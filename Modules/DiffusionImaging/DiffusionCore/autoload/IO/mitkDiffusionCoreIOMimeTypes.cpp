@@ -336,10 +336,10 @@ bool DiffusionCoreIOMimeTypes::DiffusionImageDicomMimeType::AppliesTo(const std:
   if (byteString2.empty())
     return false;
 
-  if (byteString.find("DIFFUSION")==std::string::npos && byteString2.find("diff")==std::string::npos)
+  if (byteString.find("DIFFUSION")==std::string::npos && 
+      byteString2.find("diff")==std::string::npos && 
+      byteString2.find("DWI")==std::string::npos)
     return false;
-//  if (byteString.find("NONE")==std::string::npos)
-//    return false;
 
   return canRead;
 }
