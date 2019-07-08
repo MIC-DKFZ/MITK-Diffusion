@@ -3,17 +3,49 @@ MITK Diffusion
 
 The MITK Diffusion application [[1,2]](#References) offers a selection of image analysis algorithms for the processing of diffusion-weighted MR images. It encompasses the research of the Division [Medical Image Computing](https://www.dkfz.de/en/mic/index.php) at the German Cancer Research Center (DKFZ).
 
-
+* [Downloads](#Downloads)
+* [Requirements](#Requirements)
 * [Features](#Features)
 * [Related Links](#Related)
 * [Image Gallery](#Image)
-* [Downloads](#Downloads)
-* [Requirements](#Requirements)
 * [Building MITK Diffusion from source](#Building)
 * [User Manual](http://docs.mitk.org/nightly/org_mitk_gui_qt_diffusionimaging.html)
 * [Report a Bug](https://phabricator.mitk.org/maniphest/task/edit/form/29/)
 * [References](#References)
 * [Contact](#Contact)
+
+## Downloads
+
+**Nightly Ubuntu and Windows installers:**
+<p><a href="ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion">ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion</a></p>
+
+ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion
+
+Please also have a look at the [requirements](#Requirements) for running MITK Diffusion with all its features successfully!
+
+The installers come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually". Should there be no new installer for a while, please [contact](#Contact) us and report the issue.
+
+If you encounter any bugs, please report them in our [bugtracking](https://phabricator.mitk.org/maniphest/task/edit/form/29/) system or use the [MITK-users mailing list](http://mitk.org/wiki/MITK_Mailinglist). We are grateful for any feedback!
+
+
+### Requirements
+
+* **For Ubuntu users**:
+    * Install Python 3.X: `sudo apt install python3 python3-pip`
+    * Download Python requirements file: [PythonRequirements.txt](https://raw.githubusercontent.com/MITK/MITK/master/Modules/DiffusionImaging/DiffusionCore/PythonRequirements.txt)
+    * Install Python requirements: `pip3 install -r PythonRequirements.txt`
+    * If your are behind a proxy use `pip3 --proxy <proxy> install -r PythonRequirements.txt`
+    * **Requirements for all deep-learning based functionalities**:
+        * Affected functionalities:
+            * Brain extraction
+            * TractSeg
+        * Pytorch: https://pytorch.org/ (version 0.4.0)
+        * CUDA: https://developer.nvidia.com/cuda-downloads
+        * (optional) cuDNN: https://developer.nvidia.com/cudnn
+
+* **For Windows users**:
+    * MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be installed on the system. The MITK Diffusion installer automatically installs this redistributable for you if not already present on the system, but it needs administrative privileges to do so. So to install the redistributable, **run the MITK Diffusion installer as administrator**.
+    * **Python modules are disabled under Windows!**
 
 ## Features
 
@@ -155,36 +187,6 @@ Illustration of simulated dMRI images with various artifacts (a bit excessive fo
 ![](http://mitk.org/images/0/08/RandomFibers_Example.png)
 Automatically generated random fiber configuration for Fiberfox simulations.
 <br/><br/><br/>
-
-## Downloads
-
-[**Nightly Ubuntu and Windows installers**](ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion)
-
-Please also have a look at the [requirements](#Requirements) for running MITK Diffusion with all its features successfully!
-
-The installers come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually". Should there be no new installer for a while, please [contact](#Contact) us and report the issue.
-
-If you encounter any bugs, please report them in our [bugtracking](https://phabricator.mitk.org/maniphest/task/edit/form/29/) system or use the [MITK-users mailing list](http://mitk.org/wiki/MITK_Mailinglist). We are grateful for any feedback!
-
-
-### Requirements
-
-* **For Ubuntu users**:
-    * Install Python 3.X: `sudo apt install python3 python3-pip`
-    * Download Python requirements file: [PythonRequirements.txt](https://raw.githubusercontent.com/MITK/MITK/master/Modules/DiffusionImaging/DiffusionCore/PythonRequirements.txt)
-    * Install Python requirements: `pip3 install -r PythonRequirements.txt`
-    * If your are behind a proxy use `pip3 --proxy <proxy> install -r PythonRequirements.txt`
-    * **Requirements for all deep-learning based functionalities**:
-        * Affected functionalities:
-            * Brain extraction
-            * TractSeg
-        * Pytorch: https://pytorch.org/ (version 0.4.0)
-        * CUDA: https://developer.nvidia.com/cuda-downloads
-        * (optional) cuDNN: https://developer.nvidia.com/cudnn
-
-* **For Windows users**:
-    * MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be installed on the system. The MITK Diffusion installer automatically installs this redistributable for you if not already present on the system, but it needs administrative privileges to do so. So to install the redistributable, **run the MITK Diffusion installer as administrator**.
-    * **Python modules are disabled under Windows!**
 
 
 ## Building MITK Diffusion from source
