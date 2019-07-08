@@ -1,5 +1,5 @@
 MITK_CREATE_MODULE(
-  SUBPROJECTS MITK-DTI
+  SUBPROJECTS MITK-Diffusion
   # INCLUDE_DIRS Helpers
   DEPENDS MitkDiffusionCore MitkDiffusionIO MitkFiberTracking MitkQuantification MitkConnectomics
   PACKAGE_DEPENDS PUBLIC ITK

@@ -4,7 +4,7 @@ if(APPLE)
 endif()
 
 MITK_CREATE_MODULE(
-  SUBPROJECTS MITK-DTI
+  SUBPROJECTS MITK-Diffusion
   INCLUDE_DIRS include/ include/Algorithms include/Algorithms/Reconstruction include/Algorithms/Registration include/Algorithms/Reconstruction/MultishellProcessing include/Algorithms/Reconstruction/FittingFunctions include/DicomImport include/IODataStructures/DiffusionWeightedImages include/IODataStructures/Properties include/IODataStructures/OdfImages include/IODataStructures/TensorImages include/IODataStructures include/Rendering ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS MitkMapperExt MitkPlanarFigure MitkImageExtraction MitkSceneSerializationBase MitkDICOMReader MitkMatchPointRegistration
   PACKAGE_DEPENDS
