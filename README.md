@@ -1,7 +1,8 @@
 MITK Diffusion
 ==============
 
-The MITK Diffusion application [1,2] offers a selection of image analysis algorithms for the processing of diffusion-weighted MR images. It encompasses the research of the Division [https://www.dkfz.de/en/mic/index.php Medical Image Computing] at the German Cancer Research Center (DKFZ).
+The MITK Diffusion application [[1,2]](#References) offers a selection of image analysis algorithms for the processing of diffusion-weighted MR images. It encompasses the research of the Division [Medical Image Computing](https://www.dkfz.de/en/mic/index.php) at the German Cancer Research Center (DKFZ).
+
 
 * [Features](#Features)
 * [Related Links](#Related)
@@ -10,6 +11,7 @@ The MITK Diffusion application [1,2] offers a selection of image analysis algori
 * [Requirements](#Requirements)
 * [Building MITK Diffusion from source](#Building)
 * [User Manual](http://docs.mitk.org/nightly/org_mitk_gui_qt_diffusionimaging.html)
+* [Report a Bug](https://phabricator.mitk.org/maniphest/task/edit/form/29/)
 * [References](#References)
 * [Contact](#Contact)
 
@@ -47,17 +49,17 @@ The MITK Diffusion application [1,2] offers a selection of image analysis algori
 * Image statistics
 
 **Segmentation**
-* Automatic white matter bundle segmentation (TractSeg) [3] (Linux only)
+* Automatic white matter bundle segmentation (TractSeg) [[3]](#References) (Linux only)
 * Automatic brain mask segmentation (Linux only)
 * Manual image segmentation and operations on segmentations
 * SOON: automatic brain tissue segmentation
 
 **Fiber tractography**
-* Global tractography [4]
+* Global tractography [[4]](#References)
 * Streamline tractography
-    * Interactive (similar to [5]) or seed image based
+    * Interactive (similar to [[5]](#References)) or seed image based
     * Deterministic or probabilistic
-    * Peak, ODF, tensor and raw dMRI based. The latter one in conjunction with machine learning based tractography [6]
+    * Peak, ODF, tensor and raw dMRI based. The latter one in conjunction with machine learning based tractography [[6]](#References)
     * Various possibilities for anatomical constraints.
     * Tractography priors in form of additional peak images, e.g. obtained using TractSeg
 
@@ -83,15 +85,15 @@ The MITK Diffusion application [1,2] offers a selection of image analysis algori
     * Join
     * Subtract
     * Copy
-* Fiber clustering [7]
-* Fiber fitting and weighting similar to SIFT2 and LiFE [8,9]
+* Fiber clustering [[7]](#References)
+* Fiber fitting and weighting similar to SIFT2 and LiFE [[8,9]](#References)
 * Principal direction extraction (fibers --> peaks)
 * Tract derived images:
     * Tract density images
     * Tract endpoint images
     * Tract envelopes
 
-**Fiberfox dMRI simulations** [10]
+**Fiberfox dMRI simulations** [[10]](#References)
 * Multi-compartment signal modeling
 * Simulation of the k-space acquisition including
     * Compartment specific relaxation effects
@@ -106,84 +108,72 @@ The MITK Diffusion application [1,2] offers a selection of image analysis algori
 * Integrated screenshot maker
 * Command line tools for most functionalities
 
-
 ## Related Links
 * Great python package for logging your (MITK) command line experiments:
     * https://github.com/MIC-DKFZ/cmdint
-    * <pre>pip3 install cmdint</pre>
+    * `pip3 install cmdint`
 * TractSeg reference data of 72 semiautomatically defined bundles in 105 HCP subjects: https://zenodo.org/record/1285152
 * TractSeg python package: https://github.com/MIC-DKFZ/TractSeg
-*Simulated dMRI images and ground truth of random fiber phantoms in various configurations: https://doi.org/10.5281/zenodo.2533250
+* Simulated dMRI images and ground truth of random fiber phantoms in various configurations: https://doi.org/10.5281/zenodo.2533250
 * ISMRM 2015 Tractography Challenge Data: https://doi.org/10.5281/zenodo.572345 & https://doi.org/10.5281/zenodo.1007149
 
 
 ## Image Gallery
 
+![](http://mitk.org/images/8/8f/MitkDiffusion.png) Screenshot of the MITK Diffusion Welcome Screen
+<br/><br/><br/>
 
-[[File:MitkDiffusion.png|center|frameless|700px]]
-Screenshot of the MITK Diffusion Welcome Screen
+![](http://mitk.org/images/0/09/ScalarMaps.png) Scalar map visualization
+<br/><br/><br/>
 
+![](http://mitk.org/images/3/3b/Data_Tensors.png) Tensor Visualization
+<br/><br/><br/>
 
-[[File:ScalarMaps.png|center|frameless|600px]]
-Scalar map visualization
+![](http://mitk.org/images/5/5c/Data_ODF.png) ODF visualization
+<br/><br/><br/>
 
+![](http://mitk.org/images/7/73/Data_Peaks.png) Peak visualization (uniform white coloring)
+<br/><br/><br/>
 
-[[File:Data_Tensors.png|center|frameless|600px]]
-Tensor Visualization
+![](http://mitk.org/images/6/68/StreamlineTractography.png) Interactive tractography in MITK Diffusion. The tractogram updates automatically on parameter change and movement of the spherical seed region.
+<br/><br/><br/>
 
+![](http://mitk.org/images/3/3a/Extraction_1.png) Tract dissection using manually drawn ROIs.
+<br/><br/><br/>
 
-[[File:Data_ODF.png|center|frameless|600px]]
-ODF visualization
+![](http://mitk.org/images/f/f5/FiberFit.png) Automatic streamline weighting (similar to SIFT2 or LiFE)
+<br/><br/><br/>
 
+![](http://mitk.org/images/3/33/Fiberfox.png) Illustration of the dMRI phantom simulation process using Fiberfox.
+<br/><br/><br/>
 
-[[File:Data_Peaks.png|center|frameless|600px]]
-Peak visualization (uniform white coloring)
+<img src="http://mitk.org/images/e/ec/Eddy.gif" width="250" height="200" /><img src="http://mitk.org/images/a/ad/Spike_and_motion.gif" width="250" height="200" /><img src="http://mitk.org/images/8/8e/Drift.gif" width="250" height="200" />
+<img src="http://mitk.org/images/0/08/645551_axial_motion_ghost_eddy.gif" width="250" height="200" /><img src="http://mitk.org/images/5/55/Ringing.gif" width="250" height="200" /><img src="http://mitk.org/images/3/37/683256_Distortions_Sagittal.gif" width="250" height="200" />\
+Illustration of simulated dMRI images with various artifacts (a bit excessive for illustration purposes): eddy current distortions (1), motion and spike (2), intensity drift (3), motion, eddy and noise (4), ringing (5), B0 inhomogeneity distortions (6), from left to right.
+<br/><br/><br/>
 
-
-[[File:StreamlineTractography.png|center|frameless|600px]]
-Interactive tractography in MITK Diffusion. The tractogram updates
-automatically on parameter change and movement of the spherical seed region.
-
-
-[[File:Extraction_1.png|center|frameless|600px]]
-Tract dissection using manually drawn ROIs.
-
-
-[[File:FiberFit.png|center|frameless|600px]]
-Result of automatic streamline weighting (similar to SIFT2 or LiFE)
-
-
-[[File:Fiberfox.png|center|frameless|600px]]
-Illustration of the dMRI phantom simulation process using Fiberfox.
-
-
-<p style="border:0px">[[File:Eddy.gif|200px|top]] [[File:spike_and_motion.gif|200px|top]] [[File:drift.gif|200px|top]]</p>
-<p style="border:0px">[[File:645551_axial_motion_ghost_eddy.gif|200px|top]] [[File:Ringing.gif|200px|top]] [[File:683256_Distortions_Sagittal.gif|200px|top]]</p>
-Illustration of simulated dMRI images with various artifacts (a bit excessive for illustration purposes): eddy current distortions, motion and spike, intensity drift, motion, eddy and noise, motion, B0 inhomogeneity distortions.
-
-
-[[File:RandomFibers_Example.png|center|frameless|600px]]
+![](http://mitk.org/images/0/08/RandomFibers_Example.png)
 Automatically generated random fiber configuration for Fiberfox simulations.
-
+<br/><br/><br/>
 
 ## Downloads
 
-**Nightly Ubuntu and Windows installers: ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion**
+[**Nightly Ubuntu and Windows installers**](ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion)
 
-Please also have a look at the [requirements](Requirements) for running MITK Diffusion with all its features successfully!
+Please also have a look at the [requirements](#Requirements) for running MITK Diffusion with all its features successfully!
 
 The installers come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually". Should there be no new installer for a while, please [contact](#Contact) us and report the issue.
 
-If you encounter any bugs, please report them in our [bugtracking](https://phabricator.mitk.org/maniphest/task/edit/form/21/) system or use the [MITK-users mailing list](http://mitk.org/wiki/MITK_Mailinglist). We are grateful for any feedback!
+If you encounter any bugs, please report them in our [bugtracking](https://phabricator.mitk.org/maniphest/task/edit/form/29/) system or use the [MITK-users mailing list](http://mitk.org/wiki/MITK_Mailinglist). We are grateful for any feedback!
 
 
 ### Requirements
 
 * **For Ubuntu users**:
-    * Install Python 3.X: <pre>sudo apt install python3 python3-pip</pre>
+    * Install Python 3.X: `sudo apt install python3 python3-pip`
     * Download Python requirements file: [PythonRequirements.txt](https://raw.githubusercontent.com/MITK/MITK/master/Modules/DiffusionImaging/DiffusionCore/PythonRequirements.txt)
-    * Install Python requirements: <pre>pip3 install -r PythonRequirements.txt</pre>
-    * If your are behind a proxy use <pre>pip3 --proxy <proxy> install -r PythonRequirements.txt</pre>
+    * Install Python requirements: `pip3 install -r PythonRequirements.txt`
+    * If your are behind a proxy use `pip3 --proxy <proxy> install -r PythonRequirements.txt`
     * **Requirements for all deep-learning based functionalities**:
         * Affected functionalities:
             * Brain extraction
@@ -193,14 +183,14 @@ If you encounter any bugs, please report them in our [bugtracking](https://phabr
         * (optional) cuDNN: https://developer.nvidia.com/cudnn
 
 * **For Windows users**:
-    * MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be installed on the system. The MITK Diffusion installer automatically installs this redistributable for you if not already present on the system, but it needs administrative privileges to do so. So to install the redistributable, **''run the MITK Diffusion installer as administrator**''.
+    * MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be installed on the system. The MITK Diffusion installer automatically installs this redistributable for you if not already present on the system, but it needs administrative privileges to do so. So to install the redistributable, **run the MITK Diffusion installer as administrator**.
     * **Python modules are disabled under Windows!**
 
 
 ## Building MITK Diffusion from source
-* Install [https://www.qt.io/ Qt] on your system (>= 5.11.1).
-* Clone MITK from out [repository](https://phabricator.mitk.org/source/mitk.git git) using [Git version control](https://git-scm.com/).
-* Configure the MITK Superbuild using [CMake](https://cmake.org/) (>= 3.13).
+* Install [Qt](https://www.qt.io/ Qt) on your system (>= 5.11.1).
+* Clone MITK from out [repository](https://phabricator.mitk.org/source/mitk.git git) or here from github using [Git version control](https://git-scm.com/).
+* Configure the MITK Superbuild using [CMake](https://cmake.org/) (>= 3.14.5).
     * Choose the source code directory and an empty binary directory.
     * Click "Configure".
     * Set the option MITK_BUILD_CONFIGURATION to "DiffusionRelease".
