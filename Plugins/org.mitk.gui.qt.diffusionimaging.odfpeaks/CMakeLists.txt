@@ -3,7 +3,7 @@
 project(org_mitk_gui_qt_diffusionimaging_odfpeaks)
 
 mitk_create_plugin(
-  SUBPROJECTS MITK-DTI
+  SUBPROJECTS MITK-Diffusion
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_ODFPEAKS_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
   MODULE_DEPENDS MitkFiberTracking
