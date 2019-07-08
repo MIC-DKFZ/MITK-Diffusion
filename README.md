@@ -16,10 +16,7 @@ The MITK Diffusion application [[1,2]](#References) offers a selection of image 
 
 ## Downloads
 
-**Nightly Ubuntu and Windows installers:**
-<p><a href="ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion">ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion</a></p>
-
-ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion
+**Nightly Ubuntu and Windows installers: [ftp://ftp.dkfz-heidelberg.de/outgoing/MitkDiffusion](https://bit.ly/2S1QfC8)**
 
 Please also have a look at the [requirements](#Requirements) for running MITK Diffusion with all its features successfully!
 
