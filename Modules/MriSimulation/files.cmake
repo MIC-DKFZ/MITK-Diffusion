@@ -6,13 +6,13 @@ set(CPP_FILES
 set(H_FILES
   mitkFiberfoxParameters.h
 
-  itkFitFibersToImageFilter.h
-  itkFibersFromPlanarFiguresFilter.h
-  itkTractsToDWIImageFilter.h
-  itkKspaceImageFilter.h
-  itkDftImageFilter.h
-  itkFieldmapGeneratorFilter.h
-  itkRandomPhantomFilter.h
+  Algorithms/itkFitFibersToImageFilter.h
+  Algorithms/itkFibersFromPlanarFiguresFilter.h
+  Algorithms/itkTractsToDWIImageFilter.h
+  Algorithms/itkKspaceImageFilter.h
+  Algorithms/itkDftImageFilter.h
+  Algorithms/itkFieldmapGeneratorFilter.h
+  Algorithms/itkRandomPhantomFilter.h
 
   SignalModels/mitkDiffusionSignalModel.h
   SignalModels/mitkTensorModel.h
