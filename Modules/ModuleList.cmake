@@ -3,6 +3,7 @@ set(MITK_MODULES
   FiberTracking
   Connectomics
   Quantification
+  MriSimulation
   DiffusionIO
   DiffusionCmdApps
 )

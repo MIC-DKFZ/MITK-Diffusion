@@ -37,7 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <limits>
-#include <MitkFiberTrackingExports.h>
+#include <MitkMriSimulationExports.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 
 namespace mitk
@@ -45,7 +45,7 @@ namespace mitk
   class MITKFIBERTRACKING_EXPORT FiberfoxParameters;
 
   /** Signal generation */
-  class MITKFIBERTRACKING_EXPORT SignalGenerationParameters
+  class MITKMRISIMULATION_EXPORT SignalGenerationParameters
   {
     friend FiberfoxParameters;
   public:
@@ -187,7 +187,7 @@ namespace mitk
   };
 
   /** Fiber generation */
-  class MITKFIBERTRACKING_EXPORT FiberGenerationParameters
+  class MITKMRISIMULATION_EXPORT FiberGenerationParameters
   {
   public:
 
@@ -229,7 +229,7 @@ namespace mitk
   };
 
   /** GUI persistence, input, output, ... */
-  class MITKFIBERTRACKING_EXPORT MiscFiberfoxParameters
+  class MITKMRISIMULATION_EXPORT MiscFiberfoxParameters
   {
   public:
     MiscFiberfoxParameters()
@@ -289,7 +289,7 @@ namespace mitk
   * \brief Datastructure to manage the Fiberfox signal generation parameters.
   *
   */
-  class MITKFIBERTRACKING_EXPORT FiberfoxParameters
+  class MITKMRISIMULATION_EXPORT FiberfoxParameters
   {
 
   public:

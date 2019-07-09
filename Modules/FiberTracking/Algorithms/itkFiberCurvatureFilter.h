@@ -19,7 +19,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 // MITK
 #include <mitkPlanarEllipse.h>
 #include <mitkFiberBundle.h>
-#include <mitkFiberfoxParameters.h>
 
 // ITK
 #include <itkProcessObject.h>
@@ -57,8 +56,8 @@ public:
     itkSetMacro( AngularDeviation, double )
     itkSetMacro( RemoveFibers, bool )
     itkSetMacro( UseMedian, bool )
-    itkSetMacro( InputFiberBundle, FiberBundle::Pointer )
-    itkGetMacro( OutputFiberBundle, FiberBundle::Pointer )
+    itkSetMacro( InputFiberBundle, mitk::FiberBundle::Pointer )
+    itkGetMacro( OutputFiberBundle, mitk::FiberBundle::Pointer )
 
 protected:
 
@@ -67,8 +66,8 @@ protected:
     FiberCurvatureFilter();
     ~FiberCurvatureFilter() override;
 
-    FiberBundle::Pointer m_InputFiberBundle;
-    FiberBundle::Pointer m_OutputFiberBundle;
+    mitk::FiberBundle::Pointer m_InputFiberBundle;
+    mitk::FiberBundle::Pointer m_OutputFiberBundle;
     double  m_AngularDeviation;
     double  m_Distance;
     bool    m_RemoveFibers;

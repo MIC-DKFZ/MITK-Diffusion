@@ -7,10 +7,7 @@ set(CPP_FILES
   IODataStructures/FiberBundle/mitkTrackvis.cpp
   IODataStructures/PlanarFigureComposite/mitkPlanarFigureComposite.cpp
   IODataStructures/mitkTractographyForest.cpp
-  IODataStructures/mitkFiberfoxParameters.cpp
   IODataStructures/mitkStreamlineTractographyParameters.cpp
-
-  # Interactions
 
   # Tractography
   Algorithms/GibbsTracking/mitkParticleGrid.cpp
@@ -31,7 +28,6 @@ set(H_FILES
   # DataStructures -> FiberBundle
   IODataStructures/FiberBundle/mitkFiberBundle.h
   IODataStructures/FiberBundle/mitkTrackvis.h
-  IODataStructures/mitkFiberfoxParameters.h
   IODataStructures/mitkTractographyForest.h
   IODataStructures/mitkStreamlineTractographyParameters.h
 
@@ -43,7 +39,6 @@ set(H_FILES
   Algorithms/itkEvaluateDirectionImagesFilter.h
   Algorithms/itkEvaluateTractogramDirectionsFilter.h
   Algorithms/itkFiberCurvatureFilter.h
-  Algorithms/itkFitFibersToImageFilter.h
   Algorithms/itkTractClusteringFilter.h
   Algorithms/itkTractDistanceFilter.h
   Algorithms/itkFiberExtractionFilter.h
@@ -78,30 +73,6 @@ set(H_FILES
   Algorithms/ClusteringMetrics/mitkClusteringMetricScalarMap.h
   Algorithms/ClusteringMetrics/mitkClusteringMetricInnerAngles.h
   Algorithms/ClusteringMetrics/mitkClusteringMetricLength.h
-
-  # Fiberfox
-  Fiberfox/itkFibersFromPlanarFiguresFilter.h
-  Fiberfox/itkTractsToDWIImageFilter.h
-  Fiberfox/itkKspaceImageFilter.h
-  Fiberfox/itkDftImageFilter.h
-  Fiberfox/itkFieldmapGeneratorFilter.h
-  Fiberfox/itkRandomPhantomFilter.h
-
-  Fiberfox/SignalModels/mitkDiffusionSignalModel.h
-  Fiberfox/SignalModels/mitkTensorModel.h
-  Fiberfox/SignalModels/mitkBallModel.h
-  Fiberfox/SignalModels/mitkDotModel.h
-  Fiberfox/SignalModels/mitkAstroStickModel.h
-  Fiberfox/SignalModels/mitkStickModel.h
-  Fiberfox/SignalModels/mitkRawShModel.h
-  Fiberfox/SignalModels/mitkDiffusionNoiseModel.h
-  Fiberfox/SignalModels/mitkRicianNoiseModel.h
-  Fiberfox/SignalModels/mitkChiSquareNoiseModel.h
-
-  Fiberfox/Sequences/mitkAcquisitionType.h
-  Fiberfox/Sequences/mitkSingleShotEpi.h
-  Fiberfox/Sequences/mitkConventionalSpinEcho.h
-  Fiberfox/Sequences/mitkFastSpinEcho.h
 )
 
 set(RESOURCE_FILES

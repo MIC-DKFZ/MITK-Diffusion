@@ -4,12 +4,8 @@ SET(MODULE_CUSTOM_TESTS
   mitkStreamlineTractographyTest.cpp
   mitkFiberTransformationTest.cpp
   mitkFiberExtractionTest.cpp
-  mitkFiberGenerationTest.cpp
-  mitkFiberfoxSignalGenerationTest.cpp
-  mitkFiberfoxSignalGenerationBrainSliceTest.cpp
   mitkMachineLearningTrackingTest.cpp
   mitkFiberProcessingTest.cpp
-  mitkFiberFitTest.cpp
   mitkFiberMapper3DTest.cpp
   mitkPeakShImageReaderTest.cpp
 )
