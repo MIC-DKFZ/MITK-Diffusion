@@ -1,7 +1,7 @@
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
   INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS MitkConnectomics MitkQuantification MitkFiberTracking
+  DEPENDS MitkConnectomics MitkFiberTracking
   AUTOLOAD_WITH MitkCore
   PACKAGE_DEPENDS PUBLIC DCMTK
 )
