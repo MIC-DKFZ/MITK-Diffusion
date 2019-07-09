@@ -1,3 +1,8 @@
 set(MITK_MODULES
-  DiffusionImaging
+  DiffusionCore
+  FiberTracking
+  Connectomics
+  Quantification
+  DiffusionIO
+  DiffusionCmdApps
 )
