@@ -19,7 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkCommon.h"
 #include "mitkBaseData.h"
-#include <MitkFiberTrackingExports.h>
+#include <MitkDiffusionCoreExports.h>
 #include "mitkPlanarFigure.h"
 #include "itkVectorContainer.h"
 #include "mitkDataNode.h"
@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 namespace mitk {
 
-class MITKFIBERTRACKING_EXPORT PlanarFigureComposite : public BaseData
+class MITKDIFFUSIONCORE_EXPORT PlanarFigureComposite : public BaseData
 {
 
 public:

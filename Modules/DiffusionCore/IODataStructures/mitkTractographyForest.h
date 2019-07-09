@@ -19,7 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define _MITK_TractographyForest_H
 
 #include <mitkBaseData.h>
-#include <MitkFiberTrackingExports.h>
+#include <MitkDiffusionCoreExports.h>
 
 #undef DIFFERENCE
 #define VIGRA_STATIC_LIB
@@ -29,7 +29,7 @@ namespace mitk {
 
 /**
    * \brief Class containing random forest datastructures used for fiber tractography;   */
-class MITKFIBERTRACKING_EXPORT TractographyForest : public BaseData
+class MITKDIFFUSIONCORE_EXPORT TractographyForest : public BaseData
 {
 public:
 

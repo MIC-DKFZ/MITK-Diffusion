@@ -33,17 +33,15 @@ set(CPP_FILES
   IODataStructures/Properties/mitkGradientDirectionsPropertySerializer.cpp
   IODataStructures/Properties/mitkMeasurementFramePropertySerializer.cpp
 
-  # DataStructures -> Odf
-  IODataStructures/OdfImages/mitkOdfImageSource.cpp
-  IODataStructures/OdfImages/mitkOdfImage.cpp
+  IODataStructures/mitkOdfImage.cpp
   IODataStructures/mitkShImage.cpp
-  IODataStructures/mitkShImageSource.cpp
-
-  # DataStructures -> Tensor
-  IODataStructures/TensorImages/mitkTensorImage.cpp
-
-  # DataStructures -> Peaks
+  IODataStructures/mitkTensorImage.cpp
   IODataStructures/mitkPeakImage.cpp
+
+  IODataStructures/mitkFiberBundle.cpp
+  IODataStructures/mitkTrackvis.cpp
+  IODataStructures/mitkPlanarFigureComposite.cpp
+  IODataStructures/mitkTractographyForest.cpp
 
   Rendering/vtkMaskedProgrammableGlyphFilter.cpp
   Rendering/mitkVectorImageVtkGlyphMapper3D.cpp
@@ -107,7 +105,11 @@ set(H_FILES
   Algorithms/Reconstruction/MultishellProcessing/itkBiExpFitFunctor.h
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.h
 
-  # Properties
+  IODataStructures/mitkFiberBundle.h
+  IODataStructures/mitkTrackvis.h
+  IODataStructures/mitkPlanarFigureComposite.h
+  IODataStructures/mitkTractographyForest.h
+
   IODataStructures/Properties/mitkBValueMapProperty.h
   IODataStructures/Properties/mitkGradientDirectionsProperty.h
   IODataStructures/Properties/mitkMeasurementFrameProperty.h

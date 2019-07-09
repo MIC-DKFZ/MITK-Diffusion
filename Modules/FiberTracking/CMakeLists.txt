@@ -37,9 +37,8 @@ endif()
 
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
-  INCLUDE_DIRS Algorithms Algorithms/TrackingHandlers Algorithms/ClusteringMetrics Algorithms/GibbsTracking Algorithms/StochasticTracking IODataStructures IODataStructures/FiberBundle IODataStructures/PlanarFigureComposite ${CMAKE_CURRENT_BINARY_DIR}
+  INCLUDE_DIRS Algorithms Algorithms/TrackingHandlers Algorithms/ClusteringMetrics Algorithms/GibbsTracking Algorithms/StochasticTracking IODataStructures ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${_module_deps}
-  PACKAGE_DEPENDS PUBLIC ITK|ITKFFT ITK|ITKDiffusionTensorImage Vigra HDF5 OpenMP|OpenMP_CXX
 )
 
 if(MODULE_IS_ENABLED)

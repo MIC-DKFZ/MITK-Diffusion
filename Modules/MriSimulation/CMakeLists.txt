@@ -2,9 +2,8 @@
 
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
-  INCLUDE_DIRS SignalModels Sequences ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS MitkFiberTracking
-  PACKAGE_DEPENDS PUBLIC OpenMP|OpenMP_CXX
+  INCLUDE_DIRS SignalModels Sequences Algorithms ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS MitkDiffusionCore MitkFiberTracking
 )
 
 if(MODULE_IS_ENABLED)

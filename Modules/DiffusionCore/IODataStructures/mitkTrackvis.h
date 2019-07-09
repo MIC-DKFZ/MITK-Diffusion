@@ -55,7 +55,7 @@ struct TrackVis_header
 
 // Class to handle TrackVis files.
 // -------------------------------
-class MITKFIBERTRACKING_EXPORT TrackVisFiberReader
+class MITKDIFFUSIONCORE_EXPORT TrackVisFiberReader
 {
 private:
     std::string         m_Filename;

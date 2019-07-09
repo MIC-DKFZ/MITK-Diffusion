@@ -42,7 +42,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 namespace mitk
 {
-  class MITKFIBERTRACKING_EXPORT FiberfoxParameters;
+  class MITKMRISIMULATION_EXPORT FiberfoxParameters;
 
   /** Signal generation */
   class MITKMRISIMULATION_EXPORT SignalGenerationParameters

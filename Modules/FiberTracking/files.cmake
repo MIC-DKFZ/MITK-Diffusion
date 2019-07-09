@@ -1,13 +1,5 @@
 set(CPP_FILES
-
-  mitkFiberTrackingModuleActivator.cpp
-
-  ## IO datastructures
-  IODataStructures/FiberBundle/mitkFiberBundle.cpp
-  IODataStructures/FiberBundle/mitkTrackvis.cpp
-  IODataStructures/PlanarFigureComposite/mitkPlanarFigureComposite.cpp
-  IODataStructures/mitkTractographyForest.cpp
-  IODataStructures/mitkStreamlineTractographyParameters.cpp
+  mitkStreamlineTractographyParameters.cpp
 
   # Tractography
   Algorithms/GibbsTracking/mitkParticleGrid.cpp
@@ -25,11 +17,7 @@ set(CPP_FILES
 )
 
 set(H_FILES
-  # DataStructures -> FiberBundle
-  IODataStructures/FiberBundle/mitkFiberBundle.h
-  IODataStructures/FiberBundle/mitkTrackvis.h
-  IODataStructures/mitkTractographyForest.h
-  IODataStructures/mitkStreamlineTractographyParameters.h
+  mitkStreamlineTractographyParameters.h
 
   # Algorithms
   Algorithms/itkTractDensityImageFilter.h
