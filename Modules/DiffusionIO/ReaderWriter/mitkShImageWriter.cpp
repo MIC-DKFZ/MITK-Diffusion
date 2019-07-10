@@ -20,14 +20,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageFileWriter.h"
 #include "mitkImageCast.h"
 #include "mitkIOMimeTypes.h"
-#include "mitkDiffusionCoreIOMimeTypes.h"
+#include "mitkDiffusionIOMimeTypes.h"
 #include <mitkLocaleSwitch.h>
 #include <itkShCoefficientImageExporter.h>
 #include <itksys/SystemTools.hxx>
 #include <itkNrrdImageIO.h>
 
 mitk::ShImageWriter::ShImageWriter()
-  : AbstractFileWriter(mitk::ShImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionCoreIOMimeTypes::SH_MIMETYPE() ), mitk::DiffusionCoreIOMimeTypes::SH_MIMETYPE_DESCRIPTION())
+  : AbstractFileWriter(mitk::ShImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION())
 {
   RegisterService();
 }

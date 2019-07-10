@@ -38,7 +38,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkNiftiImageIO.h"
 
 #include "mitkCustomMimeType.h"
-#include "mitkDiffusionCoreIOMimeTypes.h"
+#include "mitkDiffusionIOMimeTypes.h"
 
 #include <mitkITKImageImport.h>
 #include <mitkImageWriteAccessor.h>
@@ -71,7 +71,9 @@ DiffusionImageNiftiReaderService::
 {}
 
 DiffusionImageNiftiReaderService::
-DiffusionImageNiftiReaderService(CustomMimeType mime_type, std::string mime_type_description ) : mitk::AbstractFileReader( mime_type, mime_type_description )
+DiffusionImageNiftiReaderService()
+  : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION() )
+
 {
   Options defaultOptions;
   defaultOptions["Apply image rotation to gradients"] = true;
@@ -79,12 +81,6 @@ DiffusionImageNiftiReaderService(CustomMimeType mime_type, std::string mime_type
 
   m_ServiceReg = this->RegisterService();
 }
-
-//DiffusionImageNiftiReaderService::
-//DiffusionImageNiftiReaderService() : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionCoreIOMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionCoreIOMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION() )
-//{
-//  m_ServiceReg = this->RegisterService();
-//}
 
 std::vector<itk::SmartPointer<mitk::BaseData> >
 DiffusionImageNiftiReaderService::
@@ -125,86 +121,7 @@ void DiffusionImageNiftiReaderService::InternalRead()
       std::string ext = this->GetMimeType()->GetExtension( this->GetInputLocation() );
       ext = itksys::SystemTools::LowerCase( ext );
 
-      if(ext == ".fsl" || ext == ".fslgz")
-      {
-        // create temporary file with correct ending for nifti-io
-        std::string fname3 = "temp_dwi";
-        fname3 += ext == ".fsl" ? ".nii" : ".nii.gz";
-        itksys::SystemTools::CopyAFile(this->GetInputLocation().c_str(), fname3.c_str());
-
-        // create reader and read file
-        typedef itk::Image<DiffusionPixelType,4> ImageType4D;
-        itk::NiftiImageIO::Pointer io2 = itk::NiftiImageIO::New();
-        typedef itk::ImageFileReader<ImageType4D> FileReaderType;
-        FileReaderType::Pointer reader = FileReaderType::New();
-        reader->SetFileName(fname3);
-        reader->SetImageIO(io2);
-        reader->Update();
-        ImageType4D::Pointer img4 = reader->GetOutput();
-
-        // delete temporary file
-        itksys::SystemTools::RemoveFile(fname3.c_str());
-
-        // convert 4D file to vector image
-        itkVectorImage = VectorImageType::New();
-
-        VectorImageType::SpacingType spacing;
-        ImageType4D::SpacingType spacing4 = img4->GetSpacing();
-        for(int i=0; i<3; i++)
-          spacing[i] = spacing4[i];
-        itkVectorImage->SetSpacing( spacing );   // Set the image spacing
-
-        VectorImageType::PointType origin;
-        ImageType4D::PointType origin4 = img4->GetOrigin();
-        for(int i=0; i<3; i++)
-          origin[i] = origin4[i];
-        itkVectorImage->SetOrigin( origin );     // Set the image origin
-
-        VectorImageType::DirectionType direction;
-        ImageType4D::DirectionType direction4 = img4->GetDirection();
-        for(int i=0; i<3; i++)
-          for(int j=0; j<3; j++)
-            direction[i][j] = direction4[i][j];
-        itkVectorImage->SetDirection( direction );  // Set the image direction
-
-        VectorImageType::RegionType region;
-        ImageType4D::RegionType region4 = img4->GetLargestPossibleRegion();
-
-        VectorImageType::RegionType::SizeType size;
-        ImageType4D::RegionType::SizeType size4 = region4.GetSize();
-
-        for(int i=0; i<3; i++)
-          size[i] = size4[i];
-
-        VectorImageType::RegionType::IndexType index;
-        ImageType4D::RegionType::IndexType index4 = region4.GetIndex();
-        for(int i=0; i<3; i++)
-          index[i] = index4[i];
-
-        region.SetSize(size);
-        region.SetIndex(index);
-        itkVectorImage->SetRegions( region );
-
-        itkVectorImage->SetVectorLength(size4[3]);
-        itkVectorImage->Allocate();
-
-        itk::ImageRegionIterator<VectorImageType>   it ( itkVectorImage,  itkVectorImage->GetLargestPossibleRegion() );
-        typedef VectorImageType::PixelType VecPixType;
-        for (it.GoToBegin(); !it.IsAtEnd(); ++it)
-        {
-          VecPixType vec = it.Get();
-          VectorImageType::IndexType currentIndex = it.GetIndex();
-          for(int i=0; i<3; i++)
-            index4[i] = currentIndex[i];
-          for(unsigned int ind=0; ind<vec.Size(); ind++)
-          {
-            index4[3] = ind;
-            vec[ind] = img4->GetPixel(index4);
-          }
-          it.Set(vec);
-        }
-      }
-      else if(ext == ".nii" || ext == ".nii.gz")
+      if(ext == ".nii" || ext == ".nii.gz")
       {
         // create reader and read file
         typedef itk::Image<DiffusionPixelType,4> ImageType4D;
@@ -356,7 +273,7 @@ void DiffusionImageNiftiReaderService::InternalRead()
       double BValue = -1;
       // Diffusion Image information END
 
-      if(ext == ".fsl" || ext == ".fslgz" || ext == ".nii" || ext == ".nii.gz")
+      if(ext == ".nii" || ext == ".nii.gz")
       {
         std::string base_path = itksys::SystemTools::GetFilenamePath(this->GetInputLocation());
         std::string base = this->GetMimeType()->GetFilenameWithoutExtension(this->GetInputLocation());
@@ -415,7 +332,7 @@ void DiffusionImageNiftiReaderService::InternalRead()
     catch(...)
     {
       MITK_INFO << "Exception while reading file!!";
-      throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested vessel tree file!");
+      throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested file!");
     }
   }
 }

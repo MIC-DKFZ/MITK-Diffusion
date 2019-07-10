@@ -16,7 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkNrrdOdfImageReader.h"
 #include <mitkCustomMimeType.h>
-#include "mitkDiffusionCoreIOMimeTypes.h"
+#include "mitkDiffusionIOMimeTypes.h"
 
 #include "itkImageFileReader.h"
 #include "itkImageRegionIterator.h"
@@ -34,7 +34,7 @@ namespace mitk
   }
 
   NrrdOdfImageReader::NrrdOdfImageReader()
-    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionCoreIOMimeTypes::ODF_MIMETYPE() ), mitk::DiffusionCoreIOMimeTypes::ODF_MIMETYPE_DESCRIPTION() )
+    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::ODF_MIMETYPE() ), mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_DESCRIPTION() )
   {
     m_ServiceReg = this->RegisterService();
   }

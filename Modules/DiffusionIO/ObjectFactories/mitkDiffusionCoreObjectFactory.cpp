@@ -23,6 +23,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkCompositeMapper.h"
 #include "mitkGPUVolumeMapper3D.h"
 
+#include <mitkFiberBundleMapper3D.h>
+#include <mitkFiberBundleMapper2D.h>
+#include <mitkPeakImageMapper2D.h>
+#include <mitkPeakImageMapper3D.h>
+
 
 typedef short DiffusionPixelType;
 
@@ -53,49 +58,65 @@ mitk::Mapper::Pointer mitk::DiffusionCoreObjectFactory::CreateMapper(mitk::DataN
 {
   mitk::Mapper::Pointer newMapper=nullptr;
 
+  if (!node->GetData())
+    return newMapper;
+
   if ( id == mitk::BaseRenderer::Standard2D )
   {
-    std::string classname("OdfImage");
-    if(node->GetData() && classname.compare(node->GetData()->GetNameOfClass())==0)
+    if(std::string("OdfImage").compare(node->GetData()->GetNameOfClass())==0)
     {
       newMapper = mitk::CompositeMapper::New();
       newMapper->SetDataNode(node);
       node->SetMapper(3, static_cast<CompositeMapper*>(newMapper.GetPointer())->GetImageMapper());
     }
-    classname = "TensorImage";
-    if(node->GetData() && classname.compare(node->GetData()->GetNameOfClass())==0)
+    else if(std::string("TensorImage").compare(node->GetData()->GetNameOfClass())==0)
     {
       newMapper = mitk::CompositeMapper::New();
       newMapper->SetDataNode(node);
       node->SetMapper(3, static_cast<CompositeMapper*>(newMapper.GetPointer())->GetImageMapper());
     }
-    classname = "ShImage";
-    if(node->GetData() && classname.compare(node->GetData()->GetNameOfClass())==0)
+    else if(std::string("ShImage").compare(node->GetData()->GetNameOfClass())==0)
     {
       newMapper = mitk::CompositeMapper::New();
       newMapper->SetDataNode(node);
       node->SetMapper(3, static_cast<CompositeMapper*>(newMapper.GetPointer())->GetImageMapper());
     }
-
+    else if(std::string("FiberBundle").compare(node->GetData()->GetNameOfClass())==0)
+    {
+      newMapper = mitk::FiberBundleMapper2D::New();
+      newMapper->SetDataNode(node);
+    }
+    else if(std::string("PeakImage").compare(node->GetData()->GetNameOfClass())==0)
+    {
+      newMapper = mitk::PeakImageMapper2D::New();
+      newMapper->SetDataNode(node);
+    }
   }
   else if ( id == mitk::BaseRenderer::Standard3D )
   {
-    std::string classname("OdfImage");
-    if(node->GetData() && classname.compare(node->GetData()->GetNameOfClass())==0)
+    if(std::string("OdfImage").compare(node->GetData()->GetNameOfClass())==0)
     {
       newMapper = mitk::GPUVolumeMapper3D::New();
       newMapper->SetDataNode(node);
     }
-    classname = "TensorImage";
-    if(node->GetData() && classname.compare(node->GetData()->GetNameOfClass())==0)
+    else if(std::string("TensorImage").compare(node->GetData()->GetNameOfClass())==0)
     {
       newMapper = mitk::GPUVolumeMapper3D::New();
       newMapper->SetDataNode(node);
     }
-    classname = "ShImage";
-    if(node->GetData() && classname.compare(node->GetData()->GetNameOfClass())==0)
+    else if(std::string("ShImage").compare(node->GetData()->GetNameOfClass())==0)
     {
       newMapper = mitk::GPUVolumeMapper3D::New();
+      newMapper->SetDataNode(node);
+    }
+    else if(std::string("FiberBundle").compare(node->GetData()->GetNameOfClass())==0)
+    {
+      newMapper = mitk::FiberBundleMapper3D::New();
+      newMapper->SetDataNode(node);
+    }
+    else if(std::string("PeakImage").compare(node->GetData()->GetNameOfClass())==0)
+    {
+      newMapper = mitk::PeakImageMapper3D::New();
       newMapper->SetDataNode(node);
     }
   }
@@ -105,25 +126,33 @@ mitk::Mapper::Pointer mitk::DiffusionCoreObjectFactory::CreateMapper(mitk::DataN
 
 void mitk::DiffusionCoreObjectFactory::SetDefaultProperties(mitk::DataNode* node)
 {
-  std::string classname = "OdfImage";
-  if(node->GetData() && classname.compare(node->GetData()->GetNameOfClass())==0)
+  if (!node->GetData())
+    return;
+
+  if(std::string("OdfImage").compare(node->GetData()->GetNameOfClass())==0)
   {
     mitk::CompositeMapper::SetDefaultProperties(node);
     mitk::GPUVolumeMapper3D::SetDefaultProperties(node);
   }
-
-  classname = "TensorImage";
-  if(node->GetData() && classname.compare(node->GetData()->GetNameOfClass())==0)
+  else if(std::string("TensorImage").compare(node->GetData()->GetNameOfClass())==0)
   {
     mitk::CompositeMapper::SetDefaultProperties(node);
     mitk::GPUVolumeMapper3D::SetDefaultProperties(node);
   }
-
-  classname = "ShImage";
-  if(node->GetData() && classname.compare(node->GetData()->GetNameOfClass())==0)
+  else if(std::string("ShImage").compare(node->GetData()->GetNameOfClass())==0)
   {
     mitk::CompositeMapper::SetDefaultProperties(node);
     mitk::GPUVolumeMapper3D::SetDefaultProperties(node);
+  }
+  else if(std::string("FiberBundle").compare(node->GetData()->GetNameOfClass())==0)
+  {
+    mitk::FiberBundleMapper3D::SetDefaultProperties(node);
+    mitk::FiberBundleMapper2D::SetDefaultProperties(node);
+  }
+  else if (std::string("PeakImage").compare(node->GetData()->GetNameOfClass())==0)
+  {
+    mitk::PeakImageMapper3D::SetDefaultProperties(node);
+    mitk::PeakImageMapper2D::SetDefaultProperties(node);
   }
 }
 

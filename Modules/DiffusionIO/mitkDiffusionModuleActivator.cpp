@@ -33,6 +33,22 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigureCompositeWriter.h>
 #include <mitkTractographyForestWriter.h>
 
+#include <mitkDiffusionImageNrrdReaderService.h>
+#include <mitkDiffusionImageNiftiReaderService.h>
+#include <mitkDiffusionImageDicomReaderService.h>
+#include <mitkNrrdTensorImageReader.h>
+#include <mitkNrrdOdfImageReader.h>
+#include <mitkShImageReader.h>
+#include <mitkPeakImageReader.h>
+
+#include <mitkDiffusionImageNrrdWriterService.h>
+#include <mitkDiffusionImageNiftiWriterService.h>
+#include <mitkNrrdTensorImageWriter.h>
+#include <mitkNrrdOdfImageWriter.h>
+#include <mitkShImageWriter.h>
+
+#include <mitkDiffusionPropertyHelper.h>
+
 #include <mitkCoreServices.h>
 #include <mitkIPropertyDescriptions.h>
 #include <mitkIPropertyPersistence.h>
@@ -42,7 +58,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
   /**
-  \brief Registers services for segmentation module.
+  \brief Registers reader and writer services.
   */
   class DiffusionModuleActivator : public us::ModuleActivator
   {
@@ -71,21 +87,41 @@ namespace mitk
       }
 
       m_FiberBundleVtkReader = new FiberBundleVtkReader();
+      m_FiberBundleVtkWriter = new FiberBundleVtkWriter();
       m_FiberBundleTrackVisReader = new FiberBundleTrackVisReader();
+      m_FiberBundleTrackVisWriter = new FiberBundleTrackVisWriter();
       m_FiberBundleTckReader = new FiberBundleTckReader();
       m_FiberBundleDicomReader = new FiberBundleDicomReader();
-      m_ConnectomicsNetworkReader = new ConnectomicsNetworkReader();
-      m_PlanarFigureCompositeReader = new PlanarFigureCompositeReader();
-      m_TractographyForestReader = new TractographyForestReader();
-
-      m_FiberBundleVtkWriter = new FiberBundleVtkWriter();
-      m_FiberBundleTrackVisWriter = new FiberBundleTrackVisWriter();
       m_FiberBundleDicomWriter = new FiberBundleDicomWriter();
+
+      m_ConnectomicsNetworkReader = new ConnectomicsNetworkReader();
       m_ConnectomicsNetworkWriter = new ConnectomicsNetworkWriter();
       m_ConnectomicsNetworkCSVWriter = new ConnectomicsNetworkCSVWriter();
       m_ConnectomicsNetworkMatrixWriter = new ConnectomicsNetworkMatrixWriter();
+
+      m_PlanarFigureCompositeReader = new PlanarFigureCompositeReader();
       m_PlanarFigureCompositeWriter = new PlanarFigureCompositeWriter();
+      m_TractographyForestReader = new TractographyForestReader();
       m_TractographyForestWriter = new TractographyForestWriter();
+
+      m_DiffusionImageNrrdReader = new DiffusionImageNrrdReaderService();
+      m_DiffusionImageNrrdWriter = new DiffusionImageNrrdWriterService();
+
+      m_DiffusionImageNiftiReader = new DiffusionImageNiftiReaderService();
+      m_DiffusionImageNiftiWriter = new DiffusionImageNiftiWriterService();
+
+      m_DiffusionImageDicomReader = new DiffusionImageDicomReaderService();
+
+      m_NrrdTensorImageReader = new NrrdTensorImageReader();
+      m_NrrdOdfImageReader = new NrrdOdfImageReader();
+      m_PeakImageReader = new PeakImageReader();
+      m_ShImageReader = new ShImageReader();
+
+      m_NrrdTensorImageWriter = new NrrdTensorImageWriter();
+      m_NrrdOdfImageWriter = new NrrdOdfImageWriter();
+      m_ShImageWriter = new ShImageWriter();
+
+      mitk::DiffusionPropertyHelper::SetupProperties();
     }
 
     void Unload(us::ModuleContext*) override
@@ -111,6 +147,20 @@ namespace mitk
       delete m_ConnectomicsNetworkMatrixWriter;
       delete m_PlanarFigureCompositeWriter;
       delete m_TractographyForestWriter;
+
+      delete m_DiffusionImageNrrdReader;
+      delete m_DiffusionImageNiftiReader;
+      delete m_DiffusionImageDicomReader;
+      delete m_NrrdTensorImageReader;
+      delete m_NrrdOdfImageReader;
+      delete m_PeakImageReader;
+      delete m_ShImageReader;
+
+      delete m_DiffusionImageNrrdWriter;
+      delete m_DiffusionImageNiftiWriter;
+      delete m_NrrdTensorImageWriter;
+      delete m_NrrdOdfImageWriter;
+      delete m_ShImageWriter;
     }
 
   private:
@@ -131,6 +181,20 @@ namespace mitk
     ConnectomicsNetworkMatrixWriter * m_ConnectomicsNetworkMatrixWriter;
     PlanarFigureCompositeWriter* m_PlanarFigureCompositeWriter;
     TractographyForestWriter* m_TractographyForestWriter;
+
+    DiffusionImageNrrdReaderService * m_DiffusionImageNrrdReader;
+    DiffusionImageNiftiReaderService * m_DiffusionImageNiftiReader;
+    DiffusionImageDicomReaderService * m_DiffusionImageDicomReader;
+    NrrdTensorImageReader * m_NrrdTensorImageReader;
+    NrrdOdfImageReader * m_NrrdOdfImageReader;
+    PeakImageReader * m_PeakImageReader;
+    ShImageReader * m_ShImageReader;
+
+    DiffusionImageNrrdWriterService * m_DiffusionImageNrrdWriter;
+    DiffusionImageNiftiWriterService * m_DiffusionImageNiftiWriter;
+    NrrdTensorImageWriter * m_NrrdTensorImageWriter;
+    NrrdOdfImageWriter * m_NrrdOdfImageWriter;
+    ShImageWriter * m_ShImageWriter;
 
     std::vector<mitk::CustomMimeType*> m_MimeTypes;
 

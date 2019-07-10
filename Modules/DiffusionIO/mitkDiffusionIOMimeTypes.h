@@ -14,11 +14,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef MITKDIFFUSIONIOMIMETYPES_H
-#define MITKDIFFUSIONIOMIMETYPES_H
+#ifndef MITKDiffusionIOMimeTypes_H
+#define MITKDiffusionIOMimeTypes_H
 
 #include "mitkCustomMimeType.h"
-
 #include <string>
 
 namespace mitk {
@@ -44,6 +43,30 @@ public:
   };
   // Get all Diffusion Mime Types
   static std::vector<CustomMimeType*> Get();
+
+  class  DiffusionImageDicomMimeType : public CustomMimeType
+  {
+  public:
+    DiffusionImageDicomMimeType();
+    bool AppliesTo(const std::string &path) const override;
+    DiffusionImageDicomMimeType* Clone() const override;
+  };
+
+  class  PeakImageMimeType : public CustomMimeType
+  {
+  public:
+    PeakImageMimeType();
+    bool AppliesTo(const std::string &path) const override;
+    PeakImageMimeType* Clone() const override;
+  };
+
+  class  SHImageMimeType : public CustomMimeType
+  {
+  public:
+    SHImageMimeType();
+    bool AppliesTo(const std::string &path) const override;
+    SHImageMimeType* Clone() const override;
+  };
 
   // ------------------------------ VTK formats ----------------------------------
 
@@ -79,18 +102,27 @@ public:
 
   static DiffusionImageNrrdMimeType DWI_NRRD_MIMETYPE();
   static DiffusionImageNiftiMimeType DWI_NIFTI_MIMETYPE();
+  static DiffusionImageDicomMimeType DWI_DICOM_MIMETYPE();
+  static PeakImageMimeType PEAK_MIMETYPE();
   static CustomMimeType DTI_MIMETYPE(); // dti
-  static CustomMimeType ODF_MIMETYPE(); // qbi, odf
+  static CustomMimeType ODF_MIMETYPE(); // odf, qbi
+  static SHImageMimeType SH_MIMETYPE(); // spherical harmonics coefficients
 
+  static std::string PEAK_MIMETYPE_NAME();
   static std::string DWI_NRRD_MIMETYPE_NAME();
   static std::string DWI_NIFTI_MIMETYPE_NAME();
+  static std::string DWI_DICOM_MIMETYPE_NAME();
   static std::string DTI_MIMETYPE_NAME();
   static std::string ODF_MIMETYPE_NAME();
+  static std::string SH_MIMETYPE_NAME();
 
+  static std::string PEAK_MIMETYPE_DESCRIPTION();
   static std::string DWI_NRRD_MIMETYPE_DESCRIPTION();
   static std::string DWI_NIFTI_MIMETYPE_DESCRIPTION();
+  static std::string DWI_DICOM_MIMETYPE_DESCRIPTION();
   static std::string DTI_MIMETYPE_DESCRIPTION();
   static std::string ODF_MIMETYPE_DESCRIPTION();
+  static std::string SH_MIMETYPE_DESCRIPTION();
 
   // ------------------------------ MITK formats ----------------------------------
 
@@ -121,4 +153,4 @@ private:
 
 }
 
-#endif // MITKDIFFUSIONIOMIMETYPES_H
+#endif // MITKDiffusionIOMimeTypes_H

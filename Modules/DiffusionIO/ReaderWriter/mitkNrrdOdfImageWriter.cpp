@@ -21,12 +21,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageFileWriter.h"
 #include "mitkImageCast.h"
 #include "mitkIOMimeTypes.h"
-#include "mitkDiffusionCoreIOMimeTypes.h"
+#include "mitkDiffusionIOMimeTypes.h"
 #include <mitkLocaleSwitch.h>
 
 
 mitk::NrrdOdfImageWriter::NrrdOdfImageWriter()
-  : AbstractFileWriter(mitk::OdfImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionCoreIOMimeTypes::ODF_MIMETYPE() ), mitk::DiffusionCoreIOMimeTypes::ODF_MIMETYPE_DESCRIPTION())
+  : AbstractFileWriter(mitk::OdfImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::ODF_MIMETYPE() ), mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_DESCRIPTION())
 {
   RegisterService();
 }

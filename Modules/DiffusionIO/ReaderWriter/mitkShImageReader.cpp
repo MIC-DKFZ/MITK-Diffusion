@@ -16,7 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkShImageReader.h"
 #include <mitkCustomMimeType.h>
-#include "mitkDiffusionCoreIOMimeTypes.h"
+#include "mitkDiffusionIOMimeTypes.h"
 
 #include "itkImageFileReader.h"
 #include "itkImageRegionIterator.h"
@@ -37,7 +37,7 @@ namespace mitk
   }
 
   ShImageReader::ShImageReader()
-    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionCoreIOMimeTypes::SH_MIMETYPE() ), mitk::DiffusionCoreIOMimeTypes::SH_MIMETYPE_DESCRIPTION() )
+    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION() )
   {
     m_ServiceReg = this->RegisterService();
   }
