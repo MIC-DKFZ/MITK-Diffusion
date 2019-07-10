@@ -27,7 +27,7 @@ if(BUILD_DiffusionFiberfoxCmdApps OR MITK_BUILD_ALL_APPS)
 
       mitkFunctionCreateCommandLineApp(
         NAME ${appname}
-        DEPENDS MitkDiffusionCmdApps ${dependencies_list}
+        DEPENDS MitkDiffusionCmdApps MitkMriSimulation ${dependencies_list}
         PACKAGE_DEPENDS
       )
     endforeach()

@@ -6,10 +6,9 @@ endif()
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
   INCLUDE_DIRS  Algorithms Algorithms/Reconstruction Algorithms/Registration Algorithms/Reconstruction/MultishellProcessing Algorithms/Reconstruction/FittingFunctions DicomImport IODataStructures/DiffusionWeightedImages IODataStructures/Properties IODataStructures Rendering ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS MitkMapperExt MitkPlanarFigure MitkImageExtraction MitkSceneSerializationBase MitkDICOMReader MitkMatchPointRegistration
+  DEPENDS MitkMapperExt MitkPlanarFigure MitkImageExtraction MitkDICOMReader MitkMatchPointRegistration
   PACKAGE_DEPENDS
-    PUBLIC ITK|ITKTestKernel+ITKRegistrationCommon+ITKMetricsv4+ITKRegistrationMethodsv4+ITKDistanceMap+ITKLabelVoting+ITKVTK+ITKFFT+ITKDiffusionTensorImage
-    PUBLIC VTK|vtkFiltersProgrammable OpenMP|OpenMP_CXX Vigra HDF5
+    PUBLIC VTK|vtkFiltersProgrammable Vigra HDF5
 )
 
 if(MSVC)

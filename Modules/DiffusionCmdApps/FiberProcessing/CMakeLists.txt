@@ -35,7 +35,7 @@ if(BUILD_DiffusionFiberProcessingCmdApps OR MITK_BUILD_ALL_APPS)
 
       mitkFunctionCreateCommandLineApp(
         NAME ${appname}
-        DEPENDS MitkDiffusionCmdApps ${dependencies_list}
+        DEPENDS MitkDiffusionCmdApps MitkMriSimulation MitkFiberTracking ${dependencies_list}
         PACKAGE_DEPENDS
       )
     endforeach()

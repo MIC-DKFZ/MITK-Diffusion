@@ -1,5 +1,5 @@
 
-set(_module_deps MitkDiffusionCore MitkGraphAlgorithms MitkCLVigraRandomForest)
+set(_module_deps MitkDiffusionCore MitkCLVigraRandomForest)
 
 mitk_check_module_dependencies(
   MODULES ${_module_deps}
@@ -37,7 +37,7 @@ endif()
 
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
-  INCLUDE_DIRS Algorithms Algorithms/TrackingHandlers Algorithms/ClusteringMetrics Algorithms/GibbsTracking Algorithms/StochasticTracking IODataStructures ${CMAKE_CURRENT_BINARY_DIR}
+  INCLUDE_DIRS Algorithms Algorithms/TrackingHandlers Algorithms/ClusteringMetrics Algorithms/GibbsTracking Algorithms/StochasticTracking ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${_module_deps}
 )
 
