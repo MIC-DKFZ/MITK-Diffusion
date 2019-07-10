@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _MITK_DiffusionImageNrrdWriterService__H_
-#define _MITK_DiffusionImageNrrdWriterService__H_
+#ifndef _MITK_DiffusionImageNiftiWriter__H_
+#define _MITK_DiffusionImageNiftiWriter__H_
 
 #include <mitkAbstractFileWriter.h>
 #include <mitkDiffusionPropertyHelper.h>
@@ -27,12 +27,12 @@ namespace mitk
  * Writes diffusion volumes to a file
  * @ingroup Process
  */
-class DiffusionImageNrrdWriterService : public mitk::AbstractFileWriter
+class DiffusionImageNiftiWriter : public mitk::AbstractFileWriter
 {
 public:
 
-    DiffusionImageNrrdWriterService();
-    ~DiffusionImageNrrdWriterService() override;
+    DiffusionImageNiftiWriter();
+    ~DiffusionImageNiftiWriter() override;
 
     using AbstractFileWriter::Write;
     void Write() override;
@@ -46,8 +46,8 @@ public:
 
   protected:
 
-    DiffusionImageNrrdWriterService(const DiffusionImageNrrdWriterService& other);
-    mitk::DiffusionImageNrrdWriterService* Clone() const override;
+    DiffusionImageNiftiWriter(const DiffusionImageNiftiWriter& other);
+    mitk::DiffusionImageNiftiWriter* Clone() const override;
 
 
 };

@@ -1,5 +1,7 @@
 set(CPP_FILES
 
+  mitkDiffusionFunctionCollection.cpp
+
   # DicomImport
   # DicomImport/mitkGroupDiffusionHeadersFilter.cpp
   DicomImport/mitkDicomDiffusionImageHeaderReader.cpp
@@ -16,10 +18,18 @@ set(CPP_FILES
   DicomImport/mitkDiffusionHeaderGEDICOMFileReader.cpp
   DicomImport/mitkDiffusionHeaderPhilipsDICOMFileReader.cpp
 
-  # DataStructures -> DWI
+  # DataStructures
   IODataStructures/DiffusionWeightedImages/mitkDiffusionImageHeaderInformation.cpp
   IODataStructures/DiffusionWeightedImages/mitkDiffusionImageCorrectionFilter.cpp
   IODataStructures/DiffusionWeightedImages/mitkDiffusionImageCreationFilter.cpp
+  IODataStructures/mitkOdfImage.cpp
+  IODataStructures/mitkShImage.cpp
+  IODataStructures/mitkTensorImage.cpp
+  IODataStructures/mitkPeakImage.cpp
+  IODataStructures/mitkFiberBundle.cpp
+  IODataStructures/mitkTrackvis.cpp
+  IODataStructures/mitkPlanarFigureComposite.cpp
+  IODataStructures/mitkTractographyForest.cpp
 
   # Properties
   IODataStructures/Properties/mitkBValueMapProperty.cpp
@@ -33,47 +43,34 @@ set(CPP_FILES
   IODataStructures/Properties/mitkGradientDirectionsPropertySerializer.cpp
   IODataStructures/Properties/mitkMeasurementFramePropertySerializer.cpp
 
-  IODataStructures/mitkOdfImage.cpp
-  IODataStructures/mitkShImage.cpp
-  IODataStructures/mitkTensorImage.cpp
-  IODataStructures/mitkPeakImage.cpp
-
-  IODataStructures/mitkFiberBundle.cpp
-  IODataStructures/mitkTrackvis.cpp
-  IODataStructures/mitkPlanarFigureComposite.cpp
-  IODataStructures/mitkTractographyForest.cpp
-
+  # Mapper etc.
   Rendering/vtkMaskedProgrammableGlyphFilter.cpp
   Rendering/mitkVectorImageVtkGlyphMapper3D.cpp
   Rendering/vtkOdfSource.cxx
   Rendering/vtkThickPlane.cxx
   Rendering/mitkOdfNormalizationMethodProperty.cpp
   Rendering/mitkOdfScaleByProperty.cpp
+  Rendering/mitkFiberBundleMapper2D.cpp
+  Rendering/mitkFiberBundleMapper3D.cpp
+  Rendering/mitkPeakImageMapper2D.cpp
+  Rendering/mitkPeakImageMapper3D.cpp
+  Rendering/mitkCompositeMapper.cpp
 
   # Algorithms
   Algorithms/mitkPartialVolumeAnalysisHistogramCalculator.cpp
   Algorithms/mitkPartialVolumeAnalysisClusteringCalculator.cpp
   Algorithms/itkDwiGradientLengthCorrectionFilter.cpp
-
-  # Registration Algorithms & Co.
   Algorithms/Registration/mitkRegistrationWrapper.cpp
   Algorithms/Registration/mitkPyramidImageRegistrationMethod.cpp
   # Algorithms/Registration/mitkRegistrationMethodITK4.cpp
   Algorithms/Registration/mitkDWIHeadMotionCorrectionFilter.cpp
-
-
-  # MultishellProcessing
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkBiExpFitFunctor.cpp
-
-  # Function Collection
-  mitkDiffusionFunctionCollection.cpp
 )
 
 set(H_FILES
-  # function Collection
   mitkDiffusionFunctionCollection.h
 
   # Rendering

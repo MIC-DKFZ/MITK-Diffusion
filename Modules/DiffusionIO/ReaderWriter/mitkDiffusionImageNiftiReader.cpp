@@ -14,10 +14,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkDiffusionImageNiftiReaderService_cpp
-#define __mitkDiffusionImageNiftiReaderService_cpp
+#ifndef __mitkDiffusionImageNiftiReader_cpp
+#define __mitkDiffusionImageNiftiReader_cpp
 
-#include "mitkDiffusionImageNiftiReaderService.h"
+#include "mitkDiffusionImageNiftiReader.h"
 
 #include <iostream>
 #include <fstream>
@@ -53,25 +53,25 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
 
-DiffusionImageNiftiReaderService::
-DiffusionImageNiftiReaderService(const DiffusionImageNiftiReaderService & other)
+DiffusionImageNiftiReader::
+DiffusionImageNiftiReader(const DiffusionImageNiftiReader & other)
   : AbstractFileReader(other)
 {
 }
 
 
-DiffusionImageNiftiReaderService* DiffusionImageNiftiReaderService::Clone() const
+DiffusionImageNiftiReader* DiffusionImageNiftiReader::Clone() const
 {
-  return new DiffusionImageNiftiReaderService(*this);
+  return new DiffusionImageNiftiReader(*this);
 }
 
 
-DiffusionImageNiftiReaderService::
-~DiffusionImageNiftiReaderService()
+DiffusionImageNiftiReader::
+~DiffusionImageNiftiReader()
 {}
 
-DiffusionImageNiftiReaderService::
-DiffusionImageNiftiReaderService()
+DiffusionImageNiftiReader::
+DiffusionImageNiftiReader()
   : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION() )
 
 {
@@ -83,7 +83,7 @@ DiffusionImageNiftiReaderService()
 }
 
 std::vector<itk::SmartPointer<mitk::BaseData> >
-DiffusionImageNiftiReaderService::
+DiffusionImageNiftiReader::
 Read()
 {
   std::vector<itk::SmartPointer<mitk::BaseData> > result;
@@ -102,7 +102,7 @@ Read()
 }
 
 
-void DiffusionImageNiftiReaderService::InternalRead()
+void DiffusionImageNiftiReader::InternalRead()
 {
   OutputType::Pointer outputForCache = OutputType::New();
   if ( this->GetInputLocation() == "")
@@ -115,7 +115,7 @@ void DiffusionImageNiftiReaderService::InternalRead()
     {
       mitk::LocaleSwitch localeSwitch("C");
 
-      MITK_INFO << "DiffusionImageNiftiReaderService: reading image information";
+      MITK_INFO << "DiffusionImageNiftiReader: reading image information";
       VectorImageType::Pointer itkVectorImage;
 
       std::string ext = this->GetMimeType()->GetExtension( this->GetInputLocation() );

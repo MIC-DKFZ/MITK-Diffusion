@@ -14,10 +14,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkDiffusionImageNiftiWriterService__cpp
-#define __mitkDiffusionImageNiftiWriterService__cpp
+#ifndef __mitkDiffusionImageNiftiWriter__cpp
+#define __mitkDiffusionImageNiftiWriter__cpp
 
-#include "mitkDiffusionImageNiftiWriterService.h"
+#include "mitkDiffusionImageNiftiWriter.h"
 #include "itkMetaDataDictionary.h"
 #include "itkMetaDataObject.h"
 #include "itkNiftiImageIO.h"
@@ -31,21 +31,21 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <fstream>
 #include <mitkDiffusionFunctionCollection.h>
 
-mitk::DiffusionImageNiftiWriterService::DiffusionImageNiftiWriterService()
+mitk::DiffusionImageNiftiWriter::DiffusionImageNiftiWriter()
   : AbstractFileWriter(mitk::Image::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION())
 {
   RegisterService();
 }
 
-mitk::DiffusionImageNiftiWriterService::DiffusionImageNiftiWriterService(const mitk::DiffusionImageNiftiWriterService& other)
+mitk::DiffusionImageNiftiWriter::DiffusionImageNiftiWriter(const mitk::DiffusionImageNiftiWriter& other)
   : AbstractFileWriter(other)
 {
 }
 
-mitk::DiffusionImageNiftiWriterService::~DiffusionImageNiftiWriterService()
+mitk::DiffusionImageNiftiWriter::~DiffusionImageNiftiWriter()
 {}
 
-void mitk::DiffusionImageNiftiWriterService::Write()
+void mitk::DiffusionImageNiftiWriter::Write()
 {
   mitk::Image::ConstPointer input = dynamic_cast<const mitk::Image *>(this->GetInput());
 
@@ -54,7 +54,7 @@ void mitk::DiffusionImageNiftiWriterService::Write()
 
   if (input.IsNull())
   {
-    MITK_ERROR <<"Sorry, input to DiffusionImageNiftiWriterService is nullptr!";
+    MITK_ERROR <<"Sorry, input to DiffusionImageNiftiWriter is nullptr!";
     return;
   }
   if ( this->GetOutputLocation().empty() )
@@ -228,12 +228,12 @@ void mitk::DiffusionImageNiftiWriterService::Write()
   }
 }
 
-mitk::DiffusionImageNiftiWriterService* mitk::DiffusionImageNiftiWriterService::Clone() const
+mitk::DiffusionImageNiftiWriter* mitk::DiffusionImageNiftiWriter::Clone() const
 {
-  return new DiffusionImageNiftiWriterService(*this);
+  return new DiffusionImageNiftiWriter(*this);
 }
 
-mitk::IFileWriter::ConfidenceLevel mitk::DiffusionImageNiftiWriterService::GetConfidenceLevel() const
+mitk::IFileWriter::ConfidenceLevel mitk::DiffusionImageNiftiWriter::GetConfidenceLevel() const
 {
   mitk::Image::ConstPointer input = dynamic_cast<const mitk::Image*>(this->GetInput());
   if (input.IsNull() || !mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage( input ) )
@@ -246,4 +246,4 @@ mitk::IFileWriter::ConfidenceLevel mitk::DiffusionImageNiftiWriterService::GetCo
   }
 }
 
-#endif //__mitkDiffusionImageNiftiWriterService__cpp
+#endif //__mitkDiffusionImageNiftiWriter__cpp

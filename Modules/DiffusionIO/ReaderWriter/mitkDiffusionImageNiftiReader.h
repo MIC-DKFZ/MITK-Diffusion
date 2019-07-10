@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkDiffusionImageDicomReaderService_h
-#define __mitkDiffusionImageDicomReaderService_h
+#ifndef __mitkDiffusionImageNiftiReader_h
+#define __mitkDiffusionImageNiftiReader_h
 
 #include "mitkCommon.h"
 
@@ -37,13 +37,13 @@ namespace mitk
   /** \brief
   */
 
-  class DiffusionImageDicomReaderService : public mitk::AbstractFileReader
+  class DiffusionImageNiftiReader : public mitk::AbstractFileReader
   {
   public:
 
-    DiffusionImageDicomReaderService(const DiffusionImageDicomReaderService & other);
-    DiffusionImageDicomReaderService();
-    ~DiffusionImageDicomReaderService() override;
+    DiffusionImageNiftiReader(const DiffusionImageNiftiReader & other);
+    DiffusionImageNiftiReader();
+    ~DiffusionImageNiftiReader() override;
 
     using AbstractFileReader::Read;
     std::vector<itk::SmartPointer<BaseData> > Read() override;
@@ -60,14 +60,14 @@ namespace mitk
     OutputType::Pointer m_OutputCache;
     itk::TimeStamp m_CacheTime;
 
-    std::vector<itk::SmartPointer<BaseData> > InternalRead();
+    void InternalRead();
 
   private:
 
-    DiffusionImageDicomReaderService* Clone() const override;
+    DiffusionImageNiftiReader* Clone() const override;
     us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
 } //namespace MITK
 
-#endif // __mitkDiffusionImageDicomReaderService_h
+#endif // __mitkDiffusionImageNiftiReader_h

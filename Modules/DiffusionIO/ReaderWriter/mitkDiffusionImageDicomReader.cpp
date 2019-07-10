@@ -14,10 +14,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkDiffusionImageDicomReaderService_cpp
-#define __mitkDiffusionImageDicomReaderService_cpp
+#ifndef __mitkDiffusionImageDicomReader_cpp
+#define __mitkDiffusionImageDicomReader_cpp
 
-#include "mitkDiffusionImageDicomReaderService.h"
+#include "mitkDiffusionImageDicomReader.h"
 
 #include <iostream>
 #include <fstream>
@@ -55,25 +55,25 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
 
-DiffusionImageDicomReaderService::
-DiffusionImageDicomReaderService(const DiffusionImageDicomReaderService & other)
+DiffusionImageDicomReader::
+DiffusionImageDicomReader(const DiffusionImageDicomReader & other)
   : AbstractFileReader(other)
 {
 }
 
 
-DiffusionImageDicomReaderService* DiffusionImageDicomReaderService::Clone() const
+DiffusionImageDicomReader* DiffusionImageDicomReader::Clone() const
 {
-  return new DiffusionImageDicomReaderService(*this);
+  return new DiffusionImageDicomReader(*this);
 }
 
 
-DiffusionImageDicomReaderService::
-~DiffusionImageDicomReaderService()
+DiffusionImageDicomReader::
+~DiffusionImageDicomReader()
 {}
 
-DiffusionImageDicomReaderService::
-DiffusionImageDicomReaderService()
+DiffusionImageDicomReader::
+DiffusionImageDicomReader()
   : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::DWI_DICOM_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DWI_DICOM_MIMETYPE_DESCRIPTION() )
 {
   Options defaultOptions;
@@ -86,13 +86,13 @@ DiffusionImageDicomReaderService()
 }
 
 std::vector<itk::SmartPointer<mitk::BaseData> >
-DiffusionImageDicomReaderService::Read()
+DiffusionImageDicomReader::Read()
 {
   return InternalRead();
 }
 
 
-std::vector<itk::SmartPointer<mitk::BaseData> > DiffusionImageDicomReaderService::InternalRead()
+std::vector<itk::SmartPointer<mitk::BaseData> > DiffusionImageDicomReader::InternalRead()
 {
   std::vector<itk::SmartPointer<mitk::BaseData> > result_images;
   OutputType::Pointer outputForCache = OutputType::New();

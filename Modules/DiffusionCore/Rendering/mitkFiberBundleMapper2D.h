@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkVtkMapper.h>
 #include <mitkFiberBundle.h>
 #include <vtkSmartPointer.h>
+#include <MitkDiffusionCoreExports.h>
 
 #define MITKFIBERBUNDLEMAPPER2D_POLYDATAMAPPER vtkOpenGLPolyDataMapper
 
@@ -36,7 +37,7 @@ namespace mitk {
 
 struct IShaderRepository;
 
-class FiberBundleMapper2D : public VtkMapper
+class MITKDIFFUSIONCORE_EXPORT FiberBundleMapper2D : public VtkMapper
 {
 
 public:

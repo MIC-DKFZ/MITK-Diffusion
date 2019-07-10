@@ -14,10 +14,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkDiffusionImageNrrdReaderService_cpp
-#define __mitkDiffusionImageNrrdReaderService_cpp
+#ifndef __mitkDiffusionImageNrrdReader_cpp
+#define __mitkDiffusionImageNrrdReader_cpp
 
-#include "mitkDiffusionImageNrrdReaderService.h"
+#include "mitkDiffusionImageNrrdReader.h"
 
 #include <iostream>
 #include <fstream>
@@ -49,25 +49,25 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
 
-  DiffusionImageNrrdReaderService::
-  DiffusionImageNrrdReaderService(const DiffusionImageNrrdReaderService & other)
+  DiffusionImageNrrdReader::
+  DiffusionImageNrrdReader(const DiffusionImageNrrdReader & other)
     : AbstractFileReader(other)
   {
   }
 
 
-  DiffusionImageNrrdReaderService* DiffusionImageNrrdReaderService::Clone() const
+  DiffusionImageNrrdReader* DiffusionImageNrrdReader::Clone() const
   {
-    return new DiffusionImageNrrdReaderService(*this);
+    return new DiffusionImageNrrdReader(*this);
   }
 
 
-  DiffusionImageNrrdReaderService::
-  ~DiffusionImageNrrdReaderService()
+  DiffusionImageNrrdReader::
+  ~DiffusionImageNrrdReader()
   {}
 
-  DiffusionImageNrrdReaderService::
-  DiffusionImageNrrdReaderService()
+  DiffusionImageNrrdReader::
+  DiffusionImageNrrdReader()
     : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::DWI_NRRD_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DWI_NRRD_MIMETYPE_DESCRIPTION() )
   {
     Options defaultOptions;
@@ -77,7 +77,7 @@ namespace mitk
   }
 
   std::vector<itk::SmartPointer<mitk::BaseData> >
-  DiffusionImageNrrdReaderService::
+  DiffusionImageNrrdReader::
   Read()
   {
     std::vector<itk::SmartPointer<mitk::BaseData> > result;
@@ -96,7 +96,7 @@ namespace mitk
   }
 
 
-  void DiffusionImageNrrdReaderService::InternalRead()
+  void DiffusionImageNrrdReader::InternalRead()
   {
     OutputType::Pointer outputForCache = OutputType::New();
     if ( this->GetInputLocation() == "")
@@ -109,7 +109,7 @@ namespace mitk
       {
         mitk::LocaleSwitch localeSwitch("C");
 
-        MITK_INFO << "DiffusionImageNrrdReaderService: reading image information";
+        MITK_INFO << "DiffusionImageNrrdReader: reading image information";
         VectorImageType::Pointer itkVectorImage;
 
         std::string ext = this->GetMimeType()->GetExtension( this->GetInputLocation() );

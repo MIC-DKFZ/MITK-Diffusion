@@ -22,6 +22,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <vtkOpenGLPolyDataMapper.h>
 #include <vtkSmartPointer.h>
+#include <MitkDiffusionCoreExports.h>
+
 class vtkPropAssembly;
 class vtkPolyDataMapper;
 class vtkLookupTable;
@@ -33,7 +35,7 @@ namespace mitk {
 //## @brief Mapper for FiberBundle
 //## @ingroup Mapper
 
-class FiberBundleMapper3D : public VtkMapper
+class MITKDIFFUSIONCORE_EXPORT FiberBundleMapper3D : public VtkMapper
 {
 public:
 

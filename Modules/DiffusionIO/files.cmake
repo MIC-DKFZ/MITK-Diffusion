@@ -1,16 +1,10 @@
 set(CPP_FILES
 
-  mitkDiffusionModuleActivator.cpp
+  mitkDiffusionServiceActivator.cpp
   mitkDiffusionIOMimeTypes.cpp
 
   ObjectFactories/mitkDiffusionCoreObjectFactory.cpp
   ObjectFactories/mitkConnectomicsObjectFactory.cpp
-
-  Mapper/mitkFiberBundleMapper2D.cpp
-  Mapper/mitkFiberBundleMapper3D.cpp
-  Mapper/mitkPeakImageMapper2D.cpp
-  Mapper/mitkPeakImageMapper3D.cpp
-  Mapper/mitkCompositeMapper.cpp
 
   ReaderWriter/mitkConnectomicsNetworkReader.cpp
   ReaderWriter/mitkConnectomicsNetworkWriter.cpp
@@ -51,10 +45,10 @@ set(CPP_FILES
   ReaderWriter/mitkShImageWriter.cpp
   ReaderWriter/mitkShImageSerializer.cpp
 
-  ReaderWriter/mitkDiffusionImageDicomReaderService.cpp
-  ReaderWriter/mitkDiffusionImageNrrdReaderService.cpp
-  ReaderWriter/mitkDiffusionImageNrrdWriterService.cpp
-  ReaderWriter/mitkDiffusionImageNiftiReaderService.cpp
-  ReaderWriter/mitkDiffusionImageNiftiWriterService.cpp
+  ReaderWriter/mitkDiffusionImageDicomReader.cpp
+  ReaderWriter/mitkDiffusionImageNrrdReader.cpp
+  ReaderWriter/mitkDiffusionImageNrrdWriter.cpp
+  ReaderWriter/mitkDiffusionImageNiftiReader.cpp
+  ReaderWriter/mitkDiffusionImageNiftiWriter.cpp
 )
 

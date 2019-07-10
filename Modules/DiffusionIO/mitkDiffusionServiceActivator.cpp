@@ -33,16 +33,16 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigureCompositeWriter.h>
 #include <mitkTractographyForestWriter.h>
 
-#include <mitkDiffusionImageNrrdReaderService.h>
-#include <mitkDiffusionImageNiftiReaderService.h>
-#include <mitkDiffusionImageDicomReaderService.h>
+#include <mitkDiffusionImageNrrdReader.h>
+#include <mitkDiffusionImageNiftiReader.h>
+#include <mitkDiffusionImageDicomReader.h>
 #include <mitkNrrdTensorImageReader.h>
 #include <mitkNrrdOdfImageReader.h>
 #include <mitkShImageReader.h>
 #include <mitkPeakImageReader.h>
 
-#include <mitkDiffusionImageNrrdWriterService.h>
-#include <mitkDiffusionImageNiftiWriterService.h>
+#include <mitkDiffusionImageNrrdWriter.h>
+#include <mitkDiffusionImageNiftiWriter.h>
 #include <mitkNrrdTensorImageWriter.h>
 #include <mitkNrrdOdfImageWriter.h>
 #include <mitkShImageWriter.h>
@@ -60,7 +60,7 @@ namespace mitk
   /**
   \brief Registers reader and writer services.
   */
-  class DiffusionModuleActivator : public us::ModuleActivator
+  class DiffusionServiceActivator : public us::ModuleActivator
   {
   public:
 
@@ -104,13 +104,13 @@ namespace mitk
       m_TractographyForestReader = new TractographyForestReader();
       m_TractographyForestWriter = new TractographyForestWriter();
 
-      m_DiffusionImageNrrdReader = new DiffusionImageNrrdReaderService();
-      m_DiffusionImageNrrdWriter = new DiffusionImageNrrdWriterService();
+      m_DiffusionImageNrrdReader = new DiffusionImageNrrdReader();
+      m_DiffusionImageNrrdWriter = new DiffusionImageNrrdWriter();
 
-      m_DiffusionImageNiftiReader = new DiffusionImageNiftiReaderService();
-      m_DiffusionImageNiftiWriter = new DiffusionImageNiftiWriterService();
+      m_DiffusionImageNiftiReader = new DiffusionImageNiftiReader();
+      m_DiffusionImageNiftiWriter = new DiffusionImageNiftiWriter();
 
-      m_DiffusionImageDicomReader = new DiffusionImageDicomReaderService();
+      m_DiffusionImageDicomReader = new DiffusionImageDicomReader();
 
       m_NrrdTensorImageReader = new NrrdTensorImageReader();
       m_NrrdOdfImageReader = new NrrdOdfImageReader();
@@ -182,16 +182,16 @@ namespace mitk
     PlanarFigureCompositeWriter* m_PlanarFigureCompositeWriter;
     TractographyForestWriter* m_TractographyForestWriter;
 
-    DiffusionImageNrrdReaderService * m_DiffusionImageNrrdReader;
-    DiffusionImageNiftiReaderService * m_DiffusionImageNiftiReader;
-    DiffusionImageDicomReaderService * m_DiffusionImageDicomReader;
+    DiffusionImageNrrdReader * m_DiffusionImageNrrdReader;
+    DiffusionImageNiftiReader * m_DiffusionImageNiftiReader;
+    DiffusionImageDicomReader * m_DiffusionImageDicomReader;
     NrrdTensorImageReader * m_NrrdTensorImageReader;
     NrrdOdfImageReader * m_NrrdOdfImageReader;
     PeakImageReader * m_PeakImageReader;
     ShImageReader * m_ShImageReader;
 
-    DiffusionImageNrrdWriterService * m_DiffusionImageNrrdWriter;
-    DiffusionImageNiftiWriterService * m_DiffusionImageNiftiWriter;
+    DiffusionImageNrrdWriter * m_DiffusionImageNrrdWriter;
+    DiffusionImageNiftiWriter * m_DiffusionImageNiftiWriter;
     NrrdTensorImageWriter * m_NrrdTensorImageWriter;
     NrrdOdfImageWriter * m_NrrdOdfImageWriter;
     ShImageWriter * m_ShImageWriter;
@@ -201,4 +201,4 @@ namespace mitk
   };
 }
 
-US_EXPORT_MODULE_ACTIVATOR(mitk::DiffusionModuleActivator)
+US_EXPORT_MODULE_ACTIVATOR(mitk::DiffusionServiceActivator)
