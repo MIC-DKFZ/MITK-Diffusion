@@ -25,7 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTensorImage.h>
 
 #include <mitkCoreObjectFactory.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <itkShCoefficientImageImporter.h>
 #include <itkFlipImageFilter.h>
 #include <mitkLexicalCast.h>
@@ -36,24 +36,24 @@ See LICENSE.txt or http://www.mitk.org for details.
 template<int shOrder>
 int StartPeakExtraction(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input image", "sh coefficient image", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output directory", "output root", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask", "mask image", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("normalization", "", mitkCommandLineParser::Int, "Normalization", "0=no norm, 1=max norm, 2=single vec norm", 1, true);
-  parser.addArgument("numpeaks", "", mitkCommandLineParser::Int, "Max. number of peaks", "maximum number of extracted peaks", 2, true);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input image", "sh coefficient image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output directory", "output root", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("mask", "", mitkDiffusionCommandLineParser::String, "Mask", "mask image", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("normalization", "", mitkDiffusionCommandLineParser::Int, "Normalization", "0=no norm, 1=max norm, 2=single vec norm", 1, true);
+  parser.addArgument("numpeaks", "", mitkDiffusionCommandLineParser::Int, "Max. number of peaks", "maximum number of extracted peaks", 2, true);
 
-  parser.addArgument("rel_peakthr", "", mitkCommandLineParser::Float, "Relative peak threshold", "peak threshold relative to largest peak", 0.4, true);
-  parser.addArgument("abs_peakthr", "", mitkCommandLineParser::Float, "Absolute peak threshold", "absolute peak magnitude threshold", 0.03, true);
-  parser.addArgument("angular_thr", "", mitkCommandLineParser::Float, "Angular threshold", "in degree", 15);
+  parser.addArgument("rel_peakthr", "", mitkDiffusionCommandLineParser::Float, "Relative peak threshold", "peak threshold relative to largest peak", 0.4, true);
+  parser.addArgument("abs_peakthr", "", mitkDiffusionCommandLineParser::Float, "Absolute peak threshold", "absolute peak magnitude threshold", 0.03, true);
+  parser.addArgument("angular_thr", "", mitkDiffusionCommandLineParser::Float, "Angular threshold", "in degree", 15);
 
-  parser.addArgument("shConvention", "", mitkCommandLineParser::String, "Use specified SH-basis", "use specified SH-basis (MRtrix, FSL)", std::string("MRtrix"), true);
+  parser.addArgument("shConvention", "", mitkDiffusionCommandLineParser::String, "Use specified SH-basis", "use specified SH-basis (MRtrix, FSL)", std::string("MRtrix"), true);
 
-  parser.addArgument("flipX", "", mitkCommandLineParser::Bool, "Flip X", "Flip peaks in x direction");
-  parser.addArgument("flipY", "", mitkCommandLineParser::Bool, "Flip Y", "Flip peaks in y direction");
-  parser.addArgument("flipZ", "", mitkCommandLineParser::Bool, "Flip Z", "Flip peaks in z direction");
-  parser.addArgument("scale_by_gfa", "", mitkCommandLineParser::Bool, "Scale by GFA", "Scale ODF values and peaks by GFA");
+  parser.addArgument("flipX", "", mitkDiffusionCommandLineParser::Bool, "Flip X", "Flip peaks in x direction");
+  parser.addArgument("flipY", "", mitkDiffusionCommandLineParser::Bool, "Flip Y", "Flip peaks in y direction");
+  parser.addArgument("flipZ", "", mitkDiffusionCommandLineParser::Bool, "Flip Z", "Flip peaks in z direction");
+  parser.addArgument("scale_by_gfa", "", mitkDiffusionCommandLineParser::Bool, "Scale by GFA", "Scale ODF values and peaks by GFA");
 
   parser.setCategory("Preprocessing Tools");
   parser.setTitle("Peak Extraction");
@@ -250,18 +250,18 @@ int StartPeakExtraction(int argc, char* argv[])
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input image", "sh coefficient image", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output directory", "output root", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("shOrder", "sh", mitkCommandLineParser::Int, "Spherical harmonics order", "spherical harmonics order");
-  parser.addArgument("mask", "m", mitkCommandLineParser::String, "Mask", "mask image", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("normalization", "n", mitkCommandLineParser::Int, "Normalization", "0=no norm, 1=max norm, 2=single vec norm", 1, true);
-  parser.addArgument("numpeaks", "p", mitkCommandLineParser::Int, "Max. number of peaks", "maximum number of extracted peaks", 2, true);
-  parser.addArgument("peakthres", "r", mitkCommandLineParser::Float, "Peak threshold", "peak threshold relative to largest peak", 0.4, true);
-  parser.addArgument("abspeakthres", "a", mitkCommandLineParser::Float, "Absolute peak threshold", "absolute peak threshold weighted with local GFA value", 0.06, true);
-  parser.addArgument("shConvention", "s", mitkCommandLineParser::String, "Use specified SH-basis", "use specified SH-basis (MITK, FSL, MRtrix)", std::string("MITK"), true);
-  parser.addArgument("noFlip", "f", mitkCommandLineParser::Bool, "No flip", "do not flip input image to match MITK coordinate convention");
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input image", "sh coefficient image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output directory", "output root", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("shOrder", "sh", mitkDiffusionCommandLineParser::Int, "Spherical harmonics order", "spherical harmonics order");
+  parser.addArgument("mask", "m", mitkDiffusionCommandLineParser::String, "Mask", "mask image", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("normalization", "n", mitkDiffusionCommandLineParser::Int, "Normalization", "0=no norm, 1=max norm, 2=single vec norm", 1, true);
+  parser.addArgument("numpeaks", "p", mitkDiffusionCommandLineParser::Int, "Max. number of peaks", "maximum number of extracted peaks", 2, true);
+  parser.addArgument("peakthres", "r", mitkDiffusionCommandLineParser::Float, "Peak threshold", "peak threshold relative to largest peak", 0.4, true);
+  parser.addArgument("abspeakthres", "a", mitkDiffusionCommandLineParser::Float, "Absolute peak threshold", "absolute peak threshold weighted with local GFA value", 0.06, true);
+  parser.addArgument("shConvention", "s", mitkDiffusionCommandLineParser::String, "Use specified SH-basis", "use specified SH-basis (MITK, FSL, MRtrix)", std::string("MITK"), true);
+  parser.addArgument("noFlip", "f", mitkDiffusionCommandLineParser::Bool, "No flip", "do not flip input image to match MITK coordinate convention");
 
   parser.setCategory("Preprocessing Tools");
   parser.setTitle("Peak Extraction");

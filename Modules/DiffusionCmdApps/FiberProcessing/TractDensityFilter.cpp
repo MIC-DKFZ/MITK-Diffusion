@@ -15,7 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <metaCommand.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
@@ -37,19 +37,19 @@ typedef itk::Image<float, 3>    ItkFloatImgType;
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Filter Outliers by Tract Density");
   parser.setCategory("Fiber Tracking and Processing Methods");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.dcm)", us::Any(), false);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram", us::Any(), false);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.dcm)", us::Any(), false);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output tractogram", us::Any(), false);
 
-  parser.addArgument("threshold", "", mitkCommandLineParser::Float, "Threshold:", "positive means ROI image value threshold", 0.05);
-  parser.addArgument("overlap", "", mitkCommandLineParser::Float, "Overlap:", "positive means ROI image value threshold", 0.5);
-  parser.addArgument("min_fibers", "", mitkCommandLineParser::Int, "Min. num. fibers:", "discard positive tracts with less fibers", 0);
+  parser.addArgument("threshold", "", mitkDiffusionCommandLineParser::Float, "Threshold:", "positive means ROI image value threshold", 0.05);
+  parser.addArgument("overlap", "", mitkDiffusionCommandLineParser::Float, "Overlap:", "positive means ROI image value threshold", 0.5);
+  parser.addArgument("min_fibers", "", mitkDiffusionCommandLineParser::Int, "Min. num. fibers:", "discard positive tracts with less fibers", 0);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

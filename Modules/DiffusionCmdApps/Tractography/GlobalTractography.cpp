@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkShToOdfImageFilter.h>
 #include <mitkImageToItk.h>
 #include <mitkIOUtil.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <boost/algorithm/string.hpp>
 #include <itkFlipImageFilter.h>
 #include <mitkCoreObjectFactory.h>
@@ -37,7 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Gibbs Tracking");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -45,10 +45,10 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input image (tensor, ODF or SH-coefficient image)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("parameters", "", mitkCommandLineParser::String, "Parameters:", "parameter file (.gtp)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "binary mask image", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input image (tensor, ODF or SH-coefficient image)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output tractogram", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("parameters", "", mitkDiffusionCommandLineParser::String, "Parameters:", "parameter file (.gtp)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("mask", "", mitkDiffusionCommandLineParser::String, "Mask:", "binary mask image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

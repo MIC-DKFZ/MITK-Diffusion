@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <metaCommand.h>
-#include <mitkCommandLineParser.h>
+#include <mitkDiffusionCommandLineParser.h>
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <itksys/SystemTools.hxx>
@@ -42,7 +42,7 @@ typedef itk::Image< unsigned char, 3 >  ItkUcharImageType;
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Anchor Constrained Plausibility");
   parser.setCategory("Fiber Tracking Evaluation");
@@ -50,25 +50,25 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "a", mitkCommandLineParser::String, "Anchor tractogram:", "anchor tracts in one tractogram file", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "p", mitkCommandLineParser::String, "Input peaks:", "input peak image", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "c", mitkCommandLineParser::StringList, "Candidates:", "Folder(s) or file list of candidate tracts", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output folder:", "output folder", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "a", mitkDiffusionCommandLineParser::String, "Anchor tractogram:", "anchor tracts in one tractogram file", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "p", mitkDiffusionCommandLineParser::String, "Input peaks:", "input peak image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "c", mitkDiffusionCommandLineParser::StringList, "Candidates:", "Folder(s) or file list of candidate tracts", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output folder:", "output folder", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
 
-  parser.addArgument("reference_mask_folders", "", mitkCommandLineParser::StringList, "Reference Mask Folder(s):", "Folder(s) or file list containing reference tract masks for accuracy evaluation", true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("reference_peaks_folders", "", mitkCommandLineParser::StringList, "Reference Peaks Folder(s):", "Folder(s) or file list containing reference peak images for accuracy evaluation", true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("reference_mask_folders", "", mitkDiffusionCommandLineParser::StringList, "Reference Mask Folder(s):", "Folder(s) or file list containing reference tract masks for accuracy evaluation", true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("reference_peaks_folders", "", mitkDiffusionCommandLineParser::StringList, "Reference Peaks Folder(s):", "Folder(s) or file list containing reference peak images for accuracy evaluation", true, false, false, mitkDiffusionCommandLineParser::Input);
   
-  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask image:", "scoring is only performed inside the mask image", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("greedy_add", "", mitkCommandLineParser::Bool, "Greedy:", "if enabled, the candidate tracts are not jointly fitted to the residual image but one after the other employing a greedy scheme", false);
-  parser.addArgument("lambda", "", mitkCommandLineParser::Float, "Lambda:", "modifier for regularization", 0.1);
-  parser.addArgument("filter_outliers", "", mitkCommandLineParser::Bool, "Filter outliers:", "perform second optimization run with an upper weight bound based on the first weight estimation (99% quantile)", false);
-  parser.addArgument("regu", "", mitkCommandLineParser::String, "Regularization:", "MSM; Variance; VoxelVariance; Lasso; GroupLasso; GroupVariance; NONE", std::string("NONE"));
-  parser.addArgument("use_num_streamlines", "", mitkCommandLineParser::Bool, "Use number of streamlines as score:", "Don't fit candidates, simply use number of streamlines per candidate as score", false);
-  parser.addArgument("use_weights", "", mitkCommandLineParser::Bool, "Use input weights as score:", "Don't fit candidates, simply use first input streamline weight per candidate as score", false);
-  parser.addArgument("filter_zero_weights", "", mitkCommandLineParser::Bool, "Filter zero-weights", "Remove streamlines with weight 0 from candidates", false);
-  parser.addArgument("flipx", "", mitkCommandLineParser::Bool, "Flip x", "flip along x-axis", false);
-  parser.addArgument("flipy", "", mitkCommandLineParser::Bool, "Flip y", "flip along y-axis", false);
-  parser.addArgument("flipz", "", mitkCommandLineParser::Bool, "Flip z", "flip along z-axis", false);
+  parser.addArgument("mask", "", mitkDiffusionCommandLineParser::String, "Mask image:", "scoring is only performed inside the mask image", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("greedy_add", "", mitkDiffusionCommandLineParser::Bool, "Greedy:", "if enabled, the candidate tracts are not jointly fitted to the residual image but one after the other employing a greedy scheme", false);
+  parser.addArgument("lambda", "", mitkDiffusionCommandLineParser::Float, "Lambda:", "modifier for regularization", 0.1);
+  parser.addArgument("filter_outliers", "", mitkDiffusionCommandLineParser::Bool, "Filter outliers:", "perform second optimization run with an upper weight bound based on the first weight estimation (99% quantile)", false);
+  parser.addArgument("regu", "", mitkDiffusionCommandLineParser::String, "Regularization:", "MSM; Variance; VoxelVariance; Lasso; GroupLasso; GroupVariance; NONE", std::string("NONE"));
+  parser.addArgument("use_num_streamlines", "", mitkDiffusionCommandLineParser::Bool, "Use number of streamlines as score:", "Don't fit candidates, simply use number of streamlines per candidate as score", false);
+  parser.addArgument("use_weights", "", mitkDiffusionCommandLineParser::Bool, "Use input weights as score:", "Don't fit candidates, simply use first input streamline weight per candidate as score", false);
+  parser.addArgument("filter_zero_weights", "", mitkDiffusionCommandLineParser::Bool, "Filter zero-weights", "Remove streamlines with weight 0 from candidates", false);
+  parser.addArgument("flipx", "", mitkDiffusionCommandLineParser::Bool, "Flip x", "flip along x-axis", false);
+  parser.addArgument("flipy", "", mitkDiffusionCommandLineParser::Bool, "Flip y", "flip along y-axis", false);
+  parser.addArgument("flipz", "", mitkDiffusionCommandLineParser::Bool, "Flip z", "flip along z-axis", false);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
   std::string peak_file_name = us::any_cast<std::string>(parsedArgs["p"]);
   std::string out_folder = us::any_cast<std::string>(parsedArgs["o"]);
 
-  mitkCommandLineParser::StringContainerType candidate_tract_folders = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["c"]);
+  mitkDiffusionCommandLineParser::StringContainerType candidate_tract_folders = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["c"]);
 
   if (!out_folder.empty() && out_folder.back() != '/')
     out_folder += "/";
@@ -102,13 +102,13 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("mask"))
     mask_file = us::any_cast<std::string>(parsedArgs["mask"]);
 
-  mitkCommandLineParser::StringContainerType reference_mask_files_folders;
+  mitkDiffusionCommandLineParser::StringContainerType reference_mask_files_folders;
   if (parsedArgs.count("reference_mask_folders"))
-    reference_mask_files_folders = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["reference_mask_folders"]);
+    reference_mask_files_folders = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["reference_mask_folders"]);
 
-  mitkCommandLineParser::StringContainerType reference_peaks_files_folders;
+  mitkDiffusionCommandLineParser::StringContainerType reference_peaks_files_folders;
   if (parsedArgs.count("reference_peaks_folders"))
-    reference_peaks_files_folders = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["reference_peaks_folders"]);
+    reference_peaks_files_folders = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["reference_peaks_folders"]);
 
   std::string regu = "NONE";
   if (parsedArgs.count("regu"))

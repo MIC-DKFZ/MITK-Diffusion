@@ -17,14 +17,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImage.h>
 #include <mitkIOUtil.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <mitkDWIHeadMotionCorrectionFilter.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
 
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("HeadMotionCorrection");
   parser.setCategory("Preprocessing Tools");
@@ -32,8 +32,8 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input image", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

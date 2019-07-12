@@ -15,7 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <metaCommand.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
@@ -38,7 +38,7 @@ typedef itk::Image<unsigned char, 3>    ItkFloatImgType;
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Get Overlapping Tracts");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -46,20 +46,20 @@ int main(int argc, char* argv[])
   parser.setDescription("Find tracts that overlap with the reference masks or tracts");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input:", "input tractograms (.fib/.trk/.tck/.dcm)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Folder:", "move input tracts that do/don't overlap here", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("reference", "", mitkCommandLineParser::StringList, "Reference:", "reference tractograms or mask images", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::StringList, "Input:", "input tractograms (.fib/.trk/.tck/.dcm)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output Folder:", "move input tracts that do/don't overlap here", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("reference", "", mitkDiffusionCommandLineParser::StringList, "Reference:", "reference tractograms or mask images", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
 
-  parser.addArgument("overlap_fraction", "", mitkCommandLineParser::Float, "Overlap fraction:", "", 0.9);
-  parser.addArgument("use_any_overlap", "", mitkCommandLineParser::Bool, "Use any overlap:", "Don't find maximum overlap but use first overlap larger threshold");
-  parser.addArgument("dont_save_tracts", "", mitkCommandLineParser::Bool, "Don't save tracts:", "if true, only text files documenting the overlaps are saved and no tract files are copied");
+  parser.addArgument("overlap_fraction", "", mitkDiffusionCommandLineParser::Float, "Overlap fraction:", "", 0.9);
+  parser.addArgument("use_any_overlap", "", mitkDiffusionCommandLineParser::Bool, "Use any overlap:", "Don't find maximum overlap but use first overlap larger threshold");
+  parser.addArgument("dont_save_tracts", "", mitkDiffusionCommandLineParser::Bool, "Don't save tracts:", "if true, only text files documenting the overlaps are saved and no tract files are copied");
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
     return EXIT_FAILURE;
 
-  mitkCommandLineParser::StringContainerType input = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i"]);
-  mitkCommandLineParser::StringContainerType reference = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["reference"]);
+  mitkDiffusionCommandLineParser::StringContainerType input = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i"]);
+  mitkDiffusionCommandLineParser::StringContainerType reference = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["reference"]);
 
   std::string out_folder = us::any_cast<std::string>(parsedArgs["o"]);
 

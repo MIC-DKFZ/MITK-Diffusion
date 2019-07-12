@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkImage.h"
 #include "itkAnalyticalDiffusionQballReconstructionImageFilter.h"
 #include <mitkLexicalCast.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <mitkIOUtil.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkDiffusionPropertyHelper.h>
@@ -119,15 +119,15 @@ void TemplatedCsaQBallReconstruction(float lambda, mitk::Image::Pointer dwi, boo
  */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input image", "input raw dwi (.dwi or .nii/.nii.gz)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output image", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("sh_order", "", mitkCommandLineParser::Int, "Spherical harmonics order", "spherical harmonics order", 4);
-  parser.addArgument("b0_threshold", "", mitkCommandLineParser::Int, "b0 threshold", "baseline image intensity threshold", 0);
-  parser.addArgument("round_bvalues", "", mitkCommandLineParser::Int, "Round b-values", "round to specified integer", 0);
-  parser.addArgument("lambda", "", mitkCommandLineParser::Float, "Lambda", "ragularization factor lambda", 0.006);
-  parser.addArgument("output_sampled", "", mitkCommandLineParser::Bool, "Output sampled ODFs", "output file containing the sampled ODFs");
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input image", "input raw dwi (.dwi or .nii/.nii.gz)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output image", "output image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("sh_order", "", mitkDiffusionCommandLineParser::Int, "Spherical harmonics order", "spherical harmonics order", 4);
+  parser.addArgument("b0_threshold", "", mitkDiffusionCommandLineParser::Int, "b0 threshold", "baseline image intensity threshold", 0);
+  parser.addArgument("round_bvalues", "", mitkDiffusionCommandLineParser::Int, "Round b-values", "round to specified integer", 0);
+  parser.addArgument("lambda", "", mitkDiffusionCommandLineParser::Float, "Lambda", "ragularization factor lambda", 0.006);
+  parser.addArgument("output_sampled", "", mitkDiffusionCommandLineParser::Bool, "Output sampled ODFs", "output file containing the sampled ODFs");
 
   parser.setCategory("Signal Modelling");
   parser.setTitle("Qball Reconstruction");

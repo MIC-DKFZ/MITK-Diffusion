@@ -15,7 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <mitkFiberBundle.h>
-#include <mitkCommandLineParser.h>
+#include <mitkDiffusionCommandLineParser.h>
 #include <mitkDiffusionDataIOHelper.h>
 #include <mitkLexicalCast.h>
 #include <itkTractDistanceFilter.h>
@@ -29,31 +29,31 @@ typedef itk::Image< float, 4 >  ItkPeakImgType;
 
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Reference Similarity");
   parser.setCategory("Fiber Tracking Evaluation");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input Tracts:", "input tracts folder", us::Any(), false);
-  parser.addArgument("reference_tracts", "", mitkCommandLineParser::StringList, "", "", us::Any(), false);
-  parser.addArgument("reference_masks", "", mitkCommandLineParser::StringList, "", "", us::Any(), false);
-  parser.addArgument("reference_peaks", "", mitkCommandLineParser::StringList, "", "", us::Any(), false);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::StringList, "Input Tracts:", "input tracts folder", us::Any(), false);
+  parser.addArgument("reference_tracts", "", mitkDiffusionCommandLineParser::StringList, "", "", us::Any(), false);
+  parser.addArgument("reference_masks", "", mitkDiffusionCommandLineParser::StringList, "", "", us::Any(), false);
+  parser.addArgument("reference_peaks", "", mitkDiffusionCommandLineParser::StringList, "", "", us::Any(), false);
 
-  parser.addArgument("", "o", mitkCommandLineParser::String, "", "", us::Any(), false);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "", "", us::Any(), false);
 
-  parser.addArgument("fiber_points", "", mitkCommandLineParser::Int, "Fiber points:", "", 20);
+  parser.addArgument("fiber_points", "", mitkDiffusionCommandLineParser::Int, "Fiber points:", "", 20);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
     return EXIT_FAILURE;
 
   std::string out_folder = us::any_cast<std::string>(parsedArgs["o"]);
-  mitkCommandLineParser::StringContainerType input_tract_files = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i"]);
-  mitkCommandLineParser::StringContainerType reference_tract_files = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["reference_tracts"]);
-  mitkCommandLineParser::StringContainerType reference_mask_files = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["reference_masks"]);
-  mitkCommandLineParser::StringContainerType reference_peak_files = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["reference_peaks"]);
+  mitkDiffusionCommandLineParser::StringContainerType input_tract_files = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i"]);
+  mitkDiffusionCommandLineParser::StringContainerType reference_tract_files = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["reference_tracts"]);
+  mitkDiffusionCommandLineParser::StringContainerType reference_mask_files = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["reference_masks"]);
+  mitkDiffusionCommandLineParser::StringContainerType reference_peak_files = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["reference_peaks"]);
 
   int fiber_points = 20;
   if (parsedArgs.count("fiber_points"))

@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <metaCommand.h>
-#include <mitkCommandLineParser.h>
+#include <mitkDiffusionCommandLineParser.h>
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
@@ -41,7 +41,7 @@ typedef itk::Image<unsigned int, 3>    ItkUIntImgType;
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Merge Overlapping Tracts");
   parser.setCategory("Fiber Tracking Evaluation");
@@ -49,15 +49,15 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input:", "input tracts", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Folder:", "output folder", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("overlap", "", mitkCommandLineParser::Float, "Overlap threshold:", "Tracts with overlap larger than this threshold are merged", 0.8, false);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::StringList, "Input:", "input tracts", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output Folder:", "output folder", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("overlap", "", mitkDiffusionCommandLineParser::Float, "Overlap threshold:", "Tracts with overlap larger than this threshold are merged", 0.8, false);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
     return EXIT_FAILURE;
 
-  mitkCommandLineParser::StringContainerType input_folder = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i"]);
+  mitkDiffusionCommandLineParser::StringContainerType input_folder = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i"]);
   std::string out_folder = us::any_cast<std::string>(parsedArgs["o"]);
 
   float overlap = 0.8;

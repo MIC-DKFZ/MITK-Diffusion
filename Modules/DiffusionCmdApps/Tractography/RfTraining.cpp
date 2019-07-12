@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <metaCommand.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <iostream>
@@ -39,7 +39,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 int main(int argc, char* argv[])
 {
     MITK_INFO << "RfTraining";
-    mitkCommandLineParser parser;
+    mitkDiffusionCommandLineParser parser;
 
     parser.setTitle("Trains Random Forests for Machine Learning Based Tractography");
     parser.setCategory("Fiber Tracking and Processing Methods");
@@ -49,29 +49,29 @@ int main(int argc, char* argv[])
     parser.setArgumentPrefix("--", "-");
 
     parser.beginGroup("1. Mandatory arguments:");
-    parser.addArgument("", "i", mitkCommandLineParser::StringList, "DWIs:", "input diffusion-weighted images", us::Any(), false, false, false, mitkCommandLineParser::Input);
-    parser.addArgument("", "t", mitkCommandLineParser::StringList, "Tractograms:", "input training tractograms", us::Any(), false, false, false, mitkCommandLineParser::Input);
-    parser.addArgument("", "o", mitkCommandLineParser::String, "Forest:", "output random forest (HDF5)", us::Any(), false, false, false, mitkCommandLineParser::Output);
+    parser.addArgument("", "i", mitkDiffusionCommandLineParser::StringList, "DWIs:", "input diffusion-weighted images", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+    parser.addArgument("", "t", mitkDiffusionCommandLineParser::StringList, "Tractograms:", "input training tractograms", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+    parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Forest:", "output random forest (HDF5)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
     parser.endGroup();
 
     parser.beginGroup("2. Additional input images:");
-    parser.addArgument("masks", "", mitkCommandLineParser::StringList, "Masks:", "restrict training using a binary mask image", us::Any(), true, false, false, mitkCommandLineParser::Input);
-    parser.addArgument("wm_masks", "", mitkCommandLineParser::StringList, "WM-Masks:", "if no binary white matter mask is specified, the envelope of the input tractogram is used", us::Any(), true, false, false, mitkCommandLineParser::Input);
-    parser.addArgument("volume_modification_images", "", mitkCommandLineParser::StringList, "Volume modification images:", "specify a list of float images that modify the fiber density", us::Any(), true, false, false, mitkCommandLineParser::Input);
-    parser.addArgument("additional_feature_images", "", mitkCommandLineParser::StringList, "Additional feature images:", "specify a list of float images that hold additional features (float)", us::Any(), true, false, false, mitkCommandLineParser::Input);
+    parser.addArgument("masks", "", mitkDiffusionCommandLineParser::StringList, "Masks:", "restrict training using a binary mask image", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+    parser.addArgument("wm_masks", "", mitkDiffusionCommandLineParser::StringList, "WM-Masks:", "if no binary white matter mask is specified, the envelope of the input tractogram is used", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+    parser.addArgument("volume_modification_images", "", mitkDiffusionCommandLineParser::StringList, "Volume modification images:", "specify a list of float images that modify the fiber density", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+    parser.addArgument("additional_feature_images", "", mitkDiffusionCommandLineParser::StringList, "Additional feature images:", "specify a list of float images that hold additional features (float)", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
     parser.endGroup();
 
     parser.beginGroup("3. Forest parameters:");
-    parser.addArgument("num_trees", "", mitkCommandLineParser::Int, "Number of trees:", "number of trees", 30);
-    parser.addArgument("max_tree_depth", "", mitkCommandLineParser::Int, "Max. tree depth:", "maximum tree depth", 25);
-    parser.addArgument("sample_fraction", "", mitkCommandLineParser::Float, "Sample fraction:", "fraction of samples used per tree", 0.7);
+    parser.addArgument("num_trees", "", mitkDiffusionCommandLineParser::Int, "Number of trees:", "number of trees", 30);
+    parser.addArgument("max_tree_depth", "", mitkDiffusionCommandLineParser::Int, "Max. tree depth:", "maximum tree depth", 25);
+    parser.addArgument("sample_fraction", "", mitkDiffusionCommandLineParser::Float, "Sample fraction:", "fraction of samples used per tree", 0.7);
     parser.endGroup();
 
     parser.beginGroup("4. Feature parameters:");
-    parser.addArgument("use_sh_features", "", mitkCommandLineParser::Bool, "Use SH features:", "use SH features", false);
-    parser.addArgument("sampling_distance", "", mitkCommandLineParser::Float, "Sampling distance:", "resampling parameter for the input tractogram in mm (determines number of white-matter samples)", us::Any());
-    parser.addArgument("max_wm_samples", "", mitkCommandLineParser::Int, "Max. num. WM samples:", "upper limit for the number of WM samples");
-    parser.addArgument("num_gm_samples", "", mitkCommandLineParser::Int, "Number of gray matter samples per voxel:", "Number of gray matter samples per voxel", us::Any());
+    parser.addArgument("use_sh_features", "", mitkDiffusionCommandLineParser::Bool, "Use SH features:", "use SH features", false);
+    parser.addArgument("sampling_distance", "", mitkDiffusionCommandLineParser::Float, "Sampling distance:", "resampling parameter for the input tractogram in mm (determines number of white-matter samples)", us::Any());
+    parser.addArgument("max_wm_samples", "", mitkDiffusionCommandLineParser::Int, "Max. num. WM samples:", "upper limit for the number of WM samples");
+    parser.addArgument("num_gm_samples", "", mitkDiffusionCommandLineParser::Int, "Number of gray matter samples per voxel:", "Number of gray matter samples per voxel", us::Any());
     parser.endGroup();
 
     std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
@@ -82,28 +82,28 @@ int main(int argc, char* argv[])
     if (parsedArgs.count("use_sh_features"))
         shfeatures = us::any_cast<bool>(parsedArgs["use_sh_features"]);
 
-    mitkCommandLineParser::StringContainerType imageFiles = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i"]);
-    mitkCommandLineParser::StringContainerType wmMaskFiles;
+    mitkDiffusionCommandLineParser::StringContainerType imageFiles = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i"]);
+    mitkDiffusionCommandLineParser::StringContainerType wmMaskFiles;
     if (parsedArgs.count("wm_masks"))
-        wmMaskFiles = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["wm_masks"]);
+        wmMaskFiles = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["wm_masks"]);
 
-    mitkCommandLineParser::StringContainerType volModFiles;
+    mitkDiffusionCommandLineParser::StringContainerType volModFiles;
     if (parsedArgs.count("volume_modification_images"))
-        volModFiles = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["volume_modification_images"]);
+        volModFiles = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["volume_modification_images"]);
 
-    mitkCommandLineParser::StringContainerType addFeatFiles;
+    mitkDiffusionCommandLineParser::StringContainerType addFeatFiles;
     if (parsedArgs.count("additional_feature_images"))
-        addFeatFiles = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["additional_feature_images"]);
+        addFeatFiles = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["additional_feature_images"]);
 
-    mitkCommandLineParser::StringContainerType maskFiles;
+    mitkDiffusionCommandLineParser::StringContainerType maskFiles;
     if (parsedArgs.count("masks"))
-        maskFiles = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["masks"]);
+        maskFiles = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["masks"]);
 
     std::string forestFile = us::any_cast<std::string>(parsedArgs["o"]);
 
-    mitkCommandLineParser::StringContainerType tractogramFiles;
+    mitkDiffusionCommandLineParser::StringContainerType tractogramFiles;
     if (parsedArgs.count("t"))
-        tractogramFiles = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["t"]);
+        tractogramFiles = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["t"]);
 
     int num_trees = 30;
     if (parsedArgs.count("num_trees"))

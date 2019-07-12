@@ -21,7 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkTensorDerivedMeasurementsFilter.h>
 #include <itkDiffusionOdfGeneralizedFaImageFilter.h>
 #include <mitkTensorImage.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <boost/algorithm/string.hpp>
 #include <itksys/SystemTools.hxx>
 #include <itkMultiThreader.h>
@@ -41,7 +41,7 @@ See LICENSE.txt or http://www.mitk.org for details.
  */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Diffusion Indices");
   parser.setCategory("Diffusion Related Measures");
@@ -49,9 +49,9 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input image (tensor, ODF or SH-coefficient image)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("index", "idx", mitkCommandLineParser::String, "Index:", "index (fa, gfa, ra, ad, rd, ca, l2, l3, md, adc)", us::Any(), false);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input image (tensor, ODF or SH-coefficient image)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("index", "idx", mitkDiffusionCommandLineParser::String, "Index:", "index (fa, gfa, ra, ad, rd, ca, l2, l3, md, adc)", us::Any(), false);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

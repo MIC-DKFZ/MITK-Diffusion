@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVectorImage.h>
 #include <mitkImageCast.h>
 #include <mitkBaseData.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkIOUtil.h>
@@ -174,7 +174,7 @@ mitk::Image::Pointer DoReduceGradientDirections(mitk::Image::Pointer image, doub
 */
 int main(int argc, char* argv[])
 {
-    mitkCommandLineParser parser;
+    mitkDiffusionCommandLineParser parser;
 
     parser.setTitle("Resample Gradients");
     parser.setCategory("Preprocessing Tools");
@@ -182,11 +182,11 @@ int main(int argc, char* argv[])
     parser.setContributor("MIC");
 
     parser.setArgumentPrefix("--", "-");
-    parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input image", us::Any(), false);
-    parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false);
-    parser.addArgument("b_value", "", mitkCommandLineParser::Float, "b-value:", "float", 1000, false);
-    parser.addArgument("num_gradients", "", mitkCommandLineParser::Int, "Nr of gradients:", "integer", 32, false);
-    parser.addArgument("use_first_n", "", mitkCommandLineParser::Bool, "Use first N:", "no optimization, simply use first n gradients", 0);
+    parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input image", us::Any(), false);
+    parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output image", us::Any(), false);
+    parser.addArgument("b_value", "", mitkDiffusionCommandLineParser::Float, "b-value:", "float", 1000, false);
+    parser.addArgument("num_gradients", "", mitkDiffusionCommandLineParser::Int, "Nr of gradients:", "integer", 32, false);
+    parser.addArgument("use_first_n", "", mitkDiffusionCommandLineParser::Bool, "Use first N:", "no optimization, simply use first n gradients", 0);
 
 
     std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);

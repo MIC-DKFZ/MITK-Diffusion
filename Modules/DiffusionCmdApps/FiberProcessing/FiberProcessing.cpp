@@ -25,7 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkIOUtil.h>
@@ -48,7 +48,7 @@ mitk::FiberBundle::Pointer LoadFib(std::string filename)
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Fiber Processing");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -58,48 +58,48 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
 
   parser.beginGroup("1. Mandatory arguments:");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "Input fiber bundle (.fib, .trk, .tck)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "Output fiber bundle (.fib, .trk)", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "Input fiber bundle (.fib, .trk, .tck)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "Output fiber bundle (.fib, .trk)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
   parser.endGroup();
 
   parser.beginGroup("2. Resampling:");
-  parser.addArgument("spline_resampling", "", mitkCommandLineParser::Float, "Spline resampling:", "Resample fiber using splines with the given point distance (in mm)");
-  parser.addArgument("linear_resampling", "", mitkCommandLineParser::Float, "Linear resampling:", "Resample fiber linearly with the given point distance (in mm)");
-  parser.addArgument("num_resampling", "", mitkCommandLineParser::Int, "Num. fiber points resampling:", "Resample all fibers to the given number of points");
-  parser.addArgument("compress", "", mitkCommandLineParser::Float, "Compress:", "Compress fiber using the given error threshold (in mm)");
+  parser.addArgument("spline_resampling", "", mitkDiffusionCommandLineParser::Float, "Spline resampling:", "Resample fiber using splines with the given point distance (in mm)");
+  parser.addArgument("linear_resampling", "", mitkDiffusionCommandLineParser::Float, "Linear resampling:", "Resample fiber linearly with the given point distance (in mm)");
+  parser.addArgument("num_resampling", "", mitkDiffusionCommandLineParser::Int, "Num. fiber points resampling:", "Resample all fibers to the given number of points");
+  parser.addArgument("compress", "", mitkDiffusionCommandLineParser::Float, "Compress:", "Compress fiber using the given error threshold (in mm)");
   parser.endGroup();
 
   parser.beginGroup("3. Filtering:");
-  parser.addArgument("min_length", "", mitkCommandLineParser::Float, "Minimum length:", "Minimum fiber length (in mm)");
-  parser.addArgument("max_length", "", mitkCommandLineParser::Float, "Maximum length:", "Maximum fiber length (in mm)");
-  parser.addArgument("max_angle", "", mitkCommandLineParser::Float, "Maximum angle:", "Maximum angular STDEV (in degree) over given distance");
-  parser.addArgument("max_angle_dist", "", mitkCommandLineParser::Float, "Distance:", "Distance in mm", 10);
-  parser.addArgument("remove", "", mitkCommandLineParser::Bool, "Remove fibers exceeding curvature threshold:", "If false, only the high curvature parts are removed");
-  parser.addArgument("subsample", "", mitkCommandLineParser::Float, "Randomly select fraction of streamlines:", "Randomly select the specified fraction of streamlines from the input tractogram");
-  parser.addArgument("random_subsample", "", mitkCommandLineParser::Bool, "Randomly seed subsampling:", "Randomly seed subsampling. Else, use seed 0.");
+  parser.addArgument("min_length", "", mitkDiffusionCommandLineParser::Float, "Minimum length:", "Minimum fiber length (in mm)");
+  parser.addArgument("max_length", "", mitkDiffusionCommandLineParser::Float, "Maximum length:", "Maximum fiber length (in mm)");
+  parser.addArgument("max_angle", "", mitkDiffusionCommandLineParser::Float, "Maximum angle:", "Maximum angular STDEV (in degree) over given distance");
+  parser.addArgument("max_angle_dist", "", mitkDiffusionCommandLineParser::Float, "Distance:", "Distance in mm", 10);
+  parser.addArgument("remove", "", mitkDiffusionCommandLineParser::Bool, "Remove fibers exceeding curvature threshold:", "If false, only the high curvature parts are removed");
+  parser.addArgument("subsample", "", mitkDiffusionCommandLineParser::Float, "Randomly select fraction of streamlines:", "Randomly select the specified fraction of streamlines from the input tractogram");
+  parser.addArgument("random_subsample", "", mitkDiffusionCommandLineParser::Bool, "Randomly seed subsampling:", "Randomly seed subsampling. Else, use seed 0.");
   parser.endGroup();
 
   parser.beginGroup("4. Transformation:");
-  parser.addArgument("mirror", "", mitkCommandLineParser::Int, "Invert coordinates:", "Invert fiber coordinates XYZ (e.g. 010 to invert y-coordinate of each fiber point)");
+  parser.addArgument("mirror", "", mitkDiffusionCommandLineParser::Int, "Invert coordinates:", "Invert fiber coordinates XYZ (e.g. 010 to invert y-coordinate of each fiber point)");
 
-  parser.addArgument("rotate_x", "", mitkCommandLineParser::Float, "Rotate x-axis:", "Rotate around x-axis (in deg)");
-  parser.addArgument("rotate_y", "", mitkCommandLineParser::Float, "Rotate y-axis:", "Rotate around y-axis (in deg)");
-  parser.addArgument("rotate_z", "", mitkCommandLineParser::Float, "Rotate z-axis:", "Rotate around z-axis (in deg)");
+  parser.addArgument("rotate_x", "", mitkDiffusionCommandLineParser::Float, "Rotate x-axis:", "Rotate around x-axis (in deg)");
+  parser.addArgument("rotate_y", "", mitkDiffusionCommandLineParser::Float, "Rotate y-axis:", "Rotate around y-axis (in deg)");
+  parser.addArgument("rotate_z", "", mitkDiffusionCommandLineParser::Float, "Rotate z-axis:", "Rotate around z-axis (in deg)");
 
-  parser.addArgument("scale_x", "", mitkCommandLineParser::Float, "Scale x-axis:", "Scale in direction of x-axis");
-  parser.addArgument("scale_y", "", mitkCommandLineParser::Float, "Scale y-axis:", "Scale in direction of y-axis");
-  parser.addArgument("scale_z", "", mitkCommandLineParser::Float, "Scale z-axis", "Scale in direction of z-axis");
+  parser.addArgument("scale_x", "", mitkDiffusionCommandLineParser::Float, "Scale x-axis:", "Scale in direction of x-axis");
+  parser.addArgument("scale_y", "", mitkDiffusionCommandLineParser::Float, "Scale y-axis:", "Scale in direction of y-axis");
+  parser.addArgument("scale_z", "", mitkDiffusionCommandLineParser::Float, "Scale z-axis", "Scale in direction of z-axis");
 
-  parser.addArgument("translate_x", "", mitkCommandLineParser::Float, "Translate x-axis:", "Translate in direction of x-axis (in mm)");
-  parser.addArgument("translate_y", "", mitkCommandLineParser::Float, "Translate y-axis:", "Translate in direction of y-axis (in mm)");
-  parser.addArgument("translate_z", "", mitkCommandLineParser::Float, "Translate z-axis:", "Translate in direction of z-axis (in mm)");
+  parser.addArgument("translate_x", "", mitkDiffusionCommandLineParser::Float, "Translate x-axis:", "Translate in direction of x-axis (in mm)");
+  parser.addArgument("translate_y", "", mitkDiffusionCommandLineParser::Float, "Translate y-axis:", "Translate in direction of y-axis (in mm)");
+  parser.addArgument("translate_z", "", mitkDiffusionCommandLineParser::Float, "Translate z-axis:", "Translate in direction of z-axis (in mm)");
 
   parser.endGroup();
 
   parser.beginGroup("5. Remove fiber parts:");
-  parser.addArgument("remove_inside", "", mitkCommandLineParser::Bool, "Remove fibers inside mask:", "remove fibers inside mask");
-  parser.addArgument("remove_outside", "", mitkCommandLineParser::Bool, "Remove fibers outside mask:", "remove fibers outside mask");
-  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask image:", "mask image", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("remove_inside", "", mitkDiffusionCommandLineParser::Bool, "Remove fibers inside mask:", "remove fibers inside mask");
+  parser.addArgument("remove_outside", "", mitkDiffusionCommandLineParser::Bool, "Remove fibers outside mask:", "remove fibers outside mask");
+  parser.addArgument("mask", "", mitkDiffusionCommandLineParser::String, "Mask image:", "mask image", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
   parser.endGroup();
 
 
