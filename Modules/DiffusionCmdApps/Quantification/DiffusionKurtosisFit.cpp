@@ -14,7 +14,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <mitkIOUtil.h>
 #include <mitkDiffusionPropertyHelper.h>
 
@@ -169,7 +169,7 @@ void KurtosisMapComputation( mitk::Image::Pointer input,
 int main( int argc, char* argv[] )
 {
 
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Diffusion Kurtosis Fit");
   parser.setCategory("Diffusion Related Measures");
@@ -178,16 +178,16 @@ int main( int argc, char* argv[] )
   parser.setArgumentPrefix("--","-");
 
   // mandatory arguments
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Preifx: ", "Prefix for the output images, will append _f, _K, _D accordingly ", us::Any(), false);
-  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ", us::Any(), false);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output Preifx: ", "Prefix for the output images, will append _f, _K, _D accordingly ", us::Any(), false);
+  parser.addArgument("output_type", "", mitkDiffusionCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ", us::Any(), false);
 
   // optional arguments
-  parser.addArgument("mask", "m", mitkCommandLineParser::String, "Masking Image: ", "ROI (segmentation)", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("help", "h", mitkCommandLineParser::Bool, "Help", "Show this help text");
-  parser.addArgument("omitbzero", "om", mitkCommandLineParser::Bool, "Omit b0:", "Omit b0 value during fit (default = false)", us::Any());
-  parser.addArgument("lowerkbound", "kl", mitkCommandLineParser::Float, "lower Kbound:", "Set (unsigned) lower boundary for Kurtosis parameter (default = -1000)", us::Any());
-  parser.addArgument("upperkbound", "ku", mitkCommandLineParser::Float, "upper Kbound:", "Set upper boundary for Kurtosis parameter (default = 1000)", us::Any());
+  parser.addArgument("mask", "m", mitkDiffusionCommandLineParser::String, "Masking Image: ", "ROI (segmentation)", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("help", "h", mitkDiffusionCommandLineParser::Bool, "Help", "Show this help text");
+  parser.addArgument("omitbzero", "om", mitkDiffusionCommandLineParser::Bool, "Omit b0:", "Omit b0 value during fit (default = false)", us::Any());
+  parser.addArgument("lowerkbound", "kl", mitkDiffusionCommandLineParser::Float, "lower Kbound:", "Set (unsigned) lower boundary for Kurtosis parameter (default = -1000)", us::Any());
+  parser.addArgument("upperkbound", "ku", mitkDiffusionCommandLineParser::Float, "upper Kbound:", "Set upper boundary for Kurtosis parameter (default = 1000)", us::Any());
 
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);

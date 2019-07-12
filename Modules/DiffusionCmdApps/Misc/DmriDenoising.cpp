@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImage.h>
 #include <mitkIOUtil.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
 #include <itkTotalVariationDenoisingImageFilter.h>
@@ -33,7 +33,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("DmriDenoising");
   parser.setCategory("Preprocessing Tools");
@@ -43,25 +43,25 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
 
   parser.beginGroup("1. Mandatory arguments:");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input image", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("type", "", mitkCommandLineParser::Int, "Type:", "0 (TotalVariation), 1 (Gauss), 2 (NLM)", 0);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("type", "", mitkDiffusionCommandLineParser::Int, "Type:", "0 (TotalVariation), 1 (Gauss), 2 (NLM)", 0);
   parser.endGroup();
 
   parser.beginGroup("2. Total variation parameters:");
-  parser.addArgument("tv_iterations", "", mitkCommandLineParser::Int, "Iterations:", "", 1);
-  parser.addArgument("lambda", "", mitkCommandLineParser::Float, "Lambda:", "", 0.1);
+  parser.addArgument("tv_iterations", "", mitkDiffusionCommandLineParser::Int, "Iterations:", "", 1);
+  parser.addArgument("lambda", "", mitkDiffusionCommandLineParser::Float, "Lambda:", "", 0.1);
   parser.endGroup();
 
   parser.beginGroup("3. Gauss parameters:");
-  parser.addArgument("variance", "", mitkCommandLineParser::Float, "Variance:", "", 1.0);
+  parser.addArgument("variance", "", mitkDiffusionCommandLineParser::Float, "Variance:", "", 1.0);
   parser.endGroup();
 
   parser.beginGroup("4. NLM parameters:");
-  parser.addArgument("nlm_iterations", "", mitkCommandLineParser::Int, "Iterations:", "", 4);
-  parser.addArgument("sampling_radius", "", mitkCommandLineParser::Int, "Sampling radius:", "", 4);
-  parser.addArgument("patch_radius", "", mitkCommandLineParser::Int, "Patch radius:", "", 1);
-  parser.addArgument("num_patches", "", mitkCommandLineParser::Int, "Num. patches:", "", 10);
+  parser.addArgument("nlm_iterations", "", mitkDiffusionCommandLineParser::Int, "Iterations:", "", 4);
+  parser.addArgument("sampling_radius", "", mitkDiffusionCommandLineParser::Int, "Sampling radius:", "", 4);
+  parser.addArgument("patch_radius", "", mitkDiffusionCommandLineParser::Int, "Patch radius:", "", 1);
+  parser.addArgument("num_patches", "", mitkDiffusionCommandLineParser::Int, "Num. patches:", "", 10);
   parser.endGroup();
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);

@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <string>
 
 // CTK includes
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 
 // MITK includes
 #include "mitkConnectomicsNetworkCreator.h"
@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Network Creation");
   parser.setCategory("Connectomics");
@@ -35,11 +35,11 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "f", mitkCommandLineParser::String, "Input Tractogram", "input tractogram (.fib)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "p", mitkCommandLineParser::String, "Parcellation", "parcellation image", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output network", "where to save the output (.cnf; .mat)", us::Any(), false);
+  parser.addArgument("", "f", mitkDiffusionCommandLineParser::String, "Input Tractogram", "input tractogram (.fib)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "p", mitkDiffusionCommandLineParser::String, "Parcellation", "parcellation image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output network", "where to save the output (.cnf; .mat)", us::Any(), false);
 
-  parser.addArgument("noCenterOfMass", "", mitkCommandLineParser::Bool, "No center of mass", "Do not use center of mass for node positions");
+  parser.addArgument("noCenterOfMass", "", mitkDiffusionCommandLineParser::Bool, "No center of mass", "Do not use center of mass for node positions");
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

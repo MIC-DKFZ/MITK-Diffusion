@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImage.h>
 #include <mitkIOUtil.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <mitkMultiModalRigidDefaultRegistrationAlgorithm.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkAlgorithmHelper.h>
@@ -89,7 +89,7 @@ mitk::Image::Pointer apply_transform(mitk::Image::Pointer moving, mitk::Image::P
 
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("DREG");
   parser.setCategory("Preprocessing Tools");
@@ -97,11 +97,11 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "f", mitkCommandLineParser::String, "Fixed:", "fixed image", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "m", mitkCommandLineParser::String, "Moving:", "moving image", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("resample", "", mitkCommandLineParser::Bool, "Resample:", "resample moving image", false);
-  parser.addArgument("coreg", "", mitkCommandLineParser::StringList, "", "additionally apply transform to these images", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "f", mitkDiffusionCommandLineParser::String, "Fixed:", "fixed image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "m", mitkDiffusionCommandLineParser::String, "Moving:", "moving image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("resample", "", mitkDiffusionCommandLineParser::Bool, "Resample:", "resample moving image", false);
+  parser.addArgument("coreg", "", mitkDiffusionCommandLineParser::StringList, "", "additionally apply transform to these images", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -116,9 +116,9 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("resample"))
     resample = true;
 
-  mitkCommandLineParser::StringContainerType coreg;
+  mitkDiffusionCommandLineParser::StringContainerType coreg;
   if (parsedArgs.count("coreg"))
-    coreg = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["coreg"]);
+    coreg = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["coreg"]);
 
   try
   {

@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImage.h>
 #include <mitkIOUtil.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <mitkPeakImage.h>
 #include <itkFlipPeaksFilter.h>
 #include <mitkImageToItk.h>
@@ -28,7 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Flip Peaks");
   parser.setCategory("Preprocessing Tools");
@@ -36,11 +36,11 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input", "input image", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("", "x", mitkCommandLineParser::Bool, "Flip x", "flip along x-axis");
-  parser.addArgument("", "y", mitkCommandLineParser::Bool, "Flip y", "flip along y-axis");
-  parser.addArgument("", "z", mitkCommandLineParser::Bool, "Flip z", "flip along z-axis");
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input", "input image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output", "output image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("", "x", mitkDiffusionCommandLineParser::Bool, "Flip x", "flip along x-axis");
+  parser.addArgument("", "y", mitkDiffusionCommandLineParser::Bool, "Flip y", "flip along y-axis");
+  parser.addArgument("", "z", mitkDiffusionCommandLineParser::Bool, "Flip z", "flip along z-axis");
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

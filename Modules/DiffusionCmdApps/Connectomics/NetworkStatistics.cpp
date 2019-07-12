@@ -29,7 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImageFileWriter.h>
 
 // CTK includes
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 
 // MITK includes
 #include <mitkConnectomicsStatisticsCalculator.h>
@@ -40,7 +40,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Network Creation");
   parser.setCategory("Connectomics");
@@ -49,18 +49,18 @@ int main(int argc, char* argv[])
 
   parser.setArgumentPrefix("--", "-");
 
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input network", "input connectomics network (.cnf)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output file", "name of output file", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input network", "input connectomics network (.cnf)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output file", "name of output file", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
 
-  parser.addArgument("noGlobalStatistics", "g", mitkCommandLineParser::Bool, "No global statistics", "Do not calculate global statistics");
-  parser.addArgument("createConnectivityMatriximage", "I", mitkCommandLineParser::Bool, "Write connectivity matrix image", "Write connectivity matrix image");
-  parser.addArgument("binaryConnectivity", "b", mitkCommandLineParser::Bool, "Binary connectivity", "Whether to create a binary connectivity matrix");
-  parser.addArgument("rescaleConnectivity", "r", mitkCommandLineParser::Bool, "Rescale connectivity", "Whether to rescale the connectivity matrix");
-  parser.addArgument("localStatistics", "L", mitkCommandLineParser::StringList, "Local statistics", "Provide a list of node labels for local statistics", us::Any());
-  parser.addArgument("regionList", "R", mitkCommandLineParser::StringList, "Region list", "A space separated list of regions. Each region has the format\n regionname;label1;label2;...;labelN", us::Any());
-  parser.addArgument("granularity", "gr", mitkCommandLineParser::Int, "Granularity", "How finely to test the density range and how many thresholds to consider",1);
-  parser.addArgument("startDensity", "d", mitkCommandLineParser::Float, "Start Density", "Largest density for the range",1.0);
-  parser.addArgument("thresholdStepSize", "t", mitkCommandLineParser::Int, "Step size threshold", "Distance of two adjacent thresholds",3);
+  parser.addArgument("noGlobalStatistics", "g", mitkDiffusionCommandLineParser::Bool, "No global statistics", "Do not calculate global statistics");
+  parser.addArgument("createConnectivityMatriximage", "I", mitkDiffusionCommandLineParser::Bool, "Write connectivity matrix image", "Write connectivity matrix image");
+  parser.addArgument("binaryConnectivity", "b", mitkDiffusionCommandLineParser::Bool, "Binary connectivity", "Whether to create a binary connectivity matrix");
+  parser.addArgument("rescaleConnectivity", "r", mitkDiffusionCommandLineParser::Bool, "Rescale connectivity", "Whether to rescale the connectivity matrix");
+  parser.addArgument("localStatistics", "L", mitkDiffusionCommandLineParser::StringList, "Local statistics", "Provide a list of node labels for local statistics", us::Any());
+  parser.addArgument("regionList", "R", mitkDiffusionCommandLineParser::StringList, "Region list", "A space separated list of regions. Each region has the format\n regionname;label1;label2;...;labelN", us::Any());
+  parser.addArgument("granularity", "gr", mitkDiffusionCommandLineParser::Int, "Granularity", "How finely to test the density range and how many thresholds to consider",1);
+  parser.addArgument("startDensity", "d", mitkDiffusionCommandLineParser::Float, "Start Density", "Largest density for the range",1.0);
+  parser.addArgument("thresholdStepSize", "t", mitkDiffusionCommandLineParser::Int, "Step size threshold", "Distance of two adjacent thresholds",3);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -80,20 +80,20 @@ int main(int argc, char* argv[])
   std::string networkName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string outName = us::any_cast<std::string>(parsedArgs["o"]);
 
-  mitkCommandLineParser::StringContainerType localLabels;
+  mitkDiffusionCommandLineParser::StringContainerType localLabels;
 
   if(parsedArgs.count("localStatistics"))
   {
-    localLabels = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["localStatistics"]);
+    localLabels = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["localStatistics"]);
   }
 
-  mitkCommandLineParser::StringContainerType unparsedRegions;
+  mitkDiffusionCommandLineParser::StringContainerType unparsedRegions;
   std::map< std::string, std::vector<std::string> > parsedRegions;
   std::map< std::string, std::vector<std::string> >::iterator parsedRegionsIterator;
 
   if(parsedArgs.count("regionList"))
   {
-    unparsedRegions = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["regionList"]);
+    unparsedRegions = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["regionList"]);
 
     for(unsigned int index(0); index < unparsedRegions.size(); index++ )
     {

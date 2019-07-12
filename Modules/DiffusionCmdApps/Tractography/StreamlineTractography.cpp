@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <metaCommand.h>
-#include <mitkCommandLineParser.h>
+#include <mitkDiffusionCommandLineParser.h>
 #include <mitkLog.h>
 #include <usAny.h>
 #include <mitkIOUtil.h>
@@ -52,7 +52,7 @@ typedef itk::Image< itk::Vector< float, numOdfSamples > , 3 > SampledShImageType
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Streamline Tractography");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -63,85 +63,85 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
 
   parser.beginGroup("1. Mandatory arguments:");
-  parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input:", "input image (multiple possible for 'DetTensor' algorithm)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output fiberbundle/probability map", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("type", "", mitkCommandLineParser::String, "Type:", "which tracker to use (Peaks; Tensor; ODF; RF)", us::Any(), false);
-  parser.addArgument("probabilistic", "", mitkCommandLineParser::Bool, "Probabilistic:", "Probabilistic tractography", us::Any(false));
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::StringList, "Input:", "input image (multiple possible for 'DetTensor' algorithm)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output fiberbundle/probability map", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("type", "", mitkDiffusionCommandLineParser::String, "Type:", "which tracker to use (Peaks; Tensor; ODF; RF)", us::Any(), false);
+  parser.addArgument("probabilistic", "", mitkDiffusionCommandLineParser::Bool, "Probabilistic:", "Probabilistic tractography", us::Any(false));
   parser.endGroup();
 
   parser.beginGroup("2. Seeding:");
-  parser.addArgument("seeds", "", mitkCommandLineParser::Int, "Seeds per voxel:", "number of seed points per voxel", 1);
-  parser.addArgument("seed_image", "", mitkCommandLineParser::String, "Seed image:", "mask image defining seed voxels", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("trials_per_seed", "", mitkCommandLineParser::Int, "Max. trials per seed:", "try each seed N times until a valid streamline is obtained (only for probabilistic tractography)", 10);
-  parser.addArgument("max_tracts", "", mitkCommandLineParser::Int, "Max. number of tracts:", "tractography is stopped if the reconstructed number of tracts is exceeded", -1);
+  parser.addArgument("seeds", "", mitkDiffusionCommandLineParser::Int, "Seeds per voxel:", "number of seed points per voxel", 1);
+  parser.addArgument("seed_image", "", mitkDiffusionCommandLineParser::String, "Seed image:", "mask image defining seed voxels", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("trials_per_seed", "", mitkDiffusionCommandLineParser::Int, "Max. trials per seed:", "try each seed N times until a valid streamline is obtained (only for probabilistic tractography)", 10);
+  parser.addArgument("max_tracts", "", mitkDiffusionCommandLineParser::Int, "Max. number of tracts:", "tractography is stopped if the reconstructed number of tracts is exceeded", -1);
   parser.endGroup();
 
   parser.beginGroup("3. Tractography constraints:");
-  parser.addArgument("tracking_mask", "", mitkCommandLineParser::String, "Mask image:", "streamlines leaving the mask will stop immediately", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("stop_image", "", mitkCommandLineParser::String, "Stop ROI image:", "streamlines entering the mask will stop immediately", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("exclusion_image", "", mitkCommandLineParser::String, "Exclusion ROI image:", "streamlines entering the mask will be discarded", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("ep_constraint", "", mitkCommandLineParser::String, "Endpoint constraint:", "determines which fibers are accepted based on their endpoint location - options are NONE, EPS_IN_TARGET, EPS_IN_TARGET_LABELDIFF, EPS_IN_SEED_AND_TARGET, MIN_ONE_EP_IN_TARGET, ONE_EP_IN_TARGET and NO_EP_IN_TARGET", us::Any());
-  parser.addArgument("target_image", "", mitkCommandLineParser::String, "Target ROI image:", "effact depends on the chosen endpoint constraint (option ep_constraint)", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("tracking_mask", "", mitkDiffusionCommandLineParser::String, "Mask image:", "streamlines leaving the mask will stop immediately", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("stop_image", "", mitkDiffusionCommandLineParser::String, "Stop ROI image:", "streamlines entering the mask will stop immediately", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("exclusion_image", "", mitkDiffusionCommandLineParser::String, "Exclusion ROI image:", "streamlines entering the mask will be discarded", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("ep_constraint", "", mitkDiffusionCommandLineParser::String, "Endpoint constraint:", "determines which fibers are accepted based on their endpoint location - options are NONE, EPS_IN_TARGET, EPS_IN_TARGET_LABELDIFF, EPS_IN_SEED_AND_TARGET, MIN_ONE_EP_IN_TARGET, ONE_EP_IN_TARGET and NO_EP_IN_TARGET", us::Any());
+  parser.addArgument("target_image", "", mitkDiffusionCommandLineParser::String, "Target ROI image:", "effact depends on the chosen endpoint constraint (option ep_constraint)", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
   parser.endGroup();
 
   parser.beginGroup("4. Streamline integration parameters:");
-  parser.addArgument("sharpen_odfs", "", mitkCommandLineParser::Bool, "SHarpen ODFs:", "if you are using dODF images as input, it is advisable to sharpen the ODFs (min-max normalize and raise to the power of 4). this is not necessary for CSD fODFs, since they are narurally much sharper.");
-  parser.addArgument("cutoff", "", mitkCommandLineParser::Float, "Cutoff:", "set the FA, GFA or Peak amplitude cutoff for terminating tracks", 0.1);
-  parser.addArgument("odf_cutoff", "", mitkCommandLineParser::Float, "ODF Cutoff:", "threshold on the ODF magnitude. this is useful in case of CSD fODF tractography.", 0.0);
-  parser.addArgument("step_size", "", mitkCommandLineParser::Float, "Step size:", "step size (in voxels)", 0.5);
-  parser.addArgument("min_tract_length", "", mitkCommandLineParser::Float, "Min. tract length:", "minimum fiber length (in mm)", 20);
-  parser.addArgument("angular_threshold", "", mitkCommandLineParser::Float, "Angular threshold:", "angular threshold between two successive steps, (default: 90° * step_size, minimum 15°)");
-  parser.addArgument("loop_check", "", mitkCommandLineParser::Float, "Check for loops:", "threshold on angular stdev over the last 4 voxel lengths");
-  parser.addArgument("peak_jitter", "", mitkCommandLineParser::Float, "Peak jitter:", "important for probabilistic peak tractography and peak prior. actual jitter is drawn from a normal distribution with peak_jitter*fabs(direction_value) as standard deviation.", 0.01);
+  parser.addArgument("sharpen_odfs", "", mitkDiffusionCommandLineParser::Bool, "SHarpen ODFs:", "if you are using dODF images as input, it is advisable to sharpen the ODFs (min-max normalize and raise to the power of 4). this is not necessary for CSD fODFs, since they are narurally much sharper.");
+  parser.addArgument("cutoff", "", mitkDiffusionCommandLineParser::Float, "Cutoff:", "set the FA, GFA or Peak amplitude cutoff for terminating tracks", 0.1);
+  parser.addArgument("odf_cutoff", "", mitkDiffusionCommandLineParser::Float, "ODF Cutoff:", "threshold on the ODF magnitude. this is useful in case of CSD fODF tractography.", 0.0);
+  parser.addArgument("step_size", "", mitkDiffusionCommandLineParser::Float, "Step size:", "step size (in voxels)", 0.5);
+  parser.addArgument("min_tract_length", "", mitkDiffusionCommandLineParser::Float, "Min. tract length:", "minimum fiber length (in mm)", 20);
+  parser.addArgument("angular_threshold", "", mitkDiffusionCommandLineParser::Float, "Angular threshold:", "angular threshold between two successive steps, (default: 90° * step_size, minimum 15°)");
+  parser.addArgument("loop_check", "", mitkDiffusionCommandLineParser::Float, "Check for loops:", "threshold on angular stdev over the last 4 voxel lengths");
+  parser.addArgument("peak_jitter", "", mitkDiffusionCommandLineParser::Float, "Peak jitter:", "important for probabilistic peak tractography and peak prior. actual jitter is drawn from a normal distribution with peak_jitter*fabs(direction_value) as standard deviation.", 0.01);
   parser.endGroup();
 
   parser.beginGroup("5. Tractography prior:");
-  parser.addArgument("prior_image", "", mitkCommandLineParser::String, "Peak prior:", "tractography prior in thr for of a peak image", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("prior_weight", "", mitkCommandLineParser::Float, "Prior weight", "weighting factor between prior and data.", 0.5);
-  parser.addArgument("dont_restrict_to_prior", "", mitkCommandLineParser::Bool, "Don't restrict to prior:", "don't restrict tractography to regions where the prior is valid.", us::Any(false));
-  parser.addArgument("no_new_directions_from_prior", "", mitkCommandLineParser::Bool, "No new directios from prior:", "the prior cannot create directions where there are none in the data.", us::Any(false));
-  parser.addArgument("prior_flip_x", "", mitkCommandLineParser::Bool, "Prior Flip X:", "multiply x-coordinate of prior direction by -1");
-  parser.addArgument("prior_flip_y", "", mitkCommandLineParser::Bool, "Prior Flip Y:", "multiply y-coordinate of prior direction by -1");
-  parser.addArgument("prior_flip_z", "", mitkCommandLineParser::Bool, "Prior Flip Z:", "multiply z-coordinate of prior direction by -1");
+  parser.addArgument("prior_image", "", mitkDiffusionCommandLineParser::String, "Peak prior:", "tractography prior in thr for of a peak image", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("prior_weight", "", mitkDiffusionCommandLineParser::Float, "Prior weight", "weighting factor between prior and data.", 0.5);
+  parser.addArgument("dont_restrict_to_prior", "", mitkDiffusionCommandLineParser::Bool, "Don't restrict to prior:", "don't restrict tractography to regions where the prior is valid.", us::Any(false));
+  parser.addArgument("no_new_directions_from_prior", "", mitkDiffusionCommandLineParser::Bool, "No new directios from prior:", "the prior cannot create directions where there are none in the data.", us::Any(false));
+  parser.addArgument("prior_flip_x", "", mitkDiffusionCommandLineParser::Bool, "Prior Flip X:", "multiply x-coordinate of prior direction by -1");
+  parser.addArgument("prior_flip_y", "", mitkDiffusionCommandLineParser::Bool, "Prior Flip Y:", "multiply y-coordinate of prior direction by -1");
+  parser.addArgument("prior_flip_z", "", mitkDiffusionCommandLineParser::Bool, "Prior Flip Z:", "multiply z-coordinate of prior direction by -1");
   parser.endGroup();
 
   parser.beginGroup("6. Neighborhood sampling:");
-  parser.addArgument("num_samples", "", mitkCommandLineParser::Int, "Num. neighborhood samples:", "number of neighborhood samples that are use to determine the next progression direction", 0);
-  parser.addArgument("sampling_distance", "", mitkCommandLineParser::Float, "Sampling distance:", "distance of neighborhood sampling points (in voxels)", 0.25);
-  parser.addArgument("use_stop_votes", "", mitkCommandLineParser::Bool, "Use stop votes:", "use stop votes");
-  parser.addArgument("use_only_forward_samples", "", mitkCommandLineParser::Bool, "Use only forward samples:", "use only forward samples");
+  parser.addArgument("num_samples", "", mitkDiffusionCommandLineParser::Int, "Num. neighborhood samples:", "number of neighborhood samples that are use to determine the next progression direction", 0);
+  parser.addArgument("sampling_distance", "", mitkDiffusionCommandLineParser::Float, "Sampling distance:", "distance of neighborhood sampling points (in voxels)", 0.25);
+  parser.addArgument("use_stop_votes", "", mitkDiffusionCommandLineParser::Bool, "Use stop votes:", "use stop votes");
+  parser.addArgument("use_only_forward_samples", "", mitkDiffusionCommandLineParser::Bool, "Use only forward samples:", "use only forward samples");
   parser.endGroup();
 
   parser.beginGroup("7. Tensor tractography specific:");
-  parser.addArgument("tend_f", "", mitkCommandLineParser::Float, "Weight f", "weighting factor between first eigenvector (f=1 equals FACT tracking) and input vector dependent direction (f=0).", 1.0);
-  parser.addArgument("tend_g", "", mitkCommandLineParser::Float, "Weight g", "weighting factor between input vector (g=0) and tensor deflection (g=1 equals TEND tracking)", 0.0);
+  parser.addArgument("tend_f", "", mitkDiffusionCommandLineParser::Float, "Weight f", "weighting factor between first eigenvector (f=1 equals FACT tracking) and input vector dependent direction (f=0).", 1.0);
+  parser.addArgument("tend_g", "", mitkDiffusionCommandLineParser::Float, "Weight g", "weighting factor between input vector (g=0) and tensor deflection (g=1 equals TEND tracking)", 0.0);
   parser.endGroup();
 
   parser.beginGroup("8. Random forest tractography specific:");
-  parser.addArgument("forest", "", mitkCommandLineParser::String, "Forest:", "input random forest (HDF5 file)", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("use_sh_features", "", mitkCommandLineParser::Bool, "Use SH features:", "use SH features");
+  parser.addArgument("forest", "", mitkDiffusionCommandLineParser::String, "Forest:", "input random forest (HDF5 file)", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("use_sh_features", "", mitkDiffusionCommandLineParser::Bool, "Use SH features:", "use SH features");
   parser.endGroup();
 
   parser.beginGroup("9. Additional input:");
-  parser.addArgument("additional_images", "", mitkCommandLineParser::StringList, "Additional images:", "specify a list of float images that hold additional information (FA, GFA, additional features for RF tractography)", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("additional_images", "", mitkDiffusionCommandLineParser::StringList, "Additional images:", "specify a list of float images that hold additional information (FA, GFA, additional features for RF tractography)", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
   parser.endGroup();
 
   parser.beginGroup("10. Misc:");
-  parser.addArgument("flip_x", "", mitkCommandLineParser::Bool, "Flip X:", "multiply x-coordinate of direction proposal by -1");
-  parser.addArgument("flip_y", "", mitkCommandLineParser::Bool, "Flip Y:", "multiply y-coordinate of direction proposal by -1");
-  parser.addArgument("flip_z", "", mitkCommandLineParser::Bool, "Flip Z:", "multiply z-coordinate of direction proposal by -1");
-  parser.addArgument("no_data_interpolation", "", mitkCommandLineParser::Bool, "Don't interpolate input data:", "don't interpolate input image values");
-  parser.addArgument("no_mask_interpolation", "", mitkCommandLineParser::Bool, "Don't interpolate masks:", "don't interpolate mask image values");
-  parser.addArgument("compress", "", mitkCommandLineParser::Float, "Compress:", "compress output fibers using the given error threshold (in mm)");
-  parser.addArgument("fix_seed", "", mitkCommandLineParser::Bool, "Fix Random Seed:", "always use the same random numbers");
-  parser.addArgument("parameter_file", "", mitkCommandLineParser::String, "Parameter File:", "load parameters from json file (svae using MITK Diffusion GUI). the parameters loaded form this file are overwritten by the manually set parameters.", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("flip_x", "", mitkDiffusionCommandLineParser::Bool, "Flip X:", "multiply x-coordinate of direction proposal by -1");
+  parser.addArgument("flip_y", "", mitkDiffusionCommandLineParser::Bool, "Flip Y:", "multiply y-coordinate of direction proposal by -1");
+  parser.addArgument("flip_z", "", mitkDiffusionCommandLineParser::Bool, "Flip Z:", "multiply z-coordinate of direction proposal by -1");
+  parser.addArgument("no_data_interpolation", "", mitkDiffusionCommandLineParser::Bool, "Don't interpolate input data:", "don't interpolate input image values");
+  parser.addArgument("no_mask_interpolation", "", mitkDiffusionCommandLineParser::Bool, "Don't interpolate masks:", "don't interpolate mask image values");
+  parser.addArgument("compress", "", mitkDiffusionCommandLineParser::Float, "Compress:", "compress output fibers using the given error threshold (in mm)");
+  parser.addArgument("fix_seed", "", mitkDiffusionCommandLineParser::Bool, "Fix Random Seed:", "always use the same random numbers");
+  parser.addArgument("parameter_file", "", mitkDiffusionCommandLineParser::String, "Parameter File:", "load parameters from json file (svae using MITK Diffusion GUI). the parameters loaded form this file are overwritten by the manually set parameters.", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
   parser.endGroup();
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
     return EXIT_FAILURE;
 
-  mitkCommandLineParser::StringContainerType input_files = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i"]);
+  mitkDiffusionCommandLineParser::StringContainerType input_files = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i"]);
   std::string outFile = us::any_cast<std::string>(parsedArgs["o"]);
   std::string type = us::any_cast<std::string>(parsedArgs["type"]);
 
@@ -322,9 +322,9 @@ int main(int argc, char* argv[])
   }
 
   // LOAD DATASETS
-  mitkCommandLineParser::StringContainerType addFiles;
+  mitkDiffusionCommandLineParser::StringContainerType addFiles;
   if (parsedArgs.count("additional_images"))
-    addFiles = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["additional_images"]);
+    addFiles = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["additional_images"]);
 
   typedef itk::Image<float, 3> ItkFloatImgType;
 

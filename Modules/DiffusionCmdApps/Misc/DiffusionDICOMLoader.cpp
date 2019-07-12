@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkITKImageImport.h>
 
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <itksys/SystemTools.hxx>
 #include <itksys/Directory.hxx>
 
@@ -193,7 +193,7 @@ using namespace mitk;
  */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
   parser.setArgumentPrefix("--", "-");
 
   parser.setTitle("Diffusion Dicom Loader");
@@ -201,10 +201,10 @@ int main(int argc, char* argv[])
   parser.setDescription("Loads Diffusion Dicom files.");
   parser.setContributor("MIC");
 
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input Directory" ,"input directory containing dicom files", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output File Name", "output file", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("dwprefix", "p", mitkCommandLineParser::String, "Recursive Scan Prefix", "prefix for subfolders search rootdir is specified by the 'inputdir' argument value", us::Any(), true);
-  parser.addArgument("dryrun", "s", mitkCommandLineParser::Bool, "Dry run","do not read, only look for input files ", us::Any(), true );
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input Directory" ,"input directory containing dicom files", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output File Name", "output file", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("dwprefix", "p", mitkDiffusionCommandLineParser::String, "Recursive Scan Prefix", "prefix for subfolders search rootdir is specified by the 'inputdir' argument value", us::Any(), true);
+  parser.addArgument("dryrun", "s", mitkDiffusionCommandLineParser::Bool, "Dry run","do not read, only look for input files ", us::Any(), true );
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

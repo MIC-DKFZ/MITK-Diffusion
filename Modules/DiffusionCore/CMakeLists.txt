@@ -22,3 +22,7 @@ MITK_INSTALL(FILES PythonRequirements.txt)
 endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mitkDiffusionImagingConfigure.h.in ${CMAKE_CURRENT_BINARY_DIR}/mitkDiffusionImagingConfigure.h)
+
+mitkFunctionGetVersion(${CMAKE_CURRENT_SOURCE_DIR} MITKDIFFUSION)
+mitkFunctionGetVersionDescription(${CMAKE_CURRENT_SOURCE_DIR} MITKDIFFUSION)
+configure_file(mitkDiffusionVersion.h.in ${MITK_BINARY_DIR}/mitkDiffusionVersion.h)

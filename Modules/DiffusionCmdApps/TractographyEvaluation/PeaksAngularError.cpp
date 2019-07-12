@@ -19,7 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageToItk.h>
 #include <itkEvaluateDirectionImagesFilter.h>
 #include <metaCommand.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <itkTractsToVectorImageFilter.h>
 #include <usAny.h>
 #include <itkImageFileWriter.h>
@@ -38,15 +38,15 @@ typedef itk::Image< unsigned char, 3 >  ItkUcharImageType;
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("test", "", mitkCommandLineParser::StringList, "Test images", "test direction images", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("reference", "", mitkCommandLineParser::StringList, "Reference images", "reference direction images", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output folder", "output folder", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("masks", "", mitkCommandLineParser::StringList, "Mask(s)", "mask image(s)", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("verbose", "", mitkCommandLineParser::Bool, "Verbose", "output error images");
-  parser.addArgument("ignore_test", "", mitkCommandLineParser::Bool, "Ignore missing test", "don't increase error if no test directions are found");
-  parser.addArgument("ignore_ref", "", mitkCommandLineParser::Bool, "Ignore ignore missing ref", "don't increase error if no ref directions are found");
+  parser.addArgument("test", "", mitkDiffusionCommandLineParser::StringList, "Test images", "test direction images", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("reference", "", mitkDiffusionCommandLineParser::StringList, "Reference images", "reference direction images", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output folder", "output folder", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("masks", "", mitkDiffusionCommandLineParser::StringList, "Mask(s)", "mask image(s)", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("verbose", "", mitkDiffusionCommandLineParser::Bool, "Verbose", "output error images");
+  parser.addArgument("ignore_test", "", mitkDiffusionCommandLineParser::Bool, "Ignore missing test", "don't increase error if no test directions are found");
+  parser.addArgument("ignore_ref", "", mitkDiffusionCommandLineParser::Bool, "Ignore ignore missing ref", "don't increase error if no ref directions are found");
 
   parser.setCategory("Fiber Tracking Evaluation");
   parser.setTitle("Peaks Angular Error");
@@ -57,12 +57,12 @@ int main(int argc, char* argv[])
   if (parsedArgs.size()==0)
     return EXIT_FAILURE;
 
-  mitkCommandLineParser::StringContainerType testImages = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["test"]);
-  mitkCommandLineParser::StringContainerType referenceImages = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["reference"]);
+  mitkDiffusionCommandLineParser::StringContainerType testImages = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["test"]);
+  mitkDiffusionCommandLineParser::StringContainerType referenceImages = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["reference"]);
 
-  mitkCommandLineParser::StringContainerType maskImages;
+  mitkDiffusionCommandLineParser::StringContainerType maskImages;
   if (parsedArgs.count("masks"))
-    maskImages = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["masks"]);
+    maskImages = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["masks"]);
 
   std::string outRoot = us::any_cast<std::string>(parsedArgs["o"]);
 

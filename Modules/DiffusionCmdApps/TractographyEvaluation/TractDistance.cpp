@@ -15,7 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <mitkFiberBundle.h>
-#include <mitkCommandLineParser.h>
+#include <mitkDiffusionCommandLineParser.h>
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>
 #include <itkTractDistanceFilter.h>
@@ -27,27 +27,27 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Tract Distance");
   parser.setCategory("Fiber Processing");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i1", mitkCommandLineParser::StringList, "Input tracts 1:", "input tracts 1", us::Any(), false);
-  parser.addArgument("", "i2", mitkCommandLineParser::StringList, "Input tracts 2:", "input tracts 2", us::Any(), false);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output logfile", us::Any(), false);
+  parser.addArgument("", "i1", mitkDiffusionCommandLineParser::StringList, "Input tracts 1:", "input tracts 1", us::Any(), false);
+  parser.addArgument("", "i2", mitkDiffusionCommandLineParser::StringList, "Input tracts 2:", "input tracts 2", us::Any(), false);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output logfile", us::Any(), false);
 
-  parser.addArgument("fiber_points", "", mitkCommandLineParser::Int, "Fiber points:", "", 12);
-  parser.addArgument("metrics", "", mitkCommandLineParser::StringList, "Metrics:", "EU_MEAN (default), EU_STD, EU_MAX");
-  parser.addArgument("metric_weights", "", mitkCommandLineParser::StringList, "Metric weights:", "add one float weight for each used metric");
+  parser.addArgument("fiber_points", "", mitkDiffusionCommandLineParser::Int, "Fiber points:", "", 12);
+  parser.addArgument("metrics", "", mitkDiffusionCommandLineParser::StringList, "Metrics:", "EU_MEAN (default), EU_STD, EU_MAX");
+  parser.addArgument("metric_weights", "", mitkDiffusionCommandLineParser::StringList, "Metric weights:", "add one float weight for each used metric");
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
     return EXIT_FAILURE;
 
-  mitkCommandLineParser::StringContainerType t1_folder = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i1"]);
-  mitkCommandLineParser::StringContainerType t2_folder = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i2"]);
+  mitkDiffusionCommandLineParser::StringContainerType t1_folder = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i1"]);
+  mitkDiffusionCommandLineParser::StringContainerType t2_folder = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i2"]);
   std::string out_file = us::any_cast<std::string>(parsedArgs["o"]);
 
   int fiber_points = 12;
@@ -56,11 +56,11 @@ int main(int argc, char* argv[])
 
   std::vector< std::string > metric_strings = {"EU_MEAN"};
   if (parsedArgs.count("metrics"))
-    metric_strings = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["metrics"]);
+    metric_strings = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["metrics"]);
 
   std::vector< std::string > metric_weights = {"1.0"};
   if (parsedArgs.count("metric_weights"))
-    metric_weights = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["metric_weights"]);
+    metric_weights = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["metric_weights"]);
 
   if (metric_strings.size()!=metric_weights.size())
   {

@@ -1,4 +1,4 @@
 set(CPP_FILES
-    mitkCommandLineParser.cpp
+    mitkDiffusionCommandLineParser.cpp
     DICOMLoader.cpp
 )

@@ -15,7 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <metaCommand.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
@@ -35,7 +35,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Fiber Extraction");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -43,11 +43,11 @@ int main(int argc, char* argv[])
   parser.setDescription("Extract fibers from a tractogram using planar figure ROIs");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk)", us::Any(), false);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram", us::Any(), false);
-  parser.addArgument("planfirgure1", "pf1", mitkCommandLineParser::String, "Figure 1:", "first planar figure ROI", us::Any(), false);
-  parser.addArgument("planfirgure2", "pf2", mitkCommandLineParser::String, "Figure 2:", "second planar figure ROI", us::Any());
-  parser.addArgument("operation", "op", mitkCommandLineParser::String, "Operation:", "logical operation (AND; OR; NOT)", us::Any());
+  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input tractogram (.fib/.trk)", us::Any(), false);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output tractogram", us::Any(), false);
+  parser.addArgument("planfirgure1", "pf1", mitkDiffusionCommandLineParser::String, "Figure 1:", "first planar figure ROI", us::Any(), false);
+  parser.addArgument("planfirgure2", "pf2", mitkDiffusionCommandLineParser::String, "Figure 2:", "second planar figure ROI", us::Any());
+  parser.addArgument("operation", "op", mitkDiffusionCommandLineParser::String, "Operation:", "logical operation (AND; OR; NOT)", us::Any());
 
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);

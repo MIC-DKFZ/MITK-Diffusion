@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <metaCommand.h>
-#include <mitkCommandLineParser.h>
+#include <mitkDiffusionCommandLineParser.h>
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
@@ -42,7 +42,7 @@ typedef itk::Image<unsigned int, 3>    ItkUIntImgType;
 */
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Calculate Overlap");
   parser.setCategory("Fiber Tracking Evaluation");
@@ -50,9 +50,9 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("tractogram", "", mitkCommandLineParser::String, "", "", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("mask", "", mitkCommandLineParser::String, "", "", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("peaks", "", mitkCommandLineParser::String, "", "", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("tractogram", "", mitkDiffusionCommandLineParser::String, "", "", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("mask", "", mitkDiffusionCommandLineParser::String, "", "", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("peaks", "", mitkDiffusionCommandLineParser::String, "", "", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

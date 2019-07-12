@@ -15,7 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <metaCommand.h>
-#include "mitkCommandLineParser.h"
+#include "mitkDiffusionCommandLineParser.h"
 #include <usAny.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkFiberBundle.h>
@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 int main(int argc, char* argv[])
 {
-  mitkCommandLineParser parser;
+  mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Random Fiber Phantom");
   parser.setCategory("Diffusion Simulation Tools");
@@ -32,23 +32,23 @@ int main(int argc, char* argv[])
   parser.setDescription("Create Random Fiber Configurations");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("num_bundles", "", mitkCommandLineParser::Int, "", "", 50);
-  parser.addArgument("min_density", "", mitkCommandLineParser::Int, "", "", 50);
-  parser.addArgument("max_density", "", mitkCommandLineParser::Int, "", "", 200);
-  parser.addArgument("size_x", "", mitkCommandLineParser::Int, "", "", 250);
-  parser.addArgument("size_y", "", mitkCommandLineParser::Int, "", "", 250);
-  parser.addArgument("size_z", "", mitkCommandLineParser::Int, "", "", 250);
-  parser.addArgument("min_stepsize", "", mitkCommandLineParser::Int, "", "", 15);
-  parser.addArgument("max_stepsize", "", mitkCommandLineParser::Int, "", "", 30);
-  parser.addArgument("min_curve", "", mitkCommandLineParser::Int, "", "", 5);
-  parser.addArgument("max_curve", "", mitkCommandLineParser::Int, "", "", 45);
-  parser.addArgument("min_radius", "", mitkCommandLineParser::Int, "", "", 5);
-  parser.addArgument("max_radius", "", mitkCommandLineParser::Int, "", "", 25);
-  parser.addArgument("min_twist", "", mitkCommandLineParser::Int, "", "", 15);
-  parser.addArgument("max_twist", "", mitkCommandLineParser::Int, "", "", 30);
-  parser.addArgument("compress", "", mitkCommandLineParser::Float, "Compress:", "compress fiber using the given error threshold (in mm)", 0.1);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output folder:", "output folder", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("fix_seed", "", mitkCommandLineParser::Int, "Fix random seed:", "if >= 0, produce same random values on each run using this seed.", -1);
+  parser.addArgument("num_bundles", "", mitkDiffusionCommandLineParser::Int, "", "", 50);
+  parser.addArgument("min_density", "", mitkDiffusionCommandLineParser::Int, "", "", 50);
+  parser.addArgument("max_density", "", mitkDiffusionCommandLineParser::Int, "", "", 200);
+  parser.addArgument("size_x", "", mitkDiffusionCommandLineParser::Int, "", "", 250);
+  parser.addArgument("size_y", "", mitkDiffusionCommandLineParser::Int, "", "", 250);
+  parser.addArgument("size_z", "", mitkDiffusionCommandLineParser::Int, "", "", 250);
+  parser.addArgument("min_stepsize", "", mitkDiffusionCommandLineParser::Int, "", "", 15);
+  parser.addArgument("max_stepsize", "", mitkDiffusionCommandLineParser::Int, "", "", 30);
+  parser.addArgument("min_curve", "", mitkDiffusionCommandLineParser::Int, "", "", 5);
+  parser.addArgument("max_curve", "", mitkDiffusionCommandLineParser::Int, "", "", 45);
+  parser.addArgument("min_radius", "", mitkDiffusionCommandLineParser::Int, "", "", 5);
+  parser.addArgument("max_radius", "", mitkDiffusionCommandLineParser::Int, "", "", 25);
+  parser.addArgument("min_twist", "", mitkDiffusionCommandLineParser::Int, "", "", 15);
+  parser.addArgument("max_twist", "", mitkDiffusionCommandLineParser::Int, "", "", 30);
+  parser.addArgument("compress", "", mitkDiffusionCommandLineParser::Float, "Compress:", "compress fiber using the given error threshold (in mm)", 0.1);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output folder:", "output folder", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("fix_seed", "", mitkDiffusionCommandLineParser::Int, "Fix random seed:", "if >= 0, produce same random values on each run using this seed.", -1);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
