@@ -59,6 +59,7 @@ set(_plugins
   org.mitk.gui.qt.basicimageprocessing
   org.mitk.gui.qt.properties
   org.mitk.gui.qt.viewnavigator
+  org.mitk.gui.qt.renderwindowmanager
 )
 
 if(NOT MITK_USE_Python)
