@@ -11,6 +11,10 @@ MITK_CREATE_MODULE(
     PUBLIC VTK|vtkFiltersProgrammable Vigra HDF5
 )
 
+if(TARGET ${MODULE_TARGET} AND MITK_USE_OpenMP)
+  target_link_libraries(${MODULE_TARGET} PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
 if(MSVC)
   mitkFunctionCheckCAndCXXCompilerFlags("/wd4005" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
 endif()
