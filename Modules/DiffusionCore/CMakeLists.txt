@@ -21,7 +21,7 @@ endif()
 
 add_subdirectory(Testing)
 
-if(MITK_USE_Python)
+if(MITK_USE_Python3)
 MITK_INSTALL(FILES PythonRequirements.txt)
 endif()
 

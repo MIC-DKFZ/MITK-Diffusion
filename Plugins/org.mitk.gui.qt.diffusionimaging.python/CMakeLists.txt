@@ -1,4 +1,4 @@
-if(MITK_USE_Python)
+if(MITK_USE_Python3)
 
 # The project name must correspond to the directory name of your plug-in
 # and must not contain periods.
