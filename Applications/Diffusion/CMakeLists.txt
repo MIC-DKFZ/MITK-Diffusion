@@ -62,7 +62,7 @@ set(_plugins
   org.mitk.gui.qt.renderwindowmanager
 )
 
-if(NOT MITK_USE_Python)
+if(NOT MITK_USE_Python3)
   list(REMOVE_ITEM _plugins org.mitk.gui.qt.diffusionimaging.python)
   list(REMOVE_ITEM _plugins org.mitk.gui.qt.python)
 endif()

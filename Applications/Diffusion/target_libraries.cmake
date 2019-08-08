@@ -37,7 +37,7 @@ set(target_libraries
   org_mitk_gui_qt_renderwindowmanager
 )
 
-if(NOT MITK_USE_Python)
+if(NOT MITK_USE_Python3)
   list(REMOVE_ITEM target_libraries org_mitk_gui_qt_diffusionimaging_python)
   list(REMOVE_ITEM target_libraries org_mitk_gui_qt_python)
 endif()

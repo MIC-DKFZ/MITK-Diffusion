@@ -179,8 +179,8 @@ int main( int argc, char* argv[] )
 
   // mandatory arguments
   parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output Preifx: ", "Prefix for the output images, will append _f, _K, _D accordingly ", us::Any(), false);
-  parser.addArgument("output_type", "", mitkDiffusionCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ", us::Any(), false);
+  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output Preifx: ", "Prefix for the output images, will append _ADC, _AKC accordingly ", us::Any(), false);
+  parser.addArgument("output_type", "", mitkDiffusionCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ");
 
   // optional arguments
   parser.addArgument("mask", "m", mitkDiffusionCommandLineParser::String, "Masking Image: ", "ROI (segmentation)", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
@@ -198,8 +198,8 @@ int main( int argc, char* argv[] )
   }
 
   // mandatory arguments
-  std::string inFileName = us::any_cast<std::string>(parsedArgs["input"]);
-  std::string out_prefix = us::any_cast<std::string>(parsedArgs["output"]);
+  std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
+  std::string out_prefix = us::any_cast<std::string>(parsedArgs["o"]);
   std::string maskPath = "";
 
   mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
