@@ -119,10 +119,10 @@ int main( int argc, char* argv[] )
 
   mitkDiffusionCommandLineParser parser;
 
-  parser.setTitle("Diffusion Kurtosis Fit");
+  parser.setTitle("Diffusion IVIM Fit");
   parser.setCategory("Diffusion Related Measures");
   parser.setContributor("MIC");
-  parser.setDescription("Fitting Kurtosis");
+  parser.setDescription("Fitting IVIM");
   parser.setArgumentPrefix("--","-");
 
   // mandatory arguments
