@@ -39,6 +39,10 @@ namespace mitk
   ShImageReader::ShImageReader()
     : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION() )
   {
+    Options defaultOptions;
+    defaultOptions["Assume MRtrix/MITK style SH convention (else FSL/Dipy)"] = true;
+    this->SetDefaultOptions(defaultOptions);
+
     m_ServiceReg = this->RegisterService();
   }
 
@@ -55,6 +59,12 @@ namespace mitk
     importer->GenerateData();
 
     mitk::ShImage::Pointer shImage = mitk::ShImage::New();
+
+    Options options = this->GetOptions();
+    bool mrtrix_sh = us::any_cast<bool>(options["Assume MRtrix/MITK style SH convention (else FSL/Dipy)"]);
+    if (!mrtrix_sh)
+      shImage->SetShConvention(mitk::ShImage::SH_CONVENTION::FSL);
+
     mitk::Image::Pointer resultImage = dynamic_cast<mitk::Image*>(shImage.GetPointer());
     mitk::CastToMitkImage(importer->GetCoefficientImage(), resultImage);
     resultImage->SetVolume(importer->GetCoefficientImage()->GetBufferPointer());

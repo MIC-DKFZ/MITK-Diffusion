@@ -1,6 +1,5 @@
 import sys
 
-
 def get_mitk_sphere():
     """ Return MITK compliant dipy Sphere object.
     MITK stores ODFs as 252 values spherically sampled from the continuous ODF.
@@ -280,6 +279,7 @@ def get_mitk_sphere():
 
 error_string = None
 del error_string
+
 try:
     import dipy.direction.peaks as dpp
     from dipy.reconst.shore import ShoreModel
@@ -293,6 +293,7 @@ try:
 
     print('DIPY Reconstructions')
     data = sitk.GetArrayFromImage(in_image)
+    print(data.shape)
     bvals = np.array(bvals)
     bvecs = np.array(bvecs)
 

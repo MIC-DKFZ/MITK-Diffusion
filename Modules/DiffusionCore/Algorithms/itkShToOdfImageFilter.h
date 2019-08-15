@@ -19,6 +19,7 @@
 
 #include <itkOrientationDistributionFunction.h>
 #include <itkImageToImageFilter.h>
+#include <mitkShImage.h>
 
 namespace itk{
 /** \class ShToOdfImageFilter
@@ -31,11 +32,6 @@ class ShToOdfImageFilter : public
 {
 
 public:
-
-    enum Toolkit {  ///< SH coefficient convention (depends on toolkit)
-        FSL,
-        MRTRIX
-    };
 
     typedef itk::Vector< PixelType, (ShOrder*ShOrder + ShOrder + 2)/2 + ShOrder >   InputPixelType;
     typedef itk::Image<InputPixelType,3>              InputImageType;
@@ -58,8 +54,8 @@ public:
     /** Runtime information support. */
     itkTypeMacro(ShToOdfImageFilter, ImageToImageFilter)
 
-    itkSetMacro( Toolkit, Toolkit)  ///< define SH coefficient convention (depends on toolkit)
-    itkGetMacro( Toolkit, Toolkit)  ///< SH coefficient convention (depends on toolkit)
+    itkSetMacro( Toolkit, mitk::ShImage::SH_CONVENTION)  ///< define SH coefficient convention (depends on toolkit)
+    itkGetMacro( Toolkit, mitk::ShImage::SH_CONVENTION)  ///< SH coefficient convention (depends on toolkit)
 
     void BeforeThreadedGenerateData();
     void ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType);
@@ -71,7 +67,7 @@ protected:
     void CalcShBasis();
 
     vnl_matrix<float>                         m_ShBasis;
-    Toolkit                                   m_Toolkit;
+    mitk::ShImage::SH_CONVENTION              m_Toolkit;
 
 private:
 

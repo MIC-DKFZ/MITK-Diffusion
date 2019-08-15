@@ -143,14 +143,13 @@ void QmitkDipyReconstructionsView::StartFit()
 
   // get python script as string
   QString data;
-  QString fileName(":/QmitkDiffusionImaging/dipy_reconstructions.py");
+  QString fileName(":/QmitkDiffusionPython/dipy_reconstructions.py");
   QFile file(fileName);
   if(!file.open(QIODevice::ReadOnly)) {
-    qDebug()<<"filenot opened"<<endl;
+    MITK_INFO << "Dipy reconstruction code not found!";
   }
   else
   {
-    qDebug()<<"file opened"<<endl;
     data = file.readAll();
   }
   file.close();
@@ -186,7 +185,6 @@ void QmitkDipyReconstructionsView::StartFit()
     QMessageBox::warning(nullptr, "Error", "No b=0 volume found. Do your b-values need rounding? Use the Preprocessing View for rounding b-values,", QMessageBox::Ok);
     return;
   }
-
 
   us::ModuleContext* context = us::GetModuleContext();
   us::ServiceReference<mitk::IPythonService> m_PythonServiceRef = context->GetServiceReference<mitk::IPythonService>();
@@ -266,6 +264,7 @@ void QmitkDipyReconstructionsView::StartFit()
   m_PythonService->Execute("data=False");
   m_PythonService->Execute("bvals=" + bvals);
   m_PythonService->Execute("bvecs=" + bvecs);
+
   m_PythonService->Execute(data.toStdString(), mitk::IPythonService::MULTI_LINE_COMMAND);
 
   // clean up after running script (better way than deleting individual variables?)
@@ -309,6 +308,7 @@ void QmitkDipyReconstructionsView::StartFit()
     mitk::ShImage::ShOnDiskType::Pointer itkImg = converter->GetOutputImage();
 
     mitk::ShImage::Pointer shImage = mitk::ShImage::New();
+    shImage->SetShConvention(mitk::ShImage::SH_CONVENTION::FSL);
     mitk::Image::Pointer mitkImage = dynamic_cast<mitk::Image*>(shImage.GetPointer());
 
     switch(sh_order)
@@ -406,4 +406,5 @@ void QmitkDipyReconstructionsView::StartFit()
     GetDataStorage()->Add(seg, node);
     m_PythonService->Execute("del peak_image");
   }
+  mitk::IPythonService::ForceLoadModule();  // just included here because it flushes the python stdout
 }

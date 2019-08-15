@@ -35,6 +35,11 @@ namespace mitk
 
   public:
 
+    enum SH_CONVENTION {  ///< SH coefficient convention (depends on toolkit)
+        FSL,    // used in FSL, Dipy
+        MRTRIX  // used in MRtrix, MITK
+    };
+
     typedef itk::Image<float,4 >  ShOnDiskType; // we store the sh images in MRtrix 4D float format and convert on load to 3D multi-component images
 
     mitkClassMacro( ShImage, Image )
@@ -52,6 +57,9 @@ namespace mitk
     unsigned int ShOrder();
     unsigned int NumCoefficients();
 
+    SH_CONVENTION GetShConvention() const;
+    void SetShConvention(SH_CONVENTION ShConvention);
+
   protected:
     ShImage();
     ~ShImage() override;
@@ -64,6 +72,7 @@ namespace mitk
     mutable mitk::Image::Pointer m_RgbImage;
     unsigned int m_ShOrder;
     unsigned int m_NumCoefficients;
+    SH_CONVENTION m_ShConvention;  // use mrtrix style SH convention
   };
 
 } // namespace mitk

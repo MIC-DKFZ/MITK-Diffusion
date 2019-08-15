@@ -23,6 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionConstIterator.h"
 #include "itkImageRegionIterator.h"
 #include <mitkDiffusionFunctionCollection.h>
+#include <mitkShImage.h>
 
 namespace itk
 {
@@ -71,9 +72,14 @@ typename TOutputImage=itk::Image<itk::RGBAPixel<unsigned char>,3> >
   /** End concept checking */
 #endif
 
+  itkSetMacro( ShConvention, mitk::ShImage::SH_CONVENTION)  ///< define SH coefficient convention
+  itkGetMacro( ShConvention, mitk::ShImage::SH_CONVENTION)  ///< SH coefficient convention
+
 protected:
   ShToRgbImageFilter(){}
   ~ShToRgbImageFilter() override{}
+
+  mitk::ShImage::SH_CONVENTION m_ShConvention = mitk::ShImage::SH_CONVENTION::MRTRIX;
 
   void ThreadedGenerateData( const typename OutputImageType::RegionType &outputRegionForThread, ThreadIdType) override
   {
@@ -96,7 +102,7 @@ protected:
     oit.GoToBegin();
 
     typedef itk::OrientationDistributionFunction<float,ODF_SAMPLING_SIZE> OdfType;
-    vnl_matrix<float> sh2Basis =  mitk::sh::CalcShBasisForDirections(ShOrder, itk::PointShell<ODF_SAMPLING_SIZE, vnl_matrix_fixed<double, 3, ODF_SAMPLING_SIZE> >::DistributePointShell()->as_matrix());
+    vnl_matrix<float> sh2Basis =  mitk::sh::CalcShBasisForDirections(ShOrder, itk::PointShell<ODF_SAMPLING_SIZE, vnl_matrix_fixed<double, 3, ODF_SAMPLING_SIZE> >::DistributePointShell()->as_matrix(), m_ShConvention);
 
     while(!it.IsAtEnd() && !oit.IsAtEnd())
     {

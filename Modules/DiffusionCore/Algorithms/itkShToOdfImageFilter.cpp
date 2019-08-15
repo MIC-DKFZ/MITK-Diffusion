@@ -28,7 +28,7 @@ namespace itk {
 
 template< class PixelType, int ShOrder >
 ShToOdfImageFilter< PixelType, ShOrder >::ShToOdfImageFilter()
-  : m_Toolkit(Toolkit::MRTRIX)
+  : m_Toolkit(mitk::ShImage::SH_CONVENTION::MRTRIX)
 {
 
 }
@@ -69,7 +69,7 @@ template< class PixelType, int ShOrder >
 void ShToOdfImageFilter< PixelType, ShOrder >::CalcShBasis()
 {
   vnl_matrix_fixed<double, 3, ODF_SAMPLING_SIZE>* U = itk::PointShell<ODF_SAMPLING_SIZE, vnl_matrix_fixed<double, 3, ODF_SAMPLING_SIZE> >::DistributePointShell();
-  if (m_Toolkit==Toolkit::MRTRIX)
+  if (m_Toolkit==mitk::ShImage::SH_CONVENTION::MRTRIX)
     m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, U->as_matrix());
   else
     m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, U->as_matrix(), false);
