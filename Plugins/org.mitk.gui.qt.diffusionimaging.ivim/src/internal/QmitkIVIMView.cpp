@@ -412,7 +412,7 @@ void QmitkIVIMView::FittIVIMStart()
     filter->Update();
 
     mitk::LookupTable::Pointer kurt_map_lut = mitk::LookupTable::New();
-    kurt_map_lut->SetType( mitk::LookupTable::JET_TRANSPARENT );
+    kurt_map_lut->SetType( mitk::LookupTable::JET );
     mitk::LookupTableProperty::Pointer kurt_lut_prop =
         mitk::LookupTableProperty::New();
     kurt_lut_prop->SetLookupTable( kurt_map_lut );
@@ -756,6 +756,11 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
 
 void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
 {
+  mitk::LookupTable::Pointer lut = mitk::LookupTable::New();
+  lut->SetType( mitk::LookupTable::JET );
+  mitk::LookupTableProperty::Pointer lut_prop = mitk::LookupTableProperty::New();
+  lut_prop->SetLookupTable( lut );
+
   if(m_Controls->m_CheckDStar->isChecked())
   {
     mitk::Image::Pointer dstarimage = mitk::Image::New();
@@ -765,6 +770,8 @@ void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
     mitk::DataNode::Pointer node2=mitk::DataNode::New();
     node2->SetData( dstarimage );
     node2->SetName(newname2.toLatin1());
+    node2->SetProperty("LookupTable", lut_prop );
+
     GetDataStorage()->Add(node2, node);
   }
 
@@ -777,6 +784,8 @@ void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
     mitk::DataNode::Pointer node1=mitk::DataNode::New();
     node1->SetData( dimage );
     node1->SetName(newname1.toLatin1());
+    node1->SetProperty("LookupTable", lut_prop );
+
     GetDataStorage()->Add(node1, node);
   }
 
@@ -789,6 +798,8 @@ void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
     mitk::DataNode::Pointer node3=mitk::DataNode::New();
     node3->SetData( image );
     node3->SetName(newname0.toLatin1());
+    node3->SetProperty("LookupTable", lut_prop );
+
     GetDataStorage()->Add(node3, node);
   }
 
