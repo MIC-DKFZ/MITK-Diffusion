@@ -221,6 +221,7 @@ mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromShImage(mit
     mitk::CastToItkImage(mitkImage, itkvol);
     typename ShConverterType::Pointer converter = ShConverterType::New();
     converter->SetInput(itkvol);
+    converter->SetToolkit(mitkShImage->GetShConvention());
     converter->Update();
     output = converter->GetOutput();
     break;
@@ -232,6 +233,7 @@ mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromShImage(mit
     mitk::CastToItkImage(mitkImage, itkvol);
     typename ShConverterType::Pointer converter = ShConverterType::New();
     converter->SetInput(itkvol);
+    converter->SetToolkit(mitkShImage->GetShConvention());
     converter->Update();
     output = converter->GetOutput();
     break;
@@ -243,6 +245,7 @@ mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromShImage(mit
     mitk::CastToItkImage(mitkImage, itkvol);
     typename ShConverterType::Pointer converter = ShConverterType::New();
     converter->SetInput(itkvol);
+    converter->SetToolkit(mitkShImage->GetShConvention());
     converter->Update();
     output = converter->GetOutput();
     break;
@@ -254,6 +257,7 @@ mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromShImage(mit
     mitk::CastToItkImage(mitkImage, itkvol);
     typename ShConverterType::Pointer converter = ShConverterType::New();
     converter->SetInput(itkvol);
+    converter->SetToolkit(mitkShImage->GetShConvention());
     converter->Update();
     output = converter->GetOutput();
     break;
@@ -265,6 +269,7 @@ mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromShImage(mit
     mitk::CastToItkImage(mitkImage, itkvol);
     typename ShConverterType::Pointer converter = ShConverterType::New();
     converter->SetInput(itkvol);
+    converter->SetToolkit(mitkShImage->GetShConvention());
     converter->Update();
     output = converter->GetOutput();
     break;
@@ -276,6 +281,7 @@ mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromShImage(mit
     mitk::CastToItkImage(mitkImage, itkvol);
     typename ShConverterType::Pointer converter = ShConverterType::New();
     converter->SetInput(itkvol);
+    converter->SetToolkit(mitkShImage->GetShConvention());
     converter->Update();
     output = converter->GetOutput();
     break;

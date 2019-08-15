@@ -88,6 +88,7 @@ int main(int argc, char* argv[])
     }
     else if ( dynamic_cast<mitk::ShImage*>(mitkImage.GetPointer()) )
     {
+      MITK_INFO << "Assuming MITK/MRtrix style SH convention!";
       mitk::Image::Pointer shImage = dynamic_cast<mitk::Image*>(mitkImage.GetPointer());
       gibbsTracker->SetOdfImage(mitk::convert::GetItkOdfFromShImage(shImage));
     }

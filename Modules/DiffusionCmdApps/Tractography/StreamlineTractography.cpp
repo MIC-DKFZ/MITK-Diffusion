@@ -65,7 +65,7 @@ int main(int argc, char* argv[])
   parser.beginGroup("1. Mandatory arguments:");
   parser.addArgument("", "i", mitkDiffusionCommandLineParser::StringList, "Input:", "input image (multiple possible for 'DetTensor' algorithm)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
   parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output fiberbundle/probability map", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
-  parser.addArgument("type", "", mitkDiffusionCommandLineParser::String, "Type:", "which tracker to use (Peaks; Tensor; ODF; RF)", us::Any(), false);
+  parser.addArgument("type", "", mitkDiffusionCommandLineParser::String, "Type:", "which tracker to use (Peaks; Tensor; ODF; ODF-DIPY/FSL; RF)", us::Any(), false);
   parser.addArgument("probabilistic", "", mitkDiffusionCommandLineParser::Bool, "Probabilistic:", "Probabilistic tractography", us::Any(false));
   parser.endGroup();
 
@@ -469,7 +469,7 @@ int main(int argc, char* argv[])
     if (addImages.at(0).size()>0)
       dynamic_cast<mitk::TrackingHandlerTensor*>(handler)->SetFaImage(addImages.at(0).at(0));
   }
-  else if (type == "ODF" || (type == "Tensor" && params->m_Mode == mitk::StreamlineTractographyParameters::MODE::PROBABILISTIC))
+  else if (type == "ODF" || type == "ODF-DIPY/FSL" || (type == "Tensor" && params->m_Mode == mitk::StreamlineTractographyParameters::MODE::PROBABILISTIC))
   {
     handler = new mitk::TrackingHandlerOdf();
 
@@ -489,7 +489,10 @@ int main(int argc, char* argv[])
       if (dynamic_cast<mitk::ShImage*>(input.GetPointer()))
       {
         MITK_INFO << "Converting SH to ODF image";
-        mitk::Image::Pointer mitkImg = dynamic_cast<mitk::Image*>(input.GetPointer());
+        mitk::ShImage::Pointer mitkShImage = dynamic_cast<mitk::ShImage*>(input.GetPointer());
+        if (type == "ODF-DIPY/FSL")
+          mitkShImage->SetShConvention(mitk::ShImage::SH_CONVENTION::FSL);
+        mitk::Image::Pointer mitkImg = dynamic_cast<mitk::Image*>(mitkShImage.GetPointer());
         itkImg = mitk::convert::GetItkOdfFromShImage(mitkImg);
       }
       else if (dynamic_cast<mitk::OdfImage*>(input.GetPointer()))

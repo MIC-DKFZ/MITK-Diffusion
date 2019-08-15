@@ -95,7 +95,10 @@ int main(int argc, char* argv[])
 
       OdfVectorImgType::Pointer itkvol;
       if (dynamic_cast<mitk::ShImage*>(input.GetPointer()))
+      {
+        MITK_INFO << "Assuming MITK/MRtrix style SH convention!";
         itkvol = mitk::convert::GetItkOdfFromShImage(input);
+      }
       else
         itkvol = mitk::convert::GetItkOdfFromOdfImage(input);
 

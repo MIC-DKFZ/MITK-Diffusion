@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 mitk::ShImage::ShImage() : Image()
   , m_ShOrder(0)
   , m_NumCoefficients(0)
+  , m_ShConvention(SH_CONVENTION::MRTRIX)
 {
   m_RgbImage = nullptr;
   // not needed anymore as soon as all diffusion images are identified via properties anyway
@@ -91,6 +92,7 @@ void mitk::ShImage::Construct() const
   typename ImageType::Pointer itkvol = ImageType::New();
   mitk::CastToItkImage(this, itkvol);
   filter->SetInput(itkvol);
+  filter->SetShConvention(this->m_ShConvention);
   filter->Update();
 
   itk::Image<itk::RGBAPixel<unsigned char>,3>::Pointer tmp = filter->GetOutput();
@@ -141,4 +143,14 @@ void mitk::ShImage::PrintSelf(std::ostream &os, itk::Indent indent) const
   os << indent << "Spherical harmonics order: " << m_ShOrder << std::endl;
   os << indent << "Number of coefficients: " << m_NumCoefficients << std::endl;
   Superclass::PrintSelf(os, indent);
+}
+
+mitk::ShImage::SH_CONVENTION mitk::ShImage::ShImage::GetShConvention() const
+{
+  return m_ShConvention;
+}
+
+void mitk::ShImage::ShImage::SetShConvention(SH_CONVENTION ShConvention)
+{
+  m_ShConvention = ShConvention;
 }
