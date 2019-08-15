@@ -237,7 +237,7 @@ int main( int argc, char* argv[] )
 
   if( !DPH::IsDiffusionWeightedImage( inputImage ) )
   {
-    MITK_ERROR("DiffusionIVIMFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
+    MITK_ERROR("DiffusionKurtosisFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
     return EXIT_FAILURE;
   }
 

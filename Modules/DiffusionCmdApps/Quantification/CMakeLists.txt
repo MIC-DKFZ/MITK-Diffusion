@@ -16,6 +16,7 @@ if(BUILD_DiffusionQuantificationCmdApps OR MITK_BUILD_ALL_APPS)
     QballReconstruction^^
     TensorReconstruction^^
     DiffusionKurtosisFit^^
+    DiffusionIvimFit^^
     MultishellMethods^^
     )
 
