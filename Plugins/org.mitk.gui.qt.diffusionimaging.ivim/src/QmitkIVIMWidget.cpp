@@ -36,6 +36,9 @@ QmitkIVIMWidget::QmitkIVIMWidget( QWidget * parent )
     canvas->setContentsMargins(0,0,0,0);
   }
 
+  auto linScale = new QwtLinearScaleEngine();
+  m_Plot->setAxisScaleEngine(1, linScale);
+
   auto logScale = new QwtLogScaleEngine();
   m_Plot->setAxisScaleEngine(0, logScale);
 
@@ -80,11 +83,12 @@ void QmitkIVIMWidget::SetParameters( IVIMFilterType::IVIMSnapshot snap )
   s = s.arg(snap.currentF,4);
   s = s.arg(snap.currentD,4);
   s = s.arg(snap.currentDStar,4);
-  int curveId = this->InsertCurve( s.toLatin1(), QColor(Qt::black) );
+  int curveId = this->InsertCurve( s.toLatin1(), QColor(Qt::lightGray) );
   this->SetCurvePen( curveId, QPen( Qt::NoPen ) );
 
   QPen pen;
-  pen.setColor( QColor(Qt::red) );
+  pen.setColor( QColor(Qt::cyan) );
+  pen.setStyle( Qt::DotLine );
   pen.setWidth(2);
   double maxb = snap.bvalues.max_value();
   vnl_vector<double> xvals(2);
@@ -93,14 +97,15 @@ void QmitkIVIMWidget::SetParameters( IVIMFilterType::IVIMSnapshot snap )
   xvals[1] = maxb;
   yvals[0] = 1-snap.currentFunceiled;
   yvals[1] = yvals[0]*exp(-maxb * snap.currentD);
-  curveId = this->InsertCurve( "contribution of D to the signal", pen.color() );
+  curveId = this->InsertCurve( "contribution of D to the signal", QColor(Qt::lightGray) );
   this->SetCurveData( curveId, vec(xvals), vec(yvals) );
   this->SetCurvePen( curveId, pen );
   this->SetCurveAntialiasingOn( curveId );
 
   if(snap.currentDStar != 0)
   {
-    pen.setColor(Qt::black);
+    pen.setStyle( Qt::SolidLine );
+    pen.setColor(Qt::red);
     int nsampling = 50;
     xvals.set_size(nsampling);
     yvals.set_size(nsampling);
@@ -110,7 +115,7 @@ void QmitkIVIMWidget::SetParameters( IVIMFilterType::IVIMSnapshot snap )
       xvals[i] = (((1.0)*i)/(1.0*nsampling))*maxb;
       yvals[i] = f*exp(- xvals[i] * snap.currentD) + (1-f)*exp(- xvals[i] * (snap.currentD+snap.currentDStar));
     }
-    curveId = this->InsertCurve( "resulting fit of the model" );
+    curveId = this->InsertCurve( "resulting fit of the model", QColor(Qt::lightGray) );
     this->SetCurveData( curveId, vec(xvals), vec(yvals) );
     this->SetCurvePen( curveId, pen );
     this->SetCurveAntialiasingOn( curveId );
@@ -119,30 +124,45 @@ void QmitkIVIMWidget::SetParameters( IVIMFilterType::IVIMSnapshot snap )
   // plot points after all curves to force prettier legend formatting
   //  lines
   //  points
-  curveId = this->InsertCurve( "ignored measurement points" );
-  this->SetCurveData( curveId, vec(snap.bvalues), vec(snap.allmeas) );
-  this->SetCurvePen( curveId, QPen(Qt::NoPen) );
-  QwtSymbol* whiteSymbol = new QwtSymbol(QwtSymbol::Diamond, QColor(Qt::white), QColor(Qt::black), QSize(8,8));
-  this->SetCurveSymbol(curveId, whiteSymbol);
+//  curveId = this->InsertCurve( "ignored measurement points", QColor(Qt::lightGray) );
+//  this->SetCurveData( curveId, vec(snap.bvalues), vec(snap.allmeas) );
+//  this->SetCurvePen( curveId, QPen(Qt::NoPen) );
+//  QwtSymbol* blackSymbol = new QwtSymbol(QwtSymbol::Diamond, QColor(Qt::black), QColor(Qt::black), QSize(8,8));
+//  this->SetCurveSymbol(curveId, blackSymbol);
 
-  curveId = this->InsertCurve( "points first fit" );
+//  QwtSymbol* redSymbol = new QwtSymbol(QwtSymbol::Diamond, QColor(Qt::red), QColor(Qt::red), QSize(8,8));
+  QwtSymbol* whiteDiamond = new QwtSymbol(QwtSymbol::Diamond, QColor(Qt::white), QColor(Qt::black), QSize(8,8));
+  QwtSymbol* whiteStar = new QwtSymbol(QwtSymbol::XCross, QColor(Qt::white), QColor(Qt::white), QSize(8,8));
+
+  curveId = this->InsertCurve( "points first fit", QColor(Qt::lightGray) );
   this->SetCurveData( curveId, vec(snap.bvals1), vec(snap.meas1) );
   this->SetCurvePen( curveId, QPen( Qt::NoPen ) );
-  QwtSymbol* redSymbol = new QwtSymbol(QwtSymbol::Diamond, QColor(Qt::red), QColor(Qt::red), QSize(8,8));
-  this->SetCurveSymbol(curveId, redSymbol);
+  this->SetCurveSymbol(curveId, whiteDiamond);
 
-  if(snap.currentDStar != 0)
+  if(snap.currentDStar != 0 && !snap.high_indices.empty())
   {
-    curveId = this->InsertCurve( "additional points second fit" );
-    this->SetCurveData( curveId, vec(snap.bvals2), vec(snap.meas2) );
-    this->SetCurvePen( curveId, QPen( Qt::NoPen ) );
-    QwtSymbol* blackSymbol = new QwtSymbol(QwtSymbol::Diamond, QColor(Qt::black), QColor(Qt::black), QSize(8,8));
-    this->SetCurveSymbol(curveId, blackSymbol);
+    std::vector< double > additonal_bvals;
+    std::vector< double > additonal_meas;
+    for (int i=0; i<snap.high_indices[0]; ++i)
+    {
+      additonal_bvals.push_back(snap.bvals2[i]);
+      additonal_meas.push_back(snap.meas2[i]);
+    }
+
+    if (!additonal_bvals.empty())
+    {
+      curveId = this->InsertCurve( "additional points second fit", QColor(Qt::lightGray) );
+      this->SetCurveData( curveId, additonal_bvals, additonal_meas );
+      this->SetCurvePen( curveId, QPen( Qt::NoPen ) );
+      this->SetCurveSymbol(curveId, whiteStar);
+    }
   }
 
   auto   legend = new QwtLegend();
   m_Plot->insertLegend(legend, QwtPlot::BottomLegend);
 
+  m_Plot->setAxisTitle(0, "S/S0");
+  m_Plot->setAxisTitle(1, "b");
   this->Replot();
 
 }
