@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>QmitkIVIMViewControls</class>
  <widget class="QWidget" name="QmitkIVIMViewControls">
@@ -104,10 +104,10 @@ QGroupBox {
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QmitkDataStorageComboBox" name="m_DwiBox"></widget>
+       <widget class="QmitkDataStorageComboBox" name="m_DwiBox"/>
       </item>
       <item row="1" column="1">
-       <widget class="QmitkDataStorageComboBoxWithSelectNone" name="m_MaskBox"></widget>
+       <widget class="QmitkDataStorageComboBoxWithSelectNone" name="m_MaskBox"/>
       </item>
      </layout>
     </widget>
@@ -136,7 +136,7 @@ QGroupBox {
       <item row="0" column="0">
        <widget class="QLabel" name="m_Warning">
         <property name="styleSheet">
-         <string notr="true"></string>
+         <string notr="true"/>
         </property>
         <property name="text">
          <string>warning display</string>
@@ -312,6 +312,22 @@ QGroupBox {
                 <property name="spacing">
                  <number>0</number>
                 </property>
+                <item row="0" column="2">
+                 <widget class="QLabel" name="m_DStarLabel">
+                  <property name="maximumSize">
+                   <size>
+                    <width>51</width>
+                    <height>16777215</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>200</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                  </property>
+                 </widget>
+                </item>
                 <item row="0" column="0">
                  <widget class="QLabel" name="label_2">
                   <property name="maximumSize">
@@ -335,22 +351,6 @@ QGroupBox {
                   </property>
                   <property name="orientation">
                    <enum>Qt::Horizontal</enum>
-                  </property>
-                 </widget>
-                </item>
-                <item row="0" column="2">
-                 <widget class="QLabel" name="m_DStarLabel">
-                  <property name="maximumSize">
-                   <size>
-                    <width>51</width>
-                    <height>16777215</height>
-                   </size>
-                  </property>
-                  <property name="text">
-                   <string>200</string>
-                  </property>
-                  <property name="alignment">
-                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                   </property>
                  </widget>
                 </item>
@@ -383,21 +383,27 @@ QGroupBox {
                 </property>
                 <item row="0" column="0">
                  <widget class="QLabel" name="label_3">
+                  <property name="minimumSize">
+                   <size>
+                    <width>130</width>
+                    <height>0</height>
+                   </size>
+                  </property>
                   <property name="maximumSize">
                    <size>
-                    <width>80</width>
+                    <width>130</width>
                     <height>16777215</height>
                    </size>
                   </property>
                   <property name="text">
-                   <string>neglect b&lt;</string>
+                   <string>Ignore b&lt; (first fit)</string>
                   </property>
                  </widget>
                 </item>
                 <item row="0" column="1">
                  <widget class="QScrollBar" name="m_BThreshSlider">
                   <property name="toolTip">
-                   <string></string>
+                   <string/>
                   </property>
                   <property name="maximum">
                    <number>250</number>
@@ -648,14 +654,20 @@ QGroupBox {
                 </property>
                 <item row="0" column="0">
                  <widget class="QLabel" name="label_4">
+                  <property name="minimumSize">
+                   <size>
+                    <width>130</width>
+                    <height>0</height>
+                   </size>
+                  </property>
                   <property name="maximumSize">
                    <size>
-                    <width>80</width>
+                    <width>130</width>
                     <height>16777215</height>
                    </size>
                   </property>
                   <property name="text">
-                   <string>neglect Si&lt;</string>
+                   <string>Signal threshold:</string>
                   </property>
                  </widget>
                 </item>
@@ -928,7 +940,7 @@ QGroupBox {
                <item row="6" column="2">
                 <widget class="QCheckBox" name="m_OmitBZeroCB">
                  <property name="text">
-                  <string>Omit b=0 Measurement</string>
+                  <string>Omit b=0 Measurements</string>
                  </property>
                 </widget>
                </item>
@@ -1003,7 +1015,7 @@ QGroupBox {
                 </layout>
                </item>
                <item row="9" column="2">
-                <widget class="ctkRangeWidget" name="m_KurtosisRangeWidget" native="true"></widget>
+                <widget class="ctkRangeWidget" name="m_KurtosisRangeWidget" native="true"/>
                </item>
                <item row="8" column="2">
                 <widget class="QDoubleSpinBox" name="m_SigmaSpinBox">
@@ -1151,7 +1163,7 @@ QGroupBox {
    </item>
   </layout>
  </widget>
- <layoutdefault spacing="6" margin="11"></layoutdefault>
+ <layoutdefault spacing="6" margin="11"/>
  <customwidgets>
   <customwidget>
    <class>QmitkDataStorageComboBox</class>
@@ -1182,6 +1194,6 @@ QGroupBox {
    <container>1</container>
   </customwidget>
  </customwidgets>
- <resources></resources>
- <connections></connections>
+ <resources/>
+ <connections/>
 </ui>
