@@ -2,11 +2,6 @@ project(MitkDiffusion)
 
 set(DIFFUSIONAPP_NAME MitkDiffusion)
 
-set(_app_options)
-if(MITK_SHOW_CONSOLE_WINDOW)
-  list(APPEND _app_options SHOW_CONSOLE)
-endif()
-
 # Create a cache entry for the provisioning file which is used to export
 # the file name in the MITKConfig.cmake file. This will keep external projects
 # which rely on this file happy.
@@ -93,10 +88,7 @@ mitkFunctionCreateBlueBerryApplication(
   PLUGINS ${_plugins}
   EXCLUDE_PLUGINS ${_exclude_plugins}
   SOURCES ${_src_files}
-  ${_app_options}
 )
-
-mitk_use_modules(TARGET ${DIFFUSIONAPP_NAME} MODULES MitkAppUtil)
 
 # Add meta dependencies (e.g. on auto-load modules from depending modules)
 if(TARGET ${CMAKE_PROJECT_NAME}-autoload)
