@@ -206,7 +206,7 @@ namespace mitk
         result.push_back(outputNetwork.GetPointer());
         MITK_INFO << "Network read";
       }
-      catch (mitk::Exception e)
+      catch (mitk::Exception& e)
       {
         MITK_ERROR << e.GetDescription();
       }
