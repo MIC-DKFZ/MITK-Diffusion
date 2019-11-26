@@ -75,7 +75,7 @@ void QmitkTrackingWorker::run()
   try{
     m_View->m_GlobalTracker->Update();
   }
-  catch( mitk::Exception e )
+  catch( mitk::Exception& e )
   {
     MITK_ERROR << "Internal error occured: " <<  e.what() << "\nAborting";
   }

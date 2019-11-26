@@ -114,7 +114,7 @@ void QmitkControlVisualizationPropertiesView::SetTs(int currentThickSlicesMode, 
     }
 
     renderer->SendUpdateSlice();
-    renderer->GetRenderingManager()->RequestUpdateAll();
+    mitk::RenderingManager::GetInstance()->RequestUpdateAll();
   }
 }
 
