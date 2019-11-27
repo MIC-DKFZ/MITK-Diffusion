@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
   {
     std::cout << "Exception: " << err;
   }
-  catch ( std::exception err)
+  catch ( std::exception& err)
   {
     std::cout << "Exception: " << err.what();
   }

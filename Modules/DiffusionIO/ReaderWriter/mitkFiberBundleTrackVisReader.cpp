@@ -37,6 +37,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 mitk::FiberBundleTrackVisReader::FiberBundleTrackVisReader()
   : mitk::AbstractFileReader( mitk::DiffusionIOMimeTypes::FIBERBUNDLE_TRK_MIMETYPE_NAME(), "TrackVis Fiber Bundle Reader" )
 {
+  Options defaultOptions;
+  defaultOptions["Apply index to world transform stored in the TRK header"] = true;
+  defaultOptions["Print header"] = false;
+  this->SetDefaultOptions(defaultOptions);
+
   m_ServiceReg = this->RegisterService();
 }
 
@@ -68,10 +73,13 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleTrackVisReader:
 
     if (ext==".trk")
     {
+      Options options = this->GetOptions();
+      bool apply_matrix = us::any_cast<bool>(options["Apply index to world transform stored in the TRK header"]);
+      bool print_header = us::any_cast<bool>(options["Print header"]);
       FiberBundle::Pointer mitk_fib = FiberBundle::New();
       TrackVisFiberReader reader;
       reader.open(this->GetInputLocation().c_str());
-      reader.read(mitk_fib.GetPointer());
+      reader.read(mitk_fib.GetPointer(), apply_matrix, print_header);
       result.push_back(mitk_fib.GetPointer());
       return result;
     }

@@ -177,6 +177,37 @@ public:
 
     vtkSmartPointer<vtkPolyData>    GeneratePolyDataByIds(std::vector<unsigned int> fiberIds, vtkSmartPointer<vtkFloatArray> weights);
 
+    // Structure to hold metadata of a TrackVis file
+    struct TrackVis_header
+    {
+        char                id_string[6];
+        short int           dim[3];
+        float               voxel_size[3];
+        float               origin[3];
+        short int           n_scalars;
+        char                scalar_name[10][20];
+        short int           n_properties;
+        char                property_name[10][20];
+        float               vox_to_ras[4][4];
+        char                reserved[444];
+        char                voxel_order[4];
+        char                pad2[4];
+        float               image_orientation_patient[6];
+        char                pad1[2];
+        unsigned char       invert_x;
+        unsigned char       invert_y;
+        unsigned char       invert_z;
+        unsigned char       swap_xy;
+        unsigned char       swap_yz;
+        unsigned char       swap_zx;
+        int                 n_count;
+        int                 version;
+        int                 hdr_size;
+    };
+
+    TrackVis_header GetTrackVisHeader() const;
+    void SetTrackVisHeader(const TrackVis_header &TrackVisHeader);
+
 protected:
 
     FiberBundle( vtkPolyData* fiberPolyData = nullptr );
@@ -206,7 +237,9 @@ private:
     float   m_LengthStDev;
     itk::TimeStamp m_UpdateTime2D;
     itk::TimeStamp m_UpdateTime3D;
+
     mitk::BaseGeometry::Pointer m_ReferenceGeometry;
+    TrackVis_header     m_TrackVisHeader;
 };
 
 } // namespace mitk

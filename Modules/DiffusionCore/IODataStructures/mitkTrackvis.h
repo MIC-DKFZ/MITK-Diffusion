@@ -25,34 +25,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPolyLine.h>
 #include <itkSize.h>
 
-// Structure to hold metadata of a TrackVis file
-// ---------------------------------------------
-struct TrackVis_header
-{
-    char                id_string[6];
-    short int           dim[3];
-    float               voxel_size[3];
-    float               origin[3];
-    short int           n_scalars;
-    char                scalar_name[10][20];
-    short int           n_properties;
-    char                property_name[10][20];
-    char                reserved[508];
-    char                voxel_order[4];
-    char                pad2[4];
-    float               image_orientation_patient[6];
-    char                pad1[2];
-    unsigned char       invert_x;
-    unsigned char       invert_y;
-    unsigned char       invert_z;
-    unsigned char       swap_xy;
-    unsigned char       swap_yz;
-    unsigned char       swap_zx;
-    int                 n_count;
-    int                 version;
-    int                 hdr_size;
-};
-
 // Class to handle TrackVis files.
 // -------------------------------
 class MITKDIFFUSIONCORE_EXPORT TrackVisFiberReader
@@ -60,18 +32,19 @@ class MITKDIFFUSIONCORE_EXPORT TrackVisFiberReader
 private:
     std::string         m_Filename;
     FILE*               m_FilePointer;
+    mitk::FiberBundle::TrackVis_header m_Header;
 
 public:
-    TrackVis_header     m_Header;
 
-    short   create(std::string m_Filename, const mitk::FiberBundle* fib, bool lps);
+    short   create(std::string m_Filename, const mitk::FiberBundle* fib, bool print_header);
     short   open(std::string m_Filename );
-    short   read( mitk::FiberBundle* fib );
-    short   append(const mitk::FiberBundle* fib );
+    short   read(mitk::FiberBundle* fib , bool use_matrix, bool print_header);
+    short   write(const mitk::FiberBundle* fib );
     void    writeHdr();
     void    updateTotal( int totFibers );
     void    close();
     bool    IsTransformValid();
+    void    print_header();
 
     TrackVisFiberReader();
     ~TrackVisFiberReader();
