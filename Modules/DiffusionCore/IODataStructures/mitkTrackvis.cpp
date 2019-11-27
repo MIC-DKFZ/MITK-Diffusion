@@ -158,28 +158,29 @@ void TrackVisFiberReader::print_header()
   std::cout << "ONLY vox_to_ras AND voxel_order HEADER ENTRIES ARE USED FOR FIBER COORDINATE TRANSFORMATIONS!" << std::endl;
 
   std::cout << "\nid_string (should be \"TRACK\"): " << m_Header.id_string << std::endl;
-  std::cout << "\ndim: " << m_Header.dim[0] << ", " << m_Header.dim[1] << ", " << m_Header.dim[2] << std::endl;
-  std::cout << "\nvoxel_size: " << m_Header.voxel_size[0] << ", " << m_Header.voxel_size[1] << ", " << m_Header.voxel_size[2] << std::endl;
-  std::cout << "\norigin: " << m_Header.origin[0] << ", " << m_Header.origin[1] << ", " << m_Header.origin[2] << std::endl;
-  std::cout << "\nvox_to_ras: " << std::endl;
-  std::cout << m_Header.vox_to_ras[0][0] << ", " << m_Header.vox_to_ras[0][1] << ", " << m_Header.vox_to_ras[0][2] << ", " << m_Header.vox_to_ras[0][3] << std::endl;
-  std::cout << m_Header.vox_to_ras[1][0] << ", " << m_Header.vox_to_ras[1][1] << ", " << m_Header.vox_to_ras[1][2] << ", " << m_Header.vox_to_ras[1][3] << std::endl;
-  std::cout << m_Header.vox_to_ras[2][0] << ", " << m_Header.vox_to_ras[2][1] << ", " << m_Header.vox_to_ras[2][2] << ", " << m_Header.vox_to_ras[2][3] << std::endl;
-  std::cout << m_Header.vox_to_ras[3][0] << ", " << m_Header.vox_to_ras[3][1] << ", " << m_Header.vox_to_ras[3][2] << ", " << m_Header.vox_to_ras[3][3] << std::endl;
-  std::cout << "\nvoxel_order: " << m_Header.voxel_order[0] << ", " << m_Header.voxel_order[1] << ", " << m_Header.voxel_order[2] << ", " << m_Header.voxel_order[3] << std::endl;
-  std::cout << "\npad2: " << m_Header.pad2[0] << ", " << m_Header.pad2[1] << ", " << m_Header.pad2[2] << ", " << m_Header.pad2[3] << std::endl;
-  std::cout << "\nimage_orientation_patient: " << m_Header.image_orientation_patient[0] << ", " << m_Header.image_orientation_patient[1] << ", " << m_Header.image_orientation_patient[2] << ", " << m_Header.image_orientation_patient[3] << ", " << m_Header.image_orientation_patient[4] << ", " << m_Header.image_orientation_patient[5] << std::endl;
-  std::cout << "\npad1: " << m_Header.pad1[0] << ", " << m_Header.pad1[1] << std::endl;
-  std::cout << "\ninvert_x: " << static_cast<bool>(m_Header.invert_x) << std::endl;
-  std::cout << "\ninvert_y: " << static_cast<bool>(m_Header.invert_y) << std::endl;
-  std::cout << "\ninvert_z: " << static_cast<bool>(m_Header.invert_z) << std::endl;
-  std::cout << "\nswap_xy: " << static_cast<bool>(m_Header.swap_xy) << std::endl;
-  std::cout << "\nswap_yz: " << static_cast<bool>(m_Header.swap_yz) << std::endl;
-  std::cout << "\nswap_zx: " << static_cast<bool>(m_Header.swap_zx) << std::endl;
+  std::cout << "dim: [" << std::defaultfloat << m_Header.dim[0] << " " << m_Header.dim[1] << " " << m_Header.dim[2] << "]" << std::endl;
+  std::cout << "voxel_size: [" << m_Header.voxel_size[0] << " " << m_Header.voxel_size[1] << " " << m_Header.voxel_size[2] << "]" << std::endl;
+  std::cout << "origin: [" << m_Header.origin[0] << " " << m_Header.origin[1] << " " << m_Header.origin[2] << "]" << std::endl;
+  std::cout << "vox_to_world: " << std::scientific << std::endl;
+  std::cout << "[[" << m_Header.vox_to_ras[0][0] << ", " << m_Header.vox_to_ras[0][1] << ", " << m_Header.vox_to_ras[0][2] << ", " << m_Header.vox_to_ras[0][3] << "]" << std::endl;
+  std::cout << " [" << m_Header.vox_to_ras[1][0] << ", " << m_Header.vox_to_ras[1][1] << ", " << m_Header.vox_to_ras[1][2] << ", " << m_Header.vox_to_ras[1][3] << "]" << std::endl;
+  std::cout << " [" << m_Header.vox_to_ras[2][0] << ", " << m_Header.vox_to_ras[2][1] << ", " << m_Header.vox_to_ras[2][2] << ", " << m_Header.vox_to_ras[2][3] << "]" << std::endl;
+  std::cout << " [" << m_Header.vox_to_ras[3][0] << ", " << m_Header.vox_to_ras[3][1] << ", " << m_Header.vox_to_ras[3][2] << ", " << m_Header.vox_to_ras[3][3] << "]]" << std::defaultfloat << std::endl;
 
-  std::cout << "\nn_count: " << m_Header.n_count << std::endl;
-  std::cout << "\nversion: " << m_Header.version << std::endl;
-  std::cout << "\nhdr_size: " << m_Header.hdr_size << std::endl;
+  std::cout << "voxel_order: " << m_Header.voxel_order[0] << m_Header.voxel_order[1] << m_Header.voxel_order[2] << std::endl;
+  std::cout << "pad1: " << m_Header.pad1[0] << m_Header.pad1[1] << std::endl;
+  std::cout << "pad2: " << m_Header.pad2[0] << m_Header.pad2[1] << m_Header.pad2[2] << std::endl;
+  std::cout << "image_orientation_patient: [" << m_Header.image_orientation_patient[0] << " " << m_Header.image_orientation_patient[1] << " " << m_Header.image_orientation_patient[2] << " " << m_Header.image_orientation_patient[3] << " " << m_Header.image_orientation_patient[4] << " " << m_Header.image_orientation_patient[5] << "]" << std::endl;
+  std::cout << "invert_x: " << static_cast<bool>(m_Header.invert_x) << std::endl;
+  std::cout << "invert_y: " << static_cast<bool>(m_Header.invert_y) << std::endl;
+  std::cout << "invert_z: " << static_cast<bool>(m_Header.invert_z) << std::endl;
+  std::cout << "swap_xy: " << static_cast<bool>(m_Header.swap_xy) << std::endl;
+  std::cout << "swap_yz: " << static_cast<bool>(m_Header.swap_yz) << std::endl;
+  std::cout << "swap_zx: " << static_cast<bool>(m_Header.swap_zx) << std::endl;
+
+  std::cout << "n_count: " << m_Header.n_count << std::endl;
+  std::cout << "version: " << m_Header.version << std::endl;
+  std::cout << "hdr_size: " << m_Header.hdr_size << std::endl;
   std::cout << "\nNot printed: n_scalars, scalar_name, n_properties, property_name, reserved" << std::endl;
 
   std::cout << "--------------------------------------------------------" << std::endl;
