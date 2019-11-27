@@ -50,6 +50,7 @@ const char* mitk::FiberBundle::FIBER_ID_ARRAY = "Fiber_IDs";
 mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
   : m_NumFibers(0)
 {
+  m_TrackVisHeader.hdr_size = 0;
   m_FiberWeights = vtkSmartPointer<vtkFloatArray>::New();
   m_FiberWeights->SetName("FIBER_WEIGHTS");
 
@@ -77,6 +78,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::GetDeepCopy()
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(m_FiberPolyData);
   newFib->SetFiberColors(this->m_FiberColors);
   newFib->SetFiberWeights(this->m_FiberWeights);
+  newFib->SetReferenceGeometry(this->GetReferenceGeometry());
   return newFib;
 }
 
@@ -2635,6 +2637,16 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
   os << indent << "Extent z: " << this->GetGeometry()->GetExtentInMM(2) << "mm" << std::endl;
   os << indent << "Diagonal: " << this->GetGeometry()->GetDiagonalLength()  << "mm" << std::endl;
 
+  os << "\nReference geometry:" << std::endl;
+  if (this->GetReferenceGeometry().IsNotNull())
+  {
+    os << "Matrix:\n" << this->GetReferenceGeometry()->GetIndexToWorldTransform()->GetMatrix();
+    os << "Origin: " << this->GetReferenceGeometry()->GetOrigin() << std::endl;
+    os << "Spacing: " << this->GetReferenceGeometry()->GetSpacing() << std::endl;
+  }
+  else
+    os << "NONE" << std::endl;
+
   if (m_FiberWeights!=nullptr)
   {
     std::vector< float > weights;
@@ -2643,7 +2655,7 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
 
     std::sort(weights.begin(), weights.end());
 
-    os << indent << "\nFiber weight statistics" << std::endl;
+    os << "\nFiber weight statistics" << std::endl;
     os << indent << "Min: " << weights.front() << std::endl;
     os << indent << "1% quantile: " << weights.at(static_cast<unsigned long>(weights.size()*0.01)) << std::endl;
     os << indent << "5% quantile: " << weights.at(static_cast<unsigned long>(weights.size()*0.05)) << std::endl;
@@ -2658,6 +2670,16 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
     os << indent << "\n\nNo fiber weight array found." << std::endl;
 
   Superclass::PrintSelf(os, indent);
+}
+
+mitk::FiberBundle::TrackVis_header mitk::FiberBundle::GetTrackVisHeader() const
+{
+  return m_TrackVisHeader;
+}
+
+void mitk::FiberBundle::SetTrackVisHeader(const mitk::FiberBundle::TrackVis_header &TrackVisHeader)
+{
+  m_TrackVisHeader = TrackVisHeader;
 }
 
 /* ESSENTIAL IMPLEMENTATION OF SUPERCLASS METHODS */

@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
     std::cout << e.what();
     return EXIT_FAILURE;
   }
-  catch (std::exception e)
+  catch (std::exception& e)
   {
     std::cout << e.what();
     return EXIT_FAILURE;
