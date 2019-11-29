@@ -1,14 +1,16 @@
 MITK Diffusion
 ==============
 
-The MITK Diffusion application [[1,2]](#References) offers a selection of image analysis algorithms for the processing of diffusion-weighted MR images. It encompasses the research of the Division [Medical Image Computing](https://www.dkfz.de/en/mic/index.php) at the German Cancer Research Center (DKFZ).
+Copyright © German Cancer Research Center (DKFZ), [Division of Medical Image Computing (MIC)](https://www.dkfz.de/en/mic/index.php).
+
+The MITK Diffusion application [[1,2]](#References) offers a selection of image analysis algorithms for the processing of diffusion-weighted MR images. It encompasses the research of the Division of Medical Image Computing at the German Cancer Research Center (DKFZ).
 
 * [Downloads](#Downloads)
 * [Requirements](#Requirements)
 * [Features](#Features)
-* [Related Links](#Related)
-* [Image Gallery](#Image)
-* [Building MITK Diffusion from source](#Building)
+* [Related Links](#Related-Links)
+* [Image Gallery](#Image-Gallery)
+* [Building MITK Diffusion from source](#Building-MITK-Diffusion-from-source)
 * [User Manual](http://docs.mitk.org/nightly/org_mitk_gui_qt_diffusionimaging.html)
 * [Report a Bug](https://phabricator.mitk.org/maniphest/task/edit/form/29/)
 * [References](#References)
