@@ -490,6 +490,11 @@ void FiberExtractionFilter< PixelType >::GenerateData()
     else
       ExtractEndpoints(fib);
   }
+
+  for (auto f : m_Negatives)
+    f->SetTrackVisHeader(fib->GetTrackVisHeader());
+  for (auto f : m_Positives)
+    f->SetTrackVisHeader(fib->GetTrackVisHeader());
 }
 
 }

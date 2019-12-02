@@ -297,6 +297,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::FilterByWeights(float weight_thr, 
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(vNewPolyData);
   for (unsigned int i=0; i<weights.size(); ++i)
     newFib->SetFiberWeight(i, weights.at(i));
+  newFib->SetTrackVisHeader(this->GetTrackVisHeader());
   return newFib;
 }
 
@@ -351,6 +352,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubsampleFibers(float factor, bool
   // initialize fiber bundle
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(vNewPolyData);
   newFib->SetFiberWeights(weights);
+  newFib->SetTrackVisHeader(this->GetTrackVisHeader());
   return newFib;
 }
 
@@ -1259,6 +1261,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgTyp
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(newPolyData);
   newFib->SetFiberWeights(newFiberWeights);
 //  newFib->Compress(0.1);
+  newFib->SetTrackVisHeader(this->GetTrackVisHeader());
   return newFib;
 }
 
@@ -1275,6 +1278,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::ExtractFiberSubset(DataNode* roi, 
   vtkSmartPointer<vtkPolyData> pTmp = GeneratePolyDataByIds(tmp, weights);
   mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
   fib->SetFiberWeights(weights);
+  fib->SetTrackVisHeader(this->GetTrackVisHeader());
   return fib;
 }
 
@@ -1536,6 +1540,8 @@ void mitk::FiberBundle::UpdateFiberGeometry()
   mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
   geometry->SetFloatBounds(b);
   this->SetGeometry(geometry);
+
+  GetTrackVisHeader();
 
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
