@@ -460,7 +460,7 @@ void QmitkGibbsTrackingView::GenerateFiberBundle()
   if ( m_GlobalTracker->GetNumAcceptedFibers()==0 )
     return;
   m_FiberBundle = mitk::FiberBundle::New(fiberBundle);
-  m_FiberBundle->SetReferenceGeometry(dynamic_cast<mitk::Image*>(m_ImageNode->GetData())->GetGeometry());
+  m_FiberBundle->SetTrackVisHeader(dynamic_cast<mitk::Image*>(m_ImageNode->GetData())->GetGeometry());
 
   if (m_FiberBundleNode.IsNotNull()){
     GetDataStorage()->Remove(m_FiberBundleNode);

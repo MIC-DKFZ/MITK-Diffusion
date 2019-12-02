@@ -172,9 +172,6 @@ public:
     // compare fiber bundles
     bool Equals(FiberBundle* fib, double eps=0.01);
 
-    itkSetMacro( ReferenceGeometry, mitk::BaseGeometry::Pointer )
-    itkGetConstMacro( ReferenceGeometry, mitk::BaseGeometry::Pointer )
-
     vtkSmartPointer<vtkPolyData>    GeneratePolyDataByIds(std::vector<unsigned int> fiberIds, vtkSmartPointer<vtkFloatArray> weights);
 
     // Structure to hold metadata of a TrackVis file
@@ -205,8 +202,9 @@ public:
         int                 hdr_size;
     };
 
-    TrackVis_header GetTrackVisHeader() const;
+    TrackVis_header GetTrackVisHeader();
     void SetTrackVisHeader(const TrackVis_header &TrackVisHeader);
+    void SetTrackVisHeader(BaseGeometry *geometry);
 
 protected:
 
@@ -238,7 +236,6 @@ private:
     itk::TimeStamp m_UpdateTime2D;
     itk::TimeStamp m_UpdateTime3D;
 
-    mitk::BaseGeometry::Pointer m_ReferenceGeometry;
     TrackVis_header     m_TrackVisHeader;
 };
 

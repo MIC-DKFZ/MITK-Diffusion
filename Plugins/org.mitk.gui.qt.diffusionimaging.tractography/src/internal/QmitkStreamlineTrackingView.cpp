@@ -499,7 +499,7 @@ void QmitkStreamlineTrackingView::AfterThread()
     }
 
     mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(fiberBundle);
-    fib->SetReferenceGeometry(dynamic_cast<mitk::Image*>(m_ParentNode->GetData())->GetGeometry());
+    fib->SetTrackVisHeader(dynamic_cast<mitk::Image*>(m_ParentNode->GetData())->GetGeometry());
     if (m_Controls->m_ResampleFibersBox->isChecked() && fiberBundle->GetNumberOfLines()>0)
       fib->Compress(m_Controls->m_FiberErrorBox->value());
     fib->ColorFibersByOrientation();

@@ -94,7 +94,7 @@ void mitk::FiberBundleTrackVisWriter::Write()
 
     MITK_INFO << "Writing fiber bundle as TRK";
     TrackVisFiberReader trk;
-    trk.create(filename, input.GetPointer(), print_header);
+    trk.create(filename, const_cast<mitk::FiberBundle*>(input.GetPointer()), print_header);
     trk.writeHdr();
     trk.write(input.GetPointer());
 
