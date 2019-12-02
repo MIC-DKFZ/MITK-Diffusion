@@ -170,6 +170,8 @@ void FitFibersToImageFilter::CreateDiffSystem()
   }
 
   m_NumCoveredDirections = voxel_indicator.sum();
+  if (m_NumCoveredDirections==0 || m_MeanSignal<0.0001)
+    mitkThrow() << "No overlap between fibers and non-zero image!";
   m_MeanTractDensity /= m_NumCoveredDirections;
   m_MeanSignal /= m_NumCoveredDirections;
   b /= m_MeanSignal;
@@ -325,6 +327,9 @@ void FitFibersToImageFilter::CreatePeakSystem()
     }
   }
 
+  if (m_NumCoveredDirections==0 || m_MeanSignal<0.0001)
+    mitkThrow() << "No overlap between fibers and non-zero image!";
+
   m_MeanTractDensity /= m_NumCoveredDirections;
   m_MeanSignal /= m_NumCoveredDirections;
   b /= m_MeanSignal;
@@ -426,6 +431,9 @@ void FitFibersToImageFilter::CreateScalarSystem()
       ++fiber_count;
     }
   }
+
+  if (numCoveredVoxels==0 || m_MeanSignal<0.0001)
+    mitkThrow() << "No overlap between fibers and non-zero image!";
 
   m_MeanTractDensity /= numCoveredVoxels;
   m_MeanSignal /= numCoveredVoxels;
