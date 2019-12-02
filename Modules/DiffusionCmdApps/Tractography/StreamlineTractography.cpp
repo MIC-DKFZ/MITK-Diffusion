@@ -420,6 +420,7 @@ int main(int argc, char* argv[])
   }
 
   mitk::TrackingDataHandler* handler;
+  mitk::Image::Pointer reference_image;
   if (type == "RF")
   {
     mitk::TractographyForest::Pointer forest = mitk::IOUtil::Load<mitk::TractographyForest>(forestFile);
@@ -428,6 +429,7 @@ int main(int argc, char* argv[])
 
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
     auto input = mitk::IOUtil::Load<mitk::Image>(input_files.at(0), &functor);
+    reference_image = input;
 
     if (use_sh_features)
     {
@@ -450,6 +452,7 @@ int main(int argc, char* argv[])
 
     MITK_INFO << "loading input peak image";
     mitk::Image::Pointer mitkImage = mitk::IOUtil::Load<mitk::Image>(input_files.at(0));
+    reference_image = mitkImage;
     mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = mitk::convert::GetItkPeakFromPeakImage(mitkImage);
     dynamic_cast<mitk::TrackingHandlerPeaks*>(handler)->SetPeakImage(itkImg);
   }
@@ -462,6 +465,7 @@ int main(int argc, char* argv[])
     for (unsigned int i=0; i<input_files.size(); i++)
     {
       mitk::Image::Pointer mitkImage = mitk::IOUtil::Load<mitk::Image>(input_files.at(i));
+      reference_image = mitkImage;
       mitk::TensorImage::ItkTensorImageType::Pointer itkImg = mitk::convert::GetItkTensorFromTensorImage(mitkImage);
       dynamic_cast<mitk::TrackingHandlerTensor*>(handler)->AddTensorImage(itkImg.GetPointer());
     }
@@ -479,6 +483,7 @@ int main(int argc, char* argv[])
     {
       MITK_INFO << "Converting Tensor to ODF image";
       auto input = mitk::IOUtil::Load<mitk::Image>(input_files.at(0));
+      reference_image = input;
       itkImg = mitk::convert::GetItkOdfFromTensorImage(input);
       dynamic_cast<mitk::TrackingHandlerOdf*>(handler)->SetIsOdfFromTensor(true);
     }
@@ -486,6 +491,7 @@ int main(int argc, char* argv[])
     {
       mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"SH Image", "ODF Image"}, {});
       auto input = mitk::IOUtil::Load(input_files.at(0), &functor)[0];
+      reference_image = dynamic_cast<mitk::Image*>(input.GetPointer());
       if (dynamic_cast<mitk::ShImage*>(input.GetPointer()))
       {
         MITK_INFO << "Converting SH to ODF image";
@@ -548,6 +554,8 @@ int main(int argc, char* argv[])
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
     if (compress > 0)
       outFib->Compress(compress);
+    outFib->SetTrackVisHeader(reference_image->GetGeometry());
+
     mitk::IOUtil::Save(outFib, outFile);
   }
   else

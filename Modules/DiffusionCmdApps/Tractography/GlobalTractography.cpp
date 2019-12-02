@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
     gibbsTracker->Update();
 
     mitk::FiberBundle::Pointer mitkFiberBundle = mitk::FiberBundle::New(gibbsTracker->GetFiberBundle());
-    mitkFiberBundle->SetReferenceGeometry(mitkImage->GetGeometry());
+    mitkFiberBundle->SetTrackVisHeader(mitkImage->GetGeometry());
 
     mitk::IOUtil::Save(mitkFiberBundle, outFileName );
   }

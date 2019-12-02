@@ -36,7 +36,7 @@ private:
 
 public:
 
-    short   create(std::string m_Filename, const mitk::FiberBundle* fib, bool print_header);
+    short   create(std::string m_Filename, mitk::FiberBundle *fib, bool print_header);
     short   open(std::string m_Filename );
     short   read(mitk::FiberBundle* fib , bool use_matrix, bool print_header);
     short   write(const mitk::FiberBundle* fib );

@@ -78,7 +78,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::GetDeepCopy()
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(m_FiberPolyData);
   newFib->SetFiberColors(this->m_FiberColors);
   newFib->SetFiberWeights(this->m_FiberWeights);
-  newFib->SetReferenceGeometry(this->GetReferenceGeometry());
+  newFib->SetTrackVisHeader(this->GetTrackVisHeader());
   return newFib;
 }
 
@@ -2638,14 +2638,14 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
   os << indent << "Diagonal: " << this->GetGeometry()->GetDiagonalLength()  << "mm" << std::endl;
 
   os << "\nReference geometry:" << std::endl;
-  if (this->GetReferenceGeometry().IsNotNull())
-  {
-    os << "Matrix:\n" << this->GetReferenceGeometry()->GetIndexToWorldTransform()->GetMatrix();
-    os << "Origin: " << this->GetReferenceGeometry()->GetOrigin() << std::endl;
-    os << "Spacing: " << this->GetReferenceGeometry()->GetSpacing() << std::endl;
-  }
-  else
-    os << "NONE" << std::endl;
+  os << indent << "Size: [" << std::defaultfloat << m_TrackVisHeader.dim[0] << " " << m_TrackVisHeader.dim[1] << " " << m_TrackVisHeader.dim[2] << "]" << std::endl;
+  os << indent << "Voxel size: [" << m_TrackVisHeader.voxel_size[0] << " " << m_TrackVisHeader.voxel_size[1] << " " << m_TrackVisHeader.voxel_size[2] << "]" << std::endl;
+  os << indent << "Origin: [" << m_TrackVisHeader.origin[0] << " " << m_TrackVisHeader.origin[1] << " " << m_TrackVisHeader.origin[2] << "]" << std::endl;
+  os << indent << "Matrix: " << std::scientific << std::endl;
+  os << indent << "[[" << m_TrackVisHeader.vox_to_ras[0][0] << ", " << m_TrackVisHeader.vox_to_ras[0][1] << ", " << m_TrackVisHeader.vox_to_ras[0][2] << ", " << m_TrackVisHeader.vox_to_ras[0][3] << "]" << std::endl;
+  os << indent << " [" << m_TrackVisHeader.vox_to_ras[1][0] << ", " << m_TrackVisHeader.vox_to_ras[1][1] << ", " << m_TrackVisHeader.vox_to_ras[1][2] << ", " << m_TrackVisHeader.vox_to_ras[1][3] << "]" << std::endl;
+  os << indent << " [" << m_TrackVisHeader.vox_to_ras[2][0] << ", " << m_TrackVisHeader.vox_to_ras[2][1] << ", " << m_TrackVisHeader.vox_to_ras[2][2] << ", " << m_TrackVisHeader.vox_to_ras[2][3] << "]" << std::endl;
+  os << indent << " [" << m_TrackVisHeader.vox_to_ras[3][0] << ", " << m_TrackVisHeader.vox_to_ras[3][1] << ", " << m_TrackVisHeader.vox_to_ras[3][2] << ", " << m_TrackVisHeader.vox_to_ras[3][3] << "]]" << std::defaultfloat << std::endl;
 
   if (m_FiberWeights!=nullptr)
   {
@@ -2672,14 +2672,65 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
   Superclass::PrintSelf(os, indent);
 }
 
-mitk::FiberBundle::TrackVis_header mitk::FiberBundle::GetTrackVisHeader() const
+mitk::FiberBundle::TrackVis_header mitk::FiberBundle::GetTrackVisHeader()
 {
+  if (m_TrackVisHeader.hdr_size==0)
+  {
+    mitk::Geometry3D::Pointer geom = dynamic_cast<mitk::Geometry3D*>(this->GetGeometry());
+    SetTrackVisHeader(geom);
+  }
   return m_TrackVisHeader;
 }
 
 void mitk::FiberBundle::SetTrackVisHeader(const mitk::FiberBundle::TrackVis_header &TrackVisHeader)
 {
   m_TrackVisHeader = TrackVisHeader;
+}
+
+void mitk::FiberBundle::SetTrackVisHeader(mitk::BaseGeometry* geometry)
+{
+  vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
+  matrix->Identity();
+
+  if (geometry==nullptr)
+    return;
+
+  for(int i=0; i<3 ;i++)
+  {
+    m_TrackVisHeader.dim[i]            = geometry->GetExtent(i);
+    m_TrackVisHeader.voxel_size[i]     = geometry->GetSpacing()[i];
+    m_TrackVisHeader.origin[i]         = geometry->GetOrigin()[i];
+    matrix = geometry->GetVtkMatrix();
+  }
+
+  for (int i=0; i<4; ++i)
+    for (int j=0; j<4; ++j)
+      m_TrackVisHeader.vox_to_ras[i][j] = matrix->GetElement(i, j);
+
+  m_TrackVisHeader.n_scalars = 0;
+  m_TrackVisHeader.n_properties = 0;
+  sprintf(m_TrackVisHeader.voxel_order,"LPS");
+  m_TrackVisHeader.image_orientation_patient[0] = 1.0;
+  m_TrackVisHeader.image_orientation_patient[1] = 0.0;
+  m_TrackVisHeader.image_orientation_patient[2] = 0.0;
+  m_TrackVisHeader.image_orientation_patient[3] = 0.0;
+  m_TrackVisHeader.image_orientation_patient[4] = 1.0;
+  m_TrackVisHeader.image_orientation_patient[5] = 0.0;
+  m_TrackVisHeader.pad1[0] = 0;
+  m_TrackVisHeader.pad1[1] = 0;
+  m_TrackVisHeader.pad2[0] = 0;
+  m_TrackVisHeader.pad2[1] = 0;
+  m_TrackVisHeader.invert_x = 0;
+  m_TrackVisHeader.invert_y = 0;
+  m_TrackVisHeader.invert_z = 0;
+  m_TrackVisHeader.swap_xy = 0;
+  m_TrackVisHeader.swap_yz = 0;
+  m_TrackVisHeader.swap_zx = 0;
+  m_TrackVisHeader.n_count = 0;
+  m_TrackVisHeader.version = 2;
+  m_TrackVisHeader.hdr_size = 1000;
+  std::string id = "TRACK";
+  strcpy(m_TrackVisHeader.id_string, id.c_str());
 }
 
 /* ESSENTIAL IMPLEMENTATION OF SUPERCLASS METHODS */
