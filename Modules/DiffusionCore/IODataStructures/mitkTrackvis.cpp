@@ -226,7 +226,13 @@ short TrackVisFiberReader::read( mitk::FiberBundle* fib, bool use_matrix, bool p
   if (use_matrix)
     for (int i=0; i<4; ++i)
       for (int j=0; j<4; ++j)
-        matrix->SetElement(i, j, m_Header.vox_to_ras[i][j]);
+      {
+        if (j<3)
+          matrix->SetElement(i, j, m_Header.vox_to_ras[i][j]/m_Header.voxel_size[j]);
+        else
+          matrix->SetElement(i, j, m_Header.vox_to_ras[i][j]);
+      }
+
 
   if (m_Header.voxel_order[0]=='R')
   {
