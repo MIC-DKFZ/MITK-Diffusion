@@ -157,6 +157,7 @@ void FiberCurvatureFilter::GenerateData()
     outputPoly->SetPoints(vtkNewPoints);
     outputPoly->SetLines(vtkNewCells);
     m_OutputFiberBundle = mitk::FiberBundle::New(outputPoly);
+    m_OutputFiberBundle->SetTrackVisHeader(m_InputFiberBundle->GetTrackVisHeader());
 }
 
 }

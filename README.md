@@ -42,7 +42,12 @@ If you encounter any bugs, please report them in our [bugtracking](https://phabr
 
 * **For Windows users**:
     * MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be installed on the system. The MITK Diffusion installer automatically installs this redistributable for you if not already present on the system, but it needs administrative privileges to do so. So to install the redistributable, **run the MITK Diffusion installer as administrator**.
-    * **Python modules are disabled under Windows!**
+    * Install python 3 from https://www.python.org/downloads/windows/
+    * **Requirements for all deep-learning based functionalities**:
+        * Affected functionalities:
+            * Brain extraction
+            * TractSeg
+        * Pytorch: https://pytorch.org/ (version 0.4.0)
 
 ## Features
 

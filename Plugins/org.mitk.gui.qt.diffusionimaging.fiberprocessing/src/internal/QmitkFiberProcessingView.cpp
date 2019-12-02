@@ -1703,8 +1703,6 @@ void QmitkFiberProcessingView::MirrorFibers()
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    if (m_SelectedImage.IsNotNull())
-      fib->SetTrackVisHeader(m_SelectedImage->GetGeometry());
     fib->MirrorFibers(axis);
   }
 
