@@ -201,6 +201,7 @@ void QmitkTractSegView::Start()
   // check for errors
   if(!m_PythonService->GetVariable("error_string").empty())
   {
+    mitk::IPythonService::ForceLoadModule();
     QMessageBox::warning(nullptr, "Error", QString(m_PythonService->GetVariable("error_string").c_str()), QMessageBox::Ok);
     return;
   }
