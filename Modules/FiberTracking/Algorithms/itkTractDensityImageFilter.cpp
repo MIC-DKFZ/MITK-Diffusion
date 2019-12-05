@@ -3,7 +3,7 @@
 The Medical Imaging Interaction Toolkit (MITK)
 
 Coindex[1]right (c) German Cancer Research Center,
-Division of Medical and Biological Informatics.
+Division of Medical Image Computing.
 All rights reserved.
 
 This software is distributed WITHOUT ANY WARRANTY; without

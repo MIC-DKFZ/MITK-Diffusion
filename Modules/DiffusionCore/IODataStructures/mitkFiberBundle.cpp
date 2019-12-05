@@ -3,7 +3,7 @@
 The Medical Imaging Interaction Toolkit (MITK)
 
 Copyright (c) German Cancer Research Center,
-Division of Medical and Biological Informatics.
+Division of Medical Image Computing.
 All rights reserved.
 
 This software is distributed WITHOUT ANY WARRANTY; without
@@ -2629,7 +2629,6 @@ bool mitk::FiberBundle::Equals(mitk::FiberBundle* fib, double eps)
 
 void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
 {
-  os << this->GetNameOfClass() << ":\n";
   os << indent << "Number of fibers: " << this->GetNumFibers() << std::endl;
   os << indent << "Min. fiber length: " << this->GetMinFiberLength() << std::endl;
   os << indent << "Max. fiber length: " << this->GetMaxFiberLength() << std::endl;
@@ -2675,7 +2674,7 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
   else
     os << indent << "\n\nNo fiber weight array found." << std::endl;
 
-  Superclass::PrintSelf(os, indent);
+  Superclass::PrintSelf(os, 0);
 }
 
 mitk::FiberBundle::TrackVis_header mitk::FiberBundle::GetTrackVisHeader()

@@ -3,7 +3,7 @@
 The Medical Imaging Interaction Toolkit (MITK)
 
 Copyright (c) German Cancer Research Center,
-Division of Medical and Biological Informatics.
+Division of Medical Image Computing.
 All rights reserved.
 
 This software is distributed WITHOUT ANY WARRANTY; without
@@ -65,6 +65,12 @@ void QmitkKurtosisWidget::SetData(KurtosisFilterType::KurtosisSnapshot snap)
   //
   auto measured_values = toStdVec( snap.measurements );
   double y_bzero = measured_values[0];
+
+  MITK_INFO << "-------------";
+  MITK_INFO << y_bzero;
+  MITK_INFO << snap.m_D;
+  MITK_INFO << snap.m_K;
+
 
   const unsigned int num_samples = 50;
   vnl_vector<double> x_K_model(num_samples);

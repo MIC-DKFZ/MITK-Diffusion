@@ -1,6 +1,6 @@
 set(Plugin-Name "MITK Diffusion Imaging")
 set(Plugin-Version "0.1")
-set(Plugin-Vendor "DKFZ, Medical and Biological Informatics")
+set(Plugin-Vendor "DKFZ, Medical Image Computing")
 set(Plugin-ContactAddress "http://www.mitk.org")
 set(Require-Plugin org.mitk.gui.qt.common)
 #set(Plugin-ActivationPolicy eager)
