@@ -113,7 +113,7 @@ void QmitkTractSegView::Start()
 
   // get python script as string
   QString data;
-  QString fileName(":/QmitkDiffusionImaging/tractseg.py");
+  QString fileName(":/QmitkDiffusionPython/tractseg.py");
   QFile file(fileName);
   if(!file.open(QIODevice::ReadOnly)) {
     qDebug()<<"filenot opened"<<endl;
@@ -124,6 +124,9 @@ void QmitkTractSegView::Start()
     data = file.readAll();
   }
   file.close();
+
+  if (data.size()==0)
+    mitkThrow() << fileName << " could not be read!";
 
   us::ModuleContext* context = us::GetModuleContext();
   us::ServiceReference<mitk::IPythonService> m_PythonServiceRef = context->GetServiceReference<mitk::IPythonService>();
