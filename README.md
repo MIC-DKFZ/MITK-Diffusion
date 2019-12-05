@@ -29,25 +29,13 @@ If you encounter any bugs, please report them in our [bugtracking](https://phabr
 
 ### Requirements
 
-* **For Ubuntu users**:
-    * Install Python 3.X: `sudo apt install python3 python3-pip`
-    * Download Python requirements file: [PythonRequirements.txt](https://github.com/MIC-DKFZ/MITK-Diffusion/tree/master/Modules/DiffusionCore/PythonRequirements.txt)
-    * Install Python requirements: `pip3 install -r PythonRequirements.txt`
+    * Install Python 3.X: `sudo apt install python3 python3-pip` (Ubuntu) or from https://www.python.org/downloads/windows/ (Windows)
+    * Download our Python requirements file: [PythonRequirements.txt](https://github.com/MIC-DKFZ/MITK-Diffusion/tree/master/PythonRequirements.txt)
+    * Install the Python requirements: `pip3 install -r PythonRequirements.txt`
     * If your are behind a proxy use `pip3 --proxy <proxy> install -r PythonRequirements.txt`
-    * **Requirements for all deep-learning based functionalities**:
-        * Affected functionalities:
-            * Brain extraction
-            * TractSeg
-        * Pytorch: https://pytorch.org/ (version 0.4.0)
 
 * **For Windows users**:
     * MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be installed on the system. The MITK Diffusion installer automatically installs this redistributable for you if not already present on the system, but it needs administrative privileges to do so. So to install the redistributable, **run the MITK Diffusion installer as administrator**.
-    * Install python 3 from https://www.python.org/downloads/windows/
-    * **Requirements for all deep-learning based functionalities**:
-        * Affected functionalities:
-            * Brain extraction
-            * TractSeg
-        * Pytorch: https://pytorch.org/ (version 0.4.0)
 
 ## Features
 
