@@ -1,19 +1,18 @@
-/*=========================================================================
+/*===================================================================
 
-  Program:   Insight Segmentation & Registration Toolkit
-  Module:    $RCSfile: itkDiffusionTensor3DReconstructionImageFilter.h,v $
-  Language:  C++
-  Date:      $Date: 2006-03-27 17:01:06 $
-  Version:   $Revision: 1.12 $
+The Medical Imaging Interaction Toolkit (MITK)
 
-  Copyright (c) Insight Software Consortium. All rights reserved.
-  See ITKCopyright.txt or http://www.itk.org/HTML/Copyright.htm for details.
+Copyright (c) German Cancer Research Center.
 
-     This software is distributed WITHOUT ANY WARRANTY; without even
-     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-     PURPOSE.  See the above copyright notices for more information.
+All rights reserved.
 
-=========================================================================*/
+This software is distributed WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.
+
+See LICENSE.txt or http://www.mitk.org for details.
+
+===================================================================*/
 #ifndef __itkShCoefficientImageExporter_h_
 #define __itkShCoefficientImageExporter_h_
 

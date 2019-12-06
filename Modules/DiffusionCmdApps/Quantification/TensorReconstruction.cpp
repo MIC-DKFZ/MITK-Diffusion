@@ -2,8 +2,8 @@
 
 The Medical Imaging Interaction Toolkit (MITK)
 
-Copyright (c) German Cancer Research Center,
-Division of Medical Image Computing.
+Copyright (c) German Cancer Research Center.
+
 All rights reserved.
 
 This software is distributed WITHOUT ANY WARRANTY; without
