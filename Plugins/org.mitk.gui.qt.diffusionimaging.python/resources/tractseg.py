@@ -8,11 +8,10 @@ try:
 
     data = sitk.GetArrayFromImage(in_image)
     data = np.nan_to_num(data)
+
     swapaxes = False
-    if data.shape != (sx, sy, sz):
-        print("Swapping axes!")
-        data = np.swapaxes(data, 0, 2)
-        swapaxes = True
+    data = np.swapaxes(data, 0, 2)
+    swapaxes = True
 
     affine = np.zeros((4, 4))
     affine[0, 0] = in_image.GetDirection()[0] * in_image.GetSpacing()[0]
@@ -39,13 +38,11 @@ try:
     print('threshold', threshold)
 
     seg = run_tractseg(data=data, output_type=output_type, input_type="peaks", verbose=verbose, get_probs=get_probs,
-                       dropout_sampling=dropout_sampling, threshold=threshold, postprocess=False)
+                       dropout_sampling=dropout_sampling, threshold=threshold, postprocess=False, nr_cpus=1)
 
-    # bla = nib.Nifti1Image(seg, affine)
-    # nib.save(bla, '/home/neher/test.nii.gz')
-    if swapaxes:
-        print("Swapping axes back!")
-        seg = np.swapaxes(seg, 0, 2)
+#    bla = nib.Nifti1Image(seg, affine)
+#    nib.save(bla, '/home/neher/test.nii.gz')
+    seg = np.swapaxes(seg, 0, 2)
 
     print('Output shape: ' + str(seg.shape))
     if output_type == "tract_segmentation":

@@ -61,7 +61,7 @@
    <item row="0" column="0" rowspan="3">
     <widget class="QToolBox" name="toolBox">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="page">
       <property name="geometry">
@@ -1034,7 +1034,7 @@
           <item row="0" column="1">
            <widget class="QSpinBox" name="m_MaxTwistBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Max. fiber twist per step (in degree)</string>
             </property>
             <property name="minimum">
              <number>0</number>
@@ -1053,7 +1053,7 @@
           <item row="0" column="0">
            <widget class="QSpinBox" name="m_MinTwistBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Min. fiber twist per step (in degree)</string>
             </property>
             <property name="minimum">
              <number>0</number>
@@ -1115,7 +1115,7 @@
           <item row="0" column="0">
            <widget class="QSpinBox" name="m_StepSizeMinBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Min. distance between fiducials (in mm)</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1134,7 +1134,7 @@
           <item row="0" column="1">
            <widget class="QSpinBox" name="m_StepSizeMaxBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Max. distance between fiducials (in mm)</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1175,7 +1175,7 @@
        <item row="1" column="1">
         <widget class="QSpinBox" name="m_NumBundlesBox">
          <property name="toolTip">
-          <string>Specify number of fibers to generate for the selected bundle.</string>
+          <string>Number of generated bundles</string>
          </property>
          <property name="minimum">
           <number>1</number>
@@ -1234,7 +1234,7 @@
           <item row="0" column="0">
            <widget class="QSpinBox" name="m_CurvyMinBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Min. rotation between steps (in degree)</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1253,7 +1253,7 @@
           <item row="0" column="1">
            <widget class="QSpinBox" name="m_CurvyMaxBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Max. rotation between steps (in degree)</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1415,7 +1415,7 @@
           <item row="0" column="0">
            <widget class="QSpinBox" name="m_SizeMinBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Bundle radius</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1434,7 +1434,7 @@
           <item row="0" column="1">
            <widget class="QSpinBox" name="m_SizeMaxBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Bundle radius</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1477,7 +1477,7 @@
           <item row="0" column="1">
            <widget class="QSpinBox" name="m_MaxDensityBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Max. fibers per cm&lt;span style=&quot; vertical-align:super;&quot;&gt;2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1496,7 +1496,7 @@
           <item row="0" column="0">
            <widget class="QSpinBox" name="m_MinDensityBox">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Min. fibers per cm&lt;span style=&quot; vertical-align:super;&quot;&gt;2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="minimum">
              <number>1</number>
