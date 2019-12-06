@@ -180,7 +180,7 @@ Automatically generated random fiber configuration for Fiberfox simulations.
 
 
 ## Building MITK Diffusion from source
-* Install [Qt](https://www.qt.io/ Qt) on your system (>= 5.11.1).
+* Install [Qt](https://www.qt.io/) on your system (>= 5.12.6).
 * Clone MITK from [github](https://github.com/MIC-DKFZ/MITK-Diffusion.git) using [Git version control](https://git-scm.com/).
 * Clone MITK Diffusion from [github](https://github.com/MITK/MITK.git).
 * Configure the MITK Superbuild using [CMake](https://cmake.org/) (>= 3.14.5).
