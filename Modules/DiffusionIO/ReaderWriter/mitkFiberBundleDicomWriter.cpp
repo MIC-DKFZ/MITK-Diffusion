@@ -128,7 +128,11 @@ void mitk::FiberBundleDicomWriter::Write()
 
     // Every CodeSequenceMacro has: Code Value, Coding Scheme Designator, Code Meaning
     CodeSequenceMacro diffusionModel(model_code_value.c_str(), "DCM", model_code_meaning.c_str());
-    CodeSequenceMacro algorithmId(algo_code_value.c_str(), "DCM", algo_code_meaning.c_str());
+//    CodeSequenceMacro algorithmId(algo_code_value.c_str(), "DCM", algo_code_meaning.c_str());
+
+    AlgorithmIdentificationMacro algorithmId;
+    algorithmId.setAlgorithmName(algo_code_meaning);
+
     TrcTrackSet *set = nullptr;
     trc->addTrackSet("TRACTOGRAM", "Tractogram processed with MITK Diffusion", anatomy, diffusionModel, algorithmId, set);
 
