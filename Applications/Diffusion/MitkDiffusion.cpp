@@ -15,18 +15,24 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <mitkBaseApplication.h>
-
 #include <QPixmap>
 #include <QSplashScreen>
 #include <QTimer>
 #include <QVariant>
+
+#if defined __GNUC__ && !defined __clang__
+#  include <QDir>
+#  include <QFileInfo>
+#  include <QString>
+#  include <QStringList>
+#endif
 
 int main(int argc, char **argv)
 {
   mitk::BaseApplication app(argc, argv);
 
   app.setSingleMode(true);
-  app.setApplicationName("MitkDiffusion");
+  app.setApplicationName("MITK Diffusion");
   app.setOrganizationName("DKFZ");
 
   /*
@@ -48,14 +54,15 @@ int main(int argc, char **argv)
     QTimer::singleShot(4000, &splash, SLOT(close()));
   }
   */
-  // Preload the org.mitk.gui.qt.ext plug-in (and hence also QmitkExt) to speed
-  // up a clean-cache start. This also works around bugs in older gcc and glibc implementations,
-  // which have difficulties with multiple dynamic opening and closing of shared libraries with
-  // many global static initializers. It also helps if dependent libraries have weird static
-  // initialization methods and/or missing de-initialization code.
-  QStringList preloadLibs;
-  preloadLibs << "liborg_mitk_gui_qt_ext";
-  app.setPreloadLibraries(preloadLibs);
+
+  #if defined __GNUC__ && !defined __clang__
+    auto library = QFileInfo(argv[0]).dir().path() + "/../lib/plugins/liborg_blueberry_core_expressions.so";
+
+    if (!QFileInfo(library).exists())
+      library = "liborg_blueberry_core_expressions";
+
+    app.setPreloadLibraries(QStringList() << library);
+  #endif
 
   // app.setProperty(mitk::BaseApplication::PROP_APPLICATION, "org.mitk.qt.diffusionimagingapp");
   app.setProperty(mitk::BaseApplication::PROP_PRODUCT, "org.mitk.gui.qt.diffusionimagingapp.diffusion");
