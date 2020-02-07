@@ -190,7 +190,7 @@ Automatically generated random fiber configuration for Fiberfox simulations.
     * Click "Configure".
     * Set the option MITK_BUILD_CONFIGURATION to "DiffusionRelease".
     * Click "Generate".
-    * macOS specifics:
+    * macOS specifics (unclear if this still applies):
         * Use python 3.**6**, since python 3.**7** leads to build errors on macOS.
         * The cmake variables for python 3 might need to be set manually. It is probably enough to specify PYTHON_EXECUTABLE.
         * Openmp needs to be installed manually since it is not included in apple clang anymore: "brew install libomp" should do the trick. It might be necessary to set the corresponding make variables later in the MITK build manually:
@@ -199,10 +199,13 @@ Automatically generated random fiber configuration for Fiberfox simulations.
             * OpenMPCXX_LIB_NAMES: libomp
             * OpenMPC_LIB_NAMES: libomp
             * OpenMP_libomp_LIBRARY: /path/to/libomp.dylib
-* Build the project
+* Start the Superbuild:
     * Linux/maxOS: Open a console window, navigate to the build folder and type "make -j8" (optionally supply the number threads to be used for a parallel build with -j).
     * Windows (requires visual studio): Open the MITK Superbuild solution file and build all projects.
-* The build may take some time and should yield the binaries in "your_build_folder/MITK-build/bin"
+    * The Superbuild may take some time.
+    * After the Superbuild has finished, change the cmake binary directory from "/path/to/my/build" to "/path/to/my/build/MITK-build" and configure+generate again.
+    * Build again in "/path/to/my/build/MITK-build" using make (linux/mac) or the VS solution file.
+    * The build may again take some time and should yield the binaries in "/path/to/my/build/MITK-build/bin"
 
 More detailed build instructions can be found in the [documentation](http://docs.mitk.org/nightly/BuildInstructionsPage.html).
 

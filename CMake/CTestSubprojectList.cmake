@@ -1,0 +1,3 @@
+list(APPEND MITK_CTEST_SUBPROJECTS
+  MITK-Diffusion
+  )

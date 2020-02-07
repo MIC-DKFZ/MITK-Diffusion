@@ -1,7 +1,7 @@
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
   # INCLUDE_DIRS Helpers
-  DEPENDS MitkDiffusionCore MitkDiffusionIO MitkCommandLine
+  DEPENDS MitkDiffusionCore MitkCommandLine
   PACKAGE_DEPENDS PUBLIC ITK
 )
 
