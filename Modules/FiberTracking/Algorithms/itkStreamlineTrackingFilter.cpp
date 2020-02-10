@@ -922,10 +922,29 @@ void StreamlineTrackingFilter::SetDicomProperties(mitk::FiberBundle::Pointer fib
   std::string algo_code_value = "-";
   std::string algo_code_meaning = "-";
 
-  if ( m_Parameters->m_Mode==MODE::DETERMINISTIC && dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler) && !m_Parameters->m_InterpolateTractographyData)
+  if ( m_Parameters->m_Mode==MODE::DETERMINISTIC && dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler))
   {
-    algo_code_value = "sup181_ee04";
-    algo_code_meaning = "FACT";
+    algo_code_value = "sup181_ee01";
+    algo_code_meaning = "Deterministic";
+
+    if (m_Parameters->m_F > 0.99 && m_Parameters->m_G < 0.01)
+    {
+      if (m_Parameters->m_InterpolateTractographyData)
+      {
+        algo_code_value = "sup181_ee08";
+        algo_code_meaning = "Euler";
+      }
+      else
+      {
+        algo_code_value = "sup181_ee04";
+        algo_code_meaning = "FACT";
+      }
+    }
+    else if (m_Parameters->m_G > 0.99 && m_Parameters->m_F < 0.01)
+    {
+      algo_code_value = "sup181_ee06";
+      algo_code_meaning = "TEND";
+    }
   }
   else if (m_Parameters->m_Mode==MODE::DETERMINISTIC)
   {
@@ -970,8 +989,8 @@ void StreamlineTrackingFilter::SetDicomProperties(mitk::FiberBundle::Pointer fib
   fib->SetProperty("DICOM.anatomy.value", mitk::StringProperty::New("T-A0095"));
   fib->SetProperty("DICOM.anatomy.meaning", mitk::StringProperty::New("White matter of brain and spinal cord"));
 
-  fib->SetProperty("DICOM.algo_code.value", mitk::StringProperty::New(algo_code_value));
-  fib->SetProperty("DICOM.algo_code.meaning", mitk::StringProperty::New(algo_code_meaning));
+  fib->SetProperty("DICOM.algo_family_code.value", mitk::StringProperty::New(algo_code_value));
+  fib->SetProperty("DICOM.algo_family_code.meaning", mitk::StringProperty::New(algo_code_meaning));
 
   fib->SetProperty("DICOM.model_code.value", mitk::StringProperty::New(model_code_value));
   fib->SetProperty("DICOM.model_code.meaning", mitk::StringProperty::New(model_code_meaning));

@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImageRegionIterator.h>
 #include <mitkProperties.h>
 #include <vnl/algo/vnl_matrix_inverse.h>
+#include <boost/algorithm/string.hpp>
 
 #include <mitkCoreServices.h>
 #include <mitkPropertyPersistenceInfo.h>
@@ -375,12 +376,20 @@ float mitk::DiffusionPropertyHelper::GetB_Value(const mitk::Image* image, unsign
   }
 }
 
-void mitk::DiffusionPropertyHelper::CopyProperties(mitk::Image* source, mitk::Image* target, bool ignore_original_gradients)
+void mitk::DiffusionPropertyHelper::CopyProperties(BaseData *source, BaseData *target, bool ignore_original_gradients)
 {
   mitk::PropertyList::Pointer props = source->GetPropertyList()->Clone();
   if (ignore_original_gradients)
     props->RemoveProperty(mitk::DiffusionPropertyHelper::ORIGINALGRADIENTCONTAINERPROPERTYNAME);
   target->SetPropertyList(props);
+}
+
+void mitk::DiffusionPropertyHelper::CopyDICOMProperties(const mitk::BaseData* source, mitk::BaseData* target)
+{
+  mitk::PropertyList::Pointer list = source->GetPropertyList();
+  for (auto key : list->GetPropertyKeys())
+    if (boost::algorithm::starts_with(key, "DICOM."))
+      target->GetPropertyList()->ReplaceProperty(key, list->GetProperty(key));
 }
 
 void mitk::DiffusionPropertyHelper::InitializeImage(mitk::Image* image)

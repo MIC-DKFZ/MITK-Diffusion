@@ -132,6 +132,8 @@ void QmitkOdfMaximaExtractionView::TemplatedConvertShCoeffs(mitk::Image* mitkImg
     mitk::Image::Pointer img = dynamic_cast<mitk::Image*>(mitk::ShImage::New().GetPointer());
     img->InitializeByItk(itkCi.GetPointer());
     img->SetVolume(itkCi->GetBufferPointer());
+    mitk::DiffusionPropertyHelper::CopyDICOMProperties(mitkImg, img);
+
     DataNode::Pointer node = DataNode::New();
     node->SetData(img);
 
@@ -218,6 +220,8 @@ void QmitkOdfMaximaExtractionView::StartTensorPeakExtraction(mitk::TensorImage* 
   MaximaExtractionFilterType::PeakImageType::Pointer itkImg = filter->GetPeakImage();
   mitk::Image::Pointer mitkPeakImage = dynamic_cast<Image*>(PeakImage::New().GetPointer());
   CastToMitkImage(itkImg, mitkPeakImage);
+
+  mitk::DiffusionPropertyHelper::CopyDICOMProperties(img, mitkPeakImage);
 
   DataNode::Pointer node = DataNode::New();
   node->SetData(mitkPeakImage);
@@ -307,6 +311,7 @@ void QmitkOdfMaximaExtractionView::StartMaximaExtraction(Image *image)
   typename MaximaExtractionFilterType::PeakImageType::Pointer itkImg = filter->GetPeakImage();
   mitk::Image::Pointer img = dynamic_cast<Image*>(PeakImage::New().GetPointer());
   CastToMitkImage(itkImg, img);
+  mitk::DiffusionPropertyHelper::CopyDICOMProperties(image, img);
 
   DataNode::Pointer node = DataNode::New();
   node->SetData(img);

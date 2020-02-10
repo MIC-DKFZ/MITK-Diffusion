@@ -501,8 +501,8 @@ void GibbsTrackingFilter< ItkOdfImageType >::SetDicomProperties(mitk::FiberBundl
   fib->SetProperty("DICOM.anatomy.value", mitk::StringProperty::New("T-A0095"));
   fib->SetProperty("DICOM.anatomy.meaning", mitk::StringProperty::New("White matter of brain and spinal cord"));
 
-  fib->SetProperty("DICOM.algo_code.value", mitk::StringProperty::New(algo_code_value));
-  fib->SetProperty("DICOM.algo_code.meaning", mitk::StringProperty::New(algo_code_meaning));
+  fib->SetProperty("DICOM.algo_family_code.value", mitk::StringProperty::New(algo_code_value));
+  fib->SetProperty("DICOM.algo_family_code.meaning", mitk::StringProperty::New(algo_code_meaning));
 
   fib->SetProperty("DICOM.model_code.value", mitk::StringProperty::New(model_code_value));
   fib->SetProperty("DICOM.model_code.meaning", mitk::StringProperty::New(model_code_meaning));

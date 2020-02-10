@@ -197,6 +197,7 @@ void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWr
 
   if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(image))
     mitk::DiffusionPropertyHelper::InitializeImage( image );
+  mitk::DiffusionPropertyHelper::CopyDICOMProperties(movingImage, image);
 
   mitk::DataNode::Pointer resultNode = mitk::DataNode::New();
   resultNode->SetData(image);
@@ -294,6 +295,7 @@ void QmitkSimpleRegistrationView::StartTractoRegistration()
 
   mitk::FiberBundle::Pointer fib_copy = fib->GetDeepCopy();
   fib_copy->TransformFibers(affine);
+  mitk::DiffusionPropertyHelper::CopyProperties(fib, fib_copy);
 
   mitk::DataNode::Pointer registration_node = mitk::DataNode::New();
   registration_node->SetData(fib_copy);

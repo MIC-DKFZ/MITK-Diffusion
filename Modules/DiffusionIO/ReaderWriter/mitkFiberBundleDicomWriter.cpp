@@ -55,40 +55,43 @@ void mitk::FiberBundleDicomWriter::Write()
 
     std::string patient_id = "";
     if (!p_list->GetStringProperty("DICOM.patient_id", patient_id))
-      patient_id = "-";
+      patient_id = "0";
     std::string patient_name = "";
     if (!p_list->GetStringProperty("DICOM.patient_name", patient_name))
-      patient_name = "-";
+      patient_name = "0";
     std::string study_instance_uid = "";
     if (!p_list->GetStringProperty("DICOM.study_instance_uid", study_instance_uid))
-      study_instance_uid = "-";
+      study_instance_uid = "0";
     std::string series_instance_uid = "";
     if (!p_list->GetStringProperty("DICOM.series_instance_uid", series_instance_uid))
-      series_instance_uid = "-";
+      series_instance_uid = "0";
     std::string sop_instance_uid = "";
     if (!p_list->GetStringProperty("DICOM.sop_instance_uid", sop_instance_uid))
-      sop_instance_uid = "-";
+      sop_instance_uid = "0";
+    std::string sop_class_uid = "";
+    if (!p_list->GetStringProperty("DICOM.sop_class_uid", sop_instance_uid))
+      sop_class_uid = "0";
     std::string frame_of_reference_uid = "";
     if (!p_list->GetStringProperty("DICOM.frame_of_reference_uid", frame_of_reference_uid))
-      frame_of_reference_uid = "-";
+      frame_of_reference_uid = "0";
     std::string algo_code_value = "";
-    if (!p_list->GetStringProperty("DICOM.algo_code.value", algo_code_value))
-      algo_code_value = "-";
+    if (!p_list->GetStringProperty("DICOM.algo_family_code.value", algo_code_value))
+      algo_code_value = "0";
     std::string algo_code_meaning = "";
-    if (!p_list->GetStringProperty("DICOM.algo_code.meaning", algo_code_meaning))
-      algo_code_meaning = "-";
+    if (!p_list->GetStringProperty("DICOM.algo_family_code.meaning", algo_code_meaning))
+      algo_code_meaning = "0";
     std::string model_code_value = "";
     if (!p_list->GetStringProperty("DICOM.model_code.value", model_code_value))
-      model_code_value = "-";
+      model_code_value = "0";
     std::string model_code_meaning = "";
     if (!p_list->GetStringProperty("DICOM.model_code.meaning", model_code_meaning))
-      model_code_meaning = "-";
+      model_code_meaning = "0";
     std::string anatomy_value = "";
     if (!p_list->GetStringProperty("DICOM.anatomy.value", anatomy_value))
-      anatomy_value = "-";
+      anatomy_value = "0";
     std::string anatomy_meaning = "";
     if (!p_list->GetStringProperty("DICOM.anatomy.meaning", anatomy_meaning))
-      anatomy_meaning = "-";
+      anatomy_meaning = "0";
 
     const std::string& locale = "C";
     const std::string& currLocale = setlocale( LC_ALL, nullptr );
@@ -122,16 +125,45 @@ void mitk::FiberBundleDicomWriter::Write()
     trc->getSOPCommon().setSOPInstanceUID(sop_instance_uid.c_str());
     trc->getSeries().getSeriesInstanceUID(val);
 
+    trc->getPatient().setPatientID(patient_id.c_str());
+    trc->getPatient().setPatientName(patient_name.c_str());
+    trc->getSeries().setSeriesDescription("Tractogram processed with MITK Diffusion");
+
+    // Frame of Reference is required; could be the same as from related MR series
+    trc->getFrameOfReference().setFrameOfReferenceUID(frame_of_reference_uid.c_str());
+
+    DcmItem item;
+    item.putAndInsertOFStringArray(DCM_PatientID, patient_id);
+    item.putAndInsertOFStringArray(DCM_StudyInstanceUID, study_instance_uid);
+    item.putAndInsertOFStringArray(DCM_SeriesInstanceUID, series_instance_uid);
+    item.putAndInsertOFStringArray(DCM_SOPClassUID, sop_class_uid);
+    item.putAndInsertOFStringArray(DCM_SOPInstanceUID, sop_instance_uid);
+    IODReference* ref2 = new IODReference();
+    ref2->readFromItem(item);
+    trc->getReferencedInstances().add(ref2);
+
+    // GET STUFF FROM DICOM FILE (disbled since file probably not available)
+//    trc->importHierarchy("/media/neher/Rumpelkammer/Demo/Tumor/KOPF_UNTERSUCHUNG_20170419_164344_842000/T1_FL2D_TRA_5MM_0013/WISSING_MARISKA.MR.KOPF_UNTERSUCHUNG.0013.0022.2017.07.31.14.09.57.918625.254331277.IMA",
+//                         true,
+//                         true,
+//                         true,
+//                         true);
+
+//    trc->getReferencedInstances().addFromFiles({"/media/neher/Rumpelkammer/Demo/Tumor/KOPF_UNTERSUCHUNG_20170419_164344_842000/T1_FL2D_TRA_5MM_0013/WISSING_MARISKA.MR.KOPF_UNTERSUCHUNG.0013.0022.2017.07.31.14.09.57.918625.254331277.IMA"});
+
     // Create track set
     CodeWithModifiers anatomy("");
     anatomy.set(anatomy_value.c_str(), "SRT", anatomy_meaning.c_str());
 
     // Every CodeSequenceMacro has: Code Value, Coding Scheme Designator, Code Meaning
     CodeSequenceMacro diffusionModel(model_code_value.c_str(), "DCM", model_code_meaning.c_str());
-//    CodeSequenceMacro algorithmId(algo_code_value.c_str(), "DCM", algo_code_meaning.c_str());
 
     AlgorithmIdentificationMacro algorithmId;
-    algorithmId.setAlgorithmName(algo_code_meaning);
+    algorithmId.getAlgorithmFamilyCode().set(algo_code_value, "DCM", algo_code_meaning);
+    algorithmId.setAlgorithmName("-");
+    algorithmId.setAlgorithmVersion("-");
+    algorithmId.setAlgorithmParameters("-");
+    algorithmId.setAlgorithmSource("-");
 
     TrcTrackSet *set = nullptr;
     trc->addTrackSet("TRACTOGRAM", "Tractogram processed with MITK Diffusion", anatomy, diffusionModel, algorithmId, set);
@@ -163,14 +195,6 @@ void mitk::FiberBundleDicomWriter::Write()
         TrcTrack* track = nullptr;
         set->addTrack(pointData, numPoints, cieLabColor, 1 /* numColors */, track);
     }
-
-    // Frame of Reference is required; could be the same as from related MR series
-    trc->getFrameOfReference().setFrameOfReferenceUID(frame_of_reference_uid.c_str());
-
-    // Set some optional data
-    trc->getPatient().setPatientID(patient_id.c_str());
-    trc->getPatient().setPatientName(patient_name.c_str());
-    trc->getSeries().setSeriesDescription("Tractogram processed with MITK Diffusion");
 
     // Save file
     OFCondition result = trc->saveFile(this->GetOutputLocation().c_str());

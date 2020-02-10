@@ -46,8 +46,8 @@ QmitkDicomTractogramTagEditorView::QmitkDicomTractogramTagEditorView()
                "DICOM.series_instance_uid",
                "DICOM.sop_instance_uid",
                "DICOM.frame_of_reference_uid",
-              "DICOM.algo_code.value",
-              "DICOM.algo_code.meaning",
+              "DICOM.algo_family_code.value",
+              "DICOM.algo_family_code.meaning",
               "DICOM.model_code.value",
               "DICOM.model_code.meaning",
               "DICOM.anatomy.value",
@@ -113,7 +113,7 @@ void QmitkDicomTractogramTagEditorView::CopyProperties()
 
   for (std::string tag : m_ImageTagList)
   {
-    std::string val = "-";
+    std::string val = "0";
     source_p_list->GetStringProperty(tag.c_str(), val);
     target_p_list->SetStringProperty(tag.c_str(), val.c_str());
   }
@@ -156,7 +156,7 @@ void QmitkDicomTractogramTagEditorView::UpdateGui()
     for (std::string tag : m_TagList)
     {
       m_Controls->m_TagTable->setItem(row, 0, new QTableWidgetItem(tag.c_str()));
-      m_Controls->m_TagTable->setItem(row, 1, new QTableWidgetItem("-"));
+      m_Controls->m_TagTable->setItem(row, 1, new QTableWidgetItem("0"));
       ++row;
     }
     m_Controls->m_TagTable->blockSignals(false);
@@ -169,7 +169,7 @@ void QmitkDicomTractogramTagEditorView::UpdateGui()
   int row = 0;
   for (std::string tag : m_TagList)
   {
-    std::string val = "-";
+    std::string val = "0";
     p_list->GetStringProperty(tag.c_str(), val);
     m_Controls->m_TagTable->setItem(row, 0, new QTableWidgetItem(tag.c_str()));
     m_Controls->m_TagTable->setItem(row, 1, new QTableWidgetItem(val.c_str()));
