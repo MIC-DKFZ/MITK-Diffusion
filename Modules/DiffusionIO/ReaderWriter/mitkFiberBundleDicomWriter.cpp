@@ -160,10 +160,10 @@ void mitk::FiberBundleDicomWriter::Write()
 
     AlgorithmIdentificationMacro algorithmId;
     algorithmId.getAlgorithmFamilyCode().set(algo_code_value, "DCM", algo_code_meaning);
-    algorithmId.setAlgorithmName("-");
-    algorithmId.setAlgorithmVersion("-");
-    algorithmId.setAlgorithmParameters("-");
-    algorithmId.setAlgorithmSource("-");
+    algorithmId.setAlgorithmName("0");
+    algorithmId.setAlgorithmVersion("0");
+    algorithmId.setAlgorithmParameters("0");
+    algorithmId.setAlgorithmSource("0");
 
     TrcTrackSet *set = nullptr;
     trc->addTrackSet("TRACTOGRAM", "Tractogram processed with MITK Diffusion", anatomy, diffusionModel, algorithmId, set);
