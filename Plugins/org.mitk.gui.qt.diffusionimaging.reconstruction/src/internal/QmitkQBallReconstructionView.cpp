@@ -242,6 +242,7 @@ void QmitkQBallReconstructionView::ConvertShImage()
   {
     mitk::Image::Pointer mitkImg = dynamic_cast<mitk::Image*>(m_Controls->m_ShImageBox->GetSelectedNode()->GetData());
     auto img = mitk::convert::GetOdfFromShImage(mitkImg);
+    mitk::DiffusionPropertyHelper::CopyDICOMProperties(mitkImg, img);
     mitk::DataNode::Pointer node= mitk::DataNode::New();
     node->SetData( img );
     node->SetName(m_Controls->m_ShImageBox->GetSelectedNode()->GetName());
@@ -449,6 +450,8 @@ void QmitkQBallReconstructionView::NumericalQBallReconstruction(mitk::DataNode::
     mitk::OdfImage::Pointer image = mitk::OdfImage::New();
     image->InitializeByItk( filter->GetOutput() );
     image->SetVolume( filter->GetOutput()->GetBufferPointer() );
+    mitk::DiffusionPropertyHelper::CopyDICOMProperties(vols, image);
+
     mitk::DataNode::Pointer new_node = mitk::DataNode::New();
     new_node->SetData( image );
     new_node->SetName(nodename+nodePostfix);
@@ -594,6 +597,7 @@ void QmitkQBallReconstructionView::TemplatedAnalyticalQBallReconstruction(mitk::
   mitk::Image::Pointer coeffsImage = dynamic_cast<mitk::Image*>(mitk::ShImage::New().GetPointer());
   coeffsImage->InitializeByItk( filter->GetCoefficientImage().GetPointer() );
   coeffsImage->SetVolume( filter->GetCoefficientImage()->GetBufferPointer() );
+  mitk::DiffusionPropertyHelper::CopyDICOMProperties(vols, coeffsImage);
 
   mitk::DataNode::Pointer coeffsNode = mitk::DataNode::New();
   coeffsNode->SetData( coeffsImage );
@@ -606,6 +610,8 @@ void QmitkQBallReconstructionView::TemplatedAnalyticalQBallReconstruction(mitk::
     mitk::OdfImage::Pointer image = mitk::OdfImage::New();
     image->InitializeByItk( filter->GetOutput() );
     image->SetVolume( filter->GetOutput()->GetBufferPointer() );
+    mitk::DiffusionPropertyHelper::CopyDICOMProperties(vols, image);
+
     mitk::DataNode::Pointer node=mitk::DataNode::New();
     node->SetData( image );
     node->SetName(dataNodePointer->GetName() + nodePostfix + "_Sampeld");
@@ -715,6 +721,7 @@ void QmitkQBallReconstructionView::TemplatedMultiQBallReconstruction(double lamb
   mitk::Image::Pointer coeffsImage = dynamic_cast<mitk::Image*>(mitk::ShImage::New().GetPointer());
   coeffsImage->InitializeByItk( filter->GetCoefficientImage().GetPointer() );
   coeffsImage->SetVolume( filter->GetCoefficientImage()->GetBufferPointer() );
+  mitk::DiffusionPropertyHelper::CopyDICOMProperties(dwi, coeffsImage);
 
   mitk::DataNode::Pointer coeffsNode=mitk::DataNode::New();
   coeffsNode->SetData( coeffsImage );
@@ -727,6 +734,8 @@ void QmitkQBallReconstructionView::TemplatedMultiQBallReconstruction(double lamb
     mitk::OdfImage::Pointer image = mitk::OdfImage::New();
     image->InitializeByItk( filter->GetOutput() );
     image->SetVolume( filter->GetOutput()->GetBufferPointer() );
+    mitk::DiffusionPropertyHelper::CopyDICOMProperties(dwi, image);
+
     mitk::DataNode::Pointer node=mitk::DataNode::New();
     node->SetData( image );
     node->SetName(dataNodePointer->GetName() + "_SH_MultiShell_Qball_Sampled");

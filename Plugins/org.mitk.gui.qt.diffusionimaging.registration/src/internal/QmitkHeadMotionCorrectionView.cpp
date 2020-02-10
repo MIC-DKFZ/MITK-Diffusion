@@ -115,6 +115,8 @@ void QmitkHeadMotionCorrectionView::StartCorrection()
   registerer->SetInput(inImage);
   registerer->Update();
   mitk::Image::Pointer image = registerer->GetCorrectedImage();
+  mitk::DiffusionPropertyHelper::CopyDICOMProperties(inImage, image);
+
   mitk::DataNode::Pointer corrected_node = mitk::DataNode::New();
   corrected_node->SetData( image );
   QString name(node->GetName().c_str());

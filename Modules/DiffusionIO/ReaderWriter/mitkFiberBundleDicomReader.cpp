@@ -115,53 +115,39 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Re
       vtkSmartPointer<vtkPolyData> fiberPolyData = vtkSmartPointer<vtkPolyData>::New();
       fiberPolyData->SetPoints(vtkNewPoints);
       fiberPolyData->SetLines(vtkNewCells);
-
-//      // transform polydata from RAS (MRtrix) to LPS (MITK)
-//      mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
-//      vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
-//      matrix->Identity();
-//      matrix->SetElement(0,0,-matrix->GetElement(0,0));
-//      matrix->SetElement(1,1,-matrix->GetElement(1,1));
-//      geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
-
-//      vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
-//      transformFilter->SetInputData(fiberPolyData);
-//      transformFilter->SetTransform(geometry->GetVtkTransform());
-//      transformFilter->Update();
-
       FiberBundle::Pointer fib = FiberBundle::New(fiberPolyData);
 
-      CodeSequenceMacro algoCode = sets[ts]->getTrackingAlgorithmIdentification().at(0)->getAlgorithmNameCode();
-      val = "-"; algoCode.getCodeValue(val);
-      fib->GetPropertyList()->SetStringProperty("DICOM.algo_code.value",val.c_str());
-      val = "-"; algoCode.getCodeMeaning(val);
-      fib->GetPropertyList()->SetStringProperty("DICOM.algo_code.meaning",val.c_str());
+      CodeSequenceMacro algoCode = sets[ts]->getTrackingAlgorithmIdentification().at(0)->getAlgorithmFamilyCode();
+      val = "0"; algoCode.getCodeValue(val);
+      fib->GetPropertyList()->SetStringProperty("DICOM.algo_family_code.value",val.c_str());
+      val = "0"; algoCode.getCodeMeaning(val);
+      fib->GetPropertyList()->SetStringProperty("DICOM.algo_family_code.meaning",val.c_str());
 
       CodeSequenceMacro modelCode = sets[ts]->getDiffusionModelCode();
-      val = "-"; modelCode.getCodeValue(val);
+      val = "0"; modelCode.getCodeValue(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.model_code.value",val.c_str());
-      val = "-"; modelCode.getCodeMeaning(val);
+      val = "0"; modelCode.getCodeMeaning(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.model_code.meaning",val.c_str());
 
       CodeWithModifiers anatomy = sets[ts]->getTrackSetAnatomy();
-      val = "-"; anatomy.getCodeValue(val);
+      val = "0"; anatomy.getCodeValue(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.anatomy.value",val.c_str());
-      val = "-"; anatomy.getCodeMeaning(val);
+      val = "0"; anatomy.getCodeMeaning(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.anatomy.meaning",val.c_str());
 
-      val = "-"; trc->getPatient().getPatientID(val);
+      val = "0"; trc->getPatient().getPatientID(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.patient_id",val.c_str());
-      val = "-"; trc->getPatient().getPatientName(val);
+      val = "0"; trc->getPatient().getPatientName(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.patient_name",val.c_str());
-      val = "-"; trc->getStudy().getStudyInstanceUID(val);
+      val = "0"; trc->getStudy().getStudyInstanceUID(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.study_instance_uid",val.c_str());
-      val = "-"; trc->getSeries().getSeriesInstanceUID(val);
+      val = "0"; trc->getSeries().getSeriesInstanceUID(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid",val.c_str());
-      val = "-"; trc->getSOPCommon().getSOPInstanceUID(val);
+      val = "0"; trc->getSOPCommon().getSOPInstanceUID(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.sop_instance_uid",val.c_str());
-      val = "-"; trc->getSOPCommon().getSOPClassUID(val);
+      val = "0"; trc->getSOPCommon().getSOPClassUID(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.sop_class_uid",val.c_str());
-      val = "-"; trc->getFrameOfReference().getFrameOfReferenceUID(val);
+      val = "0"; trc->getFrameOfReference().getFrameOfReferenceUID(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.frame_of_reference_uid",val.c_str());
 
       output_fibs.push_back(fib.GetPointer());

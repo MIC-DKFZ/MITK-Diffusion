@@ -49,7 +49,7 @@ namespace mitk
     static bool IsDiffusionWeightedImage(const mitk::Image *);
     static bool IsDiffusionWeightedImage(const mitk::DataNode* node);
 
-    static void CopyProperties(mitk::Image* source, mitk::Image* target, bool ignore_original_gradients=false);
+    static void CopyProperties(mitk::BaseData* source, mitk::BaseData* target, bool ignore_original_gradients=false);
 
     static ImageType::Pointer GetItkVectorImage(Image *image);
     static const BValueMapType & GetBValueMap(const mitk::Image *);
@@ -79,6 +79,8 @@ namespace mitk
     static const std::string GetBvaluePropertyName() { return BVALUEMAPPROPERTYNAME; }
     static const std::string GetGradientContainerPropertyName() { return GRADIENTCONTAINERPROPERTYNAME; }
     static const std::string GetMeasurementFramePropertyName() { return MEASUREMENTFRAMEPROPERTYNAME; }
+
+    static void CopyDICOMProperties(const BaseData *source, BaseData *target);
 
   protected:
 

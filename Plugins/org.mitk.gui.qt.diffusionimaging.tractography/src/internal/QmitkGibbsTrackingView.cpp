@@ -461,6 +461,7 @@ void QmitkGibbsTrackingView::GenerateFiberBundle()
     return;
   m_FiberBundle = mitk::FiberBundle::New(fiberBundle);
   m_FiberBundle->SetTrackVisHeader(dynamic_cast<mitk::Image*>(m_ImageNode->GetData())->GetGeometry());
+  mitk::DiffusionPropertyHelper::CopyDICOMProperties(m_ImageNode->GetData(), m_FiberBundle);
 
   if (m_FiberBundleNode.IsNotNull()){
     GetDataStorage()->Remove(m_FiberBundleNode);
@@ -490,10 +491,7 @@ void QmitkGibbsTrackingView::GenerateFiberBundle()
       QMessageBox::information(nullptr, "Fiber bundle could not be saved", QString("%1\n%2\n%3\n%4\n%5\n%6").arg(ex.GetNameOfClass()).arg(ex.GetFile()).arg(ex.GetLine()).arg(ex.GetLocation()).arg(ex.what()).arg(ex.GetDescription()));
     }
   }
-  if(m_ImageNode.IsNull())
-    GetDataStorage()->Add(m_FiberBundleNode);
-  else
-    GetDataStorage()->Add(m_FiberBundleNode, m_ImageNode);
+  GetDataStorage()->Add(m_FiberBundleNode, m_ImageNode);
 }
 
 void QmitkGibbsTrackingView::SetOutputFile()

@@ -503,7 +503,8 @@ void QmitkStreamlineTrackingView::AfterThread()
     if (m_Controls->m_ResampleFibersBox->isChecked() && fiberBundle->GetNumberOfLines()>0)
       fib->Compress(m_Controls->m_FiberErrorBox->value());
     fib->ColorFibersByOrientation();
-    m_Tracker->SetDicomProperties(fib);
+    m_Tracker->SetDicomProperties(fib);    
+    mitk::DiffusionPropertyHelper::CopyDICOMProperties(m_ParentNode->GetData(), fib);
 
     if (m_Controls->m_InteractiveBox->isChecked())
     {
@@ -538,6 +539,7 @@ void QmitkStreamlineTrackingView::AfterThread()
     mitk::Image::Pointer img = mitk::Image::New();
     img->InitializeByItk(outImg.GetPointer());
     img->SetVolume(outImg->GetBufferPointer());
+    mitk::DiffusionPropertyHelper::CopyDICOMProperties(m_ParentNode->GetData(), img);
 
     if (m_Controls->m_InteractiveBox->isChecked())
     {

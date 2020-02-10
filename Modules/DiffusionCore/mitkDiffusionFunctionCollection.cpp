@@ -20,13 +20,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <boost/math/special_functions/legendre.hpp>
 #include <boost/math/special_functions/spherical_harmonic.hpp>
 #include <boost/version.hpp>
+#include <boost/algorithm/string.hpp>
 #include <itkPointShell.h>
 #include "itkVectorContainer.h"
 #include "vnl/vnl_vector.h"
 #include <vtkBox.h>
 #include <vtkMath.h>
 #include <itksys/SystemTools.hxx>
-#include <boost/algorithm/string.hpp>
 #include <itkShToOdfImageFilter.h>
 #include <itkTensorImageToOdfImageFilter.h>
 

@@ -314,8 +314,6 @@ void QmitkTensorReconstructionView::ResidualCalculation()
   filter->SetMax(stats->GetScalarValueMax());
   filter->Update();
 
-
-  // TENSORS TO DATATREE
   mitk::Image::Pointer image = mitk::GrabItkImageMemory( filter->GetOutput() );
   mitk::DiffusionPropertyHelper::CopyProperties(diffImage, image, true);
   mitk::DiffusionPropertyHelper::SetGradientContainer(image, gradients);
@@ -616,6 +614,7 @@ void QmitkTensorReconstructionView::TensorReconstructionWithCorr()
       mitk::TensorImage::Pointer image = mitk::TensorImage::New();
       image->InitializeByItk( outputTensorImg.GetPointer() );
       image->SetVolume( outputTensorImg->GetBufferPointer() );
+      mitk::DiffusionPropertyHelper::CopyDICOMProperties(vols, image);
       mitk::DataNode::Pointer node=mitk::DataNode::New();
       node->SetData( image );
       node->SetName(nodename+"_EigenvalueCorrected_DT");
@@ -701,6 +700,7 @@ void QmitkTensorReconstructionView::ItkTensorReconstruction()
       image->InitializeByItk( tensorImage.GetPointer() );
       image->SetVolume( tensorReconstructionFilter->GetOutput()->GetBufferPointer() );
       mitk::DataNode::Pointer node=mitk::DataNode::New();
+      mitk::DiffusionPropertyHelper::CopyDICOMProperties(vols, image);
       node->SetData( image );
       node->SetName(nodename+"_LinearLeastSquares_DT");
       GetDataStorage()->Add(node, m_Controls->m_DwiBox->GetSelectedNode());
@@ -746,6 +746,7 @@ void QmitkTensorReconstructionView::TensorsToOdf()
     image->InitializeByItk( outimg.GetPointer() );
     image->SetVolume( outimg->GetBufferPointer() );
     mitk::DataNode::Pointer node = mitk::DataNode::New();
+    mitk::DiffusionPropertyHelper::CopyDICOMProperties(tensorImageNode->GetData(), image);
     node->SetData( image );
     node->SetName(tensorImageNode->GetName()+"_Odf");
     GetDataStorage()->Add(node, tensorImageNode);
@@ -865,6 +866,7 @@ void QmitkTensorReconstructionView::DoTensorsToDWI()
       mitk::DiffusionPropertyHelper::InitializeImage( image );
 
       mitk::DataNode::Pointer node=mitk::DataNode::New();
+      mitk::DiffusionPropertyHelper::CopyDICOMProperties(vol, image);
       node->SetData( image );
       mitk::ImageVtkMapper2D::SetDefaultProperties(node);
       node->SetName(nodename+"_DWI");
