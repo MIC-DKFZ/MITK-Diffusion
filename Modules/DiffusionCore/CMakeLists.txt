@@ -21,10 +21,6 @@ endif()
 
 add_subdirectory(Testing)
 
-if(MITK_USE_Python3)
-MITK_INSTALL(FILES PythonRequirements.txt)
-endif()
-
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mitkDiffusionImagingConfigure.h.in ${CMAKE_CURRENT_BINARY_DIR}/mitkDiffusionImagingConfigure.h)
 
 mitkFunctionGetVersion(${CMAKE_CURRENT_SOURCE_DIR} MITKDIFFUSION)
