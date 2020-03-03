@@ -6,5 +6,5 @@ mitk_create_plugin(
   SUBPROJECTS MITK-Diffusion
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_IVIM_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkQtWidgetsExt MitkDiffusionCore
+  MODULE_DEPENDS MitkQtWidgetsExt MitkChart MitkDiffusionCore
 )

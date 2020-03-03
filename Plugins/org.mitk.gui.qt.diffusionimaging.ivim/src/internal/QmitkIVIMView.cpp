@@ -80,7 +80,7 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
     connect( m_Controls->m_ButtonStart, SIGNAL(clicked()), this, SLOT(FittIVIMStart()) );
     connect( m_Controls->m_ButtonAutoThres, SIGNAL(clicked()), this, SLOT(AutoThreshold()) );
 
-    connect( m_Controls->m_MethodCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(MethodCombo(int)) );
+    connect( m_Controls->m_MethodCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(OnIvimFitChanged(int)) );
 
     connect( m_Controls->m_DStarSlider, SIGNAL(valueChanged(int)), this, SLOT(DStarSlider(int)) );
     connect( m_Controls->m_BThreshSlider, SIGNAL(valueChanged(int)), this, SLOT(BThreshSlider(int)) );
@@ -92,20 +92,15 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
     connect( m_Controls->m_CheckD, SIGNAL(clicked()), this, SLOT(Checkbox()) );
     connect( m_Controls->m_Checkf, SIGNAL(clicked()), this, SLOT(Checkbox()) );
 
-    connect( m_Controls->m_ChooseMethod, SIGNAL(clicked()), this, SLOT(ChooseMethod()) );
     connect( m_Controls->m_CurveClipboard, SIGNAL(clicked()), this, SLOT(ClipboardCurveButtonClicked()) );
     connect( m_Controls->m_ValuesClipboard, SIGNAL(clicked()), this, SLOT(ClipboardStatisticsButtonClicked()) );
+    connect( m_Controls->m_SavePlot, SIGNAL(clicked()), this, SLOT(SavePlotButtonClicked()) );
 
     // connect all kurtosis actions to a recompute
     connect( m_Controls->m_KurtosisRangeWidget, SIGNAL( rangeChanged(double, double)), this, SLOT(OnKurtosisParamsChanged() ) );
-    //connect( m_Controls->m_MaximalBValueWidget, SIGNAL( valueChanged(double)), this, SLOT( OnKurtosisParamsChanged() ) );
     connect( m_Controls->m_OmitBZeroCB, SIGNAL( stateChanged(int) ), this, SLOT( OnKurtosisParamsChanged() ) );
     connect( m_Controls->m_KurtosisFitScale, SIGNAL( currentIndexChanged(int)), this, SLOT( OnKurtosisParamsChanged() ) );
     connect( m_Controls->m_UseKurtosisBoundsCB, SIGNAL(clicked() ), this, SLOT( OnKurtosisParamsChanged() ) );
-
-    m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
-    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
-
 
     m_Controls->m_DwiBox->SetDataStorage(this->GetDataStorage());
     mitk::NodePredicateIsDWI::Pointer isDwi = mitk::NodePredicateIsDWI::New();
@@ -120,8 +115,7 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_MaskBox->SetPredicate( mitk::NodePredicateAnd::New(isBinaryPredicate, mitk::NodePredicateAnd::New(isImagePredicate, is3D)) );
     connect( (QObject*)(m_Controls->m_MaskBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()));
 
-    connect( (QObject*)(m_Controls->m_ModelTabSelectionWidget), SIGNAL(currentChanged(int)), this, SLOT(UpdateGui()));
-
+    connect( (QObject*)(m_Controls->m_ModelTabSelectionWidget), SIGNAL(currentChanged(int)), this, SLOT(OnModelTabChanged(int)));
   }
 
   QString dstar = QString::number(m_Controls->m_DStarSlider->value()/1000.0);
@@ -139,10 +133,9 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
   QString lambda = QString::number(m_Controls->m_LambdaSlider->value()*.00001);
   m_Controls->m_LambdaLabel->setText(lambda);
 
-  m_Controls->m_MethodCombo->setVisible(m_Controls->m_ChooseMethod->isChecked());
   m_Controls->m_Warning->setVisible(false);
 
-  MethodCombo(m_Controls->m_MethodCombo->currentIndex());
+  OnIvimFitChanged(m_Controls->m_MethodCombo->currentIndex());
 
   m_Controls->m_KurtosisRangeWidget->setSingleStep(0.1);
   m_Controls->m_KurtosisRangeWidget->setRange( 0.0, 10.0 );
@@ -157,6 +150,106 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
   // release update block after the UI-elements were all set
   this->m_HoldUpdate = false;
 
+  QmitkIVIMView::InitChartIvim();
+
+  m_ListenerActive = false;
+
+  if (this->GetRenderWindowPart())
+  {
+    m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
+    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
+    m_ListenerActive = true;
+  }
+}
+
+void QmitkIVIMView::OnModelTabChanged(int tab)
+{
+  if (tab==0)
+    InitChartIvim();
+  else if (tab==1)
+    InitChartKurtosis();
+
+  UpdateGui();
+}
+
+void QmitkIVIMView::AddSecondFitPlot()
+{
+  if (m_Controls->m_ChartWidget->GetDataElementByLabel("signal values (used for second fit)") == nullptr)
+  {
+    std::map< double, double > init_data;
+    m_Controls->m_ChartWidget->AddData2D(init_data, "signal values (used for second fit)", QmitkChartWidget::ChartType::scatter);
+    m_Controls->m_ChartWidget->SetColor("signal values (used for second fit)", "white");
+    m_Controls->m_ChartWidget->SetMarkerSymbol("signal values (used for second fit)", QmitkChartWidget::MarkerSymbol::x_thin);
+
+    m_Controls->m_ChartWidget->Show(true);
+    m_Controls->m_ChartWidget->SetShowDataPoints(false);
+    m_Controls->m_ChartWidget->SetShowSubchart(false);
+  }
+}
+
+void QmitkIVIMView::RemoveSecondFitPlot()
+{
+  if (m_Controls->m_ChartWidget->GetDataElementByLabel("signal values (used for second fit)") != nullptr)
+  {
+    m_Controls->m_ChartWidget->RemoveData("signal values (used for second fit)");
+
+    m_Controls->m_ChartWidget->Show(true);
+    m_Controls->m_ChartWidget->SetShowDataPoints(false);
+    m_Controls->m_ChartWidget->SetShowSubchart(false);
+  }
+}
+
+void QmitkIVIMView::InitChartIvim()
+{
+  m_Controls->m_ChartWidget->Clear();
+  std::map< double, double > init_data;
+  m_Controls->m_ChartWidget->AddData2D(init_data, "D-part of fitted model", QmitkChartWidget::ChartType::line);
+  m_Controls->m_ChartWidget->AddData2D(init_data, "fitted model", QmitkChartWidget::ChartType::line);
+  m_Controls->m_ChartWidget->AddData2D(init_data, "signal values", QmitkChartWidget::ChartType::scatter);
+
+  m_Controls->m_ChartWidget->SetColor("fitted model", "red");
+  m_Controls->m_ChartWidget->SetColor("signal values", "white");
+  m_Controls->m_ChartWidget->SetColor("D-part of fitted model", "cyan");
+  m_Controls->m_ChartWidget->SetYAxisScale(QmitkChartWidget::AxisScale::log);
+
+  m_Controls->m_ChartWidget->SetYAxisLabel("S/S0");
+  m_Controls->m_ChartWidget->SetXAxisLabel("b-value");
+
+  m_Controls->m_ChartWidget->SetLineStyle("fitted model", QmitkChartWidget::LineStyle::solid);
+  m_Controls->m_ChartWidget->SetLineStyle("D-part of fitted model", QmitkChartWidget::LineStyle::dashed);
+
+  m_Controls->m_ChartWidget->SetMarkerSymbol("signal values", QmitkChartWidget::MarkerSymbol::diamond);
+
+  m_Controls->m_ChartWidget->Show(true);
+  m_Controls->m_ChartWidget->SetShowDataPoints(false);
+  m_Controls->m_ChartWidget->SetShowSubchart(false);
+
+}
+
+void QmitkIVIMView::InitChartKurtosis()
+{
+  m_Controls->m_ChartWidget->Clear();
+  std::map< double, double > init_data;
+  m_Controls->m_ChartWidget->AddData2D(init_data, "D-part of fitted model", QmitkChartWidget::ChartType::line);
+  m_Controls->m_ChartWidget->AddData2D(init_data, "fitted model", QmitkChartWidget::ChartType::line);
+  m_Controls->m_ChartWidget->AddData2D(init_data, "signal values", QmitkChartWidget::ChartType::scatter);
+
+  m_Controls->m_ChartWidget->SetColor("fitted model", "red");
+  m_Controls->m_ChartWidget->SetColor("signal values", "white");
+  m_Controls->m_ChartWidget->SetColor("D-part of fitted model", "cyan");
+  m_Controls->m_ChartWidget->SetYAxisScale(QmitkChartWidget::AxisScale::log);
+
+  m_Controls->m_ChartWidget->SetYAxisLabel("S");
+  m_Controls->m_ChartWidget->SetXAxisLabel("b-value");
+
+  m_Controls->m_ChartWidget->SetLineStyle("fitted model", QmitkChartWidget::LineStyle::solid);
+  m_Controls->m_ChartWidget->SetLineStyle("D-part of fitted model", QmitkChartWidget::LineStyle::dashed);
+
+  m_Controls->m_ChartWidget->SetMarkerSymbol("signal values", QmitkChartWidget::MarkerSymbol::diamond);
+
+  m_Controls->m_ChartWidget->Show(true);
+  m_Controls->m_ChartWidget->SetShowDataPoints(false);
+  m_Controls->m_ChartWidget->SetShowSubchart(false);
 }
 
 void QmitkIVIMView::SetFocus()
@@ -169,7 +262,7 @@ void QmitkIVIMView::Checkbox()
   OnSliceChanged();
 }
 
-void QmitkIVIMView::MethodCombo(int val)
+void QmitkIVIMView::OnIvimFitChanged(int val)
 {
   switch(val)
   {
@@ -255,17 +348,15 @@ void QmitkIVIMView::LambdaSlider (int val)
 
 void QmitkIVIMView::UpdateGui()
 {
+  m_Controls->m_FittedParamsLabel->setText("");
   if (m_Controls->m_DwiBox->GetSelectedNode().IsNotNull())
   {
-    m_Controls->m_VisualizeResultsWidget->setVisible(true);
-    m_Controls->m_KurtosisVisualizationWidget->setVisible(true);
-
+    m_Controls->m_ChartWidget->setVisible(true);
     m_HoldUpdate = false;
   }
   else
   {
-    m_Controls->m_VisualizeResultsWidget->setVisible(false);
-    m_Controls->m_KurtosisVisualizationWidget->setVisible(false);
+    m_Controls->m_ChartWidget->setVisible(false);
   }
 
   m_Controls->m_ButtonStart->setEnabled( m_Controls->m_DwiBox->GetSelectedNode().IsNotNull() );
@@ -279,7 +370,7 @@ void QmitkIVIMView::UpdateGui()
 
 void QmitkIVIMView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& )
 {
-  UpdateGui();
+//  UpdateGui();
 }
 
 void QmitkIVIMView::AutoThreshold()
@@ -391,12 +482,12 @@ void QmitkIVIMView::FittIVIMStart()
     filter->SetInput(vecimg);
     filter->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(img));
     filter->SetGradientDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(img));
-    filter->SetSmoothingSigma( this->m_Controls->m_SigmaSpinBox->value() );
+    filter->SetSmoothingSigma( m_Controls->m_SigmaSpinBox->value() );
 
-    if( this->m_Controls->m_UseKurtosisBoundsCB->isChecked() )
-      filter->SetBoundariesForKurtosis( this->m_Controls->m_KurtosisRangeWidget->minimumValue(), this->m_Controls->m_KurtosisRangeWidget->maximumValue() );
+    if( m_Controls->m_UseKurtosisBoundsCB->isChecked() )
+      filter->SetBoundariesForKurtosis( m_Controls->m_KurtosisRangeWidget->minimumValue(), m_Controls->m_KurtosisRangeWidget->maximumValue() );
 
-    filter->SetFittingScale( static_cast<itk::FitScale>(this->m_Controls->m_KurtosisFitScale->currentIndex() ) );
+    filter->SetFittingScale( static_cast<itk::FitScale>(m_Controls->m_KurtosisFitScale->currentIndex() ) );
 
     if( m_Controls->m_MaskBox->GetSelectedNode().IsNotNull() )
     {
@@ -430,7 +521,7 @@ void QmitkIVIMView::FittIVIMStart()
     QString new_kname = "Kurtosis_KMap";
     new_kname.append("_Method-"+m_Controls->m_KurtosisFitScale->currentText());
 
-    if( this->m_Controls->m_CheckKurtD->isChecked() )
+    if( m_Controls->m_CheckKurtD->isChecked() )
     {
       mitk::DataNode::Pointer dnode = mitk::DataNode::New();
       dnode->SetData( dimage );
@@ -439,7 +530,7 @@ void QmitkIVIMView::FittIVIMStart()
       GetDataStorage()->Add(dnode, m_Controls->m_DwiBox->GetSelectedNode());
     }
 
-    if( this->m_Controls->m_CheckKurtK->isChecked() )
+    if( m_Controls->m_CheckKurtK->isChecked() )
     {
       mitk::DataNode::Pointer knode = mitk::DataNode::New();
       knode->SetData( kimage );
@@ -468,25 +559,29 @@ void QmitkIVIMView::OnSliceChanged()
     return;
 
   m_Controls->m_Warning->setVisible(false);
-  if(!m_Controls || m_Controls->m_DwiBox->GetSelectedNode().IsNull())
+  if(m_Controls->m_DwiBox->GetSelectedNode().IsNull())
     return;
-
-  m_Controls->m_VisualizeResultsWidget->setVisible(false);
-  m_Controls->m_KurtosisVisualizationWidget->setVisible(false);
 
   mitk::Image::Pointer diffusionImg = dynamic_cast<mitk::Image*>(m_Controls->m_DwiBox->GetSelectedNode()->GetData());
   mitk::Image::Pointer maskImg = nullptr;
   if (m_Controls->m_MaskBox->GetSelectedNode().IsNotNull())
     maskImg = dynamic_cast<mitk::Image*>(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
 
-  if (!this->GetRenderWindowPart()) return;
+  if (!this->GetRenderWindowPart())
+    return;
+
+  if (!m_ListenerActive)
+  {
+    m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
+    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
+    m_ListenerActive = true;
+  }
 
   VecImgType::Pointer vecimg = VecImgType::New();
   mitk::CastToItkImage(diffusionImg, vecimg);
 
   VecImgType::Pointer roiImage = VecImgType::New();
 
-  bool success = false;
   if(maskImg.IsNull())
   {
     int roisize = 0;
@@ -541,18 +636,18 @@ void QmitkIVIMView::OnSliceChanged()
 
     if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
     {
-      success = FitKurtosis(roiImage,
-                            mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                            mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
-                            newstart);
+      FitKurtosis(roiImage,
+                  mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
+                  mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
+                  newstart);
     }
     else
     {
-      success = FittIVIM(roiImage,
-                         mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                         mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
-                         false,
-                         crosspos);
+      FittIVIM(roiImage,
+               mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
+               mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
+               false,
+               crosspos);
     }
   }
   else
@@ -622,41 +717,25 @@ void QmitkIVIMView::OnSliceChanged()
 
     if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
     {
-      success = FitKurtosis(roiImage,
-                            mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                            mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
-                            index);
+      FitKurtosis(roiImage,
+                  mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
+                  mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
+                  index);
     }
     else
     {
-      success = FittIVIM(roiImage,
-                         mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                         mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
-                         false,
-                         index);
+      FittIVIM(roiImage,
+               mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
+               mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
+               false,
+               index);
     }
 
     // do not update until selection changed, the values will remain the same as long as the mask is selected!
     m_HoldUpdate = true;
-
   }
 
   vecimg->SetRegions( vecimg->GetLargestPossibleRegion() );
-
-  if (success)
-  {
-    // 0 - IVIM, 1 - Kurtosis
-    if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
-    {
-      m_Controls->m_KurtosisVisualizationWidget->setVisible(true);
-      m_Controls->m_KurtosisVisualizationWidget->SetData(m_KurtosisSnap);
-    }
-    else
-    {
-      m_Controls->m_VisualizeResultsWidget->setVisible(true);
-      m_Controls->m_VisualizeResultsWidget->SetParameters(m_Snap);
-    }
-  }
 }
 
 bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContainerType *dirs, float bval, OutImgType::IndexType &crosspos )
@@ -664,20 +743,49 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
   KurtosisFilterType::Pointer filter = KurtosisFilterType::New();
 
   itk::KurtosisFitConfiguration fit_config;
-  fit_config.omit_bzero =  this->m_Controls->m_OmitBZeroCB->isChecked();
-  if( this->m_Controls->m_UseKurtosisBoundsCB->isChecked() )
+  fit_config.omit_bzero =  m_Controls->m_OmitBZeroCB->isChecked();
+  if( m_Controls->m_UseKurtosisBoundsCB->isChecked() )
   {
     fit_config.use_K_limits = true;
     vnl_vector_fixed<double, 2> k_limits;
-    k_limits[0] = this->m_Controls->m_KurtosisRangeWidget->minimumValue();
-    k_limits[1] = this->m_Controls->m_KurtosisRangeWidget->maximumValue();
+    k_limits[0] = m_Controls->m_KurtosisRangeWidget->minimumValue();
+    k_limits[1] = m_Controls->m_KurtosisRangeWidget->maximumValue();
 
     fit_config.K_limits = k_limits;
-
   }
-  fit_config.fit_scale = static_cast<itk::FitScale>(this->m_Controls->m_KurtosisFitScale->currentIndex() );
+  fit_config.fit_scale = static_cast<itk::FitScale>(m_Controls->m_KurtosisFitScale->currentIndex() );
 
   m_KurtosisSnap = filter->GetSnapshot( vecimg->GetPixel( crosspos ), dirs, bval, fit_config );
+
+  QString param_label_text("K=%2, D=%1");
+  param_label_text = param_label_text.arg( m_KurtosisSnap.m_K, 4);
+  param_label_text = param_label_text.arg( m_KurtosisSnap.m_D, 4);
+  m_Controls->m_FittedParamsLabel->setText(param_label_text);
+
+  const double maxb = m_KurtosisSnap.bvalues.max_value();
+  double S0 = m_KurtosisSnap.measurements[0];
+
+  std::map<double, double> d_line;
+  d_line[0] = S0;
+  d_line[maxb] = d_line[0]*exp(-maxb * m_KurtosisSnap.m_D);
+  m_Controls->m_ChartWidget->UpdateData2D(d_line, "D-part of fitted model");
+
+  const unsigned int num_samples = 50;
+  std::map<double, double> y;
+
+  for( unsigned int i=0; i<=num_samples; ++i)
+  {
+    double b = (((1.0)*i)/(1.0*num_samples))*maxb;
+    y[b] = S0 * exp( -b * m_KurtosisSnap.m_D + b*b * m_KurtosisSnap.m_D * m_KurtosisSnap.m_D * m_KurtosisSnap.m_K / 6.0 );
+  }
+  m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
+
+  std::map<double, double> y_meas;
+  for (unsigned int i=0; i<m_KurtosisSnap.measurements.size(); ++i)
+    if (!m_Controls->m_OmitBZeroCB->isChecked() || m_KurtosisSnap.bvalues[i] > 0.01)
+      y_meas[m_KurtosisSnap.bvalues[i]] = m_KurtosisSnap.measurements[i];
+
+  m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
 
   return true;
 }
@@ -739,10 +847,58 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
 
   try{
     filter->Update();
-    m_Snap = filter->GetSnapshot();
+    m_IvimSnap = filter->GetSnapshot();
     m_DStarMap = filter->GetOutput(2);
     m_DMap = filter->GetOutput(1);
     m_fMap = filter->GetOutput();
+
+    QString param_label_text("f=%1, D=%2, D*=%3");
+    param_label_text = param_label_text.arg(m_IvimSnap.currentF,4);
+    param_label_text = param_label_text.arg(m_IvimSnap.currentD,4);
+    param_label_text = param_label_text.arg(m_IvimSnap.currentDStar,4);
+    m_Controls->m_FittedParamsLabel->setText(param_label_text);
+
+    double maxb = m_IvimSnap.bvalues.max_value();
+
+    std::map<double, double> d_line;
+    d_line[0] = 1-m_IvimSnap.currentFunceiled;
+    d_line[maxb] = d_line[0]*exp(-maxb * m_IvimSnap.currentD);
+    m_Controls->m_ChartWidget->UpdateData2D(d_line, "D-part of fitted model");
+
+    if(m_IvimSnap.currentDStar != 0)
+    {
+      std::map<double, double> y;
+      int nsampling = 50;
+      double f = 1-m_IvimSnap.currentFunceiled;
+      for(int i=0; i<=nsampling; i++)
+      {
+        double x = (((1.0)*i)/(1.0*nsampling))*maxb;
+        y[x] = f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar));
+      }
+      m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
+
+      std::map<double, double> y_meas;
+      for (unsigned int i=0; i<m_IvimSnap.meas1.size(); ++i)
+        y_meas[m_IvimSnap.bvals1[i]] = m_IvimSnap.meas1[i];
+
+      m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
+
+      if(!m_IvimSnap.high_indices.empty())
+      {
+        MITK_INFO << "m_Snap.high_indices found";
+        AddSecondFitPlot();
+        std::map<double, double> additonal_meas;
+        for (int i=0; i<m_IvimSnap.high_indices[0]; ++i)
+          additonal_meas[m_IvimSnap.bvals2[i]] = m_IvimSnap.meas2[i];
+
+        m_Controls->m_ChartWidget->UpdateData2D(additonal_meas, "signal values (used for second fit)");
+      }
+      else
+      {
+        MITK_INFO << "NO m_Snap.high_indices found";
+        RemoveSecondFitPlot();
+      }
+    }
   }
   catch (itk::ExceptionObject &ex)
   {
@@ -806,11 +962,6 @@ void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
   this->GetRenderWindowPart()->RequestUpdate();
 }
 
-void QmitkIVIMView::ChooseMethod()
-{
-  m_Controls->m_MethodCombo->setVisible(m_Controls->m_ChooseMethod->isChecked());
-}
-
 void QmitkIVIMView::ClipboardCurveButtonClicked()
 {
   // Kurtosis
@@ -837,53 +988,58 @@ void QmitkIVIMView::ClipboardCurveButtonClicked()
   {
 
     QString clipboard("Measurement Points\n");
-    for ( unsigned int i=0; i<m_Snap.bvalues.size(); i++)
+    for ( unsigned int i=0; i<m_IvimSnap.bvalues.size(); i++)
     {
       clipboard = clipboard.append( "%L1 \t" )
-                  .arg( m_Snap.bvalues[i], 0, 'f', 2 );
+          .arg( m_IvimSnap.bvalues[i], 0, 'f', 2 );
     }
     clipboard = clipboard.append( "\n" );
 
-    for ( unsigned int i=0; i<m_Snap.allmeas.size(); i++)
+    for ( unsigned int i=0; i<m_IvimSnap.allmeas.size(); i++)
     {
       clipboard = clipboard.append( "%L1 \t" )
-                  .arg( m_Snap.allmeas[i], 0, 'f', 2 );
+          .arg( m_IvimSnap.allmeas[i], 0, 'f', 2 );
     }
     clipboard = clipboard.append( "\n" );
 
 
     clipboard = clipboard.append( "1st Linear Fit of D and f \n" );
-    double maxb = m_Snap.bvalues.max_value();
+    double maxb = m_IvimSnap.bvalues.max_value();
     clipboard = clipboard.append( "%L1 \t %L2 \n %L3 \t %L4 \n" )
-                .arg( (float) 0, 0, 'f', 2 )
-                .arg( maxb, 0, 'f', 2 )
-                .arg(1-m_Snap.currentFunceiled, 0, 'f', 2 )
-                .arg((1-m_Snap.currentFunceiled)*exp(-maxb * m_Snap.currentD), 0, 'f', 2 );
+        .arg( (float) 0, 0, 'f', 2 )
+        .arg( maxb, 0, 'f', 2 )
+        .arg(1-m_IvimSnap.currentFunceiled, 0, 'f', 2 )
+        .arg((1-m_IvimSnap.currentFunceiled)*exp(-maxb * m_IvimSnap.currentD), 0, 'f', 2 );
 
 
     int nsampling = 50;
-    double f = 1-m_Snap.currentFunceiled;
+    double f = 1-m_IvimSnap.currentFunceiled;
     clipboard = clipboard.append("Final Model\n");
     for(int i=0; i<nsampling; i++)
     {
       double x = (((1.0)*i)/(1.0*nsampling))*maxb;
       clipboard = clipboard.append( "%L1 \t" )
-                  .arg( x, 0, 'f', 2 );
+          .arg( x, 0, 'f', 2 );
     }
     clipboard = clipboard.append( "\n" );
 
     for(int i=0; i<nsampling; i++)
     {
       double x = (((1.0)*i)/(1.0*nsampling))*maxb;
-      double y = f*exp(- x * m_Snap.currentD) + (1-f)*exp(- x * (m_Snap.currentD+m_Snap.currentDStar));
+      double y = f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar));
       clipboard = clipboard.append( "%L1 \t" )
-                  .arg( y, 0, 'f', 2 );
+          .arg( y, 0, 'f', 2 );
     }
     clipboard = clipboard.append( "\n" );
 
     QApplication::clipboard()->setText(
           clipboard, QClipboard::Clipboard );
   }
+}
+
+void QmitkIVIMView::SavePlotButtonClicked()
+{
+  m_Controls->m_ChartWidget->SavePlotAsImage();
 }
 
 
@@ -895,8 +1051,8 @@ void QmitkIVIMView::ClipboardStatisticsButtonClicked()
 
     QString clipboard( "D \t K \n" );
     clipboard = clipboard.append( "%L1 \t %L2" )
-                .arg( m_KurtosisSnap.m_D, 0, 'f', 10 )
-                .arg( m_KurtosisSnap.m_K, 0, 'f', 10 ) ;
+        .arg( m_KurtosisSnap.m_D, 0, 'f', 10 )
+        .arg( m_KurtosisSnap.m_K, 0, 'f', 10 ) ;
 
     QApplication::clipboard()->setText(
           clipboard, QClipboard::Clipboard );
@@ -905,9 +1061,9 @@ void QmitkIVIMView::ClipboardStatisticsButtonClicked()
   {
     QString clipboard( "f \t D \t D* \n" );
     clipboard = clipboard.append( "%L1 \t %L2 \t %L3" )
-                .arg( m_Snap.currentF, 0, 'f', 10 )
-                .arg( m_Snap.currentD, 0, 'f', 10 )
-                .arg( m_Snap.currentDStar, 0, 'f', 10 ) ;
+        .arg( m_IvimSnap.currentF, 0, 'f', 10 )
+        .arg( m_IvimSnap.currentD, 0, 'f', 10 )
+        .arg( m_IvimSnap.currentDStar, 0, 'f', 10 ) ;
 
     QApplication::clipboard()->setText(
           clipboard, QClipboard::Clipboard );
@@ -928,9 +1084,12 @@ void QmitkIVIMView::Visible()
 {
   m_Visible = true;
 
-  QList<mitk::DataNode::Pointer> selection = GetDataManagerSelection();
-  berry::IWorkbenchPart::Pointer nullPart;
-  OnSelectionChanged(nullPart, selection);
+  if (this->GetRenderWindowPart() and !m_ListenerActive)
+  {
+    m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
+    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
+    m_ListenerActive = true;
+  }
 }
 
 void QmitkIVIMView::Hidden()
