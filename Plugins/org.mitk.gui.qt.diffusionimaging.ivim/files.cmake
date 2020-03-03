@@ -1,6 +1,5 @@
 set(SRC_CPP_FILES
-  QmitkIVIMWidget.cpp
-  QmitkKurtosisWidget.cpp
+
 )
 
 set(INTERNAL_CPP_FILES

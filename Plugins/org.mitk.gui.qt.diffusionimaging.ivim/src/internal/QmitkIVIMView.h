@@ -32,6 +32,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h"
 #include "itkDiffusionKurtosisReconstructionImageFilter.h"
 #include <QmitkSliceNavigationListener.h>
+#include <QmitkChartWidget.h>
 
 /*!
   \brief QmitkIVIMView
@@ -82,7 +83,9 @@ protected slots:
   void FittIVIMStart();
   void AutoThreshold();
 
-  void MethodCombo(int val);
+  void OnModelTabChanged(int tab);
+
+  void OnIvimFitChanged(int val);
   void Checkbox();
 
   void DStarSlider(int val);
@@ -90,14 +93,19 @@ protected slots:
   void S0ThreshSlider(int val);
   void NumItsSlider(int val);
   void LambdaSlider(int val);
-  void ChooseMethod();
   void ClipboardStatisticsButtonClicked();
   void ClipboardCurveButtonClicked();
+  void SavePlotButtonClicked();
 
   void OnKurtosisParamsChanged();
   void UpdateGui();
 
 protected:
+
+  void InitChartIvim();
+  void InitChartKurtosis();
+  void AddSecondFitPlot();
+  void RemoveSecondFitPlot();
 
   /// \brief called by QmitkAbstractView when DataManager's selection has changed
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
@@ -110,11 +118,12 @@ protected:
   OutImgType::Pointer m_DMap;
   OutImgType::Pointer m_fMap;
 
-  IVIMFilterType::IVIMSnapshot m_Snap;
+  IVIMFilterType::IVIMSnapshot m_IvimSnap;
   KurtosisFilterType::KurtosisSnapshot m_KurtosisSnap;
 
   bool m_Active;
   bool m_Visible;
+  bool m_ListenerActive;
 
   bool m_HoldUpdate;
   QmitkSliceNavigationListener  m_SliceChangeListener;
