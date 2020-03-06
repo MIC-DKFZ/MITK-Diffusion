@@ -340,6 +340,8 @@ itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelTyp
   bvalueIter = bvalues.begin();
   unsigned int running_index = 0;
   unsigned int skip_count = 0;
+  unsigned int bzero_count = 0;
+  result.m_Bzero = 0;
   while( bvalueIter != bvalues.end() )
   {
     if( *bvalueIter < vnl_math::eps && omit_bzero )
@@ -352,11 +354,18 @@ itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelTyp
       fit_bvalues[ running_index - skip_count ] = *bvalueIter;
     }
 
+    if( *bvalueIter < vnl_math::eps )
+    {
+      result.m_Bzero += input.GetElement(running_index);
+      ++bzero_count;
+    }
+
     orig_measurements[ running_index ] = input.GetElement(running_index);
 
     ++running_index;
     ++bvalueIter;
   }
+  result.m_Bzero /= bzero_count;
 
   result.fit_bvalues = fit_bvalues;
   result.fit_measurements = fit_measurements;

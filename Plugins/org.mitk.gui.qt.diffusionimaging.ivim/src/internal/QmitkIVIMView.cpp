@@ -176,7 +176,7 @@ void QmitkIVIMView::AddSecondFitPlot()
 {
   if (m_Controls->m_ChartWidget->GetDataElementByLabel("signal values (used for second fit)") == nullptr)
   {
-    std::map< double, double > init_data;
+    std::vector< std::pair<double, double> > init_data;
     m_Controls->m_ChartWidget->AddData2D(init_data, "signal values (used for second fit)", QmitkChartWidget::ChartType::scatter);
     m_Controls->m_ChartWidget->SetColor("signal values (used for second fit)", "white");
     m_Controls->m_ChartWidget->SetMarkerSymbol("signal values (used for second fit)", QmitkChartWidget::MarkerSymbol::x_thin);
@@ -202,7 +202,7 @@ void QmitkIVIMView::RemoveSecondFitPlot()
 void QmitkIVIMView::InitChartIvim()
 {
   m_Controls->m_ChartWidget->Clear();
-  std::map< double, double > init_data;
+  std::vector< std::pair<double, double> > init_data;
   m_Controls->m_ChartWidget->AddData2D(init_data, "D-part of fitted model", QmitkChartWidget::ChartType::line);
   m_Controls->m_ChartWidget->AddData2D(init_data, "fitted model", QmitkChartWidget::ChartType::line);
   m_Controls->m_ChartWidget->AddData2D(init_data, "signal values", QmitkChartWidget::ChartType::scatter);
@@ -229,7 +229,7 @@ void QmitkIVIMView::InitChartIvim()
 void QmitkIVIMView::InitChartKurtosis()
 {
   m_Controls->m_ChartWidget->Clear();
-  std::map< double, double > init_data;
+  std::vector< std::pair<double, double> > init_data;
   m_Controls->m_ChartWidget->AddData2D(init_data, "D-part of fitted model", QmitkChartWidget::ChartType::line);
   m_Controls->m_ChartWidget->AddData2D(init_data, "fitted model", QmitkChartWidget::ChartType::line);
   m_Controls->m_ChartWidget->AddData2D(init_data, "signal values", QmitkChartWidget::ChartType::scatter);
@@ -763,27 +763,31 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
   m_Controls->m_FittedParamsLabel->setText(param_label_text);
 
   const double maxb = m_KurtosisSnap.bvalues.max_value();
-  double S0 = m_KurtosisSnap.measurements[0];
+  double S0 = m_KurtosisSnap.m_Bzero;
+  if (m_KurtosisSnap.m_fittedBZero)
+    S0 = m_KurtosisSnap.m_BzeroFit;
 
-  std::map<double, double> d_line;
-  d_line[0] = S0;
-  d_line[maxb] = d_line[0]*exp(-maxb * m_KurtosisSnap.m_D);
+  std::vector< std::pair<double, double> > d_line;
+  d_line.push_back(std::pair<double, double>(0, S0));
+  d_line.push_back(std::pair<double, double>(maxb, S0*exp(-maxb * m_KurtosisSnap.m_D)));
   m_Controls->m_ChartWidget->UpdateData2D(d_line, "D-part of fitted model");
 
   const unsigned int num_samples = 50;
-  std::map<double, double> y;
+  std::vector< std::pair<double, double> > y;
 
   for( unsigned int i=0; i<=num_samples; ++i)
   {
     double b = (((1.0)*i)/(1.0*num_samples))*maxb;
-    y[b] = S0 * exp( -b * m_KurtosisSnap.m_D + b*b * m_KurtosisSnap.m_D * m_KurtosisSnap.m_D * m_KurtosisSnap.m_K / 6.0 );
+    y.push_back(std::pair<double, double>(b, S0 * exp( -b * m_KurtosisSnap.m_D + b*b * m_KurtosisSnap.m_D * m_KurtosisSnap.m_D * m_KurtosisSnap.m_K / 6.0 )));
   }
   m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
 
-  std::map<double, double> y_meas;
+  std::vector< std::pair<double, double> > y_meas;
   for (unsigned int i=0; i<m_KurtosisSnap.measurements.size(); ++i)
+  {
     if (!m_Controls->m_OmitBZeroCB->isChecked() || m_KurtosisSnap.bvalues[i] > 0.01)
-      y_meas[m_KurtosisSnap.bvalues[i]] = m_KurtosisSnap.measurements[i];
+      y_meas.push_back(std::pair<double, double>(m_KurtosisSnap.bvalues[i], m_KurtosisSnap.measurements[i]));
+  }
 
   m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
 
@@ -860,42 +864,40 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
 
     double maxb = m_IvimSnap.bvalues.max_value();
 
-    std::map<double, double> d_line;
-    d_line[0] = 1-m_IvimSnap.currentFunceiled;
-    d_line[maxb] = d_line[0]*exp(-maxb * m_IvimSnap.currentD);
+    std::vector< std::pair<double, double> > d_line;
+    d_line.push_back(std::pair<double, double>(0, 1-m_IvimSnap.currentFunceiled));
+    d_line.push_back(std::pair<double, double>(maxb, d_line[0].second*exp(-maxb * m_IvimSnap.currentD)));
     m_Controls->m_ChartWidget->UpdateData2D(d_line, "D-part of fitted model");
 
     if(m_IvimSnap.currentDStar != 0)
     {
-      std::map<double, double> y;
+      std::vector< std::pair<double, double> > y;
       int nsampling = 50;
       double f = 1-m_IvimSnap.currentFunceiled;
       for(int i=0; i<=nsampling; i++)
       {
         double x = (((1.0)*i)/(1.0*nsampling))*maxb;
-        y[x] = f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar));
+        y.push_back(std::pair<double, double>(x, f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar))));
       }
       m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
 
-      std::map<double, double> y_meas;
+      std::vector< std::pair<double, double> > y_meas;
       for (unsigned int i=0; i<m_IvimSnap.meas1.size(); ++i)
-        y_meas[m_IvimSnap.bvals1[i]] = m_IvimSnap.meas1[i];
+        y_meas.push_back(std::pair<double, double>(m_IvimSnap.bvals1[i], m_IvimSnap.meas1[i]));
 
       m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
 
       if(!m_IvimSnap.high_indices.empty())
       {
-        MITK_INFO << "m_Snap.high_indices found";
         AddSecondFitPlot();
-        std::map<double, double> additonal_meas;
+        std::vector< std::pair<double, double> > additonal_meas;
         for (int i=0; i<m_IvimSnap.high_indices[0]; ++i)
-          additonal_meas[m_IvimSnap.bvals2[i]] = m_IvimSnap.meas2[i];
+          additonal_meas.push_back(std::pair<double, double>(m_IvimSnap.bvals2[i], m_IvimSnap.meas2[i]));
 
         m_Controls->m_ChartWidget->UpdateData2D(additonal_meas, "signal values (used for second fit)");
       }
       else
       {
-        MITK_INFO << "NO m_Snap.high_indices found";
         RemoveSecondFitPlot();
       }
     }
@@ -972,6 +974,7 @@ void QmitkIVIMView::ClipboardCurveButtonClicked()
 
     ss << m_KurtosisSnap.bvalues << "\n" << m_KurtosisSnap.measurements << "\n\n";
     ss << "Fitted Values ( D  K  [b_0] ) \n" << m_KurtosisSnap.m_D << " " << m_KurtosisSnap.m_K;
+
     if( m_KurtosisSnap.m_fittedBZero )
       ss << " " << m_KurtosisSnap.m_BzeroFit;
 
@@ -981,59 +984,23 @@ void QmitkIVIMView::ClipboardCurveButtonClicked()
     ss.str( std::string() );
     ss.clear();
 
-    QApplication::clipboard()->setText(
-          clipboard, QClipboard::Clipboard );
+    QApplication::clipboard()->setText(clipboard, QClipboard::Clipboard );
   }
   else
   {
-
-    QString clipboard("Measurement Points\n");
-    for ( unsigned int i=0; i<m_IvimSnap.bvalues.size(); i++)
-    {
-      clipboard = clipboard.append( "%L1 \t" )
-          .arg( m_IvimSnap.bvalues[i], 0, 'f', 2 );
-    }
-    clipboard = clipboard.append( "\n" );
-
-    for ( unsigned int i=0; i<m_IvimSnap.allmeas.size(); i++)
-    {
-      clipboard = clipboard.append( "%L1 \t" )
-          .arg( m_IvimSnap.allmeas[i], 0, 'f', 2 );
-    }
-    clipboard = clipboard.append( "\n" );
+    std::stringstream ss;
+    QString clipboard("Normalized Measurement Points\n");
+    ss << m_IvimSnap.bvalues << "\n" << m_IvimSnap.allmeas << "\n\n";
+    ss << "Fitted Values ( f  D  D* ) \n" << m_IvimSnap.currentF << " " << m_IvimSnap.currentD << " " << m_IvimSnap.currentDStar;
 
 
-    clipboard = clipboard.append( "1st Linear Fit of D and f \n" );
-    double maxb = m_IvimSnap.bvalues.max_value();
-    clipboard = clipboard.append( "%L1 \t %L2 \n %L3 \t %L4 \n" )
-        .arg( (float) 0, 0, 'f', 2 )
-        .arg( maxb, 0, 'f', 2 )
-        .arg(1-m_IvimSnap.currentFunceiled, 0, 'f', 2 )
-        .arg((1-m_IvimSnap.currentFunceiled)*exp(-maxb * m_IvimSnap.currentD), 0, 'f', 2 );
+    ss << "\n\n";
+    clipboard.append( QString( ss.str().c_str() ));
 
+    ss.str( std::string() );
+    ss.clear();
 
-    int nsampling = 50;
-    double f = 1-m_IvimSnap.currentFunceiled;
-    clipboard = clipboard.append("Final Model\n");
-    for(int i=0; i<nsampling; i++)
-    {
-      double x = (((1.0)*i)/(1.0*nsampling))*maxb;
-      clipboard = clipboard.append( "%L1 \t" )
-          .arg( x, 0, 'f', 2 );
-    }
-    clipboard = clipboard.append( "\n" );
-
-    for(int i=0; i<nsampling; i++)
-    {
-      double x = (((1.0)*i)/(1.0*nsampling))*maxb;
-      double y = f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar));
-      clipboard = clipboard.append( "%L1 \t" )
-          .arg( y, 0, 'f', 2 );
-    }
-    clipboard = clipboard.append( "\n" );
-
-    QApplication::clipboard()->setText(
-          clipboard, QClipboard::Clipboard );
+    QApplication::clipboard()->setText(clipboard, QClipboard::Clipboard );
   }
 }
 
@@ -1054,8 +1021,7 @@ void QmitkIVIMView::ClipboardStatisticsButtonClicked()
         .arg( m_KurtosisSnap.m_D, 0, 'f', 10 )
         .arg( m_KurtosisSnap.m_K, 0, 'f', 10 ) ;
 
-    QApplication::clipboard()->setText(
-          clipboard, QClipboard::Clipboard );
+    QApplication::clipboard()->setText(clipboard, QClipboard::Clipboard );
   }
   else
   {
@@ -1065,8 +1031,7 @@ void QmitkIVIMView::ClipboardStatisticsButtonClicked()
         .arg( m_IvimSnap.currentD, 0, 'f', 10 )
         .arg( m_IvimSnap.currentDStar, 0, 'f', 10 ) ;
 
-    QApplication::clipboard()->setText(
-          clipboard, QClipboard::Clipboard );
+    QApplication::clipboard()->setText(clipboard, QClipboard::Clipboard );
   }
 }
 
