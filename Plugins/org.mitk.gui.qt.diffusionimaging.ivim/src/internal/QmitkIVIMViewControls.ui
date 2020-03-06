@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>423</width>
-    <height>648</height>
+    <width>424</width>
+    <height>689</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -905,7 +905,7 @@ QGroupBox {
                   <string>Omit b=0 Measurements</string>
                  </property>
                  <property name="checked">
-                  <bool>true</bool>
+                  <bool>false</bool>
                  </property>
                 </widget>
                </item>

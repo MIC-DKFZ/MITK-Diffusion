@@ -278,6 +278,7 @@ public:
     double m_BzeroFit;
     double m_D;
     double m_K;
+    double m_Bzero;   // mean baseline signal
   };
 
   //-- class typedefs
