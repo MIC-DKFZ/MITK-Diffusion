@@ -768,8 +768,8 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
     S0 = m_KurtosisSnap.m_BzeroFit;
 
   std::vector< std::pair<double, double> > d_line;
-  d_line.push_back(std::pair<double, double>(0, S0));
-  d_line.push_back(std::pair<double, double>(maxb, S0*exp(-maxb * m_KurtosisSnap.m_D)));
+  d_line.emplace_back(0, S0);
+  d_line.emplace_back(maxb, S0*exp(-maxb * m_KurtosisSnap.m_D));
   m_Controls->m_ChartWidget->UpdateData2D(d_line, "D-part of fitted model");
 
   const unsigned int num_samples = 50;
@@ -778,7 +778,7 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
   for( unsigned int i=0; i<=num_samples; ++i)
   {
     double b = (((1.0)*i)/(1.0*num_samples))*maxb;
-    y.push_back(std::pair<double, double>(b, S0 * exp( -b * m_KurtosisSnap.m_D + b*b * m_KurtosisSnap.m_D * m_KurtosisSnap.m_D * m_KurtosisSnap.m_K / 6.0 )));
+    y.emplace_back(b, S0 * exp( -b * m_KurtosisSnap.m_D + b*b * m_KurtosisSnap.m_D * m_KurtosisSnap.m_D * m_KurtosisSnap.m_K / 6.0 ));
   }
   m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
 
@@ -786,7 +786,7 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
   for (unsigned int i=0; i<m_KurtosisSnap.measurements.size(); ++i)
   {
     if (!m_Controls->m_OmitBZeroCB->isChecked() || m_KurtosisSnap.bvalues[i] > 0.01)
-      y_meas.push_back(std::pair<double, double>(m_KurtosisSnap.bvalues[i], m_KurtosisSnap.measurements[i]));
+      y_meas.emplace_back(m_KurtosisSnap.bvalues[i], m_KurtosisSnap.measurements[i]);
   }
 
   m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
@@ -865,8 +865,8 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
     double maxb = m_IvimSnap.bvalues.max_value();
 
     std::vector< std::pair<double, double> > d_line;
-    d_line.push_back(std::pair<double, double>(0, 1-m_IvimSnap.currentFunceiled));
-    d_line.push_back(std::pair<double, double>(maxb, d_line[0].second*exp(-maxb * m_IvimSnap.currentD)));
+    d_line.emplace_back(0, 1-m_IvimSnap.currentFunceiled);
+    d_line.emplace_back(maxb, d_line[0].second*exp(-maxb * m_IvimSnap.currentD));
     m_Controls->m_ChartWidget->UpdateData2D(d_line, "D-part of fitted model");
 
     if(m_IvimSnap.currentDStar != 0)
@@ -877,13 +877,13 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
       for(int i=0; i<=nsampling; i++)
       {
         double x = (((1.0)*i)/(1.0*nsampling))*maxb;
-        y.push_back(std::pair<double, double>(x, f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar))));
+        y.emplace_back(x, f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar)));
       }
       m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
 
       std::vector< std::pair<double, double> > y_meas;
       for (unsigned int i=0; i<m_IvimSnap.meas1.size(); ++i)
-        y_meas.push_back(std::pair<double, double>(m_IvimSnap.bvals1[i], m_IvimSnap.meas1[i]));
+        y_meas.emplace_back(m_IvimSnap.bvals1[i], m_IvimSnap.meas1[i]);
 
       m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
 
@@ -892,7 +892,7 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
         AddSecondFitPlot();
         std::vector< std::pair<double, double> > additonal_meas;
         for (int i=0; i<m_IvimSnap.high_indices[0]; ++i)
-          additonal_meas.push_back(std::pair<double, double>(m_IvimSnap.bvals2[i], m_IvimSnap.meas2[i]));
+          additonal_meas.emplace_back(m_IvimSnap.bvals2[i], m_IvimSnap.meas2[i]);
 
         m_Controls->m_ChartWidget->UpdateData2D(additonal_meas, "signal values (used for second fit)");
       }
