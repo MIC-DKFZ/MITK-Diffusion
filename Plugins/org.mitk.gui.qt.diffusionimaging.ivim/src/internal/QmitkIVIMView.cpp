@@ -1049,7 +1049,7 @@ void QmitkIVIMView::Visible()
 {
   m_Visible = true;
 
-  if (this->GetRenderWindowPart() and !m_ListenerActive)
+  if (this->GetRenderWindowPart() && !m_ListenerActive)
   {
     m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
     connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
