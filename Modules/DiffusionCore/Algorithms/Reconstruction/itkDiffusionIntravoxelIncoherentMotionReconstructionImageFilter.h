@@ -27,6 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkVectorImage.h"
 
 #include "vnl/vnl_least_squares_function.h"
+#include "vnl/vnl_cost_function.h"
 #include "vnl/algo/vnl_levenberg_marquardt.h"
 #include "vnl/vnl_math.h"
 
@@ -74,10 +75,15 @@ namespace itk{
       double D = x[1];
       double Dstar = x[2];
 
-      for(int s=0; s<N; s++)
+      for(int s=0; s<N; ++s)
       {
         double approx = (1-ef)*exp(-bvalues[s]*D)+ef*exp(-bvalues[s]*(D+Dstar));
         fx[s] = vnl_math_abs( measurements[s] - approx );
+
+        if (D<0)
+          fx[s] -= D*100000;
+        if (Dstar<0)
+          fx[s] -= Dstar*100000;
       }
 
     }
@@ -103,6 +109,9 @@ namespace itk{
       {
         double approx = (1-ef)*exp(-bvalues[s]*D)+ef*exp(-bvalues[s]*(D+fixDStar));
         fx[s] = vnl_math_abs( measurements[s] - approx );
+
+        if (D<0)
+          fx[s] -= D*100000;
       }
 
     }
@@ -111,7 +120,7 @@ namespace itk{
 
   };
 
-  /** fit a monoexponential curve only estimating D */
+  /** fit a monoexponential curve only estimating D and f */
   struct IVIM_d_and_f : public IVIM_base, vnl_least_squares_function
   {
 
@@ -130,6 +139,12 @@ namespace itk{
       {
         double approx = (1-f) * exp(-bvalues[s]*D);
         fx[s] = vnl_math_abs( measurements[s] - approx );
+
+        if (D<0)
+        {
+          fx[s] -= D*100000;
+          MITK_INFO << D*100000;
+        }
       }
 
     }
@@ -155,6 +170,9 @@ namespace itk{
       {
         double approx = (1-ef)*exp(-bvalues[s]*fixD)+ef*exp(-bvalues[s]*(fixD+Dstar));
         fx[s] = vnl_math_abs( measurements[s] - approx );
+
+        if (Dstar<0)
+          fx[s] -= Dstar*100000;
       }
 
     }
@@ -182,6 +200,9 @@ namespace itk{
       {
         double approx = (1-fixF)*exp(-bvalues[s]*fixD)+fixF*exp(-bvalues[s]*(fixD+Dstar));
         fx[s] = vnl_math_abs( measurements[s] - approx );
+
+        if (Dstar<0)
+          fx[s] -= Dstar*100000;
       }
 
     }
@@ -216,25 +237,26 @@ namespace itk{
 
       bool iterated_sequence; // wether each measurement has its own b0-acqu.
       std::vector<unsigned int> baselineind; // baseline image indicies
-
-      int N;                                 // total number of measurements
       std::vector<unsigned int> gradientind; // gradient image indicies
-      std::vector<double> bvals;             // b-values != 0
-      vnl_vector<double> bvalues;            // copy of bvalues != 0
-      vnl_vector<double> meas;               // all measurements, thresholded blanked out
+      vnl_vector<double> bvalues;            // bvalues != 0
+
+      int num_weighted;                                 // total number of measurements
+
+      vnl_vector<double> meas_for_threshold;   // all measurements, thresholded blanked out
       vnl_vector<double> allmeas;            // all measurements
 
-      int Nhigh;                       // number of used measurements
+      int num_high;                    // number of used measurements
       std::vector<int> high_indices;   // indices of used measurements
       vnl_vector<double> high_bvalues; // bvals of used measurements
       vnl_vector<double> high_meas;    // used measurements
 
+      // fit 1
       vnl_vector<double> meas1;
       vnl_vector<double> bvals1;
 
+      // fit 2
       vnl_vector<double> meas2;
       vnl_vector<double> bvals2;
-
     };
 
     enum IVIM_Method

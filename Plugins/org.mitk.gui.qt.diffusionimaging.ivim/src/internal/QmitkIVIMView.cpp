@@ -586,7 +586,7 @@ void QmitkIVIMView::OnSliceChanged()
   {
     int roisize = 0;
     if(m_Controls->m_MethodCombo->currentIndex() == 4)
-      roisize = 5;
+      roisize = 3;
 
     mitk::Point3D pos = this->GetRenderWindowPart()->GetSelectedPosition();
 
@@ -632,7 +632,23 @@ void QmitkIVIMView::OnSliceChanged()
     roiImage->SetRegions( newregion );
     roiImage->SetOrigin( pos );
     roiImage->Allocate();
-    roiImage->SetPixel(newstart, vecimg->GetPixel(index));
+//    roiImage->SetPixel(newstart, vecimg->GetPixel(index));
+
+    typedef itk::ImageRegionIterator<VecImgType> VectorIteratorType;
+    VectorIteratorType vecit(vecimg, vecimg->GetRequestedRegion() );
+    vecit.GoToBegin();
+
+    typedef itk::ImageRegionIterator<VecImgType> VectorIteratorType;
+    VectorIteratorType vecit2(roiImage, roiImage->GetLargestPossibleRegion() );
+    vecit2.GoToBegin();
+
+    while( !vecit.IsAtEnd() )
+    {
+      vecit2.Set(vecit.Get());
+
+      ++vecit;
+      ++vecit2;
+    }
 
     if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
     {
@@ -869,37 +885,34 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
     d_line.emplace_back(maxb, d_line[0].second*exp(-maxb * m_IvimSnap.currentD));
     m_Controls->m_ChartWidget->UpdateData2D(d_line, "D-part of fitted model");
 
-    if(m_IvimSnap.currentDStar != 0)
+    std::vector< std::pair<double, double> > y;
+    int nsampling = 50;
+    double f = 1-m_IvimSnap.currentFunceiled;
+    for(int i=0; i<=nsampling; i++)
     {
-      std::vector< std::pair<double, double> > y;
-      int nsampling = 50;
-      double f = 1-m_IvimSnap.currentFunceiled;
-      for(int i=0; i<=nsampling; i++)
-      {
-        double x = (((1.0)*i)/(1.0*nsampling))*maxb;
-        y.emplace_back(x, f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar)));
-      }
-      m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
+      double x = (((1.0)*i)/(1.0*nsampling))*maxb;
+      y.emplace_back(x, f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar)));
+    }
+    m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
 
-      std::vector< std::pair<double, double> > y_meas;
-      for (unsigned int i=0; i<m_IvimSnap.meas1.size(); ++i)
-        y_meas.emplace_back(m_IvimSnap.bvals1[i], m_IvimSnap.meas1[i]);
+    std::vector< std::pair<double, double> > y_meas;
+    for (unsigned int i=0; i<m_IvimSnap.meas1.size(); ++i)
+      y_meas.emplace_back(m_IvimSnap.bvals1[i], m_IvimSnap.meas1[i]);
 
-      m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
+    m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
 
-      if(!m_IvimSnap.high_indices.empty())
-      {
-        AddSecondFitPlot();
-        std::vector< std::pair<double, double> > additonal_meas;
-        for (int i=0; i<m_IvimSnap.high_indices[0]; ++i)
-          additonal_meas.emplace_back(m_IvimSnap.bvals2[i], m_IvimSnap.meas2[i]);
+    if(m_IvimSnap.num_high) // num_high is 0 if there is only one fit
+    {
+      AddSecondFitPlot();
+      std::vector< std::pair<double, double> > additonal_meas;
+      for (int i=0; i<m_IvimSnap.num_weighted-m_IvimSnap.num_high; ++i)
+        additonal_meas.emplace_back(m_IvimSnap.bvals2[i], m_IvimSnap.meas2[i]);
 
-        m_Controls->m_ChartWidget->UpdateData2D(additonal_meas, "signal values (used for second fit)");
-      }
-      else
-      {
-        RemoveSecondFitPlot();
-      }
+      m_Controls->m_ChartWidget->UpdateData2D(additonal_meas, "signal values (used for second fit)");
+    }
+    else
+    {
+      RemoveSecondFitPlot();
     }
   }
   catch (itk::ExceptionObject &ex)
@@ -1049,7 +1062,7 @@ void QmitkIVIMView::Visible()
 {
   m_Visible = true;
 
-  if (this->GetRenderWindowPart() and !m_ListenerActive)
+  if (this->GetRenderWindowPart() && !m_ListenerActive)
   {
     m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
     connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
