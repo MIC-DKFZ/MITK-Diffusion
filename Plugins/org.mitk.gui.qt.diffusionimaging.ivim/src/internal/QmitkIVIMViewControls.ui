@@ -750,11 +750,11 @@ QGroupBox {
                 <item row="0" column="1">
                  <widget class="QComboBox" name="m_MethodCombo">
                   <property name="currentIndex">
-                   <number>2</number>
+                   <number>0</number>
                   </property>
                   <item>
                    <property name="text">
-                    <string>3 Param. Fit</string>
+                    <string>Jointly fit D, f and D*</string>
                    </property>
                   </item>
                   <item>
@@ -770,11 +770,6 @@ QGroupBox {
                   <item>
                    <property name="text">
                     <string>Linearly fit D &amp; f (high b), then fit D*</string>
-                   </property>
-                  </item>
-                  <item>
-                   <property name="text">
-                    <string>Regularized fit</string>
                    </property>
                   </item>
                  </widget>

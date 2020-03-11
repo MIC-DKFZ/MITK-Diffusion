@@ -23,6 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "vnl/vnl_matrix.h"
 #include "vnl/algo/vnl_symmetric_eigensystem.h"
+#include <vnl/algo/vnl_lbfgsb.h>
 
 #include "itkRegularizedIVIMReconstructionFilter.h"
 
@@ -60,8 +61,7 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 {
 
   // Input must be an itk::VectorImage.
-  std::string gradientImageClassName(
-        this->ProcessObject::GetInput(0)->GetNameOfClass());
+  std::string gradientImageClassName(this->ProcessObject::GetInput(0)->GetNameOfClass());
   if ( strcmp(gradientImageClassName.c_str(),"VectorImage") != 0 )
   {
     itkExceptionMacro( <<
@@ -80,20 +80,15 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       minNorm = norm;
     ++gdcit;
   }
+
   minNorm += 0.001;
   gdcit = this->m_GradientDirectionContainer->Begin();
   while( gdcit != this->m_GradientDirectionContainer->End() )
   {
     if(gdcit.Value().one_norm() <= minNorm)
-    {
       m_Snap.baselineind.push_back(gdcit.Index());
-    }
     else
-    {
       m_Snap.gradientind.push_back(gdcit.Index());
-      double twonorm = gdcit.Value().two_norm();
-      m_Snap.bvals.push_back( m_BValue*twonorm*twonorm );
-    }
     ++gdcit;
   }
   if (m_Snap.gradientind.size()==0)
@@ -110,55 +105,46 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       sum_b += m_Snap.baselineind.at(i) % 2;
       sum_g += m_Snap.gradientind.at(i) % 2;
     }
-    if(  (sum_b == size || sum_b == 0)
-         && (sum_g == size || sum_g == 0) )
+    if(  (sum_b == size || sum_b == 0) && (sum_g == size || sum_g == 0) )
     {
       m_Snap.iterated_sequence = true;
-      if(m_Verbose)
-      {
+      if (m_Verbose)
         MITK_INFO << "Iterating b0 and diffusion weighted aquisition detected. Weighting each weighted measurement with its own b0.";
-      }
     }
   }
 
   // number of measurements
-  m_Snap.N = m_Snap.gradientind.size();
+  m_Snap.num_weighted = m_Snap.gradientind.size();
 
   // bvalue array
-  m_Snap.bvalues.set_size(m_Snap.N);
-  for(int i=0; i<m_Snap.N; i++)
+  m_Snap.bvalues.set_size(m_Snap.num_weighted);
+  for(int i=0; i<m_Snap.num_weighted; i++)
   {
-    m_Snap.bvalues[i] = m_Snap.bvals.at(i);
+    double twonorm = m_GradientDirectionContainer->GetElement(m_Snap.gradientind[i]).two_norm();
+    m_Snap.bvalues[i] = m_BValue*twonorm*twonorm;
   }
 
   if(m_Verbose)
   {
     std::cout << "ref bval: " << m_BValue << "; b-values: ";
-    for(int i=0; i<m_Snap.N; i++)
-    {
+    for(int i=0; i<m_Snap.num_weighted; i++)
       std::cout << m_Snap.bvalues[i] << "; ";
-    }
     std::cout << std::endl;
   }
 
   // extract bvals higher than threshold
   if(m_Method == IVIM_D_THEN_DSTAR || m_Method == IVIM_LINEAR_D_THEN_F || m_Method == IVIM_REGULARIZED)
   {
-    for(int i=0; i<m_Snap.N; i++)
-    {
+    for(int i=0; i<m_Snap.num_weighted; i++)
       if(m_Snap.bvalues[i]>m_BThres)
-      {
         m_Snap.high_indices.push_back(i);
-      }
-    }
   }
-  m_Snap.Nhigh = m_Snap.high_indices.size();
-  m_Snap.high_bvalues.set_size(m_Snap.Nhigh);
-  m_Snap.high_meas.set_size(m_Snap.Nhigh);
-  for(int i=0; i<m_Snap.Nhigh; i++)
-  {
+  m_Snap.num_high = m_Snap.high_indices.size();
+  m_Snap.high_bvalues.set_size(m_Snap.num_high);
+  m_Snap.high_meas.set_size(m_Snap.num_high);
+
+  for(int i=0; i<m_Snap.num_high; i++)
     m_Snap.high_bvalues[i] = m_Snap.bvalues[m_Snap.high_indices.at(i)];
-  }
 
 }
 
@@ -182,40 +168,31 @@ MeasAndBvals DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, T
   MeasAndBvals retval;
 
   retval.N = newmeas.size();
-
   retval.meas.set_size(retval.N);
   for(size_t i=0; i<newmeas.size(); i++)
-  {
     retval.meas[i] = newmeas[i];
-  }
 
   retval.bvals.set_size(retval.N);
   for(size_t i=0; i<newbvals.size(); i++)
-  {
     retval.bvals[i] = newbvals[i];
-  }
 
   return retval;
 }
 
 template< class TIn, class TOut>
 void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
-::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread,
-                       ThreadIdType )
+::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
 {
 
-  typename OutputImageType::Pointer outputImage =
-      static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
+  typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
   ImageRegionIterator< OutputImageType > oit(outputImage, outputRegionForThread);
   oit.GoToBegin();
 
-  typename OutputImageType::Pointer dImage =
-      static_cast< OutputImageType * >(this->ProcessObject::GetOutput(1));
+  typename OutputImageType::Pointer dImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(1));
   ImageRegionIterator< OutputImageType > oit1(dImage, outputRegionForThread);
   oit1.GoToBegin();
 
-  typename OutputImageType::Pointer dstarImage =
-      static_cast< OutputImageType * >(this->ProcessObject::GetOutput(2));
+  typename OutputImageType::Pointer dstarImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(2));
   ImageRegionIterator< OutputImageType > oit2(dstarImage, outputRegionForThread);
   oit2.GoToBegin();
 
@@ -246,10 +223,10 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 
   if(m_Method == IVIM_REGULARIZED)
   {
-    m_InternalVectorImage->SetVectorLength(m_Snap.Nhigh);
+    m_InternalVectorImage->SetVectorLength(m_Snap.num_high);
     m_InternalVectorImage->Allocate();
-    VectorImageType::PixelType varvec(m_Snap.Nhigh);
-    for(int i=0; i<m_Snap.Nhigh; i++) varvec[i] = IVIM_FOO;
+    VectorImageType::PixelType varvec(m_Snap.num_high);
+    for(int i=0; i<m_Snap.num_high; i++) varvec[i] = IVIM_FOO;
     m_InternalVectorImage->FillBuffer(varvec);
 
     m_InitialFitImage->Allocate();
@@ -272,50 +249,40 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 
     typename NumericTraits<InputPixelType>::AccumulateType b0 = NumericTraits<InputPixelType>::Zero;
 
-    m_Snap.meas.set_size(m_Snap.N);
-    m_Snap.allmeas.set_size(m_Snap.N);
+    m_Snap.meas_for_threshold.set_size(m_Snap.num_weighted);
+    m_Snap.allmeas.set_size(m_Snap.num_weighted);
     if(!m_Snap.iterated_sequence)
     {
       // Average the baseline image pixels
       for(unsigned int i = 0; i < m_Snap.baselineind.size(); ++i)
-      {
         b0 += measvec[m_Snap.baselineind[i]];
-      }
+
       if(m_Snap.baselineind.size())
         b0 /= m_Snap.baselineind.size();
 
       // measurement vector
-      for(int i = 0; i < m_Snap.N; ++i)
+      for(int i = 0; i < m_Snap.num_weighted; ++i)
       {
         m_Snap.allmeas[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
 
         if(measvec[m_Snap.gradientind[i]] > m_S0Thres)
-        {
-          m_Snap.meas[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
-        }
+          m_Snap.meas_for_threshold[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
         else
-        {
-          m_Snap.meas[i] = IVIM_FOO;
-        }
+          m_Snap.meas_for_threshold[i] = IVIM_FOO;
       }
     }
     else
     {
       // measurement vector
-      for(int i = 0; i < m_Snap.N; ++i)
+      for(int i = 0; i < m_Snap.num_weighted; ++i)
       {
         b0 = measvec[m_Snap.baselineind[i]];
-
         m_Snap.allmeas[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
 
         if(measvec[m_Snap.gradientind[i]] > m_S0Thres)
-        {
-          m_Snap.meas[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
-        }
+          m_Snap.meas_for_threshold[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
         else
-        {
-          m_Snap.meas[i] = IVIM_FOO;
-        }
+          m_Snap.meas_for_threshold[i] = IVIM_FOO;
       }
     }
 
@@ -328,11 +295,8 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 
     case IVIM_D_THEN_DSTAR:
     {
-
-      for(int i=0; i<m_Snap.Nhigh; i++)
-      {
-        m_Snap.high_meas[i] = m_Snap.meas[m_Snap.high_indices.at(i)];
-      }
+      for(int i=0; i<m_Snap.num_high; i++)
+        m_Snap.high_meas[i] = m_Snap.meas_for_threshold[m_Snap.high_indices.at(i)];
 
       MeasAndBvals input = ApplyS0Threshold(m_Snap.high_meas, m_Snap.high_bvalues);
       m_Snap.bvals1 = input.bvals;
@@ -364,10 +328,9 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       m_Snap.currentD = x_donly[0];
       m_Snap.currentF = x_donly[1];
 
-
       if(m_FitDStar)
       {
-        MeasAndBvals input2 = ApplyS0Threshold(m_Snap.meas, m_Snap.bvalues);
+        MeasAndBvals input2 = ApplyS0Threshold(m_Snap.meas_for_threshold, m_Snap.bvalues);
         m_Snap.bvals2 = input2.bvals;
         m_Snap.meas2 = input2.meas;
         if (input2.N < 2) break;
@@ -395,23 +358,7 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
             opt_idx = i;
           }
         }
-
         m_Snap.currentDStar = min_val + opt_idx * ((max_val-min_val) / num_its);
-        //          IVIM_fixd f_fixd(input2.N,m_Snap.currentD);
-        //          f_fixd.set_bvalues(input2.bvals);
-        //          f_fixd.set_measurements(input2.meas);
-
-        //          vnl_vector< double > x_fixd(2);
-        //          x_fixd[0] = 0.1;
-        //          x_fixd[1] = 0.01;
-        //          // f 0.1 Dstar 0.01 D 0.001
-
-        //          vnl_levenberg_marquardt lm_fixd(f_fixd);
-        //          lm_fixd.set_f_tolerance(0.0001);
-        //          lm_fixd.minimize(x_fixd);
-
-        //          m_Snap.currentF = x_fixd[0];
-        //          m_Snap.currentDStar = x_fixd[1];
       }
 
       break;
@@ -419,12 +366,12 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 
     case IVIM_DSTAR_FIX:
     {
-      MeasAndBvals input = ApplyS0Threshold(m_Snap.meas, m_Snap.bvalues);
+      MeasAndBvals input = ApplyS0Threshold(m_Snap.meas_for_threshold, m_Snap.bvalues);
       m_Snap.bvals1 = input.bvals;
       m_Snap.meas1 = input.meas;
       if (input.N < 2) break;
 
-      IVIM_fixdstar f_fixdstar(input.N,m_DStar);
+      IVIM_fixdstar f_fixdstar(input.N, m_DStar);
       f_fixdstar.set_bvalues(input.bvals);
       f_fixdstar.set_measurements(input.meas);
 
@@ -447,7 +394,7 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
     case IVIM_FIT_ALL:
     {
 
-      MeasAndBvals input = ApplyS0Threshold(m_Snap.meas, m_Snap.bvalues);
+      MeasAndBvals input = ApplyS0Threshold(m_Snap.meas_for_threshold, m_Snap.bvalues);
       m_Snap.bvals1 = input.bvals;
       m_Snap.meas1 = input.meas;
       if (input.N < 3) break;
@@ -475,24 +422,8 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 
     case IVIM_LINEAR_D_THEN_F:
     {
-
-      //          // neglect zero-measurements
-      //          bool zero = false;
-      //          for(int i=0; i<Nhigh; i++)
-      //          {
-      //            if( meas[high_indices.at(i)] == 0 )
-      //            {
-      //              f=0;
-      //              zero = true;
-      //              break;
-      //            }
-      //          }
-      //          if(zero) break;
-
-      for(int i=0; i<m_Snap.Nhigh; i++)
-      {
-        m_Snap.high_meas[i] = m_Snap.meas[m_Snap.high_indices.at(i)];
-      }
+      for(int i=0; i<m_Snap.num_high; i++)
+        m_Snap.high_meas[i] = m_Snap.meas_for_threshold[m_Snap.high_indices.at(i)];
 
       MeasAndBvals input = ApplyS0Threshold(m_Snap.high_meas, m_Snap.high_bvalues);
       m_Snap.bvals1 = input.bvals;
@@ -510,9 +441,7 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       }
 
       for(int i=0; i<input.N; i++)
-      {
         input.meas[i] = log(input.meas[i]);
-      }
 
       double bval_m = 0;
       double meas_m = 0;
@@ -545,7 +474,7 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 
       if(m_FitDStar)
       {
-        MeasAndBvals input2 = ApplyS0Threshold(m_Snap.meas, m_Snap.bvalues);
+        MeasAndBvals input2 = ApplyS0Threshold(m_Snap.meas_for_threshold, m_Snap.bvalues);
         m_Snap.bvals2 = input2.bvals;
         m_Snap.meas2 = input2.meas;
         if (input2.N < 2) break;
@@ -592,10 +521,8 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
     case IVIM_REGULARIZED:
     {
       //m_Snap.high_meas, m_Snap.high_bvalues;
-      for(int i=0; i<m_Snap.Nhigh; i++)
-      {
-        m_Snap.high_meas[i] = m_Snap.meas[m_Snap.high_indices.at(i)];
-      }
+      for(int i=0; i<m_Snap.num_high; i++)
+        m_Snap.high_meas[i] = m_Snap.meas_for_threshold[m_Snap.high_indices.at(i)];
 
       MeasAndBvals input = ApplyS0Threshold(m_Snap.high_meas, m_Snap.high_bvalues);
 
@@ -626,29 +553,32 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       for(int i=0; i<N; i++)
       {
         vec[i] = m_Snap.high_meas[i];
-        //MITK_INFO << "vec" << i << " = " << m_Snap.high_meas[i];
+//        MITK_INFO << "vec" << i << " = " << m_Snap.high_meas[i];
       }
 
       vecit.Set(vec);
-      ++vecit;
 
       if(!m_Verbose)
       {
         // report the middle voxel
-        if(  vecit.GetIndex()[0] == m_CrossPosition[0]
-             && vecit.GetIndex()[0] == m_CrossPosition[1]
-             && vecit.GetIndex()[0] == m_CrossPosition[2] )
+        if(  vecit.GetIndex()[0] == static_cast<itk::IndexValueType>(m_InternalVectorImage->GetLargestPossibleRegion().GetSize(0)-1)/2
+             && vecit.GetIndex()[1] == static_cast<itk::IndexValueType>(m_InternalVectorImage->GetLargestPossibleRegion().GetSize(1)-1)/2
+             && vecit.GetIndex()[2] == static_cast<itk::IndexValueType>(m_InternalVectorImage->GetLargestPossibleRegion().GetSize(2)-1)/2 )
         {
           MeasAndBvals input = ApplyS0Threshold(m_Snap.high_meas, m_Snap.high_bvalues);
           m_Snap.bvals1 = input.bvals;
           m_Snap.meas1 = input.meas;
 
-          MeasAndBvals input2 = ApplyS0Threshold(m_Snap.meas, m_Snap.bvalues);
+          MeasAndBvals input2 = ApplyS0Threshold(m_Snap.meas_for_threshold, m_Snap.bvalues);
           m_Snap.bvals2 = input2.bvals;
           m_Snap.meas2 = input2.meas;
 
           m_tmp_allmeas = m_Snap.allmeas;
         }
+
+        m_Snap.currentF = 0;
+        m_Snap.currentD = 0;
+        m_Snap.currentDStar = 0;
       }
 
       break;
@@ -667,6 +597,7 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
     ++oit1;
     ++oit2;
     ++iit;
+    ++vecit;
   }
 
   if(m_Verbose)
@@ -716,16 +647,16 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       double f = iit.Get()[0];
       IVIM_CEIL( f, 0.0, 1.0 );
 
-      oit0.Set( myround(f * 100.0) );
-      oit1.Set( myround(iit.Get()[1] * 10000.0) );
-      oit2.Set( myround(iit.Get()[2] * 1000.0) );
+      oit0.Set( myround(f) );
+      oit1.Set( myround(iit.Get()[1]) );
+      oit2.Set( myround(iit.Get()[2]) );
 
       if(!m_Verbose)
       {
         // report the middle voxel
-        if(  iit.GetIndex()[0] == m_CrossPosition[0]
-             && iit.GetIndex()[1] == m_CrossPosition[1]
-             && iit.GetIndex()[2] == m_CrossPosition[2] )
+        if(  iit.GetIndex()[0] == static_cast<itk::IndexValueType>(outimg->GetLargestPossibleRegion().GetSize(0)-1)/2
+             && iit.GetIndex()[1] == static_cast<itk::IndexValueType>(outimg->GetLargestPossibleRegion().GetSize(2)-1)/2
+             && iit.GetIndex()[2] == static_cast<itk::IndexValueType>(outimg->GetLargestPossibleRegion().GetSize(1)-1)/2 )
         {
           m_Snap.currentF = f;
           m_Snap.currentD = iit.Get()[1];
