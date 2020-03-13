@@ -49,6 +49,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateProperty.h>
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateDataType.h>
+#include <mitkLevelWindowProperty.h>
 
 const std::string QmitkIVIMView::VIEW_ID = "org.mitk.views.ivim";
 
@@ -937,11 +938,17 @@ void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
     mitk::Image::Pointer dstarimage = mitk::Image::New();
     dstarimage->InitializeByItk(m_DStarMap.GetPointer());
     dstarimage->SetVolume(m_DStarMap->GetBufferPointer());
-    QString newname2 = ""; newname2 = newname2.append("IVIM_DStarMap_Method-%1").arg(m_Controls->m_MethodCombo->currentText());
+    QString newname2 = ""; newname2 = newname2.append("D* Fit-%1").arg(m_Controls->m_MethodCombo->currentIndex()+1);
     mitk::DataNode::Pointer node2=mitk::DataNode::New();
     node2->SetData( dstarimage );
     node2->SetName(newname2.toLatin1());
     node2->SetProperty("LookupTable", lut_prop );
+
+    mitk::LevelWindowProperty::Pointer levWinProp = mitk::LevelWindowProperty::New();
+    mitk::LevelWindow levelwindow;
+    levelwindow.SetRangeMinMax(0, 0.2);
+    levWinProp->SetLevelWindow(levelwindow);
+    node2->SetProperty("levelwindow", levWinProp);
 
     GetDataStorage()->Add(node2, node);
   }
@@ -951,11 +958,17 @@ void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
     mitk::Image::Pointer dimage = mitk::Image::New();
     dimage->InitializeByItk(m_DMap.GetPointer());
     dimage->SetVolume(m_DMap->GetBufferPointer());
-    QString newname1 = ""; newname1 = newname1.append("IVIM_DMap_Method-%1").arg(m_Controls->m_MethodCombo->currentText());
+    QString newname1 = ""; newname1 = newname1.append("D Fit-%1").arg(m_Controls->m_MethodCombo->currentIndex()+1);
     mitk::DataNode::Pointer node1=mitk::DataNode::New();
     node1->SetData( dimage );
     node1->SetName(newname1.toLatin1());
     node1->SetProperty("LookupTable", lut_prop );
+
+    mitk::LevelWindowProperty::Pointer levWinProp = mitk::LevelWindowProperty::New();
+    mitk::LevelWindow levelwindow;
+    levelwindow.SetRangeMinMax(0, 0.003);
+    levWinProp->SetLevelWindow(levelwindow);
+    node1->SetProperty("levelwindow", levWinProp);
 
     GetDataStorage()->Add(node1, node);
   }
@@ -965,11 +978,17 @@ void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
     mitk::Image::Pointer image = mitk::Image::New();
     image->InitializeByItk(m_fMap.GetPointer());
     image->SetVolume(m_fMap->GetBufferPointer());
-    QString newname0 = ""; newname0 = newname0.append("IVIM_fMap_Method-%1").arg(m_Controls->m_MethodCombo->currentText());
+    QString newname0 = ""; newname0 = newname0.append("f Fit-%1").arg(m_Controls->m_MethodCombo->currentIndex()+1);
     mitk::DataNode::Pointer node3=mitk::DataNode::New();
     node3->SetData( image );
     node3->SetName(newname0.toLatin1());
     node3->SetProperty("LookupTable", lut_prop );
+
+    mitk::LevelWindowProperty::Pointer levWinProp = mitk::LevelWindowProperty::New();
+    mitk::LevelWindow levelwindow;
+    levelwindow.SetRangeMinMax(0, 1);
+    levWinProp->SetLevelWindow(levelwindow);
+    node3->SetProperty("levelwindow", levWinProp);
 
     GetDataStorage()->Add(node3, node);
   }
