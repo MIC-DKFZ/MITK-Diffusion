@@ -8,11 +8,11 @@ The view enables an interactive exploration of the selected image (click around 
 
 \section QmitkIVIMViewAdvanced IVIM fit methods
 
-The IVIM model is a bi-exponential model defined by the parameters f, D and D*: \f$(1-f)e^{-bD}+fe^{-b(D+D^*)}\f$. All fit methods available in the view ultimatle use this model but they differ how the three parameters are estimated:
+The IVIM model is a bi-exponential model defined by the parameters f, D and D*: (1-f)e^{-bD}+fe^{-b(D+D^*)}. All fit methods available in the view ultimatle use this model but they differ how the three parameters are estimated:
 
 \li <b>Jointly fit D, f and D*</b>: All three parameters are estimated simultaneously.
 \li <b>Fit D &amp; f with fixed D* value</b>: Only f and D are estimated, D* is fixed (user defined).
-\li <b>Fit D &amp; f (high b), then fit D*</b>: First fit f and D (monoexponentially \f$(1-f)e^{-bD}\f$) and use these then fixed parameters in a second fit of D* with the complete bi-exponential model.
+\li <b>Fit D &amp; f (high b), then fit D*</b>: First fit f and D (monoexponentially (1-f)e^{-bD}) and use these then fixed parameters in a second fit of D* with the complete bi-exponential model.
 \li <b>Linearly fit D &amp; f (high b), then fit D*</b>: First fit f and D linearly and use these then fixed parameters in a second fit of D* with the complete bi-exponential model.
 
 Negative values for D and D* are penalized during the fit.

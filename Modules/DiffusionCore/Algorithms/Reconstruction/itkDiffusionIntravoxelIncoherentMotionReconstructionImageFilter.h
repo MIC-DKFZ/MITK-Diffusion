@@ -84,6 +84,11 @@ namespace itk{
           fx[s] -= D*100000;
         if (Dstar<0)
           fx[s] -= Dstar*100000;
+
+        if (D>0.003)
+          fx[s] += D*100000;
+        if (Dstar>0.3)
+          fx[s] += Dstar*100000;
       }
 
     }
@@ -112,6 +117,9 @@ namespace itk{
 
         if (D<0)
           fx[s] -= D*100000;
+
+        if (D>0.003)
+          fx[s] += D*100000;
       }
 
     }
@@ -141,10 +149,10 @@ namespace itk{
         fx[s] = vnl_math_abs( measurements[s] - approx );
 
         if (D<0)
-        {
           fx[s] -= D*100000;
-          MITK_INFO << D*100000;
-        }
+
+        if (D>0.003)
+          fx[s] += D*100000;
       }
 
     }
@@ -173,6 +181,9 @@ namespace itk{
 
         if (Dstar<0)
           fx[s] -= Dstar*100000;
+
+        if (Dstar>0.3)
+          fx[s] += Dstar*100000;
       }
 
     }
@@ -203,6 +214,9 @@ namespace itk{
 
         if (Dstar<0)
           fx[s] -= Dstar*100000;
+
+        if (Dstar>0.3)
+          fx[s] += Dstar*100000;
       }
 
     }

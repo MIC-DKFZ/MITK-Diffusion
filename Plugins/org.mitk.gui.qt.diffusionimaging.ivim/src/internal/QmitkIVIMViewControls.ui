@@ -754,22 +754,22 @@ QGroupBox {
                   </property>
                   <item>
                    <property name="text">
-                    <string>Jointly fit D, f and D*</string>
+                    <string>1. Jointly fit D, f and D*</string>
                    </property>
                   </item>
                   <item>
                    <property name="text">
-                    <string>Fit D &amp; f with fixed D* value</string>
+                    <string>2. Fit D &amp; f with fixed D* value</string>
                    </property>
                   </item>
                   <item>
                    <property name="text">
-                    <string>Fit D &amp; f (high b), then fit D*</string>
+                    <string>3. Fit D &amp; f (high b), then fit D*</string>
                    </property>
                   </item>
                   <item>
                    <property name="text">
-                    <string>Linearly fit D &amp; f (high b), then fit D*</string>
+                    <string>4. Linearly fit D &amp; f (high b), then fit D*</string>
                    </property>
                   </item>
                  </widget>
