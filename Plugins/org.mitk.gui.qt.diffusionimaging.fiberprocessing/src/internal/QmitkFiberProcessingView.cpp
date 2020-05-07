@@ -93,7 +93,7 @@ void QmitkFiberProcessingView::CreateQtPartControl( QWidget *parent )
     connect(m_Controls->m_GenerateRoiImage, SIGNAL(clicked()), this, SLOT(GenerateRoiImage()) );
 
     connect(m_Controls->m_JoinBundles, SIGNAL(clicked()), this, SLOT(JoinBundles()) );
-    connect(m_Controls->m_SubstractBundles, SIGNAL(clicked()), this, SLOT(SubstractBundles()) );
+    connect(m_Controls->m_SubstractBundles, SIGNAL(clicked()), this, SLOT(SubtractBundles()) );
     connect(m_Controls->m_CopyBundle, SIGNAL(clicked()), this, SLOT(CopyBundles()) );
 
     connect(m_Controls->m_ExtractFibersButton, SIGNAL(clicked()), this, SLOT(Extract()));
@@ -1019,6 +1019,7 @@ void QmitkFiberProcessingView::UpdateGui()
   m_Controls->m_MirrorFibersFrame->setVisible(false);
   m_Controls->m_MaskExtractionFrame->setVisible(false);
   m_Controls->m_ColorMapBox->setVisible(false);
+  m_Controls->m_ValueAsWeightBox->setVisible(false);
 
   bool pfSelected = !m_SelectedPF.empty();
   bool fibSelected = !m_SelectedFB.empty();
@@ -1082,6 +1083,7 @@ void QmitkFiberProcessingView::UpdateGui()
     m_Controls->m_CompressFibersFrame->setVisible(true);
     break;
   case 3:
+    m_Controls->m_ValueAsWeightBox->setVisible(true);
     m_Controls->m_ColorFibersFrame->setVisible(true);
     m_Controls->m_ColorMapBox->setVisible(true);
     break;
@@ -1094,12 +1096,14 @@ void QmitkFiberProcessingView::UpdateGui()
     m_Controls->m_BundleWeightFrame->setVisible(true);
     break;
   case 6:
+    m_Controls->m_ValueAsWeightBox->setVisible(true);
     m_Controls->m_ColorFibersFrame->setVisible(true);
     break;
   case 7:
     m_Controls->m_ColorFibersFrame->setVisible(true);
     break;
   case 8:
+    m_Controls->m_ValueAsWeightBox->setVisible(true);
     m_Controls->m_ColorFibersFrame->setVisible(true);
     break;
   }
@@ -1566,7 +1570,7 @@ void QmitkFiberProcessingView::JoinBundles()
   UpdateGui();
 }
 
-void QmitkFiberProcessingView::SubstractBundles()
+void QmitkFiberProcessingView::SubtractBundles()
 {
   if ( m_SelectedFB.size()<2 ){
     QMessageBox::information( nullptr, "Warning", "Select at least two fiber bundles!");
@@ -1645,7 +1649,7 @@ void QmitkFiberProcessingView::DoImageColorCoding()
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked());
+    fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked());
   }
 
   if (auto renderWindowPart = this->GetRenderWindowPart())
@@ -1660,7 +1664,7 @@ void QmitkFiberProcessingView::DoCurvatureColorCoding()
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked());
+    fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked());
   }
 
   if (auto renderWindowPart = this->GetRenderWindowPart())
@@ -1674,7 +1678,7 @@ void QmitkFiberProcessingView::DoLengthColorCoding()
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked());
+    fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked());
   }
 
   if (auto renderWindowPart = this->GetRenderWindowPart())

@@ -64,11 +64,11 @@ public:
 
     // colorcoding related methods
     void ColorFibersByFiberWeights(bool opacity, bool normalize);
-    void ColorFibersByCurvature(bool opacity, bool normalize);
-    void ColorFibersByLength(bool opacity, bool normalize);
-    void ColorFibersByScalarMap(mitk::Image::Pointer, bool opacity, bool normalize);
+    void ColorFibersByCurvature(bool opacity, bool normalize, bool weight_fibers);
+    void ColorFibersByLength(bool opacity, bool normalize, bool weight_fibers);
+    void ColorFibersByScalarMap(mitk::Image::Pointer, bool opacity, bool normalize, bool weight_fibers);
     template <typename TPixel>
-    void ColorFibersByScalarMap(const mitk::PixelType pixelType, mitk::Image::Pointer, bool opacity, bool normalize);
+    void ColorFibersByScalarMap(const mitk::PixelType pixelType, mitk::Image::Pointer, bool opacity, bool normalize, bool weight_fibers);
     void ColorFibersByOrientation();
     void SetFiberOpacity(vtkDoubleArray *FAValArray);
     void ResetFiberOpacity();

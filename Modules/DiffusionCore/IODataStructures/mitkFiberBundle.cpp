@@ -509,7 +509,7 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GetFiberPolyData() const
   return m_FiberPolyData;
 }
 
-void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool normalize)
+void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool normalize, bool weight_fibers)
 {
   if (m_MaxFiberLength<=0)
     return;
@@ -562,7 +562,11 @@ void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool normalize)
       m_FiberColors->InsertTypedTuple(cell->GetPointId(j), rgba);
       count++;
     }
+
+    if (weight_fibers)
+      this->SetFiberWeight(i, m_FiberLengths.at(i));
   }
+
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
 }
@@ -680,7 +684,7 @@ void mitk::FiberBundle::ColorFibersByOrientation()
   m_UpdateTime2D.Modified();
 }
 
-void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize)
+void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize, bool weight_fibers)
 {
   double window = 5;
 
@@ -703,12 +707,14 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize)
   double max = 0;
   MITK_INFO << "Coloring fibers by curvature";
   boost::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
+
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
     ++disp;
     vtkCell* cell = m_FiberPolyData->GetCell(i);
     auto numPoints = cell->GetNumberOfPoints();
     vtkPoints* points = cell->GetPoints();
+    double mean_curv = 0;
 
     // calculate curvatures
     for (int j=0; j<numPoints; j++)
@@ -768,6 +774,8 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize)
       if (vectors.size()>0)
         dev /= vectors.size();
 
+      if (weight_fibers)
+        mean_curv += dev;
       dev = 1.0-dev/180.0;
       values.push_back(dev);
       if (dev<min)
@@ -775,7 +783,11 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize)
       if (dev>max)
         max = dev;
     }
+
+    if (weight_fibers)
+      this->SetFiberWeight(i, mean_curv/numPoints);
   }
+
   unsigned int count = 0;
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
@@ -823,15 +835,15 @@ void mitk::FiberBundle::ResetFiberOpacity()
   m_UpdateTime2D.Modified();
 }
 
-void mitk::FiberBundle::ColorFibersByScalarMap(mitk::Image::Pointer FAimage, bool opacity, bool normalize)
+void mitk::FiberBundle::ColorFibersByScalarMap(mitk::Image::Pointer FAimage, bool opacity, bool normalize, bool weight_fibers)
 {
-  mitkPixelTypeMultiplex3( ColorFibersByScalarMap, FAimage->GetPixelType(), FAimage, opacity, normalize );
+  mitkPixelTypeMultiplex4( ColorFibersByScalarMap, FAimage->GetPixelType(), FAimage, opacity, normalize, weight_fibers );
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
 }
 
 template <typename TPixel>
-void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Image::Pointer image, bool opacity, bool normalize)
+void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Image::Pointer image, bool opacity, bool normalize, bool weight_fibers)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
@@ -852,17 +864,36 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Imag
 
   double min = 999999;
   double max = -999999;
-  for(long i=0; i<m_FiberPolyData->GetNumberOfPoints(); ++i)
+
+  for (unsigned int i=0; i<m_NumFibers; i++)
   {
-    Point3D px;
-    px[0] = pointSet->GetPoint(i)[0];
-    px[1] = pointSet->GetPoint(i)[1];
-    px[2] = pointSet->GetPoint(i)[2];
-    auto pixelValue = static_cast<double>(readimage.GetPixelByWorldCoordinates(px));
-    if (pixelValue>max)
-      max = pixelValue;
-    if (pixelValue<min)
-      min = pixelValue;
+    vtkCell* cell = m_FiberPolyData->GetCell(i);
+    auto numPoints = cell->GetNumberOfPoints();
+    vtkPoints* points = cell->GetPoints();
+    double mean_val = 0;
+
+    for (int j=0; j<numPoints; j++)
+    {
+      double p[3];
+      points->GetPoint(j, p);
+
+      Point3D px;
+      px[0] = p[0];
+      px[1] = p[1];
+      px[2] = p[2];
+      auto pixelValue = static_cast<double>(readimage.GetPixelByWorldCoordinates(px));
+
+      if (pixelValue>max)
+        max = pixelValue;
+      if (pixelValue<min)
+        min = pixelValue;
+
+      if (weight_fibers)
+        mean_val += pixelValue;
+    }
+
+    if (weight_fibers)
+      this->SetFiberWeight(i, mean_val/numPoints);
   }
 
   for(long i=0; i<m_FiberPolyData->GetNumberOfPoints(); ++i)
