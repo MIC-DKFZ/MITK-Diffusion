@@ -382,7 +382,7 @@ QGroupBox {
                 <string/>
                </property>
                <property name="icon">
-                <iconset resource="../../../../../debug/MITK-build/Plugins/org.mitk.gui.qt.diffusionimaging.fiberprocessing/org_mitk_gui_qt_diffusionimaging_fiberprocessing_cached.qrc">
+                <iconset resource="../../../../../release/MITK-build/private_plugins/org.mitk.gui.qt.diffusionimaging.fiberprocessing/org_mitk_gui_qt_diffusionimaging_fiberprocessing_cached.qrc">
                  <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/circle.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/circle.png</iconset>
                </property>
                <property name="iconSize">
@@ -427,7 +427,7 @@ QGroupBox {
                 <string/>
                </property>
                <property name="icon">
-                <iconset resource="../../../../../debug/MITK-build/Plugins/org.mitk.gui.qt.diffusionimaging.fiberprocessing/org_mitk_gui_qt_diffusionimaging_fiberprocessing_cached.qrc">
+                <iconset resource="../../../../../release/MITK-build/private_plugins/org.mitk.gui.qt.diffusionimaging.fiberprocessing/org_mitk_gui_qt_diffusionimaging_fiberprocessing_cached.qrc">
                  <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/polygon.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/polygon.png</iconset>
                </property>
                <property name="iconSize">
@@ -1132,8 +1132,8 @@ QGroupBox {
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>367</width>
-        <height>408</height>
+        <width>353</width>
+        <height>426</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1276,6 +1276,13 @@ QGroupBox {
           <property name="verticalSpacing">
            <number>6</number>
           </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_12">
+            <property name="text">
+             <string>Scalar map:</string>
+            </property>
+           </widget>
+          </item>
           <item row="1" column="0">
            <widget class="QCheckBox" name="m_FiberOpacityBox">
             <property name="toolTip">
@@ -1290,25 +1297,31 @@ QGroupBox {
            </widget>
           </item>
           <item row="3" column="0">
-           <widget class="QmitkDataStorageComboBox" name="m_ColorMapBox"/>
-          </item>
-          <item row="0" column="0">
-           <widget class="QLabel" name="label_12">
-            <property name="text">
-             <string>Scalar map:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0">
            <widget class="QCheckBox" name="m_NormalizeColorValues">
             <property name="toolTip">
              <string>The values used to color the fibers are min-max normalized. If not checked, the values should be between 0 and 1.</string>
             </property>
             <property name="text">
-             <string>Normalize values</string>
+             <string>Normalize color values</string>
             </property>
             <property name="checked">
              <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QmitkDataStorageComboBox" name="m_ColorMapBox"/>
+          </item>
+          <item row="2" column="0">
+           <widget class="QCheckBox" name="m_ValueAsWeightBox">
+            <property name="toolTip">
+             <string>If checked, the (mean) unnormalized values per fiber are also used as fiber weights, e.g. the fiber length in mm.</string>
+            </property>
+            <property name="text">
+             <string>Values as weight</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
             </property>
            </widget>
           </item>
@@ -1725,7 +1738,7 @@ QGroupBox {
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="../../../../../debug/MITK-build/Plugins/org.mitk.gui.qt.diffusionimaging.fiberprocessing/org_mitk_gui_qt_diffusionimaging_fiberprocessing_cached.qrc"/>
+  <include location="../../../../../release/MITK-build/private_plugins/org.mitk.gui.qt.diffusionimaging.fiberprocessing/org_mitk_gui_qt_diffusionimaging_fiberprocessing_cached.qrc"/>
  </resources>
  <connections/>
 </ui>

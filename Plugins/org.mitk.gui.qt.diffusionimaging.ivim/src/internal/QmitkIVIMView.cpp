@@ -902,11 +902,11 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
 
     m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
 
-    if(m_IvimSnap.num_high) // num_high is 0 if there is only one fit
+    if(m_IvimSnap.bvals2.size() > 0)
     {
       AddSecondFitPlot();
       std::vector< std::pair<double, double> > additonal_meas;
-      for (int i=0; i<m_IvimSnap.num_weighted-m_IvimSnap.num_high; ++i)
+      for (int i=0; i<static_cast<int>(m_IvimSnap.bvals2.size()); ++i)
         additonal_meas.emplace_back(m_IvimSnap.bvals2[i], m_IvimSnap.meas2[i]);
 
       m_Controls->m_ChartWidget->UpdateData2D(additonal_meas, "signal values (used for second fit)");
