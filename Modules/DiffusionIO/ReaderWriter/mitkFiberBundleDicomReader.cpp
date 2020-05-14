@@ -55,7 +55,7 @@ mitk::FiberBundleDicomReader * mitk::FiberBundleDicomReader::Clone() const
   return new FiberBundleDicomReader(*this);
 }
 
-std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Read()
+std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::DoRead()
 {
 
   std::vector<itk::SmartPointer<mitk::BaseData> > output_fibs;

@@ -53,7 +53,7 @@ mitk::FiberBundleVtkReader * mitk::FiberBundleVtkReader::Clone() const
 }
 
 
-std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::Read()
+std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRead()
 {
 
   std::vector<itk::SmartPointer<mitk::BaseData> > result;

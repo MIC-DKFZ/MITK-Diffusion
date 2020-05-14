@@ -48,7 +48,7 @@ namespace mitk
   {
   }
 
-  std::vector<itk::SmartPointer<BaseData> > NrrdTensorImageReader::Read()
+  std::vector<itk::SmartPointer<BaseData> > NrrdTensorImageReader::DoRead()
   {
     std::vector<itk::SmartPointer<mitk::BaseData> > result;
     std::string location = GetInputLocation();

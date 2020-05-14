@@ -41,7 +41,7 @@ namespace mitk
   {
   }
 
-  std::vector<itk::SmartPointer<BaseData> > ConnectomicsNetworkReader::Read()
+  std::vector<itk::SmartPointer<BaseData> > ConnectomicsNetworkReader::DoRead()
   {
     std::vector<itk::SmartPointer<mitk::BaseData> > result;
     std::string location = GetInputLocation();

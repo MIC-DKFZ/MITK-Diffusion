@@ -46,7 +46,7 @@ namespace mitk
   {
   }
 
-  std::vector<itk::SmartPointer<BaseData> > PeakImageReader::Read()
+  std::vector<itk::SmartPointer<BaseData> > PeakImageReader::DoRead()
   {
     mitk::LocaleSwitch localeSwitch("C");
     std::vector<itk::SmartPointer<mitk::BaseData> > result;

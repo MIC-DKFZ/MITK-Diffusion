@@ -84,7 +84,7 @@ DiffusionImageNiftiReader()
 
 std::vector<itk::SmartPointer<mitk::BaseData> >
 DiffusionImageNiftiReader::
-Read()
+DoRead()
 {
   std::vector<itk::SmartPointer<mitk::BaseData> > result;
 

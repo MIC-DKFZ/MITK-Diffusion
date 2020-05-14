@@ -47,7 +47,7 @@ mitk::PlanarFigureCompositeReader * mitk::PlanarFigureCompositeReader::Clone() c
 }
 
 
-std::vector<itk::SmartPointer<mitk::BaseData> > mitk::PlanarFigureCompositeReader::Read()
+std::vector<itk::SmartPointer<mitk::BaseData> > mitk::PlanarFigureCompositeReader::DoRead()
 {
 
     std::vector<itk::SmartPointer<mitk::BaseData> > result;

@@ -78,7 +78,7 @@ namespace mitk
 
   std::vector<itk::SmartPointer<mitk::BaseData> >
   DiffusionImageNrrdReader::
-  Read()
+  DoRead()
   {
     std::vector<itk::SmartPointer<mitk::BaseData> > result;
 

@@ -86,7 +86,7 @@ DiffusionImageDicomReader()
 }
 
 std::vector<itk::SmartPointer<mitk::BaseData> >
-DiffusionImageDicomReader::Read()
+DiffusionImageDicomReader::DoRead()
 {
   return InternalRead();
 }
