@@ -189,17 +189,17 @@ void QmitkFiberProcessingView::Modify()
   }
   case 3:
   {
-    DoImageColorCoding();
+    MirrorFibers();
     break;
   }
   case 4:
   {
-    MirrorFibers();
+    WeightFibers();
     break;
   }
   case 5:
   {
-    WeightFibers();
+    DoWeightColorCoding();
     break;
   }
   case 6:
@@ -209,12 +209,12 @@ void QmitkFiberProcessingView::Modify()
   }
   case 7:
   {
-    DoWeightColorCoding();
+    DoLengthColorCoding();
     break;
   }
   case 8:
   {
-    DoLengthColorCoding();
+    DoImageColorCoding();
     break;
   }
   }
@@ -1083,28 +1083,28 @@ void QmitkFiberProcessingView::UpdateGui()
     m_Controls->m_CompressFibersFrame->setVisible(true);
     break;
   case 3:
-    m_Controls->m_ValueAsWeightBox->setVisible(true);
-    m_Controls->m_ColorFibersFrame->setVisible(true);
-    m_Controls->m_ColorMapBox->setVisible(true);
-    break;
-  case 4:
     m_Controls->m_MirrorFibersFrame->setVisible(true);
     if (m_SelectedSurfaces.size()>0)
       m_Controls->m_ModifyButton->setEnabled(true);
     break;
-  case 5:
+  case 4:
     m_Controls->m_BundleWeightFrame->setVisible(true);
+    break;
+  case 5:
+    m_Controls->m_ColorFibersFrame->setVisible(true);
     break;
   case 6:
     m_Controls->m_ValueAsWeightBox->setVisible(true);
     m_Controls->m_ColorFibersFrame->setVisible(true);
     break;
   case 7:
+    m_Controls->m_ValueAsWeightBox->setVisible(true);
     m_Controls->m_ColorFibersFrame->setVisible(true);
     break;
   case 8:
     m_Controls->m_ValueAsWeightBox->setVisible(true);
     m_Controls->m_ColorFibersFrame->setVisible(true);
+    m_Controls->m_ColorMapBox->setVisible(true);
     break;
   }
 

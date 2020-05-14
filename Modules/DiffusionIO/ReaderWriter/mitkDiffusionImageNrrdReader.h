@@ -45,8 +45,8 @@ namespace mitk
     DiffusionImageNrrdReader();
     ~DiffusionImageNrrdReader() override;
 
-    using AbstractFileReader::Read;
-    std::vector<itk::SmartPointer<BaseData> > Read() override;
+    using AbstractFileReader::DoRead;
+    std::vector<itk::SmartPointer<BaseData> > DoRead() override;
 
     typedef short                                                           DiffusionPixelType;
 

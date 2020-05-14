@@ -39,8 +39,8 @@ namespace mitk
     FiberBundleTckReader(const FiberBundleTckReader& other);
     FiberBundleTckReader * Clone() const override;
 
-    using mitk::AbstractFileReader::Read;
-    std::vector<itk::SmartPointer<BaseData> > Read() override;
+    using mitk::AbstractFileReader::DoRead;
+    std::vector<itk::SmartPointer<BaseData> > DoRead() override;
 
   private:
 

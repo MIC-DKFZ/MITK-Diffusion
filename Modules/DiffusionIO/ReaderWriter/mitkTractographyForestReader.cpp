@@ -42,7 +42,7 @@ mitk::TractographyForestReader * mitk::TractographyForestReader::Clone() const
 }
 
 
-std::vector<itk::SmartPointer<mitk::BaseData> > mitk::TractographyForestReader::Read()
+std::vector<itk::SmartPointer<mitk::BaseData> > mitk::TractographyForestReader::DoRead()
 {
   std::vector<itk::SmartPointer<mitk::BaseData> > result;
   std::shared_ptr< vigra::RandomForest<int> > forest;

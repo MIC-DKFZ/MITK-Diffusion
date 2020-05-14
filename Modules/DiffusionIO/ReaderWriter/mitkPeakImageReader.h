@@ -36,8 +36,8 @@ namespace mitk
     PeakImageReader();
     ~PeakImageReader() override;
 
-    using AbstractFileReader::Read;
-    std::vector<itk::SmartPointer<BaseData> > Read() override;
+    using AbstractFileReader::DoRead;
+    std::vector<itk::SmartPointer<BaseData> > DoRead() override;
 
   protected:
 

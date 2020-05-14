@@ -324,7 +324,7 @@ QGroupBox {
           <item row="3" column="0">
            <widget class="QCheckBox" name="m_InteractiveBox">
             <property name="text">
-             <string>Interactive Extraction</string>
+             <string>Interactive Extraction </string>
             </property>
            </widget>
           </item>
@@ -1353,11 +1353,6 @@ QGroupBox {
          </item>
          <item>
           <property name="text">
-           <string>Color fibers by scalar map (e.g. FA)</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
            <string>Mirror fibers</string>
           </property>
          </item>
@@ -1368,17 +1363,22 @@ QGroupBox {
          </item>
          <item>
           <property name="text">
-           <string>Color fibers by curvature</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
            <string>Color fibers by fiber weights</string>
           </property>
          </item>
          <item>
           <property name="text">
-           <string>Color fibers by length</string>
+           <string>Color &amp; weight fibers by curvature</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Color &amp; weight fibers by length</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Color &amp; weight fibers by scalar map (e.g. FA)</string>
           </property>
          </item>
         </widget>

@@ -71,7 +71,7 @@ namespace mitk
     return resultImage;
   }
 
-  std::vector<itk::SmartPointer<BaseData> > ShImageReader::Read()
+  std::vector<itk::SmartPointer<BaseData> > ShImageReader::DoRead()
   {
     mitk::LocaleSwitch localeSwitch("C");
     std::vector<itk::SmartPointer<mitk::BaseData> > result;

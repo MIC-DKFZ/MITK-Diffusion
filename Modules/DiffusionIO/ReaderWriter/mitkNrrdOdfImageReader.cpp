@@ -43,7 +43,7 @@ namespace mitk
   {
   }
 
-  std::vector<itk::SmartPointer<BaseData> > NrrdOdfImageReader::Read()
+  std::vector<itk::SmartPointer<BaseData> > NrrdOdfImageReader::DoRead()
   {
     std::vector<itk::SmartPointer<mitk::BaseData> > result;
     std::string location = GetInputLocation();

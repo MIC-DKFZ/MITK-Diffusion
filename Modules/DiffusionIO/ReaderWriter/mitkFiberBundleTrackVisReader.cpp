@@ -55,7 +55,7 @@ mitk::FiberBundleTrackVisReader * mitk::FiberBundleTrackVisReader::Clone() const
   return new FiberBundleTrackVisReader(*this);
 }
 
-std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleTrackVisReader::Read()
+std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleTrackVisReader::DoRead()
 {
 
   std::vector<itk::SmartPointer<mitk::BaseData> > result;
