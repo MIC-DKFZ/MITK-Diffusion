@@ -28,6 +28,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QRect>
 #include <QDesktopWidget>
 #include <QMainWindow>
+#include <mitkVersion.h>
+#include <mitkDiffusionVersion.h>
 
 const QString QmitkDiffusionImagingAppWorkbenchAdvisor::WELCOME_PERSPECTIVE_ID = "org.mitk.diffusionimagingapp.perspectives.welcome";
 
@@ -90,10 +92,16 @@ QmitkDiffusionImagingAppWorkbenchAdvisor::CreateWorkbenchWindowAdvisor(
   advisor->ShowViewToolbar(false);
   advisor->ShowPerspectiveToolbar(true);
   advisor->ShowVersionInfo(false);
-  advisor->ShowMitkVersionInfo(true);
+  advisor->ShowMitkVersionInfo(false);
   advisor->ShowMemoryIndicator(false);
   advisor->SetProductName("MITK Diffusion");
   advisor->SetWindowIcon(":/org.mitk.gui.qt.diffusionimagingapp/MitkDiffusion.ico");
+
+  std::cout << "MITK Diffusion git commit hash: " << MITKDIFFUSION_REVISION << std::endl;
+  std::cout << "MITK Diffusion branch name: " << MITKDIFFUSION_REVISION_NAME << std::endl;
+  std::cout << "MITK git commit hash: " << MITK_REVISION << std::endl;
+  std::cout << "MITK branch name: " << MITK_REVISION_NAME << std::endl;
+
   return advisor;
 }
 
