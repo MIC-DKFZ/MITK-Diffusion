@@ -57,7 +57,7 @@ typedef mitk::DiffusionPropertyHelper DPH;
 void IvimMapComputation( mitk::Image::Pointer input,
                          std::string output_prefix ,
                          std::string output_type,
-                         double b_thresh)
+                         double b_thresh, int type)
 {
   MITK_INFO << "Starting fit";
   DPH::ImageType::Pointer vectorImage = DPH::ImageType::New();
@@ -70,7 +70,24 @@ void IvimMapComputation( mitk::Image::Pointer input,
   ivim_filter->SetBValue( DPH::GetReferenceBValue( input.GetPointer() ) );
   ivim_filter->SetGradientDirections( DPH::GetGradientContainer( input.GetPointer() ) );
 
-  ivim_filter->SetMethod(IVIMFilterType::IVIM_D_THEN_DSTAR);
+  switch (type)
+  {
+  case 0:
+    ivim_filter->SetMethod(IVIMFilterType::IVIM_FIT_ALL);
+    break;
+  case 1:
+    ivim_filter->SetMethod(IVIMFilterType::IVIM_DSTAR_FIX);
+    break;
+  case 2:
+    ivim_filter->SetMethod(IVIMFilterType::IVIM_D_THEN_DSTAR);
+    break;
+  case 3:
+    ivim_filter->SetMethod(IVIMFilterType::IVIM_LINEAR_D_THEN_F);
+    break;
+  default:
+    ivim_filter->SetMethod(IVIMFilterType::IVIM_D_THEN_DSTAR);
+  }
+
   ivim_filter->SetBThres(b_thresh);
   ivim_filter->SetS0Thres(0);
   ivim_filter->SetFitDStar(true);
@@ -129,7 +146,8 @@ int main( int argc, char* argv[] )
   parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
   parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output Preifx: ", "Prefix for the output images, will append _ADC, _AKC accordingly ", us::Any(), false);
   parser.addArgument("output_type", "", mitkDiffusionCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ", std::string(".nrrd"));
-  parser.addArgument("b_threshold", "", mitkDiffusionCommandLineParser::Float, "b-threshold:", "Omit samller b-values", 0.0);
+  parser.addArgument("b_threshold", "", mitkDiffusionCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit^", 170.0);
+  parser.addArgument("fit_type", "", mitkDiffusionCommandLineParser::Int, "Fit:", "Jointly fit D, f and D* (0); Fit D&f with fixed D* (1); Fit D&f (high b), then fit D* (2); Linearly fit D&f (high b), then fit D* (3)", 2);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
 
@@ -143,14 +161,18 @@ int main( int argc, char* argv[] )
   mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
   mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
-  double b_thresh = 0;
+  double b_thresh = 170;
+  int fit_type = 2;
   std::string  out_type = "nrrd";
 
   if (parsedArgs.count("output_type"))
     out_type = us::any_cast<std::string>(parsedArgs["output_type"]);
 
   if (parsedArgs.count("b_threshold"))
-    b_thresh = us::any_cast<float>(parsedArgs["lowerkbound"]);
+    b_thresh = us::any_cast<float>(parsedArgs["b_threshold"]);
+
+  if (parsedArgs.count("fit_type"))
+    fit_type = us::any_cast<int>(parsedArgs["fit_type"]);
 
   if( !DPH::IsDiffusionWeightedImage( inputImage ) )
   {
@@ -161,6 +183,7 @@ int main( int argc, char* argv[] )
   IvimMapComputation( inputImage,
                       out_prefix ,
                       out_type,
-                      b_thresh);
+                      b_thresh,
+                      fit_type);
 
 }
