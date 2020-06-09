@@ -45,10 +45,10 @@ int main(int argc, char* argv[])
 {
   mitkDiffusionCommandLineParser parser;
 
-  parser.setTitle("Fiber Join");
+  parser.setTitle("Fiber Statistics");
   parser.setCategory("Fiber Tracking and Processing Methods");
   parser.setContributor("MIC");
-  parser.setDescription("Join multiple tractograms");
+  parser.setDescription("Output statistics about fiber lengths, weights, etc. to a file.");
 
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkDiffusionCommandLineParser::StringList, "Input:", "input tractograms", us::Any(), false);
