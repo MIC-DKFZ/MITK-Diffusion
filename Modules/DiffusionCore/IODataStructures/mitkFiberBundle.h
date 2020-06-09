@@ -206,6 +206,8 @@ public:
     void SetTrackVisHeader(const TrackVis_header &TrackVisHeader);
     void SetTrackVisHeader(BaseGeometry *geometry);
 
+    void PrintSelf(std::ostream &os, itk::Indent indent) const override;
+
 protected:
 
     FiberBundle( vtkPolyData* fiberPolyData = nullptr );
@@ -213,7 +215,6 @@ protected:
 
     void                            GenerateFiberIds();
     void                            UpdateFiberGeometry();
-    void                    PrintSelf(std::ostream &os, itk::Indent indent) const override;
 
 private:
 
