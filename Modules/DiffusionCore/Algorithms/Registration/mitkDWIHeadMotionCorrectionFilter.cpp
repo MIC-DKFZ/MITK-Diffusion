@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkExtractDwiChannelFilter.h>
 #include <mitkMultiModalAffineDefaultRegistrationAlgorithm.h>
-#include <mitkAlgorithmHelper.h>
+#include <mitkMAPAlgorithmHelper.h>
 #include <mitkMaskedAlgorithmHelper.h>
 #include <mitkImageMappingHelper.h>
 #include <mitkRegistrationHelper.h>
@@ -95,7 +95,7 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
   composer->SetInput(0, filter->GetOutput());
 
   mitk::MultiModalAffineDefaultRegistrationAlgorithm< ITKDiffusionVolumeType >::Pointer algo = mitk::MultiModalAffineDefaultRegistrationAlgorithm< ITKDiffusionVolumeType >::New();
-  mitk::MITKAlgorithmHelper helper(algo);
+  mitk::MAPAlgorithmHelper helper(algo);
 
   typedef vnl_matrix_fixed< double, 3, 3> TransformMatrixType;
   std::vector< TransformMatrixType > estimated_transforms;
