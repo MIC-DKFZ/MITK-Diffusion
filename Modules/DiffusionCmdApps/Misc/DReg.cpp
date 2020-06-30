@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkDiffusionCommandLineParser.h"
 #include <mitkMultiModalRigidDefaultRegistrationAlgorithm.h>
 #include <mitkDiffusionPropertyHelper.h>
-#include <mitkAlgorithmHelper.h>
+#include <mitkMAPAlgorithmHelper.h>
 #include <itkExtractDwiChannelFilter.h>
 #include <mitkRegistrationHelper.h>
 #include <mitkImageMappingHelper.h>
