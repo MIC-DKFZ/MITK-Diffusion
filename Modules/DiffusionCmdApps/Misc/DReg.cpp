@@ -132,7 +132,7 @@ int main(int argc, char* argv[])
     mitk::Image::Pointer moving_single = moving;
 
     mitk::MultiModalRigidDefaultRegistrationAlgorithm< ItkFloatImageType >::Pointer algo = mitk::MultiModalRigidDefaultRegistrationAlgorithm< ItkFloatImageType >::New();
-    mitk::MITKAlgorithmHelper helper(algo);
+    mitk::MAPAlgorithmHelper helper(algo);
 
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(fixed))
     {
