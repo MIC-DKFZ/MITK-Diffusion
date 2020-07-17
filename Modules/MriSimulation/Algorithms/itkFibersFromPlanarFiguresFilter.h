@@ -64,7 +64,7 @@ public:
   // output
   FiberContainerType GetFiberBundles(){ return m_FiberBundles; }
 
-  void SetFixSeed(bool FixSeed);
+  void SetFixSeed(int FixSeed);
 
 protected:
 
@@ -77,7 +77,7 @@ protected:
   FiberContainerType              m_FiberBundles;    ///< container for the output fiber bundles
   std::vector< mitk::Vector2D >   m_2DPoints;        ///< container for the 2D fiber waypoints
   FiberGenerationParameters       m_Parameters;
-  bool                            m_FixSeed;
+  int                             m_FixSeed;
 };
 }
 
