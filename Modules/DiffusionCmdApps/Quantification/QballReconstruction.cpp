@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
     std::vector< mitk::BaseData::Pointer > infile = mitk::IOUtil::Load(inFileName, &functor);
 
     mitk::Image::Pointer dwi = dynamic_cast<mitk::Image*>(infile.at(0).GetPointer());

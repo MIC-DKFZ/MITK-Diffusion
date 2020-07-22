@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
   try
   {
     // load input image
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images", "SH Image", "ODF Image", "Tensor Image"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images", "SH Image", "ODF Image", "Tensor Image"}, std::vector<std::string>());
     auto input = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
     bool is_odf = (dynamic_cast<mitk::ShImage*>(input.GetPointer()) || dynamic_cast<mitk::OdfImage*>(input.GetPointer()));

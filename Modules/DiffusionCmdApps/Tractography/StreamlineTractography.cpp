@@ -26,7 +26,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <fstream>
 #include <itksys/SystemTools.hxx>
 #include <mitkCoreObjectFactory.h>
-#include <omp.h>
 #include <itksys/SystemTools.hxx>
 
 #include <mitkFiberBundle.h>
@@ -392,7 +391,7 @@ int main(int argc, char* argv[])
 
   if (!prior_image.empty())
   {
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, std::vector<std::string>());
     mitk::PeakImage::Pointer priorImage = mitk::IOUtil::Load<mitk::PeakImage>(prior_image, &functor);
 
     if (priorImage.IsNull())
@@ -427,7 +426,9 @@ int main(int argc, char* argv[])
     if (forest.IsNull())
       mitkThrow() << "Forest file " << forestFile << " could not be read.";
 
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+    std::vector<std::string> include = {"Diffusion Weighted Images"};
+    std::vector<std::string> exclude = {};
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor(include, exclude);
     auto input = mitk::IOUtil::Load<mitk::Image>(input_files.at(0), &functor);
     reference_image = input;
 
@@ -489,7 +490,9 @@ int main(int argc, char* argv[])
     }
     else
     {
-      mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"SH Image", "ODF Image"}, {});
+      std::vector<std::string> include = {"SH Image", "ODF Image"};
+      std::vector<std::string> exclude = {};
+      mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor(include, exclude);
       auto input = mitk::IOUtil::Load(input_files.at(0), &functor)[0];
       reference_image = dynamic_cast<mitk::Image*>(input.GetPointer());
       if (dynamic_cast<mitk::ShImage*>(input.GetPointer()))

@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
     GibbsTrackingFilterType::Pointer gibbsTracker = GibbsTrackingFilterType::New();
 
     // load input image
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"SH Image"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"SH Image"}, std::vector<std::string>());
     mitk::Image::Pointer mitkImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
     // try to cast to Odf image

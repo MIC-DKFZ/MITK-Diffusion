@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
     mitk::Image::Pointer input_image = mitk::IOUtil::Load<mitk::Image>(imageName, &functor);
 
     typedef short                                                                         DiffusionPixelType;
