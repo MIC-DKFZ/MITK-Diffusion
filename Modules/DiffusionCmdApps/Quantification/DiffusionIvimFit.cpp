@@ -158,7 +158,7 @@ int main( int argc, char* argv[] )
   std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string out_prefix = us::any_cast<std::string>(parsedArgs["o"]);
 
-  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
   mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
   double b_thresh = 170;

@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
     outName = parameters.m_Misc.m_OutputPath + parameters.m_Misc.m_OutputPrefix;
   }
 
-  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images", "Fiberbundles"}, {});
+  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images", "Fiberbundles"}, std::vector<std::string>());
   mitk::BaseData::Pointer inputData = mitk::IOUtil::Load(input, &functor)[0];
 
   itk::TractsToDWIImageFilter< short >::Pointer tractsToDwiFilter = itk::TractsToDWIImageFilter< short >::New();

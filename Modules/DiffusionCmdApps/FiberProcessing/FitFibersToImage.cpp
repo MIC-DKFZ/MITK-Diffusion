@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
   {
     MITK_INFO << "Loading data";
 
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image", "Fiberbundles"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image", "Fiberbundles"}, std::vector<std::string>());
 
     std::vector< std::string > fib_names;
     auto input_tracts = mitk::DiffusionDataIOHelper::load_fibs(fib_files, &fib_names);

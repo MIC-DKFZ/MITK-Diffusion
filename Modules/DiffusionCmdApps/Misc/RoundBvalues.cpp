@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
   {
     typedef mitk::DiffusionPropertyHelper PropHelper;
 
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>({}));
     mitk::Image::Pointer in_image = mitk::IOUtil::Load<mitk::Image>(imageName, &functor);
 
     if (!PropHelper::IsDiffusionWeightedImage(in_image))

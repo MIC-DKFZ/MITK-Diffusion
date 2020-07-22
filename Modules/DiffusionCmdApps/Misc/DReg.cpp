@@ -124,7 +124,7 @@ int main(int argc, char* argv[])
   {
     typedef itk::Image< float, 3 > ItkFloatImageType;
 
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
     mitk::Image::Pointer fixed = mitk::IOUtil::Load<mitk::Image>(f, &functor);
     mitk::Image::Pointer moving = mitk::IOUtil::Load<mitk::Image>(m, &functor);
 

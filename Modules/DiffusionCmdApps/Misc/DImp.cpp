@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
     mitk::Image::Pointer source = mitk::IOUtil::Load<mitk::Image>(imageName, &functor);
 
     std::string ext = itksys::SystemTools::GetFilenameExtension(outImage);

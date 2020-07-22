@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
   {
     std::cout << "Loading " << inName;
 
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
     mitk::Image::Pointer dwi = mitk::IOUtil::Load<mitk::Image>(inName, &functor);
 
     if ( mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage( dwi ) )

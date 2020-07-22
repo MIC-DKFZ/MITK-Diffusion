@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"SH Image"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"SH Image"}, std::vector<std::string>());
     mitk::ShImage::Pointer source = mitk::IOUtil::Load<mitk::ShImage>(imageName, &functor);
     mitk::Image::Pointer mitkImage = dynamic_cast<mitk::Image*>(source.GetPointer());
     mitk::OdfImage::Pointer out_image = mitk::convert::GetOdfFromShImage(mitkImage);

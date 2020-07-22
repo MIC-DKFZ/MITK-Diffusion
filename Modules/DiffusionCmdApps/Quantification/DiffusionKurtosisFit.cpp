@@ -202,7 +202,7 @@ int main( int argc, char* argv[] )
   std::string out_prefix = us::any_cast<std::string>(parsedArgs["o"]);
   std::string maskPath = "";
 
-  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
   mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
   bool omitBZero = false;

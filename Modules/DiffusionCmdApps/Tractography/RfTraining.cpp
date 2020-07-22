@@ -132,7 +132,8 @@ int main(int argc, char* argv[])
 
     MITK_INFO << "loading diffusion-weighted images";
     std::vector< mitk::Image::Pointer > rawData;
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
     for (auto imgFile : imageFiles)
     {
         auto dwi = mitk::IOUtil::Load<mitk::Image>(imgFile, &functor);

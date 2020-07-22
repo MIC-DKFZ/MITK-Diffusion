@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
   std::string o = us::any_cast<std::string>(parsedArgs["o"]);
 
   std::string exec_dir = ist::GetFilenamePath(argv[0]);
-  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, {});
+  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
   mitk::Image::Pointer mitk_image = mitk::IOUtil::Load<mitk::Image>(i, &functor);
 
   bool missing_file = false;

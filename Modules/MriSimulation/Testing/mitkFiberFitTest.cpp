@@ -70,7 +70,7 @@ public:
     tracts.push_back(LoadFib("Cluster_3.fib"));
     tracts.push_back(LoadFib("Cluster_4.fib"));
 
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, std::vector<std::string>());
     mitk::PeakImage::Pointer peaks = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/FiberFit/csd_peak_image.nii.gz"), &functor);
 
 

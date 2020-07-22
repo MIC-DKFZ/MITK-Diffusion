@@ -204,7 +204,7 @@ int main(int argc, char* argv[])
 
     try
     {
-        mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({ "Diffusion Weighted Images" }, {});
+        mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({ "Diffusion Weighted Images" }, std::vector<std::string>());
         mitk::Image::Pointer mitkImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
         mitk::Image::Pointer newImage = DoReduceGradientDirections(mitkImage, bValue, nrOfGradients, use_first_n);
         //mitk::IOUtil::Save(newImage, outFileName); //save as dwi image

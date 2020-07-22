@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, {});
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, std::vector<std::string>());
     mitk::PeakImage::Pointer image = mitk::IOUtil::Load<mitk::PeakImage>(imageName, &functor);
 
     typedef mitk::ImageToItk< mitk::PeakImage::ItkPeakImageType > CasterType;
