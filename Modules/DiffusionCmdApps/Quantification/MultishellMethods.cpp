@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
       mitk::DiffusionPropertyHelper::ImageType::Pointer vectorImage = mitk::DiffusionPropertyHelper::ImageType::New();
       mitk::CastToItkImage(dwi, vectorImage);
 
-      const mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer
+      const mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer
           gradientContainer = mitk::DiffusionPropertyHelper::GetGradientContainer(dwi);
 
       const unsigned int

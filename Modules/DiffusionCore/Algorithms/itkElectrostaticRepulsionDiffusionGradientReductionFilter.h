@@ -80,11 +80,11 @@ namespace itk
     typedef std::vector<unsigned int>           IndicesVector;
     typedef std::map<unsigned int, IndicesVector>     BValueMap;
 
-    itkGetMacro(OriginalGradientDirections, GradientDirectionContainerType::Pointer)
-    itkSetMacro(OriginalGradientDirections, GradientDirectionContainerType::Pointer)
+    itkGetMacro(OriginalGradientDirections, GradientDirectionContainerType::ConstPointer)
+    itkSetMacro(OriginalGradientDirections, GradientDirectionContainerType::ConstPointer)
 
-    itkGetMacro(GradientDirections, GradientDirectionContainerType::Pointer)
-    itkSetMacro(GradientDirections, GradientDirectionContainerType::Pointer)
+    itkGetMacro(GradientDirections, GradientDirectionContainerType::ConstPointer)
+    itkSetMacro(GradientDirections, GradientDirectionContainerType::ConstPointer)
     itkSetMacro(UseFirstN, bool)
 
     IndicesVector GetUsedGradientIndices(){return m_UsedGradientIndices;}
@@ -102,8 +102,8 @@ namespace itk
     void GenerateData() override;
     double Costs(); ///< calculates electrostatic energy of current direction set
 
-    GradientDirectionContainerType::Pointer m_GradientDirections;   ///< container for the subsampled output gradient directions
-    GradientDirectionContainerType::Pointer m_OriginalGradientDirections;   ///< input gradient directions
+    GradientDirectionContainerType::ConstPointer m_GradientDirections;   ///< container for the subsampled output gradient directions
+    GradientDirectionContainerType::ConstPointer m_OriginalGradientDirections;   ///< input gradient directions
 
     IndicesVector m_UsedGradientIndices;
     IndicesVector m_UnusedGradientIndices;

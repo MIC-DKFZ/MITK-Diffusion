@@ -108,7 +108,7 @@ namespace itk
       return m_OutliersPerSlice;
     }
 
-    void SetGradients(GradientDirectionContainerType* grads)
+    void SetGradients(GradientDirectionContainerType::ConstPointer grads)
     {
       m_Gradients = grads;
     }
@@ -155,7 +155,7 @@ namespace itk
     // 'Outer' vector: slices, 'Inner' volumes
     std::vector< std::vector<double> > m_OutliersPerSlice;
 
-    GradientDirectionContainerType* m_Gradients;
+    GradientDirectionContainerType::ConstPointer m_Gradients;
 
     typename BaselineImageType::Pointer m_BaseLineImage;
 

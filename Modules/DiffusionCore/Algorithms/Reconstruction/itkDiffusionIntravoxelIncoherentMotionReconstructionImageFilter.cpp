@@ -689,7 +689,7 @@ double DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 
 template< class TIn, class TOut>
 void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
-::SetGradientDirections( GradientDirectionContainerType *gradientDirection )
+::SetGradientDirections( GradientDirectionContainerType::ConstPointer gradientDirection )
 {
   this->m_GradientDirectionContainer = gradientDirection;
   this->m_NumberOfGradientDirections = gradientDirection->Size();

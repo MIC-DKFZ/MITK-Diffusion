@@ -123,7 +123,7 @@ void mitk::DiffusionImageCreationFilter::GenerateData()
   }
 
   // header information
-  GradientDirectionContainerType::Pointer DiffusionVectors =  this->InternalGetGradientDirections( );
+  GradientDirectionContainerType::ConstPointer DiffusionVectors =  this->InternalGetGradientDirections( );
   MeasurementFrameType MeasurementFrame = this->InternalGetMeasurementFrame();
   float BValue = this->InternalGetBValue();
 
@@ -174,10 +174,10 @@ mitk::DiffusionImageCreationFilter::InternalGetMeasurementFrame()
   return MeasurementFrame;
 }
 
-mitk::DiffusionImageCreationFilter::GradientDirectionContainerType::Pointer
+mitk::DiffusionImageCreationFilter::GradientDirectionContainerType::ConstPointer
 mitk::DiffusionImageCreationFilter::InternalGetGradientDirections()
 {
-  GradientDirectionContainerType::Pointer DiffusionVectors = GradientDirectionContainerType::New();
+  GradientDirectionContainerType::ConstPointer DiffusionVectors;
 
   if( this->m_ReferenceImage )
   {

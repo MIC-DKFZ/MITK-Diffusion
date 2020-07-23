@@ -70,7 +70,7 @@ public:
 
     typedef vnl_vector_fixed< double, 3 >                       GradientType;
     typedef itk::VectorContainer< unsigned int, GradientType >  GradientListType;
-    typedef typename std::vector< GradientListType::Pointer >   GradientListContainerType;
+    typedef typename std::vector< GradientListType::ConstPointer >   GradientListContainerType;
 
    // input
     void SetImageVolumes(DwiImageContainerType cont);       ///< input DWI image volume container

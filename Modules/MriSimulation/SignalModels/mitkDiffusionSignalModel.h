@@ -54,7 +54,7 @@ public:
     virtual PixelType SimulateMeasurement(GradientType& fiberDirection) = 0;
     virtual ScalarType SimulateMeasurement(unsigned int dir, GradientType& fiberDirection) = 0;
 
-    void SetGradientList(DPH::GradientDirectionsContainerType* gradients)
+    void SetGradientList(DPH::GradientDirectionsContainerType::ConstPointer gradients)
     {
       m_GradientList.clear();
       for ( unsigned int i=0; i<gradients->Size(); ++i )

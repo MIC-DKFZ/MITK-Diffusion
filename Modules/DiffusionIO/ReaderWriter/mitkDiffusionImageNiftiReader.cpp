@@ -295,7 +295,7 @@ void DiffusionImageNiftiReader::InternalRead()
       }
 
       // Diffusion Image information START
-      GradientDirectionContainerType::Pointer DiffusionVectors = GradientDirectionContainerType::New();
+      GradientDirectionContainerType::ConstPointer DiffusionVectors;
       MeasurementFrameType MeasurementFrame;
       MeasurementFrame.set_identity();
       double BValue = -1;
@@ -418,6 +418,7 @@ void DiffusionImageNiftiReader::InternalRead()
         }
         newfile.close();
 
+        GradientDirectionContainerType::Pointer temp = GradientDirectionContainerType::New();
         if (!b_values.empty() && grad_values.size()==b_values.size()*3)
         {
 //          MITK_INFO << "Switching gradient vector x and y (bruker hack!!!)";
@@ -443,13 +444,14 @@ void DiffusionImageNiftiReader::InternalRead()
               }
             }
 
-            DiffusionVectors->InsertElement(i,vec);
+            temp->InsertElement(i,vec);
           }
         }
         else
         {
           mitkThrow() << "No valid gradient information found.";
         }
+        DiffusionVectors = temp;
       }
 
       outputForCache = mitk::GrabItkImageMemory( itkVectorImage);

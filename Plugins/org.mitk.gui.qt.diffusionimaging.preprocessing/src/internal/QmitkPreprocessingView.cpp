@@ -87,6 +87,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkFlipImageFilter.h>
 #include <mitkITKImageImport.h>
 
+#include <boost/algorithm/string.hpp>
+
 const std::string QmitkPreprocessingView::VIEW_ID =
     "org.mitk.views.diffusionpreprocessing";
 
@@ -160,6 +162,7 @@ void QmitkPreprocessingView::CreateConnections()
     connect( (QObject*)(m_Controls->m_ReduceGradientsButton), SIGNAL(clicked()), this, SLOT(DoReduceGradientDirections()) );
     connect( (QObject*)(m_Controls->m_ShowGradientsButton), SIGNAL(clicked()), this, SLOT(DoShowGradientDirections()) );
     connect( (QObject*)(m_Controls->m_MirrorGradientToHalfSphereButton), SIGNAL(clicked()), this, SLOT(DoHalfSphereGradientDirections()) );
+    connect( (QObject*)(m_Controls->m_SwapGradientsButton), SIGNAL(clicked()), this, SLOT(DoSwapGradientDimensions()) );
     connect( (QObject*)(m_Controls->m_MergeDwisButton), SIGNAL(clicked()), this, SLOT(MergeDwis()) );
     connect( (QObject*)(m_Controls->m_ProjectSignalButton), SIGNAL(clicked()), this, SLOT(DoProjectSignal()) );
     connect( (QObject*)(m_Controls->m_B_ValueMap_Rounder_SpinBox), SIGNAL(valueChanged(int)), this, SLOT(UpdateDwiBValueMapRounder(int)));
@@ -525,39 +528,39 @@ void QmitkPreprocessingView::DoUpdateInterpolationGui(int i)
 
   switch (i)
   {
-    case 0:
-    {
-      m_Controls->m_ResampleIntFrame->setVisible(false);
-      m_Controls->m_ResampleDoubleFrame->setVisible(true);
-      break;
-    }
-    case 1:
-    {
-      m_Controls->m_ResampleIntFrame->setVisible(false);
-      m_Controls->m_ResampleDoubleFrame->setVisible(true);
+  case 0:
+  {
+    m_Controls->m_ResampleIntFrame->setVisible(false);
+    m_Controls->m_ResampleDoubleFrame->setVisible(true);
+    break;
+  }
+  case 1:
+  {
+    m_Controls->m_ResampleIntFrame->setVisible(false);
+    m_Controls->m_ResampleDoubleFrame->setVisible(true);
 
-      mitk::BaseGeometry* geom = image->GetGeometry();
-      m_Controls->m_ResampleDoubleX->setValue(geom->GetSpacing()[0]);
-      m_Controls->m_ResampleDoubleY->setValue(geom->GetSpacing()[1]);
-      m_Controls->m_ResampleDoubleZ->setValue(geom->GetSpacing()[2]);
-      break;
-    }
-    case 2:
-    {
-      m_Controls->m_ResampleIntFrame->setVisible(true);
-      m_Controls->m_ResampleDoubleFrame->setVisible(false);
+    mitk::BaseGeometry* geom = image->GetGeometry();
+    m_Controls->m_ResampleDoubleX->setValue(geom->GetSpacing()[0]);
+    m_Controls->m_ResampleDoubleY->setValue(geom->GetSpacing()[1]);
+    m_Controls->m_ResampleDoubleZ->setValue(geom->GetSpacing()[2]);
+    break;
+  }
+  case 2:
+  {
+    m_Controls->m_ResampleIntFrame->setVisible(true);
+    m_Controls->m_ResampleDoubleFrame->setVisible(false);
 
-      mitk::BaseGeometry* geom = image->GetGeometry();
-      m_Controls->m_ResampleIntX->setValue(geom->GetExtent(0));
-      m_Controls->m_ResampleIntY->setValue(geom->GetExtent(1));
-      m_Controls->m_ResampleIntZ->setValue(geom->GetExtent(2));
-      break;
-    }
-    default:
-    {
-      m_Controls->m_ResampleIntFrame->setVisible(false);
-      m_Controls->m_ResampleDoubleFrame->setVisible(true);
-    }
+    mitk::BaseGeometry* geom = image->GetGeometry();
+    m_Controls->m_ResampleIntX->setValue(geom->GetExtent(0));
+    m_Controls->m_ResampleIntY->setValue(geom->GetExtent(1));
+    m_Controls->m_ResampleIntZ->setValue(geom->GetExtent(2));
+    break;
+  }
+  default:
+  {
+    m_Controls->m_ResampleIntFrame->setVisible(false);
+    m_Controls->m_ResampleDoubleFrame->setVisible(true);
+  }
   }
 }
 
@@ -585,72 +588,72 @@ void QmitkPreprocessingView::DoResampleImage()
 
     switch (m_Controls->m_ResampleTypeBox->currentIndex())
     {
-      case 0:
-      {
-        itk::Vector< double, 3 > samplingFactor;
-        samplingFactor[0] = m_Controls->m_ResampleDoubleX->value();
-        samplingFactor[1] = m_Controls->m_ResampleDoubleY->value();
-        samplingFactor[2] = m_Controls->m_ResampleDoubleZ->value();
-        resampler->SetSamplingFactor(samplingFactor);
-        break;
-      }
-      case 1:
-      {
-        itk::Vector< double, 3 > newSpacing;
-        newSpacing[0] = m_Controls->m_ResampleDoubleX->value();
-        newSpacing[1] = m_Controls->m_ResampleDoubleY->value();
-        newSpacing[2] = m_Controls->m_ResampleDoubleZ->value();
-        resampler->SetNewSpacing(newSpacing);
-        break;
-      }
-      case 2:
-      {
-        itk::ImageRegion<3> newRegion;
-        newRegion.SetSize(0, m_Controls->m_ResampleIntX->value());
-        newRegion.SetSize(1, m_Controls->m_ResampleIntY->value());
-        newRegion.SetSize(2, m_Controls->m_ResampleIntZ->value());
-        resampler->SetNewImageSize(newRegion);
-        break;
-      }
-      default:
-      {
-        MITK_WARN << "Unknown resampling parameters!";
-        return;
-      }
+    case 0:
+    {
+      itk::Vector< double, 3 > samplingFactor;
+      samplingFactor[0] = m_Controls->m_ResampleDoubleX->value();
+      samplingFactor[1] = m_Controls->m_ResampleDoubleY->value();
+      samplingFactor[2] = m_Controls->m_ResampleDoubleZ->value();
+      resampler->SetSamplingFactor(samplingFactor);
+      break;
+    }
+    case 1:
+    {
+      itk::Vector< double, 3 > newSpacing;
+      newSpacing[0] = m_Controls->m_ResampleDoubleX->value();
+      newSpacing[1] = m_Controls->m_ResampleDoubleY->value();
+      newSpacing[2] = m_Controls->m_ResampleDoubleZ->value();
+      resampler->SetNewSpacing(newSpacing);
+      break;
+    }
+    case 2:
+    {
+      itk::ImageRegion<3> newRegion;
+      newRegion.SetSize(0, m_Controls->m_ResampleIntX->value());
+      newRegion.SetSize(1, m_Controls->m_ResampleIntY->value());
+      newRegion.SetSize(2, m_Controls->m_ResampleIntZ->value());
+      resampler->SetNewImageSize(newRegion);
+      break;
+    }
+    default:
+    {
+      MITK_WARN << "Unknown resampling parameters!";
+      return;
+    }
     }
 
     QString outAdd;
     switch (m_Controls->m_InterpolatorBox->currentIndex())
     {
-      case 0:
-      {
-        resampler->SetInterpolation(ResampleFilter::Interpolate_NearestNeighbour);
-        outAdd = "NearestNeighbour";
-        break;
-      }
-      case 1:
-      {
-        resampler->SetInterpolation(ResampleFilter::Interpolate_Linear);
-        outAdd = "Linear";
-        break;
-      }
-      case 2:
-      {
-        resampler->SetInterpolation(ResampleFilter::Interpolate_BSpline);
-        outAdd = "BSpline";
-        break;
-      }
-      case 3:
-      {
-        resampler->SetInterpolation(ResampleFilter::Interpolate_WindowedSinc);
-        outAdd = "WindowedSinc";
-        break;
-      }
-      default:
-      {
-        resampler->SetInterpolation(ResampleFilter::Interpolate_NearestNeighbour);
-        outAdd = "NearestNeighbour";
-      }
+    case 0:
+    {
+      resampler->SetInterpolation(ResampleFilter::Interpolate_NearestNeighbour);
+      outAdd = "NearestNeighbour";
+      break;
+    }
+    case 1:
+    {
+      resampler->SetInterpolation(ResampleFilter::Interpolate_Linear);
+      outAdd = "Linear";
+      break;
+    }
+    case 2:
+    {
+      resampler->SetInterpolation(ResampleFilter::Interpolate_BSpline);
+      outAdd = "BSpline";
+      break;
+    }
+    case 3:
+    {
+      resampler->SetInterpolation(ResampleFilter::Interpolate_WindowedSinc);
+      outAdd = "WindowedSinc";
+      break;
+    }
+    default:
+    {
+      resampler->SetInterpolation(ResampleFilter::Interpolate_NearestNeighbour);
+      outAdd = "NearestNeighbour";
+    }
     }
 
     resampler->Update();
@@ -689,64 +692,64 @@ void QmitkPreprocessingView::TemplatedResampleImage( itk::Image<TPixel, VImageDi
 
   switch (m_Controls->m_ResampleTypeBox->currentIndex())
   {
-    case 0:
-    {
-      itk::Vector< double, 3 > sampling;
-      sampling[0] = m_Controls->m_ResampleDoubleX->value();
-      sampling[1] = m_Controls->m_ResampleDoubleY->value();
-      sampling[2] = m_Controls->m_ResampleDoubleZ->value();
+  case 0:
+  {
+    itk::Vector< double, 3 > sampling;
+    sampling[0] = m_Controls->m_ResampleDoubleX->value();
+    sampling[1] = m_Controls->m_ResampleDoubleY->value();
+    sampling[2] = m_Controls->m_ResampleDoubleZ->value();
 
-      newSpacing = itkImage->GetSpacing();
-      newSpacing[0] /= sampling[0];
-      newSpacing[1] /= sampling[1];
-      newSpacing[2] /= sampling[2];
-      newRegion = itkImage->GetLargestPossibleRegion();
-      newRegion.SetSize(0, newRegion.GetSize(0)*sampling[0]);
-      newRegion.SetSize(1, newRegion.GetSize(1)*sampling[1]);
-      newRegion.SetSize(2, newRegion.GetSize(2)*sampling[2]);
+    newSpacing = itkImage->GetSpacing();
+    newSpacing[0] /= sampling[0];
+    newSpacing[1] /= sampling[1];
+    newSpacing[2] /= sampling[2];
+    newRegion = itkImage->GetLargestPossibleRegion();
+    newRegion.SetSize(0, newRegion.GetSize(0)*sampling[0]);
+    newRegion.SetSize(1, newRegion.GetSize(1)*sampling[1]);
+    newRegion.SetSize(2, newRegion.GetSize(2)*sampling[2]);
 
-      break;
-    }
-    case 1:
-    {
-      newSpacing[0] = m_Controls->m_ResampleDoubleX->value();
-      newSpacing[1] = m_Controls->m_ResampleDoubleY->value();
-      newSpacing[2] = m_Controls->m_ResampleDoubleZ->value();
+    break;
+  }
+  case 1:
+  {
+    newSpacing[0] = m_Controls->m_ResampleDoubleX->value();
+    newSpacing[1] = m_Controls->m_ResampleDoubleY->value();
+    newSpacing[2] = m_Controls->m_ResampleDoubleZ->value();
 
-      itk::Vector< double, 3 > oldSpacing = itkImage->GetSpacing();
-      itk::Vector< double, 3 > sampling;
-      sampling[0] = oldSpacing[0]/newSpacing[0];
-      sampling[1] = oldSpacing[1]/newSpacing[1];
-      sampling[2] = oldSpacing[2]/newSpacing[2];
-      newRegion = itkImage->GetLargestPossibleRegion();
-      newRegion.SetSize(0, newRegion.GetSize(0)*sampling[0]);
-      newRegion.SetSize(1, newRegion.GetSize(1)*sampling[1]);
-      newRegion.SetSize(2, newRegion.GetSize(2)*sampling[2]);
-      break;
-    }
-    case 2:
-    {
-      newRegion.SetSize(0, m_Controls->m_ResampleIntX->value());
-      newRegion.SetSize(1, m_Controls->m_ResampleIntY->value());
-      newRegion.SetSize(2, m_Controls->m_ResampleIntZ->value());
+    itk::Vector< double, 3 > oldSpacing = itkImage->GetSpacing();
+    itk::Vector< double, 3 > sampling;
+    sampling[0] = oldSpacing[0]/newSpacing[0];
+    sampling[1] = oldSpacing[1]/newSpacing[1];
+    sampling[2] = oldSpacing[2]/newSpacing[2];
+    newRegion = itkImage->GetLargestPossibleRegion();
+    newRegion.SetSize(0, newRegion.GetSize(0)*sampling[0]);
+    newRegion.SetSize(1, newRegion.GetSize(1)*sampling[1]);
+    newRegion.SetSize(2, newRegion.GetSize(2)*sampling[2]);
+    break;
+  }
+  case 2:
+  {
+    newRegion.SetSize(0, m_Controls->m_ResampleIntX->value());
+    newRegion.SetSize(1, m_Controls->m_ResampleIntY->value());
+    newRegion.SetSize(2, m_Controls->m_ResampleIntZ->value());
 
-      itk::ImageRegion<3> oldRegion = itkImage->GetLargestPossibleRegion();
-      itk::Vector< double, 3 > sampling;
-      sampling[0] = (double)newRegion.GetSize(0)/oldRegion.GetSize(0);
-      sampling[1] = (double)newRegion.GetSize(1)/oldRegion.GetSize(1);
-      sampling[2] = (double)newRegion.GetSize(2)/oldRegion.GetSize(2);
+    itk::ImageRegion<3> oldRegion = itkImage->GetLargestPossibleRegion();
+    itk::Vector< double, 3 > sampling;
+    sampling[0] = (double)newRegion.GetSize(0)/oldRegion.GetSize(0);
+    sampling[1] = (double)newRegion.GetSize(1)/oldRegion.GetSize(1);
+    sampling[2] = (double)newRegion.GetSize(2)/oldRegion.GetSize(2);
 
-      newSpacing = itkImage->GetSpacing();
-      newSpacing[0] /= sampling[0];
-      newSpacing[1] /= sampling[1];
-      newSpacing[2] /= sampling[2];
-      break;
-    }
-    default:
-    {
-      MITK_WARN << "Unknown resampling parameters!";
-      return;
-    }
+    newSpacing = itkImage->GetSpacing();
+    newSpacing[0] /= sampling[0];
+    newSpacing[1] /= sampling[1];
+    newSpacing[2] /= sampling[2];
+    break;
+  }
+  default:
+  {
+    MITK_WARN << "Unknown resampling parameters!";
+    return;
+  }
   }
 
   itk::Point<double,3> origin = itkImage->GetOrigin();
@@ -775,45 +778,45 @@ void QmitkPreprocessingView::TemplatedResampleImage( itk::Image<TPixel, VImageDi
   QString outAdd;
   switch (m_Controls->m_InterpolatorBox->currentIndex())
   {
-    case 0:
-    {
-      typename itk::NearestNeighborInterpolateImageFunction<ImageType>::Pointer interp
-          = itk::NearestNeighborInterpolateImageFunction<ImageType>::New();
-      resampler->SetInterpolator(interp);
-      outAdd = "NearestNeighbour";
-      break;
-    }
-    case 1:
-    {
-      typename itk::LinearInterpolateImageFunction<ImageType>::Pointer interp
-          = itk::LinearInterpolateImageFunction<ImageType>::New();
-      resampler->SetInterpolator(interp);
-      outAdd = "Linear";
-      break;
-    }
-    case 2:
-    {
-      typename itk::BSplineInterpolateImageFunction<ImageType>::Pointer interp
-          = itk::BSplineInterpolateImageFunction<ImageType>::New();
-      resampler->SetInterpolator(interp);
-      outAdd = "BSpline";
-      break;
-    }
-    case 3:
-    {
-      typename itk::WindowedSincInterpolateImageFunction<ImageType, 3>::Pointer interp
-          = itk::WindowedSincInterpolateImageFunction<ImageType, 3>::New();
-      resampler->SetInterpolator(interp);
-      outAdd = "WindowedSinc";
-      break;
-    }
-    default:
-    {
-      typename itk::NearestNeighborInterpolateImageFunction<ImageType>::Pointer interp
-          = itk::NearestNeighborInterpolateImageFunction<ImageType>::New();
-      resampler->SetInterpolator(interp);
-      outAdd = "NearestNeighbour";
-    }
+  case 0:
+  {
+    typename itk::NearestNeighborInterpolateImageFunction<ImageType>::Pointer interp
+        = itk::NearestNeighborInterpolateImageFunction<ImageType>::New();
+    resampler->SetInterpolator(interp);
+    outAdd = "NearestNeighbour";
+    break;
+  }
+  case 1:
+  {
+    typename itk::LinearInterpolateImageFunction<ImageType>::Pointer interp
+        = itk::LinearInterpolateImageFunction<ImageType>::New();
+    resampler->SetInterpolator(interp);
+    outAdd = "Linear";
+    break;
+  }
+  case 2:
+  {
+    typename itk::BSplineInterpolateImageFunction<ImageType>::Pointer interp
+        = itk::BSplineInterpolateImageFunction<ImageType>::New();
+    resampler->SetInterpolator(interp);
+    outAdd = "BSpline";
+    break;
+  }
+  case 3:
+  {
+    typename itk::WindowedSincInterpolateImageFunction<ImageType, 3>::Pointer interp
+        = itk::WindowedSincInterpolateImageFunction<ImageType, 3>::New();
+    resampler->SetInterpolator(interp);
+    outAdd = "WindowedSinc";
+    break;
+  }
+  default:
+  {
+    typename itk::NearestNeighborInterpolateImageFunction<ImageType>::Pointer interp
+        = itk::NearestNeighborInterpolateImageFunction<ImageType>::New();
+    resampler->SetInterpolator(interp);
+    outAdd = "NearestNeighbour";
+  }
   }
 
   resampler->Update();
@@ -941,17 +944,17 @@ void QmitkPreprocessingView::DoProjectSignal()
 {
   switch(m_Controls->m_ProjectionMethodBox->currentIndex())
   {
-    case 0:
-      DoADCAverage();
+  case 0:
+    DoADCAverage();
     break;
-    case 1:
-      DoAKCFit();
+  case 1:
+    DoAKCFit();
     break;
-    case 2:
-      DoBiExpFit();
+  case 2:
+    DoBiExpFit();
     break;
-    default:
-      DoADCAverage();
+  default:
+    DoADCAverage();
   }
 }
 
@@ -1081,7 +1084,7 @@ CallMultishellToSingleShellFilter( itk::DWIVoxelFunctor * functor,
 
   ItkDwiType::Pointer itkVectorImagePointer = PropHelper::GetItkVectorImage(image);
   ItkDwiType* vectorImage = itkVectorImagePointer.GetPointer();
-  const GradProp::GradientDirectionsContainerType::Pointer gradientContainer = PropHelper::GetGradientContainer(image);
+  const GradProp::GradientDirectionsContainerType::ConstPointer gradientContainer = PropHelper::GetGradientContainer(image);
   const unsigned int& bValue = PropHelper::GetReferenceBValue(image);
 
   mitk::DataNode::Pointer imageNode = 0;
@@ -1403,6 +1406,7 @@ void QmitkPreprocessingView::OnImageSelectionChanged()
   m_Controls->m_ReduceGradientsButton->setEnabled(foundDwiVolume);
   m_Controls->m_ShowGradientsButton->setEnabled(foundDwiVolume);
   m_Controls->m_MirrorGradientToHalfSphereButton->setEnabled(foundDwiVolume);
+  m_Controls->m_SwapGradientsButton->setEnabled(foundDwiVolume);
   m_Controls->m_MergeDwisButton->setEnabled(foundDwiVolume);
   m_Controls->m_B_ValueMap_Rounder_SpinBox->setEnabled(foundDwiVolume);
   m_Controls->m_ProjectSignalButton->setEnabled(foundDwiVolume);
@@ -1548,16 +1552,22 @@ void QmitkPreprocessingView::DoFlipGradientDirections()
   mitk::Image::Pointer newDwi = image->Clone();
 
   auto gradientContainer = PropHelper::GetGradientContainer(newDwi);
+  auto newGradientContainer = PropHelper::GradientDirectionsContainerType::New();
 
   for (unsigned int j=0; j<gradientContainer->Size(); j++)
   {
-      if (m_Controls->m_FlipGradBoxX->isChecked()) { gradientContainer->at(j)[0] *= -1; }
-      if (m_Controls->m_FlipGradBoxY->isChecked()) { gradientContainer->at(j)[1] *= -1; }
-      if (m_Controls->m_FlipGradBoxZ->isChecked()) { gradientContainer->at(j)[2] *= -1; }
+    PropHelper::GradientDirectionType g;
+    g[0] = gradientContainer->at(j)[0];
+    g[1] = gradientContainer->at(j)[1];
+    g[2] = gradientContainer->at(j)[2];
+    if (m_Controls->m_FlipGradBoxX->isChecked()) { g[0] *= -1; }
+    if (m_Controls->m_FlipGradBoxY->isChecked()) { g[1] *= -1; }
+    if (m_Controls->m_FlipGradBoxZ->isChecked()) { g[2] *= -1; }
+    newGradientContainer->push_back(g);
   }
 
   PropHelper::CopyProperties(image, newDwi, true);
-  PropHelper::SetGradientContainer(newDwi, gradientContainer);
+  PropHelper::SetGradientContainer(newDwi, newGradientContainer);
   PropHelper::InitializeImage( newDwi );
 
   mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
@@ -1565,6 +1575,61 @@ void QmitkPreprocessingView::DoFlipGradientDirections()
 
   QString name = node->GetName().c_str();
   imageNode->SetName( (name+"_GradientFlip").toStdString().c_str() );
+  GetDataStorage()->Add( imageNode, node );
+}
+
+
+void QmitkPreprocessingView::DoSwapGradientDimensions()
+{
+  mitk::DataNode::Pointer node = m_Controls->m_SelctedImageComboBox->GetSelectedNode();
+  if (node.IsNull()) { return; }
+
+  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
+  if ( image == nullptr ) { return; }
+
+  mitk::Image::Pointer newDwi = image->Clone();
+
+  auto gradientContainer = PropHelper::GetGradientContainer(newDwi);
+  auto newGradientContainer = PropHelper::GradientDirectionsContainerType::New();
+
+  std::vector<std::string> dims_split;
+  std::string swap_string = m_Controls->m_SwapGradientsEdit->text().toStdString();
+  boost::split(dims_split, swap_string, boost::is_any_of(" "), boost::token_compress_on);
+  std::vector<int> dims_split_clean;
+  for (auto s : dims_split)
+  {
+    if (s=="x")
+      dims_split_clean.push_back(0);
+    else if (s=="y")
+      dims_split_clean.push_back(1);
+    else if (s=="z")
+      dims_split_clean.push_back(2);
+  }
+  if (dims_split_clean.size()!=3)
+  {
+    QMessageBox::warning(nullptr,"Warning", QString("String should contain x, y and z in arbitrary order separated by a space.") );
+    return;
+  }
+
+  for (unsigned int j=0; j<gradientContainer->Size(); j++)
+  {
+    PropHelper::GradientDirectionType g;
+    g[0] = gradientContainer->at(j)[dims_split_clean.at(0)];
+    g[1] = gradientContainer->at(j)[dims_split_clean.at(1)];
+    g[2] = gradientContainer->at(j)[dims_split_clean.at(2)];
+
+    newGradientContainer->push_back(g);
+  }
+
+  PropHelper::CopyProperties(image, newDwi, true);
+  PropHelper::SetGradientContainer(newDwi, newGradientContainer);
+  PropHelper::InitializeImage( newDwi );
+
+  mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
+  imageNode->SetData( newDwi );
+
+  QString name = node->GetName().c_str();
+  imageNode->SetName( (name+"_GradientDimSwapped").toStdString().c_str() );
   GetDataStorage()->Add( imageNode, node );
 }
 
@@ -1578,14 +1643,22 @@ void QmitkPreprocessingView::DoHalfSphereGradientDirections()
 
   mitk::Image::Pointer newDwi = image->Clone();
   auto gradientContainer = PropHelper::GetGradientContainer(newDwi);
+  auto newGradientContainer = PropHelper::GradientDirectionsContainerType::New();
 
   for (unsigned int j=0; j<gradientContainer->Size(); j++)
   {
-    if (gradientContainer->at(j)[0]<0) { gradientContainer->at(j) = -gradientContainer->at(j); }
+    PropHelper::GradientDirectionType g;
+    g[0] = gradientContainer->at(j)[0];
+    g[1] = gradientContainer->at(j)[1];
+    g[2] = gradientContainer->at(j)[2];
+
+    if (g[0]<0) { g = -g; }
+
+    newGradientContainer->push_back(g);
   }
 
   PropHelper::CopyProperties(image, newDwi, true);
-  PropHelper::SetGradientContainer(newDwi, gradientContainer);
+  PropHelper::SetGradientContainer(newDwi, newGradientContainer);
   PropHelper::InitializeImage( newDwi );
 
   mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
@@ -1641,32 +1714,32 @@ void QmitkPreprocessingView::DoShowGradientDirections()
       if (v.magnitude()>mitk::eps)
       {
         ip[0] = v[0]*maxSize*geometry->GetSpacing()[maxIndex]/2
-                + origin[0]-0.5*geometry->GetSpacing()[0]
-                + geometry->GetSpacing()[0]*image->GetDimension(0)/2;
+            + origin[0]-0.5*geometry->GetSpacing()[0]
+            + geometry->GetSpacing()[0]*image->GetDimension(0)/2;
 
         ip[1] = v[1]*maxSize*geometry->GetSpacing()[maxIndex]/2
-                + origin[1]-0.5*geometry->GetSpacing()[1]
-                + geometry->GetSpacing()[1]*image->GetDimension(1)/2;
+            + origin[1]-0.5*geometry->GetSpacing()[1]
+            + geometry->GetSpacing()[1]*image->GetDimension(1)/2;
 
         ip[2] = v[2]*maxSize*geometry->GetSpacing()[maxIndex]/2
-                + origin[2]-0.5*geometry->GetSpacing()[2]
-                + geometry->GetSpacing()[2]*image->GetDimension(2)/2;
+            + origin[2]-0.5*geometry->GetSpacing()[2]
+            + geometry->GetSpacing()[2]*image->GetDimension(2)/2;
 
         pointset->InsertPoint(j, ip);
       }
       else if (originSet->IsEmpty())
       {
         ip[0] = v[0]*maxSize*geometry->GetSpacing()[maxIndex]/2
-                + origin[0]-0.5*geometry->GetSpacing()[0]
-                + geometry->GetSpacing()[0]*image->GetDimension(0)/2;
+            + origin[0]-0.5*geometry->GetSpacing()[0]
+            + geometry->GetSpacing()[0]*image->GetDimension(0)/2;
 
         ip[1] = v[1]*maxSize*geometry->GetSpacing()[maxIndex]/2
-                + origin[1]-0.5*geometry->GetSpacing()[1]
-                + geometry->GetSpacing()[1]*image->GetDimension(1)/2;
+            + origin[1]-0.5*geometry->GetSpacing()[1]
+            + geometry->GetSpacing()[1]*image->GetDimension(1)/2;
 
         ip[2] = v[2]*maxSize*geometry->GetSpacing()[maxIndex]/2
-                + origin[2]-0.5*geometry->GetSpacing()[2]
-                + geometry->GetSpacing()[2]*image->GetDimension(2)/2;
+            + origin[2]-0.5*geometry->GetSpacing()[2]
+            + geometry->GetSpacing()[2]*image->GetDimension(2)/2;
 
         originSet->InsertPoint(j, ip);
       }
@@ -1795,7 +1868,7 @@ void QmitkPreprocessingView::MergeDwis()
   typedef itk::VectorImage<DiffusionPixelType,3> DwiImageType;
   typedef std::vector< DwiImageType::Pointer >   DwiImageContainerType;
 
-  typedef std::vector< GradientContainerType::Pointer >  GradientListContainerType;
+  typedef std::vector< GradientContainerType::ConstPointer >  GradientListContainerType;
 
   DwiImageContainerType       imageContainer;
   GradientListContainerType   gradientListContainer;

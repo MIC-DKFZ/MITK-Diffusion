@@ -1284,7 +1284,7 @@ void QmitkFiberfoxView::SaveParameters(QString filename)
           ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
           mitk::CastToItkImage(diffImg, itkVectorImagePointer);
           filter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg));
-          filter->SetGradientImage(mitk::DiffusionPropertyHelper::GetGradientContainer(diffImg),
+          filter->SetGradientImage(dynamic_cast<mitk::GradientDirectionsProperty *>(diffImg->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(),
                                    itkVectorImagePointer );
 
           filter->Update();
@@ -1315,7 +1315,7 @@ void QmitkFiberfoxView::SaveParameters(QString filename)
       ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
       mitk::CastToItkImage(diffImg, itkVectorImagePointer);
       filter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg));
-      filter->SetGradientImage(mitk::DiffusionPropertyHelper::GetGradientContainer(diffImg), itkVectorImagePointer );
+      filter->SetGradientImage(dynamic_cast<mitk::GradientDirectionsProperty *>(diffImg->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
 
       filter->Update();
       tensorImage = filter->GetOutput();
@@ -2059,7 +2059,7 @@ void QmitkFiberfoxView::SimulateImageFromFibers(mitk::DataNode* fiberNode)
           typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, double > TensorReconstructionImageFilterType;
           TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
           filter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg));
-          filter->SetGradientImage(mitk::DiffusionPropertyHelper::GetGradientContainer(diffImg),
+          filter->SetGradientImage(dynamic_cast<mitk::GradientDirectionsProperty *>(diffImg->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(),
                                    itkVectorImagePointer );
           filter->Update();
           tensorImage = filter->GetOutput();

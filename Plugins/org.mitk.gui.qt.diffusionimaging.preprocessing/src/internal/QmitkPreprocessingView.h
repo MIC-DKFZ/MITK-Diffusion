@@ -115,6 +115,7 @@ protected slots:
   void DoFlipGradientDirections();
   void DoClearRotationOfGradients();
   void DoAlignImages();
+  void DoSwapGradientDimensions();
 
 protected:
 

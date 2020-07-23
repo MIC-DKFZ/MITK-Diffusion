@@ -53,7 +53,7 @@ mitk::DiffusionPropertyHelper::ImageType::Pointer mitk::DiffusionPropertyHelper:
 }
 
 mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer
-mitk::DiffusionPropertyHelper::CalcAveragedDirectionSet(double precision, GradientDirectionsContainerType::Pointer directions)
+mitk::DiffusionPropertyHelper::CalcAveragedDirectionSet(double precision, GradientDirectionsContainerType::ConstPointer directions)
 {
   // save old and construct new direction container
   GradientDirectionsContainerType::Pointer newDirections = GradientDirectionsContainerType::New();
@@ -86,7 +86,7 @@ mitk::DiffusionPropertyHelper::CalcAveragedDirectionSet(double precision, Gradie
 
 void mitk::DiffusionPropertyHelper::AverageRedundantGradients(mitk::Image* image, double precision)
 {
-  GradientDirectionsContainerType::Pointer oldDirs = GetOriginalGradientContainer(image);
+  GradientDirectionsContainerType::ConstPointer oldDirs = GetOriginalGradientContainer(image);
   GradientDirectionsContainerType::Pointer newDirs = CalcAveragedDirectionSet(precision, oldDirs);
 
   // if sizes equal, we do not need to do anything in this function
@@ -117,14 +117,13 @@ void mitk::DiffusionPropertyHelper::AverageRedundantGradients(mitk::Image* image
   newVec.AllocateElements(newDirs->size());
 
   // find which gradients should be averaged
-  GradientDirectionsContainerType::Pointer oldDirections = oldDirs;
   std::vector<std::vector<int> > dirIndices;
   for(GradientDirectionsContainerType::ConstIterator gdcitNew = newDirs->Begin();
       gdcitNew != newDirs->End(); ++gdcitNew)
   {
     dirIndices.push_back(std::vector<int>(0));
     for(GradientDirectionsContainerType::ConstIterator gdcitOld = oldDirs->Begin();
-        gdcitOld != oldDirections->End(); ++gdcitOld)
+        gdcitOld != oldDirs->End(); ++gdcitOld)
     {
       if(AreAlike(gdcitNew.Value(), gdcitOld.Value(), precision))
       {
@@ -182,7 +181,7 @@ void mitk::DiffusionPropertyHelper::ApplyMeasurementFrameAndRotationMatrix(mitk:
     return;
   }
 
-  GradientDirectionsContainerType::Pointer originalDirections = GetOriginalGradientContainer(image);
+  GradientDirectionsContainerType::ConstPointer originalDirections = GetOriginalGradientContainer(image);
 
   MeasurementFrameType  measurementFrame = GetMeasurementFrame(image);
 
@@ -249,7 +248,7 @@ void mitk::DiffusionPropertyHelper::UnApplyMeasurementFrameAndRotationMatrix(mit
     return;
   }
 
-  GradientDirectionsContainerType::Pointer modifiedDirections = GetGradientContainer(image);
+  GradientDirectionsContainerType::ConstPointer modifiedDirections = GetGradientContainer(image);
 
   MeasurementFrameType measurementFrame = GetMeasurementFrame(image);
   measurementFrame = vnl_matrix_inverse<double>(measurementFrame).pinverse();
@@ -332,7 +331,7 @@ void mitk::DiffusionPropertyHelper::UpdateBValueMap(mitk::Image* image)
 
   if(GetGradientContainer(image).IsNotNull())
   {
-    GradientDirectionsContainerType::Pointer directions = GetGradientContainer(image);
+    GradientDirectionsContainerType::ConstPointer directions = GetGradientContainer(image);
 
     for(auto gdcit = directions->Begin(); gdcit!=directions->End(); ++gdcit)
     {
@@ -352,7 +351,7 @@ bool mitk::DiffusionPropertyHelper::AreAlike(GradientDirectionType g1, GradientD
 
 float mitk::DiffusionPropertyHelper::GetB_Value(const mitk::Image* image, unsigned int i)
 {
-  GradientDirectionsContainerType::Pointer directions = GetGradientContainer(image);
+  GradientDirectionsContainerType::ConstPointer directions = GetGradientContainer(image);
   float b_value = GetReferenceBValue(image);
 
   if(i > directions->Size()-1)
@@ -525,12 +524,12 @@ const mitk::DiffusionPropertyHelper::MeasurementFrameType & mitk::DiffusionPrope
   return mf->GetMeasurementFrame();
 }
 
-mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(const mitk::Image *image)
+const mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(const mitk::Image *image)
 {
   return dynamic_cast<mitk::GradientDirectionsProperty *>(image->GetProperty(ORIGINALGRADIENTCONTAINERPROPERTYNAME.c_str()).GetPointer())->GetGradientDirectionsContainer();
 }
 
-mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer mitk::DiffusionPropertyHelper::GetGradientContainer(const mitk::Image *image)
+const mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer mitk::DiffusionPropertyHelper::GetGradientContainer(const mitk::Image *image)
 {
   return dynamic_cast<mitk::GradientDirectionsProperty *>(image->GetProperty(GRADIENTCONTAINERPROPERTYNAME.c_str()).GetPointer())->GetGradientDirectionsContainer();
 }
@@ -545,9 +544,19 @@ void mitk::DiffusionPropertyHelper::SetBValueMap(mitk::Image* image, BValueMapTy
   image->GetPropertyList()->ReplaceProperty( mitk::DiffusionPropertyHelper::BVALUEMAPPROPERTYNAME.c_str(), mitk::BValueMapProperty::New(map));
 }
 
+void mitk::DiffusionPropertyHelper::SetOriginalGradientContainer(mitk::Image* image, GradientDirectionsContainerType::ConstPointer g_cont)
+{
+  image->GetPropertyList()->ReplaceProperty(ORIGINALGRADIENTCONTAINERPROPERTYNAME.c_str(), mitk::GradientDirectionsProperty::New(g_cont));
+}
+
 void mitk::DiffusionPropertyHelper::SetOriginalGradientContainer(mitk::Image* image, GradientDirectionsContainerType::Pointer g_cont)
 {
   image->GetPropertyList()->ReplaceProperty(ORIGINALGRADIENTCONTAINERPROPERTYNAME.c_str(), mitk::GradientDirectionsProperty::New(g_cont));
+}
+
+void mitk::DiffusionPropertyHelper::SetGradientContainer(mitk::Image* image, GradientDirectionsContainerType::ConstPointer g_cont)
+{
+  image->GetPropertyList()->ReplaceProperty(GRADIENTCONTAINERPROPERTYNAME.c_str(), mitk::GradientDirectionsProperty::New(g_cont));
 }
 
 void mitk::DiffusionPropertyHelper::SetGradientContainer(mitk::Image* image, GradientDirectionsContainerType::Pointer g_cont)

@@ -192,7 +192,7 @@ mitk::SignalGenerationParameters::GradientListType mitk::SignalGenerationParamet
   return m_GradientDirections;
 }
 
-mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer mitk::SignalGenerationParameters::GetItkGradientContainer()
+mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer mitk::SignalGenerationParameters::GetItkGradientContainer()
 {
   int c = 0;
   mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer out = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
@@ -205,7 +205,7 @@ mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer mitk::Si
     out->InsertElement(c, vnl_dir);
     ++c;
   }
-  return out;
+  return mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer(out);
 }
 
 mitk::SignalGenerationParameters::GradientType mitk::SignalGenerationParameters::GetGradientDirection(unsigned int i)
@@ -253,7 +253,7 @@ void mitk::SignalGenerationParameters::SetGradienDirections(GradientListType gra
   }
 }
 
-void mitk::SignalGenerationParameters::SetGradienDirections(mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer gradientList)
+void mitk::SignalGenerationParameters::SetGradienDirections(mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer gradientList)
 {
   m_NumGradients = 0;
   m_NumBaseline = 0;
@@ -604,7 +604,7 @@ void mitk::FiberfoxParameters::SetGradienDirections(mitk::SignalGenerationParame
   UpdateSignalModels();
 }
 
-void mitk::FiberfoxParameters::SetGradienDirections(mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer gradientList)
+void mitk::FiberfoxParameters::SetGradienDirections(mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer gradientList)
 {
   m_SignalGen.SetGradienDirections(gradientList);
   UpdateSignalModels();

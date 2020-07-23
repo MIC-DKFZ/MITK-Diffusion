@@ -56,15 +56,17 @@ namespace mitk
     static float GetReferenceBValue(const mitk::Image *);
     static std::vector< int > GetBValueVector(const mitk::Image *);
     static const MeasurementFrameType & GetMeasurementFrame(const mitk::Image *);
-    static GradientDirectionsContainerType::Pointer GetOriginalGradientContainer(const mitk::Image *);
-    static GradientDirectionsContainerType::Pointer GetGradientContainer(const mitk::Image *);
+    static const GradientDirectionsContainerType::ConstPointer GetOriginalGradientContainer(const mitk::Image *);
+    static const GradientDirectionsContainerType::ConstPointer GetGradientContainer(const mitk::Image *);
 
     static void SetApplyMatrixToGradients(mitk::Image* image, bool apply);
     static void SetApplyMfToGradients(mitk::Image* image, bool apply);
     static void SetMeasurementFrame(mitk::Image* image, MeasurementFrameType mf);
     static void SetReferenceBValue(mitk::Image* image, float b_value);
     static void SetBValueMap(mitk::Image* image, BValueMapType map);
+    static void SetOriginalGradientContainer(mitk::Image* image, GradientDirectionsContainerType::ConstPointer g_cont);
     static void SetOriginalGradientContainer(mitk::Image* image, GradientDirectionsContainerType::Pointer g_cont);
+    static void SetGradientContainer(mitk::Image* image, GradientDirectionsContainerType::ConstPointer g_cont);
     static void SetGradientContainer(mitk::Image* image, GradientDirectionsContainerType::Pointer g_cont);
     static void RotateGradients(mitk::Image* image, vnl_matrix_fixed<double, 3, 3> rotation_matrix, bool normalize_columns);
     static void RotateOriginalGradients(mitk::Image* image, vnl_matrix_fixed<double, 3, 3> rotation_matrix, bool normalize_columns);
@@ -72,7 +74,7 @@ namespace mitk
     static void AverageRedundantGradients(mitk::Image* image, double precision);
     static void InitializeImage(mitk::Image* image);
 
-    static GradientDirectionsContainerType::Pointer CalcAveragedDirectionSet(double precision, GradientDirectionsContainerType::Pointer directions);
+    static GradientDirectionsContainerType::Pointer CalcAveragedDirectionSet(double precision, GradientDirectionsContainerType::ConstPointer directions);
 
     static void SetupProperties(); // called in DiffusionCoreIOActivator
 

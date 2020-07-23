@@ -89,7 +89,7 @@ protected:
   DiffusionImageCreationFilter();
   ~DiffusionImageCreationFilter() override;
 
-  GradientDirectionContainerType::Pointer InternalGetGradientDirections( );
+  GradientDirectionContainerType::ConstPointer InternalGetGradientDirections( );
   MeasurementFrameType InternalGetMeasurementFrame();
   float InternalGetBValue();
 

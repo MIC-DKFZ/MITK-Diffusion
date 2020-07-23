@@ -68,7 +68,7 @@ public:
   virtual void SetFocus() override;
 
   void OutputToDatastorage(mitk::DataNode::Pointer node);
-  bool FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType* dirs, float bval, bool multivoxel, OutImgType::IndexType &crosspos);
+  bool FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType::ConstPointer dirs, float bval, bool multivoxel, OutImgType::IndexType &crosspos);
 
   void Activated() override;
   void Deactivated() override;
@@ -110,7 +110,7 @@ protected:
   /// \brief called by QmitkAbstractView when DataManager's selection has changed
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
 
-  bool FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContainerType *dirs, float bval, OutImgType::IndexType &crosspos);
+  bool FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContainerType::ConstPointer dirs, float bval, OutImgType::IndexType &crosspos);
 
   Ui::QmitkIVIMViewControls* m_Controls;
 

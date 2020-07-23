@@ -755,7 +755,7 @@ void QmitkIVIMView::OnSliceChanged()
   vecimg->SetRegions( vecimg->GetLargestPossibleRegion() );
 }
 
-bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContainerType *dirs, float bval, OutImgType::IndexType &crosspos )
+bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContainerType::ConstPointer dirs, float bval, OutImgType::IndexType &crosspos )
 {
   KurtosisFilterType::Pointer filter = KurtosisFilterType::New();
 
@@ -812,7 +812,7 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
 }
 
 
-bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType* dirs, float bval, bool multivoxel, OutImgType::IndexType &crosspos)
+bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType::ConstPointer dirs, float bval, bool multivoxel, OutImgType::IndexType &crosspos)
 {
   IVIMFilterType::Pointer filter = IVIMFilterType::New();
   filter->SetInput(vecimg);

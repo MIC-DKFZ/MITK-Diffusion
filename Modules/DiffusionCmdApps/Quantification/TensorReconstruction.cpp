@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
     else {
       typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, float > TensorReconstructionImageFilterType;
       TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
-      filter->SetGradientImage( mitk::DiffusionPropertyHelper::GetGradientContainer(dwi), itkVectorImagePointer );
+      filter->SetGradientImage( dynamic_cast<mitk::GradientDirectionsProperty *>(dwi->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
       filter->SetBValue( mitk::DiffusionPropertyHelper::GetReferenceBValue( dwi ));
       filter->SetThreshold(threshold);
       filter->Update();

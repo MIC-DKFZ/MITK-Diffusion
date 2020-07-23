@@ -167,7 +167,7 @@ namespace mitk
     unsigned int GetNumBaselineVolumes();                    ///< Get number of non-diffusion-weighted image volumes
     unsigned int GetNumVolumes();                            ///< Get number of baseline and diffusion-weighted image volumes
     GradientListType GetGradientDirections();                ///< Return gradient direction container
-    mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer GetItkGradientContainer();
+    mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer GetItkGradientContainer();
     GradientType GetGradientDirection(unsigned int i);
     std::vector< int > GetBvalues();                         ///< Returns a vector with all unique b-values (determined by the gradient magnitudes)
     double GetBvalue();
@@ -182,7 +182,7 @@ namespace mitk
 
     void SetNumWeightedVolumes(int numGradients);            ///< Automaticall calls GenerateGradientHalfShell() afterwards.
     void SetGradienDirections(GradientListType gradientList);
-    void SetGradienDirections(mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer gradientList);
+    void SetGradienDirections(mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer gradientList);
     void GenerateGradientHalfShell();                        ///< Generates half shell of gradient directions (with m_NumGradients non-zero directions)
   };
 
@@ -319,7 +319,7 @@ namespace mitk
     void GenerateGradientHalfShell();
     void SetNumWeightedVolumes(int numGradients);            ///< Automaticall calls GenerateGradientHalfShell() afterwards.
     void SetGradienDirections(mitk::SignalGenerationParameters::GradientListType gradientList);
-    void SetGradienDirections(mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer gradientList);
+    void SetGradienDirections(mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer gradientList);
     void SetBvalue(double Bvalue);
     void UpdateSignalModels();
     void ClearFiberParameters();

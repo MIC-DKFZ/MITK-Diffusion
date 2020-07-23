@@ -41,14 +41,14 @@ int mitkImageReconstructionTest(int argc, char* argv[])
     mitk::CastToItkImage(dwi, itkVectorImagePointer);
 
     float b_value = mitk::DiffusionPropertyHelper::GetReferenceBValue( dwi );
-    mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(dwi);
+    mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(dwi);
     {
       MITK_INFO << "Tensor reconstruction " << argv[2];
       mitk::TensorImage::Pointer tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(argv[2]);
       typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, float > TensorReconstructionImageFilterType;
       TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
       filter->SetBValue( b_value );
-      filter->SetGradientImage( gradients, itkVectorImagePointer );
+      filter->SetGradientImage( dynamic_cast<mitk::GradientDirectionsProperty *>(dwi->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
       filter->Update();
       mitk::TensorImage::Pointer testImage = mitk::TensorImage::New();
       testImage->InitializeByItk( filter->GetOutput() );

@@ -157,7 +157,7 @@ void QmitkDiffusionQuantificationView::DoBallStickCalculation()
     mitk::CastToItkImage(image, itkVectorImagePointer);
     FilterType::Pointer filter = FilterType::New();
     filter->SetInput( itkVectorImagePointer );
-    filter->SetGradientDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(image));
+    filter->SetGradientDirections(dynamic_cast<mitk::GradientDirectionsProperty *>(image->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy());
     filter->SetB_value(static_cast<double>(mitk::DiffusionPropertyHelper::GetReferenceBValue(image)));
     filter->Update();
 
@@ -213,7 +213,7 @@ void QmitkDiffusionQuantificationView::DoMultiTensorCalculation()
     mitk::CastToItkImage(image, itkVectorImagePointer);
     FilterType::Pointer filter = FilterType::New();
     filter->SetInput( itkVectorImagePointer );
-    filter->SetGradientDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(image));
+    filter->SetGradientDirections(dynamic_cast<mitk::GradientDirectionsProperty *>(image->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy());
     filter->SetB_value(static_cast<double>(mitk::DiffusionPropertyHelper::GetReferenceBValue(image)));
     filter->Update();
 

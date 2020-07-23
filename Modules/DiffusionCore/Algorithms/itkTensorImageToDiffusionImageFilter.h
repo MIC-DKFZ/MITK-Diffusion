@@ -81,7 +81,7 @@ namespace itk
 
     typedef vnl_vector_fixed<double,3>    GradientType;
     typedef VectorContainer<unsigned int, GradientType> GradientListType;
-    typedef GradientListType::Pointer     GradientListPointerType;
+    typedef GradientListType::ConstPointer     GradientListPointerType;
 
     /** Manually Set/Get a list of gradients */
     void SetGradientList(const GradientListPointerType list)
@@ -147,7 +147,7 @@ namespace itk
     TensorImageToDiffusionImageFilter (const Self&);
     void operator=(const Self&);
 
-    GradientListType::Pointer            m_GradientList;
+    GradientListType::ConstPointer       m_GradientList;
     double                               m_BValue;
     typename BaselineImageType::Pointer  m_BaselineImage;
 
