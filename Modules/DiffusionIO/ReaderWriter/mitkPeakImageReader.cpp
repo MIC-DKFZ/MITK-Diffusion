@@ -62,6 +62,11 @@ namespace mitk
       itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
       reader->SetImageIO(io);
     }
+    else
+    {
+      itk::NiftiImageIO::Pointer io = itk::NiftiImageIO::New();
+      reader->SetImageIO(io);
+    }
     reader->Update();
     Image::Pointer resultImage = dynamic_cast<Image*>(PeakImage::New().GetPointer());
     mitk::CastToMitkImage(reader->GetOutput(), resultImage);

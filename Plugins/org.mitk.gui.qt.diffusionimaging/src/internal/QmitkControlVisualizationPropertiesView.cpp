@@ -254,8 +254,7 @@ void QmitkControlVisualizationPropertiesView::CreateConnections()
     connect(static_cast<QObject*>(m_Controls->m_ResetColoring), SIGNAL(clicked()), static_cast<QObject*>(this), SLOT(ResetColoring()));
     connect(static_cast<QObject*>(m_Controls->m_ResetColoring2), SIGNAL(clicked()), static_cast<QObject*>(this), SLOT(ResetColoring()));
     connect(static_cast<QObject*>(m_Controls->m_FiberFading2D), SIGNAL(clicked()), static_cast<QObject*>(this), SLOT( Fiber2DfadingEFX() ) );
-    connect(static_cast<QObject*>(m_Controls->m_FiberThicknessSlider), SIGNAL(sliderReleased()), static_cast<QObject*>(this), SLOT( FiberSlicingThickness2D() ) );
-    connect(static_cast<QObject*>(m_Controls->m_FiberThicknessSlider), SIGNAL(valueChanged(int)), static_cast<QObject*>(this), SLOT( FiberSlicingUpdateLabel(int) ));
+    connect(static_cast<QObject*>(m_Controls->m_FiberClippingBox), SIGNAL(editingFinished()), static_cast<QObject*>(this), SLOT( FiberSlicingThickness2D() ) );
     connect(static_cast<QObject*>(m_Controls->m_Crosshair), SIGNAL(clicked()), static_cast<QObject*>(this), SLOT(SetInteractor()));
     connect(static_cast<QObject*>(m_Controls->m_LineWidth), SIGNAL(editingFinished()), static_cast<QObject*>(this), SLOT(LineWidthChanged()));
     connect(static_cast<QObject*>(m_Controls->m_TubeWidth), SIGNAL(editingFinished()), static_cast<QObject*>(this), SLOT(TubeRadiusChanged()));
@@ -425,8 +424,8 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
       max = std::max(max, geo->GetExtentInMM(1));
       max = std::max(max, geo->GetExtentInMM(2));
 
-      m_Controls->m_FiberThicknessSlider->setMaximum(max * 10);
-      m_Controls->m_FiberThicknessSlider->setValue(range * 10);
+      m_Controls->m_FiberClippingBox->setMaximum(max);
+      m_Controls->m_FiberClippingBox->setValue(range);
     }
     else if(dynamic_cast<mitk::OdfImage*>(nodeData) || dynamic_cast<mitk::TensorImage*>(nodeData) || dynamic_cast<mitk::ShImage*>(nodeData))
     {
@@ -963,27 +962,16 @@ void QmitkControlVisualizationPropertiesView::FiberSlicingThickness2D()
 {
   if (m_SelectedNode && dynamic_cast<mitk::FiberBundle*>(m_SelectedNode->GetData()))
   {
-    float fibThickness = m_Controls->m_FiberThicknessSlider->value() * 0.1;
+    float fibThickness = m_Controls->m_FiberClippingBox->value();
     float currentThickness = 0;
     m_SelectedNode->GetFloatProperty("Fiber2DSliceThickness", currentThickness);
     if ( fabs(fibThickness-currentThickness) < 0.001 )
-    {
       return;
-    }
 
     m_SelectedNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(fibThickness));
     dynamic_cast<mitk::FiberBundle*>(m_SelectedNode->GetData())->RequestUpdate2D();
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
   }
-}
-
-
-void QmitkControlVisualizationPropertiesView::FiberSlicingUpdateLabel(int value)
-{
-  QString label = "Range %1 mm";
-  label = label.arg(value * 0.1);
-  m_Controls->label_range->setText(label);
-  FiberSlicingThickness2D();
 }
 
 void QmitkControlVisualizationPropertiesView::SetCustomColor(const itk::EventObject& /*e*/)

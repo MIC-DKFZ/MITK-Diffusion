@@ -36,6 +36,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageFileReader.h"
 #include "itkMetaDataObject.h"
 #include "itkNiftiImageIO.h"
+#include <itkBruker2dseqImageIO.h>
+
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "mitkCustomMimeType.h"
 #include "mitkDiffusionIOMimeTypes.h"
@@ -121,13 +125,16 @@ void DiffusionImageNiftiReader::InternalRead()
       std::string ext = this->GetMimeType()->GetExtension( this->GetInputLocation() );
       ext = itksys::SystemTools::LowerCase( ext );
 
+      itk::Bruker2dseqImageIO::Pointer bruker_io = itk::Bruker2dseqImageIO::New();
+
+      typedef itk::Image<DiffusionPixelType,4> ImageType4D;
+      ImageType4D::Pointer img4 = ImageType4D::New();
+      bool bruker = false;
+
       if(ext == ".nii" || ext == ".nii.gz")
       {
         // create reader and read file
-        typedef itk::Image<DiffusionPixelType,4> ImageType4D;
         itk::NiftiImageIO::Pointer io2 = itk::NiftiImageIO::New();
-
-        ImageType4D::Pointer img4 = ImageType4D::New();
         if (io2->CanReadFile(this->GetInputLocation().c_str()))
         {
           typedef itk::ImageFileReader<ImageType4D> FileReaderType;
@@ -207,69 +214,90 @@ void DiffusionImageNiftiReader::InternalRead()
           }
         }
 
-        // convert 4D file to vector image
-        itkVectorImage = VectorImageType::New();
+      }
+      else if(bruker_io->CanReadFile(this->GetInputLocation().c_str()))
+      {
+        MITK_INFO << "Reading bruker 2dseq file";
+        typedef itk::ImageFileReader<ImageType4D> FileReaderType;
+        FileReaderType::Pointer reader = FileReaderType::New();
+        reader->SetFileName( this->GetInputLocation() );
+        reader->SetImageIO(bruker_io);
+        reader->Update();
+        img4 = reader->GetOutput();
+        bruker = true;
+      }
 
-        VectorImageType::SpacingType spacing;
-        ImageType4D::SpacingType spacing4 = img4->GetSpacing();
-        for(int i=0; i<3; i++)
-          spacing[i] = spacing4[i];
-        itkVectorImage->SetSpacing( spacing );   // Set the image spacing
+      // convert 4D file to vector image
+      itkVectorImage = VectorImageType::New();
 
-        VectorImageType::PointType origin;
-        ImageType4D::PointType origin4 = img4->GetOrigin();
-        for(int i=0; i<3; i++)
-          origin[i] = origin4[i];
-        itkVectorImage->SetOrigin( origin );     // Set the image origin
+      VectorImageType::SpacingType spacing;
+      ImageType4D::SpacingType spacing4 = img4->GetSpacing();
+      for(int i=0; i<3; i++)
+        spacing[i] = spacing4[i];
+      itkVectorImage->SetSpacing( spacing );   // Set the image spacing
 
-        VectorImageType::DirectionType direction;
+      VectorImageType::PointType origin;
+      ImageType4D::PointType origin4 = img4->GetOrigin();
+      for(int i=0; i<3; i++)
+        origin[i] = origin4[i];
+      itkVectorImage->SetOrigin( origin );     // Set the image origin
+
+      VectorImageType::DirectionType direction;
+      if (bruker)
+      {
+        MITK_INFO << "Setting image matrix to identity (bruker hack!!!)";
+        direction.SetIdentity();
+      }
+      else
+      {
         ImageType4D::DirectionType direction4 = img4->GetDirection();
         for(int i=0; i<3; i++)
           for(int j=0; j<3; j++)
             direction[i][j] = direction4[i][j];
-        itkVectorImage->SetDirection( direction );  // Set the image direction
+      }
+      itkVectorImage->SetDirection( direction );  // Set the image direction
 
-        VectorImageType::RegionType region;
-        ImageType4D::RegionType region4 = img4->GetLargestPossibleRegion();
+      VectorImageType::RegionType region;
+      ImageType4D::RegionType region4 = img4->GetLargestPossibleRegion();
 
-        VectorImageType::RegionType::SizeType size;
-        ImageType4D::RegionType::SizeType size4 = region4.GetSize();
+      VectorImageType::RegionType::SizeType size;
+      ImageType4D::RegionType::SizeType size4 = region4.GetSize();
 
+      for(int i=0; i<3; i++)
+        size[i] = size4[i];
+
+      VectorImageType::RegionType::IndexType index;
+      ImageType4D::RegionType::IndexType index4 = region4.GetIndex();
+      for(int i=0; i<3; i++)
+        index[i] = index4[i];
+
+      region.SetSize(size);
+      region.SetIndex(index);
+      itkVectorImage->SetRegions( region );
+
+      itkVectorImage->SetVectorLength(size4[3]);
+      itkVectorImage->Allocate();
+
+      itk::ImageRegionIterator<VectorImageType>   it ( itkVectorImage,  itkVectorImage->GetLargestPossibleRegion() );
+      typedef VectorImageType::PixelType VecPixType;
+      for (it.GoToBegin(); !it.IsAtEnd(); ++it)
+      {
+        VecPixType vec = it.Get();
+        VectorImageType::IndexType currentIndex = it.GetIndex();
         for(int i=0; i<3; i++)
-          size[i] = size4[i];
-
-        VectorImageType::RegionType::IndexType index;
-        ImageType4D::RegionType::IndexType index4 = region4.GetIndex();
-        for(int i=0; i<3; i++)
-          index[i] = index4[i];
-
-        region.SetSize(size);
-        region.SetIndex(index);
-        itkVectorImage->SetRegions( region );
-
-        itkVectorImage->SetVectorLength(size4[3]);
-        itkVectorImage->Allocate();
-
-        itk::ImageRegionIterator<VectorImageType>   it ( itkVectorImage,  itkVectorImage->GetLargestPossibleRegion() );
-        typedef VectorImageType::PixelType VecPixType;
-        for (it.GoToBegin(); !it.IsAtEnd(); ++it)
+          index4[i] = currentIndex[i];
+        for(unsigned int ind=0; ind<vec.Size(); ind++)
         {
-          VecPixType vec = it.Get();
-          VectorImageType::IndexType currentIndex = it.GetIndex();
-          for(int i=0; i<3; i++)
-            index4[i] = currentIndex[i];
-          for(unsigned int ind=0; ind<vec.Size(); ind++)
-          {
-            index4[3] = ind;
-            vec[ind] = img4->GetPixel(index4);
-          }
-          it.Set(vec);
+          index4[3] = ind;
+          vec[ind] = img4->GetPixel(index4);
         }
+        it.Set(vec);
       }
 
       // Diffusion Image information START
       GradientDirectionContainerType::Pointer DiffusionVectors = GradientDirectionContainerType::New();
       MeasurementFrameType MeasurementFrame;
+      MeasurementFrame.set_identity();
       double BValue = -1;
       // Diffusion Image information END
 
@@ -294,7 +322,7 @@ void DiffusionImageNiftiReader::InternalRead()
         else if (itksys::SystemTools::FileExists(base_path+"bval"))
           bvals_file = base_path + "bval";
 
-        if (itksys::SystemTools::FileExists(std::string(base+".bvecs").c_str()))
+        if (itksys::SystemTools::FileExists(base+".bvecs"))
           bvecs_file = base+".bvecs";
         else if (itksys::SystemTools::FileExists(base+".bvec"))
           bvals_file = base+".bvec";
@@ -304,7 +332,124 @@ void DiffusionImageNiftiReader::InternalRead()
           bvecs_file = base_path + "bvec";
 
         DiffusionVectors = mitk::gradients::ReadBvalsBvecs(bvals_file, bvecs_file, BValue);
-        MeasurementFrame.set_identity();
+      }
+      else
+      {
+        MITK_INFO << "Parsing bruker method file for gradient information.";
+        std::string base_path = itksys::SystemTools::GetFilenamePath(this->GetInputLocation());
+        std::string base = this->GetMimeType()->GetFilenameWithoutExtension(this->GetInputLocation());
+        base_path += "/../../";
+        std::string method_file = base_path + "method";
+
+        int g_count = 0;
+        int num_gradients = 0;
+        int num_b = 0;
+        std::vector<double> grad_values;
+        std::vector<double> b_values;
+
+        std::fstream newfile;
+        newfile.open(method_file,ios::in);
+        std::string line;
+        while(getline(newfile, line))
+        {
+          std::vector<std::string> result;
+          boost::split(result, line, boost::is_any_of("="));
+
+          // check if current section is b-value section
+          if (result.size()==2 && result.at(0)=="##$PVM_DwEffBval")
+          {
+            std::vector<std::string> vec_spec;
+            boost::split(vec_spec, result.at(1), boost::is_any_of("( )"), boost::token_compress_on);
+            for (auto a : vec_spec)
+              if (!a.empty())
+              {
+                num_b = boost::lexical_cast<int>(a);
+                MITK_INFO << "Found " << num_b << " b-values";
+                break;
+              }
+            continue;
+          }
+
+          // check if current section is gradient vector value section
+          if (result.size()==2 && result.at(0)=="##$PVM_DwGradVec")
+          {
+            std::vector<std::string> vec_spec;
+            boost::split(vec_spec, result.at(1), boost::is_any_of("( ,)"), boost::token_compress_on);
+            for (auto a : vec_spec)
+              if (!a.empty())
+              {
+                num_gradients = boost::lexical_cast<int>(a);
+                MITK_INFO << "Found " << num_gradients << " gradients";
+                break;
+              }
+            continue;
+          }
+
+          // get gradient vector values
+          if (num_gradients>0)
+          {
+
+            std::vector<std::string> grad_values_line;
+            boost::split(grad_values_line, line, boost::is_any_of(" "));
+            for (auto a : grad_values_line)
+              if (!a.empty())
+              {
+                grad_values.push_back(boost::lexical_cast<double>(a));
+                ++g_count;
+                if (g_count%3==0)
+                  --num_gradients;
+              }
+          }
+
+          // get b-values
+          if (num_b>0)
+          {
+            std::vector<std::string> b_values_line;
+            boost::split(b_values_line, line, boost::is_any_of(" "));
+            for (auto a : b_values_line)
+              if (!a.empty())
+              {
+                b_values.push_back(boost::lexical_cast<double>(a));
+                if (b_values.back()>BValue)
+                  BValue = b_values.back();
+                num_b--;
+              }
+          }
+        }
+        newfile.close();
+
+        if (!b_values.empty() && grad_values.size()==b_values.size()*3)
+        {
+//          MITK_INFO << "Switching gradient vector x and y (bruker hack!!!)";
+          for(unsigned int i=0; i<b_values.size(); ++i)
+          {
+            mitk::DiffusionPropertyHelper::GradientDirectionType vec;
+            vec[0] = grad_values.at(i*3);
+            vec[1] = grad_values.at(i*3+1);
+            vec[2] = grad_values.at(i*3+2);
+
+            double b_val = b_values.at(i);
+
+            // Adjust the vector length to encode gradient strength
+            if (BValue>0)
+            {
+              double factor = b_val/BValue;
+              if(vec.magnitude() > 0)
+              {
+                vec.normalize();
+                vec[0] = sqrt(factor)*vec[0];
+                vec[1] = sqrt(factor)*vec[1];
+                vec[2] = sqrt(factor)*vec[2];
+              }
+            }
+
+            DiffusionVectors->InsertElement(i,vec);
+          }
+        }
+        else
+        {
+          mitkThrow() << "No valid gradient information found.";
+        }
       }
 
       outputForCache = mitk::GrabItkImageMemory( itkVectorImage);

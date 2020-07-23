@@ -112,7 +112,6 @@ void TrackingHandlerTensor::InitForTracking()
         m_FloatImageRotation[r][c] = double_dir[r][c];
       }
 
-    this->CalculateMinVoxelSize();
     m_NeedsDataInit = false;
   }
 
@@ -125,6 +124,7 @@ void TrackingHandlerTensor::InitForTracking()
   }
 
   m_FaInterpolator->SetInputImage(m_FaImage);
+  this->CalculateMinVoxelSize();
 
   std::cout << "TrackingHandlerTensor - FA threshold: " << m_Parameters->m_Cutoff << std::endl;
   std::cout << "TrackingHandlerTensor - f: " << m_Parameters->m_F << std::endl;
