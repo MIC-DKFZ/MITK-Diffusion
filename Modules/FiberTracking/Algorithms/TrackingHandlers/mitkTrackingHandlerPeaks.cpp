@@ -67,10 +67,10 @@ void TrackingHandlerPeaks::InitForTracking()
 
     m_NumDirs = imageRegion4.GetSize(3)/3;
 
-    this->CalculateMinVoxelSize();
     m_NeedsDataInit = false;
   }
 
+  this->CalculateMinVoxelSize();
   std::cout << "TrackingHandlerPeaks - Peak threshold: " << m_Parameters->m_Cutoff << std::endl;
   if (m_Parameters->m_Mode == MODE::PROBABILISTIC)
     std::cout << "TrackingHandlerPeaks - Peak jitter: " << m_Parameters->m_PeakJitter << std::endl;

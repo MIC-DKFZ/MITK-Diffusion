@@ -82,7 +82,6 @@ void TrackingHandlerOdf::InitForTracking()
       m_GfaImage = gfaFilter->GetOutput();
     }
 
-    this->CalculateMinVoxelSize();
     m_NeedsDataInit = false;
   }
 
@@ -94,6 +93,7 @@ void TrackingHandlerOdf::InitForTracking()
 
   m_GfaInterpolator->SetInputImage(m_GfaImage);
   m_OdfInterpolator->SetInputImage(m_OdfImage);
+  this->CalculateMinVoxelSize();
 
   std::cout << "TrackingHandlerOdf - GFA threshold: " << m_Parameters->m_Cutoff << std::endl;
   std::cout << "TrackingHandlerOdf - ODF threshold: " << m_Parameters->m_OdfCutoff << std::endl;

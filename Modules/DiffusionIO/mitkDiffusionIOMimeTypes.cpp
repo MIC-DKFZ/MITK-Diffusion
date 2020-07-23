@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDICOMDCMTKTagScanner.h>
 #include <itkGDCMImageIO.h>
 #include <itkNiftiImageIO.h>
+#include <itkBruker2dseqImageIO.h>
 
 namespace mitk
 {
@@ -129,7 +130,7 @@ bool DiffusionIOMimeTypes::FiberBundleDicomMimeType::AppliesTo(const std::string
   {
     std::ifstream myfile;
     myfile.open (path, std::ios::binary);
-//    myfile.seekg (128);
+    //    myfile.seekg (128);
     char *buffer = new char [128];
     myfile.read (buffer,128);
     myfile.read (buffer,4);
@@ -314,32 +315,36 @@ bool DiffusionIOMimeTypes::DiffusionImageNiftiMimeType::AppliesTo(const std::str
   }
   //end fix for bug 18572
 
-  std::string ext = this->GetExtension(path);
+  std::string ext = itksys::SystemTools::GetFilenameExtension(path);
   ext = itksys::SystemTools::LowerCase(ext);
+  std::string base_path = itksys::SystemTools::GetFilenamePath(path);
+
+  itk::Bruker2dseqImageIO::Pointer io = itk::Bruker2dseqImageIO::New();
+  if(io->CanReadFile(path.c_str()) && ext.empty() && itksys::SystemTools::FileExists(std::string(base_path + "/../../method").c_str()))
+    return true;
 
   // Nifti files should only be considered for this mime type if they are
   // accompanied by bvecs and bvals files defining the diffusion information
   if (ext == ".nii" || ext == ".nii.gz")
   {
-    std::string base_path = itksys::SystemTools::GetFilenamePath(path);
     std::string base = this->GetFilenameWithoutExtension(path);
     std::string filename = base;
     if (!base_path.empty())
     {
-        base = base_path + "/" + base;
-        base_path += "/";
+      base = base_path + "/" + base;
+      base_path += "/";
     }
 
     if (itksys::SystemTools::FileExists(std::string(base + ".bvec").c_str())
-      && itksys::SystemTools::FileExists(std::string(base + ".bval").c_str())
-      )
+        && itksys::SystemTools::FileExists(std::string(base + ".bval").c_str())
+        )
     {
       return canRead;
     }
 
     if (itksys::SystemTools::FileExists(std::string(base + ".bvecs").c_str())
-      && itksys::SystemTools::FileExists(std::string(base + ".bvals").c_str())
-      )
+        && itksys::SystemTools::FileExists(std::string(base + ".bvals").c_str())
+        )
     {
       return canRead;
     }
@@ -347,16 +352,16 @@ bool DiffusionIOMimeTypes::DiffusionImageNiftiMimeType::AppliesTo(const std::str
     // hack for HCP data
     if ( filename=="data" && itksys::SystemTools::FileExists(std::string(base_path + "bvec").c_str()) && itksys::SystemTools::FileExists(std::string(base_path + "bval").c_str()) )
     {
-        return canRead;
+      return canRead;
     }
 
     if ( filename=="data" && itksys::SystemTools::FileExists(std::string(base_path + "bvecs").c_str()) && itksys::SystemTools::FileExists(std::string(base_path + "bvals").c_str()) )
     {
-        return canRead;
+      return canRead;
     }
 
-        canRead = false;
-    }
+    canRead = false;
+  }
 
   return canRead;
 }
@@ -420,8 +425,8 @@ bool DiffusionIOMimeTypes::DiffusionImageDicomMimeType::AppliesTo(const std::str
   if (byteString2.empty())
     return false;
 
-  if (byteString.find("DIFFUSION")==std::string::npos && 
-      byteString2.find("diff")==std::string::npos && 
+  if (byteString.find("DIFFUSION")==std::string::npos &&
+      byteString2.find("diff")==std::string::npos &&
       byteString2.find("DWI")==std::string::npos)
     return false;
 

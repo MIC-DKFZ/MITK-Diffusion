@@ -74,7 +74,6 @@ protected slots:
   void PlanarFigureFocus();
   void Fiber2DfadingEFX();
   void FiberSlicingThickness2D();
-  void FiberSlicingUpdateLabel(int);
   void LineWidthChanged();
   void TubeRadiusChanged();
   void RibbonWidthChanged();

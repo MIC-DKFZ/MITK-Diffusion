@@ -518,6 +518,8 @@ void QmitkStreamlineTrackingView::AfterThread()
       m_InteractiveNode->SetData(fib);
       m_InteractiveNode->SetFloatProperty("Fiber2DSliceThickness", params->GetMinVoxelSizeMm()/2);
 
+      MITK_INFO << params->GetMinVoxelSizeMm()/2;
+
       if (auto renderWindowPart = this->GetRenderWindowPart())
           renderWindowPart->RequestUpdate();
     }
@@ -1151,6 +1153,13 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     StartStopTrackingGui(false);
     return;
   }
+
+  auto spacing = dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetSpacing();
+  params->SetMinVoxelSizeMm(spacing[0]);
+  if (spacing[1] < params->GetMinVoxelSizeMm())
+    params->SetMinVoxelSizeMm(spacing[1]);
+  if (spacing[2] < params->GetMinVoxelSizeMm())
+    params->SetMinVoxelSizeMm(spacing[2]);
 
   m_Tracker->SetParameters(params);
   m_Tracker->SetTrackingHandler(m_TrackingHandler);
