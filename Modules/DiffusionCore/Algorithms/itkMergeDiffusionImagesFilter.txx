@@ -148,7 +148,7 @@ MergeDiffusionImagesFilter<TScalarType>
         int c=0;
         for (unsigned int i=0; i<m_GradientLists.size(); i++)
         {
-            GradientListType::Pointer gradients = m_GradientLists.at(i);
+            GradientListType::ConstPointer gradients = m_GradientLists.at(i);
             typename DwiImageType::Pointer img = m_ImageVolumes.at(i);
 
             for (unsigned int j=0; j<gradients->Size(); j++)

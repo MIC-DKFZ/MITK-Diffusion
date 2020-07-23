@@ -67,7 +67,7 @@ namespace itk
     typedef std::vector<unsigned int>                 IndicesVector;
     typedef std::map<unsigned int, IndicesVector>     BValueMap;
 
-    void SetOriginalGradientDirections(GradientDirectionContainerType::Pointer ptr){m_OriginalGradientDirections = ptr;}
+    void SetOriginalGradientDirections(GradientDirectionContainerType::ConstPointer ptr){m_OriginalGradientDirections = ptr;}
     void SetOriginalBValue(const double & val){m_OriginalBValue = val;}
     void SetOriginalBValueMap(const BValueMap & inp){m_BValueMap = inp;}
     void SetFunctor(DWIVoxelFunctor * functor){m_Functor = functor;}
@@ -83,7 +83,7 @@ namespace itk
     void ThreadedGenerateData( const OutputImageRegionType &, ThreadIdType);
 
     GradientDirectionContainerType::Pointer m_TargetGradientDirections;   ///< container for the subsampled output gradient directions
-    GradientDirectionContainerType::Pointer m_OriginalGradientDirections;   ///< input gradient directions
+    GradientDirectionContainerType::ConstPointer m_OriginalGradientDirections;   ///< input gradient directions
 
     BValueMap m_BValueMap;
     double m_OriginalBValue;

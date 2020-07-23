@@ -331,7 +331,7 @@ public:
 
   /**
     Trigger a single computation of the kurtosis values, first the bvalues vector is computed internally but then also stored into the returend snapshot */
-  KurtosisSnapshot GetSnapshot( const itk::VariableLengthVector< TInputPixelType > &input, GradientDirectionContainerType::Pointer, float bvalue, KurtosisFitConfiguration kf_conf);
+  KurtosisSnapshot GetSnapshot( const itk::VariableLengthVector< TInputPixelType > &input, GradientDirectionContainerType::ConstPointer, float bvalue, KurtosisFitConfiguration kf_conf);
 
   /**
     * Returns the value of the current data presented to the filter.
@@ -345,7 +345,7 @@ public:
   { this->m_ReferenceBValue = bvalue; }
 
   /** Set the gradient directions */
-  void SetGradientDirections( GradientDirectionContainerType::Pointer gradients );
+  void SetGradientDirections( GradientDirectionContainerType::ConstPointer gradients );
 
   /** Restrict map generation to an image region */
   void SetMapOutputRegion( OutputImageRegionType region )

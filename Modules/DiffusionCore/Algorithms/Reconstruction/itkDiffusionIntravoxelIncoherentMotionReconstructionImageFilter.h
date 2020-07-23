@@ -326,7 +326,7 @@ namespace itk{
    * corresponds to the gradient direction of the ith component image the
    * VectorImage.  For the baseline image, a vector of all zeros
    * should be set.*/
-    void SetGradientDirections( GradientDirectionContainerType * );
+    void SetGradientDirections( GradientDirectionContainerType::ConstPointer );
 
     void SetBValue(double bval){m_BValue = bval;}
     void SetBThres(double bval){m_BThres = bval;}
@@ -368,7 +368,7 @@ namespace itk{
     double myround(double number);
 
     /** container to hold gradient directions */
-    GradientDirectionContainerType::Pointer           m_GradientDirectionContainer;
+    GradientDirectionContainerType::ConstPointer           m_GradientDirectionContainer;
 
     /** Number of gradient measurements */
     unsigned int                                      m_NumberOfGradientDirections;

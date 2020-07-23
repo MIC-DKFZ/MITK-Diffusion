@@ -40,13 +40,13 @@ class MITKDIFFUSIONCORE_EXPORT GradientDirectionsPropertySerializer : public Bas
       {
 
         typedef mitk::GradientDirectionsProperty::GradientDirectionsContainerType GradientDirectionsContainerType;
-        GradientDirectionsContainerType::Pointer gdc = prop->GetGradientDirectionsContainer().GetPointer();
+        GradientDirectionsContainerType::ConstPointer gdc = prop->GetGradientDirectionsContainer().GetPointer();
 
         if(gdc.IsNull() || gdc->Size() == 0) return nullptr;
 
 
-        GradientDirectionsContainerType::Iterator it = gdc->Begin();
-        GradientDirectionsContainerType::Iterator end = gdc->End();
+        GradientDirectionsContainerType::ConstIterator it = gdc->Begin();
+        GradientDirectionsContainerType::ConstIterator end = gdc->End();
 
         auto  element = new TiXmlElement("gradientdirections");
 

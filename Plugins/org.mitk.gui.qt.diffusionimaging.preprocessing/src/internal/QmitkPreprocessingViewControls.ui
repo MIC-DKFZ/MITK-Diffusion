@@ -166,6 +166,25 @@ QGroupBox {
           <property name="horizontalSpacing">
            <number>6</number>
           </property>
+          <item row="9" column="0">
+           <widget class="QCommandLinkButton" name="m_ReduceGradientsButton">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="toolTip">
+             <string>Retain only the specified number of gradient directions and according image volumes. The retained directions are spread equally over the half sphere using an iterative energy repulsion strategy.</string>
+            </property>
+            <property name="statusTip">
+             <string/>
+            </property>
+            <property name="whatsThis">
+             <string notr="true"/>
+            </property>
+            <property name="text">
+             <string>Reduce number of gradients</string>
+            </property>
+           </widget>
+          </item>
           <item row="3" column="1">
            <layout class="QFormLayout" name="formLayout">
             <item row="0" column="0">
@@ -201,82 +220,6 @@ QGroupBox {
              </widget>
             </item>
            </layout>
-          </item>
-          <item row="6" column="0">
-           <widget class="QCommandLinkButton" name="m_MirrorGradientToHalfSphereButton">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="toolTip">
-             <string>Sometimes the gradient directions are not located on one half sphere.</string>
-            </property>
-            <property name="statusTip">
-             <string/>
-            </property>
-            <property name="whatsThis">
-             <string notr="true"/>
-            </property>
-            <property name="text">
-             <string>Mirror gradients to half sphere</string>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="0">
-           <widget class="QCommandLinkButton" name="m_ShowGradientsButton">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="toolTip">
-             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
-            </property>
-            <property name="statusTip">
-             <string/>
-            </property>
-            <property name="whatsThis">
-             <string notr="true"/>
-            </property>
-            <property name="text">
-             <string>Show gradients</string>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="0">
-           <widget class="QCommandLinkButton" name="m_FlipGradientsButton">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="toolTip">
-             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
-            </property>
-            <property name="statusTip">
-             <string/>
-            </property>
-            <property name="whatsThis">
-             <string notr="true"/>
-            </property>
-            <property name="text">
-             <string>Flip gradients</string>
-            </property>
-           </widget>
-          </item>
-          <item row="8" column="0">
-           <widget class="QCommandLinkButton" name="m_ReduceGradientsButton">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="toolTip">
-             <string>Retain only the specified number of gradient directions and according image volumes. The retained directions are spread equally over the half sphere using an iterative energy repulsion strategy.</string>
-            </property>
-            <property name="statusTip">
-             <string/>
-            </property>
-            <property name="whatsThis">
-             <string notr="true"/>
-            </property>
-            <property name="text">
-             <string>Reduce number of gradients</string>
-            </property>
-           </widget>
           </item>
           <item row="4" column="1">
            <widget class="QFrame" name="frame_8">
@@ -326,6 +269,44 @@ QGroupBox {
             </layout>
            </widget>
           </item>
+          <item row="7" column="0">
+           <widget class="QCommandLinkButton" name="m_MirrorGradientToHalfSphereButton">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="toolTip">
+             <string>Sometimes the gradient directions are not located on one half sphere.</string>
+            </property>
+            <property name="statusTip">
+             <string/>
+            </property>
+            <property name="whatsThis">
+             <string notr="true"/>
+            </property>
+            <property name="text">
+             <string>Mirror gradients to half sphere</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QCommandLinkButton" name="m_FlipGradientsButton">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="toolTip">
+             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
+            </property>
+            <property name="statusTip">
+             <string/>
+            </property>
+            <property name="whatsThis">
+             <string notr="true"/>
+            </property>
+            <property name="text">
+             <string>Flip gradients</string>
+            </property>
+           </widget>
+          </item>
           <item row="3" column="0">
            <widget class="QCommandLinkButton" name="m_CreateLengthCorrectedDwi">
             <property name="enabled">
@@ -336,7 +317,36 @@ QGroupBox {
             </property>
            </widget>
           </item>
-          <item row="9" column="0">
+          <item row="6" column="0">
+           <widget class="QCommandLinkButton" name="m_ShowGradientsButton">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="toolTip">
+             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
+            </property>
+            <property name="statusTip">
+             <string/>
+            </property>
+            <property name="whatsThis">
+             <string notr="true"/>
+            </property>
+            <property name="text">
+             <string>Show gradients</string>
+            </property>
+           </widget>
+          </item>
+          <item row="9" column="1">
+           <widget class="QCheckBox" name="m_KeepFirstNBox">
+            <property name="toolTip">
+             <string>Don't optimize gradients to retain, simply keep first n gradients per b-value.</string>
+            </property>
+            <property name="text">
+             <string>first n</string>
+            </property>
+           </widget>
+          </item>
+          <item row="10" column="0">
            <widget class="QCommandLinkButton" name="m_ClearRotationButton">
             <property name="enabled">
              <bool>false</bool>
@@ -355,13 +365,32 @@ QGroupBox {
             </property>
            </widget>
           </item>
-          <item row="8" column="1">
-           <widget class="QCheckBox" name="m_KeepFirstNBox">
+          <item row="5" column="0">
+           <widget class="QCommandLinkButton" name="m_SwapGradientsButton">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="toolTip">
-             <string>Don't optimize gradients to retain, simply keep first n gradients per b-value.</string>
+             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
+            </property>
+            <property name="statusTip">
+             <string/>
+            </property>
+            <property name="whatsThis">
+             <string notr="true"/>
             </property>
             <property name="text">
-             <string>first n</string>
+             <string>Reorder gradient dimensions</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QLineEdit" name="m_SwapGradientsEdit">
+            <property name="toolTip">
+             <string>New order of gradient vector components (e.g. swap x and y)</string>
+            </property>
+            <property name="text">
+             <string>y x z</string>
             </property>
            </widget>
           </item>
@@ -1340,11 +1369,11 @@ QGroupBox {
             <attribute name="horizontalHeaderCascadingSectionResizes">
              <bool>true</bool>
             </attribute>
-            <attribute name="horizontalHeaderHighlightSections">
-             <bool>true</bool>
-            </attribute>
             <attribute name="horizontalHeaderMinimumSectionSize">
              <number>0</number>
+            </attribute>
+            <attribute name="horizontalHeaderHighlightSections">
+             <bool>true</bool>
             </attribute>
             <attribute name="verticalHeaderVisible">
              <bool>false</bool>
@@ -1468,11 +1497,11 @@ QGroupBox {
             <attribute name="horizontalHeaderCascadingSectionResizes">
              <bool>true</bool>
             </attribute>
-            <attribute name="horizontalHeaderHighlightSections">
-             <bool>true</bool>
-            </attribute>
             <attribute name="horizontalHeaderMinimumSectionSize">
              <number>0</number>
+            </attribute>
+            <attribute name="horizontalHeaderHighlightSections">
+             <bool>true</bool>
             </attribute>
             <attribute name="verticalHeaderVisible">
              <bool>false</bool>

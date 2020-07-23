@@ -58,7 +58,7 @@ public:
     typedef typename mitk::DiffusionPropertyHelper::GradientDirectionsContainerType   DirectionContainerType;
 
     void SetChannelIndices( std::vector< unsigned int > indices ){ m_ChannelIndices = indices; }
-    void SetDirections( typename DirectionContainerType::Pointer directions ){ m_Directions = directions; }
+    void SetDirections( typename DirectionContainerType::ConstPointer directions ){ m_Directions = directions; }
     typename DirectionContainerType::Pointer GetNewDirections(){ return m_NewDirections; }
 
     protected:
@@ -70,7 +70,7 @@ public:
     void ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType id ) override;
 
     std::vector< unsigned int >                 m_ChannelIndices;
-    typename DirectionContainerType::Pointer    m_Directions;
+    typename DirectionContainerType::ConstPointer    m_Directions;
     typename DirectionContainerType::Pointer    m_NewDirections;
 };
 

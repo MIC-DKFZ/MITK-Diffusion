@@ -234,9 +234,11 @@ ElectrostaticRepulsionDiffusionGradientReductionFilter<TInputScalarType, TOutput
   }
 
   // set new gradient directions
-  m_GradientDirections = GradientDirectionContainerType::New();
+
+  GradientDirectionContainerType::Pointer temp = GradientDirectionContainerType::New();
   for (unsigned int i=0; i<final_gradient_indices.size(); ++i)
-    m_GradientDirections->InsertElement(i, m_OriginalGradientDirections->at(final_gradient_indices.at(i)));
+    temp->InsertElement(i, m_OriginalGradientDirections->at(final_gradient_indices.at(i)));
+  m_GradientDirections = temp;
 
   //  int index = 0;
   //  for(BValueMap::iterator it = manipulatedMap.begin(); it != manipulatedMap.end(); it++)

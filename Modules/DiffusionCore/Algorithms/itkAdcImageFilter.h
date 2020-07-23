@@ -44,7 +44,7 @@ public:
   typedef SmartPointer<const Self>                ConstPointer;
   typedef ImageToImageFilter< VectorImage< TInPixelType, 3 >, Image< TOutPixelType, 3 > >  Superclass;
   typedef mitk::DiffusionPropertyHelper::GradientDirectionType GradientDirectionType;
-  typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer GradientContainerType;
+  typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer GradientContainerType;
   typedef itk::Image< unsigned char, 3> ItkUcharImageType;
 
   /** Method for creation through the object factory. */

@@ -56,7 +56,7 @@ public:
   typedef itk::VectorContainer< unsigned int, GradientDirectionType >
   GradientDirectionContainerType;
 
-  typedef typename GradientDirectionContainerType::Iterator GradContainerIteratorType;
+  typedef typename GradientDirectionContainerType::ConstIterator GradContainerIteratorType;
 
   /** Method for creation through the object factory. */
   itkFactorylessNewMacro(Self)
@@ -66,12 +66,12 @@ public:
   itkTypeMacro(B0ImageExtractionToSeparateImageFilter,
                ImageToImageFilter);
 
-  GradientDirectionContainerType::Pointer GetDirections()
+  GradientDirectionContainerType::ConstPointer GetDirections()
   {
     return m_Directions;
   }
 
-  void SetDirections( GradientDirectionContainerType::Pointer directions )
+  void SetDirections( GradientDirectionContainerType::ConstPointer directions )
   {
     this->m_Directions = directions;
   }
@@ -95,7 +95,7 @@ protected:
   */
   virtual void GenerateOutputInformation();
 
-  GradientDirectionContainerType::Pointer m_Directions;
+  GradientDirectionContainerType::ConstPointer m_Directions;
 };
 
 } // end namespace itk

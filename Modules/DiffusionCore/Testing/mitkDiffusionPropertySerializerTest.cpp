@@ -93,7 +93,7 @@ public:
     gdc->push_back(vec3);
 
 
-    gradientdirection_prop = mitk::GradientDirectionsProperty::New(gdc.GetPointer()).GetPointer();
+    gradientdirection_prop = mitk::GradientDirectionsProperty::New(gdc).GetPointer();
     propList->ReplaceProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str(), gradientdirection_prop);
 
     mitk::MeasurementFrameProperty::MeasurementFrameType mft;

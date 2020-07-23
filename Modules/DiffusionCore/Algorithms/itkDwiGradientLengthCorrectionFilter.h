@@ -51,7 +51,7 @@ public:
   // input
   itkSetMacro(RoundingValue, int)
   itkSetMacro(ReferenceBValue, double)
-  itkSetMacro(ReferenceGradientDirectionContainer, GradientDirectionContainerType::Pointer)
+  itkSetMacro(ReferenceGradientDirectionContainer, GradientDirectionContainerType::ConstPointer)
 
   // output
   itkGetMacro(OutputGradientDirectionContainer, GradientDirectionContainerType::Pointer)
@@ -65,7 +65,7 @@ public:
   double m_ReferenceBValue;
   int m_RoundingValue;
 
-  GradientDirectionContainerType::Pointer m_ReferenceGradientDirectionContainer;
+  GradientDirectionContainerType::ConstPointer m_ReferenceGradientDirectionContainer;
   GradientDirectionContainerType::Pointer m_OutputGradientDirectionContainer;
 };
 

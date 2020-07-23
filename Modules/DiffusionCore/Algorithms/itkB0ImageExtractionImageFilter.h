@@ -64,9 +64,9 @@ namespace itk{
     typedef itk::VectorContainer< unsigned int, GradientDirectionType >
       GradientDirectionContainerType;
 
-    GradientDirectionContainerType::Pointer GetDirections()
+    GradientDirectionContainerType::ConstPointer GetDirections()
     { return m_Directions; }
-    void SetDirections( GradientDirectionContainerType::Pointer directions )
+    void SetDirections( GradientDirectionContainerType::ConstPointer directions )
     { this->m_Directions = directions; }
 
   protected:
@@ -76,7 +76,7 @@ namespace itk{
 
     void GenerateData() override;
 
-    GradientDirectionContainerType::Pointer   m_Directions;
+    GradientDirectionContainerType::ConstPointer   m_Directions;
 
   };
 

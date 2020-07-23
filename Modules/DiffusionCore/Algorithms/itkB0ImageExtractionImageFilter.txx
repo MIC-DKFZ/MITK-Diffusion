@@ -46,8 +46,8 @@ namespace itk {
     ::GenerateData()
   {
 
-    typename GradientDirectionContainerType::Iterator begin = m_Directions->Begin();
-    typename GradientDirectionContainerType::Iterator end = m_Directions->End();
+    typename GradientDirectionContainerType::ConstIterator begin = m_Directions->Begin();
+    typename GradientDirectionContainerType::ConstIterator end = m_Directions->End();
 
     // Find the index of the b0 image
     std::vector<int> indices;

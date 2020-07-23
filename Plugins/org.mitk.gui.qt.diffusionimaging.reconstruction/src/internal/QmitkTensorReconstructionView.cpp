@@ -160,7 +160,7 @@ void QmitkTensorReconstructionView::ResidualClicked(int slice, int volume)
     correctNode = mitk::DataNode::New();
     correctNode = m_Controls->m_ResBox1->GetSelectedNode();
 
-    GradientDirectionContainerType::Pointer dirs = mitk::DiffusionPropertyHelper::GetGradientContainer(diffImage);
+    GradientDirectionContainerType::ConstPointer dirs = mitk::DiffusionPropertyHelper::GetGradientContainer(diffImage);
 
     for(itk::SizeValueType i=0; i<dirs->Size() && i<=(itk::SizeValueType)volume; i++)
     {
@@ -296,11 +296,9 @@ void QmitkTensorReconstructionView::ResidualCalculation()
   else
     return;
 
-  typedef itk::TensorImageToDiffusionImageFilter<
-      TTensorPixelType, DiffusionPixelType > FilterType;
+  typedef itk::TensorImageToDiffusionImageFilter<TTensorPixelType, DiffusionPixelType > FilterType;
 
-  GradientDirectionContainerType* gradients
-      =  mitk::DiffusionPropertyHelper::GetGradientContainer(diffImage);
+  GradientDirectionContainerType::ConstPointer gradients =  mitk::DiffusionPropertyHelper::GetGradientContainer(diffImage);
 
   // Find the min and the max values from a baseline image
   mitk::ImageStatisticsHolder *stats = diffImage->GetStatistics();
@@ -577,7 +575,7 @@ void QmitkTensorReconstructionView::TensorReconstructionWithCorr()
 
       ReconstructionFilter::Pointer reconFilter = ReconstructionFilter::New();
       reconFilter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(vols));
-      reconFilter->SetGradientImage( gradientContainerCopy, itkVectorImagePointer);
+      reconFilter->SetGradientImage( mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer(gradientContainerCopy), itkVectorImagePointer);
       reconFilter->SetB0Threshold(b0Threshold);
       reconFilter->Update();
 
@@ -813,7 +811,7 @@ void QmitkTensorReconstructionView::DoTensorsToDWI()
       typedef itk::TensorImageToDiffusionImageFilter<
           TTensorPixelType, DiffusionPixelType > FilterType;
 
-      FilterType::GradientListPointerType gradientList = FilterType::GradientListType::New();
+      FilterType::GradientListPointerType gradientList;
 
       switch(m_Controls->m_TensorsToDWINumDirsSelect->currentIndex())
       {

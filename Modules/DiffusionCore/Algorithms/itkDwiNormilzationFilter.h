@@ -61,7 +61,7 @@ public:
     typedef itk::Image< unsigned short, 3 > BinImageType;
     typedef itk::Image< TInPixelType, 3 > TInPixelImageType;
     typedef mitk::DiffusionPropertyHelper::GradientDirectionType GradientDirectionType;
-    typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer GradientContainerType;
+    typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer GradientContainerType;
 
     typedef ImageRegionConstIterator< InputImageType > InputIteratorType;
     typedef ImageRegionConstIterator< UcharImageType > MaskIteratorType;

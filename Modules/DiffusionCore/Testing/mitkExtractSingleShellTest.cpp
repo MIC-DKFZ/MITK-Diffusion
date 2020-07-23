@@ -58,7 +58,7 @@ int mitkExtractSingleShellTest( int argc, char* argv[] )
   mitk::CastToItkImage(dwimage, itkVectorImagePointer);
   itk::VectorImage< short, 3 > *vectorImage = itkVectorImagePointer.GetPointer();
 
-  mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer gradientContainer = mitk::DiffusionPropertyHelper::GetGradientContainer(dwimage);
+  mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer gradientContainer = mitk::DiffusionPropertyHelper::GetGradientContainer(dwimage);
   FilterType::Pointer filter = FilterType::New();
   filter->SetInput(vectorImage);
   filter->SetOriginalGradientDirections(gradientContainer);

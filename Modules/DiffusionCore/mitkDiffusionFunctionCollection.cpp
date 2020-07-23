@@ -432,7 +432,7 @@ float mitk::sh::GetValue(const vnl_vector<float> &coefficients, const int &sh_or
 //------------------------- gradients-function ------------------------------------
 
 
-mitk::gradients::GradientDirectionContainerType::Pointer mitk::gradients::ReadBvalsBvecs(std::string bvals_file, std::string bvecs_file, double& reference_bval)
+mitk::gradients::GradientDirectionContainerType::ConstPointer mitk::gradients::ReadBvalsBvecs(std::string bvals_file, std::string bvecs_file, double& reference_bval)
 {
   mitk::gradients::GradientDirectionContainerType::Pointer directioncontainer = mitk::gradients::GradientDirectionContainerType::New();
 
@@ -535,10 +535,10 @@ mitk::gradients::GradientDirectionContainerType::Pointer mitk::gradients::ReadBv
     directioncontainer->InsertElement(i,vec);
   }
 
-  return directioncontainer;
+  return GradientDirectionContainerType::ConstPointer(directioncontainer);
 }
 
-void mitk::gradients::WriteBvalsBvecs(std::string bvals_file, std::string bvecs_file, GradientDirectionContainerType::Pointer gradients, double reference_bval)
+void mitk::gradients::WriteBvalsBvecs(std::string bvals_file, std::string bvecs_file, GradientDirectionContainerType::ConstPointer gradients, double reference_bval)
 {
   std::ofstream myfile;
   myfile.open (bvals_file.c_str());
@@ -563,7 +563,7 @@ void mitk::gradients::WriteBvalsBvecs(std::string bvals_file, std::string bvecs_
   }
 }
 
-std::vector<unsigned int> mitk::gradients::GetAllUniqueDirections(const BValueMap & refBValueMap, GradientDirectionContainerType *refGradientsContainer )
+std::vector<unsigned int> mitk::gradients::GetAllUniqueDirections(const BValueMap & refBValueMap, GradientDirectionContainerType::ConstPointer refGradientsContainer )
 {
 
   IndiciesVector directioncontainer;

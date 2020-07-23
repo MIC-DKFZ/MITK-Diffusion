@@ -65,7 +65,7 @@ public:
     weightedIndices = x;
   }
 
-  void set_gradient_directions(const GradientContainerType::Pointer& directions)
+  void set_gradient_directions(const GradientContainerType::Pointer directions)
   {
     gradientDirections = directions;
   }

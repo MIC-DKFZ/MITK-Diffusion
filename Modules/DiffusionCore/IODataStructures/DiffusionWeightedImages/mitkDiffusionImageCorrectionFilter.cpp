@@ -72,7 +72,7 @@ void mitk::DiffusionImageCorrectionFilter
     mitkThrow() << " No diffusion image given! ";
   }
 
-  DPH::GradientDirectionsContainerType::Pointer directions = DPH::GetGradientContainer(m_SourceImage);
+  DPH::GradientDirectionsContainerType::ConstPointer directions = DPH::GetGradientContainer(m_SourceImage);
   DPH::GradientDirectionsContainerType::Pointer corrected_directions = DPH::GradientDirectionsContainerType::New();
 
   mitk::BValueMapProperty::BValueMap bval_map = DPH::GetBValueMap(m_SourceImage);

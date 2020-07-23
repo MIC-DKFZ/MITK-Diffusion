@@ -270,7 +270,7 @@ void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPix
 template< class TInputPixelType, class TOutputPixelType>
 typename itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelType>::KurtosisSnapshot
 itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelType>
-::GetSnapshot(const itk::VariableLengthVector<TInputPixelType> &input, GradientDirectionContainerType::Pointer gradients, float bvalue, KurtosisFitConfiguration kf_conf)
+::GetSnapshot(const itk::VariableLengthVector<TInputPixelType> &input, GradientDirectionContainerType::ConstPointer gradients, float bvalue, KurtosisFitConfiguration kf_conf)
 {
   // initialize bvalues from reference value and the gradients provided on input
   this->SetReferenceBValue(bvalue);
@@ -380,7 +380,7 @@ itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelTyp
 
 template< class TInputPixelType, class TOutputPixelType>
 void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelType>
-::SetGradientDirections(GradientDirectionContainerType::Pointer gradients)
+::SetGradientDirections(GradientDirectionContainerType::ConstPointer gradients)
 {
   if( this->m_ReferenceBValue < 0)
   {

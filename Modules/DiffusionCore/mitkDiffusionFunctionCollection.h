@@ -243,9 +243,9 @@ private:
 
 public:
 
-  static GradientDirectionContainerType::Pointer ReadBvalsBvecs(std::string bvals_file, std::string bvecs_file, double& reference_bval);
-  static void WriteBvalsBvecs(std::string bvals_file, std::string bvecs_file, GradientDirectionContainerType::Pointer gradients, double reference_bval);
-  static std::vector<unsigned int> GetAllUniqueDirections(const BValueMap &bValueMap, GradientDirectionContainerType *refGradientsContainer );
+  static GradientDirectionContainerType::ConstPointer ReadBvalsBvecs(std::string bvals_file, std::string bvecs_file, double& reference_bval);
+  static void WriteBvalsBvecs(std::string bvals_file, std::string bvecs_file, GradientDirectionContainerType::ConstPointer gradients, double reference_bval);
+  static std::vector<unsigned int> GetAllUniqueDirections(const BValueMap &bValueMap, GradientDirectionContainerType::ConstPointer refGradientsContainer );
 
   static bool CheckForDifferingShellDirections(const BValueMap &bValueMap, GradientDirectionContainerType::ConstPointer refGradientsContainer);
   static vnl_matrix<double> ComputeSphericalHarmonicsBasis(const vnl_matrix<double> & QBallReference, const unsigned int & LOrder);

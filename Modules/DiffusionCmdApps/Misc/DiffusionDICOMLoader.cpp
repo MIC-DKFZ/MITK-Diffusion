@@ -141,7 +141,7 @@ typedef std::vector< DwiImageType::Pointer >  DwiImageContainerType;
 
 typedef mitk::Image          DiffusionImageType;
 typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType    GradientContainerType;
-typedef std::vector< GradientContainerType::Pointer >  GradientListContainerType;
+typedef std::vector< GradientContainerType::ConstPointer >  GradientListContainerType;
 
 void SearchForInputInSubdirs( std::string root_directory, std::string subdir_prefix , std::vector<DiffusionImageType::Pointer>& output_container)
 {

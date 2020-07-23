@@ -371,7 +371,7 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
 template <class TDiffusionPixelType, class TTensorPixelType>
 void
 TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorPixelType>
-::SetGradientImage( GradientDirectionContainerType *gradientDirection,
+::SetGradientImage( GradientDirectionContainerType::ConstPointer gradientDirection,
                     const GradientImagesType *gradientImage )
 {
 

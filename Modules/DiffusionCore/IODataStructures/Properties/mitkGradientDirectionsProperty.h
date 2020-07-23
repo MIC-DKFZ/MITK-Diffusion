@@ -44,9 +44,11 @@ namespace mitk
 
     mitkNewMacro1Param(GradientDirectionsProperty, const GradientDirectionsProperty&);
     mitkNewMacro1Param(GradientDirectionsProperty, const GradientDirectionsContainerType::Pointer);
+    mitkNewMacro1Param(GradientDirectionsProperty, const GradientDirectionsContainerType::ConstPointer);
     mitkNewMacro1Param(GradientDirectionsProperty, const AlternativeGradientDirectionsContainerType );
 
-    const GradientDirectionsContainerType::Pointer GetGradientDirectionsContainer() const;
+    const GradientDirectionsContainerType::ConstPointer GetGradientDirectionsContainer() const;
+    const GradientDirectionsContainerType::Pointer GetGradientDirectionsContainerCopy() const;
 
   protected:
 
@@ -55,12 +57,13 @@ namespace mitk
 
     GradientDirectionsProperty(const GradientDirectionsProperty& other);
     GradientDirectionsProperty(const GradientDirectionsContainerType::Pointer gradientDirectionsContainer);
+    GradientDirectionsProperty(const GradientDirectionsContainerType::ConstPointer gradientDirectionsContainer);
     GradientDirectionsProperty(const AlternativeGradientDirectionsContainerType gradientDirectionsContainer);
 
     bool IsEqual(const BaseProperty& property) const override;
     bool Assign(const BaseProperty & property) override;
 
-    GradientDirectionsContainerType::Pointer m_GradientDirectionsContainer;
+    GradientDirectionsContainerType::ConstPointer m_GradientDirectionsContainer;
 
     itk::LightObject::Pointer InternalClone() const override;
   };

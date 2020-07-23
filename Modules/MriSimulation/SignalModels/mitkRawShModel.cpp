@@ -87,7 +87,7 @@ bool RawShModel< ScalarType >::SampleKernels(Image::Pointer diffImg, ItkUcharIma
 
     TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
     filter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg));
-    filter->SetGradientImage(mitk::DiffusionPropertyHelper::GetGradientContainer(diffImg), itkVectorImagePointer );
+    filter->SetGradientImage(dynamic_cast<mitk::GradientDirectionsProperty *>(diffImg->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
     filter->Update();
     tensorImage = filter->GetOutput();
   }
