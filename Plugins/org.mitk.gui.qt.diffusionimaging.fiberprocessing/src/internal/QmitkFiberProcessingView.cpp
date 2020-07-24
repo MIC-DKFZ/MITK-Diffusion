@@ -554,7 +554,10 @@ void QmitkFiberProcessingView::ExtractWithMask(bool onlyEnds, bool invert, bool 
           name = "passing-" + name;
       }
 
-      newNode->SetName(name);
+      float currentThickness = 0;
+      node->GetFloatProperty("Fiber2DSliceThickness", currentThickness);
+      newNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(currentThickness));
+
       GetDataStorage()->Add(newNode, node);
     }
     node->SetVisibility(false);
@@ -1376,13 +1379,18 @@ void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
       mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(fiberBundles.at(i)->GetData());
       mitk::FiberBundle::Pointer extFB = fib->ExtractFiberSubset(planarFigure, GetDataStorage());
 
+      float currentThickness = 0;
+      fiberBundles.at(i)->GetFloatProperty("Fiber2DSliceThickness", currentThickness);
+
       if (interactive && m_Controls->m_InteractiveBox->isChecked())
       {
         if (m_InteractiveNode.IsNull())
         {
+
           m_InteractiveNode = mitk::DataNode::New();
           QString name("Interactive");
           m_InteractiveNode->SetName(name.toStdString());
+          m_InteractiveNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(currentThickness));
           GetDataStorage()->Add(m_InteractiveNode);
         }
         float op = 5.0/sqrt(fib->GetNumFibers());
@@ -1411,6 +1419,7 @@ void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
         QString name(fiberBundles.at(i)->GetName().c_str());
         name += "*";
         node->SetName(name.toStdString());
+        node->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(currentThickness));
         fiberBundles.at(i)->SetVisibility(false);
         GetDataStorage()->Add(node);
       }
