@@ -667,7 +667,7 @@ void QmitkPreprocessingView::DoResampleImage()
     QString name = node->GetName().c_str();
 
     imageNode->SetName((name+"_resampled_"+outAdd).toStdString().c_str());
-    imageNode->SetVisibility(false);
+    imageNode->SetVisibility(true);
     GetDataStorage()->Add(imageNode, node);
   }
   else if( image->GetPixelType().GetNumberOfComponents() )
