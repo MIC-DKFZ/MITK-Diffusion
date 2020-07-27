@@ -510,25 +510,23 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
   }
 
-//  float max_size = 0;
-//  handler->m_
-//  for (int i=0; i<3; ++i)
-//    if (dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i)>max_size)
-//      max_size = dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i);
-//  if (params->m_MinTractLengthMm >= max_size)
-//  {
-//    MITK_INFO << "Max. image size: " << max_size << "mm";
-//    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
-//    QMessageBox::information(nullptr, "Error", "Minimum tract length exceeds the maximum image extent! Recommended value is about 1/10 of the image extent.");
-//    StartStopTrackingGui(false);
-//    return;
-//  }
-//  else if (params->m_MinTractLengthMm > max_size/10)
-//  {
-//    MITK_INFO << "Max. image size: " << max_size << "mm";
-//    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
-//    MITK_WARN <<  "Minimum tract length is larger than 1/10 the maximum image extent! Decrease recommended.";
-//  }
+  float max_size = 0;
+  for (int i=0; i<3; ++i)
+    if (reference_image->GetGeometry()->GetExtentInMM(i)>max_size)
+      max_size = reference_image->GetGeometry()->GetExtentInMM(i);
+  if (params->m_MinTractLengthMm >= max_size)
+  {
+    MITK_INFO << "Max. image size: " << max_size << "mm";
+    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
+    MITK_ERROR << "Minimum tract length exceeds the maximum image extent! Recommended value is about 1/10 of the image extent.";
+    return EXIT_FAILURE;
+  }
+  else if (params->m_MinTractLengthMm > max_size/10)
+  {
+    MITK_INFO << "Max. image size: " << max_size << "mm";
+    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
+    MITK_WARN <<  "Minimum tract length is larger than 1/10 the maximum image extent! Decrease recommended.";
+  }
 
   MITK_INFO << "Tractography algorithm: " << type;
   tracker->SetMaskImage(mask);
