@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
   parser.addArgument("flip_z", "", mitkDiffusionCommandLineParser::Bool, "Flip Z:", "multiply z-coordinate of direction proposal by -1");
   parser.addArgument("no_data_interpolation", "", mitkDiffusionCommandLineParser::Bool, "Don't interpolate input data:", "don't interpolate input image values");
   parser.addArgument("no_mask_interpolation", "", mitkDiffusionCommandLineParser::Bool, "Don't interpolate masks:", "don't interpolate mask image values");
-  parser.addArgument("compress", "", mitkDiffusionCommandLineParser::Float, "Compress:", "compress output fibers using the given error threshold (in mm)");
+  parser.addArgument("compress", "", mitkDiffusionCommandLineParser::Bool, "Compress:", "compress output fibers (lossy)");
   parser.addArgument("fix_seed", "", mitkDiffusionCommandLineParser::Bool, "Fix Random Seed:", "always use the same random numbers");
   parser.addArgument("parameter_file", "", mitkDiffusionCommandLineParser::String, "Parameter File:", "load parameters from json file (svae using MITK Diffusion GUI). the parameters loaded form this file are overwritten by the manually set parameters.", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
   parser.endGroup();
@@ -168,19 +168,15 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("fix_seed"))
     params->m_FixRandomSeed = us::any_cast<bool>(parsedArgs["fix_seed"]);
 
-  params->m_RestrictToPrior = true;
   if (parsedArgs.count("dont_restrict_to_prior"))
     params->m_RestrictToPrior = !us::any_cast<bool>(parsedArgs["dont_restrict_to_prior"]);
 
-  params->m_NewDirectionsFromPrior = true;
   if (parsedArgs.count("no_new_directions_from_prior"))
     params->m_NewDirectionsFromPrior = !us::any_cast<bool>(parsedArgs["no_new_directions_from_prior"]);
 
-  params->m_SharpenOdfs = false;
   if (parsedArgs.count("sharpen_odfs"))
     params->m_SharpenOdfs = us::any_cast<bool>(parsedArgs["sharpen_odfs"]);
 
-  params->m_InterpolateTractographyData = true;
   if (parsedArgs.count("no_data_interpolation"))
     params->m_InterpolateTractographyData = !us::any_cast<bool>(parsedArgs["no_data_interpolation"]);
 
@@ -192,47 +188,35 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("use_sh_features"))
     use_sh_features = us::any_cast<bool>(parsedArgs["use_sh_features"]);
 
-  params->m_StopVotes = false;
   if (parsedArgs.count("use_stop_votes"))
     params->m_StopVotes = us::any_cast<bool>(parsedArgs["use_stop_votes"]);
 
-  params->m_OnlyForwardSamples = false;
   if (parsedArgs.count("use_only_forward_samples"))
     params->m_OnlyForwardSamples = us::any_cast<bool>(parsedArgs["use_only_forward_samples"]);
 
-  params->m_FlipX = false;
   if (parsedArgs.count("flip_x"))
     params->m_FlipX = us::any_cast<bool>(parsedArgs["flip_x"]);
-  params->m_FlipY = false;
   if (parsedArgs.count("flip_y"))
     params->m_FlipY = us::any_cast<bool>(parsedArgs["flip_y"]);
-  params->m_FlipZ = false;
   if (parsedArgs.count("flip_z"))
     params->m_FlipZ = us::any_cast<bool>(parsedArgs["flip_z"]);
 
-  bool prior_flip_x = false;
   if (parsedArgs.count("prior_flip_x"))
-    prior_flip_x = us::any_cast<bool>(parsedArgs["prior_flip_x"]);
-  bool prior_flip_y = false;
+    params->m_PriorFlipX = us::any_cast<bool>(parsedArgs["prior_flip_x"]);
   if (parsedArgs.count("prior_flip_y"))
-    prior_flip_y = us::any_cast<bool>(parsedArgs["prior_flip_y"]);
-  bool prior_flip_z = false;
+    params->m_PriorFlipY = us::any_cast<bool>(parsedArgs["prior_flip_y"]);
   if (parsedArgs.count("prior_flip_z"))
-    prior_flip_z = us::any_cast<bool>(parsedArgs["prior_flip_z"]);
+    params->m_PriorFlipZ = us::any_cast<bool>(parsedArgs["prior_flip_z"]);
 
-  params->m_ApplyDirectionMatrix = false;
   if (parsedArgs.count("apply_image_rotation"))
     params->m_ApplyDirectionMatrix = us::any_cast<bool>(parsedArgs["apply_image_rotation"]);
 
-  float compress = -1;
   if (parsedArgs.count("compress"))
-    compress = us::any_cast<float>(parsedArgs["compress"]);
+    params->m_CompressFibers = us::any_cast<bool>(parsedArgs["compress"]);
 
-  params->m_MinTractLengthMm = 20;
   if (parsedArgs.count("min_tract_length"))
     params->m_MinTractLengthMm = us::any_cast<float>(parsedArgs["min_tract_length"]);
 
-  params->SetLoopCheckDeg(-1);
   if (parsedArgs.count("loop_check"))
     params->SetLoopCheckDeg(us::any_cast<float>(parsedArgs["loop_check"]));
 
@@ -260,55 +244,57 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("stop_image"))
     stopFile = us::any_cast<std::string>(parsedArgs["stop_image"]);
 
-  std::string ep_constraint = "NONE";
   if (parsedArgs.count("ep_constraint"))
-    ep_constraint = us::any_cast<std::string>(parsedArgs["ep_constraint"]);
+  {
+    if (us::any_cast<std::string>(parsedArgs["ep_constraint"]) == "NONE")
+      params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::NONE;
+    else if (us::any_cast<std::string>(parsedArgs["ep_constraint"]) == "EPS_IN_TARGET")
+      params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::EPS_IN_TARGET;
+    else if (us::any_cast<std::string>(parsedArgs["ep_constraint"]) == "EPS_IN_TARGET_LABELDIFF")
+      params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::EPS_IN_TARGET_LABELDIFF;
+    else if (us::any_cast<std::string>(parsedArgs["ep_constraint"]) == "EPS_IN_SEED_AND_TARGET")
+      params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::EPS_IN_SEED_AND_TARGET;
+    else if (us::any_cast<std::string>(parsedArgs["ep_constraint"]) == "MIN_ONE_EP_IN_TARGET")
+      params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::MIN_ONE_EP_IN_TARGET;
+    else if (us::any_cast<std::string>(parsedArgs["ep_constraint"]) == "ONE_EP_IN_TARGET")
+      params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::ONE_EP_IN_TARGET;
+    else if (us::any_cast<std::string>(parsedArgs["ep_constraint"]) == "NO_EP_IN_TARGET")
+      params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::NO_EP_IN_TARGET;
+  }
 
-  params->m_Cutoff = 0.1f;
   if (parsedArgs.count("cutoff"))
     params->m_Cutoff = us::any_cast<float>(parsedArgs["cutoff"]);
 
-  params->m_OdfCutoff = 0.0;
   if (parsedArgs.count("odf_cutoff"))
     params->m_OdfCutoff = us::any_cast<float>(parsedArgs["odf_cutoff"]);
 
-  params->m_PeakJitter = 0.01;
   if (parsedArgs.count("peak_jitter"))
     params->m_PeakJitter = us::any_cast<float>(parsedArgs["peak_jitter"]);
 
-  params->SetStepSizeVox(-1);
   if (parsedArgs.count("step_size"))
     params->SetStepSizeVox(us::any_cast<float>(parsedArgs["step_size"]));
 
-  params->SetSamplingDistanceVox(-1);
   if (parsedArgs.count("sampling_distance"))
     params->SetSamplingDistanceVox(us::any_cast<float>(parsedArgs["sampling_distance"]));
 
-  params->m_NumSamples = 0;
   if (parsedArgs.count("num_samples"))
     params->m_NumSamples = static_cast<unsigned int>(us::any_cast<int>(parsedArgs["num_samples"]));
 
-  params->m_SeedsPerVoxel = 1;
   if (parsedArgs.count("seeds"))
     params->m_SeedsPerVoxel = us::any_cast<int>(parsedArgs["seeds"]);
 
-  params->m_TrialsPerSeed = 10;
   if (parsedArgs.count("trials_per_seed"))
     params->m_TrialsPerSeed = static_cast<unsigned int>(us::any_cast<int>(parsedArgs["trials_per_seed"]));
 
-  params->m_F = 1;
   if (parsedArgs.count("tend_f"))
     params->m_F = us::any_cast<float>(parsedArgs["tend_f"]);
 
-  params->m_G = 0;
   if (parsedArgs.count("tend_g"))
     params->m_G = us::any_cast<float>(parsedArgs["tend_g"]);
 
-  params->SetAngularThresholdDeg(-1);
   if (parsedArgs.count("angular_threshold"))
     params->SetAngularThresholdDeg(us::any_cast<float>(parsedArgs["angular_threshold"]));
 
-  params->m_MaxNumFibers = -1;
   if (parsedArgs.count("max_tracts"))
     params->m_MaxNumFibers = us::any_cast<int>(parsedArgs["max_tracts"]);
 
@@ -409,9 +395,9 @@ int main(int argc, char* argv[])
     mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = caster->GetOutput();
 
     std::shared_ptr< mitk::StreamlineTractographyParameters > prior_params = std::make_shared< mitk::StreamlineTractographyParameters >(*params);
-    prior_params->m_FlipX = prior_flip_x;
-    prior_params->m_FlipY = prior_flip_y;
-    prior_params->m_FlipZ = prior_flip_z;
+    prior_params->m_FlipX = params->m_PriorFlipX;
+    prior_params->m_FlipY = params->m_PriorFlipY;
+    prior_params->m_FlipZ = params->m_PriorFlipZ;
     prior_params->m_Cutoff = 0.0;
     dynamic_cast<mitk::TrackingHandlerPeaks*>(priorhandler)->SetPeakImage(itkImg);
     priorhandler->SetParameters(prior_params);
@@ -524,20 +510,25 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
   }
 
-  if (ep_constraint=="NONE")
-    params->m_EpConstraints = itk::StreamlineTrackingFilter::EndpointConstraints::NONE;
-  else if (ep_constraint=="EPS_IN_TARGET")
-    params->m_EpConstraints = itk::StreamlineTrackingFilter::EndpointConstraints::EPS_IN_TARGET;
-  else if (ep_constraint=="EPS_IN_TARGET_LABELDIFF")
-    params->m_EpConstraints = itk::StreamlineTrackingFilter::EndpointConstraints::EPS_IN_TARGET_LABELDIFF;
-  else if (ep_constraint=="EPS_IN_SEED_AND_TARGET")
-    params->m_EpConstraints = itk::StreamlineTrackingFilter::EndpointConstraints::EPS_IN_SEED_AND_TARGET;
-  else if (ep_constraint=="MIN_ONE_EP_IN_TARGET")
-    params->m_EpConstraints = itk::StreamlineTrackingFilter::EndpointConstraints::MIN_ONE_EP_IN_TARGET;
-  else if (ep_constraint=="ONE_EP_IN_TARGET")
-    params->m_EpConstraints = itk::StreamlineTrackingFilter::EndpointConstraints::ONE_EP_IN_TARGET;
-  else if (ep_constraint=="NO_EP_IN_TARGET")
-    params->m_EpConstraints = itk::StreamlineTrackingFilter::EndpointConstraints::NO_EP_IN_TARGET;
+//  float max_size = 0;
+//  handler->m_
+//  for (int i=0; i<3; ++i)
+//    if (dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i)>max_size)
+//      max_size = dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i);
+//  if (params->m_MinTractLengthMm >= max_size)
+//  {
+//    MITK_INFO << "Max. image size: " << max_size << "mm";
+//    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
+//    QMessageBox::information(nullptr, "Error", "Minimum tract length exceeds the maximum image extent! Recommended value is about 1/10 of the image extent.");
+//    StartStopTrackingGui(false);
+//    return;
+//  }
+//  else if (params->m_MinTractLengthMm > max_size/10)
+//  {
+//    MITK_INFO << "Max. image size: " << max_size << "mm";
+//    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
+//    MITK_WARN <<  "Minimum tract length is larger than 1/10 the maximum image extent! Decrease recommended.";
+//  }
 
   MITK_INFO << "Tractography algorithm: " << type;
   tracker->SetMaskImage(mask);
@@ -553,10 +544,23 @@ int main(int argc, char* argv[])
 
   if (ext == ".fib" || ext == ".trk")
   {
+
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
-    if (compress > 0)
-      outFib->Compress(compress);
+    if (params->m_CompressFibers)
+    {
+      float min_sp = 999;
+      auto spacing = handler->GetSpacing();
+      if (spacing[0] < min_sp)
+        min_sp = spacing[0];
+      if (spacing[1] < min_sp)
+        min_sp = spacing[1];
+      if (spacing[2] < min_sp)
+        min_sp = spacing[2];
+      params->m_Compression = min_sp/10;
+
+      outFib->Compress(params->m_Compression);
+    }
     outFib->SetTrackVisHeader(reference_image->GetGeometry());
 
     mitk::IOUtil::Save(outFib, outFile);
