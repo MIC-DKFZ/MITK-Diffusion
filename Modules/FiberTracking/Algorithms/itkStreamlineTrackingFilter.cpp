@@ -240,7 +240,7 @@ void StreamlineTrackingFilter::BeforeTracking()
   else if (m_Parameters->m_EpConstraints==EndpointConstraints::NO_EP_IN_TARGET)
     std::cout << "StreamlineTracking - Endpoint constraint: NO_EP_IN_TARGET" << std::endl;
 
-  std::cout << "StreamlineTracking - Angular threshold: " << m_Parameters->GetAngularThresholdDot() << "°" << std::endl;
+  std::cout << "StreamlineTracking - Angular threshold: " << m_Parameters->GetAngularThresholdDeg() << "°" << std::endl;
   std::cout << "StreamlineTracking - Stepsize: " << m_Parameters->GetStepSizeMm() << "mm (" << m_Parameters->GetStepSizeMm()/m_Parameters->GetMinVoxelSizeMm() << "*vox)" << std::endl;
   std::cout << "StreamlineTracking - Seeds per voxel: " << m_Parameters->m_SeedsPerVoxel << std::endl;
   std::cout << "StreamlineTracking - Max. tract length: " << m_Parameters->m_MaxTractLengthMm << "mm" << std::endl;
