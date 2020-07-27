@@ -238,7 +238,6 @@ void QmitkStreamlineTrackingView::ParametersToGui(mitk::StreamlineTractographyPa
 
   m_Controls->m_NumSeedsBox->setValue(params.m_NumInteractiveSeeds);
   m_Controls->m_InteractiveBox->setChecked(params.m_EnableInteractive);
-  m_Controls->m_FiberErrorBox->setValue(params.m_Compression);
   m_Controls->m_ResampleFibersBox->setChecked(params.m_CompressFibers);
 
   m_Controls->m_SeedRadiusBox->setValue(params.m_InteractiveRadiusMm);
@@ -319,6 +318,7 @@ void QmitkStreamlineTrackingView::ParametersToGui(mitk::StreamlineTractographyPa
 
 std::shared_ptr<mitk::StreamlineTractographyParameters> QmitkStreamlineTrackingView::GetParametersFromGui()
 {
+  std::shared_ptr<mitk::StreamlineTractographyParameters> params = std::make_shared<mitk::StreamlineTractographyParameters>();
 
   // NOT IN GUI
 //  unsigned int m_NumPreviousDirections = 1;
@@ -327,11 +327,23 @@ std::shared_ptr<mitk::StreamlineTractographyParameters> QmitkStreamlineTrackingV
 //  float m_DeflectionMod = 1.0;
 //  bool m_ApplyDirectionMatrix = false;
 
-  std::shared_ptr<mitk::StreamlineTractographyParameters> params = std::make_shared<mitk::StreamlineTractographyParameters>();
+  // NOT IN GUI BUT AUTOMATICALLY SET
+  if (!m_InputImageNodes.empty())
+  {
+    float min_sp = 999;
+    auto spacing = dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetSpacing();
+    if (spacing[0] < min_sp)
+      min_sp = spacing[0];
+    if (spacing[1] < min_sp)
+      min_sp = spacing[1];
+    if (spacing[2] < min_sp)
+      min_sp = spacing[2];
+    params->m_Compression = min_sp/10;
+  }
+
   params->m_InteractiveRadiusMm = m_Controls->m_SeedRadiusBox->value();
   params->m_NumInteractiveSeeds = m_Controls->m_NumSeedsBox->value();
   params->m_EnableInteractive = m_Controls->m_InteractiveBox->isChecked();
-  params->m_Compression = m_Controls->m_FiberErrorBox->value();
   params->m_CompressFibers = m_Controls->m_ResampleFibersBox->isChecked();
 
   params->m_InteractiveRadiusMm = m_Controls->m_SeedRadiusBox->value();
@@ -500,8 +512,8 @@ void QmitkStreamlineTrackingView::AfterThread()
 
     mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(fiberBundle);
     fib->SetTrackVisHeader(dynamic_cast<mitk::Image*>(m_ParentNode->GetData())->GetGeometry());
-    if (m_Controls->m_ResampleFibersBox->isChecked() && fiberBundle->GetNumberOfLines()>0)
-      fib->Compress(m_Controls->m_FiberErrorBox->value());
+    if (params->m_CompressFibers && fiberBundle->GetNumberOfLines()>0)
+      fib->Compress(params->m_Compression);
     fib->ColorFibersByOrientation();
     m_Tracker->SetDicomProperties(fib);    
     mitk::DiffusionPropertyHelper::CopyDICOMProperties(m_ParentNode->GetData(), fib);
@@ -517,8 +529,6 @@ void QmitkStreamlineTrackingView::AfterThread()
       }
       m_InteractiveNode->SetData(fib);
       m_InteractiveNode->SetFloatProperty("Fiber2DSliceThickness", params->GetMinVoxelSizeMm()/2);
-
-      MITK_INFO << params->GetMinVoxelSizeMm()/2;
 
       if (auto renderWindowPart = this->GetRenderWindowPart())
           renderWindowPart->RequestUpdate();
@@ -1154,12 +1164,34 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     return;
   }
 
+  float min_sp = 999;
   auto spacing = dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetSpacing();
-  params->SetMinVoxelSizeMm(spacing[0]);
-  if (spacing[1] < params->GetMinVoxelSizeMm())
-    params->SetMinVoxelSizeMm(spacing[1]);
-  if (spacing[2] < params->GetMinVoxelSizeMm())
-    params->SetMinVoxelSizeMm(spacing[2]);
+  if (spacing[0] < min_sp)
+    min_sp = spacing[0];
+  if (spacing[1] < min_sp)
+    min_sp = spacing[1];
+  if (spacing[2] < min_sp)
+    min_sp = spacing[2];
+  params->m_Compression = min_sp/10;
+
+  float max_size = 0;
+  for (int i=0; i<3; ++i)
+    if (dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i)>max_size)
+      max_size = dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i);
+  if (params->m_MinTractLengthMm >= max_size)
+  {
+    MITK_INFO << "Max. image size: " << max_size << "mm";
+    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
+    QMessageBox::information(nullptr, "Error", "Minimum tract length exceeds the maximum image extent! Recommended value is about 1/10 of the image extent.");
+    StartStopTrackingGui(false);
+    return;
+  }
+  else if (params->m_MinTractLengthMm > max_size/10)
+  {
+    MITK_INFO << "Max. image size: " << max_size << "mm";
+    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
+    MITK_WARN <<  "Minimum tract length is larger than 1/10 the maximum image extent! Decrease recommended.";
+  }
 
   m_Tracker->SetParameters(params);
   m_Tracker->SetTrackingHandler(m_TrackingHandler);

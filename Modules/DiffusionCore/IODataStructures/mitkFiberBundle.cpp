@@ -2239,7 +2239,7 @@ void mitk::FiberBundle::Compress(float error)
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
-  MITK_INFO << "Compressing fibers";
+  MITK_INFO << "Compressing fibers with max. error " << error << "mm";
   unsigned int numRemovedPoints = 0;
   boost::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
   vtkSmartPointer<vtkFloatArray> newFiberWeights = vtkSmartPointer<vtkFloatArray>::New();
