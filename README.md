@@ -22,19 +22,23 @@ The MITK Diffusion application [[1,2]](#References) offers a selection of image 
 
 Please have a look at the [requirements](#Requirements) for running MITK Diffusion with all its features successfully!
 
-The nightly installers come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually". Should there be no new installer for a while, please [contact](#Contact) us and report the issue.
+The nightly builds come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually". Should there be no new installer for a while, please [contact](#Contact) us and report the issue.
 
-**Windows 64-bit**:
-* [Windows 10 executable (with Python support)](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_Python.exe.html)
-* [Windows 10 zip (with Python support)](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_Python.zip.html)
-* [Windows 10 executable (without Python support)](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_NoPython.exe.html)
-* [Windows 10 zip (without Python support)](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_NoPython.zip.html)
+**Without Python Support (standard)**:
+* [Ubuntu 20.04 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-20.04_NoPython.run.html)
+* [Ubuntu 20.04 tarball archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-20.04_NoPython.tar.gz.html)
+* [Ubuntu 18.04 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-18.04_NoPython.run.html)
+* [Ubuntu 18.04 tarball archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-18.04_NoPython.tar.gz.html)
+* [Windows 10 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_NoPython.exe.html)
+* [Windows 10 zip archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_NoPython.zip.html)
 
-**Linux 64-bit**:
-* [Ubuntu 18.04 executable (with Python support)](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-18.04_Python.run.html)
-* [Ubuntu 18.04 tarball (with Python support)](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-18.04_Python.tar.gz.html)
-* [Ubuntu 18.04 executable (without Python support)](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-18.04_NoPython.run.html)
-* [Ubuntu 18.04 tarball (without Python support)](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-18.04_NoPython.tar.gz.html)
+**With Python Support (experimental)**:
+* [Ubuntu 20.04 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-20.04_Python.run.html)
+* [Ubuntu 20.04 tarball archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-20.04_Python.tar.gz.html)
+* [Ubuntu 18.04 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-18.04_Python.run.html)
+* [Ubuntu 18.04 tarball archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-18.04_Python.tar.gz.html)
+* [Windows 10 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_Python.exe.html)
+* [Windows 10 zip archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_Python.zip.html)
 
 
 If you encounter any bugs, please report them in our [bugtracking](https://phabricator.mitk.org/maniphest/task/edit/form/29/) system or use the [MITK-users mailing list](http://mitk.org/wiki/MITK_Mailinglist). We are grateful for any feedback!
