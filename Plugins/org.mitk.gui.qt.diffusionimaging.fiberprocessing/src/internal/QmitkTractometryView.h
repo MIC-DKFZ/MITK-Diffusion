@@ -46,7 +46,10 @@ public:
   virtual void CreateQtPartControl(QWidget *parent) override;
 
   template <typename TPixel>
-  void ImageValuesAlongTract(const mitk::PixelType, mitk::Image::Pointer image, mitk::FiberBundle::Pointer fib, std::vector< std::vector< double > >& data, std::string& clipboard_string);
+  void StaticResamplingTractometry(const mitk::PixelType, mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string);
+
+  template <typename TPixel>
+  void NearestCentroidPointTractometry(const mitk::PixelType, mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string);
 
   virtual void SetFocus() override;
 

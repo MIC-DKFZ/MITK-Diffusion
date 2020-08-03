@@ -324,7 +324,7 @@ QGroupBox {
           <item row="3" column="0">
            <widget class="QCheckBox" name="m_InteractiveBox">
             <property name="text">
-             <string>Interactive Extraction </string>
+             <string>Interactive Extraction</string>
             </property>
            </widget>
           </item>
@@ -1070,7 +1070,7 @@ QGroupBox {
           <item row="1" column="1">
            <widget class="QDoubleSpinBox" name="m_DensityThresholdBox">
             <property name="toolTip">
-             <string/>
+             <string>Relative tract density (value between 0.0 and 1.0)</string>
             </property>
             <property name="decimals">
              <number>5</number>
@@ -1079,13 +1079,13 @@ QGroupBox {
              <double>0.000000000000000</double>
             </property>
             <property name="maximum">
-             <double>10.000000000000000</double>
+             <double>1.000000000000000</double>
             </property>
             <property name="singleStep">
              <double>0.100000000000000</double>
             </property>
             <property name="value">
-             <double>0.010000000000000</double>
+             <double>0.050000000000000</double>
             </property>
            </widget>
           </item>

@@ -13,14 +13,14 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#include "itkTractClusteringFilter.h"
+#include "mitkTractClusteringFilter.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <boost/progress.hpp>
 #include <vnl/vnl_sparse_matrix.h>
 
-namespace itk{
+namespace mitk{
 
 TractClusteringFilter::TractClusteringFilter()
   : m_NumPoints(12)
@@ -212,6 +212,51 @@ void TractClusteringFilter::AppendCluster(std::vector< Cluster >& a, std::vector
 {
   for (auto c : b)
     a.push_back(c);
+}
+
+void TractClusteringFilter::SetDoResampling(bool DoResampling)
+{
+  m_DoResampling = DoResampling;
+}
+
+void TractClusteringFilter::SetOverlapThreshold(float OverlapThreshold)
+{
+  m_OverlapThreshold = OverlapThreshold;
+}
+
+void TractClusteringFilter::SetFilterMask(const UcharImageType::Pointer &FilterMask)
+{
+  m_FilterMask = FilterMask;
+}
+
+void TractClusteringFilter::SetMinClusterSize(unsigned int MinClusterSize)
+{
+  m_MinClusterSize = MinClusterSize;
+}
+
+void TractClusteringFilter::SetMaxClusters(unsigned int MaxClusters)
+{
+  m_MaxClusters = MaxClusters;
+}
+
+void TractClusteringFilter::SetNumPoints(unsigned int NumPoints)
+{
+  m_NumPoints = NumPoints;
+}
+
+void TractClusteringFilter::SetMergeDuplicateThreshold(float MergeDuplicateThreshold)
+{
+  m_MergeDuplicateThreshold = MergeDuplicateThreshold;
+}
+
+void TractClusteringFilter::SetInCentroids(const mitk::FiberBundle::Pointer &InCentroids)
+{
+  m_InCentroids = InCentroids;
+}
+
+void TractClusteringFilter::SetTractogram(const mitk::FiberBundle::Pointer &Tractogram)
+{
+  m_Tractogram = Tractogram;
 }
 
 std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplicateClusters2(std::vector< TractClusteringFilter::Cluster >& clusters)

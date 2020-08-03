@@ -9,6 +9,7 @@ set(CPP_FILES
   Algorithms/GibbsTracking/mitkFiberBuilder.cpp
   Algorithms/GibbsTracking/mitkSphereInterpolator.cpp
 
+  Algorithms/mitkTractClusteringFilter.cpp
   Algorithms/itkStreamlineTrackingFilter.cpp
   Algorithms/TrackingHandlers/mitkTrackingDataHandler.cpp
   Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.cpp
@@ -27,7 +28,7 @@ set(H_FILES
   Algorithms/itkEvaluateDirectionImagesFilter.h
   Algorithms/itkEvaluateTractogramDirectionsFilter.h
   Algorithms/itkFiberCurvatureFilter.h
-  Algorithms/itkTractClusteringFilter.h
+  Algorithms/mitkTractClusteringFilter.h
   Algorithms/itkTractDistanceFilter.h
   Algorithms/itkFiberExtractionFilter.h
   Algorithms/itkTdiToVolumeFractionFilter.h

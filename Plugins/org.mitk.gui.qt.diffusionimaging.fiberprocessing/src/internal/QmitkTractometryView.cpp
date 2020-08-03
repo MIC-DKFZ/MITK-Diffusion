@@ -38,6 +38,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QClipboard>
 #include <mitkLexicalCast.h>
 #include <QmitkChartWidget.h>
+#include <mitkLookupTable.h>
+#include <mitkTractClusteringFilter.h>
+#include <mitkClusteringMetricEuclideanMean.h>
 
 
 const std::string QmitkTractometryView::VIEW_ID = "org.mitk.views.tractometry";
@@ -151,13 +154,20 @@ bool QmitkTractometryView::Flip(vtkSmartPointer< vtkPolyData > polydata1, int i,
 }
 
 template <typename TPixel>
-void QmitkTractometryView::ImageValuesAlongTract(const mitk::PixelType, mitk::Image::Pointer image, mitk::FiberBundle::Pointer fib, std::vector<std::vector<double> > &data, std::string& clipboard_string)
+void QmitkTractometryView::StaticResamplingTractometry(const mitk::PixelType, mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector<std::vector<double> > &data, std::string& clipboard_string)
 {
+  mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
+
   unsigned int num_points = m_Controls->m_SamplingPointsBox->value();
   mitk::ImagePixelReadAccessor<TPixel,3> readimage(image, image->GetVolumeData(0));
   mitk::FiberBundle::Pointer working_fib = fib->GetDeepCopy();
   working_fib->ResampleToNumPoints(num_points);
   vtkSmartPointer< vtkPolyData > polydata = working_fib->GetFiberPolyData();
+
+  double rgb[3] = {0,0,0};
+
+  mitk::LookupTable::Pointer lookupTable = mitk::LookupTable::New();
+  lookupTable->SetType(mitk::LookupTable::MULTILABEL);
 
   std::vector<std::vector<double> > all_values;
   std::vector< double > mean_values;
@@ -183,11 +193,22 @@ void QmitkTractometryView::ImageValuesAlongTract(const mitk::PixelType, mitk::Im
 
     for (int j=0; j<numPoints; j++)
     {
+      lookupTable->GetTableValue(j, rgb);
+
       double* p;
       if (flip)
-        p = points->GetPoint(numPoints - j - 1);
+      {
+        auto p_idx = numPoints - j - 1;
+        p = points->GetPoint(p_idx);
+
+        working_fib->ColorSinglePoint(i, p_idx, rgb);
+      }
       else
+      {
         p = points->GetPoint(j);
+
+        working_fib->ColorSinglePoint(i, j, rgb);
+      }
 
       Point3D px;
       px[0] = p[0];
@@ -202,6 +223,7 @@ void QmitkTractometryView::ImageValuesAlongTract(const mitk::PixelType, mitk::Im
         max = pixelValue;
 
       mean_values.at(j) += pixelValue;
+
     }
 
     all_values.push_back(fib_vals);
@@ -242,6 +264,232 @@ void QmitkTractometryView::ImageValuesAlongTract(const mitk::PixelType, mitk::Im
   MITK_INFO << "Min: " << min;
   MITK_INFO << "Max: " << max;
   MITK_INFO << "Mean: " << mean/working_fib->GetNumberOfPoints();
+
+  if (m_Controls->m_ShowBinned->isChecked())
+  {
+    mitk::DataNode::Pointer new_node;
+    auto children = GetDataStorage()->GetDerivations(node);
+    for (unsigned int i=0; i<children->size(); ++i)
+    {
+      if (children->at(i)->GetName() == "binned_static")
+      {
+        new_node = children->at(i);
+        new_node->SetData(working_fib);
+        mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+        return;
+      }
+    }
+
+    new_node = mitk::DataNode::New();
+    new_node->SetData(working_fib);
+    new_node->SetName("binned_static");
+    GetDataStorage()->Add(new_node, node);
+  }
+}
+
+template <typename TPixel>
+void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType, mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string)
+{
+  mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
+
+  unsigned int num_points = m_Controls->m_SamplingPointsBox->value();
+  mitk::ImagePixelReadAccessor<TPixel,3> readimage(image, image->GetVolumeData(0));
+  mitk::FiberBundle::Pointer working_fib = fib->GetDeepCopy();
+  working_fib->ResampleSpline(1.0);
+  vtkSmartPointer< vtkPolyData > working_polydata = working_fib->GetFiberPolyData();
+
+  // clustering
+  std::vector< mitk::ClusteringMetric* > metrics;
+  metrics.push_back({new mitk::ClusteringMetricEuclideanMean()});
+
+  int cluster_size = 20;
+  float max_d = 0;
+  int i=1;
+  std::vector< float > distances;
+  while (max_d < working_fib->GetGeometry()->GetDiagonalLength()/2)
+  {
+    distances.push_back(cluster_size*i);
+    max_d = cluster_size*i;
+    ++i;
+  }
+
+  mitk::FiberBundle::Pointer fib_static_resampled = fib->GetDeepCopy();
+  fib_static_resampled->ResampleToNumPoints(num_points);
+  vtkSmartPointer< vtkPolyData > polydata_static_resampled = fib_static_resampled->GetFiberPolyData();
+
+  std::shared_ptr< mitk::TractClusteringFilter > clusterer = std::make_shared<mitk::TractClusteringFilter>();
+  clusterer->SetDistances(distances);
+  clusterer->SetTractogram(fib_static_resampled);
+
+  clusterer->SetMetrics(metrics);
+  clusterer->SetMergeDuplicateThreshold(-1);
+  clusterer->SetNumPoints(num_points);
+  clusterer->SetMaxClusters(3);
+  clusterer->SetMinClusterSize(5);
+  clusterer->Update();
+//  std::vector<mitk::FiberBundle::Pointer> tracts = clusterer->GetOutTractograms();
+  std::vector<mitk::FiberBundle::Pointer> centroids = clusterer->GetOutCentroids();
+
+  double rgb[3] = {0,0,0};
+  mitk::LookupTable::Pointer lookupTable = mitk::LookupTable::New();
+  lookupTable->SetType(mitk::LookupTable::MULTILABEL);
+
+  std::vector<std::vector<double> > all_values;
+  std::vector< double > mean_values;
+  std::vector< unsigned int > value_count;
+  for (unsigned int i=0; i<num_points; ++i)
+  {
+    mean_values.push_back(0);
+    value_count.push_back(0);
+  }
+
+  m_ReferencePolyData = centroids.at(0)->GetFiberPolyData();
+
+  double min = 100000.0;
+  double max = 0;
+  double mean = 0;
+  for (unsigned int i=0; i<working_fib->GetNumFibers(); ++i)
+  {
+    vtkCell* cell = working_polydata->GetCell(i);
+    auto numPoints = cell->GetNumberOfPoints();
+    vtkPoints* points = cell->GetPoints();
+
+    std::vector< double > fib_vals;
+
+    bool flip = false;
+    if (i>0)
+      flip = Flip(polydata_static_resampled, i);
+    else if (m_ReferencePolyData!=nullptr)
+      flip = Flip(polydata_static_resampled, 0, m_ReferencePolyData);
+
+    for (int j=0; j<numPoints; j++)
+    {
+      double* p;
+      if (flip)
+        p = points->GetPoint(numPoints - j - 1);
+      else
+        p = points->GetPoint(j);
+
+      int min_bin = 0;
+      float d=999999;
+      for (auto centroid : centroids)
+      {
+        auto centroid_polydata = centroid->GetFiberPolyData();
+
+        vtkCell* centroid_cell = centroid_polydata->GetCell(0);
+        auto centroid_numPoints = centroid_cell->GetNumberOfPoints();
+        vtkPoints* centroid_points = centroid_cell->GetPoints();
+
+        for (int bin=0; bin<centroid_numPoints; ++bin)
+        {
+          double* centroid_p;
+          centroid_p = centroid_points->GetPoint(bin);
+          float temp_d = std::sqrt((p[0]-centroid_p[0])*(p[0]-centroid_p[0]) + (p[1]-centroid_p[1])*(p[1]-centroid_p[1]) + (p[2]-centroid_p[2])*(p[2]-centroid_p[2]));
+          if (temp_d<d)
+          {
+            d = temp_d;
+            min_bin = bin;
+          }
+        }
+
+      }
+
+      lookupTable->GetTableValue(min_bin, rgb);
+      if (flip)
+        working_fib->ColorSinglePoint(i, numPoints - j - 1, rgb);
+      else
+        working_fib->ColorSinglePoint(i, j, rgb);
+
+      Point3D px;
+      px[0] = p[0];
+      px[1] = p[1];
+      px[2] = p[2];
+      double pixelValue = static_cast<double>(readimage.GetPixelByWorldCoordinates(px));
+      fib_vals.push_back(pixelValue);
+      mean += pixelValue;
+      if (pixelValue<min)
+        min = pixelValue;
+      else if (pixelValue>max)
+        max = pixelValue;
+
+      mean_values.at(min_bin) += pixelValue;
+      value_count.at(min_bin) += 1;
+    }
+
+    all_values.push_back(fib_vals);
+  }
+
+  if (m_ReferencePolyData==nullptr)
+    m_ReferencePolyData = working_polydata;
+
+  std::vector< double > std_values1;
+  std::vector< double > std_values2;
+  for (unsigned int i=0; i<num_points; ++i)
+  {
+    mean_values.at(i) /= value_count.at(i);
+    double stdev = 0;
+
+    for (unsigned int j=0; j<all_values.size(); ++j)
+    {
+      double diff = mean_values.at(i) - all_values.at(j).at(i);
+      diff *= diff;
+      stdev += diff;
+    }
+    stdev /= all_values.size();
+    stdev = std::sqrt(stdev);
+    std_values1.push_back(mean_values.at(i) + stdev);
+    std_values2.push_back(mean_values.at(i) - stdev);
+
+    clipboard_string += boost::lexical_cast<std::string>(mean_values.at(i));
+    clipboard_string += " ";
+    clipboard_string += boost::lexical_cast<std::string>(stdev);
+    clipboard_string += "\n";
+  }
+  clipboard_string += "\n";
+
+  data.push_back(mean_values);
+  data.push_back(std_values1);
+  data.push_back(std_values2);
+
+  MITK_INFO << "Min: " << min;
+  MITK_INFO << "Max: " << max;
+  MITK_INFO << "Mean: " << mean/working_fib->GetNumberOfPoints();
+
+  if (m_Controls->m_ShowBinned->isChecked())
+  {
+    mitk::DataNode::Pointer new_node;
+    mitk::DataNode::Pointer new_node2;
+    auto children = GetDataStorage()->GetDerivations(node);
+    for (unsigned int i=0; i<children->size(); ++i)
+    {
+      if (children->at(i)->GetName() == "binned_centroid")
+      {
+        new_node = children->at(i);
+        new_node->SetData(working_fib);
+        mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+        return;
+      }
+
+      if (children->at(i)->GetName() == "binned_centroid_centroid")
+      {
+        new_node2 = children->at(i);
+        new_node2->SetData(centroids.at(0));
+        mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+        return;
+      }
+
+    }
+
+    new_node = mitk::DataNode::New();
+    new_node->SetData(working_fib);
+    new_node->SetName("binned_centroid");
+    GetDataStorage()->Add(new_node, node);
+
+    new_node2 = mitk::DataNode::New();
+    new_node2->SetData(centroids.at(0));
+    new_node2->SetName("binned_centroid_centroid");
+    GetDataStorage()->Add(new_node2, node);
+  }
 }
 
 void QmitkTractometryView::Activated()
@@ -308,11 +556,10 @@ void QmitkTractometryView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*p
     {
       clipboardString += node->GetName() + "\n";
       clipboardString += "mean stdev\n";
-      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
       m_CurrentSelection.push_back(node);
 
       std::vector< std::vector< double > > data;
-      mitkPixelTypeMultiplex4( ImageValuesAlongTract, image->GetPixelType(), image, fib, data, clipboardString );
+      mitkPixelTypeMultiplex4( NearestCentroidPointTractometry, image->GetPixelType(), image, node, data, clipboardString );
 
       m_Controls->m_ChartWidget->AddData1D(data.at(0), node->GetName() + " Mean", QmitkChartWidget::ChartType::line);
       if (m_Controls->m_StDevBox->isChecked())
