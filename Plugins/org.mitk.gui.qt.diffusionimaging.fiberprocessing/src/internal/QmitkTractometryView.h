@@ -61,6 +61,7 @@ public:
 protected slots:
 
   void UpdateGui();
+  void StartTractometry();
 
 protected:
 

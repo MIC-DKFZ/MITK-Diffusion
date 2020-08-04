@@ -93,6 +93,7 @@ public:
     params = std::make_shared<mitk::StreamlineTractographyParameters>();
     params->m_FixRandomSeed = true;
     params->m_InterpolateRoiImages = false;
+    params->SetLoopCheckDeg(-1);  // todo: test loop check
 
     {
       typedef mitk::ImageToItk< mitk::TrackingHandlerPeaks::PeakImgType > CasterType;

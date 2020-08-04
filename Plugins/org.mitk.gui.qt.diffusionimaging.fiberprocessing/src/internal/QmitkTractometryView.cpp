@@ -40,7 +40,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QmitkChartWidget.h>
 #include <mitkLookupTable.h>
 #include <mitkTractClusteringFilter.h>
-#include <mitkClusteringMetricEuclideanMean.h>
+#include <mitkClusteringMetricEuclideanStd.h>
 
 
 const std::string QmitkTractometryView::VIEW_ID = "org.mitk.views.tractometry";
@@ -69,8 +69,8 @@ void QmitkTractometryView::CreateQtPartControl( QWidget *parent )
     m_Controls = new Ui::QmitkTractometryViewControls;
     m_Controls->setupUi( parent );
 
-    connect( m_Controls->m_SamplingPointsBox, SIGNAL(valueChanged(int)), this, SLOT(UpdateGui()) );
-    connect( m_Controls->m_StDevBox, SIGNAL(stateChanged(int)), this, SLOT(UpdateGui()) );
+    connect( m_Controls->m_MethodBox, SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()) );
+    connect( m_Controls->m_StartButton, SIGNAL(clicked()), this, SLOT(StartTractometry()) );
 
     mitk::TNodePredicateDataType<mitk::Image>::Pointer imageP = mitk::TNodePredicateDataType<mitk::Image>::New();
     mitk::NodePredicateDimension::Pointer dimP = mitk::NodePredicateDimension::New(3);
@@ -267,7 +267,7 @@ void QmitkTractometryView::StaticResamplingTractometry(const mitk::PixelType, mi
 
   if (m_Controls->m_ShowBinned->isChecked())
   {
-    mitk::DataNode::Pointer new_node;
+    mitk::DataNode::Pointer new_node = mitk::DataNode::New();
     auto children = GetDataStorage()->GetDerivations(node);
     for (unsigned int i=0; i<children->size(); ++i)
     {
@@ -275,14 +275,17 @@ void QmitkTractometryView::StaticResamplingTractometry(const mitk::PixelType, mi
       {
         new_node = children->at(i);
         new_node->SetData(working_fib);
+        new_node->SetVisibility(true);
+        node->SetVisibility(false);
         mitk::RenderingManager::GetInstance()->RequestUpdateAll();
         return;
       }
     }
 
-    new_node = mitk::DataNode::New();
     new_node->SetData(working_fib);
     new_node->SetName("binned_static");
+    new_node->SetVisibility(true);
+    node->SetVisibility(false);
     GetDataStorage()->Add(new_node, node);
   }
 }
@@ -300,35 +303,40 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
 
   // clustering
   std::vector< mitk::ClusteringMetric* > metrics;
-  metrics.push_back({new mitk::ClusteringMetricEuclideanMean()});
-
-  int cluster_size = 20;
-  float max_d = 0;
-  int i=1;
-  std::vector< float > distances;
-  while (max_d < working_fib->GetGeometry()->GetDiagonalLength()/2)
-  {
-    distances.push_back(cluster_size*i);
-    max_d = cluster_size*i;
-    ++i;
-  }
+  metrics.push_back({new mitk::ClusteringMetricEuclideanStd()});
 
   mitk::FiberBundle::Pointer fib_static_resampled = fib->GetDeepCopy();
   fib_static_resampled->ResampleToNumPoints(num_points);
   vtkSmartPointer< vtkPolyData > polydata_static_resampled = fib_static_resampled->GetFiberPolyData();
 
+  std::vector<mitk::FiberBundle::Pointer> centroids;
   std::shared_ptr< mitk::TractClusteringFilter > clusterer = std::make_shared<mitk::TractClusteringFilter>();
-  clusterer->SetDistances(distances);
-  clusterer->SetTractogram(fib_static_resampled);
+  int c=0;
+  while (c<30 && (centroids.empty() || centroids.size()>static_cast<unsigned long>(m_Controls->m_MaxCentroids->value())))
+  {
+    float cluster_size = m_Controls->m_ClusterSize->value() + m_Controls->m_ClusterSize->value()*c*0.2;
+    float max_d = 0;
+    int i=1;
+    std::vector< float > distances;
+    while (max_d < working_fib->GetGeometry()->GetDiagonalLength()/2)
+    {
+      distances.push_back(cluster_size*i);
+      max_d = cluster_size*i;
+      ++i;
+    }
 
-  clusterer->SetMetrics(metrics);
-  clusterer->SetMergeDuplicateThreshold(-1);
-  clusterer->SetNumPoints(num_points);
-  clusterer->SetMaxClusters(3);
-  clusterer->SetMinClusterSize(5);
-  clusterer->Update();
-//  std::vector<mitk::FiberBundle::Pointer> tracts = clusterer->GetOutTractograms();
-  std::vector<mitk::FiberBundle::Pointer> centroids = clusterer->GetOutCentroids();
+    clusterer->SetDistances(distances);
+    clusterer->SetTractogram(fib_static_resampled);
+    clusterer->SetMetrics(metrics);
+    clusterer->SetMergeDuplicateThreshold(cluster_size);
+    clusterer->SetDoResampling(false);
+    clusterer->SetNumPoints(num_points);
+  //  clusterer->SetMaxClusters(m_Controls->m_MaxCentroids->value());
+    clusterer->SetMinClusterSize(1);
+    clusterer->Update();
+    centroids = clusterer->GetOutCentroids();
+    ++c;
+  }
 
   double rgb[3] = {0,0,0};
   mitk::LookupTable::Pointer lookupTable = mitk::LookupTable::New();
@@ -343,8 +351,6 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
     value_count.push_back(0);
   }
 
-  m_ReferencePolyData = centroids.at(0)->GetFiberPolyData();
-
   double min = 100000.0;
   double max = 0;
   double mean = 0;
@@ -355,20 +361,9 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
     vtkPoints* points = cell->GetPoints();
 
     std::vector< double > fib_vals;
-
-    bool flip = false;
-    if (i>0)
-      flip = Flip(polydata_static_resampled, i);
-    else if (m_ReferencePolyData!=nullptr)
-      flip = Flip(polydata_static_resampled, 0, m_ReferencePolyData);
-
     for (int j=0; j<numPoints; j++)
     {
-      double* p;
-      if (flip)
-        p = points->GetPoint(numPoints - j - 1);
-      else
-        p = points->GetPoint(j);
+      double* p = points->GetPoint(j);
 
       int min_bin = 0;
       float d=999999;
@@ -380,6 +375,8 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
         auto centroid_numPoints = centroid_cell->GetNumberOfPoints();
         vtkPoints* centroid_points = centroid_cell->GetPoints();
 
+        bool centroid_flip = Flip(centroid_polydata, 0, centroids.at(0)->GetFiberPolyData());
+
         for (int bin=0; bin<centroid_numPoints; ++bin)
         {
           double* centroid_p;
@@ -388,17 +385,17 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
           if (temp_d<d)
           {
             d = temp_d;
-            min_bin = bin;
+            if (centroid_flip)
+              min_bin = centroid_numPoints-bin-1;
+            else
+              min_bin = bin;
           }
         }
 
       }
 
       lookupTable->GetTableValue(min_bin, rgb);
-      if (flip)
-        working_fib->ColorSinglePoint(i, numPoints - j - 1, rgb);
-      else
-        working_fib->ColorSinglePoint(i, j, rgb);
+      working_fib->ColorSinglePoint(i, j, rgb);
 
       Point3D px;
       px[0] = p[0];
@@ -457,8 +454,8 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
 
   if (m_Controls->m_ShowBinned->isChecked())
   {
-    mitk::DataNode::Pointer new_node;
-    mitk::DataNode::Pointer new_node2;
+    mitk::DataNode::Pointer new_node = mitk::DataNode::New();
+//    mitk::DataNode::Pointer new_node2;
     auto children = GetDataStorage()->GetDerivations(node);
     for (unsigned int i=0; i<children->size(); ++i)
     {
@@ -466,29 +463,17 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
       {
         new_node = children->at(i);
         new_node->SetData(working_fib);
+        new_node->SetVisibility(true);
+        node->SetVisibility(false);
         mitk::RenderingManager::GetInstance()->RequestUpdateAll();
         return;
       }
-
-      if (children->at(i)->GetName() == "binned_centroid_centroid")
-      {
-        new_node2 = children->at(i);
-        new_node2->SetData(centroids.at(0));
-        mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-        return;
-      }
-
     }
-
-    new_node = mitk::DataNode::New();
     new_node->SetData(working_fib);
     new_node->SetName("binned_centroid");
+    new_node->SetVisibility(true);
+    node->SetVisibility(false);
     GetDataStorage()->Add(new_node, node);
-
-    new_node2 = mitk::DataNode::New();
-    new_node2->SetData(centroids.at(0));
-    new_node2->SetName("binned_centroid_centroid");
-    GetDataStorage()->Add(new_node2, node);
   }
 }
 
@@ -526,74 +511,88 @@ std::string QmitkTractometryView::RGBToHexString(double *rgb)
   return os.str();
 }
 
-void QmitkTractometryView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& nodes)
+void QmitkTractometryView::StartTractometry()
 {
-  if (!m_Visible)
-    return;
-
-  m_CurrentSelection.clear();
-  if(m_Controls->m_ImageBox->GetSelectedNode().IsNull())
-    return;
-
-  std::string clipboardString = "";
   m_ReferencePolyData = nullptr;
-  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData());
 
   vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
   lookupTable->SetTableRange(0.0, 1.0);
   lookupTable->Build();
 
-  int num_tracts = 0;
-  for (auto node: nodes)
-    if ( dynamic_cast<mitk::FiberBundle*>(node->GetData()) )
-      num_tracts++;
+  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData());
 
-  int c = 1;
   this->m_Controls->m_ChartWidget->Clear();
-  for (auto node: nodes)
+  std::string clipboardString = "";
+  int c = 1;
+  for (auto node : m_CurrentSelection)
   {
-    if ( dynamic_cast<mitk::FiberBundle*>(node->GetData()) )
+    clipboardString += node->GetName() + "\n";
+    clipboardString += "mean stdev\n";
+
+    std::vector< std::vector< double > > data;
+    if (m_Controls->m_MethodBox->currentIndex()==0)
     {
-      clipboardString += node->GetName() + "\n";
-      clipboardString += "mean stdev\n";
-      m_CurrentSelection.push_back(node);
-
-      std::vector< std::vector< double > > data;
-      mitkPixelTypeMultiplex4( NearestCentroidPointTractometry, image->GetPixelType(), image, node, data, clipboardString );
-
-      m_Controls->m_ChartWidget->AddData1D(data.at(0), node->GetName() + " Mean", QmitkChartWidget::ChartType::line);
-      if (m_Controls->m_StDevBox->isChecked())
-      {
-        this->m_Controls->m_ChartWidget->AddData1D(data.at(1), node->GetName() + " +STDEV", QmitkChartWidget::ChartType::line);
-        this->m_Controls->m_ChartWidget->AddData1D(data.at(2), node->GetName() + " -STDEV", QmitkChartWidget::ChartType::line);
-      }
-
-      double color[3];
-      if (num_tracts>1)
-      {
-        float scalar_color = ( (float)c/num_tracts - 1.0/num_tracts )/(1.0-1.0/num_tracts);
-        lookupTable->GetColor(1.0 - scalar_color, color);
-      }
-      else
-        lookupTable->GetColor(0, color);
-
-      this->m_Controls->m_ChartWidget->SetColor(node->GetName() + " Mean", RGBToHexString(color));
-
-      if (m_Controls->m_StDevBox->isChecked())
-      {
-        color[0] *= 0.5;
-        color[1] *= 0.5;
-        color[2] *= 0.5;
-        this->m_Controls->m_ChartWidget->SetColor(node->GetName() + " +STDEV", RGBToHexString(color));
-        this->m_Controls->m_ChartWidget->SetColor(node->GetName() + " -STDEV", RGBToHexString(color));
-      }
-
-      this->m_Controls->m_ChartWidget->Show(true);
-      this->m_Controls->m_ChartWidget->SetShowDataPoints(false);
-      ++c;
+      mitkPixelTypeMultiplex4( StaticResamplingTractometry, image->GetPixelType(), image, node, data, clipboardString );
     }
+    else
+    {
+      mitkPixelTypeMultiplex4( NearestCentroidPointTractometry, image->GetPixelType(), image, node, data, clipboardString );
+    }
+
+    m_Controls->m_ChartWidget->AddData1D(data.at(0), node->GetName() + " Mean", QmitkChartWidget::ChartType::line);
+    if (m_Controls->m_StDevBox->isChecked())
+    {
+      this->m_Controls->m_ChartWidget->AddData1D(data.at(1), node->GetName() + " +STDEV", QmitkChartWidget::ChartType::line);
+      this->m_Controls->m_ChartWidget->AddData1D(data.at(2), node->GetName() + " -STDEV", QmitkChartWidget::ChartType::line);
+    }
+
+    double color[3];
+    if (m_CurrentSelection.size()>1)
+    {
+      float scalar_color = ( (float)c/m_CurrentSelection.size() - 1.0/m_CurrentSelection.size() )/(1.0-1.0/m_CurrentSelection.size());
+      lookupTable->GetColor(1.0 - scalar_color, color);
+    }
+    else
+      lookupTable->GetColor(0, color);
+
+    this->m_Controls->m_ChartWidget->SetColor(node->GetName() + " Mean", RGBToHexString(color));
+
+    if (m_Controls->m_StDevBox->isChecked())
+    {
+      color[0] *= 0.5;
+      color[1] *= 0.5;
+      color[2] *= 0.5;
+      this->m_Controls->m_ChartWidget->SetColor(node->GetName() + " +STDEV", RGBToHexString(color));
+      this->m_Controls->m_ChartWidget->SetColor(node->GetName() + " -STDEV", RGBToHexString(color));
+    }
+
+    this->m_Controls->m_ChartWidget->Show(true);
+    this->m_Controls->m_ChartWidget->SetShowDataPoints(false);
+    ++c;
   }
 
   QApplication::clipboard()->setText(clipboardString.c_str(), QClipboard::Clipboard);
+}
 
+void QmitkTractometryView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& nodes)
+{
+  m_Controls->m_StartButton->setEnabled(false);
+
+  if (!m_Visible)
+    return;
+
+  if (m_Controls->m_MethodBox->currentIndex()==0)
+    m_Controls->m_ClusterFrame->setVisible(false);
+  else
+    m_Controls->m_ClusterFrame->setVisible(true);
+
+  m_CurrentSelection.clear();
+  if(m_Controls->m_ImageBox->GetSelectedNode().IsNull())
+    return;
+
+  for (auto node: nodes)
+    if ( dynamic_cast<mitk::FiberBundle*>(node->GetData()) )
+      m_CurrentSelection.push_back(node);
+  if (!m_CurrentSelection.empty())
+    m_Controls->m_StartButton->setEnabled(true);
 }

@@ -152,7 +152,7 @@ namespace mitk
     float m_AngularThresholdDeg = -1;
     float m_AngularThresholdDot;
 
-    float m_LoopCheckDeg = -1;
+    float m_LoopCheckDeg = 30;
 
     float m_StepSizeVox = -1;
     float m_StepSizeMm;
