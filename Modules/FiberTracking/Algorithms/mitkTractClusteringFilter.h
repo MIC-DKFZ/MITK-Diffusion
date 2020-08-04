@@ -13,13 +13,13 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef itkTractClusteringFilter_h
-#define itkTractClusteringFilter_h
+#ifndef TractClusteringFilter_h
+#define TractClusteringFilter_h
 
 // MITK
+#include <MitkFiberTrackingExports.h>
 #include <mitkPlanarEllipse.h>
 #include <mitkFiberBundle.h>
-#include <mitkFiberfoxParameters.h>
 #include <mitkClusteringMetric.h>
 
 // ITK
@@ -32,12 +32,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPoints.h>
 #include <vtkPolyLine.h>
 
-namespace itk{
+namespace mitk{
 
 /**
 * \brief    */
 
-class TractClusteringFilter : public ProcessObject
+class MITKFIBERTRACKING_EXPORT TractClusteringFilter
 {
 public:
 
@@ -56,35 +56,13 @@ public:
     }
   };
 
-  typedef TractClusteringFilter Self;
-  typedef ProcessObject                                       Superclass;
-  typedef SmartPointer< Self >                                Pointer;
-  typedef SmartPointer< const Self >                          ConstPointer;
+  TractClusteringFilter();
+  ~TractClusteringFilter();
+
   typedef itk::Image< float, 3 >                              FloatImageType;
   typedef itk::Image< unsigned char, 3 >                      UcharImageType;
 
-  itkFactorylessNewMacro(Self)
-  itkCloneMacro(Self)
-  itkTypeMacro( TractClusteringFilter, ProcessObject )
-
-  itkSetMacro(NumPoints, unsigned int)  ///< Fibers are resampled to the specified number of points. If scalar maps are used, a larger number of points is recommended.
-  itkGetMacro(NumPoints, unsigned int)  ///< Fibers are resampled to the specified number of points. If scalar maps are used, a larger number of points is recommended.
-  itkSetMacro(MinClusterSize, unsigned int) ///< Clusters with too few fibers are discarded
-  itkGetMacro(MinClusterSize, unsigned int) ///< Clusters with too few fibers are discarded
-  itkSetMacro(MaxClusters, unsigned int) ///< Only the N largest clusters are kept
-  itkGetMacro(MaxClusters, unsigned int) ///< Only the N largest clusters are kept
-  itkSetMacro(MergeDuplicateThreshold, float) ///< Clusters with centroids very close to each other are merged. Set to 0 to avoid merging and to -1 to use the original cluster size.
-  itkGetMacro(MergeDuplicateThreshold, float) ///< Clusters with centroids very close to each other are merged. Set to 0 to avoid merging and to -1 to use the original cluster size.
-  itkSetMacro(DoResampling, bool) ///< Resample fibers to equal number of points. This is mandatory, but can be performed outside of the filter if desired.
-  itkGetMacro(DoResampling, bool) ///< Resample fibers to equal number of points. This is mandatory, but can be performed outside of the filter if desired.
-  itkSetMacro(OverlapThreshold, float)  ///< Overlap threshold used in conjunction with the filter mask when clustering around known centroids.
-  itkGetMacro(OverlapThreshold, float)  ///< Overlap threshold used in conjunction with the filter mask when clustering around known centroids.
-
-  itkSetMacro(Tractogram, mitk::FiberBundle::Pointer)   ///< The streamlines to be clustered
-  itkSetMacro(InCentroids, mitk::FiberBundle::Pointer)  ///< If a tractogram containing known tract centroids is set, the input fibers are assigned to the closest centroid. If no centroid is found within the specified smallest clustering distance, the fiber is assigned to the no-fit cluster.
-  itkSetMacro(FilterMask, UcharImageType::Pointer)  ///< If fibers are clustered around the nearest input centroids (see SetInCentroids), the complete input tractogram can additionally be pre-filtered with this binary mask and a given overlap threshold (see SetOverlapThreshold).
-
-  virtual void Update() override{
+  void Update(){
     this->GenerateData();
   }
 
@@ -93,14 +71,33 @@ public:
   std::vector<mitk::FiberBundle::Pointer> GetOutTractograms() const;
   std::vector<mitk::FiberBundle::Pointer> GetOutCentroids() const;
   std::vector<Cluster> GetOutClusters() const;
+  std::vector<std::vector<unsigned int> > GetOutFiberIndices() const;
 
   void SetMetrics(const std::vector<mitk::ClusteringMetric *> &Metrics);
 
-  std::vector<std::vector<unsigned int> > GetOutFiberIndices() const;
+  void SetTractogram(const mitk::FiberBundle::Pointer &Tractogram);
+
+  void SetInCentroids(const mitk::FiberBundle::Pointer &InCentroids);
+
+  void SetMergeDuplicateThreshold(float MergeDuplicateThreshold);
+
+  void SetNumPoints(unsigned int NumPoints);
+
+  void SetMaxClusters(unsigned int MaxClusters);
+
+  void SetMinClusterSize(unsigned int MinClusterSize);
+
+  void SetFilterMask(const UcharImageType::Pointer &FilterMask);
+
+  void SetOverlapThreshold(float OverlapThreshold);
+
+  void SetDoResampling(bool DoResampling);
+
+  unsigned int GetDiscardedClusters() const;
 
 protected:
 
-  void GenerateData() override;
+  void GenerateData();
   std::vector< vnl_matrix<float> > ResampleFibers(FiberBundle::Pointer tractogram);
   float CalcOverlap(vnl_matrix<float>& t);
 
@@ -111,9 +108,6 @@ protected:
   std::vector< Cluster > AddToKnownClusters(std::vector< unsigned int > f_indices, std::vector<vnl_matrix<float> > &centroids);
   void AppendCluster(std::vector< Cluster >& a, std::vector< Cluster >&b);
 
-  TractClusteringFilter();
-  virtual ~TractClusteringFilter();
-
   unsigned int                                m_NumPoints;
   std::vector< float >                        m_Distances;
   mitk::FiberBundle::Pointer                  m_Tractogram;
@@ -123,6 +117,7 @@ protected:
   std::vector<vnl_matrix<float> >             T;
   unsigned int                                m_MinClusterSize;
   unsigned int                                m_MaxClusters;
+  unsigned int                                m_DiscardedClusters;
   float                                       m_MergeDuplicateThreshold;
   std::vector< Cluster >                      m_OutClusters;
   bool                                        m_DoResampling;
@@ -132,9 +127,5 @@ protected:
   std::vector< std::vector< unsigned int > >          m_OutFiberIndices;
 };
 }
-
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkTractClusteringFilter.cpp"
-#endif
 
 #endif

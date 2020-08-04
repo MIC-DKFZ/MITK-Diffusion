@@ -26,7 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateAnd.h>
 #include <mitkImageCast.h>
 #include <mitkImageAccessByItk.h>
-#include <itkTractClusteringFilter.h>
+#include <mitkTractClusteringFilter.h>
 #include <mitkFiberBundle.h>
 #include <mitkClusteringMetricEuclideanMean.h>
 #include <mitkClusteringMetricEuclideanMax.h>
@@ -36,6 +36,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkClusteringMetricInnerAngles.h>
 #include <mitkClusteringMetricLength.h>
 #include <QMessageBox>
+#include <boost/lexical_cast.hpp>
 
 const std::string QmitkFiberClusteringView::VIEW_ID = "org.mitk.views.fiberclustering";
 using namespace mitk;
@@ -124,7 +125,7 @@ void QmitkFiberClusteringView::StartClustering()
     ++i;
   }
 
-  itk::TractClusteringFilter::Pointer clusterer = itk::TractClusteringFilter::New();
+  std::shared_ptr< mitk::TractClusteringFilter > clusterer = std::make_shared<mitk::TractClusteringFilter>();
   clusterer->SetDistances(distances);
   clusterer->SetTractogram(fib);
   if (m_Controls->m_InCentroidsBox->GetSelectedNode().IsNotNull())

@@ -571,6 +571,54 @@ void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool normalize, bool w
   m_UpdateTime2D.Modified();
 }
 
+void mitk::FiberBundle::ColorSinglePoint(int f_idx, int p_idx, double rgb[3])
+{
+//  vtkPoints* extrPoints = m_FiberPolyData->GetPoints();
+//  vtkIdType numOfPoints = 0;
+//  if (extrPoints!=nullptr)
+//    numOfPoints = extrPoints->GetNumberOfPoints();
+
+//  //colors and alpha value for each single point, RGBA = 4 components
+  unsigned char rgba[4] = {0,0,0,0};
+//  m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+//  m_FiberColors->Allocate(numOfPoints * 4);
+//  m_FiberColors->SetNumberOfComponents(4);
+//  m_FiberColors->SetName("FIBER_COLORS");
+
+//  auto numOfFibers = m_FiberPolyData->GetNumberOfLines();
+//  if (numOfFibers < 1)
+//    return;
+
+//  /* extract single fibers of fiberBundle */
+//  vtkCellArray* fiberList = m_FiberPolyData->GetLines();
+//  fiberList->InitTraversal();
+
+//  for (int fi=0; fi<numOfFibers; ++fi)
+//  {
+
+//    vtkIdType* idList; // contains the point id's of the line
+//    vtkIdType num_points; // number of points for current line
+////    fiberList->GetNextCell(num_points, idList);
+//    fiberList->GetCell(f_idx, num_points, idList);
+
+    vtkCell* cell = m_FiberPolyData->GetCell(f_idx);
+
+
+//    /* single fiber checkpoints: is number of points valid */
+//    if (p_idx < num_points)
+//    {
+      rgba[0] = static_cast<unsigned char>(255.0 * rgb[0]);
+      rgba[1] = static_cast<unsigned char>(255.0 * rgb[1]);
+      rgba[2] = static_cast<unsigned char>(255.0 * rgb[2]);
+      rgba[3] = 255;
+
+      m_FiberColors->InsertTypedTuple(cell->GetPointId(p_idx), rgba);
+//    }
+//  }
+  m_UpdateTime3D.Modified();
+  m_UpdateTime2D.Modified();
+}
+
 void mitk::FiberBundle::ColorFibersByOrientation()
 {
   //===== FOR WRITING A TEST ========================

@@ -48,4 +48,5 @@ void QmitkFiberProcessingPerspective::CreateInitialLayout(berry::IPageLayout::Po
   left->AddView("org.mitk.views.fiberquantification");
   left->AddView("org.mitk.views.fiberclustering");
   left->AddView("org.mitk.views.fiberfit");
+  left->AddView("org.mitk.views.tractometry");
 }

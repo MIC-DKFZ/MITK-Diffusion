@@ -18,13 +18,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionCommandLineParser.h>
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>
-#include <itkTractClusteringFilter.h>
+#include <mitkTractClusteringFilter.h>
 #include <mitkClusteringMetricEuclideanMean.h>
 #include <mitkClusteringMetricEuclideanMax.h>
 #include <mitkClusteringMetricEuclideanStd.h>
 #include <mitkClusteringMetricAnatomic.h>
 #include <mitkClusteringMetricScalarMap.h>
 #include <mitkDiffusionDataIOHelper.h>
+#include <mitkTractClusteringFilter.h>
 
 typedef itk::Image<unsigned char, 3>    ItkFloatImgType;
 
@@ -106,11 +107,11 @@ int main(int argc, char* argv[])
       std::cout.rdbuf (ss.rdbuf());       // <-- redirect
       try
       {
-        itk::TractClusteringFilter::Pointer segmenter = itk::TractClusteringFilter::New();
+        std::shared_ptr< mitk::TractClusteringFilter > segmenter = std::make_shared<mitk::TractClusteringFilter>();
 
         // calculate centroids from reference bundle
         {
-          itk::TractClusteringFilter::Pointer clusterer = itk::TractClusteringFilter::New();
+          std::shared_ptr< mitk::TractClusteringFilter > clusterer = std::make_shared<mitk::TractClusteringFilter>();
           clusterer->SetDistances({10,20,30});
           clusterer->SetTractogram(ref_fib);
           clusterer->SetMetrics({new mitk::ClusteringMetricEuclideanStd()});

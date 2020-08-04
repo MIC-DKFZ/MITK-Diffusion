@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionCommandLineParser.h>
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>
-#include <itkTractClusteringFilter.h>
+#include <mitkTractClusteringFilter.h>
 #include <mitkClusteringMetricEuclideanMean.h>
 #include <mitkClusteringMetricEuclideanMax.h>
 #include <mitkClusteringMetricEuclideanStd.h>
@@ -155,7 +155,7 @@ int main(int argc, char* argv[])
       ++i;
     }
 
-    itk::TractClusteringFilter::Pointer clusterer = itk::TractClusteringFilter::New();
+    std::shared_ptr< mitk::TractClusteringFilter > clusterer = std::make_shared<mitk::TractClusteringFilter>();
     clusterer->SetDistances(distances);
     clusterer->SetTractogram(fib);
 

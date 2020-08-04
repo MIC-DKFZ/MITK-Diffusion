@@ -41,6 +41,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkTractsToRgbaImageFilter.h>
 #include <itkTractsToVectorImageFilter.h>
 #include <itkTractsToFiberEndingsImageFilter.h>
+#include <itkSignedMaurerDistanceMapImageFilter.h>
+#include <itkBinaryThinningImageFilter.h>
 
 #include <mitkLexicalCast.h>
 
@@ -233,6 +235,14 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
         newNode = GenerateFiberEndingsPointSet(fib);
         name += "_fiber_endings";
         break;
+      case 6:
+        newNode = GenerateDistanceMap(fib);
+        name += "_distance_map";
+        break;
+      case 7:
+        newNode = GenerateBinarySkeleton(fib);
+        name += "_skeleton";
+        break;
       }
       if (newNode.IsNotNull())
       {
@@ -335,6 +345,74 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateColorHeatmap(mitk:
   img->SetVolume(outImg->GetBufferPointer());
 
   // init data node
+  mitk::DataNode::Pointer node = mitk::DataNode::New();
+  node->SetData(img);
+  return node;
+}
+
+mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateBinarySkeleton(mitk::FiberBundle::Pointer fib)
+{
+  typedef itk::Image<unsigned char, 3> UcharImageType;
+
+  itk::TractDensityImageFilter< UcharImageType >::Pointer envelope_generator = itk::TractDensityImageFilter< UcharImageType >::New();
+  envelope_generator->SetFiberBundle(fib);
+  envelope_generator->SetBinaryOutput(true);
+  envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
+  if (m_SelectedImage.IsNotNull())
+  {
+    UcharImageType::Pointer itkImage = UcharImageType::New();
+    CastToItkImage(m_SelectedImage, itkImage);
+    envelope_generator->SetInputImage(itkImage);
+    envelope_generator->SetUseImageGeometry(true);
+
+  }
+  envelope_generator->Update();
+
+  itk::BinaryThinningImageFilter<UcharImageType, UcharImageType>::Pointer map_generator = itk::BinaryThinningImageFilter<UcharImageType, UcharImageType>::New();
+  map_generator->SetInput(envelope_generator->GetOutput());
+  map_generator->Update();
+
+  UcharImageType::Pointer outImg = map_generator->GetOutput();
+  mitk::Image::Pointer img = mitk::Image::New();
+  img->InitializeByItk(outImg.GetPointer());
+  img->SetVolume(outImg->GetBufferPointer());
+
+  mitk::DataNode::Pointer node = mitk::DataNode::New();
+  node->SetData(img);
+  return node;
+}
+
+mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateDistanceMap(mitk::FiberBundle::Pointer fib)
+{
+  typedef itk::Image<unsigned char, 3> UcharImageType;
+  typedef itk::Image<float, 3> FloatImageType;
+
+  itk::TractDensityImageFilter< UcharImageType >::Pointer envelope_generator = itk::TractDensityImageFilter< UcharImageType >::New();
+  envelope_generator->SetFiberBundle(fib);
+  envelope_generator->SetBinaryOutput(true);
+  envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
+  if (m_SelectedImage.IsNotNull())
+  {
+    UcharImageType::Pointer itkImage = UcharImageType::New();
+    CastToItkImage(m_SelectedImage, itkImage);
+    envelope_generator->SetInputImage(itkImage);
+    envelope_generator->SetUseImageGeometry(true);
+
+  }
+  envelope_generator->Update();
+
+  itk::SignedMaurerDistanceMapImageFilter<UcharImageType, FloatImageType>::Pointer map_generator = itk::SignedMaurerDistanceMapImageFilter<UcharImageType, FloatImageType>::New();
+  map_generator->SetInput(envelope_generator->GetOutput());
+  map_generator->SetUseImageSpacing(true);
+  map_generator->SetSquaredDistance(false);
+  map_generator->SetInsideIsPositive(true);
+  map_generator->Update();
+
+  FloatImageType::Pointer outImg = map_generator->GetOutput();
+  mitk::Image::Pointer img = mitk::Image::New();
+  img->InitializeByItk(outImg.GetPointer());
+  img->SetVolume(outImg->GetBufferPointer());
+
   mitk::DataNode::Pointer node = mitk::DataNode::New();
   node->SetData(img);
   return node;

@@ -77,6 +77,9 @@ protected:
   mitk::DataNode::Pointer GenerateColorHeatmap(mitk::FiberBundle::Pointer fib);
   mitk::DataNode::Pointer GenerateFiberEndingsImage(mitk::FiberBundle::Pointer fib);
   mitk::DataNode::Pointer GenerateFiberEndingsPointSet(mitk::FiberBundle::Pointer fib);
+  mitk::DataNode::Pointer GenerateDistanceMap(mitk::FiberBundle::Pointer fib);
+  mitk::DataNode::Pointer GenerateBinarySkeleton(mitk::FiberBundle::Pointer fib);
+
   bool  m_Visible;
 };
 

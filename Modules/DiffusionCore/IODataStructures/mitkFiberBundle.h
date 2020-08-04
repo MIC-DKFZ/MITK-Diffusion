@@ -63,6 +63,7 @@ public:
     mitkNewMacro1Param(Self, vtkSmartPointer<vtkPolyData>) // custom constructor
 
     // colorcoding related methods
+    void ColorSinglePoint(int f_idx, int p_idx, double rgb[3]);
     void ColorFibersByFiberWeights(bool opacity, bool normalize);
     void ColorFibersByCurvature(bool opacity, bool normalize, bool weight_fibers);
     void ColorFibersByLength(bool opacity, bool normalize, bool weight_fibers);

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>484</width>
-    <height>574</height>
+    <height>744</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -23,6 +23,92 @@ QGroupBox {
 }</string>
   </property>
   <layout class="QGridLayout" name="gridLayout_10">
+   <item row="6" column="0">
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="3" column="0">
+    <widget class="QCheckBox" name="m_StDevBox">
+     <property name="text">
+      <string>Show STDEV</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QCheckBox" name="m_ShowBinned">
+     <property name="text">
+      <string>Show binned tract</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="0">
+    <widget class="QmitkChartWidget" name="m_ChartWidget" native="true">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>600</height>
+      </size>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QGroupBox" name="m_ClusterFrame">
+     <property name="title">
+      <string>Centroid Options</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_6">
+        <property name="text">
+         <string>Cluster Size:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Max. Number of Centroids:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QSpinBox" name="m_MaxCentroids">
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>99</number>
+        </property>
+        <property name="value">
+         <number>1</number>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="m_ClusterSize">
+        <property name="value">
+         <double>15.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
    <item row="0" column="0">
     <widget class="QFrame" name="frame">
      <property name="frameShape">
@@ -54,14 +140,7 @@ QGroupBox {
         </property>
        </widget>
       </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_3">
-        <property name="text">
-         <string>Input Image:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
+      <item row="2" column="1">
        <widget class="QSpinBox" name="m_SamplingPointsBox">
         <property name="minimum">
          <number>3</number>
@@ -74,46 +153,48 @@ QGroupBox {
         </property>
        </widget>
       </item>
-      <item row="1" column="0">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>Input Image:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
        <widget class="QLabel" name="label_4">
         <property name="text">
          <string>Sampling Points:</string>
         </property>
        </widget>
       </item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="m_MethodBox">
+        <item>
+         <property name="text">
+          <string>Static Resampling</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Centroid Based</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_7">
+        <property name="text">
+         <string>Binning Method:</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
-   <item row="3" column="0">
-    <spacer name="verticalSpacer">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>40</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item row="2" column="0">
-    <widget class="QmitkChartWidget" name="m_ChartWidget" native="true">
-     <property name="minimumSize">
-      <size>
-       <width>0</width>
-       <height>600</height>
-      </size>
-     </property>
-    </widget>
-   </item>
    <item row="1" column="0">
-    <widget class="QCheckBox" name="m_StDevBox">
+    <widget class="QCommandLinkButton" name="m_StartButton">
      <property name="text">
-      <string>Show STDEV</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
+      <string>Start Tractometry</string>
      </property>
     </widget>
    </item>
