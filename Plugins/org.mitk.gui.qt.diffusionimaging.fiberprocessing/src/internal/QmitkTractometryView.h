@@ -67,7 +67,6 @@ protected:
 
   /// \brief called by QmitkAbstractView when DataManager's selection has changed
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
-  QmitkChartWidget::ColorTheme GetColorTheme();
 
   Ui::QmitkTractometryViewControls* m_Controls;
 
