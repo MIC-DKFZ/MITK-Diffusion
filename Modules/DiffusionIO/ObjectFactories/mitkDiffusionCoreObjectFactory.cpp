@@ -156,11 +156,11 @@ void mitk::DiffusionCoreObjectFactory::SetDefaultProperties(mitk::DataNode* node
   }
 }
 
-const char* mitk::DiffusionCoreObjectFactory::GetFileExtensions()
+std::string mitk::DiffusionCoreObjectFactory::GetFileExtensions()
 {
   std::string fileExtension;
   this->CreateFileExtensions(m_FileExtensionsMap, fileExtension);
-  return fileExtension.c_str();
+  return fileExtension;
 }
 
 mitk::CoreObjectFactoryBase::MultimapType mitk::DiffusionCoreObjectFactory::GetFileExtensionsMap()
@@ -168,11 +168,11 @@ mitk::CoreObjectFactoryBase::MultimapType mitk::DiffusionCoreObjectFactory::GetF
   return m_FileExtensionsMap;
 }
 
-const char* mitk::DiffusionCoreObjectFactory::GetSaveFileExtensions()
+std::string mitk::DiffusionCoreObjectFactory::GetSaveFileExtensions()
 {
   std::string fileExtension;
   this->CreateFileExtensions(m_SaveFileExtensionsMap, fileExtension);
-  return fileExtension.c_str();
+  return fileExtension;
 }
 
 mitk::CoreObjectFactoryBase::MultimapType mitk::DiffusionCoreObjectFactory::GetSaveFileExtensionsMap()
