@@ -64,7 +64,7 @@ void mitk::ConnectomicsObjectFactory::SetDefaultProperties(mitk::DataNode* node)
   }
 }
 
-const char* mitk::ConnectomicsObjectFactory::GetFileExtensions()
+std::string mitk::ConnectomicsObjectFactory::GetFileExtensions()
 {
   std::string fileExtension;
   this->CreateFileExtensions(m_FileExtensionsMap, fileExtension);
@@ -76,7 +76,7 @@ mitk::CoreObjectFactoryBase::MultimapType mitk::ConnectomicsObjectFactory::GetFi
   return m_FileExtensionsMap;
 }
 
-const char* mitk::ConnectomicsObjectFactory::GetSaveFileExtensions()
+std::string mitk::ConnectomicsObjectFactory::GetSaveFileExtensions()
 {
   std::string fileExtension;
   this->CreateFileExtensions(m_SaveFileExtensionsMap, fileExtension);
