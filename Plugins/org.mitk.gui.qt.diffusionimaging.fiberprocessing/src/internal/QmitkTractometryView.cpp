@@ -78,27 +78,10 @@ void QmitkTractometryView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_ImageBox->SetPredicate(mitk::NodePredicateAnd::New(imageP, dimP));
 
-    m_Controls->m_ChartWidget->SetTheme(GetColorTheme());
     m_Controls->m_ChartWidget->SetXAxisLabel("Tract position");
     m_Controls->m_ChartWidget->SetYAxisLabel("Image Value");
 
-  }
-}
-
-::QmitkChartWidget::ColorTheme QmitkTractometryView::GetColorTheme()
-{
-  berry::IPreferencesService* prefService = berry::WorkbenchPlugin::GetDefault()->GetPreferencesService();
-  berry::IPreferences::Pointer m_StylePref = prefService->GetSystemPreferences()->Node(berry::QtPreferences::QT_STYLES_NODE);
-
-  QString styleName = m_StylePref->Get(berry::QtPreferences::QT_STYLE_NAME, "");
-
-  if (styleName == ":/org.blueberry.ui.qt/darkstyle.qss")
-  {
-    return QmitkChartWidget::ColorTheme::darkstyle;
-  }
-  else
-  {
-    return QmitkChartWidget::ColorTheme::lightstyle;
+    m_Controls->m_ChartWidget->SetTheme(QmitkChartWidget::ColorTheme::darkstyle);
   }
 }
 
@@ -515,9 +498,9 @@ void QmitkTractometryView::StartTractometry()
 {
   m_ReferencePolyData = nullptr;
 
-  vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-  lookupTable->SetTableRange(0.0, 1.0);
-  lookupTable->Build();
+  double color[3] = {0,0,0};
+  mitk::LookupTable::Pointer lookupTable = mitk::LookupTable::New();
+  lookupTable->SetType(mitk::LookupTable::MULTILABEL);
 
   mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData());
 
@@ -539,22 +522,18 @@ void QmitkTractometryView::StartTractometry()
       mitkPixelTypeMultiplex4( NearestCentroidPointTractometry, image->GetPixelType(), image, node, data, clipboardString );
     }
 
+
     m_Controls->m_ChartWidget->AddData1D(data.at(0), node->GetName() + " Mean", QmitkChartWidget::ChartType::line);
+    m_Controls->m_ChartWidget->SetLineStyle(node->GetName() + " Mean", QmitkChartWidget::LineStyle::solid);
     if (m_Controls->m_StDevBox->isChecked())
     {
-      this->m_Controls->m_ChartWidget->AddData1D(data.at(1), node->GetName() + " +STDEV", QmitkChartWidget::ChartType::line);
-      this->m_Controls->m_ChartWidget->AddData1D(data.at(2), node->GetName() + " -STDEV", QmitkChartWidget::ChartType::line);
+      m_Controls->m_ChartWidget->AddData1D(data.at(1), node->GetName() + " +STDEV", QmitkChartWidget::ChartType::line);
+      m_Controls->m_ChartWidget->AddData1D(data.at(2), node->GetName() + " -STDEV", QmitkChartWidget::ChartType::line);
+      m_Controls->m_ChartWidget->SetLineStyle(node->GetName() + " +STDEV", QmitkChartWidget::LineStyle::dashed);
+      m_Controls->m_ChartWidget->SetLineStyle(node->GetName() + " -STDEV", QmitkChartWidget::LineStyle::dashed);
     }
 
-    double color[3];
-    if (m_CurrentSelection.size()>1)
-    {
-      float scalar_color = ( (float)c/m_CurrentSelection.size() - 1.0/m_CurrentSelection.size() )/(1.0-1.0/m_CurrentSelection.size());
-      lookupTable->GetColor(1.0 - scalar_color, color);
-    }
-    else
-      lookupTable->GetColor(0, color);
-
+    lookupTable->GetTableValue(c, color);
     this->m_Controls->m_ChartWidget->SetColor(node->GetName() + " Mean", RGBToHexString(color));
 
     if (m_Controls->m_StDevBox->isChecked())

@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itksys/SystemTools.hxx>
 #include <mitkIOUtil.h>
 #include <mitkLocaleSwitch.h>
+#include <mitkPreferenceListReaderOptionsFunctor.h>
 
 /**
  * Convert files from one ending to the other
@@ -68,7 +69,8 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::Image::Pointer dwi = mitk::IOUtil::Load<mitk::Image>(inFileName);
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
+    mitk::Image::Pointer dwi = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
     mitk::DiffusionPropertyHelper::ImageType::Pointer itkVectorImagePointer = mitk::DiffusionPropertyHelper::ImageType::New();
     mitk::CastToItkImage(dwi, itkVectorImagePointer);
