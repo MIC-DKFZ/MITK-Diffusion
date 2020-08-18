@@ -9,9 +9,7 @@ try:
     data = sitk.GetArrayFromImage(in_image)
     data = np.nan_to_num(data)
 
-    swapaxes = False
     data = np.swapaxes(data, 0, 2)
-    swapaxes = True
 
     affine = np.zeros((4, 4))
     affine[0, 0] = in_image.GetDirection()[0] * in_image.GetSpacing()[0]
