@@ -24,7 +24,7 @@ set(BUILD_DiffusionMiscCmdApps ON CACHE BOOL "Build miscellaneous commandline to
 set(BUILD_DiffusionQuantificationCmdApps ON CACHE BOOL "Build commandline tools for diffusion quantification (IVIM, ADC, ...)" FORCE)
 set(BUILD_DiffusionTractographyCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber tractography" FORCE)
 set(BUILD_DiffusionTractographyEvaluationCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber tractography evaluation" FORCE)
-set(BUILD_DiffusionConnectomicsCmdApps OFF CACHE BOOL "Build commandline tools for diffusion connectomics" FORCE)
+set(BUILD_DiffusionConnectomicsCmdApps ON CACHE BOOL "Build commandline tools for diffusion connectomics" FORCE)
 
 # Build neither all plugins nor examples
 set(MITK_BUILD_ALL_PLUGINS OFF CACHE BOOL "Build all MITK plugins" FORCE)
@@ -40,3 +40,5 @@ set(MITK_SHOW_CONSOLE_WINDOW ON CACHE BOOL "Use this to enable or disable the co
 
 set(MITK_VTK_DEBUG_LEAKS OFF CACHE BOOL "" FORCE)
 set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+
+set(MITK_CUSTOM_REVISION_DESC "MITK-Diffusion" CACHE STRING "" FORCE)
