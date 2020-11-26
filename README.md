@@ -227,7 +227,7 @@ Automatically generated random fiber configuration for Fiberfox simulations.
 More detailed build instructions can be found in the [documentation](http://docs.mitk.org/nightly/BuildInstructionsPage.html).
 
 
-Continuous integration: http://cdash.mitk.org/index.php?project=MITK&display=project
+Continuous integration: https://cdash.mitk.org/index.php?project=MITK-Diffusion
 
 
 ## References
