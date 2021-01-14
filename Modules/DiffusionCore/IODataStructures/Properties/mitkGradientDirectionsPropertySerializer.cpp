@@ -18,10 +18,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define mitkGradientDirectionPropertySerializer_h_included
 
 #include "mitkBasePropertySerializer.h"
-
 #include "mitkGradientDirectionsProperty.h"
-
 #include "MitkDiffusionCoreExports.h"
+#include <tinyxml2.h>
 
 namespace mitk
 {
@@ -34,7 +33,7 @@ class MITKDIFFUSIONCORE_EXPORT GradientDirectionsPropertySerializer : public Bas
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
 
-    TiXmlElement* Serialize() override
+    tinyxml2::XMLElement* Serialize(tinyxml2::XMLDocument& doc) override
     {
       if (const GradientDirectionsProperty* prop = dynamic_cast<const GradientDirectionsProperty*>(m_Property.GetPointer()))
       {
@@ -48,14 +47,14 @@ class MITKDIFFUSIONCORE_EXPORT GradientDirectionsPropertySerializer : public Bas
         GradientDirectionsContainerType::ConstIterator it = gdc->Begin();
         GradientDirectionsContainerType::ConstIterator end = gdc->End();
 
-        auto  element = new TiXmlElement("gradientdirections");
+        auto  element = doc.NewElement("gradientdirections");
 
         while (it != end) {
-          auto  child = new TiXmlElement("entry");
+          auto  child = doc.NewElement("entry");
           std::stringstream ss;
           ss << it.Value();
-          child->SetAttribute("value", ss.str());
-          element->InsertEndChild(*child);
+          child->SetAttribute("value", ss.str().c_str());
+          element->InsertEndChild(child);
 
           ++it;
         }
@@ -65,20 +64,20 @@ class MITKDIFFUSIONCORE_EXPORT GradientDirectionsPropertySerializer : public Bas
       else return nullptr;
     }
 
-    BaseProperty::Pointer Deserialize(TiXmlElement* element) override
+    BaseProperty::Pointer Deserialize(const tinyxml2::XMLElement* element) override
     {
       if (!element) return nullptr;
 
       mitk::GradientDirectionsProperty::GradientDirectionsContainerType::Pointer gdc;
       gdc = mitk::GradientDirectionsProperty::GradientDirectionsContainerType::New();
 
-      TiXmlElement* entry = element->FirstChildElement( "entry" )->ToElement();
+      const tinyxml2::XMLElement* entry = element->FirstChildElement( "entry" )->ToElement();
       while(entry != nullptr){
 
         std::stringstream ss;
         std::string value;
 
-        entry->QueryStringAttribute("value",&value);
+	    value = std::string(entry->Attribute("value"));
         ss << value;
 
         vnl_vector_fixed<double, 3> vector;

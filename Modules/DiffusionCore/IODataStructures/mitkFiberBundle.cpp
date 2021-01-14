@@ -1069,7 +1069,7 @@ void mitk::FiberBundle::GenerateFiberIds()
   idFiberFilter->SetInputData(m_FiberPolyData);
   idFiberFilter->CellIdsOn();
   //  idFiberFilter->PointIdsOn(); // point id's are not needed
-  idFiberFilter->SetIdsArrayName(FIBER_ID_ARRAY);
+  idFiberFilter->SetCellIdsArrayName(FIBER_ID_ARRAY);
   idFiberFilter->FieldDataOn();
   idFiberFilter->Update();
 

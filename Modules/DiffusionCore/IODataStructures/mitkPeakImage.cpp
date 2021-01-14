@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPointData.h>
 #include <mitkImagePixelWriteAccessor.h>
 #include <mitkImagePixelReadAccessor.h>
+#include <vtkUnsignedCharArray.h>
 
 mitk::PeakImage::PeakImage() : Image()
 {
