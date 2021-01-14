@@ -18,10 +18,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define mitkBValueMapPropertySerializer_h_included
 
 #include "mitkBasePropertySerializer.h"
-
 #include "mitkBValueMapProperty.h"
-
 #include <MitkDiffusionCoreExports.h>
+#include <tinyxml2.h>
 
 namespace mitk
 {
@@ -52,7 +51,7 @@ public:
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
 
-  TiXmlElement* Serialize() override
+  tinyxml2::XMLElement* Serialize(tinyxml2::XMLDocument& doc) override
   {
     if (const BValueMapProperty* prop = dynamic_cast<const BValueMapProperty*>(m_Property.GetPointer()))
     {
@@ -64,16 +63,16 @@ public:
       BValueMapProperty::BValueMap::const_iterator it = map.begin();
       BValueMapProperty::BValueMap::const_iterator end = map.end();
 
-      auto  element = new TiXmlElement("bvaluemap");
+      auto  element = doc.NewElement("bvaluemap");
 
 
 
       while (it != end) {
-        auto  child = new TiXmlElement("entry");
+        auto  child = doc.NewElement("entry");
         {
           std::stringstream ss;
           ss << it->first;
-          child->SetAttribute("key", ss.str());
+          child->SetAttribute("key", ss.str().c_str());
         }
 
         {
@@ -83,9 +82,9 @@ public:
 
             ss << it->second[i] << ",";
           }
-          child->SetAttribute("value", ss.str());
+          child->SetAttribute("value", ss.str().c_str());
         }
-        element->InsertEndChild(*child);
+        element->InsertEndChild(child);
         ++it;
       }
 
@@ -95,18 +94,18 @@ public:
   }
 
 
-  BaseProperty::Pointer Deserialize(TiXmlElement* element) override
+  BaseProperty::Pointer Deserialize(const tinyxml2::XMLElement* element) override
   {
     if (!element) return nullptr;
 
     BValueMapProperty::BValueMap map;
 
-    TiXmlElement* entry = element->FirstChildElement( "entry" )->ToElement();
+    const tinyxml2::XMLElement* entry = element->FirstChildElement( "entry" )->ToElement();
     while(entry != nullptr){
 
       std::string key, value;
-      entry->QueryStringAttribute("key",&key);
-      entry->QueryStringAttribute("value",&value);
+	  key = std::string(entry->Attribute("key"));
+	  value = std::string(entry->Attribute("value"));
 
       std::vector<unsigned int> indices = split(value.c_str(), ',');
 

@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <MitkDiffusionCoreExports.h>
 
 #include "mitkSerializerMacros.h"
+#include <tinyxml2.h>
 
 namespace mitk
 {
@@ -113,11 +114,13 @@ class MITKDIFFUSIONCORE_EXPORT OdfNormalizationMethodPropertySerializer : public
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
 
-    BaseProperty::Pointer Deserialize(TiXmlElement* element) override
+    BaseProperty::Pointer Deserialize(const tinyxml2::XMLElement* element) override
     {
       if (!element) return nullptr;
-      const char* sa( element->Attribute("value") );
-      std::string s(sa?sa:"");
+
+      std::string s = "";
+      s = std::string(element->Attribute("value"));
+
       OdfNormalizationMethodProperty::Pointer property = OdfNormalizationMethodProperty::New();
       property->SetValue( s );
       return property.GetPointer();

@@ -18,10 +18,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define mitkMeasurementFramePropertySerializer_h_included
 
 #include "mitkBasePropertySerializer.h"
-
 #include "mitkMeasurementFrameProperty.h"
-
 #include <MitkDiffusionCoreExports.h>
+#include <tinyxml2.h>
 
 namespace mitk
 {
@@ -34,7 +33,7 @@ class MITKDIFFUSIONCORE_EXPORT MeasurementFramePropertySerializer : public BaseP
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
 
-    TiXmlElement* Serialize() override
+    tinyxml2::XMLElement* Serialize(tinyxml2::XMLDocument& doc) override
     {
       if (const MeasurementFrameProperty* prop = dynamic_cast<const MeasurementFrameProperty*>(m_Property.GetPointer()))
       {
@@ -44,29 +43,29 @@ class MITKDIFFUSIONCORE_EXPORT MeasurementFramePropertySerializer : public BaseP
 
         if(mft.is_zero()) return nullptr;
 
-        auto  element = new TiXmlElement("measurementframe");
+        auto  element = doc.NewElement("measurementframe");
 
-        auto  child = new TiXmlElement("entry");
+        auto  child = doc.NewElement("entry");
         std::stringstream ss;
         ss << mft;
-        child->SetAttribute("value", ss.str());
-        element->InsertEndChild(*child);
+        child->SetAttribute("value", ss.str().c_str());
+        element->InsertEndChild(child);
 
         return element;
       }
       else return nullptr;
     }
 
-    BaseProperty::Pointer Deserialize(TiXmlElement* element) override
+    BaseProperty::Pointer Deserialize(const tinyxml2::XMLElement* element) override
     {
       if (!element) return nullptr;
 
-      TiXmlElement* entry = element->FirstChildElement( "entry" )->ToElement();
+      const tinyxml2::XMLElement* entry = element->FirstChildElement( "entry" )->ToElement();
 
       std::stringstream ss;
       std::string value;
 
-      entry->QueryStringAttribute("value",&value);
+	  value = std::string(entry->Attribute("value"));
       ss << value;
 
       MeasurementFrameProperty::MeasurementFrameType matrix;

@@ -577,7 +577,7 @@ void QmitkTractbasedSpatialStatisticsView::Cut()
   for( int fiberID( 0 ); fiberID < num; fiberID++ )
   {
     vtkIdType   numPointsInCell(0);
-    vtkIdType*  pointsInCell(nullptr);
+    vtkIdType const*  pointsInCell(nullptr);
     lines->GetNextCell ( numPointsInCell, pointsInCell );
 
     int startId = 0;

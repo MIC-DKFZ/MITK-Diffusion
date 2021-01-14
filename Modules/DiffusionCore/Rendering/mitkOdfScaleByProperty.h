@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <MitkDiffusionCoreExports.h>
 #include "mitkEnumerationProperty.h"
 #include "mitkEnumerationPropertySerializer.h"
+#include <tinyxml2.h>
 
 namespace mitk
 {
@@ -94,11 +95,13 @@ class MITKDIFFUSIONCORE_EXPORT OdfScaleByPropertySerializer : public Enumeration
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
 
-    BaseProperty::Pointer Deserialize(TiXmlElement* element) override
+    BaseProperty::Pointer Deserialize(const tinyxml2::XMLElement* element) override
     {
       if (!element) return nullptr;
-      const char* sa( element->Attribute("value") );
-      std::string s(sa?sa:"");
+
+      std::string s = "";
+      s = std::string(element->Attribute("value"));
+
       OdfScaleByProperty::Pointer property = OdfScaleByProperty::New();
       property->SetValue( s );
       return property.GetPointer();

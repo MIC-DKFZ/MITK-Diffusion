@@ -650,7 +650,7 @@ void mitk::FiberBundle::ColorFibersByOrientation()
   fiberList->InitTraversal();
   for (int fi=0; fi<numOfFibers; ++fi) {
 
-    vtkIdType* idList; // contains the point id's of the line
+    vtkIdType const* idList; // contains the point id's of the line
     vtkIdType pointsPerFiber; // number of points for current line
     fiberList->GetNextCell(pointsPerFiber, idList);
 
@@ -1069,7 +1069,7 @@ void mitk::FiberBundle::GenerateFiberIds()
   idFiberFilter->SetInputData(m_FiberPolyData);
   idFiberFilter->CellIdsOn();
   //  idFiberFilter->PointIdsOn(); // point id's are not needed
-  idFiberFilter->SetIdsArrayName(FIBER_ID_ARRAY);
+  idFiberFilter->SetCellIdsArrayName(FIBER_ID_ARRAY);
   idFiberFilter->FieldDataOn();
   idFiberFilter->Update();
 

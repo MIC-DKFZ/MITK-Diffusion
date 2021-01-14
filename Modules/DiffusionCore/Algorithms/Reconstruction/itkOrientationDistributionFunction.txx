@@ -644,7 +644,7 @@ OrientationDistributionFunction<T, NOdfDirections>
 
     vtkCellArray* vtkpolys = delaunay->GetOutput()->GetPolys();
     vtkCellArray* vtknewpolys = vtkCellArray::New();
-    vtkIdType npts; vtkIdType *pts;
+    vtkIdType npts; vtkIdType const *pts;
     while(vtkpolys->GetNextCell(npts,pts))
     {
       bool insert = true;
@@ -768,7 +768,7 @@ OrientationDistributionFunction<T, NOdfDirections>
     {
       auto      idxs = new std::vector<int>();
       polys->InitTraversal();
-      vtkIdType npts; vtkIdType *pts;
+      vtkIdType npts; vtkIdType const *pts;
       while(polys->GetNextCell(npts,pts))
       {
         if( pts[0] == i )
@@ -919,7 +919,7 @@ OrientationDistributionFunction<T, NOdfDirections>
     double maxChordLength = GetMaxChordLength();
     vtkCellArray* polys = m_BaseMesh->GetPolys();
     vtkPoints* points = m_BaseMesh->GetPoints();
-    vtkIdType npts; vtkIdType *pts;
+    vtkIdType npts; vtkIdType const *pts;
     double current_min = NumericTraits<double>::max();
     polys->InitTraversal();
     while(polys->GetNextCell(npts,pts))

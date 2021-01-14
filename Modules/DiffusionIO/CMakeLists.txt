@@ -5,6 +5,6 @@ MITK_CREATE_MODULE(
   AUTOLOAD_WITH MitkCore
   PACKAGE_DEPENDS 
     PUBLIC DCMTK
-    PRIVATE tinyxml
+    PRIVATE tinyxml2
 )
 
