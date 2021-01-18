@@ -479,7 +479,7 @@ void QmitkTensorReconstructionView::ResidualCalculation()
     {
       double out = outliersPerSlice[i][j];
 
-      unsigned char *_rgba = lookup->MapValue(out);
+      const unsigned char *_rgba = lookup->MapValue(out);
       int r, g, b;
       r = _rgba[0];
       g = _rgba[1];

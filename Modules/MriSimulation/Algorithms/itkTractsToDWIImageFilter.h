@@ -138,7 +138,7 @@ protected:
     itk::TimeProbe                              m_TimeProbe;
     bool                                        m_UseConstantRandSeed;
     bool                                        m_MaskImageSet;
-    ofstream                                    m_Logfile;
+    std::ofstream                                    m_Logfile;
     std::string                                 m_MotionLog;
     std::string                                 m_SpikeLog;
 

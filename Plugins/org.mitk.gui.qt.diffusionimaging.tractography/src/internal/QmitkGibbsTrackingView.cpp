@@ -45,7 +45,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itksys/SystemTools.hxx>
 
 // MISC
-#include <tinyxml.h>
+#include <tinyxml2.h>
 
 
 
@@ -510,25 +510,25 @@ void QmitkGibbsTrackingView::SetOutputFile()
 // save current tracking paramters as xml file (.gtp)
 void QmitkGibbsTrackingView::SaveTrackingParameters()
 {
-  TiXmlDocument documentXML;
-  TiXmlDeclaration* declXML = new TiXmlDeclaration( "1.0", "", "" );
-  documentXML.LinkEndChild( declXML );
+  tinyxml2::XMLDocument documentXML;
+  //TiXmlDeclaration* declXML = new TiXmlDeclaration( "1.0", "", "" );
+  //documentXML.LinkEndChild( declXML );
 
-  TiXmlElement* mainXML = new TiXmlElement("global_tracking_parameter_file");
-  mainXML->SetAttribute("file_version",  "0.1");
-  documentXML.LinkEndChild(mainXML);
+  auto mainXML = documentXML.NewElement("global_tracking_parameter_file");
+  mainXML->SetAttribute("file_version",  0.1);
+  documentXML.InsertFirstChild(mainXML);
 
-  TiXmlElement* paramXML = new TiXmlElement("parameter_set");
-  paramXML->SetAttribute("iterations", m_Controls->m_IterationsBox->text().toStdString());
-  paramXML->SetAttribute("particle_length", QString::number((float)m_Controls->m_ParticleLengthSlider->value()/10).toStdString());
-  paramXML->SetAttribute("particle_width", QString::number((float)m_Controls->m_ParticleWidthSlider->value()/10).toStdString());
-  paramXML->SetAttribute("particle_weight", QString::number((float)m_Controls->m_ParticleWeightSlider->value()/10000).toStdString());
-  paramXML->SetAttribute("temp_start", QString::number((float)m_Controls->m_StartTempSlider->value()/100).toStdString());
-  paramXML->SetAttribute("temp_end", QString::number((float)m_Controls->m_EndTempSlider->value()/10000).toStdString());
-  paramXML->SetAttribute("inexbalance", QString::number((float)m_Controls->m_InExBalanceSlider->value()/10).toStdString());
-  paramXML->SetAttribute("fiber_length", QString::number(m_Controls->m_FiberLengthSlider->value()).toStdString());
-  paramXML->SetAttribute("curvature_threshold", QString::number(m_Controls->m_CurvatureThresholdSlider->value()).toStdString());
-  mainXML->LinkEndChild(paramXML);
+  auto paramXML = documentXML.NewElement("parameter_set");
+  paramXML->SetAttribute("iterations", m_Controls->m_IterationsBox->text().toStdString().c_str());
+  paramXML->SetAttribute("particle_length", (float)m_Controls->m_ParticleLengthSlider->value()/10);
+  paramXML->SetAttribute("particle_width", (float)m_Controls->m_ParticleWidthSlider->value()/10);
+  paramXML->SetAttribute("particle_weight", (float)m_Controls->m_ParticleWeightSlider->value()/10000);
+  paramXML->SetAttribute("temp_start", (float)m_Controls->m_StartTempSlider->value()/100);
+  paramXML->SetAttribute("temp_end", (float)m_Controls->m_EndTempSlider->value()/10000);
+  paramXML->SetAttribute("inexbalance", (float)m_Controls->m_InExBalanceSlider->value()/10);
+  paramXML->SetAttribute("fiber_length", m_Controls->m_FiberLengthSlider->value());
+  paramXML->SetAttribute("curvature_threshold", m_Controls->m_CurvatureThresholdSlider->value());
+  mainXML->InsertEndChild(paramXML);
   QString filename = QFileDialog::getSaveFileName(
                        0,
                        tr("Save Parameters"),
@@ -539,7 +539,7 @@ void QmitkGibbsTrackingView::SaveTrackingParameters()
     return;
   if(!filename.endsWith(".gtp"))
     filename += ".gtp";
-  documentXML.SaveFile( filename.toStdString() );
+  documentXML.SaveFile( filename.toStdString().c_str() );
 }
 
 // load current tracking paramters from xml file (.gtp)
@@ -549,16 +549,11 @@ void QmitkGibbsTrackingView::LoadTrackingParameters()
   if(filename.isEmpty() || filename.isNull())
     return;
 
-  TiXmlDocument doc( filename.toStdString() );
-  doc.LoadFile();
+  tinyxml2::XMLDocument doc;
+  doc.LoadFile(filename.toStdString().c_str());
 
-  TiXmlHandle hDoc(&doc);
-  TiXmlElement* pElem;
-  TiXmlHandle hRoot(0);
-
-  pElem = hDoc.FirstChildElement().Element();
-  hRoot = TiXmlHandle(pElem);
-  pElem = hRoot.FirstChildElement("parameter_set").Element();
+  tinyxml2::XMLNode * hRoot = doc.FirstChild();
+  auto pElem = hRoot->FirstChildElement("parameter_set");
 
   QString iterations(pElem->Attribute("iterations"));
   m_Controls->m_IterationsBox->setText(iterations);

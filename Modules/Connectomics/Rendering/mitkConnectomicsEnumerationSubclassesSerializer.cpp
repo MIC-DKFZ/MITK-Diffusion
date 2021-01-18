@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkConnectomicsRenderingNodeRadiusParameterProperty.h"
 #include "mitkConnectomicsRenderingNodeThresholdParameterProperty.h"
 #include "mitkConnectomicsRenderingSchemeProperty.h"
+#include <tinyxml2.h>
 
 #include <MitkConnectomicsExports.h>
 
@@ -44,7 +45,7 @@ class MITKCONNECTOMICS_EXPORT classname ## Serializer : public EnumerationProper
     itkFactorylessNewMacro(Self) \
     itkCloneMacro(Self) \
  \
-    virtual BaseProperty::Pointer Deserialize(TiXmlElement* element) \
+    virtual BaseProperty::Pointer Deserialize(const tinyxml2::XMLElement* element) \
     { \
         if (!element) return nullptr; \
             const char* sa( element->Attribute("value") ); \

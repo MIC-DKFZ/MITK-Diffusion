@@ -1582,15 +1582,15 @@ void QmitkPartialVolumeAnalysisView::SetMeasurementInfoToRenderWindow(const QStr
         if (!text.isEmpty())
         {
             m_MeasurementInfoAnnotation->SetText(1, text.toLatin1().data());
-            mitk::VtkLayerController::GetInstance(m_LastRenderWindow->GetRenderWindow())->InsertForegroundRenderer(
+            mitk::VtkLayerController::GetInstance(m_LastRenderWindow->GetVtkRenderWindow())->InsertForegroundRenderer(
                         m_MeasurementInfoRenderer, true);
         }
         else
         {
             if (mitk::VtkLayerController::GetInstance(
-                        m_LastRenderWindow->GetRenderWindow()) ->IsRendererInserted(
+                        m_LastRenderWindow->GetVtkRenderWindow()) ->IsRendererInserted(
                         m_MeasurementInfoRenderer))
-                mitk::VtkLayerController::GetInstance(m_LastRenderWindow->GetRenderWindow())->RemoveRenderer(
+                mitk::VtkLayerController::GetInstance(m_LastRenderWindow->GetVtkRenderWindow())->RemoveRenderer(
                             m_MeasurementInfoRenderer);
         }
     }
@@ -1606,15 +1606,15 @@ void QmitkPartialVolumeAnalysisView::SetMeasurementInfoToRenderWindow(const QStr
         if (!text.isEmpty())
         {
             m_MeasurementInfoAnnotation->SetText(1, text.toLatin1().data());
-            mitk::VtkLayerController::GetInstance(renderWindowPart->GetQmitkRenderWindow("axial")->GetRenderWindow())->InsertForegroundRenderer(
+            mitk::VtkLayerController::GetInstance(renderWindowPart->GetQmitkRenderWindow("axial")->GetVtkRenderWindow())->InsertForegroundRenderer(
                         m_MeasurementInfoRenderer, true);
         }
         else
         {
             if (mitk::VtkLayerController::GetInstance(
-                        renderWindowPart->GetQmitkRenderWindow("axial")->GetRenderWindow()) ->IsRendererInserted(
+                        renderWindowPart->GetQmitkRenderWindow("axial")->GetVtkRenderWindow()) ->IsRendererInserted(
                         m_MeasurementInfoRenderer))
-                mitk::VtkLayerController::GetInstance(renderWindowPart->GetQmitkRenderWindow("axial")->GetRenderWindow())->RemoveRenderer(
+                mitk::VtkLayerController::GetInstance(renderWindowPart->GetQmitkRenderWindow("axial")->GetVtkRenderWindow())->RemoveRenderer(
                             m_MeasurementInfoRenderer);
         }
     }

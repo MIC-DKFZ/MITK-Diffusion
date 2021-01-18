@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
     std::vector< std::string > fib_names;
     auto input_tracts = mitk::DiffusionDataIOHelper::load_fibs(inFibs, &fib_names);
 
-    ofstream statistics_file;
+    std::ofstream statistics_file;
     statistics_file.open (outfile);
 
     int c=0;

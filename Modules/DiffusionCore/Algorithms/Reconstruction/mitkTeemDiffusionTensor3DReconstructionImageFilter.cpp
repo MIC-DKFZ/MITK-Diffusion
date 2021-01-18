@@ -46,7 +46,7 @@ mitk::TeemDiffusionTensor3DReconstructionImageFilter<D,T>
 
 void file_replace(std::string filename, std::string what, std::string with)
 {
-  ofstream myfile2;
+  std::ofstream myfile2;
 
   std::locale C("C");
   std::locale originalLocale2 = myfile2.getloc();
@@ -57,7 +57,7 @@ void file_replace(std::string filename, std::string what, std::string with)
   myfile2.open (filename2);
 
   std::string line;
-  ifstream myfile (filename.c_str());
+  std::ifstream myfile (filename.c_str());
 
   std::locale originalLocale = myfile.getloc();
   myfile.imbue(C);

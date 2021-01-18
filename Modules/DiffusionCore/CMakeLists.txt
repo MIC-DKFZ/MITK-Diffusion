@@ -8,7 +8,7 @@ MITK_CREATE_MODULE(
   INCLUDE_DIRS  Algorithms Algorithms/Reconstruction Algorithms/Registration Algorithms/Reconstruction/MultishellProcessing Algorithms/Reconstruction/FittingFunctions DicomImport IODataStructures/DiffusionWeightedImages IODataStructures/Properties IODataStructures Rendering ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS MitkMapperExt MitkPlanarFigure MitkImageExtraction MitkDICOM MitkMatchPointRegistration
   PACKAGE_DEPENDS
-    PUBLIC VTK|FiltersProgrammable Vigra HDF5
+    PUBLIC VTK|FiltersProgrammable+IOImage+CommonComputationalGeometry Vigra HDF5
 )
 
 if(TARGET ${MODULE_TARGET} AND MITK_USE_OpenMP)
