@@ -33,7 +33,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 // MISC
 #include <fstream>
 // #include <QFile>
-#include <tinyxml.h>
+#include <tinyxml2.h>
 #include <boost/progress.hpp>
 #include <mitkLexicalCast.h>
 #include <boost/algorithm/string.hpp>
@@ -393,16 +393,13 @@ bool GibbsTrackingFilter< ItkOdfImageType >::LoadParameters()
 
     MITK_INFO << "GibbsTrackingFilter: loading parameter file " << m_LoadParameterFile;
 
-    TiXmlDocument doc( m_LoadParameterFile );
-    doc.LoadFile();
+    tinyxml2::XMLDocument doc;
+    doc.LoadFile(m_LoadParameterFile.c_str());
 
-    TiXmlHandle hDoc(&doc);
-    TiXmlElement* pElem;
-    TiXmlHandle hRoot(nullptr);
-
-    pElem = hDoc.FirstChildElement().Element();
-    hRoot = TiXmlHandle(pElem);
-    pElem = hRoot.FirstChildElement("parameter_set").Element();
+	
+	tinyxml2::XMLNode * hRoot = doc.FirstChild();
+	
+    auto pElem = hRoot->FirstChildElement("parameter_set");
 
     std::string iterations(pElem->Attribute("iterations"));
     m_Iterations = boost::lexical_cast<double>(iterations);
@@ -454,30 +451,29 @@ bool GibbsTrackingFilter< ItkOdfImageType >::SaveParameters()
     }
 
     MITK_INFO << "GibbsTrackingFilter: saving parameter file " << m_SaveParameterFile;
+	
+    tinyxml2::XMLDocument documentXML;
+    //TiXmlDeclaration* declXML = new TiXmlDeclaration( "1.0", "", "" );
+    //documentXML.LinkEndChild( declXML );
+	
+	tinyxml2::XMLNode * mainXML = documentXML.NewElement("global_tracking_parameter_file");
+	documentXML.InsertFirstChild(mainXML);
 
-    TiXmlDocument documentXML;
-    TiXmlDeclaration* declXML = new TiXmlDeclaration( "1.0", "", "" );
-    documentXML.LinkEndChild( declXML );
-
-    TiXmlElement* mainXML = new TiXmlElement("global_tracking_parameter_file");
-    mainXML->SetAttribute("file_version",  "0.1");
-    documentXML.LinkEndChild(mainXML);
-
-    TiXmlElement* paramXML = new TiXmlElement("parameter_set");
-    paramXML->SetAttribute("iterations", boost::lexical_cast<std::string>(m_Iterations));
-    paramXML->SetAttribute("particle_length", boost::lexical_cast<std::string>(m_ParticleLength));
-    paramXML->SetAttribute("particle_width", boost::lexical_cast<std::string>(m_ParticleWidth));
-    paramXML->SetAttribute("particle_weight", boost::lexical_cast<std::string>(m_ParticleWeight));
-    paramXML->SetAttribute("temp_start", boost::lexical_cast<std::string>(m_StartTemperature));
-    paramXML->SetAttribute("temp_end", boost::lexical_cast<std::string>(m_EndTemperature));
-    paramXML->SetAttribute("inexbalance", boost::lexical_cast<std::string>(m_InexBalance));
-    paramXML->SetAttribute("fiber_length", boost::lexical_cast<std::string>(m_MinFiberLength));
-    paramXML->SetAttribute("curvature_threshold", boost::lexical_cast<std::string>(m_CurvatureThreshold));
-    mainXML->LinkEndChild(paramXML);
+    auto paramXML = documentXML.NewElement("parameter_set");
+    paramXML->SetAttribute("iterations", m_Iterations);
+    paramXML->SetAttribute("particle_length", m_ParticleLength);
+    paramXML->SetAttribute("particle_width", m_ParticleWidth);
+    paramXML->SetAttribute("particle_weight", m_ParticleWeight);
+    paramXML->SetAttribute("temp_start", m_StartTemperature);
+    paramXML->SetAttribute("temp_end", m_EndTemperature);
+    paramXML->SetAttribute("inexbalance", m_InexBalance);
+    paramXML->SetAttribute("fiber_length", m_MinFiberLength);
+    paramXML->SetAttribute("curvature_threshold", m_CurvatureThreshold);
+    mainXML->InsertEndChild(paramXML);
 
     if(!boost::algorithm::ends_with(m_SaveParameterFile, ".gtp"))
       m_SaveParameterFile.append(".gtp");
-    documentXML.SaveFile( m_SaveParameterFile );
+    documentXML.SaveFile( m_SaveParameterFile.c_str() );
 
     MITK_INFO << "GibbsTrackingFilter: parameter file saved successfully";
     return true;

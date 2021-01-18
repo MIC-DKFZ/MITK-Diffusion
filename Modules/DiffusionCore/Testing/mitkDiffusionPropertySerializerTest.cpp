@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkMeasurementFrameProperty.h>
 
 #include <mitkDiffusionPropertyHelper.h>
+#include <tinyxml2.h>
 
 class mitkDiffusionPropertySerializerTestSuite : public mitk::TestFixture
 {
@@ -142,10 +143,11 @@ public:
       if (serializer != nullptr)
       {
         serializer->SetProperty(prop);
-        TiXmlElement* valueelement = nullptr;
+        tinyxml2::XMLElement* valueelement = nullptr;
         try
         {
-          valueelement = serializer->Serialize();
+		  tinyxml2::XMLDocument doc;
+          valueelement = serializer->Serialize(doc);
 //          TiXmlPrinter p;
 //          valueelement->Accept(&p);
 //          MITK_INFO << p.CStr();

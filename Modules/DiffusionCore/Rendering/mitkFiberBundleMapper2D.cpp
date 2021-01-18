@@ -36,6 +36,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlaneGeometry.h>
 #include <mitkSliceNavigationController.h>
 #include <mitkCoreServices.h>
+#include <vtkShaderProperty.h>
 
 class vtkShaderCallback : public vtkCommand
 {
@@ -190,7 +191,7 @@ void mitk::FiberBundleMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *rend
   localStorage->m_Mapper->SelectColorArray("FIBER_COLORS");
   localStorage->m_Mapper->SetInputData(fiberPolyData);
 
-  localStorage->m_Mapper->SetVertexShaderCode(
+  localStorage->m_Actor->GetShaderProperty()->SetVertexShaderCode(
         "//VTK::System::Dec\n"
         "attribute vec4 vertexMC;\n"
 
@@ -210,7 +211,7 @@ void mitk::FiberBundleMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *rend
         "}\n"
         );
 
-  localStorage->m_Mapper->SetFragmentShaderCode(
+  localStorage->m_Actor->GetShaderProperty()->SetFragmentShaderCode(
         "//VTK::System::Dec\n"  // always start with this line
         "//VTK::Output::Dec\n"  // always have this line in your FS
         "uniform vec4 slicingPlane;\n"

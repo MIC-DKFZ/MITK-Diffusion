@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
     auto distances = distance_calculator->GetMinDistances();
     auto indices = distance_calculator->GetMinIndices();
 
-    ofstream logfile;
+    std::ofstream logfile;
     logfile.open (out_file);
     for (unsigned int i=0; i<distances.size(); ++i)
     {

@@ -78,7 +78,7 @@ bool SphereInterpolator::LoadLookuptables(const std::string& lutPath)
     return false;
   }
 
-  ifstream IndicesStream;
+  std::ifstream IndicesStream;
   path = lutPath; path.append("FiberTrackingLUTIndices.bin");
   IndicesStream.open(path.c_str(), ios::in | ios::binary);
   MITK_INFO << "SphereInterpolator: 1 " << path;

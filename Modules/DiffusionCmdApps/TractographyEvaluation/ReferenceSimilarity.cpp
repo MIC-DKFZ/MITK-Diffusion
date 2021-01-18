@@ -103,7 +103,7 @@ int main(int argc, char* argv[])
       ++r;
     }
 
-    ofstream logfile;
+    std::ofstream logfile;
     logfile.open(out_folder + "ref_tract_names.txt");
     for (unsigned int i=0; i<ref_tract_names.size(); ++i)
       logfile << ist::GetFilenameWithoutExtension(ref_tract_names.at(i)) << std::endl;

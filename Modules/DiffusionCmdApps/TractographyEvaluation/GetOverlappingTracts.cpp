@@ -101,10 +101,10 @@ int main(int argc, char* argv[])
     auto input_fibs = mitk::DiffusionDataIOHelper::load_fibs(input, &input_names);
 
     MITK_INFO << "Finding overlaps";
-    ofstream logfile;
+    std::ofstream logfile;
     logfile.open (out_folder + "Overlaps.txt");
 
-    ofstream logfile2;
+    std::ofstream logfile2;
     logfile2.open (out_folder + "AllOverlaps.txt");
 
     boost::progress_display disp(input.size());

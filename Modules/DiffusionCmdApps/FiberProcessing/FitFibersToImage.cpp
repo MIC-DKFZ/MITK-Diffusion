@@ -267,7 +267,7 @@ int main(int argc, char* argv[])
 
           if (save_weights)
           {
-            ofstream logfile;
+            std::ofstream logfile;
             logfile.open (outRoot + name + "_weights.txt");
             for (unsigned int f=0; f<output_tracts.at(bundle)->GetNumFibers(); ++f)
               logfile << output_tracts.at(bundle)->GetFiberWeight(f) << "\n";
@@ -291,7 +291,7 @@ int main(int argc, char* argv[])
 
         if (save_weights)
         {
-          ofstream logfile;
+          std::ofstream logfile;
           logfile.open (outRoot + "_weights.txt");
           for (unsigned int f=0; f<out->GetNumFibers(); ++f)
             logfile << out->GetFiberWeight(f) << "\n";

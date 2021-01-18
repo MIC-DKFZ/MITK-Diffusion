@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
 
     mitk::LocaleSwitch localeSwitch("C");
     itk::ImageFileWriter< PeakImgType >::Pointer peak_image_writer = itk::ImageFileWriter< PeakImgType >::New();
-    ofstream logfile;
+    std::ofstream logfile;
     logfile.open (out_folder + "scores.txt");
     double rmse = 0.0;
     int iteration = 0;

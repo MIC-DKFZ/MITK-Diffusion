@@ -27,6 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkCustomMimeType.h>
 #include <vtkXMLPolyDataWriter.h>
 #include "mitkDiffusionIOMimeTypes.h"
+#include <vtkUnsignedCharArray.h>
 
 mitk::FiberBundleVtkWriter::FiberBundleVtkWriter()
   : mitk::AbstractFileWriter(mitk::FiberBundle::GetStaticNameOfClass(), mitk::DiffusionIOMimeTypes::FIBERBUNDLE_VTK_MIMETYPE_NAME(), "VTK Fiber Bundle Writer")

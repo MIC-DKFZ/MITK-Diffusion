@@ -27,7 +27,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkCellData.h>
 #include <vtkPointData.h>
 #include <itksys/SystemTools.hxx>
-#include <tinyxml.h>
 #include <vtkCleanPolyData.h>
 #include <mitkTrackvis.h>
 #include <mitkCustomMimeType.h>

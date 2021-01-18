@@ -143,7 +143,7 @@ int main(int argc, char* argv[])
       if (ist::FileExists(logFile, true))
         add_header = false;
 
-      ofstream file;
+      std::ofstream file;
       file.open (logFile.c_str(), std::fstream::app);
 
       std::string sens;

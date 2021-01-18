@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkPlanarFigureCompositeReader.h"
 #include <itkMetaDataObject.h>
 #include <itksys/SystemTools.hxx>
-#include <tinyxml.h>
 #include <vtkCleanPolyData.h>
 #include <mitkTrackvis.h>
 #include <mitkCustomMimeType.h>
