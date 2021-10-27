@@ -335,7 +335,7 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
   {
     vnl_vector_fixed<float,3> olddir = olddirs.back();
     std::vector< vnl_vector_fixed<float,3> > probeVecs = CreateDirections(m_Parameters->m_NumSamples);
-    itk::Point<float, 3> sample_pos;
+    itk::Point<double, 3> sample_pos;
     unsigned int alternatives = 1;
     for (unsigned int i=0; i<probeVecs.size(); i++)
     {

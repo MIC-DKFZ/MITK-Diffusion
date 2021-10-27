@@ -491,7 +491,10 @@ void mitk::FiberBundle::SetFiberPolyData(vtkSmartPointer<vtkPolyData> fiberPD, b
   if (fiberPD == nullptr)
     this->m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
   else
-    m_FiberPolyData->DeepCopy(fiberPD);
+  {
+    m_FiberPolyData->CopyStructure(fiberPD);
+//    m_FiberPolyData->DeepCopy(fiberPD);
+  }
 
   m_NumFibers = static_cast<unsigned int>(m_FiberPolyData->GetNumberOfLines());
 
@@ -1074,7 +1077,6 @@ void mitk::FiberBundle::GenerateFiberIds()
   idFiberFilter->Update();
 
   m_FiberIdDataSet = idFiberFilter->GetOutput();
-
 }
 
 float mitk::FiberBundle::GetNumEpFractionInMask(ItkUcharImgType* mask, bool different_label)
