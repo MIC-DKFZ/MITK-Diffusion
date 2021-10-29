@@ -270,14 +270,14 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateFiberEndingsPointS
     if (numPoints>0)
     {
       double* point = points->GetPoint(0);
-      itk::Point<float,3> itkPoint = mitk::imv::GetItkPoint(point);
+      itk::Point<double,3> itkPoint = mitk::imv::GetItkPoint(point);
       pointSet->InsertPoint(count, itkPoint);
       count++;
     }
     if (numPoints>2)
     {
       double* point = points->GetPoint(numPoints-1);
-      itk::Point<float,3> itkPoint = mitk::imv::GetItkPoint(point);
+      itk::Point<double,3> itkPoint = mitk::imv::GetItkPoint(point);
       pointSet->InsertPoint(count, itkPoint);
       count++;
     }

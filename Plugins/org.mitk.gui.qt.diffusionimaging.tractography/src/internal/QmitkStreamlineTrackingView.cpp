@@ -614,7 +614,7 @@ void QmitkStreamlineTrackingView::InteractiveSeedChanged(bool posChanged)
   std::srand(std::time(0));
   m_SeedPoints.clear();
 
-  itk::Point<float> world_pos = this->GetRenderWindowPart()->GetSelectedPosition();
+  itk::Point<double> world_pos = this->GetRenderWindowPart()->GetSelectedPosition();
 
   m_SeedPoints.push_back(world_pos);
   float radius = m_Controls->m_SeedRadiusBox->value();
