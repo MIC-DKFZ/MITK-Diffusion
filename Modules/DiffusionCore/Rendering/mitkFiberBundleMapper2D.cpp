@@ -37,6 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkSliceNavigationController.h>
 #include <mitkCoreServices.h>
 #include <vtkShaderProperty.h>
+#include <vtkPlaneCollection.h>
 
 class vtkShaderCallback : public vtkCommand
 {
@@ -64,31 +65,35 @@ public:
     program->SetUniformi("fiberFadingON", fiberFading);
     program->SetUniformf("fiberThickness", fiberThickness);
 
-    if (this->renderer)
-    {
-      //get information about current position of views
-      mitk::SliceNavigationController::Pointer sliceContr = renderer->GetSliceNavigationController();
-      mitk::PlaneGeometry::ConstPointer planeGeo = sliceContr->GetCurrentPlaneGeometry();
+//    if (this->renderer)
+//    {
+//      //get information about current position of views
+//      mitk::SliceNavigationController::Pointer sliceContr = renderer->GetSliceNavigationController();
+//      mitk::PlaneGeometry::ConstPointer planeGeo = sliceContr->GetCurrentPlaneGeometry();
 
-      //generate according cutting planes based on the view position
-      float planeNormal[3];
-      planeNormal[0] = planeGeo->GetNormal()[0];
-      planeNormal[1] = planeGeo->GetNormal()[1];
-      planeNormal[2] = planeGeo->GetNormal()[2];
+//      //generate according cutting planes based on the view position
+//      float planeNormal[3];
+//      planeNormal[0] = planeGeo->GetNormal()[0];
+//      planeNormal[1] = planeGeo->GetNormal()[1];
+//      planeNormal[2] = planeGeo->GetNormal()[2];
 
-      float tmp1 = planeGeo->GetOrigin()[0] * planeNormal[0];
-      float tmp2 = planeGeo->GetOrigin()[1] * planeNormal[1];
-      float tmp3 = planeGeo->GetOrigin()[2] * planeNormal[2];
-      float thickness = tmp1 + tmp2 + tmp3; //attention, correct normalvector
+//      float tmp1 = planeGeo->GetOrigin()[0] * planeNormal[0];
+//      float tmp2 = planeGeo->GetOrigin()[1] * planeNormal[1];
+//      float tmp3 = planeGeo->GetOrigin()[2] * planeNormal[2];
+//      float odotn = tmp1 + tmp2 + tmp3;
 
-      float a[4];
-      for (int i = 0; i < 3; ++i)
-        a[i] = planeNormal[i];
+//      float a[4];
+//      for (int i = 0; i < 3; ++i)
+//        a[i] = planeNormal[i];
 
-      a[3] = thickness;
-      program->SetUniform4f("slicingPlane", a);
-
-    }
+//      a[3] = odotn;
+//      MITK_INFO << "IN CALLBACK";
+//      MITK_INFO << planeGeo->GetNormal();
+//      MITK_INFO << planeGeo->GetOrigin();
+//      for (int i = 0; i < 4; ++i)
+//        MITK_INFO << a[i];
+//      program->SetUniform4f("slicingPlane", a);
+//    }
   }
 
   vtkShaderCallback() { this->renderer = nullptr; }
@@ -186,66 +191,115 @@ void mitk::FiberBundleMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *rend
   fiberPolyData->GetPointData()->AddArray(fiberBundle->GetFiberColors());
   localStorage->m_Mapper->ScalarVisibilityOn();
   localStorage->m_Mapper->SetScalarModeToUsePointFieldData();
-  localStorage->m_Mapper->SetLookupTable(m_lut);  //apply the properties after the slice was set
-  localStorage->m_Actor->GetProperty()->SetOpacity(0.999);
+//  localStorage->m_Mapper->SetLookupTable(m_lut);  //apply the properties after the slice was set
+//  localStorage->m_Actor->GetProperty()->SetOpacity(0.999);
   localStorage->m_Mapper->SelectColorArray("FIBER_COLORS");
   localStorage->m_Mapper->SetInputData(fiberPolyData);
 
-  localStorage->m_Actor->GetShaderProperty()->SetVertexShaderCode(
-        "//VTK::System::Dec\n"
-        "attribute vec4 vertexMC;\n"
+  float d = 1.0;
+  node->GetFloatProperty("Fiber2DSliceThickness", d);
 
-        "//VTK::Normal::Dec\n"
-        "uniform mat4 MCDCMatrix;\n"
+  mitk::SliceNavigationController::Pointer sliceContr = renderer->GetSliceNavigationController();
+  mitk::PlaneGeometry::ConstPointer planeGeo = sliceContr->GetCurrentPlaneGeometry();
 
-        "//VTK::Color::Dec\n"
+  const Point3D &origin = planeGeo->GetOrigin();
+  const Vector3D &normal = planeGeo->GetNormal();
 
-        "varying vec4 positionWorld;\n"
-        "varying vec4 colorVertex;\n"
+  vtkSmartPointer<vtkPlane> plane1 = vtkSmartPointer<vtkPlane>::New();
+  plane1->SetOrigin(origin[0]+normal[0]*d, origin[1]+normal[1]*d, origin[2]+normal[2]*d);
+//  plane1->SetOrigin(origin[0], origin[1], origin[2]);
+  plane1->SetNormal(-normal[0], -normal[1], -normal[2]);
 
-        "void main(void)\n"
-        "{\n"
-        "  colorVertex = scalarColor;\n"
-        "  positionWorld = vertexMC;\n"
-        "  gl_Position = MCDCMatrix * vertexMC;\n"
-        "}\n"
-        );
+  vtkSmartPointer<vtkPlane> plane2 = vtkSmartPointer<vtkPlane>::New();
+  plane2->SetOrigin(origin[0]-normal[0]*d, origin[1]-normal[1]*d, origin[2]-normal[2]*d);
+  plane2->SetNormal(normal[0], normal[1], normal[2]);
 
-  localStorage->m_Actor->GetShaderProperty()->SetFragmentShaderCode(
-        "//VTK::System::Dec\n"  // always start with this line
-        "//VTK::Output::Dec\n"  // always have this line in your FS
-        "uniform vec4 slicingPlane;\n"
-        "uniform float fiberThickness;\n"
-        "uniform int fiberFadingON;\n"
-        "uniform float fiberOpacity;\n"
+  vtkSmartPointer<vtkPlaneCollection> planes = vtkSmartPointer<vtkPlaneCollection>::New();;
+  planes->AddItem(plane1);
+  planes->AddItem(plane2);
 
-        "varying vec4 positionWorld;\n"
-        "varying vec4 colorVertex;\n"
-        "out vec4 out_Color;\n"
+  localStorage->m_Mapper->SetClippingPlanes(planes);
 
-        "void main(void)\n"
-        "{\n"
-        "  float r1 = dot(positionWorld.xyz, slicingPlane.xyz) - slicingPlane.w;\n"
+//  localStorage->m_Actor->GetShaderProperty()->SetVertexShaderCode(
+//        "//VTK::System::Dec\n"
+//        "attribute vec4 vertexMC;\n"
 
-        "  if (abs(r1) >= fiberThickness)\n"
-        "    discard;\n"
+//        "//VTK::Normal::Dec\n"
+//        "uniform mat4 MCDCMatrix;\n"
 
-        "  if (fiberFadingON != 0)\n"
-        "  {\n"
-        "    float x = (r1 + fiberThickness) / (fiberThickness*2.0);\n"
-        "    x = 1.0 - x;\n"
-        "    out_Color = vec4(colorVertex.xyz*x, fiberOpacity);\n"
-        "  }\n"
-        "  else{\n"
-        "    out_Color = vec4(colorVertex.xyz, fiberOpacity);\n"
-        "  }\n"
-        "}\n"
-        );
+//        "//VTK::Color::Dec\n"
 
-  vtkSmartPointer<vtkShaderCallback> myCallback = vtkSmartPointer<vtkShaderCallback>::New();
-  myCallback->renderer = renderer;
-  myCallback->node = this->GetDataNode();
-  localStorage->m_Mapper->AddObserver(vtkCommand::UpdateShaderEvent,myCallback);
+//        "varying vec4 positionWorld;\n"
+//        "varying vec4 colorVertex;\n"
+
+//        "void main(void)\n"
+//        "{\n"
+//        "  colorVertex = scalarColor;\n"
+//        "  positionWorld = vertexMC;\n"
+//        "  gl_Position = MCDCMatrix * vertexMC;\n"
+//        "}\n"
+//        );
+
+//  localStorage->m_Actor->GetShaderProperty()->SetFragmentShaderCode(
+//        "//VTK::System::Dec\n"  // always start with this line
+//        "//VTK::Output::Dec\n"  // always have this line in your FS
+//        "uniform vec4 slicingPlane;\n"
+//        "uniform float fiberThickness;\n"
+//        "uniform int fiberFadingON;\n"
+//        "uniform float fiberOpacity;\n"
+
+//        "varying vec4 positionWorld;\n"
+//        "varying vec4 colorVertex;\n"
+//        "out vec4 out_Color;\n"
+
+//        "void main(void)\n"
+//        "{\n"
+//        "  float r1 = dot(positionWorld.xyz, slicingPlane.xyz) - slicingPlane.w;\n"
+
+//        "  if (abs(r1) >= fiberThickness)\n"
+//        "    discard;\n"
+
+//        "  if (fiberFadingON != 0)\n"
+//        "  {\n"
+//        "    float x = (r1 + fiberThickness) / (fiberThickness*2.0);\n"
+//        "    x = 1.0 - x;\n"
+//        "    out_Color = vec4(colorVertex.xyz*x, fiberOpacity);\n"
+//        "  }\n"
+//        "  else{\n"
+//        "    out_Color = vec4(colorVertex.xyz, fiberOpacity);\n"
+//        "  }\n"
+//        "}\n"
+//        );
+
+
+//  localStorage->m_Actor->GetShaderProperty()->AddVertexShaderReplacement("//VTK::TCoord::Dec", true, "uniform vec4 slicingPlane;\n"
+//                                                                                                     "out float fade_dist;", true);
+//  localStorage->m_Actor->GetShaderProperty()->AddVertexShaderReplacement("//VTK::TCoord::Impl", true, "fade_dist = abs(dot(vertexMC.xyz, slicingPlane.xyz) - slicingPlane.w);", true);
+
+
+//  localStorage->m_Actor->GetShaderProperty()->AddFragmentShaderReplacement("//VTK::TCoord::Dec", true, "uniform float fiberThickness;\n"
+//                                                                                                       "in float fade_dist;\n"
+//                                                                                                       "uniform int fiberFadingON;", true);
+////  std::string colorImpl = "  if (fade_dist > fiberThickness) discard;\n"
+////                          "  vec3 ambientColor = ambientIntensity * vertexColorVSOutput.rgb;\n"
+////                          "  vec3 diffuseColor = diffuseIntensity * vertexColorVSOutput.rgb;\n"
+////                          "  float opacity = opacityUniform * vertexColorVSOutput.a;\n";
+//////                            "  if (fiberFadingON != 0)\n"
+//////                            "    opacity = opacity*fade_dist;\n";
+////  localStorage->m_Actor->GetShaderProperty()->AddFragmentShaderReplacement("//VTK::Color::Impl", true, colorImpl, true);
+
+//  localStorage->m_Actor->GetShaderProperty()->AddFragmentShaderReplacement("//VTK::Clip::Impl", true, "for (int planeNum = 0; planeNum < numClipPlanes; planeNum++)\n"
+//                                                                                                      "    {\n"
+//                                                                                                      "    if (abs(clipDistancesVSOutput[planeNum]) > fiberThickness) discard;\n"
+//                                                                                                      "    }\n", true);
+
+
+
+//  vtkSmartPointer<vtkShaderCallback> myCallback = vtkSmartPointer<vtkShaderCallback>::New();
+//  myCallback->renderer = renderer;
+//  myCallback->node = this->GetDataNode();
+//  localStorage->m_Mapper->AddObserver(vtkCommand::UpdateShaderEvent,myCallback);
+
 
   localStorage->m_Actor->SetMapper(localStorage->m_Mapper);
   localStorage->m_Actor->GetProperty()->SetLineWidth(m_LineWidth);
