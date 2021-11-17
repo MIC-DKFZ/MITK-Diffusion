@@ -23,6 +23,7 @@ if(BUILD_DiffusionFiberProcessingCmdApps OR MITK_BUILD_ALL_APPS)
     FiberClustering^^
     TractDensityFilter^^
     PrintFiberStatistics^^
+    CalculateDistanceToSegmentation^^
     )
 
     foreach(diffusionFiberProcessingcmdapp ${diffusionFiberProcessingcmdapps})

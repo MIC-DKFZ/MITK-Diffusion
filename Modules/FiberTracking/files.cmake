@@ -32,6 +32,7 @@ set(H_FILES
   Algorithms/itkTractDistanceFilter.h
   Algorithms/itkFiberExtractionFilter.h
   Algorithms/itkTdiToVolumeFractionFilter.h
+  Algorithms/itkDistanceFromSegmentationImageFilter.h
 
   # Tractography
   Algorithms/TrackingHandlers/mitkTrackingDataHandler.h
