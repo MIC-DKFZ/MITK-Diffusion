@@ -61,8 +61,8 @@ namespace mitk
         mitk::ConnectomicsNetwork::Pointer outputNetwork = mitk::ConnectomicsNetwork::New();
 
         tinyxml2::XMLDocument doc;
-        bool loadOkay = doc.LoadFile(location.c_str());
-        if(!loadOkay)
+        auto loadOkay = doc.LoadFile(location.c_str());
+        if(loadOkay!=tinyxml2::XMLError::XML_SUCCESS)
         {
           mitkThrow() << "Could not open file " << location << " for reading.";
         }
