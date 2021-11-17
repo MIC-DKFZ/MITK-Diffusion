@@ -57,7 +57,7 @@ namespace mitk
     typedef itk::ImageFileReader<PeakImage::ItkPeakImageType> FileReaderType;
     FileReaderType::Pointer reader = FileReaderType::New();
     reader->SetFileName(location);
-    if (ext==".peak")
+    if (ext==".peak" || ext==".nrrd")
     {
       itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
       reader->SetImageIO(io);
