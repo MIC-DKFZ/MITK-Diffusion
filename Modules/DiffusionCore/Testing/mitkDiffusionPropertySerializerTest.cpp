@@ -124,61 +124,40 @@ public:
     /* try to serialize each property in the list, then deserialize again and check for equality */
     for (mitk::PropertyList::PropertyMap::const_iterator it = propList->GetMap()->begin(); it != propList->GetMap()->end(); ++it)
     {
-      const mitk::BaseProperty* prop = it->second;
-      // construct name of serializer class
-      std::string serializername = std::string(prop->GetNameOfClass()) + "Serializer";
-      std::list<itk::LightObject::Pointer> allSerializers = itk::ObjectFactoryBase::CreateAllInstance(serializername.c_str());
-      MITK_TEST_CONDITION(allSerializers.size() > 0, std::string("Creating serializers for ") + serializername);
-      if (allSerializers.size() == 0)
-      {
-        MITK_TEST_OUTPUT( << "serialization not possible, skipping " << prop->GetNameOfClass());
-        continue;
-      }
-      if (allSerializers.size() > 1)
-      {
-        MITK_TEST_OUTPUT (<< "Warning: " << allSerializers.size() << " serializers found for " << prop->GetNameOfClass() << "testing only the first one.");
-      }
-      mitk::BasePropertySerializer* serializer = dynamic_cast<mitk::BasePropertySerializer*>( allSerializers.begin()->GetPointer());
-      MITK_TEST_CONDITION(serializer != nullptr, serializername + std::string(" is valid"));
-      if (serializer != nullptr)
-      {
-        serializer->SetProperty(prop);
-        tinyxml2::XMLElement* valueelement = nullptr;
-        try
-        {
-		  tinyxml2::XMLDocument doc;
-          valueelement = serializer->Serialize(doc);
-//          TiXmlPrinter p;
-//          valueelement->Accept(&p);
-//          MITK_INFO << p.CStr();
-        }
-        catch (...)
-        {
-        }
-        MITK_TEST_CONDITION(valueelement != nullptr, std::string("Serialize property with ") + serializername);
+      const mitk::BaseProperty* property = it->second;
 
-        if (valueelement == nullptr)
-        {
-          MITK_TEST_OUTPUT( << "serialization failed, skipping deserialization");
-          continue;
-        }
+      std::string serializername = std::string(property->GetNameOfClass()) + "Serializer";
 
-        mitk::BaseProperty::Pointer deserializedProp = serializer->Deserialize( valueelement );
-        MITK_TEST_CONDITION(deserializedProp.IsNotNull(), "serializer created valid property");
-        if (deserializedProp.IsNotNull())
-        {
-          MITK_TEST_CONDITION(*(deserializedProp.GetPointer()) == *prop, "deserialized property equals initial property for type " << prop->GetNameOfClass());
-        }
+      MITK_INFO << "Testing " << serializername;
 
-      }
-      else
+      std::list<itk::LightObject::Pointer> allSerializers =
+          itk::ObjectFactoryBase::CreateAllInstance(serializername.c_str());
+      CPPUNIT_ASSERT_EQUAL(size_t(1), allSerializers.size());
+
+      auto *serializer =
+          dynamic_cast<mitk::BasePropertySerializer *>(allSerializers.begin()->GetPointer());
+      CPPUNIT_ASSERT(serializer != nullptr);
+
+      serializer->SetProperty(property);
+      tinyxml2::XMLDocument doc;
+      tinyxml2::XMLElement *serialization(nullptr);
+      try
       {
-        MITK_TEST_OUTPUT( << "created serializer object is of class " << allSerializers.begin()->GetPointer()->GetNameOfClass())
+        serialization = serializer->Serialize(doc);
       }
-    } // for all properties
+      catch (...)
+      {
+      }
+      CPPUNIT_ASSERT(serialization != nullptr);
 
+      mitk::BaseProperty::Pointer restoredProperty = serializer->Deserialize(serialization);
+      CPPUNIT_ASSERT(restoredProperty.IsNotNull());
+
+      CPPUNIT_ASSERT(*(restoredProperty.GetPointer()) == *property);
+
+      MITK_INFO << "Testing " << serializername << " done";
+    }
   }
-
 
 };
 
