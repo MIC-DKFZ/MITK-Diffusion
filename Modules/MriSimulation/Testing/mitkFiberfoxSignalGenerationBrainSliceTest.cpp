@@ -99,9 +99,7 @@ public:
           {
             if (count<10)
             {
-              MITK_INFO << "**************************************";
-              MITK_INFO << "Test value: " << it1.GetIndex() << ":" << it1.Get()[i];
-              MITK_INFO << "Ref. value: " << it2.GetIndex() << ":" << it2.Get()[i];
+              MITK_INFO << "Index: " << it1.GetIndex() << " Gradient: " << i << " - " << it1.Get()[i] << " should be " << it2.Get()[i];
             }
             out = false;
             count++;
