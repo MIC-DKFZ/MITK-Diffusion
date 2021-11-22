@@ -58,7 +58,7 @@ Specify various ROI and mask images to constrain the tractography process.
 
 \section StrTrackUserManualParameters Tractography Parameters
 
-- Mode: Toggle between deterministic and probabilistic tractography (also affects tracking prior proposals). The probabilistic method simply samples the output direction from the discrete probability ditribution provided by the discretized ODF. Probabilistic peak tracking does not derive probabilities from the data but simply adds a normally distributed jitter to the proposed direction.
+- Mode: Toggle between deterministic and probabilistic tractography (also affects tracking prior proposals). The probabilistic method simply samples the output direction from the discrete probability distribution provided by the discretized ODF. Probabilistic peak tracking does not derive probabilities from the data but simply adds a normally distributed jitter to the proposed direction.
 - Sharpen ODFs: If you are using dODF images as input, it is advisable to sharpen the ODFs (min-max normalize and raise to the power of 4). This is not necessary (and not recommended) for CSD fODFs, since they are naturally much sharper.
 - Cutoff: If the streamline reaches a position with an FA value or peak magnitude lower than the speciefied threshold, tracking is terminated. Typical values are 0.2 for FA/GFA and 0.1 for CSD peaks.
 - FA/GFA image used to determine streamline termination. If no image is specified, the FA/GFA image is automatically calculated from the input image. If multiple tensor images are used as input, it is recommended to provide such an image since the FA maps calculated from the individual input tensor images can not provide a suitable termination criterion.

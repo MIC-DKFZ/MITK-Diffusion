@@ -147,10 +147,13 @@ void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWr
 
     mitk::DiffusionPropertyHelper::CopyProperties(movingImage, image, true);
     auto reg = spResultRegistration->GetRegistration();
-    typedef mitk::DiffusionImageCorrectionFilter CorrectionFilterType;
-    CorrectionFilterType::Pointer corrector = CorrectionFilterType::New();
-    corrector->SetImage( image );
-    corrector->CorrectDirections( mitk::MITKRegistrationHelper::getAffineMatrix(reg, false)->GetMatrix().GetVnlMatrix() );
+    if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(movingImage))
+    {
+      typedef mitk::DiffusionImageCorrectionFilter CorrectionFilterType;
+      CorrectionFilterType::Pointer corrector = CorrectionFilterType::New();
+      corrector->SetImage( image );
+      corrector->CorrectDirections( mitk::MITKRegistrationHelper::getAffineMatrix(reg, false)->GetMatrix().GetVnlMatrix() );
+    }
   }
   else
   {
