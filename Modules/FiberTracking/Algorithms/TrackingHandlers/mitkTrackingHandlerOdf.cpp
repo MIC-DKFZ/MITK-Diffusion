@@ -87,8 +87,8 @@ void TrackingHandlerOdf::InitForTracking()
 
   if (m_OdfFromTensor)
   {
-    m_Parameters->m_OdfCutoff = 0;
-    m_Parameters->m_SharpenOdfs = false;
+//    m_Parameters->m_OdfCutoff = 0;
+//    m_Parameters->m_SharpenOdfs = false;
   }
 
   m_GfaInterpolator->SetInputImage(m_GfaImage);

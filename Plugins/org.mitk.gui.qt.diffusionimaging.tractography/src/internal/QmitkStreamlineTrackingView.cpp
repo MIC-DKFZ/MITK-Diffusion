@@ -885,7 +885,6 @@ void QmitkStreamlineTrackingView::UpdateGui()
   {
     m_Controls->m_TrialsPerSeedBox->setEnabled(true);
     m_Controls->m_TrialsPerSeedLabel->setEnabled(true);
-    m_Controls->m_PeakJitterBox->setEnabled(true);
   }
 
   if(!m_InputImageNodes.empty())
@@ -901,10 +900,19 @@ void QmitkStreamlineTrackingView::UpdateGui()
 
     if ( dynamic_cast<mitk::TensorImage*>(m_InputImageNodes.at(0)->GetData()) )
     {
-      m_Controls->m_fBox->setEnabled(true);
-      m_Controls->m_fLabel->setEnabled(true);
-      m_Controls->m_gBox->setEnabled(true);
-      m_Controls->m_gLabel->setEnabled(true);
+      if (m_Controls->m_ModeBox->currentIndex()==1)
+      {
+        m_Controls->m_OdfCutoffBox->setEnabled(true);
+        m_Controls->m_OdfCutoffLabel->setEnabled(true);
+        m_Controls->m_SharpenOdfsBox->setEnabled(true);
+      }
+      else
+      {
+        m_Controls->m_fBox->setEnabled(true);
+        m_Controls->m_fLabel->setEnabled(true);
+        m_Controls->m_gBox->setEnabled(true);
+        m_Controls->m_gLabel->setEnabled(true);
+      }
     }
     else if ( dynamic_cast<mitk::OdfImage*>(m_InputImageNodes.at(0)->GetData()) ||
               dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData()))
@@ -919,6 +927,11 @@ void QmitkStreamlineTrackingView::UpdateGui()
       m_Controls->m_ForestLabel->setVisible(true);
       m_Controls->m_ScalarThresholdBox->setEnabled(false);
       m_Controls->m_FaThresholdLabel->setEnabled(false);
+    }
+    else if ( dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData()) &&
+              m_Controls->m_ModeBox->currentIndex()==1)
+    {
+      m_Controls->m_PeakJitterBox->setEnabled(true);
     }
   }
 }
