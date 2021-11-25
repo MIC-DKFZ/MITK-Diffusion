@@ -97,8 +97,8 @@ void TrackingHandlerOdf::InitForTracking()
 
   std::cout << "TrackingHandlerOdf - GFA threshold: " << m_Parameters->m_Cutoff << std::endl;
   std::cout << "TrackingHandlerOdf - ODF threshold: " << m_Parameters->m_OdfCutoff << std::endl;
-  if (m_Parameters->m_SharpenOdfs)
-    std::cout << "TrackingHandlerOdf - Sharpening ODfs" << std::endl;
+  if (m_Parameters->m_SharpenOdfs > 1)
+    std::cout << "TrackingHandlerOdf - Raising ODf values to the power of " << m_Parameters->m_SharpenOdfs << std::endl;
 }
 
 int TrackingHandlerOdf::SampleOdf(vnl_vector< float >& probs, vnl_vector< float >& angles)
@@ -168,40 +168,28 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
 
   // Find ODF maximum and remove <0 values
   float max_odf_val = 0;
-  float min_odf_val = 999;
   int max_idx_d = -1;
   int c = 0;
   for (int i : m_OdfHemisphereIndices)
   {
     if (odf_values[i]<0)
       odf_values[i] = 0;
+    odf_values[i] = pow(odf_values[i], m_Parameters->m_SharpenOdfs);
 
     if (odf_values[i]>max_odf_val)
     {
       max_odf_val = odf_values[i];
       max_idx_d = c;
     }
-    if (odf_values[i]<min_odf_val)
-      min_odf_val = odf_values[i];
 
     probs[c] = odf_values[i];
     c++;
   }
 
-  if (m_Parameters->m_SharpenOdfs)
-  {
-    // sharpen ODF
-    probs -= min_odf_val;
-    probs /= (max_odf_val-min_odf_val);
-    for (unsigned int i=0; i<probs.size(); i++)
-      probs[i] = pow(probs[i], 4);
-    float odf_sum = probs.sum();
-    if (odf_sum>0)
-    {
-      probs /= odf_sum;
-      max_odf_val /= odf_sum;
-    }
-  }
+  float odf_sum = probs.sum();
+  if (odf_sum>0)
+    probs /= odf_sum;
+  max_odf_val = max_odf_val/odf_sum;
 
   // no previous direction
   if (max_odf_val>m_Parameters->m_OdfCutoff && (olddirs.empty() || last_dir.magnitude()<=0.5))

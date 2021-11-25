@@ -191,7 +191,7 @@ void QmitkStreamlineTrackingView::CreateQtPartControl( QWidget *parent )
     connect( m_Controls->m_SeedRadiusBox, SIGNAL(editingFinished()), this, SLOT(InteractiveSeedChanged()) );
     connect( m_Controls->m_NumSeedsBox, SIGNAL(editingFinished()), this, SLOT(InteractiveSeedChanged()) );
     connect( m_Controls->m_OutputProbMap, SIGNAL(stateChanged(int)), this, SLOT(OnParameterChanged()) );
-    connect( m_Controls->m_SharpenOdfsBox, SIGNAL(stateChanged(int)), this, SLOT(OnParameterChanged()) );
+    connect( m_Controls->m_SharpenOdfsBox, SIGNAL(editingFinished()), this, SLOT(OnParameterChanged()) );
     connect( m_Controls->m_InterpolationBox, SIGNAL(stateChanged(int)), this, SLOT(OnParameterChanged()) );
     connect( m_Controls->m_MaskInterpolationBox, SIGNAL(stateChanged(int)), this, SLOT(OnParameterChanged()) );
     connect( m_Controls->m_FlipXBox, SIGNAL(stateChanged(int)), this, SLOT(OnParameterChanged()) );
@@ -207,6 +207,7 @@ void QmitkStreamlineTrackingView::CreateQtPartControl( QWidget *parent )
     connect( m_Controls->m_EpConstraintsBox, SIGNAL(currentIndexChanged(int)), this, SLOT(OnParameterChanged()) );
     connect( m_Controls->m_PeakJitterBox, SIGNAL(editingFinished()), this, SLOT(OnParameterChanged()) );
 
+    m_Controls->m_SharpenOdfsBox->editingFinished();
     m_Controls->m_SeedsPerVoxelBox->editingFinished();
     m_Controls->m_NumFibersBox->editingFinished();
     m_Controls->m_ScalarThresholdBox->editingFinished();
@@ -247,7 +248,7 @@ void QmitkStreamlineTrackingView::ParametersToGui(mitk::StreamlineTractographyPa
   m_Controls->m_gBox->setValue(params.m_G);
 
   m_Controls->m_OdfCutoffBox->setValue(params.m_OdfCutoff);
-  m_Controls->m_SharpenOdfsBox->setChecked(params.m_SharpenOdfs);
+  m_Controls->m_SharpenOdfsBox->setValue(params.m_SharpenOdfs);
 
   m_Controls->m_PriorWeightBox->setValue(params.m_Weight);
   m_Controls->m_PriorAsMaskBox->setChecked(params.m_RestrictToPrior);
@@ -353,7 +354,7 @@ std::shared_ptr<mitk::StreamlineTractographyParameters> QmitkStreamlineTrackingV
   params->m_G = static_cast<float>(m_Controls->m_gBox->value());
 
   params->m_OdfCutoff = static_cast<float>(m_Controls->m_OdfCutoffBox->value());
-  params->m_SharpenOdfs = m_Controls->m_SharpenOdfsBox->isChecked();
+  params->m_SharpenOdfs = m_Controls->m_SharpenOdfsBox->value();
 
   params->m_Weight = static_cast<float>(m_Controls->m_PriorWeightBox->value());
   params->m_RestrictToPrior = m_Controls->m_PriorAsMaskBox->isChecked();

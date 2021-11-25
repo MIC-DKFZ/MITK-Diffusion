@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
   parser.endGroup();
 
   parser.beginGroup("4. Streamline integration parameters:");
-  parser.addArgument("sharpen_odfs", "", mitkDiffusionCommandLineParser::Bool, "SHarpen ODFs:", "if you are using dODF images as input, it is advisable to sharpen the ODFs (min-max normalize and raise to the power of 4). this is not necessary for CSD fODFs, since they are narurally much sharper.");
+  parser.addArgument("sharpen_odfs", "", mitkDiffusionCommandLineParser::Int, "Sharpen ODFs:", "if you are using dODF images as input, it is advisable to sharpen the ODFs (power of X). this is not necessary for CSD fODFs, since they are narurally much sharper.");
   parser.addArgument("cutoff", "", mitkDiffusionCommandLineParser::Float, "Cutoff:", "set the FA, GFA or Peak amplitude cutoff for terminating tracks", 0.1);
   parser.addArgument("odf_cutoff", "", mitkDiffusionCommandLineParser::Float, "ODF Cutoff:", "threshold on the ODF magnitude. this is useful in case of CSD fODF tractography.", 0.0);
   parser.addArgument("step_size", "", mitkDiffusionCommandLineParser::Float, "Step size:", "step size (in voxels)", 0.5);
@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
     params->m_NewDirectionsFromPrior = !us::any_cast<bool>(parsedArgs["no_new_directions_from_prior"]);
 
   if (parsedArgs.count("sharpen_odfs"))
-    params->m_SharpenOdfs = us::any_cast<bool>(parsedArgs["sharpen_odfs"]);
+    params->m_SharpenOdfs = us::any_cast<int>(parsedArgs["sharpen_odfs"]);
 
   if (parsedArgs.count("no_data_interpolation"))
     params->m_InterpolateTractographyData = !us::any_cast<bool>(parsedArgs["no_data_interpolation"]);

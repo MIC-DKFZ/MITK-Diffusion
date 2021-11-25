@@ -207,7 +207,7 @@ void mitk::StreamlineTractographyParameters::LoadParameters(std::string filename
       else
         m_Mode = MODE::PROBABILISTIC;
 
-      m_SharpenOdfs = ReadVal<bool>(v1,"sharpen_odfs", m_SharpenOdfs);
+      m_SharpenOdfs = ReadVal<int>(v1,"sharpen_odfs", m_SharpenOdfs);
       m_Cutoff = ReadVal<float>(v1,"cutoff", m_Cutoff);
       m_OdfCutoff = ReadVal<float>(v1,"odf_cutoff", m_OdfCutoff);
       SetStepSizeVox(ReadVal<float>(v1,"step_size_vox", m_StepSizeVox));
