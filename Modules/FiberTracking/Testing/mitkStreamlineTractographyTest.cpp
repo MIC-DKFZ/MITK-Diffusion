@@ -310,7 +310,7 @@ public:
 
     params->m_Cutoff = gfa_threshold;
     params->m_OdfCutoff = 0;
-    params->m_SharpenOdfs = true;
+    params->m_SharpenOdfs = 1;
 
     SetupTracker(handler);
     tracker->Update();
@@ -330,7 +330,7 @@ public:
 
     params->m_Cutoff = gfa_threshold;
     params->m_OdfCutoff = 0;
-    params->m_SharpenOdfs = false;
+    params->m_SharpenOdfs = 8;
 
     SetupTracker(handler);
     tracker->Update();
@@ -351,7 +351,7 @@ public:
 
     params->m_Cutoff = gfa_threshold;
     params->m_OdfCutoff = 0;
-    params->m_SharpenOdfs = true;
+    params->m_SharpenOdfs = 1;
     params->m_InterpolateTractographyData = false;
 
     SetupTracker(handler);
@@ -372,7 +372,7 @@ public:
 
     params->m_Cutoff = gfa_threshold;
     params->m_OdfCutoff = 0;
-    params->m_SharpenOdfs = true;
+    params->m_SharpenOdfs = 1;
     params->m_SeedsPerVoxel = 3;
 
     SetupTracker(handler);
@@ -393,8 +393,8 @@ public:
 
     params->m_Cutoff = gfa_threshold;
     params->m_OdfCutoff = 0;
-    params->m_SharpenOdfs = true;
-    params->m_SeedsPerVoxel = 3;
+    params->m_SeedsPerVoxel = 10;
+    params->m_SharpenOdfs = 8;
     params->m_Mode = mitk::TrackingDataHandler::MODE::PROBABILISTIC;
 
     SetupTracker(handler);
@@ -415,8 +415,8 @@ public:
 
     params->m_Cutoff = gfa_threshold;
     params->m_OdfCutoff = 0;
-    params->m_SharpenOdfs = true;
     params->m_SeedsPerVoxel = 10;
+    params->m_SharpenOdfs = 8;
     params->m_Mode = mitk::TrackingDataHandler::MODE::PROBABILISTIC;
     params->m_OutputProbMap = true;
 

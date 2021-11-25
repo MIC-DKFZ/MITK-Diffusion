@@ -353,7 +353,7 @@ QGroupBox {
              <item row="1" column="1">
               <widget class="QDoubleSpinBox" name="m_SeedRadiusBox">
                <property name="toolTip">
-                <string>Seedpoints are equally distributed within a sphere centered at the selected position with the specified radius (in mm).</string>
+                <string>Seedpoints are equally distributed within a sphere centered at the selected position with the specified radius  (in mm).</string>
                </property>
                <property name="decimals">
                 <number>2</number>
@@ -578,7 +578,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>435</width>
-        <height>181</height>
+        <height>184</height>
        </rect>
       </property>
       <attribute name="label">
@@ -714,9 +714,9 @@ QGroupBox {
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>-191</y>
+        <y>-19</y>
         <width>421</width>
-        <height>428</height>
+        <height>436</height>
        </rect>
       </property>
       <attribute name="label">
@@ -843,16 +843,6 @@ QGroupBox {
          </property>
          <property name="text">
           <string>Cutoff:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QCheckBox" name="m_SharpenOdfsBox">
-         <property name="toolTip">
-          <string>If you are using dODF images as input, it is advisable to sharpen the ODFs (min-max normalize and raise to the power of 4). This is not necessary for CSD fODFs, since they are naturally much sharper.</string>
-         </property>
-         <property name="text">
-          <string/>
          </property>
         </widget>
        </item>
@@ -1118,6 +1108,19 @@ QGroupBox {
          </property>
         </widget>
        </item>
+       <item row="2" column="1">
+        <widget class="QSpinBox" name="m_SharpenOdfsBox">
+         <property name="toolTip">
+          <string>Rais ODF to the power of X</string>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="value">
+          <number>8</number>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="page_prior">
@@ -1126,7 +1129,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>435</width>
-        <height>181</height>
+        <height>184</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1282,7 +1285,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>435</width>
-        <height>181</height>
+        <height>184</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1412,7 +1415,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>435</width>
-        <height>181</height>
+        <height>184</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1581,7 +1584,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>435</width>
-        <height>181</height>
+        <height>184</height>
        </rect>
       </property>
       <attribute name="label">
