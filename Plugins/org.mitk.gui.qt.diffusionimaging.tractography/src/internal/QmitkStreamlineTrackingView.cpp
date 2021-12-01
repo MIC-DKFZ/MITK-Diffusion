@@ -497,7 +497,7 @@ void QmitkStreamlineTrackingView::AfterThread()
       QMessageBox warnBox;
       warnBox.setWindowTitle("Warning");
       warnBox.setText("No fiberbundle was generated!");
-      warnBox.setDetailedText("No fibers were generated using the chosen parameters. Typical reasons are:\n\n- Cutoff too high. Some images feature very low FA/GFA/peak size. Try to lower this parameter.\n- Angular threshold too strict. Try to increase this parameter.\n- A small step sizes also means many steps to go wrong. Especially in the case of probabilistic tractography. Try to adjust the angular threshold.");
+      warnBox.setDetailedText("No fibers were generated using the chosen parameters. Typical reasons are:\n\n- Cutoff too high. Some images feature very low FA/GFA/peak size. Try to lower this parameter.\n- Angular threshold too strict. Try to increase this parameter.\n- A small step sizes also means many steps to go wrong. Especially in the case of probabilistic tractography. Try to adjust the angular threshold.\n- In case of probabilistic tractography, try to increase the parameter for ODF sharpening (for ODF and tensor tractography) or decrease the peak jitter (for peak tracking).");
       warnBox.setIcon(QMessageBox::Warning);
       warnBox.exec();
 

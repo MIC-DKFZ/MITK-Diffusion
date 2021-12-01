@@ -168,28 +168,33 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
 
   // Find ODF maximum and remove <0 values
   float max_odf_val = 0;
+  float odf_sum = 0;
   int max_idx_d = -1;
   int c = 0;
   for (int i : m_OdfHemisphereIndices)
   {
     if (odf_values[i]<0)
-      odf_values[i] = 0;
-    odf_values[i] = pow(odf_values[i], m_Parameters->m_SharpenOdfs);
-
-    if (odf_values[i]>max_odf_val)
+      probs[c] = 0;
+    else
     {
-      max_odf_val = odf_values[i];
-      max_idx_d = c;
-    }
+      probs[c] = pow(odf_values[i], m_Parameters->m_SharpenOdfs);
 
-    probs[c] = odf_values[i];
+      if (probs[c]>max_odf_val)
+      {
+        max_odf_val = probs[c];
+        max_idx_d = c;
+      }
+
+      odf_sum += probs[c];
+    }
     c++;
   }
 
-  float odf_sum = probs.sum();
   if (odf_sum>0)
+  {
     probs /= odf_sum;
-  max_odf_val = max_odf_val/odf_sum;
+    max_odf_val = max_odf_val/odf_sum;
+  }
 
   // no previous direction
   if (max_odf_val>m_Parameters->m_OdfCutoff && (olddirs.empty() || last_dir.magnitude()<=0.5))
@@ -227,24 +232,23 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
   float max_prob = 0;
   for (unsigned int i=0; i<m_OdfHemisphereIndices.size(); i++)
   {
-    float odf_val = probs[i];
+    float prob = probs[i];
     float angle = angles[i];
     float abs_angle = fabs(angle);
 
-    odf_val *= abs_angle; // weight probabilities according to deviation from last direction
-    if (m_Parameters->m_Mode==MODE::DETERMINISTIC && odf_val>max_prob && odf_val>m_Parameters->m_OdfCutoff)
+    prob *= abs_angle; // weight probabilities according to deviation from last direction
+    if (m_Parameters->m_Mode==MODE::DETERMINISTIC && prob>max_prob && prob>m_Parameters->m_OdfCutoff)
     {
       // use maximum peak of the ODF weighted with the directional prior
-      max_prob = odf_val;
+      max_prob = prob;
       vnl_vector_fixed<float,3> d = m_OdfFloatDirs.get_row(i);
       if (angle<0)
         d *= -1;
-      output_direction = odf_val*d;
+      output_direction = prob*d;
     }
     else if (m_Parameters->m_Mode==MODE::PROBABILISTIC)
     {
-      // update ODF probabilties with the ODF values pow(abs_angle, m_DirPriorPower)
-      probs[i] = odf_val;
+      probs[i] = prob;
       probs_sum += probs[i];
     }
   }
@@ -252,6 +256,7 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
   // do probabilistic sampling
   if (m_Parameters->m_Mode==MODE::PROBABILISTIC && probs_sum>0.0001)
   {
+    probs /= probs_sum; // we have to normalize again since the probabilities have been weighted by the directional prior
     int max_sample_idx = SampleOdf(probs, angles);
     if (max_sample_idx>=0)
     {
