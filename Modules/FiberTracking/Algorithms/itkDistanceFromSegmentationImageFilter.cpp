@@ -29,7 +29,7 @@ namespace itk {
 template< class TPixelType >
 DistanceFromSegmentationImageFilter< TPixelType >::DistanceFromSegmentationImageFilter()
 {
-
+  m_Thresholds = {0.0, 3.0, 5.0, 7.0};
 }
 
 template< class TPixelType >
@@ -50,7 +50,8 @@ void DistanceFromSegmentationImageFilter< TPixelType >::GenerateData()
   vtkSmartPointer<vtkImplicitPolyDataDistance> vtkFilter = vtkSmartPointer<vtkImplicitPolyDataDistance>::New();
   vtkFilter->SetInput(m_SegmentationSurface->GetVtkPolyData());
 
-  float min_distance = 999999;
+  m_MinDistance = 999999;
+  m_Counts.resize(m_Thresholds.size(), 0);
 
   while( !tdi_it.IsAtEnd() )
   {
@@ -63,15 +64,43 @@ void DistanceFromSegmentationImageFilter< TPixelType >::GenerateData()
       double dist = vtkFilter->EvaluateFunction(point3D[0], point3D[1], point3D[2]);
       out_it.Set(dist);
 
-      if (dist<min_distance)
-        min_distance = dist;
+      if (dist<m_MinDistance)
+        m_MinDistance = dist;
+
+      for (unsigned int i=0; i<m_Thresholds.size(); ++i)
+      {
+        if (dist<m_Thresholds.at(i))
+          m_Counts[i] += 1;
+      }
     }
 
     ++tdi_it;
     ++out_it;
   }
+}
 
-  MITK_INFO << "Minimum distance between segmentation and tracts: " << min_distance << " mm";
+template< class TPixelType >
+float DistanceFromSegmentationImageFilter< TPixelType >::GetMinDistance() const
+{
+  return m_MinDistance;
+}
+
+template< class TPixelType >
+std::vector<float> DistanceFromSegmentationImageFilter< TPixelType >::GetThresholds() const
+{
+  return m_Thresholds;
+}
+
+template< class TPixelType >
+std::vector<int> DistanceFromSegmentationImageFilter< TPixelType >::GetCounts() const
+{
+  return m_Counts;
+}
+
+template< class TPixelType >
+void DistanceFromSegmentationImageFilter< TPixelType >::SetThresholds(const std::vector<float> &Thresholds)
+{
+  m_Thresholds = Thresholds;
 }
 
 }

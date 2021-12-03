@@ -55,6 +55,13 @@ public:
   typedef typename Superclass::OutputImageType        OutputImageType;
   typedef typename Superclass::OutputImageRegionType  OutputImageRegionType;
 
+  void SetThresholds(const std::vector<float> &Thresholds);
+  std::vector<float> GetThresholds() const;
+
+  std::vector<int> GetCounts() const;
+
+  float GetMinDistance() const;
+
 protected:
   DistanceFromSegmentationImageFilter();
   ~DistanceFromSegmentationImageFilter() override {}
@@ -64,6 +71,9 @@ protected:
 private:
 
   mitk::Surface::Pointer m_SegmentationSurface;
+  std::vector<float> m_Thresholds;
+  std::vector<int> m_Counts;
+  float m_MinDistance;
 };
 
 }
