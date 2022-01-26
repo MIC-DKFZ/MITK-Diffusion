@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
 
       itk::TractDensityImageFilter< ItkFloatImgType >::Pointer tdi_filter = itk::TractDensityImageFilter< ItkFloatImgType >::New();
       tdi_filter->SetFiberBundle(intput_tracts);
-      tdi_filter->SetBinaryOutput(false);
+      tdi_filter->SetMode(TDI_MODE::DENSITY);
       tdi_filter->SetOutputAbsoluteValues(false);
       tdi_filter->Update();
 

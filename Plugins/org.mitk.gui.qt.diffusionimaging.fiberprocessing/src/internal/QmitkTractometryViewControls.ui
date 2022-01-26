@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>484</width>
-    <height>744</height>
+    <height>922</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -177,6 +177,11 @@ QGroupBox {
         <item>
          <property name="text">
           <string>Centroid Based</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Segment voting</string>
          </property>
         </item>
        </widget>

@@ -22,6 +22,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkRGBAPixel.h>
 #include <mitkFiberBundle.h>
 
+enum TDI_MODE : int {
+  BINARY,
+  VISITATION_COUNT,
+  DENSITY
+};
+
 namespace itk{
 
 /**
@@ -47,8 +53,6 @@ public:
   itkGetMacro( UpsamplingFactor, float)                         ///< use higher resolution for ouput image
   itkSetMacro( InvertImage, bool)                               ///< voxelvalue = 1-voxelvalue
   itkGetMacro( InvertImage, bool)                               ///< voxelvalue = 1-voxelvalue
-  itkSetMacro( BinaryOutput, bool)                              ///< generate binary fiber envelope
-  itkGetMacro( BinaryOutput, bool)                              ///< generate binary fiber envelope
   itkSetMacro( OutputAbsoluteValues, bool)                      ///< output absolute values of the number of fibers per voxel
   itkGetMacro( OutputAbsoluteValues, bool)                      ///< output absolute values of the number of fibers per voxel
   itkSetMacro( UseImageGeometry, bool)                          ///< use input image geometry to initialize output image
@@ -60,6 +64,9 @@ public:
 
   void GenerateData() override;
 
+  TDI_MODE GetMode() const;
+  void SetMode(const TDI_MODE &Mode);
+
 protected:
 
   TractDensityImageFilter();
@@ -69,7 +76,7 @@ protected:
   mitk::FiberBundle::Pointer        m_FiberBundle;          ///< input fiber bundle
   float                             m_UpsamplingFactor;     ///< use higher resolution for ouput image
   bool                              m_InvertImage;          ///< voxelvalue = 1-voxelvalue
-  bool                              m_BinaryOutput;         ///< generate binary fiber envelope
+  TDI_MODE                          m_Mode;                 ///< what should the output look like
   bool                              m_UseImageGeometry;     ///< use input image geometry to initialize output image
   bool                              m_OutputAbsoluteValues; ///< do not normalize image values to 0-1
   bool                              m_UseTrilinearInterpolation;

@@ -553,7 +553,7 @@ void TrackingHandlerRandomForest< ShOrder, NumberOfSignalFeatures >::InitForTrai
       itk::TractDensityImageFilter< ItkUcharImgType >::Pointer env = itk::TractDensityImageFilter< ItkUcharImgType >::New();
       env->SetFiberBundle(m_Tractograms.at(t));
       env->SetInputImage(mask);
-      env->SetBinaryOutput(true);
+      env->SetMode(TDI_MODE::BINARY);
       env->SetUseImageGeometry(true);
       env->Update();
       wmmask = env->GetOutput();

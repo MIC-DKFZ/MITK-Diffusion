@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
     std::cout.rdbuf (ss.rdbuf());       // <-- redirect
     itk::TractDensityImageFilter< ItkFloatImgType >::Pointer filter = itk::TractDensityImageFilter< ItkFloatImgType >::New();
     filter->SetUpsamplingFactor(0.25);
-    filter->SetBinaryOutput(true);
+    filter->SetMode(TDI_MODE::BINARY);
     for (auto fib : reference_fibs)
     {
         filter->SetFiberBundle(fib);

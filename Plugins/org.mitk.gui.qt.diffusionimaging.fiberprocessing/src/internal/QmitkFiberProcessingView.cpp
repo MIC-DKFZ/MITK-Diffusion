@@ -363,7 +363,7 @@ void QmitkFiberProcessingView::ApplyDensityThreshold()
 
     itk::TractDensityImageFilter< ItkFloatImageType >::Pointer generator = itk::TractDensityImageFilter< ItkFloatImageType >::New();
     generator->SetFiberBundle(fib);
-    generator->SetBinaryOutput(false);
+    generator->SetMode(TDI_MODE::DENSITY);
     generator->SetOutputAbsoluteValues(false);
     generator->Update();
 

@@ -448,7 +448,7 @@ mitk::gradients::GradientDirectionContainerType::ConstPointer mitk::gradients::R
       while (std::getline(myfile, line))
       {
         std::vector<std::string> strs;
-        boost::split(strs,line,boost::is_any_of("\t \n"));
+        boost::split(strs,line,boost::is_any_of("\t \n\r"));
         for (auto token : strs)
         {
           if (!token.empty())
@@ -485,7 +485,7 @@ mitk::gradients::GradientDirectionContainerType::ConstPointer mitk::gradients::R
       while (std::getline(myfile, line))
       {
         std::vector<std::string> strs;
-        boost::split(strs,line,boost::is_any_of("\t \n"));
+        boost::split(strs,line,boost::is_any_of("\t \n\r"));
         for (auto token : strs)
         {
           if (!token.empty())

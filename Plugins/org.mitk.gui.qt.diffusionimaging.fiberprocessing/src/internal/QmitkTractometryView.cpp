@@ -41,6 +41,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLookupTable.h>
 #include <mitkTractClusteringFilter.h>
 #include <mitkClusteringMetricEuclideanStd.h>
+#include <itkTractDensityImageFilter.h>
+#include <itkImageRegionIterator.h>
 
 
 const std::string QmitkTractometryView::VIEW_ID = "org.mitk.views.tractometry";
@@ -494,6 +496,108 @@ std::string QmitkTractometryView::RGBToHexString(double *rgb)
   return os.str();
 }
 
+void QmitkTractometryView::AlongTractRadiomicsPreprocessing(mitk::Image::Pointer image, mitk::DataNode::Pointer node)
+{
+  mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
+
+  // calculate mask
+  typedef unsigned int OutPixType;
+  typedef itk::Image<OutPixType, 3> OutImageType;
+  itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
+  generator->SetFiberBundle(fib);
+  generator->SetMode(TDI_MODE::BINARY);
+  OutImageType::Pointer itkImage = OutImageType::New();
+  CastToItkImage(image, itkImage);
+  generator->SetInputImage(itkImage);
+  generator->SetUseImageGeometry(true);
+  generator->Update();
+  OutImageType::Pointer count_map = generator->GetOutput();
+
+  unsigned int num_points = m_Controls->m_SamplingPointsBox->value();
+  mitk::FiberBundle::Pointer working_fib = fib->GetDeepCopy();
+  working_fib->ResampleToNumPoints(num_points);
+  vtkSmartPointer< vtkPolyData > polydata = working_fib->GetFiberPolyData();
+
+
+  itk::ImageRegionIterator< OutImageType > it(count_map, count_map->GetLargestPossibleRegion());
+  while( !it.IsAtEnd() )
+  {
+    if (it.Get()>0)
+    {
+      std::vector<unsigned int> seg_vote; seg_vote.resize(num_points, 0);
+      typename OutImageType::PointType image_point;
+      count_map->TransformIndexToPhysicalPoint(it.GetIndex(), image_point);
+
+      for (unsigned int i=0; i<working_fib->GetNumFibers(); ++i)
+      {
+        vtkCell* cell = polydata->GetCell(i);
+        auto numPoints = cell->GetNumberOfPoints();
+        vtkPoints* points = cell->GetPoints();
+
+        bool flip = false;
+        if (i>0)
+          flip = Flip(polydata, i);
+        else if (m_ReferencePolyData!=nullptr)
+          flip = Flip(polydata, 0, m_ReferencePolyData);
+
+        float local_d = 99999999;
+        int local_closest_seg = -1;
+
+        for (int j=0; j<numPoints; j++)
+        {
+          double* p;
+          int segment_id = -1;
+          if (flip)
+          {
+            segment_id = numPoints - j - 1;
+            p = points->GetPoint(segment_id);
+          }
+          else
+          {
+            p = points->GetPoint(j);
+            segment_id = j;
+          }
+
+          float d = std::fabs( (p[0]-image_point[0]) ) + std::fabs( (p[1]-image_point[1]) ) + std::fabs( (p[2]-image_point[2]) );
+          if (d<local_d)
+          {
+            local_d = d;
+            local_closest_seg = segment_id;
+          }
+        }
+
+        seg_vote[local_closest_seg] += 1;
+      }
+
+      unsigned char final_seg_id = -1;
+      unsigned int max_count = 0;
+      for (unsigned int i=0; i<seg_vote.size(); ++i)
+      {
+        if (seg_vote.at(i)>=max_count)
+        {
+          final_seg_id = i;
+          max_count = seg_vote.at(i);
+        }
+      }
+
+      it.Set(final_seg_id + 1);
+    }
+    ++it;
+  }
+
+
+  mitk::Image::Pointer seg_img = mitk::Image::New();
+  seg_img->InitializeByItk(count_map.GetPointer());
+  seg_img->SetVolume(count_map->GetBufferPointer());
+
+  mitk::DataNode::Pointer new_node = mitk::DataNode::New();
+  new_node->SetData(seg_img);
+  new_node->SetName("segment image");
+  new_node->SetVisibility(true);
+  node->SetVisibility(false);
+  GetDataStorage()->Add(new_node, node);
+}
+
 void QmitkTractometryView::StartTractometry()
 {
   m_ReferencePolyData = nullptr;
@@ -513,15 +617,23 @@ void QmitkTractometryView::StartTractometry()
     clipboardString += "mean stdev\n";
 
     std::vector< std::vector< double > > data;
-    if (m_Controls->m_MethodBox->currentIndex()==0)
+    switch (m_Controls->m_MethodBox->currentIndex())
+    {
+    case 1:
     {
       mitkPixelTypeMultiplex4( StaticResamplingTractometry, image->GetPixelType(), image, node, data, clipboardString );
+      break;
     }
-    else
+    case 2:
+    {
+      AlongTractRadiomicsPreprocessing(image, node);
+      return;
+    }
+    default:
     {
       mitkPixelTypeMultiplex4( NearestCentroidPointTractometry, image->GetPixelType(), image, node, data, clipboardString );
     }
-
+    }
 
     m_Controls->m_ChartWidget->AddData1D(data.at(0), node->GetName() + " Mean", QmitkChartWidget::ChartType::line);
     m_Controls->m_ChartWidget->SetLineStyle(node->GetName() + " Mean", QmitkChartWidget::LineStyle::solid);

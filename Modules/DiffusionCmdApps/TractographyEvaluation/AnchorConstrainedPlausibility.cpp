@@ -250,7 +250,7 @@ int main(int argc, char* argv[])
         {
           itk::TractDensityImageFilter< ItkUcharImageType >::Pointer masks_filter = itk::TractDensityImageFilter< ItkUcharImageType >::New();
           masks_filter->SetInputImage(mask);
-          masks_filter->SetBinaryOutput(true);
+          masks_filter->SetMode(TDI_MODE::BINARY);
           masks_filter->SetFiberBundle(fib);
           masks_filter->SetUseImageGeometry(true);
           masks_filter->Update();
@@ -313,7 +313,7 @@ int main(int argc, char* argv[])
         {
           itk::TractDensityImageFilter< ItkUcharImageType >::Pointer masks_filter = itk::TractDensityImageFilter< ItkUcharImageType >::New();
           masks_filter->SetInputImage(mask);
-          masks_filter->SetBinaryOutput(true);
+          masks_filter->SetMode(TDI_MODE::BINARY);
           masks_filter->SetFiberBundle(fib);
           masks_filter->SetUseImageGeometry(true);
           masks_filter->Update();
