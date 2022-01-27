@@ -376,53 +376,10 @@ QGroupBox {
       <string>Parameters</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_5">
-      <item row="2" column="1">
-       <widget class="QSpinBox" name="m_MinFibersBox">
-        <property name="toolTip">
-         <string>Only output clusters with ate least the specified number of fibers.</string>
-        </property>
-        <property name="minimum">
-         <number>1</number>
-        </property>
-        <property name="maximum">
-         <number>9999999</number>
-        </property>
-        <property name="value">
-         <number>50</number>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QSpinBox" name="m_MaxClustersBox">
-        <property name="toolTip">
-         <string>Only output the N largest clusters. Zero means no limit.</string>
-        </property>
-        <property name="maximum">
-         <number>99999999</number>
-        </property>
-        <property name="value">
-         <number>10</number>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_4">
+      <item row="4" column="0">
+       <widget class="QLabel" name="label_10">
         <property name="text">
-         <string>Min. Fibers per Cluster:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>Max. Clusters:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_6">
-        <property name="text">
-         <string>Fiber Points:</string>
+         <string>Merge Duplicate Clusters:</string>
         </property>
        </widget>
       </item>
@@ -442,26 +399,23 @@ QGroupBox {
         </property>
        </widget>
       </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_5">
+      <item row="5" column="0">
+       <widget class="QLabel" name="label_11">
         <property name="text">
-         <string>Cluster Size:</string>
+         <string>Output Centroids:</string>
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
-       <widget class="QSpinBox" name="m_ClusterSizeBox">
+      <item row="3" column="1">
+       <widget class="QSpinBox" name="m_MaxClustersBox">
         <property name="toolTip">
-         <string>Cluster size in mm.</string>
-        </property>
-        <property name="minimum">
-         <number>1</number>
+         <string>Only output the N largest clusters. Zero means no limit.</string>
         </property>
         <property name="maximum">
-         <number>9999999</number>
+         <number>99999999</number>
         </property>
         <property name="value">
-         <number>20</number>
+         <number>10</number>
         </property>
        </widget>
       </item>
@@ -481,22 +435,82 @@ QGroupBox {
         </property>
        </widget>
       </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_10">
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_4">
         <property name="text">
-         <string>Merge Duplicate Clusters:</string>
+         <string>Min. Fibers per Cluster:</string>
         </property>
        </widget>
       </item>
-      <item row="5" column="0">
-       <widget class="QLabel" name="label_11">
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_6">
         <property name="text">
-         <string>Output Centroids:</string>
+         <string>Fiber Points:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QSpinBox" name="m_ClusterSizeBox">
+        <property name="toolTip">
+         <string>Cluster size in mm.</string>
+        </property>
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>9999999</number>
+        </property>
+        <property name="value">
+         <number>20</number>
         </property>
        </widget>
       </item>
       <item row="5" column="1">
        <widget class="QCheckBox" name="m_CentroidsBox">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>Max. Clusters:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QSpinBox" name="m_MinFibersBox">
+        <property name="toolTip">
+         <string>Only output clusters with ate least the specified number of fibers.</string>
+        </property>
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>9999999</number>
+        </property>
+        <property name="value">
+         <number>50</number>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Cluster Size:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="0">
+       <widget class="QLabel" name="label_13">
+        <property name="text">
+         <string>Merge Centroids:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="1">
+       <widget class="QCheckBox" name="m_MergeCentroidsBox">
         <property name="text">
          <string/>
         </property>

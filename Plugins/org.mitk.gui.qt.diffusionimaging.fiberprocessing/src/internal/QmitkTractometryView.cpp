@@ -127,10 +127,10 @@ bool QmitkTractometryView::Flip(vtkSmartPointer< vtkPolyData > polydata1, int i,
     auto p1 = ref_points.at(j);
 
     double* p2 = points2->GetPoint(j);
-    d_direct = (p1[0]-p2[0])*(p1[0]-p2[0]) + (p1[1]-p2[1])*(p1[1]-p2[1]) + (p1[2]-p2[2])*(p1[2]-p2[2]);
+    d_direct += (p1[0]-p2[0])*(p1[0]-p2[0]) + (p1[1]-p2[1])*(p1[1]-p2[1]) + (p1[2]-p2[2])*(p1[2]-p2[2]);
 
     double* p3 = points2->GetPoint(numPoints1-j-1);
-    d_flipped = (p1[0]-p3[0])*(p1[0]-p3[0]) + (p1[1]-p3[1])*(p1[1]-p3[1]) + (p1[2]-p3[2])*(p1[2]-p3[2]);
+    d_flipped += (p1[0]-p3[0])*(p1[0]-p3[0]) + (p1[1]-p3[1])*(p1[1]-p3[1]) + (p1[2]-p3[2])*(p1[2]-p3[2]);
   }
 
   if (d_direct>d_flipped)
@@ -519,71 +519,136 @@ void QmitkTractometryView::AlongTractRadiomicsPreprocessing(mitk::Image::Pointer
   vtkSmartPointer< vtkPolyData > polydata = working_fib->GetFiberPolyData();
 
 
+//  // clustering
+//  MITK_INFO << "CLUSTERING";
+//  std::vector< mitk::ClusteringMetric* > metrics;
+//  metrics.push_back({new mitk::ClusteringMetricEuclideanStd()});
+
+//  std::vector<mitk::FiberBundle::Pointer> centroids;
+//  std::shared_ptr< mitk::TractClusteringFilter > clusterer = std::make_shared<mitk::TractClusteringFilter>();
+//  int c=0;
+//  while (c<30 && (centroids.empty() || centroids.size()>static_cast<unsigned long>(m_Controls->m_MaxCentroids->value())))
+//  {
+//    float cluster_size = m_Controls->m_ClusterSize->value() + m_Controls->m_ClusterSize->value()*c*0.2;
+//    float max_d = 0;
+//    int i=1;
+//    std::vector< float > distances;
+//    while (max_d < working_fib->GetGeometry()->GetDiagonalLength()/2)
+//    {
+//      distances.push_back(cluster_size*i);
+//      max_d = cluster_size*i;
+//      ++i;
+//    }
+
+//    clusterer->SetDistances(distances);
+//    clusterer->SetTractogram(working_fib);
+//    clusterer->SetMetrics(metrics);
+//    clusterer->SetMergeDuplicateThreshold(cluster_size);
+//    clusterer->SetDoResampling(false);
+//    clusterer->SetNumPoints(num_points);
+//    clusterer->SetMaxClusters(1);
+//    clusterer->SetMinClusterSize(1);
+//    clusterer->Update();
+//    centroids = clusterer->GetOutCentroids();
+//    ++c;
+//  }
+//  m_ReferencePolyData = centroids.at(0)->GetFiberPolyData();
+
+  MITK_INFO << fib->GetMeanFiberLength()/(2*num_points);
+  float maxd = fib->GetMeanFiberLength()/(2*num_points);
+
+
   itk::ImageRegionIterator< OutImageType > it(count_map, count_map->GetLargestPossibleRegion());
+
+  unsigned long num_vox = 0;
+  while( !it.IsAtEnd() )
+  {
+    if (it.Get()>0)
+      ++num_vox;
+    ++it;
+  }
+  it.GoToBegin();
+
+  MITK_INFO << "Parcellating tract";
+  boost::progress_display disp(num_vox);
   while( !it.IsAtEnd() )
   {
     if (it.Get()>0)
     {
-      std::vector<unsigned int> seg_vote; seg_vote.resize(num_points, 0);
-      typename OutImageType::PointType image_point;
-      count_map->TransformIndexToPhysicalPoint(it.GetIndex(), image_point);
+      int final_seg_id = -1;
+      int mult = 1;
 
-      for (unsigned int i=0; i<working_fib->GetNumFibers(); ++i)
+      while(final_seg_id<0)
       {
-        vtkCell* cell = polydata->GetCell(i);
-        auto numPoints = cell->GetNumberOfPoints();
-        vtkPoints* points = cell->GetPoints();
+        std::vector<float> seg_vote; seg_vote.resize(num_points, 0);
+        typename OutImageType::PointType image_point;
+        count_map->TransformIndexToPhysicalPoint(it.GetIndex(), image_point);
 
-        bool flip = false;
-        if (i>0)
-          flip = Flip(polydata, i);
-        else if (m_ReferencePolyData!=nullptr)
-          flip = Flip(polydata, 0, m_ReferencePolyData);
-
-        float local_d = 99999999;
-        int local_closest_seg = -1;
-
-        for (int j=0; j<numPoints; j++)
+        for (unsigned int i=0; i<working_fib->GetNumFibers(); ++i)
         {
-          double* p;
-          int segment_id = -1;
-          if (flip)
+          vtkCell* cell = polydata->GetCell(i);
+          auto numPoints = cell->GetNumberOfPoints();
+          vtkPoints* points = cell->GetPoints();
+
+          bool flip = false;
+          if (i>0)
+            flip = Flip(polydata, i);
+          else if (m_ReferencePolyData!=nullptr)
+            flip = Flip(polydata, 0, m_ReferencePolyData);
+
+          float local_d = 99999999;
+          int local_closest_seg = -1;
+
+          for (int j=0; j<numPoints; j++)
           {
-            segment_id = numPoints - j - 1;
-            p = points->GetPoint(segment_id);
-          }
-          else
-          {
-            p = points->GetPoint(j);
-            segment_id = j;
+            double* p;
+            int segment_id = -1;
+            if (flip)
+            {
+              segment_id = numPoints - j - 1;
+              p = points->GetPoint(segment_id);
+            }
+            else
+            {
+              p = points->GetPoint(j);
+              segment_id = j;
+            }
+
+            float d = std::fabs( (p[0]-image_point[0]) ) + std::fabs( (p[1]-image_point[1]) ) + std::fabs( (p[2]-image_point[2]) );
+            if (d<local_d)
+            {
+              local_d = d;
+              local_closest_seg = j;
+            }
           }
 
-          float d = std::fabs( (p[0]-image_point[0]) ) + std::fabs( (p[1]-image_point[1]) ) + std::fabs( (p[2]-image_point[2]) );
-          if (d<local_d)
+          if (local_d<maxd*mult)
+            seg_vote[local_closest_seg] += 1.0/local_d;
+  //        seg_vote[local_closest_seg] += 1.0;
+        }
+
+        float max_count = 0;
+        for (unsigned int i=0; i<seg_vote.size(); ++i)
+        {
+          if (seg_vote.at(i)>max_count)
           {
-            local_d = d;
-            local_closest_seg = segment_id;
+            final_seg_id = i;
+            max_count = seg_vote.at(i);
           }
         }
 
-        seg_vote[local_closest_seg] += 1;
-      }
-
-      unsigned char final_seg_id = -1;
-      unsigned int max_count = 0;
-      for (unsigned int i=0; i<seg_vote.size(); ++i)
-      {
-        if (seg_vote.at(i)>=max_count)
+        if (final_seg_id>=0)
         {
-          final_seg_id = i;
-          max_count = seg_vote.at(i);
+          it.Set(final_seg_id + 1);
         }
+        ++mult;
       }
 
-      it.Set(final_seg_id + 1);
+      ++disp;
     }
     ++it;
   }
+  MITK_INFO << "DONE";
 
 
   mitk::Image::Pointer seg_img = mitk::Image::New();
@@ -619,9 +684,14 @@ void QmitkTractometryView::StartTractometry()
     std::vector< std::vector< double > > data;
     switch (m_Controls->m_MethodBox->currentIndex())
     {
-    case 1:
+    case 0:
     {
       mitkPixelTypeMultiplex4( StaticResamplingTractometry, image->GetPixelType(), image, node, data, clipboardString );
+      break;
+    }
+    case 1:
+    {
+      mitkPixelTypeMultiplex4( NearestCentroidPointTractometry, image->GetPixelType(), image, node, data, clipboardString );
       break;
     }
     case 2:
@@ -631,7 +701,7 @@ void QmitkTractometryView::StartTractometry()
     }
     default:
     {
-      mitkPixelTypeMultiplex4( NearestCentroidPointTractometry, image->GetPixelType(), image, node, data, clipboardString );
+      mitkPixelTypeMultiplex4( StaticResamplingTractometry, image->GetPixelType(), image, node, data, clipboardString );
     }
     }
 

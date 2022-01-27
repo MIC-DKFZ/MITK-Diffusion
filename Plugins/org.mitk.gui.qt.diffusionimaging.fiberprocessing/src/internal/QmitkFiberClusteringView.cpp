@@ -216,7 +216,7 @@ void QmitkFiberClusteringView::StartClustering()
       this->GetDataStorage()->Add(new_node, node);
     node->SetVisibility(false);
 
-    if (m_Controls->m_CentroidsBox->isChecked())
+    if (m_Controls->m_CentroidsBox->isChecked() && !m_Controls->m_MergeCentroidsBox->isChecked())
     {
       mitk::DataNode::Pointer new_node2 = mitk::DataNode::New();
       new_node2->SetData(centroids.at(c));
@@ -224,6 +224,17 @@ void QmitkFiberClusteringView::StartClustering()
       this->GetDataStorage()->Add(new_node2, new_node);
     }
     ++c;
+  }
+
+  if (m_Controls->m_CentroidsBox->isChecked() && m_Controls->m_MergeCentroidsBox->isChecked())
+  {
+    mitk::DataNode::Pointer new_node2 = mitk::DataNode::New();
+    auto centroid_bundle = centroids.at(0);
+    for (unsigned int i=1; i<centroids.size(); ++i)
+      centroid_bundle = centroid_bundle->AddBundle(centroids.at(i));
+    new_node2->SetData(centroid_bundle);
+    new_node2->SetName("Centroids");
+    this->GetDataStorage()->Add(new_node2);
   }
 }
 
