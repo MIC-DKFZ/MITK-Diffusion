@@ -42,7 +42,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTractClusteringFilter.h>
 #include <mitkClusteringMetricEuclideanStd.h>
 #include <itkTractDensityImageFilter.h>
-#include <itkImageRegionIterator.h>
+#include <itkTractParcellationFilter.h>
+#include <mitkLookupTableProperty.h>
+#include <mitkLevelWindowProperty.h>
 
 
 const std::string QmitkTractometryView::VIEW_ID = "org.mitk.views.tractometry";
@@ -501,166 +503,61 @@ void QmitkTractometryView::AlongTractRadiomicsPreprocessing(mitk::Image::Pointer
   mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
 
   // calculate mask
-  typedef unsigned int OutPixType;
+  typedef unsigned char OutPixType;
   typedef itk::Image<OutPixType, 3> OutImageType;
-  itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
-  generator->SetFiberBundle(fib);
-  generator->SetMode(TDI_MODE::BINARY);
+
   OutImageType::Pointer itkImage = OutImageType::New();
   CastToItkImage(image, itkImage);
-  generator->SetInputImage(itkImage);
-  generator->SetUseImageGeometry(true);
-  generator->Update();
-  OutImageType::Pointer count_map = generator->GetOutput();
 
-  unsigned int num_points = m_Controls->m_SamplingPointsBox->value();
-  mitk::FiberBundle::Pointer working_fib = fib->GetDeepCopy();
-  working_fib->ResampleToNumPoints(num_points);
-  vtkSmartPointer< vtkPolyData > polydata = working_fib->GetFiberPolyData();
-
-
-//  // clustering
-//  MITK_INFO << "CLUSTERING";
-//  std::vector< mitk::ClusteringMetric* > metrics;
-//  metrics.push_back({new mitk::ClusteringMetricEuclideanStd()});
-
-//  std::vector<mitk::FiberBundle::Pointer> centroids;
-//  std::shared_ptr< mitk::TractClusteringFilter > clusterer = std::make_shared<mitk::TractClusteringFilter>();
-//  int c=0;
-//  while (c<30 && (centroids.empty() || centroids.size()>static_cast<unsigned long>(m_Controls->m_MaxCentroids->value())))
-//  {
-//    float cluster_size = m_Controls->m_ClusterSize->value() + m_Controls->m_ClusterSize->value()*c*0.2;
-//    float max_d = 0;
-//    int i=1;
-//    std::vector< float > distances;
-//    while (max_d < working_fib->GetGeometry()->GetDiagonalLength()/2)
-//    {
-//      distances.push_back(cluster_size*i);
-//      max_d = cluster_size*i;
-//      ++i;
-//    }
-
-//    clusterer->SetDistances(distances);
-//    clusterer->SetTractogram(working_fib);
-//    clusterer->SetMetrics(metrics);
-//    clusterer->SetMergeDuplicateThreshold(cluster_size);
-//    clusterer->SetDoResampling(false);
-//    clusterer->SetNumPoints(num_points);
-//    clusterer->SetMaxClusters(1);
-//    clusterer->SetMinClusterSize(1);
-//    clusterer->Update();
-//    centroids = clusterer->GetOutCentroids();
-//    ++c;
-//  }
-//  m_ReferencePolyData = centroids.at(0)->GetFiberPolyData();
-
-  MITK_INFO << fib->GetMeanFiberLength()/(2*num_points);
-  float maxd = fib->GetMeanFiberLength()/(2*num_points);
-
-
-  itk::ImageRegionIterator< OutImageType > it(count_map, count_map->GetLargestPossibleRegion());
-
-  unsigned long num_vox = 0;
-  while( !it.IsAtEnd() )
-  {
-    if (it.Get()>0)
-      ++num_vox;
-    ++it;
-  }
-  it.GoToBegin();
-
-  MITK_INFO << "Parcellating tract";
-  boost::progress_display disp(num_vox);
-  while( !it.IsAtEnd() )
-  {
-    if (it.Get()>0)
-    {
-      int final_seg_id = -1;
-      int mult = 1;
-
-      while(final_seg_id<0)
-      {
-        std::vector<float> seg_vote; seg_vote.resize(num_points, 0);
-        typename OutImageType::PointType image_point;
-        count_map->TransformIndexToPhysicalPoint(it.GetIndex(), image_point);
-
-        for (unsigned int i=0; i<working_fib->GetNumFibers(); ++i)
-        {
-          vtkCell* cell = polydata->GetCell(i);
-          auto numPoints = cell->GetNumberOfPoints();
-          vtkPoints* points = cell->GetPoints();
-
-          bool flip = false;
-          if (i>0)
-            flip = Flip(polydata, i);
-          else if (m_ReferencePolyData!=nullptr)
-            flip = Flip(polydata, 0, m_ReferencePolyData);
-
-          float local_d = 99999999;
-          int local_closest_seg = -1;
-
-          for (int j=0; j<numPoints; j++)
-          {
-            double* p;
-            int segment_id = -1;
-            if (flip)
-            {
-              segment_id = numPoints - j - 1;
-              p = points->GetPoint(segment_id);
-            }
-            else
-            {
-              p = points->GetPoint(j);
-              segment_id = j;
-            }
-
-            float d = std::fabs( (p[0]-image_point[0]) ) + std::fabs( (p[1]-image_point[1]) ) + std::fabs( (p[2]-image_point[2]) );
-            if (d<local_d)
-            {
-              local_d = d;
-              local_closest_seg = j;
-            }
-          }
-
-          if (local_d<maxd*mult)
-            seg_vote[local_closest_seg] += 1.0/local_d;
-  //        seg_vote[local_closest_seg] += 1.0;
-        }
-
-        float max_count = 0;
-        for (unsigned int i=0; i<seg_vote.size(); ++i)
-        {
-          if (seg_vote.at(i)>max_count)
-          {
-            final_seg_id = i;
-            max_count = seg_vote.at(i);
-          }
-        }
-
-        if (final_seg_id>=0)
-        {
-          it.Set(final_seg_id + 1);
-        }
-        ++mult;
-      }
-
-      ++disp;
-    }
-    ++it;
-  }
-  MITK_INFO << "DONE";
-
+  itk::TractParcellationFilter< >::Pointer parcellator = itk::TractParcellationFilter< >::New();
+  parcellator->SetInputImage(itkImage);
+  parcellator->SetNumParcels(m_Controls->m_SamplingPointsBox->value());
+  parcellator->SetInputTract(fib);
+  parcellator->SetNumCentroids(m_Controls->m_MaxCentroids->value());
+  parcellator->SetStartClusterSize(m_Controls->m_ClusterSize->value());
+  parcellator->Update();
+  OutImageType::Pointer out_image = parcellator->GetOutput(0);
+  OutImageType::Pointer out_image_pp = parcellator->GetOutput(1);
 
   mitk::Image::Pointer seg_img = mitk::Image::New();
-  seg_img->InitializeByItk(count_map.GetPointer());
-  seg_img->SetVolume(count_map->GetBufferPointer());
+  seg_img->InitializeByItk(out_image.GetPointer());
+  seg_img->SetVolume(out_image->GetBufferPointer());
+
+  mitk::Image::Pointer seg_img_pp = mitk::Image::New();
+  seg_img_pp->InitializeByItk(out_image_pp.GetPointer());
+  seg_img_pp->SetVolume(out_image_pp->GetBufferPointer());
+
+  mitk::LookupTable::Pointer lut = mitk::LookupTable::New();
+  lut->SetType( mitk::LookupTable::JET_TRANSPARENT );
+  mitk::LookupTableProperty::Pointer lut_prop = mitk::LookupTableProperty::New();
+  lut_prop->SetLookupTable( lut );
+
+  mitk::LevelWindow lw;
+  lw.SetRangeMinMax(0, m_Controls->m_SamplingPointsBox->value());
 
   mitk::DataNode::Pointer new_node = mitk::DataNode::New();
   new_node->SetData(seg_img);
-  new_node->SetName("segment image");
+  new_node->SetName("tract parcellation");
   new_node->SetVisibility(true);
+  new_node->SetProperty("LookupTable", lut_prop );
+  new_node->SetProperty( "levelwindow", mitk::LevelWindowProperty::New( lw ) );
   node->SetVisibility(false);
   GetDataStorage()->Add(new_node, node);
+
+  mitk::DataNode::Pointer new_node2 = mitk::DataNode::New();
+  new_node2->SetData(seg_img_pp);
+  new_node2->SetName("tract parcellation pp");
+  new_node2->SetVisibility(false);
+  new_node2->SetProperty("LookupTable", lut_prop );
+  new_node2->SetProperty( "levelwindow", mitk::LevelWindowProperty::New( lw ) );
+  GetDataStorage()->Add(new_node2, new_node);
+
+  mitk::DataNode::Pointer new_node3 = mitk::DataNode::New();
+  auto working_fib = parcellator->GetWorkingTract();
+  working_fib->ColorFibersByScalarMap(seg_img, false, true, false);
+  new_node3->SetData(working_fib);
+  new_node3->SetName("centroids");
+  GetDataStorage()->Add(new_node3, new_node);
 }
 
 void QmitkTractometryView::StartTractometry()

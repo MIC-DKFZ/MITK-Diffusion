@@ -532,7 +532,7 @@ void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool normalize, bool w
 
   mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
   vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-  lookupTable->SetTableRange(0.0, 0.8);
+  lookupTable->SetTableRange(0.0, 1.0);
   lookupTable->Build();
   mitkLookup->SetVtkLookupTable(lookupTable);
   mitkLookup->SetType(mitk::LookupTable::JET);
@@ -748,7 +748,7 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize, bool weight
 
   mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
   vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-  lookupTable->SetTableRange(0.0, 0.8);
+  lookupTable->SetTableRange(0.0, 1.0);
   lookupTable->Build();
   mitkLookup->SetVtkLookupTable(lookupTable);
   mitkLookup->SetType(mitk::LookupTable::JET);
@@ -908,7 +908,7 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Imag
 
   mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
   vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-  lookupTable->SetTableRange(0.0, 0.8);
+  lookupTable->SetTableRange(0.0, 1.0);
   lookupTable->Build();
   mitkLookup->SetVtkLookupTable(lookupTable);
   mitkLookup->SetType(mitk::LookupTable::JET);

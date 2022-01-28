@@ -72,6 +72,13 @@ QGroupBox {
       <string>Centroid Options</string>
      </property>
      <layout class="QGridLayout" name="gridLayout">
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="m_ClusterSize">
+        <property name="value">
+         <double>15.000000000000000</double>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_6">
         <property name="text">
@@ -89,20 +96,23 @@ QGroupBox {
       <item row="0" column="1">
        <widget class="QSpinBox" name="m_MaxCentroids">
         <property name="minimum">
-         <number>1</number>
+         <number>0</number>
         </property>
         <property name="maximum">
-         <number>99</number>
+         <number>9999</number>
         </property>
         <property name="value">
          <number>1</number>
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QDoubleSpinBox" name="m_ClusterSize">
-        <property name="value">
-         <double>15.000000000000000</double>
+      <item row="2" column="0">
+       <widget class="QCheckBox" name="m_PostprocessParcellation">
+        <property name="text">
+         <string>Postprocess Parcellation</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -149,7 +159,7 @@ QGroupBox {
          <number>99999</number>
         </property>
         <property name="value">
-         <number>20</number>
+         <number>15</number>
         </property>
        </widget>
       </item>
@@ -169,6 +179,9 @@ QGroupBox {
       </item>
       <item row="1" column="1">
        <widget class="QComboBox" name="m_MethodBox">
+        <property name="currentIndex">
+         <number>2</number>
+        </property>
         <item>
          <property name="text">
           <string>Static Resampling</string>
