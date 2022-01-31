@@ -143,9 +143,34 @@ mitk::FiberBundle::Pointer TractParcellationFilter< OutImageType >::GetWorkingFi
 }
 
 template< class OutImageType >
-std::vector< typename OutImageType::Pointer > TractParcellationFilter< OutImageType >::GetBinarySplit(typename OutImageType::Pointer inImage)
+std::vector< typename itk::Image<unsigned char, 3>::Pointer > TractParcellationFilter< OutImageType >::GetBinarySplit(typename OutImageType::Pointer inImage)
 {
+  std::vector< typename itk::Image<unsigned char, 3>::Pointer > binary_maps;
 
+  for (unsigned int i=0; i<m_NumParcels; ++i)
+  {
+    typename itk::Image<unsigned char, 3>::Pointer parcel_image = itk::Image<unsigned char, 3>::New();
+    parcel_image->SetSpacing( inImage->GetSpacing() );
+    parcel_image->SetOrigin( inImage->GetOrigin() );
+    parcel_image->SetDirection( inImage->GetDirection() );
+    parcel_image->SetRegions( inImage->GetLargestPossibleRegion() );
+    parcel_image->Allocate();
+    parcel_image->FillBuffer(0);
+
+    binary_maps.push_back(parcel_image);
+  }
+
+  itk::ImageRegionIterator< itk::Image<unsigned char, 3> > p_it(inImage, inImage->GetLargestPossibleRegion());
+  while(!p_it.IsAtEnd())
+  {
+    if (p_it.Get()>0)
+    {
+      binary_maps.at(p_it.Get()-1)->SetPixel(p_it.GetIndex(), 1);
+    }
+    ++p_it;
+  }
+
+  return binary_maps;
 }
 
 template< class OutImageType >

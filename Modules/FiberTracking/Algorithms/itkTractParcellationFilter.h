@@ -60,6 +60,8 @@ public:
   itkSetMacro( InputImage, typename OutImageType::Pointer)
 
 
+  std::vector< typename itk::Image<unsigned char, 3>::Pointer > GetBinarySplit(typename OutImageType::Pointer inImage);
+
   void GenerateData() override;
 
 protected:
@@ -74,8 +76,6 @@ protected:
   typename OutImageType::Pointer PostprocessParcellation(typename OutImageType::Pointer outImage);
 
   void StaticResampleParcelVoting(typename OutImageType::Pointer outImage);
-
-  std::vector< typename OutImageType::Pointer > GetBinarySplit(typename OutImageType::Pointer inImage);
 
   mitk::FiberBundle::Pointer        m_ReferenceTract;
   mitk::FiberBundle::Pointer        m_InputTract;          ///< input fiber bundle
