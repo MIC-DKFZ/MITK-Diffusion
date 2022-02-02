@@ -28,14 +28,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkClusteringMetricEuclideanMean.h>
 #include <mitkClusteringMetricLength.h>
 #include <itkImageRegionConstIterator.h>
-#include <omp.h>
+#include <itkTractsToVectorImageFilter.h>
 
 namespace itk{
 
 template< class OutImageType >
 TractParcellationFilter< OutImageType >::TractParcellationFilter()
   : m_UpsamplingFactor(1)
-  , m_NumParcels(15)
+  , m_NumParcels(0)
   , m_NumCentroids(0)
   , m_StartClusterSize(5)
   , m_InputImage(nullptr)
@@ -100,8 +100,8 @@ mitk::FiberBundle::Pointer TractParcellationFilter< OutImageType >::GetWorkingFi
   // clustering
   std::vector< mitk::ClusteringMetric* > metrics;
   metrics.push_back({new mitk::ClusteringMetricEuclideanStd()});
-  metrics.push_back({new mitk::ClusteringMetricEuclideanMean()});
-  metrics.push_back({new mitk::ClusteringMetricLength()});
+//  metrics.push_back({new mitk::ClusteringMetricEuclideanMean()});
+//  metrics.push_back({new mitk::ClusteringMetricLength()});
 
   if (m_NumCentroids>0)
   {
@@ -245,42 +245,76 @@ void TractParcellationFilter< OutImageType >::StaticResampleParcelVoting(typenam
   generator->SetInputImage(outImage);
   generator->SetUseImageGeometry(true);
   generator->Update();
-  auto envelope = generator->GetOutput();
+  auto tdi = generator->GetOutput();
+
+  if (m_NumParcels < 3)
+  {
+    auto spacing = outImage->GetSpacing();
+    float f = (spacing[0] + spacing[1] + spacing[2])/3;
+    f /= generator->GetAverageSegmentLength();
+    MITK_INFO << generator->GetAverageSegmentLength();
+    MITK_INFO << generator->GetAverageNumTraversedVoxels();
+    MITK_INFO << f;
+    m_NumParcels = std::ceil(generator->GetAverageNumTraversedVoxels()/(3.0*f));
+
+    MITK_INFO << "Automatically setting number of parcels to " << m_NumParcels;
+  }
+
+  itk::TractsToVectorImageFilter<float>::Pointer fOdfFilter = itk::TractsToVectorImageFilter<float>::New();
+  fOdfFilter->SetMaskImage(tdi);
+  fOdfFilter->SetFiberBundle(m_InputTract);
+  fOdfFilter->SetNormalizationMethod(itk::TractsToVectorImageFilter<float>::NormalizationMethods::SINGLE_VEC_NORM);
+  fOdfFilter->SetMaxNumDirections(1);
+  fOdfFilter->Update();
+  itk::Image< float, 4 >::Pointer dir_image = fOdfFilter->GetDirectionImage();
 
   m_WorkingTract = GetWorkingFib();
   vtkSmartPointer< vtkPolyData > polydata = m_WorkingTract->GetFiberPolyData();
 
-  float maxd = m_InputTract->GetMeanFiberLength()/(2*m_NumParcels);
+  float maxd = m_InputTract->GetMeanFiberLength()/(0.5*m_NumParcels);
   itk::ImageRegionIterator< OutImageType > it(outImage, outImage->GetLargestPossibleRegion());
-  itk::ImageRegionIterator< OutImageType > it_mask(envelope, envelope->GetLargestPossibleRegion());
+  itk::ImageRegionIterator< OutImageType > it_tdi(tdi, tdi->GetLargestPossibleRegion());
 
   vtkSmartPointer< vtkPolyData > reference_polydata = nullptr;
   if (m_ReferenceTract.IsNotNull())
     reference_polydata = m_ReferenceTract->GetFiberPolyData();
 
   unsigned long num_vox = 0;
-  while( !it_mask.IsAtEnd() )
+  while( !it_tdi.IsAtEnd() )
   {
-    if (it_mask.Get()>0)
+    if (it_tdi.Get()>0)
       ++num_vox;
-    ++it_mask;
+    ++it_tdi;
   }
-  it_mask.GoToBegin();
+  it_tdi.GoToBegin();
 
   MITK_INFO << "Parcellating tract";
   boost::progress_display disp(num_vox);
   while( !it.IsAtEnd() )
   {
-    if (it_mask.Get()>0)
+    if (it_tdi.Get()>0)
     {
       int final_seg_id = -1;
       int mult = 1;
+
+      itk::Image< float, 4 >::IndexType idx4;
+      idx4[0] = it_tdi.GetIndex()[0];
+      idx4[1] = it_tdi.GetIndex()[1];
+      idx4[2] = it_tdi.GetIndex()[2];
+
+      vnl_vector_fixed<float, 3> ref_dir;
+      idx4[3] = 0;
+      ref_dir[0] = dir_image->GetPixel(idx4);
+      idx4[3] = 1;
+      ref_dir[1] = dir_image->GetPixel(idx4);
+      idx4[3] = 2;
+      ref_dir[2] = dir_image->GetPixel(idx4);
 
       while(final_seg_id<0)
       {
         std::vector<float> seg_vote; seg_vote.resize(m_NumParcels, 0);
         typename OutImageType::PointType image_point;
-        envelope->TransformIndexToPhysicalPoint(it.GetIndex(), image_point);
+        tdi->TransformIndexToPhysicalPoint(it.GetIndex(), image_point);
 
         for (unsigned int i=0; i<m_WorkingTract->GetNumFibers(); ++i)
         {
@@ -292,32 +326,63 @@ void TractParcellationFilter< OutImageType >::StaticResampleParcelVoting(typenam
 
           float local_d = 99999999;
           int local_closest_seg = -1;
+//          float weight = 1.0;
 
           for (int j=0; j<numPoints; j++)
           {
-            double* p;
+            itk::Point<float, 3> p;
             int segment_id = -1;
             if (flip)
             {
               segment_id = numPoints - j - 1;
-              p = points->GetPoint(segment_id);
+              p = mitk::imv::GetItkPoint(points->GetPoint(segment_id));
             }
             else
             {
-              p = points->GetPoint(j);
+              p = mitk::imv::GetItkPoint(points->GetPoint(j));
               segment_id = j;
             }
 
             float d = std::fabs( (p[0]-image_point[0]) ) + std::fabs( (p[1]-image_point[1]) ) + std::fabs( (p[2]-image_point[2]) );
+
+
+            itk::Point<float, 3> p2;
+            if (segment_id<numPoints-1)
+            {
+              p2 = mitk::imv::GetItkPoint(points->GetPoint(segment_id+1));
+            }
+            else
+            {
+              p2 = mitk::imv::GetItkPoint(points->GetPoint(segment_id-1));
+            }
+
+            vnl_vector_fixed<float, 3> dir;
+            dir[0] = p[0]-p2[0];
+            dir[1] = p[1]-p2[1];
+            dir[2] = p[2]-p2[2];
+            dir.normalize();
+
+            float a = std::fabs(dot_product(dir, ref_dir));
+            if (a<0.0000001)
+              a += 0.0000001;
+            d += (1.0/a - 1.0) * maxd;
+
             if (d<local_d)
             {
               local_d = d;
               local_closest_seg = j;
+//              typename OutImageType::IndexType p_idx;
+//              typename OutImageType::PointType mitk_p;
+//              mitk_p[0] = p[0];
+//              mitk_p[1] = p[2];
+//              mitk_p[2] = p[1];
+//              tdi->TransformPhysicalPointToIndex(mitk_p, p_idx);
+//              weight = tdi->GetPixel(p_idx);
             }
           }
 
           if (local_d<maxd*mult)
-            seg_vote[local_closest_seg] += 1.0/local_d;
+            seg_vote[local_closest_seg] += 1.0/(local_d);
         }
 
         float max_count = 0;
@@ -339,7 +404,7 @@ void TractParcellationFilter< OutImageType >::StaticResampleParcelVoting(typenam
       ++disp;
     }
     ++it;
-    ++it_mask;
+    ++it_tdi;
   }
   MITK_INFO << "DONE";
 }

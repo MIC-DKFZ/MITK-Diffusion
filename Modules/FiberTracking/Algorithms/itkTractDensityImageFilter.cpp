@@ -29,8 +29,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 namespace itk{
 
-template< class OutputImageType >
-TractDensityImageFilter< OutputImageType >::TractDensityImageFilter()
+template< class OutputImageType, class RefImageType >
+TractDensityImageFilter< OutputImageType, RefImageType >::TractDensityImageFilter()
   : m_UpsamplingFactor(1)
   , m_InvertImage(false)
   , m_Mode(DENSITY)
@@ -41,25 +41,25 @@ TractDensityImageFilter< OutputImageType >::TractDensityImageFilter()
 {
 }
 
-template< class OutputImageType >
-TractDensityImageFilter< OutputImageType >::~TractDensityImageFilter()
+template< class OutputImageType, class RefImageType >
+TractDensityImageFilter< OutputImageType, RefImageType >::~TractDensityImageFilter()
 {
 }
 
-template< class OutputImageType >
-TDI_MODE TractDensityImageFilter< OutputImageType >::GetMode() const
+template< class OutputImageType, class RefImageType >
+TDI_MODE TractDensityImageFilter< OutputImageType, RefImageType >::GetMode() const
 {
   return m_Mode;
 }
 
-template< class OutputImageType >
-void TractDensityImageFilter< OutputImageType >::SetMode(const TDI_MODE &Mode)
+template< class OutputImageType, class RefImageType >
+void TractDensityImageFilter< OutputImageType, RefImageType >::SetMode(const TDI_MODE &Mode)
 {
   m_Mode = Mode;
 }
 
-template< class OutputImageType >
-void TractDensityImageFilter< OutputImageType >::GenerateData()
+template< class OutputImageType, class RefImageType >
+void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
 {
   // generate upsampled image
   mitk::BaseGeometry::Pointer geometry = m_FiberBundle->GetGeometry();
@@ -125,6 +125,8 @@ void TractDensityImageFilter< OutputImageType >::GenerateData()
   MITK_INFO << "TractDensityImageFilter: starting image generation";
   vtkSmartPointer<vtkPolyData> fiberPolyData = m_FiberBundle->GetFiberPolyData();
 
+  m_AverageNumTraversedVoxels = 0;
+  m_AverageSegmentLength = 0;
   int numFibers = m_FiberBundle->GetNumFibers();
   boost::progress_display disp(numFibers);
   for( int i=0; i<numFibers; i++ )
@@ -152,8 +154,10 @@ void TractDensityImageFilter< OutputImageType >::GenerateData()
       outImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
       std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(newSpacing, startIndex, endIndex, startIndexCont, endIndexCont);
+      m_AverageNumTraversedVoxels += segments.size();
       for (std::pair< itk::Index<3>, double > segment : segments)
       {
+        m_AverageSegmentLength += segment.second;
         if (!outImage->GetLargestPossibleRegion().IsInside(segment.first))
           continue;
         if (outImage->GetPixel(segment.first)==0)
@@ -184,6 +188,9 @@ void TractDensityImageFilter< OutputImageType >::GenerateData()
       }
     }
   }
+
+  m_AverageSegmentLength /= m_AverageNumTraversedVoxels;
+  m_AverageNumTraversedVoxels = m_AverageNumTraversedVoxels/numFibers;
 
   m_MaxDensity = 0;
   for (int i=0; i<w*h*d; i++)

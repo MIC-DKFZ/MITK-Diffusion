@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>484</width>
-    <height>922</height>
+    <height>951</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -102,7 +102,7 @@ QGroupBox {
          <number>9999</number>
         </property>
         <property name="value">
-         <number>1</number>
+         <number>0</number>
         </property>
        </widget>
       </item>
@@ -153,7 +153,7 @@ QGroupBox {
       <item row="2" column="1">
        <widget class="QSpinBox" name="m_SamplingPointsBox">
         <property name="minimum">
-         <number>3</number>
+         <number>0</number>
         </property>
         <property name="maximum">
          <number>99999</number>

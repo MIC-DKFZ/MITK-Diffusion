@@ -121,7 +121,10 @@ int main(int argc, char* argv[])
         mitk::Image::Pointer mitk_segment = mitk::Image::New();
         mitk_segment->InitializeByItk(itk_segment.GetPointer());
         mitk_segment->SetVolume(itk_segment->GetBufferPointer());
-        mitk::IOUtil::Save(mitk_segment, outFileName + "_" +  boost::lexical_cast<std::string>(c) + ".nrrd");
+        if (c<10)
+          mitk::IOUtil::Save(mitk_segment, outFileName + "_0" +  boost::lexical_cast<std::string>(c) + ".nrrd");
+        else
+          mitk::IOUtil::Save(mitk_segment, outFileName + "_" +  boost::lexical_cast<std::string>(c) + ".nrrd");
         ++c;
       }
     }

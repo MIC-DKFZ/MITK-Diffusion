@@ -332,7 +332,7 @@ int main(int argc, char* argv[])
 
       mitk::FiberBundle::Pointer out_fib = mitk::FiberBundle::New();
       out_fib = out_fib->AddBundles(input_candidates);
-      out_fib->ColorFibersByFiberWeights(false, true);
+      out_fib->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
       mitk::IOUtil::Save(out_fib, out_folder + "AllCandidates.fib");
 
       peak_image = fitter->GetUnderexplainedImage();

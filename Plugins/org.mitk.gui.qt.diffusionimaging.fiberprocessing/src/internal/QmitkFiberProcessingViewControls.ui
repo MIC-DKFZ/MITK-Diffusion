@@ -1133,7 +1133,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>353</width>
-        <height>426</height>
+        <height>428</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1283,32 +1283,6 @@ QGroupBox {
             </property>
            </widget>
           </item>
-          <item row="1" column="0">
-           <widget class="QCheckBox" name="m_FiberOpacityBox">
-            <property name="toolTip">
-             <string>If checked, the image values are not only used to color the fibers but are also used as opaxity values.</string>
-            </property>
-            <property name="text">
-             <string>Values as opacity</string>
-            </property>
-            <property name="checked">
-             <bool>false</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0">
-           <widget class="QCheckBox" name="m_NormalizeColorValues">
-            <property name="toolTip">
-             <string>The values used to color the fibers are min-max normalized. If not checked, the values should be between 0 and 1.</string>
-            </property>
-            <property name="text">
-             <string>Normalize color values</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
           <item row="4" column="0">
            <widget class="QmitkDataStorageComboBox" name="m_ColorMapBox"/>
           </item>
@@ -1323,6 +1297,63 @@ QGroupBox {
             <property name="checked">
              <bool>false</bool>
             </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QCheckBox" name="m_FiberOpacityBox">
+            <property name="toolTip">
+             <string>If checked, the image values are not only used to color the fibers but are also used as opaxity values.</string>
+            </property>
+            <property name="text">
+             <string>Values as opacity</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QComboBox" name="m_LookupTableTypeBox">
+            <item>
+             <property name="text">
+              <string>JET</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>HOT_IRON</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>PLASMA</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>INFERNO</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>VIRIDIS</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>MAGMA</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>GRAYSCALE</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>MULTILABEL</string>
+             </property>
+            </item>
            </widget>
           </item>
          </layout>

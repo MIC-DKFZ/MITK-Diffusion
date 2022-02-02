@@ -33,7 +33,7 @@ namespace itk{
 /**
 * \brief Generates tract density images from input fiberbundles (Calamante 2010).   */
 
-template< class OutputImageType >
+template< class OutputImageType, class RefImageType=OutputImageType >
 class TractDensityImageFilter : public ImageSource< OutputImageType >
 {
 
@@ -58,9 +58,11 @@ public:
   itkSetMacro( UseImageGeometry, bool)                          ///< use input image geometry to initialize output image
   itkGetMacro( UseImageGeometry, bool)                          ///< use input image geometry to initialize output image
   itkSetMacro( FiberBundle, mitk::FiberBundle::Pointer)         ///< input fiber bundle
-  itkSetMacro( InputImage, typename OutputImageType::Pointer)   ///< use input image geometry to initialize output image
+  itkSetMacro( InputImage, typename RefImageType::Pointer)      ///< use input image geometry to initialize output image
   itkGetMacro( MaxDensity, OutPixelType)
   itkGetMacro( NumCoveredVoxels, unsigned int)
+  itkGetMacro( AverageNumTraversedVoxels, unsigned int)
+  itkGetMacro( AverageSegmentLength, float)
 
   void GenerateData() override;
 
@@ -72,7 +74,7 @@ protected:
   TractDensityImageFilter();
   ~TractDensityImageFilter() override;
 
-  typename OutputImageType::Pointer m_InputImage;           ///< use input image geometry to initialize output image
+  typename RefImageType::Pointer    m_InputImage;           ///< use input image geometry to initialize output image
   mitk::FiberBundle::Pointer        m_FiberBundle;          ///< input fiber bundle
   float                             m_UpsamplingFactor;     ///< use higher resolution for ouput image
   bool                              m_InvertImage;          ///< voxelvalue = 1-voxelvalue
@@ -84,6 +86,8 @@ protected:
   bool                              m_WorkOnFiberCopy;
   OutPixelType                      m_MaxDensity;
   unsigned int                      m_NumCoveredVoxels;
+  unsigned int                      m_AverageNumTraversedVoxels;
+  float                             m_AverageSegmentLength;
 };
 
 }

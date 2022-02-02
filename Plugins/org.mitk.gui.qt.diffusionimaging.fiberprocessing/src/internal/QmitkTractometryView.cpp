@@ -180,7 +180,7 @@ void QmitkTractometryView::StaticResamplingTractometry(const mitk::PixelType, mi
 
     for (int j=0; j<numPoints; j++)
     {
-      lookupTable->GetTableValue(j, rgb);
+      lookupTable->GetTableValue(j+1, rgb);
 
       double* p;
       if (flip)
@@ -381,7 +381,7 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
 
       }
 
-      lookupTable->GetTableValue(min_bin, rgb);
+      lookupTable->GetTableValue(min_bin+1, rgb);
       working_fib->ColorSinglePoint(i, j, rgb);
 
       Point3D px;
@@ -528,12 +528,12 @@ void QmitkTractometryView::AlongTractRadiomicsPreprocessing(mitk::Image::Pointer
   seg_img_pp->SetVolume(out_image_pp->GetBufferPointer());
 
   mitk::LookupTable::Pointer lut = mitk::LookupTable::New();
-  lut->SetType( mitk::LookupTable::JET_TRANSPARENT );
+  lut->SetType( mitk::LookupTable::MULTILABEL );
   mitk::LookupTableProperty::Pointer lut_prop = mitk::LookupTableProperty::New();
   lut_prop->SetLookupTable( lut );
 
   mitk::LevelWindow lw;
-  lw.SetRangeMinMax(0, m_Controls->m_SamplingPointsBox->value());
+  lw.SetRangeMinMax(0, parcellator->GetNumParcels());
 
   mitk::DataNode::Pointer new_node = mitk::DataNode::New();
   new_node->SetData(seg_img);
@@ -554,7 +554,7 @@ void QmitkTractometryView::AlongTractRadiomicsPreprocessing(mitk::Image::Pointer
 
   mitk::DataNode::Pointer new_node3 = mitk::DataNode::New();
   auto working_fib = parcellator->GetWorkingTract();
-  working_fib->ColorFibersByScalarMap(seg_img, false, true, false);
+  working_fib->ColorFibersByScalarMap(seg_img, false, false, mitk::LookupTable::LookupTableType::MULTILABEL);
   new_node3->SetData(working_fib);
   new_node3->SetName("centroids");
   GetDataStorage()->Add(new_node3, new_node);

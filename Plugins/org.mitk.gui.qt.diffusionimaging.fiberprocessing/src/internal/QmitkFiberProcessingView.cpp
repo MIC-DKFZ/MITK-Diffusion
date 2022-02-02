@@ -343,7 +343,36 @@ void QmitkFiberProcessingView::ApplyWeightThreshold()
     mitk::FiberBundle::Pointer newFib = fib->FilterByWeights(thr);
     if (newFib->GetNumFibers()>0)
     {
-      newFib->ColorFibersByFiberWeights(false, true);
+      switch(m_Controls->m_LookupTableTypeBox->currentIndex())
+      {
+      case 0:
+        newFib->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
+        break;
+      case 1:
+        newFib->ColorFibersByFiberWeights(false, mitk::LookupTable::HOT_IRON);
+        break;
+      case 2:
+        newFib->ColorFibersByFiberWeights(false, mitk::LookupTable::PLASMA);
+        break;
+      case 3:
+        newFib->ColorFibersByFiberWeights(false, mitk::LookupTable::INFERNO);
+        break;
+      case 4:
+        newFib->ColorFibersByFiberWeights(false, mitk::LookupTable::VIRIDIS);
+        break;
+      case 5:
+        newFib->ColorFibersByFiberWeights(false, mitk::LookupTable::MAGMA);
+        break;
+      case 6:
+        newFib->ColorFibersByFiberWeights(false, mitk::LookupTable::GRAYSCALE);
+        break;
+      case 7:
+        newFib->ColorFibersByFiberWeights(false, mitk::LookupTable::MULTILABEL);
+        break;
+      default:
+        newFib->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
+      }
+
       node->SetData(newFib);
     }
     else
@@ -1658,7 +1687,37 @@ void QmitkFiberProcessingView::DoImageColorCoding()
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked());
+
+    switch(m_Controls->m_LookupTableTypeBox->currentIndex())
+    {
+    case 0:
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET);
+      break;
+    case 1:
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::HOT_IRON);
+      break;
+    case 2:
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::PLASMA);
+      break;
+    case 3:
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::INFERNO);
+      break;
+    case 4:
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::VIRIDIS);
+      break;
+    case 5:
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MAGMA);
+      break;
+    case 6:
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::GRAYSCALE);
+      break;
+    case 7:
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MULTILABEL);
+      break;
+    default:
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET);
+    }
+
   }
 
   if (auto renderWindowPart = this->GetRenderWindowPart())
@@ -1673,7 +1732,36 @@ void QmitkFiberProcessingView::DoCurvatureColorCoding()
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked());
+
+    switch(m_Controls->m_LookupTableTypeBox->currentIndex())
+    {
+    case 0:
+      fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET);
+      break;
+    case 1:
+      fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::HOT_IRON);
+      break;
+    case 2:
+      fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::PLASMA);
+      break;
+    case 3:
+      fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::INFERNO);
+      break;
+    case 4:
+      fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::VIRIDIS);
+      break;
+    case 5:
+      fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MAGMA);
+      break;
+    case 6:
+      fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::GRAYSCALE);
+      break;
+    case 7:
+      fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MULTILABEL);
+      break;
+    default:
+      fib->ColorFibersByCurvature(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET);
+    }
   }
 
   if (auto renderWindowPart = this->GetRenderWindowPart())
@@ -1687,7 +1775,36 @@ void QmitkFiberProcessingView::DoLengthColorCoding()
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked());
+
+    switch(m_Controls->m_LookupTableTypeBox->currentIndex())
+    {
+    case 0:
+      fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET);
+      break;
+    case 1:
+      fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::HOT_IRON);
+      break;
+    case 2:
+      fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::PLASMA);
+      break;
+    case 3:
+      fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::INFERNO);
+      break;
+    case 4:
+      fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::VIRIDIS);
+      break;
+    case 5:
+      fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MAGMA);
+      break;
+    case 6:
+      fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::GRAYSCALE);
+      break;
+    case 7:
+      fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MULTILABEL);
+      break;
+    default:
+      fib->ColorFibersByLength(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET);
+    }
   }
 
   if (auto renderWindowPart = this->GetRenderWindowPart())
@@ -1701,7 +1818,36 @@ void QmitkFiberProcessingView::DoWeightColorCoding()
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_NormalizeColorValues->isChecked());
+
+    switch(m_Controls->m_LookupTableTypeBox->currentIndex())
+    {
+    case 0:
+      fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), mitk::LookupTable::JET);
+      break;
+    case 1:
+      fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), mitk::LookupTable::HOT_IRON);
+      break;
+    case 2:
+      fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), mitk::LookupTable::PLASMA);
+      break;
+    case 3:
+      fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), mitk::LookupTable::INFERNO);
+      break;
+    case 4:
+      fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), mitk::LookupTable::VIRIDIS);
+      break;
+    case 5:
+      fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), mitk::LookupTable::MAGMA);
+      break;
+    case 6:
+      fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), mitk::LookupTable::GRAYSCALE);
+      break;
+    case 7:
+      fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), mitk::LookupTable::MULTILABEL);
+      break;
+    default:
+      fib->ColorFibersByFiberWeights(m_Controls->m_FiberOpacityBox->isChecked(), mitk::LookupTable::JET);
+    }
   }
 
   if (auto renderWindowPart = this->GetRenderWindowPart())
