@@ -1691,31 +1691,31 @@ void QmitkFiberProcessingView::DoImageColorCoding()
     switch(m_Controls->m_LookupTableTypeBox->currentIndex())
     {
     case 0:
-      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET);
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET, m_Controls->m_PercentileBox->value());
       break;
     case 1:
-      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::HOT_IRON);
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::HOT_IRON, m_Controls->m_PercentileBox->value());
       break;
     case 2:
-      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::PLASMA);
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::PLASMA, m_Controls->m_PercentileBox->value());
       break;
     case 3:
-      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::INFERNO);
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::INFERNO, m_Controls->m_PercentileBox->value());
       break;
     case 4:
-      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::VIRIDIS);
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::VIRIDIS, m_Controls->m_PercentileBox->value());
       break;
     case 5:
-      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MAGMA);
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MAGMA, m_Controls->m_PercentileBox->value());
       break;
     case 6:
-      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::GRAYSCALE);
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::GRAYSCALE, m_Controls->m_PercentileBox->value());
       break;
     case 7:
-      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MULTILABEL);
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::MULTILABEL, 1.0);
       break;
     default:
-      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET);
+      fib->ColorFibersByScalarMap(dynamic_cast<mitk::Image*>(m_Controls->m_ColorMapBox->GetSelectedNode()->GetData()), m_Controls->m_FiberOpacityBox->isChecked(), m_Controls->m_ValueAsWeightBox->isChecked(), mitk::LookupTable::JET, m_Controls->m_PercentileBox->value());
     }
 
   }

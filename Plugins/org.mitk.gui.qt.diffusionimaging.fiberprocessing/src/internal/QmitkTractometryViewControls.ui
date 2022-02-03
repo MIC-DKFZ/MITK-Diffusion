@@ -72,10 +72,16 @@ QGroupBox {
       <string>Centroid Options</string>
      </property>
      <layout class="QGridLayout" name="gridLayout">
-      <item row="1" column="1">
-       <widget class="QDoubleSpinBox" name="m_ClusterSize">
+      <item row="0" column="1">
+       <widget class="QSpinBox" name="m_MaxCentroids">
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>9999</number>
+        </property>
         <property name="value">
-         <double>15.000000000000000</double>
+         <number>0</number>
         </property>
        </widget>
       </item>
@@ -93,26 +99,10 @@ QGroupBox {
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
-       <widget class="QSpinBox" name="m_MaxCentroids">
-        <property name="minimum">
-         <number>0</number>
-        </property>
-        <property name="maximum">
-         <number>9999</number>
-        </property>
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="m_ClusterSize">
         <property name="value">
-         <number>0</number>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QCheckBox" name="m_PostprocessParcellation">
-        <property name="text">
-         <string>Postprocess Parcellation</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
+         <double>15.000000000000000</double>
         </property>
        </widget>
       </item>
@@ -159,7 +149,7 @@ QGroupBox {
          <number>99999</number>
         </property>
         <property name="value">
-         <number>15</number>
+         <number>0</number>
         </property>
        </widget>
       </item>

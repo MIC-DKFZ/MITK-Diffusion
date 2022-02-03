@@ -68,9 +68,9 @@ public:
     void ColorFibersByFiberWeights(bool opacity, LookupTable::LookupTableType type);
     void ColorFibersByCurvature(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
     void ColorFibersByLength(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
-    void ColorFibersByScalarMap(mitk::Image::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
+    void ColorFibersByScalarMap(mitk::Image::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap);
     template <typename TPixel>
-    void ColorFibersByScalarMap(const mitk::PixelType pixelType, mitk::Image::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
+    void ColorFibersByScalarMap(const mitk::PixelType pixelType, mitk::Image::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap);
     void ColorFibersByOrientation();
     void SetFiberOpacity(vtkDoubleArray *FAValArray);
     void ResetFiberOpacity();
