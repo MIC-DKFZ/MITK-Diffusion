@@ -19,7 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarCircle.h>
 #include <mitkPlanarPolygon.h>
 #include <mitkPlanarFigureComposite.h>
-#include "mitkImagePixelReadAccessor.h"
+#include <mitkDiffusionFunctionCollection.h>
 #include <mitkPixelTypeMultiplex.h>
 
 #include <vtkPointData.h>
@@ -878,25 +878,51 @@ void mitk::FiberBundle::ResetFiberOpacity()
   m_UpdateTime2D.Modified();
 }
 
-void mitk::FiberBundle::ColorFibersByScalarMap(mitk::Image::Pointer FAimage, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap)
+void mitk::FiberBundle::ColorFibersByScalarMap(mitk::Image::Pointer FAimage, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
 {
-  mitkPixelTypeMultiplex5( ColorFibersByScalarMap, FAimage->GetPixelType(), FAimage, opacity, weight_fibers, type, max_cap );
+  if (FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned char" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="char" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="long" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned long" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="short" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned short" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned int" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="int")
+  {
+    typedef itk::Image<int, 3> ImageType;
+    ImageType::Pointer itkImage = ImageType::New();
+    CastToItkImage(FAimage, itkImage);
+
+    ColorFibersByScalarMap<int>(itkImage, opacity, weight_fibers, type, max_cap, interpolate );
+  }
+  else
+  {
+    typedef itk::Image<float, 3> ImageType;
+    ImageType::Pointer itkImage = ImageType::New();
+    CastToItkImage(FAimage, itkImage);
+
+    ColorFibersByScalarMap<float>(itkImage, opacity, weight_fibers, type, max_cap, interpolate );
+  }
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
 }
 
 template <typename TPixel>
-void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Image::Pointer image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap)
+void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
-  mitk::ImagePixelReadAccessor<TPixel,3> readimage(image, image->GetVolumeData(0));
-
   unsigned char rgba[4] = {0,0,0,0};
   vtkPoints* pointSet = m_FiberPolyData->GetPoints();
+
+  if (type==mitk::LookupTable::MULTILABEL)
+    interpolate = false;
+
+  auto interpolator = itk::LinearInterpolateImageFunction< itk::Image<TPixel, 3>, float >::New();
+  interpolator->SetInputImage(image);
 
   double min = 999999;
   double max = -999999;
@@ -912,12 +938,7 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Imag
     {
       double p[3];
       points->GetPoint(j, p);
-
-      Point3D px;
-      px[0] = p[0];
-      px[1] = p[1];
-      px[2] = p[2];
-      auto pixelValue = static_cast<double>(readimage.GetPixelByWorldCoordinates(px));
+      auto pixelValue = mitk::imv::GetImageValue<TPixel>(mitk::imv::GetItkPoint(p), interpolate, interpolator);
 
       if (pixelValue>max)
         max = pixelValue;
@@ -939,11 +960,11 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Imag
 
   for(long i=0; i<m_FiberPolyData->GetNumberOfPoints(); ++i)
   {
-    Point3D px;
+    itk::Point<float, 3> px;
     px[0] = pointSet->GetPoint(i)[0];
     px[1] = pointSet->GetPoint(i)[1];
     px[2] = pointSet->GetPoint(i)[2];
-    auto pixelValue = static_cast<double>(readimage.GetPixelByWorldCoordinates(px));
+    auto pixelValue = mitk::imv::GetImageValue<TPixel>(px, interpolate, interpolator);
 
     double color[3];
     mitkLookup->GetColor(pixelValue, color);

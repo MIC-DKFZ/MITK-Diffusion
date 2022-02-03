@@ -598,7 +598,7 @@ QGroupBox {
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>0</y>
+        <y>-48</y>
         <width>353</width>
         <height>456</height>
        </rect>
@@ -1383,7 +1383,7 @@ QGroupBox {
              <item row="0" column="0">
               <widget class="QLabel" name="label_17">
                <property name="text">
-                <string>Percentile:</string>
+                <string>Value cap:</string>
                </property>
               </widget>
              </item>

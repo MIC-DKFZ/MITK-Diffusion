@@ -46,6 +46,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLookupTableProperty.h>
 #include <mitkLevelWindowProperty.h>
 #include <itkMaskedStatisticsImageFilter.h>
+#include <mitkDiffusionFunctionCollection.h>
 
 
 const std::string QmitkTractometryView::VIEW_ID = "org.mitk.views.tractometry";
@@ -141,13 +142,11 @@ bool QmitkTractometryView::Flip(vtkSmartPointer< vtkPolyData > polydata1, int i,
   return false;
 }
 
-template <typename TPixel>
-void QmitkTractometryView::StaticResamplingTractometry(const mitk::PixelType, mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector<std::vector<double> > &data, std::string& clipboard_string)
+void QmitkTractometryView::StaticResamplingTractometry(mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector<std::vector<double> > &data, std::string& clipboard_string)
 {
   mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
 
   unsigned int num_points = m_Controls->m_SamplingPointsBox->value();
-  mitk::ImagePixelReadAccessor<TPixel,3> readimage(image, image->GetVolumeData(0));
   mitk::FiberBundle::Pointer working_fib = fib->GetDeepCopy();
   working_fib->ResampleToNumPoints(num_points);
   vtkSmartPointer< vtkPolyData > polydata = working_fib->GetFiberPolyData();
@@ -161,6 +160,13 @@ void QmitkTractometryView::StaticResamplingTractometry(const mitk::PixelType, mi
   std::vector< double > mean_values;
   for (unsigned int i=0; i<num_points; ++i)
     mean_values.push_back(0);
+
+
+  itk::Image<float, 3>::Pointer itkImage = itk::Image<float, 3>::New();
+  CastToItkImage(image, itkImage);
+
+  auto interpolator = itk::LinearInterpolateImageFunction< itk::Image<float, 3>, float >::New();
+  interpolator->SetInputImage(itkImage);
 
   double min = 100000.0;
   double max = 0;
@@ -198,11 +204,7 @@ void QmitkTractometryView::StaticResamplingTractometry(const mitk::PixelType, mi
         working_fib->ColorSinglePoint(i, j, rgb);
       }
 
-      Point3D px;
-      px[0] = p[0];
-      px[1] = p[1];
-      px[2] = p[2];
-      double pixelValue = static_cast<double>(readimage.GetPixelByWorldCoordinates(px));
+      double pixelValue = mitk::imv::GetImageValue<float, double>(mitk::imv::GetItkPoint(p), true, interpolator);
       fib_vals.push_back(pixelValue);
       mean += pixelValue;
       if (pixelValue<min)
@@ -278,13 +280,12 @@ void QmitkTractometryView::StaticResamplingTractometry(const mitk::PixelType, mi
   }
 }
 
-template <typename TPixel>
-void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType, mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string)
+void QmitkTractometryView::NearestCentroidPointTractometry(mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string)
 {
   mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
 
   unsigned int num_points = m_Controls->m_SamplingPointsBox->value();
-  mitk::ImagePixelReadAccessor<TPixel,3> readimage(image, image->GetVolumeData(0));
+
   mitk::FiberBundle::Pointer working_fib = fib->GetDeepCopy();
   working_fib->ResampleSpline(1.0);
   vtkSmartPointer< vtkPolyData > working_polydata = working_fib->GetFiberPolyData();
@@ -339,6 +340,12 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
     value_count.push_back(0);
   }
 
+  itk::Image<float, 3>::Pointer itkImage = itk::Image<float, 3>::New();
+  CastToItkImage(image, itkImage);
+
+  auto interpolator = itk::LinearInterpolateImageFunction< itk::Image<float, 3>, float >::New();
+  interpolator->SetInputImage(itkImage);
+
   double min = 100000.0;
   double max = 0;
   double mean = 0;
@@ -385,11 +392,7 @@ void QmitkTractometryView::NearestCentroidPointTractometry(const mitk::PixelType
       lookupTable->GetTableValue(min_bin+1, rgb);
       working_fib->ColorSinglePoint(i, j, rgb);
 
-      Point3D px;
-      px[0] = p[0];
-      px[1] = p[1];
-      px[2] = p[2];
-      double pixelValue = static_cast<double>(readimage.GetPixelByWorldCoordinates(px));
+      double pixelValue = mitk::imv::GetImageValue<float, double>(mitk::imv::GetItkPoint(p), true, interpolator);
       fib_vals.push_back(pixelValue);
       mean += pixelValue;
       if (pixelValue<min)
@@ -612,12 +615,12 @@ void QmitkTractometryView::StartTractometry()
     {
     case 0:
     {
-      mitkPixelTypeMultiplex4( StaticResamplingTractometry, image->GetPixelType(), image, node, data, clipboardString );
+      StaticResamplingTractometry( image, node, data, clipboardString );
       break;
     }
     case 1:
     {
-      mitkPixelTypeMultiplex4( NearestCentroidPointTractometry, image->GetPixelType(), image, node, data, clipboardString );
+      NearestCentroidPointTractometry( image, node, data, clipboardString );
       break;
     }
     case 2:
@@ -627,7 +630,7 @@ void QmitkTractometryView::StartTractometry()
     }
     default:
     {
-      mitkPixelTypeMultiplex4( StaticResamplingTractometry, image->GetPixelType(), image, node, data, clipboardString );
+      StaticResamplingTractometry( image, node, data, clipboardString );
     }
     }
 
