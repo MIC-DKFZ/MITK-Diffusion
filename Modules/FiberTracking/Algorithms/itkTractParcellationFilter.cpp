@@ -32,8 +32,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 namespace itk{
 
-template< class OutImageType >
-TractParcellationFilter< OutImageType >::TractParcellationFilter()
+template< class OutImageType, class InputImageType >
+TractParcellationFilter< OutImageType, InputImageType >::TractParcellationFilter()
   : m_UpsamplingFactor(1)
   , m_NumParcels(0)
   , m_NumCentroids(0)
@@ -43,13 +43,13 @@ TractParcellationFilter< OutImageType >::TractParcellationFilter()
   this->SetNumberOfRequiredOutputs(2);
 }
 
-template< class OutImageType >
-TractParcellationFilter< OutImageType >::~TractParcellationFilter()
+template< class OutImageType, class InputImageType >
+TractParcellationFilter< OutImageType, InputImageType >::~TractParcellationFilter()
 {
 }
 
-template< class OutImageType >
-bool TractParcellationFilter< OutImageType >::Flip(vtkSmartPointer< vtkPolyData > polydata1, int i, vtkSmartPointer< vtkPolyData > ref_poly, int ref_i)
+template< class OutImageType, class InputImageType >
+bool TractParcellationFilter< OutImageType, InputImageType >::Flip(vtkSmartPointer< vtkPolyData > polydata1, int i, vtkSmartPointer< vtkPolyData > ref_poly, int ref_i)
 {
   double d_direct = 0;
   double d_flipped = 0;
@@ -90,8 +90,8 @@ bool TractParcellationFilter< OutImageType >::Flip(vtkSmartPointer< vtkPolyData 
   return false;
 }
 
-template< class OutImageType >
-mitk::FiberBundle::Pointer TractParcellationFilter< OutImageType >::GetWorkingFib()
+template< class OutImageType, class InputImageType >
+mitk::FiberBundle::Pointer TractParcellationFilter< OutImageType, InputImageType >::GetWorkingFib()
 {
   mitk::FiberBundle::Pointer fib_static_resampled = m_InputTract->GetDeepCopy();
   fib_static_resampled->ResampleToNumPoints(m_NumParcels);
@@ -142,8 +142,8 @@ mitk::FiberBundle::Pointer TractParcellationFilter< OutImageType >::GetWorkingFi
   return fib_static_resampled;
 }
 
-template< class OutImageType >
-std::vector< typename itk::Image<unsigned char, 3>::Pointer > TractParcellationFilter< OutImageType >::GetBinarySplit(typename OutImageType::Pointer inImage)
+template< class OutImageType, class InputImageType >
+std::vector< typename itk::Image<unsigned char, 3>::Pointer > TractParcellationFilter< OutImageType, InputImageType >::GetBinarySplit(typename OutImageType::Pointer inImage)
 {
   std::vector< typename itk::Image<unsigned char, 3>::Pointer > binary_maps;
 
@@ -173,8 +173,8 @@ std::vector< typename itk::Image<unsigned char, 3>::Pointer > TractParcellationF
   return binary_maps;
 }
 
-template< class OutImageType >
-typename OutImageType::Pointer TractParcellationFilter< OutImageType >::PostprocessParcellation(typename OutImageType::Pointer inImage)
+template< class OutImageType, class InputImageType >
+typename OutImageType::Pointer TractParcellationFilter< OutImageType, InputImageType >::PostprocessParcellation(typename OutImageType::Pointer inImage)
 {
   itk::ImageRegionConstIterator< OutImageType > in_it(inImage, inImage->GetLargestPossibleRegion());
 
@@ -236,8 +236,8 @@ typename OutImageType::Pointer TractParcellationFilter< OutImageType >::Postproc
   return outImage;
 }
 
-template< class OutImageType >
-void TractParcellationFilter< OutImageType >::StaticResampleParcelVoting(typename OutImageType::Pointer outImage)
+template< class OutImageType, class InputImageType >
+void TractParcellationFilter< OutImageType, InputImageType >::StaticResampleParcelVoting(typename OutImageType::Pointer outImage)
 {
   typename itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
   generator->SetFiberBundle(m_InputTract);
@@ -409,8 +409,8 @@ void TractParcellationFilter< OutImageType >::StaticResampleParcelVoting(typenam
   MITK_INFO << "DONE";
 }
 
-template< class OutImageType >
-void TractParcellationFilter< OutImageType >::GenerateData()
+template< class OutImageType, class InputImageType >
+void TractParcellationFilter< OutImageType, InputImageType >::GenerateData()
 {
   // generate upsampled image
   mitk::BaseGeometry::Pointer geometry = m_InputTract->GetGeometry();

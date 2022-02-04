@@ -25,7 +25,7 @@ namespace itk{
 /**
 * \brief Generates image where the pixel values are set according to the position along a fiber bundle.   */
 
-template< class OutImageType=itk::Image<unsigned char, 3> >
+template< class OutImageType=itk::Image<unsigned char, 3>, class InputImageType=OutImageType >
 class TractParcellationFilter : public ImageSource< OutImageType >
 {
 
@@ -57,7 +57,7 @@ public:
   itkSetMacro( ReferenceTract, mitk::FiberBundle::Pointer)
   itkGetMacro( WorkingTract, mitk::FiberBundle::Pointer)
 
-  itkSetMacro( InputImage, typename OutImageType::Pointer)
+  itkSetMacro( InputImage, typename InputImageType::Pointer)
 
 
   std::vector< typename itk::Image<unsigned char, 3>::Pointer > GetBinarySplit(typename OutImageType::Pointer inImage);
@@ -84,7 +84,7 @@ protected:
   unsigned int                      m_NumParcels;
   unsigned int                      m_NumCentroids;
   float                             m_StartClusterSize;
-  typename OutImageType::Pointer    m_InputImage;
+  typename InputImageType::Pointer  m_InputImage;
 };
 
 }
