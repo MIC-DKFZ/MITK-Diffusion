@@ -48,6 +48,7 @@ int main(int argc, char* argv[])
   parser.addArgument("tracts", "", mitkDiffusionCommandLineParser::StringList, "Input tracts:", "input tracts", us::Any(), false);
   parser.addArgument("images", "", mitkDiffusionCommandLineParser::StringList, "Input images:", "input images", us::Any(), false);
   parser.addArgument("out_file", "", mitkDiffusionCommandLineParser::String, "Output File:", "output file", us::Any(), false);
+  parser.addArgument("num_parcels", "", mitkDiffusionCommandLineParser::Int, "Number of parcels:", "", 15);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -56,7 +57,10 @@ int main(int argc, char* argv[])
   mitkDiffusionCommandLineParser::StringContainerType inFibs = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["tracts"]);
   mitkDiffusionCommandLineParser::StringContainerType inImages = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["images"]);
   std::string outfile = us::any_cast<std::string>(parsedArgs["out_file"]);
-  int num_parcels = 20;
+
+  int num_parcels = 15;
+  if (parsedArgs.count("num_parcels"))
+    num_parcels = us::any_cast<int>(parsedArgs["num_parcels"]);
 
   try
   {
