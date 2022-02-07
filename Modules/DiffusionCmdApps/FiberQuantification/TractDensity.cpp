@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
   mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Tract Density");
-  parser.setCategory("Fiber Tracking and Processing Methods");
+  parser.setCategory("Fiber Quantification Methods");
   parser.setDescription("Generate tract density image, fiber envelope or fiber endpoints image.");
   parser.setContributor("MIC");
 

@@ -74,6 +74,7 @@ protected:
 
   mitk::FiberBundle::Pointer m_ReferenceFib;
   QList<mitk::DataNode::Pointer> m_CurrentSelection;
+  unsigned int m_NumSamplingPoints;
   bool  m_Visible;
 };
 

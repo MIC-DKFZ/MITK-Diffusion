@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
   mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Calcualte distance between segmentation mesh and fibers in form of a mask or TDI");
-  parser.setCategory("Fiber Tracking and Processing Methods");
+  parser.setCategory("Fiber Quantification Methods");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");

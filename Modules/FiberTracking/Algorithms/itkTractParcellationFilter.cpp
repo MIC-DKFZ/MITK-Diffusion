@@ -29,6 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkClusteringMetricLength.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkTractsToVectorImageFilter.h>
+#include <mitkTractometry.h>
 
 namespace itk{
 
@@ -94,8 +95,7 @@ template< class OutImageType, class InputImageType >
 mitk::FiberBundle::Pointer TractParcellationFilter< OutImageType, InputImageType >::GetWorkingFib()
 {
   mitk::FiberBundle::Pointer fib_static_resampled = m_InputTract->GetDeepCopy();
-  fib_static_resampled->ResampleToNumPoints(m_NumParcels);
-
+  mitk::Tractometry::ResampleIfNecessary(fib_static_resampled, m_NumParcels);
 
   // clustering
   std::vector< mitk::ClusteringMetric* > metrics;
@@ -248,17 +248,7 @@ void TractParcellationFilter< OutImageType, InputImageType >::StaticResampleParc
   auto tdi = generator->GetOutput();
 
   if (m_NumParcels < 3)
-  {
-    auto spacing = outImage->GetSpacing();
-    float f = (spacing[0] + spacing[1] + spacing[2])/3;
-    f /= generator->GetAverageSegmentLength();
-    MITK_INFO << generator->GetAverageSegmentLength();
-    MITK_INFO << generator->GetAverageNumTraversedVoxels();
-    MITK_INFO << f;
-    m_NumParcels = std::ceil(generator->GetAverageNumTraversedVoxels()/(3.0*f));
-
-    MITK_INFO << "Automatically setting number of parcels to " << m_NumParcels;
-  }
+    m_NumParcels = mitk::Tractometry::EstimateNumSamplingPoints(tdi, m_InputTract, 3);
 
   itk::TractsToVectorImageFilter<float>::Pointer fOdfFilter = itk::TractsToVectorImageFilter<float>::New();
   fOdfFilter->SetMaskImage(tdi);

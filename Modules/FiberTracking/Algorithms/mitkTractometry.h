@@ -45,11 +45,13 @@ public:
 
   static std::vector<vnl_vector<float>>  NearestCentroidPointTractometry(itk::Image<float, 3>::Pointer itkImage, mitk::FiberBundle::Pointer fib, unsigned int num_points, unsigned int max_centroids, float cluster_size, mitk::FiberBundle::Pointer ref_fib);
 
+  static unsigned int EstimateNumSamplingPoints(itk::Image<unsigned char, 3>::Pointer ref_image, mitk::FiberBundle::Pointer fib, unsigned int voxels);
+
+  static void ResampleIfNecessary(mitk::FiberBundle::Pointer fib, unsigned int num_points);
+
 protected:
 
   static bool Flip(vtkSmartPointer< vtkPolyData > polydata1, int i, vtkSmartPointer< vtkPolyData > ref_poly=nullptr);
-
-  static void ResampleIfNecessary(mitk::FiberBundle::Pointer fib, unsigned int num_points);
 
 };
 }

@@ -109,7 +109,7 @@ void QmitkTractometryView::StaticResamplingTractometry(mitk::Image::Pointer imag
 
   mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
 
-  unsigned int num_points = m_Controls->m_SamplingPointsBox->value();
+  unsigned int num_points = m_NumSamplingPoints;
   mitk::FiberBundle::Pointer working_fib = fib->GetDeepCopy();
 
   vnl_matrix<float> output = mitk::Tractometry::StaticResamplingTractometry(itkImage, working_fib, num_points, m_ReferenceFib);
@@ -163,7 +163,7 @@ void QmitkTractometryView::NearestCentroidPointTractometry(mitk::Image::Pointer 
 {
   mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
 
-  unsigned int num_points = m_Controls->m_SamplingPointsBox->value();
+  unsigned int num_points = m_NumSamplingPoints;
 
   mitk::FiberBundle::Pointer working_fib = fib->GetDeepCopy();
   working_fib->ResampleSpline(1.0);
@@ -262,7 +262,7 @@ void QmitkTractometryView::AlongTractRadiomicsPreprocessing(mitk::Image::Pointer
 
   itk::TractParcellationFilter< >::Pointer parcellator = itk::TractParcellationFilter< >::New();
   parcellator->SetInputImage(itkImage);
-  parcellator->SetNumParcels(m_Controls->m_SamplingPointsBox->value());
+  parcellator->SetNumParcels(m_NumSamplingPoints);
   parcellator->SetInputTract(fib);
   parcellator->SetNumCentroids(m_Controls->m_MaxCentroids->value());
   parcellator->SetStartClusterSize(m_Controls->m_ClusterSize->value());
@@ -345,14 +345,24 @@ void QmitkTractometryView::StartTractometry()
 {
   m_ReferenceFib = dynamic_cast<mitk::FiberBundle*>(m_CurrentSelection.at(0)->GetData())->GetDeepCopy();
 
+  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData());
+
   MITK_INFO << "Resanmpling reference fibers";
-  m_ReferenceFib->ResampleToNumPoints(m_Controls->m_SamplingPointsBox->value());
+  if (m_Controls->m_SamplingPointsBox->value()<3)
+  {
+    typedef itk::Image<unsigned char, 3> ParcellationImageType;
+    ParcellationImageType::Pointer itkImage = ParcellationImageType::New();
+    CastToItkImage(image, itkImage);
+
+    m_NumSamplingPoints = mitk::Tractometry::EstimateNumSamplingPoints(itkImage, m_ReferenceFib, 3);
+  }
+  else
+    m_NumSamplingPoints = m_Controls->m_SamplingPointsBox->value();
+  m_ReferenceFib->ResampleToNumPoints(m_NumSamplingPoints);
 
   double color[3] = {0,0,0};
   mitk::LookupTable::Pointer lookupTable = mitk::LookupTable::New();
   lookupTable->SetType(mitk::LookupTable::MULTILABEL);
-
-  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData());
 
   this->m_Controls->m_ChartWidget->Clear();
   std::string clipboardString = "";

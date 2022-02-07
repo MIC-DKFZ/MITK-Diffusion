@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_matrix.h>
 #include <mitkTractClusteringFilter.h>
 #include <mitkClusteringMetricEuclideanStd.h>
+#include <itkTractDensityImageFilter.h>
 
 namespace mitk{
 
@@ -83,6 +84,30 @@ void Tractometry::ResampleIfNecessary(mitk::FiberBundle::Pointer fib, unsigned i
 
   if (resample)
     fib->ResampleToNumPoints(num_points);
+}
+
+unsigned int Tractometry::EstimateNumSamplingPoints(itk::Image<unsigned char, 3>::Pointer ref_image, mitk::FiberBundle::Pointer fib, unsigned int voxels)
+{
+  typename itk::TractDensityImageFilter< itk::Image<unsigned char, 3> >::Pointer generator = itk::TractDensityImageFilter< itk::Image<unsigned char, 3> >::New();
+  generator->SetFiberBundle(fib);
+  generator->SetMode(TDI_MODE::BINARY);
+  generator->SetInputImage(ref_image);
+  generator->SetUseImageGeometry(true);
+  generator->Update();
+
+  auto spacing = ref_image->GetSpacing();
+  float f = (spacing[0] + spacing[1] + spacing[2])/3;
+  f /= generator->GetAverageSegmentLength();
+  MITK_INFO << generator->GetAverageSegmentLength();
+  MITK_INFO << generator->GetAverageNumTraversedVoxels();
+  MITK_INFO << f;
+  unsigned int n = std::ceil(generator->GetAverageNumTraversedVoxels()/(voxels*f));
+  if (n<3)
+    n = 3;
+
+  MITK_INFO << "Estimated number of sampling points " << n;
+
+  return n;
 }
 
 

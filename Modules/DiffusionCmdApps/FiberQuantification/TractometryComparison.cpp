@@ -40,9 +40,9 @@ int main(int argc, char* argv[])
   mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Fiber Statistics");
-  parser.setCategory("Fiber Tracking and Processing Methods");
+  parser.setCategory("Fiber Quantification Methods");
   parser.setContributor("MIC");
-  parser.setDescription("Output statistics about fiber lengths, weights, etc. to a file.");
+  parser.setDescription("Calculate mutliple tractometry methods.");
 
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("tracts", "", mitkDiffusionCommandLineParser::StringList, "Input tracts:", "input tracts", us::Any(), false);
