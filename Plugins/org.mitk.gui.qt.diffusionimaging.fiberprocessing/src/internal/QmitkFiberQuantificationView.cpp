@@ -146,6 +146,7 @@ void QmitkFiberQuantificationView::CalculateFiberDirections()
     fOdfFilter->SetNormalizationMethod(itk::TractsToVectorImageFilter<float>::NormalizationMethods::MAX_VEC_NORM);
     break;
   }
+  fOdfFilter->SetOnlyUseMaskGeometry(true);
   fOdfFilter->SetSizeThreshold(m_Controls->m_PeakThreshold->value());
   fOdfFilter->SetMaxNumDirections(m_Controls->m_MaxNumDirections->value());
   fOdfFilter->Update();

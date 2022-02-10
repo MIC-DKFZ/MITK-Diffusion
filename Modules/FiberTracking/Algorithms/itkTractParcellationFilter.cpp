@@ -255,6 +255,7 @@ void TractParcellationFilter< OutImageType, InputImageType >::StaticResampleParc
   fOdfFilter->SetFiberBundle(m_InputTract);
   fOdfFilter->SetNormalizationMethod(itk::TractsToVectorImageFilter<float>::NormalizationMethods::SINGLE_VEC_NORM);
   fOdfFilter->SetMaxNumDirections(1);
+  fOdfFilter->SetOnlyUseMaskGeometry(true);
   fOdfFilter->Update();
   itk::Image< float, 4 >::Pointer dir_image = fOdfFilter->GetDirectionImage();
 
@@ -300,95 +301,103 @@ void TractParcellationFilter< OutImageType, InputImageType >::StaticResampleParc
       idx4[3] = 2;
       ref_dir[2] = dir_image->GetPixel(idx4);
 
-      while(final_seg_id<0)
+      if (ref_dir.magnitude()>0.01)
       {
-        std::vector<float> seg_vote; seg_vote.resize(m_NumParcels, 0);
-        typename OutImageType::PointType image_point;
-        tdi->TransformIndexToPhysicalPoint(it.GetIndex(), image_point);
+        ref_dir.normalize();
 
-        for (unsigned int i=0; i<m_WorkingTract->GetNumFibers(); ++i)
+        while(final_seg_id<0 && mult<5)
         {
-          vtkCell* cell = polydata->GetCell(i);
-          auto numPoints = cell->GetNumberOfPoints();
-          vtkPoints* points = cell->GetPoints();
+          std::vector<float> seg_vote; seg_vote.resize(m_NumParcels, 0);
+          typename OutImageType::PointType image_point;
+          tdi->TransformIndexToPhysicalPoint(it.GetIndex(), image_point);
 
-          bool flip = Flip(polydata, i, reference_polydata);
-
-          float local_d = 99999999;
-          int local_closest_seg = -1;
-//          float weight = 1.0;
-
-          for (int j=0; j<numPoints; j++)
+          for (unsigned int i=0; i<m_WorkingTract->GetNumFibers(); ++i)
           {
-            itk::Point<float, 3> p;
-            int segment_id = -1;
-            if (flip)
+            vtkCell* cell = polydata->GetCell(i);
+            auto numPoints = cell->GetNumberOfPoints();
+            vtkPoints* points = cell->GetPoints();
+
+            bool flip = Flip(polydata, i, reference_polydata);
+
+            float local_d = 99999999;
+            int local_closest_seg = -1;
+  //          float weight = 1.0;
+
+            for (int j=0; j<numPoints; j++)
             {
-              segment_id = numPoints - j - 1;
-              p = mitk::imv::GetItkPoint(points->GetPoint(segment_id));
+              itk::Point<float, 3> p;
+              int segment_id = -1;
+              if (flip)
+              {
+                segment_id = numPoints - j - 1;
+                p = mitk::imv::GetItkPoint(points->GetPoint(segment_id));
+              }
+              else
+              {
+                p = mitk::imv::GetItkPoint(points->GetPoint(j));
+                segment_id = j;
+              }
+
+              float d = std::fabs( (p[0]-image_point[0]) ) + std::fabs( (p[1]-image_point[1]) ) + std::fabs( (p[2]-image_point[2]) );
+
+
+              itk::Point<float, 3> p2;
+              if (segment_id<numPoints-1)
+              {
+                p2 = mitk::imv::GetItkPoint(points->GetPoint(segment_id+1));
+              }
+              else
+              {
+                p2 = mitk::imv::GetItkPoint(points->GetPoint(segment_id-1));
+              }
+
+              vnl_vector_fixed<float, 3> dir;
+              dir[0] = p[0]-p2[0];
+              dir[1] = p[1]-p2[1];
+              dir[2] = p[2]-p2[2];
+
+              if (dir.magnitude()<0.0000001)
+                continue;
+              dir.normalize();
+
+              float a = std::fabs(dot_product(dir, ref_dir));
+              if (a<0.0000001)
+                a += 0.0000001;
+              d += (1.0/a - 1.0) * maxd;
+
+              if (d<local_d)
+              {
+                local_d = d;
+                local_closest_seg = j;
+  //              typename OutImageType::IndexType p_idx;
+  //              typename OutImageType::PointType mitk_p;
+  //              mitk_p[0] = p[0];
+  //              mitk_p[1] = p[2];
+  //              mitk_p[2] = p[1];
+  //              tdi->TransformPhysicalPointToIndex(mitk_p, p_idx);
+  //              weight = tdi->GetPixel(p_idx);
+              }
             }
-            else
+
+            if (local_d<maxd*mult)
+              seg_vote[local_closest_seg] += 1.0/(local_d);
+          }
+
+          float max_count = 0;
+          for (unsigned int i=0; i<seg_vote.size(); ++i)
+          {
+            if (seg_vote.at(i)>max_count)
             {
-              p = mitk::imv::GetItkPoint(points->GetPoint(j));
-              segment_id = j;
-            }
-
-            float d = std::fabs( (p[0]-image_point[0]) ) + std::fabs( (p[1]-image_point[1]) ) + std::fabs( (p[2]-image_point[2]) );
-
-
-            itk::Point<float, 3> p2;
-            if (segment_id<numPoints-1)
-            {
-              p2 = mitk::imv::GetItkPoint(points->GetPoint(segment_id+1));
-            }
-            else
-            {
-              p2 = mitk::imv::GetItkPoint(points->GetPoint(segment_id-1));
-            }
-
-            vnl_vector_fixed<float, 3> dir;
-            dir[0] = p[0]-p2[0];
-            dir[1] = p[1]-p2[1];
-            dir[2] = p[2]-p2[2];
-            dir.normalize();
-
-            float a = std::fabs(dot_product(dir, ref_dir));
-            if (a<0.0000001)
-              a += 0.0000001;
-            d += (1.0/a - 1.0) * maxd;
-
-            if (d<local_d)
-            {
-              local_d = d;
-              local_closest_seg = j;
-//              typename OutImageType::IndexType p_idx;
-//              typename OutImageType::PointType mitk_p;
-//              mitk_p[0] = p[0];
-//              mitk_p[1] = p[2];
-//              mitk_p[2] = p[1];
-//              tdi->TransformPhysicalPointToIndex(mitk_p, p_idx);
-//              weight = tdi->GetPixel(p_idx);
+              final_seg_id = i;
+              max_count = seg_vote.at(i);
             }
           }
 
-          if (local_d<maxd*mult)
-            seg_vote[local_closest_seg] += 1.0/(local_d);
+          if (final_seg_id>=0)
+            it.Set(final_seg_id + 1);
+
+          ++mult;
         }
-
-        float max_count = 0;
-        for (unsigned int i=0; i<seg_vote.size(); ++i)
-        {
-          if (seg_vote.at(i)>max_count)
-          {
-            final_seg_id = i;
-            max_count = seg_vote.at(i);
-          }
-        }
-
-        if (final_seg_id>=0)
-          it.Set(final_seg_id + 1);
-
-        ++mult;
       }
 
       ++disp;
