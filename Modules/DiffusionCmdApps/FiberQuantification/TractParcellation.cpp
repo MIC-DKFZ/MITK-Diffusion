@@ -51,16 +51,16 @@ int main(int argc, char* argv[])
 {
   mitkDiffusionCommandLineParser parser;
 
-  parser.setTitle("Tract Density");
+  parser.setTitle("Tract Parcellation");
   parser.setCategory("Fiber Quantification Methods");
   parser.setDescription("Parcellate tract for along-tract radiomics.");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input fiber bundle", us::Any(), false);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output image", us::Any(), false);
+  parser.addArgument("binary_output", "", mitkDiffusionCommandLineParser::String, "Binary Output:", "name of binary output parcels", us::Any());
+  parser.addArgument("full_output", "", mitkDiffusionCommandLineParser::String, "Full Output:", "name of full parcellation image", us::Any());
   parser.addArgument("reference_image", "", mitkDiffusionCommandLineParser::String, "Reference image:", "output image will have geometry of this reference image", us::Any(), false);
-  parser.addArgument("binary", "", mitkDiffusionCommandLineParser::Bool, "Binary output:", "", false);
 
   parser.addArgument("num_parcels", "", mitkDiffusionCommandLineParser::Int, "Number of parcels:", "", 15);
   parser.addArgument("num_centroids", "", mitkDiffusionCommandLineParser::Int, "Number of centroids:", "", 0);
@@ -70,9 +70,13 @@ int main(int argc, char* argv[])
   if (parsedArgs.size()==0)
     return EXIT_FAILURE;
 
-  bool binary = false;
-  if (parsedArgs.count("binary"))
-    binary = us::any_cast<bool>(parsedArgs["binary"]);
+  std::string binary_output = "";
+  if (parsedArgs.count("binary_output"))
+    binary_output = us::any_cast<std::string>(parsedArgs["binary_output"]);
+
+  std::string full_output = "";
+  if (parsedArgs.count("full_output"))
+    full_output = us::any_cast<std::string>(parsedArgs["full_output"]);
 
   int num_parcels = 15;
   if (parsedArgs.count("num_parcels"))
@@ -88,7 +92,6 @@ int main(int argc, char* argv[])
 
   std::string reference_image = us::any_cast<std::string>(parsedArgs["reference_image"]);
   std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
-  std::string outFileName = us::any_cast<std::string>(parsedArgs["o"]);
 
   try
   {
@@ -111,7 +114,7 @@ int main(int argc, char* argv[])
     OutImageType::Pointer out_image = parcellator->GetOutput(0);
     OutImageType::Pointer out_image_pp = parcellator->GetOutput(1);
 
-    if (binary)
+    if (!binary_output.empty())
     {
       auto binary_segments = parcellator->GetBinarySplit(out_image_pp);
 
@@ -122,18 +125,22 @@ int main(int argc, char* argv[])
         mitk_segment->InitializeByItk(itk_segment.GetPointer());
         mitk_segment->SetVolume(itk_segment->GetBufferPointer());
         if (c<10)
-          mitk::IOUtil::Save(mitk_segment, outFileName + "_0" +  boost::lexical_cast<std::string>(c) + ".nrrd");
+          mitk::IOUtil::Save(mitk_segment, binary_output + "_0" +  boost::lexical_cast<std::string>(c) + ".nrrd");
         else
-          mitk::IOUtil::Save(mitk_segment, outFileName + "_" +  boost::lexical_cast<std::string>(c) + ".nrrd");
+          mitk::IOUtil::Save(mitk_segment, binary_output + "_" +  boost::lexical_cast<std::string>(c) + ".nrrd");
         ++c;
       }
     }
-    else
+    if (binary_output.empty() && full_output.empty())
+    {
+      full_output = "parcellation.nrrd";
+    }
+    if (!full_output.empty())
     {
       mitk::Image::Pointer mitk_img_pp = mitk::Image::New();
       mitk_img_pp->InitializeByItk(out_image_pp.GetPointer());
       mitk_img_pp->SetVolume(out_image_pp->GetBufferPointer());
-      mitk::IOUtil::Save(mitk_img_pp, outFileName );
+      mitk::IOUtil::Save(mitk_img_pp, full_output );
     }
   }
   catch (const itk::ExceptionObject& e)
