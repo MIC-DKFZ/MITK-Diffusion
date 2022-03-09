@@ -21,6 +21,7 @@ if(BUILD_DiffusionFiberProcessingCmdApps OR MITK_BUILD_ALL_APPS)
     FiberJoin^^
     FiberClustering^^
     TractDensityFilter^^
+    FiberColoring^^
     )
 
     foreach(diffusionFiberProcessingcmdapp ${diffusionFiberProcessingcmdapps})

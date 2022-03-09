@@ -108,9 +108,10 @@ short TrackVisFiberReader::write(const mitk::FiberBundle *fib)
     {
       double* p = points->GetPoint(i);
 
-      tmp[pos++] = p[0];
-      tmp[pos++] = p[1];
-      tmp[pos++] = p[2];
+      // TRK coordinates are corner based, so we have to shift the center based vtk coordinates by half a voxel
+      tmp[pos++] = p[0] + m_Header.voxel_size[0]/2;
+      tmp[pos++] = p[1] + m_Header.voxel_size[1]/2;
+      tmp[pos++] = p[2] + m_Header.voxel_size[2]/2;
     }
 
     // write the coordinates to the file
@@ -187,6 +188,10 @@ short TrackVisFiberReader::read( mitk::FiberBundle* fib, bool use_matrix, bool p
       if (fread((char*)tmp, 1, 12, m_FilePointer) == 0)
         MITK_ERROR << "TrackVis::read: Error during read.";
 
+      // TRK coordinates are corner based, so we have to shift them back to center based coordinates
+      tmp[0] -= m_Header.voxel_size[0]/2;
+      tmp[1] -= m_Header.voxel_size[1]/2;
+      tmp[2] -= m_Header.voxel_size[2]/2;
       vtkIdType id = vtkNewPoints->InsertNextPoint(tmp);
       container->GetPointIds()->InsertNextId(id);
     }
