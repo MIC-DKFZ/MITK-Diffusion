@@ -75,7 +75,8 @@ protected:
 
   typename OutImageType::Pointer PostprocessParcellation(typename OutImageType::Pointer outImage);
 
-  void StaticResampleParcelVoting(typename OutImageType::Pointer outImage);
+  void VotingBasedParcellation(typename OutImageType::Pointer outImage);
+  void CentroidBasedParcellation(typename OutImageType::Pointer outImage);
 
   mitk::FiberBundle::Pointer        m_ReferenceTract;
   mitk::FiberBundle::Pointer        m_InputTract;          ///< input fiber bundle

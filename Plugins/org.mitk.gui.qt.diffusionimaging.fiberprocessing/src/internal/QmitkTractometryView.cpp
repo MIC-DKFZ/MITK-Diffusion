@@ -337,7 +337,7 @@ void QmitkTractometryView::AlongTractRadiomicsPreprocessing(mitk::Image::Pointer
   auto working_fib = fib->GetDeepCopy();
   working_fib->ColorFibersByScalarMap(seg_img, false, false, mitk::LookupTable::LookupTableType::MULTILABEL, 0.9);
   new_node3->SetData(working_fib);
-  new_node3->SetName("centroids");
+  new_node3->SetName("bin-colored fib");
   GetDataStorage()->Add(new_node3, node);
 }
 
@@ -354,7 +354,7 @@ void QmitkTractometryView::StartTractometry()
     ParcellationImageType::Pointer itkImage = ParcellationImageType::New();
     CastToItkImage(image, itkImage);
 
-    m_NumSamplingPoints = mitk::Tractometry::EstimateNumSamplingPoints(itkImage, m_ReferenceFib, 3);
+    m_NumSamplingPoints = mitk::Tractometry::EstimateNumSamplingPoints(itkImage, m_ReferenceFib, 5);
   }
   else
     m_NumSamplingPoints = m_Controls->m_SamplingPointsBox->value();
