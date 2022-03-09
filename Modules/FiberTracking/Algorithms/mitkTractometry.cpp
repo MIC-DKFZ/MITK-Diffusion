@@ -88,26 +88,17 @@ void Tractometry::ResampleIfNecessary(mitk::FiberBundle::Pointer fib, unsigned i
 
 unsigned int Tractometry::EstimateNumSamplingPoints(itk::Image<unsigned char, 3>::Pointer ref_image, mitk::FiberBundle::Pointer fib, unsigned int voxels)
 {
-  typename itk::TractDensityImageFilter< itk::Image<unsigned char, 3> >::Pointer generator = itk::TractDensityImageFilter< itk::Image<unsigned char, 3> >::New();
-  generator->SetFiberBundle(fib);
-  generator->SetMode(TDI_MODE::BINARY);
-  generator->SetInputImage(ref_image);
-  generator->SetUseImageGeometry(true);
-  generator->Update();
-
   auto spacing = ref_image->GetSpacing();
   float f = (spacing[0] + spacing[1] + spacing[2])/3;
-  f /= generator->GetAverageSegmentLength();
-  MITK_INFO << generator->GetAverageSegmentLength();
-  MITK_INFO << generator->GetAverageNumTraversedVoxels();
-  MITK_INFO << f;
-  unsigned int n = std::ceil(generator->GetAverageNumTraversedVoxels()/(voxels*f));
-  if (n<3)
-    n = 3;
+  float num_voxels_passed = 0;
+  for (unsigned int i=0; i<fib->GetNumFibers(); ++i)
+    num_voxels_passed += fib->GetFiberLength(i)/f;
+  num_voxels_passed /= fib->GetNumFibers();
+  unsigned int parcels = std::ceil(num_voxels_passed/voxels);
 
-  MITK_INFO << "Estimated number of sampling points " << n;
+  MITK_INFO << "Estimated number of sampling points " << parcels;
 
-  return n;
+  return parcels;
 }
 
 

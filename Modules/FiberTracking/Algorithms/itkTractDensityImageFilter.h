@@ -61,8 +61,6 @@ public:
   itkSetMacro( InputImage, typename RefImageType::Pointer)      ///< use input image geometry to initialize output image
   itkGetMacro( MaxDensity, OutPixelType)
   itkGetMacro( NumCoveredVoxels, unsigned int)
-  itkGetMacro( AverageNumTraversedVoxels, unsigned int)
-  itkGetMacro( AverageSegmentLength, float)
 
   void GenerateData() override;
 
@@ -86,8 +84,6 @@ protected:
   bool                              m_WorkOnFiberCopy;
   OutPixelType                      m_MaxDensity;
   unsigned int                      m_NumCoveredVoxels;
-  unsigned int                      m_AverageNumTraversedVoxels;
-  float                             m_AverageSegmentLength;
 };
 
 }

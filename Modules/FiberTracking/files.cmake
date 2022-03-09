@@ -34,7 +34,6 @@ set(H_FILES
   Algorithms/itkFiberExtractionFilter.h
   Algorithms/itkTdiToVolumeFractionFilter.h
   Algorithms/itkDistanceFromSegmentationImageFilter.h
-  Algorithms/itkTractParcellationFilter.h
   Algorithms/mitkTractometry.h
 
   # Tractography

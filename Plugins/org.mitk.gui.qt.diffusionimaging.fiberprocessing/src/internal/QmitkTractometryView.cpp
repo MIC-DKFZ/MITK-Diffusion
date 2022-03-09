@@ -42,7 +42,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTractClusteringFilter.h>
 #include <mitkClusteringMetricEuclideanStd.h>
 #include <itkTractDensityImageFilter.h>
-#include <itkTractParcellationFilter.h>
 #include <mitkLookupTableProperty.h>
 #include <mitkLevelWindowProperty.h>
 #include <itkMaskedStatisticsImageFilter.h>
@@ -251,96 +250,6 @@ std::string QmitkTractometryView::RGBToHexString(double *rgb)
   return os.str();
 }
 
-void QmitkTractometryView::AlongTractRadiomicsPreprocessing(mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string)
-{
-  mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-
-  // calculate mask
-  typedef itk::Image<unsigned char, 3> ParcellationImageType;
-  ParcellationImageType::Pointer itkImage = ParcellationImageType::New();
-  CastToItkImage(image, itkImage);
-
-  itk::TractParcellationFilter< >::Pointer parcellator = itk::TractParcellationFilter< >::New();
-  parcellator->SetInputImage(itkImage);
-  parcellator->SetNumParcels(m_NumSamplingPoints);
-  parcellator->SetInputTract(fib);
-  parcellator->SetNumCentroids(m_Controls->m_MaxCentroids->value());
-  parcellator->SetStartClusterSize(m_Controls->m_ClusterSize->value());
-  parcellator->Update();
-  ParcellationImageType::Pointer out_image = parcellator->GetOutput(0);
-  ParcellationImageType::Pointer out_image_pp = parcellator->GetOutput(1);
-  auto binary_masks = parcellator->GetBinarySplit(out_image_pp);
-
-  mitk::Image::Pointer seg_img = mitk::Image::New();
-  seg_img->InitializeByItk(out_image.GetPointer());
-  seg_img->SetVolume(out_image->GetBufferPointer());
-
-  mitk::Image::Pointer seg_img_pp = mitk::Image::New();
-  seg_img_pp->InitializeByItk(out_image_pp.GetPointer());
-  seg_img_pp->SetVolume(out_image_pp->GetBufferPointer());
-
-  std::vector< double > std_values1;
-  std::vector< double > std_values2;
-  std::vector< double > mean_values;
-  for (auto mask : binary_masks)
-  {
-    itk::Image<float, 3>::Pointer data_image = itk::Image<float, 3>::New();
-    CastToItkImage(image, data_image);
-    itk::MaskedStatisticsImageFilter<itk::Image<float, 3>>::Pointer statisticsImageFilter = itk::MaskedStatisticsImageFilter<itk::Image<float, 3>>::New();
-    statisticsImageFilter->SetInput(data_image);
-    statisticsImageFilter->SetMask(mask);
-    statisticsImageFilter->Update();
-    double mean = statisticsImageFilter->GetMean();
-    double stdev = std::sqrt(statisticsImageFilter->GetVariance());
-
-    std_values1.push_back(mean + stdev);
-    std_values2.push_back(mean - stdev);
-    mean_values.push_back(mean);
-
-    clipboard_string += boost::lexical_cast<std::string>(mean);
-    clipboard_string += " ";
-    clipboard_string += boost::lexical_cast<std::string>(stdev);
-    clipboard_string += "\n";
-  }
-  clipboard_string += "\n";
-
-  data.push_back(mean_values);
-  data.push_back(std_values1);
-  data.push_back(std_values2);
-
-  mitk::LookupTable::Pointer lut = mitk::LookupTable::New();
-  lut->SetType( mitk::LookupTable::MULTILABEL );
-  mitk::LookupTableProperty::Pointer lut_prop = mitk::LookupTableProperty::New();
-  lut_prop->SetLookupTable( lut );
-
-  mitk::LevelWindow lw;
-  lw.SetRangeMinMax(0, parcellator->GetNumParcels());
-
-//  mitk::DataNode::Pointer new_node = mitk::DataNode::New();
-//  new_node->SetData(seg_img);
-//  new_node->SetName("tract parcellation");
-//  new_node->SetVisibility(true);
-//  new_node->SetProperty("LookupTable", lut_prop );
-//  new_node->SetProperty( "levelwindow", mitk::LevelWindowProperty::New( lw ) );
-//  node->SetVisibility(false);
-//  GetDataStorage()->Add(new_node, node);
-
-  mitk::DataNode::Pointer new_node2 = mitk::DataNode::New();
-  new_node2->SetData(seg_img_pp);
-  new_node2->SetName("tract parcellation pp");
-  new_node2->SetVisibility(false);
-  new_node2->SetProperty("LookupTable", lut_prop );
-  new_node2->SetProperty( "levelwindow", mitk::LevelWindowProperty::New( lw ) );
-  GetDataStorage()->Add(new_node2, node);
-
-  mitk::DataNode::Pointer new_node3 = mitk::DataNode::New();
-  auto working_fib = fib->GetDeepCopy();
-  working_fib->ColorFibersByScalarMap(seg_img, false, false, mitk::LookupTable::LookupTableType::MULTILABEL, 0.9);
-  new_node3->SetData(working_fib);
-  new_node3->SetName("bin-colored fib");
-  GetDataStorage()->Add(new_node3, node);
-}
-
 void QmitkTractometryView::StartTractometry()
 {
   m_ReferenceFib = dynamic_cast<mitk::FiberBundle*>(m_CurrentSelection.at(0)->GetData())->GetDeepCopy();
@@ -383,11 +292,6 @@ void QmitkTractometryView::StartTractometry()
     case 1:
     {
       NearestCentroidPointTractometry( image, node, data, clipboardString );
-      break;
-    }
-    case 2:
-    {
-      AlongTractRadiomicsPreprocessing(image, node, data, clipboardString);
       break;
     }
     default:

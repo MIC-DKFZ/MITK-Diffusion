@@ -75,13 +75,13 @@ QGroupBox {
       <item row="0" column="1">
        <widget class="QSpinBox" name="m_MaxCentroids">
         <property name="minimum">
-         <number>0</number>
+         <number>1</number>
         </property>
         <property name="maximum">
          <number>9999</number>
         </property>
         <property name="value">
-         <number>0</number>
+         <number>1</number>
         </property>
        </widget>
       </item>
@@ -101,8 +101,11 @@ QGroupBox {
       </item>
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="m_ClusterSize">
+        <property name="maximum">
+         <double>99999.000000000000000</double>
+        </property>
         <property name="value">
-         <double>15.000000000000000</double>
+         <double>99999.000000000000000</double>
         </property>
        </widget>
       </item>
@@ -157,7 +160,7 @@ QGroupBox {
       <item row="1" column="1">
        <widget class="QComboBox" name="m_MethodBox">
         <property name="currentIndex">
-         <number>2</number>
+         <number>0</number>
         </property>
         <item>
          <property name="text">
@@ -167,11 +170,6 @@ QGroupBox {
         <item>
          <property name="text">
           <string>Centroid Based</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>Segment voting</string>
          </property>
         </item>
        </widget>
