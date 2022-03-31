@@ -146,6 +146,7 @@ void QmitkFiberQuantificationView::CalculateFiberDirections()
     fOdfFilter->SetNormalizationMethod(itk::TractsToVectorImageFilter<float>::NormalizationMethods::MAX_VEC_NORM);
     break;
   }
+  fOdfFilter->SetOnlyUseMaskGeometry(true);
   fOdfFilter->SetSizeThreshold(m_Controls->m_PeakThreshold->value());
   fOdfFilter->SetMaxNumDirections(m_Controls->m_MaxNumDirections->value());
   fOdfFilter->Update();
@@ -213,15 +214,15 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
       DataNode::Pointer newNode = nullptr;
       switch(generationMethod){
       case 0:
-        newNode = GenerateTractDensityImage(fib, false, true, node->GetName());
+        newNode = GenerateTractDensityImage(fib, TDI_MODE::DENSITY, true, node->GetName());
         name += "_TDI";
         break;
       case 1:
-        newNode = GenerateTractDensityImage(fib, false, false, node->GetName());
+        newNode = GenerateTractDensityImage(fib, TDI_MODE::DENSITY, false, node->GetName());
         name += "_TDI";
         break;
       case 2:
-        newNode = GenerateTractDensityImage(fib, true, false, node->GetName());
+        newNode = GenerateTractDensityImage(fib, TDI_MODE::BINARY, false, node->GetName());
         name += "_envelope";
         break;
       case 3:
@@ -242,6 +243,10 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
       case 7:
         newNode = GenerateBinarySkeleton(fib);
         name += "_skeleton";
+        break;
+      case 8:
+        newNode = GenerateTractDensityImage(fib, TDI_MODE::VISITATION_COUNT, true, node->GetName());
+        name += "_visitations";
         break;
       }
       if (newNode.IsNotNull())
@@ -356,7 +361,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateBinarySkeleton(mit
 
   itk::TractDensityImageFilter< UcharImageType >::Pointer envelope_generator = itk::TractDensityImageFilter< UcharImageType >::New();
   envelope_generator->SetFiberBundle(fib);
-  envelope_generator->SetBinaryOutput(true);
+  envelope_generator->SetMode(TDI_MODE::BINARY);
   envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
@@ -389,7 +394,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateDistanceMap(mitk::
 
   itk::TractDensityImageFilter< UcharImageType >::Pointer envelope_generator = itk::TractDensityImageFilter< UcharImageType >::New();
   envelope_generator->SetFiberBundle(fib);
-  envelope_generator->SetBinaryOutput(true);
+  envelope_generator->SetMode(TDI_MODE::BINARY);
   envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
@@ -419,17 +424,17 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateDistanceMap(mitk::
 }
 
 // generate tract density image from fiber bundle
-mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, bool binary, bool absolute, std::string name)
+mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, TDI_MODE mode, bool absolute, std::string name)
 {
   mitk::DataNode::Pointer node = mitk::DataNode::New();
-  if (binary)
+  if (mode==TDI_MODE::BINARY)
   {
     typedef unsigned char OutPixType;
     typedef itk::Image<OutPixType, 3> OutImageType;
 
     itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
     generator->SetFiberBundle(fib);
-    generator->SetBinaryOutput(binary);
+    generator->SetMode(mode);
     generator->SetOutputAbsoluteValues(absolute);
     generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
     if (m_SelectedImage.IsNotNull())
@@ -511,7 +516,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
 
     itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
     generator->SetFiberBundle(fib);
-    generator->SetBinaryOutput(binary);
+    generator->SetMode(mode);
     generator->SetOutputAbsoluteValues(absolute);
     generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
     if (m_SelectedImage.IsNotNull())

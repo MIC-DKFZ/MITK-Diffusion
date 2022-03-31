@@ -44,7 +44,7 @@ QGroupBox {
       </font>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>2</number>
      </property>
      <property name="tabSpacing">
       <number>5</number>
@@ -598,7 +598,7 @@ QGroupBox {
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>0</y>
+        <y>-48</y>
         <width>353</width>
         <height>456</height>
        </rect>
@@ -1133,7 +1133,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>353</width>
-        <height>426</height>
+        <height>461</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1276,6 +1276,9 @@ QGroupBox {
           <property name="verticalSpacing">
            <number>6</number>
           </property>
+          <item row="5" column="0">
+           <widget class="QmitkDataStorageComboBox" name="m_ColorMapBox"/>
+          </item>
           <item row="0" column="0">
            <widget class="QLabel" name="label_12">
             <property name="text">
@@ -1296,21 +1299,49 @@ QGroupBox {
             </property>
            </widget>
           </item>
-          <item row="3" column="0">
-           <widget class="QCheckBox" name="m_NormalizeColorValues">
-            <property name="toolTip">
-             <string>The values used to color the fibers are min-max normalized. If not checked, the values should be between 0 and 1.</string>
-            </property>
-            <property name="text">
-             <string>Normalize color values</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
           <item row="4" column="0">
-           <widget class="QmitkDataStorageComboBox" name="m_ColorMapBox"/>
+           <widget class="QComboBox" name="m_LookupTableTypeBox">
+            <item>
+             <property name="text">
+              <string>JET</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>HOT_IRON</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>PLASMA</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>INFERNO</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>VIRIDIS</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>MAGMA</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>GRAYSCALE</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>MULTILABEL</string>
+             </property>
+            </item>
+           </widget>
           </item>
           <item row="2" column="0">
            <widget class="QCheckBox" name="m_ValueAsWeightBox">
@@ -1323,6 +1354,56 @@ QGroupBox {
             <property name="checked">
              <bool>false</bool>
             </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QFrame" name="frame_2">
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
+            </property>
+            <property name="lineWidth">
+             <number>0</number>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_22">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_17">
+               <property name="text">
+                <string>Value cap:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QDoubleSpinBox" name="m_PercentileBox">
+               <property name="decimals">
+                <number>3</number>
+               </property>
+               <property name="maximum">
+                <double>1.000000000000000</double>
+               </property>
+               <property name="singleStep">
+                <double>0.100000000000000</double>
+               </property>
+               <property name="value">
+                <double>0.950000000000000</double>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </widget>
           </item>
          </layout>

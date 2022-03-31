@@ -29,11 +29,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 namespace itk{
 
-template< class OutputImageType >
-TractDensityImageFilter< OutputImageType >::TractDensityImageFilter()
+template< class OutputImageType, class RefImageType >
+TractDensityImageFilter< OutputImageType, RefImageType >::TractDensityImageFilter()
   : m_UpsamplingFactor(1)
   , m_InvertImage(false)
-  , m_BinaryOutput(false)
+  , m_Mode(DENSITY)
   , m_UseImageGeometry(false)
   , m_OutputAbsoluteValues(false)
   , m_MaxDensity(0)
@@ -41,13 +41,25 @@ TractDensityImageFilter< OutputImageType >::TractDensityImageFilter()
 {
 }
 
-template< class OutputImageType >
-TractDensityImageFilter< OutputImageType >::~TractDensityImageFilter()
+template< class OutputImageType, class RefImageType >
+TractDensityImageFilter< OutputImageType, RefImageType >::~TractDensityImageFilter()
 {
 }
 
-template< class OutputImageType >
-void TractDensityImageFilter< OutputImageType >::GenerateData()
+template< class OutputImageType, class RefImageType >
+TDI_MODE TractDensityImageFilter< OutputImageType, RefImageType >::GetMode() const
+{
+  return m_Mode;
+}
+
+template< class OutputImageType, class RefImageType >
+void TractDensityImageFilter< OutputImageType, RefImageType >::SetMode(const TDI_MODE &Mode)
+{
+  m_Mode = Mode;
+}
+
+template< class OutputImageType, class RefImageType >
+void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
 {
   // generate upsampled image
   mitk::BaseGeometry::Pointer geometry = m_FiberBundle->GetGeometry();
@@ -147,10 +159,28 @@ void TractDensityImageFilter< OutputImageType >::GenerateData()
         if (outImage->GetPixel(segment.first)==0)
           m_NumCoveredVoxels++;
 
-        if (m_BinaryOutput)
+        switch (m_Mode)
+        {
+        case BINARY:
+        {
           outImage->SetPixel(segment.first, 1);
-        else
+          break;
+        }
+        case VISITATION_COUNT:
+        {
+          outImage->SetPixel(segment.first, outImage->GetPixel(segment.first) + 1);
+          break;
+        }
+        case DENSITY:
+        {
           outImage->SetPixel(segment.first, outImage->GetPixel(segment.first)+segment.second * weight);
+          break;
+        }
+        default:
+        {
+          outImage->SetPixel(segment.first, outImage->GetPixel(segment.first)+segment.second * weight);
+        }
+        }
       }
     }
   }
@@ -159,7 +189,7 @@ void TractDensityImageFilter< OutputImageType >::GenerateData()
   for (int i=0; i<w*h*d; i++)
     if (m_MaxDensity < outImageBufferPointer[i])
       m_MaxDensity = outImageBufferPointer[i];
-  if (!m_OutputAbsoluteValues && !m_BinaryOutput)
+  if (!m_OutputAbsoluteValues && m_Mode!=BINARY)
   {
     MITK_INFO << "TractDensityImageFilter: max-normalizing output image";
     if (m_MaxDensity>0)

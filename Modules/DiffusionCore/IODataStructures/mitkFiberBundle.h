@@ -37,6 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkFloatArray.h>
 #include <itkScalableAffineTransform.h>
 #include <mitkDiffusionFunctionCollection.h>
+#include <mitkLookupTable.h>
 
 namespace mitk {
 
@@ -64,12 +65,12 @@ public:
 
     // colorcoding related methods
     void ColorSinglePoint(int f_idx, int p_idx, double rgb[3]);
-    void ColorFibersByFiberWeights(bool opacity, bool normalize);
-    void ColorFibersByCurvature(bool opacity, bool normalize, bool weight_fibers);
-    void ColorFibersByLength(bool opacity, bool normalize, bool weight_fibers);
-    void ColorFibersByScalarMap(mitk::Image::Pointer, bool opacity, bool normalize, bool weight_fibers);
+    void ColorFibersByFiberWeights(bool opacity, LookupTable::LookupTableType type);
+    void ColorFibersByCurvature(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
+    void ColorFibersByLength(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
+    void ColorFibersByScalarMap(mitk::Image::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate=true);
     template <typename TPixel>
-    void ColorFibersByScalarMap(const mitk::PixelType pixelType, mitk::Image::Pointer, bool opacity, bool normalize, bool weight_fibers);
+    void ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate=true);
     void ColorFibersByOrientation();
     void SetFiberOpacity(vtkDoubleArray *FAValArray);
     void ResetFiberOpacity();

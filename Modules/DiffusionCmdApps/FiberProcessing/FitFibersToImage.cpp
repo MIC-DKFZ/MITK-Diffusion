@@ -262,7 +262,7 @@ int main(int argc, char* argv[])
           fib = fib->FilterByWeights(0.0);
         if (fib->GetNumFibers()>0)
         {
-          fib->ColorFibersByFiberWeights(false, true);
+          fib->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
           mitk::IOUtil::Save(fib, outRoot + name + "_fitted.fib");
 
           if (save_weights)
@@ -286,7 +286,7 @@ int main(int argc, char* argv[])
         out = out->FilterByWeights(0.0); 
       if (out->GetNumFibers()>0)
       {
-        out->ColorFibersByFiberWeights(false, true);
+        out->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
         mitk::IOUtil::Save(out, outRoot + "_fitted.fib");
 
         if (save_weights)

@@ -45,11 +45,9 @@ public:
 
   virtual void CreateQtPartControl(QWidget *parent) override;
 
-  template <typename TPixel>
-  void StaticResamplingTractometry(const mitk::PixelType, mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string);
+  void StaticResamplingTractometry(mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string);
 
-  template <typename TPixel>
-  void NearestCentroidPointTractometry(const mitk::PixelType, mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string);
+  void NearestCentroidPointTractometry(mitk::Image::Pointer image, mitk::DataNode::Pointer node, std::vector< std::vector< double > >& data, std::string& clipboard_string);
 
   virtual void SetFocus() override;
 
@@ -70,11 +68,11 @@ protected:
 
   Ui::QmitkTractometryViewControls* m_Controls;
 
-  bool Flip(vtkSmartPointer< vtkPolyData > polydata1, int i, vtkSmartPointer<vtkPolyData> ref_poly=nullptr);
   std::string RGBToHexString(double *rgb);
 
-  vtkSmartPointer< vtkPolyData > m_ReferencePolyData;
+  mitk::FiberBundle::Pointer m_ReferenceFib;
   QList<mitk::DataNode::Pointer> m_CurrentSelection;
+  unsigned int m_NumSamplingPoints;
   bool  m_Visible;
 };
 

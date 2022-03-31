@@ -586,7 +586,7 @@ void TractClusteringFilter::GenerateData()
       fib->SetFiberWeights(1);
       m_OutCentroids.at(w)->SetFiberWeights(1);
     }
-    fib->ColorFibersByFiberWeights(false, false);
+    fib->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
     ++w;
   }
 

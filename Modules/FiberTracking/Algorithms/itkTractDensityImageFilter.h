@@ -22,12 +22,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkRGBAPixel.h>
 #include <mitkFiberBundle.h>
 
+enum TDI_MODE : int {
+  BINARY,
+  VISITATION_COUNT,
+  DENSITY
+};
+
 namespace itk{
 
 /**
 * \brief Generates tract density images from input fiberbundles (Calamante 2010).   */
 
-template< class OutputImageType >
+template< class OutputImageType, class RefImageType=OutputImageType >
 class TractDensityImageFilter : public ImageSource< OutputImageType >
 {
 
@@ -47,29 +53,30 @@ public:
   itkGetMacro( UpsamplingFactor, float)                         ///< use higher resolution for ouput image
   itkSetMacro( InvertImage, bool)                               ///< voxelvalue = 1-voxelvalue
   itkGetMacro( InvertImage, bool)                               ///< voxelvalue = 1-voxelvalue
-  itkSetMacro( BinaryOutput, bool)                              ///< generate binary fiber envelope
-  itkGetMacro( BinaryOutput, bool)                              ///< generate binary fiber envelope
   itkSetMacro( OutputAbsoluteValues, bool)                      ///< output absolute values of the number of fibers per voxel
   itkGetMacro( OutputAbsoluteValues, bool)                      ///< output absolute values of the number of fibers per voxel
   itkSetMacro( UseImageGeometry, bool)                          ///< use input image geometry to initialize output image
   itkGetMacro( UseImageGeometry, bool)                          ///< use input image geometry to initialize output image
   itkSetMacro( FiberBundle, mitk::FiberBundle::Pointer)         ///< input fiber bundle
-  itkSetMacro( InputImage, typename OutputImageType::Pointer)   ///< use input image geometry to initialize output image
+  itkSetMacro( InputImage, typename RefImageType::Pointer)      ///< use input image geometry to initialize output image
   itkGetMacro( MaxDensity, OutPixelType)
   itkGetMacro( NumCoveredVoxels, unsigned int)
 
   void GenerateData() override;
+
+  TDI_MODE GetMode() const;
+  void SetMode(const TDI_MODE &Mode);
 
 protected:
 
   TractDensityImageFilter();
   ~TractDensityImageFilter() override;
 
-  typename OutputImageType::Pointer m_InputImage;           ///< use input image geometry to initialize output image
+  typename RefImageType::Pointer    m_InputImage;           ///< use input image geometry to initialize output image
   mitk::FiberBundle::Pointer        m_FiberBundle;          ///< input fiber bundle
   float                             m_UpsamplingFactor;     ///< use higher resolution for ouput image
   bool                              m_InvertImage;          ///< voxelvalue = 1-voxelvalue
-  bool                              m_BinaryOutput;         ///< generate binary fiber envelope
+  TDI_MODE                          m_Mode;                 ///< what should the output look like
   bool                              m_UseImageGeometry;     ///< use input image geometry to initialize output image
   bool                              m_OutputAbsoluteValues; ///< do not normalize image values to 0-1
   bool                              m_UseTrilinearInterpolation;

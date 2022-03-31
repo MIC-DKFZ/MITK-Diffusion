@@ -19,7 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarCircle.h>
 #include <mitkPlanarPolygon.h>
 #include <mitkPlanarFigureComposite.h>
-#include "mitkImagePixelReadAccessor.h"
+#include <mitkDiffusionFunctionCollection.h>
 #include <mitkPixelTypeMultiplex.h>
 
 #include <vtkPointData.h>
@@ -512,7 +512,7 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GetFiberPolyData() const
   return m_FiberPolyData;
 }
 
-void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool normalize, bool weight_fibers)
+void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type)
 {
   if (m_MaxFiberLength<=0)
     return;
@@ -531,11 +531,9 @@ void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool normalize, bool w
     return;
 
   mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
-  vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-  lookupTable->SetTableRange(0.0, 0.8);
-  lookupTable->Build();
-  mitkLookup->SetVtkLookupTable(lookupTable);
-  mitkLookup->SetType(mitk::LookupTable::JET);
+  mitkLookup->SetType(type);
+  if (type!=mitk::LookupTable::MULTILABEL)
+    mitkLookup->GetVtkLookupTable()->SetTableRange(m_MinFiberLength, m_MaxFiberLength);
 
   unsigned int count = 0;
   for (unsigned int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
@@ -544,16 +542,11 @@ void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool normalize, bool w
     auto numPoints = cell->GetNumberOfPoints();
 
     float l = m_FiberLengths.at(i)/m_MaxFiberLength;
-    if (!normalize)
-    {
-      l = m_FiberLengths.at(i)/255.0f;
-      if (l > 1.0f)
-        l = 1.0;
-    }
+    double color[3];
+    mitkLookup->GetColor(m_FiberLengths.at(i), color);
+
     for (int j=0; j<numPoints; j++)
     {
-      double color[3];
-      lookupTable->GetColor(1.0 - static_cast<double>(l), color);
 
       rgba[0] = static_cast<unsigned char>(255.0 * color[0]);
       rgba[1] = static_cast<unsigned char>(255.0 * color[1]);
@@ -735,7 +728,7 @@ void mitk::FiberBundle::ColorFibersByOrientation()
   m_UpdateTime2D.Modified();
 }
 
-void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize, bool weight_fibers)
+void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type)
 {
   double window = 5;
 
@@ -745,13 +738,6 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize, bool weight
   m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
-
-  mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
-  vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-  lookupTable->SetTableRange(0.0, 0.8);
-  lookupTable->Build();
-  mitkLookup->SetVtkLookupTable(lookupTable);
-  mitkLookup->SetType(mitk::LookupTable::JET);
 
   std::vector< double > values;
   double min = 1;
@@ -839,6 +825,11 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize, bool weight
       this->SetFiberWeight(i, mean_curv/numPoints);
   }
 
+  mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
+  mitkLookup->SetType(type);
+  if (type!=mitk::LookupTable::MULTILABEL)
+    mitkLookup->GetVtkLookupTable()->SetTableRange(min, max);
+
   unsigned int count = 0;
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
@@ -848,16 +839,17 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool, bool normalize, bool weight
     {
       double color[3];
       double dev = values.at(count);
-      if (normalize)
-        dev = (dev-min)/(max-min);
-      else if (dev>1)
-        dev = 1;
-      lookupTable->GetColor(dev, color);
+      mitkLookup->GetColor(dev, color);
 
       rgba[0] = static_cast<unsigned char>(255.0 * color[0]);
       rgba[1] = static_cast<unsigned char>(255.0 * color[1]);
       rgba[2] = static_cast<unsigned char>(255.0 * color[2]);
-      rgba[3] = static_cast<unsigned char>(255.0);
+
+      if (opacity)
+        rgba[3] = static_cast<unsigned char>(255.0f * dev/max);
+      else
+        rgba[3] = static_cast<unsigned char>(255.0);
+
       m_FiberColors->InsertTypedTuple(cell->GetPointId(j), rgba);
       count++;
     }
@@ -886,32 +878,51 @@ void mitk::FiberBundle::ResetFiberOpacity()
   m_UpdateTime2D.Modified();
 }
 
-void mitk::FiberBundle::ColorFibersByScalarMap(mitk::Image::Pointer FAimage, bool opacity, bool normalize, bool weight_fibers)
+void mitk::FiberBundle::ColorFibersByScalarMap(mitk::Image::Pointer FAimage, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
 {
-  mitkPixelTypeMultiplex4( ColorFibersByScalarMap, FAimage->GetPixelType(), FAimage, opacity, normalize, weight_fibers );
+  if (FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned char" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="char" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="long" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned long" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="short" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned short" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned int" ||
+           FAimage->GetPixelType().GetComponentTypeAsString()=="int")
+  {
+    typedef itk::Image<int, 3> ImageType;
+    ImageType::Pointer itkImage = ImageType::New();
+    CastToItkImage(FAimage, itkImage);
+
+    ColorFibersByScalarMap<int>(itkImage, opacity, weight_fibers, type, max_cap, interpolate );
+  }
+  else
+  {
+    typedef itk::Image<float, 3> ImageType;
+    ImageType::Pointer itkImage = ImageType::New();
+    CastToItkImage(FAimage, itkImage);
+
+    ColorFibersByScalarMap<float>(itkImage, opacity, weight_fibers, type, max_cap, interpolate );
+  }
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
 }
 
 template <typename TPixel>
-void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Image::Pointer image, bool opacity, bool normalize, bool weight_fibers)
+void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
-  mitk::ImagePixelReadAccessor<TPixel,3> readimage(image, image->GetVolumeData(0));
-
   unsigned char rgba[4] = {0,0,0,0};
   vtkPoints* pointSet = m_FiberPolyData->GetPoints();
 
-  mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
-  vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-  lookupTable->SetTableRange(0.0, 0.8);
-  lookupTable->Build();
-  mitkLookup->SetVtkLookupTable(lookupTable);
-  mitkLookup->SetType(mitk::LookupTable::JET);
+  if (type==mitk::LookupTable::MULTILABEL)
+    interpolate = false;
+
+  auto interpolator = itk::LinearInterpolateImageFunction< itk::Image<TPixel, 3>, float >::New();
+  interpolator->SetInputImage(image);
 
   double min = 999999;
   double max = -999999;
@@ -927,12 +938,7 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Imag
     {
       double p[3];
       points->GetPoint(j, p);
-
-      Point3D px;
-      px[0] = p[0];
-      px[1] = p[1];
-      px[2] = p[2];
-      auto pixelValue = static_cast<double>(readimage.GetPixelByWorldCoordinates(px));
+      auto pixelValue = mitk::imv::GetImageValue<TPixel>(mitk::imv::GetItkPoint(p), interpolate, interpolator);
 
       if (pixelValue>max)
         max = pixelValue;
@@ -947,21 +953,21 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Imag
       this->SetFiberWeight(i, mean_val/numPoints);
   }
 
+  mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
+  mitkLookup->SetType(type);
+  if (type!=mitk::LookupTable::MULTILABEL)
+    mitkLookup->GetVtkLookupTable()->SetTableRange(min, max*max_cap);
+
   for(long i=0; i<m_FiberPolyData->GetNumberOfPoints(); ++i)
   {
-    Point3D px;
+    itk::Point<float, 3> px;
     px[0] = pointSet->GetPoint(i)[0];
     px[1] = pointSet->GetPoint(i)[1];
     px[2] = pointSet->GetPoint(i)[2];
-    auto pixelValue = static_cast<double>(readimage.GetPixelByWorldCoordinates(px));
-
-    if (normalize)
-      pixelValue = (pixelValue-min)/(max-min);
-    else if (pixelValue>1)
-      pixelValue = 1;
+    auto pixelValue = mitk::imv::GetImageValue<TPixel>(px, interpolate, interpolator);
 
     double color[3];
-    lookupTable->GetColor(1-pixelValue, color);
+    mitkLookup->GetColor(pixelValue, color);
 
     rgba[0] = static_cast<unsigned char>(255.0 * color[0]);
     rgba[1] = static_cast<unsigned char>(255.0 * color[1]);
@@ -977,19 +983,12 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::PixelType, mitk::Imag
 }
 
 
-void mitk::FiberBundle::ColorFibersByFiberWeights(bool opacity, bool normalize)
+void mitk::FiberBundle::ColorFibersByFiberWeights(bool opacity, mitk::LookupTable::LookupTableType type)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
-
-  mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
-  vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-  lookupTable->SetTableRange(0.0, 0.8);
-  lookupTable->Build();
-  mitkLookup->SetVtkLookupTable(lookupTable);
-  mitkLookup->SetType(mitk::LookupTable::JET);
 
   unsigned char rgba[4] = {0,0,0,0};
   unsigned int counter = 0;
@@ -1010,27 +1009,27 @@ void mitk::FiberBundle::ColorFibersByFiberWeights(bool opacity, bool normalize)
     min = 0;
   }
 
+  mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
+  mitkLookup->SetType(type);
+  if (type!=mitk::LookupTable::MULTILABEL)
+    mitkLookup->GetVtkLookupTable()->SetTableRange(min, max);
+
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
     vtkCell* cell = m_FiberPolyData->GetCell(i);
     auto numPoints = cell->GetNumberOfPoints();
     auto weight = this->GetFiberWeight(i);
 
+    double color[3];
+    mitkLookup->GetColor(weight, color);
+
     for (int j=0; j<numPoints; j++)
     {
-      float v = weight;
-      if (normalize)
-        v = (v-min)/(max-min);
-      else if (v>1)
-        v = 1;
-      double color[3];
-      lookupTable->GetColor(static_cast<double>(1-v), color);
-
       rgba[0] = static_cast<unsigned char>(255.0 * color[0]);
       rgba[1] = static_cast<unsigned char>(255.0 * color[1]);
       rgba[2] = static_cast<unsigned char>(255.0 * color[2]);
       if (opacity)
-        rgba[3] = static_cast<unsigned char>(255.0f * v);
+        rgba[3] = static_cast<unsigned char>(255.0f * weight/max);
       else
         rgba[3] = static_cast<unsigned char>(255.0);
 

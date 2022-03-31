@@ -1,6 +1,6 @@
-option(BUILD_DiffusionFiberProcessingCmdApps "Build commandline tools for diffusion fiber processing" OFF)
+option(BUILD_DiffusionFiberQuantificationCmdApps "Build commandline tools for diffusion fiber processing" OFF)
 
-if(BUILD_DiffusionFiberProcessingCmdApps OR MITK_BUILD_ALL_APPS)
+if(BUILD_DiffusionFiberQuantificationCmdApps OR MITK_BUILD_ALL_APPS)
 
   # needed include directories
   include_directories(
@@ -12,16 +12,9 @@ if(BUILD_DiffusionFiberProcessingCmdApps OR MITK_BUILD_ALL_APPS)
     # if an app requires additional dependencies
     # they are added after a "^^" and separated by "_"
     set( diffusionFiberProcessingcmdapps
-    Sift2WeightCopy^^
-    FiberExtraction^^
-    FiberExtractionRoi^^
-    FiberProcessing^^
-    FitFibersToImage^^
-    FiberDirectionExtraction^^
-    FiberJoin^^
-    FiberClustering^^
-    TractDensityFilter^^
-    FiberColoring^^
+    TractDensity^^
+    PrintFiberStatistics^^
+    DistanceToSegmentation^^
     )
 
     foreach(diffusionFiberProcessingcmdapp ${diffusionFiberProcessingcmdapps})

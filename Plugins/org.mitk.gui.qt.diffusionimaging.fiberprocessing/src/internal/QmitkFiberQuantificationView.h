@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPointSet.h>
 #include <itkCastImageFilter.h>
 #include <mitkILifecycleAwarePart.h>
+#include <itkTractDensityImageFilter.h>
 
 /*!
 \brief Generation of images from fiber bundles (TDI, envelopes, endpoint distribution) and extraction of principal fiber directions from tractograms.
@@ -73,7 +74,7 @@ protected:
   mitk::Image::Pointer                  m_SelectedImage;
   float                                 m_UpsamplingFactor; ///< upsampling factor for all image generations
 
-  mitk::DataNode::Pointer GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, bool binary, bool absolute, std::string name);
+  mitk::DataNode::Pointer GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, TDI_MODE mode, bool absolute, std::string name);
   mitk::DataNode::Pointer GenerateColorHeatmap(mitk::FiberBundle::Pointer fib);
   mitk::DataNode::Pointer GenerateFiberEndingsImage(mitk::FiberBundle::Pointer fib);
   mitk::DataNode::Pointer GenerateFiberEndingsPointSet(mitk::FiberBundle::Pointer fib);

@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
   mitkDiffusionCommandLineParser parser;
 
   parser.setTitle("Tract Density");
-  parser.setCategory("Fiber Tracking and Processing Methods");
+  parser.setCategory("Fiber Quantification Methods");
   parser.setDescription("Generate tract density image, fiber envelope or fiber endpoints image.");
   parser.setContributor("MIC");
 
@@ -139,7 +139,7 @@ int main(int argc, char* argv[])
 
       itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
       generator->SetFiberBundle(fib);
-      generator->SetBinaryOutput(binary);
+      generator->SetMode(TDI_MODE::BINARY);
       generator->SetOutputAbsoluteValues(!normalize);
       generator->SetUpsamplingFactor(upsampling);
 
@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
 
       itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
       generator->SetFiberBundle(fib);
-      generator->SetBinaryOutput(binary);
+      generator->SetMode(TDI_MODE::DENSITY);
       generator->SetOutputAbsoluteValues(!normalize);
       generator->SetUpsamplingFactor(upsampling);
 

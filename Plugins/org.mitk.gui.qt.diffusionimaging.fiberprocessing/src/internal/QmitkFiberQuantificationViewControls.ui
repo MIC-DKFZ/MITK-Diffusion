@@ -150,6 +150,11 @@ QGroupBox {
           <string>Binary Skeleton</string>
          </property>
         </item>
+        <item>
+         <property name="text">
+          <string>Streamline Visitation Count</string>
+         </property>
+        </item>
        </widget>
       </item>
      </layout>

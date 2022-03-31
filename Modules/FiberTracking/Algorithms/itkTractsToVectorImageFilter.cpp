@@ -292,6 +292,9 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
       ++dirImgIt;
     }
   }
+
+  if (max_dir_mag < 0.00000001)
+    mitkThrow() << "Maximum peak size is 0.0!";
 }
 
 

@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
       {
         itk::TractDensityImageFilter< ItkFloatImgType >::Pointer masks = itk::TractDensityImageFilter< ItkFloatImgType >::New();
         masks->SetInputImage(ref_image);
-        masks->SetBinaryOutput(true);
+        masks->SetMode(TDI_MODE::BINARY);
         masks->SetFiberBundle(fib);
         masks->SetUseImageGeometry(true);
         masks->Update();
