@@ -57,7 +57,6 @@ void mitk::NrrdOdfImageWriter::Write()
     mitk::LocaleSwitch localeSwitch("C");
 
     itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-    io->SetFileType( itk::ImageIOBase::Binary );
     io->UseCompressionOn();
 
     typedef itk::VectorImage<float, 3> VecImgType;

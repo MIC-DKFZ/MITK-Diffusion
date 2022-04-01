@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkFixedArray.h"
 #include "itkMatrix.h"
 #include "itkSymmetricEigenAnalysis.h"
-#include "itkSimpleFastMutexLock.h"
+#include <mutex>
 #include "itkDiffusionTensor3D.h"
 
 #include "vtkPolyData.h"
@@ -32,6 +32,19 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vtkCleanPolyData.h"
 #include "vtkAppendPolyData.h"
 #include "vtkPlane.h"
+
+// generate by n-fold subdivisions of an icosahedron
+// 1 - 12
+// 2 - 42
+// 3 - 92
+// 4 - 162
+// 5 - 252
+// 6 - 362
+// 7 - 492
+// 8 - 642
+// 9 - 812
+// 10 - 1002
+#define ODF_SAMPLING_SIZE 252
 
 namespace itk
 {
@@ -48,7 +61,7 @@ namespace itk
 
 template < typename TComponent, unsigned int NOdfDirections >
 class OrientationDistributionFunction: public
-        FixedArray<TComponent,NOdfDirections>
+        FixedArray<TComponent, NOdfDirections>
 {
 public:
 
@@ -204,45 +217,34 @@ private:
 
   static std::vector<int>* m_HalfSphereIdxs;
 
-  static itk::SimpleFastMutexLock m_MutexBaseMesh;
-  static itk::SimpleFastMutexLock m_MutexHalfSphereIdxs;
-  static itk::SimpleFastMutexLock m_MutexNeighbors;
-  static itk::SimpleFastMutexLock m_MutexAngularRange;
+  static std::mutex m_MutexBaseMesh;
+  static std::mutex m_MutexHalfSphereIdxs;
+  static std::mutex m_MutexNeighbors;
+  static std::mutex m_MutexAngularRange;
   typename itk::DiffusionTensor3D<TComponent>::EigenValuesArrayType   m_EigenValues;
   typename itk::DiffusionTensor3D<TComponent>::EigenVectorsMatrixType m_EigenVectors;
   bool  m_EigenAnalysisCalculated;
 
 };
 
-/** This extra typedef is necessary for preventing an Internal Compiler Error in
- * Microsoft Visual C++ 6.0. This typedef is not needed for any other compiler. */
-typedef std::ostream               OutputStreamType;
-typedef std::istream               InputStreamType;
+///** This extra typedef is necessary for preventing an Internal Compiler Error in
+// * Microsoft Visual C++ 6.0. This typedef is not needed for any other compiler. */
+//typedef std::ostream               OutputStreamType;
+//typedef std::istream               InputStreamType;
 
-template< typename TComponent, unsigned int NOdfDirections  >
-MITKDIFFUSIONCORE_EXPORT OutputStreamType& operator<<(OutputStreamType& os,
-              const OrientationDistributionFunction<TComponent,NOdfDirections> & c);
-template< typename TComponent, unsigned int NOdfDirections  >
-MITKDIFFUSIONCORE_EXPORT InputStreamType& operator>>(InputStreamType& is,
-                    OrientationDistributionFunction<TComponent,NOdfDirections> & c);
+//template< typename TComponent, unsigned int NOdfDirections  >
+//MITKDIFFUSIONCORE_EXPORT OutputStreamType& operator<<(OutputStreamType& os,
+//              const OrientationDistributionFunction<TComponent,NOdfDirections> & c);
+//template< typename TComponent, unsigned int NOdfDirections  >
+//MITKDIFFUSIONCORE_EXPORT InputStreamType& operator>>(InputStreamType& is,
+//                    OrientationDistributionFunction<TComponent,NOdfDirections> & c);
 
 
 
 } // end namespace itk
 
-// Define instantiation macro for this template.
-#define ITK_TEMPLATE_OrientationDistributionFunction(_, EXPORT, x, y) namespace itk { \
-  _(2(class MITKDIFFUSIONCORE_EXPORT EXPORT OrientationDistributionFunction< ITK_TEMPLATE_2 x >)) \
-  namespace Templates { typedef OrientationDistributionFunction< ITK_TEMPLATE_2 x > \
-                                         OrientationDistributionFunction##y; } \
-  }
-
-#if ITK_TEMPLATE_EXPLICIT
-# include "Templates/itkOrientationDistributionFunction+-.h"
-#endif
-
-#if ITK_TEMPLATE_TXX
-# include "itkOrientationDistributionFunction.txx"
+#ifndef ITK_MANUAL_INSTANTIATION
+#include "itkOrientationDistributionFunction.txx"
 #endif
 
 

@@ -88,13 +88,6 @@ void StreamlineTrackingFilter::BeforeTracking()
     m_TrackingPriorHandler->InitForTracking();
   }
 
-  m_PolyDataContainer.clear();
-  for (unsigned int i=0; i<this->GetNumberOfThreads(); i++)
-  {
-    PolyDataType poly = PolyDataType::New();
-    m_PolyDataContainer.push_back(poly);
-  }
-
   auto imageSpacing = m_TrackingHandler->GetSpacing();
   if (m_Parameters->m_OutputProbMap)
   {

@@ -39,6 +39,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_inverse.h>
 #include <typeinfo>
 #include <ciso646>
+#include <itkPointShell.h>
 
 namespace itk
 {
@@ -63,13 +64,13 @@ template<class T, unsigned int N>
 std::vector<int>* itk::OrientationDistributionFunction<T,N>::m_HalfSphereIdxs = nullptr;
 
 template<class T, unsigned int N>
-itk::SimpleFastMutexLock itk::OrientationDistributionFunction<T,N>::m_MutexBaseMesh;
+std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexBaseMesh;
 template<class T, unsigned int N>
-itk::SimpleFastMutexLock itk::OrientationDistributionFunction<T,N>::m_MutexHalfSphereIdxs;
+std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexHalfSphereIdxs;
 template<class T, unsigned int N>
-itk::SimpleFastMutexLock itk::OrientationDistributionFunction<T,N>::m_MutexNeighbors;
+std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexNeighbors;
 template<class T, unsigned int N>
-itk::SimpleFastMutexLock itk::OrientationDistributionFunction<T,N>::m_MutexAngularRange;
+std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexAngularRange;
 
 /**
   * Assignment Operator
@@ -621,7 +622,7 @@ OrientationDistributionFunction<T, NOdfDirections>
 ::ComputeBaseMesh()
 {
 
-  m_MutexBaseMesh.Lock();
+  m_MutexBaseMesh.lock();
   if(m_BaseMesh == nullptr)
   {
 
@@ -703,7 +704,7 @@ OrientationDistributionFunction<T, NOdfDirections>
 
     m_BaseMesh = polydata;
   }
-  m_MutexBaseMesh.Unlock();
+  m_MutexBaseMesh.unlock();
 }
 
 /**
@@ -758,7 +759,7 @@ OrientationDistributionFunction<T, NOdfDirections>
 {
   ComputeBaseMesh();
 
-  m_MutexNeighbors.Lock();
+  m_MutexNeighbors.lock();
   if(m_NeighborIdxs == nullptr)
   {
     m_NeighborIdxs = new std::vector< std::vector<int>* >();
@@ -794,7 +795,7 @@ OrientationDistributionFunction<T, NOdfDirections>
       m_NeighborIdxs->push_back(idxs);
     }
   }
-  m_MutexNeighbors.Unlock();
+  m_MutexNeighbors.unlock();
 
   return *m_NeighborIdxs->at(idx);
 }
@@ -811,7 +812,7 @@ OrientationDistributionFunction<T, NOdfDirections>
   if( n == 0 )
     return GetPrincipalDiffusionDirectionIndex();
 
-  m_MutexHalfSphereIdxs.Lock();
+  m_MutexHalfSphereIdxs.lock();
   if( !m_HalfSphereIdxs )
   {
     m_HalfSphereIdxs = new std::vector<int>();
@@ -823,7 +824,7 @@ OrientationDistributionFunction<T, NOdfDirections>
       }
     }
   }
-  m_MutexHalfSphereIdxs.Unlock();
+  m_MutexHalfSphereIdxs.unlock();
 
   // collect indices of directions
   // that are local maxima
@@ -1163,7 +1164,7 @@ T itk::OrientationDistributionFunction<T, N>
 {
   // following loop only performed once
   // (computing indices of each angular range)
-  m_MutexAngularRange.Lock();
+  m_MutexAngularRange.lock();
   if(m_AngularRangeIdxs == nullptr)
   {
     m_AngularRangeIdxs = new std::vector< std::vector<int>* >();
@@ -1183,7 +1184,7 @@ T itk::OrientationDistributionFunction<T, N>
       m_AngularRangeIdxs->push_back(idxs);
     }
   }
-  m_MutexAngularRange.Unlock();
+  m_MutexAngularRange.unlock();
 
   // find the maximum (or minimum) direction (remember index and value)
   T mode;

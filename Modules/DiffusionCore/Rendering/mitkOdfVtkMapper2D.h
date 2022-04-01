@@ -27,11 +27,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vtkCutter.h"
 #include "vtkClipPolyData.h"
 #include "vtkTransform.h"
-#include "vtkDataArrayTemplate.h"
 #include "vtkSmartPointer.h"
 #include "vtkOdfSource.h"
 #include "vtkThickPlane.h"
 #include <mitkDiffusionFunctionCollection.h>
+#include <itkPointShell.h>
 
 namespace mitk {
 

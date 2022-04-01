@@ -23,7 +23,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 // vnl include
 #include "vnl/vnl_least_squares_function.h"
 #include "vnl/algo/vnl_levenberg_marquardt.h"
-#include "vnl/vnl_math.h"
 
 namespace itk
 {
@@ -98,7 +97,7 @@ protected:
       for(int s=0; s<N; s++)
       {
         double approx = lambda * std::exp(-b[s] * ADC_slow) + (1-lambda) * std::exp(-b[s] * ADC_fast);
-        fx[s] = vnl_math_abs( measurements[s] - approx*S0 );
+        fx[s] = std::fabs( measurements[s] - approx*S0 );
       }
 
     }

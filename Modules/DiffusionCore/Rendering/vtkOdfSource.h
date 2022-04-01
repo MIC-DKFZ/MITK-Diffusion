@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkFloatArray.h>
 #include <itkOrientationDistributionFunction.h>
 #include <mitkOdfNormalizationMethodProperty.h>
+#include <mitkOdfImage.h>
 
 class MITKDIFFUSIONCORE_EXPORT vtkOdfSource : public vtkPolyDataAlgorithm
 {

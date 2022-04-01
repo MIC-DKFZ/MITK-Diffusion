@@ -67,7 +67,6 @@ std::string mitk::PeakImageSerializer::Serialize()
     writer->SetInput(itk_image);
     writer->SetFileName(fullname);
     itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-    io->SetFileType( itk::ImageIOBase::Binary );
     io->UseCompressionOn();
     writer->SetImageIO(io);
     writer->Update();

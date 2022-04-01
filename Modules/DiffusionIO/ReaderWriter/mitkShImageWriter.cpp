@@ -62,7 +62,6 @@ void mitk::ShImageWriter::WriteShImage(InputType::ConstPointer input)
   if (ext==".shi")
   {
     itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-    io->SetFileType( itk::ImageIOBase::Binary );
     io->UseCompressionOn();
     writer->SetImageIO(io);
   }

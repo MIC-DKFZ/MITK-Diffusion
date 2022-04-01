@@ -29,7 +29,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkOrientationDistributionFunction.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
-#include <itkSimpleFastMutexLock.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkPointSet.h>
 #include <chrono>
@@ -162,7 +161,6 @@ protected:
 
   // decision forest
   mitk::TrackingDataHandler*          m_TrackingHandler;
-  std::vector< PolyDataType >         m_PolyDataContainer;
 
   std::chrono::time_point<std::chrono::system_clock> m_StartTime;
   std::chrono::time_point<std::chrono::system_clock> m_EndTime;

@@ -19,7 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkDWIVoxelFunctor.h"
 #include "vnl/vnl_least_squares_function.h"
-#include "vnl/vnl_math.h"
+
 namespace itk
 {
 
@@ -91,7 +91,7 @@ protected:
       for(int s=0; s<N; s++)
       {
         double approx = S0 * std::exp(-b[s] * ADC);
-        fx[s] = vnl_math_abs( measurements[s] - approx );
+        fx[s] = std::fabs( measurements[s] - approx );
       }
 
     }

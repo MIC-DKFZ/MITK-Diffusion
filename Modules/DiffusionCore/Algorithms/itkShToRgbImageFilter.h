@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionIterator.h"
 #include <mitkDiffusionFunctionCollection.h>
 #include <mitkShImage.h>
+#include <itkPointShell.h>
 
 namespace itk
 {
