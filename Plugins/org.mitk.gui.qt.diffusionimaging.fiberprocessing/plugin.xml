@@ -12,6 +12,14 @@
     <keywordReference id="org.mitk.views.fiberquantification.Keyword"/>
     </view>
 
+    <view id="org.mitk.views.interactivefiberdissection"
+    name="Interactive Fiber Dissection"
+    category="Fiber processing"
+    class="QmitkInteractiveFiberDissectionView"
+    icon="resources/FiberBundleOperations.png">
+    <keywordReference id="org.mitk.views.interactivefiberdissection.Keyword"/>
+    </view>
+
     <view id="org.mitk.views.fiberprocessing"
     name="Fiber Processing"
     category="Fiber processing"

@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/QmitkInteractiveFiberDissection">
+        <file>FiberBundle.png</file>
+        <file>circle.png</file>
+        <file>polygon.png</file>
+        <file>eraze.png</file>
+        <file>highlighter.png</file>
+    </qresource>
+</RCC>
