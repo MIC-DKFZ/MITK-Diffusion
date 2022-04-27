@@ -17,17 +17,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkPointShell_txx__
 #define __itkPointShell_txx__
 
-#include "vnl/vnl_vector_fixed.h"
-#include "vnl/vnl_matrix_fixed.h"
-
 namespace itk
 {
+
 template<int NPoints, class TMatrixType >
-TMatrixType *
-PointShell<NPoints, TMatrixType >
+TMatrixType* PointShell<NPoints, TMatrixType >
 ::DistributePointShell()
 {
-
   auto theta
       = new vnl_vector_fixed<double,NPoints>();
 

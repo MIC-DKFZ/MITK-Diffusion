@@ -568,8 +568,7 @@ namespace mitk
 
     ImageMaskSpatialObject::Pointer maskSO = ImageMaskSpatialObject::New();
     maskSO->SetImage ( caster->GetOutput() );
-    m_InternalMask3D  =
-        maskSO->GetAxisAlignedBoundingBoxRegion();
+    m_InternalMask3D = maskSO->ComputeMyBoundingBoxInIndexSpace();
 
     // check if bounding box is empty, if so set it to 1,1,1
     // to prevent empty mask image

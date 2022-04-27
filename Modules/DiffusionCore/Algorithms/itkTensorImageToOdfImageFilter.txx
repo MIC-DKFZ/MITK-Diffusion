@@ -98,7 +98,7 @@ namespace itk
         (float)T[4],
         (float)T[5],
       };
-      itk::DiffusionTensor3D<float> tensor(tensorelems);
+      itk::DiffusionTensor3D<TOutputScalarType> tensor(tensorelems);
 
       itk::OrientationDistributionFunction<TOutputScalarType, ODF_SAMPLING_SIZE> odf;
       odf.InitFromTensor(tensor);

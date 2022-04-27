@@ -122,7 +122,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>
   oit.GoToBegin();
 
   typedef ImageRegionConstIterator< InputImageType > InputIteratorType;
-  typename InputImageType::Pointer inputImagePointer = NULL;
+  typename InputImageType::Pointer inputImagePointer = nullptr;
   inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
 
   InputIteratorType git( inputImagePointer, outputRegionForThread );

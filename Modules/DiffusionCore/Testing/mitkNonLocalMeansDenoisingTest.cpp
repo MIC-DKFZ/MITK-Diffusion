@@ -62,7 +62,7 @@ public:
     VectorImagetType::Pointer vectorImage;
     mitk::CastToItkImage(m_Image,vectorImage);
     m_DenoisingFilter->SetInputImage(vectorImage);
-    m_DenoisingFilter->SetNumberOfThreads(1);
+    m_DenoisingFilter->SetNumberOfWorkUnits(1);
     m_DenoisingFilter->SetComparisonRadius(1);
     m_DenoisingFilter->SetSearchRadius(1);
     m_DenoisingFilter->SetVariance(500);

@@ -37,7 +37,7 @@ namespace itk{
 
 template< class TOdfPixelType,
           class TGfaPixelType,
-          int NrOdfDirections>
+          unsigned int NrOdfDirections>
 class DiffusionOdfGeneralizedFaImageFilter :
   public ImageToImageFilter< Image< Vector< TOdfPixelType, NrOdfDirections >, 3 >,
                               Image< TGfaPixelType, 3 > >

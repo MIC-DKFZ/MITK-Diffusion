@@ -55,7 +55,7 @@ VectorImageToImageFilter< TPixelType >
     oit.GoToBegin();
 
   //   InputIteratorType;
-    typename InputImageType::Pointer inputImagePointer = NULL;
+    typename InputImageType::Pointer inputImagePointer = nullptr;
     inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
 
     ImageRegionIterator <InputImageType> git( inputImagePointer, inputImagePointer->GetLargestPossibleRegion() );

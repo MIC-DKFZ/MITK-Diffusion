@@ -19,6 +19,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkOdfImage.h"
 #include <MitkDiffusionCoreExports.h>
+#include <vnl/vnl_vector_fixed.h>
+#include <vnl/vnl_matrix_fixed.h>
 
 
 namespace itk
@@ -42,6 +44,10 @@ namespace itk
 
 }
 
+
+
+#ifndef ITK_MANUAL_INSTANTIATION
 #include "itkPointShell.txx"
+#endif
 
 #endif //__itkPointShell_h__

@@ -91,7 +91,7 @@ void IvimMapComputation( mitk::Image::Pointer input,
   ivim_filter->SetBThres(b_thresh);
   ivim_filter->SetS0Thres(0);
   ivim_filter->SetFitDStar(true);
-  ivim_filter->SetNumberOfThreads(1);
+  ivim_filter->SetNumberOfWorkUnits(1);
 
   try
   {

@@ -58,7 +58,7 @@ namespace itk
       filter->SetOriginalImage( m_ReferenceImage );
       filter->SetBValues(m_BValues);
       filter->SetLambda(m_Lambda);
-      filter->SetNumberOfThreads(this->GetNumberOfThreads());
+      filter->SetNumberOfWorkUnits(this->GetNumberOfWorkUnits());
       filter->UpdateLargestPossibleRegion();
       image = filter->GetOutput();
       std::cout << "Iteration " << i+1 << "/" <<

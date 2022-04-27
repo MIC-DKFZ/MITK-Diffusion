@@ -640,7 +640,7 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
     filter->SetReferenceImage(m_InternalVectorImage);
     filter->SetBValues(m_Snap.high_bvalues);
     filter->SetNumberIterations(m_NumberIterations);
-    filter->SetNumberOfThreads(1);
+    filter->SetNumberOfWorkUnits(1);
     filter->SetLambda(m_Lambda);
     filter->Update();
     typename RegFitType::OutputImageType::Pointer outimg = filter->GetOutput();
