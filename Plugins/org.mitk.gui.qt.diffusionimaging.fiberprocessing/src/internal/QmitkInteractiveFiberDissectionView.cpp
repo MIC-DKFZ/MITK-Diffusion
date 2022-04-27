@@ -497,80 +497,29 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 void QmitkInteractiveFiberDissectionView::RemovefromBundle()
 {
 
-//    BaseRenderer *renderer = positionEvent->GetSender();
+    if (m_negativeSelectedBundles.IsNotNull())
+    {
 
-//    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
-//    MITK_INFO << positionEvent;
+        m_DataInteractor = .at(m_negativeSelectedBundles.size()-1)->GetDataInteractor();
+        // If no data Interactor is present create a new one
+        if (m_DataInteractor.IsNull())
+        {
+          // Create PointSetData Interactor
+          m_DataInteractor = mitk::StreamlineInteractor::New();
+          // Load the according state machine for regular point set interaction
+          m_DataInteractor->LoadStateMachine("Streamline3DStates.xml");
+          // Set the configuration file that defines the triggers for the transitions
+          m_DataInteractor->SetEventConfig("Streamline3D.xml");
+          // set the DataNode (which already is added to the DataStorage
+          m_DataInteractor->SetDataNode(m_PointSetNode);
+        }
+      }
+      else
+      {
+        m_PointSetNode->SetDataInteractor(nullptr);
+        m_DataInteractor = nullptr;
+      }
 
-//     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
-//     {
-//       MITK_INFO << "2d";
-//     }
-//     else
-//     {
-//       MITK_INFO << "3d";
-//     }
-
-//    auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard2D);
-//    auto gizmo_mapper = dynamic_cast<mitk::FiberBundle* >(mapper);
-//    auto &picker = m_Picker[renderer];
-
-//    if (picker == nullptr)
-//    {
-//      picker = vtkSmartPointer<vtkCellPicker>::New();
-//      picker->SetTolerance(0.005);
-
-//      if (gizmo_mapper)
-//      { // doing this each time is bizarre
-//        picker->AddPickList(gizmo_mapper->GetVtkProp(renderer));
-//        picker->PickFromListOn();
-//      }
-//    }
-
-//    auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-//    picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-//    vtkIdType pickedPointID = picker->GetPointId();
-//    if (pickedPointID == -1)
-//    {
-//      return Gizmo::NoHandle;
-//    }
-
-//    vtkPolyData *polydata = gizmo_mapper->GetVtkPolyData(renderer);
-
-//    if (polydata && polydata->GetPointData() && polydata->GetPointData()->GetScalars())
-//    {
-//      double dataValue = polydata->GetPointData()->GetScalars()->GetTuple1(pickedPointID);
-//      return m_Gizmo->GetHandleFromPointDataValue(dataValue);
-//    }
-
-//    return Gizmo::NoHandle;
-
-//    m_picker1 = vtkSmartPointer<vtkCellPicker>::New();
-//    m_picker1->PickFromListOn();
-//    m_picker1->SetTolerance(0.005);
-//    m_picker1->GetCellId();
-//    m_picker1->GetPickedPositions();
-
-////    selPt = m_picker1->GetSelectionPoint();
-////    x = *selPt;
-////    y = *(selPt + 1);
-////    pickPos = m_picker1->GetPickedPositions();
-////    xp = *(pickPos->GetPoint(0));
-////    yp = *(pickPos->GetPoint(0)+1);
-////    zp = *(pickPos->GetPoint(0)+2);
-////    double worldPos[3];
-
-
-//     double* worldPosition = m_picker1->GetPickPosition();
-//    MITK_INFO << m_picker1;
-//    MITK_INFO << m_picker1->GetCellId();
-//    MITK_INFO << m_picker1->GetPickPosition();
-//    MITK_INFO << m_picker1->GetSelectionPoint();
-//    MITK_INFO << worldPosition[0] ;
-//    MITK_INFO << worldPosition[1] ;
-
-//    vtkNew<vtkRenderWindowInteractor> iren;
 
    UpdateGui();
 }

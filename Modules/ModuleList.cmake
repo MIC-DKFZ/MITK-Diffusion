@@ -5,4 +5,5 @@ set(MITK_MODULES
   MriSimulation
   DiffusionIO
   DiffusionCmdApps
+  FiberDissection
 )
