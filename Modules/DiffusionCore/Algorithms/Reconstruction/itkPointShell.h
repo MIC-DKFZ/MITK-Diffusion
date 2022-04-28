@@ -17,17 +17,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkPointShell_h__
 #define __itkPointShell_h__
 
-#include "mitkOdfImage.h"
 #include <MitkDiffusionCoreExports.h>
-#include <vnl/vnl_vector_fixed.h>
-#include <vnl/vnl_matrix_fixed.h>
 
 
 namespace itk
 {
   // generate by n-fold subdivisions of an icosahedron
   template<int NPoints, class TMatrixType >
-  class PointShell
+  class MITKDIFFUSIONCORE_EXPORT PointShell
   {
   public:
     static TMatrixType *DistributePointShell();
@@ -44,10 +41,6 @@ namespace itk
 
 }
 
-
-
-#ifndef ITK_MANUAL_INSTANTIATION
 #include "itkPointShell.txx"
-#endif
 
 #endif //__itkPointShell_h__

@@ -23,23 +23,16 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <algorithm>
 #include <vector>
 #include <vnl/algo/vnl_matrix_inverse.h>
-#include "itkPointShell.h"
-
-#ifdef _MSC_VER
-#if _MSC_VER <= 1700
-#define fmin(a,b) ((a<=b)?(a):(b))
-#define fmax(a,b) ((a>=b)?(a):(b))
-#define isnan(c)  (c!=c)
-#endif
-#endif
-
+#include <itkPointShell.h>
 #include <itkMatrix.h>
 #include <vnl/vnl_matrix.h>
 #include <vnl/vnl_matrix_fixed.h>
 #include <vnl/vnl_inverse.h>
 #include <typeinfo>
 #include <ciso646>
-#include <itkPointShell.h>
+#include <vnl/vnl_vector_fixed.hxx>
+#include <vnl/vnl_cross.h>
+#include <mitkLogMacros.h>
 
 namespace itk
 {

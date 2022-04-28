@@ -79,7 +79,7 @@ public:
     o[2] = 0.7045;
     MITK_TEST_CONDITION_REQUIRED(mitk::Equal(o, inputData->GetGeometry()->GetOrigin(), 0.0001, true), "Check origin ok");
 
-    mitk::ImagePixelReadAccessor<mitk::PeakImage::PixelType, 4> readAccess(inputData);
+    mitk::ImagePixelReadAccessor<mitk::PeakImage::PixelType, 4> readAccess(dynamic_cast<mitk::Image*>(inputData.GetPointer()));
     itk::Index<4> idx;
     idx[0] = 5;
     idx[1] = 4;
@@ -111,7 +111,7 @@ public:
     o[2] = 0.7045;
     MITK_TEST_CONDITION_REQUIRED(mitk::Equal(o, inputData->GetGeometry()->GetOrigin(), 0.0001, true), "Check origin ok");
 
-    mitk::ImagePixelReadAccessor<itk::Vector<float, 15>, 3> readAccess(inputData);
+    mitk::ImagePixelReadAccessor<itk::Vector<float, 15>, 3> readAccess(dynamic_cast<mitk::Image*>(inputData.GetPointer()));
     itk::Index<3> idx;
     idx[0] = 5;
     idx[1] = 4;

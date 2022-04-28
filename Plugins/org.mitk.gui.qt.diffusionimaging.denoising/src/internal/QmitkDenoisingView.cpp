@@ -173,7 +173,7 @@ void QmitkDenoisingView::StartDenoising()
       NlmFilterType::Pointer filter = NlmFilterType::New();
       filter->SetInput(extractor->GetOutput());
       filter->SetPatchRadius(m_Controls->m_NlmPatchSizeBox->value());
-      filter->SetNoiseModel(NlmFilterType::RICIAN);
+      filter->SetNoiseModel(NlmFilterType::NoiseModelEnum::RICIAN);
       filter->UseSmoothDiscPatchWeightsOn();
       filter->UseFastTensorComputationsOn();
 

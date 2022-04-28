@@ -15,6 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkMetropolisHastingsSampler.h"
+#include <mitkNumericConstants.h>
 
 using namespace mitk;
 

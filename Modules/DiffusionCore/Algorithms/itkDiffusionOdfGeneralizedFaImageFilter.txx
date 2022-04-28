@@ -30,6 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
 #include "vnl/vnl_vector_fixed.h"
+#include <vnl/vnl_vector_fixed.hxx>
 #include "itkOrientationDistributionFunction.h"
 
 namespace itk {

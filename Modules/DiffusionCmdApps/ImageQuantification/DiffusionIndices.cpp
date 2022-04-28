@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <mitkImageCast.h>
-#include <itkExceptionObject.h>
 #include <itkImageFileWriter.h>
 #include <mitkOdfImage.h>
 #include <itkTensorDerivedMeasurementsFilter.h>

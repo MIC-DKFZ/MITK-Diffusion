@@ -24,7 +24,6 @@ This file is based heavily on a corresponding ITK filter.
 
 #include <itkImageToImageFilter.h>
 #include <itkDiffusionTensor3D.h>
-#include <vcl_complex.h>
 #include <mitkFiberfoxParameters.h>
 
 namespace itk{
@@ -34,7 +33,7 @@ namespace itk{
 
 template< class TPixelType >
 class DftImageFilter :
-        public ImageToImageFilter< Image< vcl_complex< TPixelType > >, Image< vcl_complex< TPixelType > > >
+        public ImageToImageFilter< Image< std::complex< TPixelType > >, Image< std::complex< TPixelType > > >
 {
 
 public:
@@ -42,7 +41,7 @@ public:
     typedef DftImageFilter Self;
     typedef SmartPointer<Self>                      Pointer;
     typedef SmartPointer<const Self>                ConstPointer;
-    typedef ImageToImageFilter< Image< vcl_complex< TPixelType > >, Image< vcl_complex< TPixelType > > > Superclass;
+    typedef ImageToImageFilter< Image< std::complex< TPixelType > >, Image< std::complex< TPixelType > > > Superclass;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
