@@ -52,6 +52,8 @@ DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   // At least 1 inputs is necessary for a vector image.
   // For images added one at a time we need at least six
   this->SetNumberOfRequiredInputs( 1 );
+
+  this->DynamicMultiThreadingOff();
 }
 
 

@@ -61,6 +61,8 @@ OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   , m_Iterations(10)
 {
   this->SetNumberOfRequiredInputs(1);
+
+  this->DynamicMultiThreadingOff();
 }
 
 template< class PixelType, int ShOrder, int NrOdfDirections >

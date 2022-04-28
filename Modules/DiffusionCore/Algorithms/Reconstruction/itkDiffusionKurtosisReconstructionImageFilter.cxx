@@ -147,6 +147,7 @@ itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelTyp
   this->SetNthOutput(0, outputPtr1.GetPointer() );
   this->SetNthOutput(1, outputPtr2.GetPointer() );
 
+  this->DynamicMultiThreadingOff();
 }
 
 template< class TInputPixelType, class TOutputPixelType>

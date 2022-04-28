@@ -31,6 +31,7 @@ ShToOdfImageFilter< PixelType, ShOrder >::ShToOdfImageFilter()
   : m_Toolkit(mitk::ShImage::SH_CONVENTION::MRTRIX)
 {
 
+  this->DynamicMultiThreadingOff();
 }
 
 template< class PixelType, int ShOrder >

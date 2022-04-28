@@ -38,6 +38,8 @@ AdcImageFilter< TInPixelType, TOutPixelType>
   , m_B_value(0)
 {
   this->SetNumberOfRequiredInputs( 1 );
+
+  this->DynamicMultiThreadingOff();
 }
 
 template< class TInPixelType, class TOutPixelType >

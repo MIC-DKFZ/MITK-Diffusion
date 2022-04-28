@@ -124,6 +124,8 @@ namespace itk
       m_BaselineImage = 0;
       m_Min = 0.0;
       m_Max = 10000.0;
+
+      this->DynamicMultiThreadingOff();
     }
 
     virtual ~TensorImageToDiffusionImageFilter(){}

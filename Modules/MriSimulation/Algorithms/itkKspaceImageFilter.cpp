@@ -45,6 +45,8 @@ namespace itk {
   {
     m_DiffusionGradientDirection.Fill(0.0);
     m_CoilPosition.Fill(0.0);
+
+    this->DynamicMultiThreadingOff();
   }
 
   template< class ScalarType >

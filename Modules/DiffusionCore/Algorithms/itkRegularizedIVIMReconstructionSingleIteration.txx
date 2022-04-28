@@ -45,6 +45,8 @@ namespace itk
   {
     m_Lambda = 1.0;
     m_LocalVariation = LocalVariationImageType::New();
+
+    this->DynamicMultiThreadingOff();
   }
 
   /**

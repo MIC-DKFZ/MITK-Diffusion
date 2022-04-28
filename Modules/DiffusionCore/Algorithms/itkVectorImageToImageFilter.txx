@@ -35,7 +35,9 @@ VectorImageToImageFilter< TPixelType >
 ::VectorImageToImageFilter()
   : m_Index(0)
 {
-    this->SetNumberOfRequiredInputs( 1 );
+  this->SetNumberOfRequiredInputs( 1 );
+
+  this->DynamicMultiThreadingOff();
 }
 
 template< class TPixelType >
@@ -43,35 +45,35 @@ void
 VectorImageToImageFilter< TPixelType >
 ::GenerateData()
 {
-    typename OutputImageType::Pointer outputImage =
-            static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
+  typename OutputImageType::Pointer outputImage =
+      static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
 
-    outputImage->SetSpacing(this->GetInput()->GetSpacing());
-    outputImage->SetOrigin(this->GetInput()->GetOrigin());
-    outputImage->SetRegions(this->GetInput()->GetLargestPossibleRegion());
-    outputImage->Allocate();
+  outputImage->SetSpacing(this->GetInput()->GetSpacing());
+  outputImage->SetOrigin(this->GetInput()->GetOrigin());
+  outputImage->SetRegions(this->GetInput()->GetLargestPossibleRegion());
+  outputImage->Allocate();
 
-    ImageRegionIterator< OutputImageType > oit(outputImage, outputImage->GetLargestPossibleRegion());
-    oit.GoToBegin();
+  ImageRegionIterator< OutputImageType > oit(outputImage, outputImage->GetLargestPossibleRegion());
+  oit.GoToBegin();
 
   //   InputIteratorType;
-    typename InputImageType::Pointer inputImagePointer = nullptr;
-    inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
+  typename InputImageType::Pointer inputImagePointer = nullptr;
+  inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
 
-    ImageRegionIterator <InputImageType> git( inputImagePointer, inputImagePointer->GetLargestPossibleRegion() );
-    git.GoToBegin();
-    while( !git.IsAtEnd() )
-    {
-      oit.Set(git.Get()[m_Index]);
-      ++oit;
-      ++git;
-    }
+  ImageRegionIterator <InputImageType> git( inputImagePointer, inputImagePointer->GetLargestPossibleRegion() );
+  git.GoToBegin();
+  while( !git.IsAtEnd() )
+  {
+    oit.Set(git.Get()[m_Index]);
+    ++oit;
+    ++git;
+  }
 }
 
 template< class TPixelType >
 void VectorImageToImageFilter< TPixelType >::PrintSelf(std::ostream& os, Indent indent) const
 {
-    Superclass::PrintSelf(os,indent);
+  Superclass::PrintSelf(os,indent);
 }
 
 }

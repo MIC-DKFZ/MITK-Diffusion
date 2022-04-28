@@ -51,6 +51,8 @@ DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
   this->SetNthOutput(1, outputPtr2.GetPointer());
   typename OutputImageType::Pointer outputPtr3 = OutputImageType::New();
   this->SetNthOutput(2, outputPtr3.GetPointer());
+
+  this->DynamicMultiThreadingOff();
 }
 
 

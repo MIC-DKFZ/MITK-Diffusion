@@ -43,6 +43,8 @@ namespace itk {
     // At least 1 inputs is necessary for a vector image.
     // For images added one at a time we need at least six
     this->SetNumberOfRequiredInputs( 1 );
+
+    this->DynamicMultiThreadingOff();
   }
 
   template< class TOdfPixelType,

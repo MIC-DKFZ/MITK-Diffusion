@@ -42,6 +42,8 @@ template< class PixelType >
 FlipPeaksFilter< PixelType>::FlipPeaksFilter()
 {
   this->SetNumberOfRequiredInputs(1);
+
+  this->DynamicMultiThreadingOff();
 }
 
 

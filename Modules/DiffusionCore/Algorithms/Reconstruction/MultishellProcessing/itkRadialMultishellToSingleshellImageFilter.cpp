@@ -48,7 +48,7 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
 ::RadialMultishellToSingleshellImageFilter()
 {
   this->SetNumberOfRequiredInputs( 1 );
-  //this->SetNumberOfThreads(1);
+  this->DynamicMultiThreadingOff();
 }
 
 template <class TInputScalarType, class TOutputScalarType>
