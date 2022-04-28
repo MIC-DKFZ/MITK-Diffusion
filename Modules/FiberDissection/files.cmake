@@ -8,6 +8,6 @@ set(CPP_FILES
 
 set(RESOURCE_FILES
   # "Interactions" prefix forced by mitk::StateMachine
-  Interactions/Gizmo3DStates.xml
-  Interactions/Gizmo3DConfig.xml
+  Interactor/resources/Interactions/Gizmo3DStates.xml
+  Interactor/resources/Interactions/Gizmo3DConfig.xml
 )
