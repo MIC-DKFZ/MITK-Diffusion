@@ -70,7 +70,7 @@ namespace itk
       {
         double sum = T[0]*T[0] + T[3]*T[3] + T[5]*T[5]
           + T[1]*T[2]*2.0 + T[2]*T[4]*2.0 + T[1]*T[4]*2.0;
-        out = static_cast<OutputPixelType>( vcl_sqrt( sum ));
+        out = static_cast<OutputPixelType>( std::sqrt( sum ));
       }
 
       if( threadId==0 && step>0)

@@ -45,6 +45,8 @@ namespace itk
   {
     m_Lambda = 1.0;
     m_LocalVariation = LocalVariationImageType::New();
+
+    this->DynamicMultiThreadingOff();
   }
 
   /**
@@ -287,7 +289,7 @@ namespace itk
       <InputImageType,LocalVariationImageType> FilterType;
     typename FilterType::Pointer filter = FilterType::New();
     filter->SetInput(this->GetInput(0));
-    filter->SetNumberOfThreads(this->GetNumberOfThreads());
+    filter->SetNumberOfWorkUnits(this->GetNumberOfWorkUnits());
     filter->Update();
     this->m_LocalVariation = filter->GetOutput();
   }

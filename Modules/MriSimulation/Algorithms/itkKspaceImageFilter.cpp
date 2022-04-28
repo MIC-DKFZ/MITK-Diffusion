@@ -45,13 +45,15 @@ namespace itk {
   {
     m_DiffusionGradientDirection.Fill(0.0);
     m_CoilPosition.Fill(0.0);
+
+    this->DynamicMultiThreadingOff();
   }
 
   template< class ScalarType >
   void KspaceImageFilter< ScalarType >
   ::BeforeThreadedGenerateData()
   {
-    m_Spike = vcl_complex<ScalarType>(0,0);
+    m_Spike = std::complex<ScalarType>(0,0);
     m_SpikeLog = "";
     m_TransX = -m_Translation[0];
     m_TransY = -m_Translation[1];
@@ -91,14 +93,14 @@ namespace itk {
     outputImage->SetBufferedRegion( region );
     outputImage->SetRequestedRegion( region );
     outputImage->Allocate();
-    vcl_complex<ScalarType> zero = vcl_complex<ScalarType>(0, 0);
+    std::complex<ScalarType> zero = std::complex<ScalarType>(0, 0);
     outputImage->FillBuffer(zero);
     if (m_Parameters->m_SignalGen.m_NoiseVariance>0 && m_Parameters->m_Misc.m_DoAddNoise)
     {
       ImageRegionIterator< OutputImageType > oit(outputImage, outputImage->GetLargestPossibleRegion());
       while( !oit.IsAtEnd() )
       {
-        oit.Set(vcl_complex<ScalarType>(m_RandGen->GetNormalVariate(0, noiseVar), m_RandGen->GetNormalVariate(0, noiseVar)));
+        oit.Set(std::complex<ScalarType>(m_RandGen->GetNormalVariate(0, noiseVar), m_RandGen->GetNormalVariate(0, noiseVar)));
         ++oit;
       }
     }
@@ -297,7 +299,7 @@ namespace itk {
     else
         ky_shift = kyMax/2;
 
-    vcl_complex<ScalarType> zero = vcl_complex<ScalarType>(0, 0);
+    std::complex<ScalarType> zero = std::complex<ScalarType>(0, 0);
     while( !oit.IsAtEnd() )
     {
       int tick = oit.GetIndex()[1] * kxMax + oit.GetIndex()[0];
@@ -387,7 +389,7 @@ namespace itk {
       ky /= yMaxFov;
 
       // calculate signal s at k-space position (kx, ky)
-      vcl_complex<ScalarType> s(0,0);
+      std::complex<ScalarType> s(0,0);
       InputIteratorType it(m_CompartmentImages[0], m_CompartmentImages[0]->GetLargestPossibleRegion() );
       while( !it.IsAtEnd() )
       {
@@ -448,7 +450,7 @@ namespace itk {
         }
 
         // actual DFT term
-        vcl_complex<ScalarType> f(f_real * m_Parameters->m_SignalGen.m_SignalScale, 0);
+        std::complex<ScalarType> f(f_real * m_Parameters->m_SignalGen.m_SignalScale, 0);
         s += f * std::exp( std::complex<ScalarType>(0, itk::Math::twopi * (kx*x + ky*y + phi )) );
 
         ++it;
@@ -488,8 +490,8 @@ namespace itk {
         auto sym = m_ReadoutScheme->GetSymmetricIndex(kIdx);
 
         // use complex conjugate of symmetric index value at current index
-        vcl_complex<ScalarType> s = outputImage->GetPixel(sym);
-        s = vcl_complex<ScalarType>(s.real(), -s.imag());
+        std::complex<ScalarType> s = outputImage->GetPixel(sym);
+        s = std::complex<ScalarType>(s.real(), -s.imag());
         outputImage->SetPixel(kIdx, s);
 
         m_KSpaceImage->SetPixel(kIdx, sqrt(s.imag()*s.imag()+s.real()*s.real()) );

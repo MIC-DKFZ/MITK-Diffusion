@@ -121,8 +121,6 @@ public:
 
     void PropagateRequestedRegion(itk::DataObject *) override{}
 
-    void VerifyInputInformation() override{}
-
     protected:
         ResampleDwiImageFilter();
     ~ResampleDwiImageFilter() override{}

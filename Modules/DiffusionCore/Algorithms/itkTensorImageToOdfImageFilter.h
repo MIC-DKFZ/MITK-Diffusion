@@ -73,7 +73,9 @@ namespace itk
 
 
   protected:
-    TensorImageToOdfImageFilter(){};
+    TensorImageToOdfImageFilter(){
+      this->DynamicMultiThreadingOff();
+    };
     ~TensorImageToOdfImageFilter() override{};
 
     void PrintSelf (std::ostream& os, Indent indent) const override

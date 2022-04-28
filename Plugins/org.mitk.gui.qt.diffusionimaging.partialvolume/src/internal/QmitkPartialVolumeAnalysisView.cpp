@@ -931,8 +931,8 @@ void QmitkPartialVolumeAnalysisView::ShowClusteringResults()
 {
 
     typedef itk::Image<unsigned char, 3> MaskImageType;
-    mitk::Image::Pointer mask = 0;
-    MaskImageType::Pointer itkmask = 0;
+    mitk::Image::Pointer mask;
+    MaskImageType::Pointer itkmask;
 
     if(m_IsTensorImage && m_Controls->m_SimilarAnglesSlider->value() != 0)
     {
@@ -1838,7 +1838,7 @@ void QmitkPartialVolumeAnalysisView::Activated()
     mitk::DataStorage::SetOfObjects::ConstPointer _NodeSet = this->GetDataStorage()->GetAll();
     mitk::DataNode* node = 0;
     mitk::PlanarFigure* figure = 0;
-    mitk::PlanarFigureInteractor::Pointer figureInteractor = 0;
+    mitk::PlanarFigureInteractor::Pointer figureInteractor;
 
     // finally add all nodes to the model
     for(mitk::DataStorage::SetOfObjects::ConstIterator it=_NodeSet->Begin(); it!=_NodeSet->End()
@@ -1875,7 +1875,7 @@ void QmitkPartialVolumeAnalysisView::ActivatedZombieView(berry::IWorkbenchPartRe
     mitk::DataStorage::SetOfObjects::ConstPointer _NodeSet = this->GetDataStorage()->GetAll();
     mitk::DataNode* node = 0;
     mitk::PlanarFigure* figure = 0;
-    mitk::PlanarFigureInteractor::Pointer figureInteractor = 0;
+    mitk::PlanarFigureInteractor::Pointer figureInteractor;
 
     // finally add all nodes to the model
     for(mitk::DataStorage::SetOfObjects::ConstIterator it=_NodeSet->Begin(); it!=_NodeSet->End()

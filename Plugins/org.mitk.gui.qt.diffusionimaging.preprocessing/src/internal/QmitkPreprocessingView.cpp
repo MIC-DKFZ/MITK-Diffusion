@@ -1087,8 +1087,6 @@ CallMultishellToSingleShellFilter( itk::DWIVoxelFunctor * functor,
   const GradProp::GradientDirectionsContainerType::ConstPointer gradientContainer = PropHelper::GetGradientContainer(image);
   const unsigned int& bValue = PropHelper::GetReferenceBValue(image);
 
-  mitk::DataNode::Pointer imageNode = 0;
-
   // filter call
   FilterType::Pointer filter = FilterType::New();
   filter->SetInput(vectorImage);
@@ -1106,7 +1104,7 @@ CallMultishellToSingleShellFilter( itk::DWIVoxelFunctor * functor,
   PropHelper::SetReferenceBValue(outImage, m_Controls->m_targetBValueSpinBox->value());
   PropHelper::InitializeImage( outImage );
 
-  imageNode = mitk::DataNode::New();
+  mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
   imageNode->SetData( outImage );
   imageNode->SetName(imageName.toStdString().c_str());
   GetDataStorage()->Add(imageNode, parent);

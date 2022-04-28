@@ -61,6 +61,8 @@ OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   , m_Iterations(10)
 {
   this->SetNumberOfRequiredInputs(1);
+
+  this->DynamicMultiThreadingOff();
 }
 
 template< class PixelType, int ShOrder, int NrOdfDirections >
@@ -195,7 +197,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   MITK_INFO << "Relative threshold: " << m_RelativePeakThreshold;
   MITK_INFO << "Absolute threshold: " << m_AbsolutePeakThreshold;
   MITK_INFO << "Angular threshold: " << m_AngularThreshold;
-  this->SetNumberOfThreads(1);
+  this->SetNumberOfWorkUnits(1);
 }
 
 template< class PixelType, int ShOrder, int NrOdfDirections >

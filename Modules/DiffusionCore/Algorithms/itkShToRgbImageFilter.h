@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionIterator.h"
 #include <mitkDiffusionFunctionCollection.h>
 #include <mitkShImage.h>
+#include <itkPointShell.h>
 
 namespace itk
 {
@@ -76,7 +77,9 @@ typename TOutputImage=itk::Image<itk::RGBAPixel<unsigned char>,3> >
   itkGetMacro( ShConvention, mitk::ShImage::SH_CONVENTION)  ///< SH coefficient convention
 
 protected:
-  ShToRgbImageFilter(){}
+  ShToRgbImageFilter(){
+    this->DynamicMultiThreadingOff();
+  }
   ~ShToRgbImageFilter() override{}
 
   mitk::ShImage::SH_CONVENTION m_ShConvention = mitk::ShImage::SH_CONVENTION::MRTRIX;

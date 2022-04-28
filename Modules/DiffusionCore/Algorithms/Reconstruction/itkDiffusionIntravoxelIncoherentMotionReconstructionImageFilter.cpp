@@ -51,6 +51,8 @@ DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
   this->SetNthOutput(1, outputPtr2.GetPointer());
   typename OutputImageType::Pointer outputPtr3 = OutputImageType::New();
   this->SetNthOutput(2, outputPtr3.GetPointer());
+
+  this->DynamicMultiThreadingOff();
 }
 
 
@@ -640,7 +642,7 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
     filter->SetReferenceImage(m_InternalVectorImage);
     filter->SetBValues(m_Snap.high_bvalues);
     filter->SetNumberIterations(m_NumberIterations);
-    filter->SetNumberOfThreads(1);
+    filter->SetNumberOfWorkUnits(1);
     filter->SetLambda(m_Lambda);
     filter->Update();
     typename RegFitType::OutputImageType::Pointer outimg = filter->GetOutput();

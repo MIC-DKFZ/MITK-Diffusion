@@ -271,7 +271,7 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
         idft->SetRotationMatrix(m_RotationsInv.at(g));
         idft->SetDiffusionGradientDirection(m_Parameters.m_SignalGen.GetGradientDirection(g)*m_Parameters.m_SignalGen.GetBvalue()/1000.0);
         idft->SetSpikesPerSlice(numSpikes);
-        idft->SetNumberOfThreads(in_threads);
+        idft->SetNumberOfWorkUnits(in_threads);
 #pragma omp critical
         if (output_timing)
         {
@@ -300,7 +300,7 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
         auto dft = itk::DftImageFilter< Float2DImageType::PixelType >::New();
         dft->SetInput(fSlice);
         dft->SetParameters(m_Parameters);
-        dft->SetNumberOfThreads(in_threads);
+        dft->SetNumberOfWorkUnits(in_threads);
         dft->Update();
         newSlice = dft->GetOutput();
 

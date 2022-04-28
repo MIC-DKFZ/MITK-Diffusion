@@ -54,7 +54,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "qwidgetaction.h"
 #include "qcolordialog.h"
 #include <QRgb>
-#include <itkMultiThreader.h>
+#include <itkMultiThreaderBase.h>
 #include <mitkClippingProperty.h>
 #include <ciso646>
 
@@ -86,8 +86,8 @@ QmitkControlVisualizationPropertiesView::QmitkControlVisualizationPropertiesView
     m_OpacityPropertyObserverTag(0)
 {
   m_MyMenu = nullptr;
-  auto numThread = itk::MultiThreader::GetGlobalMaximumNumberOfThreads();
-  itk::MultiThreader::SetGlobalDefaultNumberOfThreads(numThread);
+  auto numThread = itk::MultiThreaderBase::GetGlobalMaximumNumberOfThreads();
+  itk::MultiThreaderBase::SetGlobalDefaultNumberOfThreads(numThread);
 }
 
 

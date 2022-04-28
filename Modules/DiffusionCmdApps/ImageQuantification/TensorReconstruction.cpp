@@ -86,7 +86,6 @@ int main(int argc, char* argv[])
 
       // Save tensor image
       itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-      io->SetFileType( itk::ImageIOBase::Binary );
       io->UseCompressionOn();
 
       mitk::LocaleSwitch localeSwitch("C");
@@ -107,7 +106,6 @@ int main(int argc, char* argv[])
 
       // Save tensor image
       itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-      io->SetFileType( itk::ImageIOBase::Binary );
       io->UseCompressionOn();
 
       mitk::LocaleSwitch localeSwitch("C");

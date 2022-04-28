@@ -129,7 +129,6 @@ void mitk::DiffusionImageNrrdWriter::Write()
   if (ext == ".hdwi" || ext == ".nrrd" || ext == ".dwi")
   {
     itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-    io->SetFileType( itk::ImageIOBase::Binary );
     io->UseCompressionOn();
 
     typedef itk::ImageFileWriter<ImageType> WriterType;

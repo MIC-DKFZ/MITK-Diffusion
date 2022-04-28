@@ -153,6 +153,19 @@ public:
   virtual OutputType EvaluateAtContinuousIndex(
     const ContinuousIndexType &, OutputType * ) const;
 
+  typename Superclass::SizeType
+  GetRadius() const override
+  {
+    // if ITKv4 compatibility is enabled then set the radius to the
+    // largest by default.
+    const InputImageType * input = this->GetInputImage();
+    if (!input)
+    {
+      itkExceptionMacro("Input image required!");
+    }
+    return input->GetLargestPossibleRegion().GetSize();
+  }
+
 protected:
   GaussianInterpolateImageFunction();
   ~GaussianInterpolateImageFunction() override{};

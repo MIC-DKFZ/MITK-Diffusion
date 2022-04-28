@@ -78,7 +78,7 @@ namespace itk{
       for(int s=0; s<N; ++s)
       {
         double approx = (1-ef)*exp(-bvalues[s]*D)+ef*exp(-bvalues[s]*(D+Dstar));
-        fx[s] = vnl_math_abs( measurements[s] - approx );
+        fx[s] = std::fabs( measurements[s] - approx );
 
         if (D<0)
           fx[s] -= D*100000;
@@ -113,7 +113,7 @@ namespace itk{
       for(int s=0; s<N; s++)
       {
         double approx = (1-ef)*exp(-bvalues[s]*D)+ef*exp(-bvalues[s]*(D+fixDStar));
-        fx[s] = vnl_math_abs( measurements[s] - approx );
+        fx[s] = std::fabs( measurements[s] - approx );
 
         if (D<0)
           fx[s] -= D*100000;
@@ -146,7 +146,7 @@ namespace itk{
       for(int s=0; s<N; s++)
       {
         double approx = (1-f) * exp(-bvalues[s]*D);
-        fx[s] = vnl_math_abs( measurements[s] - approx );
+        fx[s] = std::fabs( measurements[s] - approx );
 
         if (D<0)
           fx[s] -= D*100000;
@@ -177,7 +177,7 @@ namespace itk{
       for(int s=0; s<N; s++)
       {
         double approx = (1-ef)*exp(-bvalues[s]*fixD)+ef*exp(-bvalues[s]*(fixD+Dstar));
-        fx[s] = vnl_math_abs( measurements[s] - approx );
+        fx[s] = std::fabs( measurements[s] - approx );
 
         if (Dstar<0)
           fx[s] -= Dstar*100000;
@@ -210,7 +210,7 @@ namespace itk{
       for(int s=0; s<N; s++)
       {
         double approx = (1-fixF)*exp(-bvalues[s]*fixD)+fixF*exp(-bvalues[s]*(fixD+Dstar));
-        fx[s] = vnl_math_abs( measurements[s] - approx );
+        fx[s] = std::fabs( measurements[s] - approx );
 
         if (Dstar<0)
           fx[s] -= Dstar*100000;

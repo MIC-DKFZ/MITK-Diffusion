@@ -29,13 +29,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionIterator.h"
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
+#include "vnl/vnl_vector_fixed.h"
+#include <vnl/vnl_vector_fixed.hxx>
 #include "itkOrientationDistributionFunction.h"
 
 namespace itk {
 
   template< class TOdfPixelType,
   class TGfaPixelType,
-    int NrOdfDirections>
+    unsigned int NrOdfDirections>
     DiffusionOdfGeneralizedFaImageFilter< TOdfPixelType,
     TGfaPixelType, NrOdfDirections>
     ::DiffusionOdfGeneralizedFaImageFilter() :
@@ -44,11 +46,13 @@ namespace itk {
     // At least 1 inputs is necessary for a vector image.
     // For images added one at a time we need at least six
     this->SetNumberOfRequiredInputs( 1 );
+
+    this->DynamicMultiThreadingOff();
   }
 
   template< class TOdfPixelType,
   class TGfaPixelType,
-    int NrOdfDirections>
+    unsigned int NrOdfDirections>
     void DiffusionOdfGeneralizedFaImageFilter< TOdfPixelType,
     TGfaPixelType, NrOdfDirections>
     ::BeforeThreadedGenerateData()
@@ -57,7 +61,7 @@ namespace itk {
 
   template< class TOdfPixelType,
   class TGfaPixelType,
-    int NrOdfDirections>
+    unsigned int NrOdfDirections>
     void DiffusionOdfGeneralizedFaImageFilter< TOdfPixelType,
     TGfaPixelType, NrOdfDirections>
     ::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread,
@@ -94,7 +98,7 @@ namespace itk {
       case GFA_QUANTILES_HIGH_LOW:
         {
           vnl_vector_fixed<TOdfPixelType,NrOdfDirections> sorted;
-          for(int i=0; i<NrOdfDirections; i++)
+          for(unsigned int i=0; i<NrOdfDirections; i++)
           {
             sorted[i] = b[i];
           }
@@ -107,7 +111,7 @@ namespace itk {
       case GFA_QUANTILE_HIGH:
         {
           vnl_vector_fixed<TOdfPixelType,NrOdfDirections> sorted;
-          for(int i=0; i<NrOdfDirections; i++)
+          for(unsigned int i=0; i<NrOdfDirections; i++)
           {
             sorted[i] = b[i];
           }
@@ -148,7 +152,7 @@ namespace itk {
       case GFA_QUANTILE_LOW:
         {
           vnl_vector_fixed<TOdfPixelType,NrOdfDirections> sorted;
-          for(int i=0; i<NrOdfDirections; i++)
+          for(unsigned int i=0; i<NrOdfDirections; i++)
           {
             sorted[i] = b[i];
           }
@@ -166,7 +170,7 @@ namespace itk {
       case GFA_QUANTILES_LOW_HIGH:
         {
           vnl_vector_fixed<TOdfPixelType,NrOdfDirections> sorted;
-          for(int i=0; i<NrOdfDirections; i++)
+          for(unsigned int i=0; i<NrOdfDirections; i++)
           {
             sorted[i] = b[i];
           }
@@ -207,7 +211,7 @@ namespace itk {
 
   template< class TOdfPixelType,
   class TGfaPixelType,
-    int NrOdfDirections>
+    unsigned int NrOdfDirections>
     void DiffusionOdfGeneralizedFaImageFilter< TOdfPixelType,
     TGfaPixelType, NrOdfDirections>
     ::PrintSelf(std::ostream& os, Indent indent) const

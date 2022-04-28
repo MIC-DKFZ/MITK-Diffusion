@@ -40,6 +40,8 @@ MultiTensorImageFilter< TInPixelType, TOutPixelType>
   , m_NumTensors(2)
 {
   this->SetNumberOfRequiredInputs( 1 );
+
+  this->DynamicMultiThreadingOff();
 }
 
 template< class TInPixelType, class TOutPixelType >

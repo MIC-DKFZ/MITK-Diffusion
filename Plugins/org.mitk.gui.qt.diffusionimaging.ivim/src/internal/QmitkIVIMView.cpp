@@ -862,7 +862,7 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
     filter->SetFitDStar(true);
   }
 
-  filter->SetNumberOfThreads(1);
+  filter->SetNumberOfWorkUnits(1);
   filter->SetVerbose(false);
   filter->SetCrossPosition(crosspos);
 

@@ -34,7 +34,9 @@ namespace itk
   template <class TInputImage, class TOutputImage>
   RegularizedIVIMLocalVariationImageFilter<TInputImage, TOutputImage>
     ::RegularizedIVIMLocalVariationImageFilter()
-  {}
+  {
+    this->DynamicMultiThreadingOff();
+  }
 
   template <class TInputImage, class TOutputImage>
   void

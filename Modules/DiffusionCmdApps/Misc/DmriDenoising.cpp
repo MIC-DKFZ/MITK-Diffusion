@@ -186,7 +186,7 @@ int main(int argc, char* argv[])
         NlmFilterType::Pointer filter = NlmFilterType::New();
         filter->SetInput(extractor->GetOutput());
         filter->SetPatchRadius(patch_radius);
-        filter->SetNoiseModel(NlmFilterType::RICIAN);
+        filter->SetNoiseModel(NlmFilterType::NoiseModelEnum::RICIAN);
         filter->UseSmoothDiscPatchWeightsOn();
         filter->UseFastTensorComputationsOn();
 

@@ -43,6 +43,8 @@ NonLocalMeansDenoisingFilter< TPixelType >
     m_Mask(nullptr)
 {
   this->SetNumberOfRequiredInputs( 1 );
+
+  this->DynamicMultiThreadingOff();
 }
 
 template< class TPixelType >

@@ -55,7 +55,7 @@ public:
     typedef itk::VectorImage< double, 3 >                               DoubleDwiType;
     typedef itk::Matrix<float, 3, 3>                                    MatrixType;
     typedef itk::Image< float, 2 >                                      Float2DImageType;
-    typedef itk::Image< vcl_complex< float >, 2 >                       Complex2DImageType;
+    typedef itk::Image< std::complex< float >, 2 >                      Complex2DImageType;
     typedef itk::Vector< float, 3>                                      VectorType;
 
     itkFactorylessNewMacro(Self)

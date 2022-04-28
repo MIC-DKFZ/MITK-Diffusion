@@ -470,7 +470,7 @@ bool DiffusionIOMimeTypes::PeakImageMimeType::AppliesTo(const std::string &path)
     {
       io->SetFileName( path.c_str() );
       io->ReadImageInformation();
-      if ( io->GetPixelType() == itk::ImageIOBase::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
+      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
         return true;
     }
   }
@@ -484,7 +484,7 @@ bool DiffusionIOMimeTypes::PeakImageMimeType::AppliesTo(const std::string &path)
     {
       io->SetFileName( path.c_str() );
       io->ReadImageInformation();
-      if ( io->GetPixelType() == itk::ImageIOBase::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
+      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
         return true;
     }
   }
@@ -532,7 +532,7 @@ bool DiffusionIOMimeTypes::SHImageMimeType::AppliesTo(const std::string &path) c
       {
         io->SetFileName(path.c_str());
         io->ReadImageInformation();
-        if (io->GetPixelType() == itk::ImageIOBase::SCALAR && io->GetNumberOfDimensions() == 4)
+        if (io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions() == 4)
         {
           switch (io->GetDimensions(3))
           {
@@ -570,7 +570,7 @@ bool DiffusionIOMimeTypes::SHImageMimeType::AppliesTo(const std::string &path) c
     {
       io->SetFileName( path.c_str() );
       io->ReadImageInformation();
-      if ( io->GetPixelType() == itk::ImageIOBase::SCALAR && io->GetNumberOfDimensions()==4)
+      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4)
       {
         switch (io->GetDimensions(3))
         {

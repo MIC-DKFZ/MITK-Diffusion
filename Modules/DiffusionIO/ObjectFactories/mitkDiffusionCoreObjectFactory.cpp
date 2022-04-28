@@ -21,7 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkDataNode.h"
 
 #include "mitkCompositeMapper.h"
-#include "mitkGPUVolumeMapper3D.h"
+#include "mitkVolumeMapperVtkSmart3D.h"
 
 #include <mitkFiberBundleMapper3D.h>
 #include <mitkFiberBundleMapper2D.h>
@@ -96,17 +96,17 @@ mitk::Mapper::Pointer mitk::DiffusionCoreObjectFactory::CreateMapper(mitk::DataN
   {
     if(std::string("OdfImage").compare(node->GetData()->GetNameOfClass())==0)
     {
-      newMapper = mitk::GPUVolumeMapper3D::New();
+      newMapper = mitk::VolumeMapperVtkSmart3D::New();
       newMapper->SetDataNode(node);
     }
     else if(std::string("TensorImage").compare(node->GetData()->GetNameOfClass())==0)
     {
-      newMapper = mitk::GPUVolumeMapper3D::New();
+      newMapper = mitk::VolumeMapperVtkSmart3D::New();
       newMapper->SetDataNode(node);
     }
     else if(std::string("ShImage").compare(node->GetData()->GetNameOfClass())==0)
     {
-      newMapper = mitk::GPUVolumeMapper3D::New();
+      newMapper = mitk::VolumeMapperVtkSmart3D::New();
       newMapper->SetDataNode(node);
     }
     else if(std::string("FiberBundle").compare(node->GetData()->GetNameOfClass())==0)
@@ -132,17 +132,17 @@ void mitk::DiffusionCoreObjectFactory::SetDefaultProperties(mitk::DataNode* node
   if(std::string("OdfImage").compare(node->GetData()->GetNameOfClass())==0)
   {
     mitk::CompositeMapper::SetDefaultProperties(node);
-    mitk::GPUVolumeMapper3D::SetDefaultProperties(node);
+    mitk::VolumeMapperVtkSmart3D::SetDefaultProperties(node);
   }
   else if(std::string("TensorImage").compare(node->GetData()->GetNameOfClass())==0)
   {
     mitk::CompositeMapper::SetDefaultProperties(node);
-    mitk::GPUVolumeMapper3D::SetDefaultProperties(node);
+    mitk::VolumeMapperVtkSmart3D::SetDefaultProperties(node);
   }
   else if(std::string("ShImage").compare(node->GetData()->GetNameOfClass())==0)
   {
     mitk::CompositeMapper::SetDefaultProperties(node);
-    mitk::GPUVolumeMapper3D::SetDefaultProperties(node);
+    mitk::VolumeMapperVtkSmart3D::SetDefaultProperties(node);
   }
   else if(std::string("FiberBundle").compare(node->GetData()->GetNameOfClass())==0)
   {

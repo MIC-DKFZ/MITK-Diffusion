@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <mitkImageCast.h>
-#include <itkExceptionObject.h>
 #include <itkImageFileWriter.h>
 #include <mitkOdfImage.h>
 #include <itkTensorDerivedMeasurementsFilter.h>
@@ -24,7 +23,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkDiffusionCommandLineParser.h"
 #include <boost/algorithm/string.hpp>
 #include <itksys/SystemTools.hxx>
-#include <itkMultiThreader.h>
 #include <mitkIOUtil.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkImage.h>

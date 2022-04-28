@@ -102,7 +102,7 @@ public:
       for(unsigned int s=0; s<measurements.size(); s++)
       {
         double approx = S0 * std::exp(-bValues[s] * ADC);
-        fx[s] = vnl_math_abs( measurements[s] - approx );
+        fx[s] = std::fabs( measurements[s] - approx );
       }
     }
   };

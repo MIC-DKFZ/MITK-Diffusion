@@ -38,6 +38,8 @@ AdcImageFilter< TInPixelType, TOutPixelType>
   , m_B_value(0)
 {
   this->SetNumberOfRequiredInputs( 1 );
+
+  this->DynamicMultiThreadingOff();
 }
 
 template< class TInPixelType, class TOutPixelType >
@@ -122,7 +124,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>
   oit.GoToBegin();
 
   typedef ImageRegionConstIterator< InputImageType > InputIteratorType;
-  typename InputImageType::Pointer inputImagePointer = NULL;
+  typename InputImageType::Pointer inputImagePointer = nullptr;
   inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
 
   InputIteratorType git( inputImagePointer, outputRegionForThread );

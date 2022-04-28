@@ -23,7 +23,6 @@ This file is based heavily on a corresponding ITK filter.
 #define __itkKspaceImageFilter_h_
 
 #include <itkImageSource.h>
-#include <vcl_complex.h>
 #include <vector>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkFiberfoxParameters.h>
@@ -47,7 +46,7 @@ namespace itk{
 
   template< class ScalarType >
   class KspaceImageFilter :
-      public ImageSource< Image< vcl_complex< ScalarType >, 2 > >
+      public ImageSource< Image< std::complex< ScalarType >, 2 > >
   {
 
   public:
@@ -55,7 +54,7 @@ namespace itk{
     typedef KspaceImageFilter Self;
     typedef SmartPointer<Self>                      Pointer;
     typedef SmartPointer<const Self>                ConstPointer;
-    typedef ImageSource< Image< vcl_complex< ScalarType >, 2 > > Superclass;
+    typedef ImageSource< Image< std::complex< ScalarType >, 2 > > Superclass;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
@@ -124,7 +123,7 @@ namespace itk{
     float                                   m_TransZ;
 
     bool                                    m_IsBaseline;
-    vcl_complex<ScalarType>                 m_Spike;
+    std::complex<ScalarType>                 m_Spike;
     MatrixType                              m_Transform;
     std::string                             m_SpikeLog;
 

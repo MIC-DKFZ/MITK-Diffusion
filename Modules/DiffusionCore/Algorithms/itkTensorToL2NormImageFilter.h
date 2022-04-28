@@ -49,7 +49,9 @@ namespace itk
     typedef typename OutputImageType::RegionType  OutputImageRegionType;
 
   protected:
-    TensorToL2NormImageFilter(){};
+    TensorToL2NormImageFilter(){
+      this->DynamicMultiThreadingOff();
+    };
     ~TensorToL2NormImageFilter(){};
 
     void PrintSelf (std::ostream& os, Indent indent) const override

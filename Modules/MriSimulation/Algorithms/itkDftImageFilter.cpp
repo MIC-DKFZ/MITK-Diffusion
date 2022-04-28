@@ -33,6 +33,8 @@ DftImageFilter< TPixelType >
 ::DftImageFilter()
 {
   this->SetNumberOfRequiredInputs( 1 );
+
+  this->DynamicMultiThreadingOff();
 }
 
 template< class TPixelType >
@@ -74,7 +76,7 @@ void DftImageFilter< TPixelType >
     kx /= szx;
     ky /= szy;
 
-    vcl_complex<TPixelType> s(0,0);
+    std::complex<TPixelType> s(0,0);
     InputIteratorType it(inputImage, inputImage->GetLargestPossibleRegion() );
     while( !it.IsAtEnd() )
     {

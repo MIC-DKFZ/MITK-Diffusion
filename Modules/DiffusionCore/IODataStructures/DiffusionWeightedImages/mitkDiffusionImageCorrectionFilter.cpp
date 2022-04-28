@@ -52,7 +52,6 @@ mitk::DiffusionImageCorrectionFilter
   TransformMatrixType C;
   C.set_identity();
 
-  vnl_vector_fixed< MType, 3 > eigvals_sqrt;
   for(unsigned int i=0; i<3; i++)
   {
     C(i,i) = std::sqrt( eigvals[i] );

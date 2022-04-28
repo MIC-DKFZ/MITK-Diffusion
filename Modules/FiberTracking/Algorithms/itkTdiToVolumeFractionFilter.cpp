@@ -32,6 +32,8 @@ TdiToVolumeFractionFilter< TPixelType >::TdiToVolumeFractionFilter()
 {
   this->SetNumberOfRequiredInputs(5);
   this->SetNumberOfRequiredOutputs(4);
+
+  this->DynamicMultiThreadingOff();
 }
 
 template< class TPixelType >

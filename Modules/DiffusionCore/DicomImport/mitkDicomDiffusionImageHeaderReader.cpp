@@ -64,7 +64,6 @@ mitk::DicomDiffusionImageHeaderReader::GetVendorID()
 
   m_GdcmIO = ImageIOType::New();
   m_GdcmIO->LoadPrivateTagsOn();
-  m_GdcmIO->SetMaxSizeLoadEntry( 65536 );
 
   m_VolumeReader = VolumeReaderType::New();
   m_VolumeReader->SetImageIO( m_GdcmIO );
