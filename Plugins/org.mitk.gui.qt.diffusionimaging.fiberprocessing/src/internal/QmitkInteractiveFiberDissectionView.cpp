@@ -114,7 +114,7 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_AddRandomFibers, SIGNAL( clicked() ), this, SLOT( ExtractRandomFibersFromTractogram() ) ); //need
 
-    connect(m_Controls->m_TrainClassifier, SIGNAL( clicked() , this, SLOT( StartAlgorithm )));
+    connect(m_Controls->m_TrainClassifier, SIGNAL( clicked() ), this, SLOT( StartAlgorithm( )));
 
 
 
