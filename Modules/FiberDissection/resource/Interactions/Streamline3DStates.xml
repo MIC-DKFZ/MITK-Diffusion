@@ -1,0 +1,10 @@
+<statemachine NAME="StreamlineInteractor3D">
+    <state name="start" startstate="true" >
+        <transition event_class="InteractionPositionEvent" event_variant="AddNegStreamlineClick" target="start">
+            <action name="addnegstreamline"/>
+        </transition>
+        <transition event_class="InteractionPositionEvent" event_variant="AddPosStreamlineClick" target="start">
+            <action name="addposstreamline"/>
+        </transition>
+    </state>
+</statemachine>

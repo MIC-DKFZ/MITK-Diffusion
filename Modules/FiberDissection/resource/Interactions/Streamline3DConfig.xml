@@ -1,0 +1,10 @@
+<config>
+    <event_variant class="MousePressEvent" name="AddNegStreamlineClick">
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="shift"/>
+    </event_variant>
+    <event_variant class="MousePressEvent" name="AddPosStreamlineClick">
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="alt"/>
+    </event_variant>
+</config>
