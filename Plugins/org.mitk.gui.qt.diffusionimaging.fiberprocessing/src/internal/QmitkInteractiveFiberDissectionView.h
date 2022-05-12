@@ -30,6 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <mitkDataInteractor.h>
 #include <mitkIRenderWindowPartListener.h> //Pointset
+#include <mitkStreamlineInteractor.h>
 
 #include <itkCastImageFilter.h>
 #include <itkVTKImageImport.h>
@@ -81,9 +82,9 @@ protected slots:
   void RenderWindowPartDeactivated(mitk::IRenderWindowPart* renderWindowPart) override; //Pointset
   void OnAddPointSetClicked();//Pointset
   void CreateStreamline();
-//  void AddtoBundle();
   void RemovefromBundle();
   void ExtractRandomFibersFromTractogram();
+  void StartAlgorithm();
 
 
 
@@ -100,7 +101,7 @@ protected:
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
 
   void OnEndInteraction();
-  void OnAddBundle();
+  void CreateStreamlineInteractor();
 
 
   Ui::QmitkInteractiveFiberDissectionViewControls* m_Controls;
@@ -116,15 +117,19 @@ protected:
   mitk::DataNode::Pointer               m_SelectedPS;
   mitk::DataNode::Pointer               m_SelectedImageNode;
   mitk::FiberBundle::Pointer            m_positiveBundle;
+  mitk::FiberBundle::Pointer            m_newfibersBundle;
   mitk::FiberBundle::Pointer            m_negativeBundle;
 
 
   std::vector< mitk::DataNode::Pointer> m_positivSelectedBundles;
-  std::vector< mitk::DataNode::Pointer> m_negativeSelectedBundles;
+  std::vector< mitk::DataNode::Pointer> m_newfibersSelectedBundles;
+  mitk::DataNode::Pointer m_negativeSelectedBundles;
+
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
-  vtkSmartPointer<vtkPolyData>          m_negativeFibersData;
+  vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
 
   vtkSmartPointer<vtkCellPicker>        m_picker1;
+  mitk::StreamlineInteractor::Pointer   m_StreamlineInteractor;
 
 
 };
