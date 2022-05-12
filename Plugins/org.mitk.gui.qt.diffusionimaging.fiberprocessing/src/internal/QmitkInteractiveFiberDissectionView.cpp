@@ -45,6 +45,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateOr.h>
 
+
 #include <itkResampleImageFilter.h>
 #include <itkGaussianInterpolateImageFunction.h>
 #include <itkImageRegionIteratorWithIndex.h>
@@ -70,6 +71,7 @@ QmitkInteractiveFiberDissectionView::QmitkInteractiveFiberDissectionView()
   : QmitkAbstractView()
   , m_Controls( 0 )
   , m_IterationCounter(0)
+  , m_StreamlineInteractor(nullptr)
 {
 
 }
@@ -77,8 +79,14 @@ QmitkInteractiveFiberDissectionView::QmitkInteractiveFiberDissectionView()
 // Destructor
 QmitkInteractiveFiberDissectionView::~QmitkInteractiveFiberDissectionView()
 {
-
+  //disable interactor
+  if (m_StreamlineInteractor != nullptr)
+  {
+//    m_StreamlineInteractor->SetStreamlineNode(nullptr);
+    m_StreamlineInteractor->EnableInteraction(false);
+  }
 }
+
 
 void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 {
@@ -98,14 +106,15 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_selectedPointSetWidget->SetSelectionIsOptional(true);//pointset
     m_Controls->m_selectedPointSetWidget->SetAutoSelectNewNodes(true);//pointset
     m_Controls->m_selectedPointSetWidget->SetEmptyInfo(QString("Please select a point set"));//pointset
-    m_Controls->m_selectedPointSetWidget->SetPopUpTitel(QString("Select point set"));//pointset
+    m_Controls->m_selectedPointSetWidget->SetPopUpTitel(QString("Select point set"));//pointsett
 
     connect(m_Controls->m_ErazorButton, SIGNAL( clicked() ), this, SLOT( RemovefromBundle() ) ); //need
-    connect(m_Controls->m_HighlighterButton, SIGNAL( clicked() ), this, SLOT( AddtoBundle() ) ); //need
 
     connect(m_Controls->m_StreamlineCreation, SIGNAL( clicked() ), this, SLOT( CreateStreamline()));
 
     connect(m_Controls->m_AddRandomFibers, SIGNAL( clicked() ), this, SLOT( ExtractRandomFibersFromTractogram() ) ); //need
+
+    connect(m_Controls->m_TrainClassifier, SIGNAL( clicked() , this, SLOT( StartAlgorithm )));
 
 
 
@@ -143,24 +152,26 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
    // disable alle frames
 
   m_Controls->m_ErazorButton->setEnabled(false);
-  m_Controls->m_HighlighterButton->setEnabled(false);
+
 
 
   m_Controls->m_addPointSetPushButton->setEnabled(false);
   m_Controls->m_StreamlineCreation->setEnabled(false);
-  m_Controls->m_StreamtoTractogram->setEnabled(false);
   m_Controls->m_TrainClassifier->setEnabled(false);
   m_Controls->m_CreatePrediction->setEnabled(false);
   m_Controls->m_CreateUncertantyMap->setEnabled(false);
   m_Controls->m_Numtolabel->setEnabled(false);
   m_Controls->m_addPointSetPushButton->setEnabled(false);
   m_Controls->m_AddRandomFibers->setEnabled(false);
+  m_Controls->m_AddUncertainFibers->setEnabled(false);
 
   bool fibSelected = !m_SelectedFB.empty();
   bool multipleFibsSelected = (m_SelectedFB.size()>1);
   bool sthSelected = m_SelectedImageNode.IsNotNull();
   bool psSelected = m_SelectedPS.IsNotNull();
-  bool nfibSelected = !m_negativeSelectedBundles.empty();
+  bool nfibSelected = !m_newfibersSelectedBundles.empty();
+  bool posSelected = !m_positivSelectedBundles.empty();
+  bool negSelected = !m_negativeSelectedBundles.IsNotNull();
 
   // toggle visibility of elements according to selected method
 
@@ -198,10 +209,15 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
   if (nfibSelected)
   {
-      m_Controls->m_HighlighterButton->setEnabled(true);
+
       m_Controls->m_ErazorButton->setEnabled(true);
   }
 
+
+  if (posSelected && negSelected)
+  {
+      m_Controls->m_TrainClassifier->setEnabled(true);
+  }
 
 
 }
@@ -229,6 +245,7 @@ void QmitkInteractiveFiberDissectionView::OnAddPointSetClicked()//pointset
   pointSetNode->SetProperty("opacity", mitk::FloatProperty::New(1));
   pointSetNode->SetColor(1.0, 1.0, 0.0);
   this->GetDataStorage()->Add(pointSetNode, m_SelectedImageNode);
+
 
   m_Controls->m_selectedPointSetWidget->SetCurrentSelectedNode(pointSetNode);
 }
@@ -395,7 +412,7 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
 
       m_positiveBundle = mitk::FiberBundle::New(vNewPolyData);
       m_positiveBundle->SetTrackVisHeader(dynamic_cast<mitk::Image*>(m_SelectedImageNode->GetData())->GetGeometry());
-      m_positiveBundle->SetFiberColors(255, 255, 255);
+      m_positiveBundle->SetFiberColors(0, 255, 0);
 
 
 
@@ -408,6 +425,10 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
 
 
 
+      MITK_INFO << "The + Bundle has Streamlines:";
+      auto m_NegStreamline= dynamic_cast<mitk::FiberBundle *>(m_positivSelectedBundles.at(m_positivSelectedBundles.size()-1)->GetData());
+      MITK_INFO << m_NegStreamline->GetFiberPolyData()->GetNumberOfCells();
+
       this->GetDataStorage()->Add(m_positivSelectedBundles.at(m_positivSelectedBundles.size()-1));
 
       UpdateGui();
@@ -418,19 +439,19 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 {
      MITK_INFO << "Number of Fibers to extract from Tractogram: ";
      MITK_INFO << m_Controls->m_NumRandomFibers->value();
-     if (m_negativeSelectedBundles.empty())
+     if (m_newfibersSelectedBundles.empty())
      {
          mitk::DataNode::Pointer node = mitk::DataNode::New();
 
-         m_negativeFibersData = vtkSmartPointer<vtkPolyData>::New();
-         m_negativeFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
-         m_negativeFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
-         m_negativeBundle = mitk::FiberBundle:: New(m_negativeFibersData);
+         m_newfibersFibersData = vtkSmartPointer<vtkPolyData>::New();
+         m_newfibersFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
+         m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
+         m_newfibersBundle = mitk::FiberBundle:: New(m_newfibersFibersData);
 
-         node->SetData( m_negativeBundle );
-         m_negativeSelectedBundles.push_back(node);
-         MITK_INFO << m_negativeSelectedBundles.size();
-    //     this->GetDataStorage()->Add(m_negativeSelectedBundles.at(0));
+         node->SetData( m_newfibersBundle );
+         m_newfibersSelectedBundles.push_back(node);
+         MITK_INFO << m_newfibersSelectedBundles.size();
+    //     this->GetDataStorage()->Add(m_newfibersSelectedBundles.at(0));
     //     UpdateGui();
        MITK_INFO << "Create Bundle";
      }
@@ -466,28 +487,31 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
     //    weights->InsertValue(counter, fib->GetFiberWeight(i));
         vNewLines->InsertNextCell(container);
         counter++;
+        MITK_INFO << counter;
+        MITK_INFO << vNewLines;
+
       }
 
 
-      vNewPolyData->SetPoints(vNewPoints);
       vNewPolyData->SetLines(vNewLines);
+      vNewPolyData->SetPoints(vNewPoints);
 
-      m_negativeFibersData = vtkSmartPointer<vtkPolyData>::New();
-      m_negativeFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
-      m_negativeFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
-      m_negativeFibersData->SetPoints(vNewPoints);
-      m_negativeFibersData->SetLines(vNewLines);
+      m_newfibersFibersData = vtkSmartPointer<vtkPolyData>::New();
+      m_newfibersFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
+      m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
+      m_newfibersFibersData->SetPoints(vNewPoints);
+      m_newfibersFibersData->SetLines(vNewLines);
 
-      m_negativeBundle = mitk::FiberBundle::New(vNewPolyData);
-      m_negativeBundle->SetFiberColors(255, 0, 0);
+      m_newfibersBundle = mitk::FiberBundle::New(vNewPolyData);
+      m_newfibersBundle->SetFiberColors(255, 255, 255);
 
       mitk::DataNode::Pointer node = mitk::DataNode::New();
-      node->SetData(m_negativeBundle);
-      node->SetName("-Bundle");
-      m_negativeSelectedBundles.push_back(node);
-      MITK_INFO << m_negativeSelectedBundles.size();
+      node->SetData(m_newfibersBundle);
+      node->SetName("ToLabel");
+      m_newfibersSelectedBundles.push_back(node);
+      MITK_INFO << m_newfibersSelectedBundles.size();
 
-      this->GetDataStorage()->Add(m_negativeSelectedBundles.at(m_negativeSelectedBundles.size()-1));
+      this->GetDataStorage()->Add(m_newfibersSelectedBundles.at(m_newfibersSelectedBundles.size()-1));
 
     UpdateGui();
 
@@ -496,88 +520,55 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 
 void QmitkInteractiveFiberDissectionView::RemovefromBundle()
 {
+    if (m_StreamlineInteractor.IsNull())
+    {
+        this->CreateStreamlineInteractor();
+        mitk::FiberBundle::Pointer m_negativeBundle = mitk::FiberBundle::New();
+        mitk::DataNode::Pointer m_negativeSelectedBundles = mitk::DataNode::New();
+        m_negativeSelectedBundles->SetName("-Bundle");
+        m_negativeSelectedBundles->SetData(m_negativeBundle);
+        this->GetDataStorage()->Add(m_negativeSelectedBundles);
 
-//    BaseRenderer *renderer = positionEvent->GetSender();
+//        if (m_positivSelectedBundles.IsNull())
+//        {
 
-//    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
-//    MITK_INFO << positionEvent;
+//            mitk::FiberBundle::Pointer m_positiveBundle = mitk::FiberBundle::New();
+//            mitk::DataNode::Pointer m_positiveSelectedBundles = mitk::DataNode::New();
+//            m_positiveSelectedBundles->SetName("-Bundle");
+//            m_positiveSelectedBundles->SetData(m_positiveBundle);
+//            this->GetDataStorage()->Add(m_positiveSelectedBundles);)
+//        }
 
-//     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
-//     {
-//       MITK_INFO << "2d";
-//     }
-//     else
-//     {
-//       MITK_INFO << "3d";
-//     }
-
-//    auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard2D);
-//    auto gizmo_mapper = dynamic_cast<mitk::FiberBundle* >(mapper);
-//    auto &picker = m_Picker[renderer];
-
-//    if (picker == nullptr)
-//    {
-//      picker = vtkSmartPointer<vtkCellPicker>::New();
-//      picker->SetTolerance(0.005);
-
-//      if (gizmo_mapper)
-//      { // doing this each time is bizarre
-//        picker->AddPickList(gizmo_mapper->GetVtkProp(renderer));
-//        picker->PickFromListOn();
-//      }
-//    }
-
-//    auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-//    picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-//    vtkIdType pickedPointID = picker->GetPointId();
-//    if (pickedPointID == -1)
-//    {
-//      return Gizmo::NoHandle;
-//    }
-
-//    vtkPolyData *polydata = gizmo_mapper->GetVtkPolyData(renderer);
-
-//    if (polydata && polydata->GetPointData() && polydata->GetPointData()->GetScalars())
-//    {
-//      double dataValue = polydata->GetPointData()->GetScalars()->GetTuple1(pickedPointID);
-//      return m_Gizmo->GetHandleFromPointDataValue(dataValue);
-//    }
-
-//    return Gizmo::NoHandle;
-
-//    m_picker1 = vtkSmartPointer<vtkCellPicker>::New();
-//    m_picker1->PickFromListOn();
-//    m_picker1->SetTolerance(0.005);
-//    m_picker1->GetCellId();
-//    m_picker1->GetPickedPositions();
-
-////    selPt = m_picker1->GetSelectionPoint();
-////    x = *selPt;
-////    y = *(selPt + 1);
-////    pickPos = m_picker1->GetPickedPositions();
-////    xp = *(pickPos->GetPoint(0));
-////    yp = *(pickPos->GetPoint(0)+1);
-////    zp = *(pickPos->GetPoint(0)+2);
-////    double worldPos[3];
+        m_StreamlineInteractor->EnableInteraction(true);
+        m_StreamlineInteractor->SetNegativeNode(m_negativeSelectedBundles);
+        m_StreamlineInteractor->SetPositiveNode(m_positivSelectedBundles.at(m_positivSelectedBundles.size()-1));
+        m_StreamlineInteractor->SetToLabelNode(m_newfibersSelectedBundles.at(m_newfibersSelectedBundles.size()-1));
+    }
 
 
-//     double* worldPosition = m_picker1->GetPickPosition();
-//    MITK_INFO << m_picker1;
-//    MITK_INFO << m_picker1->GetCellId();
-//    MITK_INFO << m_picker1->GetPickPosition();
-//    MITK_INFO << m_picker1->GetSelectionPoint();
-//    MITK_INFO << worldPosition[0] ;
-//    MITK_INFO << worldPosition[1] ;
 
-//    vtkNew<vtkRenderWindowInteractor> iren;
+
+
+
+
 
    UpdateGui();
 }
 
-void QmitkInteractiveFiberDissectionView::OnAddBundle()
+
+void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractor()
 {
 
-  UpdateGui();
+    m_StreamlineInteractor = mitk::StreamlineInteractor::New();
+
+    m_StreamlineInteractor->LoadStateMachine("Streamline3DStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
+    m_StreamlineInteractor->SetEventConfig("Streamline3DConfig.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
+
+//  m_StreamlineInteractor->SetRotationEnabled(rotationEnabled);
+}
+
+
+void QmitkInteractiveFiberDissectionView::StartAlgorithm()
+{
 
 }
