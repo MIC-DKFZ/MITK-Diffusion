@@ -46,7 +46,7 @@ namespace itk {
     m_DiffusionGradientDirection.Fill(0.0);
     m_CoilPosition.Fill(0.0);
 
-    this->DynamicMultiThreadingOff();
+    
   }
 
   template< class ScalarType >
@@ -270,7 +270,7 @@ namespace itk {
 
   template< class ScalarType >
   void KspaceImageFilter< ScalarType >
-  ::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+  ::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
   {
     typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
     ImageRegionIterator< OutputImageType > oit(outputImage, outputRegionForThread);

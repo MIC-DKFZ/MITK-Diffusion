@@ -50,7 +50,7 @@ namespace itk
 
   protected:
     TensorToL2NormImageFilter(){
-      this->DynamicMultiThreadingOff();
+      
     };
     ~TensorToL2NormImageFilter(){};
 
@@ -60,7 +60,7 @@ namespace itk
     }
 
 
-    void ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, ThreadIdType threadId) override;
+    void DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread) override;
 
 
   private:

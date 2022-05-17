@@ -52,7 +52,7 @@ DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
   typename OutputImageType::Pointer outputPtr3 = OutputImageType::New();
   this->SetNthOutput(2, outputPtr3.GetPointer());
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 
@@ -183,7 +183,7 @@ MeasAndBvals DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, T
 
 template< class TIn, class TOut>
 void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
-::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
 {
 
   typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());

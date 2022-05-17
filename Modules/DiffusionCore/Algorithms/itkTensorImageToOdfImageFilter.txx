@@ -40,92 +40,70 @@ PURPOSE.  See the above copyright notices for more information.
 
 namespace itk
 {
-  template <class TInputScalarType, class TOutputScalarType>
-  void
-    TensorImageToOdfImageFilter<TInputScalarType, TOutputScalarType>
-    ::BeforeThreadedGenerateData()
+template <class TInputScalarType, class TOutputScalarType>
+void
+TensorImageToOdfImageFilter<TInputScalarType, TOutputScalarType>
+::BeforeThreadedGenerateData()
+{
+  typename OutputImageType::Pointer outImage = OutputImageType::New();
+  outImage->SetSpacing( this->GetInput()->GetSpacing() );   // Set the image spacing
+  outImage->SetOrigin( this->GetInput()->GetOrigin() );     // Set the image origin
+  outImage->SetDirection( this->GetInput()->GetDirection() );  // Set the image direction
+  outImage->SetLargestPossibleRegion( this->GetInput()->GetLargestPossibleRegion());
+  outImage->SetBufferedRegion( this->GetInput()->GetLargestPossibleRegion() );
+  outImage->SetRequestedRegion( this->GetInput()->GetLargestPossibleRegion() );
+  outImage->Allocate();
+  outImage->FillBuffer(0.0);
+
+  this->SetNumberOfRequiredOutputs (1);
+  this->SetNthOutput (0, outImage);
+}
+
+template <class TInputScalarType, class TOutputScalarType>
+void
+TensorImageToOdfImageFilter<TInputScalarType, TOutputScalarType>
+::DynamicThreadedGenerateData (const OutputImageRegionType &outputRegionForThread)
+{
+
+  typedef ImageRegionIterator<OutputImageType>      IteratorOutputType;
+  typedef ImageRegionConstIterator<InputImageType>  IteratorInputType;
+
+  IteratorOutputType itOut (this->GetOutput(), outputRegionForThread);
+  IteratorInputType  itIn (this->GetInput(), outputRegionForThread);
+
+  while(!itIn.IsAtEnd())
   {
-    typename OutputImageType::Pointer outImage = OutputImageType::New();
-    outImage->SetSpacing( this->GetInput()->GetSpacing() );   // Set the image spacing
-    outImage->SetOrigin( this->GetInput()->GetOrigin() );     // Set the image origin
-    outImage->SetDirection( this->GetInput()->GetDirection() );  // Set the image direction
-    outImage->SetLargestPossibleRegion( this->GetInput()->GetLargestPossibleRegion());
-    outImage->SetBufferedRegion( this->GetInput()->GetLargestPossibleRegion() );
-    outImage->SetRequestedRegion( this->GetInput()->GetLargestPossibleRegion() );
-    outImage->Allocate();
-    outImage->FillBuffer(0.0);
-
-    this->SetNumberOfRequiredOutputs (1);
-    this->SetNthOutput (0, outImage);
-  }
-
-  template <class TInputScalarType, class TOutputScalarType>
-  void
-    TensorImageToOdfImageFilter<TInputScalarType, TOutputScalarType>
-    ::ThreadedGenerateData (const OutputImageRegionType &outputRegionForThread, ThreadIdType threadId )
-  {
-
-    typedef ImageRegionIterator<OutputImageType>      IteratorOutputType;
-    typedef ImageRegionConstIterator<InputImageType>  IteratorInputType;
-
-    unsigned long numPixels = outputRegionForThread.GetNumberOfPixels();
-    unsigned long step = numPixels/100;
-    unsigned long progress = 0;
-
-    IteratorOutputType itOut (this->GetOutput(), outputRegionForThread);
-    IteratorInputType  itIn (this->GetInput(), outputRegionForThread);
-
-    if( threadId==0 )
-      this->UpdateProgress (0.0);
-
-
-    while(!itIn.IsAtEnd())
+    if( this->GetAbortGenerateData() )
     {
-      if( this->GetAbortGenerateData() )
-      {
-        throw itk::ProcessAborted(__FILE__,__LINE__);
-      }
-
-      InputPixelType T = itIn.Get();
-
-      OutputPixelType out;
-
-      float tensorelems[6] = {
-        (float)T[0],
-        (float)T[1],
-        (float)T[2],
-        (float)T[3],
-        (float)T[4],
-        (float)T[5],
-      };
-      itk::DiffusionTensor3D<TOutputScalarType> tensor(tensorelems);
-
-      itk::OrientationDistributionFunction<TOutputScalarType, ODF_SAMPLING_SIZE> odf;
-      odf.InitFromTensor(tensor);
-      odf.Normalize();
-
-      for( unsigned int i=0; i<ODF_SAMPLING_SIZE; i++)
-          out[i] = odf.GetElement(i);
-
-      itOut.Set(out);
-
-      if( threadId==0 && step>0)
-      {
-        if( (progress%step)==0 )
-        {
-          this->UpdateProgress ( double(progress)/double(numPixels) );
-        }
-      }
-
-      ++progress;
-      ++itIn;
-      ++itOut;
+      throw itk::ProcessAborted(__FILE__,__LINE__);
     }
 
-    if( threadId==0 )
-    {
-      this->UpdateProgress (1.0);
-    }
-    MITK_INFO << "one thread finished ODF estimation";
+    InputPixelType T = itIn.Get();
+
+    OutputPixelType out;
+
+    float tensorelems[6] = {
+      (float)T[0],
+      (float)T[1],
+      (float)T[2],
+      (float)T[3],
+      (float)T[4],
+      (float)T[5],
+    };
+    itk::DiffusionTensor3D<TOutputScalarType> tensor(tensorelems);
+
+    itk::OrientationDistributionFunction<TOutputScalarType, ODF_SAMPLING_SIZE> odf;
+    odf.InitFromTensor(tensor);
+    odf.Normalize();
+
+    for( unsigned int i=0; i<ODF_SAMPLING_SIZE; i++)
+      out[i] = odf.GetElement(i);
+
+    itOut.Set(out);
+
+    ++itIn;
+    ++itOut;
   }
+  MITK_INFO << "one thread finished ODF estimation";
+}
 } // end of namespace

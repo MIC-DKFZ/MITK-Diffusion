@@ -122,7 +122,7 @@ namespace itk{
      *
      * @param outputRegionForThread Region to denoise for each thread.
      */
-    void ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType) override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
 
 

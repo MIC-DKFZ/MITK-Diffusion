@@ -147,7 +147,7 @@ itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelTyp
   this->SetNthOutput(0, outputPtr1.GetPointer() );
   this->SetNthOutput(1, outputPtr2.GetPointer() );
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TInputPixelType, class TOutputPixelType>
@@ -422,7 +422,7 @@ void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPix
 
 template< class TInputPixelType, class TOutputPixelType>
 void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelType>
-::ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, ThreadIdType /*threadId*/)
+::DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread /*threadId*/)
 {
   typename OutputImageType::Pointer dImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
   itk::ImageRegionIteratorWithIndex< OutputImageType > dImageIt(dImage, outputRegionForThread);

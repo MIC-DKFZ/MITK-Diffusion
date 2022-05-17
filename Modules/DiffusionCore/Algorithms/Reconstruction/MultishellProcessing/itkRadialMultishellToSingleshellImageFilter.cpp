@@ -48,7 +48,7 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
 ::RadialMultishellToSingleshellImageFilter()
 {
   this->SetNumberOfRequiredInputs( 1 );
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template <class TInputScalarType, class TOutputScalarType>
@@ -147,7 +147,7 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
 template <class TInputScalarType, class TOutputScalarType>
 void
 RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
-::ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, ThreadIdType /*threadId*/)
+::DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread /*threadId*/)
 {
   // Get input gradient image pointer
   typename InputImageType::Pointer inputImage = static_cast< InputImageType * >(ProcessObject::GetInput(0));

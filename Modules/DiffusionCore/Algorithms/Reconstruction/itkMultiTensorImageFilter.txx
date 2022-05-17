@@ -41,7 +41,7 @@ MultiTensorImageFilter< TInPixelType, TOutPixelType>
 {
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TInPixelType, class TOutPixelType >
@@ -174,7 +174,7 @@ MultiTensorImageFilter< TInPixelType, TOutPixelType>::FitSingleVoxel( const type
 template< class TInPixelType, class TOutPixelType >
 void
 MultiTensorImageFilter< TInPixelType, TOutPixelType>
-::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
 {
   typedef ImageRegionConstIterator< InputImageType > InputIteratorType;
   typename InputImageType::Pointer inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );

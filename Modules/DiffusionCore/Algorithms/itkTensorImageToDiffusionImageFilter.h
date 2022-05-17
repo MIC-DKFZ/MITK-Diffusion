@@ -125,7 +125,7 @@ namespace itk
       m_Min = 0.0;
       m_Max = 10000.0;
 
-      this->DynamicMultiThreadingOff();
+      
     }
 
     virtual ~TensorImageToDiffusionImageFilter(){}
@@ -137,7 +137,7 @@ namespace itk
 
     virtual void BeforeThreadedGenerateData( void ) override;
 
-    virtual void ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, ThreadIdType) override;
+    virtual void DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread) override;
 
     //void GenerateData();
 

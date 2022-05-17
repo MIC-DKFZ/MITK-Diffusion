@@ -40,7 +40,7 @@ DwiNormilzationFilter< TInPixelType>::DwiNormilzationFilter()
 {
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TInPixelType >
@@ -123,7 +123,7 @@ void DwiNormilzationFilter< TInPixelType>::BeforeThreadedGenerateData()
 }
 
 template< class TInPixelType >
-void DwiNormilzationFilter< TInPixelType>::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+void DwiNormilzationFilter< TInPixelType>::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
 {
   typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
 

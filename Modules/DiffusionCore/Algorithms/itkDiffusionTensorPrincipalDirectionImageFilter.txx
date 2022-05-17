@@ -45,7 +45,7 @@ DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::DiffusionTensor
 {
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TTensorPixelType>
@@ -112,7 +112,7 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
 
 template< class TTensorPixelType>
 void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
-::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
 {
 
   typedef itk::DiffusionTensor3D<TTensorPixelType>    TensorType;

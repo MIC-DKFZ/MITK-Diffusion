@@ -33,7 +33,7 @@ TdiToVolumeFractionFilter< TPixelType >::TdiToVolumeFractionFilter()
   this->SetNumberOfRequiredInputs(5);
   this->SetNumberOfRequiredOutputs(4);
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TPixelType >
@@ -55,7 +55,7 @@ void TdiToVolumeFractionFilter< TPixelType >::BeforeThreadedGenerateData()
 }
 
 template< class TPixelType >
-void TdiToVolumeFractionFilter< TPixelType >::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType)
+void TdiToVolumeFractionFilter< TPixelType >::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread)
 {
   typename OutputImageType::Pointer o_intra_ax = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
   typename OutputImageType::Pointer o_inter_ax = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(1));

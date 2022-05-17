@@ -27,7 +27,7 @@ FieldmapGeneratorFilter< OutputImageType >::FieldmapGeneratorFilter()
   m_Gradient.fill(0.0);
   m_Offset.fill(0.0);
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class OutputImageType >
@@ -51,7 +51,7 @@ void FieldmapGeneratorFilter< OutputImageType >::BeforeThreadedGenerateData()
 }
 
 template< class OutputImageType >
-void FieldmapGeneratorFilter< OutputImageType >::ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType threadId)
+void FieldmapGeneratorFilter< OutputImageType >::DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread)
 {
   typename OutputImageType::Pointer outImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
   ImageRegionIterator< OutputImageType > oit(outImage, outputRegionForThread);
@@ -75,7 +75,7 @@ void FieldmapGeneratorFilter< OutputImageType >::ThreadedGenerateData( const Out
     ++oit;
   }
 
-  MITK_INFO << "Thread " << threadId << "finished processing";
+  MITK_INFO << "One thread finished processing";
 }
 
 }

@@ -39,7 +39,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>
 {
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->DynamicMultiThreadingOff();
+
 }
 
 template< class TInPixelType, class TOutPixelType >
@@ -115,7 +115,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>::FitSingleVoxel( const typename Inp
 template< class TInPixelType, class TOutPixelType >
 void
 AdcImageFilter< TInPixelType, TOutPixelType>
-::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
 {
   typename OutputImageType::Pointer outputImage =
       static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));

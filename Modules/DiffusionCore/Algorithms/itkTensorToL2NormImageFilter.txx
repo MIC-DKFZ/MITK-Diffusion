@@ -40,57 +40,38 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace itk
 {
 
-  template <class TInputImage, class TOutputImage>
-  void TensorToL2NormImageFilter<TInputImage, TOutputImage>::ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, ThreadIdType threadId )
+template <class TInputImage, class TOutputImage>
+void TensorToL2NormImageFilter<TInputImage, TOutputImage>::DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread)
+{
+  typedef ImageRegionIterator<OutputImageType>      IteratorOutputType;
+  typedef ImageRegionConstIterator<InputImageType>  IteratorInputType;
+
+  IteratorOutputType itOut(this->GetOutput(), outputRegionForThread);
+  IteratorInputType  itIn(this->GetInput(), outputRegionForThread);
+
+  while(!itOut.IsAtEnd())
   {
-    typedef ImageRegionIterator<OutputImageType>      IteratorOutputType;
-    typedef ImageRegionConstIterator<InputImageType>  IteratorInputType;
+    if( this->GetAbortGenerateData() )
+      throw itk::ProcessAborted(__FILE__,__LINE__);
 
-    unsigned long numPixels = outputRegionForThread.GetNumberOfPixels();
-    unsigned long step = numPixels/100;
-    unsigned long progress = 0;
 
-    IteratorOutputType itOut(this->GetOutput(), outputRegionForThread);
-    IteratorInputType  itIn(this->GetInput(), outputRegionForThread);
+    OutputPixelType out = static_cast<OutputPixelType>( 0.0 ); // be careful, overload in MedINRIA
 
-    if( threadId==0 )
-      this->UpdateProgress (0.0);
+    InputPixelType T = itIn.Get();
 
-    while(!itOut.IsAtEnd())
+    if ( !(T[0]==0 && T[1]==0 && T[2]==0 && T[3]==0 && T[4]==0 && T[5]==0) )
     {
-      if( this->GetAbortGenerateData() )
-        throw itk::ProcessAborted(__FILE__,__LINE__);
-
-
-      OutputPixelType out = static_cast<OutputPixelType>( 0.0 ); // be careful, overload in MedINRIA
-
-      InputPixelType T = itIn.Get();
-
-      if ( !(T[0]==0 && T[1]==0 && T[2]==0 && T[3]==0 && T[4]==0 && T[5]==0) )
-      {
-        double sum = T[0]*T[0] + T[3]*T[3] + T[5]*T[5]
+      double sum = T[0]*T[0] + T[3]*T[3] + T[5]*T[5]
           + T[1]*T[2]*2.0 + T[2]*T[4]*2.0 + T[1]*T[4]*2.0;
-        out = static_cast<OutputPixelType>( std::sqrt( sum ));
-      }
-
-      if( threadId==0 && step>0)
-      {
-        if( (progress%step)==0 )
-          this->UpdateProgress ( double(progress)/double(numPixels) );
-      }
-
-
-      itOut.Set (out);
-      ++progress;
-      ++itOut;
-      ++itIn;
-
+      out = static_cast<OutputPixelType>( std::sqrt( sum ));
     }
 
-    if( threadId==0 )
-      this->UpdateProgress (1.0);
+    itOut.Set (out);
+    ++itOut;
+    ++itIn;
 
   }
+}
 
 
 

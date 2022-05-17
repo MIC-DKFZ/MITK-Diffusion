@@ -78,13 +78,13 @@ typename TOutputImage=itk::Image<itk::RGBAPixel<unsigned char>,3> >
 
 protected:
   ShToRgbImageFilter(){
-    this->DynamicMultiThreadingOff();
+    
   }
   ~ShToRgbImageFilter() override{}
 
   mitk::ShImage::SH_CONVENTION m_ShConvention = mitk::ShImage::SH_CONVENTION::MRTRIX;
 
-  void ThreadedGenerateData( const typename OutputImageType::RegionType &outputRegionForThread, ThreadIdType) override
+  void DynamicThreadedGenerateData( const typename OutputImageType::RegionType &outputRegionForThread) override
   {
     typename InputImageType::Pointer coeff_image = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
     typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());

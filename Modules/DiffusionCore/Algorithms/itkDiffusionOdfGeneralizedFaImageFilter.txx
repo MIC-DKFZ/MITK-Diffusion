@@ -46,8 +46,6 @@ namespace itk {
     // At least 1 inputs is necessary for a vector image.
     // For images added one at a time we need at least six
     this->SetNumberOfRequiredInputs( 1 );
-
-    this->DynamicMultiThreadingOff();
   }
 
   template< class TOdfPixelType,
@@ -64,8 +62,7 @@ namespace itk {
     unsigned int NrOdfDirections>
     void DiffusionOdfGeneralizedFaImageFilter< TOdfPixelType,
     TGfaPixelType, NrOdfDirections>
-    ::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread,
-    ThreadIdType )
+    ::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread)
   {
     typename OutputImageType::Pointer outputImage =
       static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));

@@ -31,7 +31,7 @@ ShToOdfImageFilter< PixelType, ShOrder >::ShToOdfImageFilter()
   : m_Toolkit(mitk::ShImage::SH_CONVENTION::MRTRIX)
 {
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class PixelType, int ShOrder >
@@ -41,7 +41,7 @@ void ShToOdfImageFilter< PixelType, ShOrder >::BeforeThreadedGenerateData()
 }
 
 template< class PixelType, int ShOrder >
-void ShToOdfImageFilter< PixelType, ShOrder >::ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType)
+void ShToOdfImageFilter< PixelType, ShOrder >::DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread)
 {
   typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
 

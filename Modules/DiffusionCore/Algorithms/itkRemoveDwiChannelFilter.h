@@ -67,7 +67,7 @@ public:
     void PrintSelf(std::ostream& os, Indent indent) const override;
 
     void BeforeThreadedGenerateData() override;
-    void ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType id ) override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
     std::vector< unsigned int >                 m_ChannelIndices;
     typename DirectionContainerType::ConstPointer    m_Directions;

@@ -34,7 +34,7 @@ DftImageFilter< TPixelType >
 {
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TPixelType >
@@ -46,7 +46,7 @@ void DftImageFilter< TPixelType >
 
 template< class TPixelType >
 void DftImageFilter< TPixelType >
-::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType)
+::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread)
 {
   typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
 

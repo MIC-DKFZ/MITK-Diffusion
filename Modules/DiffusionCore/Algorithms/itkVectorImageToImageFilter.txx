@@ -37,7 +37,7 @@ VectorImageToImageFilter< TPixelType >
 {
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TPixelType >

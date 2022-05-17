@@ -46,7 +46,7 @@ namespace itk
     m_Lambda = 1.0;
     m_LocalVariation = LocalVariationImageType::New();
 
-    this->DynamicMultiThreadingOff();
+
   }
 
   /**
@@ -108,8 +108,7 @@ namespace itk
   template <class TInputPixel, class TOutputPixel, class TRefPixelType>
   void
   RegularizedIVIMReconstructionSingleIteration<TInputPixel, TOutputPixel, TRefPixelType>
-    ::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread,
-    ThreadIdType)
+    ::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread)
   {
 
     typename OutputImageType::Pointer output = this->GetOutput();

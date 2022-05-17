@@ -80,7 +80,7 @@ namespace itk
     ~RadialMultishellToSingleshellImageFilter() {}
 
     void BeforeThreadedGenerateData();
-    void ThreadedGenerateData( const OutputImageRegionType &, ThreadIdType);
+    void DynamicThreadedGenerateData( const OutputImageRegionType &);
 
     GradientDirectionContainerType::Pointer m_TargetGradientDirections;   ///< container for the subsampled output gradient directions
     GradientDirectionContainerType::ConstPointer m_OriginalGradientDirections;   ///< input gradient directions

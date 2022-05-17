@@ -57,7 +57,7 @@ public:
     itkGetMacro( Toolkit, mitk::ShImage::SH_CONVENTION)  ///< SH coefficient convention (depends on toolkit)
 
     void BeforeThreadedGenerateData();
-    void ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType);
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
 
 protected:
     ShToOdfImageFilter();

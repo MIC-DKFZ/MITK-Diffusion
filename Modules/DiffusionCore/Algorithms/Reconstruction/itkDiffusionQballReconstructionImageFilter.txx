@@ -48,7 +48,7 @@ namespace itk {
     // For images added one at a time we need at least six
     this->SetNumberOfRequiredInputs( 1 );
 
-    this->DynamicMultiThreadingOff();
+
   }
 
   template< class TReferenceImagePixelType,
@@ -217,8 +217,7 @@ namespace itk {
     void DiffusionQballReconstructionImageFilter< TReferenceImagePixelType,
     TGradientImagePixelType, TOdfPixelType, NrOdfDirections,
     NrBasisFunctionCenters>
-    ::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread,
-    ThreadIdType )
+    ::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread)
   {
     // init output and b-zero iterators
     typename OutputImageType::Pointer outputImage =

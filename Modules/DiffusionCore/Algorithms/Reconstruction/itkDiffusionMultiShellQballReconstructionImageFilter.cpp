@@ -53,7 +53,7 @@ DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   // For images added one at a time we need at least six
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 
@@ -589,7 +589,7 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
 template< class T, class TG, class TO, int L, int NODF>
 void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
-::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType /*NumberOfThreads*/)
+::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread /*NumberOfThreads*/)
 {
 
   itk::TimeProbe clock;

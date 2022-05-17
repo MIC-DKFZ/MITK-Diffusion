@@ -79,7 +79,7 @@ public:
     void PrintSelf(std::ostream& os, Indent indent) const;
 
     void BeforeThreadedGenerateData();
-    void ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType);
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
 
     UcharImageType::Pointer m_MaskImage;
     GradientContainerType   m_GradientDirections;

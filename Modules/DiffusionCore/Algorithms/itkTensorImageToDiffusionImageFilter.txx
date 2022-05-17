@@ -108,15 +108,11 @@ TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 
 template <class TInputScalarType, class TOutputScalarType>
 void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
-::ThreadedGenerateData (const OutputImageRegionType &outputRegionForThread, ThreadIdType threadId )
+::DynamicThreadedGenerateData (const OutputImageRegionType &outputRegionForThread)
 {
   typedef ImageRegionIterator<OutputImageType>      IteratorOutputType;
   typedef ImageRegionConstIterator<InputImageType>  IteratorInputType;
   typedef ImageRegionConstIterator<BaselineImageType>  IteratorBaselineType;
-
-  unsigned long numPixels = outputRegionForThread.GetNumberOfPixels();
-  unsigned long step = numPixels/100;
-  unsigned long progress = 0;
 
   IteratorOutputType itOut (this->GetOutput(), outputRegionForThread);
   IteratorInputType  itIn (this->GetInput(), outputRegionForThread);
@@ -129,11 +125,6 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
   {
     itMask = IteratorMaskImageType( m_MaskImage, outputRegionForThread);
     itMask.GoToBegin();
-  }
-
-  if( threadId==0 )
-  {
-    this->UpdateProgress (0.0);
   }
 
   while(!itIn.IsAtEnd())
@@ -185,7 +176,7 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
         S[5] = gn[2]*gn[2];
 
         const double res =
-                T[0]*S[0] +
+            T[0]*S[0] +
             2 * T[1]*S[1] +     T[3]*S[3] +
             2 * T[2]*S[2] + 2 * T[4]*S[4] + T[5]*S[5];
 
@@ -209,24 +200,9 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 
     itOut.Set(out);
 
-    if( threadId==0 && step>0)
-    {
-      if( (progress%step)==0 )
-      {
-        this->UpdateProgress ( double(progress)/double(numPixels) );
-      }
-    }
-
-    ++progress;
     ++itB0;
     ++itIn;
     ++itOut;
-
-  }
-
-  if( threadId==0 )
-  {
-    this->UpdateProgress (1.0);
   }
 }
 
