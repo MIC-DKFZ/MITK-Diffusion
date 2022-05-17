@@ -66,8 +66,8 @@ void mitk::StreamlineInteractor::SetNegativeNode(DataNode *node)
 {
 
   DataInteractor::SetDataNode(node);
-  m_NegStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
 
+  m_NegStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
   MITK_INFO << "Negative Node added";
 }
 

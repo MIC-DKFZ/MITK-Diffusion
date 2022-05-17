@@ -93,7 +93,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -444,7 +444,7 @@ QGroupBox {
           <item row="2" column="4">
            <widget class="QSpinBox" name="m_NumRandomFibers">
             <property name="minimum">
-             <number>10</number>
+             <number>1</number>
             </property>
            </widget>
           </item>

@@ -14,6 +14,8 @@ found in the LICENSE file.
 #define mitkStreamlineInteractor_h
 
 
+#include "MitkFiberDissectionExports.h"
+
 // MITK includes
 #include <mitkDataInteractor.h>
 #include <mitkDataNode.h>
@@ -27,7 +29,6 @@ found in the LICENSE file.
 // System includes
 #include <memory>
 
-#include "MitkFiberDissectionExports.h"
 
 namespace mitk
 {

@@ -1,9 +1,19 @@
 set(H_FILES
-  Interactor/mitkStreamlineInteractor.h
+
+    #Interactor
+    Interactor/mitkStreamlineInteractor.h
+
+    #MachineLearning
+    MachineLearning/mitkStreamlineFeatureExtractor.h
 )
 
 set(CPP_FILES
-  Interactor/mitkStreamlineInteractor.cpp
+
+    #Interactor
+    Interactor/mitkStreamlineInteractor.cpp
+
+    #MachineLearning
+    MachineLearning/mitkStreamlineFeatureExtractor.cpp
 )
 
 set(RESOURCE_FILES

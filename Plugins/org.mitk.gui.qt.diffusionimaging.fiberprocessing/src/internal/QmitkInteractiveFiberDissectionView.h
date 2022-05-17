@@ -31,6 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDataInteractor.h>
 #include <mitkIRenderWindowPartListener.h> //Pointset
 #include <mitkStreamlineInteractor.h>
+#include <mitkStreamlineFeatureExtractor.h>
 
 #include <itkCastImageFilter.h>
 #include <itkVTKImageImport.h>
@@ -82,7 +83,7 @@ protected slots:
   void RenderWindowPartDeactivated(mitk::IRenderWindowPart* renderWindowPart) override; //Pointset
   void OnAddPointSetClicked();//Pointset
   void CreateStreamline();
-  void RemovefromBundle();
+  void RemovefromBundle( bool checked );
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
 
@@ -121,9 +122,9 @@ protected:
   mitk::FiberBundle::Pointer            m_negativeBundle;
 
 
-  std::vector< mitk::DataNode::Pointer> m_positivSelectedBundles;
-  std::vector< mitk::DataNode::Pointer> m_newfibersSelectedBundles;
-  mitk::DataNode::Pointer m_negativeSelectedBundles;
+  mitk::DataNode::Pointer               m_positivSelectedBundles;
+  mitk::DataNode::Pointer               m_newfibersSelectedBundles;
+  mitk::DataNode::Pointer               m_negativeSelectedBundles;
 
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
