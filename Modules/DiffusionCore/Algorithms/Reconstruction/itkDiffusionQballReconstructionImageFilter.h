@@ -281,8 +281,8 @@ protected:
   void ComputeReconstructionMatrix();
 
   void BeforeThreadedGenerateData() override;
-  void ThreadedGenerateData( const
-      OutputImageRegionType &outputRegionForThread, ThreadIdType) override;
+  void DynamicThreadedGenerateData( const
+      OutputImageRegionType &outputRegionForThread) override;
 
   /** enum to indicate if the gradient image is specified as a single multi-
    * component image or as several separate images */

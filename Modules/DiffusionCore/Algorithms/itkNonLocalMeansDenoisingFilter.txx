@@ -44,7 +44,7 @@ NonLocalMeansDenoisingFilter< TPixelType >
 {
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TPixelType >
@@ -127,7 +127,7 @@ NonLocalMeansDenoisingFilter< TPixelType >
 template< class TPixelType >
 void
 NonLocalMeansDenoisingFilter< TPixelType >
-::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
 {
 
 

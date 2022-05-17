@@ -99,7 +99,7 @@ namespace itk{
     float CoilSensitivity(VectorType& pos);
 
     void BeforeThreadedGenerateData() override;
-    void ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType threadID) override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
     void AfterThreadedGenerateData() override;
 
     VectorType                              m_CoilPosition;

@@ -74,7 +74,7 @@ namespace itk
 
   protected:
     TensorImageToOdfImageFilter(){
-      this->DynamicMultiThreadingOff();
+      
     };
     ~TensorImageToOdfImageFilter() override{};
 
@@ -85,8 +85,8 @@ namespace itk
 
     void BeforeThreadedGenerateData( void ) override;
 
-    void ThreadedGenerateData( const
-      OutputImageRegionType &outputRegionForThread, ThreadIdType) override;
+    void DynamicThreadedGenerateData( const
+      OutputImageRegionType &outputRegionForThread) override;
 
     //void GenerateData();
 

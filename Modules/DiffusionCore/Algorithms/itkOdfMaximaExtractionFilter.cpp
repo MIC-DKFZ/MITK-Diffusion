@@ -62,7 +62,7 @@ OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 {
   this->SetNumberOfRequiredInputs(1);
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class PixelType, int ShOrder, int NrOdfDirections >
@@ -209,7 +209,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 
 template< class PixelType, int ShOrder, int NrOdfDirections >
 void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
-::ThreadedGenerateData( const OutputImageRegionType& outputRegionForThread, ThreadIdType threadID )
+::DynamicThreadedGenerateData( const OutputImageRegionType& outputRegionForThread)
 {
   typename CoefficientImageType::Pointer ShCoeffImage = static_cast< CoefficientImageType* >( this->ProcessObject::GetInput(0) );
 
@@ -356,7 +356,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     ++disp;
     ++cit;
   }
-  MITK_INFO << "Thread " << threadID << " finished extraction";
+  MITK_INFO << "One thread finished extraction";
 }
 
 }

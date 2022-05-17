@@ -242,7 +242,7 @@ protected:
     TractType::Pointer tract );
 
   /** Callback routine used by the threading library. This routine just calls
-      the ThreadedGenerateData method after setting the correct region for this
+      the DynamicThreadedGenerateData method after setting the correct region for this
       thread. **/
   static ITK_THREAD_RETURN_TYPE StochasticTractGenerationCallback( void *arg );
 

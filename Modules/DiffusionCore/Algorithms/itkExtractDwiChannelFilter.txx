@@ -36,7 +36,7 @@ ExtractDwiChannelFilter< TInPixelType>::ExtractDwiChannelFilter()
 {
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TInPixelType >
@@ -48,7 +48,7 @@ void ExtractDwiChannelFilter< TInPixelType>::BeforeThreadedGenerateData()
 }
 
 template< class TInPixelType >
-void ExtractDwiChannelFilter< TInPixelType>::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+void ExtractDwiChannelFilter< TInPixelType>::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
 {
   typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
 

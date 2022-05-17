@@ -35,7 +35,7 @@ namespace itk
   RegularizedIVIMLocalVariationImageFilter<TInputImage, TOutputImage>
     ::RegularizedIVIMLocalVariationImageFilter()
   {
-    this->DynamicMultiThreadingOff();
+
   }
 
   template <class TInputImage, class TOutputImage>
@@ -90,8 +90,7 @@ namespace itk
   template< class TInputImage, class TOutputImage>
   void
     RegularizedIVIMLocalVariationImageFilter< TInputImage, TOutputImage>
-    ::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread,
-    ThreadIdType threadId)
+    ::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread)
   {
 
     // Allocate output
@@ -107,10 +106,6 @@ namespace itk
     typename NeighborhoodAlgorithm::
       ImageBoundaryFacesCalculator<InputImageType>::FaceListType
       faceList = bC(input, outputRegionForThread, size);
-
-    // support progress methods/callbacks
-    ProgressReporter progress(
-      this, threadId, outputRegionForThread.GetNumberOfPixels());
 
     ZeroFluxNeumannBoundaryCondition<InputImageType> nbc;
     std::vector<InputPixelType> pixels;
@@ -169,9 +164,6 @@ namespace itk
         ++input_image_neighbors_it;
         ++output_image_it;
         ++input_image_it;
-
-        // report progress
-        progress.CompletedPixel();
       }
     }
   }

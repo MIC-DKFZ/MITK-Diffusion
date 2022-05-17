@@ -61,7 +61,7 @@ protected:
     ~DftImageFilter() override {}
 
     void BeforeThreadedGenerateData() override;
-    void ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType threadId) override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
 private:
 

@@ -43,7 +43,7 @@ FlipPeaksFilter< PixelType>::FlipPeaksFilter()
 {
   this->SetNumberOfRequiredInputs(1);
 
-  this->DynamicMultiThreadingOff();
+  
 }
 
 
@@ -71,7 +71,7 @@ void FlipPeaksFilter< PixelType>
 
 template< class PixelType >
 void FlipPeaksFilter< PixelType>
-::ThreadedGenerateData( const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+::DynamicThreadedGenerateData( const OutputImageRegionType& outputRegionForThread )
 {
   typename InputImageType::Pointer input_image = static_cast< InputImageType* >( this->ProcessObject::GetInput(0) );
   typename OutputImageType::Pointer output_image = static_cast< OutputImageType* >( this->ProcessObject::GetOutput(0) );

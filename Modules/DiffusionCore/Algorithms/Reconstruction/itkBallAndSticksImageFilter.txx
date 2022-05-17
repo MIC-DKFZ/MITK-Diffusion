@@ -39,7 +39,7 @@ BallAndSticksImageFilter< TInPixelType, TOutPixelType>
   : m_B_value(0)
 {
   this->SetNumberOfRequiredInputs( 1 );
-  this->DynamicMultiThreadingOff();
+  
 }
 
 template< class TInPixelType, class TOutPixelType >
@@ -178,7 +178,7 @@ BallAndSticksImageFilter< TInPixelType, TOutPixelType>::FitSingleVoxel( const ty
 template< class TInPixelType, class TOutPixelType >
 void
 BallAndSticksImageFilter< TInPixelType, TOutPixelType>
-::ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType )
+::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
 {
   typename OutputImageType::Pointer outputImage =
       static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));

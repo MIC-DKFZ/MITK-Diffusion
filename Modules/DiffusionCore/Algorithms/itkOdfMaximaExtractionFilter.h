@@ -139,7 +139,7 @@ Image< unsigned char, 3 > >
     ~OdfMaximaExtractionFilter(){}
 
     void BeforeThreadedGenerateData();
-    void ThreadedGenerateData( const OutputImageRegionType &outputRegionForThread, ThreadIdType threadID );
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
     void AfterThreadedGenerateData();
 
     /** Extract all local maxima from the densely sampled ODF surface. Thresholding possible. **/

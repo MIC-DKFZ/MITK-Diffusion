@@ -108,8 +108,7 @@ protected:
   void PrintSelf(std::ostream& os, Indent indent) const override;
 
   void BeforeThreadedGenerateData() override;
-  void ThreadedGenerateData( const
-      OutputImageRegionType &outputRegionForThread, ThreadIdType) override;
+  void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
   GfaComputationMethod m_ComputationMethod;
 
