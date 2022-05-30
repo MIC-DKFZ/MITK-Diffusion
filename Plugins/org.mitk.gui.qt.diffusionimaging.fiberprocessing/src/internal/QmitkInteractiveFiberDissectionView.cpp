@@ -71,6 +71,7 @@ QmitkInteractiveFiberDissectionView::QmitkInteractiveFiberDissectionView()
   : QmitkAbstractView()
   , m_Controls( 0 )
   , m_IterationCounter(0)
+  , m_RandomExtractionCounter(0)
   , m_StreamlineInteractor(nullptr)
 {
 
@@ -214,7 +215,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
       m_Controls->m_StreamlineCreation->setEnabled(true);
   }
 
-  if (nfibSelected)
+  if (nfibSelected && posSelected)
   {
       m_Controls->m_ErazorButton->setEnabled(true);
   }
@@ -222,7 +223,6 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
   if (posSelected && negSelected)
   {
-      MITK_INFO << "Enable Algortihm";
       m_Controls->m_TrainClassifier->setEnabled(true);
   }
 
@@ -443,19 +443,26 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
 
 void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 {
+    m_Controls->m_ErazorButton->setChecked(false);
+
+
      MITK_INFO << "Number of Fibers to extract from Tractogram: ";
      MITK_INFO << m_Controls->m_NumRandomFibers->value();
-     if (m_newfibersSelectedBundles.IsNull())
+     if (this->GetDataStorage()->Exists(m_newfibersSelectedBundles))
      {
+         MITK_INFO << "To Label Bundle Exists";
+         mitk::FiberBundle::Pointer Stack = dynamic_cast<mitk::FiberBundle *>(m_newfibersSelectedBundles->GetData());
+         this->GetDataStorage()->Remove(m_newfibersSelectedBundles);
+
          mitk::DataNode::Pointer node = mitk::DataNode::New();
 
          m_newfibersFibersData = vtkSmartPointer<vtkPolyData>::New();
          m_newfibersFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
-         m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
          m_newfibersBundle = mitk::FiberBundle:: New(m_newfibersFibersData);
+         m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
 
-         node->SetData( m_newfibersBundle );
-         m_newfibersSelectedBundles = node ;
+//         node->SetData( m_newfibersBundle );
+//         m_newfibersSelectedBundles = node ;
 
        MITK_INFO << "Create Bundle";
      }
@@ -468,7 +475,7 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 
 
       unsigned int counter = 0;
-      for ( int i=0; i<m_Controls->m_NumRandomFibers->value(); i++)
+      for ( int i=m_Controls->m_NumRandomFibers->value()*m_RandomExtractionCounter; i<m_Controls->m_NumRandomFibers->value()*(m_RandomExtractionCounter+1); i++)
       {
         vtkCell* cell = fib->GetFiberPolyData()->GetCell(i);
         auto numPoints = cell->GetNumberOfPoints();
@@ -486,8 +493,6 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
     //    weights->InsertValue(counter, fib->GetFiberWeight(i));
         vNewLines->InsertNextCell(container);
         counter++;
-        MITK_INFO << counter;
-        MITK_INFO << vNewLines;
 
       }
 
@@ -509,7 +514,11 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
       node->SetName("ToLabel");
       m_newfibersSelectedBundles = node;
 
+//      MITK_INFO << "Number of Streamlines in first function";
+//      MITK_INFO << m_newfibersSelectedBundles->GetData()->GetFiberPolyData()->GetNumberOfCells();
       this->GetDataStorage()->Add(m_newfibersSelectedBundles);
+      m_RandomExtractionCounter++;
+
 
     UpdateGui();
 
@@ -552,6 +561,9 @@ void QmitkInteractiveFiberDissectionView::RemovefromBundle( bool checked )
         else
         {
             m_StreamlineInteractor->EnableInteraction(true);
+//            MITK_INFO << "Number of Streamlines";
+//            MITK_INFO << m_newfibersSelectedBundles->GetData()->GetFiberPolyData()->GetNumberOfCells();
+            m_StreamlineInteractor->SetToLabelNode(m_newfibersSelectedBundles);
         }
     }
     else
@@ -585,9 +597,25 @@ void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractor()
 
 void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 {
+//    m_traindata.clear();
+    MITK_INFO << "Extract Features";
+    m_negativeBundle = dynamic_cast<mitk::FiberBundle*>(m_negativeSelectedBundles->GetData());
     std::shared_ptr< mitk::StreamlineFeatureExtractor > clusterer = std::make_shared<mitk::StreamlineFeatureExtractor>();
-    clusterer->SetTractogram(m_positiveBundle);
+    clusterer->SetTractogramPlus(m_positiveBundle);
+    clusterer->SetTractogramMinus(m_negativeBundle);
+    clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()));
     clusterer->Update();
+    clusterer->GetData();
+//    MITK_INFO << data.at(0);
+//    MITK_INFO << data.at(1);
+//    cv::Ptr<cv::ml::TrainData> m_traindata = clusterer->GetData();
+//    MITK_INFO << clusterer->m_labels;
+//    MITK_INFO << data.at(1);
+//    MITK_INFO << "Start Classification";
+//    clusterer->CreateClassifier();
+    clusterer->StartAlgorithm();
 
-    MITK_INFO << "HI";
+
+
+    MITK_INFO << "Algorithm run succesfully";
 }

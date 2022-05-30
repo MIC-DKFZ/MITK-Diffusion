@@ -65,21 +65,17 @@ void mitk::StreamlineInteractor::ConnectActionsAndFunctions()
 void mitk::StreamlineInteractor::SetNegativeNode(DataNode *node)
 {
 
-  DataInteractor::SetDataNode(node);
-
-  m_NegStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
-  MITK_INFO << "Negative Node added";
+    DataInteractor::SetDataNode(node);
+    m_NegStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
+    MITK_INFO << "Negative Node added";
 }
 
 void mitk::StreamlineInteractor::SetToLabelNode(DataNode *node)
 {
     DataInteractor::SetDataNode(node);
-
-  if (node && node->GetData())
-  {
     m_manStreamline = dynamic_cast<mitk::FiberBundle *>(node->GetData());
     MITK_INFO << "Label node added";
-  }
+
 }
 
 void mitk::StreamlineInteractor::SetPositiveNode(DataNode *node)
@@ -87,20 +83,13 @@ void mitk::StreamlineInteractor::SetPositiveNode(DataNode *node)
 
     DataInteractor::SetDataNode(node);
     m_PosStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
-
-
     MITK_INFO << "Positive Node added";
   }
 
 void mitk::StreamlineInteractor::AddStreamlinePosBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
     MITK_INFO << "PositiveBundle clicked";
-//     auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
-//     if (positionEvent == nullptr)
-//     {
-//       return;
-//     }
-//    return true;
+
     auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
     if (positionEvent == nullptr)
     {
@@ -117,8 +106,9 @@ void mitk::StreamlineInteractor::AddStreamlinePosBundle(StateMachineAction *, In
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
-        if (picker == nullptr)
-        {
+//        if (picker == nullptr)
+//        {
+
 
 
           picker = vtkSmartPointer<vtkCellPicker>::New();
@@ -132,17 +122,12 @@ void mitk::StreamlineInteractor::AddStreamlinePosBundle(StateMachineAction *, In
             picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
             picker->PickFromListOn();
           }
-        }
+//        }
 
         auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-//        MITK_INFO << displayPosition;
         picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
 
         vtkIdType pickedCellID = picker->GetCellId();
-
-        MITK_INFO << picker->GetCellId();
-        MITK_INFO << "Number of Cells";
-//        MITK_INFO << m_PosStreamline->GetFiberPolyData()->GetNumberOfCells();
 
 
 
@@ -154,7 +139,6 @@ void mitk::StreamlineInteractor::AddStreamlinePosBundle(StateMachineAction *, In
 
 
             vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-            MITK_INFO << vNewPolyData->GetNumberOfLines ();
             vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
             vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
 
@@ -183,6 +167,7 @@ void mitk::StreamlineInteractor::AddStreamlinePosBundle(StateMachineAction *, In
 
 
             vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(pickedCellID);
+
             auto numPoints = cell->GetNumberOfPoints();
             vtkPoints* points = cell->GetPoints();
 
@@ -207,9 +192,6 @@ void mitk::StreamlineInteractor::AddStreamlinePosBundle(StateMachineAction *, In
 
             m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
             m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
-
-            MITK_INFO << m_manStreamline->GetFiberPolyData()->GetNumberOfCells();
-            MITK_INFO << m_PosStreamline->GetFiberPolyData()->GetNumberOfCells();
         }
     }
   }
@@ -239,8 +221,8 @@ void mitk::StreamlineInteractor::AddStreamlineNegBundle(StateMachineAction *, In
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
-        if (picker == nullptr)
-        {
+//        if (picker == nullptr)
+//        {
 
 
           picker = vtkSmartPointer<vtkCellPicker>::New();
@@ -254,15 +236,14 @@ void mitk::StreamlineInteractor::AddStreamlineNegBundle(StateMachineAction *, In
             picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
             picker->PickFromListOn();
           }
-        }
+//        }
 
         auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-//        MITK_INFO << displayPosition;
+
         picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
 
         vtkIdType pickedCellID = picker->GetCellId();
 
-        MITK_INFO << picker->GetCellId();
 
         if (picker->GetCellId()==-1)
         {
@@ -271,7 +252,6 @@ void mitk::StreamlineInteractor::AddStreamlineNegBundle(StateMachineAction *, In
         else
         {
             vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-            MITK_INFO << vNewPolyData->GetNumberOfLines ();
             vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
             vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
 
@@ -325,8 +305,6 @@ void mitk::StreamlineInteractor::AddStreamlineNegBundle(StateMachineAction *, In
             m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
             m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
 
-            MITK_INFO << m_manStreamline->GetFiberPolyData()->GetNumberOfCells();
-            MITK_INFO << m_NegStreamline->GetFiberPolyData()->GetNumberOfCells();
         }
 
 

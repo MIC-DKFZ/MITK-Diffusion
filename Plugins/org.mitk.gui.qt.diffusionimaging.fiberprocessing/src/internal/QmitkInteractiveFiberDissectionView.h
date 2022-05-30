@@ -110,6 +110,7 @@ protected:
 
 
   int m_IterationCounter;                                      ///< used for data node naming
+  int m_RandomExtractionCounter;                               ///< used for random extracton of different Streamlines
 
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
@@ -131,6 +132,7 @@ protected:
 
   vtkSmartPointer<vtkCellPicker>        m_picker1;
   mitk::StreamlineInteractor::Pointer   m_StreamlineInteractor;
+
 
 
 };

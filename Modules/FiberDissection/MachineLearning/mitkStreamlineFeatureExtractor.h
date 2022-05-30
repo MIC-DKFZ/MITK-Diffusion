@@ -32,6 +32,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPoints.h>
 #include <vtkPolyLine.h>
 
+// OpenCV
+#include <opencv2/ml.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
 namespace mitk{
 
 /**
@@ -52,8 +57,16 @@ public:
     this->GenerateData();
   }
 
-  void SetTractogram(const mitk::FiberBundle::Pointer &Tractogram);
+  void SetTractogramPlus(const mitk::FiberBundle::Pointer &Tractogram);
+  void SetTractogramMinus(const mitk::FiberBundle::Pointer &Tractogram);
 
+  void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram);
+  void CreateClassifier();
+  void GetData();
+//  void GetData();
+//  cv::Ptr<cv::ml::TrainData> GetData();
+
+  void StartAlgorithm();
 
 protected:
 
@@ -64,10 +77,17 @@ protected:
 
 
   unsigned int                                m_NumPoints;
-  mitk::FiberBundle::Pointer                  m_Tractogram;
+  mitk::FiberBundle::Pointer                  m_TractogramPlus;
+  mitk::FiberBundle::Pointer                  m_TractogramMinus;
+  mitk::FiberBundle::Pointer                  m_TractogramTest;
   std::vector<vnl_matrix<float> >             T_Prototypes;
-  std::vector<vnl_matrix<float> >             T_Tractogram;
-  std::vector<vnl_matrix<float> >             m_distances;
+  std::vector<vnl_matrix<float> >             T_TractogramPlus;
+  std::vector<vnl_matrix<float> >             T_TractogramMinus;
+  std::vector<vnl_matrix<float> >             T_TractogramTest;
+  std::vector<vnl_matrix<float> >             m_DistancesPlus;
+  std::vector<vnl_matrix<float> >             m_DistancesMinus;
+  std::vector<vnl_matrix<float> >             m_DistancesTest;
+  cv::Ptr<cv::ml::TrainData>                  m_traindata;
 
 };
 }
