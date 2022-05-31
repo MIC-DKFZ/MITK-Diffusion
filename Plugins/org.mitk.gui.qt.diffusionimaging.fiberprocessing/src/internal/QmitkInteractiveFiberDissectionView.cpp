@@ -613,7 +613,8 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 //    MITK_INFO << data.at(1);
 //    MITK_INFO << "Start Classification";
 //    clusterer->CreateClassifier();
-    clusterer->StartAlgorithm();
+//     cv::Mat curdata = clusterer->StartAlgorithm();
+//     MITK_INFO << curdata;
 
 
 

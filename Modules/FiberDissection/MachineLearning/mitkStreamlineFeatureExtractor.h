@@ -66,7 +66,7 @@ public:
 //  void GetData();
 //  cv::Ptr<cv::ml::TrainData> GetData();
 
-  void StartAlgorithm();
+  cv::Mat  StartAlgorithm();
 
 protected:
 

@@ -146,41 +146,50 @@ void StreamlineFeatureExtractor::GetData()
 {
     MITK_INFO << "Start Function Ged Data";
     int labels_arr [m_DistancesPlus.size()+m_DistancesMinus.size()];
-    float data_arr [m_DistancesPlus.size()+m_DistancesMinus.size()][m_DistancesPlus.at(0).size()];
-
+    cv::Mat data;
 
     int size_plus = 0;
+
+
+
     for ( unsigned int i=0; i<m_DistancesPlus.size(); i++)
     {
+        float data_arr [m_DistancesPlus.at(0).size()];
         MITK_INFO << "Plus: Print i";
         MITK_INFO << i;
         MITK_INFO << "Adding 1";
         labels_arr[i]=1;
+
         for ( unsigned int j=0; j<m_DistancesPlus.at(0).cols(); j++)
         {
-            data_arr[i][j] = m_DistancesPlus.at(i).get(0,j);
+            data_arr[j] = m_DistancesPlus.at(i).get(0,j);
         }
+        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
+        MITK_INFO << curdata;
+        data.push_back(curdata);
         size_plus++;
     }
-    MITK_INFO << "Positive Labels added";
+
     for ( unsigned int i=m_DistancesPlus.size(); i<m_DistancesPlus.size()+m_DistancesMinus.size(); i++)
     {
         int it = i - size_plus;
-        MITK_INFO << "Minus: Print i";
-        MITK_INFO << it;
-        labels_arr[i]=0;
+        float data_arr [m_DistancesMinus.at(0).size()];
+        MITK_INFO << "Plus: Print i";
+        MITK_INFO << i;
         MITK_INFO << "Adding 0";
+        labels_arr[i]=0;
+
         for ( unsigned int j=0; j<m_DistancesMinus.at(0).cols(); j++)
         {
-            data_arr[i][j] = m_DistancesMinus.at(it).get(0,j);
+            data_arr[j] = m_DistancesMinus.at(it).get(0,j);
         }
+        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
+        data.push_back(curdata);
+        size_plus++;
     }
-    MITK_INFO << "Negavtive Labels added";
-
-
 
     cv::Mat labels(m_DistancesPlus.size()+m_DistancesMinus.size(), 1, CV_32S, labels_arr);
-    cv::Mat data(m_DistancesPlus.size()+m_DistancesMinus.size(), m_DistancesPlus.at(0).size(), CV_32F, data_arr);
+
 
     MITK_INFO << "data";
     MITK_INFO << data;
@@ -201,31 +210,64 @@ void StreamlineFeatureExtractor::GetData()
     m_rtrees->train(m_traindata);
 
     MITK_INFO << "Predicting";
-//    std::vector<std::vector<float>> test_arr(m_DistancesTest.size(), std::vector<float> (m_DistancesPlus.at(0).size(), 0));
-//    MITK_INFO << "test_arr";
-//    for ( unsigned int i=m_DistancesTest.size(); i<m_DistancesTest.size(); i++)
-//    {
-//        for ( unsigned int j=0; j<m_DistancesTest.at(0).cols(); j++)
-//        {
-//            test_arr[i][j] = m_DistancesTest.at(i).get(0,j);
-//        }
-//    }
-//    cv::Mat dataTest(m_DistancesTest.size(), m_DistancesPlus.at(0).size(), CV_32F);
-//        for ( unsigned int i=m_DistancesTest.size(); i<m_DistancesTest.size(); i++)
-//        {
-//               for ( unsigned int j=0; j<m_DistancesTest.at(0).cols(); j++)
-//                    {
-//                        dataTest[i][j] = m_DistancesTest.at(i).get(0,j);
-//                    }
-//        }
 
-//    int val;
-//    for (int i = 0; i < 20; i++)
-//    {
-//        //val = m_rtrees->predict(testingMat.row(i), predictLabels);
-//        val = std::lround(m_rtrees->predict(dataTest.row(i)));
-//        MITK_INFO << val;
-//    }
+
+    cv::Mat dataTest;
+    for ( unsigned int i=0; i<m_DistancesTest.size(); i++)
+    {
+        float data_arr [m_DistancesTest.at(0).size()];
+
+        for ( unsigned int j=0; j<m_DistancesTest.at(0).cols(); j++)
+        {
+            data_arr[j] = m_DistancesTest.at(i).get(0,j);
+        }
+        cv::Mat curdata(1, m_DistancesTest.at(0).size(), CV_32F, data_arr);
+        dataTest.push_back(curdata);
+    }
+
+
+//      parallel_for<size_t> (size_t(0), m_DistancesTest.size(), [&](size_t i))
+//      {
+//         float data_arr [m_DistancesTest.at(0).size()];
+//         for (int j = 0; j < size; j++)
+//         {
+//            data_arr[j] = m_DistancesTest.at(i).get(0,j);
+//         }
+//         cv::Mat curdata(1, m_DistancesTest.at(0).size(), CV_32F, data_arr);
+//         MITK_INFO << curdata;
+//         dataTest.push_back(curdata);
+
+//       });
+
+
+
+    int val;
+    std::vector<int> preds;
+    for (unsigned int i = 0; i < m_DistancesTest.size(); i++)
+    {
+        //val = m_rtrees->predict(testingMat.row(i), predictLabels);
+        val = std::lround(m_rtrees->predict(dataTest.row(i)));
+        preds.push_back(val);
+    }
+
+    MITK_INFO << preds.size();
+
+    auto it = std::find(preds.begin(), preds.end(), 1);
+
+    // If element was found
+    if (it != preds.end())
+    {
+
+        // calculating the index
+        // of K
+        int index = it - preds.begin();
+        cout << index << endl;
+    }
+    else {
+        // If the element is not
+        // present in the vector
+        cout << "-1" << endl;
+    }
 
 
 
@@ -233,12 +275,8 @@ void StreamlineFeatureExtractor::GetData()
 
 }
 
-//void StreamlineFeatureExtractor::CreateClassifier()
-//{
-//    MITK_INFO << m_traindata->getResponses();
 
 
-//}
 
 
 void StreamlineFeatureExtractor::GenerateData()
@@ -265,11 +303,24 @@ void StreamlineFeatureExtractor::GenerateData()
 }
 
 
-void StreamlineFeatureExtractor::StartAlgorithm()
+cv::Mat StreamlineFeatureExtractor::StartAlgorithm()
 {
     MITK_INFO << "Printing";
+    float data_arr [10] = {1, 2.4 ,4 ,4.5 ,6 ,7, 120.5, 100, 120, 100};
+    cv::Mat curdata(1, 10, CV_32F, data_arr);
+    float data_arr2 [10] = {10, 20.4 ,40 ,40.5 ,60 ,70, 1200.5, 1000, 1200, 1000};
+    cv::Mat curdata2(1, 10, CV_32F, data_arr2);
 
-//    MITK_INFO << dataset->getResponses();
+    cv::Mat data;
+//    cv::Mat data2;
+    //    data.row(1) = curdata.clone();
+    data.push_back(curdata);
+    data.push_back(curdata2);
+//    cv::add(curdata,data2,data2);
+    cout << curdata;
+    cout << data;
+//    cout << data2;
+    return curdata.clone();
 }
 
 
