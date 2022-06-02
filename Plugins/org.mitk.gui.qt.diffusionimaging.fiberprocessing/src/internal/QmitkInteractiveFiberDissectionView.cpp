@@ -605,7 +605,19 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
     clusterer->SetTractogramMinus(m_negativeBundle);
     clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()));
     clusterer->Update();
-    clusterer->GetData();
+
+    m_Prediction = clusterer->m_Prediction;
+
+    mitk::DataNode::Pointer node = mitk::DataNode::New();
+    node->SetData(m_Prediction);
+    node->SetName("Prediction");
+    m_PredictionNode = node;
+
+//      MITK_INFO << "Number of Streamlines in first function";
+//      MITK_INFO << m_newfibersSelectedBundles->GetData()->GetFiberPolyData()->GetNumberOfCells();
+    this->GetDataStorage()->Add(m_PredictionNode);
+
+//    clusterer->GetData();
 //    MITK_INFO << data.at(0);
 //    MITK_INFO << data.at(1);
 //    cv::Ptr<cv::ml::TrainData> m_traindata = clusterer->GetData();

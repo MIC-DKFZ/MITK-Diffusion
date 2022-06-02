@@ -247,8 +247,8 @@ QGroupBox {
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>399</width>
-        <height>492</height>
+        <width>414</width>
+        <height>478</height>
        </rect>
       </property>
       <property name="accessibleName">
@@ -445,6 +445,9 @@ QGroupBox {
            <widget class="QSpinBox" name="m_NumRandomFibers">
             <property name="minimum">
              <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>2000</number>
             </property>
            </widget>
           </item>

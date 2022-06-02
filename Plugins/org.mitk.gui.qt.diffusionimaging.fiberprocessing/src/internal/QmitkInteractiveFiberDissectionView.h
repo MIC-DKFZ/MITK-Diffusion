@@ -121,11 +121,13 @@ protected:
   mitk::FiberBundle::Pointer            m_positiveBundle;
   mitk::FiberBundle::Pointer            m_newfibersBundle;
   mitk::FiberBundle::Pointer            m_negativeBundle;
+  mitk::FiberBundle::Pointer            m_Prediction;
 
 
   mitk::DataNode::Pointer               m_positivSelectedBundles;
   mitk::DataNode::Pointer               m_newfibersSelectedBundles;
   mitk::DataNode::Pointer               m_negativeSelectedBundles;
+  mitk::DataNode::Pointer               m_PredictionNode;
 
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;

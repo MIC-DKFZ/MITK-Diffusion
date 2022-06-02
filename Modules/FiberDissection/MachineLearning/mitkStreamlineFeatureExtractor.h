@@ -62,11 +62,12 @@ public:
 
   void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram);
   void CreateClassifier();
-  void GetData();
-//  void GetData();
-//  cv::Ptr<cv::ml::TrainData> GetData();
+  std::vector<unsigned int>  GetData();
 
-  cv::Mat  StartAlgorithm();
+  void CreatePrediction(std::vector<unsigned int> &index);
+
+  mitk::FiberBundle::Pointer                  m_Prediction;
+
 
 protected:
 
@@ -88,7 +89,6 @@ protected:
   std::vector<vnl_matrix<float> >             m_DistancesMinus;
   std::vector<vnl_matrix<float> >             m_DistancesTest;
   cv::Ptr<cv::ml::TrainData>                  m_traindata;
-
 };
 }
 
