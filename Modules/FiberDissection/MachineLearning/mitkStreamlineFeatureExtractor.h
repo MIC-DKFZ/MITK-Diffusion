@@ -60,7 +60,7 @@ public:
   void SetTractogramPlus(const mitk::FiberBundle::Pointer &Tractogram);
   void SetTractogramMinus(const mitk::FiberBundle::Pointer &Tractogram);
 
-  void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram);
+  void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram, std::string TractogramTestName);
   void CreateClassifier();
   std::vector<unsigned int>  GetData();
 
@@ -81,6 +81,7 @@ protected:
   mitk::FiberBundle::Pointer                  m_TractogramPlus;
   mitk::FiberBundle::Pointer                  m_TractogramMinus;
   mitk::FiberBundle::Pointer                  m_TractogramTest;
+  std::string                                 m_DistancesTestName;
   std::vector<vnl_matrix<float> >             T_Prototypes;
   std::vector<vnl_matrix<float> >             T_TractogramPlus;
   std::vector<vnl_matrix<float> >             T_TractogramMinus;

@@ -603,7 +603,10 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
     std::shared_ptr< mitk::StreamlineFeatureExtractor > clusterer = std::make_shared<mitk::StreamlineFeatureExtractor>();
     clusterer->SetTractogramPlus(m_positiveBundle);
     clusterer->SetTractogramMinus(m_negativeBundle);
-    clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()));
+    clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()), m_SelectedFB.at(0)->GetName());
+
+//    m_distances = clusterer->get
+
     clusterer->Update();
 
     m_Prediction = clusterer->m_Prediction;
@@ -631,4 +634,5 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 
 
     MITK_INFO << "Algorithm run succesfully";
+
 }
