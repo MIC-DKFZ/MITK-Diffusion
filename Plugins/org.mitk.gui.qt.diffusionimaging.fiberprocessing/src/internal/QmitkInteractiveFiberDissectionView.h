@@ -86,6 +86,8 @@ protected slots:
   void RemovefromBundle( bool checked );
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
+  void CreatePredictionNode();
+  void CreateUncertaintySampleNode();
 
 
 
@@ -104,7 +106,6 @@ protected:
   void OnEndInteraction();
   void CreateStreamlineInteractor();
 
-
   Ui::QmitkInteractiveFiberDissectionViewControls* m_Controls;
 
 
@@ -122,12 +123,14 @@ protected:
   mitk::FiberBundle::Pointer            m_newfibersBundle;
   mitk::FiberBundle::Pointer            m_negativeBundle;
   mitk::FiberBundle::Pointer            m_Prediction;
+  mitk::FiberBundle::Pointer            m_UncertaintyLabel;
 
 
   mitk::DataNode::Pointer               m_positivSelectedBundles;
   mitk::DataNode::Pointer               m_newfibersSelectedBundles;
   mitk::DataNode::Pointer               m_negativeSelectedBundles;
   mitk::DataNode::Pointer               m_PredictionNode;
+  mitk::DataNode::Pointer               m_UncertaintyLabelNode;
 
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
@@ -135,7 +138,9 @@ protected:
   vtkSmartPointer<vtkCellPicker>        m_picker1;
   mitk::StreamlineInteractor::Pointer   m_StreamlineInteractor;
 
+  std::shared_ptr< mitk::StreamlineFeatureExtractor > clusterer;
 
+  std::vector<std::vector<unsigned int>> m_index;
 
 };
 

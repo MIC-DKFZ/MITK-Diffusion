@@ -93,7 +93,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>2</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -593,6 +593,13 @@ QGroupBox {
            </size>
           </property>
          </spacer>
+        </item>
+        <item row="4" column="0">
+         <widget class="QPushButton" name="m_newlabeling">
+          <property name="text">
+           <string>PushButton</string>
+          </property>
+         </widget>
         </item>
        </layout>
       </widget>

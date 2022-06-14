@@ -117,6 +117,9 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_TrainClassifier, SIGNAL( clicked() ), this, SLOT( StartAlgorithm( )));
 
+    connect(m_Controls->m_CreatePrediction, SIGNAL( clicked() ), this, SLOT( CreatePredictionNode( )));
+
+    connect(m_Controls->m_AddUncertainFibers, SIGNAL( clicked() ), this, SLOT( CreateUncertaintySampleNode( )));
 
 
 
@@ -178,6 +181,8 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 //  bool negSelected = !m_negativeSelectedBundles.IsNotNull();
     bool posSelected = this->GetDataStorage()->Exists(m_positivSelectedBundles);
     bool negSelected = this->GetDataStorage()->Exists(m_negativeSelectedBundles);
+    bool indexSelected = !m_index.empty();
+//    bool uncertaintySelected = !m_UncertaintyLabel.empty();
 
 
 
@@ -225,6 +230,16 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   {
       m_Controls->m_TrainClassifier->setEnabled(true);
   }
+
+  if (indexSelected)
+  {
+      m_Controls->m_CreatePrediction->setEnabled(true);
+      m_Controls->m_AddUncertainFibers->setEnabled(true);
+      m_Controls->m_Numtolabel->setEnabled(true);
+  }
+
+
+
 
 
 }
@@ -519,7 +534,6 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
       this->GetDataStorage()->Add(m_newfibersSelectedBundles);
       m_RandomExtractionCounter++;
 
-
     UpdateGui();
 
 
@@ -582,7 +596,6 @@ void QmitkInteractiveFiberDissectionView::RemovefromBundle( bool checked )
    UpdateGui();
 }
 
-
 void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractor()
 {
 
@@ -594,31 +607,44 @@ void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractor()
 //  m_StreamlineInteractor->SetRotationEnabled(rotationEnabled);
 }
 
-
 void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 {
 //    m_traindata.clear();
+    clusterer.reset();
     MITK_INFO << "Extract Features";
     m_negativeBundle = dynamic_cast<mitk::FiberBundle*>(m_negativeSelectedBundles->GetData());
-    std::shared_ptr< mitk::StreamlineFeatureExtractor > clusterer = std::make_shared<mitk::StreamlineFeatureExtractor>();
+    clusterer = std::make_shared<mitk::StreamlineFeatureExtractor>();
     clusterer->SetTractogramPlus(m_positiveBundle);
     clusterer->SetTractogramMinus(m_negativeBundle);
     clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()), m_SelectedFB.at(0)->GetName());
+
 
 //    m_distances = clusterer->get
 
     clusterer->Update();
 
-    m_Prediction = clusterer->m_Prediction;
+    m_index = clusterer->m_index;
 
+    m_Prediction = clusterer->CreatePrediction(m_index.at(0));
     mitk::DataNode::Pointer node = mitk::DataNode::New();
     node->SetData(m_Prediction);
     node->SetName("Prediction");
     m_PredictionNode = node;
+    this->GetDataStorage()->Add(m_PredictionNode);
+
+
+
+
+//    m_UncertaintyLabel = clusterer->m_UncertaintyLabel;
+//    mitk::DataNode::Pointer node2 = mitk::DataNode::New();
+//    node2->SetData(m_UncertaintyLabel);
+//    node2->SetName("UncertaintyLabels");
+//    m_UncertaintyLabelNode = node2;
 
 //      MITK_INFO << "Number of Streamlines in first function";
 //      MITK_INFO << m_newfibersSelectedBundles->GetData()->GetFiberPolyData()->GetNumberOfCells();
-    this->GetDataStorage()->Add(m_PredictionNode);
+//    this->GetDataStorage()->Add(m_UncertaintyLabelNode);
+//    this->GetDataStorage()->Add(m_PredictionNode);
 
 //    clusterer->GetData();
 //    MITK_INFO << data.at(0);
@@ -635,4 +661,37 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 
     MITK_INFO << "Algorithm run succesfully";
 
+    m_Controls->m_CreatePrediction->setEnabled(true);
+    UpdateGui();
+
+}
+
+void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
+{
+    MITK_INFO << "Create Prediction";
+//    clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()), m_SelectedFB.at(0)->GetName());
+    m_Prediction = clusterer->CreatePrediction(m_index.at(0));
+    mitk::DataNode::Pointer node = mitk::DataNode::New();
+    node->SetData(m_Prediction);
+    node->SetName("Prediction");
+    m_PredictionNode = node;
+    this->GetDataStorage()->Add(m_PredictionNode);
+    UpdateGui();
+}
+
+void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
+{
+     MITK_INFO << "Create Fibers to label";
+     std::vector<unsigned int> myvec = m_index.at(1);
+     myvec.resize(m_Controls->m_Numtolabel->value());
+     MITK_INFO << m_index.at(1).size();
+     MITK_INFO << myvec.size();
+
+//    clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()), m_SelectedFB.at(0)->GetName()));
+        m_UncertaintyLabel = clusterer->CreatePrediction(myvec);
+        mitk::DataNode::Pointer node = mitk::DataNode::New();
+        node->SetData(m_UncertaintyLabel);
+        node->SetName("UncertaintyLabel");
+        m_UncertaintyLabelNode = node;
+        this->GetDataStorage()->Add(m_UncertaintyLabelNode);
 }

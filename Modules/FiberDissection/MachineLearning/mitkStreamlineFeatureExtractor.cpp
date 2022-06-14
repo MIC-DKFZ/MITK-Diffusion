@@ -145,10 +145,10 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::v
     return dist_vec;
 }
 
-std::vector<unsigned int>  StreamlineFeatureExtractor::GetData()
+std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 {
-    MITK_INFO << "Start Function Ged Data";
-//    int labels_arr [m_DistancesPlus.size()+m_DistancesMinus.size()];
+    MITK_INFO << "Start Function Get Data";
+    std::vector<std::vector<unsigned int>> index_vec;
     float labels_arr [m_DistancesPlus.size()+m_DistancesMinus.size()];
     cv::Mat data;
     cv::Mat labels_arr_vec;
@@ -195,25 +195,26 @@ std::vector<unsigned int>  StreamlineFeatureExtractor::GetData()
     float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
 
     // Create sample weights
-    for (int i=0; i<labels_arr_vec.rows; i++ )
-    {
-        if (i<onesgt)
-        {
-            weights.push_back(plusval);
-        }
-        else {
-            weights.push_back(minusval);
-        }
-    }
-
+//    for (int i=0; i<labels_arr_vec.rows; i++ )
+//    {
+//        if (i<onesgt)
+//        {
+//            weights.push_back(plusval);
+//        }
+//        else {
+//            weights.push_back(minusval);
+//        }
+//    }
+    weights.push_back(minusval);
+    weights.push_back(plusval);
     MITK_INFO << "Weights";
-    MITK_INFO << plusval;
-    MITK_INFO << minusval;
+
     cv::Mat newweight;
 
-    newweight.push_back(zerosgt);
-    newweight.push_back(onesgt);
-
+    newweight.push_back(minusval);
+    newweight.push_back(plusval);
+    MITK_INFO << "Weights";
+    MITK_INFO << newweight;
 
 
 //    cv::Mat labels(m_DistancesPlus.size()+m_DistancesMinus.size(), 1, CV_32S, labels_arr);
@@ -241,13 +242,13 @@ std::vector<unsigned int>  StreamlineFeatureExtractor::GetData()
 ////    criteria.epsilon = 1e-8;
 ////    criteria.maxCount = 5000;
 
-    statistic_model->setMaxCategories(2);
-    statistic_model->setMaxDepth(3);
-    statistic_model->setMinSampleCount(1);
+    statistic_model->setMaxCategories(80);
+    statistic_model->setMaxDepth(50);
+    statistic_model->setMinSampleCount(3);
     statistic_model->setTruncatePrunedTree(true);
     statistic_model->setUse1SERule(true);
     statistic_model->setUseSurrogates(false);
-    statistic_model->setTermCriteria(cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 800, 1e-6));
+    statistic_model->setTermCriteria(cv::TermCriteria(1500, 1000, 1e-8));
     statistic_model->setCVFolds(1);
     statistic_model->setPriors(newweight);
 
@@ -286,57 +287,127 @@ std::vector<unsigned int>  StreamlineFeatureExtractor::GetData()
 //    MITK_INFO << dataTest.cols;
 //    MITK_INFO << dataTest.rows;
 //    MITK_INFO << dataTest;
-//    MITK_INFO << "________";
+    MITK_INFO << "________";
 
 
 
 
 
 
-    cv::Mat vote;
-    cv::Mat pred;
 
-//    int val;
-//    std::vector<int> pred;
-    std::vector<unsigned int> index;
-//    for (unsigned int i = 0; i < m_DistancesTest.size(); i++)
-//    {
-////        MITK_INFO << dataTest.row(i);
-//        val = statistic_model->predict(dataTest.row(i));
-//        pred.push_back(val);
+    int val;
+    std::vector<int> pred(m_DistancesTest.size());
+    std::vector<unsigned int> index(m_DistancesTest.size());
+    float one_prob;
+    float zero_prob;
+    int ones;
+    int zeros;
 
-//        if (val==1)
-//        {
-//           index.push_back(i);
-//        }
-//    }
-    statistic_model->getTermCriteria();
-    statistic_model->getVotes(dataTest, vote, 0);
-    statistic_model->predict(dataTest, pred);
 
-    MITK_INFO << pred;
+
+    std::vector<float> e(m_DistancesTest.size()) ;
+
+
+
+
+    cv::parallel_for_(cv::Range(0, m_DistancesTest.size()), [&](const cv::Range &range)
+    {
+    for (int i = range.start; i < range.end; i++)
+    {
+
+
+        cv::Mat vote;
+        val = statistic_model->predict(dataTest.row(i));
+        statistic_model->getVotes(dataTest.row(i), vote, 0);
+
+        ones  = cv::countNonZero(vote);
+        zeros = vote.cols - cv::countNonZero(vote);
+
+        one_prob = ones/ (vote.cols * 1.0);
+        zero_prob = zeros / (vote.cols * 1.0);
+
+        e.at(i) = ( -one_prob * log2(one_prob) - zero_prob * log2(zero_prob));
+
+
+
+        pred.at(i) = val;
+
+
+        if (val==1)
+        {
+           index.at(i) = i;
+        }
+
+    }
+    });
+    index.erase(
+        std::remove(index.begin(), index.end(), 0),
+        index.end());
+    index.shrink_to_fit();
+
+
+    MITK_INFO << "--------------";
+    e.erase(
+        std::remove(e.begin(), e.end(), 0),
+        e.end());
+    e.shrink_to_fit();
+    auto it = std::minmax_element(e.begin(), e.end());
+    int min_idx = std::distance(e.begin(), it.first);
+    int max_idx = std::distance(e.begin(), it.second);
+    std::cout << min_idx << ", " << max_idx << std::endl; // 1, 5
+
+    MITK_INFO << "--------------";
+
+    MITK_INFO << "Start the ordering";
+    std::vector<unsigned int> indextolabel;
+    std::priority_queue<std::pair<float, int>> q;
+      for (unsigned int i = 0; i < e.size(); ++i) {
+        q.push(std::pair<float, int>(e[i], i));
+      }
+      int k = m_DistancesTest.size(); // number of indices we need
+//      int k = 500; // number of indices we need
+      for (int i = 0; i < k; ++i) {
+        int ki = q.top().second;
+//        std::cout << "index[" << i << "] = " << ki << std::endl;x
+        indextolabel.push_back(ki);
+        q.pop();
+      }
+      MITK_INFO << "Done";
+
+//    MITK_INFO << statistic_model->getTermCriteria().maxCount;
+//    MITK_INFO << statistic_model->getTermCriteria().type;
+//    MITK_INFO << statistic_model->getTermCriteria().epsilon;
+//    statistic_model->getVotes(dataTest.row(0), vote, 0);
+//    statistic_model->predict(dataTest, pred);
+//    cv::Mat vote;
+//    statistic_model->getVotes(dataTest, vote, 0);
+//    MITK_INFO << "vote";
+//    MITK_INFO << vote.rows;
+//    MITK_INFO << vote.cols;
+//    MITK_INFO << pred;
 //    mitke_INFO << vote;
 ////    MITK_INFO << vote;s
-    MITK_INFO << vote.cols;
-    MITK_INFO << vote.rows;
+//    MITK_INFO << vote;
     MITK_INFO << "_______";
-    int one  = cv::countNonZero(vote);
-    MITK_INFO << one;
-    int zerorows = vote.rows - cv::countNonZero(vote);
-    MITK_INFO << zerorows;
 
-    index.push_back(1);
 
-    return index;
+    MITK_INFO << statistic_model->getPriors();
+//    MITK_INFO << statistic_model->getNodes();
+
+//    index.push_back(1);
+    index_vec.push_back(index);
+    index_vec.push_back(indextolabel);
+
+    return index_vec;
 
 }
 
-void StreamlineFeatureExtractor::CreatePrediction(std::vector<unsigned int> &index)
+mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vector<unsigned int> &index)
 {
 
 
 
-
+    mitk::FiberBundle::Pointer Prediction;
     MITK_INFO << "Create Bundle";
 
     vtkSmartPointer<vtkPolyData> FibersData;
@@ -385,18 +456,20 @@ void StreamlineFeatureExtractor::CreatePrediction(std::vector<unsigned int> &ind
      FibersData->SetPoints(vNewPoints);
      FibersData->SetLines(vNewLines);
 
-     m_Prediction = mitk::FiberBundle::New(vNewPolyData);
+     Prediction = mitk::FiberBundle::New(vNewPolyData);
 
 //     Bundle->SetFiberColors(255, 255, 255);
     MITK_INFO << "Cells Prediciton";
-    MITK_INFO << m_Prediction->GetFiberPolyData()->GetNumberOfCells();
+    MITK_INFO << Prediction->GetFiberPolyData()->GetNumberOfCells();
     MITK_INFO << "Cells Tractorgram";
     MITK_INFO << m_TractogramTest->GetFiberPolyData()->GetNumberOfCells();
+
+    return Prediction;
 }
 
 
 
-void StreamlineFeatureExtractor::GenerateData()
+void  StreamlineFeatureExtractor::GenerateData()
 {
     MITK_INFO << "Update";
     mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671.trk");
@@ -480,8 +553,7 @@ void StreamlineFeatureExtractor::GenerateData()
     MITK_INFO << "Size of Test Data";
     MITK_INFO << m_DistancesTest.size();
     MITK_INFO << "Done with Datacreation";
-    std::vector<unsigned int> index =GetData();
-//    CreatePrediction (index);
+    m_index =GetData();
 
 }
 

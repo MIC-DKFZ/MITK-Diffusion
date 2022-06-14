@@ -62,11 +62,15 @@ public:
 
   void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram, std::string TractogramTestName);
   void CreateClassifier();
-  std::vector<unsigned int>  GetData();
+  std::vector<std::vector<unsigned int>>  GetData();
 
-  void CreatePrediction(std::vector<unsigned int> &index);
+//  void CreatePrediction(std::vector<unsigned int> &index);
+  mitk::FiberBundle::Pointer CreatePrediction(std::vector<unsigned int> &index);
 
   mitk::FiberBundle::Pointer                  m_Prediction;
+  mitk::FiberBundle::Pointer                  m_ToLabel;
+
+  std::vector<std::vector<unsigned int>>      m_index;
 
 
 protected:
