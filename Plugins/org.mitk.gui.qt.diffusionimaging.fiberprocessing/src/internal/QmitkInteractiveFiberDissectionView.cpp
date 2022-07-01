@@ -1,4 +1,4 @@
-/*===================================================================
+﻿/*===================================================================
 
 The Medical Imaging Interaction Toolkit (MITK)
 
@@ -121,6 +121,8 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_AddUncertainFibers, SIGNAL( clicked() ), this, SLOT( CreateUncertaintySampleNode( )));
 
+    connect(m_Controls->m_newlabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromUncertainty(bool) ) ); //need
+
 
 
     connect(m_Controls->m_addPointSetPushButton, &QPushButton::clicked,//pointset
@@ -157,6 +159,8 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
   m_Controls->m_ErazorButton->setCheckable(true);
   m_Controls->m_ErazorButton->setEnabled(false);
+  m_Controls->m_newlabeling->setCheckable(true);
+  m_Controls->m_newlabeling->setEnabled(false);
 
 
 
@@ -169,6 +173,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   m_Controls->m_addPointSetPushButton->setEnabled(false);
   m_Controls->m_AddRandomFibers->setEnabled(false);
   m_Controls->m_AddUncertainFibers->setEnabled(false);
+  m_Controls->m_newlabeling->setEnabled(false);
 
   bool fibSelected = !m_SelectedFB.empty();
   bool multipleFibsSelected = (m_SelectedFB.size()>1);
@@ -182,7 +187,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
     bool posSelected = this->GetDataStorage()->Exists(m_positivSelectedBundles);
     bool negSelected = this->GetDataStorage()->Exists(m_negativeSelectedBundles);
     bool indexSelected = !m_index.empty();
-//    bool uncertaintySelected = !m_UncertaintyLabel.empty();
+    bool uncertaintySelected = this->GetDataStorage()->Exists(m_UncertaintyLabelNode);
 
 
 
@@ -237,6 +242,12 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
       m_Controls->m_AddUncertainFibers->setEnabled(true);
       m_Controls->m_Numtolabel->setEnabled(true);
   }
+
+  if (uncertaintySelected)
+  {
+      m_Controls->m_newlabeling->setEnabled(true);
+  }
+
 
 
 
@@ -451,6 +462,7 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
       MITK_INFO << m_NegStreamline->GetFiberPolyData()->GetNumberOfCells();
 
       this->GetDataStorage()->Add(m_positivSelectedBundles);
+//      m_Controls->m_selectedPointSetWidget->m_ToggleAddPoint->setEnabled(false);
 
       UpdateGui();
 
@@ -625,12 +637,12 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 
     m_index = clusterer->m_index;
 
-    m_Prediction = clusterer->CreatePrediction(m_index.at(0));
-    mitk::DataNode::Pointer node = mitk::DataNode::New();
-    node->SetData(m_Prediction);
-    node->SetName("Prediction");
-    m_PredictionNode = node;
-    this->GetDataStorage()->Add(m_PredictionNode);
+//    m_Prediction = clusterer->CreatePrediction(m_index.at(0));
+//    mitk::DataNode::Pointer node = mitk::DataNode::New();
+//    node->SetData(m_Prediction);
+//    node->SetName("Prediction");
+//    m_PredictionNode = node;
+//    this->GetDataStorage()->Add(m_PredictionNode);
 
 
 
@@ -694,4 +706,22 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
         node->SetName("UncertaintyLabel");
         m_UncertaintyLabelNode = node;
         this->GetDataStorage()->Add(m_UncertaintyLabelNode);
+        UpdateGui();
+}
+
+void QmitkInteractiveFiberDissectionView::RemovefromUncertainty( bool checked )
+{
+    if (checked)
+    {
+
+        m_UncertaintyLabel->SetFiberColors(255, 255, 255);
+            m_StreamlineInteractor->EnableInteraction(true);
+            m_StreamlineInteractor->SetToLabelNode(m_UncertaintyLabelNode);
+    }
+    else
+    {
+      m_StreamlineInteractor->EnableInteraction(false);
+//      m_StreamlineInteractor = nullptr;
+    }
+
 }

@@ -88,6 +88,7 @@ protected slots:
   void StartAlgorithm();
   void CreatePredictionNode();
   void CreateUncertaintySampleNode();
+  void RemovefromUncertainty( bool checked );
 
 
 
