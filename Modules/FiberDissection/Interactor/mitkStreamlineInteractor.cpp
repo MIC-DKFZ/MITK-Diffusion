@@ -145,6 +145,7 @@ void mitk::StreamlineInteractor::AddStreamlinePosBundle(StateMachineAction *, In
             unsigned int counter = 0;
             for ( int i=0; i<m_PosStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
             {
+
               vtkCell* cell = m_PosStreamline->GetFiberPolyData()->GetCell(i);
               auto numPoints = cell->GetNumberOfPoints();
               vtkPoints* points = cell->GetPoints();
@@ -189,11 +190,13 @@ void mitk::StreamlineInteractor::AddStreamlinePosBundle(StateMachineAction *, In
             m_PosStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
             m_PosStreamline->GetFiberPolyData()->SetLines(vNewLines);
             m_PosStreamline->SetFiberColors(0, 255, 0);
+//            m_PosStreamline->SetFiberWeights(m_PosStreamline->GetFiberWeights());
 
             m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
             m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
         }
     }
+    RenderingManager::GetInstance()->RequestUpdateAll();
   }
 
 void mitk::StreamlineInteractor::AddStreamlineNegBundle(StateMachineAction *, InteractionEvent *interactionEvent)
@@ -306,17 +309,6 @@ void mitk::StreamlineInteractor::AddStreamlineNegBundle(StateMachineAction *, In
             m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
 
         }
-
-
-
-
-
-
-
-
-
     }
-
-
-
+    RenderingManager::GetInstance()->RequestUpdateAll();
   }

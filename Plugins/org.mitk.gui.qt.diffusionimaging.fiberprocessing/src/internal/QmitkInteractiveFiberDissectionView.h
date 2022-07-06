@@ -89,6 +89,7 @@ protected slots:
   void CreatePredictionNode();
   void CreateUncertaintySampleNode();
   void RemovefromUncertainty( bool checked );
+  void RemovefromPrediction( bool checked );
 
 
 
@@ -116,7 +117,7 @@ protected:
 
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
-
+  mitk::DataNode::Pointer              m_trainbundle;
   mitk::Image::Pointer                  m_SelectedImage;
   mitk::DataNode::Pointer               m_SelectedPS;
   mitk::DataNode::Pointer               m_SelectedImageNode;
@@ -127,7 +128,7 @@ protected:
   mitk::FiberBundle::Pointer            m_UncertaintyLabel;
 
 
-  mitk::DataNode::Pointer               m_positivSelectedBundles;
+  mitk::DataNode::Pointer               m_positivBundlesNode;
   mitk::DataNode::Pointer               m_newfibersSelectedBundles;
   mitk::DataNode::Pointer               m_negativeSelectedBundles;
   mitk::DataNode::Pointer               m_PredictionNode;

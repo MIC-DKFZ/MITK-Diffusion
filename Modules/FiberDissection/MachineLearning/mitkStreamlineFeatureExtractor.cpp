@@ -52,48 +52,65 @@ void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Poin
     std::string path = "/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/";
     path.append(TractogramTestName);
     m_TractogramTest= TractogramTest;
-    m_DistancesTestName= path.append("_distances.csv");
+    auto s = std::to_string(m_NumPoints);
+    m_DistancesTestName= path.append("_distances" + s + ".csv");
 }
 
 std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk::FiberBundle::Pointer tractogram)
 {
   mitk::FiberBundle::Pointer temp_fib = tractogram->GetDeepCopy();
   temp_fib->ResampleToNumPoints(m_NumPoints);
+  MITK_INFO << "Resampling Done";
 
-  std::vector< vnl_matrix<float> > out_fib;
+  std::vector< vnl_matrix<float> > out_fib(temp_fib->GetFiberPolyData()->GetNumberOfCells());
+//  std::vector< vnl_matrix<float> > out_fib();
 
-  for (int i=0; i<temp_fib->GetFiberPolyData()->GetNumberOfCells(); i++)
-  {
-    vtkCell* cell = temp_fib->GetFiberPolyData()->GetCell(i);
-    int numPoints = cell->GetNumberOfPoints();
-    vtkPoints* points = cell->GetPoints();
+//  cv::parallel_for_(cv::Range(0, temp_fib->GetFiberPolyData()->GetNumberOfCells()), [&](const cv::Range &range)
+//  {
+//      for (int i = range.start; i < range.end; i++)
+//    #pragma omp parallel for
+//  #pragma omp parallel for num_threads(10) collapse(1)
+      for (int i=0; i<temp_fib->GetFiberPolyData()->GetNumberOfCells(); i++)
+      {
+        vtkCell* cell = temp_fib->GetFiberPolyData()->GetCell(i);
+        int numPoints = cell->GetNumberOfPoints();
+        vtkPoints* points = cell->GetPoints();
 
-    vnl_matrix<float> streamline;
-    streamline.set_size(3, m_NumPoints);
-    streamline.fill(0.0);
+        vnl_matrix<float> streamline;
+        streamline.set_size(3, m_NumPoints);
+        streamline.fill(0.0);
 
-    for (int j=0; j<numPoints; j++)
-    {
-      double cand[3];
-      points->GetPoint(j, cand);
+        for (int j=0; j<numPoints; j++)
+        {
+          double cand[3];
+          points->GetPoint(j, cand);
 
-      vnl_vector_fixed< float, 3 > candV;
-      candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
-      streamline.set_column(j, candV);
-    }
+          vnl_vector_fixed< float, 3 > candV;
+          candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
+          streamline.set_column(j, candV);
+        }
 
-    out_fib.push_back(streamline);
-  }
+//        out_fib.push_back(streamline);
+        out_fib.at(i)=streamline;
+      }
+//      });
+
+
 
   return out_fib;
 }
 
 std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::vector<vnl_matrix<float> > tractogram, std::vector<vnl_matrix<float> > prototypes)
 {
-    std::vector< vnl_matrix<float> >  dist_vec;
+    std::vector< vnl_matrix<float> >  dist_vec(tractogram.size());//
+    MITK_INFO << "Start Calculating Dmdf";
+    cv::parallel_for_(cv::Range(0, tractogram.size()), [&](const cv::Range &range)
+    {
+    for (int i = range.start; i < range.end; i++)
+//    #pragma omp parallel for
 
-
-    for (unsigned int i=0; i<tractogram.size(); i++)
+//#pragma omp parallel for
+//    for (unsigned int i=0; i<tractogram.size(); i++)
     {
 
         vnl_matrix<float> distances;
@@ -138,8 +155,11 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::v
 
 
         }
-        dist_vec.push_back(distances);
+//        dist_vec.push_back(distances);
+        dist_vec.at(i) = distances;
     }
+    });
+    MITK_INFO << "Done Calculation";
 
     return dist_vec;
 }
@@ -162,7 +182,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     for ( unsigned int i=0; i<m_DistancesPlus.size(); i++)
     {
         float data_arr [m_DistancesPlus.at(0).size()];
-        labels_arr[i]=2;
+        labels_arr[i]=1;
         labels_arr_vec.push_back(1);
 
         for ( unsigned int j=0; j<m_DistancesPlus.at(0).cols(); j++)
@@ -179,7 +199,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     {
         int it = i - size_plus;
         float data_arr [m_DistancesMinus.at(0).size()];
-        labels_arr[i]=1;
+        labels_arr[i]=0;
         labels_arr_vec.push_back(0);
 
          for ( unsigned int j=0; j<m_DistancesMinus.at(0).cols(); j++)
@@ -206,13 +226,20 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     cv::Mat labels(m_DistancesPlus.size()+m_DistancesMinus.size(), 1, CV_32S, labels_arr);
 
+//    std::ofstream myfile1;
+//    myfile1.open("/home/r948e/mycsv/labels.csv");
+//    myfile1<< cv::format(labels, cv::Formatter::FMT_CSV) << std::endl;
+//    myfile1.close();
+
+//    std::ofstream myfile2;
+//    myfile2.open("/home/r948e/mycsv/features.csv");
+//    myfile2<< cv::format(data, cv::Formatter::FMT_CSV) << std::endl;
+//    myfile2.close();
 
     cv::Ptr<cv::ml::TrainData> m_traindata = cv::ml::TrainData::create(data, cv::ml::ROW_SAMPLE, labels);
 
 //    m_traindata->setTrainTestSplitRatio(0.95, true);
     m_traindata->shuffleTrainTest();
-    MITK_INFO << m_traindata->getTrainResponses();
-    MITK_INFO << m_traindata->getTrainSamples();
     MITK_INFO << m_traindata->getClassLabels();
 
     MITK_INFO << "Start Training";
@@ -222,14 +249,14 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     auto criteria = cv::TermCriteria();
     criteria.type = cv::TermCriteria::MAX_ITER;
 //    criteria.epsilon = 1e-8;
-    criteria.maxCount = 1000;
+    criteria.maxCount = 800;
 
 //    statistic_model->setMaxCategories(2);
     statistic_model->setMaxDepth(50);
-    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
-    statistic_model->setMinSampleCount(3);
-    statistic_model->setTruncatePrunedTree(true);
-    statistic_model->setUse1SERule(true);
+//    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
+    statistic_model->setMinSampleCount(2);
+    statistic_model->setTruncatePrunedTree(false);
+    statistic_model->setUse1SERule(false);
     statistic_model->setUseSurrogates(false);
     statistic_model->setTermCriteria(criteria);
     statistic_model->setCVFolds(1);
@@ -238,7 +265,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     statistic_model->train(m_traindata);
 
-    MITK_INFO << statistic_model->isClassifier();
+
 
 
     MITK_INFO << "Predicting";
@@ -257,12 +284,6 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
         cv::Mat curdata(1, m_DistancesTest.at(0).size(), CV_32F, data_arr);
         dataTest.push_back(curdata);
     }
-//    MITK_INFO << "DataTest";
-//    MITK_INFO << dataTest.cols;
-//    MITK_INFO << dataTest.rows;
-//    MITK_INFO << dataTest;
-    MITK_INFO << "________";
-
 
 
     std::vector<unsigned int> index;
@@ -274,126 +295,84 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     for (int i = range.start; i < range.end; i++)
     {
 
-        cv::Mat vote;
 
         int val = statistic_model->predict(dataTest.row(i));
+        if (val==1)
+        {
+           index.push_back(i);
+        }
+
+
+        cv::Mat vote;
         statistic_model->getVotes(dataTest.row(i), vote, 0);
+        e.at(i) = ( -(vote.at<int>(1,0)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1)) * log2((vote.at<int>(1,0)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1))) -
+                    (vote.at<int>(1,1)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1))* log2((vote.at<int>(1,1)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1))));
 
-        float plus_prob = (vote.at<int>(1,0)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1));
-        float neg_prob = (vote.at<int>(1,1)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1));
-
-        e.at(i) = ( -plus_prob * log2(plus_prob) - neg_prob * log2(neg_prob));
-
+        if (isnan(e.at(i)))
+        {
+            e.at(i)=0;
+//            MITK_INFO << e.at(i);
+        }
         if (i==1)
         {
             MITK_INFO<< val;
             MITK_INFO << vote;
-            MITK_INFO << e.at(i);
-        }
 
-
-        if (val==2)
-        {
-           index.push_back(i);
         }
     }
     });
+//    std::ofstream myfile3;
+//    myfile3.open("/home/r948e/mycsv/entropydata.csv");
 
-//    for (unsigned  int i = 0; i < m_DistancesTest.size(); i++)
-//    {
-
-//        cv::Mat vote;
-//        val = statistic_model->predict(dataTest.row(i));
-//        statistic_model->getVotes(dataTest.row(i), vote, 0);
-
-//        float plus_prob = (vote.at<int>(1,0)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1));
-//        float neg_prob = (vote.at<int>(1,1)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1));
-
-//        e.at(i) = ( -plus_prob * log2(plus_prob) - neg_prob * log2(neg_prob));
-
-////        pred.at(i) = val;
-//        if (i==1)
-//        {
-//            MITK_INFO<< val;
-//            MITK_INFO << vote;
-//            MITK_INFO << e.at(i);
-//        }
-
-//        if (val==2)
-//        {
-//            index.push_back(i);
-////           index.at(i) = i;
-////           MITK_INFO << i;
-//        }
-//        else
-//        {
-////            index.at(i) = 0;
-////            MITK_INFO << 0;
-//        }
-
-//    }
+//  for (unsigned int i = 0; i < e.size(); i++) {
+//          myfile3 << e.at(i) << ' ';
+//      }
+//  myfile3.close();
 
 
-    MITK_INFO << index.size();
-    for (unsigned int i = 0; i < index.size(); i++) {
-            std::cout << index.at(i) << ' ';
-        }
-    MITK_INFO << index.size();
+
 
     MITK_INFO << "--------------";
+    MITK_INFO << "Prediction vector size:";
+    MITK_INFO << index.size();
+    MITK_INFO << "Entropy vector size:";
     MITK_INFO << e.size();
-    e.erase(
-        std::remove(e.begin(), e.end(), 0),
-        e.end());
-    e.shrink_to_fit();
-    MITK_INFO << e.size();
+
+    MITK_INFO << "--------------";
+
     auto it = std::minmax_element(e.begin(), e.end());
     int min_idx = std::distance(e.begin(), it.first);
     int max_idx = std::distance(e.begin(), it.second);
     std::cout << min_idx << ", " << max_idx << std::endl; // 1, 5
+    MITK_INFO << e.at(max_idx);
 
-    MITK_INFO << "--------------";
 
     MITK_INFO << "Start the ordering";
     std::vector<unsigned int> indextolabel;
     std::priority_queue<std::pair<float, int>> q;
-      for (unsigned int i = 0; i < e.size(); ++i) {
+    for (unsigned int i = 0; i < e.size(); ++i)
+    {
         q.push(std::pair<float, int>(e[i], i));
-      }
-      int k = m_DistancesTest.size(); // number of indices we need
-//      int k = 500; // number of indices we need
-      for (int i = 0; i < k; ++i) {
+    }
+    int k = m_DistancesTest.size(); // number of indices we need
+    for (int i = 0; i < k; ++i)
+    {
         int ki = q.top().second;
-//        std::cout << "index[" << i << "] = " << ki << std::endl;x
         indextolabel.push_back(ki);
         q.pop();
-      }
-      MITK_INFO << "Done";
-//      for (unsigned int i = 0; i < indextolabel.size(); i++) {
-//              std::cout << indextolabel.at(i) << ' ';
-//          }
+    }
 
-//    MITK_INFO << statistic_model->getTermCriteria().maxCount;
-//    MITK_INFO << statistic_model->getTermCriteria().type;
-//    MITK_INFO << statistic_model->getTermCriteria().epsilon;
-//    statistic_model->getVotes(dataTest.row(0), vote, 0);
-//    statistic_model->predict(dataTest, pred);
-//    cv::Mat vote;
-//    statistic_model->getVotes(dataTest, vote, 0);
-//    MITK_INFO << "vote";
-//    MITK_INFO << vote.rows;
-//    MITK_INFO << vote.cols;
-//    MITK_INFO << pred;
-//    mitke_INFO << vote;
-////    MITK_INFO << vote;
-//    MITK_INFO << vote;
-    MITK_INFO << "_______";
+//    std::ofstream myfile4;
+//    myfile4.open("/home/r948e/mycsv/indextolabel.csv");
+//    for (unsigned int i = 0; i < indextolabel.size(); i++)
+//    {
+//        myfile4 << indextolabel.at(i) << ' ';
+//    }
+//    myfile4.close();
+
+    MITK_INFO << "Done";
 
 
-//    MITK_INFO << statistic_model->getPriors();
-//    MITK_INFO << statistic_model->getNodes();
-
-//    index.push_back(1);
     index_vec.push_back(index);
     index_vec.push_back(indextolabel);
 
@@ -476,9 +455,11 @@ void  StreamlineFeatureExtractor::GenerateData()
     T_TractogramPlus= ResampleFibers(m_TractogramPlus);
 
 
-
+    MITK_INFO << "Calculate Features";
     m_DistancesMinus = CalculateDmdf(T_TractogramMinus, T_Prototypes);
     m_DistancesPlus = CalculateDmdf(T_TractogramPlus, T_Prototypes);
+
+
 
 
     std::ifstream f(m_DistancesTestName);
@@ -518,7 +499,6 @@ void  StreamlineFeatureExtractor::GenerateData()
 
 //                    // If the next token is a comma, ignore it and move on
 //                    if(ss.peek() == ',') ss.ignore();
-
 //                    // Increment the column index
                     colIdx++;
                 }
@@ -531,7 +511,9 @@ void  StreamlineFeatureExtractor::GenerateData()
     else
     {
         MITK_INFO << m_DistancesTestName;
+        MITK_INFO << "Resample Test Data";
         T_TractogramTest= ResampleFibers(m_TractogramTest);
+        MITK_INFO << "Calculate Features of Test Data";
         m_DistancesTest= CalculateDmdf(T_TractogramTest, T_Prototypes);
 
         std::ofstream myFile(m_DistancesTestName);

@@ -35,47 +35,6 @@ QGroupBox {
    <property name="bottomMargin">
     <number>9</number>
    </property>
-   <item row="0" column="0">
-    <widget class="QGroupBox" name="m_InputData">
-     <property name="title">
-      <string>Please Select Input Data</string>
-     </property>
-     <layout class="QGridLayout" name="gridLayout_9">
-      <property name="leftMargin">
-       <number>6</number>
-      </property>
-      <property name="topMargin">
-       <number>6</number>
-      </property>
-      <property name="rightMargin">
-       <number>6</number>
-      </property>
-      <property name="bottomMargin">
-       <number>6</number>
-      </property>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="toolTip">
-         <string>Input DTI</string>
-        </property>
-        <property name="text">
-         <string>Fiber Bundle:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLabel" name="m_FibLabel">
-        <property name="text">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ff0000;&quot;&gt;mandatory&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="wordWrap">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
    <item row="1" column="0">
     <widget class="QToolBox" name="toolBoxx">
      <property name="enabled">
@@ -93,7 +52,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>2</number>
+      <number>0</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -104,7 +63,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>492</height>
+        <height>464</height>
        </rect>
       </property>
       <attribute name="label">
@@ -248,7 +207,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>414</width>
-        <height>478</height>
+        <height>450</height>
        </rect>
       </property>
       <property name="accessibleName">
@@ -465,7 +424,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>492</height>
+        <height>464</height>
        </rect>
       </property>
       <attribute name="label">
@@ -514,7 +473,7 @@ QGroupBox {
          </spacer>
         </item>
         <item row="4" column="1">
-         <widget class="QPushButton" name="pushButton">
+         <widget class="QPushButton" name="m_predlabeling">
           <property name="text">
            <string>Pred_Label</string>
           </property>
@@ -638,6 +597,51 @@ QGroupBox {
       </size>
      </property>
     </spacer>
+   </item>
+   <item row="0" column="0">
+    <widget class="QGroupBox" name="m_InputData">
+     <property name="title">
+      <string>Please Select Input Data</string>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <widget class="QLabel" name="label_2">
+        <property name="toolTip">
+         <string>Input DTI</string>
+        </property>
+        <property name="text">
+         <string>Fiber Bundle:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="m_FibLabel">
+        <property name="text">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ff0000;&quot;&gt;mandatory&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QmitkSingleNodeSelectionWidget" name="m_trainbundleWidget" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>40</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
    </item>
   </layout>
  </widget>
