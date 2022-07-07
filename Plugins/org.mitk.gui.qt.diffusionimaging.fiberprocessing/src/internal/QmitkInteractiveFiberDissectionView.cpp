@@ -72,6 +72,7 @@ QmitkInteractiveFiberDissectionView::QmitkInteractiveFiberDissectionView()
   , m_Controls( 0 )
   , m_IterationCounter(0)
   , m_RandomExtractionCounter(0)
+  , m_activeCycleCounter(0)
   , m_StreamlineInteractor(nullptr)
 {
 
@@ -109,17 +110,17 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_selectedPointSetWidget->SetEmptyInfo(QString("Please select a point set"));//pointset
     m_Controls->m_selectedPointSetWidget->SetPopUpTitel(QString("Select point set"));//pointsett
 
-    m_Controls->m_trainbundleWidget->SetDataStorage(GetDataStorage());//testdata
-    m_Controls->m_trainbundleWidget->SetNodePredicate(mitk::NodePredicateAnd::New(//testdata
-      mitk::TNodePredicateDataType<mitk::FiberBundle>::New(),//testdata
-      mitk::NodePredicateNot::New(mitk::NodePredicateOr::New(//testdata
-        mitk::NodePredicateProperty::New("helper object"),//testdata
-        mitk::NodePredicateProperty::New("hidden object")))));//testdatat
+//    m_Controls->m_trainbundleWidget->SetDataStorage(GetDataStorage());//testdata
+//    m_Controls->m_trainbundleWidget->SetNodePredicate(mitk::NodePredicateAnd::New(//testdata
+//      mitk::TNodePredicateDataType<mitk::FiberBundle>::New(),//testdata
+//      mitk::NodePredicateNot::New(mitk::NodePredicateOr::New(//testdata
+//        mitk::NodePredicateProperty::New("helper object"),//testdata
+//        mitk::NodePredicateProperty::New("hidden object")))));//testdatat
 
-    m_Controls->m_trainbundleWidget->SetSelectionIsOptional(true);//testdata
-    m_Controls->m_trainbundleWidget->SetAutoSelectNewNodes(true);//testdat
-    m_Controls->m_trainbundleWidget->SetEmptyInfo(QString("Please select a point set"));//testdat
-    m_Controls->m_trainbundleWidget->SetPopUpTitel(QString("Select point set"));//testdat
+//    m_Controls->m_trainbundleWidget->SetSelectionIsOptional(true);//testdata
+//    m_Controls->m_trainbundleWidget->SetAutoSelectNewNodes(true);//testdat
+//    m_Controls->m_trainbundleWidget->SetEmptyInfo(QString("Please select a tractogram"));//testdat
+//    m_Controls->m_trainbundleWidget->SetPopUpTitel(QString("Select tractogram"));//testdat
 
 
     connect(m_Controls->m_ErazorButton, SIGNAL(toggled(bool)), this, SLOT( RemovefromBundle(bool) ) ); //need
@@ -315,7 +316,7 @@ void QmitkInteractiveFiberDissectionView::OnCurrentSelectionChanged(QmitkSingleN
   m_SelectedPS = m_Controls->m_selectedPointSetWidget->GetSelectedNode();
 
 //  m_Controls->m_trainbundleWidget->SetPointSetNode(m_Controls->m_trainbundleWidget->GetSelectedNode());
-  m_trainbundle = m_Controls->m_trainbundleWidget->GetSelectedNode();
+//  m_trainbundle = m_Controls->m_trainbundleWidget->GetSelectedNode();
 
 
   UpdateGui();
@@ -658,7 +659,6 @@ void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractor()
 
 void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 {
-    m_IterationCounter += 1;
 //    m_UncertaintyLabel
     this->GetDataStorage()->Remove(m_UncertaintyLabelNode);
 
@@ -680,6 +680,8 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
     clusterer->Update();
 
     m_index = clusterer->m_index;
+    MITK_INFO << m_activeCycleCounter;
+    m_activeCycleCounter += 1;
 
 //    m_Prediction = clusterer->CreatePrediction(m_index.at(0));
 //    mitk::DataNode::Pointer node = mitk::DataNode::New();

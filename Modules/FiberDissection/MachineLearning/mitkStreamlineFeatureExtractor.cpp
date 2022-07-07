@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk{
 
 StreamlineFeatureExtractor::StreamlineFeatureExtractor()
-  : m_NumPoints(20)
+  : m_NumPoints(40)
 {
 
 }
@@ -252,7 +252,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     criteria.maxCount = 800;
 
 //    statistic_model->setMaxCategories(2);
-    statistic_model->setMaxDepth(50);
+    statistic_model->setMaxDepth(50); //set to three
 //    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
     statistic_model->setMinSampleCount(2);
     statistic_model->setTruncatePrunedTree(false);
@@ -321,13 +321,13 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
         }
     }
     });
-//    std::ofstream myfile3;
-//    myfile3.open("/home/r948e/mycsv/entropydata.csv");
+    std::ofstream myfile3;
+    myfile3.open("/home/r948e/mycsv/entropydata.csv");
 
-//  for (unsigned int i = 0; i < e.size(); i++) {
-//          myfile3 << e.at(i) << ' ';
-//      }
-//  myfile3.close();
+  for (unsigned int i = 0; i < e.size(); i++) {
+          myfile3 << e.at(i) << ' ';
+      }
+  myfile3.close();
 
 
 
