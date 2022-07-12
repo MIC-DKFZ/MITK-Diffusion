@@ -88,7 +88,9 @@ protected slots:
   void StartAlgorithm();
   void CreatePredictionNode();
   void CreateUncertaintySampleNode();
+  void CreateDistanceSampleNode();
   void RemovefromUncertainty( bool checked );
+  void RemovefromDistance( bool checked );
   void RemovefromPrediction( bool checked );
 
 
@@ -118,7 +120,7 @@ protected:
 
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
-  mitk::DataNode::Pointer              m_trainbundle;
+//  mitk::DataNode::Pointer              m_trainbundle;
   mitk::Image::Pointer                  m_SelectedImage;
   mitk::DataNode::Pointer               m_SelectedPS;
   mitk::DataNode::Pointer               m_SelectedImageNode;
@@ -127,6 +129,7 @@ protected:
   mitk::FiberBundle::Pointer            m_negativeBundle;
   mitk::FiberBundle::Pointer            m_Prediction;
   mitk::FiberBundle::Pointer            m_UncertaintyLabel;
+  mitk::FiberBundle::Pointer            m_DistanceLabel;
 
 
   mitk::DataNode::Pointer               m_positivBundlesNode;
@@ -134,6 +137,7 @@ protected:
   mitk::DataNode::Pointer               m_negativeSelectedBundles;
   mitk::DataNode::Pointer               m_PredictionNode;
   mitk::DataNode::Pointer               m_UncertaintyLabelNode;
+  mitk::DataNode::Pointer               m_DistanceLabelNode;
 
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;

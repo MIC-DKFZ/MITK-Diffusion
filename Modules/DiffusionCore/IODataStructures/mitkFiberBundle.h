@@ -39,6 +39,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionFunctionCollection.h>
 #include <mitkLookupTable.h>
 
+#include <opencv2/ml.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
 namespace mitk {
 
 /**

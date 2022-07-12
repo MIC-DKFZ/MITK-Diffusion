@@ -52,7 +52,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>2</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -446,43 +446,10 @@ QGroupBox {
         <enum>QFrame::Raised</enum>
        </property>
        <layout class="QGridLayout" name="gridLayout_6">
-        <item row="2" column="3">
-         <spacer name="horizontalSpacer_7">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item row="0" column="3">
-         <spacer name="horizontalSpacer_4">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>84</width>
-            <height>22</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item row="4" column="1">
-         <widget class="QPushButton" name="m_predlabeling">
+        <item row="0" column="0" colspan="3">
+         <widget class="QPushButton" name="m_TrainClassifier">
           <property name="text">
-           <string>Pred_Label</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="0">
-         <widget class="QLabel" name="label_5">
-          <property name="text">
-           <string>To be labeled</string>
+           <string>Train Classifier</string>
           </property>
          </widget>
         </item>
@@ -499,22 +466,15 @@ QGroupBox {
           </property>
          </spacer>
         </item>
-        <item row="1" column="0" colspan="3">
-         <widget class="QPushButton" name="m_CreatePrediction">
+        <item row="5" column="1">
+         <widget class="QPushButton" name="m_predlabeling">
           <property name="text">
-           <string>Create Prediction</string>
+           <string>Pred_Label</string>
           </property>
          </widget>
         </item>
-        <item row="2" column="0" colspan="3">
-         <widget class="QPushButton" name="m_CreateUncertantyMap">
-          <property name="text">
-           <string>Create Uncertanty Map</string>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="0">
-         <widget class="QPushButton" name="m_newlabeling">
+        <item row="5" column="0">
+         <widget class="QPushButton" name="m_unclabeling">
           <property name="text">
            <string>Uncertainty_Label</string>
           </property>
@@ -523,6 +483,26 @@ QGroupBox {
             <normaloff>.</normaloff>.</iconset>
           </property>
          </widget>
+        </item>
+        <item row="1" column="0" colspan="3">
+         <widget class="QPushButton" name="m_CreatePrediction">
+          <property name="text">
+           <string>Create Prediction</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="3">
+         <spacer name="horizontalSpacer_4">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>84</width>
+            <height>22</height>
+           </size>
+          </property>
+         </spacer>
         </item>
         <item row="3" column="3">
          <spacer name="horizontalSpacer_6">
@@ -537,34 +517,21 @@ QGroupBox {
           </property>
          </spacer>
         </item>
-        <item row="3" column="1">
-         <widget class="QSpinBox" name="m_Numtolabel">
-          <property name="minimum">
-           <number>5</number>
-          </property>
-          <property name="maximum">
-           <number>500</number>
-          </property>
-          <property name="value">
-           <number>10</number>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0" colspan="3">
-         <widget class="QPushButton" name="m_TrainClassifier">
+        <item row="5" column="2">
+         <widget class="QPushButton" name="m_distlabeling">
           <property name="text">
-           <string>Train Classifier</string>
+           <string>Unc_dis_Label</string>
           </property>
          </widget>
         </item>
-        <item row="3" column="2">
-         <widget class="QPushButton" name="m_AddUncertainFibers">
+        <item row="2" column="0" colspan="3">
+         <widget class="QPushButton" name="m_CreateUncertantyMap">
           <property name="text">
-           <string>Add </string>
+           <string>Create Uncertanty Map</string>
           </property>
          </widget>
         </item>
-        <item row="6" column="2">
+        <item row="7" column="2">
          <spacer name="verticalSpacer_6">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
@@ -576,6 +543,76 @@ QGroupBox {
            </size>
           </property>
          </spacer>
+        </item>
+        <item row="3" column="0">
+         <widget class="QLabel" name="label_5">
+          <property name="text">
+           <string>Unc: to label</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QSpinBox" name="m_Numtolabel">
+          <property name="minimum">
+           <number>1</number>
+          </property>
+          <property name="maximum">
+           <number>500</number>
+          </property>
+          <property name="singleStep">
+           <number>0</number>
+          </property>
+          <property name="value">
+           <number>10</number>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="3">
+         <spacer name="horizontalSpacer_7">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item row="3" column="2">
+         <widget class="QPushButton" name="m_AddUncertainFibers">
+          <property name="text">
+           <string>Add </string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0">
+         <widget class="QLabel" name="label_9">
+          <property name="text">
+           <string>Dist: to label</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="QSpinBox" name="m_Numtolabel2">
+          <property name="minimum">
+           <number>1</number>
+          </property>
+          <property name="maximum">
+           <number>500</number>
+          </property>
+          <property name="value">
+           <number>10</number>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="2">
+         <widget class="QPushButton" name="m_AddDistanceFibers">
+          <property name="text">
+           <string>Add</string>
+          </property>
+         </widget>
         </item>
        </layout>
       </widget>

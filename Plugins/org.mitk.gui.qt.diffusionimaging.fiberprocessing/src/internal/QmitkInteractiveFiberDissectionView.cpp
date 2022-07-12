@@ -135,7 +135,11 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_AddUncertainFibers, SIGNAL( clicked() ), this, SLOT( CreateUncertaintySampleNode( )));
 
-    connect(m_Controls->m_newlabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromUncertainty(bool) ) ); //need
+    connect(m_Controls->m_AddDistanceFibers, SIGNAL( clicked() ), this, SLOT( CreateDistanceSampleNode( )));
+
+    connect(m_Controls->m_unclabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromUncertainty(bool) ) ); //need
+
+    connect(m_Controls->m_distlabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromDistance(bool) ) ); //need
 
     connect(m_Controls->m_predlabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromPrediction(bool) ) ); //need
 
@@ -175,10 +179,12 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
   m_Controls->m_ErazorButton->setCheckable(true);
   m_Controls->m_ErazorButton->setEnabled(false);
-  m_Controls->m_newlabeling->setCheckable(true);
-  m_Controls->m_newlabeling->setEnabled(false);
+  m_Controls->m_unclabeling->setCheckable(true);
+  m_Controls->m_unclabeling->setEnabled(false);
   m_Controls->m_predlabeling->setCheckable(true);
   m_Controls->m_predlabeling->setEnabled(false);
+  m_Controls->m_distlabeling->setCheckable(true);
+  m_Controls->m_distlabeling->setEnabled(false);
 
 
 
@@ -188,11 +194,14 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   m_Controls->m_CreatePrediction->setEnabled(false);
   m_Controls->m_CreateUncertantyMap->setEnabled(false);
   m_Controls->m_Numtolabel->setEnabled(false);
+  m_Controls->m_Numtolabel2->setEnabled(false);
   m_Controls->m_addPointSetPushButton->setEnabled(false);
   m_Controls->m_AddRandomFibers->setEnabled(false);
+  m_Controls->m_AddDistanceFibers->setEnabled(false);
   m_Controls->m_AddUncertainFibers->setEnabled(false);
-  m_Controls->m_newlabeling->setEnabled(false);
+  m_Controls->m_unclabeling->setEnabled(false);
   m_Controls->m_predlabeling->setEnabled(false);
+  m_Controls->m_distlabeling->setEnabled(false);
 
   bool fibSelected = !m_SelectedFB.empty();
   bool multipleFibsSelected = (m_SelectedFB.size()>1);
@@ -207,6 +216,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
     bool negSelected = this->GetDataStorage()->Exists(m_negativeSelectedBundles);
     bool indexSelected = !m_index.empty();
     bool uncertaintySelected = this->GetDataStorage()->Exists(m_UncertaintyLabelNode);
+    bool distanceSelected = this->GetDataStorage()->Exists(m_DistanceLabelNode);
     bool predictionSelected = this->GetDataStorage()->Exists(m_PredictionNode);
 
 
@@ -261,17 +271,23 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
       m_Controls->m_CreatePrediction->setEnabled(true);
       m_Controls->m_AddUncertainFibers->setEnabled(true);
       m_Controls->m_Numtolabel->setEnabled(true);
+      m_Controls->m_AddDistanceFibers->setEnabled(true);
+      m_Controls->m_Numtolabel2->setEnabled(true);
   }
 
   if (uncertaintySelected)
   {
-      m_Controls->m_newlabeling->setEnabled(true);
+      m_Controls->m_unclabeling->setEnabled(true);
   }
-
 
   if (predictionSelected)
   {
       m_Controls->m_predlabeling->setEnabled(true);
+  }
+
+  if (distanceSelected)
+  {
+      m_Controls->m_distlabeling->setEnabled(true);
   }
 
 
@@ -506,6 +522,7 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
 
 void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 {
+    m_SelectedFB.at(0)->SetVisibility(false);
     m_Controls->m_ErazorButton->setChecked(false);
 
 
@@ -659,12 +676,14 @@ void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractor()
 
 void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 {
-//    m_UncertaintyLabel
-    this->GetDataStorage()->Remove(m_UncertaintyLabelNode);
 
-    m_Controls->m_newlabeling->setChecked(false);
+    this->GetDataStorage()->Remove(m_UncertaintyLabelNode);
+    this->GetDataStorage()->Remove(m_DistanceLabelNode);
+
+    m_Controls->m_unclabeling->setChecked(false);
+    m_Controls->m_distlabeling->setChecked(false);
     m_Controls->m_predlabeling->setChecked(false);
-//    m_traindata.clear();
+
     clusterer.reset();
     MITK_INFO << "Extract Features";
     m_negativeBundle = dynamic_cast<mitk::FiberBundle*>(m_negativeSelectedBundles->GetData());
@@ -680,6 +699,7 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
     clusterer->Update();
 
     m_index = clusterer->m_index;
+    MITK_INFO << "Number of Cycles";
     MITK_INFO << m_activeCycleCounter;
     m_activeCycleCounter += 1;
 
@@ -727,7 +747,7 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
 {
     MITK_INFO << "Create Prediction";
-//    clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()), m_SelectedFB.at(0)->GetName());
+
     m_Prediction = clusterer->CreatePrediction(m_index.at(0));
     mitk::DataNode::Pointer node = mitk::DataNode::New();
     node->SetData(m_Prediction);
@@ -739,19 +759,38 @@ void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
 
 void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
 {
-     MITK_INFO << "Create Fibers to label";
+     MITK_INFO << "Create Fibers to label based on Uncertainty";
+
      std::vector<unsigned int> myvec = m_index.at(1);
      myvec.resize(m_Controls->m_Numtolabel->value());
      MITK_INFO << m_index.at(1).size();
      MITK_INFO << myvec.size();
 
-//    clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()), m_SelectedFB.at(0)->GetName()));
+
         m_UncertaintyLabel = clusterer->CreatePrediction(myvec);
         mitk::DataNode::Pointer node = mitk::DataNode::New();
         node->SetData(m_UncertaintyLabel);
         node->SetName("UncertaintyLabel");
         m_UncertaintyLabelNode = node;
         this->GetDataStorage()->Add(m_UncertaintyLabelNode);
+        UpdateGui();
+}
+
+void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
+{
+     MITK_INFO << "Create Fibers to label based on Distance in Features-Space";
+     std::vector<unsigned int> myvec = m_index.at(2);
+     myvec.resize(m_Controls->m_Numtolabel2->value());
+     MITK_INFO << m_index.at(2).size();
+     MITK_INFO << myvec.size();
+
+
+        m_DistanceLabel = clusterer->CreatePrediction(myvec);
+        mitk::DataNode::Pointer node = mitk::DataNode::New();
+        node->SetData(m_DistanceLabel);
+        node->SetName("DistanceLabel");
+        m_DistanceLabelNode = node;
+        this->GetDataStorage()->Add(m_DistanceLabelNode);
         UpdateGui();
 }
 
@@ -771,6 +810,24 @@ void QmitkInteractiveFiberDissectionView::RemovefromUncertainty( bool checked )
     }
     RenderingManager::GetInstance()->RequestUpdateAll();
 }
+
+void QmitkInteractiveFiberDissectionView::RemovefromDistance( bool checked )
+{
+    if (checked)
+    {
+
+        m_DistanceLabel->SetFiberColors(255, 255, 255);
+        m_StreamlineInteractor->EnableInteraction(true);
+        m_StreamlineInteractor->SetToLabelNode(m_DistanceLabelNode);
+    }
+    else
+    {
+      m_StreamlineInteractor->EnableInteraction(false);
+//      m_StreamlineInteractor = nullptr;
+    }
+    RenderingManager::GetInstance()->RequestUpdateAll();
+}
+
 
 void QmitkInteractiveFiberDissectionView::RemovefromPrediction( bool checked )
 {

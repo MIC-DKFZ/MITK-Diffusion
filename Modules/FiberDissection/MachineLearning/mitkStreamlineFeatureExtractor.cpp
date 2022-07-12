@@ -1,4 +1,4 @@
-/*===================================================================
+﻿/*===================================================================
 
 The Medical Imaging Interaction Toolkit (MITK)
 
@@ -45,6 +45,7 @@ void StreamlineFeatureExtractor::SetTractogramMinus(const mitk::FiberBundle::Poi
 {
   m_TractogramMinus = TractogramMinus;
 }
+
 
 
 void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Pointer &TractogramTest, std::string TractogramTestName)
@@ -100,25 +101,52 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk:
   return out_fib;
 }
 
-std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::vector<vnl_matrix<float> > tractogram, std::vector<vnl_matrix<float> > prototypes)
+std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::vector<vnl_matrix<float> > tractogram, std::vector<vnl_matrix<float> > prototypes,
+                                                                          std::vector<vnl_matrix<float> > local_prototypes)
 {
+    unsigned int locals;
+    if (local_prototypes.size() >= 100)
+    {
+        locals = 100;
+    }
+    else {
+        locals = local_prototypes.size();
+    }
+    MITK_INFO << "Locals:";
+    MITK_INFO << locals;
+
+
+    std::vector<vnl_matrix<float> > merged_prototypes;
+
+
+    for (unsigned int k=0; k<prototypes.size(); k++ )
+    {
+        merged_prototypes.push_back(prototypes.at(k));
+    }
+    for (unsigned int k=0; k<locals; k++ )
+    {
+        merged_prototypes.push_back(local_prototypes.at(k));
+    }
+
+//    MITK_INFO << "merged_prototypes";
+//    MITK_INFO << merged_prototypes.size();
+
+
     std::vector< vnl_matrix<float> >  dist_vec(tractogram.size());//
     MITK_INFO << "Start Calculating Dmdf";
     cv::parallel_for_(cv::Range(0, tractogram.size()), [&](const cv::Range &range)
     {
     for (int i = range.start; i < range.end; i++)
-//    #pragma omp parallel for
 
-//#pragma omp parallel for
 //    for (unsigned int i=0; i<tractogram.size(); i++)
     {
 
         vnl_matrix<float> distances;
-        distances.set_size(1, prototypes.size());
+        distances.set_size(1, local_prototypes.size());
         distances.fill(0.0);
 
 
-        for (unsigned int j=0; j<prototypes.size(); j++)
+        for (unsigned int j=0; j<local_prototypes.size(); j++)
         {
             vnl_matrix<float> single_distances;
             single_distances.set_size(1, tractogram.at(0).cols());
@@ -131,13 +159,13 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::v
                 double cur_dist;
                 double cur_dist_flip;
 
-                cur_dist = sqrt(pow(tractogram.at(i).get(0,ik) - prototypes.at(j).get(0,ik), 2.0) +
-                                       pow(tractogram.at(i).get(1,ik) - prototypes.at(j).get(1,ik), 2.0) +
-                                       pow(tractogram.at(i).get(2,ik) - prototypes.at(j).get(2,ik), 2.0));
+                cur_dist = sqrt(pow(tractogram.at(i).get(0,ik) - local_prototypes.at(j).get(0,ik), 2.0) +
+                                       pow(tractogram.at(i).get(1,ik) - local_prototypes.at(j).get(1,ik), 2.0) +
+                                       pow(tractogram.at(i).get(2,ik) - local_prototypes.at(j).get(2,ik), 2.0));
 
-                cur_dist_flip = sqrt(pow(tractogram.at(i).get(0,ik) - prototypes.at(j).get(0,prototypes.at(0).cols()-(ik+1)), 2.0) +
-                                       pow(tractogram.at(i).get(1,ik) - prototypes.at(j).get(1,prototypes.at(0).cols()-(ik+1)), 2.0) +
-                                       pow(tractogram.at(i).get(2,ik) - prototypes.at(j).get(2,prototypes.at(0).cols()-(ik+1)), 2.0));
+                cur_dist_flip = sqrt(pow(tractogram.at(i).get(0,ik) - local_prototypes.at(j).get(0,local_prototypes.at(0).cols()-(ik+1)), 2.0) +
+                                       pow(tractogram.at(i).get(1,ik) - local_prototypes.at(j).get(1,local_prototypes.at(0).cols()-(ik+1)), 2.0) +
+                                       pow(tractogram.at(i).get(2,ik) - local_prototypes.at(j).get(2,local_prototypes.at(0).cols()-(ik+1)), 2.0));
 
                 single_distances.put(0,ik, cur_dist);
                 single_distances_flip.put(0,ik, cur_dist_flip);
@@ -160,6 +188,7 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::v
     }
     });
     MITK_INFO << "Done Calculation";
+    MITK_INFO << dist_vec.at(0).size();
 
     return dist_vec;
 }
@@ -289,10 +318,12 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     std::vector<unsigned int> index;
     std::vector<float> e(m_DistancesTest.size());
 
-
-    cv::parallel_for_(cv::Range(0, m_DistancesTest.size()), [&](const cv::Range &range)
-    {
-    for (int i = range.start; i < range.end; i++)
+//    cv::setNumThreads(16);
+//    cv::parallel_for_(cv::Range(0, m_DistancesTest.size()), [&](const cv::Range &range)
+//    {
+//    for (int i = range.start; i < range.end; i++)
+#pragma omp parallel for
+    for (unsigned int i=0; i<m_DistancesTest.size(); i++)
     {
 
 
@@ -320,14 +351,14 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
         }
     }
-    });
-    std::ofstream myfile3;
-    myfile3.open("/home/r948e/mycsv/entropydata.csv");
+//    });
+//    std::ofstream myfile3;
+//    myfile3.open("/home/r948e/mycsv/entropydata.csv");
 
-  for (unsigned int i = 0; i < e.size(); i++) {
-          myfile3 << e.at(i) << ' ';
-      }
-  myfile3.close();
+//  for (unsigned int i = 0; i < e.size(); i++) {
+//          myfile3 << e.at(i) << ' ';
+//      }
+//  myfile3.close();
 
 
 
@@ -354,8 +385,10 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     {
         q.push(std::pair<float, int>(e[i], i));
     }
-    int k = m_DistancesTest.size(); // number of indices we need
-    for (int i = 0; i < k; ++i)
+//    int k = m_DistancesTest.size(); // number of indices we need
+    int lengths=500;
+//    int k = lengths; // number of indices we need
+    for (int i = 0; i < lengths; ++i)
     {
         int ki = q.top().second;
         indextolabel.push_back(ki);
@@ -369,12 +402,108 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 //        myfile4 << indextolabel.at(i) << ' ';
 //    }
 //    myfile4.close();
+    // Sorted depent on entropy now sort the 1/5
+    vnl_matrix<float> distances_matrix;
 
-    MITK_INFO << "Done";
+    distances_matrix.set_size(lengths, lengths);
+    distances_matrix.fill(0.0);
+    MITK_INFO << "Dist_start";
+
+    std::vector<float> distances_matrix_mean;
+
+
+    for (int i=0; i<lengths; i++)
+    {
+        for (int k=0; k<lengths; k++)
+        {
+            vnl_matrix<float> diff =  m_DistancesTest.at(indextolabel.at(i)) - m_DistancesTest.at(indextolabel.at(k));
+
+            distances_matrix.put(i,k,diff.absolute_value_sum()/m_DistancesTest.at(0).size());
+
+        }
+        distances_matrix_mean.push_back(distances_matrix.get_row(i).mean());
+//        MITK_INFO << meanval.at(i);
+
+    }
+
+    vnl_vector<float> sum_matrix;
+    sum_matrix.set_size(lengths);
+    sum_matrix.fill(0.0);
+
+    /*Index to find values is distancematrix*/
+    std::vector<unsigned int> myidx;
+    /*Index to find actual streamlines using indextolabel*/
+    std::vector<unsigned int> distindextolabel;
+    myidx.push_back(0);
+
+//    MITK_INFO << distances_matrix.get_row(myidx.at(i)+ sum_matrix.get_row(0)
+
+
+    for (int i=0; i<lengths; i++)
+    {
+//        unsigned int cur_i = indextolabel.at(myidx.at(i));
+        sum_matrix = (sum_matrix + distances_matrix.get_row(myidx.at(i)))/=(i+1);
+
+//        myidx.push_back(distances_matrix.get_row(myidx.at(i)).arg_max());
+        myidx.push_back(sum_matrix.arg_max());
+        distindextolabel.push_back(indextolabel.at(myidx.at(i)));
+        distances_matrix.set_column(myidx.at(i), 0.0001);
+
+    }
+
+    std::vector<unsigned int> indextolabeldist;
+    std::priority_queue<std::pair<float, int>> qq;
+    for (unsigned int i = 0; i < distances_matrix_mean.size(); ++i)
+    {
+        qq.push(std::pair<float, int>(distances_matrix_mean[i], i));
+    }
+//    int k = m_DistancesTest.size(); // number of indices we need
+//    int k = lengths; // number of indices we need
+    for (int i = 0; i < lengths; ++i)
+    {
+        int kki = qq.top().second;
+
+        indextolabeldist.push_back(indextolabel.at(kki));
+        qq.pop();
+    }
+
+    MITK_INFO << "Dist_stop";
+
+//    std::ofstream myfile6;
+//    myfile6.open("/home/r948e/mycsv/distances_matrix_mean.csv");
+//    for (unsigned int i = 0; i < distances_matrix_mean.size(); i++)
+//    {
+//        myfile6 << distances_matrix_mean.at(i) << ' ';
+//    }
+//    myfile6.close();
+
+//    std::ofstream myfile5;
+//    myfile5.open("/home/r948e/mycsv/indextolabeldist.csv");
+//    for (unsigned int i = 0; i < indextolabeldist.size(); i++)
+//    {
+//        myfile5 << indextolabeldist.at(i) << ' ';
+//    }
+//    myfile5.close();
+
+//    MITK_INFO << distances_matrix;
+//    MITK_INFO << distances_matrix.max_value();
+//    MITK_INFO << distances_matrix.arg_max();
+
+
+//    vnl_matrix<float> myx =  m_DistancesTest.at(indextolabel.at(0)) - m_DistancesTest.at(indextolabel.at(1));
+////    myx = (m_DistancesTest.at(indextolabel.at(0)) - m_DistancesTest.at(indextolabel.at(1)));
+//    MITK_INFO << m_DistancesTest.at(indextolabel.at(0));
+//    MITK_INFO << m_DistancesTest.at(indextolabel.at(1));
+//    MITK_INFO << myx.get(0,0);
+//    MITK_INFO << sqrt(pow(myx.get(0,0),2));
+//    MITK_INFO << myx.get(0,1);
+//    MITK_INFO << myx.absolute_value_sum()/m_DistancesTest.at(0).size();
+//    MITK_INFO << "Done";
 
 
     index_vec.push_back(index);
     index_vec.push_back(indextolabel);
+    index_vec.push_back(distindextolabel);
 
     return index_vec;
 
@@ -456,15 +585,15 @@ void  StreamlineFeatureExtractor::GenerateData()
 
 
     MITK_INFO << "Calculate Features";
-    m_DistancesMinus = CalculateDmdf(T_TractogramMinus, T_Prototypes);
-    m_DistancesPlus = CalculateDmdf(T_TractogramPlus, T_Prototypes);
+    m_DistancesMinus = CalculateDmdf(T_TractogramMinus, T_Prototypes, T_TractogramPlus);
+    m_DistancesPlus = CalculateDmdf(T_TractogramPlus, T_Prototypes, T_TractogramPlus);
 
 
 
 
     std::ifstream f(m_DistancesTestName);
 
-
+    MITK_INFO << m_DistancesTestName;
     if (f.good())
     {
         MITK_INFO << "File exists";
@@ -481,9 +610,6 @@ void  StreamlineFeatureExtractor::GenerateData()
 
         while(std::getline(myFile, line))
             {
-
-
-
                 // Create a stringstream of the current line
                 std::stringstream ss(line);
 //                MITK_INFO << ss;
@@ -514,15 +640,15 @@ void  StreamlineFeatureExtractor::GenerateData()
         MITK_INFO << "Resample Test Data";
         T_TractogramTest= ResampleFibers(m_TractogramTest);
         MITK_INFO << "Calculate Features of Test Data";
-        m_DistancesTest= CalculateDmdf(T_TractogramTest, T_Prototypes);
+        m_DistancesTest= CalculateDmdf(T_TractogramTest, T_Prototypes, T_TractogramPlus);
 
-        std::ofstream myFile(m_DistancesTestName);
-//        myFile << colname << "\n";
-        for(long unsigned int i = 0; i < m_DistancesTest.size(); ++i)
-        {
-            myFile << m_DistancesTest.at(i);
-        }
-        myFile.close();
+//        std::ofstream myFile(m_DistancesTestName);
+////        myFile << colname << "\n";
+//        for(long unsigned int i = 0; i < m_DistancesTest.size(); ++i)
+//        {
+//            myFile << m_DistancesTest.at(i);
+//        }
+//        myFile.close();
     }
     MITK_INFO << m_DistancesTest.size();
 
@@ -535,27 +661,6 @@ void  StreamlineFeatureExtractor::GenerateData()
     m_index =GetData();
 
 }
-
-
-//cv::Mat StreamlineFeatureExtractor::StartAlgorithm()
-//{
-//    MITK_INFO << "Printing";
-//    float data_arr [10] = {1, 2.4 ,4 ,4.5 ,6 ,7, 120.5, 100, 120, 100};
-//    cv::Mat curdata(1, 10, CV_32F, data_arr);
-//    float data_arr2 [10] = {10, 20.4 ,40 ,40.5 ,60 ,70, 1200.5, 1000, 1200, 1000};
-//    cv::Mat curdata2(1, 10, CV_32F, data_arr2);
-
-//    cv::Mat data;
-////    cv::Mat data2;
-//    //    data.row(1) = curdata.clone();
-//    data.push_back(curdata);
-//    data.push_back(curdata2);
-////    cv::add(curdata,data2,data2);
-//    cout << curdata;
-//    cout << data;
-////    cout << data2;
-//    return curdata.clone();
-//}
 
 
 
