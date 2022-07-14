@@ -60,6 +60,7 @@ public:
   void SetTractogramPlus(const mitk::FiberBundle::Pointer &Tractogram);
   void SetTractogramMinus(const mitk::FiberBundle::Pointer &Tractogram);
   void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram, std::string TractogramTestName);
+  void SetActiveCycle(int &activeCycle);
 
 
   void CreateClassifier();
@@ -78,11 +79,15 @@ protected:
 
   void GenerateData();
   std::vector< vnl_matrix<float> > ResampleFibers(FiberBundle::Pointer tractogram);
-  std::vector<vnl_matrix<float> > CalculateDmdf(std::vector<vnl_matrix<float> > tractogram, std::vector<vnl_matrix<float> > prototypes, std::vector<vnl_matrix<float> > local_prototypes);
+  std::vector<vnl_matrix<float> > CalculateDmdf(std::vector<vnl_matrix<float> > tractogram,
+                                                std::vector<vnl_matrix<float> > prototypes,
+                                                std::vector<vnl_matrix<float> > positive_local_prototypes,
+                                                std::vector<vnl_matrix<float> > negative_local_prototypes);
 
 
 
   unsigned int                                m_NumPoints;
+  int                                         m_activeCycle;
   mitk::FiberBundle::Pointer                  m_TractogramPlus;
   mitk::FiberBundle::Pointer                  m_TractogramMinus;
   mitk::FiberBundle::Pointer                  m_TractogramTest;

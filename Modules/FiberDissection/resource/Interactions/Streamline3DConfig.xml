@@ -2,9 +2,17 @@
     <event_variant class="MousePressEvent" name="AddNegStreamlineClick">
          <attribute name="EventButton" value="RightMouseButton"/>
          <attribute name="Modifiers" value="shift"/>
-    </event_variant>
+    </event_variant>addtolabelstreamline
     <event_variant class="MousePressEvent" name="AddPosStreamlineClick">
          <attribute name="EventButton" value="RightMouseButton"/>
          <attribute name="Modifiers" value="alt"/>
+    </event_variant>
+    <event_variant class="MousePressEvent" name="AddNegStreamlinetolabelClick">
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="shift,ctrl"/>
+    </event_variant>
+    <event_variant class="MousePressEvent" name="AddPosStreamlinetolabelClick">
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="alt,ctrl"/>
     </event_variant>
 </config>

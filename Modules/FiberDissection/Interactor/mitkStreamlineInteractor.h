@@ -67,6 +67,9 @@ namespace mitk
 
        void AddStreamlinePosBundle(StateMachineAction *, InteractionEvent *interactionEvent);
 
+       void AddNegStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent);
+
+       void AddPosStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent);
 
        std::map<BaseRenderer *, vtkSmartPointer<vtkCellPicker>> m_Picker;
 
@@ -93,9 +96,12 @@ namespace mitk
 //    void UpdateHandleHighlight();
 
     //! the Streamline used for visual feedback and picking
-    mitk::FiberBundle::Pointer m_NegStreamline;
-    mitk::FiberBundle::Pointer m_PosStreamline;
-    mitk::FiberBundle::Pointer m_manStreamline;
+    mitk::FiberBundle::Pointer            m_NegStreamline;
+    mitk::FiberBundle::Pointer            m_PosStreamline;
+    mitk::FiberBundle::Pointer            m_manStreamline;
+    mitk::DataNode::Pointer               m_NegStreamlineNode;
+    mitk::DataNode::Pointer               m_PosStreamlineNode;
+    mitk::DataNode::Pointer               m_manStreamlineNode;
 
     vtkSmartPointer<vtkPolyData>  m_extracted_streamline;
 
