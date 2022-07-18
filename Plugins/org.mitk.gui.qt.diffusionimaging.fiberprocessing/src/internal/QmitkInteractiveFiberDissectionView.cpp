@@ -856,7 +856,7 @@ void QmitkInteractiveFiberDissectionView::RemovefromPrediction( bool checked )
     if (checked)
     {
 
-        m_Prediction->SetFiberColors(255, 255, 255);
+//        m_Prediction->SetFiberColors(255, 255, 255);
         m_StreamlineInteractor->EnableInteraction(true);
         m_StreamlineInteractor->SetToLabelNode(m_PredictionNode);
     }

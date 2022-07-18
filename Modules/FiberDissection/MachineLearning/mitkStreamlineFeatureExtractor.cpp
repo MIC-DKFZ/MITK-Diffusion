@@ -51,6 +51,14 @@ void StreamlineFeatureExtractor::SetActiveCycle(int &activeCycle)
   m_activeCycle= activeCycle;
 }
 
+//void StreamlineFeatureExtractor::SetRandomThreshold(int &threshold)
+//{
+//    m_thresh = threshold;
+//    MITK_INFO << m_thresh;
+//}
+
+
+
 
 
 void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Pointer &TractogramTest, std::string TractogramTestName)
@@ -106,52 +114,30 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk:
   return out_fib;
 }
 
-std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::vector<vnl_matrix<float> > tractogram, std::vector<vnl_matrix<float> > prototypes,
+std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::vector<vnl_matrix<float> > tractogram,
+                                                                          std::vector<vnl_matrix<float> > prototypes,
                                                                           std::vector<vnl_matrix<float> > positive_local_prototypes,
                                                                           std::vector<vnl_matrix<float> > negative_local_prototypes)
 {
-    unsigned int pos_locals;
-    unsigned int neg_locals;
-    if (positive_local_prototypes.size() >= 50)
-    {
-        pos_locals= 50;
-    }
-    else {
-        pos_locals= positive_local_prototypes.size();
-    }
-
-    if (pos_locals <= positive_local_prototypes.size())
-    {
-        neg_locals = pos_locals;
-    }
-    else {
-        neg_locals= negative_local_prototypes.size();
-    }
 
 
-    MITK_INFO << "Locals:";
-    MITK_INFO << neg_locals + pos_locals;
 
+    std::vector< vnl_matrix<float> > merged_prototypes;
 
-    std::vector<vnl_matrix<float> > merged_prototypes;
-
-
-    for (unsigned int k=0; k<prototypes.size(); k++ )
+    for (unsigned int k=0; k<prototypes.size(); k++)
     {
         merged_prototypes.push_back(prototypes.at(k));
     }
-    for (unsigned int k=0; k<pos_locals; k++ )
+    for (unsigned int k=0; k<positive_local_prototypes.size(); k++)
     {
         merged_prototypes.push_back(positive_local_prototypes.at(k));
     }
 
-    for (unsigned int k=0; k<neg_locals; k++ )
+    for (unsigned int k=0; k<negative_local_prototypes.size(); k++)
     {
         merged_prototypes.push_back(negative_local_prototypes.at(k));
     }
 
-    MITK_INFO << "merged_prototypes";
-    MITK_INFO << merged_prototypes.size();
 
 
     std::vector< vnl_matrix<float> >  dist_vec(tractogram.size());//
@@ -164,11 +150,11 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::v
     {
 
         vnl_matrix<float> distances;
-        distances.set_size(1, merged_prototypes.size());
+        distances.set_size(1, prototypes.size());
         distances.fill(0.0);
 
 
-        for (unsigned int j=0; j<merged_prototypes.size(); j++)
+        for (unsigned int j=0; j<prototypes.size(); j++)
         {
             vnl_matrix<float> single_distances;
             single_distances.set_size(1, tractogram.at(0).cols());
@@ -181,13 +167,13 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::v
                 double cur_dist;
                 double cur_dist_flip;
 
-                cur_dist = sqrt(pow(tractogram.at(i).get(0,ik) - merged_prototypes.at(j).get(0,ik), 2.0) +
-                                       pow(tractogram.at(i).get(1,ik) - merged_prototypes.at(j).get(1,ik), 2.0) +
-                                       pow(tractogram.at(i).get(2,ik) - merged_prototypes.at(j).get(2,ik), 2.0));
+                cur_dist = sqrt(pow(tractogram.at(i).get(0,ik) - prototypes.at(j).get(0,ik), 2.0) +
+                                       pow(tractogram.at(i).get(1,ik) - prototypes.at(j).get(1,ik), 2.0) +
+                                       pow(tractogram.at(i).get(2,ik) - prototypes.at(j).get(2,ik), 2.0));
 
-                cur_dist_flip = sqrt(pow(tractogram.at(i).get(0,ik) - merged_prototypes.at(j).get(0,merged_prototypes.at(0).cols()-(ik+1)), 2.0) +
-                                       pow(tractogram.at(i).get(1,ik) - merged_prototypes.at(j).get(1,merged_prototypes.at(0).cols()-(ik+1)), 2.0) +
-                                       pow(tractogram.at(i).get(2,ik) - merged_prototypes.at(j).get(2,merged_prototypes.at(0).cols()-(ik+1)), 2.0));
+                cur_dist_flip = sqrt(pow(tractogram.at(i).get(0,ik) - prototypes.at(j).get(0,prototypes.at(0).cols()-(ik+1)), 2.0) +
+                                       pow(tractogram.at(i).get(1,ik) - prototypes.at(j).get(1,prototypes.at(0).cols()-(ik+1)), 2.0) +
+                                       pow(tractogram.at(i).get(2,ik) - prototypes.at(j).get(2,merged_prototypes.at(0).cols()-(ik+1)), 2.0));
 
                 single_distances.put(0,ik, cur_dist);
                 single_distances_flip.put(0,ik, cur_dist_flip);
@@ -218,7 +204,6 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::v
 std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 {
     MITK_INFO << "Start Function Get Data";
-    MITK_INFO << m_DistancesPlus.at(0);
 
     /*Vector which saves Prediction and Fibers to label based on uncertainty*/
     std::vector<std::vector<unsigned int>> index_vec;
@@ -270,10 +255,16 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     int onesgt = cv::countNonZero(labels_arr_vec);
     float plusval = labels_arr_vec.rows / (2.0 * onesgt );
     float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
-    cv::Mat newweight;
-    newweight.push_back(minusval);
-    newweight.push_back(plusval);
+    float w[2] = {minusval, plusval};
+//    newweight(2,1,CV_32F);
+//    newweight.push_back(minusval);
+//    newweight.push_back(plusval);
+    cv::Mat newweight = cv::Mat(1,2, CV_32F, w);
+//    newweight.at<float>(1,1)=minusval;
+//    newweight.at<float>(1,2)=plusval;
     MITK_INFO << "Weights";
+    MITK_INFO << minusval;
+    MITK_INFO << plusval;
     MITK_INFO << newweight;
 
 
@@ -314,11 +305,11 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     /*Create Dataset and initialize Classifier*/
     cv::Ptr<cv::ml::TrainData> m_traindata = cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, labels_shuffled);
-    MITK_INFO << m_traindata->getSamples();
+//    MITK_INFO << m_traindata->getSamples();
 //    m_traindata->setTrainTestSplitRatio(0.95, true);
-    MITK_INFO << m_traindata->getResponses();
+//    MITK_INFO << m_traindata->getResponses();
 //    m_traindata->shuffleTrainTest();
-    MITK_INFO << m_traindata->getClassLabels();
+//    MITK_INFO << m_traindata->getClassLabels();
 
     MITK_INFO << "Start Training";
 
@@ -414,7 +405,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     /*Get index of most unertain data (lengths defines how many data is saved)*/
 
-    int lengths=1000;
+    int lengths=500;
 //    auto it = std::minmax_element(e.begin(), e.end());
 //    int min_idx = std::distance(e.begin(), it.first);
 //    int max_idx = std::distance(e.begin(), it.second);
@@ -445,7 +436,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 //    }
 //    myfile4.close();
 
-    // Sorted depent on entropy now sort the 1/5
+    // Sorted depends on entropy now sort the 1/5
     vnl_matrix<float> distances_matrix;
 
     distances_matrix.set_size(lengths, lengths);
@@ -459,11 +450,14 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     {
         for (int k=0; k<lengths; k++)
         {
+            /*From the length.size() Samples with the highest Entropey calculate the differen between the Features*/
             vnl_matrix<float> diff =  m_DistancesTest.at(indexUnc.at(i)) - m_DistancesTest.at(indexUnc.at(k));
 
+            /*Into the eucledean difference matrix, put the distance in Feature Space between every sample pair*/
             distances_matrix.put(i,k,diff.absolute_value_sum()/m_DistancesTest.at(0).size());
 
         }
+        /*For every Sample/Streamline get the mean eucledean distance to all other Samples => one value for every Sample*/
         distances_matrix_mean.push_back(distances_matrix.get_row(i).mean());
 //        MITK_INFO << meanval.at(i);
 
@@ -473,10 +467,11 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     sum_matrix.set_size(lengths);
     sum_matrix.fill(0.0);
 
-    /*Index to find values is distancematrix*/
+    /*Index to find values in distancematrix*/
     std::vector<unsigned int> myidx;
     /*Index to find actual streamlines using indexUnc*/
     std::vector<unsigned int> indexUncDist;
+    /*Start with the Streamline of the highest entropy, which is in distance_matrix at idx 0*/
     myidx.push_back(0);
 
 //    MITK_INFO << distances_matrix.get_row(myidx.at(i)+ sum_matrix.get_row(0)
@@ -485,12 +480,16 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     for (int i=0; i<lengths; i++)
     {
 //        unsigned int cur_i = indexUnc.at(myidx.at(i));
+        /*Save mean distance of all used Samples*/
         sum_matrix = (sum_matrix + distances_matrix.get_row(myidx.at(i)))/=(i+1);
 
-//        myidx.push_back(distances_matrix.get_row(myidx.at(i)).arg_max());
-        myidx.push_back(sum_matrix.arg_max());
+        myidx.push_back(distances_matrix.get_row(myidx.at(i)).arg_max());
+//        myidx.push_back(sum_matrix.arg_max());
         indexUncDist.push_back(indexUnc.at(myidx.at(i)));
+//        distances_matrix.set_column(myidx.at(i), 0.0001);
         distances_matrix.set_column(myidx.at(i), 0.0001);
+        sum_matrix.put(myidx.at(i), 0.0001);
+//        MITK_INFO<< sum_matrix;
 
     }
 
@@ -622,8 +621,8 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
 void  StreamlineFeatureExtractor::GenerateData()
 {
     MITK_INFO << "Update";
-    mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671.trk");
-
+//    mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671.trk");
+    mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/data/Synt_tract_40_prototypes.trk");
     T_Prototypes = ResampleFibers(inputPrototypes);
     T_TractogramMinus= ResampleFibers(m_TractogramMinus);
     T_TractogramPlus= ResampleFibers(m_TractogramPlus);
