@@ -110,17 +110,11 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_selectedPointSetWidget->SetEmptyInfo(QString("Please select a point set"));//pointset
     m_Controls->m_selectedPointSetWidget->SetPopUpTitel(QString("Select point set"));//pointsett
 
-//    m_Controls->m_trainbundleWidget->SetDataStorage(GetDataStorage());//testdata
-//    m_Controls->m_trainbundleWidget->SetNodePredicate(mitk::NodePredicateAnd::New(//testdata
-//      mitk::TNodePredicateDataType<mitk::FiberBundle>::New(),//testdata
-//      mitk::NodePredicateNot::New(mitk::NodePredicateOr::New(//testdata
-//        mitk::NodePredicateProperty::New("helper object"),//testdata
-//        mitk::NodePredicateProperty::New("hidden object")))));//testdatat
+    m_Controls->m_BundleBox->SetDataStorage(this->GetDataStorage());
+    mitk::TNodePredicateDataType<mitk::FiberBundle>::Pointer isBundle= mitk::TNodePredicateDataType<mitk::FiberBundle>::New();
+    m_Controls->m_BundleBox->SetPredicate( isBundle );
 
-//    m_Controls->m_trainbundleWidget->SetSelectionIsOptional(true);//testdata
-//    m_Controls->m_trainbundleWidget->SetAutoSelectNewNodes(true);//testdat
-//    m_Controls->m_trainbundleWidget->SetEmptyInfo(QString("Please select a tractogram"));//testdat
-//    m_Controls->m_trainbundleWidget->SetPopUpTitel(QString("Select tractogram"));//testdat
+
 
 
     connect(m_Controls->m_ErazorButton, SIGNAL(toggled(bool)), this, SLOT( RemovefromBundle(bool) ) ); //need

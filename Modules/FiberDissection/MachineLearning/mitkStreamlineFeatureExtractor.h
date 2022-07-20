@@ -81,9 +81,11 @@ protected:
   void GenerateData();
   std::vector< vnl_matrix<float> > ResampleFibers(FiberBundle::Pointer tractogram);
   std::vector<vnl_matrix<float> > CalculateDmdf(std::vector<vnl_matrix<float> > tractogram,
-                                                std::vector<vnl_matrix<float> > prototypes,
-                                                std::vector<vnl_matrix<float> > positive_local_prototypes,
-                                                std::vector<vnl_matrix<float> > negative_local_prototypes);
+                                                std::vector<vnl_matrix<float> > prototypes);
+  std::vector< vnl_matrix<float> > MergeTractogram(std::vector<vnl_matrix<float> > prototypes,
+                                                  std::vector<vnl_matrix<float> > positive_local_prototypes,
+                                                  std::vector<vnl_matrix<float> > negative_local_prototypes);
+  std::vector<unsigned int> Sort(std::vector<float> sortingVector, int lengths);
 
 
 
@@ -94,10 +96,6 @@ protected:
   mitk::FiberBundle::Pointer                  m_TractogramMinus;
   mitk::FiberBundle::Pointer                  m_TractogramTest;
   std::string                                 m_DistancesTestName;
-  std::vector<vnl_matrix<float> >             T_Prototypes;
-  std::vector<vnl_matrix<float> >             T_TractogramPlus;
-  std::vector<vnl_matrix<float> >             T_TractogramMinus;
-  std::vector<vnl_matrix<float> >             T_TractogramTest;
   std::vector<vnl_matrix<float> >             m_DistancesPlus;
   std::vector<vnl_matrix<float> >             m_DistancesMinus;
   std::vector<vnl_matrix<float> >             m_DistancesTest;
