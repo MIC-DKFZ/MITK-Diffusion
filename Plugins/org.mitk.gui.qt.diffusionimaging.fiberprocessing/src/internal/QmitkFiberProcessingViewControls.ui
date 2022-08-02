@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>385</width>
-    <height>711</height>
+    <width>953</width>
+    <height>1244</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -54,8 +54,8 @@ QGroupBox {
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>353</width>
-        <height>503</height>
+        <width>935</width>
+        <height>790</height>
        </rect>
       </property>
       <attribute name="label">
@@ -598,9 +598,9 @@ QGroupBox {
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>-48</y>
-        <width>353</width>
-        <height>456</height>
+        <y>0</y>
+        <width>907</width>
+        <height>850</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1132,8 +1132,8 @@ QGroupBox {
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>353</width>
-        <height>461</height>
+        <width>935</width>
+        <height>816</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1617,8 +1617,8 @@ QGroupBox {
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>367</width>
-        <height>182</height>
+        <width>935</width>
+        <height>346</height>
        </rect>
       </property>
       <attribute name="label">

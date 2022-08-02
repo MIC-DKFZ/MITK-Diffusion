@@ -144,7 +144,7 @@ MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be inst
 * Command line tools for most functionalities
 
 ## Related Links
-* Great python package for logging your (MITK) command line experiments:
+* Great python package for logging your (MITK or other) command line experiments:
     * https://github.com/MIC-DKFZ/cmdint
     * `pip3 install cmdint`
 * TractSeg reference data of 72 semiautomatically defined bundles in 105 HCP subjects: https://zenodo.org/record/1285152
@@ -193,10 +193,10 @@ Automatically generated random fiber configuration for Fiberfox simulations.
 
 
 ## Building MITK Diffusion from source
-* Install [Qt](https://www.qt.io/) on your system (>= 5.12.6).
+* Install [Qt](https://www.qt.io/) on your system (5.12).
 * Clone MITK from [github](https://github.com/MIC-DKFZ/MITK-Diffusion.git) using [Git version control](https://git-scm.com/).
 * Clone MITK Diffusion from [github](https://github.com/MITK/MITK.git).
-* Configure the MITK Superbuild using [CMake](https://cmake.org/) (>= 3.14.5).
+* Configure the MITK Superbuild using [CMake](https://cmake.org/) (>= 3.18).
     * Choose the MITK source code directory and an empty binary directory.
     * Click "Configure".
     * Set the option MITK_EXTENSION_DIRS to "/path/to/my/mitk-diffusion-repository".
