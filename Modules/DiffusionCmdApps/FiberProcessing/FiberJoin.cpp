@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigure.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
+#include <mitkDiffusionDataIOHelper.h>
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -60,24 +61,11 @@ int main(int argc, char* argv[])
   mitkDiffusionCommandLineParser::StringContainerType inFibs = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i"]);
   std::string outFib = us::any_cast<std::string>(parsedArgs["o"]);
 
-  if (inFibs.size()<=1)
-  {
-    std::cout << "More than one input tractogram required!";
-    return EXIT_FAILURE;
-  }
-
   try
   {
-    std::vector< mitk::FiberBundle::Pointer > tractograms;
-    mitk::FiberBundle::Pointer result = LoadFib(inFibs.at(0));
-    for (std::size_t i=1; i<inFibs.size(); ++i)
-    {
-      try
-      {
-        tractograms.push_back(LoadFib(inFibs.at(i)));
-      }
-      catch(...){ std::cout << "could not load: " << inFibs.at(i); }
-    }
+    std::vector< mitk::FiberBundle::Pointer > tractograms = mitk::DiffusionDataIOHelper::load_fibs(inFibs);
+
+    mitk::FiberBundle::Pointer result = mitk::FiberBundle::New();
     result = result->AddBundles(tractograms);
     mitk::IOUtil::Save(result, outFib);
   }
