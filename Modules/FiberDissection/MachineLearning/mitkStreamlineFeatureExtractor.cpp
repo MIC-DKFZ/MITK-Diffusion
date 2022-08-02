@@ -70,36 +70,30 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk:
   MITK_INFO << "Resampling Done";
 
   std::vector< vnl_matrix<float> > out_fib(temp_fib->GetFiberPolyData()->GetNumberOfCells());
-//  std::vector< vnl_matrix<float> > out_fib();
 
-//  cv::parallel_for_(cv::Range(0, temp_fib->GetFiberPolyData()->GetNumberOfCells()), [&](const cv::Range &range)
-//  {
-//      for (int i = range.start; i < range.end; i++)
-//    #pragma omp parallel for
-//  #pragma omp parallel for num_threads(10) collapse(1)
-      for (int i=0; i<temp_fib->GetFiberPolyData()->GetNumberOfCells(); i++)
-      {
-        vtkCell* cell = temp_fib->GetFiberPolyData()->GetCell(i);
-        int numPoints = cell->GetNumberOfPoints();
-        vtkPoints* points = cell->GetPoints();
+  for (int i=0; i<temp_fib->GetFiberPolyData()->GetNumberOfCells(); i++)
+  {
+    vtkCell* cell = temp_fib->GetFiberPolyData()->GetCell(i);
+    int numPoints = cell->GetNumberOfPoints();
+    vtkPoints* points = cell->GetPoints();
 
-        vnl_matrix<float> streamline;
-        streamline.set_size(3, m_NumPoints);
-        streamline.fill(0.0);
+    vnl_matrix<float> streamline;
+    streamline.set_size(3, m_NumPoints);
+    streamline.fill(0.0);
 
-        for (int j=0; j<numPoints; j++)
-        {
-          double cand[3];
-          points->GetPoint(j, cand);
+    for (int j=0; j<numPoints; j++)
+    {
+      double cand[3];
+      points->GetPoint(j, cand);
 
-          vnl_vector_fixed< float, 3 > candV;
-          candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
-          streamline.set_column(j, candV);
-        }
+      vnl_vector_fixed< float, 3 > candV;
+      candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
+      streamline.set_column(j, candV);
+    }
 
 //        out_fib.push_back(streamline);
-        out_fib.at(i)=streamline;
-      }
+    out_fib.at(i)=streamline;
+  }
 //      });
 
 
@@ -382,12 +376,15 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
 
     /*For every Sample/Streamline get Prediction and entropy (=based on counts of Random Forest)*/
-#pragma omp parallel for num_threads(18)
+    MITK_INFO << "Predicting on all cores";
+#pragma omp parallel for
     for (unsigned int i=0; i<m_DistancesTest.size(); i++)
     {
 
 
         int val = statistic_model->predict(dataTest.row(i));
+
+        #pragma omp critical
         if (val==1)
         {
            indexPrediction.push_back(i);
@@ -405,15 +402,16 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
         }
 
     }
+    MITK_INFO << "Done";
 
     /*Save entropy values for analysis*/
-    std::ofstream myfile3;
-    myfile3.open("/home/r948e/mycsv/entropydata" + std::to_string(m_activeCycle) + ".csv");
-    for (unsigned int i = 0; i < e.size(); i++)
-    {
-        myfile3 << e.at(i) << ' ';
-    }
-    myfile3.close();
+//    std::ofstream myfile3;
+//    myfile3.open("/home/r948e/mycsv/entropydata" + std::to_string(m_activeCycle) + ".csv");
+//    for (unsigned int i = 0; i < e.size(); i++)
+//    {
+//        myfile3 << e.at(i) << ' ';
+//    }
+//    myfile3.close();
 
 
     MITK_INFO << "--------------";
@@ -436,7 +434,6 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     distances_matrix.set_size(lengths, lengths);
     distances_matrix.fill(0.0);
-    MITK_INFO << "Dist_start";
 
     std::vector<float> distances_matrix_mean;
 
@@ -462,13 +459,6 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 //    sum_matrix.set_size(lengths);
 //    sum_matrix.fill(0.0);
 
-    /*Index to find values in distancematrix*/
-    std::vector<unsigned int> myidx;
-    /*Index to find actual streamlines using indexUnc*/
-    std::vector<unsigned int> indexUncDist;
-    /*Start with the Streamline of the highest entropy, which is in distance_matrix at idx 0*/
-    myidx.push_back(0);
-    indexUncDist.push_back(indexUnc.at(myidx.at(0)));
 
 //    MITK_INFO << distances_matrix.get_row(myidx.at(i)+ sum_matrix.get_row(0)
 
@@ -489,11 +479,18 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
 //    }
 
-    /*Matrix that stores distanced of used samples */
-    vnl_matrix<float> sum_matrix;
+    /*Matrix that stores distances of used samples */
+//    vnl_matrix<float> sum_matrix;
 //    sum_matrix.set_size(lengths, lengths);
 //    sum_matrix.set_size(lengths, lengths);
-    MITK_INFO <<distances_matrix;
+
+    /*Index to find values in distancematrix*/
+    std::vector<unsigned int> myidx;
+    /*Index to find actual streamlines using indexUnc*/
+    std::vector<unsigned int> indexUncDist;
+    /*Start with the Streamline of the highest entropy, which is in distance_matrix at idx 0*/
+    myidx.push_back(0);
+    indexUncDist.push_back(indexUnc.at(myidx.at(0)));
 
     /*Vecotr that stores minvalues of current iteration*/
     vnl_matrix<float> cur_vec;
@@ -504,7 +501,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
 //        unsigned int cur_i = indexUnc.at(myidx.at(i));
 
-        /*Save mean distancfe of all used Samples*/
+        /*Save mean distance of all used Samples*/
         vnl_matrix<float> sum_matrix;
         sum_matrix.set_size(myidx.size(), lengths);
         sum_matrix.fill(0);
@@ -520,9 +517,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
         }
         myidx.push_back(cur_vec.arg_max());
 
-        MITK_INFO << "Push_back";
-        MITK_INFO << indexUncDist.at(i);
-        MITK_INFO << indexUnc.at(i);
+
         indexUncDist.push_back(indexUnc.at(myidx.at(i+1)));
         sum_matrix.clear();
 
@@ -605,6 +600,9 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
     vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
     vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
 
+//    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
+//    weights->SetNumberOfValues(this->GetNumFibers()+fib->GetNumFibers());
+
     unsigned int indexSize = index.size();
     unsigned int counter = 0;
     MITK_INFO << "Start Loop";
@@ -624,7 +622,7 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
             vtkIdType id = vNewPoints->InsertNextPoint(p);
             container->GetPointIds()->InsertNextId(id);
         }
-        //    weights->InsertValue(counter, fib->GetFiberWeight(i));
+//            weights->InsertValue(counter, fib->GetFiberWeight(i));
         vNewLines->InsertNextCell(container);
         counter++;
 
@@ -656,8 +654,8 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
 void  StreamlineFeatureExtractor::GenerateData()
 {
     MITK_INFO << "Update";
-//    mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671.trk");
-    mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/data/Synt_tract_40_prototypes.trk");
+    mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671.trk");
+//    mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/data/Synt_tract_40_prototypes.trk");
 
     std::vector<vnl_matrix<float> >             T_Prototypes;
     std::vector<vnl_matrix<float> >             T_TractogramPlus;

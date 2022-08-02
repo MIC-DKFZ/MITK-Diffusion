@@ -92,6 +92,9 @@ protected slots:
   void RemovefromUncertainty( bool checked );
   void RemovefromDistance( bool checked );
   void RemovefromPrediction( bool checked );
+  void ResampleTractogram();
+  void RandomPrototypes();
+  void SFFPrototypes();
 
 
 
@@ -134,8 +137,8 @@ protected:
 
 
   mitk::DataNode::Pointer               m_positivBundlesNode;
-  mitk::DataNode::Pointer               m_newfibersSelectedBundles;
-  mitk::DataNode::Pointer               m_negativeSelectedBundles;
+  mitk::DataNode::Pointer               m_newfibersBundleNode;
+  mitk::DataNode::Pointer               m_negativeBundleNode;
   mitk::DataNode::Pointer               m_PredictionNode;
   mitk::DataNode::Pointer               m_UncertaintyLabelNode;
   mitk::DataNode::Pointer               m_DistanceLabelNode;

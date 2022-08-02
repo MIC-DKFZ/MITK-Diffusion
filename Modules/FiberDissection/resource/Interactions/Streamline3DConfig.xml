@@ -8,11 +8,11 @@
          <attribute name="Modifiers" value="alt"/>
     </event_variant>
     <event_variant class="MousePressEvent" name="AddNegStreamlinetolabelClick">
-         <attribute name="EventButton" value="LeftMouseButton"/>
-         <attribute name="Modifiers" value="shift"/>
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="ctrl,shift"/>
     </event_variant>
     <event_variant class="MousePressEvent" name="AddPosStreamlinetolabelClick">
-         <attribute name="EventButton" value="LeftMouseButton"/>
-         <attribute name="Modifiers" value="alt"/>
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="ctrl,alt"/>
     </event_variant>
 </config>
