@@ -57,6 +57,9 @@ mitk::StreamlineInteractor::~StreamlineInteractor()
 void mitk::StreamlineInteractor::ConnectActionsAndFunctions()
 {
 //  CONNECT_CONDITION("isoverstreamline", HasPickedHandle);
+    CONNECT_CONDITION("isoverstreamline", CheckSelection);
+    CONNECT_FUNCTION("selectstreamline", SelectStreamline);
+
   CONNECT_FUNCTION("addnegstreamline", AddStreamlineNegBundle);
   CONNECT_FUNCTION("addposstreamline", AddStreamlinePosBundle);
   CONNECT_FUNCTION("addnegtolabelstreamline", AddNegStreamlinetolabelsBundle);
@@ -90,6 +93,61 @@ void mitk::StreamlineInteractor::SetPositiveNode(DataNode *node)
     m_PosStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
     MITK_INFO << "Positive Node added";
   }
+
+bool mitk::StreamlineInteractor::CheckSelection(const InteractionEvent *interactionEvent)
+{
+    const auto *positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
+    if (positionEvent != nullptr)
+    {
+
+//      Point3D point = positionEvent->GetPositionInWorld();
+      // iterate over point set and check if it contains a point close enough to the pointer to be selected
+//      int index = GetPointIndexByPosition(point, timeStep);
+
+      BaseRenderer *renderer = positionEvent->GetSender();
+
+      auto &picker = m_Picker[renderer];
+
+      picker = vtkSmartPointer<vtkCellPicker>::New();
+      picker->SetTolerance(0.01);
+      auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard3D);
+
+
+        auto vtk_mapper = dynamic_cast<VtkMapper *>(mapper);
+        if (vtk_mapper)
+        { // doing this each time is bizarre
+          picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
+          picker->PickFromListOn();
+        }
+//        }
+
+      auto displayPosition = positionEvent->GetPointerPositionOnScreen();
+      picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
+
+//      vtkIdType pickedCellID = picker->GetCellId();
+
+      if (picker->GetCellId()==-1)
+      {
+          return false;
+      }
+      else
+      {
+
+          return true;
+      }
+
+    }
+    else {
+        return false;
+    }
+}
+
+void mitk::StreamlineInteractor::SelectStreamline(StateMachineAction *, InteractionEvent *interactionEvent)
+{
+    auto *positionEvent = dynamic_cast<InteractionPositionEvent *>(interactionEvent);
+    MITK_INFO << positionEvent;
+    MITK_INFO << "Point found";
+}
 
 void mitk::StreamlineInteractor::AddStreamlinePosBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {

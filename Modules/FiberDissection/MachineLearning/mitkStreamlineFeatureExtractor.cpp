@@ -46,6 +46,21 @@ void StreamlineFeatureExtractor::SetTractogramMinus(const mitk::FiberBundle::Poi
   m_TractogramMinus = TractogramMinus;
 }
 
+void StreamlineFeatureExtractor::SetTractogramPrototypes(const mitk::FiberBundle::Pointer &TractogramPrototypes, bool standard)
+{
+  if (standard)
+  {
+      MITK_INFO << "Use Standard Prototypes...";
+    m_inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671.trk");
+  }
+  else {
+      MITK_INFO << "Use individual Prototypes...";
+      m_inputPrototypes = TractogramPrototypes;
+  }
+
+
+}
+
 void StreamlineFeatureExtractor::SetActiveCycle(int &activeCycle)
 {
   m_activeCycle= activeCycle;
@@ -654,7 +669,7 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
 void  StreamlineFeatureExtractor::GenerateData()
 {
     MITK_INFO << "Update";
-    mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671.trk");
+
 //    mitk::FiberBundle::Pointer inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/data/Synt_tract_40_prototypes.trk");
 
     std::vector<vnl_matrix<float> >             T_Prototypes;
@@ -663,7 +678,7 @@ void  StreamlineFeatureExtractor::GenerateData()
     std::vector<vnl_matrix<float> >             T_TractogramTest;
     std::vector<vnl_matrix<float> >             T_mergedPrototypes;
 
-    T_Prototypes = ResampleFibers(inputPrototypes);
+    T_Prototypes = ResampleFibers(m_inputPrototypes);
     T_TractogramMinus= ResampleFibers(m_TractogramMinus);
     T_TractogramPlus= ResampleFibers(m_TractogramPlus);
 

@@ -15,4 +15,5 @@
          <attribute name="EventButton" value="RightMouseButton"/>
          <attribute name="Modifiers" value="ctrl,alt"/>
     </event_variant>
+    <event_variant class="MouseMoveEvent" name="CheckSelected"/>
 </config>

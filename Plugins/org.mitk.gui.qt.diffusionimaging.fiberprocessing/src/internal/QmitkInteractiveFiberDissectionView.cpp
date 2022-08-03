@@ -206,6 +206,8 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   m_Controls->m_unclabeling->setEnabled(false);
   m_Controls->m_predlabeling->setEnabled(false);
   m_Controls->m_distlabeling->setEnabled(false);
+//  m_Controls->m_PrototypeBox->setEditable(false);
+//  m_Controls->m_useStandardP->
 
   bool fibSelected = !m_SelectedFB.empty();
   bool multipleFibsSelected = (m_SelectedFB.size()>1);
@@ -294,6 +296,11 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
       m_Controls->m_distlabeling->setEnabled(true);
   }
 
+  if (m_Controls->m_useStandardP->isChecked())
+  {
+      m_Controls->m_PrototypeBox->setEditable(true);
+  }
+
 
 
 
@@ -337,7 +344,7 @@ void QmitkInteractiveFiberDissectionView::RandomPrototypes()
         myvec.push_back(k);
       }
 //      auto rng = std::default_random_engine {};
-      std::random_shuffle(std::begin(myvec), std::end(myvec));
+//      std::random_shuffle(std::begin(myvec), std::end(myvec));
 
       vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
       vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
@@ -399,7 +406,7 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
       mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_BundleBox->GetSelectedNode()->GetData());
 
       /* Get Subset of Tractogram*/
-      int size_subset = std::max(1.0, ceil(2.0 * m_Controls->m_NumPrototypes->value() * std::log(m_Controls->m_NumPrototypes->value())));
+      int size_subset = std::max(1.0, ceil(3.0 * m_Controls->m_NumPrototypes->value() * std::log(m_Controls->m_NumPrototypes->value())));
 
       MITK_INFO << fib->GetNumFibers();
       std::vector<int> myvec;
@@ -408,7 +415,7 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
         myvec.push_back(k);
       }
 
-      std::random_shuffle(std::begin(myvec), std::end(myvec));
+//      std::random_shuffle(std::begin(myvec), std::end(myvec));
 
       vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
       vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
@@ -962,7 +969,6 @@ void QmitkInteractiveFiberDissectionView::RemovefromBundle( bool checked )
             m_negativeBundleNode = node;
             this->GetDataStorage()->Add(m_negativeBundleNode);
 
-
             m_StreamlineInteractor->EnableInteraction(true);
             m_StreamlineInteractor->SetNegativeNode(m_negativeBundleNode);
             m_StreamlineInteractor->SetPositiveNode(m_positivBundlesNode);
@@ -1029,6 +1035,7 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
     clusterer->SetActiveCycle(m_activeCycleCounter);
     clusterer->SetTractogramPlus(m_positiveBundle);
     clusterer->SetTractogramMinus(m_negativeBundle);
+    clusterer->SetTractogramPrototypes(dynamic_cast<mitk::FiberBundle*>(m_Controls->m_PrototypeBox->GetSelectedNode()->GetData()), m_Controls->m_useStandardP->isChecked());
     clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()), m_SelectedFB.at(0)->GetName());
 //    clusterer->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_trainbundle->GetData()), m_trainbundle->GetName());
 

@@ -1042,6 +1042,36 @@ void mitk::FiberBundle::ColorFibersByFiberWeights(bool opacity, mitk::LookupTabl
   m_UpdateTime2D.Modified();
 }
 
+void mitk::FiberBundle::ColorSingleFiber(float r, float g, float b, float alpha, int cellId)
+{
+  m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+  m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
+  m_FiberColors->SetNumberOfComponents(4);
+  m_FiberColors->SetName("FIBER_COLORS");
+
+  unsigned char rgba[4] = {0,0,0,0};
+  unsigned int counter = 0;
+  vtkCell* cell = m_FiberPolyData->GetCell(cellId);
+  auto numPoints = cell->GetNumberOfPoints();
+
+
+  for (int j=0; j<numPoints; j++)
+  {
+      rgba[0] = static_cast<unsigned char>(r);
+      rgba[1] = static_cast<unsigned char>(g);
+      rgba[2] = static_cast<unsigned char>(b);
+      rgba[3] = static_cast<unsigned char>(alpha);
+      m_FiberColors->InsertTypedTuple(j, rgba);
+
+      m_FiberColors->InsertTypedTuple(counter, rgba);
+      counter++;
+   }
+
+
+  m_UpdateTime3D.Modified();
+  m_UpdateTime2D.Modified();
+}
+
 void mitk::FiberBundle::SetFiberColors(float r, float g, float b, float alpha)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();

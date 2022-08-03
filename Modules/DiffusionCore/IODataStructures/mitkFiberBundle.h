@@ -73,6 +73,7 @@ public:
     void ColorFibersByCurvature(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
     void ColorFibersByLength(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
     void ColorFibersByScalarMap(mitk::Image::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate=true);
+    void ColorSingleFiber(float r, float g, float b, float alpha, int cellId);
     template <typename TPixel>
     void ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate=true);
     void ColorFibersByOrientation();
