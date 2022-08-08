@@ -1042,32 +1042,58 @@ void mitk::FiberBundle::ColorFibersByFiberWeights(bool opacity, mitk::LookupTabl
   m_UpdateTime2D.Modified();
 }
 
-void mitk::FiberBundle::ColorSingleFiber(float r, float g, float b, float alpha, int cellId)
+void mitk::FiberBundle::SetSingleFiberColor(float r, float g, float b, unsigned int cellId, float alpha)
 {
+//    if (m_FiberColors==nullptr)
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
+//  MITK_INFO << color->GetNumberOfTuples();
+//  MITK_INFO << m_FiberColors->GetNumberOfTuples();
+
   unsigned char rgba[4] = {0,0,0,0};
   unsigned int counter = 0;
-  vtkCell* cell = m_FiberPolyData->GetCell(cellId);
+
+
+  for (unsigned int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
+  {
+  vtkCell* cell = m_FiberPolyData->GetCell(i);
   auto numPoints = cell->GetNumberOfPoints();
 
-
-  for (int j=0; j<numPoints; j++)
+  if (i==cellId)
   {
-      rgba[0] = static_cast<unsigned char>(r);
-      rgba[1] = static_cast<unsigned char>(g);
-      rgba[2] = static_cast<unsigned char>(b);
-      rgba[3] = static_cast<unsigned char>(alpha);
-      m_FiberColors->InsertTypedTuple(j, rgba);
+      MITK_INFO << i;
+      for (int j=0; j<numPoints; j++)
+      {
+          rgba[0] = static_cast<unsigned char>(r);
+          rgba[1] = static_cast<unsigned char>(b);
+          rgba[2] = static_cast<unsigned char>(g);
+          rgba[3] = static_cast<unsigned char>(alpha);
+//          m_FiberColors->InsertTypedTuple(j, rgba);
 
-      m_FiberColors->InsertTypedTuple(counter, rgba);
-      counter++;
-   }
+          m_FiberColors->InsertTypedTuple(counter, rgba);
+          counter++;
+       }
+  }
+  else {
+      for (int j=0; j<numPoints; j++)
+      {
+          rgba[0] = static_cast<unsigned char>(255);
+          rgba[1] = static_cast<unsigned char>(255);
+          rgba[2] = static_cast<unsigned char>(255);
+          rgba[3] = static_cast<unsigned char>(alpha);
+//          m_FiberColors->InsertTypedTuple(j, rgba);
 
+          m_FiberColors->InsertTypedTuple(counter, rgba);
+          counter++;
+       }
+  }
 
+  }
+
+//  MITK_INFO << m_FiberColors->GetNumberOfTuples();
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
 }
