@@ -1064,7 +1064,6 @@ void mitk::FiberBundle::SetSingleFiberColor(float r, float g, float b, unsigned 
 
   if (i==cellId)
   {
-      MITK_INFO << i;
       for (int j=0; j<numPoints; j++)
       {
           rgba[0] = static_cast<unsigned char>(r);

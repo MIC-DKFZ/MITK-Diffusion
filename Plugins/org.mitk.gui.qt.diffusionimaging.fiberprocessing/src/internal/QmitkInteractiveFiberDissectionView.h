@@ -92,6 +92,7 @@ protected slots:
   void RemovefromUncertainty( bool checked );
   void RemovefromDistance( bool checked );
   void RemovefromPrediction( bool checked );
+  void RemovefromSelection( bool checked );
   void ResampleTractogram();
   void RandomPrototypes();
   void SFFPrototypes();
@@ -120,6 +121,7 @@ protected:
   int m_IterationCounter;                                      ///< used for data node naming
   int m_RandomExtractionCounter;                               ///< used for random extracton of different Streamlines
   int m_activeCycleCounter;
+  int m_initRandom;
 //  int m_thresh2;
 
 

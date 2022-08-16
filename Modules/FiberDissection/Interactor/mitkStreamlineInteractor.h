@@ -60,6 +60,7 @@ namespace mitk
       void SetNegativeNode(DataNode *node);
       void SetToLabelNode(DataNode *node);
       void SetPositiveNode(DataNode *node);
+      void LabelfromPrediction(bool predlabeling);
 
   protected:
 
@@ -74,6 +75,7 @@ namespace mitk
        bool CheckSelection(const InteractionEvent *interactionEvent);
 
        void SelectStreamline(StateMachineAction *, InteractionEvent *);
+
 
        std::map<BaseRenderer *, vtkSmartPointer<vtkCellPicker>> m_Picker;
 
@@ -103,11 +105,14 @@ namespace mitk
     mitk::FiberBundle::Pointer            m_NegStreamline;
     mitk::FiberBundle::Pointer            m_PosStreamline;
     mitk::FiberBundle::Pointer            m_manStreamline;
+    bool                                  m_predlabeling;
 //    mitk::FiberBundle::Pointer            m_visualStreamline;
     mitk::DataNode::Pointer               m_NegStreamlineNode;
     mitk::DataNode::Pointer               m_PosStreamlineNode;
     mitk::DataNode::Pointer               m_manStreamlineNode;
 //    mitk::DataNode::Pointer               m_visualStreamlineNode;
+
+
 
     vtkSmartPointer<vtkPolyData>  m_extracted_streamline;
 

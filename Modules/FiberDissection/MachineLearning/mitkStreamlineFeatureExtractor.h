@@ -62,6 +62,7 @@ public:
   void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram, std::string TractogramTestName);
   void SetTractogramPrototypes(const mitk::FiberBundle::Pointer &TractogramPrototypes, bool standard);
   void SetActiveCycle(int &activeCycle);
+  void SetInitRandom(int &initRandom);
 //  void SetRandomThreshold(int &threshold);
 
 
@@ -92,6 +93,7 @@ protected:
 
   unsigned int                                m_NumPoints;
   int                                         m_activeCycle;
+  int                                         m_initRandom;
   int                                         m_thresh;
   mitk::FiberBundle::Pointer                  m_TractogramPlus;
   mitk::FiberBundle::Pointer                  m_TractogramMinus;

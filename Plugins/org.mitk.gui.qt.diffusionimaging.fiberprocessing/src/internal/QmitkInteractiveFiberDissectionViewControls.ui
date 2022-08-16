@@ -97,7 +97,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>3</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -775,6 +775,13 @@ QGroupBox {
           </property>
          </widget>
         </item>
+        <item row="6" column="0">
+         <widget class="QPushButton" name="m_sellabeling">
+          <property name="text">
+           <string>Selection_Label</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </widget>
@@ -784,6 +791,11 @@ QGroupBox {
  </widget>
  <customwidgets>
   <customwidget>
+   <class>QmitkDataStorageComboBox</class>
+   <extends>QComboBox</extends>
+   <header location="global">QmitkDataStorageComboBox.h</header>
+  </customwidget>
+  <customwidget>
    <class>QmitkSingleNodeSelectionWidget</class>
    <extends>QWidget</extends>
    <header location="global">QmitkSingleNodeSelectionWidget.h</header>
@@ -792,11 +804,6 @@ QGroupBox {
    <class>QmitkPointListWidget</class>
    <extends>QWidget</extends>
    <header location="global">QmitkPointListWidget.h</header>
-  </customwidget>
-  <customwidget>
-   <class>QmitkDataStorageComboBox</class>
-   <extends>QComboBox</extends>
-   <header location="global">QmitkDataStorageComboBox.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

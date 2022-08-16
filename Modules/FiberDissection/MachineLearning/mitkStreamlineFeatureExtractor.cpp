@@ -51,7 +51,7 @@ void StreamlineFeatureExtractor::SetTractogramPrototypes(const mitk::FiberBundle
   if (standard)
   {
       MITK_INFO << "Use Standard Prototypes...";
-    m_inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671.trk");
+    m_inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671_40.trk");
   }
   else {
       MITK_INFO << "Use individual Prototypes...";
@@ -66,6 +66,11 @@ void StreamlineFeatureExtractor::SetActiveCycle(int &activeCycle)
   m_activeCycle= activeCycle;
 }
 
+void StreamlineFeatureExtractor::SetInitRandom(int &initRandom)
+{
+  m_initRandom= initRandom;
+}
+
 
 
 
@@ -75,7 +80,7 @@ void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Poin
     path.append(TractogramTestName);
     m_TractogramTest= TractogramTest;
     auto s = std::to_string(m_NumPoints);
-    m_DistancesTestName= path.append("_distances" + s + ".csv");
+    m_DistancesTestName= path.append("_distances" + std::to_string(m_NumPoints) + "_" + std::to_string(m_activeCycle) + ".csv");
 }
 
 std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk::FiberBundle::Pointer tractogram)
@@ -218,7 +223,7 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::MergeTractogram(std:
         merged_prototypes.push_back(positive_local_prototypes.at(k));
     }
 
-    for (unsigned int k=0; k<neg_locals; k++)
+    for (unsigned int k=m_initRandom; k<neg_locals; k++)
     {
         merged_prototypes.push_back(negative_local_prototypes.at(k));
     }
@@ -327,6 +332,9 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     cv::Mat labels_shuffled;
     cv::Mat samples_shuffled;
 
+
+
+
     for (int cont = 0; cont < labels_arr_vec.rows; cont++)
     {
         labels_shuffled.push_back(labels_arr_vec.row(seeds[cont]));
@@ -338,6 +346,15 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     }
 
 
+    std::ofstream labelsfile;
+    labelsfile.open("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/Labels_" + std::to_string(m_activeCycle) + ".csv");
+    labelsfile<< cv::format(labels_shuffled, cv::Formatter::FMT_CSV) << std::endl;
+    labelsfile.close();
+
+    std::ofstream featuresfile;
+    featuresfile.open("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/Features_" + std::to_string(m_activeCycle) + ".csv");
+    featuresfile<< cv::format(samples_shuffled, cv::Formatter::FMT_CSV) << std::endl;
+    featuresfile.close();
 
     /*Create Dataset and initialize Classifier*/
     cv::Ptr<cv::ml::TrainData> m_traindata = cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, labels_shuffled);
@@ -420,13 +437,13 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     MITK_INFO << "Done";
 
     /*Save entropy values for analysis*/
-//    std::ofstream myfile3;
-//    myfile3.open("/home/r948e/mycsv/entropydata" + std::to_string(m_activeCycle) + ".csv");
-//    for (unsigned int i = 0; i < e.size(); i++)
-//    {
-//        myfile3 << e.at(i) << ' ';
-//    }
-//    myfile3.close();
+    std::ofstream myfile3;
+    myfile3.open("/home/r948e/mycsv/entropydata_" + std::to_string(m_activeCycle) + ".csv");
+    for (unsigned int i = 0; i < e.size(); i++)
+    {
+        myfile3 << e.at(i) << ' ';
+    }
+    myfile3.close();
 
 
     MITK_INFO << "--------------";
@@ -438,8 +455,13 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     MITK_INFO << "--------------";
 
     /*Get index of most unertain data (lengths defines how many data is saved)*/
-    int lengths=500;
-//  int lengths = std::count_if(e.begin(), e.end(),[&](auto const& val){ return val >= 0.9; });
+//    int lengths=500;
+  int lengths = std::count_if(e.begin(), e.end(),[&](auto const& val){ return val >= 0.95; });
+  if (length<500)
+  {
+      length=500
+  }
+
     std::vector<unsigned int> indexUnc = Sort(e, lengths);
 
     MITK_INFO << indexUnc.size();
@@ -696,10 +718,10 @@ void  StreamlineFeatureExtractor::GenerateData()
 
     std::ifstream f(m_DistancesTestName);
 
-    MITK_INFO << m_DistancesTestName;
-    if (f.good())
+
+    if (f.good() && m_activeCycle!=0)
     {
-        MITK_INFO << "File exists";
+        MITK_INFO << "Loading Features of Tractogram";
         m_DistancesTest.clear();
         std::ifstream myFile(m_DistancesTestName);
 
@@ -745,12 +767,23 @@ void  StreamlineFeatureExtractor::GenerateData()
         MITK_INFO << "Calculate Features of Test Data";
         m_DistancesTest= CalculateDmdf(T_TractogramTest, T_mergedPrototypes);
 
+                std::ofstream myFile(m_DistancesTestName);
+        //        myFile << colname << "\n";
+                for(long unsigned int i = 0; i < m_DistancesTest.size(); ++i)
+                {
+                    myFile << m_DistancesTest.at(i);
+                }
+                myFile.close();
+
     }
     MITK_INFO << m_DistancesTest.size();
 
 
     MITK_INFO << "Sizes of Plus and Minus";
     MITK_INFO << m_DistancesPlus.size() + m_DistancesMinus.size();
+    MITK_INFO << "Sizes of Prototypes";
+    MITK_INFO << T_mergedPrototypes.size();
+    MITK_INFO << T_mergedPrototypes.at(0).rows();
     MITK_INFO << "Size of Test Data";
     MITK_INFO << m_DistancesTest.size();
     MITK_INFO << "Done with Datacreation";
@@ -761,7 +794,6 @@ void  StreamlineFeatureExtractor::GenerateData()
 
 
 }
-
 
 
 
