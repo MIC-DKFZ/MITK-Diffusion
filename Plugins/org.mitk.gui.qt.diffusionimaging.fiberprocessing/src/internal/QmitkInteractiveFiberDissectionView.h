@@ -96,6 +96,7 @@ protected slots:
   void ResampleTractogram();
   void RandomPrototypes();
   void SFFPrototypes();
+  void StartValidation();
 
 
 
@@ -151,7 +152,11 @@ protected:
   vtkSmartPointer<vtkCellPicker>        m_picker1;
   mitk::StreamlineInteractor::Pointer   m_StreamlineInteractor;
 
-  std::shared_ptr< mitk::StreamlineFeatureExtractor > clusterer;
+  std::shared_ptr< mitk::StreamlineFeatureExtractor > classifier;
+  std::shared_ptr< mitk::StreamlineFeatureExtractor > validater;
+
+
+  std::vector<vnl_vector<float>> m_metrics;
 
   std::vector<std::vector<unsigned int>> m_index;
 

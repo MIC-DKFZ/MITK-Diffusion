@@ -34,7 +34,15 @@ StreamlineFeatureExtractor::~StreamlineFeatureExtractor()
 
 }
 
+void StreamlineFeatureExtractor::SetTractogramPrediction(const mitk::FiberBundle::Pointer &TractogramPrediction)
+{
+  m_TractogramPrediction= TractogramPrediction;
+}
 
+void StreamlineFeatureExtractor::SetTractogramGroundtruth(const mitk::FiberBundle::Pointer &TractogramGroundtruth)
+{
+  m_TractogramGroundtruth= TractogramGroundtruth;
+}
 
 void StreamlineFeatureExtractor::SetTractogramPlus(const mitk::FiberBundle::Pointer &TractogramPlus)
 {
@@ -71,9 +79,6 @@ void StreamlineFeatureExtractor::SetInitRandom(int &initRandom)
   m_initRandom= initRandom;
 }
 
-
-
-
 void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Pointer &TractogramTest, std::string TractogramTestName)
 {
     std::string path = "/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/";
@@ -85,6 +90,7 @@ void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Poin
 
 std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk::FiberBundle::Pointer tractogram)
 {
+  MITK_INFO << "Infunction";
   mitk::FiberBundle::Pointer temp_fib = tractogram->GetDeepCopy();
   temp_fib->ResampleToNumPoints(m_NumPoints);
   MITK_INFO << "Resampling Done";
@@ -405,6 +411,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     std::vector<unsigned int> indexPrediction;
     std::vector<float> e(m_DistancesTest.size());
+    std::vector<int> pred(m_DistancesTest.size());
 
 
     /*For every Sample/Streamline get Prediction and entropy (=based on counts of Random Forest)*/
@@ -415,6 +422,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
 
         int val = statistic_model->predict(dataTest.row(i));
+        pred.at(i)=val;
 
         #pragma omp critical
         if (val==1)
@@ -437,13 +445,23 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     MITK_INFO << "Done";
 
     /*Save entropy values for analysis*/
-    std::ofstream myfile3;
-    myfile3.open("/home/r948e/mycsv/entropydata_" + std::to_string(m_activeCycle) + ".csv");
+    std::ofstream entropyfile;
+    entropyfile.open("/home/r948e/mycsv/entropydata_" + std::to_string(m_activeCycle) + ".csv");
     for (unsigned int i = 0; i < e.size(); i++)
     {
-        myfile3 << e.at(i) << ' ';
+        entropyfile << e.at(i) << ' ';
     }
-    myfile3.close();
+    entropyfile.close();
+
+    std::ofstream predictionfile;
+    predictionfile.open("/home/r948e/mycsv/predictiondata_" + std::to_string(m_activeCycle) + ".csv");
+    for (unsigned int i = 0; i < pred.size(); i++)
+    {
+        predictionfile << pred.at(i) << ' ';
+    }
+    predictionfile.close();
+
+
 
 
     MITK_INFO << "--------------";
@@ -457,9 +475,13 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     /*Get index of most unertain data (lengths defines how many data is saved)*/
 //    int lengths=500;
   int lengths = std::count_if(e.begin(), e.end(),[&](auto const& val){ return val >= 0.95; });
-  if (length<500)
+  if (lengths<500)
   {
-      length=500
+      lengths=500;
+  }
+  else if (lengths>2000)
+  {
+      lengths=2000;
   }
 
     std::vector<unsigned int> indexUnc = Sort(e, lengths);
@@ -560,54 +582,8 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     }
 
-//    std::vector<unsigned int> indexUncdist;
-//    std::priority_queue<std::pair<float, int>> qq;
-//    for (unsigned int i = 0; i < distances_matrix_mean.size(); ++i)
-//    {
-//        qq.push(std::pair<float, int>(distances_matrix_mean[i], i));
-//    }
-////    int k = m_DistancesTest.size(); // number of indices we need
-////    int k = lengths; // number of indices we need
-//    for (int i = 0; i < lengths; ++i)
-//    {
-//        int kki = qq.top().second;
-
-//        indexUncdist.push_back(indexUnc.at(kki));
-//        qq.pop();
-//    }
-
     MITK_INFO << "Dist_stop";
 
-//    std::ofstream myfile6;
-//    myfile6.open("/home/r948e/mycsv/distances_matrix_mean.csv");
-//    for (unsigned int i = 0; i < distances_matrix_mean.size(); i++)
-//    {
-//        myfile6 << distances_matrix_mean.at(i) << ' ';
-//    }
-//    myfile6.close();
-
-//    std::ofstream myfile5;
-//    myfile5.open("/home/r948e/mycsv/indexUncdist.csv");
-//    for (unsigned int i = 0; i < indexUncdist.size(); i++)
-//    {
-//        myfile5 << indexUncdist.at(i) << ' ';
-//    }
-//    myfile5.close();
-
-//    MITK_INFO << distances_matrix;
-//    MITK_INFO << distances_matrix.max_value();
-//    MITK_INFO << distances_matrix.arg_max();
-
-
-//    vnl_matrix<float> myx =  m_DistancesTest.at(indexUnc.at(0)) - m_DistancesTest.at(indexUnc.at(1));
-////    myx = (m_DistancesTest.at(indexUnc.at(0)) - m_DistancesTest.at(indexUnc.at(1)));
-//    MITK_INFO << m_DistancesTest.at(indexUnc.at(0));
-//    MITK_INFO << m_DistancesTest.at(indexUnc.at(1));
-//    MITK_INFO << myx.get(0,0);
-//    MITK_INFO << sqrt(pow(myx.get(0,0),2));
-//    MITK_INFO << myx.get(0,1);
-//    MITK_INFO << myx.absolute_value_sum()/m_DistancesTest.at(0).size();
-//    MITK_INFO << "Done";
 
     /*Save Prediction*/
     index_vec.push_back(indexPrediction);
@@ -688,7 +664,36 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
     return Prediction;
 }
 
-void  StreamlineFeatureExtractor::GenerateData()
+std::vector<int> StreamlineFeatureExtractor::CreateLabels(std::vector<vnl_matrix<float> > Testdata,
+                                                              std::vector<vnl_matrix<float> > Prediction)
+{
+//    vnl_vector<int> labels;
+//    vnl_vector.set_size(Testdata.size());
+//    vnl_vector.fill(0);
+    std::vector<int>  labels(Testdata.size(), 0);
+
+
+#pragma omp parallel for
+    for (unsigned int i=0; i<Prediction.size(); i++)
+    {
+        for (unsigned int k=0; k<Testdata.size(); k++)
+        {
+            if (Testdata.at(k)==Prediction.at(i))
+            {
+                labels.at(k)=1;
+            }
+        }
+    }
+
+
+    return labels;
+
+
+
+
+}
+
+void StreamlineFeatureExtractor::GenerateData()
 {
     MITK_INFO << "Update";
 
@@ -791,6 +796,112 @@ void  StreamlineFeatureExtractor::GenerateData()
 
 }
 
+vnl_vector<float> StreamlineFeatureExtractor::ValidationPipe()
+{
+    std::vector<vnl_matrix<float> >             T_Prototypes;
+    std::vector<vnl_matrix<float> >             T_TractogramPrediction;
+    std::vector<vnl_matrix<float> >             T_TractogramGroundtruth;
+    std::vector<vnl_matrix<float> >             T_TractogramTest;
+    std::vector<vnl_matrix<float> >             DistancesPrediction;
+    std::vector<vnl_matrix<float> >             DistancesGroundtruth;
+    std::vector<vnl_matrix<float> >             DistancesTest;
+    std::vector<int>                            LabelsPrediction;
+    std::vector<int>                            LabelsGroundtruth;
+
+    MITK_INFO << "Start Resampling";
+    T_Prototypes = ResampleFibers(m_inputPrototypes);
+    T_TractogramPrediction= ResampleFibers(m_TractogramPrediction);
+    T_TractogramGroundtruth= ResampleFibers(m_TractogramGroundtruth);
+    T_TractogramTest= ResampleFibers(m_TractogramTest);
+
+    MITK_INFO << "Calculate Features";
+    DistancesPrediction = CalculateDmdf(T_TractogramPrediction, T_Prototypes);
+    DistancesGroundtruth = CalculateDmdf(T_TractogramGroundtruth, T_Prototypes);
+    DistancesTest = CalculateDmdf(T_TractogramTest, T_Prototypes);
+
+    LabelsGroundtruth = CreateLabels(DistancesTest, DistancesGroundtruth);
+    LabelsPrediction = CreateLabels(DistancesTest, DistancesPrediction);
+
+    std::ofstream LabelsPredictionFile;
+    LabelsPredictionFile.open("/home/r948e/mycsv/predictionlabels_" + std::to_string(m_activeCycle) + ".csv");
+    for (unsigned int i = 0; i < LabelsPrediction.size(); i++)
+    {
+        LabelsPredictionFile << LabelsPrediction.at(i) << ' ';
+    }
+    LabelsPredictionFile.close();
+
+    std::ofstream LabelsGroundtruthFile;
+    LabelsGroundtruthFile.open("/home/r948e/mycsv/groundtruthlabels_" + std::to_string(m_activeCycle) + ".csv");
+    for (unsigned int i = 0; i < LabelsGroundtruth.size(); i++)
+    {
+        LabelsGroundtruthFile << LabelsGroundtruth.at(i) << ' ';
+    }
+    LabelsGroundtruthFile.close();
+
+    float FP = 0.0;
+    float FN = 0.0;
+    float TP = 0.0;
+    float TN = 0.0;
+//#pragma omp parallel for
+    for (unsigned int i=0; i<LabelsGroundtruth.size(); i++)
+    {
+        if (LabelsGroundtruth.at(i)==1 && LabelsPrediction.at(i)==1)
+        {
+            TP +=1;
+        }
+        else if (LabelsGroundtruth.at(i)==1 && LabelsPrediction.at(i)==0)
+        {
+            FN +=1;
+        }
+        else if (LabelsGroundtruth.at(i)==0 && LabelsPrediction.at(i)==1)
+        {
+            FP +=1;
+        }
+        else if (LabelsGroundtruth.at(i)==0 && LabelsPrediction.at(i)==0)
+        {
+            TN +=1;
+        }
+    }
+
+    float Precision;
+    float Recall;
+    float F1_score;
+    MITK_INFO << "TP";
+    MITK_INFO << TP;
+    MITK_INFO << "FP";
+    MITK_INFO << FP;
+    MITK_INFO << "TN";
+    MITK_INFO << TN;
+    MITK_INFO << "FN";
+    MITK_INFO << FN;
+    Precision = TP/(TP + FP);
+    MITK_INFO << "Precision";
+    MITK_INFO << Precision;
+    Recall = TP/(TP + FN);
+    MITK_INFO << "Recall";
+    MITK_INFO << Recall;
+    F1_score = (2*Precision*Recall)/(Precision+Recall);
+    MITK_INFO << "F1_score";
+    MITK_INFO << F1_score;
+
+
+
+    vnl_vector<float> metrics(7);
+
+    metrics.put(0, TP);
+    metrics.put(1, FP);
+    metrics.put(2, TN);
+    metrics.put(3, FN);
+    metrics.put(4, Precision);
+    metrics.put(5, Recall);
+    metrics.put(6, F1_score);
+
+
+
+
+    return metrics;
+
+}
 
 
 }

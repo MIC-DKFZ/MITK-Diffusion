@@ -57,6 +57,14 @@ public:
     this->GenerateData();
   }
 
+//  void Validate(){
+//    this->ValidationPipe();
+//  }
+
+
+
+  void SetTractogramGroundtruth(const mitk::FiberBundle::Pointer &Tractogram);
+  void SetTractogramPrediction(const mitk::FiberBundle::Pointer &Tractogram);
   void SetTractogramPlus(const mitk::FiberBundle::Pointer &Tractogram);
   void SetTractogramMinus(const mitk::FiberBundle::Pointer &Tractogram);
   void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram, std::string TractogramTestName);
@@ -64,6 +72,7 @@ public:
   void SetActiveCycle(int &activeCycle);
   void SetInitRandom(int &initRandom);
 //  void SetRandomThreshold(int &threshold);
+  vnl_vector<float> ValidationPipe();
 
 
   void CreateClassifier();
@@ -81,6 +90,10 @@ public:
 protected:
 
   void GenerateData();
+//  void ValidationPipe();
+
+  std::vector<int> CreateLabels(std::vector<vnl_matrix<float> > Testdata,
+                                std::vector<vnl_matrix<float> > Prediction);
   std::vector< vnl_matrix<float> > ResampleFibers(FiberBundle::Pointer tractogram);
   std::vector<vnl_matrix<float> > CalculateDmdf(std::vector<vnl_matrix<float> > tractogram,
                                                 std::vector<vnl_matrix<float> > prototypes);
@@ -91,10 +104,13 @@ protected:
 
 
 
+
   unsigned int                                m_NumPoints;
   int                                         m_activeCycle;
   int                                         m_initRandom;
   int                                         m_thresh;
+  mitk::FiberBundle::Pointer                  m_TractogramPrediction;
+  mitk::FiberBundle::Pointer                  m_TractogramGroundtruth;
   mitk::FiberBundle::Pointer                  m_TractogramPlus;
   mitk::FiberBundle::Pointer                  m_TractogramMinus;
   mitk::FiberBundle::Pointer                  m_TractogramTest;

@@ -97,7 +97,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>3</number>
+      <number>4</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -108,7 +108,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>455</height>
+        <height>424</height>
        </rect>
       </property>
       <attribute name="label">
@@ -217,7 +217,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>455</height>
+        <height>424</height>
        </rect>
       </property>
       <attribute name="label">
@@ -361,7 +361,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>441</height>
+        <height>410</height>
        </rect>
       </property>
       <property name="accessibleName">
@@ -585,7 +585,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>455</height>
+        <height>424</height>
        </rect>
       </property>
       <attribute name="label">
@@ -781,6 +781,93 @@ QGroupBox {
            <string>Selection_Label</string>
           </property>
          </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+     <widget class="QWidget" name="page_5">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>399</width>
+        <height>424</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Validation</string>
+      </attribute>
+      <widget class="QFrame" name="frame_3">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>20</y>
+         <width>351</width>
+         <height>371</height>
+        </rect>
+       </property>
+       <property name="frameShape">
+        <enum>QFrame::StyledPanel</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Raised</enum>
+       </property>
+       <layout class="QGridLayout" name="gridLayout_8">
+        <item row="1" column="1" colspan="2">
+         <widget class="QmitkDataStorageComboBox" name="m_GroundtruthBox"/>
+        </item>
+        <item row="9" column="1">
+         <widget class="QPushButton" name="m_validate">
+          <property name="text">
+           <string>Validate</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_11">
+          <property name="text">
+           <string>Prediction</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label_12">
+          <property name="text">
+           <string>Groundtrouth</string>
+          </property>
+         </widget>
+        </item>
+        <item row="11" column="2">
+         <spacer name="verticalSpacer_8">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item row="9" column="2">
+         <spacer name="horizontalSpacer_9">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item row="0" column="1" colspan="2">
+         <widget class="QmitkDataStorageComboBox" name="m_PredictionBox"/>
+        </item>
+        <item row="10" column="1" colspan="2">
+         <widget class="QLineEdit" name="m_saver"/>
         </item>
        </layout>
       </widget>
