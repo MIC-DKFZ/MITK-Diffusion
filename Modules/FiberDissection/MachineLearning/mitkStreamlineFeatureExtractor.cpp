@@ -715,73 +715,85 @@ void StreamlineFeatureExtractor::GenerateData()
 
 
     MITK_INFO << "Calculate Features";
-    m_DistancesMinus = CalculateDmdf(T_TractogramMinus, T_mergedPrototypes);
-    m_DistancesPlus = CalculateDmdf(T_TractogramPlus, T_mergedPrototypes);
+    m_DistancesMinus = CalculateDmdf(T_TractogramMinus, T_Prototypes);
+    m_DistancesPlus = CalculateDmdf(T_TractogramPlus, T_Prototypes);
 
 
+    MITK_INFO << m_DistancesTestName;
+    MITK_INFO << "Resample Test Data";
+    T_TractogramTest= ResampleFibers(m_TractogramTest);
+    MITK_INFO << "Calculate Features of Test Data";
+    m_DistancesTest= CalculateDmdf(T_TractogramTest, T_mergedPrototypes);
 
+            std::ofstream myFile(m_DistancesTestName);
+    //        myFile << colname << "\n";
+            for(long unsigned int i = 0; i < m_DistancesTest.size(); ++i)
+            {
+                myFile << m_DistancesTest.at(i);
+            }
+            myFile.close();
 
     std::ifstream f(m_DistancesTestName);
 
 
-    if (f.good() && m_activeCycle!=0)
-    {
-        MITK_INFO << "Loading Features of Tractogram";
-        m_DistancesTest.clear();
-        std::ifstream myFile(m_DistancesTestName);
+//    if (f.good() && m_activeCycle!=0)
+//    {
+//        MITK_INFO << "Loading Features of Tractogram";
+//        m_DistancesTest.clear();
+//        std::ifstream myFile(m_DistancesTestName);
 
-        if(!myFile.is_open()) throw std::runtime_error("Could not open file");
-        std::string line;
-        vnl_matrix<float> curline;
-        curline.set_size(1, m_DistancesPlus.at(0).cols());
-        curline.fill(0.0);
+//        if(!myFile.is_open()) throw std::runtime_error("Could not open file");
+//        std::string line;
+//        vnl_matrix<float> curline;
+//        curline.set_size(1, m_DistancesPlus.at(0).cols());
+//        curline.fill(0.0);
 
-        float val;
+//        float val;
 
-        while(std::getline(myFile, line))
-            {
-                // Create a stringstream of the current line
-                std::stringstream ss(line);
-//                MITK_INFO << ss;
+//        while(std::getline(myFile, line))
+//            {
+//                // Create a stringstream of the current line
+//                std::stringstream ss(line);
+////                MITK_INFO << ss;
 
-                // Keep track of the current column index
-                int colIdx = 0;
+//                // Keep track of the current column index
+//                int colIdx = 0;
 
-                // Extract each integer
-                while(ss >> val){
+//                // Extract each integer
+//                while(ss >> val){
 
-//                    // Add the current integer to the 'colIdx' column's values vector
-                    curline.put(0,colIdx, val);
+////                    // Add the current integer to the 'colIdx' column's values vector
+//                    curline.put(0,colIdx, val);
 
-//                    // If the next token is a comma, ignore it and move on
-//                    if(ss.peek() == ',') ss.ignore();
-//                    // Increment the column index
-                    colIdx++;
-                }
-                m_DistancesTest.push_back(curline);
-            }
+////                    // If the next token is a comma, ignore it and move on
+////                    if(ss.peek() == ',') ss.ignore();
+////                    // Increment the column index
+//                    colIdx++;
+//                }
+//                m_DistancesTest.push_back(curline);
+//            }
 
-            // Close file
-            myFile.close();
-    }
-    else
-    {
-        MITK_INFO << m_DistancesTestName;
-        MITK_INFO << "Resample Test Data";
-        T_TractogramTest= ResampleFibers(m_TractogramTest);
-        MITK_INFO << "Calculate Features of Test Data";
-        m_DistancesTest= CalculateDmdf(T_TractogramTest, T_mergedPrototypes);
+//            // Close file
+//            myFile.close();
+//    }
+//    else
+//    {
+//        MITK_INFO << m_DistancesTestName;
+//        MITK_INFO << "Resample Test Data";
+//        T_TractogramTest= ResampleFibers(m_TractogramTest);
+//        MITK_INFO << "Calculate Features of Test Data";
+//        m_DistancesTest= CalculateDmdf(T_TractogramTest, T_mergedPrototypes);
 
-                std::ofstream myFile(m_DistancesTestName);
-        //        myFile << colname << "\n";
-                for(long unsigned int i = 0; i < m_DistancesTest.size(); ++i)
-                {
-                    myFile << m_DistancesTest.at(i);
-                }
-                myFile.close();
+//                std::ofstream myFile(m_DistancesTestName);
+//        //        myFile << colname << "\n";
+//                for(long unsigned int i = 0; i < m_DistancesTest.size(); ++i)
+//                {
+//                    myFile << m_DistancesTest.at(i);
+//                }
+//                myFile.close();
 
-    }
-    MITK_INFO << m_DistancesTest.size();
+//    }
+//    MITK_INFO << m_DistancesTest.size();
 
 
     MITK_INFO << "Sizes of Plus and Minus";
