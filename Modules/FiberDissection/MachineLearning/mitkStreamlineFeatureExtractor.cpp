@@ -723,7 +723,7 @@ void StreamlineFeatureExtractor::GenerateData()
     MITK_INFO << "Resample Test Data";
     T_TractogramTest= ResampleFibers(m_TractogramTest);
     MITK_INFO << "Calculate Features of Test Data";
-    m_DistancesTest= CalculateDmdf(T_TractogramTest, T_mergedPrototypes);
+    m_DistancesTest= CalculateDmdf(T_TractogramTest, T_Prototypes);
 
             std::ofstream myFile(m_DistancesTestName);
     //        myFile << colname << "\n";
