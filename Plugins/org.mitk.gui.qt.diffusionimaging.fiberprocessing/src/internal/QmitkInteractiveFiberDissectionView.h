@@ -87,6 +87,7 @@ protected slots:
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
   void CreatePredictionNode();
+  void CreateCertainNode();
   void CreateUncertaintySampleNode();
   void CreateDistanceSampleNode();
   void RemovefromUncertainty( bool checked );
@@ -97,6 +98,7 @@ protected slots:
   void RandomPrototypes();
   void SFFPrototypes();
   void StartValidation();
+  void AutomaticLabelling();
 
 
 
@@ -123,6 +125,7 @@ protected:
   int m_RandomExtractionCounter;                               ///< used for random extracton of different Streamlines
   int m_activeCycleCounter;
   int m_initRandom;
+  int m_createdStreamlineCounter;
 //  int m_thresh2;
 
 
@@ -135,6 +138,10 @@ protected:
   mitk::FiberBundle::Pointer            m_newfibersBundle;
   mitk::FiberBundle::Pointer            m_negativeBundle;
   mitk::FiberBundle::Pointer            m_Prediction;
+  mitk::FiberBundle::Pointer            m_CertainPlus;
+  mitk::FiberBundle::Pointer            m_CertainMinus;
+  mitk::FiberBundle::Pointer            m_CertainBetweenPlus;
+  mitk::FiberBundle::Pointer            m_CertainBetweenMinus;
   mitk::FiberBundle::Pointer            m_UncertaintyLabel;
   mitk::FiberBundle::Pointer            m_DistanceLabel;
 
@@ -143,6 +150,10 @@ protected:
   mitk::DataNode::Pointer               m_newfibersBundleNode;
   mitk::DataNode::Pointer               m_negativeBundleNode;
   mitk::DataNode::Pointer               m_PredictionNode;
+  mitk::DataNode::Pointer               m_CertainPlusNode;
+  mitk::DataNode::Pointer               m_CertainMinusNode;
+  mitk::DataNode::Pointer               m_CertainBetweenPlusNode;
+  mitk::DataNode::Pointer               m_CertainBetweenMinusNode;
   mitk::DataNode::Pointer               m_UncertaintyLabelNode;
   mitk::DataNode::Pointer               m_DistanceLabelNode;
 

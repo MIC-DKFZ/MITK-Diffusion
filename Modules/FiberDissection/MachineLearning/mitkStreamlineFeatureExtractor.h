@@ -100,7 +100,7 @@ protected:
   std::vector< vnl_matrix<float> > MergeTractogram(std::vector<vnl_matrix<float> > prototypes,
                                                   std::vector<vnl_matrix<float> > positive_local_prototypes,
                                                   std::vector<vnl_matrix<float> > negative_local_prototypes);
-  std::vector<unsigned int> Sort(std::vector<float> sortingVector, int lengths);
+  std::vector<unsigned int> Sort(std::vector<float> sortingVector, int lengths, int start);
 
 
 

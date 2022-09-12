@@ -229,7 +229,7 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::MergeTractogram(std:
         merged_prototypes.push_back(positive_local_prototypes.at(k));
     }
 
-    for (unsigned int k=m_initRandom; k<neg_locals; k++)
+    for (unsigned int k=0; k<neg_locals; k++)
     {
         merged_prototypes.push_back(negative_local_prototypes.at(k));
     }
@@ -246,7 +246,7 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::MergeTractogram(std:
 }
 
 
-std::vector<unsigned int> StreamlineFeatureExtractor::Sort(std::vector<float> sortingVector, int lengths)
+std::vector<unsigned int> StreamlineFeatureExtractor::Sort(std::vector<float> sortingVector, int lengths, int start)
 {
     std::vector<unsigned int> index;
     std::priority_queue<std::pair<float, int>> q;
@@ -260,7 +260,10 @@ std::vector<unsigned int> StreamlineFeatureExtractor::Sort(std::vector<float> so
     for (int i = 0; i < lengths; ++i)
     {
         int ki = q.top().second;
+        if (i>=start)
+        {
         index.push_back(ki);
+        }
         q.pop();
     }
     return index;
@@ -319,7 +322,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     /*Calculate weights*/
     int zerosgt = labels_arr_vec.rows - cv::countNonZero(labels_arr_vec);
     int onesgt = cv::countNonZero(labels_arr_vec);
-    float plusval = labels_arr_vec.rows / (2.0 * onesgt );
+    float plusval = labels_arr_vec.rows / (2.0 * onesgt ) ;
     float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
     float w[2] = {minusval, plusval};
     cv::Mat newweight = cv::Mat(1,2, CV_32F, w);
@@ -372,9 +375,9 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     auto criteria = cv::TermCriteria();
     criteria.type = cv::TermCriteria::MAX_ITER;
 //    criteria.epsilon = 1e-8;
-    criteria.maxCount = 800;
+    criteria.maxCount = 400;
 
-    statistic_model->setMaxDepth(50); //set to three
+    statistic_model->setMaxDepth(10); //set to three
 //    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
     statistic_model->setMinSampleCount(2);
     statistic_model->setTruncatePrunedTree(false);
@@ -475,18 +478,69 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     /*Get index of most unertain data (lengths defines how many data is saved)*/
 //    int lengths=500;
   int lengths = std::count_if(e.begin(), e.end(),[&](auto const& val){ return val >= 0.95; });
-  if (lengths<500)
+  if (lengths>1500)
   {
-      lengths=500;
+      lengths=1500;
   }
-  else if (lengths>2000)
-  {
-      lengths=2000;
-  }
+//  else if (lengths>3000)
+//  {
+//      lengths=3000;
+//  }
 
-    std::vector<unsigned int> indexUnc = Sort(e, lengths);
+    int lengthsCertain = std::count_if(e.begin(), e.end(),[&](auto const& val){ return val < 0.05; });
 
+    std::vector<unsigned int> indexUnc = Sort(e, lengths, 0);
+
+    std::vector<unsigned int> indexCertain = Sort(e, e.size() , e.size()-lengthsCertain );
+
+    std::vector<unsigned int> indexCertainBetween = Sort(e, e.size()-lengthsCertain , lengths);
+
+    MITK_INFO << "Index Certainty Vector size";
+    MITK_INFO << indexCertain.size();
+
+//    for (unsigned int i=indexCertain.size(); i>=0; --i)
+    std::vector<unsigned int> indexCertainNeg;
+    std::vector<unsigned int> indexCertainPos;
+
+    for (unsigned int i=0; i<indexCertain.size(); i++)
+    {
+        if(pred.at(indexCertain.at(i))==0 )
+        {
+            indexCertainNeg.push_back(indexCertain.at(i));
+        }
+        else {
+            indexCertainPos.push_back(indexCertain.at(i));
+        }
+
+    }
+
+
+    //    for (unsigned int i=indexCertain.size(); i>=0; --i)
+    std::vector<unsigned int> indexCertainBetweenNeg;
+    std::vector<unsigned int> indexCertainBetweenPos;
+
+    for (unsigned int i=0; i<indexCertainBetween.size(); i++)
+    {
+        if(pred.at(indexCertainBetween.at(i))==0 )
+        {
+            indexCertainBetweenNeg.push_back(indexCertainBetween.at(i));
+        }
+        else {
+            indexCertainBetweenPos.push_back(indexCertainBetween.at(i));
+        }
+
+    }
+
+    MITK_INFO << "Index Uncertainty Vector size";
     MITK_INFO << indexUnc.size();
+    MITK_INFO << "Index Certainty Vector size";
+    MITK_INFO << indexCertainPos.size();
+    MITK_INFO << indexCertainNeg.size();
+    MITK_INFO << indexCertainNeg.size() +indexCertainPos.size();
+    MITK_INFO << "Index Certainty between Vector size";
+    MITK_INFO << indexCertainBetweenPos.size();
+    MITK_INFO << indexCertainBetweenNeg.size();
+    MITK_INFO << indexCertainBetweenNeg.size() +indexCertainBetweenPos.size();
 
 
     vnl_matrix<float> distances_matrix;
@@ -514,34 +568,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     }
 
-//    vnl_vector<float> sum_matrix;
-//    sum_matrix.set_size(lengths);
-//    sum_matrix.fill(0.0);
 
-
-//    MITK_INFO << distances_matrix.get_row(myidx.at(i)+ sum_matrix.get_row(0)
-
-
-//    for (int i=0; i<lengths; i++)
-//    {
-////        unsigned int cur_i = indexUnc.at(myidx.at(i));
-//        /*Save mean distance of all used Samples*/
-//        sum_matrix = (sum_matrix + distances_matrix.get_row(myidx.at(i)))/=(i+1);
-
-//        myidx.push_back(distances_matrix.get_row(myidx.at(i)).arg_max());
-////        myidx.push_back(sum_matrix.arg_max());
-//        indexUncDist.push_back(indexUnc.at(myidx.at(i)));
-////        distances_matrix.set_column(myidx.at(i), 0.0001);
-//        distances_matrix.set_column(myidx.at(i), 0.0001);
-//        sum_matrix.put(myidx.at(i), 0.0001);
-////        MITK_INFO<< sum_matrix;
-
-//    }
-
-    /*Matrix that stores distances of used samples */
-//    vnl_matrix<float> sum_matrix;
-//    sum_matrix.set_size(lengths, lengths);
-//    sum_matrix.set_size(lengths, lengths);
 
     /*Index to find values in distancematrix*/
     std::vector<unsigned int> myidx;
@@ -591,6 +618,14 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     index_vec.push_back(indexUnc);
     /*Save index of uncertainty measures influenced by distance*/
     index_vec.push_back(indexUncDist);
+    /*Save index of certain measures*/
+    index_vec.push_back(indexCertainNeg);
+    /*Save index of certain measures*/
+//    index_vec.push_back(indexCertainPos);
+    /*Save index of certain measures*/
+//    index_vec.push_back(indexCertainBetweenNeg);
+    /*Save index of certain measures*/
+//    index_vec.push_back(indexCertainBetweenPos);
 
     return index_vec;
 
@@ -598,9 +633,6 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
 mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vector<unsigned int> &index)
 {
-
-
-
     mitk::FiberBundle::Pointer Prediction;
     MITK_INFO << "Create Bundle";
 
@@ -705,35 +737,78 @@ void StreamlineFeatureExtractor::GenerateData()
     std::vector<vnl_matrix<float> >             T_TractogramTest;
     std::vector<vnl_matrix<float> >             T_mergedPrototypes;
 
+
+    MITK_INFO << "Resample Input Prototypes";
     T_Prototypes = ResampleFibers(m_inputPrototypes);
+    MITK_INFO << "Resample Input Tractogram Minus";
     T_TractogramMinus= ResampleFibers(m_TractogramMinus);
+    MITK_INFO << "Resample Input Tractogram Plus";
     T_TractogramPlus= ResampleFibers(m_TractogramPlus);
 
     /* Merge T_Prototypes, T_TractogramMinus and T_TractogramPlus for extra Features*/
+    MITK_INFO << "Merging Prototypes";
     T_mergedPrototypes = MergeTractogram(T_Prototypes, T_TractogramPlus, T_TractogramMinus);
 
 
 
+
     MITK_INFO << "Calculate Features";
-    m_DistancesMinus = CalculateDmdf(T_TractogramMinus, T_Prototypes);
-    m_DistancesPlus = CalculateDmdf(T_TractogramPlus, T_Prototypes);
+    MITK_INFO << "Calculate Minus Features";
+    m_DistancesMinus = CalculateDmdf(T_TractogramMinus, T_mergedPrototypes);
+//    std::ofstream myFileminus("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/dist_minus.csv");
+//    for(long unsigned int i = 0; i < m_DistancesMinus.size(); ++i)
+//    {
+//        myFileminus << m_DistancesMinus.at(i);
+//    }
+//    myFileminus.close();
+
+    MITK_INFO << "Calculate Plus Features";
+    m_DistancesPlus = CalculateDmdf(T_TractogramPlus, T_mergedPrototypes);
+
+//    std::ofstream myFileplus("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/dist_plus.csv");
+//    for(long unsigned int i = 0; i < m_DistancesPlus.size(); ++i)
+//    {
+//        myFileplus << m_DistancesPlus.at(i);
+//    }
+//    myFileplus.close();
+
 
 
     MITK_INFO << m_DistancesTestName;
     MITK_INFO << "Resample Test Data";
+
+
     T_TractogramTest= ResampleFibers(m_TractogramTest);
-    MITK_INFO << "Calculate Features of Test Data";
-    m_DistancesTest= CalculateDmdf(T_TractogramTest, T_Prototypes);
 
-            std::ofstream myFile(m_DistancesTestName);
-    //        myFile << colname << "\n";
-            for(long unsigned int i = 0; i < m_DistancesTest.size(); ++i)
-            {
-                myFile << m_DistancesTest.at(i);
-            }
-            myFile.close();
+//    std::ofstream Prototypesfibers;
+//    Prototypesfibers.open("/home/r948e/mycsv/Prototypefibers_" + std::to_string(m_activeCycle) + ".csv");
+//    for (unsigned int i = 0; i < T_mergedPrototypes.size(); i++)
+//    {
+//        Prototypesfibers<< T_mergedPrototypes.at(i) << ' ';
+//    }
+//    Prototypesfibers.close();
 
-    std::ifstream f(m_DistancesTestName);
+//    std::ofstream TestfbiersFile;
+//    TestfbiersFile.open("/home/r948e/mycsv/Testfibers_" + std::to_string(m_activeCycle) + ".csv");
+//    for (unsigned int i = 0; i < T_TractogramTest.size(); i++)
+//    {
+//        TestfbiersFile << T_TractogramTest.at(i) << ' ';
+//    }
+//    TestfbiersFile.close();
+
+
+
+//    MITK_INFO << "Calculate Features of Test Data";
+    m_DistancesTest= CalculateDmdf(T_TractogramTest, T_mergedPrototypes);
+
+//            std::ofstream myFile(m_DistancesTestName);
+//            for(long unsigned int i = 0; i < m_DistancesTest.size(); ++i)
+//            {
+//                myFile << m_DistancesTest.at(i);
+//            }
+//            myFile.close();
+
+//    std::ifstream f(m_DistancesTestName);
 
 
 //    if (f.good() && m_activeCycle!=0)
@@ -825,6 +900,8 @@ vnl_vector<float> StreamlineFeatureExtractor::ValidationPipe()
     T_TractogramPrediction= ResampleFibers(m_TractogramPrediction);
     T_TractogramGroundtruth= ResampleFibers(m_TractogramGroundtruth);
     T_TractogramTest= ResampleFibers(m_TractogramTest);
+
+
 
     MITK_INFO << "Calculate Features";
     DistancesPrediction = CalculateDmdf(T_TractogramPrediction, T_Prototypes);
