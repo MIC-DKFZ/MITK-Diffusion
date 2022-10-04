@@ -38,7 +38,10 @@ mitk::FiberBundleTrackVisReader::FiberBundleTrackVisReader()
 {
   Options defaultOptions;
   defaultOptions["Apply index to world transform stored in the TRK header"] = true;
-  defaultOptions["Print header"] = false;
+  defaultOptions["Print header"] = true;
+  defaultOptions["Flip x"] = false;
+  defaultOptions["Flip y"] = false;
+  defaultOptions["Flip z"] = false;
   this->SetDefaultOptions(defaultOptions);
 
   m_ServiceReg = this->RegisterService();
@@ -74,11 +77,14 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleTrackVisReader:
     {
       Options options = this->GetOptions();
       bool apply_matrix = us::any_cast<bool>(options["Apply index to world transform stored in the TRK header"]);
+      bool flip_x = us::any_cast<bool>(options["Flip x"]);
+      bool flip_y = us::any_cast<bool>(options["Flip y"]);
+      bool flip_z = us::any_cast<bool>(options["Flip z"]);
       bool print_header = us::any_cast<bool>(options["Print header"]);
       FiberBundle::Pointer mitk_fib = FiberBundle::New();
       TrackVisFiberReader reader;
       reader.open(this->GetInputLocation().c_str());
-      reader.read(mitk_fib.GetPointer(), apply_matrix, print_header);
+      reader.read(mitk_fib.GetPointer(), apply_matrix, flip_x, flip_y, flip_z, print_header);
       result.push_back(mitk_fib.GetPointer());
       return result;
     }

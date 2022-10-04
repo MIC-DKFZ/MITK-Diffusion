@@ -165,7 +165,7 @@ void TrackVisFiberReader::print_header()
   std::cout << "--------------------------------------------------------" << std::endl;
 }
 
-short TrackVisFiberReader::read( mitk::FiberBundle* fib, bool use_matrix, bool print_header)
+short TrackVisFiberReader::read( mitk::FiberBundle* fib, bool use_matrix, bool flip_x, bool flip_y, bool flip_z, bool print_header)
 {
   int numPoints;
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
@@ -232,6 +232,29 @@ short TrackVisFiberReader::read( mitk::FiberBundle* fib, bool use_matrix, bool p
     matrix->SetElement(1,3,-matrix->GetElement(1,3));
   }
   if (m_Header.voxel_order[2]=='I')
+  {
+    matrix->SetElement(2,0,-matrix->GetElement(2,0));
+    matrix->SetElement(2,1,-matrix->GetElement(2,1));
+    matrix->SetElement(2,2,-matrix->GetElement(2,2));
+    matrix->SetElement(2,3,-matrix->GetElement(2,3));
+  }
+
+
+  if (flip_x)
+  {
+    matrix->SetElement(0,0,-matrix->GetElement(0,0));
+    matrix->SetElement(0,1,-matrix->GetElement(0,1));
+    matrix->SetElement(0,2,-matrix->GetElement(0,2));
+    matrix->SetElement(0,3,-matrix->GetElement(0,3));
+  }
+  if (flip_y)
+  {
+    matrix->SetElement(1,0,-matrix->GetElement(1,0));
+    matrix->SetElement(1,1,-matrix->GetElement(1,1));
+    matrix->SetElement(1,2,-matrix->GetElement(1,2));
+    matrix->SetElement(1,3,-matrix->GetElement(1,3));
+  }
+  if (flip_z)
   {
     matrix->SetElement(2,0,-matrix->GetElement(2,0));
     matrix->SetElement(2,1,-matrix->GetElement(2,1));
