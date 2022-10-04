@@ -4,7 +4,7 @@ MITK_CREATE_MODULE(
   DEPENDS MitkConnectomics MitkDiffusionCore MitkSceneSerialization
   AUTOLOAD_WITH MitkCore
   PACKAGE_DEPENDS 
-    PUBLIC DCMTK
+    PUBLIC DCMTK|dcmtract
     PRIVATE tinyxml2
 )
 

@@ -78,7 +78,7 @@ public:
   {
     mitk::RenderingTestHelper renderingHelper(640, 480);
     renderingHelper.AddNodeToStorage(node);
-    renderingHelper.SetViewDirection(mitk::SliceNavigationController::Frontal);
+    renderingHelper.SetViewDirection(mitk::SliceNavigationController::Axial);
     renderingHelper.SetMapperIDToRender2D();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
