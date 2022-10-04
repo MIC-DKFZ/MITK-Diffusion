@@ -38,7 +38,7 @@ public:
 
     short   create(std::string m_Filename, mitk::FiberBundle *fib, bool print_header);
     short   open(std::string m_Filename );
-    short   read(mitk::FiberBundle* fib , bool use_matrix, bool print_header);
+    short   read( mitk::FiberBundle* fib, bool use_matrix, bool flip_x, bool flip_y, bool flip_z, bool print_header);
     short   write(const mitk::FiberBundle* fib );
     void    writeHdr();
     void    updateTotal( int totFibers );
