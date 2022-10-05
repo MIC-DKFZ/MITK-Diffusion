@@ -315,7 +315,7 @@ void mitk::DiffusionDICOMFileReader
       MITK_INFO("diffusion.dicomreader") << "Output " << outputidx+1 << "  Got vendor: " << vendor << " image type " << image_type;
 
       // parse vendor tag
-      if(    vendor.find("SIEMENS") != std::string::npos || vendor.find("Siemens HealthCare GmbH") != std::string::npos )
+      if(    vendor.find("SIEMENS") != std::string::npos || vendor.find("Siemens HealthCare GmbH") || vendor.find("Siemens Healthineers") != std::string::npos )
       {
         if( image_type.find("MOSAIC") != std::string::npos )
         {
