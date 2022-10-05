@@ -44,6 +44,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLookupTable.h>
 #include <vtkCardinalSpline.h>
 #include <vtkAppendPolyData.h>
+#include <algorithm>
 
 const char* mitk::FiberBundle::FIBER_ID_ARRAY = "Fiber_IDs";
 
