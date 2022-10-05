@@ -1,7 +1,7 @@
 numpy
 SimpleITK
 dipy
-sklearn
+scikit-learn
 https://github.com/MIC-DKFZ/batchgenerators/archive/v0.19.5.zip
 https://github.com/MIC-DKFZ/TractSeg/archive/master.zip
 https://github.com/MIC-DKFZ/HD-BET/archive/master.zip
