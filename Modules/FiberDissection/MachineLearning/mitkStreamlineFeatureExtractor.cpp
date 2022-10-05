@@ -92,7 +92,7 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk:
 {
   MITK_INFO << "Infunction";
   mitk::FiberBundle::Pointer temp_fib = tractogram->GetDeepCopy();
-  temp_fib->ResampleToNumPoints(m_NumPoints);
+//  temp_fib->ResampleToNumPoints(m_NumPoints);
   MITK_INFO << "Resampling Done";
 
   std::vector< vnl_matrix<float> > out_fib(temp_fib->GetFiberPolyData()->GetNumberOfCells());
@@ -199,21 +199,21 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::MergeTractogram(std:
     unsigned int pos_locals;
     unsigned int neg_locals;
 
-    if (positive_local_prototypes.size() >= 50)
-    {
-        pos_locals= 50;
-    }
-    else {
-        pos_locals= positive_local_prototypes.size();
-    }
+//    if (positive_local_prototypes.size() >= 50)
+//    {
+//        pos_locals= 50;
+//    }
+//    else {
+//        pos_locals= positive_local_prototypes.size();
+//    }
 
-    if (pos_locals <= negative_local_prototypes.size())
-    {
-        neg_locals = pos_locals;
-    }
-    else {
-        neg_locals= negative_local_prototypes.size();
-    }
+//    if (pos_locals <= negative_local_prototypes.size())
+//    {
+//        neg_locals = pos_locals;
+//    }
+//    else {
+//        neg_locals= negative_local_prototypes.size();
+//    }
 
 
 
@@ -224,12 +224,12 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::MergeTractogram(std:
         merged_prototypes.push_back(prototypes.at(k));
     }
 
-    for (unsigned int k=0; k<pos_locals; k++)
+    for (unsigned int k=0; k<positive_local_prototypes.size(); k++)
     {
         merged_prototypes.push_back(positive_local_prototypes.at(k));
     }
 
-    for (unsigned int k=0; k<neg_locals; k++)
+    for (unsigned int k=0; k<negative_local_prototypes.size(); k++)
     {
         merged_prototypes.push_back(negative_local_prototypes.at(k));
     }
@@ -371,7 +371,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
 
 
-    auto statistic_model = cv::ml::RTrees::create();
+    statistic_model= cv::ml::RTrees::create();
     auto criteria = cv::TermCriteria();
     criteria.type = cv::TermCriteria::MAX_ITER;
 //    criteria.epsilon = 1e-8;
@@ -391,7 +391,6 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     /*Train Classifier*/
     MITK_INFO << "Start Training";
     statistic_model->train(m_traindata);
-
 
 
     /*Predict on Test Data*/
@@ -471,6 +470,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     MITK_INFO << "Prediction vector size:";
     MITK_INFO << indexPrediction.size();
     MITK_INFO << "Entropy vector size:";
+    entropy_vector = e;
     MITK_INFO << e.size();
 
     MITK_INFO << "--------------";
@@ -493,7 +493,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     std::vector<unsigned int> indexCertain = Sort(e, e.size() , e.size()-lengthsCertain );
 
-    std::vector<unsigned int> indexCertainBetween = Sort(e, e.size()-lengthsCertain , lengths);
+//    std::vector<unsigned int> indexCertainBetween = Sort(e, e.size()-lengthsCertain , lengths);
 
     MITK_INFO << "Index Certainty Vector size";
     MITK_INFO << indexCertain.size();
@@ -516,20 +516,20 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
 
     //    for (unsigned int i=indexCertain.size(); i>=0; --i)
-    std::vector<unsigned int> indexCertainBetweenNeg;
-    std::vector<unsigned int> indexCertainBetweenPos;
+//    std::vector<unsigned int> indexCertainBetweenNeg;
+//    std::vector<unsigned int> indexCertainBetweenPos;
 
-    for (unsigned int i=0; i<indexCertainBetween.size(); i++)
-    {
-        if(pred.at(indexCertainBetween.at(i))==0 )
-        {
-            indexCertainBetweenNeg.push_back(indexCertainBetween.at(i));
-        }
-        else {
-            indexCertainBetweenPos.push_back(indexCertainBetween.at(i));
-        }
+//    for (unsigned int i=0; i<indexCertainBetween.size(); i++)
+//    {
+//        if(pred.at(indexCertainBetween.at(i))==0 )
+//        {
+//            indexCertainBetweenNeg.push_back(indexCertainBetween.at(i));
+//        }
+//        else {
+//            indexCertainBetweenPos.push_back(indexCertainBetween.at(i));
+//        }
 
-    }
+//    }
 
     MITK_INFO << "Index Uncertainty Vector size";
     MITK_INFO << indexUnc.size();
@@ -538,10 +538,115 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     MITK_INFO << indexCertainNeg.size();
     MITK_INFO << indexCertainNeg.size() +indexCertainPos.size();
     MITK_INFO << "Index Certainty between Vector size";
-    MITK_INFO << indexCertainBetweenPos.size();
-    MITK_INFO << indexCertainBetweenNeg.size();
-    MITK_INFO << indexCertainBetweenNeg.size() +indexCertainBetweenPos.size();
+//    MITK_INFO << indexCertainBetweenPos.size();
+//    MITK_INFO << indexCertainBetweenNeg.size();
+//    MITK_INFO << indexCertainBetweenNeg.size() +indexCertainBetweenPos.size();
 
+
+//    vnl_matrix<float> distances_matrix;
+
+//    distances_matrix.set_size(lengths, lengths);
+//    distances_matrix.fill(0.0);
+
+//    std::vector<float> distances_matrix_mean;
+
+
+//    for (int i=0; i<lengths; i++)
+//    {
+//        for (int k=0; k<lengths; k++)
+//        {
+//            /*From the length.size() Samples with the highest Entropey calculate the differen between the Features*/
+//            vnl_matrix<float> diff =  m_DistancesTest.at(indexUnc.at(i)) - m_DistancesTest.at(indexUnc.at(k));
+
+//            /*Into the eucledean difference matrix, put the distance in Feature Space between every sample pair*/
+//            distances_matrix.put(i,k,diff.absolute_value_sum()/m_DistancesTest.at(0).size());
+
+//        }
+//        /*For every Sample/Streamline get the mean eucledean distance to all other Samples => one value for every Sample*/
+////        distances_matrix_mean.push_back(distances_matrix.get_row(i).mean());
+////        MITK_INFO << meanval.at(i);
+
+//    }
+
+
+
+//    /*Index to find values in distancematrix*/
+//    std::vector<unsigned int> myidx;
+//    /*Index to find actual streamlines using indexUnc*/
+//    std::vector<unsigned int> indexUncDist;
+//    /*Start with the Streamline of the highest entropy, which is in distance_matrix at idx 0*/
+//    myidx.push_back(0);
+//    indexUncDist.push_back(indexUnc.at(myidx.at(0)));
+
+//    /*Vecotr that stores minvalues of current iteration*/
+//    vnl_matrix<float> cur_vec;
+//    cur_vec.set_size(1,lengths);
+//    cur_vec.fill(0.0);
+//    for (int i=0; i<lengths; i++)
+//    {
+
+////        unsigned int cur_i = indexUnc.at(myidx.at(i));
+
+//        /*Save mean distance of all used Samples*/
+//        vnl_matrix<float> sum_matrix;
+//        sum_matrix.set_size(myidx.size(), lengths);
+//        sum_matrix.fill(0);
+//        for (unsigned int ii=0; ii<myidx.size(); ii++)
+//        {
+
+//            sum_matrix.set_row(ii, distances_matrix.get_column(myidx.at(ii)));
+//        }
+
+//        for (unsigned int k=0; k<sum_matrix.columns(); k++)
+//        {
+//            cur_vec.put(0,k, sum_matrix.get_column(k).min_value());
+//        }
+//        myidx.push_back(cur_vec.arg_max());
+
+
+//        indexUncDist.push_back(indexUnc.at(myidx.at(i+1)));
+//        sum_matrix.clear();
+
+//    }
+
+//    MITK_INFO << "Dist_stop";
+
+
+    /*Save Prediction*/
+    index_vec.push_back(indexPrediction);
+    /*Save index of uncertainty measures*/
+    index_vec.push_back(indexUnc);
+    /*Save index of uncertainty measures influenced by distance*/
+//    index_vec.push_back(indexUncDist);
+    /*Save index of certain measures*/
+    index_vec.push_back(indexCertainNeg);
+    /*Save index of certain measures*/
+//    index_vec.push_back(indexCertainPos);
+    /*Save index of certain measures*/
+//    index_vec.push_back(indexCertainBetweenNeg);
+    /*Save index of certain measures*/
+//    index_vec.push_back(indexCertainBetweenPos);
+
+    return index_vec;
+
+}
+
+std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetDistanceData(float &value)
+{
+    /*Vector which saves Fibers to be labeled based on fft subset uncertainty*/
+    std::vector<std::vector<unsigned int>> index_vec;
+
+    /*Get index of most unertain data (lengths defines how many data is saved)*/
+//    int lengths=500;
+    MITK_INFO << entropy_vector.size();
+  int lengths = std::count_if(entropy_vector.begin(), entropy_vector.end(),[&](auto const& val){ return val >= value; });
+  if (lengths>1500)
+  {
+      lengths=1500;
+  }
+  MITK_INFO << lengths;
+    /*Maybe shuffling of length so not the most uncertain values are chosen*/
+    std::vector<unsigned int> indexUnc = Sort(entropy_vector, lengths, 0);
 
     vnl_matrix<float> distances_matrix;
 
@@ -563,12 +668,12 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
         }
         /*For every Sample/Streamline get the mean eucledean distance to all other Samples => one value for every Sample*/
-        distances_matrix_mean.push_back(distances_matrix.get_row(i).mean());
+//        distances_matrix_mean.push_back(distances_matrix.get_row(i).mean());
 //        MITK_INFO << meanval.at(i);
 
     }
 
-
+    MITK_INFO << "Distance Matrix Calculated";
 
     /*Index to find values in distancematrix*/
     std::vector<unsigned int> myidx;
@@ -611,27 +716,12 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 
     MITK_INFO << "Dist_stop";
 
-
-    /*Save Prediction*/
-    index_vec.push_back(indexPrediction);
-    /*Save index of uncertainty measures*/
-    index_vec.push_back(indexUnc);
-    /*Save index of uncertainty measures influenced by distance*/
     index_vec.push_back(indexUncDist);
-    /*Save index of certain measures*/
-    index_vec.push_back(indexCertainNeg);
-    /*Save index of certain measures*/
-//    index_vec.push_back(indexCertainPos);
-    /*Save index of certain measures*/
-//    index_vec.push_back(indexCertainBetweenNeg);
-    /*Save index of certain measures*/
-//    index_vec.push_back(indexCertainBetweenPos);
 
     return index_vec;
-
 }
 
-mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vector<unsigned int> &index)
+mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vector<unsigned int> &index, bool removefrompool)
 {
     mitk::FiberBundle::Pointer Prediction;
     MITK_INFO << "Create Bundle";
@@ -672,6 +762,17 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
         counter++;
 
     }
+    if (removefrompool)
+    {
+        for (unsigned int i=0; i<indexSize; i++)
+        {
+            m_TractogramTest->GetFiberPolyData()->DeleteCell(index[i]);
+        }
+    }
+
+
+
+
     MITK_INFO << "Counter";
     MITK_INFO << counter;
 
@@ -931,6 +1032,7 @@ vnl_vector<float> StreamlineFeatureExtractor::ValidationPipe()
     float FN = 0.0;
     float TP = 0.0;
     float TN = 0.0;
+    std::vector<int> indexfp;
 //#pragma omp parallel for
     for (unsigned int i=0; i<LabelsGroundtruth.size(); i++)
     {
@@ -945,6 +1047,7 @@ vnl_vector<float> StreamlineFeatureExtractor::ValidationPipe()
         else if (LabelsGroundtruth.at(i)==0 && LabelsPrediction.at(i)==1)
         {
             FP +=1;
+            indexfp.push_back(i);
         }
         else if (LabelsGroundtruth.at(i)==0 && LabelsPrediction.at(i)==0)
         {
@@ -955,6 +1058,7 @@ vnl_vector<float> StreamlineFeatureExtractor::ValidationPipe()
     float Precision;
     float Recall;
     float F1_score;
+
     MITK_INFO << "TP";
     MITK_INFO << TP;
     MITK_INFO << "FP";

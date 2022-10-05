@@ -99,6 +99,7 @@ protected slots:
   void SFFPrototypes();
   void StartValidation();
   void AutomaticLabelling();
+  void RemoveCertainData();
 
 
 
@@ -116,6 +117,7 @@ protected:
 
   void OnEndInteraction();
   void CreateStreamlineInteractor();
+  void CleanTestArray();
 
   Ui::QmitkInteractiveFiberDissectionViewControls* m_Controls;
 
@@ -146,7 +148,7 @@ protected:
   mitk::FiberBundle::Pointer            m_DistanceLabel;
 
 
-  mitk::DataNode::Pointer               m_positivBundlesNode;
+  mitk::DataNode::Pointer               m_positiveBundleNode;
   mitk::DataNode::Pointer               m_newfibersBundleNode;
   mitk::DataNode::Pointer               m_negativeBundleNode;
   mitk::DataNode::Pointer               m_PredictionNode;
