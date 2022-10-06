@@ -44,7 +44,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLookupTable.h>
 #include <vtkCardinalSpline.h>
 #include <vtkAppendPolyData.h>
+#include <random>
 #include <algorithm>
+
 
 const char* mitk::FiberBundle::FIBER_ID_ARRAY = "Fiber_IDs";
 
@@ -323,7 +325,10 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubsampleFibers(float factor, bool
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
   else
     std::srand(0);
-  std::random_shuffle(ids.begin(), ids.end());
+	
+  std::random_device rd;
+  std::mt19937 g(rd());
+  std::shuffle(ids.begin(), ids.end(), g);
 
   unsigned int counter = 0;
   for (unsigned int i=0; i<new_num_fibs; i++)
