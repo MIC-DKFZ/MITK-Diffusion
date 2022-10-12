@@ -81,11 +81,12 @@ void StreamlineFeatureExtractor::SetInitRandom(int &initRandom)
 
 void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Pointer &TractogramTest, std::string TractogramTestName)
 {
-    std::string path = "/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/";
-    path.append(TractogramTestName);
+//    std::string path = "/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/";
+//    path.append(TractogramTestName);
+    MITK_INFO << TractogramTestName;
     m_TractogramTest= TractogramTest;
-    auto s = std::to_string(m_NumPoints);
-    m_DistancesTestName= path.append("_distances" + std::to_string(m_NumPoints) + "_" + std::to_string(m_activeCycle) + ".csv");
+//    auto s = std::to_string(m_NumPoints);
+//    m_DistancesTestName= path.append("_distances" + std::to_string(m_NumPoints) + "_" + std::to_string(m_activeCycle) + ".csv");
 }
 
 std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk::FiberBundle::Pointer tractogram)
@@ -355,15 +356,15 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
     }
 
 
-    std::ofstream labelsfile;
-    labelsfile.open("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/Labels_" + std::to_string(m_activeCycle) + ".csv");
-    labelsfile<< cv::format(labels_shuffled, cv::Formatter::FMT_CSV) << std::endl;
-    labelsfile.close();
+//    std::ofstream labelsfile;
+//    labelsfile.open("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/Labels_" + std::to_string(m_activeCycle) + ".csv");
+//    labelsfile<< cv::format(labels_shuffled, cv::Formatter::FMT_CSV) << std::endl;
+//    labelsfile.close();
 
-    std::ofstream featuresfile;
-    featuresfile.open("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/Features_" + std::to_string(m_activeCycle) + ".csv");
-    featuresfile<< cv::format(samples_shuffled, cv::Formatter::FMT_CSV) << std::endl;
-    featuresfile.close();
+//    std::ofstream featuresfile;
+//    featuresfile.open("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/storage/Features_" + std::to_string(m_activeCycle) + ".csv");
+//    featuresfile<< cv::format(samples_shuffled, cv::Formatter::FMT_CSV) << std::endl;
+//    featuresfile.close();
 
     /*Create Dataset and initialize Classifier*/
     cv::Ptr<cv::ml::TrainData> m_traindata = cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, labels_shuffled);
@@ -487,7 +488,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 //      lengths=3000;
 //  }
 
-    int lengthsCertain = std::count_if(e.begin(), e.end(),[&](auto const& val){ return val < 0.05; });
+    int lengthsCertain = std::count_if(e.begin(), e.end(),[&](auto const& val){ return val < 0.1; });
 
     std::vector<unsigned int> indexUnc = Sort(e, lengths, 0);
 
@@ -875,7 +876,7 @@ void StreamlineFeatureExtractor::GenerateData()
 
 
 
-    MITK_INFO << m_DistancesTestName;
+//    MITK_INFO << m_DistancesTestName;
     MITK_INFO << "Resample Test Data";
 
 

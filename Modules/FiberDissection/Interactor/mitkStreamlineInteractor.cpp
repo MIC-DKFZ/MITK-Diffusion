@@ -220,6 +220,7 @@ void mitk::StreamlineInteractor::SelectStreamline(StateMachineAction *, Interact
             {
         vtkIdType pickedCellID = picker->GetCellId();
         m_manStreamline->SetSingleFiberColor(0.0, 255.0, 0.0, pickedCellID);
+//        m_manStreamline->SetFloatProperty("shape.tuberadius", 1.0)
         }
     }
     else {
@@ -246,6 +247,7 @@ void mitk::StreamlineInteractor::SelectStreamline(StateMachineAction *, Interact
             {
         vtkIdType pickedCellID = picker->GetCellId();
         m_manStreamline->SetSingleFiberColor(0.0, 255.0, 0.0, pickedCellID);
+//        m_manStreamline->SetFloatProperty("shape.tuberadius", 1.0);
         }
     }
 

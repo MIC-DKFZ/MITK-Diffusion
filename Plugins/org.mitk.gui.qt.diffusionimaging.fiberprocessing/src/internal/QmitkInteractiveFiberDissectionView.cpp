@@ -798,6 +798,9 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
         m_positiveBundle = mitk::FiberBundle:: New(m_positiveFibersData);
 
         node->SetData( m_positiveBundle );
+        node->SetData(m_negativeBundle);
+//        node->SetFloatProperty("shape.tuberadius", 0.5);
+//        mitk::RenderingManager::GetInstance()->RequestUpdateAll();
         m_positiveBundleNode = node;
         this->GetDataStorage()->Add(m_positiveBundleNode);
       MITK_INFO << "Create Bundle";
@@ -903,6 +906,9 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
       mitk::DataNode::Pointer node = mitk::DataNode::New();
       node->SetData(m_positiveBundle);
       node->SetName("+Bundle");
+//      node->SetFloatProperty("shape.tuberadius", 0.5);
+//      mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+
       m_positiveBundleNode= node;
 
 
@@ -1031,6 +1037,10 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
       mitk::DataNode::Pointer node = mitk::DataNode::New();
       node->SetData(m_newfibersBundle);
       node->SetName("ToLabel");
+//      node->SetData(m_negativeBundle);
+//      node->SetFloatProperty("shape.tuberadius", 0.5);
+//      mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+
       m_newfibersBundleNode = node;
 
 //      MITK_INFO << "Number of Streamlines in first function";
@@ -1179,6 +1189,8 @@ void QmitkInteractiveFiberDissectionView::RemovefromBundle( bool checked )
             mitk::DataNode::Pointer node = mitk::DataNode::New();
             node->SetName("-Bundle");
             node->SetData(m_negativeBundle);
+//            node->SetFloatProperty("shape.tuberadius", 0.5);
+//            mitk::RenderingManager::GetInstance()->RequestUpdateAll();
             m_negativeBundleNode = node;
             this->GetDataStorage()->Add(m_negativeBundleNode);
 
