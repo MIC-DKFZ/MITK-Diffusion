@@ -2,6 +2,7 @@ set(H_FILES
 
     #Interactor
     Interactor/mitkStreamlineInteractor.h
+    Interactor/mitkStreamlineInteractorBrush.h
 
     #MachineLearning
     MachineLearning/mitkStreamlineFeatureExtractor.h
@@ -11,6 +12,7 @@ set(CPP_FILES
 
     #Interactor
     Interactor/mitkStreamlineInteractor.cpp
+    Interactor/mitkStreamlineInteractorBrush.cpp
 
     #MachineLearning
     MachineLearning/mitkStreamlineFeatureExtractor.cpp
