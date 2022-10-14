@@ -127,10 +127,15 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
     mitk::TNodePredicateDataType<mitk::FiberBundle>::Pointer isGroundtruth = mitk::TNodePredicateDataType<mitk::FiberBundle>::New();
     m_Controls->m_GroundtruthBox->SetPredicate( isGroundtruth );
 
+    m_Controls->m_TestBundleBox->SetDataStorage(this->GetDataStorage());
+    mitk::TNodePredicateDataType<mitk::FiberBundle>::Pointer isTestBundle = mitk::TNodePredicateDataType<mitk::FiberBundle>::New();
+    m_Controls->m_TestBundleBox->SetPredicate( isTestBundle);
 
 
 
-    connect(m_Controls->m_ErazorButton, SIGNAL(toggled(bool)), this, SLOT( RemovefromBundle(bool) ) ); //need
+
+    connect(m_Controls->m_ErazorButton, SIGNAL(toggled(bool)), this, SLOT( RemovefromBundle(bool) ) );
+    connect(m_Controls->m_BrushButton, SIGNAL(toggled(bool)), this, SLOT( RemovefromBundleBrush(bool) ) );
 
     connect(m_Controls->m_StreamlineCreation, SIGNAL( clicked() ), this, SLOT( CreateStreamline()));
 
@@ -148,9 +153,13 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_unclabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromUncertainty(bool) ) ); //need
 
+    connect(m_Controls->m_unclabelingBrush, SIGNAL(toggled(bool)), this, SLOT( RemovefromUncertaintyBrush(bool) ) ); //need
+
     connect(m_Controls->m_distlabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromDistance(bool) ) ); //need
 
     connect(m_Controls->m_predlabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromPrediction(bool) ) ); //need
+
+    connect(m_Controls->m_predlabelingBrush, SIGNAL(toggled(bool)), this, SLOT( RemovefromPredictionBrush(bool) ) ); //need
 
     connect(m_Controls->m_sellabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromSelection(bool) ) ); //need
     
@@ -202,10 +211,16 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
   m_Controls->m_ErazorButton->setCheckable(true);
   m_Controls->m_ErazorButton->setEnabled(false);
+  m_Controls->m_BrushButton->setCheckable(true);
+  m_Controls->m_BrushButton->setEnabled(false);
   m_Controls->m_unclabeling->setCheckable(true);
   m_Controls->m_unclabeling->setEnabled(false);
   m_Controls->m_predlabeling->setCheckable(true);
   m_Controls->m_predlabeling->setEnabled(false);
+  m_Controls->m_unclabelingBrush->setCheckable(true);
+  m_Controls->m_unclabelingBrush->setEnabled(false);
+  m_Controls->m_predlabelingBrush->setCheckable(true);
+  m_Controls->m_predlabelingBrush->setEnabled(false);
   m_Controls->m_distlabeling->setCheckable(true);
   m_Controls->m_distlabeling->setEnabled(false);
   m_Controls->m_sellabeling->setCheckable(true);
@@ -283,6 +298,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   if (nfibSelected && posSelected)
   {
       m_Controls->m_ErazorButton->setEnabled(true);
+      m_Controls->m_BrushButton->setEnabled(true);
   }
 
 
@@ -303,11 +319,13 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   if (uncertaintySelected)
   {
       m_Controls->m_unclabeling->setEnabled(true);
+      m_Controls->m_unclabelingBrush->setEnabled(true);
   }
 
   if (predictionSelected)
   {
       m_Controls->m_predlabeling->setEnabled(true);
+      m_Controls->m_predlabelingBrush->setEnabled(true);
   }
 
 //  if (distanceSelected)
@@ -929,6 +947,7 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 {
     m_SelectedFB.at(0)->SetVisibility(false);
     m_Controls->m_ErazorButton->setChecked(false);
+    m_Controls->m_BrushButton->setChecked(false);
 
 
      MITK_INFO << "Number of Fibers to extract from Tractogram: ";
@@ -1046,10 +1065,20 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 //      MITK_INFO << "Number of Streamlines in first function";
 //      MITK_INFO << m_newfibersBundleNode->GetData()->GetFiberPolyData()->GetNumberOfCells();
       this->GetDataStorage()->Add(m_newfibersBundleNode);
+
+      mitk::FiberBundle::Pointer m_negativeBundle = mitk::FiberBundle::New();
+      mitk::DataNode::Pointer node2 = mitk::DataNode::New();
+      node2->SetName("-Bundle");
+      node2->SetData(m_negativeBundle);
+//            node->SetFloatProperty("shape.tuberadius", 0.5);
+//            mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+      m_negativeBundleNode = node2;
+      this->GetDataStorage()->Add(m_negativeBundleNode);
+
       m_RandomExtractionCounter++;
       }
 
-      m_Controls->m_ErazorButton->setChecked(true);
+//      m_Controls->m_ErazorButton->setChecked(true);
 
 
     UpdateGui();
@@ -1057,160 +1086,84 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 
 }
 
-
-//void QmitkInteractiveFiberDissectionView::ExtractClosestFibersFromTractogram()
-//{
-//    m_SelectedFB.at(0)->SetVisibility(false);
-//    m_Controls->m_ErazorButton->setChecked(false);
-
-
-//     MITK_INFO << "Number of Fibers to extract from Tractogram: ";
-//     MITK_INFO << m_Controls->m_NumRandomFibers->value();
-//     if (this->GetDataStorage()->Exists(m_newfibersBundleNode))
-//     {
-//         MITK_INFO << "To Label Bundle Exists";
-//         mitk::FiberBundle::Pointer Stack = dynamic_cast<mitk::FiberBundle *>(m_newfibersBundleNode->GetData());
-//         this->GetDataStorage()->Remove(m_newfibersBundleNode);
-
-//         mitk::DataNode::Pointer node = mitk::DataNode::New();
-
-//         m_newfibersFibersData = vtkSmartPointer<vtkPolyData>::New();
-//         m_newfibersFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
-//         m_newfibersBundle = mitk::FiberBundle:: New(m_newfibersFibersData);
-//         m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
-
-////         node->SetData( m_newfibersBundle );
-////         m_newfibersBundleNode = node ;
-
-//       MITK_INFO << "Create Bundle";
-//     }
-
-//      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData());
-////      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle *>(m_trainbundle->GetData());
-
-//      vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-//      vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-//      vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-//      vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
-////      weights->SetNumberOfValues(this->GetNumFibers()+fib->GetNumFibers());
-
-////      MITK_INFO << fib->GetNumFibers();
-////      std::vector<int> myvec;
-////      for (unsigned int k=0; k<fib->GetNumFibers(); k++)
-////      {
-////        myvec.push_back(k);
-////      }
-////      std::random_shuffle(std::begin(myvec), std::end(myvec));
-
-//       /* Check weather all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
-//      unsigned int counter = 0;
-//      int thresh1;
-//      int thresh2;
-//      thresh2 = m_Controls->m_NumRandomFibers->value()*(m_RandomExtractionCounter+1);
-//      thresh1 = m_Controls->m_NumRandomFibers->value()*(m_RandomExtractionCounter);
-//      if (thresh1>fib->GetFiberPolyData()->GetNumberOfCells())
-//      {
-//          thresh1=fib->GetFiberPolyData()->GetNumberOfCells();
-//      }
-//      if (thresh2>fib->GetFiberPolyData()->GetNumberOfCells())
-//      {
-//          thresh2=fib->GetFiberPolyData()->GetNumberOfCells();
-//      }
-
-//      if (thresh1!=fib->GetFiberPolyData()->GetNumberOfCells())
-//      {
-//      for ( int i=thresh1; i<thresh2; i++)
-//      {
-//        vtkCell* cell = fib->GetFiberPolyData()->GetCell(i);
-//        auto numPoints = cell->GetNumberOfPoints();
-//        vtkPoints* points = cell->GetPoints();
-
-//        vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-//        for (unsigned int j=0; j<numPoints; j++)
-//        {
-//          double p[3];
-//          points->GetPoint(j, p);
-
-//          vtkIdType id = vNewPoints->InsertNextPoint(p);
-//          container->GetPointIds()->InsertNextId(id);
-//        }
-//        weights->InsertValue(counter, fib->GetFiberWeight(i));
-//        vNewLines->InsertNextCell(container);
-//        counter++;
-
-//      }
-
-
-
-//      vNewPolyData->SetLines(vNewLines);
-//      vNewPolyData->SetPoints(vNewPoints);
-
-//      m_newfibersFibersData = vtkSmartPointer<vtkPolyData>::New();
-//      m_newfibersFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
-//      m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
-//      m_newfibersFibersData->SetPoints(vNewPoints);
-//      m_newfibersFibersData->SetLines(vNewLines);
-
-//      m_newfibersBundle = mitk::FiberBundle::New(vNewPolyData);
-//      m_newfibersBundle->SetFiberColors(255, 255, 255);
-//      m_newfibersBundle->SetFiberWeights(weights);
-
-//      mitk::DataNode::Pointer node = mitk::DataNode::New();
-//      node->SetData(m_newfibersBundle);
-//      node->SetName("ToLabel");
-//      m_newfibersBundleNode = node;
-
-////      MITK_INFO << "Number of Streamlines in first function";
-////      MITK_INFO << m_newfibersBundleNode->GetData()->GetFiberPolyData()->GetNumberOfCells();
-//      this->GetDataStorage()->Add(m_newfibersBundleNode);
-//      m_RandomExtractionCounter++;
-//      }
-
-//      m_Controls->m_ErazorButton->setChecked(true);
-
-
-//    UpdateGui();
-
-
-//}
-
-
 void QmitkInteractiveFiberDissectionView::RemovefromBundle( bool checked )
 {
     if (checked)
     {
+        m_Controls->m_BrushButton->setChecked(false);
 
-        if (m_StreamlineInteractor.IsNull())
-        {
+//        if (m_StreamlineInteractor.IsNull())
+//        {
+            this->CreateStreamlineInteractorBrush();
             this->CreateStreamlineInteractor();
+//        }
+        m_StreamlineInteractor->EnableInteraction(true);
+        m_StreamlineInteractor->LabelfromPrediction(false);
+        m_StreamlineInteractor->SetNegativeNode(m_negativeBundleNode);
+        m_StreamlineInteractor->SetPositiveNode(m_positiveBundleNode);
+        m_StreamlineInteractor->SetToLabelNode(m_newfibersBundleNode);
+        m_StreamlineInteractor->EnableInteraction(true);
 
-            mitk::FiberBundle::Pointer m_negativeBundle = mitk::FiberBundle::New();
-            mitk::DataNode::Pointer node = mitk::DataNode::New();
-            node->SetName("-Bundle");
-            node->SetData(m_negativeBundle);
-//            node->SetFloatProperty("shape.tuberadius", 0.5);
-//            mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-            m_negativeBundleNode = node;
-            this->GetDataStorage()->Add(m_negativeBundleNode);
-
-            m_StreamlineInteractor->EnableInteraction(true);
-            m_StreamlineInteractor->LabelfromPrediction(false);
-            m_StreamlineInteractor->SetNegativeNode(m_negativeBundleNode);
-            m_StreamlineInteractor->SetPositiveNode(m_positiveBundleNode);
-            m_StreamlineInteractor->SetToLabelNode(m_newfibersBundleNode);
-        }
-        else
-        {
-            m_StreamlineInteractor->EnableInteraction(true);
-            m_StreamlineInteractor->LabelfromPrediction(false);
-            m_StreamlineInteractor->SetPositiveNode(m_positiveBundleNode);
-            m_StreamlineInteractor->SetToLabelNode(m_newfibersBundleNode);
-        }
+//            m_StreamlineInteractor->EnableInteraction(true);
+//            m_StreamlineInteractor->LabelfromPrediction(false);
+//            m_StreamlineInteractor->SetNegativeNode(m_negativeBundleNode);
+//            m_StreamlineInteractor->SetPositiveNode(m_positiveBundleNode);
+//            m_StreamlineInteractor->SetToLabelNode(m_newfibersBundleNode);
+//        }
+//        else
+//        {
+//            m_StreamlineInteractor->EnableInteraction(true);
+//            m_StreamlineInteractor->LabelfromPrediction(false);
+//            m_StreamlineInteractor->SetPositiveNode(m_positiveBundleNode);
+//            m_StreamlineInteractor->SetToLabelNode(m_newfibersBundleNode);
+//        }
     }
     else
     {
       m_StreamlineInteractor->EnableInteraction(false);
+//      m_StreamlineInteractor = nullptr;
+    }
+
+
+   UpdateGui();
+}
+
+void QmitkInteractiveFiberDissectionView::RemovefromBundleBrush( bool checked )
+{
+    if (checked)
+    {
+        m_Controls->m_ErazorButton->setChecked(false);
+
+//        if (m_StreamlineInteractorBrush.IsNull())
+//        {
+            this->CreateStreamlineInteractor();
+            this->CreateStreamlineInteractorBrush();
+//        }
+
+
+        m_StreamlineInteractorBrush->EnableInteraction(true);
+        m_StreamlineInteractorBrush->LabelfromPrediction(false);
+        m_StreamlineInteractorBrush->SetNegativeNode(m_negativeBundleNode);
+        m_StreamlineInteractorBrush->SetPositiveNode(m_positiveBundleNode);
+        m_StreamlineInteractorBrush->SetToLabelNode(m_newfibersBundleNode);
+        m_StreamlineInteractorBrush->EnableInteraction(true);
+//            m_StreamlineInteractorBrush->EnableInteraction(true);
+//            m_StreamlineInteractorBrush->LabelfromPrediction(false);
+//            m_StreamlineInteractorBrush->SetNegativeNode(m_negativeBundleNode);
+//            m_StreamlineInteractorBrush->SetPositiveNode(m_positiveBundleNode);
+//            m_StreamlineInteractorBrush->SetToLabelNode(m_newfibersBundleNode);
+//        }
+//        else
+//        {
+//            m_StreamlineInteractorBrush->EnableInteraction(true);
+//            m_StreamlineInteractorBrush->LabelfromPrediction(false);
+//            m_StreamlineInteractorBrush->SetPositiveNode(m_positiveBundleNode);
+//            m_StreamlineInteractorBrush->SetToLabelNode(m_newfibersBundleNode);
+//        }
+    }
+    else
+    {
+      m_StreamlineInteractorBrush->EnableInteraction(false);
 //      m_StreamlineInteractor = nullptr;
     }
 
@@ -1225,6 +1178,17 @@ void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractor()
 
     m_StreamlineInteractor->LoadStateMachine("Streamline3DStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
     m_StreamlineInteractor->SetEventConfig("Streamline3DConfig.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
+
+//  m_StreamlineInteractor->SetRotationEnabled(rotationEnabled);
+}
+
+void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractorBrush()
+{
+
+    m_StreamlineInteractorBrush = mitk::StreamlineInteractorBrush::New();
+
+    m_StreamlineInteractorBrush->LoadStateMachine("StreamlineBrush3DStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
+    m_StreamlineInteractorBrush->SetEventConfig("StreamlineBrush3DConfig.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
 
 //  m_StreamlineInteractor->SetRotationEnabled(rotationEnabled);
 }
@@ -1268,7 +1232,9 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 
     m_Controls->m_unclabeling->setChecked(false);
     m_Controls->m_distlabeling->setChecked(false);
+    m_Controls->m_unclabelingBrush->setChecked(false);
     m_Controls->m_predlabeling->setChecked(false);
+    m_Controls->m_predlabelingBrush->setChecked(false);
 
     classifier.reset();
     MITK_INFO << "Extract Features";
@@ -1454,15 +1420,46 @@ void QmitkInteractiveFiberDissectionView::RemovefromUncertainty( bool checked )
 {
     if (checked)
     {
+        m_Controls->m_unclabelingBrush->setChecked(false);
+        m_Controls->m_predlabelingBrush->setChecked(false);
+        m_Controls->m_predlabeling->setChecked(false);
+
 
         m_UncertaintyLabel->SetFiberColors(255, 255, 255);
+        this->CreateStreamlineInteractor();
         m_StreamlineInteractor->EnableInteraction(true);
         m_StreamlineInteractor->LabelfromPrediction(false);
+        m_StreamlineInteractor->SetNegativeNode(m_negativeBundleNode);
+        m_StreamlineInteractor->SetPositiveNode(m_positiveBundleNode);
         m_StreamlineInteractor->SetToLabelNode(m_UncertaintyLabelNode);
     }
     else
     {
       m_StreamlineInteractor->EnableInteraction(false);
+//      m_StreamlineInteractor = nullptr;
+    }
+    RenderingManager::GetInstance()->RequestUpdateAll();
+}
+
+void QmitkInteractiveFiberDissectionView::RemovefromUncertaintyBrush( bool checked )
+{
+    if (checked)
+    {
+        m_Controls->m_unclabeling->setChecked(false);
+        m_Controls->m_predlabelingBrush->setChecked(false);
+        m_Controls->m_predlabeling->setChecked(false);
+
+        m_UncertaintyLabel->SetFiberColors(255, 255, 255);
+        this->CreateStreamlineInteractorBrush();
+        m_StreamlineInteractorBrush->EnableInteraction(true);
+        m_StreamlineInteractorBrush->LabelfromPrediction(false);
+        m_StreamlineInteractorBrush->SetNegativeNode(m_negativeBundleNode);
+        m_StreamlineInteractorBrush->SetPositiveNode(m_positiveBundleNode);
+        m_StreamlineInteractorBrush->SetToLabelNode(m_UncertaintyLabelNode);
+    }
+    else
+    {
+      m_StreamlineInteractorBrush->EnableInteraction(false);
 //      m_StreamlineInteractor = nullptr;
     }
     RenderingManager::GetInstance()->RequestUpdateAll();
@@ -1490,16 +1487,48 @@ void QmitkInteractiveFiberDissectionView::RemovefromPrediction( bool checked )
 {
     if (checked)
     {
+        m_Controls->m_predlabelingBrush->setChecked(false);
+        m_Controls->m_unclabelingBrush->setChecked(false);
+        m_Controls->m_unclabeling->setChecked(false);
 
 //        m_Prediction->SetFiberColors(255, 255, 255);
+        this->CreateStreamlineInteractor();
         m_StreamlineInteractor->EnableInteraction(true);
         m_StreamlineInteractor->LabelfromPrediction(true);
+        m_StreamlineInteractor->SetNegativeNode(m_negativeBundleNode);
+        m_StreamlineInteractor->SetPositiveNode(m_positiveBundleNode);
         m_StreamlineInteractor->SetToLabelNode(m_PredictionNode);
     }
     else
     {
       m_StreamlineInteractor->EnableInteraction(false);
 //      m_StreamlineInteractor = nullptr;
+//      this->CleanTestArray();
+    }
+
+}
+
+void QmitkInteractiveFiberDissectionView::RemovefromPredictionBrush( bool checked )
+{
+    if (checked)
+    {
+        m_Controls->m_predlabeling->setChecked(false);
+        m_Controls->m_unclabelingBrush->setChecked(false);
+        m_Controls->m_unclabeling->setChecked(false);
+
+//        m_Prediction->SetFiberColors(255, 255, 255);
+        this->CreateStreamlineInteractorBrush();
+        m_StreamlineInteractorBrush->EnableInteraction(true);
+        m_StreamlineInteractorBrush->LabelfromPrediction(true);
+        m_StreamlineInteractorBrush->SetNegativeNode(m_negativeBundleNode);
+        m_StreamlineInteractorBrush->SetPositiveNode(m_positiveBundleNode);
+        m_StreamlineInteractorBrush->SetToLabelNode(m_PredictionNode);
+    }
+    else
+    {
+      m_StreamlineInteractorBrush->EnableInteraction(false);
+//      m_StreamlineInteractor = nullptr;
+//      this->CleanTestArray();
     }
 
 }
@@ -1527,10 +1556,10 @@ void QmitkInteractiveFiberDissectionView::StartValidation()
 
 
     validater.reset();
-    mitk::DataNode::Pointer prednode = m_Controls->m_BundleBox->GetSelectedNode();
-    mitk::FiberBundle::Pointer pred = dynamic_cast<mitk::FiberBundle *>(prednode->GetData());
-    mitk::DataNode::Pointer gtnode = m_Controls->m_BundleBox->GetSelectedNode();
-    mitk::FiberBundle::Pointer gt = dynamic_cast<mitk::FiberBundle *>(gtnode->GetData());
+//    mitk::DataNode::Pointer prednode = m_Controls->m_BundleBox->GetSelectedNode();
+//    mitk::FiberBundle::Pointer pred = dynamic_cast<mitk::FiberBundle *>(prednode->GetData());
+//    mitk::DataNode::Pointer gtnode = m_Controls->m_BundleBox->GetSelectedNode();
+//    mitk::FiberBundle::Pointer gt = dynamic_cast<mitk::FiberBundle *>(gtnode->GetData());
 //    mitk::FiberBundle::Pointer pred = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_PredictionBox->GetSelectedNode()->GetData());
 //    mitk::FiberBundle::Pointer gt = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_GroundtruthBox->GetSelectedNode()->GetData());
 
@@ -1731,7 +1760,7 @@ void QmitkInteractiveFiberDissectionView::CleanTestArray()
             }
     //    });
 
-        fib->GetFiberPolyData()->RemoveDeletedCells();
+//        fib->GetFiberPolyData()->RemoveDeletedCells();
 
         MITK_INFO << fib->GetFiberPolyData()->GetNumberOfCells();
 

@@ -49,6 +49,7 @@ set(CACHED_RESOURCE_FILES
   resources/circle.png
   resources/polygon.png
   resources/eraze.png
+  resources/brush.png
   resources/highlighter.png
 )
 

@@ -31,6 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDataInteractor.h>
 #include <mitkIRenderWindowPartListener.h> //Pointset
 #include <mitkStreamlineInteractor.h>
+#include <mitkStreamlineInteractorBrush.h>
 #include <mitkStreamlineFeatureExtractor.h>
 
 #include <itkCastImageFilter.h>
@@ -84,6 +85,7 @@ protected slots:
   void OnAddPointSetClicked();//Pointset
   void CreateStreamline();
   void RemovefromBundle( bool checked );
+  void RemovefromBundleBrush( bool checked );
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
   void CreatePredictionNode();
@@ -91,8 +93,10 @@ protected slots:
   void CreateUncertaintySampleNode();
   void CreateDistanceSampleNode();
   void RemovefromUncertainty( bool checked );
+  void RemovefromUncertaintyBrush( bool checked );
   void RemovefromDistance( bool checked );
   void RemovefromPrediction( bool checked );
+  void RemovefromPredictionBrush( bool checked );
   void RemovefromSelection( bool checked );
   void ResampleTractogram();
   void RandomPrototypes();
@@ -117,6 +121,7 @@ protected:
 
   void OnEndInteraction();
   void CreateStreamlineInteractor();
+  void CreateStreamlineInteractorBrush();
   void CleanTestArray();
 
   Ui::QmitkInteractiveFiberDissectionViewControls* m_Controls;
@@ -164,6 +169,7 @@ protected:
 
   vtkSmartPointer<vtkCellPicker>        m_picker1;
   mitk::StreamlineInteractor::Pointer   m_StreamlineInteractor;
+  mitk::StreamlineInteractorBrush::Pointer   m_StreamlineInteractorBrush;
 
   std::shared_ptr< mitk::StreamlineFeatureExtractor > classifier;
   std::shared_ptr< mitk::StreamlineFeatureExtractor > validater;
