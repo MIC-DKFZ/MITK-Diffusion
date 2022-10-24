@@ -35,39 +35,7 @@ QGroupBox {
    <property name="bottomMargin">
     <number>9</number>
    </property>
-   <item row="0" column="0">
-    <widget class="QGroupBox" name="m_InputData">
-     <property name="title">
-      <string>Please Select Input Data</string>
-     </property>
-     <layout class="QGridLayout" name="gridLayout_9">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="toolTip">
-         <string>Input DTI</string>
-        </property>
-        <property name="text">
-         <string>Fiber Bundle:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLabel" name="m_FibLabel">
-        <property name="text">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ff0000;&quot;&gt;mandatory&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="wordWrap">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="2">
-       <widget class="QmitkDataStorageComboBox" name="m_TestBundleBox"/>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item row="1" column="0">
+   <item row="2" column="0">
     <widget class="QToolBox" name="toolBoxx">
      <property name="enabled">
       <bool>true</bool>
@@ -84,7 +52,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>3</number>
+      <number>0</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -95,7 +63,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>463</height>
+        <height>439</height>
        </rect>
       </property>
       <attribute name="label">
@@ -116,7 +84,7 @@ QGroupBox {
             <x>0</x>
             <y>0</y>
             <width>381</width>
-            <height>383</height>
+            <height>359</height>
            </rect>
           </property>
           <attribute name="label">
@@ -161,7 +129,7 @@ QGroupBox {
             <x>0</x>
             <y>0</y>
             <width>381</width>
-            <height>383</height>
+            <height>359</height>
            </rect>
           </property>
           <attribute name="label">
@@ -250,7 +218,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>463</height>
+        <height>439</height>
        </rect>
       </property>
       <attribute name="label">
@@ -394,7 +362,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>463</height>
+        <height>439</height>
        </rect>
       </property>
       <property name="accessibleName">
@@ -605,7 +573,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>463</height>
+        <height>439</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1012,7 +980,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>399</width>
-        <height>463</height>
+        <height>439</height>
        </rect>
       </property>
       <attribute name="label">
@@ -1084,6 +1052,45 @@ QGroupBox {
        </layout>
       </widget>
      </widget>
+    </widget>
+   </item>
+   <item row="0" column="0" rowspan="2">
+    <widget class="QGroupBox" name="m_InputData">
+     <property name="title">
+      <string>Please Select Input Data</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_9">
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_13">
+        <property name="text">
+         <string>Training Fiber Bundle:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="toolTip">
+         <string>Input DTI</string>
+        </property>
+        <property name="text">
+         <string>Selectd Fiber Bundle:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QmitkDataStorageComboBox" name="m_TestBundleBox"/>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLabel" name="m_FibLabel">
+        <property name="text">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ff0000;&quot;&gt;mandatory&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
   </layout>

@@ -131,12 +131,15 @@ protected:
   int m_IterationCounter;                                      ///< used for data node naming
   int m_RandomExtractionCounter;                               ///< used for random extracton of different Streamlines
   int m_activeCycleCounter;
-  int m_initRandom;
+  int m_newpos;
+  int m_newneg;
+  int m_startneg;
   int m_createdStreamlineCounter;
 //  int m_thresh2;
 
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
+  mitk::DataNode::Pointer m_testnode;
 //  mitk::DataNode::Pointer              m_trainbundle;
   mitk::Image::Pointer                  m_SelectedImage;
   mitk::DataNode::Pointer               m_SelectedPS;

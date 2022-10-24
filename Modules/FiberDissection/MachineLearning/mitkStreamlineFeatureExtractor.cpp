@@ -74,10 +74,6 @@ void StreamlineFeatureExtractor::SetActiveCycle(int &activeCycle)
   m_activeCycle= activeCycle;
 }
 
-void StreamlineFeatureExtractor::SetInitRandom(int &initRandom)
-{
-  m_initRandom= initRandom;
-}
 
 void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Pointer &TractogramTest, std::string TractogramTestName)
 {
