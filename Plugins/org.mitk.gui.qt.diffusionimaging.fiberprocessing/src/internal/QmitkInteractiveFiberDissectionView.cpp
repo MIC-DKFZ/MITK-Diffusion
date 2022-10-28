@@ -1342,10 +1342,12 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
     m_UncertaintyLabel = classifier->CreatePrediction(myvec, true);
     mitk::DataNode::Pointer node = mitk::DataNode::New();
     node->SetData(m_UncertaintyLabel);
+    float d = 5.0;
 
     auto s = std::to_string(m_activeCycleCounter);
     node->SetName("UncertaintyLabel"+s);
     m_UncertaintyLabelNode = node;
+    m_UncertaintyLabelNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(d));
     this->GetDataStorage()->Add(m_UncertaintyLabelNode);
     UpdateGui();
 }
