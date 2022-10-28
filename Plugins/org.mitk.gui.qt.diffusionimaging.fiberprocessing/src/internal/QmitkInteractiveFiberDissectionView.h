@@ -104,7 +104,7 @@ protected slots:
   void StartValidation();
   void AutomaticLabelling();
   void RemoveCertainData();
-
+  void ResetClassifier();
 
 
 

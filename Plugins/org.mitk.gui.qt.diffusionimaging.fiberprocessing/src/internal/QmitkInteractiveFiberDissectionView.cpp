@@ -175,6 +175,8 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_RemoveCertainData, SIGNAL( clicked() ), this, SLOT( RemoveCertainData( ) ) );
 
+    connect(m_Controls->m_resetClassifier, SIGNAL( clicked() ), this, SLOT( ResetClassifier( ) ) );
+
 
 
     connect(m_Controls->m_addPointSetPushButton, &QPushButton::clicked,//pointset
@@ -1734,3 +1736,28 @@ void QmitkInteractiveFiberDissectionView::CleanTestArray()
 
 }
 
+void QmitkInteractiveFiberDissectionView::ResetClassifier()
+{
+    m_IterationCounter = 0;
+    m_RandomExtractionCounter = 0;
+    m_activeCycleCounter = 0;
+    m_createdStreamlineCounter = 0;
+
+    classifier.reset();
+    this->GetDataStorage()->Remove(m_positiveBundleNode);
+    this->GetDataStorage()->Remove(m_negativeBundleNode);
+    this->GetDataStorage()->Remove(m_negativeBundleNode);
+
+    m_positiveBundleNode = NULL;
+    m_negativeBundleNode = NULL;
+    m_negativeBundleNode = NULL;
+    m_positiveBundle = NULL;
+    m_negativeBundle = NULL;
+    m_negativeBundle = NULL;
+    m_Controls->m_TrainClassifier->setEnabled(false);
+    m_Controls->m_CreatePrediction->setEnabled(false);
+    m_Controls->m_CreateUncertantyMap->setEnabled(false);
+
+
+
+}
