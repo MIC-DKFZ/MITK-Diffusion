@@ -202,6 +202,7 @@ void QmitkInteractiveFiberDissectionView::SetFocus()
 {
   m_Controls->toolBoxx->setFocus();
   //m_Controls->m_addPointSetPushButton->setFocus();//pointset
+  UpdateGui();
 }
 
 void QmitkInteractiveFiberDissectionView::UpdateGui()
@@ -1231,6 +1232,7 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
     m_Controls->m_unclabelingBrush->setChecked(false);
     m_Controls->m_predlabeling->setChecked(false);
     m_Controls->m_predlabelingBrush->setChecked(false);
+    m_uncCounter = 0;
 
 //    classifier.reset();
     MITK_INFO << "Extract Features";
@@ -1333,10 +1335,12 @@ void QmitkInteractiveFiberDissectionView::RemoveCertainData()
 
 void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
 {
+     this->GetDataStorage()->Remove(m_UncertaintyLabelNode);
      MITK_INFO << "Create Fibers to label based on Uncertainty";
 
-     std::vector<unsigned int> myvec = m_index.at(1);
-     myvec.resize(m_Controls->m_Numtolabel->value());
+     std::vector<unsigned int> vec = m_index.at(1);
+     std::vector<unsigned int> myvec = {vec.begin() + m_uncCounter, vec.begin() + m_uncCounter + m_Controls->m_Numtolabel->value()};
+     m_uncCounter = m_uncCounter + m_Controls->m_Numtolabel->value();
      MITK_INFO << m_index.at(1).size();
      MITK_INFO << myvec.size();
 

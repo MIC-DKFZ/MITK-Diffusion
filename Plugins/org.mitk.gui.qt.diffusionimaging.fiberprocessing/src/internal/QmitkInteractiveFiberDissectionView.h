@@ -135,6 +135,7 @@ protected:
   int m_newneg;
   int m_startneg;
   int m_createdStreamlineCounter;
+  int m_uncCounter;
 //  int m_thresh2;
 
 
