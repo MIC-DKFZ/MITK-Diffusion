@@ -37,7 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkParametricSpline.h>
 #include <vtkPolygon.h>
 #include <vtkCleanPolyData.h>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <vtkTransformPolyDataFilter.h>
 #include <mitkTransferFunction.h>
 #include <vtkLookupTable.h>
@@ -749,7 +749,7 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
   double min = 1;
   double max = 0;
   MITK_INFO << "Coloring fibers by curvature";
-  boost::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
+  boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
 
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
@@ -1090,7 +1090,7 @@ float mitk::FiberBundle::GetNumEpFractionInMask(ItkUcharImgType* mask, bool diff
 
   MITK_INFO << "Calculating EP-Fraction";
 
-  boost::progress_display disp(m_NumFibers);
+  boost::timer::progress_display disp(m_NumFibers);
   unsigned int in_mask = 0;
 
   for (unsigned int i=0; i<m_NumFibers; i++)
@@ -1132,7 +1132,7 @@ std::tuple<float, float> mitk::FiberBundle::GetDirectionalOverlap(ItkUcharImgTyp
 
   MITK_INFO << "Calculating overlap";
   auto spacing = mask->GetSpacing();
-  boost::progress_display disp(m_NumFibers);
+  boost::timer::progress_display disp(m_NumFibers);
   double length_sum = 0;
   double in_mask_length = 0;
   double aligned_length = 0;
@@ -1208,7 +1208,7 @@ float mitk::FiberBundle::GetOverlap(ItkUcharImgType* mask)
 
   MITK_INFO << "Calculating overlap";
   auto spacing = mask->GetSpacing();
-  boost::progress_display disp(m_NumFibers);
+  boost::timer::progress_display disp(m_NumFibers);
   double length_sum = 0;
   double in_mask_length = 0;
   for (unsigned int i=0; i<m_NumFibers; i++)
@@ -1258,7 +1258,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgTyp
   std::vector< float > fib_weights;
 
   MITK_INFO << "Cutting fibers";
-  boost::progress_display disp(m_NumFibers);
+  boost::timer::progress_display disp(m_NumFibers);
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
     ++disp;
@@ -1453,7 +1453,7 @@ std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(DataNode *roi,
       }
 
       MITK_INFO << "Extracting with polygon";
-      boost::progress_display disp(m_NumFibers);
+      boost::timer::progress_display disp(m_NumFibers);
       for (unsigned int i=0; i<m_NumFibers; i++)
       {
         ++disp ;
@@ -1499,7 +1499,7 @@ std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(DataNode *roi,
       radius *= radius;
 
       MITK_INFO << "Extracting with circle";
-      boost::progress_display disp(m_NumFibers);
+      boost::timer::progress_display disp(m_NumFibers);
       for (unsigned int i=0; i<m_NumFibers; i++)
       {
         ++disp ;
@@ -1843,7 +1843,7 @@ void mitk::FiberBundle::RotateAroundAxis(double x, double y, double z)
 void mitk::FiberBundle::ScaleFibers(double x, double y, double z, bool subtractCenter)
 {
   MITK_INFO << "Scaling fibers";
-  boost::progress_display disp(m_NumFibers);
+  boost::timer::progress_display disp(m_NumFibers);
 
   mitk::BaseGeometry* geom = this->GetGeometry();
   mitk::Point3D c = geom->GetCenter();
@@ -1921,7 +1921,7 @@ void mitk::FiberBundle::MirrorFibers(unsigned int axis)
     return;
 
   MITK_INFO << "Mirroring fibers";
-  boost::progress_display disp(m_NumFibers);
+  boost::timer::progress_display disp(m_NumFibers);
 
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
@@ -1956,7 +1956,7 @@ void mitk::FiberBundle::RemoveDir(vnl_vector_fixed<double,3> dir, double thresho
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
-  boost::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
+  boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
     ++disp ;
@@ -2022,7 +2022,7 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
   MITK_INFO << "Applying curvature threshold";
-  boost::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
+  boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
     ++disp ;
@@ -2112,7 +2112,7 @@ bool mitk::FiberBundle::RemoveShortFibers(float lengthInMM)
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
   float min = m_MaxFiberLength;
 
-  boost::progress_display disp(m_NumFibers);
+  boost::timer::progress_display disp(m_NumFibers);
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
     ++disp;
@@ -2157,7 +2157,7 @@ bool mitk::FiberBundle::RemoveLongFibers(float lengthInMM)
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
   MITK_INFO << "Removing long fibers";
-  boost::progress_display disp(m_NumFibers);
+  boost::timer::progress_display disp(m_NumFibers);
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
     ++disp;
@@ -2206,7 +2206,7 @@ void mitk::FiberBundle::ResampleSpline(float pointDistance, double tension, doub
   std::vector< vtkSmartPointer<vtkPolyLine> > resampled_streamlines;
   resampled_streamlines.resize(m_NumFibers);
 
-  boost::progress_display disp(m_NumFibers);
+  boost::timer::progress_display disp(m_NumFibers);
 #pragma omp parallel for
   for (int i=0; i<static_cast<int>(m_NumFibers); i++)
   {
@@ -2296,7 +2296,7 @@ void mitk::FiberBundle::Compress(float error)
 
   MITK_INFO << "Compressing fibers with max. error " << error << "mm";
   unsigned int numRemovedPoints = 0;
-  boost::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
+  boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
   vtkSmartPointer<vtkFloatArray> newFiberWeights = vtkSmartPointer<vtkFloatArray>::New();
   newFiberWeights->SetName("FIBER_WEIGHTS");
   newFiberWeights->SetNumberOfValues(m_NumFibers);
@@ -2551,7 +2551,7 @@ void mitk::FiberBundle::ResampleLinear(double pointDistance)
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
   MITK_INFO << "Resampling fibers (linear)";
-  boost::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
+  boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
   vtkSmartPointer<vtkFloatArray> newFiberWeights = vtkSmartPointer<vtkFloatArray>::New();
   newFiberWeights->SetName("FIBER_WEIGHTS");
   newFiberWeights->SetNumberOfValues(m_NumFibers);
