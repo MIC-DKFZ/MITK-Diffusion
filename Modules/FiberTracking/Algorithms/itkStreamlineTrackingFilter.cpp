@@ -32,6 +32,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <TrackingHandlers/mitkTrackingHandlerTensor.h>
 #include <TrackingHandlers/mitkTrackingHandlerRandomForest.h>
 #include <mitkDiffusionFunctionCollection.h>
+#include <random>
 
 namespace itk {
 
@@ -632,7 +633,11 @@ void StreamlineTrackingFilter::GenerateData()
 {
   this->BeforeTracking();
   if (!m_Parameters->m_FixRandomSeed)
-    std::random_shuffle(m_SeedPoints.begin(), m_SeedPoints.end());
+  {
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(m_SeedPoints.begin(), m_SeedPoints.end(), g);
+  }
 
   m_CurrentTracts = 0;
   int num_seeds = static_cast<int>(m_SeedPoints.size());
