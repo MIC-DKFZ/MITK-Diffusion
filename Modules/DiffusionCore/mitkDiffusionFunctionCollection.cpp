@@ -519,6 +519,13 @@ mitk::gradients::GradientDirectionContainerType::ConstPointer mitk::gradients::R
     vec[1] = bvec_entries.at(i+bval_entries.size());
     vec[2] = bvec_entries.at(i+2*bval_entries.size());
 
+    if (b_val>0 && vec.magnitude() < 0.001) // could be IVIM data --> set vec to  1,0,0
+    {
+        vec[0] = 1.0;
+        vec[1] = 0.0;
+        vec[2] = 0.0;
+    }
+
     // Adjust the vector length to encode gradient strength
     if (reference_bval>0)
     {

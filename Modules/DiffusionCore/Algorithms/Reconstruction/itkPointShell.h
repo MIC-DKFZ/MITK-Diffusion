@@ -24,7 +24,7 @@ namespace itk
 {
   // generate by n-fold subdivisions of an icosahedron
   template<int NPoints, class TMatrixType >
-  class MITKDIFFUSIONCORE_EXPORT PointShell
+  class PointShell
   {
   public:
     static TMatrixType *DistributePointShell();
@@ -41,6 +41,8 @@ namespace itk
 
 }
 
+#ifndef ITK_MANUAL_INSTANTIATION
 #include "itkPointShell.txx"
+#endif
 
 #endif //__itkPointShell_h__
