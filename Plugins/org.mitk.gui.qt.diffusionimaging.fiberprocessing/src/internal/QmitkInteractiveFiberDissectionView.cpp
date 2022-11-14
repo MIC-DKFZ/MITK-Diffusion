@@ -1555,16 +1555,6 @@ void QmitkInteractiveFiberDissectionView::StartValidation()
    m_metrics.push_back(metrics);
 
 
-   std::ofstream metricsfile;
-   metricsfile.open("/home/r948e/mycsv/metrics_" + std::to_string(m_activeCycleCounter) + ".csv");
-   for (unsigned int i = 0; i < m_metrics.size(); i++)
-   {
-       metricsfile << m_metrics.at(i) << std::endl;
-   }
-
-   metricsfile.close();
-
-
     MITK_INFO << "Validation run succesfully";
 
     UpdateGui();
