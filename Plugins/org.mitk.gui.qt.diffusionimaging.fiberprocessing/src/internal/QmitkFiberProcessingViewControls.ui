@@ -39,12 +39,11 @@ QGroupBox {
     <widget class="QToolBox" name="toolBoxx">
      <property name="font">
       <font>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
      <property name="currentIndex">
-      <number>2</number>
+      <number>0</number>
      </property>
      <property name="tabSpacing">
       <number>5</number>
@@ -382,7 +381,7 @@ QGroupBox {
                 <string/>
                </property>
                <property name="icon">
-                <iconset resource="../../../../../release/MITK-build/private_plugins/org.mitk.gui.qt.diffusionimaging.fiberprocessing/org_mitk_gui_qt_diffusionimaging_fiberprocessing_cached.qrc">
+                <iconset>
                  <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/circle.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/circle.png</iconset>
                </property>
                <property name="iconSize">
@@ -427,7 +426,7 @@ QGroupBox {
                 <string/>
                </property>
                <property name="icon">
-                <iconset resource="../../../../../release/MITK-build/private_plugins/org.mitk.gui.qt.diffusionimaging.fiberprocessing/org_mitk_gui_qt_diffusionimaging_fiberprocessing_cached.qrc">
+                <iconset>
                  <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/polygon.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/polygon.png</iconset>
                </property>
                <property name="iconSize">
@@ -437,7 +436,7 @@ QGroupBox {
                 </size>
                </property>
                <property name="checkable">
-                <bool>true</bool>
+                <bool>false</bool>
                </property>
                <property name="flat">
                 <bool>true</bool>
@@ -598,7 +597,7 @@ QGroupBox {
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>-48</y>
+        <y>0</y>
         <width>353</width>
         <height>456</height>
        </rect>
@@ -1618,7 +1617,7 @@ QGroupBox {
         <x>0</x>
         <y>0</y>
         <width>367</width>
-        <height>182</height>
+        <height>181</height>
        </rect>
       </property>
       <attribute name="label">
