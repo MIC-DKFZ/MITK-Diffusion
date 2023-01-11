@@ -65,6 +65,8 @@ int main(int argc, char* argv[])
 
   parser.beginGroup("2. Color by scalar map:");
   parser.addArgument("scalar_map", "", mitkDiffusionCommandLineParser::String, "", "", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
+  parser.addArgument("lookup", "", mitkDiffusionCommandLineParser::String, "", "JET, MULTILABEL", us::Any(), true, false, false);
+  parser.addArgument("interpolate", "", mitkDiffusionCommandLineParser::Bool, "", "");
   parser.endGroup();
 
 
@@ -79,6 +81,14 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("resample"))
     resample = us::any_cast<float>(parsedArgs["resample"]);
 
+  std::string lookup = "JET";
+  if (parsedArgs.count("lookup"))
+    lookup = us::any_cast<std::string>(parsedArgs["lookup"]);
+
+  bool interpolate = false;
+  if (parsedArgs.count("interpolate"))
+    interpolate = us::any_cast<bool>(parsedArgs["interpolate"]);
+
   try
   {
     mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
@@ -90,7 +100,10 @@ int main(int argc, char* argv[])
     {
       auto scalar_map = mitk::IOUtil::Load<mitk::Image>(us::any_cast<std::string>(parsedArgs["scalar_map"]));
 
-      fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::MULTILABEL, 1.0);
+      if (lookup == "JET")
+        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::JET, 1.0, interpolate);
+      else
+        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::MULTILABEL, 1.0, false);
     }
     mitk::IOUtil::Save(fib.GetPointer(), outFileName );
 

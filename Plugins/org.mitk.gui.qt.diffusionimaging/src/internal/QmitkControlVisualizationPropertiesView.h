@@ -136,7 +136,7 @@ protected:
   QMenu* m_MyMenu;
 
   // for planarfigure and bundle handling:
-  mitk::DataNode::Pointer m_SelectedNode;
+  std::vector< mitk::DataNode::Pointer > m_SelectedNodes;
   mitk::DataNode* m_CurrentPickingNode;
 
   unsigned long m_ColorPropertyObserverTag;

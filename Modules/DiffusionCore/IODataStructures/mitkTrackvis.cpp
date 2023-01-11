@@ -7,9 +7,11 @@ TrackVisFiberReader::~TrackVisFiberReader() { if (m_FilePointer) fclose( m_FileP
 
 // Create a TrackVis file and store standard metadata. The file is ready to append fibers.
 // ---------------------------------------------------------------------------------------
-short TrackVisFiberReader::create(std::string filename , mitk::FiberBundle *fib, bool print_header)
+short TrackVisFiberReader::create(std::string filename , mitk::FiberBundle *fib, bool print_header, bool use_lps)
 {
   m_Header = fib->GetTrackVisHeader();
+  if (use_lps)
+    sprintf(m_Header.voxel_order,"LPS");
 
   if (print_header)
     this->print_header();

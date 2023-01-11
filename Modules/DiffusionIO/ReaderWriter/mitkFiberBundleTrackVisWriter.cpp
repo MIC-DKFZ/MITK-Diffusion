@@ -32,6 +32,7 @@ mitk::FiberBundleTrackVisWriter::FiberBundleTrackVisWriter()
 {
   Options defaultOptions;
   defaultOptions["Print header"] = false;
+  defaultOptions["Use LPS coordinate system (default is RAS)"] = false;
   this->SetDefaultOptions(defaultOptions);
 
   RegisterService();
@@ -91,10 +92,11 @@ void mitk::FiberBundleTrackVisWriter::Write()
 
     Options options = this->GetOptions();
     bool print_header = us::any_cast<bool>(options["Print header"]);
+    bool use_lps = us::any_cast<bool>(options["Use LPS coordinate system (default is RAS)"]);
 
     MITK_INFO << "Writing fiber bundle as TRK";
     TrackVisFiberReader trk;
-    trk.create(filename, const_cast<mitk::FiberBundle*>(input.GetPointer()), print_header);
+    trk.create(filename, const_cast<mitk::FiberBundle*>(input.GetPointer()), print_header, use_lps);
     trk.writeHdr();
     trk.write(input.GetPointer());
 

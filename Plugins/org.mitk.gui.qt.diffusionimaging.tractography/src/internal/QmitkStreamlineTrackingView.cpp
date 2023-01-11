@@ -279,6 +279,7 @@ void QmitkStreamlineTrackingView::ParametersToGui(mitk::StreamlineTractographyPa
   m_Controls->m_MaxTractLengthBox->setValue(params.m_MaxTractLengthMm);
   m_Controls->m_OutputProbMap->setChecked(params.m_OutputProbMap);
   m_Controls->m_FixSeedBox->setChecked(params.m_FixRandomSeed);
+  m_Controls->m_SecondOrderBox->setChecked(params.m_SecondOrder);
   m_Controls->m_PeakJitterBox->setValue(params.m_PeakJitter);
 
   switch (params.m_Mode)
@@ -385,6 +386,7 @@ std::shared_ptr<mitk::StreamlineTractographyParameters> QmitkStreamlineTrackingV
   params->m_MaxTractLengthMm = m_Controls->m_MaxTractLengthBox->value();
   params->m_OutputProbMap = m_Controls->m_OutputProbMap->isChecked();
   params->m_FixRandomSeed = m_Controls->m_FixSeedBox->isChecked();
+  params->m_SecondOrder = m_Controls->m_SecondOrderBox->isChecked();
   params->m_PeakJitter = static_cast<float>(m_Controls->m_PeakJitterBox->value());
 
   switch (m_Controls->m_ModeBox->currentIndex())
@@ -1188,24 +1190,24 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     min_sp = spacing[2];
   params->m_Compression = min_sp/10;
 
-  float max_size = 0;
-  for (int i=0; i<3; ++i)
-    if (dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i)>max_size)
-      max_size = dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i);
-  if (params->m_MinTractLengthMm >= max_size)
-  {
-    MITK_INFO << "Max. image size: " << max_size << "mm";
-    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
-    QMessageBox::information(nullptr, "Error", "Minimum tract length exceeds the maximum image extent! Recommended value is about 1/10 of the image extent.");
-    StartStopTrackingGui(false);
-    return;
-  }
-  else if (params->m_MinTractLengthMm > max_size/10)
-  {
-    MITK_INFO << "Max. image size: " << max_size << "mm";
-    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
-    MITK_WARN <<  "Minimum tract length is larger than 1/10 the maximum image extent! Decrease recommended.";
-  }
+//  float max_size = 0;
+//  for (int i=0; i<3; ++i)
+//    if (dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i)>max_size)
+//      max_size = dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())->GetGeometry()->GetExtentInMM(i);
+//  if (params->m_MinTractLengthMm >= max_size)
+//  {
+//    MITK_INFO << "Max. image size: " << max_size << "mm";
+//    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
+//    QMessageBox::information(nullptr, "Error", "Minimum tract length exceeds the maximum image extent! Recommended value is about 1/10 of the image extent.");
+//    StartStopTrackingGui(false);
+//    return;
+//  }
+//  else if (params->m_MinTractLengthMm > max_size/10)
+//  {
+//    MITK_INFO << "Max. image size: " << max_size << "mm";
+//    MITK_INFO << "Min. tract length: " << params->m_MinTractLengthMm << "mm";
+//    MITK_WARN <<  "Minimum tract length is larger than 1/10 the maximum image extent! Decrease recommended.";
+//  }
 
   m_Tracker->SetParameters(params);
   m_Tracker->SetTrackingHandler(m_TrackingHandler);

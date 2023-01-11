@@ -98,7 +98,7 @@ void TrackingHandlerOdf::InitForTracking()
   std::cout << "TrackingHandlerOdf - GFA threshold: " << m_Parameters->m_Cutoff << std::endl;
   std::cout << "TrackingHandlerOdf - ODF threshold: " << m_Parameters->m_OdfCutoff << std::endl;
   if (m_Parameters->m_SharpenOdfs > 1)
-    std::cout << "TrackingHandlerOdf - Raising ODf values to the power of " << m_Parameters->m_SharpenOdfs << std::endl;
+    std::cout << "TrackingHandlerOdf - Raising ODF values to the power of " << m_Parameters->m_SharpenOdfs << std::endl;
 }
 
 int TrackingHandlerOdf::SampleOdf(vnl_vector< float >& probs, vnl_vector< float >& angles)

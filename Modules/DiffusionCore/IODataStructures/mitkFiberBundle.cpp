@@ -1837,7 +1837,9 @@ void mitk::FiberBundle::RotateAroundAxis(double x, double y, double z)
   m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
   m_FiberPolyData->SetPoints(vtkNewPoints);
   m_FiberPolyData->SetLines(vtkNewCells);
+  auto colors = GetFiberColors();
   this->SetFiberPolyData(m_FiberPolyData, true);
+  SetFiberColors(colors);
 }
 
 void mitk::FiberBundle::ScaleFibers(double x, double y, double z, bool subtractCenter)
@@ -2800,7 +2802,7 @@ void mitk::FiberBundle::SetTrackVisHeader(mitk::BaseGeometry* geometry)
 
   m_TrackVisHeader.n_scalars = 0;
   m_TrackVisHeader.n_properties = 0;
-  sprintf(m_TrackVisHeader.voxel_order,"LPS");
+  sprintf(m_TrackVisHeader.voxel_order,"RAS");
   m_TrackVisHeader.image_orientation_patient[0] = 1.0;
   m_TrackVisHeader.image_orientation_patient[1] = 0.0;
   m_TrackVisHeader.image_orientation_patient[2] = 0.0;

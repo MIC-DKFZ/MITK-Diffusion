@@ -93,6 +93,7 @@ namespace mitk
     bool m_FixRandomSeed = false;
     unsigned int m_NumPreviousDirections = 1;
     float m_PeakJitter = 0.01; // actual jitter is drawn from a normal distribution with m_PeakJitter*fabs(direction_value) as standard deviation
+    bool m_SecondOrder = true;
 
     // prior
     // - peak image
