@@ -84,10 +84,8 @@ MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be inst
 * Image statistics
 
 **Segmentation**
-* Automatic white matter bundle segmentation (TractSeg) [[3]](#References) (Linux only)
 * Automatic brain mask segmentation (Linux only)
 * Manual image segmentation and operations on segmentations
-* SOON: automatic brain tissue segmentation
 
 **Fiber tractography**
 * Global tractography [[4]](#References)
