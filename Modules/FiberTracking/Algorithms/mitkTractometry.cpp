@@ -102,7 +102,8 @@ unsigned int Tractometry::EstimateNumSamplingPoints(itk::Image<unsigned char, 3>
 }
 
 
-std::vector<vnl_vector<float>> Tractometry::NearestCentroidPointTractometry(itk::Image<float, 3>::Pointer itkImage, mitk::FiberBundle::Pointer working_fib, unsigned int num_points, unsigned int max_centroids, float cluster_size, mitk::FiberBundle::Pointer ref_fib)
+std::vector<vnl_vector<float>> Tractometry::NearestCentroidPointTractometry(itk::Image<float, 3>::Pointer itkImage, mitk::FiberBundle::Pointer working_fib, unsigned int num_points, unsigned int max_centroids, float cluster_size,
+                                                                            mitk::FiberBundle::Pointer ref_fib, bool flip_parcellation)
 {
   vtkSmartPointer< vtkPolyData > polydata = working_fib->GetFiberPolyData();
   vtkSmartPointer< vtkPolyData > ref_polydata = nullptr;
@@ -114,6 +115,23 @@ std::vector<vnl_vector<float>> Tractometry::NearestCentroidPointTractometry(itk:
 
   auto interpolator = itk::LinearInterpolateImageFunction< itk::Image<float, 3>, float >::New();
   interpolator->SetInputImage(itkImage);
+
+  {
+    auto p1 = polydata->GetCell(polydata->GetNumberOfCells()/2)->GetPoints()->GetPoint(0);
+    itk::Point<double, 3> itk_p;
+    itk_p[0] = p1[0];
+    itk_p[1] = p1[1];
+    itk_p[2] = p1[2];
+
+    float pixelValue = mitk::imv::GetImageValue<float, double>(itk_p, false, interpolator);
+    if (pixelValue > 1.5)
+      {
+      flip_parcellation = true;
+      MITK_INFO << "FLIP";
+      }
+    else
+      flip_parcellation = false;
+  }
 
   mitk::LookupTable::Pointer lookupTable = mitk::LookupTable::New();
   lookupTable->SetType(mitk::LookupTable::MULTILABEL);
@@ -182,6 +200,8 @@ std::vector<vnl_vector<float>> Tractometry::NearestCentroidPointTractometry(itk:
         vtkPoints* centroid_points = centroid_cell->GetPoints();
 
         bool centroid_flip = Flip(centroid_polydata, 0, ref_polydata);
+        if (flip_parcellation)
+          centroid_flip = !centroid_flip;
 
         for (int bin=0; bin<centroid_numPoints; ++bin)
         {
@@ -225,7 +245,7 @@ std::vector<vnl_vector<float>> Tractometry::NearestCentroidPointTractometry(itk:
   return output;
 }
 
-vnl_matrix<float> Tractometry::StaticResamplingTractometry(itk::Image<float, 3>::Pointer itkImage, mitk::FiberBundle::Pointer working_fib, unsigned int num_points, mitk::FiberBundle::Pointer ref_fib)
+vnl_matrix<float> Tractometry::StaticResamplingTractometry(itk::Image<float, 3>::Pointer itkImage, mitk::FiberBundle::Pointer working_fib, unsigned int num_points, mitk::FiberBundle::Pointer ref_fib, bool flip_parcellation)
 {
 
   ResampleIfNecessary(working_fib, num_points);
@@ -246,6 +266,25 @@ vnl_matrix<float> Tractometry::StaticResamplingTractometry(itk::Image<float, 3>:
   vnl_matrix<float> output; output.set_size(num_points, working_fib->GetNumFibers());
   output.fill(0.0);
 
+
+  {
+    auto p1 = polydata->GetCell(polydata->GetNumberOfCells()/2)->GetPoints()->GetPoint(0);
+    itk::Point<double, 3> itk_p;
+    itk_p[0] = p1[0];
+    itk_p[1] = p1[1];
+    itk_p[2] = p1[2];
+
+    float pixelValue = mitk::imv::GetImageValue<float, double>(itk_p, false, interpolator);
+    MITK_INFO << "TEST <<< " << pixelValue;
+    if (pixelValue > 1.5)
+      {
+      flip_parcellation = true;
+      MITK_INFO << "FLIP";
+      }
+    else
+      flip_parcellation = false;
+  }
+
   for (unsigned int i=0; i<working_fib->GetNumFibers(); ++i)
   {
     vtkCell* cell = polydata->GetCell(i);
@@ -253,6 +292,8 @@ vnl_matrix<float> Tractometry::StaticResamplingTractometry(itk::Image<float, 3>:
     vtkPoints* points = cell->GetPoints();
 
     bool flip = Flip(polydata, i, ref_polydata);
+    if (flip_parcellation)
+      flip = !flip;
 
     for (int j=0; j<numPoints; j++)
     {

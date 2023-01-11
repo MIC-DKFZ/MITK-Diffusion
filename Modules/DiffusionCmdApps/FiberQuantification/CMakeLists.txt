@@ -15,6 +15,7 @@ if(BUILD_DiffusionFiberQuantificationCmdApps OR MITK_BUILD_ALL_APPS)
     TractDensity^^
     PrintFiberStatistics^^
     DistanceToSegmentation^^
+    Tractometry^^
     )
 
     foreach(diffusionFiberProcessingcmdapp ${diffusionFiberProcessingcmdapps})

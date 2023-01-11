@@ -41,9 +41,9 @@ class MITKFIBERTRACKING_EXPORT Tractometry
 {
 public:
 
-  static vnl_matrix<float> StaticResamplingTractometry(itk::Image<float, 3>::Pointer itkImage, mitk::FiberBundle::Pointer fib, unsigned int num_points, mitk::FiberBundle::Pointer ref_fib);
+  static vnl_matrix<float> StaticResamplingTractometry(itk::Image<float, 3>::Pointer itkImage, mitk::FiberBundle::Pointer fib, unsigned int num_points, mitk::FiberBundle::Pointer ref_fib, bool flip_parcellation);
 
-  static std::vector<vnl_vector<float>>  NearestCentroidPointTractometry(itk::Image<float, 3>::Pointer itkImage, mitk::FiberBundle::Pointer fib, unsigned int num_points, unsigned int max_centroids, float cluster_size, mitk::FiberBundle::Pointer ref_fib);
+  static std::vector<vnl_vector<float>>  NearestCentroidPointTractometry(itk::Image<float, 3>::Pointer itkImage, mitk::FiberBundle::Pointer fib, unsigned int num_points, unsigned int max_centroids, float cluster_size, mitk::FiberBundle::Pointer ref_fib, bool flip_parcellation);
 
   static unsigned int EstimateNumSamplingPoints(itk::Image<unsigned char, 3>::Pointer ref_image, mitk::FiberBundle::Pointer fib, unsigned int voxels);
 

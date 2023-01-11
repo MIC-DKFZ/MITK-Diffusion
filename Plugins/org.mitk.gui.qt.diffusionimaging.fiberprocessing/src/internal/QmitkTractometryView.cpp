@@ -111,7 +111,7 @@ void QmitkTractometryView::StaticResamplingTractometry(mitk::Image::Pointer imag
   unsigned int num_points = m_NumSamplingPoints;
   mitk::FiberBundle::Pointer working_fib = fib->GetDeepCopy();
 
-  vnl_matrix<float> output = mitk::Tractometry::StaticResamplingTractometry(itkImage, working_fib, num_points, m_ReferenceFib);
+  vnl_matrix<float> output = mitk::Tractometry::StaticResamplingTractometry(itkImage, working_fib, num_points, m_ReferenceFib, false);
 
   std::vector< double > std_values1;
   std::vector< double > std_values2;
@@ -170,7 +170,7 @@ void QmitkTractometryView::NearestCentroidPointTractometry(mitk::Image::Pointer 
   itk::Image<float, 3>::Pointer itkImage = itk::Image<float, 3>::New();
   CastToItkImage(image, itkImage);
 
-  auto output = mitk::Tractometry::NearestCentroidPointTractometry(itkImage, working_fib, num_points, m_Controls->m_MaxCentroids->value(), m_Controls->m_ClusterSize->value(), m_ReferenceFib);
+  auto output = mitk::Tractometry::NearestCentroidPointTractometry(itkImage, working_fib, num_points, m_Controls->m_MaxCentroids->value(), m_Controls->m_ClusterSize->value(), m_ReferenceFib, false);
 
   std::vector< double > std_values1;
   std::vector< double > std_values2;
