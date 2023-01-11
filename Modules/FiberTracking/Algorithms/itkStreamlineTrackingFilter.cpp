@@ -241,6 +241,10 @@ void StreamlineTrackingFilter::BeforeTracking()
   std::cout << "StreamlineTracking - Min. tract length: " << m_Parameters->m_MinTractLengthMm << "mm" << std::endl;
   std::cout << "StreamlineTracking - Max. num. tracts: " << m_Parameters->m_MaxNumFibers << std::endl;
   std::cout << "StreamlineTracking - Loop check: " << m_Parameters->GetLoopCheckDeg() << "°" << std::endl;
+  if (m_Parameters->m_SecondOrder)
+    std::cout << "StreamlineTracking - Using second order streamline integration" << std::endl;
+  else
+    std::cout << "StreamlineTracking - Using first order streamline integration" << std::endl;
 
   std::cout << "StreamlineTracking - Num. neighborhood samples: " << m_Parameters->m_NumSamples << std::endl;
   std::cout << "StreamlineTracking - Max. sampling distance: " << m_Parameters->GetSamplingDistanceMm() << "mm (" << m_Parameters->GetSamplingDistanceMm()/m_Parameters->GetMinVoxelSizeMm() << "*vox)" << std::endl;
@@ -508,6 +512,14 @@ float StreamlineTrackingFilter::FollowStreamline(itk::Point<float, 3> pos, vnl_v
     if (last_dirs.size()>m_Parameters->m_NumPreviousDirections)
       last_dirs.pop_front();
     dir = GetNewDirection(pos, last_dirs, oldIndex);
+    if (m_Parameters->m_SecondOrder)
+    {
+      itk::Point<float, 3> dpos = pos;
+      dpos[0] += dir[0]*m_Parameters->GetStepSizeMm()*0.5;
+      dpos[1] += dir[1]*m_Parameters->GetStepSizeMm()*0.5;
+      dpos[2] += dir[2]*m_Parameters->GetStepSizeMm()*0.5;
+      dir = GetNewDirection(dpos, last_dirs, oldIndex);
+    }
 
     while (m_PauseTracking){}
 

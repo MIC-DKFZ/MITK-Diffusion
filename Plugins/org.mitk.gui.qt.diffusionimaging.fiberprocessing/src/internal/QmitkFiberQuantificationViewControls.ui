@@ -155,6 +155,11 @@ QGroupBox {
           <string>Streamline Visitation Count</string>
          </property>
         </item>
+        <item>
+         <property name="text">
+          <string>Fiber Pointset</string>
+         </property>
+        </item>
        </widget>
       </item>
      </layout>

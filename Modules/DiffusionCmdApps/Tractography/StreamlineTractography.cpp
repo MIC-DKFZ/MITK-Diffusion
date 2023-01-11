@@ -89,9 +89,11 @@ int main(int argc, char* argv[])
   parser.addArgument("odf_cutoff", "", mitkDiffusionCommandLineParser::Float, "ODF Cutoff:", "threshold on the ODF magnitude. this is useful in case of CSD fODF tractography.", 0.0);
   parser.addArgument("step_size", "", mitkDiffusionCommandLineParser::Float, "Step size:", "step size (in voxels)", 0.5);
   parser.addArgument("min_tract_length", "", mitkDiffusionCommandLineParser::Float, "Min. tract length:", "minimum fiber length (in mm)", 20);
+  parser.addArgument("max_tract_length", "", mitkDiffusionCommandLineParser::Float, "Max. tract length:", "maximum fiber length (in mm)", 400);
   parser.addArgument("angular_threshold", "", mitkDiffusionCommandLineParser::Float, "Angular threshold:", "angular threshold between two successive steps, (default: 90° * step_size, minimum 15°)");
   parser.addArgument("loop_check", "", mitkDiffusionCommandLineParser::Float, "Check for loops:", "threshold on angular stdev over the last 4 voxel lengths");
   parser.addArgument("peak_jitter", "", mitkDiffusionCommandLineParser::Float, "Peak jitter:", "important for probabilistic peak tractography and peak prior. actual jitter is drawn from a normal distribution with peak_jitter*fabs(direction_value) as standard deviation.", 0.01);
+  parser.addArgument("first_order", "", mitkDiffusionCommandLineParser::Bool, "First order integration:", "use first order integration. default is second order to avoids streamlineovershoot", false);
   parser.endGroup();
 
   parser.beginGroup("5. Tractography prior:");
@@ -217,8 +219,14 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("min_tract_length"))
     params->m_MinTractLengthMm = us::any_cast<float>(parsedArgs["min_tract_length"]);
 
+  if (parsedArgs.count("max_tract_length"))
+    params->m_MaxTractLengthMm = us::any_cast<float>(parsedArgs["max_tract_length"]);
+
   if (parsedArgs.count("loop_check"))
     params->SetLoopCheckDeg(us::any_cast<float>(parsedArgs["loop_check"]));
+
+  if (parsedArgs.count("first_order"))
+    params->m_SecondOrder = false;
 
   std::string forestFile;
   if (parsedArgs.count("forest"))

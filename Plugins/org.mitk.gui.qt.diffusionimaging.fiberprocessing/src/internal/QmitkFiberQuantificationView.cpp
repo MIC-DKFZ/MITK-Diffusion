@@ -248,6 +248,9 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
         newNode = GenerateTractDensityImage(fib, TDI_MODE::VISITATION_COUNT, true, node->GetName());
         name += "_visitations";
         break;
+      case 9:
+        newNode = GenerateFiberPointSet(fib);
+        name += "_fiber_points";
       }
       if (newNode.IsNotNull())
       {
@@ -282,6 +285,34 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateFiberEndingsPointS
     if (numPoints>2)
     {
       double* point = points->GetPoint(numPoints-1);
+      itk::Point<double,3> itkPoint = mitk::imv::GetItkPoint(point);
+      pointSet->InsertPoint(count, itkPoint);
+      count++;
+    }
+  }
+
+  mitk::DataNode::Pointer node = mitk::DataNode::New();
+  node->SetData( pointSet );
+  return node;
+}
+
+// generate pointset displaying the fiber endings
+mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateFiberPointSet(mitk::FiberBundle::Pointer fib)
+{
+  mitk::PointSet::Pointer pointSet = mitk::PointSet::New();
+  vtkSmartPointer<vtkPolyData> fiberPolyData = fib->GetFiberPolyData();
+
+  int count = 0;
+  int numFibers = fib->GetNumFibers();
+  for( int i=0; i<numFibers; i++ )
+  {
+    vtkCell* cell = fiberPolyData->GetCell(i);
+    int numPoints = cell->GetNumberOfPoints();
+    vtkPoints* points = cell->GetPoints();
+
+    for (int j=0; j<numPoints; ++j)
+    {
+      double* point = points->GetPoint(j);
       itk::Point<double,3> itkPoint = mitk::imv::GetItkPoint(point);
       pointSet->InsertPoint(count, itkPoint);
       count++;

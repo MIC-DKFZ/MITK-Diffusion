@@ -26,6 +26,7 @@ if(BUILD_DiffusionMiscCmdApps OR MITK_BUILD_ALL_APPS)
     HeadMotionCorrection^^
     DmriDenoising^^MitkImageDenoising
     RoundBvalues^^
+    FiberScreenshot^^
     )
 
     foreach(diffusionMisccmdapp ${diffusionMisccmdapps})
@@ -39,7 +40,7 @@ if(BUILD_DiffusionMiscCmdApps OR MITK_BUILD_ALL_APPS)
 
       mitkFunctionCreateCommandLineApp(
         NAME ${appname}
-        DEPENDS MitkDiffusionCmdApps ${dependencies_list}
+        DEPENDS MitkDiffusionCmdApps MitkTestingHelper ${dependencies_list}
         PACKAGE_DEPENDS
       )
     endforeach()

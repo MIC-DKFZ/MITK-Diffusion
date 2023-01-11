@@ -92,6 +92,7 @@ public:
 
     params = std::make_shared<mitk::StreamlineTractographyParameters>();
     params->m_FixRandomSeed = true;
+    params->m_SecondOrder = false;
     params->m_InterpolateRoiImages = false;
     params->SetLoopCheckDeg(-1);  // todo: test loop check
 
