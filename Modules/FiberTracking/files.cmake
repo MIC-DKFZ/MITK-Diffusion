@@ -15,7 +15,6 @@ set(CPP_FILES
   Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.cpp
   Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.cpp
   Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.cpp
-  Algorithms/mitkTractometry.cpp
 )
 
 set(H_FILES
@@ -34,7 +33,6 @@ set(H_FILES
   Algorithms/itkFiberExtractionFilter.h
   Algorithms/itkTdiToVolumeFractionFilter.h
   Algorithms/itkDistanceFromSegmentationImageFilter.h
-  Algorithms/mitkTractometry.h
 
   # Tractography
   Algorithms/TrackingHandlers/mitkTrackingDataHandler.h
