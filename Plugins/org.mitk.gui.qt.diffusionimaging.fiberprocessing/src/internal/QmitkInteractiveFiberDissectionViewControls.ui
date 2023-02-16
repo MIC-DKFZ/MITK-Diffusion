@@ -52,7 +52,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>3</number>
+      <number>4</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -1054,16 +1054,6 @@ QGroupBox {
         </property>
        </widget>
       </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="toolTip">
-         <string>Input DTI</string>
-        </property>
-        <property name="text">
-         <string>Selectd Fiber Bundle:</string>
-        </property>
-       </widget>
-      </item>
       <item row="1" column="1">
        <widget class="QmitkDataStorageComboBox" name="m_TestBundleBox"/>
       </item>
@@ -1074,6 +1064,16 @@ QGroupBox {
         </property>
         <property name="wordWrap">
          <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="toolTip">
+         <string>Input DTI</string>
+        </property>
+        <property name="text">
+         <string>Selectd Fiber Bundle:</string>
         </property>
        </widget>
       </item>

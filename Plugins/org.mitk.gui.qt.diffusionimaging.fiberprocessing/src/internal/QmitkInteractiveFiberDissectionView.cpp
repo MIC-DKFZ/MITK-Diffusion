@@ -421,70 +421,139 @@ void QmitkInteractiveFiberDissectionView::RandomPrototypes()
 {
 
 
-     MITK_INFO << "Number of Fibers to use as Prototypes: ";
-     MITK_INFO << m_Controls->m_NumPrototypes->value();
+//     MITK_INFO << "Number of Fibers to use as Prototypes: ";
+//     MITK_INFO << m_Controls->m_NumPrototypes->value();
 
-      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_BundleBox->GetSelectedNode()->GetData());
+//      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_BundleBox->GetSelectedNode()->GetData());
 
-      MITK_INFO << fib->GetNumFibers();
-      std::vector<int> myvec;
-      for (unsigned int k=0; k<fib->GetNumFibers(); k++)
-      {
-        myvec.push_back(k);
-      }
-//      auto rng = std::default_random_engine {};
-      std::random_shuffle(std::begin(myvec), std::end(myvec));
+//      MITK_INFO << fib->GetNumFibers();
+//      std::vector<int> myvec;
+//      for (unsigned int k=0; k<fib->GetNumFibers(); k++)
+//      {
+//        myvec.push_back(k);
+//      }
+//      std::random_shuffle(std::begin(myvec), std::end(myvec));
 
-      vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-      vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-      vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
+//      vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
+//      vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
+//      vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
 
-      vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
+//      vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
 
-       /* Check wether all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
-      unsigned int counter = 0;
+//       /* Check wether all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
+//      unsigned int counter = 0;
 
-      for (int i=0; i<m_Controls->m_NumPrototypes->value(); i++)
-      {
-        vtkCell* cell = fib->GetFiberPolyData()->GetCell(myvec.at(i));
+//      for (int i=0; i<m_Controls->m_NumPrototypes->value(); i++)
+//      {
+//        vtkCell* cell = fib->GetFiberPolyData()->GetCell(myvec.at(i));
+//        auto numPoints = cell->GetNumberOfPoints();
+//        vtkPoints* points = cell->GetPoints();
+
+//        vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+//        for (unsigned int j=0; j<numPoints; j++)
+//        {
+//          double p[3];
+//          points->GetPoint(j, p);
+
+//          vtkIdType id = vNewPoints->InsertNextPoint(p);
+//          container->GetPointIds()->InsertNextId(id);
+//        }
+//        weights->InsertValue(counter, fib->GetFiberWeight(myvec.at(i)));
+//        vNewLines->InsertNextCell(container);
+//        counter++;
+
+//      }
+
+
+
+//      vNewPolyData->SetLines(vNewLines);
+//      vNewPolyData->SetPoints(vNewPoints);
+
+//      mitk::FiberBundle::Pointer PrototypesBundle = mitk::FiberBundle::New(vNewPolyData);
+//      PrototypesBundle->SetFiberWeights(weights);
+
+//      mitk::DataNode::Pointer node = mitk::DataNode::New();
+//      node->SetData(PrototypesBundle);
+//      node->SetName("Random_Prototypes");
+
+////      MITK_INFO << "Number of Streamlines in first function";
+////      MITK_INFO << m_newfibersBundleNode->GetData()->GetFiberPolyData()->GetNumberOfCells();
+//      m_Controls->m_PrototypeBox->SetAutoSelectNewItems (true);
+//      this->GetDataStorage()->Add(node);
+//      m_Controls->m_PrototypeBox->SetAutoSelectNewItems (false);
+//      m_Controls->m_useStandardP->setChecked(false);
+//      node->SetVisibility(false);
+    // Get the number of fibers to use as prototypes from the user interface
+    const int numPrototypes = m_Controls->m_NumPrototypes->value();
+    MITK_INFO << "Number of Fibers to use as Prototypes: " << numPrototypes;
+
+    // Get the bundle of fibers to extract prototypes from
+    mitk::DataNode::Pointer selectedNode = m_Controls->m_BundleBox->GetSelectedNode();
+    if (!selectedNode)
+    {
+        MITK_ERROR << "No fiber bundle selected";
+        return;
+    }
+    mitk::FiberBundle::Pointer fiberBundle = dynamic_cast<mitk::FiberBundle*>(selectedNode->GetData());
+    if (!fiberBundle)
+    {
+        MITK_ERROR << "Selected node does not contain a fiber bundle";
+        return;
+    }
+    MITK_INFO << "Number of fibers in the selected bundle: " << fiberBundle->GetNumFibers();
+
+    // Randomly shuffle the indices of fibers in the bundle
+    std::vector<int> indices(fiberBundle->GetNumFibers());
+    std::iota(std::begin(indices), std::end(indices), 0); // fill the vector with 0 to n-1
+    std::random_shuffle(std::begin(indices), std::end(indices));
+
+    // Create new PolyData to hold the prototype fibers
+    vtkSmartPointer<vtkPolyData> prototypePolyData = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkCellArray> prototypeLines = vtkSmartPointer<vtkCellArray>::New();
+    vtkSmartPointer<vtkPoints> prototypePoints = vtkSmartPointer<vtkPoints>::New();
+    vtkSmartPointer<vtkFloatArray> prototypeWeights = vtkSmartPointer<vtkFloatArray>::New();
+
+    // Extract a subset of fibers as prototypes
+    for (int i = 0; i < numPrototypes; i++)
+    {
+        if (indices.empty()) break;
+        const int index = indices.back();
+        indices.pop_back();
+
+        vtkCell* cell = fiberBundle->GetFiberPolyData()->GetCell(index);
         auto numPoints = cell->GetNumberOfPoints();
         vtkPoints* points = cell->GetPoints();
 
         vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-        for (unsigned int j=0; j<numPoints; j++)
+        for (unsigned int j = 0; j < numPoints; j++)
         {
-          double p[3];
-          points->GetPoint(j, p);
-
-          vtkIdType id = vNewPoints->InsertNextPoint(p);
-          container->GetPointIds()->InsertNextId(id);
+            double p[3];
+            points->GetPoint(j, p);
+            vtkIdType id = prototypePoints->InsertNextPoint(p);
+            container->GetPointIds()->InsertNextId(id);
         }
-        weights->InsertValue(counter, fib->GetFiberWeight(myvec.at(i)));
-        vNewLines->InsertNextCell(container);
-        counter++;
 
-      }
+        prototypeWeights->InsertNextValue(fiberBundle->GetFiberWeight(index));
+        prototypeLines->InsertNextCell(container);
+    }
 
+    // Create a new FiberBundle containing the prototype fibers
+    prototypePolyData->SetLines(prototypeLines);
+    prototypePolyData->SetPoints(prototypePoints);
+    mitk::FiberBundle::Pointer prototypesBundle = mitk::FiberBundle::New(prototypePolyData);
+    prototypesBundle->SetFiberWeights(prototypeWeights);
+    auto node = mitk::DataNode::New();
+    node->SetData(prototypesBundle);
+    node->SetName("Random_Prototypes");
+    node->SetVisibility(false);
 
+    GetDataStorage()->Add(node);
+    m_Controls->m_PrototypeBox->SetAutoSelectNewItems(true);
+    m_Controls->m_PrototypeBox->SetSelectedNode(node);
+    m_Controls->m_PrototypeBox->SetAutoSelectNewItems(false);
+    m_Controls->m_useStandardP->setChecked(false);
 
-      vNewPolyData->SetLines(vNewLines);
-      vNewPolyData->SetPoints(vNewPoints);
-
-      mitk::FiberBundle::Pointer PrototypesBundle = mitk::FiberBundle::New(vNewPolyData);
-      PrototypesBundle->SetFiberWeights(weights);
-
-      mitk::DataNode::Pointer node = mitk::DataNode::New();
-      node->SetData(PrototypesBundle);
-      node->SetName("Random_Prototypes");
-
-//      MITK_INFO << "Number of Streamlines in first function";
-//      MITK_INFO << m_newfibersBundleNode->GetData()->GetFiberPolyData()->GetNumberOfCells();
-      m_Controls->m_PrototypeBox->SetAutoSelectNewItems (true);
-      this->GetDataStorage()->Add(node);
-      m_Controls->m_PrototypeBox->SetAutoSelectNewItems (false);
-      m_Controls->m_useStandardP->setChecked(false);
-      node->SetVisibility(false);
-
+    MITK_INFO << "Created new node with " << numPrototypes << " random prototypes";
 
 }
 
@@ -1269,6 +1338,8 @@ void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
     MITK_INFO << "Create Prediction";
 
     m_Prediction = classifier->CreatePrediction(m_index.at(0), false);
+
+//    m_Prediction->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
     mitk::DataNode::Pointer node = mitk::DataNode::New();
     node->SetData(m_Prediction);
     auto s = std::to_string(m_activeCycleCounter);
