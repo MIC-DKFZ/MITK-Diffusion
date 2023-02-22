@@ -206,6 +206,7 @@ void QmitkStreamlineTrackingView::CreateQtPartControl( QWidget *parent )
     connect( m_Controls->m_TrialsPerSeedBox, SIGNAL(editingFinished()), this, SLOT(OnParameterChanged()) );
     connect( m_Controls->m_EpConstraintsBox, SIGNAL(currentIndexChanged(int)), this, SLOT(OnParameterChanged()) );
     connect( m_Controls->m_PeakJitterBox, SIGNAL(editingFinished()), this, SLOT(OnParameterChanged()) );
+    connect( m_Controls->m_SecondOrderBox, SIGNAL(stateChanged(int)), this, SLOT(OnParameterChanged()) );
 
     m_Controls->m_SharpenOdfsBox->editingFinished();
     m_Controls->m_SeedsPerVoxelBox->editingFinished();

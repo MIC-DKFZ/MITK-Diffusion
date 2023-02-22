@@ -149,14 +149,6 @@ void mitk::FiberBundleMapper2D::Update(mitk::BaseRenderer * renderer)
   if (fiberBundle==nullptr)
     return;
 
-  int lineWidth = 1.0;
-  node->GetIntProperty("LineWidth", lineWidth);
-  if (m_LineWidth!=lineWidth)
-  {
-    m_LineWidth = lineWidth;
-    fiberBundle->RequestUpdate2D();
-  }
-
   vtkProperty *property = localStorage->m_Actor->GetProperty();
   property->SetLighting(false);
 
@@ -302,6 +294,15 @@ void mitk::FiberBundleMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *rend
 
 
   localStorage->m_Actor->SetMapper(localStorage->m_Mapper);
+
+  int lineWidth = 0;
+  node->GetIntProperty("shape.linewidth", lineWidth);
+  if (m_LineWidth!=lineWidth)
+  {
+    m_LineWidth = lineWidth;
+    fiberBundle->RequestUpdate2D();
+  }
+
   localStorage->m_Actor->GetProperty()->SetLineWidth(m_LineWidth);
 
   // We have been modified => save this for next Update()
