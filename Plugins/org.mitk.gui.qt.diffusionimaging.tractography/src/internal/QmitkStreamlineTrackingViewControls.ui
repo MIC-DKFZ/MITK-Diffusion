@@ -1130,7 +1130,7 @@ QGroupBox {
        <item row="15" column="1">
         <widget class="QCheckBox" name="m_SecondOrderBox">
          <property name="toolTip">
-          <string>Always produce the same random numbers.</string>
+          <string>Use second order integration to avoid streamline overshoot</string>
          </property>
          <property name="text">
           <string/>
