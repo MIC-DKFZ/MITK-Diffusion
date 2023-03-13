@@ -121,55 +121,70 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk:
 std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::CalculateDmdf(std::vector<vnl_matrix<float> > tractogram,
                                                                           std::vector<vnl_matrix<float> > prototypes)
 {
+// Initialize a vector to store distance matrices for each tractogram item
+std::vector<vnl_matrix<float>> dist_vec(tractogram.size());
 
-    std::vector< vnl_matrix<float> >  dist_vec(tractogram.size());//
-    MITK_INFO << "Start Calculating Dmdf";
-
+// Loop over each tractogram item
 #pragma omp parallel for
-    for (unsigned int i=0; i<tractogram.size(); i++)
+for (std::size_t i = 0; i < tractogram.size(); ++i)
+{
+    // Initialize a distance matrix for the current tractogram item
+    vnl_matrix<float> distances(1, 2 * prototypes.size(), 0.0);
+
+    // Loop over each prototype
+    for (std::size_t j = 0; j < prototypes.size(); ++j)
     {
-        vnl_matrix<float> distances;
-        distances.set_size(1, prototypes.size());
-        distances.fill(0.0);
-        for (unsigned int j=0; j<prototypes.size(); j++)
+        // Initialize matrices to store distances between the current tractogram item and the current prototype
+        vnl_matrix<float> single_distances(1, tractogram[0].cols(), 0.0);
+        vnl_matrix<float> single_distances_flip(1, tractogram[0].cols(), 0.0);
+        vnl_matrix<float> single_end_distances(1, 2, 0.0);
+        vnl_matrix<float> single_end_distances_flip(1, 2, 0.0);
+
+        // Loop over each point in the current tractogram item
+        for (std::size_t ik = 0; ik < tractogram[0].cols(); ++ik)
         {
-            vnl_matrix<float> single_distances;
-            single_distances.set_size(1, tractogram.at(0).cols());
-            single_distances.fill(0.0);
-            vnl_matrix<float> single_distances_flip;
-            single_distances_flip.set_size(1, tractogram.at(0).cols());
-            single_distances_flip.fill(0.0);
-            for (unsigned int ik=0; ik<tractogram.at(0).cols(); ik++)
+            // Calculate the Euclidean distance between the current point in the current tractogram item and the current point in the current prototype
+            const double cur_dist = std::sqrt(std::pow(tractogram[i](0, ik) - prototypes[j](0, ik), 2.0)
+                                              + std::pow(tractogram[i](1, ik) - prototypes[j](1, ik), 2.0)
+                                              + std::pow(tractogram[i](2, ik) - prototypes[j](2, ik), 2.0));
+            single_distances(0, ik) = cur_dist;
+
+            // Calculate the Euclidean distance between the current point in the current tractogram item and the mirrored current point in the current prototype
+            const double cur_dist_flip = std::sqrt(std::pow(tractogram[i](0, ik) - prototypes[j](0, prototypes[0].cols() - (ik + 1)), 2.0)
+                                                   + std::pow(tractogram[i](1, ik) - prototypes[j](1, prototypes[0].cols() - (ik + 1)), 2.0)
+                                                   + std::pow(tractogram[i](2, ik) - prototypes[j](2, prototypes[0].cols() - (ik + 1)), 2.0));
+            single_distances_flip(0, ik) = cur_dist_flip;
+
+            // Store the distances between the first and last points of the current tractogram item and the current prototype
+            if (ik == 0)
             {
-                double cur_dist;
-                double cur_dist_flip;
-
-                cur_dist = sqrt(pow(tractogram.at(i).get(0,ik) - prototypes.at(j).get(0,ik), 2.0) +
-                                       pow(tractogram.at(i).get(1,ik) - prototypes.at(j).get(1,ik), 2.0) +
-                                       pow(tractogram.at(i).get(2,ik) - prototypes.at(j).get(2,ik), 2.0));
-
-                cur_dist_flip = sqrt(pow(tractogram.at(i).get(0,ik) - prototypes.at(j).get(0,prototypes.at(0).cols()-(ik+1)), 2.0) +
-                                       pow(tractogram.at(i).get(1,ik) - prototypes.at(j).get(1,prototypes.at(0).cols()-(ik+1)), 2.0) +
-                                       pow(tractogram.at(i).get(2,ik) - prototypes.at(j).get(2,prototypes.at(0).cols()-(ik+1)), 2.0));
-
-                single_distances.put(0,ik, cur_dist);
-                single_distances_flip.put(0,ik, cur_dist_flip);
-
+                single_end_distances(0, 0) = cur_dist;
+                single_end_distances_flip(0, 0) = cur_dist_flip;
             }
-
-            if (single_distances_flip.mean()> single_distances.mean())
+            else if (ik == tractogram[0].cols() - 1)
             {
-                distances.put(0,j, single_distances.mean());
+                single_end_distances(0, 1) = cur_dist;
+                single_end_distances_flip(0, 1) = cur_dist_flip;
             }
-            else {
-                distances.put(0,j, single_distances_flip.mean());
-            }
-          }
-        dist_vec.at(i) = distances;
-       }
+        }
 
-    MITK_INFO << "Done Calculation";
-    MITK_INFO << dist_vec.at(0).size();
+        // Calculate the mean distance between the current tractogram item and the current prototype
+        const double mean_single_distances = single_distances.mean();
+        const double mean_single_distances_flip = single_distances_flip.mean();
+        distances(0, j) = mean_single_distances_flip > mean_single_distances ? mean_single_distances : mean_single_distances_flip;
+
+        // // Calculate the mean END distance between the current tractogram item and the current prototype
+        const double mean_single_end_distances = single_end_distances.mean();
+        const double mean_single_end_distances_flip = single_end_distances_flip.mean();
+        const std::size_t end_distances_index = prototypes.size() + j;
+        distances(0, end_distances_index) = mean_single_end_distances_flip > mean_single_end_distances ? mean_single_distances : mean_single_end_distances_flip;
+    }
+
+        dist_vec[i] = distances;
+    }
+
+    MITK_INFO << "The size of the distances is " <<dist_vec[0].cols();
+    MITK_INFO << "Done calculating Dmdf";
 
     return dist_vec;
 }
