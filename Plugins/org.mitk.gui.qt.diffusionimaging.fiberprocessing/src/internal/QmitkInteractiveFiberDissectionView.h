@@ -176,6 +176,8 @@ protected:
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
 
+  mitk::DataNode::Pointer               circleNode;
+
   vtkSmartPointer<vtkCellPicker>        m_picker1;
   mitk::StreamlineInteractor::Pointer   m_StreamlineInteractor;
   mitk::StreamlineInteractorBrush::Pointer   m_StreamlineInteractorBrush;

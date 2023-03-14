@@ -901,183 +901,190 @@ void QmitkInteractiveFiberDissectionView::RenderWindowPartDeactivated(mitk::IRen
 void QmitkInteractiveFiberDissectionView::CreateStreamline()
 {
 
-//    if (m_positiveBundleNode.IsNull())
-//    {
-//        mitk::DataNode::Pointer node = mitk::DataNode::New();
-
-//        m_positiveFibersData = vtkSmartPointer<vtkPolyData>::New();
-//        m_positiveFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
-//        m_positiveFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
-//        m_positiveBundle = mitk::FiberBundle:: New(m_positiveFibersData);
-
-//        node->SetData( m_positiveBundle );
-//        node->SetData(m_negativeBundle);
-////        node->SetFloatProperty("shape.tuberadius", 0.5);
-////        mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-//        m_positiveBundleNode = node;
-//        this->GetDataStorage()->Add(m_positiveBundleNode);
-//      MITK_INFO << "Create Bundle";
-//    }
-
-//    if (!m_positiveBundleNode.IsNull())
-//    {
-
-//        this->GetDataStorage()->Remove(m_positiveBundleNode);
-//        MITK_INFO << "Adding fibers";
-//        MITK_INFO << m_positiveBundle->GetFiberPolyData()->GetNumberOfCells();
-//        m_positiveFibersData = m_positiveBundle->GetFiberPolyData();
-//    }
-
-
-
-
-
-//    vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-//    vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-//    vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-
-
-//    unsigned int counter = 0;
-//    for (unsigned int i=0; i<m_positiveFibersData->GetNumberOfCells(); ++i)
-//    {
-//      MITK_INFO<< "New Line";
-//      vtkCell* cell = m_positiveFibersData->GetCell(i);
-//      auto numPoints = cell->GetNumberOfPoints();
-//      vtkPoints* points = cell->GetPoints();
-
-//      vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-//      for (unsigned int j=0; j<numPoints; ++j)
-//      {
-//        double p[3];
-//        points->GetPoint(j, p);
-
-//        vtkIdType id = vNewPoints->InsertNextPoint(p);
-//        container->GetPointIds()->InsertNextId(id);
-//      }
-
-//      vNewLines->InsertNextCell(container);
-//      counter++;
-//    }
-
-//    mitk::PointSet::Pointer pointSet = dynamic_cast<mitk::PointSet *>(m_SelectedPS->GetData());
-
-
-//    vnl_matrix<float> streamline;
-//    streamline.set_size(3, pointSet->GetSize());
-//    streamline.fill(0.0);
-
-
-//    mitk::PointSet::PointsIterator begin = pointSet->Begin();
-//    mitk::PointSet::PointsIterator end = pointSet->End();
-//    unsigned int i;
-//    mitk::PointSet::PointsContainer::Iterator it;
-
-//    for (it = begin, i = 0; it != end; ++it, ++i)
-//    {
-//        PointSet::PointType pt = pointSet->GetPoint(it->Index());
-//        vnl_vector_fixed< float, 3 > candV;
-//        candV[0]=pt[0]; candV[1]=pt[1]; candV[2]=pt[2];
-//        streamline.set_column(i, candV);
-//    }
-
-//      // build Fiber
-//    vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-
-
-//      for (unsigned int j=0; j<streamline.cols(); j++)
-//      {
-//        double p[3];
-//        p[0] = streamline.get(0,j);
-//        p[1] = streamline.get(1,j);
-//        p[2] = streamline.get(2,j);
-
-//        vtkIdType id = vNewPoints->InsertNextPoint(p);
-//        container->GetPointIds()->InsertNextId(id);
-//      }
-//      MITK_INFO<< "Last Line from current pointset";
-//      vNewLines->InsertNextCell(container);
-
-//      vNewPolyData->SetPoints(vNewPoints);
-//      vNewPolyData->SetLines(vNewLines);
-
-//      m_positiveFibersData = vtkSmartPointer<vtkPolyData>::New();
-//      m_positiveFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
-//      m_positiveFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
-//      m_positiveFibersData->SetPoints(vNewPoints);
-//      m_positiveFibersData->SetLines(vNewLines);
-
-//      m_positiveBundle = mitk::FiberBundle::New(vNewPolyData);
-//      m_positiveBundle->ResampleToNumPoints(40);
-//      MITK_INFO << "Resampling Done";
-
-
-//      m_positiveBundle->SetFiberColors(0, 255, 0);
-
-
-
-//      mitk::DataNode::Pointer node = mitk::DataNode::New();
-//      node->SetData(m_positiveBundle);
-//      node->SetName("+Bundle");
-////      node->SetFloatProperty("shape.tuberadius", 0.5);
-////      mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-
-//      m_positiveBundleNode= node;
-
-
-
-//      MITK_INFO << "The + Bundle has Streamlines:";
-//      auto m_PosStreamline= dynamic_cast<mitk::FiberBundle *>(m_positiveBundleNode->GetData());
-//      MITK_INFO << m_PosStreamline->GetFiberPolyData()->GetNumberOfCells();
-
-//      this->GetDataStorage()->Add(m_positiveBundleNode);
-////      m_Controls->m_selectedPointSetWidget->m_ToggleAddPoint->setEnabled(false);
-
-//      UpdateGui();
-//      m_createdStreamlineCounter +=1;
-    // initialize figure's geometry with empty geometry
-    mitk::PlanarCircle::Pointer figure = mitk::PlanarCircle::New();
-    mitk::PlaneGeometry::Pointer emptygeometry = mitk::PlaneGeometry::New();
-    figure->SetPlaneGeometry( emptygeometry );
-
-    //set desired data to DataNode where Planarfigure is stored
-    mitk::DataNode::Pointer newNode = mitk::DataNode::New();
-    newNode->SetName(QString("Ball").toStdString());
-    newNode->SetData(figure);
-    newNode->SetBoolProperty("planarfigure.3drendering", true);
-    newNode->SetBoolProperty("planarfigure.3drendering.fill", true);
-
-    mitk::PlanarFigureInteractor::Pointer figureInteractor = dynamic_cast<mitk::PlanarFigureInteractor*>(newNode->GetDataInteractor().GetPointer());
-    if(figureInteractor.IsNull())
+    if (m_positiveBundleNode.IsNull())
     {
-      figureInteractor = mitk::PlanarFigureInteractor::New();
-      us::Module* planarFigureModule = us::ModuleRegistry::GetModule( "MitkPlanarFigure" );
-      figureInteractor->LoadStateMachine("PlanarFigureInteraction.xml", planarFigureModule );
-      figureInteractor->SetEventConfig( "PlanarFigureConfig.xml", planarFigureModule );
-      figureInteractor->SetDataNode(newNode);
+        mitk::DataNode::Pointer node = mitk::DataNode::New();
+
+        m_positiveFibersData = vtkSmartPointer<vtkPolyData>::New();
+        m_positiveFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
+        m_positiveFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
+        m_positiveBundle = mitk::FiberBundle:: New(m_positiveFibersData);
+
+        node->SetData( m_positiveBundle );
+        node->SetData(m_negativeBundle);
+//        node->SetFloatProperty("shape.tuberadius", 0.5);
+//        mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+        m_positiveBundleNode = node;
+        this->GetDataStorage()->Add(m_positiveBundleNode);
+      MITK_INFO << "Create Bundle";
     }
 
-    // figure drawn on the topmost layer / image
-    GetDataStorage()->Add(newNode );
+    if (!m_positiveBundleNode.IsNull())
+    {
+
+        this->GetDataStorage()->Remove(m_positiveBundleNode);
+        MITK_INFO << "Adding fibers";
+        MITK_INFO << m_positiveBundle->GetFiberPolyData()->GetNumberOfCells();
+        m_positiveFibersData = m_positiveBundle->GetFiberPolyData();
+    }
 
 
-    newNode->SetSelected(true);
 
-    vtkSmartPointer<vtkSphereSource> sphereSource = vtkSmartPointer<vtkSphereSource>::New();
-    sphereSource->SetRadius(10);
-    sphereSource->SetPhiResolution(30);
-    sphereSource->SetThetaResolution(30);
-    sphereSource->Update();
 
-    // Convert the VTK sphere to a MITK surface
-    mitk::Surface::Pointer sphereSurface = mitk::Surface::New();
-    sphereSurface->SetVtkPolyData(sphereSource->GetOutput());
 
-    // Add the surface to the DataStorage
-    mitk::DataNode::Pointer sphereNode = mitk::DataNode::New();
-    sphereNode->SetData(sphereSurface);
-    sphereNode->SetName("Sphere");
-    GetDataStorage()->Add(sphereNode);
+    vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
+    vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
+
+
+
+    unsigned int counter = 0;
+    for (unsigned int i=0; i<m_positiveFibersData->GetNumberOfCells(); ++i)
+    {
+      MITK_INFO<< "New Line";
+      vtkCell* cell = m_positiveFibersData->GetCell(i);
+      auto numPoints = cell->GetNumberOfPoints();
+      vtkPoints* points = cell->GetPoints();
+
+      vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+      for (unsigned int j=0; j<numPoints; ++j)
+      {
+        double p[3];
+        points->GetPoint(j, p);
+
+        vtkIdType id = vNewPoints->InsertNextPoint(p);
+        container->GetPointIds()->InsertNextId(id);
+      }
+
+      vNewLines->InsertNextCell(container);
+      counter++;
+    }
+
+    mitk::PointSet::Pointer pointSet = dynamic_cast<mitk::PointSet *>(m_SelectedPS->GetData());
+
+
+    vnl_matrix<float> streamline;
+    streamline.set_size(3, pointSet->GetSize());
+    streamline.fill(0.0);
+
+
+    mitk::PointSet::PointsIterator begin = pointSet->Begin();
+    mitk::PointSet::PointsIterator end = pointSet->End();
+    unsigned int i;
+    mitk::PointSet::PointsContainer::Iterator it;
+
+    for (it = begin, i = 0; it != end; ++it, ++i)
+    {
+        PointSet::PointType pt = pointSet->GetPoint(it->Index());
+        vnl_vector_fixed< float, 3 > candV;
+        candV[0]=pt[0]; candV[1]=pt[1]; candV[2]=pt[2];
+        streamline.set_column(i, candV);
+    }
+
+      // build Fiber
+    vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+
+
+      for (unsigned int j=0; j<streamline.cols(); j++)
+      {
+        double p[3];
+        p[0] = streamline.get(0,j);
+        p[1] = streamline.get(1,j);
+        p[2] = streamline.get(2,j);
+
+        vtkIdType id = vNewPoints->InsertNextPoint(p);
+        container->GetPointIds()->InsertNextId(id);
+      }
+      MITK_INFO<< "Last Line from current pointset";
+      vNewLines->InsertNextCell(container);
+
+      vNewPolyData->SetPoints(vNewPoints);
+      vNewPolyData->SetLines(vNewLines);
+
+      m_positiveFibersData = vtkSmartPointer<vtkPolyData>::New();
+      m_positiveFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
+      m_positiveFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
+      m_positiveFibersData->SetPoints(vNewPoints);
+      m_positiveFibersData->SetLines(vNewLines);
+
+      m_positiveBundle = mitk::FiberBundle::New(vNewPolyData);
+      m_positiveBundle->ResampleToNumPoints(40);
+      MITK_INFO << "Resampling Done";
+
+
+      m_positiveBundle->SetFiberColors(0, 255, 0);
+
+
+
+      mitk::DataNode::Pointer node = mitk::DataNode::New();
+      node->SetData(m_positiveBundle);
+      node->SetName("+Bundle");
+//      node->SetFloatProperty("shape.tuberadius", 0.5);
+//      mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+
+      m_positiveBundleNode= node;
+
+
+
+      MITK_INFO << "The + Bundle has Streamlines:";
+      auto m_PosStreamline= dynamic_cast<mitk::FiberBundle *>(m_positiveBundleNode->GetData());
+      MITK_INFO << m_PosStreamline->GetFiberPolyData()->GetNumberOfCells();
+
+      this->GetDataStorage()->Add(m_positiveBundleNode);
+//      m_Controls->m_selectedPointSetWidget->m_ToggleAddPoint->setEnabled(false);
+
+      UpdateGui();
+      m_createdStreamlineCounter +=1;
+
+    // initialize figure's geometry with empty geometry
+//    mitk::PlanarCircle::Pointer figure = mitk::PlanarCircle::New();
+//    mitk::PlaneGeometry::Pointer emptygeometry = mitk::PlaneGeometry::New();
+//    figure->SetPlaneGeometry( emptygeometry );
+
+//    //set desired data to DataNode where Planarfigure is stored
+////    mitk::DataNode::Pointer circleNode = mitk::DataNode::New();
+//    circleNode->SetName(QString("Ball").toStdString());
+//    circleNode->SetData(figure);
+//    circleNode->SetBoolProperty("planarfigure.3drendering", true);
+//    circleNode->SetBoolProperty("planarfigure.3drendering.fill", true);
+
+//    mitk::PlanarFigureInteractor::Pointer figureInteractor = dynamic_cast<mitk::PlanarFigureInteractor*>(circleNode->GetDataInteractor().GetPointer());
+//    if(figureInteractor.IsNull())
+//    {
+//      figureInteractor = mitk::PlanarFigureInteractor::New();
+//      us::Module* planarFigureModule = us::ModuleRegistry::GetModule( "MitkPlanarFigure" );
+//      figureInteractor->LoadStateMachine("PlanarFigureInteraction.xml", planarFigureModule );
+//      figureInteractor->SetEventConfig( "PlanarFigureConfig.xml", planarFigureModule );
+//      figureInteractor->SetDataNode(circleNode);
+//    }
+
+//    // figure drawn on the topmost layer / image
+//    GetDataStorage()->Add(circleNode );
+
+//    UpdateGui();
+
+//    circleNode->SetSelected(true);
+
+//    vtkSmartPointer<vtkSphereSource> sphereSource = vtkSmartPointer<vtkSphereSource>::New();
+////    sphereSource->SetRadius(circleNode->GetData()->GetProperty("radius")->GetDoubleValue());
+//    sphereSource->SetRadius(5.0);
+//    sphereSource->SetCenter(0,0,0);
+//    sphereSource->SetPhiResolution(30);
+//    sphereSource->SetThetaResolution(30);
+//    sphereSource->Update();
+
+//    // Convert the VTK sphere to a MITK surface
+//    mitk::Surface::Pointer sphereSurface = mitk::Surface::New();
+//    sphereSurface->SetVtkPolyData(sphereSource->GetOutput());
+
+//    // Add the surface to the DataStorage
+//    mitk::DataNode::Pointer sphereNode = mitk::DataNode::New();
+//    sphereNode->SetData(sphereSurface);
+//    sphereNode->SetName("Sphere");
+//    sphereNode->SetVisibility(true);
+//    sphereNode->SetOpacity(1.0);
+//    sphereNode->SetColor(1.0, 0.0, 0.0);
+//    GetDataStorage()->Add(sphereNode);
 
 
 //    vtkSmartPointer<vtkSphereSource> sphereSource = vtkSmartPointer<vtkSphereSource>::New();
@@ -1129,143 +1136,132 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
 
 void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 {
+
+
+    // Hide the selected node.
     m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
     m_testnode->SetVisibility(false);
-//    m_SelectedFB.at(0)->SetVisibility(false);
+
+    // Uncheck the Brush and Erazor buttons.
     m_Controls->m_ErazorButton->setChecked(false);
     m_Controls->m_BrushButton->setChecked(false);
 
 
-     MITK_INFO << "Number of Fibers to extract from Tractogram: ";
-     MITK_INFO << m_Controls->m_NumRandomFibers->value();
-     if (this->GetDataStorage()->Exists(m_newfibersBundleNode))
-     {
-         MITK_INFO << "To Label Bundle Exists";
-         mitk::FiberBundle::Pointer Stack = dynamic_cast<mitk::FiberBundle *>(m_newfibersBundleNode->GetData());
-         this->GetDataStorage()->Remove(m_newfibersBundleNode);
+    // Print the number of fibers to extract.
+    MITK_INFO << "Number of Fibers to extract from Tractogram: ";
+    MITK_INFO << m_Controls->m_NumRandomFibers->value();
+    MITK_INFO << this->GetDataStorage()->GetAll();
 
-         mitk::DataNode::Pointer node = mitk::DataNode::New();
 
-         m_newfibersFibersData = vtkSmartPointer<vtkPolyData>::New();
-         m_newfibersFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
-         m_newfibersBundle = mitk::FiberBundle:: New(m_newfibersFibersData);
-         m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
+    // If a newfibersBundleNode exists, remove it from the data storage.
+    if (m_newfibersBundleNode)
+    {
+        MITK_INFO << "To Label Bundle Exists";
+        mitk::FiberBundle::Pointer Stack = dynamic_cast<mitk::FiberBundle *>(m_newfibersBundleNode->GetData());
 
-//         node->SetData( m_newfibersBundle );
-//         m_newfibersBundleNode = node ;
+        // Create a new data node and set it to an empty FiberBundle.
+        mitk::DataNode::Pointer node = mitk::DataNode::New();
+        m_newfibersFibersData = vtkSmartPointer<vtkPolyData>::New();
+        m_newfibersFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
+        m_newfibersBundle = mitk::FiberBundle:: New(m_newfibersFibersData);
+        m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
 
-       MITK_INFO << "Create Bundle";
-     }
+        // Print a message to indicate the creation of the FiberBundle.
+        MITK_INFO << "Create Bundle";
+    }
+    // Get the selected node, which is assumed to be a FiberBundle.
+    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
 
-      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
-     //      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData());
-//      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle *>(m_trainbundle->GetData());
+    // Create a new PolyData object, and its associated points and cell arrays.
+    vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
+    vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
+    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
 
-      vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-      vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-      vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
+    // Initialize a counter variable.
+    unsigned int counter = 0;
 
-      vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
-//      weights->SetNumberOfValues(this->GetNumFibers()+fib->GetNumFibers());
+    if (m_Controls->m_NumRandomFibers->value() != fib->GetFiberPolyData()->GetNumberOfCells()) {
+        for (int i = 0; i < m_Controls->m_NumRandomFibers->value(); i++) {
+            // Get the i-th fiber in the input dataset
+            vtkCell* cell = fib->GetFiberPolyData()->GetCell(i);
+            // Get the number of points in the fiber
+            auto numPoints = cell->GetNumberOfPoints();
+            // Get the points in the fiber
+            vtkPoints* points = cell->GetPoints();
 
-//      MITK_INFO << fib->GetNumFibers();
-//      std::vector<int> myvec;
-//      for (unsigned int k=0; k<fib->GetNumFibers(); k++)
-//      {
-//        myvec.push_back(k);
-//      }
-//      std::random_shuffle(std::begin(myvec), std::end(myvec));
+            // Create a new vtkPolyLine container to store the new fiber
+            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
 
-       /* Check weather all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
-      unsigned int counter = 0;
-//      int thresh1;
-//      int thresh2;
-//      thresh2 = m_Controls->m_NumRandomFibers->value()*(m_RandomExtractionCounter+1);
-//      thresh1 = m_Controls->m_NumRandomFibers->value()*(m_RandomExtractionCounter);
-//      if (thresh1>fib->GetFiberPolyData()->GetNumberOfCells())
-//      {
-//          thresh1=fib->GetFiberPolyData()->GetNumberOfCells();
-//      }
-//      if (thresh2>fib->GetFiberPolyData()->GetNumberOfCells())
-//      {
-//          thresh2=fib->GetFiberPolyData()->GetNumberOfCells();
-//      }
+            // Loop through each point in the fiber
+            for (unsigned int j = 0; j < numPoints; j++) {
+                double p[3];
+                points->GetPoint(j, p);
 
-//      if (thresh1!=fib->GetFiberPolyData()->GetNumberOfCells())
-        if (m_Controls->m_NumRandomFibers->value()!=fib->GetFiberPolyData()->GetNumberOfCells())
-      {
-//      for ( int i=thresh1; i<thresh2; i++)
-      for ( int i=0; i<m_Controls->m_NumRandomFibers->value(); i++)
-      {
-        vtkCell* cell = fib->GetFiberPolyData()->GetCell(i);
-        auto numPoints = cell->GetNumberOfPoints();
-        vtkPoints* points = cell->GetPoints();
+                // Insert the new point into the vtkPoints object and get its ID
+                vtkIdType id = vNewPoints->InsertNextPoint(p);
+                // Add the ID to the container object to create a new fiber
+                container->GetPointIds()->InsertNextId(id);
+            }
 
-        vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-        for (unsigned int j=0; j<numPoints; j++)
-        {
-          double p[3];
-          points->GetPoint(j, p);
+            // Insert the fiber weight into the vtkDoubleArray object
+            weights->InsertValue(counter, fib->GetFiberWeight(i));
+            // Insert the new fiber into the vtkCellArray object
+            vNewLines->InsertNextCell(container);
 
-          vtkIdType id = vNewPoints->InsertNextPoint(p);
-          container->GetPointIds()->InsertNextId(id);
-        }
-        weights->InsertValue(counter, fib->GetFiberWeight(i));
-        vNewLines->InsertNextCell(container);
-
+            // Increment the counter variable
         counter++;
+    }
 
-      }
-
-      for ( int i=0; i<m_Controls->m_NumRandomFibers->value(); i++)
-      {
+    // Delete the old fibers from the input dataset
+    for (int i = 0; i < m_Controls->m_NumRandomFibers->value(); i++) {
         fib->GetFiberPolyData()->DeleteCell(i);
-      }
-      fib->GetFiberPolyData()->RemoveDeletedCells();
+    }
+    // Remove any deleted cells from the input dataset
+    fib->GetFiberPolyData()->RemoveDeletedCells();
 
-      MITK_INFO << fib->GetFiberPolyData()->GetNumberOfCells();
+    // Output the number of fibers in the new dataset to the console
+    MITK_INFO << fib->GetFiberPolyData()->GetNumberOfCells();
 
-//      m_SelectedFB.at(0)->SetData(fib);
+    // Set the vtkPolyData object to the new fibers
+    vNewPolyData->SetLines(vNewLines);
+    vNewPolyData->SetPoints(vNewPoints);
 
-      vNewPolyData->SetLines(vNewLines);
-      vNewPolyData->SetPoints(vNewPoints);
+    // Create a new vtkPolyData object and set it to the new fibers
+    m_newfibersFibersData = vtkSmartPointer<vtkPolyData>::New();
+    m_newfibersFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
+    m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
+    m_newfibersFibersData->SetPoints(vNewPoints);
+    m_newfibersFibersData->SetLines(vNewLines);
 
-      m_newfibersFibersData = vtkSmartPointer<vtkPolyData>::New();
-      m_newfibersFibersData->SetPoints(vtkSmartPointer<vtkPoints>::New());
-      m_newfibersFibersData->SetLines(vtkSmartPointer<vtkCellArray>::New());
-      m_newfibersFibersData->SetPoints(vNewPoints);
-      m_newfibersFibersData->SetLines(vNewLines);
+    // Create a new mitk::FiberBundle object and set it to the new fibers
+    m_newfibersBundle = mitk::FiberBundle::New(vNewPolyData);
+    m_newfibersBundle->SetFiberColors(255, 255, 255);
+    m_newfibersBundle->SetFiberWeights(weights);
 
-      m_newfibersBundle = mitk::FiberBundle::New(vNewPolyData);
-      m_newfibersBundle->SetFiberColors(255, 255, 255);
-      m_newfibersBundle->SetFiberWeights(weights);
 
-      mitk::DataNode::Pointer node = mitk::DataNode::New();
-      node->SetData(m_newfibersBundle);
-      node->SetName("ToLabel");
-//      node->SetData(m_negativeBundle);
-//      node->SetFloatProperty("shape.tuberadius", 0.5);
-//      mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+    mitk::DataNode::Pointer node = mitk::DataNode::New();
+    node->SetData(m_newfibersBundle);
+    node->SetName("ToLabel");
+    m_newfibersBundleNode = node;
+    this->GetDataStorage()->Add(m_newfibersBundleNode);
 
-      m_newfibersBundleNode = node;
+    // Create a new data node for the negativeBundle object
+    if (!m_negativeBundleNode)
+    {
+        mitk::FiberBundle::Pointer m_negativeBundle = mitk::FiberBundle::New();
+        mitk::DataNode::Pointer node2 = mitk::DataNode::New();
+        node2->SetName("-Bundle");
+        node2->SetData(m_negativeBundle);
+        m_negativeBundleNode = node2;
+        this->GetDataStorage()->Add(m_negativeBundleNode);
+    }
 
-//      MITK_INFO << "Number of Streamlines in first function";
-//      MITK_INFO << m_newfibersBundleNode->GetData()->GetFiberPolyData()->GetNumberOfCells();
-      this->GetDataStorage()->Add(m_newfibersBundleNode);
 
-      mitk::FiberBundle::Pointer m_negativeBundle = mitk::FiberBundle::New();
-      mitk::DataNode::Pointer node2 = mitk::DataNode::New();
-      node2->SetName("-Bundle");
-      node2->SetData(m_negativeBundle);
-//            node->SetFloatProperty("shape.tuberadius", 0.5);
-//            mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-      m_negativeBundleNode = node2;
-      this->GetDataStorage()->Add(m_negativeBundleNode);
+    // Increment the RandomExtractionCounter
+    m_RandomExtractionCounter++;
+    }
 
-      m_RandomExtractionCounter++;
-      }
-
-//      m_Controls->m_ErazorButton->setChecked(true);
 
 
     UpdateGui();

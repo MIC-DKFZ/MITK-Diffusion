@@ -84,15 +84,26 @@ void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Poin
 std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk::FiberBundle::Pointer tractogram)
 {
   MITK_INFO << "Infunction";
-//  mitk::FiberBundle::Pointer temp_fib = tractogram->GetDeepCopy();
-//  temp_fib->ResampleToNumPoints(m_NumPoints);
+  mitk::FiberBundle::Pointer temp_fib = tractogram->GetDeepCopy();
+  vtkPolyData* polyData = temp_fib->GetFiberPolyData();
+
+  for (vtkIdType i = 0; i < polyData->GetNumberOfCells(); i++)
+  {
+    vtkCell* cell = polyData->GetCell(i);
+    if (cell->GetNumberOfPoints() != polyData->GetCell(0)->GetNumberOfPoints())
+    {
+      throw std::runtime_error("Not all cells have an equal number of points!");
+//        temp_fib->ResampleToNumPoints(m_NumPoints);
+    }
+  }
+
   MITK_INFO << "Resampling Done";
 
-  std::vector< vnl_matrix<float> > out_fib(tractogram->GetFiberPolyData()->GetNumberOfCells());
+  std::vector< vnl_matrix<float> > out_fib(temp_fib->GetFiberPolyData()->GetNumberOfCells());
 //#pragma omp parallel for
-  for (int i=0; i<tractogram->GetFiberPolyData()->GetNumberOfCells(); i++)
+  for (int i=0; i<temp_fib->GetFiberPolyData()->GetNumberOfCells(); i++)
   {
-    vtkCell* cell = tractogram->GetFiberPolyData()->GetCell(i);
+    vtkCell* cell = temp_fib->GetFiberPolyData()->GetCell(i);
     int numPoints = cell->GetNumberOfPoints();
     vtkPoints* points = cell->GetPoints();
 
