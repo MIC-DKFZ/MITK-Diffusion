@@ -52,6 +52,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkFloatArray.h>
 #include <vtkCellPicker.h>
 
+#include <mitkSurface.h>
+
+#include <vtkSphereSource.h>
+#include <vtkPolyDataMapper.h>
+
 /*!
 \brief View to process fiber bundles. Supplies methods to extract fibers from the bundle, fiber resampling, mirroring, join and subtract bundles and much more.
 */

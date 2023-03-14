@@ -13,7 +13,7 @@
     </view>
 
     <view id="org.mitk.views.interactivefiberdissection"
-    name="Interactive Fiber Dissection"
+    name="atTRACTive"
     category="Fiber processing"
     class="QmitkInteractiveFiberDissectionView"
     icon="resources/FiberBundleOperations.png">
