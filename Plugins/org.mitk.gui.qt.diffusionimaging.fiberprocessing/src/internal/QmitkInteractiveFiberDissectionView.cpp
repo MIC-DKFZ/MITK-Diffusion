@@ -373,7 +373,7 @@ void QmitkInteractiveFiberDissectionView::ResampleTractogram()
         points->GetPoint(j, p);
 
         vtkIdType id = vNewPoints->InsertNextPoint(p);
-        container->GetPointIds()->InsertNextId(id);
+        container->GetPointIds()->InsertNextId(id);PointSet
       }
       weights->InsertValue(counter, tempfib->GetFiberWeight(myvec.at(i)));
       vNewLines->InsertNextCell(container);
