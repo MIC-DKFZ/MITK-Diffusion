@@ -21,10 +21,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "ui_QmitkInteractiveFiberDissectionViewControls.h"
 
 
-
+#include <QmitkAbstractView.h>
 #include <mitkFiberBundle.h>
 #include <mitkDataInteractor.h>
 #include <mitkStreamlineInteractor.h>
+#include <mitkSphereInteractor.h>
 #include <mitkStreamlineInteractorBrush.h>
 #include <mitkStreamlineFeatureExtractor.h>
 
@@ -54,7 +55,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 /*!
 \brief View to dissect fiber bundles with active learning
 */
-class QmitkInteractiveFiberDissectionView : public QmitkAbstractView, public mitk::IRenderWindowPartListener
+class QmitkInteractiveFiberDissectionView : public QmitkAbstractView
 {
   // this is needed for all Qt objects that should have a Qt meta-object
   // (everything that derives from QObject and wants to have signal/slots)
@@ -70,6 +71,8 @@ public:
   QmitkInteractiveFiberDissectionView();
   virtual ~QmitkInteractiveFiberDissectionView();
 
+
+  virtual void CreateQtPartControl(QWidget *parent) override;
 
   ///
   /// Sets the focus to an internal widget.
@@ -170,6 +173,8 @@ protected:
   vtkSmartPointer<vtkCellPicker>        m_picker1;
   mitk::StreamlineInteractor::Pointer   m_StreamlineInteractor;
   mitk::StreamlineInteractorBrush::Pointer   m_StreamlineInteractorBrush;
+
+  mitk::SphereInteractor::Pointer   m_SphereInteractor;
 
   std::shared_ptr< mitk::StreamlineFeatureExtractor > classifier;
   std::shared_ptr< mitk::StreamlineFeatureExtractor > validater;

@@ -1,6 +1,7 @@
 set(H_FILES
 
     #Interactor
+    Interactor/mitkSphereInteractor.h
     Interactor/mitkStreamlineInteractor.h
     Interactor/mitkStreamlineInteractorBrush.h
 
@@ -11,6 +12,7 @@ set(H_FILES
 set(CPP_FILES
 
     #Interactor
+    Interactor/mitkSphereInteractor.cpp
     Interactor/mitkStreamlineInteractor.cpp
     Interactor/mitkStreamlineInteractorBrush.cpp
 
@@ -20,6 +22,9 @@ set(CPP_FILES
 
 set(RESOURCE_FILES
   # "Interactions" prefix forced by mitk::StateMachine
+
+  Interactions/SphereInteractionsStates.xml
+  Interactions/SphereInteractionsConfig.xml
   Interactions/Streamline3DStates.xml
   Interactions/Streamline3DConfig.xml
   Interactions/StreamlineBrush3DStates.xml

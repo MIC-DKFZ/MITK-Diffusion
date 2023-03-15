@@ -10,7 +10,34 @@ found in the LICENSE file.
 
 ============================================================================*/
 
-#include "mitkSphereZonesInteractor.h"
+#include "mitkSphereInteractor.h"
+//#include "mitkSphereMapper2D.h"
+
+// MITK includes
+#include <mitkInteractionConst.h>
+#include <mitkInteractionPositionEvent.h>
+#include <mitkInternalEvent.h>
+#include <mitkLookupTableProperty.h>
+#include <mitkOperationEvent.h>
+#include <mitkRotationOperation.h>
+#include <mitkScaleOperation.h>
+#include <mitkSurface.h>
+#include <mitkUndoController.h>
+#include <mitkVtkMapper.h>
+
+// VTK includes
+#include <vtkCamera.h>
+#include <vtkInteractorObserver.h>
+#include <vtkInteractorStyle.h>
+#include <vtkMath.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkVector.h>
+#include <vtkPolyLine.h>
+#include <vtkVectorOperators.h>
+
+
 #include "mitkDataStorage.h"
 #include "mitkDataNode.h"
 #include "mitkSurface.h"
@@ -18,11 +45,23 @@ found in the LICENSE file.
 
 #include <vtkSphereSource.h>
 
+mitk::SphereInteractor::SphereInteractor()
+{
+
+
+    // TODO if we want to get this configurable, the this is the recipe:
+    // - make the 2D mapper add corresponding properties to control "enabled" and "color"
+    // - make the interactor evaluate those properties
+    // - in an ideal world, modify the state machine on the fly and skip mouse move handling
+}
+
 const char* mitk::SphereInteractor::DATANODE_PROPERTY_SIZE = "zone.size";
 const char* mitk::SphereInteractor::DATANODE_PROPERTY_CREATED = "zone.created";
 
+
 void mitk::SphereInteractor::UpdateSurface(mitk::DataNode::Pointer dataNode)
 {
+
   if (!dataNode->GetData())
   {
     MITK_WARN("SphereInteractor")("DataInteractor")
@@ -58,11 +97,11 @@ void mitk::SphereInteractor::UpdateSurface(mitk::DataNode::Pointer dataNode)
 
   // update the RenderWindow to show the changed surface
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+
 }
 
-mitk::SphereInteractor::SphereInteractor()
-{
-}
+
+
 
 mitk::SphereInteractor::~SphereInteractor()
 {
@@ -72,6 +111,7 @@ void mitk::SphereInteractor::ConnectActionsAndFunctions()
 {
   CONNECT_FUNCTION("addCenter", AddCenter);
   CONNECT_FUNCTION("changeRadius", ChangeRadius);
+  CONNECT_FUNCTION("endCreationStart", EndCreationStart);
   CONNECT_FUNCTION("endCreation", EndCreation);
   CONNECT_FUNCTION("abortCreation", AbortCreation);
 }
@@ -85,8 +125,17 @@ void mitk::SphereInteractor::DataNodeChanged()
   }
 }
 
+void mitk::SphereInteractor::StartEndNodes(mitk::DataNode::Pointer startDataNode, mitk::DataNode::Pointer endDataNode){
+    m_startDataNode = startDataNode;
+    m_endDataNode = endDataNode;
+
+    DataInteractor::SetDataNode(startDataNode);
+
+}
+
 void mitk::SphereInteractor::AddCenter(mitk::StateMachineAction*, mitk::InteractionEvent* interactionEvent)
 {
+  MITK_INFO << "Start";
   // cast InteractionEvent to a position event in order to read out the mouse position
   mitk::InteractionPositionEvent* positionEvent = dynamic_cast<mitk::InteractionPositionEvent*>(interactionEvent);
   mitk::DataNode::Pointer dataNode = this->GetDataNode();
@@ -102,13 +151,13 @@ void mitk::SphereInteractor::AddCenter(mitk::StateMachineAction*, mitk::Interact
 
   // set origin of the data node to the mouse click position
   dataNodeData->GetGeometry()->SetOrigin(positionEvent->GetPositionInWorld());
-  MITK_INFO("USNavigationLogging") << "Critical Structure added on position " << positionEvent->GetPointerPositionOnScreen() << " (Image Coordinates); "
-    << positionEvent->GetPositionInWorld() << " (World Coordinates)";
+  MITK_INFO << "Critical Structure added on position " << positionEvent->GetPointerPositionOnScreen() << " (Image Coordinates); " << positionEvent->GetPositionInWorld() << " (World Coordinates)";
 
   dataNode->SetFloatProperty("opacity", 0.60f);
 
-  //return true;
+//  return true;
 }
+
 
 void mitk::SphereInteractor::ChangeRadius(mitk::StateMachineAction*, mitk::InteractionEvent* interactionEvent)
 {
@@ -118,9 +167,18 @@ void mitk::SphereInteractor::ChangeRadius(mitk::StateMachineAction*, mitk::Inter
   mitk::Point3D mousePosition = positionEvent->GetPositionInWorld();
 
   mitk::ScalarType radius = mousePosition.EuclideanDistanceTo(curNode->GetData()->GetGeometry()->GetOrigin());
+
   curNode->SetFloatProperty(DATANODE_PROPERTY_SIZE, radius);
 
   mitk::SphereInteractor::UpdateSurface(curNode);
+
+  //return true;
+}
+
+void mitk::SphereInteractor::EndCreationStart(mitk::StateMachineAction*, mitk::InteractionEvent* /*interactionEvent*/)
+{
+  this->GetDataNode()->SetBoolProperty(DATANODE_PROPERTY_CREATED, true);
+    DataInteractor::SetDataNode(m_endDataNode);
 
   //return true;
 }
@@ -133,6 +191,7 @@ void mitk::SphereInteractor::EndCreation(mitk::StateMachineAction*, mitk::Intera
 
 void mitk::SphereInteractor::AbortCreation(mitk::StateMachineAction*, mitk::InteractionEvent*)
 {
+    MITK_INFO << "Inside Abort Creation";
   this->GetDataNode()->SetData(mitk::Surface::New());
 
   // update the RenderWindow to remove the surface

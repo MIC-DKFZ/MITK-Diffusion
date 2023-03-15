@@ -10,97 +10,85 @@ found in the LICENSE file.
 
 ============================================================================*/
 
-#ifndef MITKSphereInteractor_H
-#define MITKSphereInteractor_H
+#ifndef mitkSphereInteractor_h
+#define mitkSphereInteractor_h
 
-#include "mitkDataInteractor.h"
 
+#include "MitkFiberDissectionExports.h"
+
+// MITK includes
+#include <mitkDataInteractor.h>
+#include <mitkDataNode.h>
+#include <mitkGeometry3D.h>
+#include <mitkFiberBundle.h>
+
+// VTK includes
+#include <vtkCellPicker.h>
+#include <vtkSmartPointer.h>
+
+// System includes
+#include <memory>
 
 
 namespace mitk
 {
-  class Surface;
-  class DataNode;
+  class InteractionPositionEvent;
 
-  /**
-   * \brief DataInteractor for creating a sphere at a specific coordinate.
-   * The origin is set by mitk::SphereInteractor::AddCenter() and then the
-   * radius can be updated by mitk::SphereInteractor::ChangeRadius(). An
-   * updated sphere is rendered every time the radius changes.
-   *
-   * DataNode attributes set by this class:
-   * * zone.size (float) - the radius of the sphere
-   * * zone.created (bool) - determines if the interactor reached its final state
-   *
-   * Two state machines for this interactor are available as resources of the
-   * USNavigation module.
-   * * USZoneInteractions.xml: Create a sphere by clicking left, moving the mouse
-   *   and clicking left againg. Aborting is possible by right mouse click.
-   * * USZoneInteractionsHold.xml: Create a sphere by pressing the left mouse button,
-   *   moving the mouse while holding it pressed and finally release the button.
-   *   Aborting is possible by right mouse click.
-   */
-  class SphereInteractor : public DataInteractor
+  //! Data interactor to pick Spheres via interaction
+  //! with a mitk::Sphere.
+
+  class MITKFIBERDISSECTION_EXPORT SphereInteractor : public DataInteractor
   {
   public:
+    mitkClassMacro(SphereInteractor, DataInteractor);
+    itkFactorylessNewMacro(Self);
+    itkCloneMacro(Self);
+
+
+
     static const char* DATANODE_PROPERTY_SIZE;
     static const char* DATANODE_PROPERTY_CREATED;
 
-    mitkClassMacro(SphereInteractor, DataInteractor);
+    static void UpdateSurface(itk::SmartPointer<mitk::DataNode>);
 
-    itkNewMacro(Self);
-
-      /**
-       * \brief Creates Vtk Sphere according to current radius.
-       * The radius is gotten from the float property "zone.size" of the
-       * data node.
-       */
-       static void UpdateSurface(itk::SmartPointer<mitk::DataNode>);
+    void StartEndNodes(mitk::DataNode::Pointer startDataNode, mitk::DataNode::Pointer endDataNode);
+    mitk::DataNode::Pointer m_startDataNode;
+    mitk::DataNode::Pointer m_endDataNode;
 
   protected:
-    SphereInteractor();
-    ~SphereInteractor() override;
 
-    /**
-     * \brief Connects the functions from the state machine to methods of this class.
-     */
-    void ConnectActionsAndFunctions() override;
-
-    /**
-     * \brief Sets empty surface as data for the new data node.
-     * This is necessary as data nodes without data do not work
-     * with data interactors.
-     */
     void DataNodeChanged() override;
-
     /**
      * \brief Sets origin of the data node to the coordinates of the position event.
      * \return false if interaction event isn't a position event, true otherwise
      */
     void AddCenter(StateMachineAction*, InteractionEvent*);
-
+    void ChangeRadius(StateMachineAction*, InteractionEvent*);
+    void EndCreation(StateMachineAction*, InteractionEvent*);
+    void EndCreationStart(StateMachineAction*, InteractionEvent*);
+    void AbortCreation(StateMachineAction*, InteractionEvent*);
     /**
      * \brief Updates radius attribute according to position event.
      * Calculates distance between the data node origin and the current position
      * event and updates the data node attribue "zone.size" accordingly. The
-     * mitk::SphereInteractor::UpdateSurface() function is called then.
+     * mitk::USZonesInteractor::UpdateSurface() function is called then.
      *
      * \return false if interaction event isn't a position event, true otherwise
      */
-    void ChangeRadius(StateMachineAction*, InteractionEvent*);
 
-    /**
-     * \brief Sets the property "zone.created" of the data node to true.
-     * \return always true
-     */
-    void EndCreation(StateMachineAction*, InteractionEvent*);
 
-    /**
-     * \brief Removes Vtk Sphere from data node.
-     * \return always true
-     */
-    void AbortCreation(StateMachineAction*, InteractionEvent*);
+  private:
+    SphereInteractor();
+    ~SphereInteractor() override;
+
+    //! Setup the relation between the XML state machine and this object's methods.
+    void ConnectActionsAndFunctions() override;
+
+
+
+
+
+
   };
-} // namespace mitk
-
-#endif // MITKSphereInteractor_H
+}
+#endif

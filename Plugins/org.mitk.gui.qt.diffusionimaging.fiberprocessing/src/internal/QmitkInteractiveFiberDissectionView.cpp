@@ -42,7 +42,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkSphereSource.h>
 #include <vtkProperty.h>
 #include <vtkPolyDataMapper.h>
-#include <mitkPlanarFigureInteractor.h>
+//#include <mitkPlanarFigureInteractor.h>
 //#include <mitkStreamlineFeatureExtractor.h>
 
 #include <mitkInteractionConst.h>
@@ -903,24 +903,35 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
 //    // Set a name for the renderer node
 //    rendererNode->SetName("RendererNode");
 
-//    // Add the renderer node to the DataStorage
+    // Add the renderer node to the DataStorage
 //    GetDataStorage()->Add(rendererNode);
 //    RenderingManager::GetInstance()->RequestUpdateAll();
-    // workaround for bug 16407
-//    m_Interactor = mitk::SphereInteractor::New();
-//    m_Interactor->LoadStateMachine("SphereInteractionsStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
-//    m_Interactor->SetEventConfig("globalConfig.xml");
 
-//    mitk::DataNode::Pointer dataNode = mitk::DataNode::New();
-//    // zone number is added to zone name (padding one zero)
-//    dataNode->SetName("HI");
-//    dataNode->SetColor(0.9, 0.9, 0);
-//    this->GetDataStorage()->Add(dataNode);
-//    m_Interactor->SetDataNode(dataNode);
+
+    m_SphereInteractor= mitk::SphereInteractor::New();
+    m_SphereInteractor->LoadStateMachine("SphereInteractionsStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
+    m_SphereInteractor->SetEventConfig("SphereInteractionsConfig.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
+
+    MITK_INFO << "Interarctor created";
+
+    mitk::DataNode::Pointer startDataNode = mitk::DataNode::New();
+    mitk::DataNode::Pointer endDataNode = mitk::DataNode::New();
+    // zone number is added to zone name (padding one zero)
+    startDataNode->SetName("StartRegion");
+    startDataNode->SetColor(1, 0, 1);
+
+    endDataNode->SetName("EndRegion");
+    endDataNode->SetColor(1, 1, 0);
+
+    this->GetDataStorage()->Add(startDataNode);
+    this->GetDataStorage()->Add(endDataNode);
+    MITK_INFO <<"Sphere to interactor";
+    m_SphereInteractor->StartEndNodes(startDataNode, endDataNode);
 
 
 
     UpdateGui();
+    MITK_INFO << "Done with interaction";
 }
 
 void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
