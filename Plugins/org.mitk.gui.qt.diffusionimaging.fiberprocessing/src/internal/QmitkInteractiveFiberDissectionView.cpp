@@ -373,7 +373,7 @@ void QmitkInteractiveFiberDissectionView::ResampleTractogram()
         points->GetPoint(j, p);
 
         vtkIdType id = vNewPoints->InsertNextPoint(p);
-        container->GetPointIds()->InsertNextId(id);PointSet
+        container->GetPointIds()->InsertNextId(id);
       }
       weights->InsertValue(counter, tempfib->GetFiberWeight(myvec.at(i)));
       vNewLines->InsertNextCell(container);
@@ -907,16 +907,16 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
 //    GetDataStorage()->Add(rendererNode);
 //    RenderingManager::GetInstance()->RequestUpdateAll();
     // workaround for bug 16407
-    m_Interactor = mitk::SphereInteractor::New();
-    m_Interactor->LoadStateMachine("SphereInteractionsStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
-    m_Interactor->SetEventConfig("globalConfig.xml");
+//    m_Interactor = mitk::SphereInteractor::New();
+//    m_Interactor->LoadStateMachine("SphereInteractionsStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
+//    m_Interactor->SetEventConfig("globalConfig.xml");
 
-    mitk::DataNode::Pointer dataNode = mitk::DataNode::New();
-    // zone number is added to zone name (padding one zero)
-    dataNode->SetName("HI");
-    dataNode->SetColor(0.9, 0.9, 0);
-    this->GetDataStorage()->Add(dataNode);
-    m_Interactor->SetDataNode(dataNode);
+//    mitk::DataNode::Pointer dataNode = mitk::DataNode::New();
+//    // zone number is added to zone name (padding one zero)
+//    dataNode->SetName("HI");
+//    dataNode->SetColor(0.9, 0.9, 0);
+//    this->GetDataStorage()->Add(dataNode);
+//    m_Interactor->SetDataNode(dataNode);
 
 
 

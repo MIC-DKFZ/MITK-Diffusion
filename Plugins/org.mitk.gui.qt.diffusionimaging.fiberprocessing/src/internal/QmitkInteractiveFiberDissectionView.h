@@ -20,16 +20,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define QmitkInteractiveFiberDissectionView_h
 #include "ui_QmitkInteractiveFiberDissectionViewControls.h"
 
-#include <QInputDialog> //Pointset
-#include <QmitkPointListWidget.h>//Pointset
-
-#include <QmitkAbstractView.h>//Pointset
-#include <QmitkSingleNodeSelectionWidget.h>//Pointset
 
 
 #include <mitkFiberBundle.h>
 #include <mitkDataInteractor.h>
-#include <mitkIRenderWindowPartListener.h> //Pointset
 #include <mitkStreamlineInteractor.h>
 #include <mitkStreamlineInteractorBrush.h>
 #include <mitkStreamlineFeatureExtractor.h>
@@ -58,7 +52,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPolyDataMapper.h>
 
 /*!
-\brief View to process fiber bundles. Supplies methods to extract fibers from the bundle, fiber resampling, mirroring, join and subtract bundles and much more.
+\brief View to dissect fiber bundles with active learning
 */
 class QmitkInteractiveFiberDissectionView : public QmitkAbstractView, public mitk::IRenderWindowPartListener
 {
@@ -76,7 +70,6 @@ public:
   QmitkInteractiveFiberDissectionView();
   virtual ~QmitkInteractiveFiberDissectionView();
 
-  virtual void CreateQtPartControl(QWidget *parent) override;
 
   ///
   /// Sets the focus to an internal widget.
@@ -85,9 +78,6 @@ public:
 
 protected slots:
 
-  void RenderWindowPartActivated(mitk::IRenderWindowPart* renderWindowPart) override; //Pointset
-  void RenderWindowPartDeactivated(mitk::IRenderWindowPart* renderWindowPart) override; //Pointset
-  void OnAddPointSetClicked();//Pointset
   void CreateStreamline();
   void RemovefromBundle( bool checked );
   void RemovefromBundleBrush( bool checked );
@@ -119,7 +109,6 @@ protected slots:
 
 
 protected:
-  void OnCurrentSelectionChanged(QmitkSingleNodeSelectionWidget::NodeList nodes);//Pointset
 
 
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
