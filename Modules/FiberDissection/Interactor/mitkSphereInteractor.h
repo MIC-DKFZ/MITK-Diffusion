@@ -50,31 +50,29 @@ namespace mitk
     static const char* DATANODE_PROPERTY_CREATED;
 
     static void UpdateSurface(itk::SmartPointer<mitk::DataNode>);
+    void ExtractFibers();
 
     void StartEndNodes(mitk::DataNode::Pointer startDataNode, mitk::DataNode::Pointer endDataNode);
+    void workingBundleNode(mitk::FiberBundle::Pointer workingBundle);
+
     mitk::DataNode::Pointer m_startDataNode;
     mitk::DataNode::Pointer m_endDataNode;
+    mitk::FiberBundle::Pointer m_workingBundle;
 
   protected:
 
     void DataNodeChanged() override;
-    /**
-     * \brief Sets origin of the data node to the coordinates of the position event.
-     * \return false if interaction event isn't a position event, true otherwise
-     */
+
+
     void AddCenter(StateMachineAction*, InteractionEvent*);
     void ChangeRadius(StateMachineAction*, InteractionEvent*);
-    void EndCreation(StateMachineAction*, InteractionEvent*);
+//    void EndCreation(StateMachineAction*, InteractionEvent*);
     void EndCreationStart(StateMachineAction*, InteractionEvent*);
     void AbortCreation(StateMachineAction*, InteractionEvent*);
-    /**
-     * \brief Updates radius attribute according to position event.
-     * Calculates distance between the data node origin and the current position
-     * event and updates the data node attribue "zone.size" accordingly. The
-     * mitk::USZonesInteractor::UpdateSurface() function is called then.
-     *
-     * \return false if interaction event isn't a position event, true otherwise
-     */
+
+
+
+
 
 
   private:

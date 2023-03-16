@@ -239,20 +239,14 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
   mitk::DataNode::Pointer curtestnode =  m_Controls->m_TestBundleBox->GetSelectedNode();
   bool testnodeSelected = curtestnode.IsNotNull();
-  MITK_INFO << testnodeSelected;
   bool fibSelected = !m_SelectedFB.empty();
   bool multipleFibsSelected = (m_SelectedFB.size()>1);
-//  bool nfibSelected = !m_newfibersBundleNode.empty();
-//  bool posSelected = !m_positiveBundleNode.empty();
   bool nfibSelected = m_newfibersBundleNode.IsNotNull();
-//  bool posSelected = !m_positiveBundleNode.IsNotNull();
-//  bool negSelected = !m_negativeBundleNode.IsNotNull();
-    bool posSelected = this->GetDataStorage()->Exists(m_positiveBundleNode);
-    bool negSelected = this->GetDataStorage()->Exists(m_negativeBundleNode);
-    bool indexSelected = !m_index.empty();
-    bool uncertaintySelected = this->GetDataStorage()->Exists(m_UncertaintyLabelNode);
-//    bool distanceSelected = this->GetDataStorage()->Exists(m_DistanceLabelNode);
-    bool predictionSelected = this->GetDataStorage()->Exists(m_PredictionNode);
+  bool posSelected = this->GetDataStorage()->Exists(m_positiveBundleNode);
+  bool negSelected = this->GetDataStorage()->Exists(m_negativeBundleNode);
+  bool indexSelected = !m_index.empty();
+  bool uncertaintySelected = this->GetDataStorage()->Exists(m_UncertaintyLabelNode);
+  bool predictionSelected = this->GetDataStorage()->Exists(m_PredictionNode);
 
 
 
@@ -810,104 +804,6 @@ void QmitkInteractiveFiberDissectionView::OnSelectionChanged(berry::IWorkbenchPa
 
 void QmitkInteractiveFiberDissectionView::CreateStreamline()
 {
-
-    // initialize figure's geometry with empty geometry
-//    mitk::PlanarCircle::Pointer figure = mitk::PlanarCircle::New();
-//    mitk::PlaneGeometry::Pointer emptygeometry = mitk::PlaneGeometry::New();
-//    figure->SetPlaneGeometry( emptygeometry );
-
-//    //set desired data to DataNode where Planarfigure is stored
-////    mitk::DataNode::Pointer circleNode = mitk::DataNode::New();
-//    circleNode->SetName(QString("Ball").toStdString());
-//    circleNode->SetData(figure);
-//    circleNode->SetBoolProperty("planarfigure.3drendering", true);
-//    circleNode->SetBoolProperty("planarfigure.3drendering.fill", true);
-
-//    mitk::PlanarFigureInteractor::Pointer figureInteractor = dynamic_cast<mitk::PlanarFigureInteractor*>(circleNode->GetDataInteractor().GetPointer());
-//    if(figureInteractor.IsNull())
-//    {
-//      figureInteractor = mitk::PlanarFigureInteractor::New();
-//      us::Module* planarFigureModule = us::ModuleRegistry::GetModule( "MitkPlanarFigure" );
-//      figureInteractor->LoadStateMachine("PlanarFigureInteraction.xml", planarFigureModule );
-//      figureInteractor->SetEventConfig( "PlanarFigureConfig.xml", planarFigureModule );
-//      figureInteractor->SetDataNode(circleNode);
-//    }
-
-//    // figure drawn on the topmost layer / image
-//    GetDataStorage()->Add(circleNode );
-
-//    UpdateGui();
-
-//    circleNode->SetSelected(true);
-
-//    vtkSmartPointer<vtkSphereSource> sphereSource = vtkSmartPointer<vtkSphereSource>::New();
-////    sphereSource->SetRadius(circleNode->GetData()->GetProperty("radius")->GetDoubleValue());
-//    sphereSource->SetRadius(5.0);
-//    sphereSource->SetCenter(0,0,0);
-//    sphereSource->SetPhiResolution(30);
-//    sphereSource->SetThetaResolution(30);
-//    sphereSource->Update();
-
-//    // Convert the VTK sphere to a MITK surface
-//    mitk::Surface::Pointer sphereSurface = mitk::Surface::New();
-//    sphereSurface->SetVtkPolyData(sphereSource->GetOutput());
-
-//    // Add the surface to the DataStorage
-//    mitk::DataNode::Pointer sphereNode = mitk::DataNode::New();
-//    sphereNode->SetData(sphereSurface);
-//    sphereNode->SetName("Sphere");
-//    sphereNode->SetVisibility(true);
-//    sphereNode->SetOpacity(1.0);
-//    sphereNode->SetColor(1.0, 0.0, 0.0);
-//    GetDataStorage()->Add(sphereNode);
-
-
-//    vtkSmartPointer<vtkSphereSource> sphereSource = vtkSmartPointer<vtkSphereSource>::New();
-//    sphereSource->SetCenter(0, 0, 0);
-//    sphereSource->SetRadius(5.0);
-
-//    auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard3D);
-
-
-//    vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-//    vtkmapper->SetInputConnection(sphereSource->GetOutputPort());
-
-//    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-//    actor->SetMapper(mapper);
-//    actor->GetProperty()->SetColor(1,0,0);
-
-//    mitk::Surface::Pointer sphereSurface = mitk::Surface::New();
-//    sphereSurface->SetVtkPolyData(sphereSource->GetOutput());
-
-//    mitk::DataNode::Pointer m_SphereNode = mitk::DataNode::New();
-//    m_SphereNode->SetName("Sphere");
-//    m_SphereNode->SetData(sphereSurface);
-
-//    m_SphereNode->SetOpacity(1.0);
-//    m_SphereNode->SetColor(1.0, 0.0, 0.0);
-//    m_SphereNode->SetVisibility(true);
-
-//    GetDataStorage()->Add(m_SphereNode);
-//    mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-//    mitk::VtkPropRenderer::Pointer m_Renderer = mitk::VtkPropRenderer::New();
-//    m_Renderer->SetMapperID(mitk::BaseRenderer::Standard3D);
-//    m_Renderer->SetDataStorage(GetDataStorage());
-//    m_Renderer->SetDataNode(m_SphereNode);
-
-//    GetDataStorage()->Add(m_Renderer->GetRendererAsDataNode());
-//    mitk::DataNode::Pointer rendererNode = mitk::DataNode::New();
-//    rendererNode->SetData(m_Renderer);
-
-//    m_SphereNode->SetData(sphereSurface);
-//    m_SphereNode->SetVisibility(true);
-//    // Set a name for the renderer node
-//    rendererNode->SetName("RendererNode");
-
-    // Add the renderer node to the DataStorage
-//    GetDataStorage()->Add(rendererNode);
-//    RenderingManager::GetInstance()->RequestUpdateAll();
-
-
     m_SphereInteractor= mitk::SphereInteractor::New();
     m_SphereInteractor->LoadStateMachine("SphereInteractionsStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
     m_SphereInteractor->SetEventConfig("SphereInteractionsConfig.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
@@ -916,7 +812,7 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
 
     mitk::DataNode::Pointer startDataNode = mitk::DataNode::New();
     mitk::DataNode::Pointer endDataNode = mitk::DataNode::New();
-    // zone number is added to zone name (padding one zero)
+
     startDataNode->SetName("StartRegion");
     startDataNode->SetColor(1, 0, 1);
 
@@ -925,8 +821,14 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
 
     this->GetDataStorage()->Add(startDataNode);
     this->GetDataStorage()->Add(endDataNode);
+
+    MITK_INFO << "Get Bundle";
+    m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
     MITK_INFO <<"Sphere to interactor";
+    m_SphereInteractor->workingBundleNode(fib);
     m_SphereInteractor->StartEndNodes(startDataNode, endDataNode);
+
 
 
 
@@ -1189,7 +1091,6 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 
     MITK_INFO << "Clean Test Data";
 
-//    this->CleanTestArray();
     m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
 //     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData());
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());

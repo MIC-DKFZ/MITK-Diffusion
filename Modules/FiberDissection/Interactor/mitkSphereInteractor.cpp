@@ -41,6 +41,7 @@ found in the LICENSE file.
 #include "mitkDataStorage.h"
 #include "mitkDataNode.h"
 #include "mitkSurface.h"
+#include "mitkFiberBundle.h"
 #include "mitkInteractionPositionEvent.h"
 
 #include <vtkSphereSource.h>
@@ -112,7 +113,7 @@ void mitk::SphereInteractor::ConnectActionsAndFunctions()
   CONNECT_FUNCTION("addCenter", AddCenter);
   CONNECT_FUNCTION("changeRadius", ChangeRadius);
   CONNECT_FUNCTION("endCreationStart", EndCreationStart);
-  CONNECT_FUNCTION("endCreation", EndCreation);
+//  CONNECT_FUNCTION("endCreation", EndCreation);
   CONNECT_FUNCTION("abortCreation", AbortCreation);
 }
 
@@ -130,12 +131,15 @@ void mitk::SphereInteractor::StartEndNodes(mitk::DataNode::Pointer startDataNode
     m_endDataNode = endDataNode;
 
     DataInteractor::SetDataNode(startDataNode);
+}
+
+void mitk::SphereInteractor::workingBundleNode(mitk::FiberBundle::Pointer workingBundle){
+    m_workingBundle = workingBundle;
 
 }
 
 void mitk::SphereInteractor::AddCenter(mitk::StateMachineAction*, mitk::InteractionEvent* interactionEvent)
 {
-  MITK_INFO << "Start";
   // cast InteractionEvent to a position event in order to read out the mouse position
   mitk::InteractionPositionEvent* positionEvent = dynamic_cast<mitk::InteractionPositionEvent*>(interactionEvent);
   mitk::DataNode::Pointer dataNode = this->GetDataNode();
@@ -177,17 +181,27 @@ void mitk::SphereInteractor::ChangeRadius(mitk::StateMachineAction*, mitk::Inter
 
 void mitk::SphereInteractor::EndCreationStart(mitk::StateMachineAction*, mitk::InteractionEvent* /*interactionEvent*/)
 {
+   MITK_INFO << "EndCreationStart";
+
   this->GetDataNode()->SetBoolProperty(DATANODE_PROPERTY_CREATED, true);
-    DataInteractor::SetDataNode(m_endDataNode);
+   if (this->GetDataNode()->GetName() == m_startDataNode->GetName()) {
+     DataInteractor::SetDataNode(m_endDataNode);
+   }
+  else {
+      ExtractFibers();
+  }
+
 
   //return true;
 }
 
-void mitk::SphereInteractor::EndCreation(mitk::StateMachineAction*, mitk::InteractionEvent* /*interactionEvent*/)
-{
-  this->GetDataNode()->SetBoolProperty(DATANODE_PROPERTY_CREATED, true);
-  //return true;
-}
+//void mitk::SphereInteractor::EndCreation(mitk::StateMachineAction*, mitk::InteractionEvent* /*interactionEvent*/)
+//{
+//    MITK_INFO<< "Extract Fibers";
+//   this->GetDataNode()->SetBoolProperty(DATANODE_PROPERTY_CREATED, true);
+//   ExtractFibers();
+//  //return true;
+//}
 
 void mitk::SphereInteractor::AbortCreation(mitk::StateMachineAction*, mitk::InteractionEvent*)
 {
@@ -198,4 +212,20 @@ void mitk::SphereInteractor::AbortCreation(mitk::StateMachineAction*, mitk::Inte
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 
   //return true;
+}
+
+void mitk::SphereInteractor::ExtractFibers()
+{
+    MITK_INFO << "Extract Fibers";
+    vtkPolyData* polyData = m_workingBundle->GetFiberPolyData();
+    MITK_INFO << polyData->GetNumberOfCells();
+
+//    for (vtkIdType i = 0; i < polyData->GetNumberOfCells(); i++)
+//    {
+//      vtkCell* cell = polyData->GetCell(i);
+//      if (cell->GetNumberOfPoints() != polyData->GetCell(0)->GetNumberOfPoints())
+//      {
+//        throw std::runtime_error("Not all cells have an equal number of points!");
+//      }
+//    }
 }
