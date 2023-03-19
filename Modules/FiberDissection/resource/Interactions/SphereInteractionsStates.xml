@@ -11,12 +11,8 @@
   <transition event_class="MousePressEvent" event_variant="LeftClick" target="start">
     <action name="endCreationStart" />
   </transition>
-<!--  <transition event_class="MousePressEvent" event_variant="LeftClick" target="final">
-    <action name="endCreation" />
-  </transition>-->
   <transition event_class="MousePressEvent" event_variant="RightClick" target="start">
     <action name="abortCreation" />
   </transition>
 </state>
-<state name="final"><!-- final state in which nothing is done anymore --></state>
 </statemachine>

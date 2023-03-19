@@ -813,6 +813,7 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
     mitk::DataNode::Pointer startDataNode = mitk::DataNode::New();
     mitk::DataNode::Pointer endDataNode = mitk::DataNode::New();
 
+
     startDataNode->SetName("StartRegion");
     startDataNode->SetColor(1, 0, 1);
 
@@ -822,11 +823,22 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
     this->GetDataStorage()->Add(startDataNode);
     this->GetDataStorage()->Add(endDataNode);
 
+
+    mitk::DataNode::Pointer reducedFibersDataNode = mitk::DataNode::New();
+    mitk::DataNode::Pointer node = mitk::DataNode::New();
+    mitk::FiberBundle::Pointer reducedFib = mitk::FiberBundle::New();
+    node->SetData(reducedFib);
+    node->SetName("Reduced");
+    reducedFibersDataNode = node;
+
+    this->GetDataStorage()->Add(reducedFibersDataNode);
+
     MITK_INFO << "Get Bundle";
     m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
+
     MITK_INFO <<"Sphere to interactor";
-    m_SphereInteractor->workingBundleNode(fib);
+    m_SphereInteractor->workingBundleNode(fib, reducedFib);
     m_SphereInteractor->StartEndNodes(startDataNode, endDataNode);
 
 
@@ -852,7 +864,6 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
     // Print the number of fibers to extract.
     MITK_INFO << "Number of Fibers to extract from Tractogram: ";
     MITK_INFO << m_Controls->m_NumRandomFibers->value();
-    MITK_INFO << this->GetDataStorage()->GetAll();
 
 
     // If a newfibersBundleNode exists, remove it from the data storage.
@@ -872,6 +883,7 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
         MITK_INFO << "Create Bundle";
     }
     // Get the selected node, which is assumed to be a FiberBundle.
+    MITK_INFO << "Get Test Data";
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
 
     // Create a new PolyData object, and its associated points and cell arrays.

@@ -36,6 +36,7 @@ found in the LICENSE file.
 #include <vtkVector.h>
 #include <vtkPolyLine.h>
 #include <vtkVectorOperators.h>
+#include <vtkSelectEnclosedPoints.h>
 
 
 #include "mitkDataStorage.h"
@@ -133,8 +134,9 @@ void mitk::SphereInteractor::StartEndNodes(mitk::DataNode::Pointer startDataNode
     DataInteractor::SetDataNode(startDataNode);
 }
 
-void mitk::SphereInteractor::workingBundleNode(mitk::FiberBundle::Pointer workingBundle){
+void mitk::SphereInteractor::workingBundleNode(mitk::FiberBundle::Pointer workingBundle, mitk::FiberBundle::Pointer reducedBundle){
     m_workingBundle = workingBundle;
+    m_reducedFibersBundle = reducedBundle;
 
 }
 
@@ -211,21 +213,86 @@ void mitk::SphereInteractor::AbortCreation(mitk::StateMachineAction*, mitk::Inte
   // update the RenderWindow to remove the surface
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 
+
+
   //return true;
 }
 
 void mitk::SphereInteractor::ExtractFibers()
 {
     MITK_INFO << "Extract Fibers";
-    vtkPolyData* polyData = m_workingBundle->GetFiberPolyData();
-    MITK_INFO << polyData->GetNumberOfCells();
 
-//    for (vtkIdType i = 0; i < polyData->GetNumberOfCells(); i++)
-//    {
-//      vtkCell* cell = polyData->GetCell(i);
-//      if (cell->GetNumberOfPoints() != polyData->GetCell(0)->GetNumberOfPoints())
-//      {
-//        throw std::runtime_error("Not all cells have an equal number of points!");
-//      }
-//    }
+
+    vtkPolyData* polyData = m_workingBundle->GetFiberPolyData();
+
+    vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
+    vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
+    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
+
+    unsigned int counter = 0;
+    for (int i = 0; i < polyData->GetNumberOfCells(); i++)
+    {
+        vtkCell* cell = polyData->GetCell(i);
+
+        // Assume you have a vtkCell object named cell
+        vtkPoints* points = cell->GetPoints();
+
+        double startPoint[3];
+        double endPoint[3];
+
+        int numPoints = cell->GetNumberOfPoints();
+
+        points->GetPoint(0, startPoint);
+        points->GetPoint(numPoints - 1, endPoint);
+
+        mitk::Surface::Pointer startSurfaceData = dynamic_cast<mitk::Surface*>(m_startDataNode->GetData());
+        mitk::Surface::Pointer endSurfaceData = dynamic_cast<mitk::Surface*>(m_endDataNode->GetData());
+
+
+
+        if ((startSurfaceData->GetGeometry()->IsInside(startPoint) && endSurfaceData->GetGeometry()->IsInside(endPoint)) || ((endSurfaceData->GetGeometry()->IsInside(endPoint) && startSurfaceData->GetGeometry()->IsInside(startPoint))))
+        {
+            MITK_INFO << "Inside";
+            // Create a new vtkPolyLine container to store the new fiber
+              vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+
+              // Loop through each point in the fiber
+              for (int j = 0; j < numPoints; j++) {
+                  double p[3];
+                  points->GetPoint(j, p);
+
+                  // Insert the new point into the vtkPoints object and get its ID
+                  vtkIdType id = vNewPoints->InsertNextPoint(p);
+                  // Add the ID to the container object to create a new fiber
+                  container->GetPointIds()->InsertNextId(id);
+              }
+
+              // Insert the fiber weight into the vtkDoubleArray object
+//              weights->InsertValue(counter, m_workingBundle->GetFiberWeight(i));
+              // Insert the new fiber into the vtkCellArray object
+              vNewLines->InsertNextCell(container);
+
+              // Increment the counter variable
+              counter++;
+
+        }
+    }
+        vNewPolyData->SetLines(vNewLines);
+        vNewPolyData->SetPoints(vNewPoints);
+
+        // Create a new vtkPolyData object and set it to the new fibers
+        m_reducedFibersBundle->GetFiberPolyData()->SetPoints(vNewPoints);
+        m_reducedFibersBundle->GetFiberPolyData()->SetLines(vNewLines);
+
+
+        // Create a new mitk::FiberBundle object and set it to the new fibers
+//        m_reducedFibersBundle = mitk::FiberBundle::New(vNewPolyData);
+//        m_reducedFibersBundle->SetFiberColors(255, 255, 255);
+        m_reducedFibersBundle->SetFiberWeights(weights);
+        m_reducedFibersBundle->ColorFibersByOrientation();
+
+    mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
+
+
