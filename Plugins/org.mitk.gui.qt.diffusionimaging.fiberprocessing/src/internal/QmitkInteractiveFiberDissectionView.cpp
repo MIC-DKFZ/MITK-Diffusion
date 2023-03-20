@@ -205,9 +205,9 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
    // disable alle frames
 
   m_Controls->m_ErazorButton->setCheckable(true);
-  m_Controls->m_ErazorButton->setEnabled(false);
+  m_Controls->m_ErazorButton->setEnabled(true);
   m_Controls->m_BrushButton->setCheckable(true);
-  m_Controls->m_BrushButton->setEnabled(false);
+  m_Controls->m_BrushButton->setEnabled(true);
   m_Controls->m_unclabeling->setCheckable(true);
   m_Controls->m_unclabeling->setEnabled(false);
   m_Controls->m_predlabeling->setCheckable(true);
@@ -804,7 +804,7 @@ void QmitkInteractiveFiberDissectionView::OnSelectionChanged(berry::IWorkbenchPa
 
 void QmitkInteractiveFiberDissectionView::CreateStreamline()
 {
-    m_SphereInteractor= mitk::SphereInteractor::New();
+    m_SphereInteractor = mitk::SphereInteractor::New();
     m_SphereInteractor->LoadStateMachine("SphereInteractionsStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
     m_SphereInteractor->SetEventConfig("SphereInteractionsConfig.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
 
@@ -824,36 +824,34 @@ void QmitkInteractiveFiberDissectionView::CreateStreamline()
     this->GetDataStorage()->Add(endDataNode);
 
 
-    mitk::DataNode::Pointer reducedFibersDataNode = mitk::DataNode::New();
+    m_reducedFibersDataNode = mitk::DataNode::New();
     mitk::DataNode::Pointer node = mitk::DataNode::New();
     mitk::FiberBundle::Pointer reducedFib = mitk::FiberBundle::New();
-    node->SetData(reducedFib);
-    node->SetName("Reduced");
-    reducedFibersDataNode = node;
+    m_reducedFibersDataNode->SetData(reducedFib);
+    m_reducedFibersDataNode->SetName("Reduced");
+//    m_reducedFibersDataNode = node;
 
-    this->GetDataStorage()->Add(reducedFibersDataNode);
+    this->GetDataStorage()->Add(m_reducedFibersDataNode);
 
     MITK_INFO << "Get Bundle";
     m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
-    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
+//    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
 
     MITK_INFO <<"Sphere to interactor";
-    m_SphereInteractor->workingBundleNode(fib, reducedFib);
+    m_SphereInteractor->workingBundleNode(m_testnode, m_reducedFibersDataNode);
     m_SphereInteractor->StartEndNodes(startDataNode, endDataNode);
 
 
 
 
     UpdateGui();
-    MITK_INFO << "Done with interaction";
 }
 
 void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 {
-
-
     // Hide the selected node.
     m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+//    m_testnode = m_SphereInteractor->m_reducedFibersBundle;
     m_testnode->SetVisibility(false);
 
     // Uncheck the Brush and Erazor buttons.
@@ -884,13 +882,18 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
     }
     // Get the selected node, which is assumed to be a FiberBundle.
     MITK_INFO << "Get Test Data";
-    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
+//    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
 
+    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_reducedFibersDataNode->GetData());
+    MITK_INFO << fib->GetFiberPolyData()->GetNumberOfCells();
+
+
+    MITK_INFO << "Loaded";
     // Create a new PolyData object, and its associated points and cell arrays.
     vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
     vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
     vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
+//    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
 
     // Initialize a counter variable.
     unsigned int counter = 0;
@@ -919,14 +922,14 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
             }
 
             // Insert the fiber weight into the vtkDoubleArray object
-            weights->InsertValue(counter, fib->GetFiberWeight(i));
+//            weights->InsertValue(counter, fib->GetFiberWeight(i));
             // Insert the new fiber into the vtkCellArray object
             vNewLines->InsertNextCell(container);
 
             // Increment the counter variable
         counter++;
     }
-
+        MITK_INFO << counter;
     // Delete the old fibers from the input dataset
     for (int i = 0; i < m_Controls->m_NumRandomFibers->value(); i++) {
         fib->GetFiberPolyData()->DeleteCell(i);
@@ -951,8 +954,7 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
     // Create a new mitk::FiberBundle object and set it to the new fibers
     m_newfibersBundle = mitk::FiberBundle::New(vNewPolyData);
     m_newfibersBundle->SetFiberColors(255, 255, 255);
-    m_newfibersBundle->SetFiberWeights(weights);
-
+//    m_newfibersBundle->SetFiberWeights(weights);
 
     mitk::DataNode::Pointer node = mitk::DataNode::New();
     node->SetData(m_newfibersBundle);
@@ -969,6 +971,16 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
         node2->SetData(m_negativeBundle);
         m_negativeBundleNode = node2;
         this->GetDataStorage()->Add(m_negativeBundleNode);
+    }
+
+    if (!m_positiveBundleNode)
+    {
+        mitk::FiberBundle::Pointer m_positiveBundle = mitk::FiberBundle::New();
+        mitk::DataNode::Pointer node3 = mitk::DataNode::New();
+        node3->SetName("+Bundle");
+        node3->SetData(m_positiveBundle);
+        m_positiveBundleNode = node3;
+        this->GetDataStorage()->Add(m_positiveBundleNode);
     }
 
 

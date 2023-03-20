@@ -53,10 +53,14 @@ namespace mitk
     void ExtractFibers();
 
     void StartEndNodes(mitk::DataNode::Pointer startDataNode, mitk::DataNode::Pointer endDataNode);
-    void workingBundleNode(mitk::FiberBundle::Pointer workingBundle, mitk::FiberBundle::Pointer reducedBundle);
+//    void workingBundleNode(mitk::FiberBundle::Pointer workingBundle, mitk::FiberBundle::Pointer reducedBundle);
+    void workingBundleNode(mitk::DataNode::Pointer workingBundleNode, mitk::DataNode::Pointer reducedBundleNode);
 
     mitk::DataNode::Pointer m_startDataNode;
     mitk::DataNode::Pointer m_endDataNode;
+
+    mitk::DataNode::Pointer m_workingBundleNode;
+    mitk::DataNode::Pointer m_reducedFibersBundleNode;
     mitk::FiberBundle::Pointer m_workingBundle;
     mitk::FiberBundle::Pointer m_reducedFibersBundle;
 

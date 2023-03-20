@@ -134,10 +134,18 @@ void mitk::SphereInteractor::StartEndNodes(mitk::DataNode::Pointer startDataNode
     DataInteractor::SetDataNode(startDataNode);
 }
 
-void mitk::SphereInteractor::workingBundleNode(mitk::FiberBundle::Pointer workingBundle, mitk::FiberBundle::Pointer reducedBundle){
-    m_workingBundle = workingBundle;
-    m_reducedFibersBundle = reducedBundle;
+//void mitk::SphereInteractor::workingBundleNode(mitk::FiberBundle::Pointer workingBundle, mitk::FiberBundle::Pointer reducedBundle){
+//    m_workingBundle = workingBundle;
+//    m_reducedFibersBundle = reducedBundle;
+//}
 
+void mitk::SphereInteractor::workingBundleNode(mitk::DataNode::Pointer workingBundleNode, mitk::DataNode::Pointer reducedBundleNode){
+
+    m_workingBundleNode = workingBundleNode;
+    m_workingBundle = dynamic_cast<mitk::FiberBundle *>(m_workingBundleNode->GetData());
+
+    m_reducedFibersBundleNode = reducedBundleNode;
+    m_reducedFibersBundle = dynamic_cast<mitk::FiberBundle *>(m_reducedFibersBundleNode->GetData());
 }
 
 void mitk::SphereInteractor::AddCenter(mitk::StateMachineAction*, mitk::InteractionEvent* interactionEvent)
@@ -183,7 +191,6 @@ void mitk::SphereInteractor::ChangeRadius(mitk::StateMachineAction*, mitk::Inter
 
 void mitk::SphereInteractor::EndCreationStart(mitk::StateMachineAction*, mitk::InteractionEvent* /*interactionEvent*/)
 {
-   MITK_INFO << "EndCreationStart";
 
   this->GetDataNode()->SetBoolProperty(DATANODE_PROPERTY_CREATED, true);
    if (this->GetDataNode()->GetName() == m_startDataNode->GetName()) {
@@ -207,7 +214,6 @@ void mitk::SphereInteractor::EndCreationStart(mitk::StateMachineAction*, mitk::I
 
 void mitk::SphereInteractor::AbortCreation(mitk::StateMachineAction*, mitk::InteractionEvent*)
 {
-    MITK_INFO << "Inside Abort Creation";
   this->GetDataNode()->SetData(mitk::Surface::New());
 
   // update the RenderWindow to remove the surface
@@ -220,12 +226,11 @@ void mitk::SphereInteractor::AbortCreation(mitk::StateMachineAction*, mitk::Inte
 
 void mitk::SphereInteractor::ExtractFibers()
 {
-    MITK_INFO << "Extract Fibers";
 
 
     vtkPolyData* polyData = m_workingBundle->GetFiberPolyData();
 
-    vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
+//    vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
     vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
     vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
     vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
@@ -253,7 +258,6 @@ void mitk::SphereInteractor::ExtractFibers()
 
         if ((startSurfaceData->GetGeometry()->IsInside(startPoint) && endSurfaceData->GetGeometry()->IsInside(endPoint)) || ((endSurfaceData->GetGeometry()->IsInside(endPoint) && startSurfaceData->GetGeometry()->IsInside(startPoint))))
         {
-            MITK_INFO << "Inside";
             // Create a new vtkPolyLine container to store the new fiber
               vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
 
@@ -269,17 +273,16 @@ void mitk::SphereInteractor::ExtractFibers()
               }
 
               // Insert the fiber weight into the vtkDoubleArray object
-//              weights->InsertValue(counter, m_workingBundle->GetFiberWeight(i));
+              MITK_INFO << i;
+              weights->InsertValue(counter, m_workingBundle->GetFiberWeight(i));
               // Insert the new fiber into the vtkCellArray object
               vNewLines->InsertNextCell(container);
-
-              // Increment the counter variable
               counter++;
-
         }
+        // Increment the counter variable
     }
-        vNewPolyData->SetLines(vNewLines);
-        vNewPolyData->SetPoints(vNewPoints);
+///*        vNewPolyData->SetLines(vNewLines);
+//        vNewPolyData->SetPoints(vNewPoints)*/;
 
         // Create a new vtkPolyData object and set it to the new fibers
         m_reducedFibersBundle->GetFiberPolyData()->SetPoints(vNewPoints);
@@ -289,10 +292,11 @@ void mitk::SphereInteractor::ExtractFibers()
         // Create a new mitk::FiberBundle object and set it to the new fibers
 //        m_reducedFibersBundle = mitk::FiberBundle::New(vNewPolyData);
 //        m_reducedFibersBundle->SetFiberColors(255, 255, 255);
-        m_reducedFibersBundle->SetFiberWeights(weights);
         m_reducedFibersBundle->ColorFibersByOrientation();
 
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+    m_reducedFibersBundle->SetFiberWeights(weights);
+
 }
 
 

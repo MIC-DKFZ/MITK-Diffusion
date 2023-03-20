@@ -164,6 +164,7 @@ protected:
   mitk::DataNode::Pointer               m_CertainBetweenMinusNode;
   mitk::DataNode::Pointer               m_UncertaintyLabelNode;
   mitk::DataNode::Pointer               m_DistanceLabelNode;
+  mitk::DataNode::Pointer               m_reducedFibersDataNode;
 
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
