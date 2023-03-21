@@ -39,7 +39,7 @@ mitk::FiberBundleTrackVisReader::FiberBundleTrackVisReader()
   Options defaultOptions;
   defaultOptions["Apply index to world transform stored in the TRK header"] = true;
   defaultOptions["Print header"] = true;
-  defaultOptions["Flip x"] = false;
+  defaultOptions["Flip x"] = true;
   defaultOptions["Flip y"] = false;
   defaultOptions["Flip z"] = false;
   this->SetDefaultOptions(defaultOptions);

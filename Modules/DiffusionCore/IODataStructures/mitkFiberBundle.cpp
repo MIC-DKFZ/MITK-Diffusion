@@ -914,7 +914,7 @@ void mitk::FiberBundle::ColorFibersByScalarMap(mitk::Image::Pointer FAimage, boo
 }
 
 template <typename TPixel>
-void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
+void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double , bool interpolate)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
@@ -961,8 +961,8 @@ void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::P
 
   mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
   mitkLookup->SetType(type);
-  if (type!=mitk::LookupTable::MULTILABEL)
-    mitkLookup->GetVtkLookupTable()->SetTableRange(min, max*max_cap);
+//  if (type!=mitk::LookupTable::MULTILABEL)
+//    mitkLookup->GetVtkLookupTable()->SetTableRange(min, max*max_cap);
 
   for(long i=0; i<m_FiberPolyData->GetNumberOfPoints(); ++i)
   {
