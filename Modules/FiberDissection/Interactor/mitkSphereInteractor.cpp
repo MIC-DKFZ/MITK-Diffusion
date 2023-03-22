@@ -273,7 +273,6 @@ void mitk::SphereInteractor::ExtractFibers()
               }
 
               // Insert the fiber weight into the vtkDoubleArray object
-              MITK_INFO << i;
               weights->InsertValue(counter, m_workingBundle->GetFiberWeight(i));
               // Insert the new fiber into the vtkCellArray object
               vNewLines->InsertNextCell(container);
@@ -296,6 +295,12 @@ void mitk::SphereInteractor::ExtractFibers()
 
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
     m_reducedFibersBundle->SetFiberWeights(weights);
+
+    m_startDataNode->SetVisibility(false);
+    m_endDataNode->SetVisibility(false);
+    m_workingBundleNode->SetVisibility(false);
+
+
 
 }
 

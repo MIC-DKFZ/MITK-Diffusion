@@ -73,7 +73,6 @@ void mitk::StreamlineInteractorBrush::SetNegativeNode(DataNode *node)
 //    DataInteractor::SetDataNode(node);
     m_NegStreamlineNode = node;
     m_NegStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
-    MITK_INFO << "Negative Node added";
 }
 
 void mitk::StreamlineInteractorBrush::SetToLabelNode(DataNode *node)
@@ -81,7 +80,6 @@ void mitk::StreamlineInteractorBrush::SetToLabelNode(DataNode *node)
     m_manStreamlineNode = node;
     DataInteractor::SetDataNode(m_manStreamlineNode);
     m_manStreamline = dynamic_cast<mitk::FiberBundle *>(node->GetData());
-    MITK_INFO << "Label node added";
 //    m_init = false;
 
 }
@@ -92,7 +90,6 @@ void mitk::StreamlineInteractorBrush::SetPositiveNode(DataNode *node)
     //    DataInteractor::SetDataNode(node);
     m_PosStreamlineNode = node;
     m_PosStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
-    MITK_INFO << "Positive Node added";
 }
 
 void mitk::StreamlineInteractorBrush::LabelfromPrediction(bool predlabeling)
@@ -257,19 +254,17 @@ void mitk::StreamlineInteractorBrush::SelectStreamline(StateMachineAction *, Int
 
 void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
-    MITK_INFO << "PositiveBundle clicked";
     DataInteractor::SetDataNode(m_manStreamlineNode);
 
     auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
     if (positionEvent == nullptr)
     {
-        MITK_INFO << "no position";
+
     }
 
     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
     {
 //      m_PickedHandle = PickFrom2D(positionEvent);
-        MITK_INFO << "2D";
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
@@ -295,7 +290,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
 
       if (picker->GetCellId()==-1)
       {
-          MITK_INFO << "Nothing picked";
       }
       else {
 
@@ -424,7 +418,7 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
 
         if (picker->GetCellId()==-1)
         {
-            MITK_INFO << "Nothing picked";
+
         }
         else {
 
@@ -528,20 +522,18 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
 
 void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
-    MITK_INFO << "NegativeBundle clicked";
 
     DataInteractor::SetDataNode(m_manStreamlineNode);
 
     auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
     if (positionEvent == nullptr)
     {
-        MITK_INFO << "no position";
+
     }
 
     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
     {
 //      m_PickedHandle = PickFrom2D(positionEvent);
-        MITK_INFO << "2D";
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
@@ -567,7 +559,7 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
 
       if (picker->GetCellId()==-1)
       {
-          MITK_INFO << "Nothing picked";
+
       }
       else {
 
@@ -700,7 +692,7 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
 
         if (picker->GetCellId()==-1)
         {
-            MITK_INFO << "Nothing picked";
+
         }
         else
         {
@@ -799,21 +791,18 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
 
 void mitk::StreamlineInteractorBrush::AddNegStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
-    MITK_INFO << "TolabelBundle clicked";
     DataInteractor::SetDataNode(m_NegStreamlineNode);
 
 
     auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
     if (positionEvent == nullptr)
     {
-        MITK_INFO << "no position";
     }
 
     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
     {
 //      m_PickedHandle = PickFrom2D(positionEvent);
 
-        MITK_INFO << "2D";
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
@@ -839,7 +828,7 @@ void mitk::StreamlineInteractorBrush::AddNegStreamlinetolabelsBundle(StateMachin
 
       if (picker->GetCellId()==-1)
       {
-          MITK_INFO << "Nothing picked";
+
       }
       else {
 
@@ -938,7 +927,7 @@ void mitk::StreamlineInteractorBrush::AddNegStreamlinetolabelsBundle(StateMachin
 
         if (picker->GetCellId()==-1)
         {
-            MITK_INFO << "Nothing picked";
+
         }
         else
         {
@@ -1003,21 +992,20 @@ void mitk::StreamlineInteractorBrush::AddNegStreamlinetolabelsBundle(StateMachin
 
 void mitk::StreamlineInteractorBrush::AddPosStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
-    MITK_INFO << "TolabelBundle clicked";
     DataInteractor::SetDataNode(m_PosStreamlineNode);
 
 
     auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
     if (positionEvent == nullptr)
     {
-        MITK_INFO << "no position";
+
     }
 
     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
     {
 //      m_PickedHandle = PickFrom2D(positionEvent);
 
-        MITK_INFO << "2D";
+
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
@@ -1043,7 +1031,7 @@ void mitk::StreamlineInteractorBrush::AddPosStreamlinetolabelsBundle(StateMachin
 
       if (picker->GetCellId()==-1)
       {
-          MITK_INFO << "Nothing picked";
+
       }
       else {
 
@@ -1142,7 +1130,7 @@ void mitk::StreamlineInteractorBrush::AddPosStreamlinetolabelsBundle(StateMachin
 
         if (picker->GetCellId()==-1)
         {
-            MITK_INFO << "Nothing picked";
+
         }
         else
         {
