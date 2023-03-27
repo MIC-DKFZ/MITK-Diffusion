@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <boost/progress.hpp>
 #include <vnl/vnl_sparse_matrix.h>
 #include <mitkIOUtil.h>
+#include <random>
 
 namespace mitk{
 
@@ -585,6 +586,10 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 //    MITK_INFO << "Dist_stop";
 
 
+    // auto rng = std::default_random_engine {};
+    // std::shuffle(std::begin(indexUnc), std::end(indexUnc), rng);
+
+
     /*Save Prediction*/
     index_vec.push_back(indexPrediction);
     /*Save index of uncertainty measures*/
@@ -593,6 +598,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 //    index_vec.push_back(indexUncDist);
     /*Save index of certain measures*/
     index_vec.push_back(indexCertainNeg);
+
     /*Save index of certain measures*/
 //    index_vec.push_back(indexCertainPos);
     /*Save index of certain measures*/
@@ -938,6 +944,10 @@ vnl_vector<float> StreamlineFeatureExtractor::ValidationPipe()
     return metrics;
 
 }
+
+
+
+
 
 
 }

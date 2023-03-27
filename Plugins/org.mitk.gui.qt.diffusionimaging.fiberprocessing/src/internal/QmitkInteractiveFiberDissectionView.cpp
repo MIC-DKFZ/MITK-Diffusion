@@ -173,7 +173,7 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_RandomPrototypesButton, SIGNAL( clicked() ), this, SLOT( RandomPrototypes( ) ) );
 
-    connect(m_Controls->m_SFFPrototypesButton, SIGNAL( clicked() ), this, SLOT( SFFPrototypes( ) ) );
+    connect(m_Controls->m_TestBundleBox, SIGNAL( currentIndexChanged(int) ), this, SLOT( SFFPrototypes( ) ) );
 
     connect(m_Controls->m_validate, SIGNAL( clicked() ), this, SLOT( StartValidation( ) ) );
 
@@ -260,16 +260,17 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
     m_Controls->m_AddRandomFibers->setEnabled(true);
     m_Controls->m_sellabeling->setEnabled(true);
 
-    if (m_Controls->m_TestBundleBox->currentIndexChanged()){
-            m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
-            if  (!this->GetDataStorage()->GetNamedNode("Prototypes")){
-                this->GetDataStorage()->Remove(this->GetDataStorage()->GetNamedNode("Prototypes"))
-            }
-            else{
-            }
-
-        this->SFFPrototypes();
+    // if (m_Controls->m_TestBundleBox->OnPropertyListChanged()){
+    m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+    if  (!this->GetDataStorage()->GetNamedNode("Prototypes")){
+        // this->SFFPrototypes();
     }
+    else{
+        this->GetDataStorage()->Remove(this->GetDataStorage()->GetNamedNode("Prototypes"));
+    }
+
+        
+    // }
 
 
   }
@@ -482,8 +483,11 @@ void QmitkInteractiveFiberDissectionView::RandomPrototypes()
 }
 
 void QmitkInteractiveFiberDissectionView::SFFPrototypes()
-{
-
+{   
+    m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+    if  (this->GetDataStorage()->GetNamedNode("Prototypes")){
+                this->GetDataStorage()->Remove(this->GetDataStorage()->GetNamedNode("Prototypes"));
+            }
 
      MITK_INFO << "Number of Fibers to use as Prototypes: ";
      MITK_INFO << m_Controls->m_NumPrototypes->value();
@@ -1560,24 +1564,10 @@ void QmitkInteractiveFiberDissectionView::StartValidation()
 
 void QmitkInteractiveFiberDissectionView::AutomaticLabelling()
 {
-//    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData());
-//    mitk::FiberBundle::Pointer fib_true = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_GroundtruthBox->GetSelectedNode()->GetData());
-//    vtkCell* cell;
-//    vtkCell* cell2;
-//    for (int i=0; i<fib->GetFiberPolyData()->GetNumberOfCells(); i++)
-//    {
-//        cell = fib->GetFiberPolyData()->GetCell(i);
-//        for (int k=0; k<fib->GetFiberPolyData()->GetNumberOfCells(); k++ )
-//        {
-//            cell2 = fib_true->GetFiberPolyData()->GetCell(i);
-//            if (cell==cell2)
-//                MITK_INFO << "Same";
-//        }
-//    }
 
-    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_PredictionNode->GetData());
-    mitk::FiberBundle::Pointer fib_true = dynamic_cast<mitk::FiberBundle*>(m_positiveBundleNode->GetData());
-    MITK_INFO << 1;
+    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
+    
+    
     vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
     vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
     vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
@@ -1586,6 +1576,8 @@ void QmitkInteractiveFiberDissectionView::AutomaticLabelling()
 
      /* Check wether all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
     unsigned int counter = 0;
+
+    MITK_INFO << fib->GetFiberPolyData()->GetNumberOfCells();
 
     for (int i=0; i<fib->GetFiberPolyData()->GetNumberOfCells(); i++)
     {
@@ -1602,44 +1594,24 @@ void QmitkInteractiveFiberDissectionView::AutomaticLabelling()
         vtkIdType id = vNewPoints->InsertNextPoint(p);
         container->GetPointIds()->InsertNextId(id);
       }
-      weights->InsertValue(counter, fib->GetFiberWeight(i));
+      weights->InsertValue(counter, classifier->entropy_vector.at(i));
       vNewLines->InsertNextCell(container);
       counter++;
 
     }
-    MITK_INFO << 2;
-    for (int i=0; i<fib_true->GetFiberPolyData()->GetNumberOfCells(); i++)
-    {
-      vtkCell* cell = fib_true->GetFiberPolyData()->GetCell(i);
-      auto numPoints = cell->GetNumberOfPoints();
-      vtkPoints* points = cell->GetPoints();
 
-      vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-      for (unsigned int j=0; j<numPoints; j++)
-      {
-        double p[3];
-        points->GetPoint(j, p);
-
-        vtkIdType id = vNewPoints->InsertNextPoint(p);
-        container->GetPointIds()->InsertNextId(id);
-      }
-//      weights->InsertValue(counter, fib_true->GetFiberWeight(i));
-      vNewLines->InsertNextCell(container);
-      counter++;
-
-    }
-    MITK_INFO << 3;
 
 
     vNewPolyData->SetLines(vNewLines);
     vNewPolyData->SetPoints(vNewPoints);
 
-    mitk::FiberBundle::Pointer MergedPrediction = mitk::FiberBundle::New(vNewPolyData);
-    MergedPrediction->SetFiberWeights(weights);
+    mitk::FiberBundle::Pointer uncertaintymap = mitk::FiberBundle::New(vNewPolyData);
+    uncertaintymap->SetFiberWeights(weights);
+    uncertaintymap->ColorFibersByFiberWeights(false, mitk::LookupTable::JET_TRANSPARENT);
 
     mitk::DataNode::Pointer node = mitk::DataNode::New();
-    node->SetData(MergedPrediction);
-    node->SetName("MergedPrediction");
+    node->SetData(uncertaintymap);
+    node->SetName("uncertaintymap");
     this->GetDataStorage()->Add(node);
     MITK_INFO << 3;
 

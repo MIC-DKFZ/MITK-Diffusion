@@ -86,6 +86,7 @@ public:
   mitk::FiberBundle::Pointer                  m_ToLabel;
 
   std::vector<std::vector<unsigned int>>      m_index;
+  
   std::vector<float> entropy_vector;
   cv::Ptr<cv::ml::RTrees> statistic_model;
 
