@@ -240,6 +240,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
   mitk::DataNode::Pointer curtestnode =  m_Controls->m_TestBundleBox->GetSelectedNode();
   bool testnodeSelected = curtestnode.IsNotNull();
+  bool prototypesGenerated = m_Prototypes.IsNotNull();
   bool fibSelected = !m_SelectedFB.empty();
   bool multipleFibsSelected = (m_SelectedFB.size()>1);
   bool nfibSelected = m_newfibersBundleNode.IsNotNull();
@@ -262,18 +263,14 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
     // if (m_Controls->m_TestBundleBox->OnPropertyListChanged()){
     m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
-    if  (!this->GetDataStorage()->GetNamedNode("Prototypes")){
-        // this->SFFPrototypes();
+    if  (!prototypesGenerated){
+        this->SFFPrototypes();
     }
     else{
-        this->GetDataStorage()->Remove(this->GetDataStorage()->GetNamedNode("Prototypes"));
     }
-
-        
-    // }
-
-
   }
+
+
 
   if (fibSelected)
   {
@@ -485,15 +482,15 @@ void QmitkInteractiveFiberDissectionView::RandomPrototypes()
 void QmitkInteractiveFiberDissectionView::SFFPrototypes()
 {   
     m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
-    if  (this->GetDataStorage()->GetNamedNode("Prototypes")){
-                this->GetDataStorage()->Remove(this->GetDataStorage()->GetNamedNode("Prototypes"));
-            }
+    if (m_Prototypes.IsNotNull()){
+        this->GetDataStorage()->Remove(m_Prototypes);
+    }
 
      MITK_INFO << "Number of Fibers to use as Prototypes: ";
      MITK_INFO << m_Controls->m_NumPrototypes->value();
      MITK_INFO << "Start Creating Prototypes based on SFF";
 
-      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_BundleBox->GetSelectedNode()->GetData());
+      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
 
       /* Get Subset of Tractogram*/
       int size_subset = std::max(1.0, ceil(3.0 * m_Controls->m_NumPrototypes->value() * std::log(m_Controls->m_NumPrototypes->value())));
@@ -701,7 +698,7 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
 
           mitk::FiberBundle::Pointer PrototypesBundle = mitk::FiberBundle::New(vNewPolyData2);
           PrototypesBundle->SetFiberWeights(weights2);
-          MITK_INFO << PrototypesBundle->GetFiberPolyData()->GetNumberOfCells();
+          MITK_INFO << "Number of cells: " << PrototypesBundle->GetFiberPolyData()->GetNumberOfCells();
 
 
 
@@ -709,11 +706,12 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
       node->SetData(PrototypesBundle);
       node->SetName("Prototypes");
 
+      m_Prototypes = node;
 ////      MITK_INFO << "Number of Streamlines in first function";
 ////      MITK_INFO << m_newfibersBundleNode->GetData()->GetFiberPolyData()->GetNumberOfCells();
       m_Controls->m_PrototypeBox->SetAutoSelectNewItems (true);
-      this->GetDataStorage()->Add(node, m_testnode);
-      node->SetVisibility(false);
+      this->GetDataStorage()->Add(m_Prototypes, m_testnode);
+      m_Prototypes->SetVisibility(false);
       m_Controls->m_PrototypeBox->SetAutoSelectNewItems (false);
       m_Controls->m_useStandardP->setChecked(false);
 
@@ -1167,7 +1165,7 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
     classifier->SetActiveCycle(m_activeCycleCounter);
     classifier->SetTractogramPlus(m_positiveBundle);
     classifier->SetTractogramMinus(m_negativeBundle);
-    classifier->SetTractogramPrototypes(dynamic_cast<mitk::FiberBundle*>(m_Controls->m_PrototypeBox->GetSelectedNode()->GetData()), m_Controls->m_useStandardP->isChecked());
+    classifier->SetTractogramPrototypes(dynamic_cast<mitk::FiberBundle*>(m_Prototypes->GetData()), m_Controls->m_useStandardP->isChecked());
 //    classifier->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData()), m_SelectedFB.at(0)->GetName());
     classifier->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData()), m_testnode->GetName());
 //    classifier->SetTractogramTest(dynamic_cast<mitk::FiberBundle*>(m_trainbundle->GetData()), m_trainbundle->GetName());
@@ -1535,7 +1533,7 @@ void QmitkInteractiveFiberDissectionView::StartValidation()
 //    mitk::FiberBundle::Pointer gt = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_GroundtruthBox->GetSelectedNode()->GetData());
 
     validater= std::make_shared<mitk::StreamlineFeatureExtractor>();
-    validater->SetTractogramPrototypes(dynamic_cast<mitk::FiberBundle*>(m_Controls->m_PrototypeBox->GetSelectedNode()->GetData()), m_Controls->m_useStandardP->isChecked());
+    validater->SetTractogramPrototypes(dynamic_cast<mitk::FiberBundle*>(m_Prototypes->GetData()), m_Controls->m_useStandardP->isChecked());
     MITK_INFO << "Prototypes loaded";
     validater->SetTractogramPrediction(dynamic_cast<mitk::FiberBundle*>(m_Controls->m_PredictionBox->GetSelectedNode()->GetData()));
     MITK_INFO << "Prediction loaded";
