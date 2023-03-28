@@ -586,9 +586,6 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
 //    MITK_INFO << "Dist_stop";
 
 
-    // auto rng = std::default_random_engine {};
-    // std::shuffle(std::begin(indexUnc), std::end(indexUnc), rng);
-
 
     /*Save Prediction*/
     index_vec.push_back(indexPrediction);
@@ -944,6 +941,212 @@ vnl_vector<float> StreamlineFeatureExtractor::ValidationPipe()
     return metrics;
 
 }
+
+
+
+
+
+// std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetData()
+// {
+//     MITK_INFO << "Start Function Get Data";
+
+//     /*Vector which saves Prediction and Fibers to label based on uncertainty*/
+//     std::vector<std::vector<unsigned int>> index_vec;
+
+//     cv::Mat data;
+//     cv::Mat labels_arr_vec;
+
+//     int size_plus = 0;
+
+
+//     /*Create Trainingdata: Go through positive and negative Bundle and save distances as cv::Mat and create vector with labels*/
+//     for ( unsigned int i=0; i<m_DistancesPlus.size(); i++)
+//     {
+//         float data_arr [m_DistancesPlus.at(0).size()];
+
+//         labels_arr_vec.push_back(1);
+
+//         for ( unsigned int j=0; j<m_DistancesPlus.at(0).cols(); j++)
+//         {
+//             data_arr[j] = m_DistancesPlus.at(i).get(0,j);
+//         }
+//         cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
+//         data.push_back(curdata);
+//         size_plus++;
+
+//     }
+
+//     for ( unsigned int i=m_DistancesPlus.size(); i<m_DistancesPlus.size()+m_DistancesMinus.size(); i++)
+//     {
+//         int it = i - size_plus;
+//         float data_arr [m_DistancesMinus.at(0).size()];
+
+//         labels_arr_vec.push_back(0);
+
+//          for ( unsigned int j=0; j<m_DistancesMinus.at(0).cols(); j++)
+//         {
+//             data_arr[j] = m_DistancesMinus.at(it).get(0,j);
+//         }
+//         cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
+//         data.push_back(curdata);
+
+//     }
+//     MITK_INFO << data.cols;
+//     MITK_INFO << data.rows;
+
+//     /*Calculate weights*/
+//     int zerosgt = labels_arr_vec.rows - cv::countNonZero(labels_arr_vec);
+//     int onesgt = cv::countNonZero(labels_arr_vec);
+//     float plusval = labels_arr_vec.rows / (2.0 * onesgt ) ;
+//     float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
+//     float w[2] = {minusval, plusval};
+//     cv::Mat newweight = cv::Mat(1,2, CV_32F, w);
+//     MITK_INFO << "Weights";
+//     MITK_INFO << newweight;
+
+
+//     /*Shuffle Data*/
+//     std::vector <int> seeds;
+//     for (int cont = 0; cont < labels_arr_vec.rows; cont++)
+//     {
+//         seeds.push_back(cont);
+//     }
+
+//     cv::randShuffle(seeds);
+//     cv::Mat labels_shuffled;
+//     cv::Mat samples_shuffled;
+
+
+
+
+//     for (int cont = 0; cont < labels_arr_vec.rows; cont++)
+//     {
+//         labels_shuffled.push_back(labels_arr_vec.row(seeds[cont]));
+//     }
+
+//     for (int cont = 0; cont < labels_arr_vec.rows; cont++)
+//     {
+//         samples_shuffled.push_back(data.row(seeds[cont]));
+//     }
+
+//     /*Create Dataset and initialize Classifier*/
+//     cv::Ptr<cv::ml::TrainData> m_traindata = cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, labels_shuffled);
+
+
+
+
+//     statistic_model= cv::ml::RTrees::create();
+//     auto criteria = cv::TermCriteria();
+//     criteria.type = cv::TermCriteria::MAX_ITER;
+// //    criteria.epsilon = 1e-8;
+//     criteria.maxCount = 300;
+
+//     statistic_model->setMaxDepth(10); //set to three
+// //    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
+//     statistic_model->setMinSampleCount(2);
+//     statistic_model->setTruncatePrunedTree(false);
+//     statistic_model->setUse1SERule(false);
+//     statistic_model->setUseSurrogates(false);
+//     statistic_model->setTermCriteria(criteria);
+//     statistic_model->setCVFolds(1);
+//     statistic_model->setPriors(newweight);
+
+
+//     /*Train Classifier*/
+//     MITK_INFO << "Start Training";
+//     statistic_model->train(m_traindata);
+
+
+//     /*Predict on Test Data*/
+//     MITK_INFO << "Predicting";
+
+//     /*Create Dataset as cv::Mat*/
+//     cv::Mat dataTest;
+//     for ( unsigned int i=0; i<m_DistancesTest.size(); i++)
+//     {
+//         float data_arr [m_DistancesTest.at(0).size()];
+
+//         for ( unsigned int j=0; j<m_DistancesTest.at(0).cols(); j++)
+//         {
+//             data_arr[j] = m_DistancesTest.at(i).get(0,j);
+//         }
+//         cv::Mat curdata(1, m_DistancesTest.at(0).size(), CV_32F, data_arr);
+//         dataTest.push_back(curdata);
+//     }
+
+
+//     std::vector<unsigned int> indexPrediction;
+//     std::vector<float> e(m_DistancesTest.size());
+//     std::vector<int> pred(m_DistancesTest.size());
+
+
+//     /*For every Sample/Streamline get Prediction and entropy (=based on counts of Random Forest)*/
+//     MITK_INFO << "Predicting on all cores";
+// #pragma omp parallel for
+//     for (unsigned int i=0; i<m_DistancesTest.size(); i++)
+//     {
+
+
+//         int val = statistic_model->predict(dataTest.row(i));
+//         pred.at(i)=val;
+
+//         #pragma omp critical
+//         if (val==1)
+//         {
+//            indexPrediction.push_back(i);
+//         }
+
+
+//         cv::Mat vote;
+//         statistic_model->getVotes(dataTest.row(i), vote, 0);
+//         e.at(i) = ( -(vote.at<int>(1,0)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1)) * log2((vote.at<int>(1,0)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1))) -
+//                     (vote.at<int>(1,1)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1))* log2((vote.at<int>(1,1)*1.0)/ (vote.at<int>(1,0)+vote.at<int>(1,1))));
+
+//         if (isnan(e.at(i)))
+//         {
+//             e.at(i)=0;
+//         }
+
+//     }
+//     MITK_INFO << "Done";
+
+//     MITK_INFO << "--------------";
+//     MITK_INFO << "Prediction vector size:";
+//     MITK_INFO << indexPrediction.size();
+//     MITK_INFO << "Entropy vector size:";
+//     entropy_vector = e;
+//     MITK_INFO << e.size();
+
+//     MITK_INFO << "--------------";
+
+//   int lengths = std::count_if(e.begin(), e.end(),[&](auto const& val){ return val >= 0.95; });
+//   if (lengths>1500)
+//   {
+//       lengths=1500;
+//   }
+
+
+
+//     int lengthsCertain = std::count_if(e.begin(), e.end(),[&](auto const& val){ return val < 0.1; });
+
+//     std::vector<unsigned int> indexUnc = Sort(e, lengths, 0);
+
+
+
+
+//     MITK_INFO << "Index Uncertainty Vector size";
+//     MITK_INFO << indexUnc.size();
+
+//     index_vec.push_back(indexPrediction);
+//     index_vec.push_back(indexUnc);
+//     index_vec.push_back(indexCertainNeg);
+
+//     return index_vec;
+
+// }
+
+
+
 
 
 
