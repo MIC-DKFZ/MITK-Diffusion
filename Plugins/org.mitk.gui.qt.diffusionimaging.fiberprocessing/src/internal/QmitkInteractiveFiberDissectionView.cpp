@@ -68,6 +68,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_sparse_matrix.h>
 #include <random>    // for std::default_random_engine
 
+#include <thread>
+
 
 #include <mitkBaseRenderer.h>
 #include <mitkRenderingManager.h>
@@ -252,6 +254,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
 
 
+
   // toggle visibility of elements according to selected method
 
 
@@ -261,14 +264,15 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
     m_Controls->m_AddRandomFibers->setEnabled(true);
     m_Controls->m_sellabeling->setEnabled(true);
 
-    // if (m_Controls->m_TestBundleBox->OnPropertyListChanged()){
-    m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
     if  (!prototypesGenerated){
+
         this->SFFPrototypes();
+        
     }
     else{
     }
   }
+
 
 
 
@@ -345,7 +349,7 @@ void QmitkInteractiveFiberDissectionView::OnEndInteraction()
 
 void QmitkInteractiveFiberDissectionView::ResampleTractogram()
 {
-    mitk::DataNode::Pointer node = m_Controls->m_BundleBox->GetSelectedNode();
+    mitk::DataNode::Pointer node = m_testnode;
     auto tractogram = dynamic_cast<mitk::FiberBundle *>(node->GetData());
     mitk::FiberBundle::Pointer tempfib = tractogram->GetDeepCopy();
 
@@ -400,6 +404,9 @@ void QmitkInteractiveFiberDissectionView::ResampleTractogram()
     newnode->SetData( ShuffledBundle );
     newnode->SetName( node->GetName() + "_" + std::to_string(40) );
     this->GetDataStorage()->Add(newnode);
+    m_Controls->m_TestBundleBox->SetSelectedNode(newnode);
+
+
     UpdateGui();
 }
 
@@ -752,8 +759,6 @@ void QmitkInteractiveFiberDissectionView::OnSelectionChanged(berry::IWorkbenchPa
 }
 
 
-
-
 void QmitkInteractiveFiberDissectionView::CreateStreamline()
 {
     m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
@@ -996,6 +1001,7 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
         node2->SetData(m_negativeBundle);
         m_negativeBundleNode = node2;
         this->GetDataStorage()->Add(m_negativeBundleNode);
+        m_negativeBundleNode->SetVisibility(false);
     }
 
     if (!m_positiveBundleNode)
@@ -1263,12 +1269,21 @@ void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
     mitk::FiberBundle::Pointer m_Prediction = mitk::FiberBundle::New(vNewPolyData);
 //    m_Prediction->SetFiberWeights(weights);
 
-//    mitk::DataNode::Pointer node = mitk::DataNode::New();
     node->SetData(m_Prediction);
     node->SetName("Prediction"+s);
 //    this->GetDataStorage()->Add(node);
     m_PredictionNode = node;
     this->GetDataStorage()->Add(m_PredictionNode);
+
+    // mitk::DataNode::Pointer ImgNode = mitk::DataNode::New();
+    // ImgNode =  classifier->m_imgNode;
+    // this->GetDataStorage()->Add(ImgNode);
+
+
+    // mitk::DataNode::Pointer fiberNode = mitk::DataNode::New();
+    // fiberNode =  classifier->m_fiberNode;
+    // this->GetDataStorage()->Add(fiberNode);
+    
     UpdateGui();
 }
 
@@ -1279,11 +1294,14 @@ void QmitkInteractiveFiberDissectionView::CreateCertainNode()
 
     m_CertainMinus = classifier->CreatePrediction(m_index.at(2), false);
     mitk::DataNode::Pointer node = mitk::DataNode::New();
+    
     node->SetData(m_CertainMinus);
     auto s = std::to_string(m_activeCycleCounter);
     node->SetName("m_CertainMinus"+s);
     m_CertainMinusNode = node;
     this->GetDataStorage()->Add(m_CertainMinusNode);
+    
+
 
 //    m_CertainPlus = classifier->CreatePrediction(m_index.at(4));
 //    mitk::DataNode::Pointer node2= mitk::DataNode::New();
@@ -1370,7 +1388,7 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
     curidx =  classifier->GetDistanceData(myval);
     std::vector<unsigned int> myvec = curidx.at(0);
     myvec.resize(m_Controls->m_Numtolabel2->value());
-    MITK_INFO << m_index.at(2).size();
+    MITK_INFO << m_index.at(0).size();
     MITK_INFO << myvec.size();
     m_DistanceLabel = classifier->CreatePrediction(myvec, true);
     mitk::DataNode::Pointer node = mitk::DataNode::New();

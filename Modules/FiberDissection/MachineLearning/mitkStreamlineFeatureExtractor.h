@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // ITK
 #include <itkProcessObject.h>
+#include <itkTractDensityImageFilter.h>
 
 // VTK
 #include <vtkSmartPointer.h>
@@ -76,17 +77,22 @@ public:
 
 
   void CreateClassifier();
-  std::vector<std::vector<unsigned int>>  GetData();
+  std::vector<std::vector<unsigned int>>  Predict();
+  std::vector<std::vector<unsigned int>>  Predict2();
+  // mitk::DataNode::Pointer  Predict2();
+  // std::vector<std::vector<unsigned int>>  PredictLabels();
+  void TrainModel();
 
 //  void CreatePrediction(std::vector<unsigned int> &index);
   mitk::FiberBundle::Pointer CreatePrediction(std::vector<unsigned int> &index, bool removefrompool);
   std::vector<std::vector<unsigned int>> GetDistanceData(float &value);
 
   mitk::FiberBundle::Pointer                  m_Prediction;
+  mitk::DataNode::Pointer                      m_imgNode;
+  mitk::DataNode::Pointer                     m_fiberNode;
   mitk::FiberBundle::Pointer                  m_ToLabel;
 
   std::vector<std::vector<unsigned int>>      m_index;
-  
   std::vector<float> entropy_vector;
   cv::Ptr<cv::ml::RTrees> statistic_model;
 
