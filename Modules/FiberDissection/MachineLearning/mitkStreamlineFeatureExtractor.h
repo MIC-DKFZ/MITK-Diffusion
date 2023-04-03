@@ -79,6 +79,7 @@ public:
   void CreateClassifier();
   std::vector<std::vector<unsigned int>>  Predict();
   std::vector<std::vector<unsigned int>>  Predict2();
+  std::vector<std::vector<unsigned int>>  Predict3();
   // mitk::DataNode::Pointer  Predict2();
   // std::vector<std::vector<unsigned int>>  PredictLabels();
   void TrainModel();
@@ -86,6 +87,8 @@ public:
 //  void CreatePrediction(std::vector<unsigned int> &index);
   mitk::FiberBundle::Pointer CreatePrediction(std::vector<unsigned int> &index, bool removefrompool);
   std::vector<std::vector<unsigned int>> GetDistanceData(float &value);
+  std::vector<std::vector<unsigned int>> GetDistanceData2(float &value);
+  std::vector<unsigned int> GetIndex(std::vector< vnl_matrix<float>> distances);
 
   mitk::FiberBundle::Pointer                  m_Prediction;
   mitk::DataNode::Pointer                      m_imgNode;
@@ -93,6 +96,7 @@ public:
   mitk::FiberBundle::Pointer                  m_ToLabel;
 
   std::vector<std::vector<unsigned int>>      m_index;
+  std::vector<unsigned int>                   myindex;
   std::vector<float> entropy_vector;
   cv::Ptr<cv::ml::RTrees> statistic_model;
 

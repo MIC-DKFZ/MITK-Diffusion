@@ -1201,6 +1201,7 @@ void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
     MITK_INFO << "Create Prediction";
 
     m_Prediction = classifier->CreatePrediction(m_index.at(0), false);
+    // m_Prediction = classifier->CreatePrediction(classifier->myindex, false);
 
 
 
@@ -1385,7 +1386,7 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
     float myval = m_Controls->m_subsetfft->value() * 0.01;
     MITK_INFO << myval;
     std::vector<std::vector<unsigned int>> curidx;
-    curidx =  classifier->GetDistanceData(myval);
+    curidx =  classifier->GetDistanceData2(myval);
     std::vector<unsigned int> myvec = curidx.at(0);
     myvec.resize(m_Controls->m_Numtolabel2->value());
     MITK_INFO << m_index.at(0).size();
@@ -1453,19 +1454,38 @@ void QmitkInteractiveFiberDissectionView::RemovefromUncertaintyBrush( bool check
 void QmitkInteractiveFiberDissectionView::RemovefromDistance( bool checked )
 {
     if (checked)
+    // if (checked)
     {
+        m_Controls->m_unclabeling->setChecked(false);
+        m_Controls->m_predlabelingBrush->setChecked(false);
+        m_Controls->m_predlabeling->setChecked(false);
 
         m_DistanceLabel->SetFiberColors(255, 255, 255);
-        m_StreamlineInteractor->EnableInteraction(true);
-        m_StreamlineInteractor->LabelfromPrediction(false);
-        m_StreamlineInteractor->SetToLabelNode(m_DistanceLabelNode);
+        this->CreateStreamlineInteractorBrush();
+        m_StreamlineInteractorBrush->EnableInteraction(true);
+        m_StreamlineInteractorBrush->LabelfromPrediction(false);
+        m_StreamlineInteractorBrush->SetNegativeNode(m_negativeBundleNode);
+        m_StreamlineInteractorBrush->SetPositiveNode(m_positiveBundleNode);
+        m_StreamlineInteractorBrush->SetToLabelNode(m_DistanceLabelNode);
     }
     else
     {
-      m_StreamlineInteractor->EnableInteraction(false);
+      m_StreamlineInteractorBrush->EnableInteraction(false);
 //      m_StreamlineInteractor = nullptr;
     }
     RenderingManager::GetInstance()->RequestUpdateAll();
+
+//         m_DistanceLabel->SetFiberColors(255, 255, 255);
+//         m_StreamlineInteractor->EnableInteraction(true);
+//         m_StreamlineInteractor->LabelfromPrediction(false);
+//         m_StreamlineInteractor->SetToLabelNode(m_DistanceLabelNode);
+//     }
+//     else
+//     {
+//       m_StreamlineInteractor->EnableInteraction(false);
+// //      m_StreamlineInteractor = nullptr;
+//     }
+//     RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
 void QmitkInteractiveFiberDissectionView::RemovefromPrediction( bool checked )
