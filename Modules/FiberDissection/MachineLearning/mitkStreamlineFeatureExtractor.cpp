@@ -76,7 +76,7 @@ void StreamlineFeatureExtractor::SetTractogramPrototypes(const mitk::FiberBundle
 
 void StreamlineFeatureExtractor::SetActiveCycle(int &activeCycle)
 {
-  m_activeCycle= activeCycle;
+  m_activeCycle = activeCycle;
 }
 
 
@@ -187,19 +187,22 @@ for (std::size_t i = 0; i < tractogram.size(); ++i)
         // Calculate the mean distance between the current tractogram item and the current prototype
         const double mean_single_distances = single_distances.mean();
         const double mean_single_distances_flip = single_distances_flip.mean();
-        distances(0, j) = mean_single_distances_flip > mean_single_distances ? mean_single_distances : mean_single_distances_flip;
+        // distances(0, j) = mean_single_distances_flip > mean_single_distances ? mean_single_distances : mean_single_distances_flip;
 
         // // Calculate the mean END distance between the current tractogram item and the current prototype
         const double mean_single_end_distances = single_end_distances.mean();
         const double mean_single_end_distances_flip = single_end_distances_flip.mean();
         const std::size_t end_distances_index = prototypes.size() + j;
-        distances(0, end_distances_index) = mean_single_end_distances_flip > mean_single_end_distances ? mean_single_distances : mean_single_end_distances_flip;
+        distances(0, j) = mean_single_end_distances_flip > mean_single_end_distances ? mean_single_distances : mean_single_end_distances_flip;
+
+        distances(0, end_distances_index) = mean_single_distances_flip > mean_single_distances ? mean_single_distances : mean_single_distances_flip;
     }
 
         dist_vec[i] = distances;
     }
 
     MITK_INFO << "The size of the distances is " <<dist_vec[0].cols();
+    MITK_INFO << "The size of the distances is " <<dist_vec[0].rows();
     MITK_INFO << "Done calculating Dmdf";
 
     return dist_vec;
@@ -422,15 +425,16 @@ void StreamlineFeatureExtractor::GenerateData()
     T_TractogramTest= ResampleFibers(m_TractogramTest);
     MITK_INFO << "Calculate Features of Test Data";
     m_DistancesTest= CalculateDmdf(T_TractogramTest, T_mergedPrototypes);
+    MITK_INFO << m_DistancesTest.size();
 
-    myindex = GetIndex(m_DistancesTest);
+    // if (m_activeCycle == 0){
+    myindex = GetIndex(m_DistancesTest);    
+    // }
+    
     
 
 
 
-
-
-    MITK_INFO << "Done with Datacreation";
 
     TrainModel();
     // m_index = PredictLabels();
@@ -444,30 +448,25 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
     std::vector<unsigned int> indices;
     unsigned int num_matrices = distances.size();
 
-    // const vnl_vector<float> row = matrix.get_row(last_row_index);
-    // const float max_value = row.max_value();
-
-    // MITK_INFO << "Maxvalue " << max_value;
     for (unsigned int i = 0; i < num_matrices; ++i) {
-        const vnl_matrix<float>& matrix = distances[i];
-        unsigned int num_rows = matrix.rows();
-        unsigned int last_row_index = num_rows - 1;
-        bool last_row_below_10 = true;
 
-        for (unsigned int j = 0; j < matrix.cols(); ++j) {
-            if (matrix(last_row_index, j) >= 100.0f) {
-                last_row_below_10 = false;
-                break;
-            }
+        const vnl_matrix<float>& matrix = distances[i];
+        unsigned int num_cols = matrix.cols();
+        unsigned int last_col_index = num_cols - 1;
+        bool last_col_below_10 = true;
+        if (matrix(0, last_col_index) >= 40) {
+            last_col_below_10 = false;
+            // break;
         }
-        if (last_row_below_10) {
+        
+        if (last_col_below_10) {
             indices.push_back(i);
         }
     }
-    MITK_INFO << "Size" << indices.size();
-  return indices;
+    std::cout << "Number of matrices: " << num_matrices << std::endl;
+    std::cout << "Number of indices: " << indices.size() << std::endl;
+    return indices;
 }
-
 
 vnl_vector<float> StreamlineFeatureExtractor::ValidationPipe()
 {
@@ -1282,9 +1281,9 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetDistanceD
 //    int lengths=500;
     MITK_INFO << entropy_vector.size();
   int lengths = std::count_if(entropy_vector.begin(), entropy_vector.end(),[&](auto const& val){ return val >= value; });
-  if (lengths>500)
+  if (lengths>250)
   {
-      lengths=500;
+      lengths=250;
   }
   MITK_INFO << lengths;
 

@@ -91,7 +91,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -115,7 +115,7 @@ QGroupBox {
           <number>0</number>
          </property>
          <property name="currentIndex">
-          <number>0</number>
+          <number>1</number>
          </property>
          <widget class="QWidget" name="Defaults">
           <property name="geometry">
@@ -167,8 +167,8 @@ QGroupBox {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>273</width>
-            <height>171</height>
+            <width>381</width>
+            <height>390</height>
            </rect>
           </property>
           <attribute name="label">
@@ -191,7 +191,7 @@ QGroupBox {
               <number>200</number>
              </property>
              <property name="value">
-              <number>100</number>
+              <number>75</number>
              </property>
             </widget>
            </item>
@@ -505,7 +505,7 @@ QGroupBox {
                <x>0</x>
                <y>0</y>
                <width>363</width>
-               <height>163</height>
+               <height>172</height>
               </rect>
              </property>
              <attribute name="label">
@@ -726,8 +726,8 @@ QGroupBox {
               <rect>
                <x>0</x>
                <y>0</y>
-               <width>371</width>
-               <height>329</height>
+               <width>337</width>
+               <height>204</height>
               </rect>
              </property>
              <attribute name="label">

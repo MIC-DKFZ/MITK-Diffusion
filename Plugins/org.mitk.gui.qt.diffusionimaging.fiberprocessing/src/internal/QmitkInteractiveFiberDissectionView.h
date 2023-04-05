@@ -166,6 +166,7 @@ protected:
   mitk::DataNode::Pointer               m_DistanceLabelNode;
   mitk::DataNode::Pointer               m_reducedFibersDataNode;
   mitk::DataNode::Pointer               m_Prototypes;
+  mitk::DataNode::Pointer               m_newtestnode;
 
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
