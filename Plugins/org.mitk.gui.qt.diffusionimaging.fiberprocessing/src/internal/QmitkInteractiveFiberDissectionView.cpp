@@ -1214,69 +1214,69 @@ void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
     auto s = std::to_string(m_activeCycleCounter);
     node->SetName("Prediction"+s);
     m_PredictionNode = node;
-//     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_PredictionNode->GetData());
-//     mitk::FiberBundle::Pointer fib_true = dynamic_cast<mitk::FiberBundle*>(m_positiveBundleNode->GetData());
-//     vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-//     vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-//     vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
+    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_PredictionNode->GetData());
+    mitk::FiberBundle::Pointer fib_true = dynamic_cast<mitk::FiberBundle*>(m_positiveBundleNode->GetData());
+    vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
+    vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
 
-//     vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
+    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
 
-//      /* Check wether all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
-//     unsigned int counter = 0;
+     /* Check wether all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
+    unsigned int counter = 0;
 
-//     for (int i=0; i<fib->GetFiberPolyData()->GetNumberOfCells(); i++)
-//     {
-//       vtkCell* cell = fib->GetFiberPolyData()->GetCell(i);
-//       auto numPoints = cell->GetNumberOfPoints();
-//       vtkPoints* points = cell->GetPoints();
+    for (int i=0; i<fib->GetFiberPolyData()->GetNumberOfCells(); i++)
+    {
+      vtkCell* cell = fib->GetFiberPolyData()->GetCell(i);
+      auto numPoints = cell->GetNumberOfPoints();
+      vtkPoints* points = cell->GetPoints();
 
-//       vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-//       for (unsigned int j=0; j<numPoints; j++)
-//       {
-//         double p[3];
-//         points->GetPoint(j, p);
+      vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+      for (unsigned int j=0; j<numPoints; j++)
+      {
+        double p[3];
+        points->GetPoint(j, p);
 
-//         vtkIdType id = vNewPoints->InsertNextPoint(p);
-//         container->GetPointIds()->InsertNextId(id);
-//       }
-//       weights->InsertValue(counter, fib->GetFiberWeight(i));
-//       vNewLines->InsertNextCell(container);
-//       counter++;
+        vtkIdType id = vNewPoints->InsertNextPoint(p);
+        container->GetPointIds()->InsertNextId(id);
+      }
+      weights->InsertValue(counter, fib->GetFiberWeight(i));
+      vNewLines->InsertNextCell(container);
+      counter++;
 
-//     }
-//     for (int i=0; i<fib_true->GetFiberPolyData()->GetNumberOfCells(); i++)
-//     {
-//       vtkCell* cell = fib_true->GetFiberPolyData()->GetCell(i);
-//       auto numPoints = cell->GetNumberOfPoints();
-//       vtkPoints* points = cell->GetPoints();
+    }
+    for (int i=0; i<fib_true->GetFiberPolyData()->GetNumberOfCells(); i++)
+    {
+      vtkCell* cell = fib_true->GetFiberPolyData()->GetCell(i);
+      auto numPoints = cell->GetNumberOfPoints();
+      vtkPoints* points = cell->GetPoints();
 
-//       vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-//       for (unsigned int j=0; j<numPoints; j++)
-//       {
-//         double p[3];
-//         points->GetPoint(j, p);
+      vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+      for (unsigned int j=0; j<numPoints; j++)
+      {
+        double p[3];
+        points->GetPoint(j, p);
 
-//         vtkIdType id = vNewPoints->InsertNextPoint(p);
-//         container->GetPointIds()->InsertNextId(id);
-//       }
-// //      weights->InsertValue(counter, fib_true->GetFiberWeight(i));
-//       vNewLines->InsertNextCell(container);
-//       counter++;
+        vtkIdType id = vNewPoints->InsertNextPoint(p);
+        container->GetPointIds()->InsertNextId(id);
+      }
+//      weights->InsertValue(counter, fib_true->GetFiberWeight(i));
+      vNewLines->InsertNextCell(container);
+      counter++;
 
-//     }
+    }
 
 
-//     vNewPolyData->SetLines(vNewLines);
-//     vNewPolyData->SetPoints(vNewPoints);
+    vNewPolyData->SetLines(vNewLines);
+    vNewPolyData->SetPoints(vNewPoints);
 
-//     mitk::FiberBundle::Pointer m_Prediction = mitk::FiberBundle::New(vNewPolyData);
-// //    m_Prediction->SetFiberWeights(weights);
+    mitk::FiberBundle::Pointer m_Prediction = mitk::FiberBundle::New(vNewPolyData);
+//    m_Prediction->SetFiberWeights(weights);
 
-//     node->SetData(m_Prediction);
-//     node->SetName("Prediction"+s);
-// //    this->GetDataStorage()->Add(node);
-//     m_PredictionNode = node;
+    node->SetData(m_Prediction);
+    node->SetName("Prediction"+s);
+//    this->GetDataStorage()->Add(node);
+    m_PredictionNode = node;
     this->GetDataStorage()->Add(m_PredictionNode);
 
     // mitk::DataNode::Pointer ImgNode = mitk::DataNode::New();

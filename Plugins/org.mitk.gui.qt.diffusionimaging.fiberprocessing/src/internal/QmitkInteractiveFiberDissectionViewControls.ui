@@ -91,7 +91,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>2</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -115,7 +115,7 @@ QGroupBox {
           <number>0</number>
          </property>
          <property name="currentIndex">
-          <number>1</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="Defaults">
           <property name="geometry">
@@ -706,7 +706,7 @@ QGroupBox {
                 </property>
                </spacer>
               </item>
-              <item row="2" column="7" colspan="2">
+              <item row="2" column="6" colspan="3">
                <spacer name="horizontalSpacer_6">
                 <property name="orientation">
                  <enum>Qt::Horizontal</enum>
@@ -726,8 +726,8 @@ QGroupBox {
               <rect>
                <x>0</x>
                <y>0</y>
-               <width>337</width>
-               <height>204</height>
+               <width>361</width>
+               <height>212</height>
               </rect>
              </property>
              <attribute name="label">
