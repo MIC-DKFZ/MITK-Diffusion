@@ -613,9 +613,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
           vNewPolyData->SetLines(vNewLines);
 
   //        m_NegStreamline = mitk::FiberBundle::New(vNewPolyData);
-          m_NegStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-          m_NegStreamline->GetFiberPolyData()->SetLines(vNewLines);
-          m_NegStreamline->SetFiberColors(255, 0, 0);
 //            m_NegStreamline->SetFiberWeights(m_NegStreamline->GetFiberWeights());
 
           m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
@@ -623,6 +620,12 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
 
           if (m_predlabeling==false)
           {
+          
+
+          m_NegStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
+          m_NegStreamline->GetFiberPolyData()->SetLines(vNewLines);
+          m_NegStreamline->SetFiberColors(255, 0, 0);
+          
           vtkSmartPointer<vtkPolyData> vNewPolyData2 = vtkSmartPointer<vtkPolyData>::New();
           vtkSmartPointer<vtkCellArray> vNewLines2 = vtkSmartPointer<vtkCellArray>::New();
           vtkSmartPointer<vtkPoints> vNewPoints2 = vtkSmartPointer<vtkPoints>::New();
@@ -743,45 +746,46 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
             vNewPolyData->SetLines(vNewLines);
 
     //        m_NegStreamline = mitk::FiberBundle::New(vNewPolyData);
-            m_NegStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-            m_NegStreamline->GetFiberPolyData()->SetLines(vNewLines);
-            m_NegStreamline->SetFiberColors(255, 0, 0);
 
             m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
             m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
 
             if (m_predlabeling==false)
             {
-                vtkSmartPointer<vtkPolyData> vNewPolyData2 = vtkSmartPointer<vtkPolyData>::New();
-                vtkSmartPointer<vtkCellArray> vNewLines2 = vtkSmartPointer<vtkCellArray>::New();
-                vtkSmartPointer<vtkPoints> vNewPoints2 = vtkSmartPointer<vtkPoints>::New();
+
+              m_NegStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
+              m_NegStreamline->GetFiberPolyData()->SetLines(vNewLines);
+              m_NegStreamline->SetFiberColors(255, 0, 0);
+              vtkSmartPointer<vtkPolyData> vNewPolyData2 = vtkSmartPointer<vtkPolyData>::New();
+              vtkSmartPointer<vtkCellArray> vNewLines2 = vtkSmartPointer<vtkCellArray>::New();
+              vtkSmartPointer<vtkPoints> vNewPoints2 = vtkSmartPointer<vtkPoints>::New();
 
 
-                counter = 0;
-                for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-                {
+              counter = 0;
+              for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
+              {
 
-                vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
-                auto numPoints = cell->GetNumberOfPoints();
-                vtkPoints* points = cell->GetPoints();
+              vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
+              auto numPoints = cell->GetNumberOfPoints();
+              vtkPoints* points = cell->GetPoints();
 
-                vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-                for (unsigned int j=0; j<numPoints; j++)
-                {
-                  double p[3];
-                  points->GetPoint(j, p);
+              vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+              for (unsigned int j=0; j<numPoints; j++)
+              {
+                double p[3];
+                points->GetPoint(j, p);
 
-                  vtkIdType id = vNewPoints2->InsertNextPoint(p);
-                  container->GetPointIds()->InsertNextId(id);
-                }
-                //    weights->InsertValue(counter, fib->GetFiberWeight(i));
-                vNewLines2->InsertNextCell(container);
-                counter++;
+                vtkIdType id = vNewPoints2->InsertNextPoint(p);
+                container->GetPointIds()->InsertNextId(id);
+              }
+              //    weights->InsertValue(counter, fib->GetFiberWeight(i));
+              vNewLines2->InsertNextCell(container);
+              counter++;
 
-                }
-                m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints2);
-                m_manStreamline->GetFiberPolyData()->SetLines(vNewLines2);
-                m_manStreamline->SetFiberColors(255, 255, 255);
+              }
+              m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints2);
+              m_manStreamline->GetFiberPolyData()->SetLines(vNewLines2);
+              m_manStreamline->SetFiberColors(255, 255, 255);
             }
 
         }
