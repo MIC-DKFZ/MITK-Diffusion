@@ -92,6 +92,7 @@ QmitkInteractiveFiberDissectionView::QmitkInteractiveFiberDissectionView()
   , m_RandomExtractionCounter(0)
   , m_activeCycleCounter(0)
   , m_createdStreamlineCounter(0)
+  , m_prototypecounter(0)
   , m_StreamlineInteractor(nullptr)
 {
 
@@ -238,7 +239,16 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   m_Controls->m_AddUncertainFibers->setEnabled(false);
 
   mitk::DataNode::Pointer curtestnode =  m_Controls->m_TestBundleBox->GetSelectedNode();
-  bool testnodeSelected = curtestnode.IsNotNull();
+  if (m_activeCycleCounter>0 && curtestnode!=m_testnode){
+    MITK_INFO << "Testnode changed";
+    m_activeCycleCounter=0;
+  }
+  else if (m_activeCycleCounter>0 && curtestnode==m_testnode){
+      MITK_INFO << "Testnodes are the same";
+  }
+
+
+  bool testnodeSelected = curtestnode.IsNotNull(); 
   bool prototypesGenerated = m_Prototypes.IsNotNull();
   bool fibSelected = !m_SelectedFB.empty();
   bool multipleFibsSelected = (m_SelectedFB.size()>1);
@@ -257,10 +267,11 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
 
   // are fiber bundles selected?
-  if ( testnodeSelected )
+  if ( testnodeSelected)
   {
-    if  (!prototypesGenerated){
+    if  (!prototypesGenerated  && m_prototypecounter==0){
         this->SFFPrototypes();
+        MITK_INFO << "Not";
     }
   }
 
@@ -466,199 +477,171 @@ void QmitkInteractiveFiberDissectionView::RandomPrototypes()
 
 void QmitkInteractiveFiberDissectionView::SFFPrototypes()
 {   
-    m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
-    if (m_Prototypes.IsNotNull()){
-        this->GetDataStorage()->Remove(m_Prototypes);
-    }
+    if (m_prototypecounter==0){
+        MITK_INFO << "Create prototypes";
+        m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
 
-     MITK_INFO << "Number of Fibers to use as Prototypes: ";
-     MITK_INFO << m_Controls->m_NumPrototypes->value();
-     MITK_INFO << "Start Creating Prototypes based on SFF";
+        if (m_Prototypes.IsNotNull()){
+            this->GetDataStorage()->Remove(m_Prototypes);
+        }
 
-      mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
+        MITK_INFO << "Number of Fibers to use as Prototypes: ";
+        MITK_INFO << m_Controls->m_NumPrototypes->value();
+        MITK_INFO << "Start Creating Prototypes based on SFF";
 
-      /* Get Subset of Tractogram*/
-      int size_subset = std::max(1.0, ceil(3.0 * m_Controls->m_NumPrototypes->value() * std::log(m_Controls->m_NumPrototypes->value())));
+        mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
 
-      MITK_INFO << fib->GetNumFibers();
-      std::vector<int> myvec;
-      for (unsigned int k=0; k<fib->GetNumFibers(); k++)
-      {
-        myvec.push_back(k);
-      }
+        /* Get Subset of Tractogram*/
+        int size_subset = std::max(1.0, ceil(3.0 * m_Controls->m_NumPrototypes->value() * std::log(m_Controls->m_NumPrototypes->value())));
 
-//      std::random_shuffle(std::begin(myvec), std::end(myvec));
-
-      vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-      vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-      vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-      vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
+        MITK_INFO << fib->GetNumFibers();
+        std::vector<int> myvec;
+        for (unsigned int k=0; k<fib->GetNumFibers(); k++){
+            myvec.push_back(k);
+        }
 
 
-      unsigned int counter = 0;
+        vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
+        vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
+        vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
 
-      for (int i=0; i<size_subset; i++)
-      {
-        vtkCell* cell = fib->GetFiberPolyData()->GetCell(myvec.at(i));
-        auto numPoints = cell->GetNumberOfPoints();
-        vtkPoints* points = cell->GetPoints();
+        vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
 
-        vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-        for (unsigned int j=0; j<numPoints; j++)
+
+        unsigned int counter = 0;
+
+        for (int i=0; i<size_subset; i++){
+            vtkCell* cell = fib->GetFiberPolyData()->GetCell(myvec.at(i));
+            auto numPoints = cell->GetNumberOfPoints();
+            vtkPoints* points = cell->GetPoints();
+
+            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+            for (unsigned int j=0; j<numPoints; j++)
+            {
+            double p[3];
+            points->GetPoint(j, p);
+
+            vtkIdType id = vNewPoints->InsertNextPoint(p);
+            container->GetPointIds()->InsertNextId(id);
+            }
+            weights->InsertValue(counter, fib->GetFiberWeight(myvec.at(i)));
+            vNewLines->InsertNextCell(container);
+            counter++;
+
+        }
+
+
+        vNewPolyData->SetLines(vNewLines);
+        vNewPolyData->SetPoints(vNewPoints);
+
+        mitk::FiberBundle::Pointer temp_fib = mitk::FiberBundle::New(vNewPolyData);
+        temp_fib->SetFiberWeights(weights);
+
+        MITK_INFO << temp_fib->GetFiberPolyData()->GetNumberOfCells();
+        /* Create std::vector <vnl_matrix> of the SubsetBundle*/
+        std::vector< vnl_matrix<float> > out_fib(temp_fib->GetFiberPolyData()->GetNumberOfCells());
+
+        for (int i=0; i<temp_fib->GetFiberPolyData()->GetNumberOfCells(); i++){
+            vtkCell* cell = temp_fib->GetFiberPolyData()->GetCell(i);
+            int numPoints = cell->GetNumberOfPoints();
+            vtkPoints* points = cell->GetPoints();
+
+            vnl_matrix<float> streamline;
+            streamline.set_size(3, cell->GetNumberOfPoints());
+            streamline.fill(0.0);
+
+            for (int j=0; j<numPoints; j++)
+            {
+            double cand[3];
+            points->GetPoint(j, cand);
+
+            vnl_vector_fixed< float, 3 > candV;
+            candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
+            streamline.set_column(j, candV);
+            }
+            out_fib.at(i)=streamline;
+        }
+
+
+        /* Calculate the distancematrix of Subset*/
+        std::vector< vnl_matrix<float> >  dist_vec(out_fib.size());//
+        cv::parallel_for_(cv::Range(0, out_fib.size()), [&](const cv::Range &range){
+            for (int i = range.start; i < range.end; i++){
+                vnl_matrix<float> distances;
+                distances.set_size(1, out_fib.size());
+                distances.fill(0.0);
+                
+                for (unsigned int j=0; j<out_fib.size(); j++){
+                    vnl_matrix<float> single_distances;
+                    single_distances.set_size(1, out_fib.at(0).cols());
+                    single_distances.fill(0.0);
+                    vnl_matrix<float> single_distances_flip;
+                    single_distances_flip.set_size(1, out_fib.at(0).cols());
+                    single_distances_flip.fill(0.0);
+                    for (unsigned int ik=0; ik<out_fib.at(0).cols(); ik++){
+                        double cur_dist;
+                        double cur_dist_flip;
+                        cur_dist = sqrt(pow(out_fib.at(i).get(0,ik) - out_fib.at(j).get(0,ik), 2.0) +
+                                                pow(out_fib.at(i).get(1,ik) - out_fib.at(j).get(1,ik), 2.0) +
+                                                pow(out_fib.at(i).get(2,ik) - out_fib.at(j).get(2,ik), 2.0));
+                        cur_dist_flip = sqrt(pow(out_fib.at(i).get(0,ik) - out_fib.at(j).get(0,out_fib.at(0).cols()-(ik+1)), 2.0) +
+                                                pow(out_fib.at(i).get(1,ik) - out_fib.at(j).get(1,out_fib.at(0).cols()-(ik+1)), 2.0) +
+                                                pow(out_fib.at(i).get(2,ik) - out_fib.at(j).get(2,out_fib.at(0).cols()-(ik+1)), 2.0));
+
+                        single_distances.put(0,ik, cur_dist);
+                        single_distances_flip.put(0,ik, cur_dist_flip);
+
+                    }
+
+                    if (single_distances_flip.mean()> single_distances.mean()){
+                        distances.put(0,j, single_distances.mean());
+                    }
+                    else {
+                        distances.put(0,j, single_distances_flip.mean());
+                    }
+
+
+
+                }
+                dist_vec.at(i) = distances;
+            }
+        });
+
+
+        /*Index to find values in distancematrix*/
+        std::vector<unsigned int> myidx;
+        myidx.push_back(0);
+
+        /*Vecotr that stores minvalues of current iteration*/
+        vnl_matrix<float> cur_vec;
+        cur_vec.set_size(1, size_subset);
+        cur_vec.fill(0.0);
+        for (int i=0; i<m_Controls->m_NumPrototypes->value(); i++)
         {
-          double p[3];
-          points->GetPoint(j, p);
 
-          vtkIdType id = vNewPoints->InsertNextPoint(p);
-          container->GetPointIds()->InsertNextId(id);
-        }
-        weights->InsertValue(counter, fib->GetFiberWeight(myvec.at(i)));
-        vNewLines->InsertNextCell(container);
-        counter++;
+            vnl_matrix<float> sum_matrix;
+            sum_matrix.set_size(myidx.size(), size_subset);
+            sum_matrix.fill(0);
+            for (unsigned int ii=0; ii<myidx.size(); ii++){
+                sum_matrix.set_row(ii, dist_vec.at(myidx.at(ii)).get_row(0));
+            }
 
-      }
-
-
-      vNewPolyData->SetLines(vNewLines);
-      vNewPolyData->SetPoints(vNewPoints);
-
-      mitk::FiberBundle::Pointer temp_fib = mitk::FiberBundle::New(vNewPolyData);
-      temp_fib->SetFiberWeights(weights);
-
-      MITK_INFO << temp_fib->GetFiberPolyData()->GetNumberOfCells();
-      /* Create std::vector <vnl_matrix> of the SubsetBundle*/
-      std::vector< vnl_matrix<float> > out_fib(temp_fib->GetFiberPolyData()->GetNumberOfCells());
-
-      for (int i=0; i<temp_fib->GetFiberPolyData()->GetNumberOfCells(); i++)
-      {
-        vtkCell* cell = temp_fib->GetFiberPolyData()->GetCell(i);
-        int numPoints = cell->GetNumberOfPoints();
-        vtkPoints* points = cell->GetPoints();
-
-        vnl_matrix<float> streamline;
-        streamline.set_size(3, cell->GetNumberOfPoints());
-        streamline.fill(0.0);
-
-        for (int j=0; j<numPoints; j++)
-        {
-          double cand[3];
-          points->GetPoint(j, cand);
-
-          vnl_vector_fixed< float, 3 > candV;
-          candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
-          streamline.set_column(j, candV);
-        }
-
-    //        out_fib.push_back(streamline);
-        out_fib.at(i)=streamline;
-      }
-
-
-      /* Calculate the distancematrix of Subset*/
-      std::vector< vnl_matrix<float> >  dist_vec(out_fib.size());//
-      cv::parallel_for_(cv::Range(0, out_fib.size()), [&](const cv::Range &range)
-      {
-      for (int i = range.start; i < range.end; i++)
-
-  //    for (unsigned int i=0; i<tractogram.size(); i++)
-      {
-
-          vnl_matrix<float> distances;
-          distances.set_size(1, out_fib.size());
-          distances.fill(0.0);
-
-
-          for (unsigned int j=0; j<out_fib.size(); j++)
-          {
-              vnl_matrix<float> single_distances;
-              single_distances.set_size(1, out_fib.at(0).cols());
-              single_distances.fill(0.0);
-              vnl_matrix<float> single_distances_flip;
-              single_distances_flip.set_size(1, out_fib.at(0).cols());
-              single_distances_flip.fill(0.0);
-              for (unsigned int ik=0; ik<out_fib.at(0).cols(); ik++)
-              {
-                  double cur_dist;
-                  double cur_dist_flip;
-
-                  cur_dist = sqrt(pow(out_fib.at(i).get(0,ik) - out_fib.at(j).get(0,ik), 2.0) +
-                                         pow(out_fib.at(i).get(1,ik) - out_fib.at(j).get(1,ik), 2.0) +
-                                         pow(out_fib.at(i).get(2,ik) - out_fib.at(j).get(2,ik), 2.0));
-
-                  cur_dist_flip = sqrt(pow(out_fib.at(i).get(0,ik) - out_fib.at(j).get(0,out_fib.at(0).cols()-(ik+1)), 2.0) +
-                                         pow(out_fib.at(i).get(1,ik) - out_fib.at(j).get(1,out_fib.at(0).cols()-(ik+1)), 2.0) +
-                                         pow(out_fib.at(i).get(2,ik) - out_fib.at(j).get(2,out_fib.at(0).cols()-(ik+1)), 2.0));
-
-                  single_distances.put(0,ik, cur_dist);
-                  single_distances_flip.put(0,ik, cur_dist_flip);
-
-              }
-
-              if (single_distances_flip.mean()> single_distances.mean())
-              {
-                  distances.put(0,j, single_distances.mean());
-              }
-              else {
-                  distances.put(0,j, single_distances_flip.mean());
-              }
-
-
-
-          }
-  //        dist_vec.push_back(distances);
-          dist_vec.at(i) = distances;
-      }
-      });
-
-
-      /*Index to find values in distancematrix*/
-      std::vector<unsigned int> myidx;
-      /*Index to find actual streamlines using indexUnc*/
-      std::vector<unsigned int> indexUncDist;
-      /*Start with the Streamline of the highest entropy, which is in distance_matrix at idx 0*/
-      myidx.push_back(0);
-
-      /*Vecotr that stores minvalues of current iteration*/
-      vnl_matrix<float> cur_vec;
-      cur_vec.set_size(1, size_subset);
-      cur_vec.fill(0.0);
-      for (int i=0; i<m_Controls->m_NumPrototypes->value(); i++)
-      {
-
-  //        unsigned int cur_i = indexUnc.at(myidx.at(i));
-
-          /*Save mean distance of all used Samples*/
-
-          vnl_matrix<float> sum_matrix;
-          sum_matrix.set_size(myidx.size(), size_subset);
-          sum_matrix.fill(0);
-          for (unsigned int ii=0; ii<myidx.size(); ii++)
-          {
-
-              sum_matrix.set_row(ii, dist_vec.at(myidx.at(ii)).get_row(0));
-          }
-
-          for (unsigned int k=0; k<sum_matrix.columns(); k++)
-          {
-              cur_vec.put(0,k, sum_matrix.get_column(k).min_value());
-          }
-          myidx.push_back(cur_vec.arg_max());
-          sum_matrix.clear();
+            for (unsigned int k=0; k<sum_matrix.columns(); k++){
+                cur_vec.put(0,k, sum_matrix.get_column(k).min_value());
+            }
+            myidx.push_back(cur_vec.arg_max());
+            sum_matrix.clear();
 
         }
-          vtkSmartPointer<vtkPolyData> vNewPolyData2 = vtkSmartPointer<vtkPolyData>::New();
-          vtkSmartPointer<vtkCellArray> vNewLines2 = vtkSmartPointer<vtkCellArray>::New();
-          vtkSmartPointer<vtkPoints> vNewPoints2 = vtkSmartPointer<vtkPoints>::New();
+        vtkSmartPointer<vtkPolyData> vNewPolyData2 = vtkSmartPointer<vtkPolyData>::New();
+        vtkSmartPointer<vtkCellArray> vNewLines2 = vtkSmartPointer<vtkCellArray>::New();
+        vtkSmartPointer<vtkPoints> vNewPoints2 = vtkSmartPointer<vtkPoints>::New();
 
-          vtkSmartPointer<vtkFloatArray> weights2 = vtkSmartPointer<vtkFloatArray>::New();
+        vtkSmartPointer<vtkFloatArray> weights2 = vtkSmartPointer<vtkFloatArray>::New();
 
-           /* Check wether all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
-          counter = 0;
+        counter = 0;
 
-          for (int i=0; i<m_Controls->m_NumPrototypes->value(); i++)
-          {
-
+        for (int i=0; i<m_Controls->m_NumPrototypes->value(); i++){
             vtkCell* cell = fib->GetFiberPolyData()->GetCell(myidx.at(i));
             auto numPoints = cell->GetNumberOfPoints();
             vtkPoints* points = cell->GetPoints();
@@ -666,41 +649,42 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
             vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
             for (unsigned int j=0; j<numPoints; j++)
             {
-              double p[3];
-              points->GetPoint(j, p);
+            double p[3];
+            points->GetPoint(j, p);
 
-              vtkIdType id = vNewPoints2->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
+            vtkIdType id = vNewPoints2->InsertNextPoint(p);
+            container->GetPointIds()->InsertNextId(id);
             }
             weights2->InsertValue(counter, fib->GetFiberWeight(myvec.at(i)));
             vNewLines2->InsertNextCell(container);
             counter++;
 
-          }
+        }
 
-          vNewPolyData2->SetLines(vNewLines2);
-          vNewPolyData2->SetPoints(vNewPoints2);
+        vNewPolyData2->SetLines(vNewLines2);
+        vNewPolyData2->SetPoints(vNewPoints2);
 
-          mitk::FiberBundle::Pointer PrototypesBundle = mitk::FiberBundle::New(vNewPolyData2);
-          PrototypesBundle->SetFiberWeights(weights2);
-          MITK_INFO << "Number of cells: " << PrototypesBundle->GetFiberPolyData()->GetNumberOfCells();
-
-
-
-      mitk::DataNode::Pointer node = mitk::DataNode::New();
-      node->SetData(PrototypesBundle);
-      node->SetName("Prototypes");
-
-      m_Prototypes = node;
-////      MITK_INFO << "Number of Streamlines in first function";
-////      MITK_INFO << m_newfibersBundleNode->GetData()->GetFiberPolyData()->GetNumberOfCells();
-      m_Controls->m_PrototypeBox->SetAutoSelectNewItems (true);
-      this->GetDataStorage()->Add(m_Prototypes, m_testnode);
-      m_Prototypes->SetVisibility(false);
-      m_Controls->m_PrototypeBox->SetAutoSelectNewItems (false);
-      m_Controls->m_useStandardP->setChecked(false);
+        mitk::FiberBundle::Pointer PrototypesBundle = mitk::FiberBundle::New(vNewPolyData2);
+        PrototypesBundle->SetFiberWeights(weights2);
+        MITK_INFO << "Number of cells: " << PrototypesBundle->GetFiberPolyData()->GetNumberOfCells();
 
 
+
+        mitk::DataNode::Pointer node = mitk::DataNode::New();
+        node->SetData(PrototypesBundle);
+        node->SetName("Prototypes");
+
+        m_Prototypes = node;
+        m_Controls->m_PrototypeBox->SetAutoSelectNewItems (true);
+        this->GetDataStorage()->Add(m_Prototypes, m_testnode);
+        m_Prototypes->SetVisibility(false);
+        m_Controls->m_PrototypeBox->SetAutoSelectNewItems (false);
+        m_Controls->m_useStandardP->setChecked(false);
+
+    }
+    else{
+        MITK_INFO << "No Prototypes created as classifier continiues to learn. To start from scratch, press 'Reset Classifier' ";
+    }
 
 }
 
@@ -1119,7 +1103,7 @@ void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractorBrush()
 
 void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 {
-
+    m_prototypecounter = 1;
     if (m_activeCycleCounter==1){
         MITK_INFO << "1";
         mitk::DataNode::Pointer node = mitk::DataNode::New();
@@ -1662,7 +1646,7 @@ void QmitkInteractiveFiberDissectionView::CleanTestArray()
 
     mitk::FiberBundle::Pointer fib_pos = dynamic_cast<mitk::FiberBundle*>(m_positiveBundleNode->GetData());
     mitk::FiberBundle::Pointer fib_neg = dynamic_cast<mitk::FiberBundle*>(m_negativeBundleNode->GetData());
-//    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData());
+ //    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.at(0)->GetData());
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
     vtkCell* cur_cell;
     vtkCell* cur_cell2;
@@ -1745,6 +1729,7 @@ void QmitkInteractiveFiberDissectionView::ResetClassifier()
     m_RandomExtractionCounter = 0;
     m_activeCycleCounter = 0;
     m_createdStreamlineCounter = 0;
+    m_prototypecounter = 0;
 
     classifier.reset();
     this->GetDataStorage()->Remove(m_positiveBundleNode);

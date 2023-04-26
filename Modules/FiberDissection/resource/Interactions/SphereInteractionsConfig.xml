@@ -3,9 +3,15 @@
   <attribute name="EventButton" value="LeftMouseButton"/>
   <attribute name="Modifiers" value="shift"/>
 </event_variant>
+<event_variant class="MousePressEvent" name="LeftClickNormal">
+  <attribute name="EventButton" value="LeftMouseButton"/>
+  <!-- <attribute name="Modifiers" value="shift"/> -->
+</event_variant>
 <event_variant class="MousePressEvent" name="RightClick">
   <attribute name="EventButton" value="RightMouseButton"/>
-  <attribute name="Modifiers" value="shift"/>
+  <!-- <attribute name="Modifiers" value="shift"/> -->
 </event_variant>
 <event_variant class="MouseMoveEvent" name="JustMouseMove"/>
+  <!-- <attribute name="Modifiers" value="shift"/>
+</event_variant> -->
 </config>
