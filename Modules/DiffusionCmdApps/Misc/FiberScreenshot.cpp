@@ -59,6 +59,7 @@ int main(int argc, char* argv[])
   parser.addArgument("rotate_x", "", mitkDiffusionCommandLineParser::Float, "Rotate x-axis:", "Rotate around x-axis (in deg)");
   parser.addArgument("rotate_y", "", mitkDiffusionCommandLineParser::Float, "Rotate y-axis:", "Rotate around y-axis (in deg)");
   parser.addArgument("rotate_z", "", mitkDiffusionCommandLineParser::Float, "Rotate z-axis:", "Rotate around z-axis (in deg)");
+  parser.addArgument("background", "", mitkDiffusionCommandLineParser::String, "Background:", "Background color (WHITE, BLACK)");
 
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
@@ -81,6 +82,10 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("rotate_z"))
     rotateZ = us::any_cast<float>(parsedArgs["rotate_z"]);
 
+  std::string color = "BLACK";
+  if (parsedArgs.count("background"))
+    color = us::any_cast<std::string>(parsedArgs["background"]);
+
   try
   {
     mitk::RenderingTestHelper renderingHelper(640*2, 480*2);
@@ -99,10 +104,19 @@ int main(int argc, char* argv[])
 
     vtkSmartPointer<vtkRenderer> renderer = renderingHelper.GetVtkRenderer();
     renderer->GetRenderWindow()->DoubleBufferOn();
+    double bgcolor[] = {0.0, 0.0, 0.0};
+    if (color != "BLACK")
+    {
+      bgcolor[0] = 1.0;
+      bgcolor[1] = 1.0;
+      bgcolor[2] = 1.0;
+    }
+
+    renderer->SetBackground(bgcolor);
 
     vtkSmartPointer<vtkRenderLargeImage> magnifier = vtkSmartPointer<vtkRenderLargeImage>::New();
     magnifier->SetInput(renderer);
-    magnifier->SetMagnification(4);
+    magnifier->SetMagnification(1);
 
     vtkSmartPointer<vtkImageWriter> fileWriter = vtkSmartPointer<vtkPNGWriter>::New();
     fileWriter->SetInputConnection(magnifier->GetOutputPort());
