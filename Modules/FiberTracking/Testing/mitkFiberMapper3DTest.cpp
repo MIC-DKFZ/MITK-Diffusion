@@ -29,6 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkTesting.h>
 #include <thread>
 #include <chrono>
+#include <mitkAnatomicalPlanes.h>
 
 class mitkFiberMapper3DTestSuite : public mitk::TestFixture
 {
@@ -78,7 +79,7 @@ public:
   {
     mitk::RenderingTestHelper renderingHelper(640, 480);
     renderingHelper.AddNodeToStorage(node);
-    renderingHelper.SetViewDirection(mitk::SliceNavigationController::Axial);
+    renderingHelper.SetViewDirection(mitk::AnatomicalPlane::Axial);
     renderingHelper.SetMapperIDToRender2D();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));

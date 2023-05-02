@@ -33,7 +33,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <berryPlatform.h>
 
 
-#include "QmitkSliderNavigatorWidget.h"
+//#include "QmitkSliderNavigatorWidget.h"
 #include <QMessageBox>
 
 #include "mitkNodePredicateDataType.h"
