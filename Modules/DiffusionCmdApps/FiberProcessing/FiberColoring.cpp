@@ -65,8 +65,9 @@ int main(int argc, char* argv[])
 
   parser.beginGroup("2. Color by scalar map:");
   parser.addArgument("scalar_map", "", mitkDiffusionCommandLineParser::String, "", "", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("lookup", "", mitkDiffusionCommandLineParser::String, "", "JET, MULTILABEL", us::Any(), true, false, false);
+  parser.addArgument("lookup", "", mitkDiffusionCommandLineParser::String, "", "JET, MAGMA, INFERNO, VIRIDIS, PLASMA, MULTILABEL", us::Any(), true, false, false);
   parser.addArgument("interpolate", "", mitkDiffusionCommandLineParser::Bool, "", "");
+  parser.addArgument("normalize", "", mitkDiffusionCommandLineParser::Bool, "", "");
   parser.endGroup();
 
 
@@ -89,6 +90,11 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("interpolate"))
     interpolate = us::any_cast<bool>(parsedArgs["interpolate"]);
 
+  float max_cap = 1.0;
+  if (parsedArgs.count("normalize"))
+    max_cap = -1.0;
+
+
   try
   {
     mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
@@ -101,9 +107,17 @@ int main(int argc, char* argv[])
       auto scalar_map = mitk::IOUtil::Load<mitk::Image>(us::any_cast<std::string>(parsedArgs["scalar_map"]));
 
       if (lookup == "JET")
-        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::JET, 1.0, interpolate);
+        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::JET, max_cap, interpolate);
+      else if (lookup == "VIRIDIS")
+        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::VIRIDIS, max_cap, interpolate);
+      else if (lookup == "PLASMA")
+        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::PLASMA, max_cap, interpolate);
+      else if (lookup == "INFERNO")
+        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::INFERNO, max_cap, interpolate);
+      else if (lookup == "MAGMA")
+        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::MAGMA, max_cap, interpolate);
       else
-        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::MULTILABEL, 1.0, false);
+        fib->ColorFibersByScalarMap(scalar_map, false, false, mitk::LookupTable::MULTILABEL, max_cap, false);
     }
     mitk::IOUtil::Save(fib.GetPointer(), outFileName );
 

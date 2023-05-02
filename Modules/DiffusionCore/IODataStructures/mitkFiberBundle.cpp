@@ -961,7 +961,7 @@ void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::P
 
   mitk::LookupTable::Pointer mitkLookup = mitk::LookupTable::New();
   mitkLookup->SetType(type);
-  if (type!=mitk::LookupTable::MULTILABEL)
+  if (type!=mitk::LookupTable::MULTILABEL && max_cap > 0)
     mitkLookup->GetVtkLookupTable()->SetTableRange(min, max*max_cap);
 
   for(long i=0; i<m_FiberPolyData->GetNumberOfPoints(); ++i)
