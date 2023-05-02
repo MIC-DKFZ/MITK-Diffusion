@@ -19,7 +19,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "internal/QmitkDiffusionApplicationPlugin.h"
 
 #include <berryPlatform.h>
-#include <berryIPreferencesService.h>
 #include <berryWorkbenchPreferenceConstants.h>
 #include <QmitkExtWorkbenchWindowAdvisor.h>
 

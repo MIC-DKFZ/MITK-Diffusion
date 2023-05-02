@@ -16,15 +16,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkDiffusionImagingAppIntroPart.h"
 
+#include "mitkIPreferencesService.h"
 #include "mitkNodePredicateDataType.h"
 #include <berryIWorkbenchWindow.h>
 #include <berryIWorkbench.h>
 #include <berryIWorkbenchPage.h>
 #include <berryIPerspectiveRegistry.h>
 #include <berryWorkbenchPreferenceConstants.h>
-#include <berryIPreferences.h>
-#include <berryIPreferencesService.h>
-
 #include <berryIEditorReference.h>
 #include <berryIEditorInput.h>
 
@@ -51,9 +49,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkDataStorageEditorInput.h"
 #include <string>
 
-#include "mitkProgressBar.h"
-#include "mitkNodePredicateNot.h"
-#include "mitkNodePredicateProperty.h"
+#include <mitkCoreServices.h>
+#include <mitkIPreferencesService.h>
+#include <mitkIPreferences.h>
 
 namespace
 {
@@ -133,7 +131,9 @@ namespace
 QmitkDiffusionImagingAppIntroPart::QmitkDiffusionImagingAppIntroPart()
   : m_Controls(nullptr)
 {
-  berry::IPreferences::Pointer workbenchPrefs = QmitkDiffusionApplicationPlugin::GetDefault()->GetPreferencesService()->GetSystemPreferences();
+  auto* preferencesService = mitk::CoreServices::GetPreferencesService();
+  auto* workbenchPrefs = preferencesService->GetSystemPreferences();
+
   workbenchPrefs->PutBool(berry::WorkbenchPreferenceConstants::SHOW_INTRO, true);
   workbenchPrefs->Flush();
 }
@@ -143,13 +143,17 @@ QmitkDiffusionImagingAppIntroPart::~QmitkDiffusionImagingAppIntroPart()
   // if the workbench is not closing (that means, welcome screen was closed explicitly), set "Show_intro" false
   if (!this->GetIntroSite()->GetPage()->GetWorkbenchWindow()->GetWorkbench()->IsClosing())
   {
-    berry::IPreferences::Pointer workbenchPrefs = QmitkDiffusionApplicationPlugin::GetDefault()->GetPreferencesService()->GetSystemPreferences();
+    auto* preferencesService = mitk::CoreServices::GetPreferencesService();
+    auto* workbenchPrefs = preferencesService->GetSystemPreferences();
     workbenchPrefs->PutBool(berry::WorkbenchPreferenceConstants::SHOW_INTRO, false);
     workbenchPrefs->Flush();
   }
   else
   {
-    berry::IPreferences::Pointer workbenchPrefs = QmitkDiffusionApplicationPlugin::GetDefault()->GetPreferencesService()->GetSystemPreferences();
+
+    auto* preferencesService = mitk::CoreServices::GetPreferencesService();
+    auto* workbenchPrefs = preferencesService->GetSystemPreferences();
+
     workbenchPrefs->PutBool(berry::WorkbenchPreferenceConstants::SHOW_INTRO, true);
     workbenchPrefs->Flush();
   }
