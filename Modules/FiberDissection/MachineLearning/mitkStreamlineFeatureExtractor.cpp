@@ -672,6 +672,14 @@ void StreamlineFeatureExtractor::TrainModel()
     MITK_INFO << "Start Training";
     statistic_model->train(m_traindata);
 
+    // // Create a new MITK data node and set its data to the RTrees instance
+    // mitk::DataNode::Pointer newNode = mitk::DataNode::New();
+    // newNode->SetName("My RTrees model");
+    // newNode->SetData(rtrees);
+
+    // // Add the new data node to the MITK data storage
+    // this->GetDataStorage()->Add(newNode);
+
 }
 
 std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
