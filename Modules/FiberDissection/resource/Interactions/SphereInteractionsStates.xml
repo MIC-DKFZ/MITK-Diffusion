@@ -1,0 +1,35 @@
+<statemachine NAME="SphereInteractior">
+<state name="start" startstate="true">
+  <transition event_class="MousePressEvent" event_variant="LeftClick" target="radius">
+    <action name="addCenter"/>
+  </transition>
+</state>
+<state name="radius">
+  <transition event_class="MouseMoveEvent" event_variant="JustMouseMove" target="radius">
+    <action name="changeRadius" />
+  </transition>
+  <transition event_class="MousePressEvent" event_variant="LeftClickNormal" target="start2">
+    <action name="endCreationStart" />
+  </transition>
+  <transition event_class="MousePressEvent" event_variant="RightClick" target="start2">
+    <action name="abortCreation" />
+  </transition>
+</state>
+<state name="start2">
+  <transition event_class="MousePressEvent" event_variant="LeftClick" target="radius2">
+    <action name="addCenter"/>
+  </transition>
+</state>
+<state name="radius2">
+  <transition event_class="MouseMoveEvent" event_variant="JustMouseMove" target="radius2">
+    <action name="changeRadius" />
+  </transition>
+  <transition event_class="MousePressEvent" event_variant="LeftClickNormal" target="final">
+    <action name="endCreationStart" />
+  </transition>
+  <transition event_class="MousePressEvent" event_variant="RightClick" target="start2">
+    <action name="abortCreation" />
+  </transition>
+</state>
+<state name="final"><!-- final state in which nothing is done anymore --></state>
+</statemachine>

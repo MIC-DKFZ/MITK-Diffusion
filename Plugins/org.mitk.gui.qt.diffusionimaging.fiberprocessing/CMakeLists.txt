@@ -6,5 +6,5 @@ mitk_create_plugin(
   SUBPROJECTS MITK-Diffusion
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_FIBERPROCESSING_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkFiberTracking MitkMriSimulation MitkChart MitkMultilabel MitkModelFit
+  MODULE_DEPENDS MitkFiberTracking MitkMriSimulation MitkChart MitkMultilabel MitkModelFit MitkQtWidgetsExt MitkQtWidgets MitkFiberDissection
 )

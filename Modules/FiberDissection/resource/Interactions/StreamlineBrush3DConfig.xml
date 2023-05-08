@@ -1,0 +1,19 @@
+<config>
+    <event_variant class="MouseMoveEvent" name="AddNegStreamlineClick">
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="shift"/>
+    </event_variant>addtolabelstreamline
+    <event_variant class="MouseMoveEvent" name="AddPosStreamlineClick">
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="alt"/>
+    </event_variant>
+    <event_variant class="MouseMoveEvent" name="AddNegStreamlinetolabelClick">
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="ctrl,shift"/>
+    </event_variant>
+    <event_variant class="MouseMoveEvent" name="AddPosStreamlinetolabelClick">
+         <attribute name="EventButton" value="RightMouseButton"/>
+         <attribute name="Modifiers" value="ctrl,alt"/>
+    </event_variant>
+    <event_variant class="MouseMoveEvent" name="CheckSelected"/>
+</config>

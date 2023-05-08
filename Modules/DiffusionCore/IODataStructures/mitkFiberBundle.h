@@ -39,6 +39,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionFunctionCollection.h>
 #include <mitkLookupTable.h>
 
+#include <opencv2/ml.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
 namespace mitk {
 
 /**
@@ -76,6 +80,7 @@ public:
     void ResetFiberOpacity();
     void SetFiberColors(vtkSmartPointer<vtkUnsignedCharArray> fiberColors);
     void SetFiberColors(float r, float g, float b, float alpha=255);
+    void SetSingleFiberColor(float r, float g, float b, unsigned int cellId, float alpha=255);
     vtkSmartPointer<vtkUnsignedCharArray> GetFiberColors() const { return m_FiberColors; }
 
     // fiber compression
