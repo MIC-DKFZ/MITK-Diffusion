@@ -100,7 +100,7 @@ protected slots:
   void RandomPrototypes();
   void SFFPrototypes();
   void StartValidation();
-  void AutomaticLabelling();
+  void CreateUncertantyMap();
   void RemoveCertainData();
   void ResetClassifier();
 
