@@ -180,7 +180,7 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_validate, SIGNAL( clicked() ), this, SLOT( StartValidation( ) ) );
 
-    connect(m_Controls->m_automaticLabelling, SIGNAL( clicked() ), this, SLOT( AutomaticLabelling( ) ) );
+    connect(m_Controls->m_CreateUncertantyMap, SIGNAL( clicked() ), this, SLOT( CreateUncertantyMap( ) ) );
 
     connect(m_Controls->m_RemoveCertainData, SIGNAL( clicked() ), this, SLOT( RemoveCertainData( ) ) );
 
@@ -267,13 +267,13 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
 
   // are fiber bundles selected?
-  if ( testnodeSelected)
-  {
-    if  (!prototypesGenerated  && m_prototypecounter==0){
-        this->SFFPrototypes();
-        MITK_INFO << "Not";
-    }
-  }
+//  if ( testnodeSelected)
+//  {
+//    if  (!prototypesGenerated  && m_prototypecounter==0){
+//        this->SFFPrototypes();
+//        MITK_INFO << "Not";
+//    }
+//  }
 
   
   
@@ -676,7 +676,7 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
 
         m_Prototypes = node;
         m_Controls->m_PrototypeBox->SetAutoSelectNewItems (true);
-        this->GetDataStorage()->Add(m_Prototypes, m_testnode);
+//        this->GetDataStorage()->Add(m_Prototypes, m_testnode);
         m_Prototypes->SetVisibility(false);
         m_Controls->m_PrototypeBox->SetAutoSelectNewItems (false);
         m_Controls->m_useStandardP->setChecked(false);
@@ -1103,7 +1103,13 @@ void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractorBrush()
 
 void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 {
-    m_prototypecounter = 1;
+    m_Controls->m_ErazorButton->setEnabled(false);
+    m_Controls->m_BrushButton->setEnabled(false);
+    if ( m_prototypecounter ==0){
+        this->SFFPrototypes();
+        m_prototypecounter = 1;
+    }
+
     if (m_activeCycleCounter==1){
         MITK_INFO << "1";
         mitk::DataNode::Pointer node = mitk::DataNode::New();
@@ -1585,7 +1591,7 @@ void QmitkInteractiveFiberDissectionView::StartValidation()
 
 }
 
-void QmitkInteractiveFiberDissectionView::AutomaticLabelling()
+void QmitkInteractiveFiberDissectionView::CreateUncertantyMap()
 {
 
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
