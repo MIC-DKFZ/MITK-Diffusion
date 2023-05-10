@@ -31,6 +31,9 @@ set(CPP_FILES
   IODataStructures/mitkPlanarFigureComposite.cpp
   IODataStructures/mitkTractographyForest.cpp
 
+
+  IODataStructures/mitkStatisticModel.h
+
   # Properties
   IODataStructures/Properties/mitkBValueMapProperty.cpp
   IODataStructures/Properties/mitkGradientDirectionsProperty.cpp
@@ -106,6 +109,8 @@ set(H_FILES
   IODataStructures/mitkTrackvis.h
   IODataStructures/mitkPlanarFigureComposite.h
   IODataStructures/mitkTractographyForest.h
+  
+  IODataStructures/mitkStatisticModel.h
 
   IODataStructures/Properties/mitkBValueMapProperty.h
   IODataStructures/Properties/mitkGradientDirectionsProperty.h
