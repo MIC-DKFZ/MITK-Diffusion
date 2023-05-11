@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 
 
-const char* mitk::StatisticModel::FIBER_ID_ARRAY = "Fiber_IDs";
 
 mitk::StatisticModel::StatisticModel()
 {

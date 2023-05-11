@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkSphereInteractor.h>
 #include <mitkStreamlineInteractorBrush.h>
 #include <mitkStreamlineFeatureExtractor.h>
+#include <mitkStatisticModel.h> 
 
 #include <itkCastImageFilter.h>
 #include <itkVTKImageImport.h>
@@ -81,7 +82,7 @@ public:
 
 protected slots:
 
-  void CreateStreamline();
+  void CreateSubset();
   void RemovefromBundle( bool checked );
   void RemovefromBundleBrush( bool checked );
   void ExtractRandomFibersFromTractogram();

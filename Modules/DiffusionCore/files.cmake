@@ -32,7 +32,7 @@ set(CPP_FILES
   IODataStructures/mitkTractographyForest.cpp
 
 
-  IODataStructures/mitkStatisticModel.h
+  IODataStructures/mitkStatisticModel.cpp
 
   # Properties
   IODataStructures/Properties/mitkBValueMapProperty.cpp

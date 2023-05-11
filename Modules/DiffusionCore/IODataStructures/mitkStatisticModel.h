@@ -15,8 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef _MITK_FiberBundle_H
-#define _MITK_FiberBundle_H
+#ifndef _MITK_StatisticModel_H
+#define _MITK_StatisticModel_H
 
 //includes for MITK datastructure
 #include <mitkBaseData.h>
@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDataStorage.h>
 
 //includes storing fiberdata
-
+#include <vtkSmartPointer.h>
 
 // OpenCV
 #include <opencv2/ml.hpp>
@@ -40,8 +40,10 @@ class MITKDIFFUSIONCORE_EXPORT StatisticModel : public BaseData
 {
 public:
 
-    mitkClassMacro(StatisticModel, BaseData);
-    itkFactorylessNewMacro(Self);
+
+    // mitkClassMacro( StatisticModel, BaseData )
+    // itkFactorylessNewMacro(Self)
+    // itkCloneMacro(Self)
 
     StatisticModel();
     virtual ~StatisticModel();

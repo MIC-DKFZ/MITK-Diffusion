@@ -38,6 +38,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateOr.h>
 #include <mitkPlanarCircle.h>
 #include <mitkSurface.h>
+#include <mitkStatisticModel.h>
 #include <vtkSphereSource.h>
 #include <vtkProperty.h>
 #include <vtkPolyDataMapper.h>
@@ -146,7 +147,7 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_BrushButton, SIGNAL(toggled(bool)), this, SLOT( RemovefromBundleBrush(bool) ) );
 
-    connect(m_Controls->m_StreamlineCreation, SIGNAL( clicked() ), this, SLOT( CreateStreamline()));
+    connect(m_Controls->m_SubsetCreation, SIGNAL( clicked() ), this, SLOT( CreateSubset()));
 
     connect(m_Controls->m_AddRandomFibers, SIGNAL( clicked() ), this, SLOT( ExtractRandomFibersFromTractogram() ) ); //need
 
@@ -176,7 +177,7 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_RandomPrototypesButton, SIGNAL( clicked() ), this, SLOT( RandomPrototypes( ) ) );
 
-    connect(m_Controls->m_TestBundleBox, SIGNAL( currentIndexChanged(int) ), this, SLOT( SFFPrototypes( ) ) );
+//    connect(m_Controls->m_TestBundleBox, SIGNAL( currentIndexChanged(int) ), this, SLOT( SFFPrototypes( ) ) );
 
     connect(m_Controls->m_validate, SIGNAL( clicked() ), this, SLOT( StartValidation( ) ) );
 
@@ -227,12 +228,12 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
 
 
-  m_Controls->m_StreamlineCreation->setEnabled(true);
+  m_Controls->m_SubsetCreation->setEnabled(false);
   m_Controls->m_TrainClassifier->setEnabled(false);
   m_Controls->m_CreatePrediction->setEnabled(false);
   m_Controls->m_CreateUncertantyMap->setEnabled(false);
   m_Controls->m_Numtolabel->setEnabled(false);
-  m_Controls->m_Numtolabel2->setEnabled(false);
+  m_Controls->m_NumRandomFibers2->setEnabled(false);
 
   m_Controls->m_AddRandomFibers->setEnabled(false);
   m_Controls->m_AddDistanceFibers->setEnabled(false);
@@ -248,8 +249,8 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   }
 
 
-  bool testnodeSelected = curtestnode.IsNotNull(); 
-  bool prototypesGenerated = m_Prototypes.IsNotNull();
+  bool testnodeSelected = curtestnode.IsNotNull();
+//  bool prototypesGenerated = m_Prototypes.IsNotNull();
   bool fibSelected = !m_SelectedFB.empty();
   bool multipleFibsSelected = (m_SelectedFB.size()>1);
   bool nfibSelected = m_newfibersBundleNode.IsNotNull();
@@ -267,13 +268,12 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
 
   // are fiber bundles selected?
-//  if ( testnodeSelected)
-//  {
-//    if  (!prototypesGenerated  && m_prototypecounter==0){
-//        this->SFFPrototypes();
-//        MITK_INFO << "Not";
-//    }
-//  }
+  if ( testnodeSelected)
+  {
+
+      m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+      m_Controls->m_SubsetCreation->setEnabled(true);
+  }
 
   
   
@@ -314,7 +314,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
       m_Controls->m_AddUncertainFibers->setEnabled(true);
       m_Controls->m_Numtolabel->setEnabled(true);
       m_Controls->m_AddDistanceFibers->setEnabled(true);
-      m_Controls->m_Numtolabel2->setEnabled(true);
+      m_Controls->m_NumRandomFibers2->setEnabled(true);
   }
 
   if (uncertaintySelected)
@@ -339,7 +339,9 @@ void QmitkInteractiveFiberDissectionView::OnEndInteraction()
 
 void QmitkInteractiveFiberDissectionView::ResampleTractogram()
 {
-    mitk::DataNode::Pointer node = m_testnode;
+
+    m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+   mitk::DataNode::Pointer node = m_testnode;
     auto tractogram = dynamic_cast<mitk::FiberBundle *>(node->GetData());
     mitk::FiberBundle::Pointer tempfib = tractogram->GetDeepCopy();
 
@@ -721,7 +723,7 @@ void QmitkInteractiveFiberDissectionView::OnSelectionChanged(berry::IWorkbenchPa
 }
 
 
-void QmitkInteractiveFiberDissectionView::CreateStreamline()
+void QmitkInteractiveFiberDissectionView::CreateSubset()
 {
   
 
@@ -1173,6 +1175,17 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 
     classifier->Update();
 
+
+    // mitk::StatisticModel::Pointer myModel = mitk::StatisticModel::New();
+
+    // // Load the statistical model from a file
+    // myModel->m_StatModel = classifier->statistic_model;
+
+    // Add the data to a MITK DataNode
+    mitk::DataNode::Pointer node = mitk::DataNode::New();
+    node->SetName("Classifier");
+    node->SetData(classifier->statistic_model);
+
     m_index = classifier->m_index;
     MITK_INFO << "Number of Cycles";
     MITK_INFO << m_activeCycleCounter;
@@ -1372,7 +1385,7 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
 {
 //     MITK_INFO << "Create Fibers to label based on Distance in Features-Space";
 //     std::vector<unsigned int> myvec = m_index.at(2);
-//     myvec.resize(m_Controls->m_Numtolabel2->value());
+//     myvec.resize(m_Controls->m_NumRandomFibers2->value());
 //     MITK_INFO << m_index.at(2).size();
 //     MITK_INFO << myvec.size();
 
@@ -1381,7 +1394,7 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
     std::vector<std::vector<unsigned int>> curidx;
     curidx =  classifier->GetDistanceData2(myval);
     std::vector<unsigned int> myvec = curidx.at(0);
-    myvec.resize(m_Controls->m_Numtolabel2->value());
+    myvec.resize(m_Controls->m_NumRandomFibers2->value());
     MITK_INFO << m_index.at(0).size();
     MITK_INFO << myvec.size();
     m_DistanceLabel = classifier->CreatePrediction(myvec, true);
