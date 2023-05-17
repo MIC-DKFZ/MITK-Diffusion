@@ -89,18 +89,18 @@ void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Poin
 std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::ResampleFibers(mitk::FiberBundle::Pointer tractogram)
 {
   MITK_INFO << "Infunction";
-//   mitk::FiberBundle::Pointer temp_fib = tractogram->GetDeepCopy();
-//   vtkPolyData* polyData = temp_fib->GetFiberPolyData();
+   mitk::FiberBundle::Pointer temp_fib = tractogram->GetDeepCopy();
+   vtkPolyData* polyData = temp_fib->GetFiberPolyData();
 
-//   for (vtkIdType i = 0; i < polyData->GetNumberOfCells(); i++)
-//   {
-//     vtkCell* cell = polyData->GetCell(i);
-//     if (cell->GetNumberOfPoints() != polyData->GetCell(0)->GetNumberOfPoints())
-//     {
-//       throw std::runtime_error("Not all cells have an equal number of points!");
-// //        temp_fib->ResampleToNumPoints(m_NumPoints);
-//     }
-//   }
+   for (vtkIdType i = 0; i < polyData->GetNumberOfCells(); i++)
+   {
+     vtkCell* cell = polyData->GetCell(i);
+     if (cell->GetNumberOfPoints() != polyData->GetCell(0)->GetNumberOfPoints())
+     {
+       throw std::runtime_error("Not all cells have an equal number of points!");
+ //        temp_fib->ResampleToNumPoints(m_NumPoints);
+     }
+   }
 
   MITK_INFO << "Resampling Done";
 

@@ -11,7 +11,7 @@
   <transition event_class="MousePressEvent" event_variant="LeftClickNormal" target="start2">
     <action name="endCreationStart" />
   </transition>
-  <transition event_class="MousePressEvent" event_variant="RightClick" target="start2">
+  <transition event_class="MousePressEvent" event_variant="RightClick" target="start">
     <action name="abortCreation" />
   </transition>
 </state>

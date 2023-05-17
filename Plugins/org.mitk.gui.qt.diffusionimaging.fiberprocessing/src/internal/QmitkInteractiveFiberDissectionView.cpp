@@ -236,6 +236,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   m_Controls->m_NumRandomFibers2->setEnabled(false);
 
   m_Controls->m_AddRandomFibers->setEnabled(false);
+  m_Controls->m_NumRandomFibers->setEnabled(false);
   m_Controls->m_AddDistanceFibers->setEnabled(false);
   m_Controls->m_AddUncertainFibers->setEnabled(false);
 
@@ -280,6 +281,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   if (reduced){
     m_Controls->m_sellabeling->setEnabled(true);
     m_Controls->m_AddRandomFibers->setEnabled(true);
+    m_Controls->m_NumRandomFibers->setEnabled(true);
     }
 
 
@@ -765,6 +767,7 @@ void QmitkInteractiveFiberDissectionView::CreateSubset()
 
     
     m_Controls->m_AddRandomFibers->setEnabled(true);
+    m_Controls->m_NumRandomFibers->setEnabled(true);
     m_Controls->m_sellabeling->setEnabled(true);
 
 
@@ -957,6 +960,7 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
     node->SetData(m_newfibersBundle);
     node->SetName("ToLabel");
     m_newfibersBundleNode = node;
+    m_newfibersBundleNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(5.0));
 //      m_newfibersBundleNode->SetData(m_newfibersBundle);
     this->GetDataStorage()->Add(m_newfibersBundleNode);
 
@@ -968,6 +972,7 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
         node2->SetName("-Bundle");
         node2->SetData(m_negativeBundle);
         m_negativeBundleNode = node2;
+        m_negativeBundleNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(5.0));
         this->GetDataStorage()->Add(m_negativeBundleNode);
         m_negativeBundleNode->SetVisibility(false);
     }
@@ -979,6 +984,7 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
         node3->SetName("+Bundle");
         node3->SetData(m_positiveBundle);
         m_positiveBundleNode = node3;
+        m_positiveBundleNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(5.0));
         this->GetDataStorage()->Add(m_positiveBundleNode);
     }
 
@@ -1182,9 +1188,9 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
     // myModel->m_StatModel = classifier->statistic_model;
 
     // Add the data to a MITK DataNode
-    mitk::DataNode::Pointer node = mitk::DataNode::New();
-    node->SetName("Classifier");
-    node->SetData(classifier->statistic_model);
+    // mitk::DataNode::Pointer node = mitk::DataNode::New();
+    // node->SetName("Classifier");
+    // node->SetData(classifier->statistic_model);
 
     m_index = classifier->m_index;
     MITK_INFO << "Number of Cycles";
