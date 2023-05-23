@@ -93,7 +93,7 @@ protected slots:
   void CreateDistanceSampleNode();
   void RemovefromUncertainty( bool checked );
   void RemovefromUncertaintyBrush( bool checked );
-  void RemovefromDistance( bool checked );
+  void RemovefromDistanceBrush( bool checked );
   void RemovefromPrediction( bool checked );
   void RemovefromPredictionBrush( bool checked );
   void RemovefromSelection( bool checked );
@@ -135,6 +135,7 @@ protected:
   int m_createdStreamlineCounter;
   int m_uncCounter;
   int m_prototypecounter;
+  int m_posOffsetcounter;
 //  int m_thresh2;
 
 

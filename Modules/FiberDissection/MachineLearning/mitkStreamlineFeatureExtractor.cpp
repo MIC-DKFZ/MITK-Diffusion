@@ -454,7 +454,7 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
         unsigned int num_cols = matrix.cols();
         unsigned int last_col_index = num_cols - 1;
         bool last_col_below_10 = true;
-        if (matrix(0, last_col_index) >= 40) {
+        if (matrix(0, last_col_index) >= 25) {
             last_col_below_10 = false;
             // break;
         }

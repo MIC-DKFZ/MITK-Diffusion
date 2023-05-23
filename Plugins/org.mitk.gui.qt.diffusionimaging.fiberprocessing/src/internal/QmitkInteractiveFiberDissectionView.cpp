@@ -94,6 +94,7 @@ QmitkInteractiveFiberDissectionView::QmitkInteractiveFiberDissectionView()
   , m_activeCycleCounter(0)
   , m_createdStreamlineCounter(0)
   , m_prototypecounter(0)
+  , m_posOffsetcounter(0)
   , m_StreamlineInteractor(nullptr)
 {
 
@@ -165,7 +166,7 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
 
     connect(m_Controls->m_unclabelingBrush, SIGNAL(toggled(bool)), this, SLOT( RemovefromUncertaintyBrush(bool) ) ); //need
 
-    connect(m_Controls->m_distlabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromDistance(bool) ) ); //need
+    connect(m_Controls->m_distlabelingBrush, SIGNAL(toggled(bool)), this, SLOT( RemovefromDistanceBrush(bool) ) ); //need
 
     connect(m_Controls->m_predlabeling, SIGNAL(toggled(bool)), this, SLOT( RemovefromPrediction(bool) ) ); //need
 
@@ -221,6 +222,8 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   m_Controls->m_unclabelingBrush->setEnabled(false);
   m_Controls->m_predlabelingBrush->setCheckable(true);
   m_Controls->m_predlabelingBrush->setEnabled(false);
+  m_Controls->m_distlabelingBrush->setCheckable(true);
+  m_Controls->m_distlabelingBrush->setEnabled(false);
   m_Controls->m_distlabeling->setCheckable(true);
   m_Controls->m_distlabeling->setEnabled(false);
   m_Controls->m_sellabeling->setCheckable(true);
@@ -242,11 +245,20 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
   mitk::DataNode::Pointer curtestnode =  m_Controls->m_TestBundleBox->GetSelectedNode();
   if (m_activeCycleCounter>0 && curtestnode!=m_testnode){
-    MITK_INFO << "Testnode changed";
+   MITK_INFO << "Testnode changed";
     m_activeCycleCounter=0;
-  }
-  else if (m_activeCycleCounter>0 && curtestnode==m_testnode){
-      MITK_INFO << "Testnodes are the same";
+
+    // Checking if m_positiveBundleNode is not empty
+    if (m_positiveBundleNode.IsNotNull())
+    {
+        // Accessing the fiber polydata and updating the offset counter
+        mitk::FiberBundle::Pointer fiberBundle = dynamic_cast<mitk::FiberBundle*>(m_positiveBundleNode->GetData());
+        if (fiberBundle.IsNotNull())
+        {
+            m_posOffsetcounter += fiberBundle->GetFiberPolyData()->GetNumberOfCells();
+        }
+}
+
   }
 
 
@@ -259,6 +271,7 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   bool negSelected = this->GetDataStorage()->Exists(m_negativeBundleNode);
   bool indexSelected = !m_index.empty();
   bool uncertaintySelected = this->GetDataStorage()->Exists(m_UncertaintyLabelNode);
+  bool distanceuncertanySelected = this->GetDataStorage()->Exists(m_DistanceLabelNode);
   bool predictionSelected = this->GetDataStorage()->Exists(m_PredictionNode);
   bool reduced = m_reducedFibersDataNode.IsNotNull();
 
@@ -330,8 +343,13 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
       m_Controls->m_predlabeling->setEnabled(true);
       m_Controls->m_predlabelingBrush->setEnabled(true);
   }
+  if (distanceuncertanySelected)
+  {
+        m_Controls->m_distlabelingBrush->setEnabled(true);
+        m_Controls->m_distlabeling->setEnabled(true);
+  }
   
-  m_Controls->m_distlabeling->setEnabled(true);
+
 }
 
 void QmitkInteractiveFiberDissectionView::OnEndInteraction()
@@ -1151,7 +1169,7 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 
 
     m_Controls->m_unclabeling->setChecked(false);
-    m_Controls->m_distlabeling->setChecked(false);
+    m_Controls->m_distlabelingBrush->setChecked(false);
     m_Controls->m_unclabelingBrush->setChecked(false);
     m_Controls->m_predlabeling->setChecked(false);
     m_Controls->m_predlabelingBrush->setChecked(false);
@@ -1213,6 +1231,7 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
 {
     MITK_INFO << "Create Prediction";
+    MITK_INFO << "Removing " << m_posOffsetcounter << " Fibers from Data";
 
     m_Prediction = classifier->CreatePrediction(m_index.at(0), false);
 
@@ -1231,7 +1250,7 @@ void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
 
     vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
 
-     /* Check wether all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
+     /* Check wether all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/ 
     unsigned int counter = 0;
 
     for (int i=0; i<fib->GetFiberPolyData()->GetNumberOfCells(); i++)
@@ -1254,7 +1273,12 @@ void QmitkInteractiveFiberDissectionView::CreatePredictionNode()
       counter++;
 
     }
-    for (int i=0; i<fib_true->GetFiberPolyData()->GetNumberOfCells(); i++)
+
+    MITK_INFO << "Size m_positive " << fib_true->GetFiberPolyData()->GetNumberOfCells();
+
+
+
+    for (int i=m_posOffsetcounter; i<fib_true->GetFiberPolyData()->GetNumberOfCells(); i++)
     {
       vtkCell* cell = fib_true->GetFiberPolyData()->GetCell(i);
       auto numPoints = cell->GetNumberOfPoints();
@@ -1380,9 +1404,10 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
     m_UncertaintyLabelNode = node;
     m_UncertaintyLabelNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(d));
     this->GetDataStorage()->Add(m_UncertaintyLabelNode);
-    UpdateGui();
+    
     m_PredictionNode->SetVisibility(false);
     m_Controls->m_unclabelingBrush->setChecked(true);
+    UpdateGui();
 
 
 }
@@ -1410,6 +1435,9 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
     node->SetName("DistanceLabel"+s);
     m_DistanceLabelNode = node;
     this->GetDataStorage()->Add(m_DistanceLabelNode);
+    
+    m_PredictionNode->SetVisibility(false);
+    m_Controls->m_distlabelingBrush->setChecked(true);
     UpdateGui();
 }
 
@@ -1463,7 +1491,7 @@ void QmitkInteractiveFiberDissectionView::RemovefromUncertaintyBrush( bool check
     RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
-void QmitkInteractiveFiberDissectionView::RemovefromDistance( bool checked )
+void QmitkInteractiveFiberDissectionView::RemovefromDistanceBrush( bool checked )
 {
     if (checked)
     // if (checked)
@@ -1483,21 +1511,9 @@ void QmitkInteractiveFiberDissectionView::RemovefromDistance( bool checked )
     else
     {
       m_StreamlineInteractorBrush->EnableInteraction(false);
-//      m_StreamlineInteractor = nullptr;
     }
     RenderingManager::GetInstance()->RequestUpdateAll();
 
-//         m_DistanceLabel->SetFiberColors(255, 255, 255);
-//         m_StreamlineInteractor->EnableInteraction(true);
-//         m_StreamlineInteractor->LabelfromPrediction(false);
-//         m_StreamlineInteractor->SetToLabelNode(m_DistanceLabelNode);
-//     }
-//     else
-//     {
-//       m_StreamlineInteractor->EnableInteraction(false);
-// //      m_StreamlineInteractor = nullptr;
-//     }
-//     RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
 void QmitkInteractiveFiberDissectionView::RemovefromPrediction( bool checked )

@@ -91,7 +91,7 @@ QGroupBox {
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <property name="tabSpacing">
       <number>6</number>
@@ -122,8 +122,8 @@ QGroupBox {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>216</width>
-            <height>80</height>
+            <width>381</width>
+            <height>421</height>
            </rect>
           </property>
           <attribute name="label">
@@ -359,7 +359,7 @@ QGroupBox {
             </widget>
            </item>
            <item row="8" column="5">
-            <widget class="QPushButton" name="m_unclabelingBrush">
+            <widget class="QPushButton" name="m_distlabelingBrush">
              <property name="maximumSize">
               <size>
                <width>30</width>
@@ -506,7 +506,7 @@ QGroupBox {
             </widget>
            </item>
            <item row="8" column="2" colspan="2">
-            <widget class="QPushButton" name="m_AddUncertainFibers">
+            <widget class="QPushButton" name="m_AddDistanceFibers">
              <property name="text">
               <string>Add </string>
              </property>
@@ -592,7 +592,7 @@ QGroupBox {
             </spacer>
            </item>
            <item row="8" column="4">
-            <widget class="QPushButton" name="m_unclabeling">
+            <widget class="QPushButton" name="m_distlabeling">
              <property name="maximumSize">
               <size>
                <width>30</width>
@@ -625,32 +625,45 @@ QGroupBox {
             <x>0</x>
             <y>0</y>
             <width>381</width>
-            <height>244</height>
+            <height>249</height>
            </rect>
           </property>
           <attribute name="label">
            <string>Advanced</string>
           </attribute>
-          <layout class="QGridLayout" name="gridLayout_30">
-           <item row="6" column="4" colspan="2">
-            <widget class="QPushButton" name="m_sellabeling">
+          <layout class="QGridLayout" name="gridLayout_2">
+           <item row="6" column="0" colspan="6">
+            <widget class="QLabel" name="label_37">
              <property name="text">
-              <string>Label</string>
+              <string>Label from Current Selection</string>
              </property>
             </widget>
            </item>
-           <item row="7" column="3">
-            <spacer name="verticalSpacer_6">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
+           <item row="4" column="2">
+            <widget class="QPushButton" name="m_unclabeling">
+             <property name="maximumSize">
               <size>
-               <width>20</width>
-               <height>40</height>
+               <width>30</width>
+               <height>30</height>
               </size>
              </property>
-            </spacer>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="icon">
+              <iconset>
+               <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/eraze.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/eraze.png</iconset>
+             </property>
+             <property name="iconSize">
+              <size>
+               <width>32</width>
+               <height>32</height>
+              </size>
+             </property>
+             <property name="flat">
+              <bool>true</bool>
+             </property>
+            </widget>
            </item>
            <item row="2" column="0">
             <widget class="QLabel" name="label_9">
@@ -659,7 +672,14 @@ QGroupBox {
              </property>
             </widget>
            </item>
-           <item row="0" column="5">
+           <item row="5" column="0" colspan="2">
+            <widget class="QPushButton" name="m_certainData">
+             <property name="text">
+              <string>Certain Data</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="7">
             <spacer name="horizontalSpacer">
              <property name="orientation">
               <enum>Qt::Horizontal</enum>
@@ -672,55 +692,6 @@ QGroupBox {
              </property>
             </spacer>
            </item>
-           <item row="5" column="3" colspan="2">
-            <widget class="QSpinBox" name="spinBox_2">
-             <property name="maximum">
-              <number>100</number>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="0" colspan="6">
-            <widget class="QPushButton" name="m_distlabeling">
-             <property name="text">
-              <string>Unc_dis_Label</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="0" colspan="3">
-            <widget class="QPushButton" name="m_certainData">
-             <property name="text">
-              <string>Certain Data</string>
-             </property>
-            </widget>
-           </item>
-           <item row="6" column="0" colspan="4">
-            <widget class="QLabel" name="label_37">
-             <property name="text">
-              <string>Label from Current Selection</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="4" colspan="2">
-            <widget class="QPushButton" name="m_AddDistanceFibers">
-             <property name="text">
-              <string>Add</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0" colspan="3">
-            <widget class="QPushButton" name="m_CreateUncertantyMap">
-             <property name="text">
-              <string>Create Uncertanty Map</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="5">
-            <widget class="QPushButton" name="m_RemoveCertainData">
-             <property name="text">
-              <string>Remove</string>
-             </property>
-            </widget>
-           </item>
            <item row="1" column="0" colspan="3">
             <widget class="QPushButton" name="m_CreatePrediction">
              <property name="text">
@@ -728,7 +699,37 @@ QGroupBox {
              </property>
             </widget>
            </item>
-           <item row="2" column="2" colspan="2">
+           <item row="7" column="5">
+            <spacer name="verticalSpacer_6">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item row="2" column="1" colspan="2">
+            <widget class="QSpinBox" name="m_subsetfft">
+             <property name="maximum">
+              <number>100</number>
+             </property>
+             <property name="value">
+              <number>95</number>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0" colspan="2">
+            <widget class="QPushButton" name="m_unclabelingBrush">
+             <property name="text">
+              <string>Unc_dis_Label</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
             <widget class="QSpinBox" name="m_NumRandomFibers2">
              <property name="enabled">
               <bool>true</bool>
@@ -744,13 +745,38 @@ QGroupBox {
              </property>
             </widget>
            </item>
-           <item row="2" column="1">
-            <widget class="QSpinBox" name="m_subsetfft">
+           <item row="5" column="2">
+            <widget class="QSpinBox" name="spinBox_2">
              <property name="maximum">
               <number>100</number>
              </property>
-             <property name="value">
-              <number>95</number>
+            </widget>
+           </item>
+           <item row="5" column="6">
+            <widget class="QPushButton" name="m_RemoveCertainData">
+             <property name="text">
+              <string>Remove</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="6">
+            <widget class="QPushButton" name="m_sellabeling">
+             <property name="text">
+              <string>Label</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0" colspan="3">
+            <widget class="QPushButton" name="m_CreateUncertantyMap">
+             <property name="text">
+              <string>Create Uncertanty Map</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1" colspan="2">
+            <widget class="QPushButton" name="m_AddUncertainFibers">
+             <property name="text">
+              <string>Add</string>
              </property>
             </widget>
            </item>
