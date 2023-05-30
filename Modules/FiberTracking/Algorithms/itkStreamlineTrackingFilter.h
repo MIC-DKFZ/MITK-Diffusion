@@ -159,7 +159,6 @@ protected:
   void BuildFibers(bool check);
   float CheckCurvature(DirectionContainer *fib, bool front);
 
-  // decision forest
   mitk::TrackingDataHandler*          m_TrackingHandler;
 
   std::chrono::time_point<std::chrono::system_clock> m_StartTime;

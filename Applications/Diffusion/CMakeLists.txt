@@ -32,7 +32,6 @@ set(_plugins
   org.mitk.gui.qt.python
   org.mitk.gui.qt.volumevisualization
   org.mitk.gui.qt.diffusionimaging
-  org.mitk.gui.qt.diffusionimaging.connectomics
   org.mitk.gui.qt.diffusionimaging.fiberfox
   org.mitk.gui.qt.diffusionimaging.fiberprocessing
   org.mitk.gui.qt.diffusionimaging.ivim

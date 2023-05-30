@@ -1,7 +1,6 @@
 set(MITK_PLUGINS
   org.mitk.gui.qt.diffusionimagingapp:OFF
   org.mitk.gui.qt.diffusionimaging:OFF
-  org.mitk.gui.qt.diffusionimaging.connectomics:OFF
   org.mitk.gui.qt.diffusionimaging.denoising:OFF
   org.mitk.gui.qt.diffusionimaging.fiberfox:OFF
   org.mitk.gui.qt.diffusionimaging.fiberprocessing:OFF

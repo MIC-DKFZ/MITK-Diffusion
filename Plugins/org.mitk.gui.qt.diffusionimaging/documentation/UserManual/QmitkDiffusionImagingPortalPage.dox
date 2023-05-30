@@ -9,10 +9,10 @@ MITK Diffusion offers a selection of image analysis methods for dMRI processing.
 
 MITK Diffusion consists of multiple components with their own documentation:
 
-\subsection sub1 Data formats, import and export
+\subsection diff_sub1 Data formats, import and export
 \li \subpage QmitkDiffusionImagingDataImportPage
 
-\subsection sub2 Preprocessing and Reconstruction
+\subsection diff_sub2 Preprocessing and Reconstruction
 \li \subpage org_mitk_views_diffusionpreprocessing
 \li \subpage org_mitk_views_simpleregistrationview
 \li \subpage org_mitk_views_headmotioncorrectionview
@@ -20,7 +20,7 @@ MITK Diffusion consists of multiple components with their own documentation:
 \li \subpage org_mitk_views_tensorreconstruction
 \li \subpage org_mitk_views_qballreconstruction
 
-\subsection sub3 Visualization and Quantification
+\subsection diff_sub3 Visualization and Quantification
 \li \subpage org_mitk_views_controlvisualizationpropertiesview
 \li \subpage org_mitk_views_odfdetails
 \li \subpage org_mitk_views_odfmaximaextraction
@@ -28,21 +28,17 @@ MITK Diffusion consists of multiple components with their own documentation:
 \li \subpage org_mitk_views_diffusionquantification
 \li \subpage org_mitk_views_ivim
 
-\subsection sub4 Fiber Tractography
+\subsection diff_sub4 Fiber Tractography
 \li \subpage org_mitk_views_streamlinetracking
 \li \subpage org_mitk_views_gibbstracking
-\li \subpage org_mitk_views_mlbtview
 \li \subpage org_mitk_views_fiberprocessing
 \li \subpage org_mitk_views_fiberquantification
 \li \subpage org_mitk_views_fiberfit
 \li \subpage org_mitk_views_fiberclustering
 
-\subsection sub5 Fiberfox dMRI Simulation
+\subsection diff_sub5 Fiberfox dMRI Simulation
 \li \subpage org_mitk_views_fiberfoxview
 \li \subpage org_mitk_views_fibergenerationview
 \li \subpage org_mitk_views_fieldmapgenerator
-
-\subsection sub6 Connectomics
-\li \subpage org_mitk_diffusionimagingapp_perspectives_connectomics
 
 */

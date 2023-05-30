@@ -13,7 +13,6 @@ set(target_libraries
   org_mitk_gui_qt_python
   org_mitk_gui_qt_volumevisualization
   org_mitk_gui_qt_diffusionimaging
-  org_mitk_gui_qt_diffusionimaging_connectomics
   org_mitk_gui_qt_diffusionimaging_fiberfox
   org_mitk_gui_qt_diffusionimaging_fiberprocessing
   org_mitk_gui_qt_diffusionimaging_ivim

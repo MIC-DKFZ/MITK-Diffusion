@@ -20,14 +20,6 @@
     <keywordReference id="org.mitk.views.streamlinetracking.Keyword"/>
     </view>
 
-    <view id="org.mitk.views.mlbtview"
-    name="ML-Based Tractography Training"
-    category="Fiber Tractography"
-    class="QmitkMLBTView"
-    icon="resources/ml_tractography.png">
-    <keywordReference id="org.mitk.views.mlbtview.Keyword"/>
-    </view>
-
   </extension>
 
   <extension point="org.blueberry.ui.keywords">
@@ -54,16 +46,6 @@
   <keyword label="tensor" id="org.mitk.views.streamlinetracking.Keyword"/>
   <keyword label="dti" id="org.mitk.views.streamlinetracking.Keyword"/>
   <keyword label="diffusion" id="org.mitk.views.streamlinetracking.Keyword"/>
-
-  <keyword label="tractography" id="org.mitk.views.mlbtview.Keyword"/>
-  <keyword label="tracking" id="org.mitk.views.mlbtview.Keyword"/>
-  <keyword label="fiber" id="org.mitk.views.mlbtview.Keyword"/>
-  <keyword label="machine" id="org.mitk.views.mlbtview.Keyword"/>
-  <keyword label="learning" id="org.mitk.views.mlbtview.Keyword"/>
-  <keyword label="streamline" id="org.mitk.views.mlbtview.Keyword"/>
-  <keyword label="tensor" id="org.mitk.views.mlbtview.Keyword"/>
-  <keyword label="dwi" id="org.mitk.views.mlbtview.Keyword"/>
-  <keyword label="diffusion" id="org.mitk.views.mlbtview.Keyword"/>
 
   </extension>
 

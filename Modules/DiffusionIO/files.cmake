@@ -4,14 +4,6 @@ set(CPP_FILES
   mitkDiffusionIOMimeTypes.cpp
 
   ObjectFactories/mitkDiffusionCoreObjectFactory.cpp
-  ObjectFactories/mitkConnectomicsObjectFactory.cpp
-
-  ReaderWriter/mitkConnectomicsNetworkReader.cpp
-  ReaderWriter/mitkConnectomicsNetworkWriter.cpp
-  ReaderWriter/mitkConnectomicsNetworkCSVWriter.cpp
-  ReaderWriter/mitkConnectomicsNetworkMatrixWriter.cpp
-  ReaderWriter/mitkConnectomicsNetworkSerializer.cpp
-  ReaderWriter/mitkConnectomicsNetworkDefinitions.cpp
 
   ReaderWriter/mitkFiberBundleDicomReader.cpp
   ReaderWriter/mitkFiberBundleDicomWriter.cpp
