@@ -21,7 +21,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundleTrackVisReader.h>
 #include <mitkConnectomicsNetworkReader.h>
 #include <mitkPlanarFigureCompositeReader.h>
-#include <mitkTractographyForestReader.h>
 #include <mitkFiberBundleDicomReader.h>
 
 #include <mitkFiberBundleVtkWriter.h>
@@ -31,8 +30,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkConnectomicsNetworkCSVWriter.h>
 #include <mitkConnectomicsNetworkMatrixWriter.h>
 #include <mitkPlanarFigureCompositeWriter.h>
-#include <mitkTractographyForestWriter.h>
-
 #include <mitkDiffusionImageNrrdReader.h>
 #include <mitkDiffusionImageNiftiReader.h>
 #include <mitkDiffusionImageDicomReader.h>
@@ -101,8 +98,6 @@ namespace mitk
 
       m_PlanarFigureCompositeReader = new PlanarFigureCompositeReader();
       m_PlanarFigureCompositeWriter = new PlanarFigureCompositeWriter();
-      m_TractographyForestReader = new TractographyForestReader();
-      m_TractographyForestWriter = new TractographyForestWriter();
 
       m_DiffusionImageNrrdReader = new DiffusionImageNrrdReader();
       m_DiffusionImageNrrdWriter = new DiffusionImageNrrdWriter();
@@ -136,7 +131,6 @@ namespace mitk
       delete m_FiberBundleTrackVisReader;
       delete m_ConnectomicsNetworkReader;
       delete m_PlanarFigureCompositeReader;
-      delete m_TractographyForestReader;
       delete m_FiberBundleDicomReader;
 
       delete m_FiberBundleDicomWriter;
@@ -146,7 +140,6 @@ namespace mitk
       delete m_ConnectomicsNetworkCSVWriter;
       delete m_ConnectomicsNetworkMatrixWriter;
       delete m_PlanarFigureCompositeWriter;
-      delete m_TractographyForestWriter;
 
       delete m_DiffusionImageNrrdReader;
       delete m_DiffusionImageNiftiReader;
@@ -171,8 +164,7 @@ namespace mitk
     FiberBundleDicomReader * m_FiberBundleDicomReader;
     ConnectomicsNetworkReader * m_ConnectomicsNetworkReader;
     PlanarFigureCompositeReader* m_PlanarFigureCompositeReader;
-    TractographyForestReader* m_TractographyForestReader;
-
+    
     FiberBundleDicomWriter * m_FiberBundleDicomWriter;
     FiberBundleVtkWriter * m_FiberBundleVtkWriter;
     FiberBundleTrackVisWriter * m_FiberBundleTrackVisWriter;
@@ -180,7 +172,6 @@ namespace mitk
     ConnectomicsNetworkCSVWriter * m_ConnectomicsNetworkCSVWriter;
     ConnectomicsNetworkMatrixWriter * m_ConnectomicsNetworkMatrixWriter;
     PlanarFigureCompositeWriter* m_PlanarFigureCompositeWriter;
-    TractographyForestWriter* m_TractographyForestWriter;
 
     DiffusionImageNrrdReader * m_DiffusionImageNrrdReader;
     DiffusionImageNiftiReader * m_DiffusionImageNiftiReader;

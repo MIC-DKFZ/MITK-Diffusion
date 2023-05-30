@@ -20,14 +20,6 @@
     <keywordReference id="org.mitk.views.dipyreconstruction.Keyword"/>
     </view>
 
-    <view id="org.mitk.views.tractseg"
-    name="TractSeg"
-    category="Segmentation"
-    class="QmitkTractSegView"
-    icon="resources/tract_seg.png">
-    <keywordReference id="org.mitk.views.dipyreconstruction.Keyword"/>
-    </view>
-
   </extension>
 
 
@@ -35,13 +27,6 @@
     <extension point="org.blueberry.ui.keywords">
 
     <keyword label="segmentation" id="org.mitk.views.brainextraction.Keyword"/>
-    <keyword label="segmentation" id="org.mitk.views.tractseg.Keyword"/>
-    <keyword label="fiber" id="org.mitk.views.tractseg.Keyword"/>
-    <keyword label="bundle" id="org.mitk.views.tractseg.Keyword"/>
-    <keyword label="tract" id="org.mitk.views.tractseg.Keyword"/>
-    <keyword label="TOM" id="org.mitk.views.tractseg.Keyword"/>
-    <keyword label="map" id="org.mitk.views.tractseg.Keyword"/>
-    <keyword label="orientation" id="org.mitk.views.tractseg.Keyword"/>
 
     </extension>
 

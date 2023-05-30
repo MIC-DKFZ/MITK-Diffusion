@@ -9,7 +9,6 @@ mitkAddCustomModuleTest(mitkFiberBundleReaderWriterTest mitkFiberBundleReaderWri
 mitkAddCustomModuleTest(mitkFiberTransformationTest mitkFiberTransformationTest ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX.fib ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX_transformed.fib)
 mitkAddCustomModuleTest(mitkFiberExtractionTest mitkFiberExtractionTest ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX.fib ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX_extracted.fib ${MITK_DATA_DIR}/DiffusionImaging/ROI1.pf ${MITK_DATA_DIR}/DiffusionImaging/ROI2.pf ${MITK_DATA_DIR}/DiffusionImaging/ROI3.pf ${MITK_DATA_DIR}/DiffusionImaging/ROIIMAGE.nrrd ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX_inside.fib ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX_outside.fib ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX_passing-mask.fib ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX_ending-in-mask.fib ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX_subtracted.fib ${MITK_DATA_DIR}/DiffusionImaging/fiberBundleX_added.fib)
 
-mitkAddCustomModuleTest(mitkMachineLearningTrackingTest mitkMachineLearningTrackingTest)
 mitkAddCustomModuleTest(mitkStreamlineTractographyTest mitkStreamlineTractographyTest)
 mitkAddCustomModuleTest(mitkFiberProcessingTest mitkFiberProcessingTest)
 mitkAddCustomModuleTest(mitkPeakShImageReaderTest mitkPeakShImageReaderTest)
