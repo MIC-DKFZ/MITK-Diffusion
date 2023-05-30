@@ -22,10 +22,6 @@ set(CPP_FILES
   ReaderWriter/mitkFiberBundleVtkWriter.cpp
   ReaderWriter/mitkFiberBundleSerializer.cpp
 
-  ReaderWriter/mitkTractographyForestReader.cpp
-  ReaderWriter/mitkTractographyForestWriter.cpp
-  ReaderWriter/mitkTractographyForestSerializer.cpp
-
   ReaderWriter/mitkPlanarFigureCompositeWriter.cpp
   ReaderWriter/mitkPlanarFigureCompositeReader.cpp
   ReaderWriter/mitkPlanarFigureCompositeSerializer.cpp

@@ -30,7 +30,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <TrackingHandlers/mitkTrackingHandlerOdf.h>
 #include <TrackingHandlers/mitkTrackingHandlerPeaks.h>
 #include <TrackingHandlers/mitkTrackingHandlerTensor.h>
-#include <TrackingHandlers/mitkTrackingHandlerRandomForest.h>
 #include <mitkDiffusionFunctionCollection.h>
 #include <random>
 
@@ -979,11 +978,6 @@ void StreamlineTrackingFilter::SetDicomProperties(mitk::FiberBundle::Pointer fib
       model_code_value = "sup181_bb01";
       model_code_meaning = "Single Tensor";
     }
-  }
-  else if (dynamic_cast<mitk::TrackingHandlerRandomForest<6, 28>*>(m_TrackingHandler) || dynamic_cast<mitk::TrackingHandlerRandomForest<6, 100>*>(m_TrackingHandler))
-  {
-    model_code_value = "sup181_bb03";
-    model_code_meaning = "Model Free";
   }
   else if (dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler))
   {

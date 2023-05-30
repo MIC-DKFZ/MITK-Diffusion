@@ -12,8 +12,6 @@ set(MITK_USE_Qwt OFF CACHE BOOL "" FORCE)
 set(MITK_DOXYGEN_GENERATE_QCH_FILES OFF CACHE BOOL "Use doxygen to generate Qt compressed help files for MITK docs" FORCE)
 set(BLUEBERRY_USE_QT_HELP OFF CACHE BOOL "Enable support for integrating bundle documentation into Qt Help" FORCE)
 
-set(MITK_USE_Vigra ON CACHE BOOL "MITK Use Vigra Library" FORCE)
-set(MITK_USE_HDF5 ON CACHE BOOL "MITK Use HDF5 Library" FORCE)
 set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMQI ON CACHE BOOL "" FORCE)

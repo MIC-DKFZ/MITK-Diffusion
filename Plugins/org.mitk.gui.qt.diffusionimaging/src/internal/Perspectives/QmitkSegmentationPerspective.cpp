@@ -44,7 +44,6 @@ void QmitkSegmentationPerspective::CreateInitialLayout(berry::IPageLayout::Point
     // here goes the perspective specific stuff
     /////////////////////////////////////////////
 
-    left->AddView("org.mitk.views.tractseg");
     left->AddView("org.mitk.views.segmentation");
     left->AddView("org.mitk.views.segmentationutilities");
     left->AddView("org.mitk.views.measurement");

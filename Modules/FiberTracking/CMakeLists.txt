@@ -1,5 +1,5 @@
 
-set(_module_deps MitkDiffusionCore MitkCLVigraRandomForest)
+set(_module_deps MitkDiffusionCore)
 
 mitk_check_module_dependencies(
   MODULES ${_module_deps}

@@ -36,7 +36,6 @@ set(H_FILES
 
   # Tractography
   Algorithms/TrackingHandlers/mitkTrackingDataHandler.h
-  Algorithms/TrackingHandlers/mitkTrackingHandlerRandomForest.h
   Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h
   Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h
   Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h

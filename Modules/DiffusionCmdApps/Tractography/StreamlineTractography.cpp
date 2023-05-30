@@ -31,12 +31,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <itkStreamlineTrackingFilter.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingDataHandler.h>
-#include <Algorithms/TrackingHandlers/mitkTrackingHandlerRandomForest.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
 #include <itkTensorImageToOdfImageFilter.h>
-#include <mitkTractographyForest.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkStreamlineTractographyParameters.h>
 
@@ -118,16 +116,11 @@ int main(int argc, char* argv[])
   parser.addArgument("tend_g", "", mitkDiffusionCommandLineParser::Float, "Weight g", "weighting factor between input vector (g=0) and tensor deflection (g=1 equals TEND tracking)", 0.0);
   parser.endGroup();
 
-  parser.beginGroup("8. Random forest tractography specific:");
-  parser.addArgument("forest", "", mitkDiffusionCommandLineParser::String, "Forest:", "input random forest (HDF5 file)", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("use_sh_features", "", mitkDiffusionCommandLineParser::Bool, "Use SH features:", "use SH features");
-  parser.endGroup();
-
-  parser.beginGroup("9. Additional input:");
+  parser.beginGroup("8. Additional input:");
   parser.addArgument("additional_images", "", mitkDiffusionCommandLineParser::StringList, "Additional images:", "specify a list of float images that hold additional information (FA, GFA, additional features for RF tractography)", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
   parser.endGroup();
 
-  parser.beginGroup("10. Misc:");
+  parser.beginGroup("9. Misc:");
   parser.addArgument("flip_x", "", mitkDiffusionCommandLineParser::Bool, "Flip X:", "multiply x-coordinate of direction proposal by -1");
   parser.addArgument("flip_y", "", mitkDiffusionCommandLineParser::Bool, "Flip Y:", "multiply y-coordinate of direction proposal by -1");
   parser.addArgument("flip_z", "", mitkDiffusionCommandLineParser::Bool, "Flip Z:", "multiply z-coordinate of direction proposal by -1");
@@ -186,10 +179,6 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("no_mask_interpolation"))
     params->m_InterpolateRoiImages = !us::any_cast<bool>(parsedArgs["no_mask_interpolation"]);
 
-  bool use_sh_features = false;
-  if (parsedArgs.count("use_sh_features"))
-    use_sh_features = us::any_cast<bool>(parsedArgs["use_sh_features"]);
-
   if (parsedArgs.count("use_stop_votes"))
     params->m_StopVotes = us::any_cast<bool>(parsedArgs["use_stop_votes"]);
 
@@ -227,10 +216,6 @@ int main(int argc, char* argv[])
 
   if (parsedArgs.count("first_order"))
     params->m_SecondOrder = false;
-
-  std::string forestFile;
-  if (parsedArgs.count("forest"))
-    forestFile = us::any_cast<std::string>(parsedArgs["forest"]);
 
   std::string maskFile = "";
   if (parsedArgs.count("tracking_mask"))
@@ -414,34 +399,7 @@ int main(int argc, char* argv[])
 
   mitk::TrackingDataHandler* handler;
   mitk::Image::Pointer reference_image;
-  if (type == "RF")
-  {
-    mitk::TractographyForest::Pointer forest = mitk::IOUtil::Load<mitk::TractographyForest>(forestFile);
-    if (forest.IsNull())
-      mitkThrow() << "Forest file " << forestFile << " could not be read.";
-
-    std::vector<std::string> include = {"Diffusion Weighted Images"};
-    std::vector<std::string> exclude = {};
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor(include, exclude);
-    auto input = mitk::IOUtil::Load<mitk::Image>(input_files.at(0), &functor);
-    reference_image = input;
-
-    if (use_sh_features)
-    {
-      handler = new mitk::TrackingHandlerRandomForest<6,28>();
-      dynamic_cast<mitk::TrackingHandlerRandomForest<6,28>*>(handler)->SetForest(forest);
-      dynamic_cast<mitk::TrackingHandlerRandomForest<6,28>*>(handler)->AddDwi(input);
-      dynamic_cast<mitk::TrackingHandlerRandomForest<6,28>*>(handler)->SetAdditionalFeatureImages(addImages);
-    }
-    else
-    {
-      handler = new mitk::TrackingHandlerRandomForest<6,100>();
-      dynamic_cast<mitk::TrackingHandlerRandomForest<6,100>*>(handler)->SetForest(forest);
-      dynamic_cast<mitk::TrackingHandlerRandomForest<6,100>*>(handler)->AddDwi(input);
-      dynamic_cast<mitk::TrackingHandlerRandomForest<6,100>*>(handler)->SetAdditionalFeatureImages(addImages);
-    }
-  }
-  else if (type == "Peaks")
+  if (type == "Peaks")
   {
     handler = new mitk::TrackingHandlerPeaks();
 

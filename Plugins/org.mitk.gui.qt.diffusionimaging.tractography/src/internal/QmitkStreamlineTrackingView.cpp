@@ -114,19 +114,16 @@ void QmitkStreamlineTrackingView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_TargetImageSelectionWidget->SetDataStorage(this->GetDataStorage());
     m_Controls->m_PriorImageSelectionWidget->SetDataStorage(this->GetDataStorage());
     m_Controls->m_StopImageSelectionWidget->SetDataStorage(this->GetDataStorage());
-    m_Controls->m_ForestSelectionWidget->SetDataStorage(this->GetDataStorage());
     m_Controls->m_ExclusionImageSelectionWidget->SetDataStorage(this->GetDataStorage());
 
     mitk::TNodePredicateDataType<mitk::PeakImage>::Pointer isPeakImagePredicate = mitk::TNodePredicateDataType<mitk::PeakImage>::New();
     mitk::TNodePredicateDataType<mitk::Image>::Pointer isImagePredicate = mitk::TNodePredicateDataType<mitk::Image>::New();
-    mitk::TNodePredicateDataType<mitk::TractographyForest>::Pointer isTractographyForest = mitk::TNodePredicateDataType<mitk::TractographyForest>::New();
 
     mitk::NodePredicateProperty::Pointer isBinaryPredicate = mitk::NodePredicateProperty::New("binary", mitk::BoolProperty::New(true));
     mitk::NodePredicateNot::Pointer isNotBinaryPredicate = mitk::NodePredicateNot::New( isBinaryPredicate );
     mitk::NodePredicateAnd::Pointer isNotABinaryImagePredicate = mitk::NodePredicateAnd::New( isImagePredicate, isNotBinaryPredicate );
     mitk::NodePredicateDimension::Pointer dimensionPredicate = mitk::NodePredicateDimension::New(3);
 
-    m_Controls->m_ForestSelectionWidget->SetNodePredicate(isTractographyForest);
     m_Controls->m_FaImageSelectionWidget->SetNodePredicate( mitk::NodePredicateAnd::New(isNotABinaryImagePredicate, dimensionPredicate) );
     m_Controls->m_FaImageSelectionWidget->SetEmptyInfo("--");
     m_Controls->m_FaImageSelectionWidget->SetSelectionIsOptional(true);
@@ -174,8 +171,7 @@ void QmitkStreamlineTrackingView::CreateQtPartControl( QWidget *parent )
     connect( m_Controls->m_ExclusionImageSelectionWidget, &QmitkAbstractNodeSelectionWidget::CurrentSelectionChanged, this, &QmitkStreamlineTrackingView::OnParameterChanged );
     connect( m_Controls->m_MaskImageSelectionWidget, &QmitkAbstractNodeSelectionWidget::CurrentSelectionChanged, this, &QmitkStreamlineTrackingView::OnParameterChanged );
     connect( m_Controls->m_FaImageSelectionWidget, &QmitkAbstractNodeSelectionWidget::CurrentSelectionChanged, this, &QmitkStreamlineTrackingView::OnParameterChanged );
-    connect( m_Controls->m_ForestSelectionWidget, &QmitkAbstractNodeSelectionWidget::CurrentSelectionChanged, this, &QmitkStreamlineTrackingView::ForestSwitched );
-    connect( m_Controls->m_ForestSelectionWidget, &QmitkAbstractNodeSelectionWidget::CurrentSelectionChanged, this, &QmitkStreamlineTrackingView::OnParameterChanged );
+
     connect( m_Controls->m_SeedsPerVoxelBox, SIGNAL(editingFinished()), this, SLOT(OnParameterChanged()) );
     connect( m_Controls->m_NumFibersBox, SIGNAL(editingFinished()), this, SLOT(OnParameterChanged()) );
     connect( m_Controls->m_ScalarThresholdBox, SIGNAL(editingFinished()), this, SLOT(OnParameterChanged()) );
@@ -779,11 +775,6 @@ void QmitkStreamlineTrackingView::DeleteTrackingHandler()
   }
 }
 
-void QmitkStreamlineTrackingView::ForestSwitched()
-{
-  DeleteTrackingHandler();
-}
-
 void QmitkStreamlineTrackingView::OutputStyleSwitched()
 {
   if (m_InteractiveNode.IsNotNull())
@@ -854,8 +845,6 @@ void QmitkStreamlineTrackingView::UpdateGui()
   m_Controls->m_OdfCutoffBox->setEnabled(false);
   m_Controls->m_OdfCutoffLabel->setEnabled(false);
   m_Controls->m_SharpenOdfsBox->setEnabled(false);
-  m_Controls->m_ForestSelectionWidget->setVisible(false);
-  m_Controls->m_ForestLabel->setVisible(false);
   m_Controls->commandLinkButton->setEnabled(false);
   m_Controls->m_TrialsPerSeedBox->setEnabled(false);
   m_Controls->m_TrialsPerSeedLabel->setEnabled(false);
@@ -924,13 +913,6 @@ void QmitkStreamlineTrackingView::UpdateGui()
       m_Controls->m_OdfCutoffBox->setEnabled(true);
       m_Controls->m_OdfCutoffLabel->setEnabled(true);
       m_Controls->m_SharpenOdfsBox->setEnabled(true);
-    }
-    else if (  mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage( dynamic_cast<mitk::Image *>(m_InputImageNodes.at(0)->GetData())) )
-    {
-      m_Controls->m_ForestSelectionWidget->setVisible(true);
-      m_Controls->m_ForestLabel->setVisible(true);
-      m_Controls->m_ScalarThresholdBox->setEnabled(false);
-      m_Controls->m_FaThresholdLabel->setEnabled(false);
     }
     else if ( dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData()) &&
               m_Controls->m_ModeBox->currentIndex()==1)
@@ -1039,57 +1021,6 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
         ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
         mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
         dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetGfaImage(itkImg);
-      }
-    }
-  }
-  else if ( mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage( dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())) )
-  {
-    if ( m_Controls->m_ForestSelectionWidget->GetSelectedNode().IsNull() )
-    {
-      QMessageBox::information(nullptr, "Information", "Not random forest for machine learning based tractography (raw dMRI tractography) selected. Did you accidentally select the raw diffusion-weighted image in the datamanager?");
-      StartStopTrackingGui(false);
-      return;
-    }
-
-    if (m_TrackingHandler==nullptr)
-    {
-      mitk::TractographyForest::Pointer forest = dynamic_cast<mitk::TractographyForest*>(m_Controls->m_ForestSelectionWidget->GetSelectedNode()->GetData());
-      mitk::Image::Pointer dwi = dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData());
-
-      std::vector< std::vector< ItkFloatImageType::Pointer > > additionalFeatureImages;
-      additionalFeatureImages.push_back(std::vector< ItkFloatImageType::Pointer >());
-      for (auto img : m_AdditionalInputImages)
-      {
-        ItkFloatImageType::Pointer itkimg = ItkFloatImageType::New();
-        mitk::CastToItkImage(img, itkimg);
-        additionalFeatureImages.at(0).push_back(itkimg);
-      }
-
-      bool forest_valid = false;
-      if (forest->GetNumFeatures()>=100)
-      {
-        params->m_NumPreviousDirections = static_cast<unsigned int>((forest->GetNumFeatures() - (100 + additionalFeatureImages.at(0).size()))/3);
-        m_TrackingHandler = new mitk::TrackingHandlerRandomForest<6, 100>();
-        dynamic_cast<mitk::TrackingHandlerRandomForest<6, 100>*>(m_TrackingHandler)->AddDwi(dwi);
-        dynamic_cast<mitk::TrackingHandlerRandomForest<6, 100>*>(m_TrackingHandler)->SetAdditionalFeatureImages(additionalFeatureImages);
-        dynamic_cast<mitk::TrackingHandlerRandomForest<6, 100>*>(m_TrackingHandler)->SetForest(forest);
-        forest_valid = dynamic_cast<mitk::TrackingHandlerRandomForest<6, 100>*>(m_TrackingHandler)->IsForestValid();
-      }
-      else
-      {
-        params->m_NumPreviousDirections = static_cast<unsigned int>((forest->GetNumFeatures() - (28 + additionalFeatureImages.at(0).size()))/3);
-        m_TrackingHandler = new mitk::TrackingHandlerRandomForest<6, 28>();
-        dynamic_cast<mitk::TrackingHandlerRandomForest<6, 28>*>(m_TrackingHandler)->AddDwi(dwi);
-        dynamic_cast<mitk::TrackingHandlerRandomForest<6, 28>*>(m_TrackingHandler)->SetAdditionalFeatureImages(additionalFeatureImages);
-        dynamic_cast<mitk::TrackingHandlerRandomForest<6, 28>*>(m_TrackingHandler)->SetForest(forest);
-        forest_valid = dynamic_cast<mitk::TrackingHandlerRandomForest<6, 28>*>(m_TrackingHandler)->IsForestValid();
-      }
-
-      if (!forest_valid)
-      {
-        QMessageBox::information(nullptr, "Information", "Random forest is invalid. The forest signatue does not match the parameters of TrackingHandlerRandomForest.");
-        StartStopTrackingGui(false);
-        return;
       }
     }
   }
