@@ -124,25 +124,9 @@ public:
   static std::string ODF_MIMETYPE_DESCRIPTION();
   static std::string SH_MIMETYPE_DESCRIPTION();
 
-  // ------------------------------ MITK formats ----------------------------------
-
-  static CustomMimeType CONNECTOMICS_MIMETYPE(); // cnf
-  static CustomMimeType CONNECTOMICS_MATRIX_MIMETYPE(); // mat
-  static CustomMimeType CONNECTOMICS_LIST_MIMETYPE(); // txt
-
-  static std::string CONNECTOMICS_MIMETYPE_NAME();
-  static std::string CONNECTOMICS_MATRIX_MIMETYPE_NAME();
-  static std::string CONNECTOMICS_LIST_MIMETYPE_NAME();
-
-  static std::string CONNECTOMICS_MIMETYPE_DESCRIPTION();
-
   static CustomMimeType PLANARFIGURECOMPOSITE_MIMETYPE();
   static std::string PLANARFIGURECOMPOSITE_MIMETYPE_NAME();
   static std::string PLANARFIGURECOMPOSITE_MIMETYPE_DESCRIPTION();
-
-  static CustomMimeType TRACTOGRAPHYFOREST_MIMETYPE();
-  static std::string TRACTOGRAPHYFOREST_MIMETYPE_NAME();
-  static std::string TRACTOGRAPHYFOREST_MIMETYPE_DESCRIPTION();
 
 private:
 

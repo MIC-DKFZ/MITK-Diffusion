@@ -6,7 +6,6 @@ MITK_CREATE_MODULE(
 )
 
 if(MODULE_IS_ENABLED)
-  add_subdirectory(Connectomics)
   add_subdirectory(Fiberfox)
   add_subdirectory(FiberProcessing)
   add_subdirectory(Tractography)

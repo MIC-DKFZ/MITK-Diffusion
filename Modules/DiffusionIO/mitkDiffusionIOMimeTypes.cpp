@@ -40,8 +40,6 @@ std::vector<CustomMimeType*> DiffusionIOMimeTypes::Get()
   mimeTypes.push_back(FIBERBUNDLE_TRK_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_TCK_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_DICOM_MIMETYPE().Clone());
-  mimeTypes.push_back(CONNECTOMICS_MIMETYPE().Clone());
-  mimeTypes.push_back(TRACTOGRAPHYFOREST_MIMETYPE().Clone());
   mimeTypes.push_back(PLANARFIGURECOMPOSITE_MIMETYPE().Clone());
 
   mimeTypes.push_back(DWI_NRRD_MIMETYPE().Clone());
@@ -63,17 +61,6 @@ CustomMimeType DiffusionIOMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE()
   mimeType.SetComment("Planar Figure Composite");
   mimeType.SetCategory(category);
   mimeType.AddExtension("pfc");
-  return mimeType;
-}
-
-
-CustomMimeType DiffusionIOMimeTypes::TRACTOGRAPHYFOREST_MIMETYPE()
-{
-  CustomMimeType mimeType(TRACTOGRAPHYFOREST_MIMETYPE_NAME());
-  std::string category = "Tractography Forest";
-  mimeType.SetComment("Tractography Forest");
-  mimeType.SetCategory(category);
-  mimeType.AddExtension("rf");
   return mimeType;
 }
 
@@ -184,36 +171,6 @@ DiffusionIOMimeTypes::FiberBundleDicomMimeType* DiffusionIOMimeTypes::FiberBundl
 DiffusionIOMimeTypes::FiberBundleDicomMimeType DiffusionIOMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE()
 {
   return FiberBundleDicomMimeType();
-}
-
-CustomMimeType DiffusionIOMimeTypes::CONNECTOMICS_MIMETYPE()
-{
-  CustomMimeType mimeType(CONNECTOMICS_MIMETYPE_NAME());
-  std::string category = "Connectomics Networks";
-  mimeType.SetComment("Connectomics Networks Files");
-  mimeType.SetCategory(category);
-  mimeType.AddExtension("cnf");
-  return mimeType;
-}
-
-CustomMimeType DiffusionIOMimeTypes::CONNECTOMICS_MATRIX_MIMETYPE()
-{
-  CustomMimeType mimeType(CONNECTOMICS_MATRIX_MIMETYPE_NAME());
-  std::string category = "Connectomics Networks export";
-  mimeType.SetComment("Connectomics Matrix Files");
-  mimeType.SetCategory(category);
-  mimeType.AddExtension("mat");
-  return mimeType;
-}
-
-CustomMimeType DiffusionIOMimeTypes::CONNECTOMICS_LIST_MIMETYPE()
-{
-  CustomMimeType mimeType(CONNECTOMICS_LIST_MIMETYPE_NAME());
-  std::string category = "Connectomics Networks export";
-  mimeType.SetComment("Connectomics Connection Lists");
-  mimeType.SetCategory(category);
-  mimeType.AddExtension("txt");
-  return mimeType;
 }
 
 DiffusionIOMimeTypes::DiffusionImageNrrdMimeType::DiffusionImageNrrdMimeType()
@@ -659,33 +616,9 @@ std::string DiffusionIOMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME()
   return name;
 }
 
-std::string DiffusionIOMimeTypes::CONNECTOMICS_MIMETYPE_NAME()
-{
-  static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".cnf";
-  return name;
-}
-
-std::string DiffusionIOMimeTypes::CONNECTOMICS_MATRIX_MIMETYPE_NAME()
-{
-  static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".mat";
-  return name;
-}
-
-std::string DiffusionIOMimeTypes::CONNECTOMICS_LIST_MIMETYPE_NAME()
-{
-  static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".txt";
-  return name;
-}
-
 std::string DiffusionIOMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE_NAME()
 {
   static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".pfc";
-  return name;
-}
-
-std::string DiffusionIOMimeTypes::TRACTOGRAPHYFOREST_MIMETYPE_NAME()
-{
-  static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".rf";
   return name;
 }
 
@@ -738,21 +671,9 @@ std::string DiffusionIOMimeTypes::FIBERBUNDLE_MIMETYPE_DESCRIPTION()
   return description;
 }
 
-std::string DiffusionIOMimeTypes::CONNECTOMICS_MIMETYPE_DESCRIPTION()
-{
-  static std::string description = "Connectomics Networks";
-  return description;
-}
-
 std::string DiffusionIOMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE_DESCRIPTION()
 {
   static std::string description = "Planar Figure Composite";
-  return description;
-}
-
-std::string DiffusionIOMimeTypes::TRACTOGRAPHYFOREST_MIMETYPE_DESCRIPTION()
-{
-  static std::string description = "Tractography Forest";
   return description;
 }
 

@@ -33,7 +33,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTensorImage.h>
 #include <mitkImage.h>
 #include <mitkDiffusionPropertyHelper.h>
-#include <mitkConnectomicsNetwork.h>
 #include "usModuleRegistry.h"
 #include <mitkPeakImage.h>
 #include <mitkBaseRenderer.h>

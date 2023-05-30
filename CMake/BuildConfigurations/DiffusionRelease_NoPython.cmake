@@ -21,7 +21,6 @@ set(BUILD_DiffusionMiscCmdApps ON CACHE BOOL "Build miscellaneous commandline to
 set(BUILD_DiffusionQuantificationCmdApps ON CACHE BOOL "Build commandline tools for diffusion quantification (IVIM, ADC, ...)" FORCE)
 set(BUILD_DiffusionTractographyCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber tractography" FORCE)
 set(BUILD_DiffusionTractographyEvaluationCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber tractography evaluation" FORCE)
-set(BUILD_DiffusionConnectomicsCmdApps ON CACHE BOOL "Build commandline tools for diffusion connectomics" FORCE)
 set(BUILD_DiffusionPythonCmdApps OFF CACHE BOOL "Build commandline tools for diffusion with python" FORCE)
 
 # Build neither all plugins nor examples
