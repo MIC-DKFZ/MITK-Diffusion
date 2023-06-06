@@ -106,7 +106,6 @@ protected:
  * @param tag the gdcm::Tag to be search for
  * @param dataset a gdcm::DataSet to look into
  * @param target a string to store the value of the given tag if found
- * @param verbose make some output
  *
  * @return true if a string was found, false otherwise
  */

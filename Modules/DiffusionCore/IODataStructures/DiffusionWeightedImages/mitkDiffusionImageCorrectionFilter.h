@@ -46,7 +46,7 @@ public:
 
   /**
    * @brief Set the mitk image ( a 3d+t image ) which is to be reinterpreted as dw image
-   * @param mitkImage
+   * @param input input image
    */
   void SetImage( DiffusionImageTypePointer input )
   {

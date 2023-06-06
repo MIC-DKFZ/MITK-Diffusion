@@ -105,6 +105,7 @@ public:
   /**
    * @brief SetExtractSingleShell
    * @param b_value b-value of the shell to be extracted
+   * @param map all b-vales
    * @param tol the tolerance of the shell choice, i.e. all shells within [ b_value - tol, b_value + tol ] will be extracted
    */
   void SetExtractSingleShell( double b_value, BValueMapType map, double tol );

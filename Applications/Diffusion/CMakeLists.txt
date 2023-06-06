@@ -23,7 +23,6 @@ set(_plugins
   org.mitk.planarfigure
   org.mitk.gui.qt.application
   org.mitk.gui.qt.ext
-  org.mitk.gui.qt.diffusionimagingapp
   org.mitk.gui.qt.common
   org.mitk.gui.qt.stdmultiwidgeteditor
   org.mitk.gui.qt.datamanager
@@ -31,7 +30,7 @@ set(_plugins
   org.mitk.gui.qt.segmentation
   org.mitk.gui.qt.python
   org.mitk.gui.qt.volumevisualization
-  org.mitk.gui.qt.diffusionimaging
+  org.mitk.gui.qt.diffusionimaging.controls
   org.mitk.gui.qt.diffusionimaging.fiberfox
   org.mitk.gui.qt.diffusionimaging.fiberprocessing
   org.mitk.gui.qt.diffusionimaging.ivim
@@ -43,6 +42,7 @@ set(_plugins
   org.mitk.gui.qt.diffusionimaging.python
   org.mitk.gui.qt.diffusionimaging.denoising
   org.mitk.gui.qt.diffusionimaging.partialvolume
+  org.mitk.gui.qt.diffusionimagingapp
   org.mitk.gui.qt.matchpoint.algorithm.browser
   org.mitk.gui.qt.matchpoint.algorithm.control
   org.mitk.gui.qt.matchpoint.mapper

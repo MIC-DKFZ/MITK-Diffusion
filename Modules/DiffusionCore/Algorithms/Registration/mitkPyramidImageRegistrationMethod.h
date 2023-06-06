@@ -170,7 +170,7 @@ public:
 
   /**
    * @brief Copies the estimated parameters to the given array
-   * @param paramArray, target array for copy, make sure to allocate enough space
+   * @param paramArray target array for copy, make sure to allocate enough space
    */
   void GetParameters( double* paramArray)
   {
@@ -253,7 +253,7 @@ public:
 
   /**
    * @brief Set if fixed image mask is used to exclude a region.
-   * @param flag , true if mask is to be used, false if mask is to be ignored (default)
+   * @param flag true if mask is to be used, false if mask is to be ignored (default)
    */
   void SetUseFixedImageMask( bool flag)
   {

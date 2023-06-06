@@ -48,13 +48,7 @@ public:
   //itkFactorylessNewMacro(Self)
   //itkCloneMacro(Self)
 
-  /**
-   * \brief operator ()
-   * \param SignalMatrix is a NxM matrix (N = Number of gradients; M = Number of Shells)
-   * \param S0 is the reference signal (b=0)
-   * \return NxP Signal vector containing the new signal (e.g. [S_1 S_2 S_3 ... S_N] -> only diffusion weighted signal).
-   *The first column of the matrix is reserved for the new calculated signal (other columns can hold e.g. the RMS-error)
-   */
+  //The first column of the matrix is reserved for the new calculated signal (other columns can hold e.g. the RMS-error)
   virtual void operator()(vnl_matrix<double> & /*newSignal*/,const vnl_matrix<double> & /*SignalMatrix*/, const double & /*S0*/)=0;
 
 };

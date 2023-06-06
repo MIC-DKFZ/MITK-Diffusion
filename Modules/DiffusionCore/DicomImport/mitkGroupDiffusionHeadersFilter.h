@@ -52,12 +52,14 @@ namespace mitk
     /**
     * Sets the input n'th of this process object
     * @param idx the number associated with the given input
+    * @param input the input
     */
     virtual void SetInput( const unsigned int& idx, InputType input );
 
     /**
     * Sets the input n'th of this process object
     * @param idx the number associated with the given input
+    * @param output the output
     */
     virtual void SetNthOutput( const unsigned int& idx, InputType output );
 

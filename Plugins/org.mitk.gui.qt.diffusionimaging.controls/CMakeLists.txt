@@ -1,4 +1,4 @@
-project(org_mitk_gui_qt_diffusionimaging)
+project(org_mitk_gui_qt_diffusionimaging_controls)
 
 mitk_create_plugin(
   SUBPROJECTS MITK-Diffusion
