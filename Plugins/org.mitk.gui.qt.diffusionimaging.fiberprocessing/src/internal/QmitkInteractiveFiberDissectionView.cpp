@@ -189,8 +189,6 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
     connect(m_Controls->m_resetClassifier, SIGNAL( clicked() ), this, SLOT( ResetClassifier( ) ) );
 
 
-
-
   }
 
   UpdateGui();
@@ -342,6 +340,8 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   {
       m_Controls->m_predlabeling->setEnabled(true);
       m_Controls->m_predlabelingBrush->setEnabled(true);
+      m_Controls->m_CreateUncertantyMap->setEnabled(true);
+    
   }
   if (distanceuncertanySelected)
   {
@@ -1137,14 +1137,10 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
     }
 
     if (m_activeCycleCounter==1){
-        MITK_INFO << "1";
         mitk::DataNode::Pointer node = mitk::DataNode::New();
-        MITK_INFO << "2";
         mitk::FiberBundle::Pointer fib = classifier->CreatePrediction(classifier->myindex, false);
-        MITK_INFO << "3";
         m_newtestnode=node;
         m_newtestnode->SetData(fib);
-        MITK_INFO << "4";
         m_newtestnode->SetName(m_testnode->GetName());
     }
     MITK_INFO << "6";
@@ -1628,8 +1624,16 @@ void QmitkInteractiveFiberDissectionView::StartValidation()
 
 void QmitkInteractiveFiberDissectionView::CreateUncertantyMap()
 {
-
-    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
+    MITK_INFO << m_activeCycleCounter << " Active Cycle Counter";
+    mitk::FiberBundle::Pointer fib;
+    if (m_activeCycleCounter==1){
+       mitk::FiberBundle::Pointer fib = classifier->CreatePrediction(classifier->myindex, false);
+    }
+    else{
+       mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_newtestnode->GetData());
+    }
+    
+    MITK_INFO << fib->GetFiberPolyData()->GetNumberOfCells();
     
     
     vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
@@ -1641,7 +1645,6 @@ void QmitkInteractiveFiberDissectionView::CreateUncertantyMap()
      /* Check wether all Streamlines of the bundles are labeled... If all are labeled Skip for Loop*/
     unsigned int counter = 0;
 
-    MITK_INFO << fib->GetFiberPolyData()->GetNumberOfCells();
 
     for (int i=0; i<fib->GetFiberPolyData()->GetNumberOfCells(); i++)
     {

@@ -193,9 +193,9 @@ for (std::size_t i = 0; i < tractogram.size(); ++i)
         const double mean_single_end_distances = single_end_distances.mean();
         const double mean_single_end_distances_flip = single_end_distances_flip.mean();
         const std::size_t end_distances_index = prototypes.size() + j;
-        distances(0, j) = mean_single_end_distances_flip > mean_single_end_distances ? mean_single_distances : mean_single_end_distances_flip;
+        distances(0, j) = mean_single_distances_flip > mean_single_distances ? mean_single_distances : mean_single_distances_flip;
 
-        distances(0, end_distances_index) = mean_single_distances_flip > mean_single_distances ? mean_single_distances : mean_single_distances_flip;
+        distances(0, end_distances_index) = mean_single_end_distances_flip > mean_single_end_distances ? mean_single_end_distances : mean_single_end_distances_flip;
     }
 
         dist_vec[i] = distances;
@@ -442,31 +442,113 @@ void StreamlineFeatureExtractor::GenerateData()
     m_index = Predict3();
 
 }
-
 std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_matrix<float>> distances)
 {
     std::vector<unsigned int> indices;
     unsigned int num_matrices = distances.size();
 
-    for (unsigned int i = 0; i < num_matrices; ++i) {
+    // Calculate the threshold based on the mean of the last row in the last matrix
+    float threshold = 0.0;
+    if (num_matrices > 0) {
+        const vnl_matrix<float>& lastMatrix = distances.back();
+        unsigned int lastRow = lastMatrix.rows() - 1;
 
+        std::vector<float> values;
+        for (unsigned int col = 0; col < lastMatrix.cols(); ++col) {
+            values.push_back(lastMatrix(lastRow, col));
+        }
+
+        // Only take 20% of data for higher speed
+        std::sort(values.begin(), values.end());
+        unsigned int firstQuartileIndex = std::floor(values.size() / 5.0);
+        threshold = values[firstQuartileIndex];
+    }
+
+    // Check each matrix to find indices that meet the condition
+    for (unsigned int i = 0; i < num_matrices; ++i) {
         const vnl_matrix<float>& matrix = distances[i];
         unsigned int num_cols = matrix.cols();
         unsigned int last_col_index = num_cols - 1;
-        bool last_col_below_10 = true;
-        if (matrix(0, last_col_index) >= 25) {
-            last_col_below_10 = false;
-            // break;
+        bool last_col_below_threshold = true;
+
+        for (unsigned int row = 0; row < matrix.rows(); ++row) {
+            if (matrix(row, last_col_index) >= threshold) {
+                last_col_below_threshold = false;
+                break;
+            }
         }
-        
-        if (last_col_below_10) {
+
+        if (last_col_below_threshold) {
             indices.push_back(i);
         }
     }
+
+    // Print debug information
     std::cout << "Number of matrices: " << num_matrices << std::endl;
     std::cout << "Number of indices: " << indices.size() << std::endl;
+
     return indices;
 }
+//std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_matrix<float>> distances)
+//{
+//    std::vector<unsigned int> indices;
+//    unsigned int num_matrices = distances.size();
+
+
+//    // Calculate the mean of the last row in the distances matrix
+//    float threshold = 0.0;
+//    if (num_matrices > 0) {
+//        const vnl_matrix<float>& lastMatrix = distances[num_matrices - 1];
+//        unsigned int lastRow = lastMatrix.rows() - 1;
+
+//        std::vector<float> values;
+//        for (unsigned int col = 0; col < lastMatrix.cols(); ++col) {
+//            values.push_back(lastMatrix(lastRow, col));
+//        }
+
+//        std::sort(values.begin(), values.end());
+//        unsigned int firstQuartileIndex = std::floor(values.size() / 4.0);
+//        threshold = values[firstQuartileIndex];
+//    }
+
+//    // for (unsigned int i = 0; i < num_matrices; ++i) {
+
+//    //     const vnl_matrix<float>& matrix = distances[i];
+//    //     unsigned int num_cols = matrix.cols();
+//    //     unsigned int last_col_index = num_cols - 1;
+//    //     bool last_col_below_10 = true;
+//    //     if (matrix(0, last_col_index) >= 25) {
+//    //         last_col_below_10 = false;
+//    //         // break;
+//    //     }
+
+//    //     if (last_col_below_10) {
+//    //         indices.push_back(i);
+//    //     }
+//    // }
+
+
+//    for (unsigned int i = 0; i < num_matrices; ++i) {
+//        const vnl_matrix<float>& matrix = distances[i];
+//        unsigned int num_cols = matrix.cols();
+//        unsigned int last_col_index = num_cols - 1;
+//        bool last_col_below_threshold = true;
+
+//        for (unsigned int row = 0; row < matrix.rows(); ++row) {
+//            if (matrix(row, last_col_index) >= threshold) {
+//                last_col_below_threshold = false;
+//                break;
+//            }
+//        }
+
+//        if (last_col_below_threshold) {
+//            indices.push_back(i);
+//        }
+//    }
+//    std::cout << "Number of matrices: " << num_matrices << std::endl;
+//    std::cout << "Number of indices: " << indices.size() << std::endl;
+//    return indices;
+//}
 
 vnl_vector<float> StreamlineFeatureExtractor::ValidationPipe()
 {
