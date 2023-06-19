@@ -8,7 +8,7 @@
   <transition event_class="MouseMoveEvent" event_variant="JustMouseMove" target="radius">
     <action name="changeRadius" />
   </transition>
-  <transition event_class="MousePressEvent" event_variant="LeftClickNormal" target="start2">
+  <transition event_class="MousePressEvent" event_variant="LeftClick" target="start2">
     <action name="endCreationStart" />
   </transition>
   <transition event_class="MousePressEvent" event_variant="RightClick" target="start">
@@ -24,7 +24,7 @@
   <transition event_class="MouseMoveEvent" event_variant="JustMouseMove" target="radius2">
     <action name="changeRadius" />
   </transition>
-  <transition event_class="MousePressEvent" event_variant="LeftClickNormal" target="final">
+  <transition event_class="MousePressEvent" event_variant="LeftClick" target="final">
     <action name="endCreationStart" />
   </transition>
   <transition event_class="MousePressEvent" event_variant="RightClick" target="start2">

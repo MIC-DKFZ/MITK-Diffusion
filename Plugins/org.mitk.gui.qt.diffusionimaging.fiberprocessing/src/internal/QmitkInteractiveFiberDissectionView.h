@@ -75,34 +75,24 @@ public:
 
   virtual void CreateQtPartControl(QWidget *parent) override;
 
-  ///
-  /// Sets the focus to an internal widget.
-  ///
   virtual void SetFocus() override;
 
 protected slots:
 
   void CreateSubset();
-  void RemovefromBundle( bool checked );
   void RemovefromBundleBrush( bool checked );
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
   void CreatePredictionNode();
-  void CreateCertainNode();
   void CreateUncertaintySampleNode();
   void CreateDistanceSampleNode();
-  void RemovefromUncertainty( bool checked );
   void RemovefromUncertaintyBrush( bool checked );
   void RemovefromDistanceBrush( bool checked );
-  void RemovefromPrediction( bool checked );
   void RemovefromPredictionBrush( bool checked );
-  void RemovefromSelection( bool checked );
   void ResampleTractogram();
   void RandomPrototypes();
   void SFFPrototypes();
-  void StartValidation();
   void CreateUncertantyMap();
-  void RemoveCertainData();
   void ResetClassifier();
 
 
@@ -120,7 +110,6 @@ protected:
   void OnEndInteraction();
   void CreateStreamlineInteractor();
   void CreateStreamlineInteractorBrush();
-  void CleanTestArray();
 
   Ui::QmitkInteractiveFiberDissectionViewControls* m_Controls;
 
@@ -136,12 +125,11 @@ protected:
   int m_uncCounter;
   int m_prototypecounter;
   int m_posOffsetcounter;
-//  int m_thresh2;
 
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
-  mitk::DataNode::Pointer m_testnode;
-//  mitk::DataNode::Pointer              m_trainbundle;
+  mitk::DataNode::Pointer               m_testnode;
+//  mitk::DataNode::Pointer             m_trainbundle;
   mitk::Image::Pointer                  m_SelectedImage;
   mitk::DataNode::Pointer               m_SelectedPS;
   mitk::DataNode::Pointer               m_SelectedImageNode;
@@ -149,10 +137,6 @@ protected:
   mitk::FiberBundle::Pointer            m_newfibersBundle;
   mitk::FiberBundle::Pointer            m_negativeBundle;
   mitk::FiberBundle::Pointer            m_Prediction;
-  mitk::FiberBundle::Pointer            m_CertainPlus;
-  mitk::FiberBundle::Pointer            m_CertainMinus;
-  mitk::FiberBundle::Pointer            m_CertainBetweenPlus;
-  mitk::FiberBundle::Pointer            m_CertainBetweenMinus;
   mitk::FiberBundle::Pointer            m_UncertaintyLabel;
   mitk::FiberBundle::Pointer            m_DistanceLabel;
 
@@ -161,10 +145,6 @@ protected:
   mitk::DataNode::Pointer               m_newfibersBundleNode;
   mitk::DataNode::Pointer               m_negativeBundleNode;
   mitk::DataNode::Pointer               m_PredictionNode;
-  mitk::DataNode::Pointer               m_CertainPlusNode;
-  mitk::DataNode::Pointer               m_CertainMinusNode;
-  mitk::DataNode::Pointer               m_CertainBetweenPlusNode;
-  mitk::DataNode::Pointer               m_CertainBetweenMinusNode;
   mitk::DataNode::Pointer               m_UncertaintyLabelNode;
   mitk::DataNode::Pointer               m_DistanceLabelNode;
   mitk::DataNode::Pointer               m_reducedFibersDataNode;
@@ -176,17 +156,12 @@ protected:
 
   mitk::DataNode::Pointer               circleNode;
 
-  vtkSmartPointer<vtkCellPicker>        m_picker1;
-  mitk::StreamlineInteractor::Pointer   m_StreamlineInteractor;
   mitk::StreamlineInteractorBrush::Pointer   m_StreamlineInteractorBrush;
 
   mitk::SphereInteractor::Pointer   m_SphereInteractor;
 
   std::shared_ptr< mitk::StreamlineFeatureExtractor > classifier;
-  std::shared_ptr< mitk::StreamlineFeatureExtractor > validater;
 
-
-  std::vector<vnl_vector<float>> m_metrics;
 
   std::vector<std::vector<unsigned int>> m_index;
 
