@@ -62,8 +62,7 @@ void mitk::StreamlineInteractorBrush::ConnectActionsAndFunctions()
 
   CONNECT_FUNCTION("addnegstreamline", AddStreamlineNegBundle);
   CONNECT_FUNCTION("addposstreamline", AddStreamlinePosBundle);
-  CONNECT_FUNCTION("addnegtolabelstreamline", AddNegStreamlinetolabelsBundle);
-  CONNECT_FUNCTION("addpostolabelstreamline", AddPosStreamlinetolabelsBundle);
+  CONNECT_FUNCTION("addtolabelstreamline", AddStreamlinetolabelsBundle);
 //  CONNECT_FUNCTION("FeedUndoStack", FeedUndoStack);
 }
 
@@ -793,7 +792,7 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
     RenderingManager::GetInstance()->RequestUpdateAll();
   }
 
-void mitk::StreamlineInteractorBrush::AddNegStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent)
+void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
     DataInteractor::SetDataNode(m_NegStreamlineNode);
 
@@ -991,15 +990,11 @@ void mitk::StreamlineInteractorBrush::AddNegStreamlinetolabelsBundle(StateMachin
 
         }
     }
-    RenderingManager::GetInstance()->RequestUpdateAll();
-  }
 
-void mitk::StreamlineInteractorBrush::AddPosStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent)
-{
     DataInteractor::SetDataNode(m_PosStreamlineNode);
 
 
-    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
+//    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
     if (positionEvent == nullptr)
     {
 

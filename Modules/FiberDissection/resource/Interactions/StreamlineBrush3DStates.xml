@@ -10,11 +10,8 @@
         <transition event_class="InteractionPositionEvent" event_variant="AddPosStreamlineClick" target="start">
             <action name="addposstreamline"/>
         </transition>
-        <transition event_class="InteractionPositionEvent" event_variant="AddNegStreamlinetolabelClick" target="start">
-            <action name="addnegtolabelstreamline"/>
-        </transition>
-        <transition event_class="InteractionPositionEvent" event_variant="AddPosStreamlinetolabelClick" target="start">
-            <action name="addpostolabelstreamline"/>
+        <transition event_class="InteractionPositionEvent" event_variant="AddStreamlinetolabelClick" target="start">
+            <action name="addtolabelstreamline"/>
         </transition>
     </state>
 </statemachine>

@@ -58,9 +58,6 @@ public:
     this->GenerateData();
   }
 
-//  void Validate(){
-//    this->ValidationPipe();
-//  }
 
 
 
@@ -72,26 +69,19 @@ public:
   void SetTractogramPrototypes(const mitk::FiberBundle::Pointer &TractogramPrototypes, bool standard);
   void SetActiveCycle(int &activeCycle);
   void SetInitRandom(int &initRandom);
-//  void SetRandomThreshold(int &threshold);
   vnl_vector<float> ValidationPipe();
 
 
   void CreateClassifier();
   std::vector<std::vector<unsigned int>>  Predict();
-  std::vector<std::vector<unsigned int>>  Predict2();
-  std::vector<std::vector<unsigned int>>  Predict3();
-  // mitk::DataNode::Pointer  Predict2();
-  // std::vector<std::vector<unsigned int>>  PredictLabels();
   void TrainModel();
 
-//  void CreatePrediction(std::vector<unsigned int> &index);
   mitk::FiberBundle::Pointer CreatePrediction(std::vector<unsigned int> &index, bool removefrompool);
   std::vector<std::vector<unsigned int>> GetDistanceData(float &value);
-  std::vector<std::vector<unsigned int>> GetDistanceData2(float &value);
   std::vector<unsigned int> GetIndex(std::vector< vnl_matrix<float>> distances);
 
   mitk::FiberBundle::Pointer                  m_Prediction;
-  mitk::DataNode::Pointer                      m_imgNode;
+  mitk::DataNode::Pointer                     m_imgNode;
   mitk::DataNode::Pointer                     m_fiberNode;
   mitk::FiberBundle::Pointer                  m_ToLabel;
 
@@ -104,11 +94,8 @@ public:
 protected:
 
   void GenerateData();
-//  void ValidationPipe();
 
-  std::vector<int> CreateLabels(std::vector<vnl_matrix<float> > Testdata,
-                                std::vector<vnl_matrix<float> > Prediction);
-  std::vector< vnl_matrix<float> > ResampleFibers(FiberBundle::Pointer tractogram);
+  std::vector< vnl_matrix<float> > TractToMatrixFibers(FiberBundle::Pointer tractogram);
   std::vector<vnl_matrix<float> > CalculateDmdf(std::vector<vnl_matrix<float> > tractogram,
                                                 std::vector<vnl_matrix<float> > prototypes);
   std::vector< vnl_matrix<float> > MergeTractogram(std::vector<vnl_matrix<float> > prototypes,

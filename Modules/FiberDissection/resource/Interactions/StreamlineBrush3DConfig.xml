@@ -7,13 +7,9 @@
          <attribute name="EventButton" value="RightMouseButton"/>
          <attribute name="Modifiers" value="alt"/>
     </event_variant>
-    <event_variant class="MouseMoveEvent" name="AddNegStreamlinetolabelClick">
+    <event_variant class="MouseMoveEvent" name="AddStreamlinetolabelClick">
          <attribute name="EventButton" value="RightMouseButton"/>
-         <attribute name="Modifiers" value="ctrl,shift"/>
-    </event_variant>
-    <event_variant class="MouseMoveEvent" name="AddPosStreamlinetolabelClick">
-         <attribute name="EventButton" value="RightMouseButton"/>
-         <attribute name="Modifiers" value="ctrl,alt"/>
+         <attribute name="Modifiers" value="ctrl"/>
     </event_variant>
     <event_variant class="MouseMoveEvent" name="CheckSelected"/>
 </config>

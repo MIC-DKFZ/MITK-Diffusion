@@ -68,9 +68,8 @@ namespace mitk
 
        void AddStreamlinePosBundle(StateMachineAction *, InteractionEvent *interactionEvent);
 
-       void AddNegStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent);
+       void AddStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent);
 
-       void AddPosStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent);
 
        bool CheckSelection(const InteractionEvent *interactionEvent);
 

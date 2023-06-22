@@ -196,9 +196,6 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   m_Controls->m_CreateUncertantyMap->setEnabled(false);
   m_Controls->m_Numtolabel->setEnabled(false);
   m_Controls->m_NumRandomFibers2->setEnabled(false);
-
-//  m_Controls->m_AddRandomFibers->setEnabled(false);
-//  m_Controls->m_NumRandomFibers->setEnabled(false);
   m_Controls->m_AddDistanceFibers->setEnabled(false);
   m_Controls->m_AddUncertainFibers->setEnabled(false);
 
@@ -222,22 +219,15 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
 
 
   bool testnodeSelected = curtestnode.IsNotNull();
-//  bool prototypesGenerated = m_Prototypes.IsNotNull();
   bool fibSelected = !m_SelectedFB.empty();
   bool multipleFibsSelected = (m_SelectedFB.size()>1);
-//  bool nfibSelected = m_newfibersBundleNode.IsNotNull();
   bool posSelected = this->GetDataStorage()->Exists(m_positiveBundleNode);
   bool negSelected = this->GetDataStorage()->Exists(m_negativeBundleNode);
   bool indexSelected = !m_index.empty();
   bool uncertaintySelected = this->GetDataStorage()->Exists(m_UncertaintyLabelNode);
   bool distanceuncertanySelected = this->GetDataStorage()->Exists(m_DistanceLabelNode);
   bool predictionSelected = this->GetDataStorage()->Exists(m_PredictionNode);
-//  bool reduced = m_reducedFibersDataNode.IsNotNull();
 
-
-
-
-  // toggle visibility of elements according to selected method
 
 
   // are fiber bundles selected?
@@ -259,20 +249,12 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   if (fibSelected)
   {
     m_Controls->m_FibLabel->setText(QString(m_SelectedFB.at(0)->GetName().c_str()));
-    // more than two bundles needed to join/subtract
     if (multipleFibsSelected )
     {
       m_Controls->m_FibLabel->setText("multiple bundles selected");
     }
   }
 
-
-  // is image selected
-
-//  if (nfibSelected && posSelected)
-//  {
-//      m_Controls->m_BrushButton->setEnabled(true);
-//  }
 
 
   if (posSelected && negSelected)
@@ -470,7 +452,11 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
         mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_testnode->GetData());
 
         /* Get Subset of Tractogram*/
-        int size_subset = std::max(1.0, ceil(3.0 * m_Controls->m_NumPrototypes->value() * std::log(m_Controls->m_NumPrototypes->value())));
+        unsigned int size_subset = std::max(1.0, ceil(3.0 * m_Controls->m_NumPrototypes->value() * std::log(m_Controls->m_NumPrototypes->value())));
+
+        if (size_subset>fib->GetNumFibers()){
+            size_subset = fib->GetNumFibers();
+        }
 
         MITK_INFO << fib->GetNumFibers();
         std::vector<int> myvec;
@@ -488,7 +474,7 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
 
         unsigned int counter = 0;
 
-        for (int i=0; i<size_subset; i++){
+        for (unsigned int i=0; i<size_subset; i++){
             vtkCell* cell = fib->GetFiberPolyData()->GetCell(myvec.at(i));
             auto numPoints = cell->GetNumberOfPoints();
             vtkPoints* points = cell->GetPoints();
@@ -654,7 +640,6 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
 
         m_Prototypes = node;
         m_Controls->m_PrototypeBox->SetAutoSelectNewItems (true);
-//        this->GetDataStorage()->Add(m_Prototypes, m_testnode);
         m_Prototypes->SetVisibility(false);
         m_Controls->m_PrototypeBox->SetAutoSelectNewItems (false);
         m_Controls->m_useStandardP->setChecked(false);
@@ -699,7 +684,17 @@ void QmitkInteractiveFiberDissectionView::CreateSubset()
 {
   
 //    QMessageBox::information(nullptr, "Template", "Please load and select an image before starting image processing.");
+    if (m_Controls->m_helpmessages->isChecked())
+    {
+      // Nothing selected. Inform the user and return
+      QMessageBox::information(nullptr, "Helper", "Roughly draw a start and an end ROI of your target tract.\n"
+                                                  " 1. Use the middle mouse button two draw the center of the start region, then adjust the size and confirm with the middle mouse button\n"
+                                                  " 2. Navigate to the end region and do the same again. \n"
+                                                  " 3. The subset of streamlines will be presented.\n"
+                                                  " 4. Choose how many fibers of the subset you want to label.\n"
+                                                  " 5. Click 'add' to annotate a subset of presented fibers.");
 
+    }
     m_SphereInteractor = mitk::SphereInteractor::New();
     m_SphereInteractor->LoadStateMachine("SphereInteractionsStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
     m_SphereInteractor->SetEventConfig("SphereInteractionsConfig.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
@@ -725,7 +720,6 @@ void QmitkInteractiveFiberDissectionView::CreateSubset()
     mitk::FiberBundle::Pointer reducedFib = mitk::FiberBundle::New();
     m_reducedFibersDataNode->SetData(reducedFib);
     m_reducedFibersDataNode->SetName("Reduced");
-//    m_reducedFibersDataNode = node;
 
     this->GetDataStorage()->Add(m_reducedFibersDataNode, m_testnode);
 
@@ -748,6 +742,17 @@ void QmitkInteractiveFiberDissectionView::CreateSubset()
 
 void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
 {
+    if (m_Controls->m_helpmessages->isChecked())
+    {
+      QMessageBox::information(nullptr, "Helper", "Please annotate the displayed fibers.\n"
+                                                  "- If a fiber belongs to the target tract press 'alt' and simply hover over the fiber\n"
+                                                  "- If the fiber does not belong to the target tract press 'shift' and hover over the fiber\n"
+                                                  "- To unlabel a fiber press the 'Cntrl' button and hover over the respective fiber \n"
+                                                  "Once you are done, you can train the classifier by pressing 'Train Classifier'\n"
+                                                  "Note: You dont have to label all Fibers "
+                                                  );
+
+    }
     m_reducedFibersDataNode->SetVisibility(false);
     // Hide the selected node.
     m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
@@ -763,21 +768,10 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
     MITK_INFO << m_Controls->m_NumRandomFibers->value();
 
 
-    // If a newfibersBundleNode exists, remove it from the data storage.
-//    if (!m_newfibersBundleNode)
-//    {
-//        mitk::FiberBundle::Pointer m_newfibersBundle = mitk::FiberBundle::New();
-//        mitk::DataNode::Pointer node = mitk::DataNode::New();
-//        node->SetName("ToLabel");
-//        node->SetData(m_newfibersBundle);
-//        m_newfibersBundleNode = node;
-//        this->GetDataStorage()->Add(m_newfibersBundleNode);
-//    }
     if (m_newfibersBundleNode)
     {
         MITK_INFO << "To Label Bundle Exists";
         this->GetDataStorage()->Remove(m_newfibersBundleNode);
-//        mitk::FiberBundle::Pointer Stack = dynamic_cast<mitk::FiberBundle *>(m_newfibersBundleNode->GetData());
 
         // Create a new data node and set it to an empty FiberBundle.
         mitk::DataNode::Pointer node = mitk::DataNode::New();
@@ -897,18 +891,6 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
         }
 
 
-
-
-    // Delete the old fibers from the input dataset
-//    for (int i = 0; i < m_Controls->m_NumRandomFibers->value(); i++) {
-//        fib->GetFiberPolyData()->DeleteCell(i);
-//    }
-    // Remove any deleted cells from the input dataset
-//    fib->GetFiberPolyData()->RemoveDeletedCells();
-
-    // Output the number of fibers in the new dataset to the console
-//    MITK_INFO << fib->GetFiberPolyData()->GetNumberOfCells();
-
     // Set the vtkPolyData object to the new fibers
     vNewPolyData->SetLines(vNewLines);
     vNewPolyData->SetPoints(vNewPoints);
@@ -1008,6 +990,15 @@ void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractorBrush()
 
 void QmitkInteractiveFiberDissectionView::StartAlgorithm()
 {
+    if (m_Controls->m_helpmessages->isChecked())
+    {
+      QMessageBox::information(nullptr, "Helper", "Classifier training started...\n"
+                                                  "Once it is finished, the prediction will be displayed.\n"
+                                                  "If it is sufficient, you may save it. Feel free to exclude outliers, or to label more fibers to improve the prediction.\n"
+                                                  "You can turn of this helper by unchecking the radie button in the lower part of the view."
+                                                  );
+
+    }
     m_Controls->m_AddRandomFibers->setEnabled(false);
     m_Controls->m_NumRandomFibers->setEnabled(false);
     m_Controls->m_BrushButton->setEnabled(false);
@@ -1229,12 +1220,19 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
 void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
 {
      MITK_INFO << "Create Fibers to label based on Distance in Features-Space";
-//    this->GetDataStorage()->Remove(m_UncertaintyLabelNode);
+     if (m_Controls->m_helpmessages->isChecked())
+     {
+       QMessageBox::information(nullptr, "Helper", "A new subset is generated to be annotated\n"
+                                                   "Again, use alt, shift and cntrl to label positive or negative fibers or to unlabel wrong annotated fibers\n"
+                                                   "Then retrain the classifier..."
+                                                   );
+
+     }
 
     float myval = m_Controls->m_subsetfft->value() * 0.01;
 
     std::vector<std::vector<unsigned int>> curidx;
-    curidx =  classifier->GetDistanceData2(myval);
+    curidx =  classifier->GetDistanceData(myval);
     MITK_INFO << "cur_idx check";
     std::vector<unsigned int> myvec = curidx.at(0);
     myvec.resize(m_Controls->m_NumRandomFibers2->value());
@@ -1303,6 +1301,14 @@ void QmitkInteractiveFiberDissectionView::RemovefromDistanceBrush( bool checked 
 
 void QmitkInteractiveFiberDissectionView::RemovefromPredictionBrush( bool checked )
 {
+    if (m_Controls->m_helpmessages->isChecked())
+    {
+      QMessageBox::information(nullptr, "Helper", "You may now exclude false predicted streamlines from the prediction\n"
+                                                  "Again, use alt, shift and cntrl to label positive or negative fibers or to unlabel wrong annotated fibers\n"
+                                                  "Then save the prediction..."
+                                                  );
+
+    }
     if (checked)
     {
         m_Controls->m_unclabelingBrush->setChecked(false);
