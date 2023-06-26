@@ -1,11 +1,11 @@
 if(CPACK_GENERATOR MATCHES "NSIS")
 
   # set the package header icon for MUI
-  SET(CPACK_PACKAGE_ICON "/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/new_mitk/mitk\\mitk.bmp")
+  SET(CPACK_PACKAGE_ICON "/home/robin/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/new_mitk/mitk\\mitk.bmp")
   # set the install/unistall icon used for the installer itself
   # There is a bug in NSIS that does not handle full unix paths properly.
-  SET(CPACK_NSIS_MUI_ICON "/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/new_mitk/mitk\\mitk.ico")
-  SET(CPACK_NSIS_MUI_UNIICON "/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/new_mitk/mitk\\mitk.ico")
+  SET(CPACK_NSIS_MUI_ICON "/home/robin/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/new_mitk/mitk\\mitk.ico")
+  SET(CPACK_NSIS_MUI_UNIICON "/home/robin/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/new_mitk/mitk\\mitk.ico")
 
   set(CPACK_NSIS_DISPLAY_NAME "MITK Diffusion")
 
