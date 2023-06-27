@@ -107,7 +107,7 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::TractToMatrixFibers(
   }
 
   // Log a message to indicate that the resampling is done
-  MITK_INFO << "All fibers of equal number of points";
+  MITK_INFO << "All fibers have equal number of points";
 
   // Create a vector to store the output matrices, one for each fiber
   std::vector< vnl_matrix<float> > out_fib(tractogram->GetFiberPolyData()->GetNumberOfCells());
@@ -220,9 +220,6 @@ for (std::size_t i = 0; i < tractogram.size(); ++i)
         dist_vec[i] = distances;
     }
 
-    MITK_INFO << "The size of the distances is " <<dist_vec[0].cols();
-    MITK_INFO << "The size of the distances is " <<dist_vec[0].rows();
-    MITK_INFO << "Done calculating Dmdf";
 
     return dist_vec;
 }
@@ -326,7 +323,6 @@ std::vector<unsigned int> StreamlineFeatureExtractor::Sort(std::vector<float> so
 
 mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vector<unsigned int>& index, bool removefrompool)
 {
-    MITK_INFO << "Create Bundle";
 
     // Create a new vtkPolyData for storing the fibers
     vtkSmartPointer<vtkPolyData> fibersData = vtkSmartPointer<vtkPolyData>::New();
@@ -340,7 +336,7 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
 
     unsigned int indexSize = index.size();
     unsigned int counter = 0;
-    MITK_INFO << "Start Loop";
+
     for (unsigned int i = 0; i < indexSize; i++)
     {
         // Get the cell (fiber) from the tractogram
@@ -374,8 +370,6 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
         }
     }
 
-    MITK_INFO << "Counter";
-    MITK_INFO << counter;
 
     // Set the lines and points to the new vtkPolyData
     vNewPolyData->SetLines(vNewLines);
@@ -388,18 +382,12 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
     // Create a new FiberBundle using the fibersData
     mitk::FiberBundle::Pointer prediction = mitk::FiberBundle::New(fibersData);
 
-    MITK_INFO << "Cells Prediction";
-    MITK_INFO << prediction->GetFiberPolyData()->GetNumberOfCells();
-    MITK_INFO << "Cells Tractogram";
-    MITK_INFO << m_TractogramTest->GetFiberPolyData()->GetNumberOfCells();
-
     return prediction;
 }
 
 
 void StreamlineFeatureExtractor::GenerateData()
 {
-    MITK_INFO << "Update";
 
     // Initialize variables
     std::vector<vnl_matrix<float>> T_Prototypes;
@@ -409,15 +397,12 @@ void StreamlineFeatureExtractor::GenerateData()
     std::vector<vnl_matrix<float>> T_mergedPrototypes;
 
     // Convert input prototypes to matrices
-    MITK_INFO << "TractToMatrix Input Prototypes";
     T_Prototypes = TractToMatrixFibers(m_inputPrototypes);
 
     // Convert input tractogram minus to matrices
-    MITK_INFO << "TractToMatrix Input Tractogram Minus";
     T_TractogramMinus = TractToMatrixFibers(m_TractogramMinus);
 
     // Convert input tractogram plus to matrices
-    MITK_INFO << "TractToMatrix Input Tractogram Plus";
     T_TractogramPlus = TractToMatrixFibers(m_TractogramPlus);
 
     // Merge prototypes with tractogram plus and minus
@@ -425,15 +410,13 @@ void StreamlineFeatureExtractor::GenerateData()
     T_mergedPrototypes = MergeTractogram(T_Prototypes, T_TractogramPlus, T_TractogramMinus);
 
     // Calculate features for tractogram minus
-    MITK_INFO << "Calculate Minus Features";
+    MITK_INFO << "Calculate Features";
     m_DistancesMinus = CalculateDmdf(T_TractogramMinus, T_mergedPrototypes);
 
     // Calculate features for tractogram plus
-    MITK_INFO << "Calculate Plus Features";
     m_DistancesPlus = CalculateDmdf(T_TractogramPlus, T_mergedPrototypes);
 
     // Convert test tractogram to matrices
-    MITK_INFO << "TractToMatrix Test Data";
     T_TractogramTest = TractToMatrixFibers(m_TractogramTest);
 
     // Calculate features for test data
@@ -442,7 +425,10 @@ void StreamlineFeatureExtractor::GenerateData()
     MITK_INFO << m_DistancesTest.size();
 
     // Get indices for prediction
-    myindex = GetIndex(m_DistancesTest);
+//    if (m_activeCycle==0){
+        myindex = GetIndex(m_DistancesTest);
+//    }
+    MITK_INFO << "Size of myindex is " << myindex.size() << " and my_active is " << m_activeCycle;
 
     // Train the model
     TrainModel();
@@ -451,6 +437,53 @@ void StreamlineFeatureExtractor::GenerateData()
     m_index = Predict();
 }
 
+//std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_matrix<float>> distances)
+//{
+//    std::vector<unsigned int> indices;
+//    unsigned int num_matrices = distances.size();
+
+//    // Calculate the threshold based on the mean of the last row in the last matrix
+//    float threshold = 0.0;
+//    if (num_matrices > 0) {
+//        const vnl_matrix<float>& lastMatrix = distances.back();
+//        unsigned int lastRow = lastMatrix.rows() - 1;
+
+//        std::vector<float> values;
+//        for (unsigned int col = 0; col < lastMatrix.cols(); ++col) {
+//            values.push_back(lastMatrix(lastRow, col));
+//        }
+
+//        // Only take 20% of data for higher speed
+//        std::sort(values.begin(), values.end());
+//        unsigned int firstQuartileIndex = std::floor(values.size() / 5.0);
+//        threshold = values[firstQuartileIndex];
+//    }
+
+//    // Check each matrix to find indices that meet the condition
+//    for (unsigned int i = 0; i < num_matrices; ++i) {
+//        const vnl_matrix<float>& matrix = distances[i];
+//        unsigned int num_cols = matrix.cols();
+//        unsigned int last_col_index = num_cols - 1;
+//        bool last_col_below_threshold = true;
+
+//        for (unsigned int row = 0; row < matrix.rows(); ++row) {
+//            if (matrix(row, last_col_index) >= threshold) {
+//            last_col_below_threshold = false;
+//            break;
+//            }
+//        }
+
+//        if (last_col_below_threshold) {
+//            indices.push_back(i);
+//        }
+//    }
+
+//    // Print debug information
+//    std::cout << "Number of matrices: " << num_matrices << std::endl;
+//    std::cout << "Number of indices: " << indices.size() << std::endl;
+
+//    return indices;
+//}
 
 
 std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_matrix<float>> distances)
@@ -469,7 +502,7 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
             values.push_back(lastMatrix(lastRow, col));
         }
 
-        if (distances.size()>100000){
+        if (distances.size()>80000){
             // Only take 20% of data for higher speed
             std::sort(values.begin(), values.end());
             unsigned int firstQuartileIndex = std::floor(values.size() / 5.0);
@@ -477,10 +510,10 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
         }
         else {
             std::sort(values.begin(), values.end());
-            unsigned int firstQuartileIndex = std::floor(values.size() / 1.0);
-            threshold = values[firstQuartileIndex];
+            threshold = values[0];
         }
     }
+    std::cout << "Threshold: " << threshold;
 
     // Check each matrix to find indices that meet the condition
     for (unsigned int i = 0; i < num_matrices; ++i) {
@@ -560,8 +593,6 @@ void StreamlineFeatureExtractor::TrainModel()
     float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
     float w[2] = {minusval, plusval};
     cv::Mat newweight = cv::Mat(1,2, CV_32F, w);
-    MITK_INFO << "Weights";
-    MITK_INFO << newweight;
 
 
     /*Shuffle Data*/
@@ -712,15 +743,12 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetDistanceD
     std::vector<std::vector<unsigned int>> index_vec;
 
     /*Get index of most unertain data (lengths defines how many data is saved)*/
-//    int lengths=500;
-    MITK_INFO << entropy_vector.size();
+
   int lengths = std::count_if(entropy_vector.begin(), entropy_vector.end(),[&](auto const& val){ return val >= value; });
   if (lengths>250)
   {
       lengths=250;
   }
-  MITK_INFO << lengths;
-
     /*Maybe shuffling of length so not the most uncertain values are chosen*/
     std::vector<unsigned int> indexUnc = Sort(entropy_vector, lengths, 0);
 
@@ -754,7 +782,6 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetDistanceD
 
     }
 
-    MITK_INFO << "Distance Matrix Calculated";
 
     /*Index to find values in distancematrix*/
     std::vector<unsigned int> myidx;
@@ -795,13 +822,11 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetDistanceD
 
     }
 
-    MITK_INFO << "Dist_stop";
 
     index_vec.push_back(indexUncDist);
 
     return index_vec;
 }
-
 
 }
 
