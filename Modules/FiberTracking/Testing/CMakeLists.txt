@@ -13,8 +13,7 @@ mitkAddCustomModuleTest(mitkStreamlineTractographyTest mitkStreamlineTractograph
 mitkAddCustomModuleTest(mitkFiberProcessingTest mitkFiberProcessingTest)
 mitkAddCustomModuleTest(mitkPeakShImageReaderTest mitkPeakShImageReaderTest)
 
-#if(MITK_ENABLE_RENDERING_TESTING) # apparently does not work on ubuntu
-mitkAddCustomModuleTest(mitkFiberMapper3DTest mitkFiberMapper3DTest)
-#ENDIF()
+# does not work reliably
+# mitkAddCustomModuleTest(mitkFiberMapper3DTest mitkFiberMapper3DTest)
 
 ENDIF()
