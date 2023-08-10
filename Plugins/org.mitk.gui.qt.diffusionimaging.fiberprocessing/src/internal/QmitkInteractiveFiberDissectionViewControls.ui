@@ -115,15 +115,15 @@ QGroupBox {
           <number>0</number>
          </property>
          <property name="currentIndex">
-          <number>1</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="Defaults">
           <property name="geometry">
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>237</width>
-            <height>111</height>
+            <width>381</width>
+            <height>452</height>
            </rect>
           </property>
           <attribute name="label">
@@ -131,30 +131,13 @@ QGroupBox {
           </attribute>
           <layout class="QGridLayout" name="gridLayout_6">
            <item row="0" column="0">
-            <widget class="QLabel" name="inputImageOneLabel">
-             <property name="text">
-              <string>Extract from</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <widget class="QmitkDataStorageComboBox" name="m_BundleBox"/>
-           </item>
-           <item row="1" column="0">
-            <widget class="QPushButton" name="m_SFFPrototypesButton">
-             <property name="text">
-              <string>SFF Extraction</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0">
             <widget class="QPushButton" name="m_ResampleButton">
              <property name="text">
               <string>Resample Bundle</string>
              </property>
             </widget>
            </item>
-           <item row="3" column="0">
+           <item row="1" column="0">
             <spacer name="verticalSpacer_23">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -182,14 +165,27 @@ QGroupBox {
            <string>Advanced Settings</string>
           </attribute>
           <layout class="QGridLayout" name="gridLayout_4">
-           <item row="0" column="0">
-            <widget class="QLabel" name="inputImageOneLabel_3">
+           <item row="1" column="0">
+            <widget class="QLabel" name="inputImageOneLabel">
              <property name="text">
-              <string>Number of Prototypes</string>
+              <string>Extract from</string>
              </property>
             </widget>
            </item>
-           <item row="0" column="2">
+           <item row="13" column="0" colspan="2">
+            <spacer name="verticalSpacer_5">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>170</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item row="0" column="1">
             <widget class="QSpinBox" name="m_NumPrototypes">
              <property name="minimum">
               <number>10</number>
@@ -202,14 +198,41 @@ QGroupBox {
              </property>
             </widget>
            </item>
-           <item row="1" column="0">
+           <item row="1" column="1">
+            <widget class="QmitkDataStorageComboBox" name="m_BundleBox"/>
+           </item>
+           <item row="2" column="0">
             <widget class="QPushButton" name="m_RandomPrototypesButton">
              <property name="text">
               <string>Random Extraction</string>
              </property>
             </widget>
            </item>
-           <item row="2" column="0" colspan="2">
+           <item row="0" column="0">
+            <widget class="QLabel" name="inputImageOneLabel_3">
+             <property name="text">
+              <string>Number of Prototypes</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QPushButton" name="m_SFFPrototypesButton">
+             <property name="text">
+              <string>SFF Extraction</string>
+             </property>
+            </widget>
+           </item>
+           <item row="8" column="0">
+            <widget class="QLabel" name="inputImageOneLabel_2">
+             <property name="text">
+              <string>Choose own Prototypes</string>
+             </property>
+            </widget>
+           </item>
+           <item row="8" column="1">
+            <widget class="QmitkDataStorageComboBox" name="m_PrototypeBox"/>
+           </item>
+           <item row="9" column="0">
             <widget class="QRadioButton" name="m_useStandardP">
              <property name="enabled">
               <bool>true</bool>
@@ -221,29 +244,6 @@ QGroupBox {
               <bool>true</bool>
              </property>
             </widget>
-           </item>
-           <item row="3" column="0">
-            <widget class="QLabel" name="inputImageOneLabel_2">
-             <property name="text">
-              <string>Choose own Prototypes</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="1">
-            <widget class="QmitkDataStorageComboBox" name="m_PrototypeBox"/>
-           </item>
-           <item row="4" column="0">
-            <spacer name="verticalSpacer_5">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>170</height>
-              </size>
-             </property>
-            </spacer>
            </item>
           </layout>
          </widget>
@@ -280,7 +280,7 @@ QGroupBox {
        <item row="1" column="0">
         <widget class="QToolBox" name="toolBox_2">
          <property name="currentIndex">
-          <number>1</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="page_16">
           <property name="geometry">
@@ -555,7 +555,7 @@ QGroupBox {
             <x>0</x>
             <y>0</y>
             <width>381</width>
-            <height>218</height>
+            <height>192</height>
            </rect>
           </property>
           <attribute name="label">

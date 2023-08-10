@@ -16,7 +16,7 @@
     name="atTRACTive"
     category="Fiber processing"
     class="QmitkInteractiveFiberDissectionView"
-    icon="resources/FiberBundleOperations.png">
+    icon="resources/atTRACTive.png">
     <keywordReference id="org.mitk.views.interactivefiberdissection.Keyword"/>
     </view>
 

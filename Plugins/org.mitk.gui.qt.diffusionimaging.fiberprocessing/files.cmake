@@ -43,10 +43,12 @@ set(CACHED_RESOURCE_FILES
   resources/FiberClustering.png
   resources/FiberFit.png
   resources/circle.png
+  resources/atTRACTive.png
   resources/polygon.png
   resources/eraze.png
   resources/brush.png
   resources/highlighter.png
+
 )
 
 set(QRC_FILES

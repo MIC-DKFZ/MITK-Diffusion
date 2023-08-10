@@ -1182,8 +1182,8 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
      MITK_INFO << "Create Fibers to label based on Uncertainty";
 
      std::vector<unsigned int> vec = m_index.at(1);
-     std::vector<unsigned int> myvec = {vec.begin() + m_uncCounter, vec.begin() + m_uncCounter + m_Controls->m_Numtolabel->value()};
-     m_uncCounter = m_uncCounter + m_Controls->m_Numtolabel->value();
+     std::vector<unsigned int> myvec = {vec.begin() + m_uncCounter, vec.begin() + m_uncCounter + m_Controls->m_NumRandomFibers2->value()};
+     m_uncCounter = m_uncCounter + m_Controls->m_NumRandomFibers2->value();
      MITK_INFO << m_index.at(1).size();
      MITK_INFO << myvec.size();
 
@@ -1224,7 +1224,7 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
     curidx =  classifier->GetDistanceData(myval);
 
     std::vector<unsigned int> myvec = curidx.at(0);
-    myvec.resize(m_Controls->m_NumRandomFibers2->value());
+    myvec.resize(m_Controls->m_Numtolabel->value());
 
     m_DistanceLabel = classifier->CreatePrediction(myvec, true);
 

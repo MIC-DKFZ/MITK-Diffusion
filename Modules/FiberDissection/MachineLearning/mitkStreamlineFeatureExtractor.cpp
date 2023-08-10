@@ -102,7 +102,8 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::TractToMatrixFibers(
     // throw a runtime error indicating the need for preprocessing
     if (cell->GetNumberOfPoints() != polyData->GetCell(0)->GetNumberOfPoints())
     {
-      throw std::runtime_error("Not all cells have an equal number of points! TractToMatrix the tractogram first in the preprocessing view.");
+
+      throw std::runtime_error("Not all cells have an equal number of points! Resample the tractogram first in the preprocessing view and reset the Classifier before restart");
     }
   }
 
@@ -425,9 +426,7 @@ void StreamlineFeatureExtractor::GenerateData()
     MITK_INFO << m_DistancesTest.size();
 
     // Get indices for prediction
-//    if (m_activeCycle==0){
-        myindex = GetIndex(m_DistancesTest);
-//    }
+    myindex = GetIndex(m_DistancesTest);
     MITK_INFO << "Size of myindex is " << myindex.size() << " and my_active is " << m_activeCycle;
 
     // Train the model
@@ -490,6 +489,7 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
 {
     std::vector<unsigned int> indices;
     unsigned int num_matrices = distances.size();
+    MITK_INFO << "Get in Getindex";
 
     // Calculate the threshold based on the mean of the last row in the last matrix
     float threshold = 0.0;
@@ -501,19 +501,20 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
         for (unsigned int col = 0; col < lastMatrix.cols(); ++col) {
             values.push_back(lastMatrix(lastRow, col));
         }
-
-        if (distances.size()>80000){
+        MITK_INFO << "Values:" << values.size();
+        if (distances.size()>80000 && m_activeCycle == 0){
             // Only take 20% of data for higher speed
             std::sort(values.begin(), values.end());
             unsigned int firstQuartileIndex = std::floor(values.size() / 5.0);
             threshold = values[firstQuartileIndex];
+            MITK_INFO << "Threshold: " << threshold;
         }
         else {
             std::sort(values.begin(), values.end());
-            threshold = values[0];
+            MITK_INFO << "Cur_value: " << values[0];
+            threshold = values.back();
         }
     }
-    std::cout << "Threshold: " << threshold;
 
     // Check each matrix to find indices that meet the condition
     for (unsigned int i = 0; i < num_matrices; ++i) {
@@ -535,8 +536,8 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
     }
 
     // Print debug information
-    std::cout << "Number of matrices: " << num_matrices << std::endl;
-    std::cout << "Number of indices: " << indices.size() << std::endl;
+    MITK_INFO << "Number of matrices: " << num_matrices << std::endl;
+    MITK_INFO << "Number of indices: " << indices.size() << std::endl;
 
     return indices;
 }
