@@ -1400,6 +1400,7 @@ void QmitkInteractiveFiberDissectionView::ResetClassifier()
     m_Controls->m_TrainClassifier->setEnabled(false);
     m_Controls->m_CreatePrediction->setEnabled(false);
     m_Controls->m_CreateUncertantyMap->setEnabled(false);
+    m_Controls->m_AddDistanceFibers->setEnabled(false);
 
 
 
