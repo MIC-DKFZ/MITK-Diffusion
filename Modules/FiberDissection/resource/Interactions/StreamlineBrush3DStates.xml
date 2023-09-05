@@ -1,0 +1,17 @@
+<statemachine NAME="StreamlineInteractor3D">
+    <state name="start" startstate="true" >
+        <transition event_class="MouseMoveEvent" event_variant="CheckSelected" target="start">
+            <condition name="isoverstreamline"/>
+            <action name="selectstreamline"/>
+        </transition>
+        <transition event_class="InteractionPositionEvent" event_variant="AddNegStreamlineClick" target="start">
+            <action name="addnegstreamline"/>
+        </transition>
+        <transition event_class="InteractionPositionEvent" event_variant="AddPosStreamlineClick" target="start">
+            <action name="addposstreamline"/>
+        </transition>
+        <transition event_class="InteractionPositionEvent" event_variant="AddStreamlinetolabelClick" target="start">
+            <action name="addtolabelstreamline"/>
+        </transition>
+    </state>
+</statemachine>

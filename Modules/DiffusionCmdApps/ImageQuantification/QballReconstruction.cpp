@@ -192,6 +192,7 @@ int main(int argc, char* argv[])
     }
 
     auto bMap = mitk::DiffusionPropertyHelper::GetBValueMap(dwi);
+    MITK_INFO <<  bMap.size();
     if(bMap.size()!=4 && bMap.size()!=2)
       mitkThrow() << "Only three equidistant shells or a single shell are supported. Found " << bMap.size();
 

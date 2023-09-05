@@ -30,6 +30,9 @@ set(CPP_FILES
   IODataStructures/mitkTrackvis.cpp
   IODataStructures/mitkPlanarFigureComposite.cpp
 
+
+  IODataStructures/mitkStatisticModel.cpp
+
   # Properties
   IODataStructures/Properties/mitkBValueMapProperty.cpp
   IODataStructures/Properties/mitkGradientDirectionsProperty.cpp
