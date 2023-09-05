@@ -79,8 +79,9 @@ public:
 
 protected slots:
 
-  void CreateSubset();
+  void UpdateGui();     ///< update button activity etc. dpending on current datamanager selection
   void RemovefromBundleBrush( bool checked );
+  void CreateSubset();
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
   void CreatePredictionNode();
@@ -90,14 +91,11 @@ protected slots:
   void RemovefromDistanceBrush( bool checked );
   void RemovefromPredictionBrush( bool checked );
   void ResampleTractogram();
-  void RandomPrototypes();
   void SFFPrototypes();
   void CreateUncertantyMap();
   void ResetClassifier();
 
 
-
-  void UpdateGui();     ///< update button activity etc. dpending on current datamanager selection
 
 
 
@@ -125,11 +123,11 @@ protected:
   int m_uncCounter;
   int m_prototypecounter;
   int m_posOffsetcounter;
+  int m_init_subset;
 
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
   mitk::DataNode::Pointer               m_testnode;
-//  mitk::DataNode::Pointer             m_trainbundle;
   mitk::Image::Pointer                  m_SelectedImage;
   mitk::DataNode::Pointer               m_SelectedPS;
   mitk::DataNode::Pointer               m_SelectedImageNode;

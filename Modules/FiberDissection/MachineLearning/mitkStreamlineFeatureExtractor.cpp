@@ -43,7 +43,6 @@ void StreamlineFeatureExtractor::SetTractogramPrediction(const mitk::FiberBundle
   m_TractogramPrediction= TractogramPrediction;
 }
 
-
 void StreamlineFeatureExtractor::SetTractogramGroundtruth(const mitk::FiberBundle::Pointer &TractogramGroundtruth)
 {
   m_TractogramGroundtruth= TractogramGroundtruth;
@@ -59,17 +58,11 @@ void StreamlineFeatureExtractor::SetTractogramMinus(const mitk::FiberBundle::Poi
   m_TractogramMinus = TractogramMinus;
 }
 
-void StreamlineFeatureExtractor::SetTractogramPrototypes(const mitk::FiberBundle::Pointer &TractogramPrototypes, bool standard)
+void StreamlineFeatureExtractor::SetTractogramPrototypes(const mitk::FiberBundle::Pointer &TractogramPrototypes)
 {
-  if (standard)
-  {
-      MITK_INFO << "Use Standard Prototypes...";
-    m_inputPrototypes = mitk::IOUtil::Load<mitk::FiberBundle>("/home/r948e/E132-Projekte/Projects/2022_Peretzke_Interactive_Fiber_Dissection/mitk_diff/prototypes_599671_40.trk");
-  }
-  else {
       MITK_INFO << "Use individual Prototypes...";
       m_inputPrototypes = TractogramPrototypes;
-  }
+
 }
 
 void StreamlineFeatureExtractor::SetActiveCycle(int &activeCycle)
@@ -77,10 +70,8 @@ void StreamlineFeatureExtractor::SetActiveCycle(int &activeCycle)
   m_activeCycle = activeCycle;
 }
 
-
-void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Pointer &TractogramTest, std::string TractogramTestName)
+void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Pointer &TractogramTest)
 {
-    MITK_INFO << TractogramTestName;
     m_TractogramTest= TractogramTest;
 }
 
@@ -321,7 +312,6 @@ std::vector<unsigned int> StreamlineFeatureExtractor::Sort(std::vector<float> so
     return index;
 }
 
-
 mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vector<unsigned int>& index, bool removefrompool)
 {
 
@@ -386,7 +376,6 @@ mitk::FiberBundle::Pointer StreamlineFeatureExtractor::CreatePrediction(std::vec
     return prediction;
 }
 
-
 void StreamlineFeatureExtractor::GenerateData()
 {
 
@@ -407,11 +396,10 @@ void StreamlineFeatureExtractor::GenerateData()
     T_TractogramPlus = TractToMatrixFibers(m_TractogramPlus);
 
     // Merge prototypes with tractogram plus and minus
-    MITK_INFO << "Merging Prototypes";
     T_mergedPrototypes = MergeTractogram(T_Prototypes, T_TractogramPlus, T_TractogramMinus);
 
     // Calculate features for tractogram minus
-    MITK_INFO << "Calculate Features";
+    MITK_INFO << "Calculate Features of Training Data";
     m_DistancesMinus = CalculateDmdf(T_TractogramMinus, T_mergedPrototypes);
 
     // Calculate features for tractogram plus
@@ -423,11 +411,9 @@ void StreamlineFeatureExtractor::GenerateData()
     // Calculate features for test data
     MITK_INFO << "Calculate Features of Test Data";
     m_DistancesTest = CalculateDmdf(T_TractogramTest, T_mergedPrototypes);
-    MITK_INFO << m_DistancesTest.size();
 
     // Get indices for prediction
     myindex = GetIndex(m_DistancesTest);
-    MITK_INFO << "Size of myindex is " << myindex.size() << " and my_active is " << m_activeCycle;
 
     // Train the model
     TrainModel();
@@ -436,60 +422,10 @@ void StreamlineFeatureExtractor::GenerateData()
     m_index = Predict();
 }
 
-//std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_matrix<float>> distances)
-//{
-//    std::vector<unsigned int> indices;
-//    unsigned int num_matrices = distances.size();
-
-//    // Calculate the threshold based on the mean of the last row in the last matrix
-//    float threshold = 0.0;
-//    if (num_matrices > 0) {
-//        const vnl_matrix<float>& lastMatrix = distances.back();
-//        unsigned int lastRow = lastMatrix.rows() - 1;
-
-//        std::vector<float> values;
-//        for (unsigned int col = 0; col < lastMatrix.cols(); ++col) {
-//            values.push_back(lastMatrix(lastRow, col));
-//        }
-
-//        // Only take 20% of data for higher speed
-//        std::sort(values.begin(), values.end());
-//        unsigned int firstQuartileIndex = std::floor(values.size() / 5.0);
-//        threshold = values[firstQuartileIndex];
-//    }
-
-//    // Check each matrix to find indices that meet the condition
-//    for (unsigned int i = 0; i < num_matrices; ++i) {
-//        const vnl_matrix<float>& matrix = distances[i];
-//        unsigned int num_cols = matrix.cols();
-//        unsigned int last_col_index = num_cols - 1;
-//        bool last_col_below_threshold = true;
-
-//        for (unsigned int row = 0; row < matrix.rows(); ++row) {
-//            if (matrix(row, last_col_index) >= threshold) {
-//            last_col_below_threshold = false;
-//            break;
-//            }
-//        }
-
-//        if (last_col_below_threshold) {
-//            indices.push_back(i);
-//        }
-//    }
-
-//    // Print debug information
-//    std::cout << "Number of matrices: " << num_matrices << std::endl;
-//    std::cout << "Number of indices: " << indices.size() << std::endl;
-
-//    return indices;
-//}
-
-
 std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_matrix<float>> distances)
 {
     std::vector<unsigned int> indices;
     unsigned int num_matrices = distances.size();
-    MITK_INFO << "Get in Getindex";
 
     // Calculate the threshold based on the mean of the last row in the last matrix
     float threshold = 0.0;
@@ -501,17 +437,14 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
         for (unsigned int col = 0; col < lastMatrix.cols(); ++col) {
             values.push_back(lastMatrix(lastRow, col));
         }
-        MITK_INFO << "Values:" << values.size();
         if (distances.size()>80000 && m_activeCycle == 0){
             // Only take 20% of data for higher speed
             std::sort(values.begin(), values.end());
             unsigned int firstQuartileIndex = std::floor(values.size() / 5.0);
             threshold = values[firstQuartileIndex];
-            MITK_INFO << "Threshold: " << threshold;
         }
         else {
             std::sort(values.begin(), values.end());
-            MITK_INFO << "Cur_value: " << values[0];
             threshold = values.back();
         }
     }
@@ -535,9 +468,6 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
         }
     }
 
-    // Print debug information
-    MITK_INFO << "Number of matrices: " << num_matrices << std::endl;
-    MITK_INFO << "Number of indices: " << indices.size() << std::endl;
 
     return indices;
 }
@@ -584,8 +514,6 @@ void StreamlineFeatureExtractor::TrainModel()
         data.push_back(curdata);
 
     }
-    MITK_INFO << data.cols;
-    MITK_INFO << data.rows;
 
     /*Calculate weights*/
     int zerosgt = labels_arr_vec.rows - cv::countNonZero(labels_arr_vec);
@@ -653,10 +581,6 @@ void StreamlineFeatureExtractor::TrainModel()
 std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
 {
     std::vector<std::vector<unsigned int>> index_vec;
-
-    /*Predict on Test Data*/
-    MITK_INFO << "Predicting";
-
     /*Create Dataset as cv::Mat*/
     cv::Mat dataTest;
     for (unsigned int i = 0; i < myindex.size(); i++)
@@ -700,14 +624,11 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
             e.at(i) = 0;
         }
     }
-    MITK_INFO << "Done";
-
-    MITK_INFO << "--------------";
-    MITK_INFO << "Prediction vector size:";
-    MITK_INFO << indexPrediction.size();
-    MITK_INFO << "Entropy vector size:";
     entropy_vector = e;
-    MITK_INFO << e.size();
+    MITK_INFO << "Done";
+    MITK_INFO << "--------------";
+    MITK_INFO << "Number of fibers in prediction: " << indexPrediction.size();
+    MITK_INFO << "Entropy vector size:" << e.size();
     MITK_INFO << "--------------";
 
     int lengths = std::count_if(e.begin(), e.end(), [&](auto const& val) { return val >= 0.95; });
@@ -728,9 +649,6 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
         newidx.push_back(myindex.at(indexUnc.at(i)));
     }
 
-    MITK_INFO << indexUnc.size();
-
-    MITK_INFO << indexUnc.size();
     index_vec.push_back(indexPrediction);
     index_vec.push_back(newidx);
 

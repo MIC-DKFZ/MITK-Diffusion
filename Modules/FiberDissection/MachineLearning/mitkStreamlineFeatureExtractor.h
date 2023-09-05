@@ -65,8 +65,8 @@ public:
   void SetTractogramPrediction(const mitk::FiberBundle::Pointer &Tractogram);
   void SetTractogramPlus(const mitk::FiberBundle::Pointer &Tractogram);
   void SetTractogramMinus(const mitk::FiberBundle::Pointer &Tractogram);
-  void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram, std::string TractogramTestName);
-  void SetTractogramPrototypes(const mitk::FiberBundle::Pointer &TractogramPrototypes, bool standard);
+  void SetTractogramTest(const mitk::FiberBundle::Pointer &Tractogram);
+  void SetTractogramPrototypes(const mitk::FiberBundle::Pointer &TractogramPrototypes);
   void SetActiveCycle(int &activeCycle);
   void SetInitRandom(int &initRandom);
   vnl_vector<float> ValidationPipe();
