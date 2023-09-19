@@ -230,9 +230,9 @@ void mitk::DiffusionPropertyHelper::ApplyMeasurementFrameAndRotationMatrix(mitk:
   {
     vnl_vector<double> vec = gdcit.Value();
     if (apply_matrix)
-      vec = vec.pre_multiply(measurementFrame);
-    if (apply_mf)
       vec = vec.pre_multiply(imageRotationMatrix);
+    if (apply_mf)
+      vec = vec.pre_multiply(measurementFrame);
     directions->InsertElement(c, vec);
     c++;
   }
