@@ -1,0 +1,17 @@
+<config>
+<event_variant class="MousePressEvent" name="LeftClick">
+  <attribute name="EventButton" value="MiddleMouseButton"/>
+<!--  <attribute name="Modifiers" value="shift"/>-->
+</event_variant>
+<event_variant class="MousePressEvent" name="LeftClickNormal">
+  <attribute name="EventButton" value="LeftClick"/>
+  <!-- <attribute name="Modifiers" value="shift"/> -->
+</event_variant>
+<event_variant class="MousePressEvent" name="RightClick">
+  <attribute name="EventButton" value="RightMouseButton"/>
+  <!-- <attribute name="Modifiers" value="shift"/> -->
+</event_variant>
+<event_variant class="MouseMoveEvent" name="JustMouseMove"/>
+  <!-- <attribute name="Modifiers" value="shift"/>
+</event_variant> -->
+</config>

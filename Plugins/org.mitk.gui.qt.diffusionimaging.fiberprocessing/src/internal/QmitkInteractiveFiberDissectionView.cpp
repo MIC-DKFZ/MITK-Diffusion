@@ -77,6 +77,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkVtkPropRenderer.h>
 #include <mitkInteractionConst.h>
 #include <mitkInteractionPositionEvent.h>
+#include <mitkProgressBar.h>
 #include <vtkSmartPointer.h>
 #include <vtkSphereSource.h>
 #include <vtkPolyDataMapper.h>
@@ -121,11 +122,15 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
     mitk::TNodePredicateDataType<mitk::FiberBundle>::Pointer isTestBundle = mitk::TNodePredicateDataType<mitk::FiberBundle>::New();
     m_Controls->m_TestBundleBox->SetPredicate( isTestBundle);
 
-
+    m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
+    mitk::TNodePredicateDataType<mitk::Image>::Pointer isImage = mitk::TNodePredicateDataType<mitk::Image>::New();
+    m_Controls->m_ImageBox->SetPredicate( isImage);
 
     connect(m_Controls->m_BrushButton, SIGNAL(toggled(bool)), this, SLOT( RemovefromBundleBrush(bool) ) );
 
     connect(m_Controls->m_SubsetCreation, SIGNAL( clicked() ), this, SLOT( CreateSubset()));
+
+    connect(m_Controls->m_CreateSegmentation, SIGNAL( clicked() ), this, SLOT( CreateSphereSegmentation()));
 
     connect(m_Controls->m_AddRandomFibers, SIGNAL( clicked() ), this, SLOT( ExtractRandomFibersFromTractogram() ) ); //need
 
@@ -280,8 +285,8 @@ void QmitkInteractiveFiberDissectionView::OnEndInteraction()
 
 void QmitkInteractiveFiberDissectionView::ResampleTractogram()
 {
-
-    m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+   m_testnode->SetVisibility(false);
+   m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
    mitk::DataNode::Pointer node = m_testnode;
     auto tractogram = dynamic_cast<mitk::FiberBundle *>(node->GetData());
     mitk::FiberBundle::Pointer tempfib = tractogram->GetDeepCopy();
@@ -577,6 +582,63 @@ void QmitkInteractiveFiberDissectionView::OnSelectionChanged(berry::IWorkbenchPa
     UpdateGui();
 }
 
+void QmitkInteractiveFiberDissectionView::CreateSphereSegmentation()
+{
+
+    if (m_Controls->m_helpmessages->isChecked())
+    {
+      // Nothing selected. Inform the user and return
+      QMessageBox::information(nullptr, "Helper", "Roughly draw a start and an end ROI of your target tract.\n"
+                                                  " 1. Use the middle mouse button two draw the center of the start region, then adjust the size and confirm with the middle mouse button\n"
+                                                  " 2. Navigate to the end region and do the same again. \n"
+                                                  " 3. The Segmentation of ROIS will be presented.\n"
+                                                  " 4. Choose how many fibers of the subset you want to label.\n"
+                                                  " 5. Click 'add' to annotate a subset of presented fibers.");
+
+    }
+    m_SphereSegmentationInteractor = mitk::SphereSegmentationInteractor::New();
+    m_SphereSegmentationInteractor->LoadStateMachine("SphereSegmentationInteractionsStates.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
+    m_SphereSegmentationInteractor->SetEventConfig("SphereSegmentationInteractionsConfig.xml", us::ModuleRegistry::GetModule("MitkFiberDissection"));
+
+    MITK_INFO << "Interarctor created";
+
+    mitk::DataNode::Pointer startDataNode = mitk::DataNode::New();
+    mitk::DataNode::Pointer startSurfaceDataNode = mitk::DataNode::New();
+    mitk::DataNode::Pointer endDataNode = mitk::DataNode::New();
+    mitk::DataNode::Pointer endSurfaceDataNode = mitk::DataNode::New();
+
+    startDataNode->SetName("StartRegion");
+    startDataNode->SetColor(1, 0, 1);
+    startSurfaceDataNode->SetName("StartROI");
+    startSurfaceDataNode->SetColor(1, 0, 1);
+
+    endDataNode->SetName("EndRegion");
+    endDataNode->SetColor(1, 1, 0);
+    endSurfaceDataNode->SetName("EndROI");
+    endSurfaceDataNode->SetColor(1, 1, 0);
+
+
+    this->GetDataStorage()->Add(startDataNode);
+    this->GetDataStorage()->Add(endDataNode);
+    this->GetDataStorage()->Add(startSurfaceDataNode, startDataNode);
+    this->GetDataStorage()->Add(endSurfaceDataNode, endDataNode);
+
+    mitk::DataNode::Pointer imageNode = m_Controls->m_ImageBox->GetSelectedNode();
+    mitk::Image::Pointer image = dynamic_cast<mitk::Image *>(imageNode->GetData());
+
+    m_SphereSegmentationInteractor->SetImage(image);
+
+    m_SphereSegmentationInteractor->StartEndNodes(startDataNode, endDataNode);
+    m_SphereSegmentationInteractor->StartEndSurfaceNodes(startSurfaceDataNode, endSurfaceDataNode);
+
+
+
+
+//    this->GetDataStorage()->Remove(startDataNode);
+    UpdateGui();
+
+}
+
 void QmitkInteractiveFiberDissectionView::CreateSubset()
 {
 
@@ -627,7 +689,6 @@ void QmitkInteractiveFiberDissectionView::CreateSubset()
     m_Controls->m_AddRandomFibers->setEnabled(true);
     m_Controls->m_NumRandomFibers->setEnabled(true);
     m_init_subset = 1;
-
 
     UpdateGui();
 
