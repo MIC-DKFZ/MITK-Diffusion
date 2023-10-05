@@ -340,8 +340,9 @@ void QmitkInteractiveFiberDissectionView::ResampleTractogram()
     mitk::DataNode::Pointer newnode = mitk::DataNode::New();
     newnode->SetData( ShuffledBundle );
     newnode->SetName( node->GetName() + "_" + std::to_string(40) );
-    this->GetDataStorage()->Add(newnode);
+    this->GetDataStorage()->Add(newnode, m_testnode);
     m_Controls->m_TestBundleBox->SetSelectedNode(newnode);
+    m_testnode->SetVisibility(false);
 
 
     UpdateGui();

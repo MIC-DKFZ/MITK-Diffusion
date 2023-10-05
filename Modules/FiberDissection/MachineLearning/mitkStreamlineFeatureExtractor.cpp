@@ -153,13 +153,13 @@ std::vector<vnl_matrix<float>> dist_vec(tractogram.size());
 
 // Loop over each tractogram item
 #pragma omp parallel for
-for (std::size_t i = 0; i < tractogram.size(); ++i)
+for (int i = 0; i < static_cast<int>(tractogram.size()); ++i)
 {
     // Initialize a distance matrix for the current tractogram item
     vnl_matrix<float> distances(1, 2 * prototypes.size(), 0.0);
 
     // Loop over each prototype
-    for (std::size_t j = 0; j < prototypes.size(); ++j)
+    for (int j = 0; j < static_cast<int>(prototypes.size()); ++j)
     {
         // Initialize matrices to store distances between the current tractogram item and the current prototype
         vnl_matrix<float> single_distances(1, tractogram[0].cols(), 0.0);
@@ -168,7 +168,7 @@ for (std::size_t i = 0; i < tractogram.size(); ++i)
         vnl_matrix<float> single_end_distances_flip(1, 2, 0.0);
 
         // Loop over each point in the current tractogram item
-        for (std::size_t ik = 0; ik < tractogram[0].cols(); ++ik)
+        for (int ik = 0; ik < static_cast<int>(tractogram[0].cols()); ++ik)
         {
             // Calculate the Euclidean distance between the current point in the current tractogram item and the current point in the current prototype
             const double cur_dist = std::sqrt(std::pow(tractogram[i](0, ik) - prototypes[j](0, ik), 2.0)
@@ -188,7 +188,7 @@ for (std::size_t i = 0; i < tractogram.size(); ++i)
                 single_end_distances(0, 0) = cur_dist;
                 single_end_distances_flip(0, 0) = cur_dist_flip;
             }
-            else if (ik == tractogram[0].cols() - 1)
+            else if (ik == static_cast<int>(tractogram[0].cols()) - 1)
             {
                 single_end_distances(0, 1) = cur_dist;
                 single_end_distances_flip(0, 1) = cur_dist_flip;
@@ -472,60 +472,156 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
     return indices;
 }
 
+//void StreamlineFeatureExtractor::TrainModel()
+//{
+
+
+//    cv::Mat data;
+//    cv::Mat labels_arr_vec;
+
+//    int size_plus = 0;
+
+
+//    /*Create Trainingdata: Go through positive and negative Bundle and save distances as cv::Mat and create vector with labels*/
+//    for ( unsigned int i=0; i<m_DistancesPlus.size(); i++)
+//    {
+//        float data_arr [m_DistancesPlus.at(0).size()];
+
+//        labels_arr_vec.push_back(1);
+
+//        for ( unsigned int j=0; j<m_DistancesPlus.at(0).cols(); j++)
+//        {
+//            data_arr[j] = m_DistancesPlus.at(i).get(0,j);
+//        }
+//        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
+//        data.push_back(curdata);
+//        size_plus++;
+
+//    }
+
+//    for ( unsigned int i=m_DistancesPlus.size(); i<m_DistancesPlus.size()+m_DistancesMinus.size(); i++)
+//    {
+//        int it = i - size_plus;
+//        float data_arr [m_DistancesMinus.at(0).size()];
+
+//        labels_arr_vec.push_back(0);
+
+//         for ( unsigned int j=0; j<m_DistancesMinus.at(0).cols(); j++)
+//        {
+//            data_arr[j] = m_DistancesMinus.at(it).get(0,j);
+//        }
+//        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
+//        data.push_back(curdata);
+
+//    }
+
+//    /*Calculate weights*/
+//    int zerosgt = labels_arr_vec.rows - cv::countNonZero(labels_arr_vec);
+//    int onesgt = cv::countNonZero(labels_arr_vec);
+//    float plusval = labels_arr_vec.rows / (2.0 * onesgt ) ;
+//    float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
+//    float w[2] = {minusval, plusval};
+//    cv::Mat newweight = cv::Mat(1,2, CV_32F, w);
+
+
+//    /*Shuffle Data*/
+//    std::vector <int> seeds;
+//    for (int cont = 0; cont < labels_arr_vec.rows; cont++)
+//    {
+//        seeds.push_back(cont);
+//    }
+
+//    cv::randShuffle(seeds);
+//    cv::Mat labels_shuffled;
+//    cv::Mat samples_shuffled;
+
+
+
+
+//    for (int cont = 0; cont < labels_arr_vec.rows; cont++)
+//    {
+//        labels_shuffled.push_back(labels_arr_vec.row(seeds[cont]));
+//    }
+
+//    for (int cont = 0; cont < labels_arr_vec.rows; cont++)
+//    {
+//        samples_shuffled.push_back(data.row(seeds[cont]));
+//    }
+
+//    /*Create Dataset and initialize Classifier*/
+//    cv::Ptr<cv::ml::TrainData> m_traindata = cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, labels_shuffled);
+
+
+
+
+//    statistic_model= cv::ml::RTrees::create();
+//    auto criteria = cv::TermCriteria();
+//    criteria.type = cv::TermCriteria::MAX_ITER;
+////    criteria.epsilon = 1e-8;
+//    criteria.maxCount = 300;
+
+//    statistic_model->setMaxDepth(10); //set to three
+////    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
+//    statistic_model->setMinSampleCount(2);
+//    statistic_model->setTruncatePrunedTree(false);
+//    statistic_model->setUse1SERule(false);
+//    statistic_model->setUseSurrogates(false);
+//    statistic_model->setTermCriteria(criteria);
+//    statistic_model->setCVFolds(1);
+//    statistic_model->setPriors(newweight);
+
+
+//    /*Train Classifier*/
+//    MITK_INFO << "Start Training";
+//    statistic_model->train(m_traindata);
+
+
+//}
+
 void StreamlineFeatureExtractor::TrainModel()
 {
+     cv::Mat data;
+     cv::Mat labels_arr_vec;
 
+     int size_plus = 0;
 
-    cv::Mat data;
-    cv::Mat labels_arr_vec;
+     /* Determine minority and majority classes */
+     int minority_class = 0;  // Initialize with one of your class labels
+     int majority_class = 1;  // Initialize with the other class label
 
-    int size_plus = 0;
-
-
-    /*Create Trainingdata: Go through positive and negative Bundle and save distances as cv::Mat and create vector with labels*/
-    for ( unsigned int i=0; i<m_DistancesPlus.size(); i++)
+    /* Create Trainingdata: Go through positive and negative Bundle and save distances as cv::Mat and create vector with labels */
+    for (int i = 0; i < static_cast<int>(m_DistancesPlus.size()); i++)
     {
-        float data_arr [m_DistancesPlus.at(0).size()];
+        float data_arr[m_DistancesPlus.at(0).size()];
 
         labels_arr_vec.push_back(1);
 
-        for ( unsigned int j=0; j<m_DistancesPlus.at(0).cols(); j++)
+        for (int j = 0; j < static_cast<int>(m_DistancesPlus.at(0).cols()); j++)
         {
-            data_arr[j] = m_DistancesPlus.at(i).get(0,j);
+            data_arr[j] = m_DistancesPlus.at(i).get(0, j);
         }
         cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
         data.push_back(curdata);
         size_plus++;
-
     }
 
-    for ( unsigned int i=m_DistancesPlus.size(); i<m_DistancesPlus.size()+m_DistancesMinus.size(); i++)
+    for (int i = static_cast<int>(m_DistancesPlus.size()); i < static_cast<int>(m_DistancesPlus.size() + m_DistancesMinus.size()); i++)
     {
         int it = i - size_plus;
-        float data_arr [m_DistancesMinus.at(0).size()];
+        float data_arr[m_DistancesMinus.at(0).size()];
 
         labels_arr_vec.push_back(0);
 
-         for ( unsigned int j=0; j<m_DistancesMinus.at(0).cols(); j++)
+        for (int j = 0; j < static_cast<int>(m_DistancesMinus.at(0).cols()); j++)
         {
-            data_arr[j] = m_DistancesMinus.at(it).get(0,j);
+            data_arr[j] = m_DistancesMinus.at(it).get(0, j);
         }
         cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
         data.push_back(curdata);
-
     }
 
-    /*Calculate weights*/
-    int zerosgt = labels_arr_vec.rows - cv::countNonZero(labels_arr_vec);
-    int onesgt = cv::countNonZero(labels_arr_vec);
-    float plusval = labels_arr_vec.rows / (2.0 * onesgt ) ;
-    float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
-    float w[2] = {minusval, plusval};
-    cv::Mat newweight = cv::Mat(1,2, CV_32F, w);
-
-
-    /*Shuffle Data*/
-    std::vector <int> seeds;
+    /* Shuffle Data */
+    std::vector<int> seeds;
     for (int cont = 0; cont < labels_arr_vec.rows; cont++)
     {
         seeds.push_back(cont);
@@ -534,9 +630,6 @@ void StreamlineFeatureExtractor::TrainModel()
     cv::randShuffle(seeds);
     cv::Mat labels_shuffled;
     cv::Mat samples_shuffled;
-
-
-
 
     for (int cont = 0; cont < labels_arr_vec.rows; cont++)
     {
@@ -548,34 +641,54 @@ void StreamlineFeatureExtractor::TrainModel()
         samples_shuffled.push_back(data.row(seeds[cont]));
     }
 
-    /*Create Dataset and initialize Classifier*/
+    /* Oversample the minority class to match the majority class size */
+    int minority_size = cv::countNonZero(labels_shuffled == minority_class);
+    int majority_size = cv::countNonZero(labels_shuffled == majority_class);
+
+    if (minority_size < majority_size)
+    {
+        int oversample_factor = majority_size / minority_size;
+        cv::Mat oversampled_minority_samples;
+        cv::Mat oversampled_minority_labels;
+
+        for (int i = 0; i < oversample_factor; i++)
+        {
+            oversampled_minority_samples.push_back(samples_shuffled);
+            oversampled_minority_labels.push_back(labels_shuffled);
+        }
+
+        samples_shuffled.push_back(oversampled_minority_samples);
+        labels_shuffled.push_back(oversampled_minority_labels);
+    }
+
+    /* Create Dataset and initialize Classifier */
     cv::Ptr<cv::ml::TrainData> m_traindata = cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, labels_shuffled);
 
-
-
-
-    statistic_model= cv::ml::RTrees::create();
+    statistic_model = cv::ml::RTrees::create();
     auto criteria = cv::TermCriteria();
     criteria.type = cv::TermCriteria::MAX_ITER;
-//    criteria.epsilon = 1e-8;
     criteria.maxCount = 300;
 
-    statistic_model->setMaxDepth(10); //set to three
-//    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
+    statistic_model->setMaxDepth(10);
     statistic_model->setMinSampleCount(2);
     statistic_model->setTruncatePrunedTree(false);
     statistic_model->setUse1SERule(false);
     statistic_model->setUseSurrogates(false);
     statistic_model->setTermCriteria(criteria);
     statistic_model->setCVFolds(1);
-    statistic_model->setPriors(newweight);
 
+    /* Calculate weights - You can remove this part as it's no longer needed with oversampling */
+    // int zerosgt = labels_arr_vec.rows - cv::countNonZero(labels_arr_vec);
+    // int onesgt = cv::countNonZero(labels_arr_vec);
+    // float plusval = labels_arr_vec.rows / (2.0 * onesgt );
+    // float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
+    // float w[2] = {minusval, plusval};
+    // cv::Mat newweight = cv::Mat(1, 2, CV_32F, w);
+    // statistic_model->setPriors(newweight);
 
-    /*Train Classifier*/
+    /* Train Classifier */
     MITK_INFO << "Start Training";
     statistic_model->train(m_traindata);
-
-
 }
 
 std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
