@@ -80,7 +80,7 @@ QmitkStreamlineTrackingView::QmitkStreamlineTrackingView()
   , m_TrackingHandler(nullptr)
   , m_ThreadIsRunning(false)
   , m_DeleteTrackingHandler(false)
-  , m_Visible(false)
+  , m_Visible(true)
   , m_LastPrior(nullptr)
   , m_TrackingPriorHandler(nullptr)
 {
