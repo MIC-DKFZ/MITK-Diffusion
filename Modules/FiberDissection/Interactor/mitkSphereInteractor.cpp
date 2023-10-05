@@ -134,11 +134,6 @@ void mitk::SphereInteractor::StartEndNodes(mitk::DataNode::Pointer startDataNode
     DataInteractor::SetDataNode(startDataNode);
 }
 
-//void mitk::SphereInteractor::workingBundleNode(mitk::FiberBundle::Pointer workingBundle, mitk::FiberBundle::Pointer reducedBundle){
-//    m_workingBundle = workingBundle;
-//    m_reducedFibersBundle = reducedBundle;
-//}
-
 void mitk::SphereInteractor::workingBundleNode(mitk::DataNode::Pointer workingBundleNode, mitk::DataNode::Pointer reducedBundleNode){
 
     m_workingBundleNode = workingBundleNode;
@@ -172,7 +167,6 @@ void mitk::SphereInteractor::AddCenter(mitk::StateMachineAction*, mitk::Interact
 //  return true;
 }
 
-
 void mitk::SphereInteractor::ChangeRadius(mitk::StateMachineAction*, mitk::InteractionEvent* interactionEvent)
 {
   // cast InteractionEvent to a position event in order to read out the mouse position
@@ -204,14 +198,6 @@ void mitk::SphereInteractor::EndCreationStart(mitk::StateMachineAction*, mitk::I
   //return true;
 }
 
-//void mitk::SphereInteractor::EndCreation(mitk::StateMachineAction*, mitk::InteractionEvent* /*interactionEvent*/)
-//{
-//    MITK_INFO<< "Extract Fibers";
-//   this->GetDataNode()->SetBoolProperty(DATANODE_PROPERTY_CREATED, true);
-//   ExtractFibers();
-//  //return true;
-//}
-
 void mitk::SphereInteractor::AbortCreation(mitk::StateMachineAction*, mitk::InteractionEvent*)
 {
   this->GetDataNode()->SetData(mitk::Surface::New());
@@ -230,7 +216,6 @@ void mitk::SphereInteractor::ExtractFibers()
 
     vtkPolyData* polyData = m_workingBundle->GetFiberPolyData();
 
-//    vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
     vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
     vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
     vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
@@ -280,17 +265,12 @@ void mitk::SphereInteractor::ExtractFibers()
         }
         // Increment the counter variable
     }
-///*        vNewPolyData->SetLines(vNewLines);
-//        vNewPolyData->SetPoints(vNewPoints)*/;
 
         // Create a new vtkPolyData object and set it to the new fibers
         m_reducedFibersBundle->GetFiberPolyData()->SetPoints(vNewPoints);
         m_reducedFibersBundle->GetFiberPolyData()->SetLines(vNewLines);
 
 
-        // Create a new mitk::FiberBundle object and set it to the new fibers
-//        m_reducedFibersBundle = mitk::FiberBundle::New(vNewPolyData);
-//        m_reducedFibersBundle->SetFiberColors(255, 255, 255);
         m_reducedFibersBundle->ColorFibersByOrientation();
 
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
