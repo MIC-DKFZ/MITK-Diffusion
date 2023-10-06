@@ -49,11 +49,10 @@ namespace mitk
     static const char* DATANODE_PROPERTY_SIZE;
     static const char* DATANODE_PROPERTY_CREATED;
 
+
     static void UpdateSurface(itk::SmartPointer<mitk::DataNode>);
     void ExtractFibers();
 
-    void StartEndNodes(mitk::DataNode::Pointer startDataNode, mitk::DataNode::Pointer endDataNode);
-//    void workingBundleNode(mitk::FiberBundle::Pointer workingBundle, mitk::FiberBundle::Pointer reducedBundle);
     void workingBundleNode(mitk::DataNode::Pointer workingBundleNode, mitk::DataNode::Pointer reducedBundleNode);
 
     mitk::DataNode::Pointer m_startDataNode;
@@ -64,25 +63,29 @@ namespace mitk
     mitk::FiberBundle::Pointer m_workingBundle;
     mitk::FiberBundle::Pointer m_reducedFibersBundle;
 
-  protected:
-
     void DataNodeChanged() override;
 
+
+    void StartEndNodes(mitk::DataNode::Pointer startDataNode, mitk::DataNode::Pointer endDataNode);
 
     void AddCenter(StateMachineAction*, InteractionEvent*);
     void ChangeRadius(StateMachineAction*, InteractionEvent*);
 //    void EndCreation(StateMachineAction*, InteractionEvent*);
-    void EndCreationStart(StateMachineAction*, InteractionEvent*);
+    virtual void EndCreationStart(StateMachineAction*, InteractionEvent*);
     void AbortCreation(StateMachineAction*, InteractionEvent*);
 
+  protected:
 
+
+
+
+    SphereInteractor();
+    ~SphereInteractor() override;
 
 
 
 
   private:
-    SphereInteractor();
-    ~SphereInteractor() override;
 
     //! Setup the relation between the XML state machine and this object's methods.
     void ConnectActionsAndFunctions() override;

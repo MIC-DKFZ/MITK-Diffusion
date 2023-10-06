@@ -56,20 +56,17 @@ mitk::StreamlineInteractorBrush::~StreamlineInteractorBrush()
 
 void mitk::StreamlineInteractorBrush::ConnectActionsAndFunctions()
 {
-//  CONNECT_CONDITION("isoverstreamline", HasPickedHandle);
     CONNECT_CONDITION("isoverstreamline", CheckSelection);
     CONNECT_FUNCTION("selectstreamline", SelectStreamline);
 
   CONNECT_FUNCTION("addnegstreamline", AddStreamlineNegBundle);
   CONNECT_FUNCTION("addposstreamline", AddStreamlinePosBundle);
   CONNECT_FUNCTION("addtolabelstreamline", AddStreamlinetolabelsBundle);
-//  CONNECT_FUNCTION("FeedUndoStack", FeedUndoStack);
 }
 
 void mitk::StreamlineInteractorBrush::SetNegativeNode(DataNode *node)
 {
 
-//    DataInteractor::SetDataNode(node);
     m_NegStreamlineNode = node;
     m_NegStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
 }
@@ -79,14 +76,11 @@ void mitk::StreamlineInteractorBrush::SetToLabelNode(DataNode *node)
     m_manStreamlineNode = node;
     DataInteractor::SetDataNode(m_manStreamlineNode);
     m_manStreamline = dynamic_cast<mitk::FiberBundle *>(node->GetData());
-//    m_init = false;
 
 }
 
 void mitk::StreamlineInteractorBrush::SetPositiveNode(DataNode *node)
 {
-
-    //    DataInteractor::SetDataNode(node);
     m_PosStreamlineNode = node;
     m_PosStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
 }
@@ -129,8 +123,6 @@ bool mitk::StreamlineInteractorBrush::CheckSelection(const InteractionEvent *int
 
             if (picker->GetCellId()==-1 && m_predlabeling==false)
             {
-//                m_manStreamline->SetFiberColors(255, 255, 255);
-//                vtkSmartPointer<vtkUnsignedCharArray> FiberColors = m_manStreamline->m_FiberColors;
 
                 RenderingManager::GetInstance()->RequestUpdateAll();
                 return false;
@@ -165,7 +157,6 @@ bool mitk::StreamlineInteractorBrush::CheckSelection(const InteractionEvent *int
 
             if (picker->GetCellId()==-1 && m_predlabeling==false)
             {
-//                m_manStreamline->SetFiberColors(255, 255, 255);
                 RenderingManager::GetInstance()->RequestUpdateAll();
                 return false;
             }
@@ -180,7 +171,6 @@ bool mitk::StreamlineInteractorBrush::CheckSelection(const InteractionEvent *int
 
     }
     else {
-//        m_manStreamline->SetFiberColors(255, 255, 255);
         RenderingManager::GetInstance()->RequestUpdateAll();
         return false;
     }
@@ -208,7 +198,7 @@ void mitk::StreamlineInteractorBrush::SelectStreamline(StateMachineAction *, Int
             picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
             picker->PickFromListOn();
           }
-    //        }
+
 
         auto displayPosition = positionEvent->GetPointerPositionOnScreen();
         picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
@@ -216,7 +206,7 @@ void mitk::StreamlineInteractorBrush::SelectStreamline(StateMachineAction *, Int
             {
         vtkIdType pickedCellID = picker->GetCellId();
         m_manStreamline->SetSingleFiberColor(0.0, 255.0, 0.0, pickedCellID);
-//        m_manStreamline->SetFloatProperty("shape.tuberadius", 1.0)
+
         }
     }
     else {
@@ -263,7 +253,7 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
 
     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
     {
-//      m_PickedHandle = PickFrom2D(positionEvent);
+
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
@@ -278,7 +268,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
           picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
           picker->PickFromListOn();
         }
-//        }
 
       auto displayPosition = positionEvent->GetPointerPositionOnScreen();
       picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
@@ -341,11 +330,11 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
           vNewPolyData->SetPoints(vNewPoints);
           vNewPolyData->SetLines(vNewLines);
 
-  //        m_PosStreamline = mitk::FiberBundle::New(vNewPolyData);
+
           m_PosStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
           m_PosStreamline->GetFiberPolyData()->SetLines(vNewLines);
           m_PosStreamline->SetFiberColors(0, 255, 0);
-//            m_PosStreamline->SetFiberWeights(m_PosStreamline->GetFiberWeights());
+
 
           m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
           m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
@@ -373,14 +362,16 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
               vtkIdType id = vNewPoints2->InsertNextPoint(p);
               container->GetPointIds()->InsertNextId(id);
             }
-        //    weights->InsertValue(counter, fib->GetFiberWeight(i));
+
             vNewLines2->InsertNextCell(container);
             counter++;
 
           }
           m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints2);
           m_manStreamline->GetFiberPolyData()->SetLines(vNewLines2);
-          m_manStreamline->SetFiberColors(255, 255, 255);
+          if (m_predlabeling==false){
+              m_manStreamline->SetFiberColors(255, 255, 255);
+            }
           }
 
 
@@ -406,7 +397,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
             picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
             picker->PickFromListOn();
           }
-//        }
 
         auto displayPosition = positionEvent->GetPointerPositionOnScreen();
         picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
@@ -443,7 +433,7 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
                 vtkIdType id = vNewPoints->InsertNextPoint(p);
                 container->GetPointIds()->InsertNextId(id);
               }
-          //    weights->InsertValue(counter, fib->GetFiberWeight(i));
+
               vNewLines->InsertNextCell(container);
               counter++;
 
@@ -470,11 +460,9 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
             vNewPolyData->SetPoints(vNewPoints);
             vNewPolyData->SetLines(vNewLines);
 
-    //        m_PosStreamline = mitk::FiberBundle::New(vNewPolyData);
             m_PosStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
             m_PosStreamline->GetFiberPolyData()->SetLines(vNewLines);
             m_PosStreamline->SetFiberColors(0, 255, 0);
-//            m_PosStreamline->SetFiberWeights(m_PosStreamline->GetFiberWeights());
 
 
             m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
@@ -504,14 +492,15 @@ void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction 
                 vtkIdType id = vNewPoints2->InsertNextPoint(p);
                 container->GetPointIds()->InsertNextId(id);
               }
-          //    weights->InsertValue(counter, fib->GetFiberWeight(i));
               vNewLines2->InsertNextCell(container);
               counter++;
 
             }
             m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints2);
             m_manStreamline->GetFiberPolyData()->SetLines(vNewLines2);
-            m_manStreamline->SetFiberColors(255, 255, 255);
+            if (m_predlabeling==false){
+                m_manStreamline->SetFiberColors(255, 255, 255);
+              }
             }
 
         }
@@ -532,7 +521,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
 
     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
     {
-//      m_PickedHandle = PickFrom2D(positionEvent);
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
@@ -547,7 +535,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
           picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
           picker->PickFromListOn();
         }
-//        }
 
       auto displayPosition = positionEvent->GetPointerPositionOnScreen();
       picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
@@ -584,7 +571,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
               vtkIdType id = vNewPoints->InsertNextPoint(p);
               container->GetPointIds()->InsertNextId(id);
             }
-        //    weights->InsertValue(counter, fib->GetFiberWeight(i));
             vNewLines->InsertNextCell(container);
             counter++;
 
@@ -610,9 +596,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
 
           vNewPolyData->SetPoints(vNewPoints);
           vNewPolyData->SetLines(vNewLines);
-
-  //        m_NegStreamline = mitk::FiberBundle::New(vNewPolyData);
-//            m_NegStreamline->SetFiberWeights(m_NegStreamline->GetFiberWeights());
 
           m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
           m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
@@ -647,7 +630,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
               vtkIdType id = vNewPoints2->InsertNextPoint(p);
               container->GetPointIds()->InsertNextId(id);
             }
-        //    weights->InsertValue(counter, fib->GetFiberWeight(i));
             vNewLines2->InsertNextCell(container);
             counter++;
 
@@ -668,8 +650,7 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
-//        if (picker == nullptr)
-//        {
+
 
 
           picker = vtkSmartPointer<vtkCellPicker>::New();
@@ -683,7 +664,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
             picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
             picker->PickFromListOn();
           }
-//        }
 
         auto displayPosition = positionEvent->GetPointerPositionOnScreen();
 
@@ -718,7 +698,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
                 vtkIdType id = vNewPoints->InsertNextPoint(p);
                 container->GetPointIds()->InsertNextId(id);
               }
-          //    weights->InsertValue(counter, fib->GetFiberWeight(i));
               vNewLines->InsertNextCell(container);
               counter++;
 
@@ -744,7 +723,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
             vNewPolyData->SetPoints(vNewPoints);
             vNewPolyData->SetLines(vNewLines);
 
-    //        m_NegStreamline = mitk::FiberBundle::New(vNewPolyData);
 
             m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
             m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
@@ -777,7 +755,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
                 vtkIdType id = vNewPoints2->InsertNextPoint(p);
                 container->GetPointIds()->InsertNextId(id);
               }
-              //    weights->InsertValue(counter, fib->GetFiberWeight(i));
               vNewLines2->InsertNextCell(container);
               counter++;
 
@@ -804,8 +781,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
 
     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
     {
-//      m_PickedHandle = PickFrom2D(positionEvent);
-
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
@@ -820,7 +795,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
           picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
           picker->PickFromListOn();
         }
-//        }
 
       auto displayPosition = positionEvent->GetPointerPositionOnScreen();
       picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
@@ -857,7 +831,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
               vtkIdType id = vNewPoints->InsertNextPoint(p);
               container->GetPointIds()->InsertNextId(id);
             }
-        //    weights->InsertValue(counter, fib->GetFiberWeight(i));
             vNewLines->InsertNextCell(container);
             counter++;
 
@@ -884,11 +857,11 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
           vNewPolyData->SetPoints(vNewPoints);
           vNewPolyData->SetLines(vNewLines);
 
-  //        m_manStreamline = mitk::FiberBundle::New(vNewPolyData);
           m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
           m_manStreamline->GetFiberPolyData()->SetLines(vNewLines);
-          m_manStreamline->SetFiberColors(255, 255, 255);
-//            m_manStreamline->SetFiberWeights(m_manStreamline->GetFiberWeights());
+          if (m_predlabeling==false){
+              m_manStreamline->SetFiberColors(255, 255, 255);
+            }
 
           m_NegStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
           m_NegStreamline->GetFiberPolyData()->RemoveDeletedCells();
@@ -904,8 +877,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
-//        if (picker == nullptr)
-//        {
 
 
           picker = vtkSmartPointer<vtkCellPicker>::New();
@@ -919,8 +890,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
             picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
             picker->PickFromListOn();
           }
-//        }
-
         auto displayPosition = positionEvent->GetPointerPositionOnScreen();
 
         picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
@@ -954,7 +923,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
                 vtkIdType id = vNewPoints->InsertNextPoint(p);
                 container->GetPointIds()->InsertNextId(id);
               }
-          //    weights->InsertValue(counter, fib->GetFiberWeight(i));
               vNewLines->InsertNextCell(container);
               counter++;
 
@@ -980,10 +948,11 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
             vNewPolyData->SetPoints(vNewPoints);
             vNewPolyData->SetLines(vNewLines);
 
-    //        m_manStreamline = mitk::FiberBundle::New(vNewPolyData);
             m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
             m_manStreamline->GetFiberPolyData()->SetLines(vNewLines);
-            m_manStreamline->SetFiberColors(255, 255, 255);
+            if (m_predlabeling==false){
+                m_manStreamline->SetFiberColors(255, 255, 255);
+              }
 
             m_NegStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
             m_NegStreamline->GetFiberPolyData()->RemoveDeletedCells();
@@ -994,7 +963,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
     DataInteractor::SetDataNode(m_PosStreamlineNode);
 
 
-//    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
     if (positionEvent == nullptr)
     {
 
@@ -1002,7 +970,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
 
     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
     {
-//      m_PickedHandle = PickFrom2D(positionEvent);
 
 
         BaseRenderer *renderer = positionEvent->GetSender();
@@ -1019,7 +986,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
           picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
           picker->PickFromListOn();
         }
-//        }
 
       auto displayPosition = positionEvent->GetPointerPositionOnScreen();
       picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
@@ -1056,7 +1022,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
               vtkIdType id = vNewPoints->InsertNextPoint(p);
               container->GetPointIds()->InsertNextId(id);
             }
-        //    weights->InsertValue(counter, fib->GetFiberWeight(i));
             vNewLines->InsertNextCell(container);
             counter++;
 
@@ -1083,11 +1048,11 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
           vNewPolyData->SetPoints(vNewPoints);
           vNewPolyData->SetLines(vNewLines);
 
-  //        m_manStreamline = mitk::FiberBundle::New(vNewPolyData);
           m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
           m_manStreamline->GetFiberPolyData()->SetLines(vNewLines);
-          m_manStreamline->SetFiberColors(255, 255, 255);
-//            m_manStreamline->SetFiberWeights(m_manStreamline->GetFiberWeights());
+          if (m_predlabeling==false){
+              m_manStreamline->SetFiberColors(255, 255, 255);
+            }
 
           m_PosStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
           m_PosStreamline->GetFiberPolyData()->RemoveDeletedCells();
@@ -1103,8 +1068,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
         BaseRenderer *renderer = positionEvent->GetSender();
 
         auto &picker = m_Picker[renderer];
-//        if (picker == nullptr)
-//        {
 
 
           picker = vtkSmartPointer<vtkCellPicker>::New();
@@ -1118,7 +1081,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
             picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
             picker->PickFromListOn();
           }
-//        }
 
         auto displayPosition = positionEvent->GetPointerPositionOnScreen();
 
@@ -1153,7 +1115,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
                 vtkIdType id = vNewPoints->InsertNextPoint(p);
                 container->GetPointIds()->InsertNextId(id);
               }
-          //    weights->InsertValue(counter, fib->GetFiberWeight(i));
               vNewLines->InsertNextCell(container);
               counter++;
 
@@ -1179,10 +1140,11 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
             vNewPolyData->SetPoints(vNewPoints);
             vNewPolyData->SetLines(vNewLines);
 
-    //        m_manStreamline = mitk::FiberBundle::New(vNewPolyData);
             m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
             m_manStreamline->GetFiberPolyData()->SetLines(vNewLines);
-            m_manStreamline->SetFiberColors(255, 255, 255);
+            if (m_predlabeling==false){
+                m_manStreamline->SetFiberColors(255, 255, 255);
+              }
 
             m_PosStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
             m_PosStreamline->GetFiberPolyData()->RemoveDeletedCells();

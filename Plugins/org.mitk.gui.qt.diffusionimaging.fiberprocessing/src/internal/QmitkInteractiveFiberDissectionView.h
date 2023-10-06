@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDataInteractor.h>
 #include <mitkStreamlineInteractor.h>
 #include <mitkSphereInteractor.h>
+#include <mitkSphereSegmentationInteractor.h>
 #include <mitkStreamlineInteractorBrush.h>
 #include <mitkStreamlineFeatureExtractor.h>
 #include <mitkStatisticModel.h> 
@@ -82,6 +83,7 @@ protected slots:
   void UpdateGui();     ///< update button activity etc. dpending on current datamanager selection
   void RemovefromBundleBrush( bool checked );
   void CreateSubset();
+  void CreateSphereSegmentation();
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
   void CreatePredictionNode();
@@ -157,6 +159,7 @@ protected:
   mitk::StreamlineInteractorBrush::Pointer   m_StreamlineInteractorBrush;
 
   mitk::SphereInteractor::Pointer   m_SphereInteractor;
+  mitk::SphereSegmentationInteractor::Pointer   m_SphereSegmentationInteractor;
 
   std::shared_ptr< mitk::StreamlineFeatureExtractor > classifier;
 
