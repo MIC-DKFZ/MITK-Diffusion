@@ -52,6 +52,7 @@ const char* mitk::FiberBundle::FIBER_ID_ARRAY = "Fiber_IDs";
 
 mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
   : m_NumFibers(0)
+  , m_IsRAS(false)
 {
   m_TrackVisHeader.hdr_size = 0;
   m_FiberWeights = vtkSmartPointer<vtkFloatArray>::New();
@@ -2004,7 +2005,10 @@ void mitk::FiberBundle::MirrorFibers(unsigned int axis)
   m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
   m_FiberPolyData->SetPoints(vtkNewPoints);
   m_FiberPolyData->SetLines(vtkNewCells);
+
+  auto colors = GetFiberColors();
   this->SetFiberPolyData(m_FiberPolyData, true);
+  SetFiberColors(colors);
 }
 
 void mitk::FiberBundle::RemoveDir(vnl_vector_fixed<double,3> dir, double threshold)
@@ -2906,5 +2910,21 @@ bool mitk::FiberBundle::VerifyRequestedRegion()
 }
 void mitk::FiberBundle::SetRequestedRegion(const itk::DataObject* )
 {
+
+}
+
+
+namespace mitk {
+
+  bool FiberBundle::IsRAS() const
+  {
+    return m_IsRAS;
+  }
+
+
+  void FiberBundle::setIsRAS(bool newIsRAS)
+  {
+    m_IsRAS = newIsRAS;
+  }
 
 }

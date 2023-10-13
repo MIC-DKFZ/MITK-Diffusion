@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkXMLPolyDataWriter.h>
 #include "mitkDiffusionIOMimeTypes.h"
 #include <vtkUnsignedCharArray.h>
+#include <vtkTransformPolyDataFilter.h>
 
 mitk::FiberBundleVtkWriter::FiberBundleVtkWriter()
   : mitk::AbstractFileWriter(mitk::FiberBundle::GetStaticNameOfClass(), mitk::DiffusionIOMimeTypes::FIBERBUNDLE_VTK_MIMETYPE_NAME(), "VTK Fiber Bundle Writer")
@@ -91,6 +92,34 @@ void mitk::FiberBundleVtkWriter::Write()
     vtkSmartPointer<vtkUnsignedCharArray> fiberColors = nullptr;
 
     vtkSmartPointer<vtkPolyData> fibPoly = input->GetFiberPolyData();
+
+    bool ras = input->IsRAS();
+
+    mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
+    vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
+    matrix->Identity();
+    if (ras)
+    {
+      matrix->SetElement(0,0,-matrix->GetElement(0,0));
+      matrix->SetElement(0,1,-matrix->GetElement(0,1));
+      matrix->SetElement(0,2,-matrix->GetElement(0,2));
+      matrix->SetElement(0,3,-matrix->GetElement(0,3));
+
+      matrix->SetElement(1,0,-matrix->GetElement(1,0));
+      matrix->SetElement(1,1,-matrix->GetElement(1,1));
+      matrix->SetElement(1,2,-matrix->GetElement(1,2));
+      matrix->SetElement(1,3,-matrix->GetElement(1,3));
+
+      geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
+
+      vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+      transformFilter->SetInputData(fibPoly);
+      transformFilter->SetTransform(geometry->GetVtkTransform());
+      transformFilter->Update();
+      fibPoly = transformFilter->GetOutput();
+    }
+
+
     if (us::any_cast<bool>(options["Save fiber weights"]))
     {
       MITK_INFO << "Adding fiber weight information";

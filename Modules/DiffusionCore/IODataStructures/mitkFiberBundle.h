@@ -215,6 +215,10 @@ public:
 
     void PrintSelf(std::ostream &os, itk::Indent indent) const override;
 
+    void setIsRAS(bool newIsRAS);
+
+    bool IsRAS() const;
+
 protected:
 
     FiberBundle( vtkPolyData* fiberPolyData = nullptr );
@@ -245,6 +249,8 @@ private:
     itk::TimeStamp m_UpdateTime3D;
 
     TrackVis_header     m_TrackVisHeader;
+
+    bool m_IsRAS;
 };
 
 } // namespace mitk
