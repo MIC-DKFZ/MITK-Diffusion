@@ -31,6 +31,24 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkStreamlineFeatureExtractor.h>
 #include <mitkStatisticModel.h> 
 
+#include <mitkTensorImage.h>
+#include <mitkDataStorage.h>
+#include <mitkDataNode.h>
+#include <mitkImage.h>
+#include <itkImage.h>
+#include <itkStreamlineTrackingFilter.h>
+#include <Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h>
+#include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
+#include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
+#include <random>
+#include <mitkPointSet.h>
+#include <mitkPointSetShapeProperty.h>
+#include <QThread>
+#include <QTimer>
+#include <QmitkStdMultiWidget.h>
+#include <QmitkSliceNavigationListener.h>
+#include <mitkILifecycleAwarePart.h>
+#include <mitkStreamlineTractographyParameters.h>
 #include <itkCastImageFilter.h>
 #include <itkVTKImageImport.h>
 #include <itkVTKImageExport.h>
@@ -57,6 +75,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 /*!
 \brief View to dissect fiber bundles with active learning
 */
+
+//class QmitkStreamlineTrackingView;
+//class QmitkStreamlineTrackingWorker : public QObject
+//{
+//  Q_OBJECT
+
+//public:
+
+//  QmitkStreamlineTrackingWorker(class QmitkStreamlineTrackingView* view);
+
+//public slots:
+
+//  void run();
+
+//private:
+
+//  QmitkStreamlineTrackingView* m_View;
+//};
+
+
 class QmitkInteractiveFiberDissectionView : public QmitkAbstractView
 {
   // this is needed for all Qt objects that should have a Qt meta-object
@@ -75,6 +113,12 @@ public:
 
 
   virtual void CreateQtPartControl(QWidget *parent) override;
+
+  typedef itk::StreamlineTrackingFilter   TrackerType;
+  TrackerType::Pointer              m_Tracker;
+//  QmitkStreamlineTrackingWorker     m_TrackingWorker;
+  QThread                           m_TrackingThread;
+
 
   virtual void SetFocus() override;
 
@@ -97,6 +141,7 @@ protected slots:
   void CreateUncertantyMap();
   void ResetClassifier();
 
+  void startTractography();
 
 
 
@@ -126,6 +171,8 @@ protected:
   int m_prototypecounter;
   int m_posOffsetcounter;
   int m_init_subset;
+
+
 
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
@@ -165,6 +212,9 @@ protected:
 
 
   std::vector<std::vector<unsigned int>> m_index;
+
+private:
+  mitk::TrackingDataHandler*              m_TrackingHandler;
 
 };
 

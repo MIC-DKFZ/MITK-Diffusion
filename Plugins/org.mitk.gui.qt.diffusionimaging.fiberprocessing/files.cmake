@@ -21,6 +21,7 @@ set(UI_FILES
   src/internal/QmitkFiberClusteringViewControls.ui
   src/internal/QmitkInteractiveFiberDissectionViewControls.ui
   src/internal/QmitkFiberFitViewControls.ui
+
 )
 
 set(MOC_H_FILES
