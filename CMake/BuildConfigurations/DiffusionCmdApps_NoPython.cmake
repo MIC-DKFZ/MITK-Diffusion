@@ -12,8 +12,6 @@ set(MITK_USE_Qwt OFF CACHE BOOL "" FORCE)
 set(MITK_DOXYGEN_GENERATE_QCH_FILES OFF CACHE BOOL "Use doxygen to generate Qt compressed help files for MITK docs" FORCE)
 set(BLUEBERRY_USE_QT_HELP OFF CACHE BOOL "Enable support for integrating bundle documentation into Qt Help" FORCE)
 
-set(MITK_USE_Vigra ON CACHE BOOL "MITK Use Vigra Library" FORCE)
-set(MITK_USE_HDF5 ON CACHE BOOL "MITK Use HDF5 Library" FORCE)
 set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMQI ON CACHE BOOL "" FORCE)
@@ -27,8 +25,6 @@ set(BUILD_DiffusionFiberfoxCmdApps ON CACHE BOOL "Build commandline tools for di
 set(BUILD_DiffusionMiscCmdApps ON CACHE BOOL "Build miscellaneous commandline tools for diffusion" FORCE)
 set(BUILD_DiffusionQuantificationCmdApps ON CACHE BOOL "Build commandline tools for diffusion quantification (IVIM, ADC, ...)" FORCE)
 set(BUILD_DiffusionTractographyCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber tractography" FORCE)
-set(BUILD_DiffusionTractographyEvaluationCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber tractography evaluation" FORCE)
-set(BUILD_DiffusionConnectomicsCmdApps ON CACHE BOOL "Build commandline tools for diffusion connectomics" FORCE)
 set(BUILD_DiffusionPythonCmdApps OFF CACHE BOOL "Build commandline tools for diffusion with python" FORCE)
 set(MITK_CUSTOM_REVISION_DESC "DiffusionCmdApps" CACHE STRING "" FORCE)
 

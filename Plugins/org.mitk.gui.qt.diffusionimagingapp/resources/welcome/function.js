@@ -9,7 +9,6 @@ var moduleNames = new Array(
                             "Diffusion Indices",
                             "Tractography",
                             "Fiber Processing",
-                            "Connectomics",
                             "Fiberfox",
                             "IVIM & Kurtosis",
                             "Segmentation",
@@ -22,7 +21,6 @@ var moduleLinks = new Array(
                             "mitk://mitk.perspectives/org.mitk.perspectives.quantification?clear=false",
                             "mitk://mitk.perspectives/org.mitk.perspectives.tractography2?clear=false",
                             "mitk://mitk.perspectives/org.mitk.perspectives.fiberprocessings?clear=false",
-                            "mitk://mitk.perspectives/org.mitk.perspectives.connectomics?clear=false",
                             "mitk://mitk.perspectives/org.mitk.perspectives.syntheticdata?clear=false",
                             "mitk://mitk.perspectives/org.mitk.perspectives.ivim?clear=false",
                             "mitk://mitk.perspectives/org.mitk.perspectives.segmentation?clear=false",
@@ -36,7 +34,6 @@ var picFilenames = new Array(
                              "03quantification.png",
                              "04tractography.png",
                              "05fiberprocessing.png",
-                             "06connectomics.png",
                              "10softwarephantoms.png",
                              "07ivim.png",
                              "11segmentation.png",
@@ -50,7 +47,6 @@ var aniFilenames = new Array(
                              "03aquantification.png",
                              "04atractography.png",
                              "05afiberprocessing.png",
-                             "06aconnectomics.png",
                              "10asoftwarephantoms.png",
                              "07aivim.png",
                              "11asegmentation.png",
@@ -59,7 +55,6 @@ var aniFilenames = new Array(
 // if your module is not stable, you can mark it as experimental.
 // just set true for experimental or false for stable.
 var experimental = new Array(
-                             false,
                              false,
                              false,
                              false,
@@ -79,7 +74,6 @@ var moduleDescriptions = new Array(
             "MITK allows the calculation of different scalar measures for raw diffusion-weighted images (MD, ADC), tensors (Fractional Anisotropy, Relative Anisotropy, Axial Diffusivity, Radial Diffusivity) or ODFs (Generalized Fractional Anisotropy).",
             "The tractography components of MITK Diffusion implement several fiber tractography algorithms (global and streamline; tensor, dODF/fODF/FOD, peak based as well as machine learning based using the raw signal). The fiber bundle operations view enables fiber postprocessing in various ways. The fiber quantification view generates a variety of images from given fiber tracts, extracts the principal fiber directions and gives detailed information about the fiberbundle itself.",
             "The results obtained with any fiber tractography method can be postprocessed using tract dissection, filtering, clustering, coloring or SIFT2-like fitting methods.",
-            "Connectomics aims at building graphs (nodes and edges) from a tractogram and applying graph theory for data analysis.",
             "The Fiberfox software phantom tool allows you to create synthetic diffusion-weighted MR images easily and with a wide variety of properties and options.",
             "You can use Intravoxel Incoherent Motion to estimate tissue perfusion on basis of diffusion measurements. Several models and interactive exploration of the data are supported.",
             "MITK Diffusion provides tools for image segmentation and diffusion unrelated image processing.",

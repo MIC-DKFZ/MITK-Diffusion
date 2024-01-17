@@ -30,11 +30,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
-#include <Algorithms/TrackingHandlers/mitkTrackingHandlerRandomForest.h>
 #include <random>
 #include <mitkPointSet.h>
 #include <mitkPointSetShapeProperty.h>
-#include <mitkTractographyForest.h>
 #include <QThread>
 #include <QTimer>
 #include <QmitkStdMultiWidget.h>
@@ -106,7 +104,6 @@ protected slots:
   void DeleteTrackingHandler();
   void OnParameterChanged();
   void InteractiveSeedChanged(bool posChanged=false);
-  void ForestSwitched();
   void OutputStyleSwitched();
   void AfterThread();                       ///< update gui etc. after tracking has finished
   void BeforeThread();                      ///< start timer etc.

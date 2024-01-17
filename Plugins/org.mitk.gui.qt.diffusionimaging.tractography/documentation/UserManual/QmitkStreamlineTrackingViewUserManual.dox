@@ -19,8 +19,6 @@ Select the data you want to track on in the datamanager. Supported file types ar
 - One or multiple DTI images selected in the datamanager.
 - One ODF image, e.g. obtained using MITK Q-ball reconstruction or MRtrix CSD (tractography similar to [6]). Input can bes discretely sampled ODFs or an SH representation of the ODFs.
 - One peak image (4D float image).
-- One raw diffusion-weighted image for machine learning based tractography [1].
--- Tractography Forest: Needed for machine learning based tractography [1].
 
 \section StrTrackUserManualSeeding Seeding
 

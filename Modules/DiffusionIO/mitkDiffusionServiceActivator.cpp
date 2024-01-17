@@ -19,20 +19,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundleVtkReader.h>
 #include <mitkFiberBundleTckReader.h>
 #include <mitkFiberBundleTrackVisReader.h>
-#include <mitkConnectomicsNetworkReader.h>
 #include <mitkPlanarFigureCompositeReader.h>
-#include <mitkTractographyForestReader.h>
 #include <mitkFiberBundleDicomReader.h>
 
 #include <mitkFiberBundleVtkWriter.h>
 #include <mitkFiberBundleTrackVisWriter.h>
 #include <mitkFiberBundleDicomWriter.h>
-#include <mitkConnectomicsNetworkWriter.h>
-#include <mitkConnectomicsNetworkCSVWriter.h>
-#include <mitkConnectomicsNetworkMatrixWriter.h>
 #include <mitkPlanarFigureCompositeWriter.h>
-#include <mitkTractographyForestWriter.h>
-
 #include <mitkDiffusionImageNrrdReader.h>
 #include <mitkDiffusionImageNiftiReader.h>
 #include <mitkDiffusionImageDicomReader.h>
@@ -94,15 +87,8 @@ namespace mitk
       m_FiberBundleDicomReader = new FiberBundleDicomReader();
       m_FiberBundleDicomWriter = new FiberBundleDicomWriter();
 
-      m_ConnectomicsNetworkReader = new ConnectomicsNetworkReader();
-      m_ConnectomicsNetworkWriter = new ConnectomicsNetworkWriter();
-      m_ConnectomicsNetworkCSVWriter = new ConnectomicsNetworkCSVWriter();
-      m_ConnectomicsNetworkMatrixWriter = new ConnectomicsNetworkMatrixWriter();
-
       m_PlanarFigureCompositeReader = new PlanarFigureCompositeReader();
       m_PlanarFigureCompositeWriter = new PlanarFigureCompositeWriter();
-      m_TractographyForestReader = new TractographyForestReader();
-      m_TractographyForestWriter = new TractographyForestWriter();
 
       m_DiffusionImageNrrdReader = new DiffusionImageNrrdReader();
       m_DiffusionImageNrrdWriter = new DiffusionImageNrrdWriter();
@@ -134,19 +120,13 @@ namespace mitk
       delete m_FiberBundleVtkReader;
       delete m_FiberBundleTckReader;
       delete m_FiberBundleTrackVisReader;
-      delete m_ConnectomicsNetworkReader;
       delete m_PlanarFigureCompositeReader;
-      delete m_TractographyForestReader;
       delete m_FiberBundleDicomReader;
 
       delete m_FiberBundleDicomWriter;
       delete m_FiberBundleVtkWriter;
       delete m_FiberBundleTrackVisWriter;
-      delete m_ConnectomicsNetworkWriter;
-      delete m_ConnectomicsNetworkCSVWriter;
-      delete m_ConnectomicsNetworkMatrixWriter;
       delete m_PlanarFigureCompositeWriter;
-      delete m_TractographyForestWriter;
 
       delete m_DiffusionImageNrrdReader;
       delete m_DiffusionImageNiftiReader;
@@ -169,18 +149,12 @@ namespace mitk
     FiberBundleTckReader * m_FiberBundleTckReader;
     FiberBundleTrackVisReader * m_FiberBundleTrackVisReader;
     FiberBundleDicomReader * m_FiberBundleDicomReader;
-    ConnectomicsNetworkReader * m_ConnectomicsNetworkReader;
     PlanarFigureCompositeReader* m_PlanarFigureCompositeReader;
-    TractographyForestReader* m_TractographyForestReader;
-
+    
     FiberBundleDicomWriter * m_FiberBundleDicomWriter;
     FiberBundleVtkWriter * m_FiberBundleVtkWriter;
     FiberBundleTrackVisWriter * m_FiberBundleTrackVisWriter;
-    ConnectomicsNetworkWriter * m_ConnectomicsNetworkWriter;
-    ConnectomicsNetworkCSVWriter * m_ConnectomicsNetworkCSVWriter;
-    ConnectomicsNetworkMatrixWriter * m_ConnectomicsNetworkMatrixWriter;
     PlanarFigureCompositeWriter* m_PlanarFigureCompositeWriter;
-    TractographyForestWriter* m_TractographyForestWriter;
 
     DiffusionImageNrrdReader * m_DiffusionImageNrrdReader;
     DiffusionImageNiftiReader * m_DiffusionImageNiftiReader;

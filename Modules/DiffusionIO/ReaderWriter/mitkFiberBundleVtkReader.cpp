@@ -35,11 +35,16 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkXMLDataReader.h>
 #include "mitkDiffusionIOMimeTypes.h"
 #include <vtkUnsignedCharArray.h>
+#include <vtkTransformPolyDataFilter.h>
 
 
 mitk::FiberBundleVtkReader::FiberBundleVtkReader()
   : mitk::AbstractFileReader( mitk::DiffusionIOMimeTypes::FIBERBUNDLE_VTK_MIMETYPE_NAME(), "VTK Fiber Bundle Reader" )
 {
+  Options defaultOptions;
+  defaultOptions["Use RAS space"] = false;
+  this->SetDefaultOptions(defaultOptions);
+
   m_ServiceReg = this->RegisterService();
 }
 
@@ -68,6 +73,30 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
   std::string ext = itksys::SystemTools::GetFilenameLastExtension(filename);
   ext = itksys::SystemTools::LowerCase(ext);
 
+  Options options = this->GetOptions();
+  bool ras = us::any_cast<bool>(options["Use RAS space"]);
+
+  mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
+  vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
+  matrix->Identity();
+
+  if (ras)
+  {
+    matrix->SetElement(0,0,-matrix->GetElement(0,0));
+    matrix->SetElement(0,1,-matrix->GetElement(0,1));
+    matrix->SetElement(0,2,-matrix->GetElement(0,2));
+    matrix->SetElement(0,3,-matrix->GetElement(0,3));
+
+    matrix->SetElement(1,0,-matrix->GetElement(1,0));
+    matrix->SetElement(1,1,-matrix->GetElement(1,1));
+    matrix->SetElement(1,2,-matrix->GetElement(1,2));
+    matrix->SetElement(1,3,-matrix->GetElement(1,3));
+  }
+  geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
+
+  vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+
+
   try
   {
     MITK_INFO << "Loading tractogram (VTK format): " << itksys::SystemTools::GetFilenameName(filename);
@@ -81,12 +110,19 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
       if ( reader->GetOutput() != nullptr )
       {
         vtkSmartPointer<vtkPolyData> fiberPolyData = reader->GetOutput();
+        if (ras)
+        {
+          transformFilter->SetInputData(fiberPolyData);
+          transformFilter->SetTransform(geometry->GetVtkTransform());
+          transformFilter->Update();
+          fiberPolyData = transformFilter->GetOutput();
+        }
         FiberBundle::Pointer fiberBundle = FiberBundle::New(fiberPolyData);
+        fiberBundle->setIsRAS(ras);
 
         vtkSmartPointer<vtkFloatArray> weights = vtkFloatArray::SafeDownCast(fiberPolyData->GetCellData()->GetArray("FIBER_WEIGHTS"));
         if (weights!=nullptr)
         {
-          //                    float weight=0;
           for (int i=0; i<weights->GetNumberOfValues(); i++)
           {
             if (weights->GetValue(i)<0.0)
@@ -95,11 +131,6 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
               weights->SetValue(i,0);
             }
           }
-          //                        if (!mitk::Equal(weights->GetValue(i),weight,0.00001))
-          //                        {
-          //                            MITK_INFO << "Weight: " << weights->GetValue(i);
-          //                            weight = weights->GetValue(i);
-          //                        }
           fiberBundle->SetFiberWeights(weights);
         }
 
@@ -132,19 +163,20 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
       if ( reader->GetOutput() != nullptr )
       {
         vtkSmartPointer<vtkPolyData> fiberPolyData = reader->GetOutput();
+        if (ras)
+        {
+          transformFilter->SetInputData(fiberPolyData);
+          transformFilter->SetTransform(geometry->GetVtkTransform());
+          transformFilter->Update();
+          fiberPolyData = transformFilter->GetOutput();
+        }
         FiberBundle::Pointer fiberBundle = FiberBundle::New(fiberPolyData);
+        fiberBundle->setIsRAS(ras);
 
         vtkSmartPointer<vtkFloatArray> weights = vtkFloatArray::SafeDownCast(fiberPolyData->GetCellData()->GetArray("FIBER_WEIGHTS"));
 
         if (weights!=nullptr)
         {
-          //                                float weight=0;
-          //                                for (int i=0; i<weights->GetSize(); i++)
-          //                                    if (!mitk::Equal(weights->GetValue(i),weight,0.00001))
-          //                                    {
-          //                                        MITK_INFO << "Weight: " << weights->GetValue(i);
-          //                                        weight = weights->GetValue(i);
-          //                                    }
           fiberBundle->SetFiberWeights(weights);
         }
 

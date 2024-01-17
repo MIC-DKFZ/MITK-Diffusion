@@ -14,7 +14,6 @@ if(BUILD_DiffusionTractographyCmdApps OR MITK_BUILD_ALL_APPS)
     set( diffusiontractographycmdapps
     StreamlineTractography^^
     GlobalTractography^^
-    RfTraining^^
     )
 
     foreach(diffusiontractographycmdapp ${diffusiontractographycmdapps})

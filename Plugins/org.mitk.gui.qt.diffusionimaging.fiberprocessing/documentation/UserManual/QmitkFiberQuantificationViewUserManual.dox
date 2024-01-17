@@ -24,7 +24,7 @@ Calculate the voxel-wise principal fiber directions (fixels) from a tractogram.
 - Angular Threshold: Cluster directions that are close together using the specified threshold (in degree).
 - Size Threshold: Discard principal directions with a magnitude smaller than the specified threshold. This value is the vector magnitude raltive to the largest vector in the voxel.
 - Normalization: Normalize the principal fiber directions by the global maximum, the voxel-wise maximum or each direction individually.
-- Output #Directions per Voxel: Generate an image that contains the number of principal directions per voxel as values.
+- Output \#Directions per Voxel: Generate an image that contains the number of principal directions per voxel as values.
 
 \imageMacro{DirectionExtractionFib.png, "Input fiber bundle",10}
 \imageMacro{DirectionExtractionPeaks.png, "Output principal fiber directions",10}
