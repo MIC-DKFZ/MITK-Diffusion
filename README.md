@@ -22,30 +22,17 @@ The MITK Diffusion application [[1,2]](#References) offers a selection of image 
 
 Please have a look at the [requirements](#Requirements) for running MITK Diffusion with all its features successfully!
 
-The nightly builds come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually". Should there be no new installer for a while, please [contact](#Contact) us and report the issue.
+The latest builds come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually".
 
-**Without Python Support (standard)**:
 * [Ubuntu 20.04 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-20.04_NoPython.run.html)
 * [Ubuntu 20.04 tarball archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-20.04_NoPython.tar.gz.html)
 * [Windows 10 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_NoPython.exe.html)
 * [Windows 10 zip archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_NoPython.zip.html)
 
-**With Python Support (experimental)**:
-* [Ubuntu 20.04 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-20.04_Python.run.html)
-* [Ubuntu 20.04 tarball archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_ubuntu-20.04_Python.tar.gz.html)
-* [Windows 10 executable installer](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_Python.exe.html)
-* [Windows 10 zip archive](http://www.mitk.org/download/diffusion/nightly/MITK-Diffusion_Windows-10_Python.zip.html)
-
-
-If you encounter any bugs, please report them in our [bugtracking](https://phabricator.mitk.org/maniphest/task/edit/form/29/) system or use the [MITK-users mailing list](http://mitk.org/wiki/MITK_Mailinglist). We are grateful for any feedback!
+If you encounter any bugs, please report them here on github or use the [MITK-users mailing list](http://mitk.org/wiki/MITK_Mailinglist). We are grateful for any feedback!
 
 
 ### Requirements
-
-* Install Python 3.X: `sudo apt install python3 python3-pip` (Ubuntu) or from https://www.python.org/downloads/windows/ (Windows)
-* Download our Python requirements file: [PythonRequirements.txt](https://github.com/MIC-DKFZ/MITK-Diffusion/tree/master/PythonRequirements.txt)
-* Install the Python requirements: `pip3 install -r PythonRequirements.txt`
-* If your are behind a proxy use `pip3 --proxy <proxy> install -r PythonRequirements.txt`
 
 **For Windows users**:
 MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be installed on the system. The MITK Diffusion installer automatically installs this redistributable for you if not already present on the system, but it needs administrative privileges to do so. So to install the redistributable, **run the MITK Diffusion installer as administrator**.
@@ -190,27 +177,19 @@ Automatically generated random fiber configuration for Fiberfox simulations.
 
 
 ## Building MITK Diffusion from source
-* Install [Qt](https://www.qt.io/) on your system (5.12).
+* Install [Qt](https://www.qt.io/) on your system (6.6.1).
 * Clone MITK from [github](https://github.com/MIC-DKFZ/MITK-Diffusion.git) using [Git version control](https://git-scm.com/).
 * Clone MITK Diffusion from [github](https://github.com/MITK/MITK.git).
-* Configure the MITK Superbuild using [CMake](https://cmake.org/) (>= 3.18).
+* Configure the MITK Superbuild using [CMake](https://cmake.org/).
     * Choose the MITK source code directory and an empty binary directory.
     * Click "Configure".
     * Set the option MITK_EXTENSION_DIRS to "/path/to/my/mitk-diffusion-repository".
     * Click "Configure".
     * Set the option MITK_BUILD_CONFIGURATION to "DiffusionRelease".
     * Click "Generate".
-    * macOS specifics (unclear if this still applies):
-        * Use python 3.**6**, since python 3.**7** leads to build errors on macOS.
-        * The cmake variables for python 3 might need to be set manually. It is probably enough to specify PYTHON_EXECUTABLE.
-        * Openmp needs to be installed manually since it is not included in apple clang anymore: "brew install libomp" should do the trick. It might be necessary to set the corresponding make variables later in the MITK build manually:
-            * OpenMP_CXX_FLAGS: -Xpreprocessor -fopenmp -I"/path/to/python3/includes/"
-            * OpenMP_C_FLAGS: -Xpreprocessor -fopenmp -I"/path/to/python3/includes/"
-            * OpenMPCXX_LIB_NAMES: libomp
-            * OpenMPC_LIB_NAMES: libomp
-            * OpenMP_libomp_LIBRARY: /path/to/libomp.dylib
+
 * Start the Superbuild:
-    * Linux/maxOS: Open a console window, navigate to the build folder and type "make -j8" (optionally supply the number threads to be used for a parallel build with -j).
+    * Linux: Open a console window, navigate to the build folder and type "make -j8" (optionally supply the number threads to be used for a parallel build with -j).
     * Windows (requires visual studio): Open the MITK Superbuild solution file and build all projects.
     * The Superbuild may take some time.
     * After the Superbuild has finished, change the cmake binary directory from "/path/to/my/build" to "/path/to/my/build/MITK-build" and configure+generate again.
@@ -219,9 +198,7 @@ Automatically generated random fiber configuration for Fiberfox simulations.
 
 More detailed build instructions can be found in the [documentation](http://docs.mitk.org/nightly/BuildInstructionsPage.html).
 
-
 Continuous integration: https://cdash.mitk.org/index.php?project=MITK-Diffusion
-
 
 ## References
 
