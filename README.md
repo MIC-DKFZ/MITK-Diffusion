@@ -22,9 +22,7 @@ The MITK Diffusion application [[1,2]](#References) offers a selection of image 
 
 Please have a look at the [requirements](#Requirements) for running MITK Diffusion with all its features successfully!
 
-The latest builds come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually".
-
-[All installers](http://www.mitk.org/download/diffusion/nightly/)
+The latest builds come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually". You can find the newest installers [here](http://www.mitk.org/download/diffusion/nightly/).
 
 If you encounter any bugs, please report them here on github or use the [MITK-users mailing list](http://mitk.org/wiki/MITK_Mailinglist). We are grateful for any feedback!
 
