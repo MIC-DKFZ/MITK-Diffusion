@@ -55,6 +55,16 @@ namespace mitk
 
     static BValueMap CreateBValueMap(const GradientDirectionsContainerType * gdc, float referenceBValue);
     static float GetBValueOfGradientDirection(unsigned int i, float referenceBValue, const GradientDirectionsContainerType *gdc);
+
+    std::string GetValueAsString() const override
+    { return ""; }
+
+    bool ToJSON(nlohmann::json& ) const override
+    { return false; }
+
+    bool FromJSON(const nlohmann::json& ) override
+    { return false; }
+
   protected:
 
     BValueMapProperty();

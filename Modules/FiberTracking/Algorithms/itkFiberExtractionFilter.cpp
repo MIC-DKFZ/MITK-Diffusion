@@ -141,14 +141,14 @@ void FiberExtractionFilter< PixelType >::ExtractOverlap(mitk::FiberBundle::Point
         itk::Point<float, 3> startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
         itk::Index<3> startIndex;
         itk::ContinuousIndex<float, 3> startIndexCont;
-        roi->TransformPhysicalPointToIndex(startVertex, startIndex);
-        roi->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+        (void)roi->TransformPhysicalPointToIndex(startVertex, startIndex);
+        (void)roi->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
         itk::Point<float, 3> endVertex = mitk::imv::GetItkPoint(points->GetPoint(j + 1));
         itk::Index<3> endIndex;
         itk::ContinuousIndex<float, 3> endIndexCont;
-        roi->TransformPhysicalPointToIndex(endVertex, endIndex);
-        roi->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+        (void)roi->TransformPhysicalPointToIndex(endVertex, endIndex);
+        (void)roi->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
         std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(roi->GetSpacing(), startIndex, endIndex, startIndexCont, endIndexCont);
         for (std::pair< itk::Index<3>, double > segment : segments)

@@ -27,6 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QThread>
 #include <mitkFiberBundle.h>
 #include <QTime>
+#include <QElapsedTimer>
 #include <itkImage.h>
 #include <vtkSmartPointer.h>
 #include <vtkPolyData.h>
@@ -147,7 +148,7 @@ private:
 
   /** flags etc. */
   bool            m_ThreadIsRunning;
-  QTimer*         m_TrackingTimer;
+  QElapsedTimer   m_TrackingTimer;
   QTime           m_TrackingTime;
   unsigned long   m_ElapsedTime;
   QString         m_OutputFileName;

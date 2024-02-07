@@ -25,7 +25,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QApplication>
 #include <QPoint>
 #include <QRect>
-#include <QDesktopWidget>
 #include <QMainWindow>
 #include <mitkVersion.h>
 #include <mitkDiffusionVersion.h>

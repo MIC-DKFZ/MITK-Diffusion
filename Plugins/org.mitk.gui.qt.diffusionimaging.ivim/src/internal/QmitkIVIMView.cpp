@@ -708,9 +708,8 @@ void QmitkIVIMView::OnSliceChanged()
       vecimg->TransformIndexToPhysicalPoint(vecit.GetIndex(), point);
 
       MaskImgType::IndexType index;
-      maskItk->TransformPhysicalPointToIndex(point, index);
 
-      if(maskItk->GetPixel(index) != 0)
+      if(maskItk->TransformPhysicalPointToIndex(point, index) && maskItk->GetPixel(index) != 0)
       {
         avg += vecit.Get();
         numPixels += 1.0;

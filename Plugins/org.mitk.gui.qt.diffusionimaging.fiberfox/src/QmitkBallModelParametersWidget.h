@@ -33,7 +33,7 @@ public:
 
     static const std::string VIEW_ID;
 
-    QmitkBallModelParametersWidget (QWidget* parent = nullptr, Qt::WindowFlags f = nullptr);
+    QmitkBallModelParametersWidget (QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
     virtual ~QmitkBallModelParametersWidget();
 
     virtual void CreateQtPartControl(QWidget *parent);

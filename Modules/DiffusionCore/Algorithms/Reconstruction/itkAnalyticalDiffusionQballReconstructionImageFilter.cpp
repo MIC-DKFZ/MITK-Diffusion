@@ -469,7 +469,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
       bval = bval*bval*m_BValue;
       if(bval > 100)
       {
-        centerMass += gdcit1.Value();
+        centerMass += gdcit1.Value().as_vector();
         count ++;
       }
     }

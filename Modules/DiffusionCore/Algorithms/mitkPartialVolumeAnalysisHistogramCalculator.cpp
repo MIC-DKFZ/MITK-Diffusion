@@ -794,8 +794,8 @@ namespace mitk
       if(itmask.Get() != 0)
       {
         outImage->TransformIndexToPhysicalPoint (itimage.GetIndex(), point);
-        image->TransformPhysicalPointToContinuousIndex(point, index);
-        itimage.Set(interpolator->EvaluateAtContinuousIndex(index));
+        if (image->TransformPhysicalPointToContinuousIndex(point, index))
+          itimage.Set(interpolator->EvaluateAtContinuousIndex(index));
       }
 
       ++itmask;

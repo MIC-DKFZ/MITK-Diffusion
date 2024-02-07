@@ -428,7 +428,7 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
             double cand[3];
             points->GetPoint(j, cand);
 
-            vnl_vector_fixed< float, 3 > candV;
+            vnl_vector< float > candV(3);
             candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
             streamline.set_column(j, candV);
             }

@@ -98,14 +98,14 @@ void FitFibersToImageFilter::CreateDiffSystem()
         PointType3 startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
         itk::Index<3> startIndex;
         itk::ContinuousIndex<float, 3> startIndexCont;
-        m_DiffImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-        m_DiffImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+        (void)m_DiffImage->TransformPhysicalPointToIndex(startVertex, startIndex);
+        (void)m_DiffImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
         PointType3 endVertex = mitk::imv::GetItkPoint(points->GetPoint(j+1));
         itk::Index<3> endIndex;
         itk::ContinuousIndex<float, 3> endIndexCont;
-        m_DiffImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-        m_DiffImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+        (void)m_DiffImage->TransformPhysicalPointToIndex(endVertex, endIndex);
+        (void)m_DiffImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
         mitk::DiffusionSignalModel<>::GradientType fiber_dir;
         fiber_dir[0] = endVertex[0]-startVertex[0];
@@ -263,14 +263,14 @@ void FitFibersToImageFilter::CreatePeakSystem()
         PointType3 startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
         itk::Index<3> startIndex;
         itk::ContinuousIndex<float, 3> startIndexCont;
-        m_MaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-        m_MaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+        (void)m_MaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
+        (void)m_MaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
         PointType3 endVertex = mitk::imv::GetItkPoint(points->GetPoint(j+1));
         itk::Index<3> endIndex;
         itk::ContinuousIndex<float, 3> endIndexCont;
-        m_MaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-        m_MaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+        (void)m_MaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
+        (void)m_MaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
         vnl_vector_fixed<float,3> fiber_dir;
         fiber_dir[0] = endVertex[0]-startVertex[0];
@@ -386,14 +386,14 @@ void FitFibersToImageFilter::CreateScalarSystem()
         PointType3 startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
         itk::Index<3> startIndex;
         itk::ContinuousIndex<float, 3> startIndexCont;
-        m_ScalarImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-        m_ScalarImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+        (void)m_ScalarImage->TransformPhysicalPointToIndex(startVertex, startIndex);
+        (void)m_ScalarImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
         PointType3 endVertex = mitk::imv::GetItkPoint(points->GetPoint(j+1));
         itk::Index<3> endIndex;
         itk::ContinuousIndex<float, 3> endIndexCont;
-        m_ScalarImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-        m_ScalarImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+        (void)m_ScalarImage->TransformPhysicalPointToIndex(endVertex, endIndex);
+        (void)m_ScalarImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
         std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(spacing, startIndex, endIndex, startIndexCont, endIndexCont);
         for (std::pair< itk::Index<3>, double > seg : segments)

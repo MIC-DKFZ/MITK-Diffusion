@@ -127,8 +127,8 @@ public:
       int dir_idx=0;
       itk::Index<3> tmp_idx;
       itk::Index<3> idx;
-      parc->TransformPhysicalPointToIndex(itkP, idx);
-      if (!parc->GetLargestPossibleRegion().IsInside(idx))
+
+      if (!parc->TransformPhysicalPointToIndex(itkP, idx))
         continue;
 
       short label = parc->GetPixel(idx);

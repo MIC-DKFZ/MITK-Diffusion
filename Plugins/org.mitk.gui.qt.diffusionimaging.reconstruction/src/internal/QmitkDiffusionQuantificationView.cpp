@@ -353,7 +353,7 @@ void QmitkDiffusionQuantificationView::OdfQuantification(int method)
       itkvol = mitk::convert::GetItkOdfFromOdfImage(vol);
     std::string nodename = node->GetName();
 
-    mitk::StatusBar::GetInstance()->DisplayText(status.sprintf("Computing GFA for %s", nodename.c_str()).toLatin1());
+    mitk::StatusBar::GetInstance()->DisplayText(status.asprintf("Computing GFA for %s", nodename.c_str()).toLatin1());
     typedef itk::DiffusionOdfGeneralizedFaImageFilter<TOdfPixelType,TOdfPixelType,ODF_SAMPLING_SIZE> GfaFilterType;
     GfaFilterType::Pointer gfaFilter = GfaFilterType::New();
     gfaFilter->SetInput(itkvol);
@@ -507,7 +507,7 @@ void QmitkDiffusionQuantificationView::TensorQuantification(int method)
 
     std::string nodename = node->GetName();
 
-    mitk::StatusBar::GetInstance()->DisplayText(status.sprintf("Computing FA for %s", nodename.c_str()).toLatin1());
+    mitk::StatusBar::GetInstance()->DisplayText(status.asprintf("Computing FA for %s", nodename.c_str()).toLatin1());
     typedef itk::Image< TTensorPixelType, 3 > FAImageType;
 
     typedef itk::ShiftScaleImageFilter<FAImageType, FAImageType> ShiftScaleFilterType;

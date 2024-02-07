@@ -142,14 +142,14 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
       itk::Point<float, 3> startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
       itk::Index<3> startIndex;
       itk::ContinuousIndex<float, 3> startIndexCont;
-      outImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-      outImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+      (void)outImage->TransformPhysicalPointToIndex(startVertex, startIndex);
+      (void)outImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
       itk::Point<float, 3> endVertex = mitk::imv::GetItkPoint(points->GetPoint(j + 1));
       itk::Index<3> endIndex;
       itk::ContinuousIndex<float, 3> endIndexCont;
-      outImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-      outImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+      (void)outImage->TransformPhysicalPointToIndex(endVertex, endIndex);
+      (void)outImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
       std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(newSpacing, startIndex, endIndex, startIndexCont, endIndexCont);
       for (std::pair< itk::Index<3>, double > segment : segments)

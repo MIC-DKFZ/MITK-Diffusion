@@ -1086,17 +1086,21 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
               continue;
             dir.Normalize();
 
-            itk::Point<float, 3> startVertex = points_copy.at(j);
+            auto tmp = points_copy.at(j);
+            itk::Point<float, 3> startVertex;
+            startVertex[0] = tmp[0]; startVertex[1] = tmp[1]; startVertex[2] = tmp[2];
             itk::Index<3> startIndex;
             itk::ContinuousIndex<float, 3> startIndexCont;
-            m_TransformedMaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-            m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+            (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
+            (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
-            itk::Point<float, 3> endVertex = points_copy.at(j+1);
+            tmp = points_copy.at(j+1);
+            itk::Point<float, 3> endVertex;
+            endVertex[0] = tmp[0]; endVertex[1] = tmp[1]; endVertex[2] = tmp[2];
             itk::Index<3> endIndex;
             itk::ContinuousIndex<float, 3> endIndexCont;
-            m_TransformedMaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-            m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+            (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
+            (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
             std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(m_WorkingSpacing, startIndex, endIndex, startIndexCont, endIndexCont);
 
@@ -1533,9 +1537,8 @@ void TractsToDWIImageFilter< PixelType >::SimulateMotion(int g)
         }
 
         DoubleDwiType::IndexType index = maskIt.GetIndex();
-        m_TransformedMaskImage->TransformPhysicalPointToIndex(GetMovedPoint(index, true), index);
 
-        if (m_TransformedMaskImage->GetLargestPossibleRegion().IsInside(index))
+        if (m_TransformedMaskImage->TransformPhysicalPointToIndex(GetMovedPoint(index, true), index))
           m_TransformedMaskImage->SetPixel(index, 100);
         ++maskIt;
       }

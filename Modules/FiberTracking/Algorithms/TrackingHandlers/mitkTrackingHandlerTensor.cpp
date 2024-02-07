@@ -177,8 +177,7 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::GetMatchingDirection(itk::Index
 
 bool TrackingHandlerTensor::WorldToIndex(itk::Point<float, 3>& pos, itk::Index<3>& index)
 {
-  m_TensorImages.at(0)->TransformPhysicalPointToIndex(pos, index);
-  return m_TensorImages.at(0)->GetLargestPossibleRegion().IsInside(index);
+  return m_TensorImages.at(0)->TransformPhysicalPointToIndex(pos, index);
 }
 
 vnl_vector_fixed<float,3> TrackingHandlerTensor::GetDirection(itk::Point<float, 3> itkP, vnl_vector_fixed<float,3> oldDir, TensorType& tensor)
@@ -186,11 +185,9 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::GetDirection(itk::Point<float, 
   // transform physical point to index coordinates
   itk::Index<3> idx;
   itk::ContinuousIndex< float, 3> cIdx;
-  m_FaImage->TransformPhysicalPointToIndex(itkP, idx);
-  m_FaImage->TransformPhysicalPointToContinuousIndex(itkP, cIdx);
 
   vnl_vector_fixed<float,3> dir; dir.fill(0.0);
-  if ( !m_FaImage->GetLargestPossibleRegion().IsInside(idx) )
+  if ( !m_FaImage->TransformPhysicalPointToIndex(itkP, idx) || !m_FaImage->TransformPhysicalPointToContinuousIndex(itkP, cIdx) )
     return dir;
 
   int image_num = -1;
@@ -307,7 +304,8 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::ProposeDirection(const itk::Poi
   try
   {
     itk::Index<3> index;
-    m_TensorImages.at(0)->TransformPhysicalPointToIndex(pos, index);
+    if (!m_TensorImages.at(0)->TransformPhysicalPointToIndex(pos, index))
+      return output_direction;
 
     float fa = mitk::imv::GetImageValue<float>(pos, m_Parameters->m_InterpolateTractographyData, m_FaInterpolator);
     if (fa<m_Parameters->m_Cutoff)

@@ -106,7 +106,6 @@ QmitkGibbsTrackingView::QmitkGibbsTrackingView()
   connect(&m_TrackingThread, SIGNAL(started()), this, SLOT(BeforeThread()));
   connect(&m_TrackingThread, SIGNAL(started()), &m_TrackingWorker, SLOT(run()));
   connect(&m_TrackingThread, SIGNAL(finished()), this, SLOT(AfterThread()));
-  m_TrackingTimer = new QTimer(this);
 }
 
 QmitkGibbsTrackingView::~QmitkGibbsTrackingView()
@@ -141,7 +140,6 @@ void QmitkGibbsTrackingView::StopGibbsTracking()
 void QmitkGibbsTrackingView::AfterThread()
 {
   m_ThreadIsRunning = false;
-  m_TrackingTimer->stop();
 
   UpdateGUI();
 
@@ -185,7 +183,7 @@ void QmitkGibbsTrackingView::BeforeThread()
   m_ThreadIsRunning = true;
   m_TrackingTime = QTime::currentTime();
   m_ElapsedTime = 0;
-  m_TrackingTimer->start(1000);
+  m_TrackingTimer.restart();
 
   UpdateGUI();
 }
@@ -202,7 +200,7 @@ void QmitkGibbsTrackingView::CreateQtPartControl( QWidget *parent )
 
     AdvancedSettings();
 
-    connect( m_TrackingTimer, SIGNAL(timeout()), this, SLOT(TimerUpdate()) );
+    // connect( m_TrackingTimer, SIGNAL(elapsed()), this, SLOT(TimerUpdate()) );
     connect( m_Controls->m_TrackingStop, SIGNAL(clicked()), this, SLOT(StopGibbsTracking()) );
     connect( m_Controls->m_TrackingStart, SIGNAL(clicked()), this, SLOT(StartGibbsTracking()) );
     connect( m_Controls->m_AdvancedSettingsCheckbox, SIGNAL(clicked()), this, SLOT(AdvancedSettings()) );
@@ -322,8 +320,7 @@ void QmitkGibbsTrackingView::UpdateTrackingStatus()
   if (m_GlobalTracker.IsNull())
     return;
 
-  m_ElapsedTime += m_TrackingTime.elapsed()/1000;
-  m_TrackingTime.restart();
+  m_ElapsedTime += m_TrackingTimer.elapsed()/1000;
   unsigned long hours = m_ElapsedTime/3600;
   unsigned long minutes = (m_ElapsedTime%3600)/60;
   unsigned long seconds = m_ElapsedTime%60;

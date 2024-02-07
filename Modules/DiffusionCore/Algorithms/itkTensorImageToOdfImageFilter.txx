@@ -53,7 +53,8 @@ TensorImageToOdfImageFilter<TInputScalarType, TOutputScalarType>
   outImage->SetBufferedRegion( this->GetInput()->GetLargestPossibleRegion() );
   outImage->SetRequestedRegion( this->GetInput()->GetLargestPossibleRegion() );
   outImage->Allocate();
-  outImage->FillBuffer(0.0);
+  itk::Vector<TOutputScalarType, 252> nullv; nullv.Fill(0);
+  outImage->FillBuffer(nullv);
 
   this->SetNumberOfRequiredOutputs (1);
   this->SetNthOutput (0, outImage);

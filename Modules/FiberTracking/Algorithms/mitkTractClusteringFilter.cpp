@@ -85,8 +85,8 @@ float TractClusteringFilter::CalcOverlap(vnl_matrix<float>& t)
       point[1] = p[1];
       point[2] = p[2];
       itk::Index<3> idx;
-      m_FilterMask->TransformPhysicalPointToIndex(point, idx);
-      if (m_FilterMask->GetLargestPossibleRegion().IsInside(idx) && m_FilterMask->GetPixel(idx)>0)
+
+      if (m_FilterMask->TransformPhysicalPointToIndex(point, idx) && m_FilterMask->GetPixel(idx)>0)
         overlap += 1;
     }
     overlap /= m_NumPoints;
@@ -122,7 +122,7 @@ std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(mitk::Fibe
 
       vnl_vector_fixed< float, 3 > candV;
       candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
-      streamline.set_column(j, candV);
+      streamline.set_column(j, candV.as_vector());
     }
 
     out_fib.push_back(streamline);

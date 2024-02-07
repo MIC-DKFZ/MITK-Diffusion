@@ -118,7 +118,6 @@ MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be inst
 * Automatic generation of random fiber configurations
 
 **Other features**
-* Interactive Python console (Linux only)
 * Integrated screenshot maker
 * Command line tools for most functionalities
 

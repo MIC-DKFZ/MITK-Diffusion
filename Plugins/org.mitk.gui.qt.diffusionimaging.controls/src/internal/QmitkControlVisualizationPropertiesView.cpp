@@ -56,6 +56,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkMultiThreaderBase.h>
 #include <mitkClippingProperty.h>
 #include <ciso646>
+#include <QActionGroup>
 
 #define ROUND(a) ((a)>0 ? (int)((a)+0.5) : -(int)(0.5-(a)))
 
@@ -319,7 +320,6 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
 
   m_SelectedNodes.clear();
 
-  int numOdfImages = 0;
   for (mitk::DataNode::Pointer node: nodes)
   {
     if(node.IsNull())
@@ -472,8 +472,6 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
       bool colourisationModeBit = false;
       node->GetBoolProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", colourisationModeBit );
       m_Controls->m_OdfColorBox->setCurrentIndex(colourisationModeBit);
-
-      numOdfImages++;
     }
     else if(dynamic_cast<mitk::PlanarFigure*>(nodeData))
     {

@@ -790,8 +790,8 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   while( ! gradientInputImageIterator.IsAtEnd() )
   {
 
-    odf = 0.0;
-    coeffPixel = 0.0;
+    odf.Fill(0.0);
+    coeffPixel.Fill(0.0);
 
     GradientVectorType b = gradientInputImageIterator.Get();
 
