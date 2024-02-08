@@ -1,15 +1,12 @@
-
 # A list of plug-in targets which should be automatically enabled
 # (or be available in external projects) for this application
 
 set(target_libraries
   org_blueberry_ui_qt
   org_blueberry_ui_qt_help
-  org_mitk_planarfigure
   org_mitk_gui_qt_ext
   org_mitk_gui_qt_datamanager
   org_mitk_gui_qt_segmentation
-  org_mitk_gui_qt_python
   org_mitk_gui_qt_volumevisualization
   org_mitk_gui_qt_diffusionimaging_controls
   org_mitk_gui_qt_diffusionimaging_fiberfox
@@ -20,7 +17,6 @@ set(target_libraries
   org_mitk_gui_qt_diffusionimaging_reconstruction
   org_mitk_gui_qt_diffusionimaging_tractography
   org_mitk_gui_qt_diffusionimaging_registration
-  org_mitk_gui_qt_diffusionimaging_python
   org_mitk_gui_qt_diffusionimaging_denoising
   org_mitk_gui_qt_diffusionimaging_partialvolume
   org_mitk_gui_qt_diffusionimagingapp
@@ -35,7 +31,7 @@ set(target_libraries
   org_mitk_gui_qt_renderwindowmanager
 )
 
-if(NOT MITK_USE_Python3)
-  list(REMOVE_ITEM target_libraries org_mitk_gui_qt_diffusionimaging_python)
-  list(REMOVE_ITEM target_libraries org_mitk_gui_qt_python)
+if(MITK_USE_Python3)
+  list(APPEND target_libraries org_mitk_gui_qt_diffusionimaging_python)
+  list(APPEND target_libraries org_mitk_gui_qt_python)
 endif()

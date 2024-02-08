@@ -128,7 +128,7 @@ std::vector<vnl_matrix<float> > StreamlineFeatureExtractor::TractToMatrixFibers(
       points->GetPoint(j, cand);
 
       // Create a vnl_vector_fixed object to store the coordinates of the current point
-      vnl_vector_fixed< float, 3 > candV;
+      vnl_vector< float > candV(3);
       candV[0] = cand[0];
       candV[1] = cand[1];
       candV[2] = cand[2];

@@ -115,8 +115,8 @@ namespace itk{
       {
         itk::Point<float, 3> vertex = mitk::imv::GetItkPoint(points->GetPoint(0));
         itk::Index<3> index;
-        outImage->TransformPhysicalPointToIndex(vertex, index);
-        if (upsampledRegion.IsInside(index))
+
+        if (outImage->TransformPhysicalPointToIndex(vertex, index))
         {
           if (m_BinaryOutput)
           {
@@ -133,8 +133,8 @@ namespace itk{
       {
         itk::Point<float, 3> vertex = mitk::imv::GetItkPoint(points->GetPoint(numPoints-1));
         itk::Index<3> index;
-        outImage->TransformPhysicalPointToIndex(vertex, index);
-        if (upsampledRegion.IsInside(index))
+
+        if (outImage->TransformPhysicalPointToIndex(vertex, index))
         {
           if (m_BinaryOutput)
           {

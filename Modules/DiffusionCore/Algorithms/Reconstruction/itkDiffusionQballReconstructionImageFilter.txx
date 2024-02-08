@@ -459,7 +459,7 @@ namespace itk {
       {
         if(gdcit1.Value().one_norm() > 0.0)
         {
-          centerMass += gdcit1.Value();
+          centerMass += gdcit1.Value().as_vector();
           count ++;
         }
       }

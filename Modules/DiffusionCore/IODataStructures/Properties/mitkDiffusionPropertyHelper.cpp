@@ -228,11 +228,11 @@ void mitk::DiffusionPropertyHelper::ApplyMeasurementFrameAndRotationMatrix(mitk:
   for(GradientDirectionsContainerType::ConstIterator gdcit = originalDirections->Begin();
       gdcit != originalDirections->End(); ++gdcit)
   {
-    vnl_vector<double> vec = gdcit.Value();
+    auto vec = gdcit.Value();
     if (apply_matrix)
-      vec = vec.pre_multiply(imageRotationMatrix);
+        vec = vec*imageRotationMatrix;
     if (apply_mf)
-      vec = vec.pre_multiply(measurementFrame);
+        vec = vec*measurementFrame;
     directions->InsertElement(c, vec);
     c++;
   }
@@ -251,7 +251,7 @@ void mitk::DiffusionPropertyHelper::UnApplyMeasurementFrameAndRotationMatrix(mit
   GradientDirectionsContainerType::ConstPointer modifiedDirections = GetGradientContainer(image);
 
   MeasurementFrameType measurementFrame = GetMeasurementFrame(image);
-  measurementFrame = vnl_matrix_inverse<double>(measurementFrame).pinverse();
+  measurementFrame = vnl_matrix_inverse<double>(measurementFrame.as_matrix()).pinverse();
 
   mitk::Vector3D s = image->GetGeometry()->GetSpacing();
   mitk::VnlVector c0 = image->GetGeometry()->GetMatrixColumn(0)/s[0];
@@ -267,7 +267,8 @@ void mitk::DiffusionPropertyHelper::UnApplyMeasurementFrameAndRotationMatrix(mit
   imageRotationMatrix[0][2] = c2[0];
   imageRotationMatrix[1][2] = c2[1];
   imageRotationMatrix[2][2] = c2[2];
-  imageRotationMatrix = vnl_matrix_inverse<double>(imageRotationMatrix).pinverse();
+  imageRotationMatrix = vnl_matrix_inverse<double>(imageRotationMatrix.as_matrix()).pinverse();
+
 
   GradientDirectionsContainerType::Pointer directions = GradientDirectionsContainerType::New();
 
@@ -297,11 +298,11 @@ void mitk::DiffusionPropertyHelper::UnApplyMeasurementFrameAndRotationMatrix(mit
   for(GradientDirectionsContainerType::ConstIterator gdcit = modifiedDirections->Begin();
       gdcit != modifiedDirections->End(); ++gdcit)
   {
-    vnl_vector<double> vec = gdcit.Value();
+    auto vec = gdcit.Value();
     if (apply_matrix)
-      vec = vec.pre_multiply(imageRotationMatrix);
+      vec = vec*imageRotationMatrix;
     if (apply_mf)
-      vec = vec.pre_multiply(measurementFrame);
+      vec = vec*measurementFrame;
     directions->InsertElement(c, vec);
     c++;
   }
@@ -579,8 +580,8 @@ void mitk::DiffusionPropertyHelper::RotateGradients(mitk::Image* image, vnl_matr
   auto old_gradients = GetGradientContainer(image);
   for(auto gdcit = old_gradients->Begin(); gdcit != old_gradients->End(); ++gdcit)
   {
-    vnl_vector<double> vec = gdcit.Value();
-    vec = vec.pre_multiply(rotation_matrix);
+    auto vec = gdcit.Value();
+    vec = vec*rotation_matrix;
     new_gradients->InsertElement(c, vec);
     c++;
   }
@@ -597,8 +598,8 @@ void mitk::DiffusionPropertyHelper::RotateOriginalGradients(mitk::Image* image, 
   auto old_gradients = GetOriginalGradientContainer(image);
   for(auto gdcit = old_gradients->Begin(); gdcit != old_gradients->End(); ++gdcit)
   {
-    vnl_vector<double> vec = gdcit.Value();
-    vec = vec.pre_multiply(rotation_matrix);
+    auto vec = gdcit.Value();
+    vec = vec*rotation_matrix;
     new_gradients->InsertElement(c, vec);
     c++;
   }

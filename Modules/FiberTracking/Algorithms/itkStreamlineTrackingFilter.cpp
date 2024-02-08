@@ -850,12 +850,10 @@ void StreamlineTrackingFilter::FiberToProbmap(FiberType* fib)
   for (auto p : *fib)
   {
     ItkDoubleImgType::IndexType idx;
-    m_OutputProbabilityMap->TransformPhysicalPointToIndex(p, idx);
 
-    if (idx != last_idx)
+    if (m_OutputProbabilityMap->TransformPhysicalPointToIndex(p, idx) && idx != last_idx)
     {
-      if (m_OutputProbabilityMap->GetLargestPossibleRegion().IsInside(idx))
-        m_OutputProbabilityMap->SetPixel(idx, m_OutputProbabilityMap->GetPixel(idx)+1);
+      m_OutputProbabilityMap->SetPixel(idx, m_OutputProbabilityMap->GetPixel(idx)+1);
       last_idx = idx;
     }
   }

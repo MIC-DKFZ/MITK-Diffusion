@@ -92,7 +92,9 @@ void TractsToRgbaImageFilter< OutputImageType >::GenerateData()
   outImage->SetDirection( newDirection );
   outImage->SetRegions( upsampledRegion );
   outImage->Allocate();
-  outImage->FillBuffer(0.0);
+  OutPixelType nullp;
+  nullp.Fill(0.0);
+  outImage->FillBuffer(nullp);
 
   itk::Image< itk::RGBAPixel<double>, 3 >::Pointer double_out = itk::Image< itk::RGBAPixel<double>, 3 >::New();
   double_out->SetSpacing( newSpacing );
@@ -100,7 +102,9 @@ void TractsToRgbaImageFilter< OutputImageType >::GenerateData()
   double_out->SetDirection( newDirection );
   double_out->SetRegions( upsampledRegion );
   double_out->Allocate();
-  double_out->FillBuffer(0.0);
+  auto p = itk::RGBAPixel<double>();
+  p.Fill(0.0);
+  double_out->FillBuffer(p);
 
   vtkSmartPointer<vtkPolyData> fiberPolyData = m_FiberBundle->GetFiberPolyData();
   int numFibers = m_FiberBundle->GetNumFibers();
@@ -119,14 +123,14 @@ void TractsToRgbaImageFilter< OutputImageType >::GenerateData()
       Point<float, 3> startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
       Index<3> startIndex;
       ContinuousIndex<float, 3> startIndexCont;
-      double_out->TransformPhysicalPointToIndex(startVertex, startIndex);
-      double_out->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+      (void)double_out->TransformPhysicalPointToIndex(startVertex, startIndex);
+      (void)double_out->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
       Point<float, 3> endVertex = mitk::imv::GetItkPoint(points->GetPoint(j + 1));
       Index<3> endIndex;
       ContinuousIndex<float, 3> endIndexCont;
-      double_out->TransformPhysicalPointToIndex(endVertex, endIndex);
-      double_out->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+      (void)double_out->TransformPhysicalPointToIndex(endVertex, endIndex);
+      (void)double_out->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
       Vector<float, 3> dir;
       dir[0] = fabs(endVertex[0]-startVertex[0]);

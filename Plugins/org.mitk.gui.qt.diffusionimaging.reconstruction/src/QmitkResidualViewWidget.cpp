@@ -74,12 +74,12 @@ void QmitkResidualViewWidget::wheelEvent(QWheelEvent *event)
 {
 
   // Position of the mouse in scene coordinates
-  QPointF before(mapToScene(event->pos()));
+  QPointF before(mapToScene(event->position().toPoint()));
 
   QPointF screenCenter = m_CurrentCenterPoint;
 
   double factor = 1.15;
-  if(event->delta() > 0)
+  if(event->angleDelta().y() > 0)
   {
     scale(factor, factor);
   }
@@ -89,7 +89,7 @@ void QmitkResidualViewWidget::wheelEvent(QWheelEvent *event)
   }
 
   //Get the position after scaling, in scene coords
-  QPointF after(mapToScene(event->pos()));
+  QPointF after(mapToScene(event->position().toPoint()));
 
   //Get the offset of how the screen moved
   QPointF offset = before - after;

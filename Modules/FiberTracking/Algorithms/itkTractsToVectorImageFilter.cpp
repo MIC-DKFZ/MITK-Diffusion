@@ -158,14 +158,14 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
       itk::Point<float, 3> startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
       itk::Index<3> startIndex;
       itk::ContinuousIndex<float, 3> startIndexCont;
-      m_MaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-      m_MaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+      (void)m_MaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
+      (void)m_MaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
       itk::Point<float, 3> endVertex = mitk::imv::GetItkPoint(points->GetPoint(j + 1));
       itk::Index<3> endIndex;
       itk::ContinuousIndex<float, 3> endIndexCont;
-      m_MaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-      m_MaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+      (void)m_MaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
+      (void)m_MaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
       dir[0] = endVertex[0]-startVertex[0];
       dir[1] = endVertex[1]-startVertex[1];

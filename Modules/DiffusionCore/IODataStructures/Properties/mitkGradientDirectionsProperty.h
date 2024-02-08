@@ -50,6 +50,15 @@ namespace mitk
     const GradientDirectionsContainerType::ConstPointer GetGradientDirectionsContainer() const;
     const GradientDirectionsContainerType::Pointer GetGradientDirectionsContainerCopy() const;
 
+    std::string GetValueAsString() const override
+    { return ""; }
+
+    bool ToJSON(nlohmann::json& ) const override
+    { return false; }
+
+    bool FromJSON(const nlohmann::json& ) override
+    { return false; }
+
   protected:
 
     GradientDirectionsProperty();

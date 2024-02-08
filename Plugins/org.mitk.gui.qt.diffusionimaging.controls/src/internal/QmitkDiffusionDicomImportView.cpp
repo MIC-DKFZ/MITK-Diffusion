@@ -194,7 +194,7 @@ void QmitkDiffusionDicomImport::DicomLoadAddFolderNames()
 {
   // SELECT FOLDER DIALOG
   QFileDialog w( m_Parent, QString("Select folders containing DWI data") );
-  w.setFileMode( QFileDialog::DirectoryOnly );
+  w.setFileMode( QFileDialog::Directory );
   w.setOption(QFileDialog::DontUseNativeDialog,true);
 
   QListView *l = w.findChild<QListView*>("listView");

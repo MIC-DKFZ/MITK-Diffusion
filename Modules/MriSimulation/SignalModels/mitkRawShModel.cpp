@@ -176,7 +176,7 @@ bool RawShModel< ScalarType >::SampleKernels(Image::Pointer diffImg, ItkUcharIma
 
     if ( this->GetMaxNumKernels()>this->GetNumberOfKernels() && FA>m_FaRange.first && FA<m_FaRange.second && ADC>m_AdcRange.first && ADC<m_AdcRange.second)
     {
-      if (this->SetShCoefficients( coeffs, (double)itkVectorImagePointer->GetPixel(it.GetIndex())[b0Index]/max ))
+      if (this->SetShCoefficients( coeffs.as_vector(), (double)itkVectorImagePointer->GetPixel(it.GetIndex())[b0Index]/max ))
       {
         tensor.ComputeEigenAnalysis(eigenvalues, eigenvectors);
         itk::Vector<double,3> dir;

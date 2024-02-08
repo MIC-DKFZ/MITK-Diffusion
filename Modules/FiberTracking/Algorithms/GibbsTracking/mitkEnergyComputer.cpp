@@ -43,7 +43,7 @@ EnergyComputer::EnergyComputer(ItkFloatImageType* mask, ParticleGrid* particleGr
     m_Spacing[2] = mask->GetSpacing()[2];
 
     // get rotation matrix
-    vnl_matrix<double> temp = mask->GetDirection().GetVnlMatrix();
+    vnl_matrix<double> temp = mask->GetDirection().GetVnlMatrix().as_matrix();
     vnl_matrix<float>  directionMatrix; directionMatrix.set_size(3,3);
     vnl_copy(temp, directionMatrix);
     vnl_matrix_fixed<float, 3, 3> I = directionMatrix*directionMatrix.transpose();

@@ -1158,13 +1158,11 @@ float mitk::FiberBundle::GetNumEpFractionInMask(ItkUcharImgType* mask, bool diff
 
     itk::Point<float, 3> startVertex =mitk::imv::GetItkPoint(points->GetPoint(0));
     itk::Index<3> startIndex;
-    mask->TransformPhysicalPointToIndex(startVertex, startIndex);
 
     itk::Point<float, 3> endVertex =mitk::imv::GetItkPoint(points->GetPoint(numPoints-1));
     itk::Index<3> endIndex;
-    mask->TransformPhysicalPointToIndex(endVertex, endIndex);
 
-    if (mask->GetLargestPossibleRegion().IsInside(startIndex) && mask->GetLargestPossibleRegion().IsInside(endIndex))
+    if (mask->TransformPhysicalPointToIndex(startVertex, startIndex) && mask->TransformPhysicalPointToIndex(endVertex, endIndex))
     {
       float v1 = mask->GetPixel(startIndex);
       if (v1 < 0.5f)
@@ -1204,14 +1202,14 @@ std::tuple<float, float> mitk::FiberBundle::GetDirectionalOverlap(ItkUcharImgTyp
       itk::Point<float, 3> startVertex =mitk::imv::GetItkPoint(points->GetPoint(j));
       itk::Index<3> startIndex;
       itk::ContinuousIndex<float, 3> startIndexCont;
-      mask->TransformPhysicalPointToIndex(startVertex, startIndex);
-      mask->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+      (void)mask->TransformPhysicalPointToIndex(startVertex, startIndex);
+      (void)mask->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
       itk::Point<float, 3> endVertex =mitk::imv::GetItkPoint(points->GetPoint(j + 1));
       itk::Index<3> endIndex;
       itk::ContinuousIndex<float, 3> endIndexCont;
-      mask->TransformPhysicalPointToIndex(endVertex, endIndex);
-      mask->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+      (void)mask->TransformPhysicalPointToIndex(endVertex, endIndex);
+      (void)mask->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
       
       vnl_vector_fixed< float, 3 > fdir;
       fdir[0] = endVertex[0] - startVertex[0];
@@ -1279,14 +1277,14 @@ float mitk::FiberBundle::GetOverlap(ItkUcharImgType* mask)
       itk::Point<float, 3> startVertex =mitk::imv::GetItkPoint(points->GetPoint(j));
       itk::Index<3> startIndex;
       itk::ContinuousIndex<float, 3> startIndexCont;
-      mask->TransformPhysicalPointToIndex(startVertex, startIndex);
-      mask->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+      (void)mask->TransformPhysicalPointToIndex(startVertex, startIndex);
+      (void)mask->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
       itk::Point<float, 3> endVertex =mitk::imv::GetItkPoint(points->GetPoint(j + 1));
       itk::Index<3> endIndex;
       itk::ContinuousIndex<float, 3> endIndexCont;
-      mask->TransformPhysicalPointToIndex(endVertex, endIndex);
-      mask->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+      (void)mask->TransformPhysicalPointToIndex(endVertex, endIndex);
+      (void)mask->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
       std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(spacing, startIndex, endIndex, startIndexCont, endIndexCont);
       for (std::pair< itk::Index<3>, double > segment : segments)
@@ -1331,11 +1329,8 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgTyp
       {
         itk::Point<float, 3> itkP =mitk::imv::GetItkPoint(points->GetPoint(j));
         itk::Index<3> idx;
-        mask->TransformPhysicalPointToIndex(itkP, idx);
 
-        bool inside = false;
-        if ( mask->GetLargestPossibleRegion().IsInside(idx) && mask->GetPixel(idx)!=0 )
-          inside = true;
+        bool inside = mask->TransformPhysicalPointToIndex(itkP, idx);
 
         if (inside && !invert)
         {

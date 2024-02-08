@@ -20,7 +20,6 @@ set(_plugins
   org.blueberry.ui.qt.help
   org.mitk.core.services
   org.mitk.gui.common
-  org.mitk.planarfigure
   org.mitk.gui.qt.application
   org.mitk.gui.qt.ext
   org.mitk.gui.qt.common
@@ -28,7 +27,6 @@ set(_plugins
   org.mitk.gui.qt.datamanager
   org.mitk.gui.qt.measurementtoolbox
   org.mitk.gui.qt.segmentation
-  org.mitk.gui.qt.python
   org.mitk.gui.qt.volumevisualization
   org.mitk.gui.qt.diffusionimaging.controls
   org.mitk.gui.qt.diffusionimaging.fiberfox
@@ -39,7 +37,6 @@ set(_plugins
   org.mitk.gui.qt.diffusionimaging.reconstruction
   org.mitk.gui.qt.diffusionimaging.tractography
   org.mitk.gui.qt.diffusionimaging.registration
-  org.mitk.gui.qt.diffusionimaging.python
   org.mitk.gui.qt.diffusionimaging.denoising
   org.mitk.gui.qt.diffusionimaging.partialvolume
   org.mitk.gui.qt.diffusionimagingapp
@@ -55,9 +52,9 @@ set(_plugins
   org.mitk.gui.qt.pixelvalue
 )
 
-if(NOT MITK_USE_Python3)
-  list(REMOVE_ITEM _plugins org.mitk.gui.qt.diffusionimaging.python)
-  list(REMOVE_ITEM _plugins org.mitk.gui.qt.python)
+if(MITK_USE_Python3)
+  list(APPEND _plugins org.mitk.gui.qt.diffusionimaging.python)
+  list(APPEND _plugins org.mitk.gui.qt.python)
 endif()
 
 
@@ -78,7 +75,7 @@ set(_src_files
   MitkDiffusion.cpp
 )
 
-qt5_add_resources(_src_files splashscreen.qrc)
+#qt5_add_resources(_src_files splashscreen.qrc)
 
 mitkFunctionCreateBlueBerryApplication(
   NAME ${DIFFUSIONAPP_NAME}

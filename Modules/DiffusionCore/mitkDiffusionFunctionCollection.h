@@ -74,8 +74,9 @@ public:
   template< class TPixelType, class TOutPixelType=TPixelType >
   static TOutPixelType GetImageValue(const itk::Point<float, 3>& itkP, bool interpolate, typename itk::LinearInterpolateImageFunction< itk::Image< TPixelType, 3 >, float >::Pointer interpolator)
   {
+    TPixelType nullval = TPixelType(0.0);
     if (interpolator==nullptr)
-      return 0.0;
+      return nullval;
 
     itk::ContinuousIndex< float, 3> cIdx;
     interpolator->ConvertPointToContinuousIndex(itkP, cIdx);
@@ -92,7 +93,7 @@ public:
       }
     }
     else
-      return 0.0;
+      return nullval;
   }
 
   template< class TPixelType=unsigned char >
@@ -225,7 +226,7 @@ public:
   static void SampleOdf(const vnl_vector<float>& coefficients, itk::OrientationDistributionFunction<TComponent, N>& odf)
   {
     auto dirs = odf.GetDirections();
-    auto basis = CalcShBasisForDirections(ShOrder(coefficients.size()), *dirs);
+    auto basis = CalcShBasisForDirections(ShOrder(coefficients.size()), dirs->as_matrix());
     auto odf_vals = basis * coefficients;
     for (unsigned int i=0; i<odf_vals.size(); ++i)
       odf[i] = odf_vals[i];

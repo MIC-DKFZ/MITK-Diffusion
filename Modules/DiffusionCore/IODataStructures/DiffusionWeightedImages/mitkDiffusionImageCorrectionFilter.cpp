@@ -37,14 +37,13 @@ mitk::DiffusionImageCorrectionFilter
 ::GetRotationComponent(const TransformMatrixType &A)
 {
   TransformMatrixType B;
-
   B = A * A.transpose();
 
   // get the eigenvalues and eigenvectors
   typedef double MType;
   vnl_vector< MType > eigvals;
   vnl_matrix< MType > eigvecs;
-  vnl_symmetric_eigensystem_compute< MType > ( B, eigvecs, eigvals );
+  vnl_symmetric_eigensystem_compute< MType > ( B.as_matrix(), eigvecs, eigvals );
 
   vnl_matrix_fixed< MType, 3, 3 > eigvecs_fixed;
   eigvecs_fixed.set_columns(0, eigvecs );

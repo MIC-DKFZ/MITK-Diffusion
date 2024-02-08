@@ -41,6 +41,15 @@ namespace mitk
     const MeasurementFrameType &GetMeasurementFrame() const;
     void SetMeasurementFrame(const MeasurementFrameType & frame);
 
+    std::string GetValueAsString() const override
+    { return ""; }
+
+    bool ToJSON(nlohmann::json& ) const override
+    { return false; }
+
+    bool FromJSON(const nlohmann::json& ) override
+    { return false; }
+
   protected:
 
     MeasurementFrameProperty();

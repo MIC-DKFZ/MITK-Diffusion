@@ -45,7 +45,7 @@ class DIFFUSIONIMAGING_RECONSTRUCTION_EXPORT QmitkODFRenderWidget : public QWidg
 
 public:
 
-  QmitkODFRenderWidget( QWidget* parent = nullptr, Qt::WindowFlags f = nullptr );
+  QmitkODFRenderWidget( QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags() );
   virtual ~QmitkODFRenderWidget();
 
   template<unsigned int ODF_SIZE=ODF_SAMPLING_SIZE>

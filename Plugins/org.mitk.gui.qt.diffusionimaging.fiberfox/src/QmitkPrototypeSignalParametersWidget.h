@@ -33,7 +33,7 @@ public:
 
     static const std::string VIEW_ID;
 
-    QmitkPrototypeSignalParametersWidget (QWidget* parent = nullptr, Qt::WindowFlags f = nullptr);
+    QmitkPrototypeSignalParametersWidget (QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
     virtual ~QmitkPrototypeSignalParametersWidget();
 
     virtual void CreateQtPartControl(QWidget *parent);

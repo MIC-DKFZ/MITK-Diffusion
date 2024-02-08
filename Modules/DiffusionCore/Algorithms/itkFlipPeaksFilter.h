@@ -62,7 +62,7 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
     FlipPeaksFilter();
     ~FlipPeaksFilter(){}
 
-    void BeforeThreadedGenerateData();
+    void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
     void AfterThreadedGenerateData();
 

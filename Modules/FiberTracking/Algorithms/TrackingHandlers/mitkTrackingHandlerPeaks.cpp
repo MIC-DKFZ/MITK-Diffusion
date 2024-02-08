@@ -30,8 +30,7 @@ TrackingHandlerPeaks::~TrackingHandlerPeaks()
 
 bool TrackingHandlerPeaks::WorldToIndex(itk::Point<float, 3>& pos, itk::Index<3>& index)
 {
-  m_DummyImage->TransformPhysicalPointToIndex(pos, index);
-  return m_DummyImage->GetLargestPossibleRegion().IsInside(index);
+  return m_DummyImage->TransformPhysicalPointToIndex(pos, index);
 }
 
 void TrackingHandlerPeaks::InitForTracking()
@@ -180,11 +179,9 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::GetDirection(itk::Point<float, 3
   // transform physical point to index coordinates
   itk::Index<3> idx3;
   itk::ContinuousIndex< float, 3> cIdx;
-  m_DummyImage->TransformPhysicalPointToIndex(itkP, idx3);
-  m_DummyImage->TransformPhysicalPointToContinuousIndex(itkP, cIdx);
 
   vnl_vector_fixed<float,3> dir; dir.fill(0.0);
-  if ( !m_DummyImage->GetLargestPossibleRegion().IsInside(idx3) )
+  if ( !m_DummyImage->TransformPhysicalPointToIndex(itkP, idx3) || !m_DummyImage->TransformPhysicalPointToContinuousIndex(itkP, cIdx) )
     return dir;
 
   if (interpolate)
@@ -263,7 +260,8 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::ProposeDirection(const itk::Poin
   vnl_vector_fixed<float,3> output_direction; output_direction.fill(0);
 
   itk::Index<3> index;
-  m_DummyImage->TransformPhysicalPointToIndex(pos, index);
+  if (!m_DummyImage->TransformPhysicalPointToIndex(pos, index))
+    return output_direction;
 
   vnl_vector_fixed<float,3> oldDir; oldDir.fill(0.0);
   if (!olddirs.empty())

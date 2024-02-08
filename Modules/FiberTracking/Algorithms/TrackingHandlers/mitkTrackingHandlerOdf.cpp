@@ -38,8 +38,7 @@ TrackingHandlerOdf::~TrackingHandlerOdf()
 
 bool TrackingHandlerOdf::WorldToIndex(itk::Point<float, 3>& pos, itk::Index<3>& index)
 {
-  m_OdfImage->TransformPhysicalPointToIndex(pos, index);
-  return m_OdfImage->GetLargestPossibleRegion().IsInside(index);
+  return m_OdfImage->TransformPhysicalPointToIndex(pos, index);
 }
 
 void TrackingHandlerOdf::InitForTracking()
@@ -145,9 +144,9 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
   vnl_vector_fixed<float,3> output_direction; output_direction.fill(0);
 
   itk::Index<3> idx;
-  m_OdfImage->TransformPhysicalPointToIndex(pos, idx);
+  auto isinside = m_OdfImage->TransformPhysicalPointToIndex(pos, idx);
 
-  if ( !m_OdfImage->GetLargestPossibleRegion().IsInside(idx) )
+  if ( !isinside )
     return output_direction;
 
   // check GFA threshold for termination
