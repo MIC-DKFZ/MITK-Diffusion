@@ -558,11 +558,11 @@ void StreamlineFeatureExtractor::TrainModel()
     auto criteria = cv::TermCriteria();
     criteria.type = cv::TermCriteria::MAX_ITER;
 //    criteria.epsilon = 1e-8;
-    criteria.maxCount = 300;
+    criteria.maxCount = 500;
 
     statistic_model->setMaxDepth(10); //set to three
 //    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
-    statistic_model->setMinSampleCount(2);
+    statistic_model->setMinSampleCount(5); //2
     statistic_model->setTruncatePrunedTree(false);
     statistic_model->setUse1SERule(false);
     statistic_model->setUseSurrogates(false);
