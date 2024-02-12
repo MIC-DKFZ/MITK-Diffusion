@@ -1162,8 +1162,10 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
         double cand[3];
         points->GetPoint(j, cand);
 
-        vnl_vector_fixed< float, 3 > candV;
-        candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
+        vnl_vector<float> candV(3); // Create a vnl_vector<float> with size 3
+        candV[0] = cand[0]; // Assign values from cand to candV
+        candV[1] = cand[1];
+        candV[2] = cand[2];
         streamline.set_column(j, candV);
         }
         out_fib.at(i)=streamline;
