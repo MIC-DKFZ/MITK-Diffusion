@@ -30,8 +30,3 @@ set(target_libraries
   org_mitk_gui_qt_viewnavigator
   org_mitk_gui_qt_renderwindowmanager
 )
-
-if(MITK_USE_Python3)
-  list(APPEND target_libraries org_mitk_gui_qt_diffusionimaging_python)
-  list(APPEND target_libraries org_mitk_gui_qt_python)
-endif()

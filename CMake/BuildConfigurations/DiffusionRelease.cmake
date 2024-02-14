@@ -1,16 +1,11 @@
 message(STATUS "Configuring MITK Diffusion Release Build")
 
 # Enable non-optional external dependencies
-# set(MITK_USE_Vigra ON CACHE BOOL "MITK Use Vigra Library" FORCE)
-# set(MITK_USE_HDF5 ON CACHE BOOL "MITK Use HDF5 Library" FORCE)
 set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMQI ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenCV ON CACHE BOOL "" FORCE)
-set(MITK_USE_Python3 ON CACHE BOOL "" FORCE)
-set(MITK_USE_BetData ON CACHE BOOL "" FORCE)
-set(BUILD_DiffusionPythonCmdApps ON CACHE BOOL "Build commandline tools for diffusion with python" FORCE)
 
 # Disable all apps but MITK Diffusion
 set(MITK_BUILD_ALL_APPS OFF CACHE BOOL "Build all MITK applications" FORCE)
@@ -41,4 +36,4 @@ set(MITK_SHOW_CONSOLE_WINDOW ON CACHE BOOL "Use this to enable or disable the co
 set(MITK_VTK_DEBUG_LEAKS OFF CACHE BOOL "" FORCE)
 set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 
-set(MITK_CUSTOM_REVISION_DESC "MITK-Diffusion" CACHE STRING "" FORCE)
+set(MITK_CUSTOM_REVISION_DESC "MITK-Diffusion-NoPython" CACHE STRING "" FORCE)

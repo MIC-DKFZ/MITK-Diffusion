@@ -1,1 +1,1 @@
-mitkFunctionAddExternalProject(NAME BetData OFF ADVANCED)
+# mitkFunctionAddExternalProject(NAME BetData OFF ADVANCED)

@@ -42,7 +42,6 @@ MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be inst
 * Registration
 * Head-motion correction
 * Denoising
-* Skull stripping and brain mask segmentation (Linux only)
 * Resampling, cropping, flipping and merging
 * Header modifications
 * Single volume extraction
@@ -56,7 +55,6 @@ MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be inst
 
 **ODF reconstruction and signal modelling**
 * Tensor and Q-ball reconstruction
-* Other reconstructions via Dipy wrapping (CSD, 3D SHORE, SFM) (Linux only)
 * ODF peak calculation
 * MRtrix or camino results can be imported
 
@@ -66,7 +64,6 @@ MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be inst
 * Image statistics
 
 **Segmentation**
-* Automatic brain mask segmentation (Linux only)
 * Manual image segmentation and operations on segmentations
 
 **Fiber tractography**
@@ -171,7 +168,7 @@ Automatically generated random fiber configuration for Fiberfox simulations.
 
 
 ## Building MITK Diffusion from source
-* Install [Qt](https://www.qt.io/) on your system (6.6.1).
+* Install [Qt](https://www.qt.io/) on your system (currently 6.6.1).
 * Clone MITK from [github](https://github.com/MIC-DKFZ/MITK-Diffusion.git) using [Git version control](https://git-scm.com/).
 * Clone MITK Diffusion from [github](https://github.com/MITK/MITK.git).
 * Configure the MITK Superbuild using [CMake](https://cmake.org/).

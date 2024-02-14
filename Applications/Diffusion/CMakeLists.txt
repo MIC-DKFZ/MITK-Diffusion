@@ -52,13 +52,6 @@ set(_plugins
   org.mitk.gui.qt.pixelvalue
 )
 
-if(MITK_USE_Python3)
-  list(APPEND _plugins org.mitk.gui.qt.diffusionimaging.python)
-  list(APPEND _plugins org.mitk.gui.qt.python)
-endif()
-
-
-
 # Plug-ins listed below will not be
 #  - added as a build-time dependency to the executable
 #  - listed in the provisioning file for the executable

@@ -1,5 +1,0 @@
-<RCC>
-    <qresource prefix="/QmitkDiffusionPython">
-        <file>dipy_reconstructions.py</file>
-    </qresource>
-</RCC>

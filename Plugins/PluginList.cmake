@@ -10,6 +10,5 @@ set(MITK_PLUGINS
   org.mitk.gui.qt.diffusionimaging.reconstruction:OFF
   org.mitk.gui.qt.diffusionimaging.registration:OFF
   org.mitk.gui.qt.diffusionimaging.tractography:OFF
-  org.mitk.gui.qt.diffusionimaging.python:OFF
   org.mitk.gui.qt.diffusionimagingapp:OFF
 )

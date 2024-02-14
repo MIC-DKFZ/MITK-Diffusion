@@ -6,8 +6,6 @@ set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMQI ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenCV ON CACHE BOOL "" FORCE)
-set(MITK_USE_Python3 ON CACHE BOOL "" FORCE)
-set(MITK_USE_BetData ON CACHE BOOL "" FORCE)
 
 set(MITK_BUILD_APP_Diffusion ON CACHE BOOL "Build MITK Diffusion" FORCE)
 
@@ -17,7 +15,6 @@ set(BUILD_DiffusionFiberfoxCmdApps ON CACHE BOOL "Build commandline tools for di
 set(BUILD_DiffusionMiscCmdApps ON CACHE BOOL "Build miscellaneous commandline tools for diffusion" FORCE)
 set(BUILD_DiffusionQuantificationCmdApps ON CACHE BOOL "Build commandline tools for diffusion quantification (IVIM, ADC, ...)" FORCE)
 set(BUILD_DiffusionTractographyCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber tractography" FORCE)
-set(BUILD_DiffusionPythonCmdApps ON CACHE BOOL "Build commandline tools for diffusion with python" FORCE)
 
 # Build neither all plugins nor examples
 set(BUILD_TESTING ON CACHE BOOL "Build the MITK tests" FORCE)
