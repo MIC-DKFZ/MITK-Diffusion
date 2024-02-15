@@ -592,15 +592,13 @@ void StreamlineFeatureExtractor::TrainModel()
     /* Create Trainingdata: Go through positive and negative Bundle and save distances as cv::Mat and create vector with labels */
     for (int i = 0; i < static_cast<int>(m_DistancesPlus.size()); i++)
     {
-        float data_arr[m_DistancesPlus.at(0).size()];
-
         labels_arr_vec.push_back(1);
 
+        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F);
         for (int j = 0; j < static_cast<int>(m_DistancesPlus.at(0).cols()); j++)
         {
-            data_arr[j] = m_DistancesPlus.at(i).get(0, j);
+            curdata.at<float>(0,j) = m_DistancesPlus.at(i).get(0, j);
         }
-        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
         data.push_back(curdata);
         size_plus++;
     }
@@ -608,15 +606,14 @@ void StreamlineFeatureExtractor::TrainModel()
     for (int i = static_cast<int>(m_DistancesPlus.size()); i < static_cast<int>(m_DistancesPlus.size() + m_DistancesMinus.size()); i++)
     {
         int it = i - size_plus;
-        float data_arr[m_DistancesMinus.at(0).size()];
 
         labels_arr_vec.push_back(0);
 
+        cv::Mat curdata(1, m_DistancesMinus.at(0).size(), CV_32F);
         for (int j = 0; j < static_cast<int>(m_DistancesMinus.at(0).cols()); j++)
         {
-            data_arr[j] = m_DistancesMinus.at(it).get(0, j);
+            curdata.at<float>(0, j) = m_DistancesMinus.at(it).get(0, j);
         }
-        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
         data.push_back(curdata);
     }
 
@@ -695,17 +692,13 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
 {
     std::vector<std::vector<unsigned int>> index_vec;
     /*Create Dataset as cv::Mat*/
-    cv::Mat dataTest;
+    cv::Mat dataTest(myindex.size(), m_DistancesTest.at(0).size(), CV_32F);
     for (unsigned int i = 0; i < myindex.size(); i++)
     {
-        float data_arr[m_DistancesTest.at(0).size()];
-
         for (unsigned int j = 0; j < m_DistancesTest.at(myindex.at(0)).cols(); j++)
         {
-            data_arr[j] = m_DistancesTest.at(myindex.at(i)).get(0, j);
+            dataTest.at< float >(i,j) = m_DistancesTest.at(myindex.at(i)).get(0, j);
         }
-        cv::Mat curdata(1, m_DistancesTest.at(myindex.at(0)).size(), CV_32F, data_arr);
-        dataTest.push_back(curdata);
     }
 
     std::vector<unsigned int> indexPrediction;
@@ -716,7 +709,7 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
     /*For every Sample/Streamline get Prediction and entropy (=based on counts of Random Forest)*/
     MITK_INFO << "Predicting on all cores";
     #pragma omp parallel for
-    for (unsigned int i = 0; i < myindex.size(); i++)
+    for (int i = 0; i < static_cast<int>(myindex.size()); i++)
     {
         int val = statistic_model->predict(dataTest.row(i));
         pred.at(i) = val;
