@@ -59,8 +59,6 @@ set(CPP_FILES
   Rendering/mitkCompositeMapper.cpp
 
   # Algorithms
-  Algorithms/mitkPartialVolumeAnalysisHistogramCalculator.cpp
-  Algorithms/mitkPartialVolumeAnalysisClusteringCalculator.cpp
   Algorithms/itkDwiGradientLengthCorrectionFilter.cpp
   Algorithms/Registration/mitkRegistrationWrapper.cpp
   Algorithms/Registration/mitkPyramidImageRegistrationMethod.cpp
@@ -85,8 +83,6 @@ set(H_FILES
   Algorithms/Reconstruction/itkDiffusionMultiShellQballReconstructionImageFilter.h
   Algorithms/Reconstruction/itkPointShell.h
   Algorithms/Reconstruction/itkOrientationDistributionFunction.h
-  Algorithms/Reconstruction/itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h
-  Algorithms/Reconstruction/itkDiffusionKurtosisReconstructionImageFilter.h
   Algorithms/Reconstruction/itkBallAndSticksImageFilter.h
   Algorithms/Reconstruction/itkMultiTensorImageFilter.h
 
@@ -126,13 +122,10 @@ set(H_FILES
   Algorithms/itkTensorImageToDiffusionImageFilter.h
   Algorithms/itkTensorToL2NormImageFilter.h
   Algorithms/itkGaussianInterpolateImageFunction.h
-  Algorithms/mitkPartialVolumeAnalysisHistogramCalculator.h
-  Algorithms/mitkPartialVolumeAnalysisClusteringCalculator.h
+  
   Algorithms/itkDiffusionTensorPrincipalDirectionImageFilter.h
   Algorithms/itkCartesianToPolarVectorImageFilter.h
   Algorithms/itkPolarToCartesianVectorImageFilter.h
-  Algorithms/itkDistanceMapFilter.h
-  Algorithms/itkResidualImageFilter.h
   Algorithms/itkExtractChannelFromRgbaImageFilter.h
   Algorithms/itkTensorReconstructionWithEigenvalueCorrectionFilter.h
   Algorithms/itkMergeDiffusionImagesFilter.h

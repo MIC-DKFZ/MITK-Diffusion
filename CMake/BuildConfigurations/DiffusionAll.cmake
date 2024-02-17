@@ -15,6 +15,7 @@ set(BUILD_DiffusionFiberfoxCmdApps ON CACHE BOOL "Build commandline tools for di
 set(BUILD_DiffusionMiscCmdApps ON CACHE BOOL "Build miscellaneous commandline tools for diffusion" FORCE)
 set(BUILD_DiffusionQuantificationCmdApps ON CACHE BOOL "Build commandline tools for diffusion quantification (IVIM, ADC, ...)" FORCE)
 set(BUILD_DiffusionTractographyCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber tractography" FORCE)
+set(BUILD_DiffusionIVIMCmdApps ON CACHE BOOL "" FORCE)
 
 # Build neither all plugins nor examples
 set(BUILD_TESTING ON CACHE BOOL "Build the MITK tests" FORCE)

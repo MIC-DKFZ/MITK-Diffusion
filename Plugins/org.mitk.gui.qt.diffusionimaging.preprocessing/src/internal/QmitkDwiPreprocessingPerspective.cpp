@@ -45,7 +45,6 @@ void  QmitkDwiPreprocessingPerspective::CreateInitialLayout(berry::IPageLayout::
     /////////////////////////////////////////////
 
     left->AddView("org.mitk.views.diffusionpreprocessing");
-    left->AddView("org.mitk.views.brainextraction");
     left->AddView("org.mitk.views.denoisingview");
     left->AddView("org.mitk.views.simpleregistrationview");
     left->AddView("org.mitk.views.headmotioncorrectionview");
