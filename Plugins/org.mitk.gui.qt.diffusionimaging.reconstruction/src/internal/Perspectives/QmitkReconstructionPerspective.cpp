@@ -47,6 +47,4 @@ void QmitkReconstructionPerspective::CreateInitialLayout(berry::IPageLayout::Poi
   left->AddView("org.mitk.views.tensorreconstruction");
   left->AddView("org.mitk.views.qballreconstruction");
   left->AddView("org.mitk.views.odfmaximaextraction");
-  left->AddView("org.mitk.views.dipyreconstruction");
-  left->AddView("org.mitk.views.odfdetails");
 }

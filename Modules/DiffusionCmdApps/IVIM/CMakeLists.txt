@@ -1,6 +1,6 @@
-option(BUILD_DiffusionQuantificationCmdApps "Build commandline tools for diffusion quantification (FA, ADC, ...)" OFF)
+option(BUILD_DiffusionIVIMCmdApps "Build commandline tools for diffusion IVIM and Kurtosis" OFF)
 
-if(BUILD_DiffusionQuantificationCmdApps OR MITK_BUILD_ALL_APPS)
+if(BUILD_DiffusionIVIMCmdApps OR MITK_BUILD_ALL_APPS)
 
   # needed include directories
   include_directories(
@@ -11,16 +11,14 @@ if(BUILD_DiffusionQuantificationCmdApps OR MITK_BUILD_ALL_APPS)
     # list of diffusion cmdapps
     # if an app requires additional dependencies
     # they are added after a "^^" and separated by "_"
-    set( diffusionQuantificationcmdapps
-    DiffusionIndices^^
-    QballReconstruction^^
-    TensorReconstruction^^
-    MultishellMethods^^
+    set( diffusionIVIMcmdapps
+    DiffusionKurtosisFit^^
+    DiffusionIvimFit^^
     )
 
-    foreach(diffusionQuantificationcmdapp ${diffusionQuantificationcmdapps})
+    foreach(app ${diffusionIVIMcmdapps})
       # extract cmd app name and dependencies
-      string(REPLACE "^^" "\\;" cmdapp_info ${diffusionQuantificationcmdapp})
+      string(REPLACE "^^" "\\;" cmdapp_info ${app})
       set(cmdapp_info_list ${cmdapp_info})
       list(GET cmdapp_info_list 0 appname)
       list(GET cmdapp_info_list 1 raw_dependencies)
@@ -29,7 +27,7 @@ if(BUILD_DiffusionQuantificationCmdApps OR MITK_BUILD_ALL_APPS)
 
       mitkFunctionCreateCommandLineApp(
         NAME ${appname}
-        DEPENDS MitkDiffusionCmdApps ${dependencies_list}
+        DEPENDS MitkDiffusionCmdApps MitkIVIM ${dependencies_list}
         PACKAGE_DEPENDS
       )
     endforeach()

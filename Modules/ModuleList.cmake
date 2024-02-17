@@ -3,6 +3,7 @@ set(MITK_MODULES
   FiberTracking
   MriSimulation
   DiffusionIO
-  DiffusionCmdApps
   FiberDissection
+  IVIM
+  DiffusionCmdApps
 )
