@@ -296,7 +296,9 @@ void QmitkInteractiveFiberDissectionView::ResampleTractogram()
     {
       myvec.push_back(k);
     }
-    std::random_shuffle(std::begin(myvec), std::end(myvec));
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(std::begin(myvec), std::end(myvec), g);
 
     vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
     vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
