@@ -104,7 +104,6 @@ protected slots:
   void DoLengthCorrection();
   void DoDwiNormalization();
   void DoProjectSignal();
-  void DoExtractBrainMask();
   void DoResampleImage();
   void DoCropImage();
   void DoUpdateInterpolationGui(int i);

@@ -26,7 +26,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkTimeProbe.h"
 #include "itkB0ImageExtractionImageFilter.h"
 #include "itkB0ImageExtractionToSeparateImageFilter.h"
-#include "itkBrainMaskExtractionImageFilter.h"
 #include "itkCastImageFilter.h"
 #include "itkVectorContainer.h"
 #include <itkElectrostaticRepulsionDiffusionGradientReductionFilter.h>
@@ -61,7 +60,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkOdfScaleByProperty.h"
 #include <mitkPointSet.h>
 #include <itkAdcImageFilter.h>
-#include <itkBrainMaskExtractionImageFilter.h>
 #include <mitkImageCast.h>
 #include <mitkRotationOperation.h>
 #include <QTableWidgetItem>
@@ -154,8 +152,6 @@ void QmitkPreprocessingView::CreateConnections()
     m_Controls->m_MergeDwiBox->SetPredicate(isMitkImage);
     m_Controls->m_AlignImageBox->SetPredicate(isMitkImage);
 
-    m_Controls->m_ExtractBrainMask->setVisible(false);
-    m_Controls->m_BrainMaskIterationsBox->setVisible(false);
     m_Controls->m_ResampleIntFrame->setVisible(false);
     connect( (QObject*)(m_Controls->m_ButtonAverageGradients), SIGNAL(clicked()), this, SLOT(AverageGradients()) );
     connect( (QObject*)(m_Controls->m_ButtonExtractB0), SIGNAL(clicked()), this, SLOT(ExtractB0()) );
@@ -562,10 +558,6 @@ void QmitkPreprocessingView::DoUpdateInterpolationGui(int i)
     m_Controls->m_ResampleDoubleFrame->setVisible(true);
   }
   }
-}
-
-void QmitkPreprocessingView::DoExtractBrainMask()
-{
 }
 
 void QmitkPreprocessingView::DoResampleImage()
@@ -1424,7 +1416,6 @@ void QmitkPreprocessingView::OnImageSelectionChanged()
   bool foundSingleImageVolume = foundDwiVolume || (foundImageVolume && !(multiComponentVolume || threeDplusTVolume));
   m_Controls->m_FlipAxis->setEnabled(foundSingleImageVolume);
   m_Controls->m_CropImageButton->setEnabled(foundSingleImageVolume);
-  m_Controls->m_ExtractBrainMask->setEnabled(foundSingleImageVolume);
   m_Controls->m_ResampleImageButton->setEnabled(foundSingleImageVolume);
 
   // reset sampling frame to 1 and update all ealted components

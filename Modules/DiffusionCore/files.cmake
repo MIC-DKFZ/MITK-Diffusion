@@ -71,7 +71,6 @@ set(H_FILES
   Algorithms/itkDiffusionOdfPrepareVisualizationImageFilter.h
   Algorithms/itkElectrostaticRepulsionDiffusionGradientReductionFilter.h
   Algorithms/itkTensorDerivedMeasurementsFilter.h
-  Algorithms/itkBrainMaskExtractionImageFilter.h
   Algorithms/itkB0ImageExtractionImageFilter.h
   Algorithms/itkB0ImageExtractionToSeparateImageFilter.h
   Algorithms/itkTensorImageToDiffusionImageFilter.h
