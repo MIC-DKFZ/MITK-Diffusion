@@ -1,5 +1,6 @@
 set(MITK_MODULES
   DiffusionCore
+  FiberBundle
   FiberTracking
   MriSimulation
   DiffusionIO

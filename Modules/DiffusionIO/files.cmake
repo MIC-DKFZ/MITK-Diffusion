@@ -5,22 +5,6 @@ set(CPP_FILES
 
   ObjectFactories/mitkDiffusionCoreObjectFactory.cpp
 
-  ReaderWriter/mitkFiberBundleDicomReader.cpp
-  ReaderWriter/mitkFiberBundleDicomWriter.cpp
-  ReaderWriter/mitkFiberBundleTckReader.cpp
-  ReaderWriter/mitkFiberBundleTrackVisReader.cpp
-  ReaderWriter/mitkFiberBundleTrackVisWriter.cpp
-  ReaderWriter/mitkFiberBundleVtkReader.cpp
-  ReaderWriter/mitkFiberBundleVtkWriter.cpp
-  ReaderWriter/mitkFiberBundleSerializer.cpp
-
-  ReaderWriter/mitkPlanarFigureCompositeWriter.cpp
-  ReaderWriter/mitkPlanarFigureCompositeReader.cpp
-  ReaderWriter/mitkPlanarFigureCompositeSerializer.cpp
-
-  ReaderWriter/mitkPeakImageReader.cpp
-  ReaderWriter/mitkPeakImageSerializer.cpp
-
   ReaderWriter/mitkNrrdTensorImageReader.cpp
   ReaderWriter/mitkNrrdTensorImageWriter.cpp
   ReaderWriter/mitkTensorImageSerializer.cpp

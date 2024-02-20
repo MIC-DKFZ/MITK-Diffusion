@@ -29,7 +29,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkOdfImage.h>
 #include <mitkTensorImage.h>
-#include <mitkPeakImage.h>
 #include <itkOrientationDistributionFunction.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
@@ -188,7 +187,6 @@ public:
   static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromTensorImage(mitk::Image::Pointer mitkImage);
   static mitk::OdfImage::Pointer GetOdfFromTensorImage(mitk::Image::Pointer mitkImage);
   static mitk::TensorImage::ItkTensorImageType::Pointer GetItkTensorFromTensorImage(mitk::Image::Pointer mitkImage);
-  static mitk::PeakImage::ItkPeakImageType::Pointer GetItkPeakFromPeakImage(mitk::Image::Pointer mitkImage);
 
   template<unsigned int NUM_COEFFS>
   static typename itk::Image< itk::Vector<float, NUM_COEFFS>, 3>::Pointer GetItkShFromShImage(mitk::Image::Pointer mitkImage)

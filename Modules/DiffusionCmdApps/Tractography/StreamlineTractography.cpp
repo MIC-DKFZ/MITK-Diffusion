@@ -404,9 +404,9 @@ int main(int argc, char* argv[])
     handler = new mitk::TrackingHandlerPeaks();
 
     MITK_INFO << "loading input peak image";
-    mitk::Image::Pointer mitkImage = mitk::IOUtil::Load<mitk::Image>(input_files.at(0));
+    mitk::PeakImage::Pointer mitkImage = mitk::IOUtil::Load<mitk::PeakImage>(input_files.at(0));
     reference_image = mitkImage;
-    mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = mitk::convert::GetItkPeakFromPeakImage(mitkImage);
+    mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = mitkImage->GetItkPeakImage();
     dynamic_cast<mitk::TrackingHandlerPeaks*>(handler)->SetPeakImage(itkImg);
   }
   else if (type == "Tensor" && params->m_Mode == mitk::StreamlineTractographyParameters::MODE::DETERMINISTIC)

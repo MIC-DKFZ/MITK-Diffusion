@@ -320,16 +320,6 @@ mitk::TensorImage::ItkTensorImageType::Pointer mitk::convert::GetItkTensorFromTe
   return caster->GetOutput();
 }
 
-mitk::PeakImage::ItkPeakImageType::Pointer mitk::convert::GetItkPeakFromPeakImage(mitk::Image::Pointer mitkImage)
-{
-  typedef mitk::ImageToItk< mitk::PeakImage::ItkPeakImageType > CasterType;
-  CasterType::Pointer caster = CasterType::New();
-  caster->SetInput(mitkImage);
-  caster->SetCopyMemFlag(true);
-  caster->Update();
-  return caster->GetOutput();
-}
-
 mitk::OdfImage::Pointer mitk::convert::GetOdfFromTensorImage(mitk::Image::Pointer mitkImage)
 {
   mitk::OdfImage::Pointer image = mitk::OdfImage::New();

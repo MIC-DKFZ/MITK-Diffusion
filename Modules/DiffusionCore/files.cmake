@@ -25,11 +25,6 @@ set(CPP_FILES
   IODataStructures/mitkOdfImage.cpp
   IODataStructures/mitkShImage.cpp
   IODataStructures/mitkTensorImage.cpp
-  IODataStructures/mitkPeakImage.cpp
-  IODataStructures/mitkFiberBundle.cpp
-  IODataStructures/mitkTrackvis.cpp
-  IODataStructures/mitkPlanarFigureComposite.cpp
-
 
   IODataStructures/mitkStatisticModel.cpp
 
@@ -52,10 +47,6 @@ set(CPP_FILES
   Rendering/vtkThickPlane.cxx
   Rendering/mitkOdfNormalizationMethodProperty.cpp
   Rendering/mitkOdfScaleByProperty.cpp
-  Rendering/mitkFiberBundleMapper2D.cpp
-  Rendering/mitkFiberBundleMapper3D.cpp
-  Rendering/mitkPeakImageMapper2D.cpp
-  Rendering/mitkPeakImageMapper3D.cpp
   Rendering/mitkCompositeMapper.cpp
 
   # Algorithms
@@ -75,6 +66,7 @@ set(H_FILES
 
   # Rendering
   Rendering/mitkOdfVtkMapper2D.h
+  Rendering/mitkCompositeMapper.cpp
 
   # Reconstruction
   Algorithms/Reconstruction/itkDiffusionQballReconstructionImageFilter.h
@@ -99,10 +91,6 @@ set(H_FILES
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.h
   Algorithms/Reconstruction/MultishellProcessing/itkBiExpFitFunctor.h
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.h
-
-  IODataStructures/mitkFiberBundle.h
-  IODataStructures/mitkTrackvis.h
-  IODataStructures/mitkPlanarFigureComposite.h
 
   IODataStructures/Properties/mitkBValueMapProperty.h
   IODataStructures/Properties/mitkGradientDirectionsProperty.h

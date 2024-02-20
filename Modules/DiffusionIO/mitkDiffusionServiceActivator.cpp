@@ -16,23 +16,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <usModuleActivator.h>
 #include <usModuleContext.h>
 
-#include <mitkFiberBundleVtkReader.h>
-#include <mitkFiberBundleTckReader.h>
-#include <mitkFiberBundleTrackVisReader.h>
-#include <mitkPlanarFigureCompositeReader.h>
-#include <mitkFiberBundleDicomReader.h>
 
-#include <mitkFiberBundleVtkWriter.h>
-#include <mitkFiberBundleTrackVisWriter.h>
-#include <mitkFiberBundleDicomWriter.h>
-#include <mitkPlanarFigureCompositeWriter.h>
 #include <mitkDiffusionImageNrrdReader.h>
 #include <mitkDiffusionImageNiftiReader.h>
 #include <mitkDiffusionImageDicomReader.h>
 #include <mitkNrrdTensorImageReader.h>
 #include <mitkNrrdOdfImageReader.h>
 #include <mitkShImageReader.h>
-#include <mitkPeakImageReader.h>
 
 #include <mitkDiffusionImageNrrdWriter.h>
 #include <mitkDiffusionImageNiftiWriter.h>
@@ -57,38 +47,9 @@ namespace mitk
   {
   public:
 
-    void Load(us::ModuleContext* context) override
+    void Load(us::ModuleContext* ) override
     {
       m_MimeTypes = mitk::DiffusionIOMimeTypes::Get();
-      for (std::vector<mitk::CustomMimeType*>::const_iterator mimeTypeIter = m_MimeTypes.begin(),
-        iterEnd = m_MimeTypes.end(); mimeTypeIter != iterEnd; ++mimeTypeIter)
-      {
-        us::ServiceProperties props;
-        mitk::CustomMimeType* mt = *mimeTypeIter;
-        if (mt->GetName()==mitk::DiffusionIOMimeTypes::FIBERBUNDLE_VTK_MIMETYPE_NAME())
-          props[ us::ServiceConstants::SERVICE_RANKING() ] = -1;
-        else if (mt->GetName()==mitk::DiffusionIOMimeTypes::FIBERBUNDLE_TRK_MIMETYPE_NAME())
-          props[ us::ServiceConstants::SERVICE_RANKING() ] = -2;
-        else if (mt->GetName()==mitk::DiffusionIOMimeTypes::FIBERBUNDLE_TCK_MIMETYPE_NAME())
-          props[ us::ServiceConstants::SERVICE_RANKING() ] = -3;
-        else if (mt->GetName()==mitk::DiffusionIOMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME())
-          props[ us::ServiceConstants::SERVICE_RANKING() ] = -4;
-        else
-          props[ us::ServiceConstants::SERVICE_RANKING() ] = 10;
-
-        context->RegisterService(*mimeTypeIter, props);
-      }
-
-      m_FiberBundleVtkReader = new FiberBundleVtkReader();
-      m_FiberBundleVtkWriter = new FiberBundleVtkWriter();
-      m_FiberBundleTrackVisReader = new FiberBundleTrackVisReader();
-      m_FiberBundleTrackVisWriter = new FiberBundleTrackVisWriter();
-      m_FiberBundleTckReader = new FiberBundleTckReader();
-      m_FiberBundleDicomReader = new FiberBundleDicomReader();
-      m_FiberBundleDicomWriter = new FiberBundleDicomWriter();
-
-      m_PlanarFigureCompositeReader = new PlanarFigureCompositeReader();
-      m_PlanarFigureCompositeWriter = new PlanarFigureCompositeWriter();
 
       m_DiffusionImageNrrdReader = new DiffusionImageNrrdReader();
       m_DiffusionImageNrrdWriter = new DiffusionImageNrrdWriter();
@@ -100,7 +61,6 @@ namespace mitk
 
       m_NrrdTensorImageReader = new NrrdTensorImageReader();
       m_NrrdOdfImageReader = new NrrdOdfImageReader();
-      m_PeakImageReader = new PeakImageReader();
       m_ShImageReader = new ShImageReader();
 
       m_NrrdTensorImageWriter = new NrrdTensorImageWriter();
@@ -117,23 +77,11 @@ namespace mitk
         delete m_MimeTypes.at(loop);
       }
 
-      delete m_FiberBundleVtkReader;
-      delete m_FiberBundleTckReader;
-      delete m_FiberBundleTrackVisReader;
-      delete m_PlanarFigureCompositeReader;
-      delete m_FiberBundleDicomReader;
-
-      delete m_FiberBundleDicomWriter;
-      delete m_FiberBundleVtkWriter;
-      delete m_FiberBundleTrackVisWriter;
-      delete m_PlanarFigureCompositeWriter;
-
       delete m_DiffusionImageNrrdReader;
       delete m_DiffusionImageNiftiReader;
       delete m_DiffusionImageDicomReader;
       delete m_NrrdTensorImageReader;
       delete m_NrrdOdfImageReader;
-      delete m_PeakImageReader;
       delete m_ShImageReader;
 
       delete m_DiffusionImageNrrdWriter;
@@ -145,23 +93,11 @@ namespace mitk
 
   private:
 
-    FiberBundleVtkReader * m_FiberBundleVtkReader;
-    FiberBundleTckReader * m_FiberBundleTckReader;
-    FiberBundleTrackVisReader * m_FiberBundleTrackVisReader;
-    FiberBundleDicomReader * m_FiberBundleDicomReader;
-    PlanarFigureCompositeReader* m_PlanarFigureCompositeReader;
-    
-    FiberBundleDicomWriter * m_FiberBundleDicomWriter;
-    FiberBundleVtkWriter * m_FiberBundleVtkWriter;
-    FiberBundleTrackVisWriter * m_FiberBundleTrackVisWriter;
-    PlanarFigureCompositeWriter* m_PlanarFigureCompositeWriter;
-
     DiffusionImageNrrdReader * m_DiffusionImageNrrdReader;
     DiffusionImageNiftiReader * m_DiffusionImageNiftiReader;
     DiffusionImageDicomReader * m_DiffusionImageDicomReader;
     NrrdTensorImageReader * m_NrrdTensorImageReader;
     NrrdOdfImageReader * m_NrrdOdfImageReader;
-    PeakImageReader * m_PeakImageReader;
     ShImageReader * m_ShImageReader;
 
     DiffusionImageNrrdWriter * m_DiffusionImageNrrdWriter;

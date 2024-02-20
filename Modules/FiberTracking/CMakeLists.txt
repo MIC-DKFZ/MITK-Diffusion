@@ -1,5 +1,5 @@
 
-set(_module_deps MitkDiffusionCore)
+set(_module_deps MitkDiffusionCore MitkFiberBundle)
 
 mitk_check_module_dependencies(
   MODULES ${_module_deps}
