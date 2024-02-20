@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef MITKDIFFUSIONDICOMFILEREADER_H
 #define MITKDIFFUSIONDICOMFILEREADER_H
 
-#include "MitkDiffusionCoreExports.h"
+#include <MitkDiffusionImageExports.h>
 
 #include "mitkDICOMITKSeriesGDCMReader.h"
 #include "mitkDiffusionHeaderDICOMFileReader.h"
@@ -26,7 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
 
-class MITKDIFFUSIONCORE_EXPORT DiffusionDICOMFileReader
+class MITKDIFFUSIONIMAGE_EXPORT DiffusionDICOMFileReader
     : public ClassicDICOMSeriesReader
 {
 public:

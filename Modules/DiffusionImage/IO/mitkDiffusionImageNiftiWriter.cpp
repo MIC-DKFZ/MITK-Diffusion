@@ -26,7 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkDiffusionImageMimeTypes.h"
 #include "mitkImageCast.h"
 #include <mitkLocaleSwitch.h>
-
+#include <mitkDiffusionImageHelperFunctions.h>
 #include <iostream>
 #include <fstream>
 

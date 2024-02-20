@@ -17,13 +17,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef MITKDIFFUSIONHEADERSIEMENSMOSAICDICOMFILEREADER_H
 #define MITKDIFFUSIONHEADERSIEMENSMOSAICDICOMFILEREADER_H
 
+#include <MitkDiffusionImageExports.h>
 #include "mitkDiffusionHeaderSiemensDICOMFileReader.h"
 #include "mitkDiffusionDICOMFileReaderHelper.h"
 
 namespace mitk
 {
 
-class MITKDIFFUSIONCORE_EXPORT DiffusionHeaderSiemensMosaicDICOMFileReader
+class MITKDIFFUSIONIMAGE_EXPORT DiffusionHeaderSiemensMosaicDICOMFileReader
     : public DiffusionHeaderSiemensDICOMFileReader
 {
 public:

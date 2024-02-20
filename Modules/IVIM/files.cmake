@@ -2,11 +2,17 @@ set(H_FILES
 
   itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h
   itkDiffusionKurtosisReconstructionImageFilter.h
+  itkRegularizedIVIMLocalVariationImageFilter.h
+  itkRegularizedIVIMReconstructionFilter.h
+  itkRegularizedIVIMReconstructionSingleIteration.h
 )
 
 set(CPP_FILES
   itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.cpp
   itkDiffusionKurtosisReconstructionImageFilter.cpp
+  itkRegularizedIVIMLocalVariationImageFilter.txx
+  itkRegularizedIVIMReconstructionFilter.txx
+  itkRegularizedIVIMReconstructionSingleIteration.txx
 )
 
 set(RESOURCE_FILES

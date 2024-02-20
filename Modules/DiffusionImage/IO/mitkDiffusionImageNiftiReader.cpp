@@ -49,7 +49,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageDataItem.h>
 #include <mitkLocaleSwitch.h>
 #include "mitkIOUtil.h"
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionImageHelperFunctions.h>
 #include <vtkNIFTIImageReader.h>
 #include <vtkNIFTIImageHeader.h>
 #include <vtkImageIterator.h>

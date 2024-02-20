@@ -1058,7 +1058,7 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
     double y = (*U)(1,i);
     double z = (*U)(2,i);
     double cart[3];
-    mitk::sh::Cart2Sph(x,y,z,cart);
+    mitk::gradients::Cart2Sph(x,y,z,cart);
     (*U)(0,i) = cart[0];
     (*U)(1,i) = cart[1];
     (*U)(2,i) = cart[2];
@@ -1079,7 +1079,7 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
     double y = m_GradientDirectionContainer->ElementAt(refShell[i]).normalize().get(1);
     double z = m_GradientDirectionContainer->ElementAt(refShell[i]).normalize().get(2);
     double cart[3];
-    mitk::sh::Cart2Sph(x,y,z,cart);
+    mitk::gradients::Cart2Sph(x,y,z,cart);
     (*Q)(0,i) = cart[0];
     (*Q)(1,i) = cart[1];
     (*Q)(2,i) = cart[2];

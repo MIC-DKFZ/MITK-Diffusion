@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef MITKDIFFUSIONHEADERFILEREADER_H
 #define MITKDIFFUSIONHEADERFILEREADER_H
 
-#include <MitkDiffusionCoreExports.h>
 #include <mitkCommon.h>
 
 #include <itkLightObject.h>
@@ -26,6 +25,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "gdcmScanner.h"
 #include "gdcmReader.h"
 #include <vnl/vnl_vector_fixed.h>
+
+#include <MitkDiffusionImageExports.h>
 
 
 namespace mitk
@@ -74,7 +75,7 @@ struct DiffusionImageMosaicDICOMHeaderInformation
  *
  * To provide a diffusion header reader for a new vendor, reimplement the \sa ReadDiffusionHeader method.
  */
-class MITKDIFFUSIONCORE_EXPORT DiffusionHeaderDICOMFileReader
+class MITKDIFFUSIONIMAGE_EXPORT DiffusionHeaderDICOMFileReader
     : public itk::LightObject
 {
 public:

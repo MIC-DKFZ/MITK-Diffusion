@@ -1,13 +1,13 @@
 #ifndef MITKDIFFUSIONHEADERGEDICOMFILEREADER_H
 #define MITKDIFFUSIONHEADERGEDICOMFILEREADER_H
 
-#include "MitkDiffusionCoreExports.h"
+#include <MitkDiffusionImageExports.h>
 #include "mitkDiffusionHeaderDICOMFileReader.h"
 
 namespace mitk
 {
 
-class MITKDIFFUSIONCORE_EXPORT DiffusionHeaderGEDICOMFileReader
+class MITKDIFFUSIONIMAGE_EXPORT DiffusionHeaderGEDICOMFileReader
     : public DiffusionHeaderDICOMFileReader
 {
 public:

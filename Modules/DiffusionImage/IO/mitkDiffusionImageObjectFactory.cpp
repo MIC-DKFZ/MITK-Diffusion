@@ -20,8 +20,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkBaseRenderer.h"
 #include "mitkDataNode.h"
 
-#include "mitkVolumeMapperVtkSmart3D.h"
-
 
 typedef short DiffusionPixelType;
 
@@ -48,6 +46,15 @@ mitk::DiffusionImageObjectFactory::~DiffusionImageObjectFactory()
 
 }
 
+mitk::Mapper::Pointer mitk::DiffusionImageObjectFactory::CreateMapper(mitk::DataNode* node, MapperSlotId )
+{
+    mitk::Mapper::Pointer newMapper=nullptr;
+
+    if (!node->GetData())
+        return newMapper;
+
+    return newMapper;
+}
 
 void mitk::DiffusionImageObjectFactory::SetDefaultProperties(mitk::DataNode* node)
 {

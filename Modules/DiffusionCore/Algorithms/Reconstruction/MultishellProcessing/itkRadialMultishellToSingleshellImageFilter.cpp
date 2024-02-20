@@ -99,10 +99,10 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
     //- get TragetSHBasis using allDirectionsContainer
     vnl_matrix<double> sphericalCoordinates;
     sphericalCoordinates = mitk::gradients::ComputeSphericalFromCartesian(m_TargetDirectionsIndicies, m_OriginalGradientDirections);
-    vnl_matrix<double> TargetSHBasis = mitk::gradients::ComputeSphericalHarmonicsBasis(sphericalCoordinates, SHMaxOrder);
+    vnl_matrix<double> TargetSHBasis = mitk::sh::ComputeSphericalHarmonicsBasis(sphericalCoordinates, SHMaxOrder);
     //- get ShellSHBasis using currentShellDirections
     sphericalCoordinates = mitk::gradients::ComputeSphericalFromCartesian(currentShell, m_OriginalGradientDirections);
-    vnl_matrix<double> ShellSHBasis = mitk::gradients::ComputeSphericalHarmonicsBasis(sphericalCoordinates, SHMaxOrder);
+    vnl_matrix<double> ShellSHBasis = mitk::sh::ComputeSphericalHarmonicsBasis(sphericalCoordinates, SHMaxOrder);
     //- calculate interpolationSHBasis [TargetSHBasis * ShellSHBasis^-1]
     vnl_matrix_inverse<double> invShellSHBasis(ShellSHBasis);
     vnl_matrix<double> shellInterpolationMatrix = TargetSHBasis * invShellSHBasis.pinverse();

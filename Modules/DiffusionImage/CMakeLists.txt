@@ -1,7 +1,7 @@
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
-  INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} Properties IO
+  INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} Properties IO IO/DicomImport
   DEPENDS MitkCore MitkSceneSerializationBase MitkDICOM
   PACKAGE_DEPENDS
-    # PUBLIC VTK|FiltersProgrammable+IOImage+CommonComputationalGeometry ITK|VNL
+    ITK|ITKIONRRD ITK|ITKIOGDCM+ITKIOBruker+ITKIONIFTI
 )

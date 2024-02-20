@@ -2,24 +2,7 @@ set(CPP_FILES
 
   mitkDiffusionFunctionCollection.cpp
 
-  # DicomImport
-  # DicomImport/mitkGroupDiffusionHeadersFilter.cpp
-  DicomImport/mitkDicomDiffusionImageHeaderReader.cpp
-  DicomImport/mitkGEDicomDiffusionImageHeaderReader.cpp
-  DicomImport/mitkPhilipsDicomDiffusionImageHeaderReader.cpp
-  DicomImport/mitkSiemensDicomDiffusionImageHeaderReader.cpp
-  DicomImport/mitkSiemensMosaicDicomDiffusionImageHeaderReader.cpp
-
-  DicomImport/mitkDiffusionDICOMFileReader.cpp
-  DicomImport/mitkDiffusionHeaderDICOMFileReader.cpp
-  DicomImport/mitkDiffusionHeaderSiemensDICOMFileReader.cpp
-  DicomImport/mitkDiffusionHeaderSiemensDICOMFileHelper.cpp
-  DicomImport/mitkDiffusionHeaderSiemensMosaicDICOMFileReader.cpp
-  DicomImport/mitkDiffusionHeaderGEDICOMFileReader.cpp
-  DicomImport/mitkDiffusionHeaderPhilipsDICOMFileReader.cpp
-
   # DataStructures
-  IODataStructures/DiffusionWeightedImages/mitkDiffusionImageHeaderInformation.cpp
   IODataStructures/DiffusionWeightedImages/mitkDiffusionImageCorrectionFilter.cpp
   IODataStructures/DiffusionWeightedImages/mitkDiffusionImageCreationFilter.cpp
   IODataStructures/mitkOdfImage.cpp
@@ -50,11 +33,12 @@ set(CPP_FILES
 )
 
 set(H_FILES
+
   mitkDiffusionFunctionCollection.h
 
   # Rendering
   Rendering/mitkOdfVtkMapper2D.h
-  Rendering/mitkCompositeMapper.cpp
+  Rendering/mitkCompositeMapper.h
 
   # Reconstruction
   Algorithms/Reconstruction/itkDiffusionQballReconstructionImageFilter.h
@@ -118,9 +102,6 @@ set(H_FILES
   Algorithms/itkNonLocalMeansDenoisingFilter.h
   Algorithms/itkVectorImageToImageFilter.h
   Algorithms/itkSplitVectorImageFilter.h
-  Algorithms/itkRegularizedIVIMLocalVariationImageFilter.h
-  Algorithms/itkRegularizedIVIMReconstructionFilter.h
-  Algorithms/itkRegularizedIVIMReconstructionSingleIteration.h
 )
 
 set( TOOL_FILES

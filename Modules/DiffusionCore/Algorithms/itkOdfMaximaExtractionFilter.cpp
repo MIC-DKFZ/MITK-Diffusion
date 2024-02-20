@@ -255,7 +255,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     for (unsigned int i=0; i<candidates.size(); ++i)
     {
       double spherical[3];
-      mitk::sh::Cart2Sph(candidates[i][0], candidates[i][1], candidates[i][2], spherical);
+      mitk::gradients::Cart2Sph(candidates[i][0], candidates[i][1], candidates[i][2], spherical);
       vnl_vector<double> x;
       x.set_size(2);
       x[0] = spherical[1];  // theta
@@ -282,7 +282,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       minimizer.minimize(x);
 
       float v = -minimizer.get_end_error()*scale;
-      candidates[i] = mitk::sh::Sph2Cart(x[0], x[1], v);
+      candidates[i] = mitk::gradients::Sph2Cart(x[0], x[1], v);
       if (v>max)
         max = v;
     }

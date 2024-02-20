@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImageRegionIterator.h>
 #include <itkArray.h>
 #include <vnl/vnl_vector.h>
+#include <mitkDiffusionImageHelperFunctions.h>
 #include <mitkDiffusionFunctionCollection.h>
 
 #include <cstdio>
@@ -495,7 +496,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
         double y = gdcit.Value().get(1);
         double z = gdcit.Value().get(2);
         double cart[3];
-        mitk::sh::Cart2Sph(x,y,z,cart);
+        mitk::gradients::Cart2Sph(x,y,z,cart);
         Q(0,i) = cart[0];
         Q(1,i) = cart[1];
         Q(2,i++) = cart[2];
@@ -513,7 +514,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
           double y = gdcit.Value().get(1);
           double z = gdcit.Value().get(2);
           double cart[3];
-          mitk::sh::Cart2Sph(x,y,z,cart);
+          mitk::gradients::Cart2Sph(x,y,z,cart);
           Q(0,i) = cart[0];
           Q(1,i) = cart[1];
           Q(2,i++) = cart[2];
