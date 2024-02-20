@@ -17,10 +17,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef MITKDIFFUSIONPROPERTYHELPER_H
 #define MITKDIFFUSIONPROPERTYHELPER_H
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionImageExports.h>
 
 #include <mitkImage.h>
-#include <mitkBValueMapProperty.h>
+#include "mitkBValueMapProperty.h"
 #include <mitkGradientDirectionsProperty.h>
 #include <mitkMeasurementFrameProperty.h>
 #include <mitkDataNode.h>
@@ -35,7 +35,7 @@ namespace mitk
   * missing.
   */
 
-  class MITKDIFFUSIONCORE_EXPORT DiffusionPropertyHelper
+  class MITKDIFFUSIONIMAGE_EXPORT DiffusionPropertyHelper
   {
   public:
 

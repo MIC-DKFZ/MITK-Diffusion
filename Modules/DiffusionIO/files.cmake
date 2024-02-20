@@ -16,11 +16,5 @@ set(CPP_FILES
   ReaderWriter/mitkShImageReader.cpp
   ReaderWriter/mitkShImageWriter.cpp
   ReaderWriter/mitkShImageSerializer.cpp
-
-  ReaderWriter/mitkDiffusionImageDicomReader.cpp
-  ReaderWriter/mitkDiffusionImageNrrdReader.cpp
-  ReaderWriter/mitkDiffusionImageNrrdWriter.cpp
-  ReaderWriter/mitkDiffusionImageNiftiReader.cpp
-  ReaderWriter/mitkDiffusionImageNiftiWriter.cpp
 )
 

@@ -37,7 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkNrrdImageIO.h"
 
 #include "mitkCustomMimeType.h"
-#include "mitkDiffusionIOMimeTypes.h"
+#include "mitkDiffusionImageMimeTypes.h"
 #include <mitkDiffusionDICOMFileReader.h>
 #include <mitkDICOMTagBasedSorter.h>
 #include <mitkSortByImagePositionPatient.h>
@@ -74,7 +74,7 @@ DiffusionImageDicomReader::
 
 DiffusionImageDicomReader::
 DiffusionImageDicomReader()
-  : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::DWI_DICOM_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DWI_DICOM_MIMETYPE_DESCRIPTION() )
+  : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_DICOM_MIMETYPE() ), mitk::DiffusionImageMimeTypes::DWI_DICOM_MIMETYPE_DESCRIPTION() )
 {
   Options defaultOptions;
   defaultOptions["Apply image rotation to gradients"] = true;

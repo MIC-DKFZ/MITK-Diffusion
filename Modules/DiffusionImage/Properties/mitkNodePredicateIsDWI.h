@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef MITKNODEPREDICATEISDWI_H_HEADER_INCLUDED_
 #define MITKNODEPREDICATEISDWI_H_HEADER_INCLUDED_
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionImageExports.h>
 
 #include "mitkNodePredicateBase.h"
 #include "mitkBaseProperty.h"
@@ -31,7 +31,7 @@ namespace mitk {
      * @ingroup DataStorage
      */
 
-    class MITKDIFFUSIONCORE_EXPORT NodePredicateIsDWI : public NodePredicateBase
+    class MITKDIFFUSIONIMAGE_EXPORT NodePredicateIsDWI : public NodePredicateBase
     {
     public:
       mitkClassMacro(NodePredicateIsDWI, NodePredicateBase);

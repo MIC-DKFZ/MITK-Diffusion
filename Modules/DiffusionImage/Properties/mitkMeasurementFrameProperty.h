@@ -20,13 +20,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkBaseProperty.h"
 #include <vnl/vnl_matrix_fixed.h>
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionImageExports.h>
 
 namespace mitk
 {
 
   /** This property will store the measurement frame */
-  class MITKDIFFUSIONCORE_EXPORT MeasurementFrameProperty : public mitk::BaseProperty
+  class MITKDIFFUSIONIMAGE_EXPORT MeasurementFrameProperty : public mitk::BaseProperty
   {
   public:
     typedef vnl_matrix_fixed< double, 3, 3 >                            MeasurementFrameType;

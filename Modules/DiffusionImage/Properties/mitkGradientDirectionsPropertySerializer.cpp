@@ -19,13 +19,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkBasePropertySerializer.h"
 #include "mitkGradientDirectionsProperty.h"
-#include "MitkDiffusionCoreExports.h"
+#include "MitkDiffusionImageExports.h"
 #include <tinyxml2.h>
 
 namespace mitk
 {
 
-class MITKDIFFUSIONCORE_EXPORT GradientDirectionsPropertySerializer : public BasePropertySerializer
+class MITKDIFFUSIONIMAGE_EXPORT GradientDirectionsPropertySerializer : public BasePropertySerializer
 {
   public:
 

@@ -23,7 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkNrrdImageIO.h"
 #include "itkImageFileWriter.h"
 #include "itksys/SystemTools.hxx"
-#include "mitkDiffusionIOMimeTypes.h"
+#include "mitkDiffusionImageMimeTypes.h"
 #include "mitkImageCast.h"
 #include <mitkLocaleSwitch.h>
 
@@ -32,7 +32,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 
 mitk::DiffusionImageNrrdWriter::DiffusionImageNrrdWriter()
-  : AbstractFileWriter(mitk::Image::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::DWI_NRRD_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DWI_NRRD_MIMETYPE_DESCRIPTION())
+  : AbstractFileWriter(mitk::Image::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NRRD_MIMETYPE() ), mitk::DiffusionImageMimeTypes::DWI_NRRD_MIMETYPE_DESCRIPTION())
 {
   RegisterService();
 }

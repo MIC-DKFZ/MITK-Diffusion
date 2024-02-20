@@ -1,4 +1,5 @@
 set(MITK_MODULES
+  DiffusionImage
   DiffusionCore
   FiberBundle
   FiberTracking

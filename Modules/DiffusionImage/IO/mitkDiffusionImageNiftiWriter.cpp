@@ -23,16 +23,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkNiftiImageIO.h"
 #include "itkImageFileWriter.h"
 #include "itksys/SystemTools.hxx"
-#include "mitkDiffusionIOMimeTypes.h"
+#include "mitkDiffusionImageMimeTypes.h"
 #include "mitkImageCast.h"
 #include <mitkLocaleSwitch.h>
 
 #include <iostream>
 #include <fstream>
-#include <mitkDiffusionFunctionCollection.h>
 
 mitk::DiffusionImageNiftiWriter::DiffusionImageNiftiWriter()
-  : AbstractFileWriter(mitk::Image::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION())
+  : AbstractFileWriter(mitk::Image::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION())
 {
   RegisterService();
 }

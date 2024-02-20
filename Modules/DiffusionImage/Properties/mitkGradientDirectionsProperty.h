@@ -22,13 +22,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVectorContainer.h>
 #include <itkVector.h>
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionImageExports.h>
 
 namespace mitk
 {
 
   /** This property will store the gradients directions and the original gradient directions */
-  class MITKDIFFUSIONCORE_EXPORT GradientDirectionsProperty : public mitk::BaseProperty
+  class MITKDIFFUSIONIMAGE_EXPORT GradientDirectionsProperty : public mitk::BaseProperty
   {
   public:
     typedef unsigned int                                             IndexType;

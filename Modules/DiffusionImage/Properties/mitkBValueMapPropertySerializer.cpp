@@ -19,13 +19,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkBasePropertySerializer.h"
 #include "mitkBValueMapProperty.h"
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionImageExports.h>
 #include <tinyxml2.h>
 
 namespace mitk
 {
 
-class MITKDIFFUSIONCORE_EXPORT BValueMapPropertySerializer : public BasePropertySerializer
+class MITKDIFFUSIONIMAGE_EXPORT BValueMapPropertySerializer : public BasePropertySerializer
 {
 
 protected:

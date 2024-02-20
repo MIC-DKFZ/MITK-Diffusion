@@ -21,7 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <map>
 #include <vector>
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionImageExports.h>
 #include <itkVectorContainer.h>
 #include <vnl/vnl_vector_fixed.h>
 namespace mitk
@@ -29,7 +29,7 @@ namespace mitk
 
   /** This property will store the b value map */
 
-  class MITKDIFFUSIONCORE_EXPORT BValueMapProperty : public mitk::BaseProperty
+  class MITKDIFFUSIONIMAGE_EXPORT BValueMapProperty : public mitk::BaseProperty
   {
   public:
     /**

@@ -28,18 +28,6 @@ set(CPP_FILES
 
   IODataStructures/mitkStatisticModel.cpp
 
-  # Properties
-  IODataStructures/Properties/mitkBValueMapProperty.cpp
-  IODataStructures/Properties/mitkGradientDirectionsProperty.cpp
-  IODataStructures/Properties/mitkMeasurementFrameProperty.cpp
-  IODataStructures/Properties/mitkDiffusionPropertyHelper.cpp
-  IODataStructures/Properties/mitkNodePredicateIsDWI.cpp
-
-  # Serializer
-  IODataStructures/Properties/mitkBValueMapPropertySerializer.cpp
-  IODataStructures/Properties/mitkGradientDirectionsPropertySerializer.cpp
-  IODataStructures/Properties/mitkMeasurementFramePropertySerializer.cpp
-
   # Mapper etc.
   Rendering/vtkMaskedProgrammableGlyphFilter.cpp
   Rendering/mitkVectorImageVtkGlyphMapper3D.cpp
@@ -91,11 +79,6 @@ set(H_FILES
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.h
   Algorithms/Reconstruction/MultishellProcessing/itkBiExpFitFunctor.h
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.h
-
-  IODataStructures/Properties/mitkBValueMapProperty.h
-  IODataStructures/Properties/mitkGradientDirectionsProperty.h
-  IODataStructures/Properties/mitkMeasurementFrameProperty.h
-  IODataStructures/Properties/mitkDiffusionPropertyHelper.h
 
   IODataStructures/DiffusionWeightedImages/mitkDiffusionImageTransformedCreationFilter.h
 

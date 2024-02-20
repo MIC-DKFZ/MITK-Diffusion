@@ -42,7 +42,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <boost/lexical_cast.hpp>
 
 #include "mitkCustomMimeType.h"
-#include "mitkDiffusionIOMimeTypes.h"
+#include "mitkDiffusionImageMimeTypes.h"
 
 #include <mitkITKImageImport.h>
 #include <mitkImageWriteAccessor.h>
@@ -76,7 +76,7 @@ DiffusionImageNiftiReader::
 
 DiffusionImageNiftiReader::
 DiffusionImageNiftiReader()
-  : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION() )
+  : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION() )
 
 {
   Options defaultOptions;
