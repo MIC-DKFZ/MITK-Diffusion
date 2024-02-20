@@ -6,7 +6,7 @@ endif()
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
   INCLUDE_DIRS  Algorithms Algorithms/Reconstruction Algorithms/Registration Algorithms/Reconstruction/MultishellProcessing Algorithms/Reconstruction/FittingFunctions DicomImport IODataStructures/DiffusionWeightedImages IODataStructures/Properties IODataStructures Rendering ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS MitkMapperExt MitkPlanarFigure MitkImageExtraction MitkDICOM MitkMatchPointRegistration
+  DEPENDS MitkMapperExt MitkImageExtraction MitkMatchPointRegistration
   PACKAGE_DEPENDS
     PUBLIC VTK|FiltersProgrammable+IOImage+CommonComputationalGeometry ITK|VNL
 )
