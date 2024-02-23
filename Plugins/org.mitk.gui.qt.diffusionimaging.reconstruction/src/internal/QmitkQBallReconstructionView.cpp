@@ -49,7 +49,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkOdfNormalizationMethodProperty.h"
 #include "mitkOdfScaleByProperty.h"
 #include <mitkImageCast.h>
-#include "mitkDiffusionImagingConfigure.h"
 #include <mitkNodePredicateIsDWI.h>
 
 #include "berryIStructuredSelection.h"

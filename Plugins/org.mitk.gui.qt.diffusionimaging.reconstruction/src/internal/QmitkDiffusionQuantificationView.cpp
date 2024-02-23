@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "QmitkDiffusionQuantificationView.h"
-#include "mitkDiffusionImagingConfigure.h"
 #include "itkTimeProbe.h"
 #include "itkImage.h"
 #include "mitkNodePredicateDataType.h"

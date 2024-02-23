@@ -34,7 +34,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 =========================================================================*/
 
 #include <iostream>
-#include <mitkDiffusionVersion.h>
 #include "mitkDiffusionCommandLineParser.h"
 
 mitkDiffusionCommandLineParser::mitkDiffusionCommandLineParser() : mitkCommandLineParser::mitkCommandLineParser()
@@ -44,17 +43,6 @@ mitkDiffusionCommandLineParser::mitkDiffusionCommandLineParser() : mitkCommandLi
 
 std::map<std::string, us::Any> mitkDiffusionCommandLineParser::parseArguments(const StringContainerType &arguments, bool *ok)
 {
-  for (unsigned int i = 1; i < arguments.size(); ++i)
-  {
-    std::string argument = arguments.at(i);
-
-    if (!argument.compare("--version"))
-    {
-      std::cout << "MITK Diffusion git commit hash: " << MITKDIFFUSION_REVISION << std::endl;
-      std::cout << "MITK Diffusion branch name: " << MITKDIFFUSION_REVISION_NAME << std::endl;
-    }
-  }
-
   return mitkCommandLineParser::parseArguments(arguments, ok);
 }
 

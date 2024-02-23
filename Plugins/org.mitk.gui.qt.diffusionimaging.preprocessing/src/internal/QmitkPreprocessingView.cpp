@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 //#define MBILOG_ENABLE_DEBUG
 
 #include "QmitkPreprocessingView.h"
-#include "mitkDiffusionImagingConfigure.h"
 
 // qt includes
 #include <QMessageBox>
