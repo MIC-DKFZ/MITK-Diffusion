@@ -25,7 +25,7 @@ set(BUILD_DiffusionIVIMCmdApps OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.controls" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.tractography" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.segmentation" ON CACHE BOOL "" FORCE)
-set("MITK_BUILD_org.mitk.views.viewnavigator" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.viewnavigator" ON CACHE BOOL "" FORCE)
 
 # Build neither all plugins nor examples
 set(MITK_BUILD_ALL_PLUGINS OFF CACHE BOOL "Build all MITK plugins" FORCE)
@@ -42,4 +42,10 @@ set(MITK_SHOW_CONSOLE_WINDOW ON CACHE BOOL "Use this to enable or disable the co
 set(MITK_VTK_DEBUG_LEAKS OFF CACHE BOOL "" FORCE)
 
 set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
-set(MITK_CUSTOM_REVISION_DESC "Fiber Tractography" CACHE STRING "" FORCE)
+set(MITK_CUSTOM_PRODUCT_NAME "MITK Fiber Tractography" CACHE STRING "" FORCE)
+
+set(MITK_APPS_SHOWVIEWTOOLBAR OFF CACHE BOOL "" FORCE)
+set(MITK_APPS_SHOWPERSPECTIVETOOLBAR ON CACHE BOOL "" FORCE)
+
+set(MITK_APPS_VIEWEXCLUDELIST "" CACHE STRING "" FORCE)
+set(MITK_APPS_PERSPECTIVEEXCLUDELIST "" CACHE STRING "" FORCE)
