@@ -24,7 +24,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundleVtkWriter.h>
 #include <mitkFiberBundleTrackVisWriter.h>
 #include <mitkFiberBundleDicomWriter.h>
-#include <mitkPeakImageReader.h>
 
 #include <mitkPlanarFigureCompositeReader.h>
 #include <mitkPlanarFigureCompositeWriter.h>
@@ -79,8 +78,6 @@ namespace mitk
       m_PlanarFigureCompositeReader = new PlanarFigureCompositeReader();
       m_PlanarFigureCompositeWriter = new PlanarFigureCompositeWriter();
 
-      m_PeakImageReader = new PeakImageReader();
-
       mitk::DiffusionPropertyHelper::SetupProperties();
     }
 
@@ -99,7 +96,6 @@ namespace mitk
       delete m_FiberBundleDicomWriter;
       delete m_FiberBundleVtkWriter;
       delete m_FiberBundleTrackVisWriter;
-      delete m_PeakImageReader;
 
       delete m_PlanarFigureCompositeReader;
       delete m_PlanarFigureCompositeWriter;
@@ -115,8 +111,6 @@ namespace mitk
     FiberBundleDicomWriter * m_FiberBundleDicomWriter;
     FiberBundleVtkWriter * m_FiberBundleVtkWriter;
     FiberBundleTrackVisWriter * m_FiberBundleTrackVisWriter;
-
-    PeakImageReader * m_PeakImageReader;
 
     PlanarFigureCompositeReader* m_PlanarFigureCompositeReader;
     PlanarFigureCompositeWriter* m_PlanarFigureCompositeWriter;

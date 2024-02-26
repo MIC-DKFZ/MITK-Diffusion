@@ -34,8 +34,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #endif
 
 #include "itkMergeDiffusionImagesFilter.h"
-#include "itkTensorToL2NormImageFilter.h"
-#include "itkRescaleIntensityImageFilter.h"
 #include <itkImageRegionIterator.h>
 #include <itkImageRegionConstIterator.h>
 #include <boost/timer/progress_display.hpp>

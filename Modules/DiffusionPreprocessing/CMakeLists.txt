@@ -1,0 +1,9 @@
+MITK_CREATE_MODULE(
+  SUBPROJECTS MITK-Diffusion
+  INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS MitkDiffusionImage
+)
+
+if(TARGET ${MODULE_TARGET} AND MITK_USE_OpenMP)
+  target_link_libraries(${MODULE_TARGET} PUBLIC OpenMP::OpenMP_CXX)
+endif()

@@ -6,7 +6,7 @@ mitk_create_plugin(
   SUBPROJECTS MITK-Diffusion
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_PREPROCESSING_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkDiffusionCore
+  MODULE_DEPENDS MitkDiffusionPreprocessing MitkDiffusionCore
   PACKAGE_DEPENDS
     ITK|ITKDenoising
 )

@@ -68,8 +68,6 @@ protected slots:
   void TensorQuantify(int method);
   void TensorQuantification(int method) ;
 
-  void DoBallStickCalculation();
-  void DoMultiTensorCalculation();
   void UpdateGui();
 
 protected:

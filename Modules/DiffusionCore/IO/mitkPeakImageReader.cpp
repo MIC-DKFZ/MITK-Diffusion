@@ -16,7 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkPeakImageReader.h"
 #include <mitkCustomMimeType.h>
-#include "mitkFiberBundleMimeTypes.h"
+#include "mitkDiffusionIOMimeTypes.h"
 #include <mitkPeakImage.h>
 #include <mitkIOUtil.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
@@ -37,7 +37,7 @@ namespace mitk
   }
 
   PeakImageReader::PeakImageReader()
-    : mitk::AbstractFileReader( CustomMimeType( mitk::FiberBundleMimeTypes::PEAK_MIMETYPE() ), mitk::FiberBundleMimeTypes::PEAK_MIMETYPE_DESCRIPTION() )
+    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE() ), mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_DESCRIPTION() )
   {
     m_ServiceReg = this->RegisterService();
   }

@@ -42,8 +42,6 @@ std::vector<CustomMimeType*> FiberBundleMimeTypes::Get()
   mimeTypes.push_back(FIBERBUNDLE_TCK_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_DICOM_MIMETYPE().Clone());
 
-  mimeTypes.push_back(PEAK_MIMETYPE().Clone());
-
   return mimeTypes;
 }
 
@@ -182,65 +180,6 @@ FiberBundleMimeTypes::FiberBundleDicomMimeType FiberBundleMimeTypes::FIBERBUNDLE
 }
 
 
-FiberBundleMimeTypes::PeakImageMimeType::PeakImageMimeType() : CustomMimeType(PEAK_MIMETYPE_NAME())
-{
-  std::string category = "Peak Image";
-  this->SetCategory(category);
-  this->SetComment("Peak Image");
-
-  this->AddExtension("nrrd");
-  this->AddExtension("nii");
-  this->AddExtension("nii.gz");
-  this->AddExtension("peak");
-}
-
-bool FiberBundleMimeTypes::PeakImageMimeType::AppliesTo(const std::string &path) const
-{
-  std::string ext = itksys::SystemTools::GetFilenameExtension(path);
-  if (ext==".peak")
-    return true;
-
-  try
-  {
-    itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-    if ( io->CanReadFile( path.c_str() ) )
-    {
-      io->SetFileName( path.c_str() );
-      io->ReadImageInformation();
-      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
-        return true;
-    }
-  }
-  catch(...)
-  {}
-
-  try
-  {
-    itk::NiftiImageIO::Pointer io = itk::NiftiImageIO::New();
-    if ( io->CanReadFile( path.c_str() ) )
-    {
-      io->SetFileName( path.c_str() );
-      io->ReadImageInformation();
-      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
-        return true;
-    }
-  }
-  catch(...)
-  {}
-
-  return false;
-}
-
-FiberBundleMimeTypes::PeakImageMimeType* FiberBundleMimeTypes::PeakImageMimeType::Clone() const
-{
-  return new PeakImageMimeType(*this);
-}
-
-
-FiberBundleMimeTypes::PeakImageMimeType FiberBundleMimeTypes::PEAK_MIMETYPE()
-{
-  return PeakImageMimeType();
-}
 
 // Names
 std::string FiberBundleMimeTypes::FIBERBUNDLE_VTK_MIMETYPE_NAME()
@@ -267,22 +206,10 @@ std::string FiberBundleMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME()
   return name;
 }
 
-std::string FiberBundleMimeTypes::PEAK_MIMETYPE_NAME()
-{
-  static std::string name ="ODF_PEAKS";
-  return name;
-}
-
 // Descriptions
 std::string FiberBundleMimeTypes::FIBERBUNDLE_MIMETYPE_DESCRIPTION()
 {
   static std::string description = "Fiberbundles";
-  return description;
-}
-
-std::string FiberBundleMimeTypes::PEAK_MIMETYPE_DESCRIPTION()
-{
-  static std::string description = "Peak Image";
   return description;
 }
 

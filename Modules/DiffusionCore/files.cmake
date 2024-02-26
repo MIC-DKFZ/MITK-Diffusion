@@ -3,9 +3,26 @@ set(CPP_FILES
   mitkDiffusionFunctionCollection.cpp
 
   # DataStructures
-  IODataStructures/mitkOdfImage.cpp
-  IODataStructures/mitkShImage.cpp
-  IODataStructures/mitkTensorImage.cpp
+  IO/mitkOdfImage.cpp
+  IO/mitkShImage.cpp
+  IO/mitkTensorImage.cpp
+  IO/mitkPeakImage.cpp
+
+  IO/mitkDiffusionServiceActivator.cpp
+  IO/mitkDiffusionIOMimeTypes.cpp
+  IO/mitkDiffusionCoreObjectFactory.cpp
+
+  IO/mitkNrrdTensorImageReader.cpp
+  IO/mitkNrrdTensorImageWriter.cpp
+  IO/mitkTensorImageSerializer.cpp
+  IO/mitkNrrdOdfImageReader.cpp
+  IO/mitkNrrdOdfImageWriter.cpp
+  IO/mitkOdfImageSerializer.cpp
+  IO/mitkShImageReader.cpp
+  IO/mitkShImageWriter.cpp
+  IO/mitkShImageSerializer.cpp
+  IO/mitkPeakImageReader.h
+  IO/mitkPeakImageSerializer.h
 
   # Mapper etc.
   Rendering/vtkMaskedProgrammableGlyphFilter.cpp
@@ -15,9 +32,10 @@ set(CPP_FILES
   Rendering/mitkOdfNormalizationMethodProperty.cpp
   Rendering/mitkOdfScaleByProperty.cpp
   Rendering/mitkCompositeMapper.cpp
+  Rendering/mitkPeakImageMapper2D.cpp
+  Rendering/mitkPeakImageMapper3D.cpp
 
   # Algorithms
-  Algorithms/itkDwiGradientLengthCorrectionFilter.cpp
   
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.cpp
@@ -29,9 +47,32 @@ set(H_FILES
 
   mitkDiffusionFunctionCollection.h
 
+  # DataStructures
+  IO/mitkOdfImage.h
+  IO/mitkShImage.h
+  IO/mitkTensorImage.h
+  IO/mitkPeakImage.h
+
+  IO/mitkDiffusionIOMimeTypes.h
+  IO/mitkDiffusionCoreObjectFactory.h
+
+  IO/mitkNrrdTensorImageReader.h
+  IO/mitkNrrdTensorImageWriter.h
+  IO/mitkTensorImageSerializer.h
+  IO/mitkNrrdOdfImageReader.h
+  IO/mitkNrrdOdfImageWriter.h
+  IO/mitkOdfImageSerializer.h
+  IO/mitkShImageReader.h
+  IO/mitkShImageWriter.h
+  IO/mitkShImageSerializer.h
+  IO/mitkPeakImageReader.cpp
+  IO/mitkPeakImageSerializer.cpp
+
   # Rendering
   Rendering/mitkOdfVtkMapper2D.h
   Rendering/mitkCompositeMapper.h
+  Rendering/mitkPeakImageMapper2D.h
+  Rendering/mitkPeakImageMapper3D.h
 
   # Reconstruction
   Algorithms/Reconstruction/itkDiffusionQballReconstructionImageFilter.h
@@ -40,14 +81,6 @@ set(H_FILES
   Algorithms/Reconstruction/itkDiffusionMultiShellQballReconstructionImageFilter.h
   Algorithms/Reconstruction/itkPointShell.h
   Algorithms/Reconstruction/itkOrientationDistributionFunction.h
-  Algorithms/Reconstruction/itkBallAndSticksImageFilter.h
-  Algorithms/Reconstruction/itkMultiTensorImageFilter.h
-
-  # Fitting functions
-  Algorithms/Reconstruction/FittingFunctions/mitkAbstractFitter.h
-  Algorithms/Reconstruction/FittingFunctions/mitkMultiTensorFitter.h
-  Algorithms/Reconstruction/FittingFunctions/mitkBallStickFitter.h
-
 
   # MultishellProcessing
   Algorithms/Reconstruction/MultishellProcessing/itkRadialMultishellToSingleshellImageFilter.h
@@ -59,32 +92,19 @@ set(H_FILES
 
   # Algorithms
   Algorithms/itkDiffusionOdfGeneralizedFaImageFilter.h
-  Algorithms/itkDiffusionOdfPrepareVisualizationImageFilter.h
-  Algorithms/itkElectrostaticRepulsionDiffusionGradientReductionFilter.h
   Algorithms/itkTensorDerivedMeasurementsFilter.h
   Algorithms/itkTensorImageToDiffusionImageFilter.h
   Algorithms/itkTensorToL2NormImageFilter.h
   Algorithms/itkGaussianInterpolateImageFunction.h
   
   Algorithms/itkDiffusionTensorPrincipalDirectionImageFilter.h
-  Algorithms/itkExtractChannelFromRgbaImageFilter.h
   Algorithms/itkTensorReconstructionWithEigenvalueCorrectionFilter.h
-  Algorithms/itkMergeDiffusionImagesFilter.h
   Algorithms/itkShCoefficientImageImporter.h
   Algorithms/itkShCoefficientImageExporter.h
   Algorithms/itkOdfMaximaExtractionFilter.h
-  Algorithms/itkResampleDwiImageFilter.h
-  Algorithms/itkDwiGradientLengthCorrectionFilter.h
   Algorithms/itkAdcImageFilter.h
-  Algorithms/itkDwiNormilzationFilter.h
-  Algorithms/itkRemoveDwiChannelFilter.h
   Algorithms/itkFlipPeaksFilter.h
   Algorithms/itkShToOdfImageFilter.h
-  Algorithms/itkFourDToVectorImageFilter.h
-  Algorithms/itkVectorImageToFourDImageFilter.h
-  Algorithms/itkNonLocalMeansDenoisingFilter.h
-  Algorithms/itkVectorImageToImageFilter.h
-  Algorithms/itkSplitVectorImageFilter.h
 )
 
 set( TOOL_FILES

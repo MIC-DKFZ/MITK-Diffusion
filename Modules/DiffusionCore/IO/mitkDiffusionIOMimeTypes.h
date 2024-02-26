@@ -36,20 +36,32 @@ public:
     SHImageMimeType* Clone() const override;
   };
 
+  class  PeakImageMimeType : public CustomMimeType
+  {
+  public:
+    PeakImageMimeType();
+    bool AppliesTo(const std::string &path) const override;
+    PeakImageMimeType* Clone() const override;
+  };
+
 
   // ------------------------- Image formats (ITK based) --------------------------
 
   static CustomMimeType DTI_MIMETYPE(); // dti
   static CustomMimeType ODF_MIMETYPE(); // odf, qbi
   static SHImageMimeType SH_MIMETYPE(); // spherical harmonics coefficients
+  static PeakImageMimeType PEAK_MIMETYPE();
 
   static std::string DTI_MIMETYPE_NAME();
   static std::string ODF_MIMETYPE_NAME();
   static std::string SH_MIMETYPE_NAME();
+  static std::string PEAK_MIMETYPE_NAME();
 
   static std::string DTI_MIMETYPE_DESCRIPTION();
   static std::string ODF_MIMETYPE_DESCRIPTION();
   static std::string SH_MIMETYPE_DESCRIPTION();
+  static std::string PEAK_MIMETYPE_DESCRIPTION();
+
 
 private:
 

@@ -22,8 +22,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkFiberBundleMapper3D.h>
 #include <mitkFiberBundleMapper2D.h>
-#include <mitkPeakImageMapper2D.h>
-#include <mitkPeakImageMapper3D.h>
 
 
 typedef short DiffusionPixelType;
@@ -65,22 +63,12 @@ mitk::Mapper::Pointer mitk::FiberBundleObjectFactory::CreateMapper(mitk::DataNod
       newMapper = mitk::FiberBundleMapper2D::New();
       newMapper->SetDataNode(node);
     }
-    else if(std::string("PeakImage").compare(node->GetData()->GetNameOfClass())==0)
-    {
-      newMapper = mitk::PeakImageMapper2D::New();
-      newMapper->SetDataNode(node);
-    }
   }
   else if ( id == mitk::BaseRenderer::Standard3D )
   {
     if(std::string("FiberBundle").compare(node->GetData()->GetNameOfClass())==0)
     {
       newMapper = mitk::FiberBundleMapper3D::New();
-      newMapper->SetDataNode(node);
-    }
-    else if(std::string("PeakImage").compare(node->GetData()->GetNameOfClass())==0)
-    {
-      newMapper = mitk::PeakImageMapper3D::New();
       newMapper->SetDataNode(node);
     }
   }
@@ -97,11 +85,6 @@ void mitk::FiberBundleObjectFactory::SetDefaultProperties(mitk::DataNode* node)
   {
     mitk::FiberBundleMapper3D::SetDefaultProperties(node);
     mitk::FiberBundleMapper2D::SetDefaultProperties(node);
-  }
-  else if (std::string("PeakImage").compare(node->GetData()->GetNameOfClass())==0)
-  {
-    mitk::PeakImageMapper3D::SetDefaultProperties(node);
-    mitk::PeakImageMapper2D::SetDefaultProperties(node);
   }
 }
 

@@ -50,16 +50,6 @@ QGroupBox {
       <property name="bottomMargin">
        <number>6</number>
       </property>
-      <item row="0" column="0">
-       <widget class="QCommandLinkButton" name="m_AdcDwiButton">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="text">
-         <string>ADC</string>
-        </property>
-       </widget>
-      </item>
       <item row="1" column="0">
        <widget class="QCommandLinkButton" name="m_MdDwiButton">
         <property name="enabled">
@@ -70,23 +60,13 @@ QGroupBox {
         </property>
        </widget>
       </item>
-      <item row="2" column="0">
-       <widget class="QCommandLinkButton" name="m_BallStickButton">
+      <item row="0" column="0">
+       <widget class="QCommandLinkButton" name="m_AdcDwiButton">
         <property name="enabled">
          <bool>false</bool>
         </property>
         <property name="text">
-         <string>Ball-Stick</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="0">
-       <widget class="QCommandLinkButton" name="m_MultiTensorButton">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="text">
-         <string>Multi-Tensor Fit</string>
+         <string>ADC</string>
         </property>
        </widget>
       </item>

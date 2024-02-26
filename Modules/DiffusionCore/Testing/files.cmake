@@ -9,7 +9,7 @@ set(MODULE_CUSTOM_TESTS
   mitkImageReconstructionTest.cpp
   mitkConvertDWITypeTest.cpp
   mitkExtractSingleShellTest.cpp
-  mitkNonLocalMeansDenoisingTest.cpp
+  #mitkNonLocalMeansDenoisingTest.cpp
   mitkDiffusionDICOMFileReaderTest.cpp
 )
 

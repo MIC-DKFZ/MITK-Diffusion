@@ -24,6 +24,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNrrdOdfImageWriter.h>
 #include <mitkShImageWriter.h>
 
+#include <mitkPeakImageReader.h>
+
 #include <mitkCoreServices.h>
 #include <mitkIPropertyDescriptions.h>
 #include <mitkIPropertyPersistence.h>
@@ -50,6 +52,8 @@ namespace mitk
       m_NrrdTensorImageWriter = new NrrdTensorImageWriter();
       m_NrrdOdfImageWriter = new NrrdOdfImageWriter();
       m_ShImageWriter = new ShImageWriter();
+
+      m_PeakImageReader = new PeakImageReader();
     }
 
     void Unload(us::ModuleContext*) override
@@ -62,6 +66,7 @@ namespace mitk
       delete m_NrrdTensorImageReader;
       delete m_NrrdOdfImageReader;
       delete m_ShImageReader;
+      delete m_PeakImageReader;
 
       delete m_NrrdTensorImageWriter;
       delete m_NrrdOdfImageWriter;
@@ -73,6 +78,7 @@ namespace mitk
     NrrdTensorImageReader * m_NrrdTensorImageReader;
     NrrdOdfImageReader * m_NrrdOdfImageReader;
     ShImageReader * m_ShImageReader;
+    PeakImageReader * m_PeakImageReader;
 
     NrrdTensorImageWriter * m_NrrdTensorImageWriter;
     NrrdOdfImageWriter * m_NrrdOdfImageWriter;

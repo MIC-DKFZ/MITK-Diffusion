@@ -38,6 +38,7 @@ std::vector<CustomMimeType*> DiffusionIOMimeTypes::Get()
   mimeTypes.push_back(DTI_MIMETYPE().Clone());
   mimeTypes.push_back(ODF_MIMETYPE().Clone());
   mimeTypes.push_back(SH_MIMETYPE().Clone());
+  mimeTypes.push_back(PEAK_MIMETYPE().Clone());
 
   return mimeTypes;
 }
@@ -172,6 +173,67 @@ CustomMimeType DiffusionIOMimeTypes::ODF_MIMETYPE()
   return mimeType;
 }
 
+
+DiffusionIOMimeTypes::PeakImageMimeType::PeakImageMimeType() : CustomMimeType(PEAK_MIMETYPE_NAME())
+{
+  std::string category = "Peak Image";
+  this->SetCategory(category);
+  this->SetComment("Peak Image");
+
+  this->AddExtension("nrrd");
+  this->AddExtension("nii");
+  this->AddExtension("nii.gz");
+  this->AddExtension("peak");
+}
+
+bool DiffusionIOMimeTypes::PeakImageMimeType::AppliesTo(const std::string &path) const
+{
+  std::string ext = itksys::SystemTools::GetFilenameExtension(path);
+  if (ext==".peak")
+    return true;
+
+  try
+  {
+    itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
+    if ( io->CanReadFile( path.c_str() ) )
+    {
+      io->SetFileName( path.c_str() );
+      io->ReadImageInformation();
+      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
+        return true;
+    }
+  }
+  catch(...)
+  {}
+
+  try
+  {
+    itk::NiftiImageIO::Pointer io = itk::NiftiImageIO::New();
+    if ( io->CanReadFile( path.c_str() ) )
+    {
+      io->SetFileName( path.c_str() );
+      io->ReadImageInformation();
+      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
+        return true;
+    }
+  }
+  catch(...)
+  {}
+
+  return false;
+}
+
+DiffusionIOMimeTypes::PeakImageMimeType* DiffusionIOMimeTypes::PeakImageMimeType::Clone() const
+{
+  return new PeakImageMimeType(*this);
+}
+
+
+DiffusionIOMimeTypes::PeakImageMimeType DiffusionIOMimeTypes::PEAK_MIMETYPE()
+{
+  return PeakImageMimeType();
+}
+
 std::string DiffusionIOMimeTypes::DTI_MIMETYPE_NAME()
 {
   static std::string name = "DT_IMAGE";
@@ -187,6 +249,12 @@ std::string DiffusionIOMimeTypes::ODF_MIMETYPE_NAME()
 std::string DiffusionIOMimeTypes::SH_MIMETYPE_NAME()
 {
   static std::string name = "SH_IMAGE";
+  return name;
+}
+
+std::string DiffusionIOMimeTypes::PEAK_MIMETYPE_NAME()
+{
+  static std::string name ="ODF_PEAKS";
   return name;
 }
 
@@ -207,6 +275,12 @@ std::string DiffusionIOMimeTypes::ODF_MIMETYPE_DESCRIPTION()
 std::string DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION()
 {
   static std::string description = "SH Image";
+  return description;
+}
+
+std::string DiffusionIOMimeTypes::PEAK_MIMETYPE_DESCRIPTION()
+{
+  static std::string description = "Peak Image";
   return description;
 }
 

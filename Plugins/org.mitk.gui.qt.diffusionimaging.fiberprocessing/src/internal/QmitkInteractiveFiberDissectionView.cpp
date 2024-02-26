@@ -51,7 +51,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 
 #include <itkResampleImageFilter.h>
-#include <itkGaussianInterpolateImageFunction.h>
 #include <itkImageRegionIteratorWithIndex.h>
 #include <itkTractsToFiberEndingsImageFilter.h>
 #include <itkTractDensityImageFilter.h>

@@ -2,9 +2,6 @@ set(H_FILES
 
     mitkDiffusionImageHeaderInformation.h
     mitkDiffusionImageHelperFunctions.h
-    itkB0ImageExtractionImageFilter.h
-    itkB0ImageExtractionToSeparateImageFilter.h
-    itkExtractDwiChannelFilter.h
 
     IO/mitkDiffusionImageMimeTypes.h
     IO/mitkDiffusionImageObjectFactory.h
@@ -41,9 +38,6 @@ set(CPP_FILES
 
     mitkDiffusionImageHeaderInformation.cpp
     mitkDiffusionImageHelperFunctions.cpp
-    itkB0ImageExtractionImageFilter.txx
-    itkB0ImageExtractionToSeparateImageFilter.txx
-    itkExtractDwiChannelFilter.txx
 
     IO/mitkDiffusionImageServiceActivator.cpp
     IO/mitkDiffusionImageMimeTypes.cpp

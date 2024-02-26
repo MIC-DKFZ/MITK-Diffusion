@@ -28,14 +28,6 @@ public:
 
   static std::vector<CustomMimeType*> Get();
 
-  class  PeakImageMimeType : public CustomMimeType
-  {
-  public:
-    PeakImageMimeType();
-    bool AppliesTo(const std::string &path) const override;
-    PeakImageMimeType* Clone() const override;
-  };
-
   // ------------------------------ VTK formats ----------------------------------
 
   static CustomMimeType FIBERBUNDLE_VTK_MIMETYPE();
@@ -65,12 +57,6 @@ public:
 
   static FiberBundleDicomMimeType FIBERBUNDLE_DICOM_MIMETYPE();
   static std::string FIBERBUNDLE_DICOM_MIMETYPE_NAME();
-
-
-  static PeakImageMimeType PEAK_MIMETYPE();
-  static std::string PEAK_MIMETYPE_NAME();
-  static std::string PEAK_MIMETYPE_DESCRIPTION();
-
 
   static CustomMimeType PLANARFIGURECOMPOSITE_MIMETYPE();
   static std::string PLANARFIGURECOMPOSITE_MIMETYPE_NAME();
