@@ -17,10 +17,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define TractClusteringFilter_h
 
 // MITK
-#include <MitkFiberTrackingExports.h>
 #include <mitkPlanarEllipse.h>
 #include <mitkFiberBundle.h>
-#include <mitkClusteringMetric.h>
+#include "mitkClusteringMetric.h"
+#include <MitkFiberProcessingExports.h>
 
 // ITK
 #include <itkProcessObject.h>
@@ -37,7 +37,7 @@ namespace mitk{
 /**
 * \brief    */
 
-class MITKFIBERTRACKING_EXPORT TractClusteringFilter
+class MITKFIBERPROCESSING_EXPORT TractClusteringFilter
 {
 public:
 

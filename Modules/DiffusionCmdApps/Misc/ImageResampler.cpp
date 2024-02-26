@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkDiffusionCommandLineParser.h"
 
 #include <mitkIOUtil.h>
-#include <mitkRegistrationWrapper.h>
 #include <mitkImage.h>
 #include <mitkImageCast.h>
 #include <mitkITKImageImport.h>

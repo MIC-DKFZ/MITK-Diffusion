@@ -3,5 +3,5 @@ MITK_CREATE_MODULE(
   INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} IO Rendering
   DEPENDS MitkDiffusionCore MitkPlanarFigure MitkDICOM
   PACKAGE_DEPENDS
-    PRIVATE DCMTK|dcmtract VTK|CommonComputationalGeometry
+    DCMTK|dcmtract VTK|CommonComputationalGeometry ITK|ITKIONRRD+ITKIONIFTI
 )

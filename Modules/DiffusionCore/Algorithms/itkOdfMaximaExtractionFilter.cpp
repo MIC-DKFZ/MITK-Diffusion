@@ -31,7 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPolyLine.h>
 
 #include <boost/math/special_functions.hpp>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 
 using namespace boost::math;
 
@@ -215,7 +215,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 
   ImageRegionConstIterator< CoefficientImageType > cit(ShCoeffImage, outputRegionForThread );
 
-  boost::progress_display disp(outputRegionForThread.GetSize()[0]*outputRegionForThread.GetSize()[1]*outputRegionForThread.GetSize()[2]);
+  boost::timer::progress_display disp(outputRegionForThread.GetSize()[0]*outputRegionForThread.GetSize()[1]*outputRegionForThread.GetSize()[2]);
   OdfType odf;
   while( !cit.IsAtEnd() )
   {

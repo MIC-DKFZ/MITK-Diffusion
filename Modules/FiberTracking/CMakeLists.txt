@@ -37,7 +37,7 @@ endif()
 
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
-  INCLUDE_DIRS Algorithms Algorithms/TrackingHandlers Algorithms/ClusteringMetrics Algorithms/GibbsTracking Algorithms/StochasticTracking ${CMAKE_CURRENT_BINARY_DIR}
+  INCLUDE_DIRS Algorithms Algorithms/TrackingHandlers Algorithms/GibbsTracking ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${_module_deps}
 )
 

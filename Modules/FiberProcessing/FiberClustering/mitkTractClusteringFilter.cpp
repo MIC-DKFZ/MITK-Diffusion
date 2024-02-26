@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #define _USE_MATH_DEFINES
 #include <math.h>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <vnl/vnl_sparse_matrix.h>
 
 namespace mitk{

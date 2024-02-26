@@ -18,14 +18,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define MITKDIFFUSIONIMAGECORRECTIONFILTER_H
 
 #include "mitkImageSource.h"
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionRegistrationExports.h>
 
 namespace mitk
 {
 /**
  * @class DiffusionImageCorrectionFilter
  */
-class MITKDIFFUSIONCORE_EXPORT DiffusionImageCorrectionFilter
+class MITKDIFFUSIONREGISTRATION_EXPORT DiffusionImageCorrectionFilter
         : public ImageSource
 {
 public:

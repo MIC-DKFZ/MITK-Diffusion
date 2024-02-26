@@ -17,8 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef MITKPYRAMIDREGISTRATIONMETHODHELPER_H
 #define MITKPYRAMIDREGISTRATIONMETHODHELPER_H
 
-#include <MitkDiffusionCoreExports.h>
-
 #include <itkCommand.h>
 
 #include <itkRegularStepGradientDescentOptimizer.h>

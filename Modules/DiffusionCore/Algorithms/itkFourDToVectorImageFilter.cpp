@@ -31,7 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPolyLine.h>
 
 #include <boost/math/special_functions.hpp>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 
 
 using namespace boost::math;

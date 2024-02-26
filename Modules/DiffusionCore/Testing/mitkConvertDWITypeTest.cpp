@@ -17,8 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkTestingMacros.h"
 #include "mitkIOUtil.h"
 
-#include "mitkDWIHeadMotionCorrectionFilter.h"
-
 /**
  * @brief Custom test to provide CMD-line access to the mitk::DWIHeadMotionCorrectionFilter
  *

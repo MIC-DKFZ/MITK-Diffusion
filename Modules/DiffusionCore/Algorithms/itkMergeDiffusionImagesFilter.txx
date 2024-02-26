@@ -38,7 +38,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkRescaleIntensityImageFilter.h"
 #include <itkImageRegionIterator.h>
 #include <itkImageRegionConstIterator.h>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 
 namespace itk
 {
@@ -137,7 +137,7 @@ MergeDiffusionImagesFilter<TScalarType>
 
     MITK_INFO << "MergeDiffusionImagesFilter: merging images";
     GradientType zeroG; zeroG.fill(0.0);
-    boost::progress_display disp(this->GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels());
+    boost::timer::progress_display disp(this->GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels());
     while(!itOut.IsAtEnd())
     {
         ++disp;

@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkITKImageImport.h"
 #include <itkVectorImage.h>
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionRegistrationExports.h>
 
 namespace mitk
 {
@@ -42,7 +42,7 @@ namespace mitk
  *
  */
 
-class MITKDIFFUSIONCORE_EXPORT DWIHeadMotionCorrectionFilter
+class MITKDIFFUSIONREGISTRATION_EXPORT DWIHeadMotionCorrectionFilter
     : public ImageToImageFilter
 {
 public:

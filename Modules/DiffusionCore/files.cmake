@@ -3,13 +3,9 @@ set(CPP_FILES
   mitkDiffusionFunctionCollection.cpp
 
   # DataStructures
-  IODataStructures/DiffusionWeightedImages/mitkDiffusionImageCorrectionFilter.cpp
-  IODataStructures/DiffusionWeightedImages/mitkDiffusionImageCreationFilter.cpp
   IODataStructures/mitkOdfImage.cpp
   IODataStructures/mitkShImage.cpp
   IODataStructures/mitkTensorImage.cpp
-
-  IODataStructures/mitkStatisticModel.cpp
 
   # Mapper etc.
   Rendering/vtkMaskedProgrammableGlyphFilter.cpp
@@ -22,10 +18,7 @@ set(CPP_FILES
 
   # Algorithms
   Algorithms/itkDwiGradientLengthCorrectionFilter.cpp
-  Algorithms/Registration/mitkRegistrationWrapper.cpp
-  Algorithms/Registration/mitkPyramidImageRegistrationMethod.cpp
-  # Algorithms/Registration/mitkRegistrationMethodITK4.cpp
-  Algorithms/Registration/mitkDWIHeadMotionCorrectionFilter.cpp
+  
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.cpp
@@ -64,22 +57,16 @@ set(H_FILES
   Algorithms/Reconstruction/MultishellProcessing/itkBiExpFitFunctor.h
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.h
 
-  IODataStructures/DiffusionWeightedImages/mitkDiffusionImageTransformedCreationFilter.h
-
   # Algorithms
   Algorithms/itkDiffusionOdfGeneralizedFaImageFilter.h
   Algorithms/itkDiffusionOdfPrepareVisualizationImageFilter.h
   Algorithms/itkElectrostaticRepulsionDiffusionGradientReductionFilter.h
   Algorithms/itkTensorDerivedMeasurementsFilter.h
-  Algorithms/itkB0ImageExtractionImageFilter.h
-  Algorithms/itkB0ImageExtractionToSeparateImageFilter.h
   Algorithms/itkTensorImageToDiffusionImageFilter.h
   Algorithms/itkTensorToL2NormImageFilter.h
   Algorithms/itkGaussianInterpolateImageFunction.h
   
   Algorithms/itkDiffusionTensorPrincipalDirectionImageFilter.h
-  Algorithms/itkCartesianToPolarVectorImageFilter.h
-  Algorithms/itkPolarToCartesianVectorImageFilter.h
   Algorithms/itkExtractChannelFromRgbaImageFilter.h
   Algorithms/itkTensorReconstructionWithEigenvalueCorrectionFilter.h
   Algorithms/itkMergeDiffusionImagesFilter.h
@@ -90,14 +77,11 @@ set(H_FILES
   Algorithms/itkDwiGradientLengthCorrectionFilter.h
   Algorithms/itkAdcImageFilter.h
   Algorithms/itkDwiNormilzationFilter.h
-  Algorithms/itkSplitDWImageFilter.h
   Algorithms/itkRemoveDwiChannelFilter.h
-  Algorithms/itkExtractDwiChannelFilter.h
   Algorithms/itkFlipPeaksFilter.h
   Algorithms/itkShToOdfImageFilter.h
   Algorithms/itkFourDToVectorImageFilter.h
   Algorithms/itkVectorImageToFourDImageFilter.h
-  Algorithms/Registration/mitkDWIHeadMotionCorrectionFilter.h
   Algorithms/itkNonLocalMeansDenoisingFilter.h
   Algorithms/itkVectorImageToImageFilter.h
   Algorithms/itkSplitVectorImageFilter.h

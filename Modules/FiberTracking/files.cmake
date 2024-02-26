@@ -9,7 +9,6 @@ set(CPP_FILES
   Algorithms/GibbsTracking/mitkFiberBuilder.cpp
   Algorithms/GibbsTracking/mitkSphereInterpolator.cpp
 
-  Algorithms/mitkTractClusteringFilter.cpp
   Algorithms/itkStreamlineTrackingFilter.cpp
   Algorithms/TrackingHandlers/mitkTrackingDataHandler.cpp
   Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.cpp
@@ -20,20 +19,6 @@ set(CPP_FILES
 set(H_FILES
   mitkStreamlineTractographyParameters.h
 
-  # Algorithms
-  Algorithms/itkTractDensityImageFilter.h
-  Algorithms/itkTractsToFiberEndingsImageFilter.h
-  Algorithms/itkTractsToRgbaImageFilter.h
-  Algorithms/itkTractsToVectorImageFilter.h
-  Algorithms/itkEvaluateDirectionImagesFilter.h
-  Algorithms/itkEvaluateTractogramDirectionsFilter.h
-  Algorithms/itkFiberCurvatureFilter.h
-  Algorithms/mitkTractClusteringFilter.h
-  Algorithms/itkTractDistanceFilter.h
-  Algorithms/itkFiberExtractionFilter.h
-  Algorithms/itkTdiToVolumeFractionFilter.h
-  Algorithms/itkDistanceFromSegmentationImageFilter.h
-
   # Tractography
   Algorithms/TrackingHandlers/mitkTrackingDataHandler.h
   Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h
@@ -41,7 +26,6 @@ set(H_FILES
   Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h
 
   Algorithms/itkGibbsTrackingFilter.h
-  Algorithms/itkStochasticTractographyFilter.h
   Algorithms/GibbsTracking/mitkParticle.h
   Algorithms/GibbsTracking/mitkParticleGrid.h
   Algorithms/GibbsTracking/mitkMetropolisHastingsSampler.h
@@ -52,16 +36,6 @@ set(H_FILES
   Algorithms/GibbsTracking/mitkFiberBuilder.h
 
   Algorithms/itkStreamlineTrackingFilter.h
-
-  # Clustering
-  Algorithms/ClusteringMetrics/mitkClusteringMetric.h
-  Algorithms/ClusteringMetrics/mitkClusteringMetricEuclideanMean.h
-  Algorithms/ClusteringMetrics/mitkClusteringMetricEuclideanMax.h
-  Algorithms/ClusteringMetrics/mitkClusteringMetricEuclideanStd.h
-  Algorithms/ClusteringMetrics/mitkClusteringMetricAnatomic.h
-  Algorithms/ClusteringMetrics/mitkClusteringMetricScalarMap.h
-  Algorithms/ClusteringMetrics/mitkClusteringMetricInnerAngles.h
-  Algorithms/ClusteringMetrics/mitkClusteringMetricLength.h
 )
 
 set(RESOURCE_FILES

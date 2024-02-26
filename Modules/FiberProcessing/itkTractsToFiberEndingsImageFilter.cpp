@@ -19,7 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPolyLine.h>
 #include <vtkCellArray.h>
 #include <vtkCellData.h>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionFunctionCollection.h>
 
 namespace itk{
@@ -102,7 +102,7 @@ namespace itk{
     vtkSmartPointer<vtkPolyData> fiberPolyData = m_FiberBundle->GetFiberPolyData();
 
     int numFibers = m_FiberBundle->GetNumFibers();
-    boost::progress_display disp(numFibers);
+    boost::timer::progress_display disp(numFibers);
     for( int i=0; i<numFibers; i++ )
     {
         ++disp;

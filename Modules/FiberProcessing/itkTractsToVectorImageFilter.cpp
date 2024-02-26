@@ -12,7 +12,7 @@
 // misc
 #define _USE_MATH_DEFINES
 #include <cmath>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionFunctionCollection.h>
 
 namespace itk{
@@ -138,7 +138,7 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
   VectorContainer< unsigned int, std::vector< double > >::Pointer peakLengths = VectorContainer< unsigned int, std::vector< double > >::New();
 
   MITK_INFO << "Generating directions from tractogram";
-  boost::progress_display disp(numFibers);
+  boost::timer::progress_display disp(numFibers);
   for( int i=0; i<numFibers; i++ )
   {
     ++disp;
@@ -215,7 +215,7 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
 
   MITK_INFO << "Clustering directions";
   float max_dir_mag = 0;
-  boost::progress_display disp2(outImageSize[0]*outImageSize[1]*outImageSize[2]);
+  boost::timer::progress_display disp2(outImageSize[0]*outImageSize[1]*outImageSize[2]);
   while(!dirIt.IsAtEnd())
   {
     ++disp2;

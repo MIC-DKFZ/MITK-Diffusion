@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef MITKPYRAMIDIMAGEREGISTRATION_H
 #define MITKPYRAMIDIMAGEREGISTRATION_H
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionRegistrationExports.h>
 
 #include <itkObject.h>
 #include "itkImageMaskSpatialObject.h"
@@ -57,7 +57,7 @@ namespace mitk
  *   - MattesMutualInformation for CrossModality=on ( default ) and
  *   - NormalizedCorrelation for CrossModality=off.
  */
-class MITKDIFFUSIONCORE_EXPORT PyramidImageRegistrationMethod :
+class MITKDIFFUSIONREGISTRATION_EXPORT PyramidImageRegistrationMethod :
     public itk::Object
 {
 public:

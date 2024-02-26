@@ -23,7 +23,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImageFileWriter.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
-#include <itkEvaluateDirectionImagesFilter.h>
 #include <itkTractsToVectorImageFilter.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkLocaleSwitch.h>

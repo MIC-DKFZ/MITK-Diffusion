@@ -19,10 +19,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkElectrostaticRepulsionDiffusionGradientReductionFilter.h>
 
-#include "mitkDWIHeadMotionCorrectionFilter.h"
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkImageCast.h>
 #include <mitkProperties.h>
+#include <mitkITKImageImport.h>
 
 typedef short                                       DiffusionPixelType;
 

@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <vtkDoubleArray.h>
 #include <vtkPointData.h>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 
 namespace itk{
 
@@ -42,7 +42,7 @@ void FiberCurvatureFilter::GenerateData()
     vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
     MITK_INFO << "Applying curvature threshold";
-    boost::progress_display disp(inputPoly->GetNumberOfCells());
+    boost::timer::progress_display disp(inputPoly->GetNumberOfCells());
 #pragma omp parallel for
     for (int i=0; i<inputPoly->GetNumberOfCells(); i++)
     {

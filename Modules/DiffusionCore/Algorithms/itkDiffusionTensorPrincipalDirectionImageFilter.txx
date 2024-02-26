@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionIterator.h"
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 
 #include <vtkSmartPointer.h>
 #include <vtkPolyData.h>

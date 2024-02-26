@@ -21,7 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #define _USE_MATH_DEFINES
 #include <cmath>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionFunctionCollection.h>
 #include <boost/lexical_cast.hpp>
 
@@ -120,7 +120,7 @@ void FiberExtractionFilter< PixelType >::ExtractOverlap(mitk::FiberBundle::Point
 
   std::vector< unsigned int > negative_ids; // fibers not overlapping with ANY mask
 
-  boost::progress_display disp(m_InputFiberBundle->GetNumFibers());
+  boost::timer::progress_display disp(m_InputFiberBundle->GetNumFibers());
   for (unsigned int i=0; i<m_InputFiberBundle->GetNumFibers(); i++)
   {
     ++disp;
@@ -216,7 +216,7 @@ void FiberExtractionFilter< PixelType >::ExtractEndpoints(mitk::FiberBundle::Poi
 
   std::vector< unsigned int > negative_ids; // fibers not overlapping with ANY mask
 
-  boost::progress_display disp(m_InputFiberBundle->GetNumFibers());
+  boost::timer::progress_display disp(m_InputFiberBundle->GetNumFibers());
   for (unsigned int i=0; i<m_InputFiberBundle->GetNumFibers(); i++)
   {
     ++disp;
@@ -301,7 +301,7 @@ void FiberExtractionFilter< PixelType >::ExtractLabels(mitk::FiberBundle::Pointe
 
   std::vector< unsigned int > negative_ids; // fibers not overlapping with ANY label
 
-  boost::progress_display disp(m_InputFiberBundle->GetNumFibers());
+  boost::timer::progress_display disp(m_InputFiberBundle->GetNumFibers());
   for (unsigned int i=0; i<m_InputFiberBundle->GetNumFibers(); i++)
   {
     ++disp;

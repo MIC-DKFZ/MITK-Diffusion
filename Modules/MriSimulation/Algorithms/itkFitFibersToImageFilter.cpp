@@ -1,6 +1,6 @@
 #include "itkFitFibersToImageFilter.h"
 
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionFunctionCollection.h>
 
 namespace itk{
@@ -77,7 +77,7 @@ void FitFibersToImageFilter::CreateDiffSystem()
   unsigned int numFibers = 0;
   for (unsigned int bundle=0; bundle<m_Tractograms.size(); bundle++)
     numFibers += m_Tractograms.at(bundle)->GetNumFibers();
-  boost::progress_display disp(numFibers);
+  boost::timer::progress_display disp(numFibers);
   m_GroupSizes.clear();
   for (unsigned int bundle=0; bundle<m_Tractograms.size(); bundle++)
   {
@@ -242,7 +242,7 @@ void FitFibersToImageFilter::CreatePeakSystem()
   int numFibers = 0;
   for (unsigned int bundle=0; bundle<m_Tractograms.size(); bundle++)
     numFibers += m_Tractograms.at(bundle)->GetNumFibers();
-  boost::progress_display disp(numFibers);
+  boost::timer::progress_display disp(numFibers);
   for (unsigned int bundle=0; bundle<m_Tractograms.size(); bundle++)
   {
     vtkSmartPointer<vtkPolyData> polydata = m_Tractograms.at(bundle)->GetFiberPolyData();
@@ -367,7 +367,7 @@ void FitFibersToImageFilter::CreateScalarSystem()
   int numFibers = 0;
   for (unsigned int bundle=0; bundle<m_Tractograms.size(); bundle++)
     numFibers += m_Tractograms.at(bundle)->GetNumFibers();
-  boost::progress_display disp(numFibers);
+  boost::timer::progress_display disp(numFibers);
   m_GroupSizes.clear();
   for (unsigned int bundle=0; bundle<m_Tractograms.size(); bundle++)
   {

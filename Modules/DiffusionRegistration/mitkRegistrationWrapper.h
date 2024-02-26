@@ -2,7 +2,7 @@
 #define MITKBATCHEDREGISTRATION_H
 
 // MITK
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionRegistrationExports.h>
 #include "mitkCommon.h"
 #include "mitkImage.h"
 
@@ -21,7 +21,7 @@ namespace mitk
  *  For DWI images a registerable B0 Image will automatically be extracted.
  *
  */
-class MITKDIFFUSIONCORE_EXPORT RegistrationWrapper
+class MITKDIFFUSIONREGISTRATION_EXPORT RegistrationWrapper
 {
 public:
 

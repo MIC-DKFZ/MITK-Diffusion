@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // misc
 #include <math.h>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionFunctionCollection.h>
 
 namespace itk{
@@ -110,7 +110,7 @@ void TractsToRgbaImageFilter< OutputImageType >::GenerateData()
   int numFibers = m_FiberBundle->GetNumFibers();
 
   float scale = 100 * pow((float)m_UpsamplingFactor,3);
-  boost::progress_display disp(numFibers);
+  boost::timer::progress_display disp(numFibers);
   for( int i=0; i<numFibers; ++i )
   {
     ++disp;

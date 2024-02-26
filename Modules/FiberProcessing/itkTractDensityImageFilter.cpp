@@ -13,6 +13,7 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
+
 #include "itkTractDensityImageFilter.h"
 
 // VTK
@@ -23,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // misc
 #include <cmath>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <vtkBox.h>
 #include <mitkDiffusionFunctionCollection.h>
 
@@ -126,7 +127,7 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
   vtkSmartPointer<vtkPolyData> fiberPolyData = m_FiberBundle->GetFiberPolyData();
 
   int numFibers = m_FiberBundle->GetNumFibers();
-  boost::progress_display disp(numFibers);
+  boost::timer::progress_display disp(numFibers);
   for( int i=0; i<numFibers; i++ )
   {
     ++disp;
@@ -207,3 +208,4 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
   MITK_INFO << "TractDensityImageFilter: finished processing";
 }
 }
+
