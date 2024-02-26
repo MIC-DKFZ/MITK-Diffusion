@@ -1,14 +1,13 @@
 set(H_FILES
-  itkTractDensityImageFilter.h
-  itkTractsToVectorImageFilter.h
+  FiberDerivedImages/itkTractDensityImageFilter.h
+  FiberDerivedImages/itkTractsToVectorImageFilter.h
+  FiberDerivedImages/itkTractsToFiberEndingsImageFilter.h
+  FiberDerivedImages/itkTractsToRgbaImageFilter.h
 
-  itkTractsToFiberEndingsImageFilter.h
-  itkTractsToRgbaImageFilter.h
+  FiberModification/itkFiberCurvatureFilter.h
+  FiberModification/itkFiberExtractionFilter.h
 
-  itkFiberCurvatureFilter.h
-
-  itkFiberExtractionFilter.h
-  itkDistanceFromSegmentationImageFilter.h
+  FiberQuantification/itkDistanceFromSegmentationImageFilter.h
 
   # Clustering
   FiberClustering/mitkTractClusteringFilter.h
