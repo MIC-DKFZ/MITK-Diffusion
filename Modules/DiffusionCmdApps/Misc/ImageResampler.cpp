@@ -15,7 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 
 #include <mitkIOUtil.h>
 #include <mitkImage.h>
@@ -305,7 +305,7 @@ static mitk::Image::Pointer ResampleDWIbySpacing(mitk::Image::Pointer input, flo
 
 int main( int argc, char* argv[] )
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
   parser.setArgumentPrefix("--","-");
 
   parser.setTitle("Image Resampler");
@@ -314,13 +314,13 @@ int main( int argc, char* argv[] )
   parser.setDescription("Resample an image to eigther a specific spacing or to a reference image.");
 
   // Add command line argument names
-  parser.addArgument("help", "h",mitkDiffusionCommandLineParser::Bool, "Show this help text");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "Input file",us::Any(),false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "Output file",us::Any(),false, false, false, mitkDiffusionCommandLineParser::Output);
-  parser.addArgument("spacing", "s", mitkDiffusionCommandLineParser::String, "Spacing:", "Resample provide x,y,z spacing in mm (e.g. -r 1,1,3), is not applied to tensor data",us::Any());
-  parser.addArgument("reference", "r", mitkDiffusionCommandLineParser::String, "Reference:", "Resample using supplied reference image. Also cuts image to same dimensions",us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("win-sinc", "w", mitkDiffusionCommandLineParser::Bool, "Windowed-sinc interpolation:", "Use windowed-sinc interpolation (3) instead of linear interpolation ",us::Any());
-  parser.addArgument("nearest-neigh", "n", mitkDiffusionCommandLineParser::Bool, "Nearest Neighbor:", "Use Nearest Neighbor interpolation instead of linear interpolation ",us::Any());
+  parser.addArgument("help", "h",mitkCommandLineParser::Bool, "Show this help text");
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "Input file",us::Any(),false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "Output file",us::Any(),false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("spacing", "s", mitkCommandLineParser::String, "Spacing:", "Resample provide x,y,z spacing in mm (e.g. -r 1,1,3), is not applied to tensor data",us::Any());
+  parser.addArgument("reference", "r", mitkCommandLineParser::String, "Reference:", "Resample using supplied reference image. Also cuts image to same dimensions",us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("win-sinc", "w", mitkCommandLineParser::Bool, "Windowed-sinc interpolation:", "Use windowed-sinc interpolation (3) instead of linear interpolation ",us::Any());
+  parser.addArgument("nearest-neigh", "n", mitkCommandLineParser::Bool, "Nearest Neighbor:", "Use Nearest Neighbor interpolation instead of linear interpolation ",us::Any());
 
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);

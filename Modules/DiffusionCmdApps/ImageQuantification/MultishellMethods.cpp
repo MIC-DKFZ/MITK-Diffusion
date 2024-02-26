@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImage.h>
 #include <mitkOdfImage.h>
 #include <mitkBaseData.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 
 #include <itkRadialMultishellToSingleshellImageFilter.h>
@@ -44,7 +44,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("Multishell Methods");
   parser.setCategory("Preprocessing Tools");
@@ -52,12 +52,12 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input file", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output file", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
-  parser.addArgument("adc", "D", mitkDiffusionCommandLineParser::Bool, "ADC:", "ADC Average", us::Any(), false);
-  parser.addArgument("akc", "K", mitkDiffusionCommandLineParser::Bool, "Kurtosis fit:", "Kurtosis Fit", us::Any(), false);
-  parser.addArgument("biexp", "B", mitkDiffusionCommandLineParser::Bool, "BiExp fit:", "BiExp fit", us::Any(), false);
-  parser.addArgument("targetbvalue", "b", mitkDiffusionCommandLineParser::String, "b Value:", "target bValue (mean, min, max)", us::Any(), false);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input file", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output file", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("adc", "D", mitkCommandLineParser::Bool, "ADC:", "ADC Average", us::Any(), false);
+  parser.addArgument("akc", "K", mitkCommandLineParser::Bool, "Kurtosis fit:", "Kurtosis Fit", us::Any(), false);
+  parser.addArgument("biexp", "B", mitkCommandLineParser::Bool, "BiExp fit:", "BiExp fit", us::Any(), false);
+  parser.addArgument("targetbvalue", "b", mitkCommandLineParser::String, "b Value:", "target bValue (mean, min, max)", us::Any(), false);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

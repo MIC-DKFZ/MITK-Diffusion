@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkDiffusionTensor3D.h>
 #include <itkImageFileWriter.h>
 #include <itkNrrdImageIO.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <itksys/SystemTools.hxx>
 #include <mitkIOUtil.h>
 #include <mitkLocaleSwitch.h>
@@ -35,12 +35,12 @@ See LICENSE.txt or http://www.mitk.org for details.
  */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input image", "input raw dwi", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output image", "output image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
-  parser.addArgument("b0_threshold", "", mitkDiffusionCommandLineParser::Int, "b0 threshold", "baseline image intensity threshold", 0);
-  parser.addArgument("correct_negative_eigenv", "", mitkDiffusionCommandLineParser::Bool, "Correct negative eigenvalues", "correct negative eigenvalues", us::Any(false));
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input image", "input raw dwi", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output image", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("b0_threshold", "", mitkCommandLineParser::Int, "b0 threshold", "baseline image intensity threshold", 0);
+  parser.addArgument("correct_negative_eigenv", "", mitkCommandLineParser::Bool, "Correct negative eigenvalues", "correct negative eigenvalues", us::Any(false));
 
   parser.setCategory("Signal Modelling");
   parser.setTitle("Tensor Reconstruction");

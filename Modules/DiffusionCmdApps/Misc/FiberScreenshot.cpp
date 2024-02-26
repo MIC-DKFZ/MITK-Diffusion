@@ -25,7 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkIOUtil.h>
@@ -42,7 +42,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("Fiber Screenshot");
   parser.setDescription("Take a screenshot of the loaded fiber bundle");
@@ -51,15 +51,15 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
 
   parser.beginGroup("1. Mandatory arguments:");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::StringList, "Input:", "input tractograms", us::Any(), false);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "Output png", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
-  parser.addArgument("resample", "", mitkDiffusionCommandLineParser::Float, "", "");
+  parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input:", "input tractograms", us::Any(), false);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "Output png", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("resample", "", mitkCommandLineParser::Float, "", "");
   parser.endGroup();
 
-  parser.addArgument("rotate_x", "", mitkDiffusionCommandLineParser::Float, "Rotate x-axis:", "Rotate around x-axis (in deg)");
-  parser.addArgument("rotate_y", "", mitkDiffusionCommandLineParser::Float, "Rotate y-axis:", "Rotate around y-axis (in deg)");
-  parser.addArgument("rotate_z", "", mitkDiffusionCommandLineParser::Float, "Rotate z-axis:", "Rotate around z-axis (in deg)");
-  parser.addArgument("background", "", mitkDiffusionCommandLineParser::String, "Background:", "Background color (WHITE, BLACK)");
+  parser.addArgument("rotate_x", "", mitkCommandLineParser::Float, "Rotate x-axis:", "Rotate around x-axis (in deg)");
+  parser.addArgument("rotate_y", "", mitkCommandLineParser::Float, "Rotate y-axis:", "Rotate around y-axis (in deg)");
+  parser.addArgument("rotate_z", "", mitkCommandLineParser::Float, "Rotate z-axis:", "Rotate around z-axis (in deg)");
+  parser.addArgument("background", "", mitkCommandLineParser::String, "Background:", "Background color (WHITE, BLACK)");
 
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
 
 
-  mitkDiffusionCommandLineParser::StringContainerType inFibs = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i"]);
+  mitkCommandLineParser::StringContainerType inFibs = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i"]);
   std::string outFileName = us::any_cast<std::string>(parsedArgs["o"]);
 
   float rotateX = 0;

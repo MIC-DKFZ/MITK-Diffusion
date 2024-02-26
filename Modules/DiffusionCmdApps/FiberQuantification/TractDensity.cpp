@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkIOUtil.h>
@@ -49,7 +49,7 @@ mitk::FiberBundle::Pointer LoadFib(std::string filename)
 */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("Tract Density");
   parser.setCategory("Fiber Quantification Methods");
@@ -57,13 +57,13 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input fiber bundle", us::Any(), false);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output image", us::Any(), false);
-  parser.addArgument("binary", "", mitkDiffusionCommandLineParser::Bool, "Binary output:", "calculate binary tract envelope", us::Any());
-  parser.addArgument("normalize", "", mitkDiffusionCommandLineParser::Bool, "Normalized output:", "normalize output to 0-1", us::Any());
-  parser.addArgument("endpoints", "", mitkDiffusionCommandLineParser::Bool, "Output endpoints image:", "calculate image of fiber endpoints instead of mask", us::Any());
-  parser.addArgument("reference_image", "", mitkDiffusionCommandLineParser::String, "Reference image:", "output image will have geometry of this reference image", us::Any());
-  parser.addArgument("upsampling", "", mitkDiffusionCommandLineParser::Float, "Upsampling:", "upsampling", 1.0);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input fiber bundle", us::Any(), false);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false);
+  parser.addArgument("binary", "", mitkCommandLineParser::Bool, "Binary output:", "calculate binary tract envelope", us::Any());
+  parser.addArgument("normalize", "", mitkCommandLineParser::Bool, "Normalized output:", "normalize output to 0-1", us::Any());
+  parser.addArgument("endpoints", "", mitkCommandLineParser::Bool, "Output endpoints image:", "calculate image of fiber endpoints instead of mask", us::Any());
+  parser.addArgument("reference_image", "", mitkCommandLineParser::String, "Reference image:", "output image will have geometry of this reference image", us::Any());
+  parser.addArgument("upsampling", "", mitkCommandLineParser::Float, "Upsampling:", "upsampling", 1.0);
 
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);

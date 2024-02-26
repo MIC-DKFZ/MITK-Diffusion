@@ -16,7 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkIOUtil.h>
 #include <metaCommand.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
@@ -43,7 +43,7 @@ mitk::FiberBundle::Pointer LoadFib(std::string filename)
 */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("Fiber Statistics");
   parser.setCategory("Fiber Quantification Methods");
@@ -51,14 +51,14 @@ int main(int argc, char* argv[])
   parser.setDescription("Output statistics about fiber lengths, weights, etc. to a file.");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::StringList, "Input:", "input tractograms", us::Any(), false);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output File:", "output file", us::Any(), false);
+  parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input:", "input tractograms", us::Any(), false);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output File:", "output file", us::Any(), false);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
     return EXIT_FAILURE;
 
-  mitkDiffusionCommandLineParser::StringContainerType inFibs = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i"]);
+  mitkCommandLineParser::StringContainerType inFibs = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i"]);
   std::string outfile = us::any_cast<std::string>(parsedArgs["o"]);
 
   try
