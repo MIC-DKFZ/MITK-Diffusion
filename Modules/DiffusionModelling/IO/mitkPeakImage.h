@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPolyData.h>
 #include <vtkSmartPointer.h>
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 
 namespace mitk
 {
@@ -30,7 +30,7 @@ namespace mitk
   /**
   * \brief this class encapsulates tensor images
   */
-  class MITKDIFFUSIONCORE_EXPORT PeakImage : public Image
+  class MITKDIFFUSIONMODELLING_EXPORT PeakImage : public Image
   {
 
   public:

@@ -24,12 +24,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __vtkThickPlane_h
 #define __vtkThickPlane_h
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 
 #include "vtkImplicitFunction.h"
 #include "mitkCommon.h"
 
-class MITKDIFFUSIONCORE_EXPORT vtkThickPlane : public vtkImplicitFunction
+class MITKDIFFUSIONMODELLING_EXPORT vtkThickPlane : public vtkImplicitFunction
 {
 public:
   // Description

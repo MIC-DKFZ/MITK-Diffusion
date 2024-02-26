@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkImageVtkMapper2D.h"
 #include "mitkOdfVtkMapper2D.h"
 #include "mitkLevelWindowProperty.h"
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 
 namespace mitk {
 
@@ -41,7 +41,7 @@ namespace mitk {
   //##Documentation
   //## @brief Composite pattern for combination of different mappers
   //## @ingroup Mapper
-  class MITKDIFFUSIONCORE_EXPORT CompositeMapper : public VtkMapper
+  class MITKDIFFUSIONMODELLING_EXPORT CompositeMapper : public VtkMapper
   {
   public:
 

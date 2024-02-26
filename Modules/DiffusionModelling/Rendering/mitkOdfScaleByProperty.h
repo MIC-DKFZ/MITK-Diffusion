@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef _MITK_OdfScaleByProperty__H_
 #define _MITK_OdfScaleByProperty__H_
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 #include "mitkEnumerationProperty.h"
 #include "mitkEnumerationPropertySerializer.h"
 #include <tinyxml2.h>
@@ -37,7 +37,7 @@ namespace mitk
  *     ODFSB_NONE, ODFSB_GFA, ODFSB_PC
  * Default is ODFSB_NONE
  */
-class MITKDIFFUSIONCORE_EXPORT OdfScaleByProperty : public EnumerationProperty
+class MITKDIFFUSIONMODELLING_EXPORT OdfScaleByProperty : public EnumerationProperty
 {
 public:
 
@@ -87,7 +87,7 @@ protected:
   virtual void AddInterpolationTypes();
 };
 
-class MITKDIFFUSIONCORE_EXPORT OdfScaleByPropertySerializer : public EnumerationPropertySerializer
+class MITKDIFFUSIONMODELLING_EXPORT OdfScaleByPropertySerializer : public EnumerationPropertySerializer
 {
   public:
 

@@ -1,7 +1,7 @@
 set(MITK_MODULES
   DiffusionImage
   DiffusionPreprocessing
-  DiffusionCore
+  DiffusionModelling
   DiffusionRegistration
   FiberBundle
   FiberProcessing

@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 //includes for MITK datastructure
 #include <mitkBaseData.h>
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 #include <mitkDataStorage.h>
 
 //includes storing fiberdata
@@ -37,7 +37,7 @@ namespace mitk {
 
 /**
    * \brief Base Class for Fiber Bundles;   */
-class MITKDIFFUSIONCORE_EXPORT StatisticModel : public BaseData
+class MITKDIFFUSIONMODELLING_EXPORT StatisticModel : public BaseData
 {
 public:
 

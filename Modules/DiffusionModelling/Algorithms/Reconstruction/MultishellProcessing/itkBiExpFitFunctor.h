@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _itk_KurtosisFitFunctor_h_
-#define _itk_KurtosisFitFunctor_h_
+#ifndef _itk_BiExpFitFunctor_h_
+#define _itk_BiExpFitFunctor_h_
 
 #include "itkDWIVoxelFunctor.h"
 #include <cmath>
@@ -27,13 +27,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace itk
 {
 
-class MITKDIFFUSIONCORE_EXPORT KurtosisFitFunctor : public DWIVoxelFunctor
+class MITKDIFFUSIONMODELLING_EXPORT BiExpFitFunctor : public DWIVoxelFunctor
 {
 public:
-  KurtosisFitFunctor(){}
-  ~KurtosisFitFunctor() override{}
+  BiExpFitFunctor(){}
+  ~BiExpFitFunctor() override{}
 
-  typedef KurtosisFitFunctor                       Self;
+  typedef BiExpFitFunctor                         Self;
   typedef SmartPointer<Self>                      Pointer;
   typedef SmartPointer<const Self>                ConstPointer;
   typedef DWIVoxelFunctor                         Superclass;
@@ -41,7 +41,7 @@ public:
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
   /** Runtime information support. */
-  itkTypeMacro(KurtosisFitFunctor, DWIVoxelFunctor)
+  itkTypeMacro(BiExpFitFunctor, DWIVoxelFunctor)
 
   void operator()(vnl_matrix<double> & newSignal,const vnl_matrix<double> & SignalMatrix, const double & S0) override;
 
@@ -53,7 +53,7 @@ protected:
   vnl_vector<double> m_BValueList;
 
   /**
-   * \brief The lestSquaresFunction struct for Non-Linear-Least-Squres fit of Kurtosis
+   * \brief The lestSquaresFunction struct for Non-Linear-Least-Squres fit of Biexponential model
    */
   struct lestSquaresFunction: public vnl_least_squares_function
   {
@@ -81,21 +81,23 @@ protected:
     int N;
 
     lestSquaresFunction(unsigned int number_of_measurements) :
-      vnl_least_squares_function(2 /*number of unknowns [ADC AKC]*/, number_of_measurements, no_gradient)
+      vnl_least_squares_function(3 /*number of unknowns [ ADC_slow ADC_fast lambda]*/, number_of_measurements, no_gradient)
     {
       N = get_number_of_residuals();
     }
 
     void f(const vnl_vector<double>& x, vnl_vector<double>& fx) override {
 
-      const double & D = x[0];
-      const double & K = x[1];
+      const double & ADC_slow = x[0];
+      const double & ADC_fast = x[1];
+      const double & lambda = x[2];
+
       const vnl_vector<double> & b = bValueVector;
 
       for(int s=0; s<N; s++)
       {
-        double approx = S0 * std::exp(- b[s] * D + 1./6. *b[s] * b[s] *D * D * K);
-        fx[s] = std::fabs( measurements[s] - approx );
+        double approx = lambda * std::exp(-b[s] * ADC_slow) + (1-lambda) * std::exp(-b[s] * ADC_fast);
+        fx[s] = std::fabs( measurements[s] - approx*S0 );
       }
 
     }

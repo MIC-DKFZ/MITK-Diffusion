@@ -17,8 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkPointShell_h__
 #define __itkPointShell_h__
 
-#include <MitkDiffusionCoreExports.h>
-
 
 namespace itk
 {

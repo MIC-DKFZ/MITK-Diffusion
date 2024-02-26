@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkVectorImage.h"
 #include "mitkImageVtkAccessor.h"
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 
 namespace mitk
 {
@@ -30,7 +30,7 @@ namespace mitk
   /**
   * \brief this class encapsulates spherical harmonics coefficients
   */
-  class MITKDIFFUSIONCORE_EXPORT ShImage : public Image
+  class MITKDIFFUSIONMODELLING_EXPORT ShImage : public Image
   {
 
   public:

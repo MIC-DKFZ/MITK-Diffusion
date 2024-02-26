@@ -23,7 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkVtkMapper.h>
 #include <mitkPeakImage.h>
 #include <vtkSmartPointer.h>
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 
 #define MITKPeakImageMapper2D_POLYDATAMAPPER vtkOpenGLPolyDataMapper
 
@@ -40,7 +40,7 @@ namespace mitk {
 
 struct IShaderRepository;
 
-class MITKDIFFUSIONCORE_EXPORT PeakImageMapper2D : public VtkMapper
+class MITKDIFFUSIONMODELLING_EXPORT PeakImageMapper2D : public VtkMapper
 {
 
 public:

@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __vtkOdfSource_h
 #define __vtkOdfSource_h
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 
 #include "vtkPolyDataAlgorithm.h"
 #include "mitkCommon.h"
@@ -26,7 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkOdfNormalizationMethodProperty.h>
 #include <mitkOdfImage.h>
 
-class MITKDIFFUSIONCORE_EXPORT vtkOdfSource : public vtkPolyDataAlgorithm
+class MITKDIFFUSIONMODELLING_EXPORT vtkOdfSource : public vtkPolyDataAlgorithm
 {
 public:
 

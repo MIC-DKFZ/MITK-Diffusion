@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define __mitkDiffusionFunctionCollection_h_
 
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 #include <vnl/vnl_vector.h>
 #include <vnl/vnl_vector_fixed.h>
 #include <itkVectorContainer.h>
@@ -36,7 +36,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 namespace mitk{
 
-class MITKDIFFUSIONCORE_EXPORT convert
+class MITKDIFFUSIONMODELLING_EXPORT convert
 {
 public:
   static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromTensorImage(mitk::Image::Pointer mitkImage);
@@ -61,7 +61,7 @@ public:
   static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromOdfImage(mitk::Image::Pointer mitkImage);
 };
 
-class MITKDIFFUSIONCORE_EXPORT sh
+class MITKDIFFUSIONMODELLING_EXPORT sh
 {
 public:
   static double factorial(int number);

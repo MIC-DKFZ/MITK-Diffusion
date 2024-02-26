@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkOrientationDistributionFunction_h
 #define __itkOrientationDistributionFunction_h
 
-#include <MitkDiffusionCoreExports.h>
 #include "itkIndent.h"
 #include "itkFixedArray.h"
 #include "itkMatrix.h"

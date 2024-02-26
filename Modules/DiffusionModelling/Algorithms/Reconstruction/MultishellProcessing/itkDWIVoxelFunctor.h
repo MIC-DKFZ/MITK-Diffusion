@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef _itk_DWIVoxelFunctor_h_
 #define _itk_DWIVoxelFunctor_h_
 
-#include <MitkDiffusionCoreExports.h>
+#include <MitkDiffusionModellingExports.h>
 #include "vnl/vnl_vector.h"
 #include "vnl/vnl_matrix.h"
 #include <itkObject.h>
@@ -30,7 +30,7 @@ namespace itk
  * \brief The DWIVoxelFunctor class
  * Abstract basisclass for voxelprocessing of Diffusion Weighted Images
  */
-class MITKDIFFUSIONCORE_EXPORT DWIVoxelFunctor: public Object
+class MITKDIFFUSIONMODELLING_EXPORT DWIVoxelFunctor: public Object
 {
 protected:
   DWIVoxelFunctor(){}

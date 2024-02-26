@@ -1,7 +1,7 @@
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
   INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} IO Rendering
-  DEPENDS MitkDiffusionCore MitkPlanarFigure MitkDICOM
+  DEPENDS MitkPlanarFigure MitkDICOM MitkDiffusionModelling
   PACKAGE_DEPENDS
     DCMTK|dcmtract VTK|CommonComputationalGeometry ITK|ITKIONRRD+ITKIONIFTI
 )

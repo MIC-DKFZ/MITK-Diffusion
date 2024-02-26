@@ -14,26 +14,22 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _itk_BiExpFitFunctor_h_
-#define _itk_BiExpFitFunctor_h_
+#ifndef _itk_ADCFitFunctor_h_
+#define _itk_ADCFitFunctor_h_
 
 #include "itkDWIVoxelFunctor.h"
-#include <cmath>
-
-// vnl include
 #include "vnl/vnl_least_squares_function.h"
-#include "vnl/algo/vnl_levenberg_marquardt.h"
 
 namespace itk
 {
 
-class MITKDIFFUSIONCORE_EXPORT BiExpFitFunctor : public DWIVoxelFunctor
+class MITKDIFFUSIONMODELLING_EXPORT ADCFitFunctor : public DWIVoxelFunctor
 {
 public:
-  BiExpFitFunctor(){}
-  ~BiExpFitFunctor() override{}
+  ADCFitFunctor(){}
+  ~ADCFitFunctor() override{}
 
-  typedef BiExpFitFunctor                         Self;
+  typedef ADCFitFunctor                       Self;
   typedef SmartPointer<Self>                      Pointer;
   typedef SmartPointer<const Self>                ConstPointer;
   typedef DWIVoxelFunctor                         Superclass;
@@ -41,9 +37,9 @@ public:
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
   /** Runtime information support. */
-  itkTypeMacro(BiExpFitFunctor, DWIVoxelFunctor)
+  itkTypeMacro(ADCFitFunctor, DWIVoxelFunctor)
 
-  void operator()(vnl_matrix<double> & newSignal,const vnl_matrix<double> & SignalMatrix, const double & S0) override;
+  void operator()(vnl_matrix<double> & newSignal, const vnl_matrix<double> & SignalMatrix, const double & S0) override;
 
   void setTargetBValue(const double & targetBValue){m_TargetBvalue = targetBValue;}
   void setListOfBValues(const vnl_vector<double> & BValueList){m_BValueList = BValueList;}
@@ -53,7 +49,7 @@ protected:
   vnl_vector<double> m_BValueList;
 
   /**
-   * \brief The lestSquaresFunction struct for Non-Linear-Least-Squres fit of Biexponential model
+   * \brief The lestSquaresFunction struct for Non-Linear-Least-Squres fit of monoexponential model
    */
   struct lestSquaresFunction: public vnl_least_squares_function
   {
@@ -81,30 +77,26 @@ protected:
     int N;
 
     lestSquaresFunction(unsigned int number_of_measurements) :
-      vnl_least_squares_function(3 /*number of unknowns [ ADC_slow ADC_fast lambda]*/, number_of_measurements, no_gradient)
+      vnl_least_squares_function(1 /*number of unknowns [ ADC ]*/, number_of_measurements, no_gradient)
     {
       N = get_number_of_residuals();
     }
 
     void f(const vnl_vector<double>& x, vnl_vector<double>& fx) override {
 
-      const double & ADC_slow = x[0];
-      const double & ADC_fast = x[1];
-      const double & lambda = x[2];
+      const double & ADC = x[0];
 
       const vnl_vector<double> & b = bValueVector;
 
       for(int s=0; s<N; s++)
       {
-        double approx = lambda * std::exp(-b[s] * ADC_slow) + (1-lambda) * std::exp(-b[s] * ADC_fast);
-        fx[s] = std::fabs( measurements[s] - approx*S0 );
+        double approx = S0 * std::exp(-b[s] * ADC);
+        fx[s] = std::fabs( measurements[s] - approx );
       }
 
     }
   };
-
 };
-
 }
 
 #endif

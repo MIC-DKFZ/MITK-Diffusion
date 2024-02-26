@@ -15,46 +15,46 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef __mitkOdfImage__h
-#define __mitkOdfImage__h
+#ifndef __mitkTensorImage__h
+#define __mitkTensorImage__h
 
 #include "mitkImage.h"
 #include "itkVectorImage.h"
-#include "mitkImageVtkAccessor.h"
 
-#include <MitkDiffusionCoreExports.h>
-#include <itkOrientationDistributionFunction.h>
+#include <MitkDiffusionModellingExports.h>
+
+
+#define TENSOR_NUM_ELEMENTS 6
 
 namespace mitk
 {
 
   /**
-  * \brief this class encapsulates orientation distribution images
+  * \brief this class encapsulates tensor images
   */
-  class MITKDIFFUSIONCORE_EXPORT OdfImage : public Image
+  class MITKDIFFUSIONMODELLING_EXPORT TensorImage : public Image
   {
 
   public:
 
     typedef float ScalarPixelType;
-    typedef itk::Vector< ScalarPixelType, ODF_SAMPLING_SIZE > PixelType;
-    typedef itk::Image< itk::Vector< ScalarPixelType, ODF_SAMPLING_SIZE >, 3 > ItkOdfImageType;
+    typedef itk::DiffusionTensor3D<ScalarPixelType> PixelType;
+    typedef itk::Image<PixelType,3> ItkTensorImageType;
 
-    mitkClassMacro( OdfImage, Image )
+    mitkClassMacro( TensorImage, Image )
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
 
-    virtual const vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0) const;
     virtual vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0);
 
-    const vtkImageData* GetVtkImageData(int t = 0, int n = 0) const override;
     vtkImageData* GetVtkImageData(int t = 0, int n = 0) override;
+    const vtkImageData* GetVtkImageData(int t = 0, int n = 0) const override;
 
     virtual void ConstructRgbImage() const;
 
   protected:
-    OdfImage();
-    ~OdfImage() override;
+    TensorImage();
+    ~TensorImage() override;
 
     mutable mitk::Image::Pointer m_RgbImage;
 
@@ -62,4 +62,4 @@ namespace mitk
 
 } // namespace mitk
 
-#endif /* __mitkOdfImage__h */
+#endif /* __mitkTensorImage__h */
