@@ -32,6 +32,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vtkThickPlane.h"
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <itkPointShell.h>
+#include <vtkImageProbeFilter.h>
 
 namespace mitk {
 
@@ -145,6 +146,7 @@ private:
     vtkImageData*                                     m_VtkImage ;
     std::vector< OdfDisplayGeometry >                 m_LastDisplayGeometry;
     mitk::LocalStorageHandler<LocalStorage>           m_LSH;
+    vtkSmartPointer<vtkImageProbeFilter>              m_ProbeFilter;
 
     static vnl_matrix<float>                          m_Sh2Basis;
     static vnl_matrix<float>                          m_Sh4Basis;

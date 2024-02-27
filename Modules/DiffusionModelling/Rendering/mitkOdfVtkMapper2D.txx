@@ -21,7 +21,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkOdfVtkMapper2D.h"
 #include "mitkDataNode.h"
 #include "mitkBaseRenderer.h"
-#include "mitkMatrixConvert.h"
 #include "mitkGeometry3D.h"
 #include "mitkTimeGeometry.h"
 #include "mitkOdfNormalizationMethodProperty.h"
@@ -30,10 +29,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkTensorImage.h"
 #include "mitkShImage.h"
 
-#include "vtkSphereSource.h"
-#include "vtkPropCollection.h"
-#include "vtkMaskedGlyph3D.h"
-#include "vtkGlyph2D.h"
 #include "vtkGlyph3D.h"
 #include "vtkMaskedProgrammableGlyphFilter.h"
 #include "vtkImageData.h"
@@ -47,8 +42,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vtkLookupTable.h"
 #include "vtkProperty.h"
 #include "vtkPolyDataNormals.h"
-#include "vtkLight.h"
-#include "vtkLightCollection.h"
 #include "vtkMath.h"
 #include "vtkFloatArray.h"
 #include "vtkDelaunay2D.h"
@@ -56,7 +49,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkInformationVector.h>
 #include <vtkInformation.h>
 #include "vtkRenderer.h"
-
+#include <vtkImageInterpolator.h>
 #include "itkOrientationDistributionFunction.h"
 
 #include "itkFixedArray.h"
@@ -208,6 +201,12 @@ mitk::OdfVtkMapper2D<T,N>
   m_Clippers2[2]->SetClipFunction( m_ThickPlanes2[2] );
 
   m_ShowMaxNumber = 500;
+
+  vtkSmartPointer<vtkImageInterpolator> interpolator = vtkSmartPointer<vtkImageInterpolator>::New();
+  interpolator->SetInterpolationModeToNearest();
+
+  m_ProbeFilter = vtkSmartPointer<vtkImageProbeFilter>::New();
+  m_ProbeFilter->SetInterpolator(interpolator);
 }
 
 template<class T, int N>
@@ -272,52 +271,55 @@ void  mitk::OdfVtkMapper2D<T,N>
   point[2] = p2[2];
 
   vtkPointData* data = pfilter->GetPointData();
-  vtkDataArray* image_vals = data->GetArray("vector");
   vtkIdType id = pfilter->GetPointId();
+
   m_OdfTransform->Identity();
   m_OdfTransform->Translate(point[0],point[1],point[2]);
 
   typedef itk::OrientationDistributionFunction<float,N> OdfType;
   OdfType odf;
 
-  if( image_vals->GetNumberOfComponents()==6 && !m_ToggleTensorEllipsoidView )
+  vtkDataArray* scalars = data->GetScalars();
+
+  if( scalars->GetNumberOfComponents()==6 && !m_ToggleTensorEllipsoidView )
   {
+
     float tensorelems[6] = {
-      (float)image_vals->GetComponent(id,0),
-      (float)image_vals->GetComponent(id,1),
-      (float)image_vals->GetComponent(id,2),
-      (float)image_vals->GetComponent(id,3),
-      (float)image_vals->GetComponent(id,4),
-      (float)image_vals->GetComponent(id,5),
+        (float)scalars->GetTuple(id)[0],
+        (float)scalars->GetTuple(id)[1],
+        (float)scalars->GetTuple(id)[2],
+        (float)scalars->GetTuple(id)[3],
+        (float)scalars->GetTuple(id)[4],
+        (float)scalars->GetTuple(id)[5],
     };
     itk::DiffusionTensor3D<float> tensor(tensorelems);
     odf.InitFromTensor(tensor);
   }
-  else if( image_vals->GetNumberOfComponents()==6 && m_ToggleTensorEllipsoidView )
+  else if( scalars->GetNumberOfComponents()==6 && m_ToggleTensorEllipsoidView )
   {
     float tensorelems[6] = {
-      (float)image_vals->GetComponent(id,0),
-      (float)image_vals->GetComponent(id,1),
-      (float)image_vals->GetComponent(id,2),
-      (float)image_vals->GetComponent(id,3),
-      (float)image_vals->GetComponent(id,4),
-      (float)image_vals->GetComponent(id,5),
+        (float)scalars->GetTuple(id)[0],
+        (float)scalars->GetTuple(id)[1],
+        (float)scalars->GetTuple(id)[2],
+        (float)scalars->GetTuple(id)[3],
+        (float)scalars->GetTuple(id)[4],
+        (float)scalars->GetTuple(id)[5],
     };
     itk::DiffusionTensor3D<float> tensor( tensorelems );
     odf.InitFromEllipsoid( tensor );
   }
-  else if (image_vals->GetNumberOfComponents() == ODF_SAMPLING_SIZE)
+  else if (scalars->GetNumberOfComponents() == ODF_SAMPLING_SIZE)
   {
     for(int i=0; i<N; i++)
-      odf[i] = (double)image_vals->GetComponent(id,i);
+      odf[i] = (double)scalars->GetTuple(id)[i];
   }
   else
   {
-    int nrCoeffs = image_vals->GetNumberOfComponents();
+    int nrCoeffs = scalars->GetNumberOfComponents();
     Vector< float, N > odf_vals;
     vnl_vector< float > coeffs(nrCoeffs);
     for(int i=0; i<nrCoeffs; i++)
-      coeffs[i] = (float)image_vals->GetComponent(id,i);
+      coeffs[i] = (float)scalars->GetTuple(id)[i];
 
     switch (nrCoeffs)
     {
@@ -656,6 +658,10 @@ void  mitk::OdfVtkMapper2D<T,N>
 
     cuttedPlane = m_Clippers2[index]->GetOutput ();
 
+    m_ProbeFilter->SetInputData(cuttedPlane); // cuttedPlane is your vtkPolyData from vtkCutter
+    m_ProbeFilter->Update();
+    cuttedPlane = m_ProbeFilter->GetPolyDataOutput();
+
     if(cuttedPlane->GetNumberOfPoints())
     {
       localStorage->m_OdfsPlanes[index]->RemoveAllInputs();
@@ -819,6 +825,7 @@ void mitk::OdfVtkMapper2D<T,N>
       m_VtkImage->GetPointData()->GetArray(0)->SetName("vector");
     }
 
+    m_ProbeFilter->SetSourceData(m_VtkImage); // m_VtkImage is your original vtkImageData
     GenerateDataForRenderer(renderer);
   }
   else

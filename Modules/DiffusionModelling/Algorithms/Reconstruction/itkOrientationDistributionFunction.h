@@ -17,20 +17,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkOrientationDistributionFunction_h
 #define __itkOrientationDistributionFunction_h
 
-#include "itkIndent.h"
 #include "itkFixedArray.h"
 #include "itkMatrix.h"
-#include "itkSymmetricEigenAnalysis.h"
 #include <mutex>
 #include "itkDiffusionTensor3D.h"
 
 #include "vtkPolyData.h"
-#include "vtkPoints.h"
-#include "vtkCellArray.h"
-#include "vtkDelaunay2D.h"
-#include "vtkCleanPolyData.h"
 #include "vtkAppendPolyData.h"
-#include "vtkPlane.h"
 
 // generate by n-fold subdivisions of an icosahedron
 // 1 - 12

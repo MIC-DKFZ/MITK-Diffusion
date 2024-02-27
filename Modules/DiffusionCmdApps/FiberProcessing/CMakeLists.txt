@@ -15,7 +15,7 @@ if(BUILD_DiffusionFiberProcessingCmdApps OR MITK_BUILD_ALL_APPS)
     Sift2WeightCopy^^
     FiberExtraction^^
     FiberExtractionRoi^^
-    # FiberProcessing^^
+    FiberModification^^
     FitFibersToImage^^
     FiberDirectionExtraction^^
     FiberJoin^^

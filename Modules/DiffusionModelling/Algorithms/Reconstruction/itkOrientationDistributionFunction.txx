@@ -17,22 +17,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef _itkOrientationDistributionFunction_txx
 #define _itkOrientationDistributionFunction_txx
 
-#include <cstdio>
-#include <cstdlib>
-#include <ctime>
-#include <algorithm>
-#include <vector>
 #include <vnl/algo/vnl_matrix_inverse.h>
 #include <itkPointShell.h>
 #include <itkMatrix.h>
 #include <vnl/vnl_matrix.h>
 #include <vnl/vnl_matrix_fixed.h>
 #include <vnl/vnl_inverse.h>
-#include <typeinfo>
 #include <ciso646>
 #include <vnl/vnl_vector_fixed.hxx>
 #include <vnl/vnl_cross.h>
 #include <mitkLogMacros.h>
+#include <vtkDelaunay2D.h>
+#include <vtkPlane.h>
 
 namespace itk
 {
