@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkTestingMacros.h"
 #include "mitkTestFixture.h"
 #include "itkNonLocalMeansDenoisingFilter.h"
-#include "mitkGradientDirectionsProperty.h"
 #include "mitkITKImageImport.h"
 #include <mitkImageCast.h>
 

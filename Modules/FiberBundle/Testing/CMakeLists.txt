@@ -1,0 +1,6 @@
+MITK_CREATE_MODULE_TESTS()
+
+mitkAddCustomModuleTest(mitkFiberBundleReaderWriterTest mitkFiberBundleReaderWriterTest)
+
+# does not work reliably
+mitkAddCustomModuleTest(mitkFiberMapper3DTest mitkFiberMapper3DTest)

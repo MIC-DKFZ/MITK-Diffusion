@@ -5,3 +5,5 @@ MITK_CREATE_MODULE(
   PACKAGE_DEPENDS
     DCMTK|dcmtract VTK|CommonComputationalGeometry ITK|ITKIONRRD+ITKIONIFTI
 )
+
+add_subdirectory(Testing)

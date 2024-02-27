@@ -8,4 +8,6 @@ MITK_CREATE_MODULE(
   DEPENDS MitkDiffusionImage MitkDiffusionPreprocessing MitkMatchPointRegistration
 )
 
+add_subdirectory(Testing)
+
 endif()

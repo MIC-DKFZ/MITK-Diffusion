@@ -3,3 +3,5 @@ MITK_CREATE_MODULE(
   INCLUDE_DIRS FiberClustering FiberDerivedImages FiberModification FiberQuantification ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS MitkFiberBundle
 )
+
+add_subdirectory(Testing)

@@ -27,129 +27,189 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImage.h>
 #include <mitkDiffusionPropertyHelper.h>
 
-int mitkImageReconstructionTest(int argc, char* argv[])
+
+#include <mitkTestFixture.h>
+#include <mitkPreferenceListReaderOptionsFunctor.h>
+
+class mitkImageReconstructionTestSuite : public mitk::TestFixture
 {
-  MITK_TEST_BEGIN("mitkImageReconstructionTest");
 
-  MITK_TEST_CONDITION_REQUIRED(argc>1,"check for input data")
+  CPPUNIT_TEST_SUITE(mitkImageReconstructionTestSuite);
+  MITK_TEST(MyTest);
+  CPPUNIT_TEST_SUITE_END();
 
-      try
+  typedef itk::Image<float, 3> ItkFloatImgType;
+
+  private:
+
+  /** Members used inside the different (sub-)tests. All members are initialized via setUp().*/
+
+  public:
+
+  void setUp() override
   {
-    mitk::Image::Pointer dwi = mitk::IOUtil::Load<mitk::Image>(argv[1]);
+// # ${MITK_DATA_DIR}/DiffusionImaging/ImageReconstruction/test_dti.dti
+// # ${MITK_DATA_DIR}/DiffusionImaging/ImageReconstruction/test_QN0.qbi
+// # ${MITK_DATA_DIR}/DiffusionImaging/ImageReconstruction/test_QA0.qbi
+// # ${MITK_DATA_DIR}/DiffusionImaging/ImageReconstruction/test_QA6.qbi
+// # ${MITK_DATA_DIR}/DiffusionImaging/ImageReconstruction/test_QA4.qbi
+// # ${MITK_DATA_DIR}/DiffusionImaging/ImageReconstruction/test_QA5.qbi)
+  }
+
+  void tearDown() override
+  {
+
+  }
+
+  void MyTest()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
+    auto dwi = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"), &functor);
+    float b_value = mitk::DiffusionPropertyHelper::GetReferenceBValue( dwi );
 
     itk::VectorImage<short,3>::Pointer itkVectorImagePointer = itk::VectorImage<short,3>::New();
     mitk::CastToItkImage(dwi, itkVectorImagePointer);
 
-    float b_value = mitk::DiffusionPropertyHelper::GetReferenceBValue( dwi );
-    mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(dwi);
-    {
-      MITK_INFO << "Tensor reconstruction " << argv[2];
-      mitk::TensorImage::Pointer tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(argv[2]);
-      typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, float > TensorReconstructionImageFilterType;
-      TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
-      filter->SetBValue( b_value );
-      filter->SetGradientImage( dynamic_cast<mitk::GradientDirectionsProperty *>(dwi->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
-      filter->Update();
-      mitk::TensorImage::Pointer testImage = mitk::TensorImage::New();
-      testImage->InitializeByItk( filter->GetOutput() );
-      testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
-      MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *tensorImage, 0.0001, true), "tensor reconstruction test.");
-    }
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
 
-    {
-      MITK_INFO << "Numerical Q-ball reconstruction " << argv[3];
-      mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[3]);
-      typedef itk::DiffusionQballReconstructionImageFilter<short, short, float, ODF_SAMPLING_SIZE> QballReconstructionImageFilterType;
-      QballReconstructionImageFilterType::Pointer filter = QballReconstructionImageFilterType::New();
-      filter->SetBValue( b_value );
-      filter->SetGradientImage( gradients, itkVectorImagePointer );
-      filter->SetNormalizationMethod(QballReconstructionImageFilterType::QBR_STANDARD);
-      filter->Update();
-      mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
-      testImage->InitializeByItk( filter->GetOutput() );
-      testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
-      MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.0001, true), "Numerical Q-ball reconstruction test.");
-    }
-
-    {
-      MITK_INFO << "Standard Q-ball reconstruction " << argv[4];
-      mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[4]);
-      typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
-      FilterType::Pointer filter = FilterType::New();
-      filter->SetBValue( b_value );
-      filter->SetGradientImage( gradients, itkVectorImagePointer );
-      filter->SetLambda(0.006);
-      filter->SetNormalizationMethod(FilterType::QBAR_STANDARD);
-      filter->Update();
-      mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
-      testImage->InitializeByItk( filter->GetOutput() );
-      testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
-      MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.0001, true), "Standard Q-ball reconstruction test.");
-    }
-
-    {
-      MITK_INFO << "CSA Q-ball reconstruction " << argv[5];
-      mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[5]);
-      typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
-      FilterType::Pointer filter = FilterType::New();
-      filter->SetBValue( b_value );
-      filter->SetGradientImage( gradients, itkVectorImagePointer );
-      filter->SetLambda(0.006);
-      filter->SetNormalizationMethod(FilterType::QBAR_SOLID_ANGLE);
-      filter->Update();
-      mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
-      testImage->InitializeByItk( filter->GetOutput() );
-      testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
-      MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.0001, true), "CSA Q-ball reconstruction test.");
-    }
-
-    {
-      MITK_INFO << "ADC profile reconstruction " << argv[6];
-      mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[6]);
-      typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
-      FilterType::Pointer filter = FilterType::New();
-      filter->SetBValue( b_value );
-      filter->SetGradientImage( gradients, itkVectorImagePointer );
-      filter->SetLambda(0.006);
-      filter->SetNormalizationMethod(FilterType::QBAR_ADC_ONLY);
-      filter->Update();
-      mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
-      testImage->InitializeByItk( filter->GetOutput() );
-      testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
-      MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.0001, true), "ADC profile reconstruction test.");
-    }
-
-    {
-      MITK_INFO << "Raw signal modeling " << argv[7];
-      mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[7]);
-      typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
-      FilterType::Pointer filter = FilterType::New();
-      filter->SetBValue( b_value );
-      filter->SetGradientImage( gradients, itkVectorImagePointer );
-      filter->SetLambda(0.006);
-      filter->SetNormalizationMethod(FilterType::QBAR_RAW_SIGNAL);
-      filter->Update();
-      mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
-      testImage->InitializeByItk( filter->GetOutput() );
-      testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
-      MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.1, true), "Raw signal modeling test.");
-    }
-  }
-  catch (const itk::ExceptionObject& e)
-  {
-    MITK_INFO << e.what();
-    return EXIT_FAILURE;
-  }
-  catch (const std::exception& e)
-  {
-    MITK_INFO << e.what();
-    return EXIT_FAILURE;
-  }
-  catch (...)
-  {
-    MITK_INFO << "ERROR!?!";
-    return EXIT_FAILURE;
+    typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, float > TensorReconstructionImageFilterType;
+    TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
+    filter->SetBValue( b_value );
+    filter->SetGradientImage( dynamic_cast<mitk::GradientDirectionsProperty *>(dwi->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
+    filter->Update();
+    mitk::TensorImage::Pointer testImage = mitk::TensorImage::New();
+    testImage->InitializeByItk( filter->GetOutput() );
+    testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
+    MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *tensorImage, 0.0001, true), "tensor reconstruction test.");
   }
 
-  MITK_TEST_END();
-}
+};
+
+MITK_TEST_SUITE_REGISTRATION(mitkImageReconstruction)
+
+// int mitkImageReconstructionTest(int argc, char* argv[])
+// {
+//   MITK_TEST_BEGIN("mitkImageReconstructionTest");
+
+//   MITK_TEST_CONDITION_REQUIRED(argc>1,"check for input data")
+
+//       try
+//   {
+//     mitk::Image::Pointer dwi = mitk::IOUtil::Load<mitk::Image>(argv[1]);
+
+//     itk::VectorImage<short,3>::Pointer itkVectorImagePointer = itk::VectorImage<short,3>::New();
+//     mitk::CastToItkImage(dwi, itkVectorImagePointer);
+
+//     float b_value = mitk::DiffusionPropertyHelper::GetReferenceBValue( dwi );
+//     mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(dwi);
+//     {
+//       MITK_INFO << "Tensor reconstruction " << argv[2];
+//       mitk::TensorImage::Pointer tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(argv[2]);
+//       typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, float > TensorReconstructionImageFilterType;
+//       TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
+//       filter->SetBValue( b_value );
+//       filter->SetGradientImage( dynamic_cast<mitk::GradientDirectionsProperty *>(dwi->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
+//       filter->Update();
+//       mitk::TensorImage::Pointer testImage = mitk::TensorImage::New();
+//       testImage->InitializeByItk( filter->GetOutput() );
+//       testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
+//       MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *tensorImage, 0.0001, true), "tensor reconstruction test.");
+//     }
+
+//     {
+//       MITK_INFO << "Numerical Q-ball reconstruction " << argv[3];
+//       mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[3]);
+//       typedef itk::DiffusionQballReconstructionImageFilter<short, short, float, ODF_SAMPLING_SIZE> QballReconstructionImageFilterType;
+//       QballReconstructionImageFilterType::Pointer filter = QballReconstructionImageFilterType::New();
+//       filter->SetBValue( b_value );
+//       filter->SetGradientImage( gradients, itkVectorImagePointer );
+//       filter->SetNormalizationMethod(QballReconstructionImageFilterType::QBR_STANDARD);
+//       filter->Update();
+//       mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
+//       testImage->InitializeByItk( filter->GetOutput() );
+//       testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
+//       MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.0001, true), "Numerical Q-ball reconstruction test.");
+//     }
+
+//     {
+//       MITK_INFO << "Standard Q-ball reconstruction " << argv[4];
+//       mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[4]);
+//       typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
+//       FilterType::Pointer filter = FilterType::New();
+//       filter->SetBValue( b_value );
+//       filter->SetGradientImage( gradients, itkVectorImagePointer );
+//       filter->SetLambda(0.006);
+//       filter->SetNormalizationMethod(FilterType::QBAR_STANDARD);
+//       filter->Update();
+//       mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
+//       testImage->InitializeByItk( filter->GetOutput() );
+//       testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
+//       MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.0001, true), "Standard Q-ball reconstruction test.");
+//     }
+
+//     {
+//       MITK_INFO << "CSA Q-ball reconstruction " << argv[5];
+//       mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[5]);
+//       typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
+//       FilterType::Pointer filter = FilterType::New();
+//       filter->SetBValue( b_value );
+//       filter->SetGradientImage( gradients, itkVectorImagePointer );
+//       filter->SetLambda(0.006);
+//       filter->SetNormalizationMethod(FilterType::QBAR_SOLID_ANGLE);
+//       filter->Update();
+//       mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
+//       testImage->InitializeByItk( filter->GetOutput() );
+//       testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
+//       MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.0001, true), "CSA Q-ball reconstruction test.");
+//     }
+
+//     {
+//       MITK_INFO << "ADC profile reconstruction " << argv[6];
+//       mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[6]);
+//       typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
+//       FilterType::Pointer filter = FilterType::New();
+//       filter->SetBValue( b_value );
+//       filter->SetGradientImage( gradients, itkVectorImagePointer );
+//       filter->SetLambda(0.006);
+//       filter->SetNormalizationMethod(FilterType::QBAR_ADC_ONLY);
+//       filter->Update();
+//       mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
+//       testImage->InitializeByItk( filter->GetOutput() );
+//       testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
+//       MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.0001, true), "ADC profile reconstruction test.");
+//     }
+
+//     {
+//       MITK_INFO << "Raw signal modeling " << argv[7];
+//       mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(argv[7]);
+//       typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
+//       FilterType::Pointer filter = FilterType::New();
+//       filter->SetBValue( b_value );
+//       filter->SetGradientImage( gradients, itkVectorImagePointer );
+//       filter->SetLambda(0.006);
+//       filter->SetNormalizationMethod(FilterType::QBAR_RAW_SIGNAL);
+//       filter->Update();
+//       mitk::OdfImage::Pointer testImage = mitk::OdfImage::New();
+//       testImage->InitializeByItk( filter->GetOutput() );
+//       testImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
+//       MITK_TEST_CONDITION_REQUIRED(mitk::Equal(*testImage, *odfImage, 0.1, true), "Raw signal modeling test.");
+//     }
+//   }
+//   catch (const itk::ExceptionObject& e)
+//   {
+//     MITK_INFO << e.what();
+//     return EXIT_FAILURE;
+//   }
+//   catch (const std::exception& e)
+//   {
+//     MITK_INFO << e.what();
+//     return EXIT_FAILURE;
+//   }
+//   catch (...)
+//   {
+//     MITK_INFO << "ERROR!?!";
+//     return EXIT_FAILURE;
+//   }
+
+//   MITK_TEST_END();
+// }
