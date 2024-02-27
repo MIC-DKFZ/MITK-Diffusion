@@ -1,6 +1,6 @@
 option(BUILD_MODULE_FiberDissection "" OFF)
 
-if(BUILD_MODULE_FiberDissection OR MITK_BUILD_ALL_APPS)
+if(BUILD_MODULE_FiberDissection)
 
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
