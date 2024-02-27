@@ -1,6 +1,6 @@
 set(CPP_FILES
 
-  mitkDiffusionFunctionCollection.cpp
+  mitkDiffusionModellingHelperFunctions.cpp
 
   # DataStructures
   IO/mitkOdfImage.cpp
@@ -45,7 +45,7 @@ set(CPP_FILES
 
 set(H_FILES
 
-  mitkDiffusionFunctionCollection.h
+  mitkDiffusionModellingHelperFunctions.h
 
   # DataStructures
   IO/mitkOdfImage.h

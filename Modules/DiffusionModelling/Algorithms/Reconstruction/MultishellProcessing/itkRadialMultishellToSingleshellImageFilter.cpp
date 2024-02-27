@@ -36,7 +36,7 @@ PURPOSE.  See the above copyright notices for more information.
 #define _USE_MATH_DEFINES
 
 #include "itkRadialMultishellToSingleshellImageFilter.h"
-#include "mitkDiffusionFunctionCollection.h"
+#include "mitkDiffusionModellingHelperFunctions.h"
 
 
 namespace itk

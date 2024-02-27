@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkTimeProbe.h>
 #include <itkPointShell.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 namespace itk {
 

@@ -37,7 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkFloatArray.h>
 #include <itkScalableAffineTransform.h>
 #include <mitkLookupTable.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 namespace mitk {
 

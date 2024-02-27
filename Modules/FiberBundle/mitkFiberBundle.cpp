@@ -19,7 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarCircle.h>
 #include <mitkPlanarPolygon.h>
 #include <mitkPlanarFigureComposite.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkPixelTypeMultiplex.h>
 
 #include <vtkPointData.h>

@@ -58,7 +58,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <boost/version.hpp>
 #include <itkShToOdfImageFilter.h>
 #include <mitkImageCast.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 const std::string QmitkQBallReconstructionView::VIEW_ID = "org.mitk.views.qballreconstruction";
 

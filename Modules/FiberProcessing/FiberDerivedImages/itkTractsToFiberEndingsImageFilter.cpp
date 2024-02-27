@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkCellArray.h>
 #include <vtkCellData.h>
 #include <boost/timer/progress_display.hpp>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 namespace itk{
 

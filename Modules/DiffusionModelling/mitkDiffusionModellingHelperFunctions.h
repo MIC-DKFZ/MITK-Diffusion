@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkDiffusionFunctionCollection_h_
-#define __mitkDiffusionFunctionCollection_h_
+#ifndef __mitkDiffusionModellingHelperFunctions_h_
+#define __mitkDiffusionModellingHelperFunctions_h_
 
 
 #include <MitkDiffusionModellingExports.h>
@@ -87,5 +87,5 @@ public:
 
 }
 
-#endif //__mitkDiffusionFunctionCollection_h_
+#endif //__mitkDiffusionModellingHelperFunctions_h_
 

@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <itkPoint.h>
 #include <mitkBaseData.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkStreamlineTractographyParameters.h>
 
 namespace mitk

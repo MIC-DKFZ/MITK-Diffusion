@@ -23,7 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkArray.h>
 #include <vnl/vnl_vector.h>
 #include <mitkDiffusionImageHelperFunctions.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 #include <cstdio>
 #include <locale>

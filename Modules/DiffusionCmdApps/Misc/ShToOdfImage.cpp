@@ -21,7 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itkShToOdfImageFilter.h>
 #include <mitkShImage.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 int main(int argc, char* argv[])
 {

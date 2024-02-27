@@ -31,7 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTensorImage.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <itkAdcImageFilter.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkLocaleSwitch.h>
 
 /**

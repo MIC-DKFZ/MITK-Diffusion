@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkShImage.h>
 #include <itkOrientationDistributionFunction.h>
 #include <vnl/algo/vnl_lbfgsb.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 class VnlCostFunction : public vnl_cost_function
 {

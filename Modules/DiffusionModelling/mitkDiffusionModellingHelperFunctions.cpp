@@ -14,7 +14,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include "mitkDiffusionFunctionCollection.h"
+#include "mitkDiffusionModellingHelperFunctions.h"
 #include "mitkNumericTypes.h"
 
 #include <boost/math/special_functions/legendre.hpp>

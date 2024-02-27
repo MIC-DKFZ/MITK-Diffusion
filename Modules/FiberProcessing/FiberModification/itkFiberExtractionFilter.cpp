@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <boost/timer/progress_display.hpp>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 #include <boost/lexical_cast.hpp>
 
 namespace itk{

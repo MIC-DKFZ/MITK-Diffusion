@@ -30,7 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <TrackingHandlers/mitkTrackingHandlerOdf.h>
 #include <TrackingHandlers/mitkTrackingHandlerPeaks.h>
 #include <TrackingHandlers/mitkTrackingHandlerTensor.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 #include <random>
 
 namespace itk {
