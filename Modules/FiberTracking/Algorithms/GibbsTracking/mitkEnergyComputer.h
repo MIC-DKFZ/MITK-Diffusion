@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define _ENCOMP
 
 #include <MitkFiberTrackingExports.h>
-#include <itkOrientationDistributionFunction.h>
 #include <mitkParticleGrid.h>
 #include <mitkSphereInterpolator.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>

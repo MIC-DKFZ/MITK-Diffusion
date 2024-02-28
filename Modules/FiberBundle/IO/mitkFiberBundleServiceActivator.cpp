@@ -28,8 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigureCompositeReader.h>
 #include <mitkPlanarFigureCompositeWriter.h>
 
-#include <mitkDiffusionPropertyHelper.h>
-
 #include <mitkCoreServices.h>
 #include <mitkIPropertyDescriptions.h>
 #include <mitkIPropertyPersistence.h>
