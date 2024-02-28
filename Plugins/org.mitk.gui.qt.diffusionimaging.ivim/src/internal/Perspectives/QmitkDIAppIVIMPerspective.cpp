@@ -42,4 +42,5 @@ void QmitkDIAppIVIMPerspective::CreateInitialLayout(berry::IPageLayout::Pointer 
   left->AddView("org.mitk.views.ivim");
   left->AddView("org.mitk.views.segmentation");
   left->AddView("org.mitk.views.imagestatistics");
+  left->AddView("org.mitk.views.diffusionpreprocessing");
 }

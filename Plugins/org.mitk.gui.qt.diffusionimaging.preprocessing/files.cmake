@@ -7,7 +7,6 @@ set(INTERNAL_CPP_FILES
   mitkPluginActivator.cpp
 
   QmitkPreprocessingView.cpp
-  QmitkDwiPreprocessingPerspective.cpp
 )
 
 set(UI_FILES
@@ -18,7 +17,6 @@ set(MOC_H_FILES
   src/internal/mitkPluginActivator.h
 
   src/internal/QmitkPreprocessingView.h
-  src/internal/QmitkDwiPreprocessingPerspective.h
 )
 
 set(CACHED_RESOURCE_FILES
