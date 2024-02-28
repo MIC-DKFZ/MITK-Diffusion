@@ -19,7 +19,7 @@ set(MITK_BUILD_APP_Diffusion OFF CACHE BOOL "Build MITK Diffusion" FORCE)
 
 # enable modules
 set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)
-set(BUILD_MODULE_DiffusionPreprocessing OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberBundle OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberDissection OFF CACHE BOOL "" FORCE)
