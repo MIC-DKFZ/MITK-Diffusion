@@ -21,6 +21,17 @@ set(MITK_APPS_VIEWEXCLUDELIST "" CACHE STRING "" FORCE)
 set(MITK_APPS_PERSPECTIVEEXCLUDELIST "org.mitk.extapp.defaultperspective;org.mitk.mitkworkbench.perspectives.visualization;" CACHE STRING "" FORCE)
 
 
+# modules
+set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionPreprocessing OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionRegistration OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberBundle OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberDissection OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberProcessing OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberTracking OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_IVIM OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_MriSimulation OFF CACHE BOOL "" FORCE)
+
 # cmdapps
 set(BUILD_DiffusionFiberQuantificationCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber quantification" FORCE)
 set(BUILD_DiffusionFiberProcessingCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber processing" FORCE)

@@ -1,3 +1,7 @@
+option(BUILD_MODULE_DiffusionModelling "" OFF)
+
+if(BUILD_MODULE_DiffusionModelling)
+
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
   INCLUDE_DIRS  Algorithms Algorithms/Reconstruction Algorithms/Reconstruction/MultishellProcessing IO Rendering ${CMAKE_CURRENT_BINARY_DIR}
@@ -11,3 +15,5 @@ MITK_CREATE_MODULE(
 #endif()
 
 add_subdirectory(Testing)
+
+endif()

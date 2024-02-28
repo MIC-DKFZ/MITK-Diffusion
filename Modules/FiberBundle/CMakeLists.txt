@@ -1,3 +1,7 @@
+option(BUILD_MODULE_FiberBundle "" OFF)
+
+if(BUILD_MODULE_FiberBundle)
+
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
   INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} IO Rendering
@@ -7,3 +11,5 @@ MITK_CREATE_MODULE(
 )
 
 add_subdirectory(Testing)
+
+endif()

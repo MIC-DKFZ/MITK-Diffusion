@@ -1,5 +1,5 @@
-include(${MITK_EXTENSION_DIRS}/CMake/BuildConfigurations/set_always.txt)
-include(${MITK_EXTENSION_DIRS}/CMake/BuildConfigurations/set_release.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/set_always.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/set_release.txt)
 
 message(STATUS "Configuring MITK IVIM Build")
 set(MITK_CUSTOM_PRODUCT_NAME "MITK IVIM" CACHE STRING "" FORCE)
@@ -18,8 +18,15 @@ set(MITK_BUILD_APP_Workbench ON CACHE BOOL "Build the MITK Workbench" FORCE)
 set(MITK_BUILD_APP_Diffusion OFF CACHE BOOL "Build MITK Diffusion" FORCE)
 
 # enable modules
-set(BUILD_MODULE_FiberDissection OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionPreprocessing OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberBundle OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberDissection OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberProcessing OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberTracking OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_IVIM ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_MriSimulation OFF CACHE BOOL "" FORCE)
 
 # enable command line tools
 set(BUILD_DiffusionFiberQuantificationCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber quantification" FORCE)

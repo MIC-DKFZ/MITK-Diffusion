@@ -1,4 +1,4 @@
-include(${MITK_EXTENSION_DIRS}/CMake/BuildConfigurations/set_always.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/set_always.txt)
 
 message(STATUS "Configuring MITK Diffusion with all Plugins")
 set(MITK_CUSTOM_PRODUCT_NAME "MITK Diffusion" CACHE STRING "" FORCE)
@@ -11,8 +11,15 @@ set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenCV ON CACHE BOOL "" FORCE)
 
 # enable modules
-set(BUILD_MODULE_FiberDissection ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberDissection ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberTracking ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_IVIM ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_MriSimulation ON CACHE BOOL "" FORCE)
 
 # enable command line tools
 set(BUILD_DiffusionFiberQuantificationCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber quantification" FORCE)

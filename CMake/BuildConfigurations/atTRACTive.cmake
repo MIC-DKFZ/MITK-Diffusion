@@ -1,5 +1,5 @@
-include(${MITK_EXTENSION_DIRS}/CMake/BuildConfigurations/set_always.txt)
-include(${MITK_EXTENSION_DIRS}/CMake/BuildConfigurations/set_release.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/set_always.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/set_release.txt)
 
 message(STATUS "Configuring MITK Fiber Tractography Build")
 set(MITK_CUSTOM_PRODUCT_NAME "MITK atTRACTive" CACHE STRING "" FORCE)
@@ -12,8 +12,15 @@ set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenCV ON CACHE BOOL "" FORCE)
 
 # enable modules
-set(BUILD_MODULE_FiberDissection ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionPreprocessing OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberDissection ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberTracking OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_IVIM OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_MriSimulation OFF CACHE BOOL "" FORCE)
 
 # enable cmd apps
 # nothing for attractive

@@ -1,5 +1,5 @@
-include(${MITK_EXTENSION_DIRS}/CMake/BuildConfigurations/set_always.txt)
-include(${MITK_EXTENSION_DIRS}/CMake/BuildConfigurations/set_release.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/set_always.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/set_release.txt)
 
 set(MITK_USE_BLUEBERRY OFF CACHE BOOL "" FORCE)
 set(MITK_USE_CTK OFF CACHE BOOL "" FORCE)

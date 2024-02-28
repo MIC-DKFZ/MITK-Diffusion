@@ -1,3 +1,6 @@
+option(BUILD_MODULE_FiberTracking "" OFF)
+
+if(BUILD_MODULE_FiberTracking)
 
 set(_module_deps MitkFiberBundle)
 
@@ -41,6 +44,6 @@ MITK_CREATE_MODULE(
   DEPENDS ${_module_deps}
 )
 
-if(MODULE_IS_ENABLED)
-  add_subdirectory(Testing)
+add_subdirectory(Testing)
+
 endif()

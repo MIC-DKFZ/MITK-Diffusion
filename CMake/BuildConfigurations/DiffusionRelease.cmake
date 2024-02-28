@@ -1,2 +1,2 @@
-include(${MITK_EXTENSION_DIRS}/CMake/BuildConfigurations/DiffusionAll.cmake)
-include(${MITK_EXTENSION_DIRS}/CMake/BuildConfigurations/set_release.txt)
+include(${CMAKE_CURRENT_LIST_DIR}/DiffusionAll.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/set_release.txt)
