@@ -637,25 +637,6 @@ QGroupBox {
             </property>
            </widget>
           </item>
-          <item row="3" column="0">
-           <widget class="QCommandLinkButton" name="m_NormalizeImageValuesButton">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="toolTip">
-             <string>Normalizes the diffusion-weighted image values across all weighted volumes to the given mean and standard deviation.</string>
-            </property>
-            <property name="statusTip">
-             <string/>
-            </property>
-            <property name="whatsThis">
-             <string notr="true"/>
-            </property>
-            <property name="text">
-             <string>Normalize image values</string>
-            </property>
-           </widget>
-          </item>
           <item row="2" column="1">
            <widget class="QFrame" name="frame_4">
             <property name="frameShape">
@@ -680,44 +661,6 @@ QGroupBox {
              <property name="spacing">
               <number>0</number>
              </property>
-             <item row="0" column="0">
-              <widget class="QSpinBox" name="m_targetBValueSpinBox">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="toolTip">
-                <string>Target b-value</string>
-               </property>
-               <property name="maximum">
-                <number>100000</number>
-               </property>
-               <property name="singleStep">
-                <number>500</number>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="1">
-              <widget class="QComboBox" name="m_ProjectionMethodBox">
-               <property name="toolTip">
-                <string>Select projection method.</string>
-               </property>
-               <item>
-                <property name="text">
-                 <string>ADC Average</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>AKC</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>Bi-Exponential</string>
-                </property>
-               </item>
-              </widget>
-             </item>
             </layout>
            </widget>
           </item>
@@ -737,19 +680,6 @@ QGroupBox {
             </property>
             <property name="text">
              <string>Average repetitions</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0">
-           <widget class="QCommandLinkButton" name="m_ProjectSignalButton">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="toolTip">
-             <string>Project image values onto one b-shell.</string>
-            </property>
-            <property name="text">
-             <string>Project onto shell</string>
             </property>
            </widget>
           </item>
@@ -777,51 +707,6 @@ QGroupBox {
              <property name="verticalSpacing">
               <number>0</number>
              </property>
-             <item row="0" column="1">
-              <widget class="QSpinBox" name="m_NewStdev">
-               <property name="enabled">
-                <bool>true</bool>
-               </property>
-               <property name="toolTip">
-                <string>New stdev</string>
-               </property>
-               <property name="maximum">
-                <number>100000</number>
-               </property>
-               <property name="singleStep">
-                <number>100</number>
-               </property>
-               <property name="value">
-                <number>500</number>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="2">
-              <widget class="QmitkDataStorageComboBoxWithSelectNone" name="m_NormalizationMaskBox">
-               <property name="toolTip">
-                <string>Select binary mask image. The mask is used to calculate the old mean and standard deviation.</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="0">
-              <widget class="QSpinBox" name="m_NewMean">
-               <property name="enabled">
-                <bool>true</bool>
-               </property>
-               <property name="toolTip">
-                <string>New mean value</string>
-               </property>
-               <property name="maximum">
-                <number>100000</number>
-               </property>
-               <property name="singleStep">
-                <number>100</number>
-               </property>
-               <property name="value">
-                <number>1000</number>
-               </property>
-              </widget>
-             </item>
             </layout>
            </widget>
           </item>
@@ -1712,11 +1597,6 @@ QGroupBox {
    <extends>QComboBox</extends>
    <header location="global">QmitkDataStorageComboBox.h</header>
   </customwidget>
-  <customwidget>
-   <class>QmitkDataStorageComboBoxWithSelectNone</class>
-   <extends>QComboBox</extends>
-   <header>QmitkDataStorageComboBoxWithSelectNone.h</header>
-  </customwidget>
  </customwidgets>
  <tabstops>
   <tabstop>m_SelctedImageComboBox</tabstop>
@@ -1738,13 +1618,6 @@ QGroupBox {
   <tabstop>m_ExtractGradientBox</tabstop>
   <tabstop>m_ButtonAverageGradients</tabstop>
   <tabstop>m_Blur</tabstop>
-  <tabstop>m_ProjectSignalButton</tabstop>
-  <tabstop>m_targetBValueSpinBox</tabstop>
-  <tabstop>m_ProjectionMethodBox</tabstop>
-  <tabstop>m_NormalizeImageValuesButton</tabstop>
-  <tabstop>m_NewMean</tabstop>
-  <tabstop>m_NewStdev</tabstop>
-  <tabstop>m_NormalizationMaskBox</tabstop>
   <tabstop>m_FlipAxis</tabstop>
   <tabstop>m_FlipX</tabstop>
   <tabstop>m_FlipY</tabstop>

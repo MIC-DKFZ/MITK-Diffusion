@@ -31,11 +31,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // mitk includes
 #include <mitkImage.h>
-#include "itkDWIVoxelFunctor.h"
 #include <mitkDiffusionPropertyHelper.h>
 #include <vtkMatrix4x4.h>
 #include <vtkSmartPointer.h>
-#include <mitkPeakImage.h>
 #include <mitkImageToItk.h>
 
 typedef short DiffusionPixelType;
@@ -102,8 +100,6 @@ protected slots:
   void DoHalfSphereGradientDirections();
   void UpdateDwiBValueMapRounder(int i);
   void DoLengthCorrection();
-  void DoDwiNormalization();
-  void DoProjectSignal();
   void DoResampleImage();
   void DoCropImage();
   void DoUpdateInterpolationGui(int i);
@@ -144,9 +140,6 @@ protected:
   Ui::QmitkPreprocessingViewControls* m_Controls;
 
   void SetDefaultNodeProperties(mitk::DataNode::Pointer node, std::string name);
-  void CallMultishellToSingleShellFilter( itk::DWIVoxelFunctor * functor,
-                                          mitk::Image::Pointer ImPtr, QString imageName,
-                                          mitk::DataNode* parent );
 
   void CleanBValueTableWidget();
 

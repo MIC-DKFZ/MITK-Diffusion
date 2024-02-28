@@ -34,7 +34,6 @@ PURPOSE.  See the above copyright notices for more information.
 
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
-#include <itkPointShell.h>
 
 namespace itk
 {
