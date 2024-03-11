@@ -14,7 +14,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <mitkIOUtil.h>
 #include <mitkDiffusionPropertyHelper.h>
 
@@ -134,7 +134,7 @@ void IvimMapComputation( mitk::Image::Pointer input,
 int main( int argc, char* argv[] )
 {
 
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("Diffusion IVIM Fit");
   parser.setCategory("Diffusion Related Measures");
@@ -143,11 +143,11 @@ int main( int argc, char* argv[] )
   parser.setArgumentPrefix("--","-");
 
   // mandatory arguments
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output Preifx: ", "Prefix for the output images", us::Any(), false);
-  parser.addArgument("output_type", "", mitkDiffusionCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ", std::string(".nrrd"));
-  parser.addArgument("b_threshold", "", mitkDiffusionCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit^", 170.0);
-  parser.addArgument("fit_type", "", mitkDiffusionCommandLineParser::Int, "Fit:", "Jointly fit D, f and D* (0); Fit D&f with fixed D* (1); Fit D&f (high b), then fit D* (2); Linearly fit D&f (high b), then fit D* (3)", 2);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Preifx: ", "Prefix for the output images", us::Any(), false);
+  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ", std::string(".nrrd"));
+  parser.addArgument("b_threshold", "", mitkCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit^", 170.0);
+  parser.addArgument("fit_type", "", mitkCommandLineParser::Int, "Fit:", "Jointly fit D, f and D* (0); Fit D&f with fixed D* (1); Fit D&f (high b), then fit D* (2); Linearly fit D&f (high b), then fit D* (3)", 2);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
 

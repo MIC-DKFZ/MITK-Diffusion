@@ -29,8 +29,9 @@ if(BUILD_DiffusionQuantificationCmdApps OR MITK_BUILD_ALL_APPS)
 
       mitkFunctionCreateCommandLineApp(
         NAME ${appname}
-        DEPENDS MitkDiffusionCmdApps ${dependencies_list}
+        DEPENDS MitkDiffusionCmdApps MitkDiffusionModelling MitkDiffusionPreprocessing ${dependencies_list}
         PACKAGE_DEPENDS
+          ITK|ITKIONRRD+ITKIONIFTI
       )
     endforeach()
     

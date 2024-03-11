@@ -17,51 +17,24 @@ See LICENSE.txt or http://www.mitk.org for details.
 //#define MBILOG_ENABLE_DEBUG
 
 #include "QmitkPreprocessingView.h"
-#include "mitkDiffusionImagingConfigure.h"
 
 // qt includes
 #include <QMessageBox>
 
 // itk includes
-#include "itkTimeProbe.h"
 #include "itkB0ImageExtractionImageFilter.h"
 #include "itkB0ImageExtractionToSeparateImageFilter.h"
-#include "itkBrainMaskExtractionImageFilter.h"
-#include "itkCastImageFilter.h"
 #include "itkVectorContainer.h"
 #include <itkElectrostaticRepulsionDiffusionGradientReductionFilter.h>
 #include <itkMergeDiffusionImagesFilter.h>
 #include <itkDwiGradientLengthCorrectionFilter.h>
 #include <itkDwiNormilzationFilter.h>
-#include <mitkTensorImage.h>
-#include <mitkOdfImage.h>
-
-// Multishell includes
-#include <itkRadialMultishellToSingleshellImageFilter.h>
-
-// Multishell Functors
-#include <itkADCAverageFunctor.h>
-#include <itkKurtosisFitFunctor.h>
-#include <itkBiExpFitFunctor.h>
-#include <itkADCFitFunctor.h>
 
 // mitk includes
 #include "QmitkDataStorageComboBox.h"
-#include "mitkProgressBar.h"
-#include "mitkStatusBar.h"
 #include "mitkNodePredicateDataType.h"
 #include "mitkProperties.h"
-#include "mitkVtkResliceInterpolationProperty.h"
-#include "mitkLookupTable.h"
-#include "mitkLookupTableProperty.h"
-#include "mitkTransferFunction.h"
-#include "mitkTransferFunctionProperty.h"
-#include "mitkDataNodeObject.h"
-#include "mitkOdfNormalizationMethodProperty.h"
-#include "mitkOdfScaleByProperty.h"
 #include <mitkPointSet.h>
-#include <itkAdcImageFilter.h>
-#include <itkBrainMaskExtractionImageFilter.h>
 #include <mitkImageCast.h>
 #include <mitkRotationOperation.h>
 #include <QTableWidgetItem>
@@ -134,28 +107,16 @@ void QmitkPreprocessingView::CreateConnections()
 {
   if ( m_Controls )
   {
-    m_Controls->m_NormalizationMaskBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_SelctedImageComboBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_MergeDwiBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_AlignImageBox->SetDataStorage(this->GetDataStorage());
 
     mitk::TNodePredicateDataType<mitk::Image>::Pointer isMitkImage = mitk::TNodePredicateDataType<mitk::Image>::New();
 
-    mitk::NodePredicateDataType::Pointer isDti = mitk::NodePredicateDataType::New("TensorImage");
-    mitk::NodePredicateDataType::Pointer isOdf = mitk::NodePredicateDataType::New("OdfImage");
-    mitk::NodePredicateOr::Pointer isDiffusionImage = mitk::NodePredicateOr::New(isOdf, isDti);
-
-    mitk::NodePredicateAnd::Pointer noDiffusionImage = mitk::NodePredicateAnd::New(isMitkImage, mitk::NodePredicateNot::New(isDiffusionImage));
-    mitk::NodePredicateProperty::Pointer isBinaryPredicate = mitk::NodePredicateProperty::New("binary", mitk::BoolProperty::New(true));
-    mitk::NodePredicateAnd::Pointer binaryNoDiffusionImage = mitk::NodePredicateAnd::New(noDiffusionImage, isBinaryPredicate);
-
-    m_Controls->m_NormalizationMaskBox->SetPredicate(binaryNoDiffusionImage);
     m_Controls->m_SelctedImageComboBox->SetPredicate(isMitkImage);
     m_Controls->m_MergeDwiBox->SetPredicate(isMitkImage);
     m_Controls->m_AlignImageBox->SetPredicate(isMitkImage);
 
-    m_Controls->m_ExtractBrainMask->setVisible(false);
-    m_Controls->m_BrainMaskIterationsBox->setVisible(false);
     m_Controls->m_ResampleIntFrame->setVisible(false);
     connect( (QObject*)(m_Controls->m_ButtonAverageGradients), SIGNAL(clicked()), this, SLOT(AverageGradients()) );
     connect( (QObject*)(m_Controls->m_ButtonExtractB0), SIGNAL(clicked()), this, SLOT(ExtractB0()) );
@@ -164,10 +125,8 @@ void QmitkPreprocessingView::CreateConnections()
     connect( (QObject*)(m_Controls->m_MirrorGradientToHalfSphereButton), SIGNAL(clicked()), this, SLOT(DoHalfSphereGradientDirections()) );
     connect( (QObject*)(m_Controls->m_SwapGradientsButton), SIGNAL(clicked()), this, SLOT(DoSwapGradientDimensions()) );
     connect( (QObject*)(m_Controls->m_MergeDwisButton), SIGNAL(clicked()), this, SLOT(MergeDwis()) );
-    connect( (QObject*)(m_Controls->m_ProjectSignalButton), SIGNAL(clicked()), this, SLOT(DoProjectSignal()) );
     connect( (QObject*)(m_Controls->m_B_ValueMap_Rounder_SpinBox), SIGNAL(valueChanged(int)), this, SLOT(UpdateDwiBValueMapRounder(int)));
     connect( (QObject*)(m_Controls->m_CreateLengthCorrectedDwi), SIGNAL(clicked()), this, SLOT(DoLengthCorrection()) );
-    connect( (QObject*)(m_Controls->m_NormalizeImageValuesButton), SIGNAL(clicked()), this, SLOT(DoDwiNormalization()) );
     connect( (QObject*)(m_Controls->m_ResampleImageButton), SIGNAL(clicked()), this, SLOT(DoResampleImage()) );
     connect( (QObject*)(m_Controls->m_ResampleTypeBox), SIGNAL(currentIndexChanged(int)), this, SLOT(DoUpdateInterpolationGui(int)) );
     connect( (QObject*)(m_Controls->m_CropImageButton), SIGNAL(clicked()), this, SLOT(DoCropImage()) );
@@ -179,8 +138,6 @@ void QmitkPreprocessingView::CreateConnections()
     connect( (QObject*)(m_Controls->m_ModifyHeader), SIGNAL(clicked()), this, SLOT(DoApplyHeader()) );
     connect( (QObject*)(m_Controls->m_AlignImageButton), SIGNAL(clicked()), this, SLOT(DoAlignImages()) );
     connect( (QObject*)(m_Controls->m_SelctedImageComboBox), SIGNAL(OnSelectionChanged(const mitk::DataNode*)), this, SLOT(OnImageSelectionChanged()) );
-
-    m_Controls->m_NormalizationMaskBox->SetZeroEntryText("--");
 
     QFont f("monospace");
     f.setStyleHint(QFont::Monospace);
@@ -564,10 +521,6 @@ void QmitkPreprocessingView::DoUpdateInterpolationGui(int i)
   }
 }
 
-void QmitkPreprocessingView::DoExtractBrainMask()
-{
-}
-
 void QmitkPreprocessingView::DoResampleImage()
 {
   mitk::DataNode::Pointer node = m_Controls->m_SelctedImageComboBox->GetSelectedNode();
@@ -841,19 +794,6 @@ void QmitkPreprocessingView::DoApplyHeader()
   if ( image == nullptr ) { return; }
 
   bool isDiffusionImage( PropHelper::IsDiffusionWeightedImage(image) );
-
-  bool isDti = false;
-  bool isOdf = false;
-  bool isPeak = false;
-  if (!isDiffusionImage)
-  {
-    if ( dynamic_cast<mitk::TensorImage*>(node->GetData()) )
-      isDti = true;
-    else if ( dynamic_cast<mitk::OdfImage*>(node->GetData()) )
-      isOdf = true;
-    else if ( dynamic_cast<mitk::PeakImage*>(node->GetData()) )
-      isPeak = true;
-  }
   mitk::Image::Pointer newImage = image->Clone();
 
   mitk::Vector3D spacing;
@@ -902,34 +842,7 @@ void QmitkPreprocessingView::DoApplyHeader()
   }
 
   mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
-  if (isOdf)
-  {
-    mitk::OdfImage::ItkOdfImageType::Pointer itk_img = mitk::OdfImage::ItkOdfImageType::New();
-    mitk::CastToItkImage(newImage, itk_img);
-
-    mitk::Image::Pointer odfImage = dynamic_cast<mitk::Image*>(mitk::OdfImage::New().GetPointer());
-    mitk::CastToMitkImage(itk_img, odfImage);
-    odfImage->SetVolume(itk_img->GetBufferPointer());
-    imageNode->SetData( odfImage );
-  }
-  else if (isDti)
-  {
-    mitk::TensorImage::ItkTensorImageType::Pointer itk_img = mitk::ImageToItkImage<mitk::TensorImage::PixelType,3>(newImage);
-    mitk::Image::Pointer tensorImage = dynamic_cast<mitk::Image*>(mitk::TensorImage::New().GetPointer());
-    mitk::CastToMitkImage(itk_img, tensorImage);
-    tensorImage->SetVolume(itk_img->GetBufferPointer());
-    imageNode->SetData( tensorImage );
-  }
-  else if (isPeak)
-  {
-    mitk::PeakImage::ItkPeakImageType::Pointer itk_img = mitk::ImageToItkImage<float,4>(newImage);
-    mitk::Image::Pointer peakImage = dynamic_cast<mitk::Image*>(mitk::PeakImage::New().GetPointer());
-    mitk::CastToMitkImage(itk_img, peakImage);
-    peakImage->SetVolume(itk_img->GetBufferPointer());
-    imageNode->SetData( peakImage );
-  }
-  else
-    imageNode->SetData( newImage );
+  imageNode->SetData( newImage );
 
   QString name = node->GetName().c_str();
   imageNode->SetName((name+"_newheader").toStdString().c_str());
@@ -938,84 +851,6 @@ void QmitkPreprocessingView::DoApplyHeader()
                                                           mitk::RenderingManager::REQUEST_UPDATE_ALL,
                                                           true );
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-}
-
-void QmitkPreprocessingView::DoProjectSignal()
-{
-  switch(m_Controls->m_ProjectionMethodBox->currentIndex())
-  {
-  case 0:
-    DoADCAverage();
-    break;
-  case 1:
-    DoAKCFit();
-    break;
-  case 2:
-    DoBiExpFit();
-    break;
-  default:
-    DoADCAverage();
-  }
-}
-
-void QmitkPreprocessingView::DoDwiNormalization()
-{
-  mitk::DataNode::Pointer node = m_Controls->m_SelctedImageComboBox->GetSelectedNode();
-  if (node.IsNull()) { return; }
-
-  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
-  if ( image == nullptr ) { return; }
-
-  bool isDiffusionImage( PropHelper::IsDiffusionWeightedImage(image) );
-  if ( ! isDiffusionImage ) { return; }
-
-  auto gradientContainer = PropHelper::GetGradientContainer(image);
-
-  int b0Index = -1;
-  for (unsigned int i=0; i<gradientContainer->size(); i++)
-  {
-    GradientDirectionType g = gradientContainer->GetElement(i);
-    if (g.magnitude()<0.001)
-    {
-      b0Index = i;
-      break;
-    }
-  }
-  if (b0Index==-1) { return; }
-
-  typedef itk::DwiNormilzationFilter<short>  FilterType;
-
-  ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
-  mitk::CastToItkImage(image, itkVectorImagePointer);
-
-  FilterType::Pointer filter = FilterType::New();
-  filter->SetInput( itkVectorImagePointer );
-  filter->SetGradientDirections(PropHelper::GetGradientContainer(image));
-  filter->SetNewMean(m_Controls->m_NewMean->value());
-  filter->SetNewStdev(m_Controls->m_NewStdev->value());
-
-  UcharImageType::Pointer itkImage = nullptr;
-  if (m_Controls->m_NormalizationMaskBox->GetSelectedNode().IsNotNull())
-  {
-    itkImage = UcharImageType::New();
-    if (  dynamic_cast<mitk::Image*>(m_Controls->m_NormalizationMaskBox->GetSelectedNode()->GetData()) != nullptr )
-    {
-      mitk::CastToItkImage( dynamic_cast<mitk::Image*>(m_Controls->m_NormalizationMaskBox->GetSelectedNode()->GetData()), itkImage );
-    }
-    filter->SetMaskImage(itkImage);
-  }
-  filter->Update();
-
-  mitk::Image::Pointer newImage = mitk::GrabItkImageMemory( filter->GetOutput() );
-  PropHelper::CopyProperties(image, newImage, false);
-  PropHelper::InitializeImage( newImage );
-
-  mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
-  imageNode->SetData( newImage );
-  QString name = node->GetName().c_str();
-
-  imageNode->SetName((name+"_normalized").toStdString().c_str());
-  GetDataStorage()->Add(imageNode, node);
 }
 
 void QmitkPreprocessingView::DoLengthCorrection()
@@ -1069,137 +904,6 @@ void QmitkPreprocessingView::UpdateDwiBValueMapRounder(int i)
 
   UpdateBValueTableWidget(i);
   UpdateGradientDetails();
-}
-
-void QmitkPreprocessingView::
-CallMultishellToSingleShellFilter( itk::DWIVoxelFunctor * functor,
-                                   mitk::Image::Pointer image,
-                                   QString imageName,
-                                   mitk::DataNode* parent )
-{
-  typedef itk::RadialMultishellToSingleshellImageFilter<DiffusionPixelType, DiffusionPixelType> FilterType;
-
-  // filter input parameter
-  const mitk::BValueMapProperty::BValueMap& originalShellMap = PropHelper::GetBValueMap(image);
-
-  ItkDwiType::Pointer itkVectorImagePointer = PropHelper::GetItkVectorImage(image);
-  ItkDwiType* vectorImage = itkVectorImagePointer.GetPointer();
-  const GradProp::GradientDirectionsContainerType::ConstPointer gradientContainer = PropHelper::GetGradientContainer(image);
-  const unsigned int& bValue = PropHelper::GetReferenceBValue(image);
-
-  // filter call
-  FilterType::Pointer filter = FilterType::New();
-  filter->SetInput(vectorImage);
-  filter->SetOriginalGradientDirections(gradientContainer);
-  filter->SetOriginalBValueMap(originalShellMap);
-  filter->SetOriginalBValue(bValue);
-  filter->SetFunctor(functor);
-  filter->Update();
-
-  // create new DWI image
-  mitk::Image::Pointer outImage = mitk::GrabItkImageMemory( filter->GetOutput() );
-  PropHelper::CopyProperties(image, outImage, true);
-
-  PropHelper::SetGradientContainer(outImage, filter->GetTargetGradientDirections());
-  PropHelper::SetReferenceBValue(outImage, m_Controls->m_targetBValueSpinBox->value());
-  PropHelper::InitializeImage( outImage );
-
-  mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
-  imageNode->SetData( outImage );
-  imageNode->SetName(imageName.toStdString().c_str());
-  GetDataStorage()->Add(imageNode, parent);
-}
-
-void QmitkPreprocessingView::DoBiExpFit()
-{
-  mitk::DataNode::Pointer node = m_Controls->m_SelctedImageComboBox->GetSelectedNode();
-  if (node.IsNull()) { return; }
-
-  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
-  if ( image == nullptr ) { return; }
-
-  bool isDiffusionImage( PropHelper::IsDiffusionWeightedImage(image) );
-  if ( ! isDiffusionImage ) { return; }
-
-  itk::BiExpFitFunctor::Pointer functor = itk::BiExpFitFunctor::New();
-
-  QString name(node->GetName().c_str());
-
-  const mitk::BValueMapProperty::BValueMap& originalShellMap = PropHelper::GetBValueMap(image);
-
-  mitk::BValueMapProperty::BValueMap::const_iterator it = originalShellMap.begin();
-  ++it;/* skip b=0*/ unsigned int s = 0; /*shell index */
-  vnl_vector<double> bValueList(originalShellMap.size()-1);
-
-  while( it != originalShellMap.end() ) { bValueList.put(s++,(it++)->first); }
-
-  const double targetBValue = m_Controls->m_targetBValueSpinBox->value();
-  functor->setListOfBValues(bValueList);
-  functor->setTargetBValue(targetBValue);
-  CallMultishellToSingleShellFilter(functor,image,name + "_BiExp", node);
-}
-
-void QmitkPreprocessingView::DoAKCFit()
-{
-  mitk::DataNode::Pointer node = m_Controls->m_SelctedImageComboBox->GetSelectedNode();
-  if (node.IsNull()) { return; }
-
-  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
-  if ( image == nullptr ) { return; }
-
-  bool isDiffusionImage( PropHelper::IsDiffusionWeightedImage(image) );
-  if ( ! isDiffusionImage ) { return; }
-
-  itk::KurtosisFitFunctor::Pointer functor = itk::KurtosisFitFunctor::New();
-
-  QString name(node->GetName().c_str());
-
-  const mitk::BValueMapProperty::BValueMap& originalShellMap = PropHelper::GetBValueMap(image);
-
-  mitk::BValueMapProperty::BValueMap::const_iterator it = originalShellMap.begin();
-  ++it;/* skip b=0*/ unsigned int s = 0; /*shell index */
-  vnl_vector<double> bValueList(originalShellMap.size()-1);
-  while(it != originalShellMap.end())
-    bValueList.put(s++,(it++)->first);
-
-  const double targetBValue = m_Controls->m_targetBValueSpinBox->value();
-  functor->setListOfBValues(bValueList);
-  functor->setTargetBValue(targetBValue);
-  CallMultishellToSingleShellFilter(functor,image,name + "_AKC", node);
-}
-
-void QmitkPreprocessingView::DoADCFit()
-{
-  // later
-}
-
-void QmitkPreprocessingView::DoADCAverage()
-{
-  mitk::DataNode::Pointer node = m_Controls->m_SelctedImageComboBox->GetSelectedNode();
-  if (node.IsNull()) { return; }
-  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
-  if ( image == nullptr ) { return; }
-
-  bool isDiffusionImage( PropHelper::IsDiffusionWeightedImage(image) );
-  if ( ! isDiffusionImage )
-    return;
-
-  itk::ADCAverageFunctor::Pointer functor = itk::ADCAverageFunctor::New();
-
-  QString name(node->GetName().c_str());
-
-  const mitk::BValueMapProperty::BValueMap &originalShellMap  = PropHelper::GetBValueMap(image);
-
-  mitk::BValueMapProperty::BValueMap::const_iterator it = originalShellMap.begin();
-  ++it;/* skip b=0*/ unsigned int s = 0; /*shell index */
-  vnl_vector<double> bValueList(originalShellMap.size()-1);
-  while(it != originalShellMap.end())
-    bValueList.put(s++,(it++)->first);
-
-  const double targetBValue = m_Controls->m_targetBValueSpinBox->value();
-  functor->setListOfBValues(bValueList);
-  functor->setTargetBValue(targetBValue);
-  CallMultishellToSingleShellFilter(functor,image,name + "_ADC", node);
 }
 
 void QmitkPreprocessingView::CleanBValueTableWidget()
@@ -1407,10 +1111,7 @@ void QmitkPreprocessingView::OnImageSelectionChanged()
   m_Controls->m_SwapGradientsButton->setEnabled(foundDwiVolume);
   m_Controls->m_MergeDwisButton->setEnabled(foundDwiVolume);
   m_Controls->m_B_ValueMap_Rounder_SpinBox->setEnabled(foundDwiVolume);
-  m_Controls->m_ProjectSignalButton->setEnabled(foundDwiVolume);
   m_Controls->m_CreateLengthCorrectedDwi->setEnabled(foundDwiVolume);
-  m_Controls->m_targetBValueSpinBox->setEnabled(foundDwiVolume);
-  m_Controls->m_NormalizeImageValuesButton->setEnabled(foundDwiVolume);
   m_Controls->m_RemoveGradientButton->setEnabled(foundDwiVolume);
   m_Controls->m_ExtractGradientButton->setEnabled(foundDwiVolume);
   m_Controls->m_FlipGradientsButton->setEnabled(foundDwiVolume);
@@ -1424,7 +1125,6 @@ void QmitkPreprocessingView::OnImageSelectionChanged()
   bool foundSingleImageVolume = foundDwiVolume || (foundImageVolume && !(multiComponentVolume || threeDplusTVolume));
   m_Controls->m_FlipAxis->setEnabled(foundSingleImageVolume);
   m_Controls->m_CropImageButton->setEnabled(foundSingleImageVolume);
-  m_Controls->m_ExtractBrainMask->setEnabled(foundSingleImageVolume);
   m_Controls->m_ResampleImageButton->setEnabled(foundSingleImageVolume);
 
   // reset sampling frame to 1 and update all ealted components
@@ -1476,16 +1176,6 @@ void QmitkPreprocessingView::OnImageSelectionChanged()
         item->setText(QString::number(mf.get(r,c)));
         m_Controls->m_MeasurementFrameTable->setItem( r, c, item );
       }
-
-    //calculate target bValue for MultishellToSingleShellfilter
-    const mitk::BValueMapProperty::BValueMap & bValMap = PropHelper::GetBValueMap(image);
-
-    mitk::BValueMapProperty::BValueMap::const_iterator it = bValMap.begin();
-    unsigned int targetBVal = 0;
-    while(it != bValMap.end()) { targetBVal += (it++)->first; }
-
-    targetBVal /= (float)bValMap.size()-1;
-    m_Controls->m_targetBValueSpinBox->setValue(targetBVal);
 
     m_Controls->m_RemoveGradientBox->setMaximum(PropHelper::GetGradientContainer(image)->Size()-1);
     m_Controls->m_ExtractGradientBox->setMaximum(PropHelper::GetGradientContainer(image)->Size()-1);
@@ -1797,7 +1487,6 @@ void QmitkPreprocessingView::DoReduceGradientDirections()
   BValueMap originalShellMap = PropHelper::GetBValueMap(image);
 
   std::vector<unsigned int> newNumGradientDirections;
-  int shellCounter = 0;
 
   QString name = node->GetName().c_str();
   for (int i=0; i<m_Controls->m_B_ValueMap_TableWidget->rowCount(); i++)
@@ -1808,7 +1497,6 @@ void QmitkPreprocessingView::DoReduceGradientDirections()
     newNumGradientDirections.push_back(num);
     name += "_";
     name += QString::number(num);
-    shellCounter++;
   }
 
   if (newNumGradientDirections.empty()) { return; }

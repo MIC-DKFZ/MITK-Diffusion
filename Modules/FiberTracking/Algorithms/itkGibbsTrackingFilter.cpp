@@ -34,7 +34,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <fstream>
 // #include <QFile>
 #include <tinyxml2.h>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <mitkLexicalCast.h>
 #include <boost/algorithm/string.hpp>
 
@@ -281,7 +281,7 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   m_NumAcceptedFibers = 0;
   m_CurrentIteration = 0;
   bool just_built_fibers = false;
-  boost::progress_display disp(m_Iterations);
+  boost::timer::progress_display disp(m_Iterations);
   if (!m_AbortTracking)
     while (m_CurrentIteration<m_Iterations)
     {

@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "QmitkTensorReconstructionView.h"
-#include "mitkDiffusionImagingConfigure.h"
 
 // qt includes
 #include <QMessageBox>
@@ -25,39 +24,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QGraphicsLinearLayout>
 
 
-// itk includes
-#include "itkTimeProbe.h"
-//#include "itkTensor.h"
-
-// mitk includes
-#include "mitkProgressBar.h"
-#include "mitkStatusBar.h"
-
 #include "mitkNodePredicateDataType.h"
 #include "QmitkDataStorageComboBox.h"
-
-#include "mitkTeemDiffusionTensor3DReconstructionImageFilter.h"
 #include "itkDiffusionTensor3DReconstructionImageFilter.h"
 #include "itkTensorImageToDiffusionImageFilter.h"
 #include "itkPointShell.h"
 #include "itkVector.h"
 #include "itkB0ImageExtractionImageFilter.h"
 #include "itkTensorReconstructionWithEigenvalueCorrectionFilter.h"
-
 #include "mitkImageCast.h"
-#include "mitkImageAccessByItk.h"
 #include <itkBinaryThresholdImageFilter.h>
 #include <mitkImageVtkMapper2D.h>
-
-#include "mitkProperties.h"
-#include "mitkDataNodeObject.h"
-#include "mitkOdfNormalizationMethodProperty.h"
-#include "mitkOdfScaleByProperty.h"
-#include "mitkLookupTableProperty.h"
-#include "mitkLookupTable.h"
-#include "mitkImageStatisticsHolder.h"
 #include <mitkITKImageImport.h>
-
 #include <itkTensorImageToOdfImageFilter.h>
 #include <berryIWorkbenchWindow.h>
 #include <berryISelectionService.h>

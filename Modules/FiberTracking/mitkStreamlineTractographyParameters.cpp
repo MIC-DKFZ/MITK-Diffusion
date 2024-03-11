@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <algorithm>
 #include <string>
 #include <mitkStreamlineTractographyParameters.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 mitk::StreamlineTractographyParameters::StreamlineTractographyParameters()
 {

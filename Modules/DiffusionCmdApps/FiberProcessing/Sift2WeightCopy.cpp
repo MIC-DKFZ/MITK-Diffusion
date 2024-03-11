@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkIOUtil.h>
@@ -49,7 +49,7 @@ mitk::FiberBundle::Pointer LoadFib(std::string filename)
 */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("SIFT2 Fiber Weight Import");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -57,9 +57,9 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input fiber bundle", us::Any(), false);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output fiber bundle (.fib)", us::Any(), false);
-  parser.addArgument("weights", "", mitkDiffusionCommandLineParser::String, "Weights:", "input weights file (.txt)", us::Any(), false);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input fiber bundle", us::Any(), false);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output fiber bundle (.fib)", us::Any(), false);
+  parser.addArgument("weights", "", mitkCommandLineParser::String, "Weights:", "input weights file (.txt)", us::Any(), false);
 
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);

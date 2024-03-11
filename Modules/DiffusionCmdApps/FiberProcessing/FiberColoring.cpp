@@ -25,7 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkIOUtil.h>
@@ -48,7 +48,7 @@ mitk::FiberBundle::Pointer LoadFib(std::string filename)
 */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("Fiber Coloring");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -58,16 +58,16 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
 
   parser.beginGroup("1. Mandatory arguments:");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "Input fiber bundle (.fib, .trk, .tck)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "Output fiber bundle (.fib)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
-  parser.addArgument("resample", "", mitkDiffusionCommandLineParser::Float, "", "");
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "Input fiber bundle (.fib, .trk, .tck)", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "Output fiber bundle (.fib)", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("resample", "", mitkCommandLineParser::Float, "", "");
   parser.endGroup();
 
   parser.beginGroup("2. Color by scalar map:");
-  parser.addArgument("scalar_map", "", mitkDiffusionCommandLineParser::String, "", "", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("lookup", "", mitkDiffusionCommandLineParser::String, "", "JET, MAGMA, INFERNO, VIRIDIS, PLASMA, MULTILABEL", us::Any(), true, false, false);
-  parser.addArgument("interpolate", "", mitkDiffusionCommandLineParser::Bool, "", "");
-  parser.addArgument("normalize", "", mitkDiffusionCommandLineParser::Bool, "", "");
+  parser.addArgument("scalar_map", "", mitkCommandLineParser::String, "", "", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("lookup", "", mitkCommandLineParser::String, "", "JET, MAGMA, INFERNO, VIRIDIS, PLASMA, MULTILABEL", us::Any(), true, false, false);
+  parser.addArgument("interpolate", "", mitkCommandLineParser::Bool, "", "");
+  parser.addArgument("normalize", "", mitkCommandLineParser::Bool, "", "");
   parser.endGroup();
 
 

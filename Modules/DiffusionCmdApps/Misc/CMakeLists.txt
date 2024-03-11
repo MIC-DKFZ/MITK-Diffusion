@@ -34,7 +34,7 @@ if(BUILD_DiffusionMiscCmdApps OR MITK_BUILD_ALL_APPS)
 
       mitkFunctionCreateCommandLineApp(
         NAME ${appname}
-        DEPENDS MitkDiffusionCmdApps MitkTestingHelper ${dependencies_list}
+        DEPENDS MitkDiffusionCmdApps MitkDiffusionRegistration MitkDiffusionModelling MitkFiberBundle MitkTestingHelper ${dependencies_list}
         PACKAGE_DEPENDS
       )
     endforeach()

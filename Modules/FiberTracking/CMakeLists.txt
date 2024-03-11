@@ -1,5 +1,8 @@
+option(BUILD_MODULE_FiberTracking "" OFF)
 
-set(_module_deps MitkDiffusionCore)
+if(BUILD_MODULE_FiberTracking)
+
+set(_module_deps MitkFiberBundle)
 
 mitk_check_module_dependencies(
   MODULES ${_module_deps}
@@ -37,10 +40,10 @@ endif()
 
 MITK_CREATE_MODULE(
   SUBPROJECTS MITK-Diffusion
-  INCLUDE_DIRS Algorithms Algorithms/TrackingHandlers Algorithms/ClusteringMetrics Algorithms/GibbsTracking Algorithms/StochasticTracking ${CMAKE_CURRENT_BINARY_DIR}
+  INCLUDE_DIRS Algorithms Algorithms/TrackingHandlers Algorithms/GibbsTracking ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${_module_deps}
 )
 
-if(MODULE_IS_ENABLED)
-  add_subdirectory(Testing)
+add_subdirectory(Testing)
+
 endif()

@@ -8,6 +8,8 @@ set(H_FILES
 
     #MachineLearning
     MachineLearning/mitkStreamlineFeatureExtractor.h
+    
+    MachineLearning/mitkStatisticModel.h
 )
 
 set(CPP_FILES
@@ -20,6 +22,8 @@ set(CPP_FILES
 
     #MachineLearning
     MachineLearning/mitkStreamlineFeatureExtractor.cpp
+    
+    MachineLearning/mitkStatisticModel.cpp
 )
 
 set(RESOURCE_FILES

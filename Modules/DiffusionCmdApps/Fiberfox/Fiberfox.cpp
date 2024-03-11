@@ -21,14 +21,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
 #include <mitkFiberfoxParameters.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 
 #include <itkTractsToDWIImageFilter.h>
 #include <mitkLexicalCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkFiberfoxParameters.h>
-#include <mitkDiffusionVersion.h>
 
 using namespace mitk;
 
@@ -38,19 +37,19 @@ using namespace mitk;
 */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
   parser.setTitle("Fiberfox");
   parser.setCategory("Diffusion Simulation Tools");
   parser.setContributor("MIC");
   parser.setDescription("Command line interface to Fiberfox." " Simulate a diffusion-weighted image from a tractogram using the specified parameter file.");
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output root:", "output folder and file prefix", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input tractogram or diffusion-weighted image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("parameters", "p", mitkDiffusionCommandLineParser::String, "Parameter file:", "fiberfox parameter file (.ffp)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("template", "t", mitkDiffusionCommandLineParser::String, "Template image:", "use parameters of the template image", us::Any(), true, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("verbose", "v", mitkDiffusionCommandLineParser::Bool, "Output additional images:", "output volume fraction images etc.", us::Any());
-  parser.addArgument("dont_apply_direction_matrix", "", mitkDiffusionCommandLineParser::Bool, "Don't apply direction matrix:", "don't rotate gradients by image direction matrix", us::Any());
-  parser.addArgument("fix_seed", "", mitkDiffusionCommandLineParser::Bool, "Use fix random seed:", "always use same sequence of random numbers", us::Any());
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output root:", "output folder and file prefix", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram or diffusion-weighted image", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("parameters", "p", mitkCommandLineParser::String, "Parameter file:", "fiberfox parameter file (.ffp)", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("template", "t", mitkCommandLineParser::String, "Template image:", "use parameters of the template image", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("verbose", "v", mitkCommandLineParser::Bool, "Output additional images:", "output volume fraction images etc.", us::Any());
+  parser.addArgument("dont_apply_direction_matrix", "", mitkCommandLineParser::Bool, "Don't apply direction matrix:", "don't rotate gradients by image direction matrix", us::Any());
+  parser.addArgument("fix_seed", "", mitkCommandLineParser::Bool, "Use fix random seed:", "always use same sequence of random numbers", us::Any());
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)

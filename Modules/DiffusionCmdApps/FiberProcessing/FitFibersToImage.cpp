@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <metaCommand.h>
-#include <mitkDiffusionCommandLineParser.h>
+#include <mitkCommandLineParser.h>
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
@@ -28,7 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkFitFibersToImageFilter.h>
 #include <mitkTensorModel.h>
 #include <mitkITKImageImport.h>
-#include <mitkDiffusionDataIOHelper.h>
+#include <mitkFiberBundleIOHelper.h>
 
 typedef itk::Point<float, 4> PointType4;
 typedef itk::Image< float, 4 >  PeakImgType;
@@ -38,7 +38,7 @@ typedef itk::Image< float, 4 >  PeakImgType;
 */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("Fit Fibers To Image");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -46,26 +46,26 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i1", mitkDiffusionCommandLineParser::StringList, "Input tractograms:", "input tractograms (files or folder)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("", "i2", mitkDiffusionCommandLineParser::String, "Input image:", "input image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output root", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
+  parser.addArgument("", "i1", mitkCommandLineParser::StringList, "Input tractograms:", "input tractograms (files or folder)", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "i2", mitkCommandLineParser::String, "Input image:", "input image", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output root", us::Any(), false, false, false, mitkCommandLineParser::Output);
 
-  parser.addArgument("max_iter", "", mitkDiffusionCommandLineParser::Int, "Max. iterations:", "maximum number of optimizer iterations", 20);
-  parser.addArgument("bundle_based", "", mitkDiffusionCommandLineParser::Bool, "Bundle based fit:", "fit one weight per input tractogram/bundle, not for each fiber", false);
-  parser.addArgument("min_g", "", mitkDiffusionCommandLineParser::Float, "Min. g:", "lower termination threshold for gradient magnitude", 1e-5);
-  parser.addArgument("lambda", "", mitkDiffusionCommandLineParser::Float, "Lambda:", "modifier for regularization", 1.0);
-  parser.addArgument("save_res", "", mitkDiffusionCommandLineParser::Bool, "Save Residuals:", "save residual images", false);
-  parser.addArgument("save_weights", "", mitkDiffusionCommandLineParser::Bool, "Save Weights:", "save fiber weights in a separate text file", false);
-  parser.addArgument("filter_zero", "", mitkDiffusionCommandLineParser::Bool, "Filter Zero Weights:", "filter fibers with zero weight", false);
-  parser.addArgument("filter_outliers", "", mitkDiffusionCommandLineParser::Bool, "Filter outliers:", "perform second optimization run with an upper weight bound based on the first weight estimation (99% quantile)", false);
-  parser.addArgument("join_tracts", "", mitkDiffusionCommandLineParser::Bool, "Join output tracts:", "outout tracts are merged into a single tractogram", false);
-  parser.addArgument("regu", "", mitkDiffusionCommandLineParser::String, "Regularization:", "MSM; Variance; VoxelVariance; Lasso; GroupLasso; GroupVariance; NONE", std::string("VoxelVariance"));
+  parser.addArgument("max_iter", "", mitkCommandLineParser::Int, "Max. iterations:", "maximum number of optimizer iterations", 20);
+  parser.addArgument("bundle_based", "", mitkCommandLineParser::Bool, "Bundle based fit:", "fit one weight per input tractogram/bundle, not for each fiber", false);
+  parser.addArgument("min_g", "", mitkCommandLineParser::Float, "Min. g:", "lower termination threshold for gradient magnitude", 1e-5);
+  parser.addArgument("lambda", "", mitkCommandLineParser::Float, "Lambda:", "modifier for regularization", 1.0);
+  parser.addArgument("save_res", "", mitkCommandLineParser::Bool, "Save Residuals:", "save residual images", false);
+  parser.addArgument("save_weights", "", mitkCommandLineParser::Bool, "Save Weights:", "save fiber weights in a separate text file", false);
+  parser.addArgument("filter_zero", "", mitkCommandLineParser::Bool, "Filter Zero Weights:", "filter fibers with zero weight", false);
+  parser.addArgument("filter_outliers", "", mitkCommandLineParser::Bool, "Filter outliers:", "perform second optimization run with an upper weight bound based on the first weight estimation (99% quantile)", false);
+  parser.addArgument("join_tracts", "", mitkCommandLineParser::Bool, "Join output tracts:", "outout tracts are merged into a single tractogram", false);
+  parser.addArgument("regu", "", mitkCommandLineParser::String, "Regularization:", "MSM; Variance; VoxelVariance; Lasso; GroupLasso; GroupVariance; NONE", std::string("VoxelVariance"));
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
     return EXIT_FAILURE;
 
-  mitkDiffusionCommandLineParser::StringContainerType fib_files = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["i1"]);
+  mitkCommandLineParser::StringContainerType fib_files = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["i1"]);
   std::string input_image_name = us::any_cast<std::string>(parsedArgs["i2"]);
   std::string outRoot = us::any_cast<std::string>(parsedArgs["o"]);
 
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image", "Fiberbundles"}, std::vector<std::string>());
 
     std::vector< std::string > fib_names;
-    auto input_tracts = mitk::DiffusionDataIOHelper::load_fibs(fib_files, &fib_names);
+    auto input_tracts = mitk::FiberBundleIOHelper::load_fibs(fib_files, &fib_names);
 
     itk::FitFibersToImageFilter::Pointer fitter = itk::FitFibersToImageFilter::New();
 

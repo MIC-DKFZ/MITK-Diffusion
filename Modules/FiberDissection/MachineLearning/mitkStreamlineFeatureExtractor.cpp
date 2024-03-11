@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkTractDensityImageFilter.h>
 #include <mitkImagePixelReadAccessor.h>
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <vnl/vnl_sparse_matrix.h>
 #include <mitkIOUtil.h>
 #include <random>

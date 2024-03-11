@@ -14,7 +14,6 @@ if(BUILD_DiffusionFiberQuantificationCmdApps OR MITK_BUILD_ALL_APPS)
     set( diffusionFiberProcessingcmdapps
     TractDensity^^
     PrintFiberStatistics^^
-    DistanceToSegmentation^^
     )
 
     foreach(diffusionFiberProcessingcmdapp ${diffusionFiberProcessingcmdapps})
@@ -28,7 +27,7 @@ if(BUILD_DiffusionFiberQuantificationCmdApps OR MITK_BUILD_ALL_APPS)
 
       mitkFunctionCreateCommandLineApp(
         NAME ${appname}
-        DEPENDS MitkDiffusionCmdApps MitkMriSimulation MitkFiberTracking ${dependencies_list}
+        DEPENDS MitkDiffusionCmdApps MitkFiberProcessing ${dependencies_list}
         PACKAGE_DEPENDS
       )
     endforeach()

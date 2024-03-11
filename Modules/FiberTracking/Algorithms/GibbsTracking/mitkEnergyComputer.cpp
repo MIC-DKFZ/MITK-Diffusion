@@ -17,6 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkEnergyComputer.h"
 #include <vnl/vnl_copy.h>
 #include <itkNumericTraits.h>
+#include <itkOrientationDistributionFunction.h>
 
 using namespace mitk;
 

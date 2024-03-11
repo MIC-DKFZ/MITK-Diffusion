@@ -15,7 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <metaCommand.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
@@ -48,7 +48,7 @@ ItkFloatImgType::Pointer LoadItkImage(const std::string& filename)
 */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("Fiber Extraction With ROI Image");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -58,30 +58,30 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
 
   parser.beginGroup("1. Mandatory arguments:");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.dcm)", us::Any(), false);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output root", us::Any(), false);
-  parser.addArgument("rois", "", mitkDiffusionCommandLineParser::StringList, "ROI images:", "ROI images", us::Any(), false);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.dcm)", us::Any(), false);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output root", us::Any(), false);
+  parser.addArgument("rois", "", mitkCommandLineParser::StringList, "ROI images:", "ROI images", us::Any(), false);
   parser.endGroup();
 
   parser.beginGroup("2. Label based extraction:");
-  parser.addArgument("split_labels", "", mitkDiffusionCommandLineParser::Bool, "Split labels:", "output a separate tractogram for each label-->label tract", false);
-  parser.addArgument("skip_self_connections", "", mitkDiffusionCommandLineParser::Bool, "Skip self connections:", "ignore streamlines between two identical labels", false);
-  parser.addArgument("all_labels", "", mitkDiffusionCommandLineParser::Bool, "All labels:", "use all labels (0 is excluded)", false);
-  parser.addArgument("labels", "", mitkDiffusionCommandLineParser::StringList, "Labels:", "positive means roi image value in labels vector", us::Any());
-  parser.addArgument("start_labels", "", mitkDiffusionCommandLineParser::StringList, "Start Labels:", "use separate start and end labels instead of one mixed set", us::Any());
-  parser.addArgument("end_labels", "", mitkDiffusionCommandLineParser::StringList, "End Labels:", "use separate start and end labels instead of one mixed set", us::Any());
-  parser.addArgument("paired", "", mitkDiffusionCommandLineParser::Bool, "Paired:", "start and end label list are paired", false);
+  parser.addArgument("split_labels", "", mitkCommandLineParser::Bool, "Split labels:", "output a separate tractogram for each label-->label tract", false);
+  parser.addArgument("skip_self_connections", "", mitkCommandLineParser::Bool, "Skip self connections:", "ignore streamlines between two identical labels", false);
+  parser.addArgument("all_labels", "", mitkCommandLineParser::Bool, "All labels:", "use all labels (0 is excluded)", false);
+  parser.addArgument("labels", "", mitkCommandLineParser::StringList, "Labels:", "positive means roi image value in labels vector", us::Any());
+  parser.addArgument("start_labels", "", mitkCommandLineParser::StringList, "Start Labels:", "use separate start and end labels instead of one mixed set", us::Any());
+  parser.addArgument("end_labels", "", mitkCommandLineParser::StringList, "End Labels:", "use separate start and end labels instead of one mixed set", us::Any());
+  parser.addArgument("paired", "", mitkCommandLineParser::Bool, "Paired:", "start and end label list are paired", false);
   parser.endGroup();
 
   parser.beginGroup("3. Misc:");
-  parser.addArgument("both_ends", "", mitkDiffusionCommandLineParser::Bool, "Both ends:", "Fibers are extracted if both endpoints are located in the ROI.", false);
-  parser.addArgument("overlap_fraction", "", mitkDiffusionCommandLineParser::Float, "Overlap fraction:", "Extract by overlap, not by endpoints. Extract fibers that overlap to at least the provided factor (0-1) with the ROI.", -1);
-  parser.addArgument("invert", "", mitkDiffusionCommandLineParser::Bool, "Invert:", "get streamlines not positive for any of the ROI images", false);
-  parser.addArgument("output_negatives", "", mitkDiffusionCommandLineParser::Bool, "Negatives:", "output negatives", false);
-  parser.addArgument("interpolate", "", mitkDiffusionCommandLineParser::Bool, "Interpolate:", "interpolate ROI images (only for endpoint based extraction)", false);
-  parser.addArgument("threshold", "", mitkDiffusionCommandLineParser::Float, "Threshold:", "positive means ROI image value threshold", 0.5);
-  parser.addArgument("min_fibers", "", mitkDiffusionCommandLineParser::Int, "Min. num. fibers:", "discard positive tracts with less fibers", 0);
-  parser.addArgument("split_rois", "", mitkDiffusionCommandLineParser::Bool, "Split ROIs:", "output a separate tractogram for each ROI", false);
+  parser.addArgument("both_ends", "", mitkCommandLineParser::Bool, "Both ends:", "Fibers are extracted if both endpoints are located in the ROI.", false);
+  parser.addArgument("overlap_fraction", "", mitkCommandLineParser::Float, "Overlap fraction:", "Extract by overlap, not by endpoints. Extract fibers that overlap to at least the provided factor (0-1) with the ROI.", -1);
+  parser.addArgument("invert", "", mitkCommandLineParser::Bool, "Invert:", "get streamlines not positive for any of the ROI images", false);
+  parser.addArgument("output_negatives", "", mitkCommandLineParser::Bool, "Negatives:", "output negatives", false);
+  parser.addArgument("interpolate", "", mitkCommandLineParser::Bool, "Interpolate:", "interpolate ROI images (only for endpoint based extraction)", false);
+  parser.addArgument("threshold", "", mitkCommandLineParser::Float, "Threshold:", "positive means ROI image value threshold", 0.5);
+  parser.addArgument("min_fibers", "", mitkCommandLineParser::Int, "Min. num. fibers:", "discard positive tracts with less fibers", 0);
+  parser.addArgument("split_rois", "", mitkCommandLineParser::Bool, "Split ROIs:", "output a separate tractogram for each ROI", false);
   parser.endGroup();
 
 
@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
   std::string inFib = us::any_cast<std::string>(parsedArgs["i"]);
   std::string outFib = us::any_cast<std::string>(parsedArgs["o"]);
 
-  mitkDiffusionCommandLineParser::StringContainerType roi_files = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["rois"]);
+  mitkCommandLineParser::StringContainerType roi_files = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["rois"]);
 
   bool both_ends = false;
   if (parsedArgs.count("both_ends"))
@@ -142,17 +142,17 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("threshold"))
     threshold = us::any_cast<float>(parsedArgs["threshold"]);
 
-  mitkDiffusionCommandLineParser::StringContainerType labels;
+  mitkCommandLineParser::StringContainerType labels;
   if (parsedArgs.count("labels"))
-    labels = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["labels"]);
+    labels = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["labels"]);
 
-  mitkDiffusionCommandLineParser::StringContainerType start_labels;
+  mitkCommandLineParser::StringContainerType start_labels;
   if (parsedArgs.count("start_labels"))
-    start_labels = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["start_labels"]);
+    start_labels = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["start_labels"]);
 
-  mitkDiffusionCommandLineParser::StringContainerType end_labels;
+  mitkCommandLineParser::StringContainerType end_labels;
   if (parsedArgs.count("end_labels"))
-    end_labels = us::any_cast<mitkDiffusionCommandLineParser::StringContainerType>(parsedArgs["end_labels"]);
+    end_labels = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["end_labels"]);
 
   bool paired = false;
   if (parsedArgs.count("paired"))

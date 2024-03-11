@@ -14,52 +14,25 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-//#define MBILOG_ENABLE_DEBUG
-
 #include "QmitkQBallReconstructionView.h"
 
-// qt includes
 #include <QMessageBox>
-
-// itk includes
-#include "itkTimeProbe.h"
-
-// mitk includes
 #include "mitkProgressBar.h"
-#include "mitkStatusBar.h"
-
 #include "mitkNodePredicateDataType.h"
 #include "QmitkDataStorageComboBox.h"
-
 #include "itkDiffusionQballReconstructionImageFilter.h"
 #include "itkAnalyticalDiffusionQballReconstructionImageFilter.h"
 #include "itkDiffusionMultiShellQballReconstructionImageFilter.h"
-#include "itkVectorContainer.h"
 #include "itkB0ImageExtractionImageFilter.h"
 #include <itkBinaryThresholdImageFilter.h>
-
 #include "mitkOdfImage.h"
-#include "mitkProperties.h"
-#include "mitkVtkResliceInterpolationProperty.h"
-#include "mitkLookupTable.h"
-#include "mitkLookupTableProperty.h"
-#include "mitkTransferFunction.h"
-#include "mitkTransferFunctionProperty.h"
-#include "mitkDataNodeObject.h"
-#include "mitkOdfNormalizationMethodProperty.h"
-#include "mitkOdfScaleByProperty.h"
 #include <mitkImageCast.h>
-#include "mitkDiffusionImagingConfigure.h"
 #include <mitkNodePredicateIsDWI.h>
-
-#include "berryIStructuredSelection.h"
-#include "berryIWorkbenchWindow.h"
-#include "berryISelectionService.h"
 #include <mitkShImage.h>
 #include <boost/version.hpp>
 #include <itkShToOdfImageFilter.h>
 #include <mitkImageCast.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 const std::string QmitkQBallReconstructionView::VIEW_ID = "org.mitk.views.qballreconstruction";
 

@@ -18,12 +18,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <metaCommand.h>
-#include "mitkDiffusionCommandLineParser.h"
+#include "mitkCommandLineParser.h"
 #include <usAny.h>
 #include <itkImageFileWriter.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
-#include <itkEvaluateDirectionImagesFilter.h>
 #include <itkTractsToVectorImageFilter.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkLocaleSwitch.h>
@@ -33,7 +32,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 */
 int main(int argc, char* argv[])
 {
-  mitkDiffusionCommandLineParser parser;
+  mitkCommandLineParser parser;
 
   parser.setTitle("Fiber Direction Extraction");
   parser.setCategory("Fiber Tracking and Processing Methods");
@@ -41,16 +40,16 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkDiffusionCommandLineParser::String, "Input:", "input tractogram (.fib/.trk)", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("", "o", mitkDiffusionCommandLineParser::String, "Output:", "output root", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Output);
-  parser.addArgument("mask", "", mitkDiffusionCommandLineParser::String, "Mask:", "mask image", us::Any(), false, false, false, mitkDiffusionCommandLineParser::Input);
-  parser.addArgument("athresh", "", mitkDiffusionCommandLineParser::Float, "Angular threshold:", "angular threshold in degrees. closer fiber directions are regarded as one direction and clustered together.", 25, true);
-  parser.addArgument("peakthresh", "", mitkDiffusionCommandLineParser::Float, "Peak size threshold:", "peak size threshold relative to largest peak in voxel", 0.2, true);
-  parser.addArgument("only_mask_geometry", "", mitkDiffusionCommandLineParser::Bool, "Only mask geometry:", "don't use content of mask image, only use it's geometry", false);
-  parser.addArgument("verbose", "", mitkDiffusionCommandLineParser::Bool, "Verbose:", "output optional and intermediate calculation results");
-  parser.addArgument("numdirs", "", mitkDiffusionCommandLineParser::Int, "Max. num. directions:", "maximum number of fibers per voxel", 3, true);
-  parser.addArgument("normalization", "", mitkDiffusionCommandLineParser::Int, "Normalization method:", "1=global maximum; 2=single vector; 3=voxel-wise maximum", 1);
-  parser.addArgument("file_ending", "", mitkDiffusionCommandLineParser::String, "Image type:", ".nrrd; .nii; .nii.gz", std::string(".nii.gz"));
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk)", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output root", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "mask image", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("athresh", "", mitkCommandLineParser::Float, "Angular threshold:", "angular threshold in degrees. closer fiber directions are regarded as one direction and clustered together.", 25, true);
+  parser.addArgument("peakthresh", "", mitkCommandLineParser::Float, "Peak size threshold:", "peak size threshold relative to largest peak in voxel", 0.2, true);
+  parser.addArgument("only_mask_geometry", "", mitkCommandLineParser::Bool, "Only mask geometry:", "don't use content of mask image, only use it's geometry", false);
+  parser.addArgument("verbose", "", mitkCommandLineParser::Bool, "Verbose:", "output optional and intermediate calculation results");
+  parser.addArgument("numdirs", "", mitkCommandLineParser::Int, "Max. num. directions:", "maximum number of fibers per voxel", 3, true);
+  parser.addArgument("normalization", "", mitkCommandLineParser::Int, "Normalization method:", "1=global maximum; 2=single vector; 3=voxel-wise maximum", 1);
+  parser.addArgument("file_ending", "", mitkCommandLineParser::String, "Image type:", ".nrrd; .nii; .nii.gz", std::string(".nii.gz"));
 
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);

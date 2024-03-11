@@ -1029,7 +1029,8 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     if (m_TrackingHandler==nullptr)
     {
       m_TrackingHandler = new mitk::TrackingHandlerPeaks();
-      dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingHandler)->SetPeakImage(mitk::convert::GetItkPeakFromPeakImage(dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())));
+      auto itk_peak_image = dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData())->GetItkPeakImage();
+      dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingHandler)->SetPeakImage(itk_peak_image);
     }
   }
 

@@ -15,7 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "itkTractsToDWIImageFilter.h"
-#include <boost/progress.hpp>
+#include <boost/timer/progress_display.hpp>
 #include <vtkSmartPointer.h>
 #include <vtkPolyData.h>
 #include <vtkCellArray.h>
@@ -187,7 +187,7 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
   PrintToLog("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, false);
   unsigned long lastTick = 0;
 
-  boost::progress_display disp(static_cast<unsigned long>(num_gradient_volumes)*compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2));
+  boost::timer::progress_display disp(static_cast<unsigned long>(num_gradient_volumes)*compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2));
 
 #pragma omp parallel for num_threads(out_threads)
   for (int g=0; g<num_gradient_volumes; g++)
@@ -1004,7 +1004,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     unsigned int region_size_y = m_WorkingImageRegion.GetSize(1);
     unsigned int num_gradients = m_Parameters.m_SignalGen.GetNumVolumes();
     int numFibers = m_FiberBundle->GetNumFibers();
-    boost::progress_display disp(numFibers*num_gradients);
+    boost::timer::progress_display disp(numFibers*num_gradients);
 
     if (m_FiberBundle->GetMeanFiberLength()<5.0)
       omp_set_num_threads(2);
@@ -1350,7 +1350,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     PrintToLog("Adding noise: " + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_NoiseVariance), false);
   ImageRegionIterator<OutputImageType> it4 (m_OutputImage, m_OutputImage->GetLargestPossibleRegion());
   DoubleDwiType::PixelType signal; signal.SetSize(m_Parameters.m_SignalGen.GetNumVolumes());
-  boost::progress_display disp2(m_OutputImage->GetLargestPossibleRegion().GetNumberOfPixels());
+  boost::timer::progress_display disp2(m_OutputImage->GetLargestPossibleRegion().GetNumberOfPixels());
 
   PrintToLog("0%   10   20   30   40   50   60   70   80   90   100%", false, true, false);
   PrintToLog("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, false);

@@ -1,8 +1,12 @@
 set(MITK_MODULES
-  DiffusionCore
+  DiffusionImage
+  DiffusionPreprocessing
+  DiffusionModelling
+  DiffusionRegistration
+  FiberBundle
+  FiberProcessing
   FiberTracking
   MriSimulation
-  DiffusionIO
   FiberDissection
   IVIM
   DiffusionCmdApps

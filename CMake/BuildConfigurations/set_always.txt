@@ -1,0 +1,58 @@
+
+set(MITK_BUILD_ALL_APPS OFF CACHE BOOL "Build all MITK applications" FORCE)
+set(MITK_BUILD_APP_CoreApp OFF CACHE BOOL "Build the MITK CoreApp" FORCE)
+set(MITK_BUILD_APP_Workbench ON CACHE BOOL "Build the MITK Workbench" FORCE)
+
+# Build neither all plugins nor examples
+set(MITK_BUILD_ALL_PLUGINS OFF CACHE BOOL "Build all MITK plugins" FORCE)
+set(MITK_BUILD_EXAMPLES OFF CACHE BOOL "Build the MITK examples" FORCE)
+
+# Activate in-application help generation
+set(MITK_DOXYGEN_GENERATE_QCH_FILES ON CACHE BOOL "Use doxygen to generate Qt compressed help files for MITK docs" FORCE)
+set(BLUEBERRY_USE_QT_HELP ON CACHE BOOL "Enable support for integrating bundle documentation into Qt Help" FORCE)
+
+# Enable console window
+set(MITK_SHOW_CONSOLE_WINDOW ON CACHE BOOL "Use this to enable or disable the console window when starting MITK GUI Applications" FORCE)
+
+set(MITK_APPS_SHOWVIEWTOOLBAR OFF CACHE BOOL "" FORCE)
+set(MITK_APPS_SHOWPERSPECTIVETOOLBAR ON CACHE BOOL "" FORCE)
+
+set(MITK_APPS_VIEWEXCLUDELIST "" CACHE STRING "" FORCE)
+set(MITK_APPS_PERSPECTIVEEXCLUDELIST "org.mitk.extapp.defaultperspective;org.mitk.mitkworkbench.perspectives.visualization;" CACHE STRING "" FORCE)
+
+
+# modules
+set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionPreprocessing OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionRegistration OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberBundle OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberDissection OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberProcessing OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberTracking OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_IVIM OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_MriSimulation OFF CACHE BOOL "" FORCE)
+
+# cmdapps
+set(BUILD_DiffusionFiberQuantificationCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber quantification" FORCE)
+set(BUILD_DiffusionFiberProcessingCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber processing" FORCE)
+set(BUILD_DiffusionFiberfoxCmdApps OFF CACHE BOOL "Build commandline tools for diffusion data simulation (Fiberfox)" FORCE)
+set(BUILD_DiffusionMiscCmdApps OFF CACHE BOOL "Build miscellaneous commandline tools for diffusion" FORCE)
+set(BUILD_DiffusionQuantificationCmdApps OFF CACHE BOOL "Build commandline tools for diffusion quantification (ADC, ...)" FORCE)
+set(BUILD_DiffusionTractographyCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber tractography" FORCE)
+set(BUILD_DiffusionIVIMCmdApps OFF CACHE BOOL "Build commandline tools for IVIM" FORCE)
+
+# plugins
+set("MITK_BUILD_org.mitk.gui.qt.viewnavigator" ON CACHE BOOL "" FORCE) # always ON
+
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.controls" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.denoising" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.fiberfox" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.fiberprocessing" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.ivim" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.odfpeaks" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.preprocessing" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.reconstruction" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.registration" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.tractography" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.segmentation" OFF CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.measurementtoolbox" OFF CACHE BOOL "" FORCE)

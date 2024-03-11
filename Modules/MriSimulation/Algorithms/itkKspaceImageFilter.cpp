@@ -30,7 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkSingleShotEpi.h>
 #include <mitkConventionalSpinEcho.h>
 #include <mitkFastSpinEcho.h>
-#include <mitkDiffusionFunctionCollection.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 #include <itkImageFileWriter.h>
 
 namespace itk {
