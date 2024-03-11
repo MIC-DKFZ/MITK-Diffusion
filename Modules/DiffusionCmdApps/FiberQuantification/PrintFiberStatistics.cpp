@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigure.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
-#include <mitkDiffusionDataIOHelper.h>
+#include <mitkFiberBundleIOHelper.h>
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -65,7 +65,7 @@ int main(int argc, char* argv[])
   {
 
     std::vector< std::string > fib_names;
-    auto input_tracts = mitk::DiffusionDataIOHelper::load_fibs(inFibs, &fib_names);
+    auto input_tracts = mitk::FiberBundleIOHelper::load_fibs(inFibs, &fib_names);
 
     std::ofstream statistics_file;
     statistics_file.open (outfile);

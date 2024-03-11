@@ -21,7 +21,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImage.h>
 #include <mitkImage.h>
 #include <mitkIOUtil.h>
-#include <mitkFiberBundle.h>
 #include <mitkImageToItk.h>
 
 #include <itksys/SystemTools.hxx>
@@ -36,9 +35,7 @@ class MITKDIFFUSIONCMDAPPS_EXPORT DiffusionDataIOHelper
 {
 public:
 
-  static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string > extensions={".fib", ".trk"});
-
-  static std::vector< mitk::FiberBundle::Pointer > load_fibs(const std::vector<std::string> files, std::vector<std::string>* filenames=nullptr);
+  static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string > extensions);
 
   static std::vector< mitk::Image::Pointer > load_mitk_images(const std::vector<std::string> files, std::vector<std::string>* filenames=nullptr);
 

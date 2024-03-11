@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigure.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
-#include <mitkDiffusionDataIOHelper.h>
+#include <mitkFiberBundleIOHelper.h>
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    std::vector< mitk::FiberBundle::Pointer > tractograms = mitk::DiffusionDataIOHelper::load_fibs(inFibs);
+    std::vector< mitk::FiberBundle::Pointer > tractograms = mitk::FiberBundleIOHelper::load_fibs(inFibs);
 
     mitk::FiberBundle::Pointer result = mitk::FiberBundle::New();
     result = result->AddBundles(tractograms);

@@ -29,7 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLexicalCast.h>
 #include <mitkCoreObjectFactory.h>
 #include <mitkIOUtil.h>
-#include <mitkDiffusionDataIOHelper.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkImage.h>
 #include <mitkRenderingTestHelper.h>
 #include <vtkRenderLargeImage.h>
@@ -89,7 +89,7 @@ int main(int argc, char* argv[])
   try
   {
     mitk::RenderingTestHelper renderingHelper(640*2, 480*2);
-    std::vector< mitk::FiberBundle::Pointer > tractograms = mitk::DiffusionDataIOHelper::load_fibs(inFibs);
+    std::vector< mitk::FiberBundle::Pointer > tractograms = mitk::FiberBundleIOHelper::load_fibs(inFibs);
     for (auto fib : tractograms)
     {
       fib->RotateAroundAxis(rotateX, rotateY, rotateZ);

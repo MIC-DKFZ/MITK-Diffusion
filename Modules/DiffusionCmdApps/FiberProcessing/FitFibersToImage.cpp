@@ -28,7 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkFitFibersToImageFilter.h>
 #include <mitkTensorModel.h>
 #include <mitkITKImageImport.h>
-#include <mitkDiffusionDataIOHelper.h>
+#include <mitkFiberBundleIOHelper.h>
 
 typedef itk::Point<float, 4> PointType4;
 typedef itk::Image< float, 4 >  PeakImgType;
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image", "Fiberbundles"}, std::vector<std::string>());
 
     std::vector< std::string > fib_names;
-    auto input_tracts = mitk::DiffusionDataIOHelper::load_fibs(fib_files, &fib_names);
+    auto input_tracts = mitk::FiberBundleIOHelper::load_fibs(fib_files, &fib_names);
 
     itk::FitFibersToImageFilter::Pointer fitter = itk::FitFibersToImageFilter::New();
 
