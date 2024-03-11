@@ -490,7 +490,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
     {
       mitk::LabelSetImage::Pointer multilabelImage = mitk::LabelSetImage::New();
       multilabelImage->InitializeByLabeledImage(img);
-      multilabelImage->GetActiveLabelSet()->SetActiveLabel(1);
+      multilabelImage->SetActiveLabel(1);
       mitk::Label::Pointer label = multilabelImage->GetActiveLabel();
       label->SetName("Tractogram");
 
