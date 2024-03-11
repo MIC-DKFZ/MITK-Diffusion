@@ -1,0 +1,1 @@
+mitkFunctionAddExternalProject(NAME OpenCV ON)
