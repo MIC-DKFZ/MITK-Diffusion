@@ -168,6 +168,10 @@ Automatically generated random fiber configuration for Fiberfox simulations.
 
 
 ## Building MITK Diffusion from source
+
+Please not that we moved away from a separate MITK Diffusion application and are instead building configurations of the MITK Workbench. In a (near)-future version of MITK, customizations of the Workbench will be possible to change the display and executable name etc.
+A workaround is to use the MITK branch https://github.com/MITK/MITK/tree/feature/T30337-WorkbenchCustomizations2, which already enables some of those customizations but the final mechanism fot that will be different. 
+
 * Install [Qt](https://www.qt.io/) on your system (currently 6.6.1).
 * Clone MITK from [github](https://github.com/MIC-DKFZ/MITK-Diffusion.git) using [Git version control](https://git-scm.com/).
 * Clone MITK Diffusion from [github](https://github.com/MITK/MITK.git).
@@ -176,7 +180,7 @@ Automatically generated random fiber configuration for Fiberfox simulations.
     * Click "Configure".
     * Set the option MITK_EXTENSION_DIRS to "/path/to/my/mitk-diffusion-repository".
     * Click "Configure".
-    * Set the option MITK_BUILD_CONFIGURATION to "DiffusionRelease".
+    * Set the option MITK_BUILD_CONFIGURATION to "DiffusionRelease" or any other desired configuration. There are various configurations to build e.g. only IVIM modules or only tractography. The DiffusionRelease/DiffusionDebug configurations contain all modules.
     * Click "Generate".
 
 * Start the Superbuild:
