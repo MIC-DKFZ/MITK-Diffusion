@@ -191,7 +191,6 @@ void QmitkQBallReconstructionView::CreateConnections()
   {
     connect( static_cast<QObject*>(m_Controls->m_ButtonStandard), SIGNAL(clicked()), this, SLOT(ReconstructStandard()) );
     connect( static_cast<QObject*>(m_Controls->m_QBallReconstructionMethodComboBox), SIGNAL(currentIndexChanged(int)), this, SLOT(MethodChoosen(int)) );
-    connect( static_cast<QObject*>(m_Controls->m_QBallReconstructionThreasholdEdit), SIGNAL(valueChanged(int)), this, SLOT(PreviewThreshold(int)) );
     connect( static_cast<QObject*>(m_Controls->m_ConvertButton), SIGNAL(clicked()), this, SLOT(ConvertShImage()) );
 
     m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
