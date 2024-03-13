@@ -20,7 +20,7 @@ set(BUILD_MODULE_FiberDissection ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberTracking OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_IVIM OFF CACHE BOOL "" FORCE)
-set(BUILD_MODULE_MriSimulation ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_MriSimulation OFF CACHE BOOL "" FORCE)
 
 # enable cmd apps
 # nothing for attractive

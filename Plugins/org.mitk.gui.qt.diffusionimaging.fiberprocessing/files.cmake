@@ -10,7 +10,6 @@ set(INTERNAL_CPP_FILES
   QmitkFiberProcessingView.cpp
   QmitkFiberClusteringView.cpp
   QmitkInteractiveFiberDissectionView.cpp
-  QmitkFiberFitView.cpp
 
   Perspectives/QmitkFiberProcessingPerspective.cpp
 )
@@ -20,7 +19,6 @@ set(UI_FILES
   src/internal/QmitkFiberProcessingViewControls.ui
   src/internal/QmitkFiberClusteringViewControls.ui
   src/internal/QmitkInteractiveFiberDissectionViewControls.ui
-  src/internal/QmitkFiberFitViewControls.ui
 )
 
 set(MOC_H_FILES
@@ -30,7 +28,6 @@ set(MOC_H_FILES
   src/internal/QmitkFiberProcessingView.h
   src/internal/QmitkFiberClusteringView.h
   src/internal/QmitkInteractiveFiberDissectionView.h
-  src/internal/QmitkFiberFitView.h
 
   src/internal/Perspectives/QmitkFiberProcessingPerspective.h
 )

@@ -36,22 +36,6 @@
     <keywordReference id="org.mitk.views.fiberclustering.Keyword"/>
     </view>
 
-    <view id="org.mitk.views.fiberfit"
-    name="Fiber Fit"
-    category="Fiber processing"
-    class="QmitkFiberFitView"
-    icon="resources/FiberFit.png">
-    <keywordReference id="org.mitk.views.fiberfit.Keyword"/>
-    </view>
-
-    <view id="org.mitk.views.tractometry"
-    name="Tractometry"
-    category="Fiber processing"
-    class="QmitkTractometryView"
-    icon="resources/Tractometry.png">
-    <keywordReference id="org.mitk.views.tractometry.Keyword"/>
-    </view>
-
   </extension>
 
 
@@ -73,11 +57,6 @@
   <keyword label="fiber" id="org.mitk.views.fiberclustering.Keyword"/>
   <keyword label="quickbundles" id="org.mitk.views.fiberclustering.Keyword"/>
   <keyword label="clustering" id="org.mitk.views.fiberclustering.Keyword"/>
-
-  <keyword label="fit" id="org.mitk.views.fiberfit.Keyword"/>
-  <keyword label="sift" id="org.mitk.views.fiberfit.Keyword"/>
-  <keyword label="life" id="org.mitk.views.fiberfit.Keyword"/>
-  <keyword label="fiber" id="org.mitk.views.fiberfit.Keyword"/>
 
   <keyword label="processing" id="org.mitk.views.fiberprocessing.Keyword"/>
   <keyword label="extract" id="org.mitk.views.fiberprocessing.Keyword"/>

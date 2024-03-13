@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?BlueBerry version="0.1"?>
+<plugin>
+
+  <extension point="org.blueberry.ui.views">
+
+    <view id="org.mitk.views.fiberfit"
+    name="Fiber Fit"
+    category="Fiber processing"
+    class="QmitkFiberFitView"
+    icon="resources/FiberFit.png">
+    <keywordReference id="org.mitk.views.fiberfit.Keyword"/>
+    </view>
+
+  </extension>
+
+
+
+  <extension point="org.blueberry.ui.keywords">
+
+  <keyword label="fit" id="org.mitk.views.fiberfit.Keyword"/>
+  <keyword label="sift" id="org.mitk.views.fiberfit.Keyword"/>
+  <keyword label="life" id="org.mitk.views.fiberfit.Keyword"/>
+  <keyword label="fiber" id="org.mitk.views.fiberfit.Keyword"/>
+
+  </extension>
+
+</plugin>
