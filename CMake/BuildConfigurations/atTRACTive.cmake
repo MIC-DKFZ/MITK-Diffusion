@@ -12,15 +12,15 @@ set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenCV ON CACHE BOOL "" FORCE)
 
 # enable modules
-set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)
-set(BUILD_MODULE_DiffusionPreprocessing OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberDissection ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberTracking OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_IVIM OFF CACHE BOOL "" FORCE)
-set(BUILD_MODULE_MriSimulation OFF CACHE BOOL "" FORCE)
+set(BUILD_MODULE_MriSimulation ON CACHE BOOL "" FORCE)
 
 # enable cmd apps
 # nothing for attractive
