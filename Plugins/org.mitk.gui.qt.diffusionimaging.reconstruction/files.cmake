@@ -11,12 +11,14 @@ set(INTERNAL_CPP_FILES
   QmitkQBallReconstructionView.cpp
   QmitkDiffusionQuantificationView.cpp
   QmitkTensorReconstructionView.cpp
+  QmitkOdfMaximaExtractionView.cpp
 )
 
 set(UI_FILES
   src/internal/QmitkQBallReconstructionViewControls.ui
   src/internal/QmitkDiffusionQuantificationViewControls.ui
   src/internal/QmitkTensorReconstructionViewControls.ui
+  src/internal/QmitkOdfMaximaExtractionViewControls.ui
 )
 
 set(MOC_H_FILES
@@ -28,6 +30,7 @@ set(MOC_H_FILES
   src/internal/QmitkQBallReconstructionView.h
   src/internal/QmitkDiffusionQuantificationView.h
   src/internal/QmitkTensorReconstructionView.h
+  src/internal/QmitkOdfMaximaExtractionView.h
 )
 
 set(CACHED_RESOURCE_FILES
@@ -36,6 +39,7 @@ set(CACHED_RESOURCE_FILES
   resources/quantification.png
   resources/tensor.png
   resources/odf.png
+  resources/odf_peaks.png
 )
 
 set(QRC_FILES

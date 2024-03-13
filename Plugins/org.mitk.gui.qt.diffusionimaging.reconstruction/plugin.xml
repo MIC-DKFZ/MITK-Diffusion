@@ -38,6 +38,14 @@
     <keywordReference id="org.mitk.views.odfdetails.Keyword"/>
     </view>
 
+    <view id="org.mitk.views.odfmaximaextraction"
+    name="Peak Extraction"
+    category="Signal modeling"
+    class="QmitkOdfMaximaExtractionView"
+    icon="resources/odf_peaks.png">
+    <keywordReference id="org.mitk.views.odfmaximaextraction.Keyword"/>
+    </view>
+
   </extension>
 
   <extension point="org.blueberry.ui.keywords">
@@ -87,6 +95,17 @@
   <keyword label="statistics" id="org.mitk.views.odfdetails.Keyword"/>
   <keyword label="values" id="org.mitk.views.odfdetails.Keyword"/>
   <keyword label="shape" id="org.mitk.views.odfdetails.Keyword"/>
+
+  <keyword label="ODF" id="org.mitk.views.odfmaximaextraction.Keyword"/>
+  <keyword label="SH" id="org.mitk.views.odfmaximaextraction.Keyword"/>
+  <keyword label="spherical harmonic" id="org.mitk.views.odfmaximaextraction.Keyword"/>
+  <keyword label="maximum" id="org.mitk.views.odfmaximaextraction.Keyword"/>
+  <keyword label="peak" id="org.mitk.views.odfmaximaextraction.Keyword"/>
+  <keyword label="main" id="org.mitk.views.odfmaximaextraction.Keyword"/>
+  <keyword label="FOD" id="org.mitk.views.odfmaximaextraction.Keyword"/>
+  <keyword label="direction" id="org.mitk.views.odfmaximaextraction.Keyword"/>
+  <keyword label="fODF" id="org.mitk.views.odfmaximaextraction.Keyword"/>
+  <keyword label="dODF" id="org.mitk.views.odfmaximaextraction.Keyword"/>
 
   </extension>
 

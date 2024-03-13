@@ -50,7 +50,6 @@ set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.fiberfox" OFF CACHE BOOL "" FOR
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.fiberprocessing" OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.fiberfit" OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.ivim" OFF CACHE BOOL "" FORCE)
-set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.odfpeaks" OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.preprocessing" OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.reconstruction" OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.registration" OFF CACHE BOOL "" FORCE)
