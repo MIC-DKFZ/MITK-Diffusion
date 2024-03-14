@@ -27,8 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkSmartPointer.h>
 
 // OpenCV
-//#include <opencv2/ml.hpp>
-#include <opencv4/opencv2/ml.hpp>
+#include <opencv2/ml.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
