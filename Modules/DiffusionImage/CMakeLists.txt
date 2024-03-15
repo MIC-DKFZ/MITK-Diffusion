@@ -9,3 +9,5 @@ MITK_CREATE_MODULE(
 # if(TARGET ${MODULE_TARGET} AND MITK_USE_OpenMP)
 #   target_link_libraries(${MODULE_TARGET} PUBLIC OpenMP::OpenMP_CXX)
 # endif()
+
+add_subdirectory(Testing)
