@@ -130,11 +130,13 @@ protected slots:
   void CreateSphereSegmentation();
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
+  void StartAlgorithmGen();
+  void StartGeneralizationAlgorithm();
   void CreatePredictionNode();
   void CreateUncertaintySampleNode();
   void CreateDistanceSampleNode();
   void RemovefromUncertaintyBrush( bool checked );
-  void RemovefromDistanceBrush( bool checked );
+  void RemovefromDistanceBrush( bool checked);
   void RemovefromPredictionBrush( bool checked );
   void ResampleTractogram();
   void SFFPrototypes();
@@ -142,6 +144,8 @@ protected slots:
   void ResetClassifier();
 
   void startTractography();
+
+  void addGeneralizationBundles(bool reset);
 
 
 
@@ -171,6 +175,7 @@ protected:
   int m_prototypecounter;
   int m_posOffsetcounter;
   int m_init_subset;
+  int m_generalizationMode;
 
 
 
@@ -186,6 +191,8 @@ protected:
   mitk::FiberBundle::Pointer            m_Prediction;
   mitk::FiberBundle::Pointer            m_UncertaintyLabel;
   mitk::FiberBundle::Pointer            m_DistanceLabel;
+  mitk::FiberBundle::Pointer            cur_negativeBundle;
+  mitk::FiberBundle::Pointer            cur_positiveBundle;
 
 
   mitk::DataNode::Pointer               m_positiveBundleNode;
@@ -197,6 +204,15 @@ protected:
   mitk::DataNode::Pointer               m_reducedFibersDataNode;
   mitk::DataNode::Pointer               m_Prototypes;
   mitk::DataNode::Pointer               m_newtestnode;
+
+ // This code is for atTRACTive generalization
+  mitk::FiberBundle::Pointer            m_positiveGenBundle;
+  mitk::FiberBundle::Pointer            m_negativeGenBundle;
+  mitk::DataNode::Pointer               m_positiveGenBundleNode;
+  mitk::DataNode::Pointer               m_negativeGenBundleNode;
+
+
+
 
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
