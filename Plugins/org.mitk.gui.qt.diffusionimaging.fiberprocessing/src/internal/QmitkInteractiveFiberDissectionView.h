@@ -31,6 +31,24 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkStreamlineFeatureExtractor.h>
 #include <mitkStatisticModel.h> 
 
+#include <mitkTensorImage.h>
+#include <mitkDataStorage.h>
+#include <mitkDataNode.h>
+#include <mitkImage.h>
+#include <itkImage.h>
+#include <itkStreamlineTrackingFilter.h>
+#include <Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h>
+#include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
+#include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
+#include <random>
+#include <mitkPointSet.h>
+#include <mitkPointSetShapeProperty.h>
+#include <QThread>
+#include <QTimer>
+#include <QmitkStdMultiWidget.h>
+#include <QmitkSliceNavigationListener.h>
+#include <mitkILifecycleAwarePart.h>
+#include <mitkStreamlineTractographyParameters.h>
 #include <itkCastImageFilter.h>
 #include <itkVTKImageImport.h>
 #include <itkVTKImageExport.h>
@@ -57,6 +75,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 /*!
 \brief View to dissect fiber bundles with active learning
 */
+
+//class QmitkStreamlineTrackingView;
+//class QmitkStreamlineTrackingWorker : public QObject
+//{
+//  Q_OBJECT
+
+//public:
+
+//  QmitkStreamlineTrackingWorker(class QmitkStreamlineTrackingView* view);
+
+//public slots:
+
+//  void run();
+
+//private:
+
+//  QmitkStreamlineTrackingView* m_View;
+//};
+
+
 class QmitkInteractiveFiberDissectionView : public QmitkAbstractView
 {
   // this is needed for all Qt objects that should have a Qt meta-object
@@ -76,6 +114,12 @@ public:
 
   virtual void CreateQtPartControl(QWidget *parent) override;
 
+  typedef itk::StreamlineTrackingFilter   TrackerType;
+  TrackerType::Pointer              m_Tracker;
+//  QmitkStreamlineTrackingWorker     m_TrackingWorker;
+  QThread                           m_TrackingThread;
+
+
   virtual void SetFocus() override;
 
 protected slots:
@@ -86,17 +130,22 @@ protected slots:
   void CreateSphereSegmentation();
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
+  void StartAlgorithmGen();
+  void StartGeneralizationAlgorithm();
   void CreatePredictionNode();
   void CreateUncertaintySampleNode();
   void CreateDistanceSampleNode();
   void RemovefromUncertaintyBrush( bool checked );
-  void RemovefromDistanceBrush( bool checked );
+  void RemovefromDistanceBrush( bool checked);
   void RemovefromPredictionBrush( bool checked );
   void ResampleTractogram();
   void SFFPrototypes();
   void CreateUncertantyMap();
   void ResetClassifier();
 
+  void startTractography();
+
+  void addGeneralizationBundles(bool reset);
 
 
 
@@ -126,6 +175,9 @@ protected:
   int m_prototypecounter;
   int m_posOffsetcounter;
   int m_init_subset;
+  int m_generalizationMode;
+
+
 
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
@@ -139,6 +191,8 @@ protected:
   mitk::FiberBundle::Pointer            m_Prediction;
   mitk::FiberBundle::Pointer            m_UncertaintyLabel;
   mitk::FiberBundle::Pointer            m_DistanceLabel;
+  mitk::FiberBundle::Pointer            cur_negativeBundle;
+  mitk::FiberBundle::Pointer            cur_positiveBundle;
 
 
   mitk::DataNode::Pointer               m_positiveBundleNode;
@@ -150,6 +204,15 @@ protected:
   mitk::DataNode::Pointer               m_reducedFibersDataNode;
   mitk::DataNode::Pointer               m_Prototypes;
   mitk::DataNode::Pointer               m_newtestnode;
+
+ // This code is for atTRACTive generalization
+  mitk::FiberBundle::Pointer            m_positiveGenBundle;
+  mitk::FiberBundle::Pointer            m_negativeGenBundle;
+  mitk::DataNode::Pointer               m_positiveGenBundleNode;
+  mitk::DataNode::Pointer               m_negativeGenBundleNode;
+
+
+
 
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
@@ -165,6 +228,9 @@ protected:
 
 
   std::vector<std::vector<unsigned int>> m_index;
+
+private:
+  mitk::TrackingDataHandler*              m_TrackingHandler;
 
 };
 

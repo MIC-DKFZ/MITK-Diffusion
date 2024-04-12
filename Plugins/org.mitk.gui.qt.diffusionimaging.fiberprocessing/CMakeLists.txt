@@ -6,7 +6,7 @@ mitk_create_plugin(
   SUBPROJECTS MITK-Diffusion
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_FIBERPROCESSING_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkFiberProcessing MitkQtWidgets MitkFiberDissection
+MODULE_DEPENDS MitkFiberProcessing MitkQtWidgets MitkFiberDissection MitkFiberTracking MitkQtWidgetsExt MitkQtWidgets
   PACKAGE_DEPENDS
     PRIVATE ITK|ITKVTK
 )
