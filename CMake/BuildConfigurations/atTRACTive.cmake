@@ -22,8 +22,14 @@ set(BUILD_MODULE_FiberTracking OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_IVIM OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_MriSimulation OFF CACHE BOOL "" FORCE)
 
-# enable cmd apps
-# nothing for attractive
+# enable command line tools
+set(BUILD_DiffusionFiberQuantificationCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber quantification" FORCE)
+set(BUILD_DiffusionFiberProcessingCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber processing" FORCE)
+set(BUILD_DiffusionFiberfoxCmdApps OFF CACHE BOOL "Build commandline tools for diffusion data simulation (Fiberfox)" FORCE)
+set(BUILD_DiffusionMiscCmdApps OFF CACHE BOOL "Build miscellaneous commandline tools for diffusion" FORCE)
+set(BUILD_DiffusionQuantificationCmdApps OFF CACHE BOOL "Build commandline tools for diffusion quantification (IVIM, ADC, ...)" FORCE)
+set(BUILD_DiffusionTractographyCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber tractography" FORCE)
+set(BUILD_DiffusionIVIMCmdApps OFF CACHE BOOL "" FORCE)
 
 # enable plugins
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.controls" ON CACHE BOOL "" FORCE)
