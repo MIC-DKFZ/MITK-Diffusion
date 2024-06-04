@@ -58,7 +58,7 @@ public:
   itkCloneMacro(Self)
 
   /** Runtime information support. */
-  itkTypeMacro(MLBSTrackingFilter, ImageToImageFilter)
+  itkTypeMacro(StreamlineTrackingFilter, ImageToImageFilter)
 
   typedef itk::Image<unsigned char, 3>                ItkUcharImgType;
   typedef itk::Image<unsigned int, 3>                 ItkUintImgType;
