@@ -83,8 +83,8 @@ public:
     odf_threshold = 0.1f;
     peak_threshold = 0.1f;
 
-    mitk::Image::Pointer odf_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/qball_image.qbi"));
-    mitk::Image::Pointer tensor_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/tensor_image.dti"));
+    mitk::Image::Pointer odf_image = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/qball_image.qbi"));
+    mitk::Image::Pointer tensor_image = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/tensor_image.dti"));
     mitk::Image::Pointer peak_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/qball_peak_image.nii.gz"));
     mitk::Image::Pointer seed_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/seed_image.nii.gz"));
     mitk::Image::Pointer mask_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/mask_image.nii.gz"));
