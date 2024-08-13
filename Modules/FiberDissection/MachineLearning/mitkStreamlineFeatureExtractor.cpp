@@ -578,13 +578,17 @@ void StreamlineFeatureExtractor::TrainModel()
     /* Train Classifier */
     MITK_INFO << "Start Training";
     statistic_model->train(m_traindata);
+    MITK_INFO << "Done";
 }
 
 std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
 {
+    MITK_INFO << "1";
     std::vector<std::vector<unsigned int>> index_vec;
     /*Create Dataset as cv::Mat*/
     cv::Mat dataTest;
+
+    dataTest.create(myindex.size(), m_DistancesTest.at(0).cols(), CV_32F);
 
     for (unsigned int i = 0; i < myindex.size(); i++)
     {
@@ -594,10 +598,12 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
         }
     }
 
+    MITK_INFO << "2";
     std::vector<unsigned int> indexPrediction;
     std::vector<float> e(myindex.size());
     std::vector<int> pred(myindex.size());
     std::fill(pred.begin(), pred.end(), 0.0f);
+
 
     /*For every Sample/Streamline get Prediction and entropy (=based on counts of Random Forest)*/
     MITK_INFO << "Predicting on all cores";
