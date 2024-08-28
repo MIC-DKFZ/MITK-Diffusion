@@ -50,7 +50,7 @@ DiffusionImageMimeTypes::DiffusionImageNrrdMimeType::DiffusionImageNrrdMimeType(
 {
   std::string category = "Diffusion Weighted Images";
   this->SetCategory(category);
-  this->SetComment("Diffusion Weighted Images");
+  this->SetComment("nrrd dMRI");
 
   this->AddExtension("dwi");
   //this->AddExtension("hdwi"); // saving with detached header does not work out of the box
@@ -125,7 +125,7 @@ DiffusionImageMimeTypes::DiffusionImageNiftiMimeType::DiffusionImageNiftiMimeTyp
 {
   std::string category = "Diffusion Weighted Images";
   this->SetCategory(category);
-  this->SetComment("Diffusion Weighted Images");
+  this->SetComment("nifti dMRI");
   this->AddExtension("nii.gz");
   this->AddExtension("nii");
 }

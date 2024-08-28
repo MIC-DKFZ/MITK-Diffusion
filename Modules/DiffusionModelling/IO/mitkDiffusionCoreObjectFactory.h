@@ -53,10 +53,8 @@ private:
     std::string m_InternalFileExtensions;
     std::string m_SaveFileExtensions;
 
-    itk::ObjectFactoryBase::Pointer m_NrrdDiffusionImageIOFactory;
     itk::ObjectFactoryBase::Pointer m_NrrdOdfImageIOFactory;
 
-    itk::ObjectFactoryBase::Pointer m_NrrdDiffusionImageWriterFactory;
     itk::ObjectFactoryBase::Pointer m_NrrdOdfImageWriterFactory;
 };
 
