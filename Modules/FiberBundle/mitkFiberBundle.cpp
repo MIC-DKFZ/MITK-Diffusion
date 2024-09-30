@@ -1167,6 +1167,9 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgTyp
 
         bool inside = mask->TransformPhysicalPointToIndex(itkP, idx);
 
+        if (inside && mask->GetPixel(idx) <= 0)
+          inside = false;
+
         if (inside && !invert)
         {
           vtkIdType id = vtkNewPoints->InsertNextPoint(itkP.GetDataPointer());

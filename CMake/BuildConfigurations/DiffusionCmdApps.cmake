@@ -14,6 +14,17 @@ set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMQI ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
 
+set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionRegistration ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberDissection ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberTracking ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_IVIM ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_MriSimulation ON CACHE BOOL "" FORCE)
+set(BUILD_TESTING ON CACHE BOOL "Build the MITK tests" FORCE)
+
 # enable command line tools
 set(BUILD_DiffusionFiberQuantificationCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber quantification" FORCE)
 set(BUILD_DiffusionFiberProcessingCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber processing" FORCE)

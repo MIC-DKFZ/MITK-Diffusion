@@ -1,5 +1,5 @@
 SET(MODULE_CUSTOM_TESTS
-  mitkGibbsTrackingTest.cpp
+  mitkGlobalTractographyTest.cpp
   mitkStreamlineTractographyTest.cpp
 )
 
