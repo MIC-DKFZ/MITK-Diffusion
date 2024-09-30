@@ -127,6 +127,7 @@ protected slots:
   void UpdateGui();     ///< update button activity etc. dpending on current datamanager selection
   void RemovefromBundleBrush( bool checked );
   void CreateSubset();
+  void CreateReductionSubset();
   void CreateSphereSegmentation();
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
@@ -146,6 +147,8 @@ protected slots:
   void startTractography();
 
   void addGeneralizationBundles(bool reset);
+  void addGeneralizationSavedPosBundles();
+  void addGeneralizationSavedNegBundles();
 
 
 
@@ -202,6 +205,8 @@ protected:
   mitk::DataNode::Pointer               m_UncertaintyLabelNode;
   mitk::DataNode::Pointer               m_DistanceLabelNode;
   mitk::DataNode::Pointer               m_reducedFibersDataNode;
+  mitk::DataNode::Pointer               m_reducedFibersTractogramNode;
+
   mitk::DataNode::Pointer               m_Prototypes;
   mitk::DataNode::Pointer               m_newtestnode;
 
