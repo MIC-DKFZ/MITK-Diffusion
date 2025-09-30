@@ -45,7 +45,6 @@ found in the LICENSE file.
 #include "mitkSurface.h"
 #include "mitkFiberBundle.h"
 #include "mitkInteractionPositionEvent.h"
-
 #include <mitkLabelSetImage.h>
 
 #include <vtkSphereSource.h>
@@ -123,12 +122,9 @@ void mitk::SphereSegmentationInteractor::CreateSegmentation()
       return;
     }
 
-    mitk::LabelSetImage::Pointer startSegmentation = mitk::LabelSetImage::New();
-    startSegmentation->InitializeByLabeledImage(startImage);
-
     // Create name for the result node
     std::string nameOfResultImage = m_startDataNode->GetName() + "_ROI";
-    m_startDataSurfaceNode->SetData(startSegmentation);
+    m_startDataSurfaceNode->SetData(startImage);
     m_startDataSurfaceNode->SetProperty("name", mitk::StringProperty::New(nameOfResultImage));
 
     mitk::SurfaceToImageFilter::Pointer endSurfaceToImageFilter = mitk::SurfaceToImageFilter::New();
@@ -143,12 +139,9 @@ void mitk::SphereSegmentationInteractor::CreateSegmentation()
       return;
     }
 
-    mitk::LabelSetImage::Pointer endSegmentation = mitk::LabelSetImage::New();
-    endSegmentation->InitializeByLabeledImage(endImage);
-
     // Create name for the result node
     nameOfResultImage = m_endDataNode->GetName() + "_ROI";
-    m_endDataSurfaceNode->SetData(endSegmentation);
+    m_endDataSurfaceNode->SetData(endImage);
     m_endDataSurfaceNode->SetProperty("name", mitk::StringProperty::New(nameOfResultImage));
 
     // Hide the original nodes

@@ -43,6 +43,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkTractsToFiberEndingsImageFilter.h>
 #include <itkSignedMaurerDistanceMapImageFilter.h>
 #include <itkBinaryThinningImageFilter.h>
+#include <mitkLabelSetImage.h>
 
 #include <mitkLexicalCast.h>
 
@@ -488,10 +489,9 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
 
     if (m_SelectedImage.IsNotNull())
     {
-      mitk::LabelSetImage::Pointer multilabelImage = mitk::LabelSetImage::New();
+      mitk::MultiLabelSegmentation::Pointer multilabelImage = mitk::MultiLabelSegmentation::New();
       multilabelImage->InitializeByLabeledImage(img);
-      multilabelImage->SetActiveLabel(1);
-      mitk::Label::Pointer label = multilabelImage->GetActiveLabel();
+      mitk::Label::Pointer label = multilabelImage->GetLabel(1);
       label->SetName("Tractogram");
 
       // Add Segmented Property Category Code Sequence tags (0062, 0003): Sequence defining the general category of this

@@ -45,7 +45,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkSmartPointer.h>
 #include <vtkSelection.h>
 #include <vtkSelectionNode.h>
-#include <vtkExtractSelectedThresholds.h>
 #include <vtkFloatArray.h>
 #include <vtkCellPicker.h>
 

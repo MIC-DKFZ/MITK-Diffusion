@@ -17,15 +17,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkOdfImage.h"
 #include "mitkImageCast.h"
 #include "itkImage.h"
-#include "mitkImageVtkAccessor.h"
 #include "itkOdfToRgbImageFilter.h"
 #include <mitkProperties.h>
 
 mitk::OdfImage::OdfImage() : Image()
 {
   m_RgbImage = nullptr;
-  // not needed anymore as soon as all diffusion images are identified via properties anyway
-  this->SetProperty("IsOdfImage", mitk::BoolProperty::New(true));
 }
 
 mitk::OdfImage::~OdfImage()

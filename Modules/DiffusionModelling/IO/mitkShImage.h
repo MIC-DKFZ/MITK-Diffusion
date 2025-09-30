@@ -19,8 +19,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define __mitkShImage__h
 
 #include "mitkImage.h"
-#include "itkVectorImage.h"
-#include "mitkImageVtkAccessor.h"
 
 #include <MitkDiffusionModellingExports.h>
 
