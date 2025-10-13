@@ -17,8 +17,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkShImage.h"
 #include "mitkImageCast.h"
 #include "itkImage.h"
+<<<<<<< HEAD
 #include "mitkImageVtkReadAccessor.h"
 #include "mitkImageVtkWriteAccessor.h"
+=======
+>>>>>>> master
 #include <mitkProperties.h>
 #include "itkShToRgbImageFilter.h"
 
@@ -28,8 +31,6 @@ mitk::ShImage::ShImage() : Image()
   , m_ShConvention(SH_CONVENTION::MRTRIX)
 {
   m_RgbImage = nullptr;
-  // not needed anymore as soon as all diffusion images are identified via properties anyway
-  this->SetProperty("IsShImage", mitk::BoolProperty::New(true));
 }
 
 mitk::ShImage::~ShImage()

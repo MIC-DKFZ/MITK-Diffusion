@@ -19,9 +19,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define __mitkOdfImage__h
 
 #include "mitkImage.h"
+<<<<<<< HEAD
 #include "itkVectorImage.h"
 #include "mitkImageVtkReadAccessor.h"
 #include "mitkImageVtkWriteAccessor.h"
+=======
+>>>>>>> master
 
 #include <MitkDiffusionModellingExports.h>
 #include <itkOrientationDistributionFunction.h>
