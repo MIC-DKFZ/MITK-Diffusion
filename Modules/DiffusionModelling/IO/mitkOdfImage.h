@@ -20,7 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkImage.h"
 #include "itkVectorImage.h"
-#include "mitkImageVtkAccessor.h"
+#include "mitkImageVtkReadAccessor.h"
+#include "mitkImageVtkWriteAccessor.h"
 
 #include <MitkDiffusionModellingExports.h>
 #include <itkOrientationDistributionFunction.h>

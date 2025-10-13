@@ -17,7 +17,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkOdfImage.h"
 #include "mitkImageCast.h"
 #include "itkImage.h"
-#include "mitkImageVtkAccessor.h"
+#include "mitkImageVtkReadAccessor.h"
+#include "mitkImageVtkWriteAccessor.h"
 #include "itkOdfToRgbImageFilter.h"
 #include <mitkProperties.h>
 

@@ -860,9 +860,10 @@ void QmitkInteractiveFiberDissectionView::startTractography()
 
       if (dynamic_cast<mitk::ShImage*>(m_Controls->m_TestBundleBox->GetSelectedNode()->GetData()))
         dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetOdfImage(mitk::convert::GetItkOdfFromShImage(dynamic_cast<mitk::ShImage*>(m_Controls->m_TestBundleBox->GetSelectedNode()->GetData())));
-      else
+      else{
         dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetOdfImage(mitk::convert::GetItkOdfFromOdfImage(dynamic_cast<mitk::OdfImage*>(m_Controls->m_TestBundleBox->GetSelectedNode()->GetData())));
         MITK_INFO << "ODF_image";
+      }
 
     }
 //    m_Tracker->SetMaskImage(mask)
