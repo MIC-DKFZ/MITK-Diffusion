@@ -1,4 +1,4 @@
-/*===================================================================
+﻿/*===================================================================
 
 The Medical Imaging Interaction Toolkit (MITK)
 
@@ -411,12 +411,9 @@ void StreamlineFeatureExtractor::GenerateData()
     // Calculate features for test data
     MITK_INFO << "Calculate Features of Test Data";
     m_DistancesTest = CalculateDmdf(T_TractogramTest, T_mergedPrototypes);
-    MITK_INFO << " Number of distances: " << m_DistancesTest.size();
 
     // Get indices for prediction
     myindex = GetIndex(m_DistancesTest);
-
-    MITK_INFO << " Number of myindex: " << myindex.size();
 
     // Train the model
     TrainModel();
@@ -459,12 +456,10 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
         unsigned int last_col_index = num_cols - 1;
         bool last_col_below_threshold = true;
 
-        if (distances.size()>80000 && m_activeCycle == 0){
-            for (unsigned int row = 0; row < matrix.rows(); ++row) {
-                if (matrix(row, last_col_index) >= threshold) {
-                    last_col_below_threshold = false;
-                    break;
-                }
+        for (unsigned int row = 0; row < matrix.rows(); ++row) {
+            if (matrix(row, last_col_index) >= threshold) {
+                last_col_below_threshold = false;
+                break;
             }
         }
 
@@ -477,6 +472,111 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetIndex(std::vector< vnl_
     return indices;
 }
 
+//void StreamlineFeatureExtractor::TrainModel()
+//{
+
+
+//    cv::Mat data;
+//    cv::Mat labels_arr_vec;
+
+//    int size_plus = 0;
+
+
+//    /*Create Trainingdata: Go through positive and negative Bundle and save distances as cv::Mat and create vector with labels*/
+//    for ( unsigned int i=0; i<m_DistancesPlus.size(); i++)
+//    {
+//        float data_arr [m_DistancesPlus.at(0).size()];
+
+//        labels_arr_vec.push_back(1);
+
+//        for ( unsigned int j=0; j<m_DistancesPlus.at(0).cols(); j++)
+//        {
+//            data_arr[j] = m_DistancesPlus.at(i).get(0,j);
+//        }
+//        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
+//        data.push_back(curdata);
+//        size_plus++;
+
+//    }
+
+//    for ( unsigned int i=m_DistancesPlus.size(); i<m_DistancesPlus.size()+m_DistancesMinus.size(); i++)
+//    {
+//        int it = i - size_plus;
+//        float data_arr [m_DistancesMinus.at(0).size()];
+
+//        labels_arr_vec.push_back(0);
+
+//         for ( unsigned int j=0; j<m_DistancesMinus.at(0).cols(); j++)
+//        {
+//            data_arr[j] = m_DistancesMinus.at(it).get(0,j);
+//        }
+//        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
+//        data.push_back(curdata);
+
+//    }
+
+//    /*Calculate weights*/
+//    int zerosgt = labels_arr_vec.rows - cv::countNonZero(labels_arr_vec);
+//    int onesgt = cv::countNonZero(labels_arr_vec);
+//    float plusval = labels_arr_vec.rows / (2.0 * onesgt ) ;
+//    float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
+//    float w[2] = {minusval, plusval};
+//    cv::Mat newweight = cv::Mat(1,2, CV_32F, w);
+
+
+//    /*Shuffle Data*/
+//    std::vector <int> seeds;
+//    for (int cont = 0; cont < labels_arr_vec.rows; cont++)
+//    {
+//        seeds.push_back(cont);
+//    }
+
+//    cv::randShuffle(seeds);
+//    cv::Mat labels_shuffled;
+//    cv::Mat samples_shuffled;
+
+
+
+
+//    for (int cont = 0; cont < labels_arr_vec.rows; cont++)
+//    {
+//        labels_shuffled.push_back(labels_arr_vec.row(seeds[cont]));
+//    }
+
+//    for (int cont = 0; cont < labels_arr_vec.rows; cont++)
+//    {
+//        samples_shuffled.push_back(data.row(seeds[cont]));
+//    }
+
+//    /*Create Dataset and initialize Classifier*/
+//    cv::Ptr<cv::ml::TrainData> m_traindata = cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, labels_shuffled);
+
+
+
+
+//    statistic_model= cv::ml::RTrees::create();
+//    auto criteria = cv::TermCriteria();
+//    criteria.type = cv::TermCriteria::MAX_ITER;
+////    criteria.epsilon = 1e-8;
+//    criteria.maxCount = 300;
+
+//    statistic_model->setMaxDepth(10); //set to three
+////    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
+//    statistic_model->setMinSampleCount(2);
+//    statistic_model->setTruncatePrunedTree(false);
+//    statistic_model->setUse1SERule(false);
+//    statistic_model->setUseSurrogates(false);
+//    statistic_model->setTermCriteria(criteria);
+//    statistic_model->setCVFolds(1);
+//    statistic_model->setPriors(newweight);
+
+
+//    /*Train Classifier*/
+//    MITK_INFO << "Start Training";
+//    statistic_model->train(m_traindata);
+
+
+//}
 
 void StreamlineFeatureExtractor::TrainModel()
 {
@@ -574,22 +674,25 @@ void StreamlineFeatureExtractor::TrainModel()
     statistic_model->setTermCriteria(criteria);
     statistic_model->setCVFolds(1);
 
+    /* Calculate weights - You can remove this part as it's no longer needed with oversampling */
+    // int zerosgt = labels_arr_vec.rows - cv::countNonZero(labels_arr_vec);
+    // int onesgt = cv::countNonZero(labels_arr_vec);
+    // float plusval = labels_arr_vec.rows / (2.0 * onesgt );
+    // float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
+    // float w[2] = {minusval, plusval};
+    // cv::Mat newweight = cv::Mat(1, 2, CV_32F, w);
+    // statistic_model->setPriors(newweight);
 
     /* Train Classifier */
     MITK_INFO << "Start Training";
     statistic_model->train(m_traindata);
-    MITK_INFO << "Done";
 }
 
 std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
 {
-    MITK_INFO << "1";
     std::vector<std::vector<unsigned int>> index_vec;
     /*Create Dataset as cv::Mat*/
-    cv::Mat dataTest;
-
-    dataTest.create(myindex.size(), m_DistancesTest.at(0).cols(), CV_32F);
-
+    cv::Mat dataTest(myindex.size(), m_DistancesTest.at(0).size(), CV_32F);
     for (unsigned int i = 0; i < myindex.size(); i++)
     {
         for (unsigned int j = 0; j < m_DistancesTest.at(myindex.at(0)).cols(); j++)
@@ -598,12 +701,10 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::Predict()
         }
     }
 
-    MITK_INFO << "2";
     std::vector<unsigned int> indexPrediction;
     std::vector<float> e(myindex.size());
     std::vector<int> pred(myindex.size());
     std::fill(pred.begin(), pred.end(), 0.0f);
-
 
     /*For every Sample/Streamline get Prediction and entropy (=based on counts of Random Forest)*/
     MITK_INFO << "Predicting on all cores";
@@ -758,109 +859,4 @@ std::vector<std::vector<unsigned int>>  StreamlineFeatureExtractor::GetDistanceD
 
 
 
-//void StreamlineFeatureExtractor::TrainModel()
-//{
-
-
-//    cv::Mat data;
-//    cv::Mat labels_arr_vec;
-
-//    int size_plus = 0;
-
-
-//    /*Create Trainingdata: Go through positive and negative Bundle and save distances as cv::Mat and create vector with labels*/
-//    for ( unsigned int i=0; i<m_DistancesPlus.size(); i++)
-//    {
-//        float data_arr [m_DistancesPlus.at(0).size()];
-
-//        labels_arr_vec.push_back(1);
-
-//        for ( unsigned int j=0; j<m_DistancesPlus.at(0).cols(); j++)
-//        {
-//            data_arr[j] = m_DistancesPlus.at(i).get(0,j);
-//        }
-//        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
-//        data.push_back(curdata);
-//        size_plus++;
-
-//    }
-
-//    for ( unsigned int i=m_DistancesPlus.size(); i<m_DistancesPlus.size()+m_DistancesMinus.size(); i++)
-//    {
-//        int it = i - size_plus;
-//        float data_arr [m_DistancesMinus.at(0).size()];
-
-//        labels_arr_vec.push_back(0);
-
-//         for ( unsigned int j=0; j<m_DistancesMinus.at(0).cols(); j++)
-//        {
-//            data_arr[j] = m_DistancesMinus.at(it).get(0,j);
-//        }
-//        cv::Mat curdata(1, m_DistancesPlus.at(0).size(), CV_32F, data_arr);
-//        data.push_back(curdata);
-
-//    }
-
-//    /*Calculate weights*/
-//    int zerosgt = labels_arr_vec.rows - cv::countNonZero(labels_arr_vec);
-//    int onesgt = cv::countNonZero(labels_arr_vec);
-//    float plusval = labels_arr_vec.rows / (2.0 * onesgt ) ;
-//    float minusval = labels_arr_vec.rows / (2.0 * zerosgt );
-//    float w[2] = {minusval, plusval};
-//    cv::Mat newweight = cv::Mat(1,2, CV_32F, w);
-
-
-//    /*Shuffle Data*/
-//    std::vector <int> seeds;
-//    for (int cont = 0; cont < labels_arr_vec.rows; cont++)
-//    {
-//        seeds.push_back(cont);
-//    }
-
-//    cv::randShuffle(seeds);
-//    cv::Mat labels_shuffled;
-//    cv::Mat samples_shuffled;
-
-
-
-
-//    for (int cont = 0; cont < labels_arr_vec.rows; cont++)
-//    {
-//        labels_shuffled.push_back(labels_arr_vec.row(seeds[cont]));
-//    }
-
-//    for (int cont = 0; cont < labels_arr_vec.rows; cont++)
-//    {
-//        samples_shuffled.push_back(data.row(seeds[cont]));
-//    }
-
-//    /*Create Dataset and initialize Classifier*/
-//    cv::Ptr<cv::ml::TrainData> m_traindata = cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, labels_shuffled);
-
-
-
-
-//    statistic_model= cv::ml::RTrees::create();
-//    auto criteria = cv::TermCriteria();
-//    criteria.type = cv::TermCriteria::MAX_ITER;
-////    criteria.epsilon = 1e-8;
-//    criteria.maxCount = 500;
-
-//    statistic_model->setMaxDepth(10); //set to three
-////    statistic_model->setMinSampleCount(m_traindata->getNTrainSamples()*0.01);
-//    statistic_model->setMinSampleCount(5); //2
-//    statistic_model->setTruncatePrunedTree(false);
-//    statistic_model->setUse1SERule(false);
-//    statistic_model->setUseSurrogates(false);
-//    statistic_model->setTermCriteria(criteria);
-//    statistic_model->setCVFolds(1);
-//    statistic_model->setPriors(newweight);
-
-
-//    /*Train Classifier*/
-//    MITK_INFO << "Start Training";
-//    statistic_model->train(m_traindata);
-
-
-//}
  

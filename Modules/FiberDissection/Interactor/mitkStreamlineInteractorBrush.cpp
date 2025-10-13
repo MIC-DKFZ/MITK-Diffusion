@@ -771,12 +771,10 @@ void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction 
 
 void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
-
     DataInteractor::SetDataNode(m_NegStreamlineNode);
 
-    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
-    if (m_NegStreamlineNode->IsVisible(nullptr) == true) {
 
+    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
     if (positionEvent == nullptr)
     {
     }
@@ -961,10 +959,10 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
 
         }
     }
-    }
+
     DataInteractor::SetDataNode(m_PosStreamlineNode);
 
-    if (m_PosStreamlineNode->IsVisible(nullptr) == true) {
+
     if (positionEvent == nullptr)
     {
 
@@ -1152,7 +1150,6 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
             m_PosStreamline->GetFiberPolyData()->RemoveDeletedCells();
 
         }
-    }
     }
     RenderingManager::GetInstance()->RequestUpdateAll();
   }
