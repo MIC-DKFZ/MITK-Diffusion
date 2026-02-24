@@ -74,7 +74,32 @@ DiffusionImageNiftiReader::
 ~DiffusionImageNiftiReader()
 {}
 
-DiffusionImageNiftiReader::
+IFileReader::ConfidenceLevel DiffusionImageNiftiReader::GetConfidenceLevel() const
+{
+  // The mime type is registered with plain .nii/.nii.gz extensions (no AppliesTo override
+  // is active due to object slicing in the AbstractFileReader constructor). We therefore
+  // replicate the DiffusionImageNiftiMimeType::AppliesTo() logic here: a NIfTI file is
+  // only treated as DWI when the required bvec/bval sidecar files are present.
+  const std::string path = this->GetInputLocation();
+  const std::string ext = itksys::SystemTools::LowerCase(itksys::SystemTools::GetFilenameExtension(path));
+  if (ext == ".nii" || ext == ".nii.gz")
+  {
+    const std::string base_path = itksys::SystemTools::GetFilenamePath(path);
+    std::string base = itksys::SystemTools::GetFilenameWithoutLastExtension(
+                         itksys::SystemTools::GetFilenameWithoutLastExtension(path));
+    if (!base_path.empty())
+      base = base_path + "/" + base;
+
+    const bool has_sidecar =
+      (itksys::SystemTools::FileExists(base + ".bvec") && itksys::SystemTools::FileExists(base + ".bval")) ||
+      (itksys::SystemTools::FileExists(base + ".bvecs") && itksys::SystemTools::FileExists(base + ".bvals"));
+    if (!has_sidecar)
+      return IFileReader::Unsupported;
+  }
+  return AbstractFileReader::GetConfidenceLevel();
+}
+
+  DiffusionImageNiftiReader::
 DiffusionImageNiftiReader()
   : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION() )
 

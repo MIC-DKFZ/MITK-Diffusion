@@ -47,6 +47,7 @@ namespace mitk
 
     using AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
+    ConfidenceLevel GetConfidenceLevel() const override;
 
     typedef short                                                           DiffusionPixelType;
 
