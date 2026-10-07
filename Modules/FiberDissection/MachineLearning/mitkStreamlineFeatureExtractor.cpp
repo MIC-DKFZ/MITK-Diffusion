@@ -106,6 +106,7 @@ void StreamlineFeatureExtractor::SetTractogramPrototypes(const mitk::FiberBundle
 {
   m_Prototypes = ToMatrix(prototypes, "The prototype bundle");
   m_PrototypeColumns.clear();
+  m_Labels.prototypeFeatures = cv::Mat();
 }
 
 void StreamlineFeatureExtractor::SetTractogramPlus(const mitk::FiberBundle::Pointer &tractogram)
@@ -297,6 +298,141 @@ void StreamlineFeatureExtractor::ReducePool(const std::vector<std::uint64_t> &po
   MITK_INFO << "Pool reduced from " << numCandidates << " to " << keep.size() << " streamlines close to the positive labels";
 }
 
+void StreamlineFeatureExtractor::AddLabels(const std::vector<std::uint64_t> &keys, const FiberMatrix &fibers)
+{
+  auto& labels = m_Labels;
+  const int numOld = static_cast<int>(labels.keys.size());
+  for (std::size_t i = 0; i < keys.size(); ++i)
+  {
+    if (labels.slotOfKey.emplace(keys[i], static_cast<int>(labels.keys.size())).second)
+    {
+      labels.keys.push_back(keys[i]);
+      labels.fibers.insert(labels.fibers.end(), fibers.begin() + i * FiberStride, fibers.begin() + (i + 1) * FiberStride);
+    }
+  }
+  const int numSlots = static_cast<int>(labels.keys.size());
+  const int numPrototypes = static_cast<int>(m_Prototypes.size() / FiberStride);
+
+  // prototype features: only the new rows, or all rows after the prototypes changed
+  const bool prototypesValid = labels.prototypeFeatures.rows == numOld && labels.prototypeFeatures.cols == 2 * numPrototypes;
+  const int firstPrototypeRow = prototypesValid ? numOld : 0;
+  if (firstPrototypeRow < numSlots)
+  {
+    cv::Mat prototypeFeatures(numSlots, 2 * numPrototypes, CV_32F);
+    if (firstPrototypeRow > 0)
+      labels.prototypeFeatures.copyTo(prototypeFeatures.rowRange(0, firstPrototypeRow));
+
+#pragma omp parallel for
+    for (int i = firstPrototypeRow; i < numSlots; ++i)
+    {
+      float* row = prototypeFeatures.ptr<float>(i);
+      for (int p = 0; p < numPrototypes; ++p)
+        Distances(&labels.fibers[i * FiberStride], &m_Prototypes[p * FiberStride], row[p], row[numPrototypes + p]);
+    }
+    labels.prototypeFeatures = prototypeFeatures;
+  }
+
+  // distances between labeled fibers: extend the matrices by the rows/columns of the new fibers
+  if (numSlots > numOld)
+  {
+    cv::Mat mdf(numSlots, numSlots, CV_32F);
+    cv::Mat endpoints(numSlots, numSlots, CV_32F);
+    if (numOld > 0)
+    {
+      labels.mdf.copyTo(mdf(cv::Rect(0, 0, numOld, numOld)));
+      labels.endpoints.copyTo(endpoints(cv::Rect(0, 0, numOld, numOld)));
+    }
+
+#pragma omp parallel for
+    for (int i = numOld; i < numSlots; ++i)
+    {
+      for (int j = 0; j < numSlots; ++j)
+        Distances(&labels.fibers[i * FiberStride], &labels.fibers[j * FiberStride], mdf.at<float>(i, j), endpoints.at<float>(i, j));
+    }
+    for (int i = numOld; i < numSlots; ++i)
+    {
+      for (int j = 0; j < numOld; ++j)
+      {
+        mdf.at<float>(j, i) = mdf.at<float>(i, j);
+        endpoints.at<float>(j, i) = endpoints.at<float>(i, j);
+      }
+    }
+    labels.mdf = mdf;
+    labels.endpoints = endpoints;
+  }
+
+  MITK_INFO << "Training features of " << numSlots - numOld << " newly labeled streamlines computed, " << numOld << " reused from cache";
+}
+
+void StreamlineFeatureExtractor::PruneLabels(const std::vector<std::uint64_t> &keys)
+{
+  auto& labels = m_Labels;
+  const std::unordered_set<std::uint64_t> used(keys.begin(), keys.end());
+  std::vector<int> keep;
+  for (int s = 0; s < static_cast<int>(labels.keys.size()); ++s)
+  {
+    if (used.count(labels.keys[s]))
+      keep.push_back(s);
+  }
+  if (keep.size() == labels.keys.size())
+    return;
+
+  const int numKeep = static_cast<int>(keep.size());
+  LabelCache pruned;
+  pruned.fibers.resize(numKeep * FiberStride);
+  pruned.mdf.create(numKeep, numKeep, CV_32F);
+  pruned.endpoints.create(numKeep, numKeep, CV_32F);
+  const bool prototypesValid = labels.prototypeFeatures.rows == static_cast<int>(labels.keys.size());
+  if (prototypesValid)
+    pruned.prototypeFeatures.create(numKeep, labels.prototypeFeatures.cols, CV_32F);
+
+  for (int k = 0; k < numKeep; ++k)
+  {
+    const int s = keep[k];
+    pruned.slotOfKey[labels.keys[s]] = k;
+    pruned.keys.push_back(labels.keys[s]);
+    std::copy_n(labels.fibers.begin() + s * FiberStride, FiberStride, pruned.fibers.begin() + k * FiberStride);
+    if (prototypesValid)
+      labels.prototypeFeatures.row(s).copyTo(pruned.prototypeFeatures.row(k));
+    for (int l = 0; l < numKeep; ++l)
+    {
+      pruned.mdf.at<float>(k, l) = labels.mdf.at<float>(s, keep[l]);
+      pruned.endpoints.at<float>(k, l) = labels.endpoints.at<float>(s, keep[l]);
+    }
+  }
+  labels = std::move(pruned);
+}
+
+cv::Mat StreamlineFeatureExtractor::LabelFeatures(const std::vector<std::uint64_t> &rowKeys, const std::vector<std::uint64_t> &localKeys) const
+{
+  const int numPrototypes = m_Labels.prototypeFeatures.cols / 2;
+  const int numLocal = static_cast<int>(localKeys.size());
+  const int numReferences = numPrototypes + numLocal;
+
+  std::vector<int> localSlots;
+  for (auto key : localKeys)
+    localSlots.push_back(m_Labels.slotOfKey.at(key));
+
+  cv::Mat features(static_cast<int>(rowKeys.size()), 2 * numReferences, CV_32F);
+  for (int i = 0; i < features.rows; ++i)
+  {
+    const int s = m_Labels.slotOfKey.at(rowKeys[i]);
+    const float* prototypeRow = m_Labels.prototypeFeatures.ptr<float>(s);
+    float* row = features.ptr<float>(i);
+    for (int p = 0; p < numPrototypes; ++p)
+    {
+      row[p] = prototypeRow[p];
+      row[numReferences + p] = prototypeRow[numPrototypes + p];
+    }
+    for (int r = 0; r < numLocal; ++r)
+    {
+      row[numPrototypes + r] = m_Labels.mdf.at<float>(s, localSlots[r]);
+      row[numReferences + numPrototypes + r] = m_Labels.endpoints.at<float>(s, localSlots[r]);
+    }
+  }
+  return features;
+}
+
 cv::Mat StreamlineFeatureExtractor::ComputeFeatures(const FiberMatrix &fibers, const FiberMatrix &localReferences) const
 {
   const int numFibers = static_cast<int>(fibers.size() / FiberStride);
@@ -371,14 +507,19 @@ void StreamlineFeatureExtractor::Update()
   FiberMatrix localReferences = minus;
   localReferences.insert(localReferences.end(), plus.begin(), plus.end());
 
+  std::vector<std::uint64_t> minusKeys;
+  for (std::size_t i = 0; i < minus.size(); i += FiberStride)
+    minusKeys.push_back(Hash(&minus[i]));
   std::vector<std::uint64_t> plusKeys;
   for (std::size_t i = 0; i < plus.size(); i += FiberStride)
     plusKeys.push_back(Hash(&plus[i]));
-  std::vector<std::uint64_t> localKeys;
-  for (std::size_t i = 0; i < localReferences.size(); i += FiberStride)
-    localKeys.push_back(Hash(&localReferences[i]));
+  std::vector<std::uint64_t> localKeys = minusKeys;
+  localKeys.insert(localKeys.end(), plusKeys.begin(), plusKeys.end());
 
+  // forget labels that were removed, extend the training features by the new labels
   PruneLocalColumns(localKeys);
+  PruneLabels(localKeys);
+  AddLabels(localKeys, localReferences);
 
   // Large pools are reduced in the first cycle before the prototype features are computed, which saves most of the work.
   if (m_ActiveCycle == 0 && m_PoolIds.size() > PoolReductionThreshold)
@@ -394,8 +535,7 @@ void StreamlineFeatureExtractor::Update()
     m_PrototypeColumns = ComputeColumns(m_Prototypes);
   }
 
-  MITK_INFO << "Calculate features of training data";
-  TrainModel(ComputeFeatures(plus, localReferences), ComputeFeatures(minus, localReferences));
+  TrainModel(LabelFeatures(plusKeys, localKeys), LabelFeatures(minusKeys, localKeys));
 
   MITK_INFO << "Predict " << std::count(m_PoolActive.begin(), m_PoolActive.end(), 1) << " streamlines";
   Predict(AssembleCandidateFeatures(localKeys));
@@ -441,27 +581,16 @@ void StreamlineFeatureExtractor::Predict(const cv::Mat &features)
   m_Entropies.assign(numCandidates, 0.0f);
   std::vector<char> positive(numCandidates, 0);
 
+  // With labels 0/1, the sum of the leaf values over all trees is the number of trees voting positive.
+  // This walks the forest once per streamline, getVotes() calls the prediction once per tree.
+  const int numTrees = static_cast<int>(m_Model->getRoots().size());
+
 #pragma omp parallel for
   for (int i = 0; i < numCandidates; ++i)
   {
-    // first row: class labels, second row: number of trees voting for the class
-    cv::Mat votes;
-    m_Model->getVotes(features.row(i), votes, 0);
-
-    int positiveVotes = 0;
-    int negativeVotes = 0;
-    for (int c = 0; c < votes.cols; ++c)
-    {
-      if (votes.at<int>(0, c) == 1)
-        positiveVotes += votes.at<int>(1, c);
-      else
-        negativeVotes += votes.at<int>(1, c);
-    }
-
-    positive[i] = positiveVotes > negativeVotes;
-    const int totalVotes = positiveVotes + negativeVotes;
-    if (totalVotes > 0)
-      m_Entropies[i] = BinaryEntropy(static_cast<double>(positiveVotes) / totalVotes);
+    const int positiveVotes = cvRound(m_Model->predict(features.row(i), cv::noArray(), cv::ml::DTrees::PREDICT_SUM));
+    positive[i] = 2 * positiveVotes > numTrees;
+    m_Entropies[i] = BinaryEntropy(static_cast<double>(positiveVotes) / numTrees);
   }
 
   m_PredictedIds.clear();

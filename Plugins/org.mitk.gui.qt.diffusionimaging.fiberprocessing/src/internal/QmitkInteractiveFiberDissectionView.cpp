@@ -167,6 +167,11 @@ void QmitkInteractiveFiberDissectionView::CreateQtPartControl( QWidget *parent )
     connect(m_Controls->m_predlabelingBrush, SIGNAL(toggled(bool)), this, SLOT( RemovefromPredictionBrush(bool) ) ); //need
     connect(m_Controls->m_predlabelingBrushGen, SIGNAL(toggled(bool)), this, SLOT( RemovefromPredictionBrush(bool) ) ); //need
 
+    // the generalization tab offers the same sampling tools as the normal workflow
+    connect(m_Controls->m_AddUncertainFibersGen, SIGNAL( clicked() ), this, SLOT( CreateUncertaintySampleNode( )));
+    connect(m_Controls->m_unclabelingBrushGen, SIGNAL(toggled(bool)), this, SLOT( RemovefromUncertaintyBrush(bool) ) );
+    connect(m_Controls->m_CreateUncertantyManGen, SIGNAL( clicked() ), this, SLOT( CreateUncertantyMap( ) ) );
+
     connect(m_Controls->m_ResampleButton, SIGNAL( clicked() ), this, SLOT( ResampleTractogram( ) ) );
 
     connect(m_Controls->m_CreateUncertantyMap, SIGNAL( clicked() ), this, SLOT( CreateUncertantyMap( ) ) );
@@ -201,33 +206,27 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   m_Controls->m_FibLabel->setText("<font color='red'>nothing selected</font>");
   m_Controls->m_InputData->setTitle("Please Select Input Data");
 
-   // disable alle frames
-
-  m_Controls->m_BrushButton->setCheckable(true);
-  m_Controls->m_BrushButton->setEnabled(false);
-  m_Controls->m_unclabelingBrush->setCheckable(true);
-  m_Controls->m_unclabelingBrush->setEnabled(false);
-  m_Controls->m_predlabelingBrush->setCheckable(true);
-  m_Controls->m_predlabelingBrush->setEnabled(false);
-  m_Controls->m_predlabelingBrushGen->setCheckable(true);
-  m_Controls->m_predlabelingBrushGen->setEnabled(false);
-  m_Controls->m_distlabelingBrush->setCheckable(true);
-  m_Controls->m_distlabelingBrush->setEnabled(false);
-  m_Controls->m_distlabelingBrushGen->setCheckable(true);
-  m_Controls->m_distlabelingBrushGen->setEnabled(false);
-  m_Controls->m_add_annotations->setEnabled(false);
-
-
-
-  m_Controls->m_SubsetCreation->setEnabled(false);
-  m_Controls->m_TrainClassifier->setEnabled(false);
-  m_Controls->m_CreateUncertantyMap->setEnabled(false);
-  m_Controls->m_Numtolabel->setEnabled(false);
-  m_Controls->m_NumRandomFibers2->setEnabled(false);
-  m_Controls->m_AddDistanceFibers->setEnabled(false);
-  m_Controls->m_AddUncertainFibers->setEnabled(false);
-
-  m_Controls->m_TrainClassifierGen->setEnabled(false);
+  // disable everything, then enable what is possible. Both tabs have the same tools.
+  for (QPushButton* brush : {m_Controls->m_BrushButton,
+                             m_Controls->m_unclabelingBrush, m_Controls->m_unclabelingBrushGen,
+                             m_Controls->m_predlabelingBrush, m_Controls->m_predlabelingBrushGen,
+                             m_Controls->m_distlabelingBrush, m_Controls->m_distlabelingBrushGen})
+  {
+    brush->setCheckable(true);
+    brush->setEnabled(false);
+  }
+  for (QWidget* widget : std::initializer_list<QWidget*>{
+         m_Controls->m_SubsetCreation,
+         m_Controls->m_TrainClassifier, m_Controls->m_TrainClassifierGen,
+         m_Controls->m_add_annotations, m_Controls->m_add_annotations_2,
+         m_Controls->m_CreateUncertantyMap, m_Controls->m_CreateUncertantyManGen,
+         m_Controls->m_Numtolabel, m_Controls->m_NumtolabelGen,
+         m_Controls->m_AddDistanceFibers, m_Controls->m_AddDistanceFibersGen,
+         m_Controls->m_NumRandomFibers2, m_Controls->m_NumRandomFibers2Ben,
+         m_Controls->m_AddUncertainFibers, m_Controls->m_AddUncertainFibersGen})
+  {
+    widget->setEnabled(false);
+  }
 
 
   mitk::DataNode::Pointer curtestnode =  m_Controls->m_TestBundleBox->GetSelectedNode();
@@ -292,30 +291,6 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
       m_Controls->m_TrainClassifier->setEnabled(true);
   }
 
-  if (indexSelected)
-  {
-      m_Controls->m_AddUncertainFibers->setEnabled(true);
-      m_Controls->m_Numtolabel->setEnabled(true);
-      m_Controls->m_AddDistanceFibers->setEnabled(true);
-      m_Controls->m_NumRandomFibers2->setEnabled(true);
-  }
-
-  if (uncertaintySelected)
-  {
-      m_Controls->m_unclabelingBrush->setEnabled(true);
-  }
-
-  if (predictionSelected)
-  {
-      m_Controls->m_predlabelingBrush->setEnabled(true);
-      m_Controls->m_CreateUncertantyMap->setEnabled(true);
-    
-  }
-  if (distanceuncertanySelected)
-  {
-        m_Controls->m_distlabelingBrush->setEnabled(true);
-  }
-
   if (posGenSelected)
   {
       m_Controls->m_initGeneralization->setEnabled(true);
@@ -326,16 +301,20 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
        m_Controls->m_TrainClassifierGen->setEnabled(true);
   }
 
-  if (classifierexist)
-  {
-      m_Controls->m_add_annotations->setEnabled(true);
-  }
-
-  if (predictionSelected)
-  {
-      m_Controls->m_predlabelingBrushGen->setEnabled(true);
-  }
-
+  // tools that work on the current classifier are the same in both tabs
+  auto enable = [](bool enabled, std::initializer_list<QWidget*> widgets) {
+    for (auto* widget : widgets)
+      widget->setEnabled(enabled);
+  };
+  enable(indexSelected, {m_Controls->m_AddUncertainFibers, m_Controls->m_AddUncertainFibersGen,
+                         m_Controls->m_NumRandomFibers2, m_Controls->m_NumRandomFibers2Ben,
+                         m_Controls->m_AddDistanceFibers, m_Controls->m_AddDistanceFibersGen,
+                         m_Controls->m_Numtolabel, m_Controls->m_NumtolabelGen});
+  enable(uncertaintySelected, {m_Controls->m_unclabelingBrush, m_Controls->m_unclabelingBrushGen});
+  enable(distanceuncertanySelected, {m_Controls->m_distlabelingBrush, m_Controls->m_distlabelingBrushGen});
+  enable(predictionSelected, {m_Controls->m_predlabelingBrush, m_Controls->m_predlabelingBrushGen});
+  enable(predictionSelected && indexSelected, {m_Controls->m_CreateUncertantyMap, m_Controls->m_CreateUncertantyManGen});
+  enable(classifierexist, {m_Controls->m_add_annotations, m_Controls->m_add_annotations_2});
 }
 
 void QmitkInteractiveFiberDissectionView::OnEndInteraction()
@@ -730,6 +709,19 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
     UpdateGui();
 }
 
+bool QmitkInteractiveFiberDissectionView::HelpMessagesEnabled() const
+{
+    return (m_generalizationMode ? m_Controls->m_helpmessages_2 : m_Controls->m_helpmessages)->isChecked();
+}
+
+void QmitkInteractiveFiberDissectionView::UncheckLabelingBrushes()
+{
+    for (QPushButton* brush : {m_Controls->m_unclabelingBrush, m_Controls->m_unclabelingBrushGen,
+                               m_Controls->m_predlabelingBrush, m_Controls->m_predlabelingBrushGen,
+                               m_Controls->m_distlabelingBrush, m_Controls->m_distlabelingBrushGen})
+      brush->setChecked(false);
+}
+
 void QmitkInteractiveFiberDissectionView::StartLabelingBrush(mitk::DataNode::Pointer toLabelNode, bool fromPrediction)
 {
     this->CreateStreamlineInteractorBrush();
@@ -770,6 +762,7 @@ void QmitkInteractiveFiberDissectionView::CreateStreamlineInteractorBrush()
 
 bool QmitkInteractiveFiberDissectionView::RunClassifier(mitk::FiberBundle::Pointer plus, mitk::FiberBundle::Pointer minus)
 {
+    this->UncheckLabelingBrushes();
     this->GetDataStorage()->Remove(m_UncertaintyLabelNode);
     this->GetDataStorage()->Remove(m_DistanceLabelNode);
     this->GetDataStorage()->Remove(m_newfibersBundleNode);
@@ -816,11 +809,9 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithm()
                                                   "You can turn of this helper by unchecking the radie button in the lower part of the view."
                                                   );
     }
+    m_generalizationMode = 0;
     m_Controls->m_NumRandomFibers->setEnabled(false);
     m_Controls->m_BrushButton->setEnabled(false);
-    m_Controls->m_predlabelingBrush->setChecked(false);
-    m_Controls->m_distlabelingBrush->setChecked(false);
-    m_Controls->m_unclabelingBrush->setChecked(false);
 
     m_negativeBundle = GetBundle(m_negativeBundleNode);
     m_positiveBundle = GetBundle(m_positiveBundleNode);
@@ -868,7 +859,8 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
 
      // next batch of the most uncertain streamlines that are still in the pool
      const auto& uncertain = classifier->GetUncertainIds();
-     const auto numRequested = static_cast<std::size_t>(m_Controls->m_NumRandomFibers2->value());
+     const bool generalization = m_generalizationMode != 0;
+     const auto numRequested = static_cast<std::size_t>((generalization ? m_Controls->m_NumRandomFibers2Ben : m_Controls->m_NumRandomFibers2)->value());
      std::vector<unsigned int> ids;
      while (static_cast<std::size_t>(m_uncCounter) < uncertain.size() && ids.size() < numRequested)
      {
@@ -890,7 +882,7 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
      this->GetDataStorage()->Add(m_UncertaintyLabelNode);
 
      m_PredictionNode->SetVisibility(false);
-     m_Controls->m_unclabelingBrush->setChecked(true);
+     (generalization ? m_Controls->m_unclabelingBrushGen : m_Controls->m_unclabelingBrush)->setChecked(true);
 
      UpdateGui();
 }
@@ -901,7 +893,7 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
       return;
 
      MITK_INFO << "Create Fibers to label based on Distance in Features-Space";
-     if (m_Controls->m_helpmessages->isChecked())
+     if (this->HelpMessagesEnabled())
      {
        QMessageBox::information(nullptr, "Helper", "A new subset is generated to be annotated\n"
                                                    "Again, use alt, shift and cntrl to label positive or negative fibers or to unlabel wrong annotated fibers\n"
@@ -941,6 +933,7 @@ void QmitkInteractiveFiberDissectionView::RemovefromUncertaintyBrush( bool check
     if (checked)
     {
         m_Controls->m_predlabelingBrush->setChecked(false);
+        m_Controls->m_predlabelingBrushGen->setChecked(false);
         m_UncertaintyLabel->SetFiberColors(255, 255, 255);
         this->StartLabelingBrush(m_UncertaintyLabelNode, false);
     }
@@ -957,10 +950,8 @@ void QmitkInteractiveFiberDissectionView::RemovefromDistanceBrush(bool checked)
 {
     if (checked)
     {
-        if (m_generalizationMode == 0)
-            m_Controls->m_predlabelingBrush->setChecked(false);
-        else
-            m_Controls->m_predlabelingBrushGen->setChecked(false);
+        m_Controls->m_predlabelingBrush->setChecked(false);
+        m_Controls->m_predlabelingBrushGen->setChecked(false);
 
         m_DistanceLabel->SetFiberColors(255, 255, 255);
         this->StartLabelingBrush(m_DistanceLabelNode, false);
@@ -978,7 +969,7 @@ void QmitkInteractiveFiberDissectionView::RemovefromPredictionBrush( bool checke
 {
     if (checked)
     {
-        if (m_Controls->m_helpmessages->isChecked())
+        if (this->HelpMessagesEnabled())
         {
           QMessageBox::information(nullptr, "Helper", "You may now exclude false predicted streamlines from the prediction\n"
                                                       "Again, use alt, shift and cntrl to label positive or negative fibers or to unlabel wrong annotated fibers\n"
@@ -986,6 +977,7 @@ void QmitkInteractiveFiberDissectionView::RemovefromPredictionBrush( bool checke
                                                       );
         }
         m_Controls->m_unclabelingBrush->setChecked(false);
+        m_Controls->m_unclabelingBrushGen->setChecked(false);
         this->StartLabelingBrush(m_PredictionNode, true);
     }
     else
@@ -1097,16 +1089,12 @@ void QmitkInteractiveFiberDissectionView::StartGeneralizationAlgorithm()
                                                   );
     }
 
-    m_Controls->m_distlabelingBrushGen->setChecked(false);
     cur_negativeBundle = GetBundle(m_negativeGenBundleNode);
     cur_positiveBundle = GetBundle(m_positiveGenBundleNode);
     m_testnode->SetVisibility(false);
 
     if (!this->RunClassifier(cur_positiveBundle, cur_negativeBundle))
       return;
-
-    m_Controls->m_AddDistanceFibersGen->setEnabled(true);
-    m_Controls->m_NumtolabelGen->setEnabled(true);
 
     // empty label bundles for the annotations of this subject
     this->GetDataStorage()->Remove(m_negativeBundleNode);
@@ -1126,6 +1114,7 @@ void QmitkInteractiveFiberDissectionView::StartGeneralizationAlgorithm()
 
 void QmitkInteractiveFiberDissectionView::StartAlgorithmGen( )
 {
+    m_generalizationMode = 1;
     this->addGeneralizationBundles(false);
 
     if (m_Controls->m_helpmessages_2->isChecked())
@@ -1137,14 +1126,8 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithmGen( )
                                                   );
     }
 
-    m_Controls->m_distlabelingBrushGen->setChecked(false);
     m_testnode->SetVisibility(false);
-
-    if (this->RunClassifier(cur_positiveBundle, cur_negativeBundle))
-    {
-      m_Controls->m_AddDistanceFibersGen->setEnabled(true);
-      m_Controls->m_NumtolabelGen->setEnabled(true);
-    }
+    this->RunClassifier(cur_positiveBundle, cur_negativeBundle);
 
     UpdateGui();
 }

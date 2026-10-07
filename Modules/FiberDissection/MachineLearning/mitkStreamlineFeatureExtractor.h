@@ -39,9 +39,11 @@ namespace mitk{
 * prototypes (fixed for a session) and the labeled streamlines (local prototypes). For each
 * reference two features are used: the mean direct-flip distance (MDF) and the mean endpoint distance.
 *
-* The object is meant to live for a whole labeling session. Features of the test pool are cached per
-* reference streamline, so a new training cycle only computes distances to newly labeled streamlines
-* instead of recomputing the full feature matrix.
+* The object is meant to live for a whole labeling session and extends its features instead of recomputing them:
+* - pool features: one column per reference streamline; prototype columns are computed once per session,
+*   a cycle only adds the columns of newly labeled streamlines (and drops those of unlabeled ones)
+* - training features: distances of the labeled streamlines to the prototypes and to each other are kept,
+*   a cycle only adds the rows/columns of newly labeled streamlines
 *
 * All fiber ids taken or returned by this class refer to the fibers of the tractogram passed to SetTractogramTest().
 */
@@ -109,6 +111,17 @@ protected:
     std::vector<float> endpoints;
   };
 
+  /** Labeled streamlines with their distances to the prototypes and to each other (both distances are symmetric). */
+  struct LabelCache
+  {
+    std::unordered_map<std::uint64_t, int> slotOfKey;  ///< fiber hash -> row/column
+    std::vector<std::uint64_t>             keys;
+    FiberMatrix                            fibers;
+    cv::Mat                                prototypeFeatures;  ///< labels x 2*prototypes: mdf | endpoints
+    cv::Mat                                mdf;                ///< labels x labels
+    cv::Mat                                endpoints;          ///< labels x labels
+  };
+
   static FiberMatrix ToMatrix(mitk::FiberBundle *fib, const std::vector<unsigned int> &ids, const std::string &name);
   static FiberMatrix ToMatrix(mitk::FiberBundle *fib, const std::string &name);
   static std::uint64_t Hash(const float *fiber);
@@ -122,6 +135,12 @@ protected:
   void PruneLocalColumns(const std::vector<std::uint64_t> &keys);
   /** Restricts the pool to the candidates closest to the positive labels. */
   void ReducePool(const std::vector<std::uint64_t> &positiveKeys);
+  /** Adds labeled fibers that are not cached yet and computes only their distances. */
+  void AddLabels(const std::vector<std::uint64_t> &keys, const FiberMatrix &fibers);
+  /** Drops labeled fibers that are no longer used. */
+  void PruneLabels(const std::vector<std::uint64_t> &keys);
+  /** Training features of the given labeled fibers from the label cache, same layout as ComputeFeatures(). */
+  cv::Mat LabelFeatures(const std::vector<std::uint64_t> &rowKeys, const std::vector<std::uint64_t> &localKeys) const;
   /** Features of arbitrary fibers: global prototypes followed by the given local references. */
   cv::Mat ComputeFeatures(const FiberMatrix &fibers, const FiberMatrix &localReferences) const;
   /** Features of all active pool candidates from the cache, same layout as ComputeFeatures(). */
@@ -144,6 +163,8 @@ protected:
   // cached features of the pool candidates, one column per reference fiber
   std::vector<FeatureColumn>                  m_PrototypeColumns;
   std::unordered_map<std::uint64_t, FeatureColumn> m_LocalColumns;
+  // cached training features of the labeled fibers
+  LabelCache                                  m_Labels;
 
   // results of the last Update()
   cv::Ptr<cv::ml::RTrees>                     m_Model;

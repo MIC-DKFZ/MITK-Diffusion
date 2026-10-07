@@ -134,6 +134,8 @@ protected:
   void CreateStreamlineInteractorBrush();
   void StartLabelingBrush(mitk::DataNode::Pointer toLabelNode, bool fromPrediction);
   void StopLabelingBrush();
+  void UncheckLabelingBrushes();
+  bool HelpMessagesEnabled() const;
   /** Trains the classifier on the given labels and shows the prediction. Starts a new session in the first cycle. */
   bool RunClassifier(mitk::FiberBundle::Pointer plus, mitk::FiberBundle::Pointer minus);
   void AddSavedGeneralizationBundle(const mitk::DataNode *selectedNode, mitk::DataNode::Pointer &genNode, const std::string &name, float r, float g, float b);
