@@ -36,19 +36,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDataNode.h>
 #include <mitkImage.h>
 #include <itkImage.h>
-#include <itkStreamlineTrackingFilter.h>
-#include <Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h>
-#include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
-#include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
 #include <random>
 #include <mitkPointSet.h>
 #include <mitkPointSetShapeProperty.h>
-#include <QThread>
 #include <QTimer>
 #include <QmitkStdMultiWidget.h>
 #include <QmitkSliceNavigationListener.h>
 #include <mitkILifecycleAwarePart.h>
-#include <mitkStreamlineTractographyParameters.h>
 #include <itkCastImageFilter.h>
 #include <itkVTKImageImport.h>
 #include <itkVTKImageExport.h>
@@ -76,25 +70,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 \brief View to dissect fiber bundles with active learning
 */
 
-//class QmitkStreamlineTrackingView;
-//class QmitkStreamlineTrackingWorker : public QObject
-//{
-//  Q_OBJECT
-
-//public:
-
-//  QmitkStreamlineTrackingWorker(class QmitkStreamlineTrackingView* view);
-
-//public slots:
-
-//  void run();
-
-//private:
-
-//  QmitkStreamlineTrackingView* m_View;
-//};
-
-
 class QmitkInteractiveFiberDissectionView : public QmitkAbstractView
 {
   // this is needed for all Qt objects that should have a Qt meta-object
@@ -114,10 +89,6 @@ public:
 
   virtual void CreateQtPartControl(QWidget *parent) override;
 
-  typedef itk::StreamlineTrackingFilter   TrackerType;
-  TrackerType::Pointer              m_Tracker;
-//  QmitkStreamlineTrackingWorker     m_TrackingWorker;
-  QThread                           m_TrackingThread;
 
 
   virtual void SetFocus() override;
@@ -144,7 +115,6 @@ protected slots:
   void CreateUncertantyMap();
   void ResetClassifier();
 
-  void startTractography();
 
   void addGeneralizationBundles(bool reset);
   void addGeneralizationSavedPosBundles();
@@ -162,6 +132,11 @@ protected:
   void OnEndInteraction();
   void CreateStreamlineInteractor();
   void CreateStreamlineInteractorBrush();
+  void StartLabelingBrush(mitk::DataNode::Pointer toLabelNode, bool fromPrediction);
+  void StopLabelingBrush();
+  /** Trains the classifier on the given labels and shows the prediction. Starts a new session in the first cycle. */
+  bool RunClassifier(mitk::FiberBundle::Pointer plus, mitk::FiberBundle::Pointer minus);
+  void AddSavedGeneralizationBundle(const mitk::DataNode *selectedNode, mitk::DataNode::Pointer &genNode, const std::string &name, float r, float g, float b);
 
   Ui::QmitkInteractiveFiberDissectionViewControls* m_Controls;
 
@@ -208,7 +183,6 @@ protected:
   mitk::DataNode::Pointer               m_reducedFibersTractogramNode;
 
   mitk::DataNode::Pointer               m_Prototypes;
-  mitk::DataNode::Pointer               m_newtestnode;
 
  // This code is for atTRACTive generalization
   mitk::FiberBundle::Pointer            m_positiveGenBundle;
@@ -232,10 +206,6 @@ protected:
   std::shared_ptr< mitk::StreamlineFeatureExtractor > classifier;
 
 
-  std::vector<std::vector<unsigned int>> m_index;
-
-private:
-  mitk::TrackingDataHandler*              m_TrackingHandler;
 
 };
 
