@@ -126,6 +126,9 @@ namespace itk{
      */
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
+    /** Releases the mask used for this run. */
+    void AfterThreadedGenerateData() override;
+
 
 
   private:
@@ -137,6 +140,7 @@ namespace itk{
     std::atomic<unsigned int> m_CurrentVoxelCount;    ///< Amount of processed voxels, counted by all work units.
     double m_Variance;                                ///< Estimated noise variance.
     typename MaskImageType::Pointer m_Mask;           ///< Pointer to the mask image.
+    typename MaskImageType::Pointer m_UsedMask;       ///< m_Mask, or a full mask without one, during one run.
   };
 }
 

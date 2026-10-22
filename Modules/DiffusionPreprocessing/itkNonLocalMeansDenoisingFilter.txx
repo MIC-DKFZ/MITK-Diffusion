@@ -67,15 +67,20 @@ NonLocalMeansDenoisingFilter< TPixelType >
   typename InputImageType::Pointer inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
   if (m_Mask.IsNull())
   {
-    // If no mask is used generate a mask of the complete image
-
-    m_Mask = MaskImageType::New();
-    m_Mask->SetRegions(inputImagePointer->GetLargestPossibleRegion());
-    m_Mask->Allocate();
-    m_Mask->FillBuffer(1);
+    // Without a mask every voxel is denoised. The full mask is kept for this run only, so that a
+    // later run on another input does not inherit it.
+    m_UsedMask = MaskImageType::New();
+    m_UsedMask->SetRegions(inputImagePointer->GetLargestPossibleRegion());
+    m_UsedMask->Allocate();
+    m_UsedMask->FillBuffer(1);
   }
   else
   {
+    // Mask and image are iterated voxel by voxel.
+    if (m_Mask->GetLargestPossibleRegion() != inputImagePointer->GetLargestPossibleRegion())
+      itkExceptionMacro("The mask does not have the size of the image.");
+    m_UsedMask = m_Mask;
+
     // Calculation of the smallest masked region
 
     typename OutputImageType::Pointer outputImage =
@@ -84,10 +89,9 @@ NonLocalMeansDenoisingFilter< TPixelType >
     oit.GoToBegin();
     ImageRegionIterator< MaskImageType > mit(m_Mask, m_Mask->GetLargestPossibleRegion());
     mit.GoToBegin();
-    typename MaskImageType::IndexType minIndex;
-    typename MaskImageType::IndexType maxIndex;
-    minIndex.Fill(10000);
-    maxIndex.Fill(0);
+    typename MaskImageType::IndexType minIndex = m_Mask->GetLargestPossibleRegion().GetUpperIndex();
+    typename MaskImageType::IndexType maxIndex = m_Mask->GetLargestPossibleRegion().GetIndex();
+    bool foundMaskedVoxel = false;
     typename OutputImageType::PixelType outpix;
     outpix.SetSize(inputImagePointer->GetVectorLength());
     outpix.Fill(0);
@@ -97,6 +101,7 @@ NonLocalMeansDenoisingFilter< TPixelType >
       if (mit.Get())
       {
         // calculation of the start & end index of the smallest masked region
+        foundMaskedVoxel = true;
         minIndex[0] = minIndex[0] < mit.GetIndex()[0] ? minIndex[0] : mit.GetIndex()[0];
         minIndex[1] = minIndex[1] < mit.GetIndex()[1] ? minIndex[1] : mit.GetIndex()[1];
         minIndex[2] = minIndex[2] < mit.GetIndex()[2] ? minIndex[2] : mit.GetIndex()[2];
@@ -113,16 +118,19 @@ NonLocalMeansDenoisingFilter< TPixelType >
       ++oit;
     }
 
+    // calculation of the masked region; an empty mask leaves the output all zero (set above), and
+    // the threads find no masked voxel in the full region
+    if (foundMaskedVoxel)
+    {
+      typename OutputImageType::SizeType size;
+      size[0] = maxIndex[0] - minIndex[0] + 1;
+      size[1] = maxIndex[1] - minIndex[1] + 1;
+      size[2] = maxIndex[2] - minIndex[2] + 1;
 
-    // calculation of the masked region
-    typename OutputImageType::SizeType size;
-    size[0] = maxIndex[0] - minIndex[0] + 1;
-    size[1] = maxIndex[1] - minIndex[1] + 1;
-    size[2] = maxIndex[2] - minIndex[2] + 1;
+      typename OutputImageType::RegionType region (minIndex, size);
 
-    typename OutputImageType::RegionType region (minIndex, size);
-
-    outputImage->SetRequestedRegion(region);
+      outputImage->SetRequestedRegion(region);
+    }
   }
 
   m_CurrentVoxelCount = 0;
@@ -142,7 +150,7 @@ NonLocalMeansDenoisingFilter< TPixelType >
   ImageRegionIterator< OutputImageType > oit(outputImage, outputRegionForThread);
   oit.GoToBegin();
 
-  ImageRegionIterator< MaskImageType > mit(m_Mask, outputRegionForThread);
+  ImageRegionIterator< MaskImageType > mit(m_UsedMask, outputRegionForThread);
   mit.GoToBegin();
 
 
@@ -385,6 +393,14 @@ NonLocalMeansDenoisingFilter< TPixelType >
   }
 
   MITK_INFO << "One Thread finished calculation";
+}
+
+template< class TPixelType >
+void
+NonLocalMeansDenoisingFilter< TPixelType >
+::AfterThreadedGenerateData()
+{
+  m_UsedMask = nullptr;
 }
 
 template< class TPixelType >

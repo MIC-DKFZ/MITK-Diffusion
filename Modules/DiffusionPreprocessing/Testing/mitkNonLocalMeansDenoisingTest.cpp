@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkITKImageImport.h"
 #include <mitkImageCast.h>
 #include <mitkDiffusionPropertyHelper.h>
+#include <itkImageRegionConstIterator.h>
 
 class mitkNonLocalMeansDenoisingTestSuite : public mitk::TestFixture
 {
@@ -33,6 +34,9 @@ class mitkNonLocalMeansDenoisingTestSuite : public mitk::TestFixture
   MITK_TEST(Denoise_SeveralWorkUnits_SameResultAndCountsEveryVoxel);
   MITK_TEST(Denoise_LargeDifferences_KeepsValues);
   MITK_TEST(Denoise_ZeroVariance_Throws);
+  MITK_TEST(Denoise_EmptyMask_ReturnsZeros);
+  MITK_TEST(Denoise_MaskOfOtherSize_Throws);
+  MITK_TEST(Denoise_NewInputWithoutMask_DenoisesEveryVoxel);
   CPPUNIT_TEST_SUITE_END();
 
 private:
@@ -223,6 +227,52 @@ public:
   {
     m_DenoisingFilter->SetVariance(0);
     CPPUNIT_ASSERT_THROW(m_DenoisingFilter->Update(), itk::ExceptionObject);
+  }
+
+  void Denoise_EmptyMask_ReturnsZeros()
+  {
+    VectorImagetType::Pointer vectorImage;
+    mitk::CastToItkImage(m_Image, vectorImage);
+    auto mask = itk::Image<short, 3>::New();
+    mask->SetRegions(vectorImage->GetLargestPossibleRegion());
+    mask->Allocate();
+    mask->FillBuffer(0);
+    m_DenoisingFilter->SetInputMask(mask);
+    m_DenoisingFilter->Update();
+
+    itk::ImageRegionConstIterator<VectorImagetType> it(m_DenoisingFilter->GetOutput(), m_DenoisingFilter->GetOutput()->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+      for (unsigned int c = 0; c < it.Get().GetSize(); ++c)
+        CPPUNIT_ASSERT_EQUAL(short(0), it.Get()[c]);
+  }
+
+  void Denoise_MaskOfOtherSize_Throws()
+  {
+    auto mask = itk::Image<short, 3>::New();
+    itk::Image<short, 3>::RegionType region;
+    region.SetSize({2, 2, 2});
+    mask->SetRegions(region);
+    mask->Allocate();
+    mask->FillBuffer(1);
+    m_DenoisingFilter->SetInputMask(mask);
+    CPPUNIT_ASSERT_THROW(m_DenoisingFilter->Update(), itk::ExceptionObject);
+  }
+
+  void Denoise_NewInputWithoutMask_DenoisesEveryVoxel()
+  {
+    // The full mask made for the first, smaller input must not be reused for the second.
+    m_DenoisingFilter->SetInputImage(CreateRow({100, 100, 100}));
+    m_DenoisingFilter->Update();
+
+    VectorImagetType::Pointer vectorImage;
+    mitk::CastToItkImage(m_Image, vectorImage);
+    m_DenoisingFilter->SetInputImage(vectorImage);
+    m_DenoisingFilter->UpdateLargestPossibleRegion();
+
+    m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMg.dwi"));
+    mitk::GrabItkImageMemory(m_DenoisingFilter->GetOutput(), m_DenoisedImage);
+    m_DenoisedImage->SetPropertyList(m_Image->GetPropertyList()->Clone());
+    MITK_ASSERT_EQUAL(m_DenoisedImage, m_ReferenceImage, "NLMg after a run on another input should return the reference.");
   }
 
 };
