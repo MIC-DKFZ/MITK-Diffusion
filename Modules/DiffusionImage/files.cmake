@@ -24,6 +24,7 @@ set(H_FILES
     Properties/mitkGradientDirectionsProperty.h
     Properties/mitkMeasurementFrameProperty.h
     Properties/mitkDiffusionPropertyHelper.h
+    Properties/mitkNodePredicateIsDWI.h
 
 )
 

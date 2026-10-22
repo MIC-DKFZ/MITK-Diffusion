@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkDiffusionImageMimeTypes.h"
-#include "mitkIOMimeTypes.h"
 #include <itksys/SystemTools.hxx>
 #include <itkNrrdImageIO.h>
 #include <itkMetaDataDictionary.h>
@@ -23,7 +22,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLog.h>
 #include <mitkDICOMDCMTKTagScanner.h>
 #include <itkGDCMImageIO.h>
-#include <itkNiftiImageIO.h>
 #include <itkBruker2dseqImageIO.h>
 
 namespace mitk

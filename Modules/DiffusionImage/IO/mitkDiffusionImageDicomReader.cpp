@@ -19,34 +19,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkDiffusionImageDicomReader.h"
 
-#include <iostream>
-#include <fstream>
-
-
-// Diffusion properties
-#include <mitkGradientDirectionsProperty.h>
-#include <mitkBValueMapProperty.h>
-#include <mitkMeasurementFrameProperty.h>
-#include <mitkProperties.h>
-
-#include <itkImageRegionIterator.h>
-#include <itkMetaDataObject.h>
 #include "itksys/SystemTools.hxx"
 #include "itkImageFileReader.h"
-#include "itkMetaDataObject.h"
-#include "itkNrrdImageIO.h"
 
 #include "mitkCustomMimeType.h"
 #include "mitkDiffusionImageMimeTypes.h"
 #include <mitkDiffusionDICOMFileReader.h>
 
-#include <mitkITKImageImport.h>
-#include <mitkImageWriteAccessor.h>
-#include <mitkImageDataItem.h>
-#include <mitkIOUtil.h>
 #include <itksys/Directory.hxx>
 #include <gdcmDirectory.h>
-#include <mitkStringProperty.h>
 
 namespace mitk
 {
