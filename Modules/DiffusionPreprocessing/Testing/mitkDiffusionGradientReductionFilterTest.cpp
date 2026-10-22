@@ -22,6 +22,7 @@ class mitkDiffusionGradientReductionFilterTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionGradientReductionFilterTestSuite);
   MITK_TEST(Reduce_SameSeed_SameSelection);
   MITK_TEST(Reduce_UseFirstN_KeepsFirstVolumesOfEachShell);
+  MITK_TEST(Reduce_DefaultSeed_KnownSelection);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -87,6 +88,14 @@ public:
     for (unsigned int i = 0; i < 16; ++i)
       expected.push_back(i);
     CPPUNIT_ASSERT(Reduce(true) == expected);
+  }
+
+  void Reduce_DefaultSeed_KnownSelection()
+  {
+    // The selection of the random search with seed 0, as computed before the filter was
+    // restructured; a faster cost computation must keep it.
+    const FilterType::IndicesVector expected = {0, 2, 5, 7, 10, 13, 15, 17, 20, 23, 24, 25, 26, 27, 28, 29};
+    CPPUNIT_ASSERT(Reduce(false) == expected);
   }
 };
 

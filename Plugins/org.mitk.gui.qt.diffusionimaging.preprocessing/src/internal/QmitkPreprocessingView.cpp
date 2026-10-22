@@ -1447,7 +1447,6 @@ void QmitkPreprocessingView::DoReduceGradientDirections()
   filter->SetInput( itkVectorImagePointer );
   filter->SetOriginalGradientDirections(gradientContainer);
   filter->SetNumGradientDirections(newNumGradientDirections);
-  filter->SetOriginalBValueMap(originalShellMap);
   filter->SetShellSelectionBValueMap(shellSlectionMap);
   filter->SetUseFirstN(m_Controls->m_KeepFirstNBox->isChecked());
   filter->Update();

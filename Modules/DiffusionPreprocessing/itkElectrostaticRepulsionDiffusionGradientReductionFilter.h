@@ -29,19 +29,29 @@ the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef _itk_ElectrostaticRepulsionDiffusionGradientReductionFilter_h_
-#define _itk_ElectrostaticRepulsionDiffusionGradientReductionFilter_h_
+#ifndef itkElectrostaticRepulsionDiffusionGradientReductionFilter_h
+#define itkElectrostaticRepulsionDiffusionGradientReductionFilter_h
 
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
 #include <itkVectorContainer.h>
 
+#include <map>
+#include <vector>
+
 namespace itk
 {
-
 /**
-* \brief Select subset of the input vectors equally distributed over the sphere using an iterative electrostatic repulsion strategy.   */
-
+ * \brief Keeps a subset of the volumes of each selected shell whose directions spread evenly over
+ * the sphere.
+ *
+ * Per shell, the first wanted directions are swapped at random against unused ones as long as a
+ * swap increases the smallest angle between two kept directions (antipodal directions count as
+ * equal). The search is seeded with the same seed for every shell, so the selection is
+ * reproducible. With UseFirstN the first wanted directions are kept. A shell with fewer directions
+ * than wanted is kept whole. The output keeps the input order of the kept volumes; volumes of
+ * shells that are not selected are dropped.
+ */
   template <class TInputScalarType, class TOutputScalarType>
   class ElectrostaticRepulsionDiffusionGradientReductionFilter
     : public ImageToImageFilter<itk::VectorImage<TInputScalarType,3>, itk::VectorImage<TOutputScalarType,3> >
@@ -49,11 +59,10 @@ namespace itk
 
   public:
 
-    typedef ElectrostaticRepulsionDiffusionGradientReductionFilter Self;
-    typedef SmartPointer<Self>                      Pointer;
-    typedef SmartPointer<const Self>                ConstPointer;
-    typedef ImageToImageFilter< itk::VectorImage<TOutputScalarType,3>, itk::VectorImage<TOutputScalarType,3> >
-      Superclass;
+    using Self = ElectrostaticRepulsionDiffusionGradientReductionFilter;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
+    using Superclass = ImageToImageFilter<itk::VectorImage<TInputScalarType,3>, itk::VectorImage<TOutputScalarType,3>>;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
@@ -62,64 +71,55 @@ namespace itk
     /** Runtime information support. */
     itkTypeMacro(ElectrostaticRepulsionDiffusionGradientReductionFilter, ImageToImageFilter)
 
-    typedef TInputScalarType                         InputScalarType;
-    typedef itk::VectorImage<InputScalarType,3>      InputImageType;
-    typedef typename InputImageType::PixelType       InputPixelType;
+    using InputScalarType = TInputScalarType;
+    using InputImageType = itk::VectorImage<InputScalarType,3>;
+    using InputPixelType = typename InputImageType::PixelType;
 
-    typedef TOutputScalarType                         OutputScalarType;
-    typedef itk::VectorImage<OutputScalarType,3>      OutputImageType;
-    typedef typename OutputImageType::PixelType       OutputPixelType;
+    using OutputScalarType = TOutputScalarType;
+    using OutputImageType = itk::VectorImage<OutputScalarType,3>;
+    using OutputPixelType = typename OutputImageType::PixelType;
 
-    typedef OutputScalarType                          BaselineScalarType;
-    typedef BaselineScalarType                        BaselinePixelType;
-    typedef typename itk::Image<BaselinePixelType,3>  BaselineImageType;
+    using GradientDirectionType = vnl_vector_fixed<double, 3>;
+    using GradientDirectionContainerType = itk::VectorContainer<unsigned int, GradientDirectionType>;
 
-    typedef vnl_vector_fixed< double, 3 >                               GradientDirectionType;
-    typedef itk::VectorContainer< unsigned int, GradientDirectionType > GradientDirectionContainerType;
+    using IndicesVector = std::vector<unsigned int>;
+    using BValueMap = std::map<unsigned int, IndicesVector>;
 
-    typedef std::vector<unsigned int>           IndicesVector;
-    typedef std::map<unsigned int, IndicesVector>     BValueMap;
-
+    /** The gradients of the input volumes. */
     itkGetMacro(OriginalGradientDirections, GradientDirectionContainerType::ConstPointer)
     itkSetMacro(OriginalGradientDirections, GradientDirectionContainerType::ConstPointer)
 
+    /** The gradients of the output volumes, available after the update. */
     itkGetMacro(GradientDirections, GradientDirectionContainerType::ConstPointer)
-    itkSetMacro(GradientDirections, GradientDirectionContainerType::ConstPointer)
+
     itkSetMacro(UseFirstN, bool)
+
     /** Seed of the random search, the same for every shell; a fixed seed makes the selection reproducible. Default 0. */
     itkSetMacro(RandomSeed, unsigned int)
     itkGetMacro(RandomSeed, unsigned int)
 
-    IndicesVector GetUsedGradientIndices(){return m_UsedGradientIndices;}
-    void SetOriginalBValueMap(BValueMap inp){m_OriginalBValueMap = inp;}
-    void SetShellSelectionBValueMap(BValueMap inp){m_InputBValueMap = inp;}
-    void SetNumGradientDirections(std::vector<unsigned int> numDirs){m_NumGradientDirections = numDirs;}
-
-
-    void UpdateOutputInformation() override;
+    /** The shells to keep (b-value to volume indices) and, in the same order, how many directions each keeps. */
+    void SetShellSelectionBValueMap(BValueMap inp){m_InputBValueMap = inp; this->Modified();}
+    void SetNumGradientDirections(std::vector<unsigned int> numDirs){m_NumGradientDirections = numDirs; this->Modified();}
 
   protected:
     ElectrostaticRepulsionDiffusionGradientReductionFilter();
-    ~ElectrostaticRepulsionDiffusionGradientReductionFilter() override {}
+    ~ElectrostaticRepulsionDiffusionGradientReductionFilter() override = default;
 
+    /** Vector length of the output: per selected shell the wanted number of directions or all of them. */
+    void GenerateOutputInformation() override;
     void GenerateData() override;
-    double Costs(); ///< calculates electrostatic energy of current direction set
+
+    /** Smallest angle between two used directions, antipodal directions counted as equal. */
+    double Costs(const IndicesVector& used) const;
 
     GradientDirectionContainerType::ConstPointer m_GradientDirections;   ///< container for the subsampled output gradient directions
     GradientDirectionContainerType::ConstPointer m_OriginalGradientDirections;   ///< input gradient directions
-
-    IndicesVector m_UsedGradientIndices;
-    IndicesVector m_UnusedGradientIndices;
-    IndicesVector m_BaselineImageIndices;
-
-    BValueMap m_OriginalBValueMap;
     BValueMap m_InputBValueMap;
     bool      m_UseFirstN;
     unsigned int m_RandomSeed;
-
     std::vector<unsigned int> m_NumGradientDirections;
   };
-
 
 } // end of namespace
 
@@ -127,6 +127,5 @@ namespace itk
 #ifndef ITK_MANUAL_INSTANTIATION
 #include "itkElectrostaticRepulsionDiffusionGradientReductionFilter.txx"
 #endif
-
 
 #endif
