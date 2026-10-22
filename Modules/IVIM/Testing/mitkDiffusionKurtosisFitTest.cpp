@@ -51,6 +51,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(Update_InputChanged_FitsWholeNewInput);
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
   MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
+  MITK_TEST(TestMulti_Smoothed_MatchRecordedValues);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionKurtosisReconstructionImageFilter<short, double>;
@@ -540,6 +541,40 @@ public:
       AssertClose(r.fit.k, snapshot.m_K);
       AssertClose(r.fittedBZero, snapshot.m_BzeroFit);
       AssertClose(204, snapshot.m_Bzero);
+    }
+  }
+
+  void TestMulti_Smoothed_MatchRecordedValues()
+  {
+    // Values recorded from the fit to catch unintended changes, with the Gaussian smoothing of
+    // variance 1.5 mm^2 that MitkDiffusionKurtosisFit applies, without and with the app's default
+    // bounds; voxel (5, 5, 1) is in the center.
+    struct Recorded
+    {
+      bool bounds;
+      Parameters mean;
+      Parameters center;
+    };
+    const std::vector<Recorded> recorded = {
+      {false, {0.0009027673453, 0.122532678}, {0.0008759313526, 0.4594837527}},
+      {true, {0.0009027673453, 0.122532678}, {0.0008759313526, 0.4594837527}}};
+
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    const std::size_t center = 5 + 11 * 5 + 121 * 1;
+    for (const auto& r : recorded)
+    {
+      auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
+      filter->SetSmoothingSigma(1.5);
+      if (r.bounds)
+        filter->SetBoundariesForKurtosis(-1000, 1000);
+      filter->Update();
+      auto maps = GetMaps(filter);
+      MITK_INFO << std::setprecision(10) << "smoothed, bounds " << r.bounds << ": mean D " << Mean(maps.d)
+                << ", mean K " << Mean(maps.k) << "; center D " << maps.d[center] << ", K " << maps.k[center];
+      AssertClose(r.mean.d, Mean(maps.d));
+      AssertClose(r.mean.k, Mean(maps.k));
+      AssertClose(r.center.d, maps.d[center]);
+      AssertClose(r.center.k, maps.k[center]);
     }
   }
 };

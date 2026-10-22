@@ -36,6 +36,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Fit_NoBaselineSignal_Zero);
   MITK_TEST(LinearDThenF_OneShellAboveThreshold_DFromThatShell);
   MITK_TEST(Update_SecondRun_SameSnapshotAndMaps);
+  MITK_TEST(Snapshot_SignalThreshold_FitInputsAndMapValues);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float>;
@@ -296,6 +297,70 @@ public:
     CPPUNIT_ASSERT(firstMaps.f == secondMaps.f);
     CPPUNIT_ASSERT(firstMaps.d == secondMaps.d);
     CPPUNIT_ASSERT(firstMaps.dStar == secondMaps.dStar);
+  }
+
+  void Snapshot_SignalThreshold_FitInputsAndMapValues()
+  {
+    // The view plots the snapshot of a single voxel: the normalized measurements of the first fit
+    // (above the signal threshold, and above the b threshold for the two-step methods) and of the
+    // second fit (above the signal threshold), and prints its parameters.
+    const double s0Threshold = 4000;
+    const auto signal = IvimSignal(m_BValues, 10000, 0.1, 0.001, 0.02);
+    auto image = MakeImage({signal});
+    auto gradients = MakeGradients(m_BValues, 1000);
+
+    const std::vector<FilterType::IVIM_Method> methods = {
+      FilterType::IVIM_FIT_ALL, FilterType::IVIM_DSTAR_FIX, FilterType::IVIM_D_THEN_DSTAR, FilterType::IVIM_LINEAR_D_THEN_F};
+    for (auto method : methods)
+    {
+      const bool twoStep = method == FilterType::IVIM_D_THEN_DSTAR || method == FilterType::IVIM_LINEAR_D_THEN_F;
+      std::vector<double> allBValues, allMeasurements, firstBValues, firstMeasurements, secondBValues, secondMeasurements;
+      for (std::size_t i = 2; i < m_BValues.size(); ++i)
+      {
+        const double s = std::round(signal[i]);
+        allBValues.push_back(m_BValues[i]);
+        allMeasurements.push_back(s / 10000);
+        if (s <= s0Threshold)
+          continue;
+        if (!twoStep || m_BValues[i] > 170)
+        {
+          firstBValues.push_back(m_BValues[i]);
+          firstMeasurements.push_back(s / 10000);
+        }
+        if (twoStep)
+        {
+          secondBValues.push_back(m_BValues[i]);
+          secondMeasurements.push_back(s / 10000);
+        }
+      }
+      // Only b = 1000 is below the threshold.
+      CPPUNIT_ASSERT(std::round(signal.back()) <= s0Threshold);
+      CPPUNIT_ASSERT(std::round(signal[signal.size() - 2]) > s0Threshold);
+
+      auto filter = MakeFilter(image, gradients, 1000, method);
+      filter->SetS0Thres(s0Threshold);
+      filter->Update();
+      const auto maps = GetMaps(filter);
+      const auto snapshot = filter->GetSnapshot();
+
+      auto assertEqual = [](const std::vector<double>& expected, const vnl_vector<double>& actual)
+      {
+        CPPUNIT_ASSERT_EQUAL(expected.size(), static_cast<std::size_t>(actual.size()));
+        for (std::size_t i = 0; i < expected.size(); ++i)
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(expected[i], actual[i], 1e-12);
+      };
+      assertEqual(allBValues, snapshot.bvalues);
+      assertEqual(allMeasurements, snapshot.allmeas);
+      assertEqual(firstBValues, snapshot.bvals1);
+      assertEqual(firstMeasurements, snapshot.meas1);
+      assertEqual(secondBValues, snapshot.bvals2);
+      assertEqual(secondMeasurements, snapshot.meas2);
+
+      CPPUNIT_ASSERT_EQUAL(static_cast<float>(snapshot.currentF), static_cast<float>(maps.f[0]));
+      CPPUNIT_ASSERT_EQUAL(static_cast<float>(snapshot.currentD), static_cast<float>(maps.d[0]));
+      CPPUNIT_ASSERT_EQUAL(static_cast<float>(snapshot.currentDStar), static_cast<float>(maps.dStar[0]));
+      CPPUNIT_ASSERT_EQUAL(snapshot.currentF, snapshot.currentFunceiled);
+    }
   }
 };
 
