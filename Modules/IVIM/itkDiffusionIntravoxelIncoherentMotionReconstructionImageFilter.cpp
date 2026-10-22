@@ -270,13 +270,14 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       if(m_Snap.baselineind.size())
         b0 /= m_Snap.baselineind.size();
 
-      // measurement vector
+      // measurement vector; without baseline signal the signal ratios are undefined, so the
+      // measurements are left out and the voxel gets 0
       for(int i = 0; i < m_Snap.num_weighted; ++i)
       {
-        m_Snap.allmeas[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
+        m_Snap.allmeas[i] = b0 > 0 ? measvec[m_Snap.gradientind[i]] / b0 : 0;
 
-        if(measvec[m_Snap.gradientind[i]] > m_S0Thres)
-          m_Snap.meas_for_threshold[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
+        if(b0 > 0 && measvec[m_Snap.gradientind[i]] > m_S0Thres)
+          m_Snap.meas_for_threshold[i] = measvec[m_Snap.gradientind[i]] / b0;
         else
           m_Snap.meas_for_threshold[i] = IVIM_FOO;
       }
@@ -287,10 +288,10 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       for(int i = 0; i < m_Snap.num_weighted; ++i)
       {
         b0 = measvec[m_Snap.baselineind[i]];
-        m_Snap.allmeas[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
+        m_Snap.allmeas[i] = b0 > 0 ? measvec[m_Snap.gradientind[i]] / b0 : 0;
 
-        if(measvec[m_Snap.gradientind[i]] > m_S0Thres)
-          m_Snap.meas_for_threshold[i] = measvec[m_Snap.gradientind[i]] / (b0+.0001);
+        if(b0 > 0 && measvec[m_Snap.gradientind[i]] > m_S0Thres)
+          m_Snap.meas_for_threshold[i] = measvec[m_Snap.gradientind[i]] / b0;
         else
           m_Snap.meas_for_threshold[i] = IVIM_FOO;
       }

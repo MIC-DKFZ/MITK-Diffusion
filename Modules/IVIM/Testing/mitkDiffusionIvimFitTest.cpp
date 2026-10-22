@@ -33,6 +33,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Update_ReferenceBValueNotSet_Throws);
   MITK_TEST(Baselines_NoBZero_AllDirectionsOfLowestShell);
   MITK_TEST(Baselines_Mean_NotTruncated);
+  MITK_TEST(Fit_NoBaselineSignal_Zero);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float>;
@@ -154,10 +155,10 @@ public:
     // Values recorded from the fit to catch unintended changes, b threshold 170, D* 0.06 for the
     // fixed D* method; voxel (5, 5, 5) is in the center of the 11^3 image.
     const std::vector<Recorded> recorded = {
-      {FilterType::IVIM_FIT_ALL, {0.4289386548, 0.0005090772679, 0.01859561014}, {0.8115641475, 0.0005265806685, 0.01223030128}},
-      {FilterType::IVIM_DSTAR_FIX, {0.2727057611, 0.000750951204, 0.05999999866}, {0.7812179327, 0.0006338245585, 0.05999999866}},
-      {FilterType::IVIM_D_THEN_DSTAR, {0.2727045735, 0.0007509544281, 0.02995032977}, {0.7812152505, 0.000633834512, 0.01441000029}},
-      {FilterType::IVIM_LINEAR_D_THEN_F, {0.3739919173, 0.0005149761726, 0.02083793334}, {0.7865120173, 0.000659120793, 0.01441000029}}};
+      {FilterType::IVIM_FIT_ALL, {0.428927243, 0.00050945312, 0.0185983037}, {0.8115640879, 0.0005265806685, 0.01223029941}},
+      {FilterType::IVIM_DSTAR_FIX, {0.2727053955, 0.0007509511815, 0.05999999866}, {0.7812178731, 0.0006338245585, 0.05999999866}},
+      {FilterType::IVIM_D_THEN_DSTAR, {0.2727041887, 0.0007509544279, 0.02993353789}, {0.7812152505, 0.000633834512, 0.01441000029}},
+      {FilterType::IVIM_LINEAR_D_THEN_F, {0.3739915474, 0.0005149761726, 0.02083905281}, {0.7865119576, 0.000659120793, 0.01441000029}}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 5;
@@ -242,6 +243,25 @@ public:
     auto snapshot = filter->GetSnapshot();
     for (int i = 0; i < snapshot.num_weighted; ++i)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(std::round(signal[i + 2]) / 1000.5, snapshot.allmeas[i], 1e-6);
+  }
+
+  void Fit_NoBaselineSignal_Zero()
+  {
+    std::vector<double> signal(m_BValues.size(), 100);
+    signal[0] = 0;
+    signal[1] = 0;
+    auto image = MakeImage({signal});
+    const std::vector<FilterType::IVIM_Method> methods = {
+      FilterType::IVIM_FIT_ALL, FilterType::IVIM_DSTAR_FIX, FilterType::IVIM_D_THEN_DSTAR, FilterType::IVIM_LINEAR_D_THEN_F};
+    for (auto method : methods)
+    {
+      auto filter = MakeFilter(image, MakeGradients(m_BValues, 1000), 1000, method);
+      filter->Update();
+      auto maps = GetMaps(filter);
+      CPPUNIT_ASSERT_EQUAL(0.0, maps.f[0]);
+      CPPUNIT_ASSERT_EQUAL(0.0, maps.d[0]);
+      CPPUNIT_ASSERT_EQUAL(0.0, maps.dStar[0]);
+    }
   }
 };
 
