@@ -109,12 +109,23 @@ MergeDiffusionImagesFilter<TScalarType>
         typename DwiImageType::Pointer tmp = m_ImageVolumes.at(i);
         if ( img->GetLargestPossibleRegion()!=tmp->GetLargestPossibleRegion() )
             throw itk::ExceptionObject (__FILE__,__LINE__,"Error: images are not of same size.");
+        // Voxels are merged by index into the geometry of the first image.
+        if ( !img->IsCongruentImageGeometry(tmp, ImageToImageFilterCommon::GetGlobalDefaultCoordinateTolerance(), ImageToImageFilterCommon::GetGlobalDefaultDirectionTolerance()) )
+            throw itk::ExceptionObject (__FILE__,__LINE__,"Error: images do not have the same spacing, origin and direction.");
+        if ( m_GradientLists.at(i)->Size()!=tmp->GetVectorLength() )
+            throw itk::ExceptionObject (__FILE__,__LINE__,"Error: number of gradients does not match the number of image volumes.");
     }
 
     m_BValue = 0;
     for (auto bval : m_BValues)
       if (bval>m_BValue)
         m_BValue = bval;
+
+    // The gradients are rescaled relative to the largest reference b-value below.
+    for (const auto& gradients : m_GradientLists)
+      for (const auto& g : gradients->CastToSTLConstContainer())
+        if (g.two_norm()>0.0001 && m_BValue<=0)
+          throw itk::ExceptionObject (__FILE__,__LINE__,"Error: diffusion-weighted volumes need a positive reference b-value.");
     m_OutputGradients = GradientListType::New();
 
     typename DwiImageType::Pointer outImage = DwiImageType::New();
