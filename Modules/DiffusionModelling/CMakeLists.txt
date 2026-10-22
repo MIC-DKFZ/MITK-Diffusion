@@ -9,10 +9,6 @@ MITK_CREATE_MODULE(
     ITK|ITKIONRRD+ITKIONIFTI
 )
 
-#if(MSVC)
-#  mitkFunctionCheckCAndCXXCompilerFlags("/wd4005" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
-#endif()
-
 add_subdirectory(Testing)
 
 endif()

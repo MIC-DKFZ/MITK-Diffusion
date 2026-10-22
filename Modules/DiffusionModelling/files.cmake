@@ -20,8 +20,8 @@ set(CPP_FILES
   IO/mitkShImageReader.cpp
   IO/mitkShImageWriter.cpp
   IO/mitkShImageSerializer.cpp
-  IO/mitkPeakImageReader.h
-  IO/mitkPeakImageSerializer.h
+  IO/mitkPeakImageReader.cpp
+  IO/mitkPeakImageSerializer.cpp
 
   # Mapper etc.
   Rendering/mitkOdfNormalizationMethodProperty.cpp
@@ -33,7 +33,6 @@ set(CPP_FILES
   Rendering/mitkPeakImageMapper3D.cpp
 
   # Algorithms
-  
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.cpp
@@ -61,8 +60,8 @@ set(H_FILES
   IO/mitkShImageReader.h
   IO/mitkShImageWriter.h
   IO/mitkShImageSerializer.h
-  IO/mitkPeakImageReader.cpp
-  IO/mitkPeakImageSerializer.cpp
+  IO/mitkPeakImageReader.h
+  IO/mitkPeakImageSerializer.h
 
   # Rendering
   Rendering/mitkOdfGlyphGenerator.h
@@ -92,7 +91,10 @@ set(H_FILES
   Algorithms/itkTensorDerivedMeasurementsFilter.h
   Algorithms/itkTensorImageToDiffusionImageFilter.h
   Algorithms/itkTensorToL2NormImageFilter.h
-  
+  Algorithms/itkTensorImageToOdfImageFilter.h
+  Algorithms/itkTensorToRgbImageFilter.h
+  Algorithms/itkOdfToRgbImageFilter.h
+  Algorithms/itkShToRgbImageFilter.h
   Algorithms/itkDiffusionTensorPrincipalDirectionImageFilter.h
   Algorithms/itkTensorReconstructionWithEigenvalueCorrectionFilter.h
   Algorithms/itkShCoefficientImageImporter.h
