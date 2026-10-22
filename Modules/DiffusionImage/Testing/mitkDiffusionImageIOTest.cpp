@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
+#include <mitkDiffusionImageHelperFunctions.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkFileReaderSelector.h>
 #include <mitkIOUtil.h>
@@ -34,12 +35,18 @@ class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
   MITK_TEST(NrrdReader_MitkFrameKey_ReadsFrame);
   MITK_TEST(NrrdReader_StandardFrameField_ReadsFrame);
   MITK_TEST(NrrdReader_NoFrame_ReadsIdentity);
+  MITK_TEST(NrrdReader_LegacyMitkFileWithRotation_AppliesRotationAndFrame);
+  MITK_TEST(NrrdReader_StandardFileWithRotation_AppliesFrameOnly);
   MITK_TEST(NrrdReader_BothFrameKinds_ReadsIdentity);
   MITK_TEST(NrrdReader_GradientCountMismatch_Throws);
   MITK_TEST(NrrdReader_MissingBValue_Throws);
   MITK_TEST(NrrdReader_DetachedHeader_Reads);
   MITK_TEST(NrrdWriter_RoundTrip_KeepsDataAndGradients);
   MITK_TEST(NrrdWriter_OnlyModifiedGradients_WritesThem);
+  MITK_TEST(NrrdWriter_ObliqueImage_KeepsModifiedGradients);
+  MITK_TEST(NiftiReader_PositiveDeterminant_NegatesBvecX);
+  MITK_TEST(NiftiReader_NegativeDeterminant_RotatesBvecs);
+  MITK_TEST(NiftiWriter_ObliqueImage_WritesFslBvecs);
   MITK_TEST(NiftiWriter_RoundTrip_KeepsDataAndGradients);
   MITK_TEST(PlainNrrdWriter_Dwi_WritesNoDiffusionKeys);
   MITK_TEST(ReaderSelection_PlainImages_NoDwiReader);
@@ -96,14 +103,31 @@ class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
     return identity;
   }
 
+  /** Rotation about x by 30 and about z by 40 degrees: not symmetric, and the two do not commute. */
+  static PropHelper::MeasurementFrameType RotationX30() { return mitk::imv::GetRotationMatrixVnl<double>(30, 0, 0); }
+  static PropHelper::MeasurementFrameType RotationZ40() { return mitk::imv::GetRotationMatrixVnl<double>(0, 0, 40); }
+
+  /** Modified gradients expected for the given original gradients, as row vectors g * left * right. */
+  static PropHelper::GradientDirectionsContainerType::Pointer Transformed(const PropHelper::GradientDirectionsContainerType* gradients,
+                                                                         const PropHelper::MeasurementFrameType& left,
+                                                                         const PropHelper::MeasurementFrameType& right)
+  {
+    auto result = PropHelper::GradientDirectionsContainerType::New();
+    for (const auto& g : gradients->CastToSTLConstContainer())
+      result->push_back(g * left * right);
+    return result;
+  }
+
   /**
    * Writes the pixels of m_Dwi with only the given key/value pairs through plain ITK, the way other
    * tools write DWI NRRDs.
    */
-  std::string WriteNrrd(const std::string& name, const itk::MetaDataDictionary& dictionary)
+  std::string WriteNrrd(const std::string& name, const itk::MetaDataDictionary& dictionary,
+                        const PropHelper::MeasurementFrameType& direction = Identity())
   {
     auto image = PropHelper::ImageType::New();
     image->Graft(PropHelper::GetItkVectorImage(m_Dwi));
+    image->SetDirection(PropHelper::ImageType::DirectionType(direction));
     image->SetMetaDataDictionary(dictionary);
     auto writer = itk::ImageFileWriter<PropHelper::ImageType>::New();
     writer->SetInput(image);
@@ -139,6 +163,20 @@ class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
     CPPUNIT_ASSERT(MaxDifference(PropHelper::GetGradientContainer(expected), PropHelper::GetGradientContainer(actual)) <= gradientTolerance);
     CPPUNIT_ASSERT(PropHelper::GetMeasurementFrame(expected) == PropHelper::GetMeasurementFrame(actual));
     CPPUNIT_ASSERT(PropHelper::GetBValueMap(expected) == PropHelper::GetBValueMap(actual));
+  }
+
+  /** Replaces the rotation part of the image matrix, keeping spacing and origin. */
+  static void SetRotation(mitk::Image* image, const vnl_matrix_fixed<double, 3, 3>& rotation)
+  {
+    auto geometry = image->GetGeometry();
+    mitk::AffineTransform3D::MatrixType matrix;
+    for (unsigned int r = 0; r < 3; ++r)
+      for (unsigned int c = 0; c < 3; ++c)
+        matrix[r][c] = rotation[r][c] * geometry->GetSpacing()[c];
+    auto transform = mitk::AffineTransform3D::New();
+    transform->SetMatrix(matrix);
+    transform->SetOffset(geometry->GetIndexToWorldTransform()->GetOffset());
+    geometry->SetIndexToWorldTransform(transform);
   }
 
 public:
@@ -192,6 +230,32 @@ public:
     CPPUNIT_ASSERT(MaxDifference(PropHelper::GetGradientContainer(m_Dwi), PropHelper::GetGradientContainer(image)) < 1e-12);
   }
 
+  void NrrdReader_LegacyMitkFileWithRotation_AppliesRotationAndFrame()
+  {
+    // Earlier MITK versions wrote only MITK's key; such files keep their old reading.
+    auto dictionary = DiffusionKeys(31);
+    const auto mf = RotationZ40();
+    itk::EncapsulateMetaData<std::string>(dictionary, "measurement frame",
+      std::format(" ({},{},{}) ({},{},{}) ({},{},{})", mf(0,0), mf(0,1), mf(0,2), mf(1,0), mf(1,1), mf(1,2), mf(2,0), mf(2,1), mf(2,2)));
+    auto image = mitk::IOUtil::Load<mitk::Image>(WriteNrrd("legacy_oblique.dwi", dictionary, RotationX30()));
+
+    auto expected = Transformed(PropHelper::GetOriginalGradientContainer(m_Dwi), RotationX30(), mf);
+    CPPUNIT_ASSERT(MaxDifference(expected, PropHelper::GetGradientContainer(image)) < 1e-12);
+  }
+
+  void NrrdReader_StandardFileWithRotation_AppliesFrameOnly()
+  {
+    // NRRD defines gradients by the measurement frame alone; the image matrix does not rotate them.
+    auto dictionary = DiffusionKeys(31);
+    const auto mf = RotationZ40();
+    const std::vector<std::vector<double>> rows = {{mf(0,0), mf(0,1), mf(0,2)}, {mf(1,0), mf(1,1), mf(1,2)}, {mf(2,0), mf(2,1), mf(2,2)}};
+    itk::EncapsulateMetaData<std::vector<std::vector<double>>>(dictionary, "NRRD_measurement frame", rows);
+    auto image = mitk::IOUtil::Load<mitk::Image>(WriteNrrd("standard_oblique.dwi", dictionary, RotationX30()));
+
+    auto expected = Transformed(PropHelper::GetOriginalGradientContainer(m_Dwi), Identity(), mf);
+    CPPUNIT_ASSERT(MaxDifference(expected, PropHelper::GetGradientContainer(image)) < 1e-12);
+  }
+
   void NrrdReader_BothFrameKinds_ReadsIdentity()
   {
     // Has the standard field and MITK's key/value pair.
@@ -241,6 +305,72 @@ public:
     mitk::IOUtil::Save(source, "DWI_NRRD", path);
     auto image = mitk::IOUtil::Load<mitk::Image>(path);
     CPPUNIT_ASSERT(MaxDifference(PropHelper::GetGradientContainer(m_Dwi), PropHelper::GetGradientContainer(image)) == 0);
+  }
+
+  void NrrdWriter_ObliqueImage_KeepsModifiedGradients()
+  {
+    auto dictionary = DiffusionKeys(31);
+    itk::EncapsulateMetaData<std::string>(dictionary, "measurement frame", " (0,1,0) (-1,0,0) (0,0,1)");
+    auto source = mitk::IOUtil::Load<mitk::Image>(WriteNrrd("legacy_oblique.dwi", dictionary, RotationX30()));
+
+    const auto path = m_TempDir + "/oblique_roundtrip.dwi";
+    mitk::IOUtil::Save(source, "DWI_NRRD", path);
+    auto image = mitk::IOUtil::Load<mitk::Image>(path);
+    CPPUNIT_ASSERT(mitk::Equal(*source, *image, mitk::eps, true));
+    CPPUNIT_ASSERT(MaxDifference(PropHelper::GetGradientContainer(source), PropHelper::GetGradientContainer(image)) == 0);
+    CPPUNIT_ASSERT(PropHelper::GetMeasurementFrame(image) == Identity());
+  }
+
+  /** Gradients as ReadBvalsBvecs returns them for the bvals/bvecs next to a NIfTI file, turned by the given matrix. */
+  static PropHelper::GradientDirectionsContainerType::Pointer RawBvecs(const std::string& base, const PropHelper::MeasurementFrameType& toWorld)
+  {
+    double bref = 0;
+    auto raw = mitk::gradients::ReadBvalsBvecs(base + ".bvals", base + ".bvecs", bref);
+    return Transformed(raw, toWorld.transpose(), Identity());
+  }
+
+  void NiftiReader_PositiveDeterminant_NegatesBvecX()
+  {
+    // qform diag(-1,-1,1) in RAS, so the ITK matrix is the identity with determinant +1: FSL negates x.
+    const auto base = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/diffusion_image");
+    auto functor = DwiReaderFunctor();
+    auto image = mitk::IOUtil::Load<mitk::Image>(base + ".nii.gz", &functor);
+    PropHelper::MeasurementFrameType toWorld = Identity();
+    toWorld(0, 0) = -1;
+    CPPUNIT_ASSERT(MaxDifference(RawBvecs(base, toWorld), PropHelper::GetGradientContainer(image)) < 1e-6);
+  }
+
+  void NiftiReader_NegativeDeterminant_RotatesBvecs()
+  {
+    // qform diag(-1,1,1) in RAS (LAS storage), so the ITK matrix is diag(1,-1,1), determinant -1.
+    const auto base = GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_1_OUT");
+    auto functor = DwiReaderFunctor();
+    auto image = mitk::IOUtil::Load<mitk::Image>(base + ".nii.gz", &functor);
+    PropHelper::MeasurementFrameType toWorld = Identity();
+    toWorld(1, 1) = -1;
+    CPPUNIT_ASSERT(MaxDifference(RawBvecs(base, toWorld), PropHelper::GetGradientContainer(image)) < 1e-6);
+  }
+
+  void NiftiWriter_ObliqueImage_WritesFslBvecs()
+  {
+    // Oblique image with a measurement frame: NIfTI has no frame, so it must end up in the bvecs.
+    auto source = m_Dwi->Clone();
+    SetRotation(source, RotationX30());
+    PropHelper::SetMeasurementFrame(source, RotationZ40());
+    PropHelper::InitializeImage(source);
+
+    const auto path = m_TempDir + "/oblique.nii.gz";
+    mitk::IOUtil::Save(source, "DWI_NIFTI", path);
+
+    // World = R * F * bvec with F negating x, since det(R) = +1.
+    PropHelper::MeasurementFrameType flipX = Identity();
+    flipX(0, 0) = -1;
+    const PropHelper::MeasurementFrameType toWorld = RotationX30() * flipX;
+    CPPUNIT_ASSERT(MaxDifference(PropHelper::GetGradientContainer(source), RawBvecs(m_TempDir + "/oblique", toWorld)) < 1e-6);
+
+    auto functor = DwiReaderFunctor();
+    auto image = mitk::IOUtil::Load<mitk::Image>(path, &functor);
+    CPPUNIT_ASSERT(MaxDifference(PropHelper::GetGradientContainer(source), PropHelper::GetGradientContainer(image)) < 1e-6);
   }
 
   void NiftiWriter_RoundTrip_KeepsDataAndGradients()

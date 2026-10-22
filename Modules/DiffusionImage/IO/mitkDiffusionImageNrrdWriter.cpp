@@ -69,40 +69,21 @@ void mitk::DiffusionImageNrrdWriter::Write()
   mitk::CastToItkImage(input,itkImg);
   auto& dictionary = itkImg->GetMetaDataDictionary();
 
-  // std::format("{}") writes the shortest text that reads back to the same double.
-  const auto mf = mitk::DiffusionPropertyHelper::GetMeasurementFrame(input);
-  if (!mf.is_zero())
-  {
-    itk::EncapsulateMetaData<std::string>(dictionary, "measurement frame",
-      std::format(" ({},{},{}) ({},{},{}) ({},{},{})", mf(0,0), mf(0,1), mf(0,2), mf(1,0), mf(1,1), mf(1,2), mf(2,0), mf(2,1), mf(2,2)));
-  }
+  // The modified gradients are world vectors. They are written with an identity measurement frame,
+  // as the standard NRRD field and as MITK's own key (which earlier MITK versions read); together
+  // they mark the file as written by this version. std::format("{}") writes the shortest text that
+  // reads back to the same double.
+  const std::vector<std::vector<double>> identity = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+  itk::EncapsulateMetaData<std::vector<std::vector<double>>>(dictionary, "NRRD_measurement frame", identity);
+  itk::EncapsulateMetaData<std::string>(dictionary, "measurement frame", " (1,0,0) (0,1,0) (0,0,1)");
   itk::EncapsulateMetaData<std::string>(dictionary, "modality", "DWMRI");
-
-  // Images whose original gradients were never derived (no InitializeImage) keep only the
-  // modified ones.
-  auto gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(input);
-  if (input->GetProperty(mitk::DiffusionPropertyHelper::GetOriginalGradientContainerPropertyName().c_str()).IsNotNull()
-      && mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(input)->Size() > 0)
+  itk::EncapsulateMetaData<std::string>(dictionary, "DWMRI_b-value", std::format("{}", mitk::DiffusionPropertyHelper::GetReferenceBValue(input)));
+  const auto gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(input);
+  for (unsigned int i = 0; i < gradients->Size(); ++i)
   {
-    MITK_INFO << "Saving original gradient directions";
-    gradients = mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(input);
+    const auto& g = gradients->ElementAt(i);
+    itk::EncapsulateMetaData<std::string>(dictionary, std::format("DWMRI_gradient_{:04}", i), std::format("{} {} {}", g[0], g[1], g[2]));
   }
-  else
-  {
-    MITK_INFO << "Original gradient directions not found. Saving modified gradient directions";
-  }
-
-  if (gradients->Size() > 0)
-  {
-    itk::EncapsulateMetaData<std::string>(dictionary, "DWMRI_b-value", std::format("{}", mitk::DiffusionPropertyHelper::GetReferenceBValue(input)));
-    for (unsigned int i = 0; i < gradients->Size(); ++i)
-    {
-      const auto& g = gradients->ElementAt(i);
-      itk::EncapsulateMetaData<std::string>(dictionary, std::format("DWMRI_gradient_{:04}", i), std::format("{} {} {}", g[0], g[1], g[2]));
-    }
-  }
-
-  typedef itk::VectorImage<short,3> ImageType;
 
   // default extension is .nrrd
   if (!this->GetRegisteredMimeType().MatchesExtension(this->GetOutputLocation()))
@@ -112,7 +93,7 @@ void mitk::DiffusionImageNrrdWriter::Write()
     itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
     io->UseCompressionOn();
 
-    typedef itk::ImageFileWriter<ImageType> WriterType;
+    typedef itk::ImageFileWriter<VectorImageType> WriterType;
     WriterType::Pointer nrrdWriter = WriterType::New();
     nrrdWriter->UseInputMetaDataDictionaryOn();
     nrrdWriter->SetInput( itkImg );

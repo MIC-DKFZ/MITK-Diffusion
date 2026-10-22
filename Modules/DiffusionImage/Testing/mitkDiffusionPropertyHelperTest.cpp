@@ -16,6 +16,7 @@ found in the LICENSE file.
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkIOUtil.h>
 #include <mitkITKImageImport.h>
+#include <mitkDiffusionImageHelperFunctions.h>
 
 class mitkDiffusionPropertyHelperTestSuite : public mitk::TestFixture
 {
@@ -24,6 +25,7 @@ class mitkDiffusionPropertyHelperTestSuite : public mitk::TestFixture
   MITK_TEST(InitializeImage_NoMeasurementFrame_KeepsGradients);
   MITK_TEST(Getters_NoDiffusionProperties_Throw);
   MITK_TEST(AverageRedundantGradients_NegativeValues_AveragesSigned);
+  MITK_TEST(InitializeImage_RotationAndFrame_DerivesOriginalGradientsExactly);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -61,6 +63,20 @@ class mitkDiffusionPropertyHelperTestSuite : public mitk::TestFixture
     PropHelper::SetReferenceBValue(image, 1000);
     PropHelper::InitializeImage(image);
     return image;
+  }
+
+  /** Replaces the rotation part of the image matrix, keeping spacing and origin. */
+  static void SetRotation(mitk::Image* image, const vnl_matrix_fixed<double, 3, 3>& rotation)
+  {
+    auto geometry = image->GetGeometry();
+    mitk::AffineTransform3D::MatrixType matrix;
+    for (unsigned int r = 0; r < 3; ++r)
+      for (unsigned int c = 0; c < 3; ++c)
+        matrix[r][c] = rotation[r][c] * geometry->GetSpacing()[c];
+    auto transform = mitk::AffineTransform3D::New();
+    transform->SetMatrix(matrix);
+    transform->SetOffset(geometry->GetIndexToWorldTransform()->GetOffset());
+    geometry->SetIndexToWorldTransform(transform);
   }
 
 public:
@@ -120,6 +136,25 @@ public:
     auto pixel = itkImage->GetPixel({0, 0, 0});
     CPPUNIT_ASSERT_EQUAL(short(-15), pixel[0]);
     CPPUNIT_ASSERT_EQUAL(short(5), pixel[1]);
+  }
+
+  void InitializeImage_RotationAndFrame_DerivesOriginalGradientsExactly()
+  {
+    // Rotation and frame that do not commute: deriving original from modified gradients must undo
+    // them in reverse order.
+    auto image = m_Dwi->Clone();
+    SetRotation(image, mitk::imv::GetRotationMatrixVnl<double>(30, 0, 0));
+    PropHelper::SetMeasurementFrame(image, mitk::imv::GetRotationMatrixVnl<double>(0, 0, 40));
+    PropHelper::SetApplyMatrixToGradients(image, true);
+    PropHelper::InitializeImage(image);
+    auto original = PropHelper::GetOriginalGradientContainer(image);
+
+    image->GetPropertyList()->RemoveProperty(PropHelper::GetOriginalGradientContainerPropertyName());
+    PropHelper::InitializeImage(image);
+    auto derived = PropHelper::GetOriginalGradientContainer(image);
+    CPPUNIT_ASSERT_EQUAL(original->Size(), derived->Size());
+    for (unsigned int i = 0; i < original->Size(); ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, (original->ElementAt(i) - derived->ElementAt(i)).two_norm(), 1e-12);
   }
 };
 

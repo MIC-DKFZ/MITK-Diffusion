@@ -27,6 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkImageCast.h"
 #include <mitkLocaleSwitch.h>
 #include <mitkDiffusionImageHelperFunctions.h>
+#include <vnl/vnl_inverse.h>
 #include <iostream>
 #include <fstream>
 
@@ -175,21 +176,14 @@ void mitk::DiffusionImageNiftiWriter::Write()
         bvecs_file = base_path + "/" + bvecs_file;
     bvecs_file += ".bvecs";
 
-    // Images whose original gradients were never derived (no InitializeImage) keep only the
-    // modified ones.
-    auto gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(input);
-    if (input->GetProperty(mitk::DiffusionPropertyHelper::GetOriginalGradientContainerPropertyName().c_str()).IsNotNull()
-        && mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(input)->Size() > 0)
-    {
-      MITK_INFO << "Saving original gradient directions";
-      gradients = mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(input);
-    }
-    else
-    {
-      MITK_INFO << "Original gradient directions not found. Saving modified gradient directions";
-    }
-    if (gradients->Size() > 0)
-      mitk::gradients::WriteBvalsBvecs(bvals_file, bvecs_file, gradients, mitk::DiffusionPropertyHelper::GetReferenceBValue(input));
+    // FSL bvecs: the modified gradients are world vectors, turned into the voxel frame the reader
+    // expects.
+    const auto worldFromBvecs = mitk::gradients::FslBvecsMeasurementFrame(itkImg->GetDirection()).transpose();
+    const auto bvecsFromWorld = vnl_inverse(worldFromBvecs);
+    auto bvecs = GradientDirectionContainerType::New();
+    for (const auto& g : mitk::DiffusionPropertyHelper::GetGradientContainer(input)->CastToSTLConstContainer())
+      bvecs->push_back(bvecsFromWorld * g);
+    mitk::gradients::WriteBvalsBvecs(bvals_file, bvecs_file, bvecs.GetPointer(), mitk::DiffusionPropertyHelper::GetReferenceBValue(input));
   }
 }
 

@@ -192,9 +192,13 @@ public:
   static vnl_vector_fixed<double, 3> Sph2Cart(const double& theta, const double& phi, const double& rad);
   static GradientDirectionContainerType::ConstPointer ReadBvalsBvecs(std::string bvals_file, std::string bvecs_file, double& reference_bval);
   static void WriteBvalsBvecs(std::string bvals_file, std::string bvecs_file, GradientDirectionContainerType::ConstPointer gradients, double reference_bval);
+  /**
+   * Measurement frame of FSL bvecs for an image with the given direction matrix: applied to the bvecs
+   * it gives world (LPS) gradients. ReadBvalsBvecs and WriteBvalsBvecs do not apply it.
+   */
+  static DiffusionPropertyHelper::MeasurementFrameType FslBvecsMeasurementFrame(const itk::Matrix<double, 3, 3>& direction);
   static std::vector<unsigned int> GetAllUniqueDirections(const BValueMap &bValueMap, GradientDirectionContainerType::ConstPointer refGradientsContainer );
 
-  static bool CheckForDifferingShellDirections(const BValueMap &bValueMap, GradientDirectionContainerType::ConstPointer refGradientsContainer);
   static vnl_matrix<double> ComputeSphericalFromCartesian(const IndiciesVector  & refShell, const GradientDirectionContainerType * refGradientsContainer);
   static GradientDirectionContainerType::Pointer CreateNormalizedUniqueGradientDirectionContainer(const BValueMap &bValueMap, const GradientDirectionContainerType * origninalGradentcontainer);
   };

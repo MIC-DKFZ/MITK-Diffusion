@@ -76,10 +76,6 @@ DiffusionImageNiftiReader()
   : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_NAME() ), mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION() )
 
 {
-  Options defaultOptions;
-  defaultOptions["Apply image rotation to gradients"] = true;
-  this->SetDefaultOptions(defaultOptions);
-
   m_ServiceReg = this->RegisterService();
 }
 
@@ -258,6 +254,7 @@ void DiffusionImageNiftiReader::InternalRead()
           bvecs_file = base_path + "bvec";
 
         DiffusionVectors = mitk::gradients::ReadBvalsBvecs(bvals_file, bvecs_file, BValue);
+        MeasurementFrame = mitk::gradients::FslBvecsMeasurementFrame(itkVectorImage->GetDirection());
       }
       else
       {
@@ -391,7 +388,9 @@ void DiffusionImageNiftiReader::InternalRead()
       mitk::DiffusionPropertyHelper::SetMeasurementFrame(outputForCache, MeasurementFrame);
       mitk::DiffusionPropertyHelper::SetBValueMap(outputForCache, BValueMap);
       mitk::DiffusionPropertyHelper::SetReferenceBValue(outputForCache, BValue);
-      mitk::DiffusionPropertyHelper::SetApplyMatrixToGradients(outputForCache, us::any_cast<bool>(this->GetOptions()["Apply image rotation to gradients"]));
+      // The measurement frame already contains the image rotation (FSL bvecs; Bruker images have an
+      // identity matrix), so the modified gradients are world vectors.
+      mitk::DiffusionPropertyHelper::SetApplyMatrixToGradients(outputForCache, false);
       mitk::DiffusionPropertyHelper::InitializeImage(outputForCache);
 
       // Since we have already read the tree, we can store it in a cache variable

@@ -63,9 +63,10 @@ namespace
 
   /**
    * Reads gradients, reference b-value and measurement frame from the NRRD key/value pairs.
-   * Throws if they do not describe a DWI with one gradient per image component.
+   * Throws if they do not describe a DWI with one gradient per image component. Returns whether the
+   * file was written by an earlier MITK version.
    */
-  void ParseDiffusionHeader(const itk::MetaDataDictionary& dictionary,
+  bool ParseDiffusionHeader(const itk::MetaDataDictionary& dictionary,
                             unsigned int numberOfComponents,
                             GradientDirectionContainerType* gradients,
                             MeasurementFrameType& measurementFrame,
@@ -143,11 +144,12 @@ namespace
     for (const auto& [index, g] : gradientsByIndex)
       gradients->InsertElement(index, g);
 
-    // MITK's key wins where a file has both; that is how such files were read so far.
-    if (mitkFrame && !IsZero(*mitkFrame))
-      measurementFrame = *mitkFrame;
-    else if (standardFrame && !IsZero(*standardFrame))
-      measurementFrame = *standardFrame;
+    // Earlier MITK versions wrote only their own key. Current MITK writes both, with identical values.
+    const bool legacyMitkFile = mitkFrame && !standardFrame;
+    const auto& frame = legacyMitkFile ? mitkFrame : standardFrame;
+    if (frame && !IsZero(*frame))
+      measurementFrame = *frame;
+    return legacyMitkFile;
   }
 }
 
@@ -230,7 +232,7 @@ namespace mitk
         MeasurementFrameType MeasurementFrame;
         MeasurementFrame.set_identity();
         float BValue = -1;
-        ParseDiffusionHeader(itkVectorImage->GetMetaDataDictionary(), itkVectorImage->GetVectorLength(), DiffusionVectors, MeasurementFrame, BValue);
+        const bool legacyMitkFile = ParseDiffusionHeader(itkVectorImage->GetMetaDataDictionary(), itkVectorImage->GetVectorLength(), DiffusionVectors, MeasurementFrame, BValue);
 
         outputForCache = mitk::GrabItkImageMemory( itkVectorImage);
 
@@ -240,7 +242,11 @@ namespace mitk
         mitk::DiffusionPropertyHelper::SetMeasurementFrame(outputForCache, MeasurementFrame);
         mitk::DiffusionPropertyHelper::SetBValueMap(outputForCache, BValueMap);
         mitk::DiffusionPropertyHelper::SetReferenceBValue(outputForCache, BValue);
-        mitk::DiffusionPropertyHelper::SetApplyMatrixToGradients(outputForCache, us::any_cast<bool>(this->GetOptions()["Apply image rotation to gradients"]));
+        // NRRD defines the gradients through the measurement frame alone, which makes the modified
+        // gradients world vectors. Files written by earlier MITK versions are read as they always
+        // were, with the image rotation applied before the frame.
+        const bool applyRotation = legacyMitkFile && us::any_cast<bool>(this->GetOptions()["Apply image rotation to gradients"]);
+        mitk::DiffusionPropertyHelper::SetApplyMatrixToGradients(outputForCache, applyRotation);
         mitk::DiffusionPropertyHelper::InitializeImage(outputForCache);
 
         // Since we have already read the tree, we can store it in a cache variable

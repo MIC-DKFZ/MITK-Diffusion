@@ -303,15 +303,16 @@ void mitk::DiffusionPropertyHelper::UnApplyMeasurementFrameAndRotationMatrix(mit
     std::cout << measurementFrame << std::endl;
   }
 
+  // The inverse of ApplyMeasurementFrameAndRotationMatrix, so the factors come in reverse order.
   int c = 0;
   for(GradientDirectionsContainerType::ConstIterator gdcit = modifiedDirections->Begin();
       gdcit != modifiedDirections->End(); ++gdcit)
   {
     auto vec = gdcit.Value();
-    if (apply_matrix)
-      vec = vec*imageRotationMatrix;
     if (apply_mf)
       vec = vec*measurementFrame;
+    if (apply_matrix)
+      vec = vec*imageRotationMatrix;
     directions->InsertElement(c, vec);
     c++;
   }
