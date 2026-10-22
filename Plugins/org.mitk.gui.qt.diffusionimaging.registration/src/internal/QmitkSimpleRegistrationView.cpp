@@ -14,21 +14,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-//misc
-#define _USE_MATH_DEFINES
-#include <math.h>
-
-// Blueberry
-#include <berryISelectionService.h>
-#include <berryIWorkbenchWindow.h>
-
-// Qmitk
 #include "QmitkSimpleRegistrationView.h"
 
-// MITK
 #include <mitkNodePredicateDataType.h>
 #include <mitkDiffusionPropertyHelper.h>
-#include <mitkImageMappingHelper.h>
 // MatchPoint's ITKInitializedMultiResImageRegistrationAlgorithm::doSetProperty() assigns a bool
 // that unwrapMetaProperty() may leave unset; GCC's optimizer reports that in Release builds
 // despite -isystem. MatchPoint is a MITK external, so the warning is silenced for its headers.
@@ -46,29 +35,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionImageEditing.h>
 #include <mitkDiffusionImageMapping.h>
 
-// Qt
 #include <QMessageBox>
 #include <QThreadPool>
-
-#define _USE_MATH_DEFINES
-#include <math.h>
 
 const std::string QmitkSimpleRegistrationView::VIEW_ID = "org.mitk.views.simpleregistrationview";
 
 QmitkSimpleRegistrationView::QmitkSimpleRegistrationView()
   : QmitkAbstractView()
-  , m_Controls( 0 )
-  , m_RegistrationType(0)
-  , m_RegistrationRunning(false)
 {
-
 }
 
-// Destructor
-QmitkSimpleRegistrationView::~QmitkSimpleRegistrationView()
-{
-
-}
+QmitkSimpleRegistrationView::~QmitkSimpleRegistrationView() = default;
 
 void QmitkSimpleRegistrationView::StartRegistration()
 {
@@ -110,11 +87,9 @@ void QmitkSimpleRegistrationView::StartRegistration()
   pJob->m_TargetDataUID = mitk::EnsureUID(m_Controls->m_FixedImageBox->GetSelectedNode()->GetData());
   pJob->m_MovingDataUID = mitk::EnsureUID(m_Controls->m_MovingImageBox->GetSelectedNode()->GetData());
 
-  connect(pJob, SIGNAL(RegResultIsAvailable(mitk::MAPRegistrationWrapper::Pointer, const QmitkRegistrationJob*)), this,
-          SLOT(OnRegResultIsAvailable(mitk::MAPRegistrationWrapper::Pointer, const QmitkRegistrationJob*)),
-          Qt::BlockingQueuedConnection);
-  connect(pJob, SIGNAL(Error(QString)), this, SLOT(OnRegistrationError(QString)));
-  connect(pJob, SIGNAL(Finished()), this, SLOT(OnRegistrationFinished()));
+  connect(pJob, &QmitkRegistrationJob::RegResultIsAvailable, this, &QmitkSimpleRegistrationView::OnRegResultIsAvailable, Qt::BlockingQueuedConnection);
+  connect(pJob, &QmitkRegistrationJob::Error, this, &QmitkSimpleRegistrationView::OnRegistrationError);
+  connect(pJob, &QmitkRegistrationJob::Finished, this, &QmitkSimpleRegistrationView::OnRegistrationFinished);
 
   m_RegistrationRunning = true;
   m_Controls->m_RegistrationStartButton->setEnabled(false);
@@ -176,8 +151,6 @@ void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWr
     else
       resultNode->SetName("Registered (affine)");
   }
-//  resultNode->SetOpacity(0.6);
-//  resultNode->SetColor(0.0, 0.0, 1.0);
   GetDataStorage()->Add(resultNode);
 
   mitk::RenderingManager::GetInstance()->InitializeViews( resultNode->GetData()->GetTimeGeometry(),
@@ -203,11 +176,9 @@ void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWr
 
 void QmitkSimpleRegistrationView::CreateQtPartControl( QWidget *parent )
 {
-  // build up qt view, unless already done
   if ( !m_Controls )
   {
-    // create GUI widgets from the Qt Designer's .ui file
-    m_Controls = new Ui::QmitkSimpleRegistrationViewControls;
+    m_Controls = std::make_unique<Ui::QmitkSimpleRegistrationViewControls>();
     m_Controls->setupUi( parent );
 
     m_Controls->m_FixedImageBox->SetDataStorage(this->GetDataStorage());
@@ -225,14 +196,14 @@ void QmitkSimpleRegistrationView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_TractoBox->SetPredicate(isFib);
     m_Controls->m_RegObjectBox->SetPredicate(isReg);
 
-    connect( m_Controls->m_FixedImageBox, SIGNAL(currentIndexChanged(int)), this, SLOT(FixedImageChanged()) );
-    connect( m_Controls->m_MovingImageBox, SIGNAL(currentIndexChanged(int)), this, SLOT(MovingImageChanged()) );
+    connect(m_Controls->m_FixedImageBox, &QComboBox::currentIndexChanged, this, &QmitkSimpleRegistrationView::FixedImageChanged);
+    connect(m_Controls->m_MovingImageBox, &QComboBox::currentIndexChanged, this, &QmitkSimpleRegistrationView::MovingImageChanged);
 
-    connect( m_Controls->m_TractoBox, SIGNAL(currentIndexChanged(int)), this, SLOT(TractoChanged()) );
-    connect( m_Controls->m_RegObjectBox, SIGNAL(currentIndexChanged(int)), this, SLOT(TractoChanged()) );
+    connect(m_Controls->m_TractoBox, &QComboBox::currentIndexChanged, this, &QmitkSimpleRegistrationView::TractoChanged);
+    connect(m_Controls->m_RegObjectBox, &QComboBox::currentIndexChanged, this, &QmitkSimpleRegistrationView::TractoChanged);
 
-    connect( m_Controls->m_RegistrationStartButton, SIGNAL(clicked()), this, SLOT(StartRegistration()) );
-    connect( m_Controls->m_TractoRegistrationStartButton, SIGNAL(clicked()), this, SLOT(StartTractoRegistration()) );
+    connect(m_Controls->m_RegistrationStartButton, &QAbstractButton::clicked, this, &QmitkSimpleRegistrationView::StartRegistration);
+    connect(m_Controls->m_TractoRegistrationStartButton, &QAbstractButton::clicked, this, &QmitkSimpleRegistrationView::StartTractoRegistration);
 
     FixedImageChanged();
     MovingImageChanged();
