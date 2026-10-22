@@ -52,6 +52,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
   MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
   MITK_TEST(TestMulti_Smoothed_MatchRecordedValues);
+  MITK_TEST(TestMulti_SmoothingVarianceZero_SameAsNoSmoothing);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionKurtosisReconstructionImageFilter<short, double>;
@@ -576,6 +577,22 @@ public:
       AssertClose(r.center.d, maps.d[center]);
       AssertClose(r.center.k, maps.k[center]);
     }
+  }
+
+  void TestMulti_SmoothingVarianceZero_SameAsNoSmoothing()
+  {
+    // The view's default smoothing variance is 0.
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
+    filter->Update();
+    auto zeroVarianceFilter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
+    zeroVarianceFilter->SetSmoothingSigma(0);
+    zeroVarianceFilter->Update();
+
+    const auto expected = GetMaps(filter);
+    const auto actual = GetMaps(zeroVarianceFilter);
+    CPPUNIT_ASSERT(expected.d == actual.d);
+    CPPUNIT_ASSERT(expected.k == actual.k);
   }
 };
 
