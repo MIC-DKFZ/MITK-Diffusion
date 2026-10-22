@@ -28,7 +28,8 @@ namespace mitk
 {
 
   /**
-  * \brief this class encapsulates tensor images
+  * \brief Peak image: a 4D float image whose fourth dimension holds three components (x, y, z in
+  * world coordinates) per peak and voxel.
   */
   class MITKDIFFUSIONMODELLING_EXPORT PeakImage : public Image
   {
@@ -42,9 +43,11 @@ namespace mitk
     itkCloneMacro(Self)
     mitkCloneMacro(Self)
 
-    void ConstructPolydata();
-
-    vtkSmartPointer< vtkPolyData > GetPolyData()
+    /**
+    * One two-point line per peak longer than 0.001, centred on its voxel, with the "FIBER_COLORS"
+    * point array; built on first use.
+    */
+    vtkSmartPointer< vtkPolyData > GetPolyData() const
     {
       if (m_PolyData==nullptr)
         this->ConstructPolydata();
@@ -62,6 +65,10 @@ namespace mitk
     ~PeakImage() override;
 
     mutable vtkSmartPointer< vtkPolyData > m_PolyData;
+
+  private:
+    void ConstructPolydata() const;
+    void ColorPolyDataByOrientation() const;
 
   };
 

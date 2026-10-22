@@ -18,11 +18,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkImageDataItem.h"
 #include "mitkImageCast.h"
 #include <mitkImageToItk.h>
-#include <vtkPolyLine.h>
 #include <vtkPointData.h>
 #include <mitkImagePixelWriteAccessor.h>
 #include <mitkImagePixelReadAccessor.h>
 #include <vtkUnsignedCharArray.h>
+
+#include <algorithm>
 
 mitk::PeakImage::PeakImage() : Image()
 {
@@ -38,9 +39,8 @@ mitk::PeakImage::~PeakImage()
 
 }
 
-void mitk::PeakImage::ConstructPolydata()
+void mitk::PeakImage::ConstructPolydata() const
 {
-  MITK_INFO << "PeakImage constructing polydata";
   if (this->GetDimensions()[3]%3!=0)
     mitkThrow() << "Fourth dimension needs to be a multiple of 3";
 
@@ -55,41 +55,29 @@ void mitk::PeakImage::ConstructPolydata()
   int sz_z = static_cast<int>(this->GetDimensions()[2]);
   unsigned int num_dirs = this->GetDimensions()[3]/3;
 
-  double minSpacing = 1;
   ItkPeakImageType::SpacingType spacing = itkImg->GetSpacing();
-  if(spacing[0]<spacing[1] && spacing[0]<spacing[2])
-    minSpacing = spacing[0];
-  else if (spacing[1] < spacing[2])
-    minSpacing = spacing[1];
-  else
-    minSpacing = spacing[2];
+  const double minSpacing = std::min({spacing[0], spacing[1], spacing[2]});
 
   vtkSmartPointer<vtkCellArray> m_VtkCellArray = vtkSmartPointer<vtkCellArray>::New();
   vtkSmartPointer<vtkPoints>    m_VtkPoints = vtkSmartPointer<vtkPoints>::New();
 
-#ifdef WIN32
-#pragma omp parallel for
-#else
-#pragma omp parallel for collapse(3)
-#endif
+  // Serial, so that the lines come in the same order on every run.
   for (int x=0; x<sz_x; ++x)
     for (int y=0; y<sz_y; ++y)
       for (int z=0; z<sz_z; ++z)
       {
         itk::Index<4> idx4; idx4[0] = x; idx4[1] = y; idx4[2] = z;
 
+        itk::ContinuousIndex<double, 4> center;
+        center[0] = idx4[0];
+        center[1] = idx4[1];
+        center[2] = idx4[2];
+        center[3] = 0;
+        itk::Point<double, 4> worldCenter;
+        itkImg->TransformContinuousIndexToPhysicalPoint( center, worldCenter );
+
         for (unsigned int i=0; i<num_dirs; i++)
         {
-          itk::ContinuousIndex<double, 4> center;
-          center[0] = idx4[0];
-          center[1] = idx4[1];
-          center[2] = idx4[2];
-          center[3] = 0;
-
-          itk::Point<double, 4> worldCenter;
-          itkImg->TransformContinuousIndexToPhysicalPoint( center, worldCenter );
-
-          idx4[3] = 0;
           vnl_vector_fixed< float, 3 > dir;
           idx4[3] = i*3;
           dir[0] = itkImg->GetPixel(idx4);
@@ -102,35 +90,27 @@ void mitk::PeakImage::ConstructPolydata()
           if (!(dir.magnitude()>=0.001f))
             continue;
 
-#pragma omp critical
-          {
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            // add direction to vector field (with spacing compensation)
-            itk::Point<double> worldStart;
-            worldStart[0] = worldCenter[0]-static_cast<double>(dir[0])/2*minSpacing;
-            worldStart[1] = worldCenter[1]-static_cast<double>(dir[1])/2*minSpacing;
-            worldStart[2] = worldCenter[2]-static_cast<double>(dir[2])/2*minSpacing;
-            vtkIdType id = m_VtkPoints->InsertNextPoint(worldStart.GetDataPointer());
-            container->GetPointIds()->InsertNextId(id);
-            itk::Point<double> worldEnd;
-            worldEnd[0] = worldCenter[0]+static_cast<double>(dir[0])/2*minSpacing;
-            worldEnd[1] = worldCenter[1]+static_cast<double>(dir[1])/2*minSpacing;
-            worldEnd[2] = worldCenter[2]+static_cast<double>(dir[2])/2*minSpacing;
-            id = m_VtkPoints->InsertNextPoint(worldEnd.GetDataPointer());
-            container->GetPointIds()->InsertNextId(id);
-            m_VtkCellArray->InsertNextCell(container);
-          }
+          // add direction to vector field (with spacing compensation)
+          itk::Point<double> worldStart;
+          worldStart[0] = worldCenter[0]-static_cast<double>(dir[0])/2*minSpacing;
+          worldStart[1] = worldCenter[1]-static_cast<double>(dir[1])/2*minSpacing;
+          worldStart[2] = worldCenter[2]-static_cast<double>(dir[2])/2*minSpacing;
+          itk::Point<double> worldEnd;
+          worldEnd[0] = worldCenter[0]+static_cast<double>(dir[0])/2*minSpacing;
+          worldEnd[1] = worldCenter[1]+static_cast<double>(dir[1])/2*minSpacing;
+          worldEnd[2] = worldCenter[2]+static_cast<double>(dir[2])/2*minSpacing;
+          const vtkIdType line[2] = {m_VtkPoints->InsertNextPoint(worldStart.GetDataPointer()),
+                                     m_VtkPoints->InsertNextPoint(worldEnd.GetDataPointer())};
+          m_VtkCellArray->InsertNextCell(2, line);
         }
       }
 
   m_PolyData = vtkSmartPointer<vtkPolyData>::New();
   m_PolyData->SetPoints(m_VtkPoints);
   m_PolyData->SetLines(m_VtkCellArray);
-  MITK_INFO << "PeakImage finished constructing polydata";
 
-  ColorByOrientation();
-
-  this->Modified();
+  // Built on demand, also from inside rendering, so the image is not marked as modified here.
+  this->ColorPolyDataByOrientation();
 }
 
 
@@ -138,8 +118,7 @@ mitk::PeakImage::ItkPeakImageType::Pointer mitk::PeakImage::GetItkPeakImage()
 {
   typedef mitk::ImageToItk< mitk::PeakImage::ItkPeakImageType > CasterType;
   CasterType::Pointer caster = CasterType::New();
-  auto mitk_image = dynamic_cast<mitk::Image*>(this);
-  caster->SetInput(mitk_image);
+  caster->SetInput(this);
   caster->SetCopyMemFlag(true);
   caster->Update();
   return caster->GetOutput();
@@ -178,14 +157,12 @@ void mitk::PeakImage::SetCustomColor(float r, float g, float b)
 
 void mitk::PeakImage::ColorByOrientation()
 {
-  //===== FOR WRITING A TEST ========================
-  //  colorT size == tupelComponents * tupelElements
-  //  compare color results
-  //  to cover this code 100% also PolyData needed, where colorarray already exists
-  //  + one fiber with exactly 1 point
-  //  + one fiber with 0 points
-  //=================================================
+  this->ColorPolyDataByOrientation();
+  this->Modified();
+}
 
+void mitk::PeakImage::ColorPolyDataByOrientation() const
+{
   vtkPolyData* polyData = this->GetPolyData();
   vtkPoints* extrPoints = nullptr;
   extrPoints = polyData->GetPoints();
@@ -232,11 +209,10 @@ void mitk::PeakImage::ColorByOrientation()
     }
     else
     {
-      MITK_INFO << "Peak with point number!=2 detected!" ;
+      MITK_WARN << "Peak with point number!=2 detected!" ;
       continue;
     }
   }
 
   polyData->GetPointData()->AddArray(colors);
-  this->Modified();
 }

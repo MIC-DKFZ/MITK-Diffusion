@@ -85,7 +85,6 @@ namespace mitk
     std::vector<itk::SmartPointer<mitk::BaseData> > result;
     std::string location = GetInputLocation();
     std::string ext = itksys::SystemTools::GetFilenameLastExtension(location);
-    MITK_INFO << "Reading " << location;
 
     typedef itk::ImageFileReader<PeakImage::ItkPeakImageType> FileReaderType;
     FileReaderType::Pointer reader = FileReaderType::New();
@@ -111,7 +110,6 @@ namespace mitk
     StringProperty::Pointer nameProp;
     nameProp = StringProperty::New(itksys::SystemTools::GetFilenameWithoutExtension(GetInputLocation()));
     resultImage->SetProperty("name", nameProp);
-    dynamic_cast<PeakImage*>(resultImage.GetPointer())->ConstructPolydata();
 
     result.push_back( resultImage.GetPointer() );
 
