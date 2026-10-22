@@ -20,6 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageToImageFilter.h"
 #include "itkVectorImage.h"
 
+#include <algorithm>
+
 #include "mitkDiffusionPropertyHelper.h"
 
 // vnl includes
@@ -40,9 +42,9 @@ namespace itk
       public vnl_least_squares_function
   {
   public:
-    /** full lsq_function constructor; the residuals are the measurements and the bound penalty */
+    /** full lsq_function constructor; the residuals are the measurements and the bound penalties of D and K */
     kurtosis_fit_lsq_function( unsigned int num_params, unsigned int num_measurements, UseGradient g=no_gradient)
-      : vnl_least_squares_function( num_params, num_measurements + 1, g),
+      : vnl_least_squares_function( num_params, num_measurements + 2, g),
         m_use_bounds(false),
         m_use_logscale(false),
         m_skip_fit(false)
@@ -97,10 +99,15 @@ namespace itk
       }
 
       bvalues = _bvals;
+
+      // A bound violation of the whole bound range costs 1000 times the largest measurement, which
+      // outweighs any misfit of the measurements.
+      m_penalty_weight = 1000 * std::max( 1.0, meas.size() > 0 ? meas.inf_norm() : 0.0 );
     }
 
 
-    /** use penalty terms on fitting to force the parameters stay within the default bounds */
+    /** use penalty terms on fitting to force the parameters stay within the default bounds,
+        D in [0, 0.004] mm^2/s and K in [0, 4] */
     void use_bounds()
     {
       m_use_bounds = true;
@@ -134,9 +141,20 @@ namespace itk
       {
         fx[s] = meas[s] - M(x, s);
       }
-      fx[meas.size()] = penalty_term(x);
+      fx[meas.size()] = penalty_term(x, 0);
+      fx[meas.size() + 1] = penalty_term(x, 1);
 
       MITK_DEBUG("Fit.x_and_f") << x << " | " << fx;
+    }
+
+    /** The penalty lets D and K end slightly outside their bounds; this moves them onto the bounds. */
+    void clamp_to_bounds( vnl_vector<double>& x ) const
+    {
+      if( !m_use_bounds )
+        return;
+
+      for( unsigned int i=0; i<2; ++i )
+        x[i] = std::clamp( x[i], kurtosis_lower_bounds[i], kurtosis_upper_bounds[i] );
     }
 
   protected:
@@ -165,35 +183,16 @@ namespace itk
         return m_bzero * result ;
     }
 
-    /** Penalty term on D and K during fitting, make sure the vector that is passed in contains (D, K) in this ordering */
-    virtual double penalty_term( vnl_vector<double> const& x)
+    /** Penalty residual of parameter i of (D, K): zero inside the bounds and growing linearly with
+        the distance outside, so the bounds do not affect fits inside them. */
+    double penalty_term( vnl_vector<double> const& x, unsigned int i ) const
     {
-      double penalty = 0;
-
-      // skip when turned off
       if( !m_use_bounds )
-        return penalty;
+        return 0;
 
-      // we have bounds for D and K only (the first two params )
-      for( unsigned int i=0; i< 2; i++)
-      {
-        // 5% penalty boundary
-        // use exponential function to scale the penalty (max when x[i] == bounds )
-        double penalty_boundary = 0.02 * (kurtosis_upper_bounds[i] - kurtosis_lower_bounds[i]);
-
-        if( x[i] < kurtosis_lower_bounds[i] + penalty_boundary )
-        {
-          penalty += 1e6 * exp( -1 * ( x[i] - kurtosis_lower_bounds[i]) / penalty_boundary );
-        }
-        else if ( x[i] > kurtosis_upper_bounds[i] - penalty_boundary )
-        {
-          penalty += 1e6 * exp( -1 * ( kurtosis_upper_bounds[i] - x[i]) / penalty_boundary );
-        }
-      }
-
-      MITK_DEBUG("Fit.Orig.Penalty") << x << " || penalty: " << penalty;
-
-      return penalty;
+      const double range = kurtosis_upper_bounds[i] - kurtosis_lower_bounds[i];
+      const double violation = std::max( { 0.0, kurtosis_lower_bounds[i] - x[i], x[i] - kurtosis_upper_bounds[i] } );
+      return m_penalty_weight * violation / range;
     }
 
     bool m_use_bounds;
@@ -210,6 +209,8 @@ namespace itk
 
     /** S0, or its logarithm in log scale */
     double m_bzero = 0;
+
+    double m_penalty_weight = 1000;
 
   };
 
@@ -392,7 +393,8 @@ public:
     this->m_ApplyPriorSmoothing = flag;
   }
 
-  /** Set boundaries enforced by penalty terms in the fitting procedure */
+  /** Set boundaries enforced by penalty terms in the fitting procedure; they also bound D to
+      [0, 0.004] mm^2/s */
   void SetBoundariesForKurtosis( double lower, double upper )
   {
     m_UseKBounds = true;

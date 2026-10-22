@@ -114,6 +114,7 @@ static void FitSingleVoxel( const itk::VariableLengthVector< TInputPixelType > &
 
    vnl_levenberg_marquardt nonlinear_fit( kurtosis_cost_fn );
    nonlinear_fit.minimize( result );
+   kurtosis_cost_fn.clamp_to_bounds( result );
   }
   else
   {
@@ -131,6 +132,7 @@ static void FitSingleVoxel( const itk::VariableLengthVector< TInputPixelType > &
    vnl_vector<double> d_and_k = result.extract( 2 );
    vnl_levenberg_marquardt nonlinear_fit( kurtosis_cost_fn );
    nonlinear_fit.minimize( d_and_k );
+   kurtosis_cost_fn.clamp_to_bounds( d_and_k );
    result[0] = d_and_k[0];
    result[1] = d_and_k[1];
    result[2] = data.bzero;

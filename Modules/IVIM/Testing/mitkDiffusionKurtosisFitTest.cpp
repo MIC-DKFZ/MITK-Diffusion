@@ -32,6 +32,8 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(MapOmitBZero_SyntheticVoxels_RecoversDAndK);
   MITK_TEST(MapBounds_KInsideBounds_RecoversDAndK);
   MITK_TEST(MapBounds_AppDefault_RecoversDAndK);
+  MITK_TEST(MapBounds_KJustInsideBounds_Recovered);
+  MITK_TEST(MapBounds_DAndKOutsideBounds_OnTheBounds);
   MITK_TEST(Update_KBoundsEqual_Throws);
   MITK_TEST(Snapshot_KBoundsReversed_Throws);
   MITK_TEST(Snapshot_SyntheticVoxel_RecoversDAndK);
@@ -141,6 +143,31 @@ public:
     filter->SetBoundariesForKurtosis(-1000, 1000);
     filter->Update();
     AssertRecovered(GetMaps(filter), 1e-6, 1e-3);
+  }
+
+  void MapBounds_KJustInsideBounds_Recovered()
+  {
+    auto filter = MakeFilter(MakeImage({KurtosisSignal(m_BValues, 10000, 0.001, 0.03)}), m_Gradients, 3000);
+    filter->SetBoundariesForKurtosis(0, 3);
+    filter->Update();
+    auto maps = GetMaps(filter);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, maps.d[0], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.03, maps.k[0], 1e-3);
+  }
+
+  void MapBounds_DAndKOutsideBounds_OnTheBounds()
+  {
+    // The second voxel decays faster than D = 0.004 with K >= 0 allows.
+    auto filter = MakeFilter(MakeImage({KurtosisSignal(m_BValues, 10000, 0.001, -0.5),
+                                        KurtosisSignal(m_BValues, 10000, 0.008, 0)}),
+                             m_Gradients,
+                             3000);
+    filter->SetBoundariesForKurtosis(0, 3);
+    filter->Update();
+    auto maps = GetMaps(filter);
+    CPPUNIT_ASSERT_EQUAL(0.0, maps.k[0]);
+    CPPUNIT_ASSERT_EQUAL(0.004, maps.d[1]);
+    CPPUNIT_ASSERT_EQUAL(0.0, maps.k[1]);
   }
 
   void Update_KBoundsEqual_Throws()
