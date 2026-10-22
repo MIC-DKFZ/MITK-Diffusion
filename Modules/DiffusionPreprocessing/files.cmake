@@ -8,7 +8,6 @@ set(H_FILES
   itkMergeDiffusionImagesFilter.h
   itkResampleDwiImageFilter.h
   itkDwiGradientLengthCorrectionFilter.h
-  itkDwiNormilzationFilter.h
   itkRemoveDwiChannelFilter.h
   itkNonLocalMeansDenoisingFilter.h
   itkVectorImageToImageFilter.h

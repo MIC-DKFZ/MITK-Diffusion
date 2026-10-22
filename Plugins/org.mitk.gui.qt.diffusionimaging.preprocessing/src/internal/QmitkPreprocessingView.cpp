@@ -28,7 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkElectrostaticRepulsionDiffusionGradientReductionFilter.h>
 #include <mitkDiffusionImageEditing.h>
 #include <itkDwiGradientLengthCorrectionFilter.h>
-#include <itkDwiNormilzationFilter.h>
 
 // mitk includes
 #include "QmitkDataStorageComboBox.h"
