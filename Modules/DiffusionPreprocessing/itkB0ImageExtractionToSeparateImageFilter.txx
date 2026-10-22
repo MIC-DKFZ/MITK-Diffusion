@@ -13,159 +13,110 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkB0ImageExtractionToSeparateImageFilter_txx
-#define __itkB0ImageExtractionToSeparateImageFilter_txx
+
+#ifndef itkB0ImageExtractionToSeparateImageFilter_txx
+#define itkB0ImageExtractionToSeparateImageFilter_txx
 
 #include "itkB0ImageExtractionToSeparateImageFilter.h"
 
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionIterator.h>
+#include <mitkB0Indices.h>
 
-template< class TInputImagePixelType,
-          class TOutputImagePixelType>
-itk::B0ImageExtractionToSeparateImageFilter< TInputImagePixelType, TOutputImagePixelType >
-::B0ImageExtractionToSeparateImageFilter()
+#include <cmath>
+
+template <class TInputImagePixelType, class TOutputImagePixelType>
+itk::B0ImageExtractionToSeparateImageFilter<TInputImagePixelType, TOutputImagePixelType>::B0ImageExtractionToSeparateImageFilter()
 {
-  this->SetNumberOfRequiredInputs( 1 );
+  this->SetNumberOfRequiredInputs(1);
 }
 
-template< class TInputImagePixelType,
-          class TOutputImagePixelType>
-void itk::B0ImageExtractionToSeparateImageFilter<
-TInputImagePixelType, TOutputImagePixelType >::CopyInformation( const DataObject *)
+template <class TInputImagePixelType, class TOutputImagePixelType>
+std::vector<unsigned int> itk::B0ImageExtractionToSeparateImageFilter<TInputImagePixelType, TOutputImagePixelType>::B0Indices() const
 {
-
-}
-
-template< class TInputImagePixelType,
-          class TOutputImagePixelType>
-void itk::B0ImageExtractionToSeparateImageFilter<
-TInputImagePixelType, TOutputImagePixelType >::GenerateOutputInformation()
-{
-
-}
-
-template< class TInputImagePixelType,
-          class TOutputImagePixelType>
-void itk::B0ImageExtractionToSeparateImageFilter<
-TInputImagePixelType, TOutputImagePixelType >::GenerateData()
-{
-
   if (m_Directions.IsNull() || m_Directions->Size() != this->GetInput()->GetVectorLength())
     itkExceptionMacro("The number of gradient directions does not match the number of image volumes.");
+  if (std::isnan(m_ReferenceBValue))
+    itkExceptionMacro("The reference b-value is not set.");
 
-  GradContainerIteratorType begin = m_Directions->Begin();
-  GradContainerIteratorType end = m_Directions->End();
-
-  // Find the indices of the b0 images in the diffusion image
-  std::vector<int> indices;
-  int index = 0;
-  while(begin!=end)
-  {
-    GradientDirectionType grad = begin->Value();
-
-    if(grad[0] == 0 && grad[1] == 0 && grad[2] == 0)
-    {
-      indices.push_back(index);
-    }
-    ++index;
-    ++begin;
-  }
+  std::vector<unsigned int> indices = mitk::GetB0Indices(m_Directions, m_ReferenceBValue);
   // Without a b0 volume the output would silently have no time steps.
   if (indices.empty())
-    itkExceptionMacro("The image has no b0 volume (gradient direction (0,0,0)).");
+    itkExceptionMacro("The image has no b0 volume (no b-value rounds to 0).");
+  return indices;
+}
 
-  // declare the output image
-  // this will have the b0 images stored as timesteps
-  typename OutputImageType::Pointer outputImage = this->GetOutput();
-  //OutputImageType::New();
-
-  // get the input region
-  typename Superclass::InputImageType::RegionType inputRegion =
-      this->GetInput()->GetLargestPossibleRegion();
-
-  // allocate image with
-  //  - dimension: [DimX, DimY, DimZ, NumOfb0 ]
-  //  - spacing: old one, 1.0 time
+template <class TInputImagePixelType, class TOutputImagePixelType>
+void itk::B0ImageExtractionToSeparateImageFilter<TInputImagePixelType, TOutputImagePixelType>::GenerateOutputInformation()
+{
+  // The output has another dimension than the input, so the superclass cannot copy the
+  // information.
+  auto input = this->GetInput();
+  auto output = this->GetOutput();
+  if (input == nullptr || output == nullptr)
+    return;
 
   typename OutputImageType::SpacingType spacing;
   spacing.Fill(1);
-
   typename OutputImageType::PointType origin;
   origin.Fill(0);
-
-  OutputImageRegionType outputRegion;
-
-  // the spacing and origin corresponds to the respective values in the input image (3D)
-  // the same for the region
-  for (unsigned int i=0; i< 3; i++)
+  typename OutputImageType::DirectionType direction;
+  direction.SetIdentity();
+  OutputImageRegionType region;
+  for (unsigned int i = 0; i < 3; ++i)
   {
-    spacing[i] = (this->GetInput()->GetSpacing())[i];
-    origin[i] = (this->GetInput()->GetOrigin())[i];
-    outputRegion.SetSize(i, this->GetInput()->GetLargestPossibleRegion().GetSize()[i]);
-    outputRegion.SetIndex(i, this->GetInput()->GetLargestPossibleRegion().GetIndex()[i]);
+    spacing[i] = input->GetSpacing()[i];
+    origin[i] = input->GetOrigin()[i];
+    region.SetSize(i, input->GetLargestPossibleRegion().GetSize()[i]);
+    region.SetIndex(i, input->GetLargestPossibleRegion().GetIndex()[i]);
+    for (unsigned int j = 0; j < 3; ++j)
+      direction(i, j) = input->GetDirection()(i, j);
   }
+  region.SetSize(3, this->B0Indices().size());
+  region.SetIndex(3, 0);
 
-  // number of timesteps = number of b0 images
-  outputRegion.SetSize(3, indices.size());
-  outputRegion.SetIndex( 3, 0 );
-
-  // output image direction (4x4)
-  typename OutputImageType::DirectionType outputDirection;
-  //initialize to identity
-  outputDirection.SetIdentity();
-  // get the input image direction ( 3x3 matrix )
-  typename InputImageType::DirectionType inputDirection = this->GetInput()->GetDirection();
-
-  for( unsigned int i=0; i< 3; i++)
-  {
-    outputDirection(0,i) = inputDirection(0,i);
-    outputDirection(1,i) = inputDirection(1,i);
-    outputDirection(2,i) = inputDirection(2,i);
-  }
-
-  outputImage->SetSpacing( spacing );
-  outputImage->SetOrigin( origin );
-  outputImage->SetDirection( outputDirection );
-  outputImage->SetRegions( outputRegion );
-  outputImage->Allocate();
-
-  // input iterator
-  itk::ImageRegionConstIterator<InputImageType> inputIt( this->GetInput(), this->GetInput()->GetLargestPossibleRegion() );
-
-  // we want to iterate separately over each 3D volume of the output image
-  // so reset the regions last dimension
-  outputRegion.SetSize(3,1);
-  unsigned int currentTimeStep = 0;
-
-
-  // extract b0 and insert them as a new time step
-  for(std::vector<int>::iterator indexIt = indices.begin();
-      indexIt != indices.end();
-      indexIt++)
-  {
-    // set the time step
-    outputRegion.SetIndex(3, currentTimeStep);
-    itk::ImageRegionIterator< OutputImageType> outputIt( outputImage.GetPointer(), outputRegion );
-
-    // iterate over the current b0 image and store it to corresponding place
-    outputIt.GoToBegin();
-    inputIt.GoToBegin();
-    while( !outputIt.IsAtEnd() && !inputIt.IsAtEnd() )
-    {
-      // the input vector
-      typename InputImageType::PixelType vec = inputIt.Get();
-
-      outputIt.Set( vec[*indexIt]);
-      ++outputIt;
-      ++inputIt;
-    }
-
-    // increase time step
-    currentTimeStep++;
-  }
-
-
+  output->SetSpacing(spacing);
+  output->SetOrigin(origin);
+  output->SetDirection(direction);
+  output->SetLargestPossibleRegion(region);
 }
 
-#endif // ifndef __itkB0ImageExtractionToSeparateImageFilter_txx
+template <class TInputImagePixelType, class TOutputImagePixelType>
+void itk::B0ImageExtractionToSeparateImageFilter<TInputImagePixelType, TOutputImagePixelType>::GenerateInputRequestedRegion()
+{
+  Superclass::GenerateInputRequestedRegion();
+  if (auto input = const_cast<InputImageType*>(this->GetInput()))
+    input->SetRequestedRegionToLargestPossibleRegion();
+}
+
+template <class TInputImagePixelType, class TOutputImagePixelType>
+void itk::B0ImageExtractionToSeparateImageFilter<TInputImagePixelType, TOutputImagePixelType>::EnlargeOutputRequestedRegion(DataObject* output)
+{
+  Superclass::EnlargeOutputRequestedRegion(output);
+  output->SetRequestedRegionToLargestPossibleRegion();
+}
+
+template <class TInputImagePixelType, class TOutputImagePixelType>
+void itk::B0ImageExtractionToSeparateImageFilter<TInputImagePixelType, TOutputImagePixelType>::GenerateData()
+{
+  const std::vector<unsigned int> indices = this->B0Indices();
+
+  auto input = this->GetInput();
+  typename OutputImageType::Pointer outputImage = this->GetOutput();
+  outputImage->SetBufferedRegion(outputImage->GetRequestedRegion());
+  outputImage->Allocate();
+
+  // One 3D volume of the output per b0 volume, in the order of the input.
+  OutputImageRegionType volumeRegion = outputImage->GetLargestPossibleRegion();
+  volumeRegion.SetSize(3, 1);
+  for (unsigned int t = 0; t < indices.size(); ++t)
+  {
+    volumeRegion.SetIndex(3, t);
+    ImageRegionIterator<OutputImageType> outputIt(outputImage, volumeRegion);
+    ImageRegionConstIterator<InputImageType> inputIt(input, input->GetLargestPossibleRegion());
+    for (; !outputIt.IsAtEnd() && !inputIt.IsAtEnd(); ++outputIt, ++inputIt)
+      outputIt.Set(inputIt.Get()[indices[t]]);
+  }
+}
+
+#endif

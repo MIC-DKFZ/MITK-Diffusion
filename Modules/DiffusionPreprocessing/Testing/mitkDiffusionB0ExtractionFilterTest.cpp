@@ -29,6 +29,9 @@ class mitkDiffusionB0ExtractionFilterTestSuite : public mitk::TestFixture
   MITK_TEST(Average_GradientCountMismatch_Throws);
   MITK_TEST(Average_SeveralB0_IsTheirMean);
   MITK_TEST(Separate_SeveralB0_KeepsEachInOrder);
+  MITK_TEST(Average_BValueRoundingToZero_IsB0);
+  MITK_TEST(Separate_BValueRoundingToZero_IsB0);
+  MITK_TEST(Average_NoReferenceBValue_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -39,6 +42,7 @@ class mitkDiffusionB0ExtractionFilterTestSuite : public mitk::TestFixture
   DwiType::Pointer m_Dwi;
   PropHelper::GradientDirectionsContainerType::ConstPointer m_Gradients;
   PropHelper::GradientDirectionsContainerType::Pointer m_GradientsWithoutB0;
+  double m_BValue = 0;
 
   /**
    * Files with several b0 volumes: test_multi.dwi (9 b0 among 99 volumes, identity frame) and
@@ -47,6 +51,16 @@ class mitkDiffusionB0ExtractionFilterTestSuite : public mitk::TestFixture
   static std::vector<std::string> MultiB0Files()
   {
     return { "DiffusionImaging/ImageReconstruction/test_multi.dwi", "DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi" };
+  }
+
+  /** Gradients with volume 0 (b0) shortened to b = 3000 * 0.01^2 = 0.3, which rounds to 0. */
+  PropHelper::GradientDirectionsContainerType::Pointer GradientsWithNearlyZeroB0() const
+  {
+    auto gradients = PropHelper::GradientDirectionsContainerType::New();
+    for (const auto& g : m_Gradients->CastToSTLConstContainer())
+      gradients->push_back(g);
+    gradients->ElementAt(0)[0] = 0.01;
+    return gradients;
   }
 
   static std::vector<unsigned int> ZeroGradientIndices(const PropHelper::GradientDirectionsContainerType* gradients)
@@ -65,6 +79,7 @@ public:
     auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"));
     m_Dwi = PropHelper::GetItkVectorImage(image);
     m_Gradients = PropHelper::GetGradientContainer(image);
+    m_BValue = PropHelper::GetReferenceBValue(image);
     m_GradientsWithoutB0 = PropHelper::GradientDirectionsContainerType::New();
     for (const auto& g : m_Gradients->CastToSTLConstContainer())
       m_GradientsWithoutB0->push_back(g);
@@ -83,6 +98,7 @@ public:
     auto filter = AverageFilterType::New();
     filter->SetInput(m_Dwi);
     filter->SetDirections(m_Gradients);
+    filter->SetReferenceBValue(m_BValue);
     filter->Update();
 
     itk::ImageRegionConstIteratorWithIndex<AverageFilterType::OutputImageType> it(filter->GetOutput(), filter->GetOutput()->GetLargestPossibleRegion());
@@ -95,6 +111,7 @@ public:
     auto filter = AverageFilterType::New();
     filter->SetInput(m_Dwi);
     filter->SetDirections(m_GradientsWithoutB0.GetPointer());
+    filter->SetReferenceBValue(m_BValue);
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
   }
 
@@ -103,6 +120,7 @@ public:
     auto filter = SeparateFilterType::New();
     filter->SetInput(m_Dwi);
     filter->SetDirections(m_Gradients);
+    filter->SetReferenceBValue(m_BValue);
     filter->Update();
 
     auto output = filter->GetOutput();
@@ -123,6 +141,7 @@ public:
     auto filter = SeparateFilterType::New();
     filter->SetInput(m_Dwi);
     filter->SetDirections(m_GradientsWithoutB0.GetPointer());
+    filter->SetReferenceBValue(m_BValue);
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
   }
 
@@ -133,6 +152,7 @@ public:
     auto filter = AverageFilterType::New();
     filter->SetInput(m_Dwi);
     filter->SetDirections(m_GradientsWithoutB0.GetPointer());
+    filter->SetReferenceBValue(m_BValue);
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
   }
 
@@ -149,6 +169,7 @@ public:
       auto filter = AverageFilterType::New();
       filter->SetInput(dwi);
       filter->SetDirections(gradients);
+      filter->SetReferenceBValue(PropHelper::GetReferenceBValue(image));
       filter->Update();
       auto output = filter->GetOutput();
       CPPUNIT_ASSERT(output->GetOrigin() == dwi->GetOrigin());
@@ -179,6 +200,7 @@ public:
       auto filter = SeparateFilterType::New();
       filter->SetInput(dwi);
       filter->SetDirections(gradients);
+      filter->SetReferenceBValue(PropHelper::GetReferenceBValue(image));
       filter->Update();
       auto output = filter->GetOutput();
       CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(b0.size()), output->GetLargestPossibleRegion().GetSize(3));
@@ -201,6 +223,38 @@ public:
         }
       }
     }
+  }
+
+  void Average_BValueRoundingToZero_IsB0()
+  {
+    // As in the b-value map: a b-value that rounds to 0 marks a b0 volume, not only a zero vector.
+    auto filter = AverageFilterType::New();
+    filter->SetInput(m_Dwi);
+    filter->SetDirections(GradientsWithNearlyZeroB0().GetPointer());
+    filter->SetReferenceBValue(m_BValue);
+    filter->Update();
+
+    itk::ImageRegionConstIteratorWithIndex<AverageFilterType::OutputImageType> it(filter->GetOutput(), filter->GetOutput()->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+      CPPUNIT_ASSERT_EQUAL(m_Dwi->GetPixel(it.GetIndex())[0], it.Get());
+  }
+
+  void Separate_BValueRoundingToZero_IsB0()
+  {
+    auto filter = SeparateFilterType::New();
+    filter->SetInput(m_Dwi);
+    filter->SetDirections(GradientsWithNearlyZeroB0().GetPointer());
+    filter->SetReferenceBValue(m_BValue);
+    filter->Update();
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(1), filter->GetOutput()->GetLargestPossibleRegion().GetSize(3));
+  }
+
+  void Average_NoReferenceBValue_Throws()
+  {
+    auto filter = AverageFilterType::New();
+    filter->SetInput(m_Dwi);
+    filter->SetDirections(m_Gradients);
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
   }
 };
 

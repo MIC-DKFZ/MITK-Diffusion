@@ -9,6 +9,7 @@ set(H_FILES
   itkDwiGradientLengthCorrectionFilter.h
   itkRemoveDwiChannelFilter.h
   itkNonLocalMeansDenoisingFilter.h
+  mitkB0Indices.h
   mitkDiffusionImageDenoising.h
   mitkDiffusionImageEditing.h
 )

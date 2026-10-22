@@ -37,6 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImageRegionIterator.h>
 #include <itkImageRegionConstIterator.h>
 #include <boost/timer/progress_display.hpp>
+#include <mitkB0Indices.h>
 
 namespace itk
 {
@@ -165,7 +166,7 @@ MergeDiffusionImagesFilter<TScalarType>
                 GradientType g = gradients->GetElement(j);
                 double mag = g.two_norm();
 
-                if (mag>0.0001)
+                if (!mitk::IsB0(g, m_BValues.at(i)))
                 {
                     double frac = m_BValues.at(i)*mag*mag/m_BValue;
                     g.normalize();

@@ -61,14 +61,16 @@ void itk::DwiGradientLengthCorrectionFilter::GenerateData()
     const double currentBValue = m_ReferenceBValue*twonorm*twonorm ;
     const double roundedBValue = int((currentBValue + 0.5 * m_RoundingValue)/m_RoundingValue)*m_RoundingValue;
 
-    if (roundedBValue<m_NewBValue && roundedBValue>1)
+    // A volume whose b-value rounds to 0 is a b0 volume, as in the b-value map (mitk::IsB0), here
+    // with the rounding value of this filter.
+    if (roundedBValue<m_NewBValue && roundedBValue>0)
       m_NewBValue = roundedBValue;
   }
 
   // The new reference b-value is the smallest rounded b-value of a weighted volume; without one it
   // would stay at the maximum double.
   if (m_NewBValue == itk::NumericTraits<double>::max())
-    itkExceptionMacro("No diffusion-weighted volume: no b-value rounds to more than 1.");
+    itkExceptionMacro("No diffusion-weighted volume: every b-value rounds to 0.");
 
   it = m_ReferenceGradientDirectionContainer->Begin();
   for(; it != m_ReferenceGradientDirectionContainer->End(); ++it)
@@ -77,7 +79,7 @@ void itk::DwiGradientLengthCorrectionFilter::GenerateData()
     const double currentBValue = m_ReferenceBValue*twonorm*twonorm ;
     const double roundedBValue = int((currentBValue + 0.5 * m_RoundingValue)/m_RoundingValue)*m_RoundingValue;
 
-    if (roundedBValue>1)
+    if (roundedBValue>0)
     {
       const double f = std::sqrt(roundedBValue/m_NewBValue);
       GradientDirectionType grad = it.Value();

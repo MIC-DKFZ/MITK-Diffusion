@@ -20,6 +20,7 @@ class mitkDiffusionGradientLengthCorrectionFilterTestSuite : public mitk::TestFi
   CPPUNIT_TEST_SUITE(mitkDiffusionGradientLengthCorrectionFilterTestSuite);
   MITK_TEST(Correct_TwoShells_RoundsBValues);
   MITK_TEST(Correct_OnlyB0_Throws);
+  MITK_TEST(Correct_RoundingOne_SmallestNonZeroBValueIsReference);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DwiGradientLengthCorrectionFilter;
@@ -63,6 +64,22 @@ public:
     filter->SetRoundingValue(10);
     filter->SetReferenceGradientDirectionContainer(Gradients({0, 0}).GetPointer());
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  void Correct_RoundingOne_SmallestNonZeroBValueIsReference()
+  {
+    // As in the b-value map, only a b-value that rounds to 0 is b0; b = 1 is a shell.
+    auto filter = FilterType::New();
+    filter->SetReferenceBValue(1000);
+    filter->SetRoundingValue(1);
+    filter->SetReferenceGradientDirectionContainer(Gradients({0.3, 1, 1000}).GetPointer());
+    filter->Update();
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, filter->GetNewBValue(), 1e-12);
+    auto output = filter->GetOutputGradientDirectionContainer();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, output->ElementAt(0).two_norm(), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, output->ElementAt(1).two_norm(), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sqrt(1000.0), output->ElementAt(2).two_norm(), 1e-9);
   }
 };
 

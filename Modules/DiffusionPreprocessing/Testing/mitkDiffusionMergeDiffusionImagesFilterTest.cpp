@@ -28,6 +28,7 @@ class mitkDiffusionMergeDiffusionImagesFilterTestSuite : public mitk::TestFixtur
   MITK_TEST(Merge_DifferentDirection_Throws);
   MITK_TEST(Merge_MoreGradientsThanVolumes_Throws);
   MITK_TEST(Merge_ZeroReferenceBValue_Throws);
+  MITK_TEST(Merge_BValueRoundingToZero_IsB0);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -138,6 +139,19 @@ public:
     filter->SetGradientLists({m_Gradients, m_Gradients});
     filter->SetBValues({0, 0});
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  void Merge_BValueRoundingToZero_IsB0()
+  {
+    // Volume 0 of the second image gets b = 3000 * 0.01^2 = 0.3, which rounds to 0 as in the
+    // b-value map: its merged gradient is the zero vector, not a rescaled short one.
+    auto gradients = PropHelper::GradientDirectionsContainerType::New();
+    for (const auto& g : m_Gradients->CastToSTLConstContainer())
+      gradients->push_back(g);
+    gradients->ElementAt(0)[0] = 0.01;
+    auto filter = CreateFilter(gradients.GetPointer(), m_BValue);
+    filter->Update();
+    CPPUNIT_ASSERT_EQUAL(0.0, filter->GetOutputGradients()->ElementAt(m_Dwi->GetVectorLength()).two_norm());
   }
 };
 

@@ -1540,6 +1540,7 @@ void QmitkPreprocessingView::ExtractB0()
   FilterType::Pointer filter = FilterType::New();
   filter->SetInput( itkVectorImagePointer );
   filter->SetDirections(PropHelper::GetGradientContainer(image));
+  filter->SetReferenceBValue(PropHelper::GetReferenceBValue(image));
 
   filter->Update();
 
@@ -1574,6 +1575,7 @@ void QmitkPreprocessingView::DoExtractBOWithoutAveraging()
   FilterType::Pointer filter = FilterType::New();
   filter->SetInput( itkVectorImagePointer );
   filter->SetDirections(PropHelper::GetGradientContainer(image));
+  filter->SetReferenceBValue(PropHelper::GetReferenceBValue(image));
 
   filter->Update();
 
