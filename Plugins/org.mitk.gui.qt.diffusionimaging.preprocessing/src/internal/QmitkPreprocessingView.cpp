@@ -61,6 +61,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <boost/algorithm/string.hpp>
 
+#include <set>
+
 const std::string QmitkPreprocessingView::VIEW_ID =
     "org.mitk.views.diffusionpreprocessing";
 
@@ -1203,7 +1205,7 @@ void QmitkPreprocessingView::DoFlipGradientDirections()
   if (node.IsNull()) { return; }
 
   mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
-  if ( image == nullptr ) { return; }
+  if ( image == nullptr || !PropHelper::IsDiffusionWeightedImage(image) ) { return; }
 
   mitk::Image::Pointer newDwi = image->Clone();
 
@@ -1241,7 +1243,7 @@ void QmitkPreprocessingView::DoSwapGradientDimensions()
   if (node.IsNull()) { return; }
 
   mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
-  if ( image == nullptr ) { return; }
+  if ( image == nullptr || !PropHelper::IsDiffusionWeightedImage(image) ) { return; }
 
   mitk::Image::Pointer newDwi = image->Clone();
 
@@ -1261,7 +1263,8 @@ void QmitkPreprocessingView::DoSwapGradientDimensions()
     else if (s=="z")
       dims_split_clean.push_back(2);
   }
-  if (dims_split_clean.size()!=3)
+  // A permutation of x, y and z: "x x z" would drop the y component.
+  if (dims_split_clean.size()!=3 || std::set<int>(dims_split_clean.begin(), dims_split_clean.end()).size()!=3)
   {
     QMessageBox::warning(nullptr,"Warning", QString("String should contain x, y and z in arbitrary order separated by a space.") );
     return;
@@ -1295,7 +1298,7 @@ void QmitkPreprocessingView::DoHalfSphereGradientDirections()
   if (node.IsNull()) { return; }
 
   mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
-  if ( image == nullptr ) { return; }
+  if ( image == nullptr || !PropHelper::IsDiffusionWeightedImage(image) ) { return; }
 
   mitk::Image::Pointer newDwi = image->Clone();
   auto gradientContainer = PropHelper::GetGradientContainer(newDwi);
