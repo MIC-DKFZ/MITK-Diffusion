@@ -38,6 +38,11 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
 ::GenerateData ()
 {
   typename GradientImagesType::Pointer input_image = static_cast< GradientImagesType * >( this->ProcessObject::GetInput(0) );
+  if (m_GradientDirectionContainer.IsNull())
+    itkExceptionMacro(<< "No gradient directions set.");
+  if (input_image->GetVectorLength() != m_GradientDirectionContainer->Size())
+    itkExceptionMacro(<< m_GradientDirectionContainer->Size() << " gradient directions for " << input_image->GetVectorLength() << " image components.");
+
   typename itk::ImageDuplicator<GradientImagesType>::Pointer duplicator = itk::ImageDuplicator<GradientImagesType>::New();
   duplicator->SetInputImage(input_image);
   duplicator->Update();
@@ -60,6 +65,12 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
     if(bval<100)
       numberb0++;
   }
+
+  // The b0 mean normalizes every voxel, and six tensor elements need six diffusion-weighted volumes.
+  if (numberb0 == 0)
+    itkExceptionMacro(<< "No baseline volume (b < 100 s/mm^2) found.");
+  if (nof - numberb0 < 6)
+    itkExceptionMacro(<< "At least 6 diffusion-weighted volumes are needed, found " << nof - numberb0 << ".");
 
 
   // Matrix to store all diffusion encoding gradients

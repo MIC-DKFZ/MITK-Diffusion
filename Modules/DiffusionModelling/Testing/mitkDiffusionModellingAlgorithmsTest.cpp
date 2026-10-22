@@ -33,6 +33,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionModellingAlgorithmsTestSuite);
   MITK_TEST(EigenvalueCorrection_ThreadCount_SameResult);
   MITK_TEST(PrincipalDirection_PeakImageGeometry);
+  MITK_TEST(EigenvalueCorrection_InvalidGradients_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -96,6 +97,45 @@ public:
     }
     CPPUNIT_ASSERT_MESSAGE("Corrected tensors are not all zero", nonZero > 0);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("Tensor components that differ between 1 and N threads", 0u, differing);
+  }
+
+  /** Runs the eigenvalue correction on a constant 2x2x2 DWI with the given gradients (b=1000). */
+  static void CorrectEigenvalues(const std::vector<vnl_vector_fixed<double, 3>> &directions)
+  {
+    using FilterType = itk::TensorReconstructionWithEigenvalueCorrectionFilter<short, float>;
+    auto dwi = itk::VectorImage<short, 3>::New();
+    itk::VectorImage<short, 3>::RegionType region;
+    region.SetSize({{2, 2, 2}});
+    dwi->SetRegions(region);
+    dwi->SetVectorLength(directions.size());
+    dwi->Allocate();
+    itk::VariableLengthVector<short> pixel(directions.size());
+    pixel.Fill(500);
+    dwi->FillBuffer(pixel);
+
+    auto gradients = FilterType::GradientDirectionContainerType::New();
+    for (const auto &direction : directions)
+      gradients->push_back(direction);
+
+    auto filter = FilterType::New();
+    filter->SetBValue(1000);
+    filter->SetGradientImage(gradients.GetPointer(), dwi);
+    filter->Update();
+  }
+
+  // Without a b0 volume every voxel was divided by zero and the output was silently all zero;
+  // fewer than six diffusion-weighted volumes gave a rank-deficient fit.
+  void EigenvalueCorrection_InvalidGradients_Throws()
+  {
+    std::vector<vnl_vector_fixed<double, 3>> directions;
+    const double unit[7][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.7071, 0.7071, 0}, {0.7071, 0, 0.7071}, {0, 0.7071, 0.7071}, {0.5774, 0.5774, 0.5774}};
+    for (const auto &u : unit)
+      directions.emplace_back(u[0], u[1], u[2]);
+    CPPUNIT_ASSERT_THROW(CorrectEigenvalues(directions), itk::ExceptionObject);
+
+    directions.resize(5);
+    directions.emplace_back(0, 0, 0);
+    CPPUNIT_ASSERT_THROW(CorrectEigenvalues(directions), itk::ExceptionObject);
   }
 
   // The 4D peak image takes the tensor image's geometry; its fourth origin component was left
