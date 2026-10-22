@@ -104,8 +104,10 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::FlipAxes(const Image* image, c
       newGradients->push_back(mirror * g);
 
     newImage = GrabItkImageMemory(flipper->GetOutput());
-    // CopyProperties only reads its source.
-    PropHelper::CopyProperties(const_cast<Image*>(image), newImage, true);
+    // DiffusionPropertyHelper::CopyProperties(source, target, true) without a const source: all
+    // properties except the original gradients, which InitializeImage derives again.
+    newImage->SetPropertyList(image->GetPropertyList()->Clone());
+    newImage->GetPropertyList()->RemoveProperty(PropHelper::GetOriginalGradientContainerPropertyName());
     PropHelper::SetGradientContainer(newImage, newGradients);
     PropHelper::InitializeImage(newImage);
   }

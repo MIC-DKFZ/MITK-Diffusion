@@ -102,8 +102,10 @@ mitk::Image::Pointer mitk::DiffusionImageDenoising::Denoise(const Image* dwi, co
   composer->Update();
 
   Image::Pointer result = GrabItkImageMemory(composer->GetOutput());
-  // CopyProperties only reads its source.
-  PropHelper::CopyProperties(const_cast<Image*>(dwi), result, true);
+  // DiffusionPropertyHelper::CopyProperties(source, target, true) without a const source: all
+  // properties except the original gradients, which InitializeImage derives again.
+  result->SetPropertyList(dwi->GetPropertyList()->Clone());
+  result->GetPropertyList()->RemoveProperty(PropHelper::GetOriginalGradientContainerPropertyName());
   PropHelper::InitializeImage(result);
   return result;
 }
