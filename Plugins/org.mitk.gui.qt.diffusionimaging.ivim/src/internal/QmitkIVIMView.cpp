@@ -313,17 +313,16 @@ void QmitkIVIMView::AutoThreshold()
   MITK_INFO << "Performing Histogram Analysis on Channel" << index;
 
   // A DWI cannot be cast to a scalar image, so the b=0 channel is extracted.
-  typedef itk::Image<short,3> ImgType;
-  typedef itk::VectorIndexSelectionCastImageFilter<VecImgType, ImgType> ChannelFilterType;
+  using ImgType = itk::Image<short, 3>;
+  using ChannelFilterType = itk::VectorIndexSelectionCastImageFilter<VecImgType, ImgType>;
   ChannelFilterType::Pointer channelFilter = ChannelFilterType::New();
   channelFilter->SetInput(vecimg);
   channelFilter->SetIndex(index);
   channelFilter->Update();
   ImgType::Pointer img = channelFilter->GetOutput();
 
-  typedef itk::Statistics::ScalarImageToHistogramGenerator< ImgType >
-      HistogramGeneratorType;
-  typedef HistogramGeneratorType::HistogramType HistogramType;
+  using HistogramGeneratorType = itk::Statistics::ScalarImageToHistogramGenerator<ImgType>;
+  using HistogramType = HistogramGeneratorType::HistogramType;
 
   HistogramGeneratorType::Pointer histogramGenerator = HistogramGeneratorType::New();
   histogramGenerator->SetInput( img );
