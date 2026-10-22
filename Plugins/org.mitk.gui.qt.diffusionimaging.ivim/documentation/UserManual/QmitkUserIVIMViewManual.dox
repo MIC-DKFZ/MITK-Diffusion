@@ -1,22 +1,53 @@
 /**
 \page org_mitk_views_ivim Intra-voxel incoherent motion estimation (IVIM)
 
-This view enables the estimation of "Intra-voxel incoherent motion estimation" (IVIM) and diffusion kurtosis parameters from diffusion weighted images. The required input is a diffusion weighted image that was acquired with multiple different b-values (unidirectional).
+This view fits the "intra-voxel incoherent motion" (IVIM) model and the diffusion kurtosis model to diffusion-weighted images and generates parameter maps. The input is a diffusion-weighted image acquired with several b-values; the gradient directions do not matter. IVIM needs several b-values below about 200 s/mm² to separate perfusion from diffusion, kurtosis needs b-values up to about 2000-3000 s/mm².
 
-The view enables an interactive exploration of the selected image (click around in the image and watch the estimated parameters in the figure of the view) as well as generation of parameter maps.
+\section QmitkIVIMViewInput Input and preview
 
+\li <b>Raw DWI</b>: the diffusion-weighted image.
+\li <b>ROI</b> (optional): a binary 3D image.
 
-\section QmitkIVIMViewAdvanced IVIM fit methods
+The plot shows the fit of the model selected by the tab (IVIM or Kurtosis) to the signal at the crosshair position; click around in the image to explore it. The fitted parameters are shown above the plot. With a ROI selected, the plot shows the fit to the mean signal of all image voxels whose centres lie inside the ROI instead, and the view reports how many voxels were averaged; it then no longer follows the crosshair. The preview fits the unsmoothed signal.
 
-The IVIM model is a bi-exponential model defined by the parameters f, D and D*: (1-f)e^{-bD}+fe^{-b(D+D^*)}. All fit methods available in the view ultimatle use this model but they differ how the three parameters are estimated:
+The buttons below the plot copy the b-values and measurements of the voxel (for IVIM as S/S0) with the fitted parameters ("Signal values to clipboard") or only the fitted parameters ("Fit-parameters to clipboard") to the clipboard, or save the plot as an image file.
 
-\li <b>Jointly fit D, f and D*</b>: All three parameters are estimated simultaneously.
-\li <b>Fit D &amp; f with fixed D* value</b>: Only f and D are estimated, D* is fixed (user defined).
-\li <b>Fit D &amp; f (high b), then fit D*</b>: First fit f and D (monoexponentially (1-f)e^{-bD}) and use these then fixed parameters in a second fit of D* with the complete bi-exponential model.
-\li <b>Linearly fit D &amp; f (high b), then fit D*</b>: First fit f and D linearly and use these then fixed parameters in a second fit of D* with the complete bi-exponential model.
+<b>Generate Parameter Maps</b> fits every voxel of the image with the settings of the selected tab and adds the maps checked under "Output Maps" below the image in the Data Manager. Voxels that cannot be fitted, for example without signal or with too few usable measurements, get 0.
 
-Negative values for D and D* are penalized during the fit.
+\section QmitkIVIMViewIvim IVIM
 
+The IVIM model is a bi-exponential model of the signal ratio S/S0 with the perfusion fraction f, the diffusion coefficient D and the pseudo-diffusion coefficient D*: S/S0 = (1-f) exp(-bD) + f exp(-b(D+D*)). S0 is the mean of the b=0 volumes; without b=0 volumes the volumes of the lowest b-value serve as S0. The fit methods differ in how they estimate the three parameters:
+
+\li <b>1. Jointly fit D, f and D*</b>: all three parameters are estimated in one non-linear fit.
+\li <b>2. Fit D &amp; f with fixed D* value</b>: only f and D are estimated; D* is the value of the D* slider.
+\li <b>3. Fit D &amp; f (high b), then fit D*</b>: first f and D of the mono-exponential (1-f) exp(-bD) are fitted to the measurements with b-values above the "Ignore b&lt;" threshold, where the perfusion signal has decayed. Then D* is chosen with f and D fixed: the best of 100 values from 0.001 to 0.15 mm²/s in steps of 0.00149 mm²/s.
+\li <b>4. Linearly fit D &amp; f (high b), then fit D*</b>: as method 3, but f and D come from the straight line through the points (b, log S/S0) above the threshold.
+
+The non-linear fits of methods 1 to 3 penalize D outside [0, 0.003] mm²/s and D* outside [0, 0.3] mm²/s; the line of method 4 is not bounded.
+
+Parameters:
+\li <b>D*</b> (method 2): the fixed D* in mm²/s.
+\li <b>Signal threshold</b>: diffusion-weighted measurements at or below this value, in the units of the image, are left out of the fit. The "*" button sets it from the histogram of the b=0 volume: twice the most frequent value between the image minimum and half of the image maximum.
+\li <b>Ignore b&lt; (first fit)</b> (methods 3 and 4): the b-value threshold in s/mm² of the first fit.
+\li <b>Output Maps</b>: the maps of f, D and D* to generate, named "f Fit-n", "D Fit-n" and "D* Fit-n" with the method number n. For methods 3 and 4, D* is searched only when its map is checked; the preview always shows it.
+
+The IVIM maps cover the whole image; the ROI is used only for the preview. The plot shows S/S0, the measurements of the first fit and, for methods 3 and 4, those of the D* search.
+
+\section QmitkIVIMViewKurtosis Kurtosis
+
+The kurtosis model describes the signal with the apparent diffusion coefficient D and the kurtosis K: S = S0 exp(-bD + b²D²K/6). S0 is the mean of the b=0 volumes.
+
+\li <b>Select Fit Type</b>: "Straight Fit" fits S, "Logarithmic Fit" fits log S; the logarithmic fit leaves out measurements at or below 0.
+\li <b>Omit b=0 Measurements</b>: S0 is fitted as a third parameter instead of taken from the b=0 volumes. Without b=0 volumes, S0 is always fitted.
+\li <b>Boundaries for K</b>: when on, K is kept within the selected range and D within [0, 0.004] mm²/s.
+\li <b>Smoothing variance (mm²)</b>: the variance of a Gaussian smoothing applied to each volume before the maps are fitted; 0 means no smoothing.
+\li <b>Output Maps</b>: the maps of D and K, named "Kurtosis_DMap_Method-..." and "Kurtosis_KMap_Method-..." with the fit type.
+
+The kurtosis maps are fitted only inside the ROI if one is selected (other voxels get 0); the ROI must have the size and geometry of the image. The plot shows S, the measurements and the fitted curve.
+
+\section QmitkIVIMViewCmdApps Command line tools
+
+MitkDiffusionIvimFit generates the IVIM maps (methods 1 to 4 as fit types 0 to 3, with the b threshold and the fixed D* as options, signal threshold 0). MitkDiffusionKurtosisFit generates the kurtosis maps with a straight fit, an optional mask, optional fitted S0 and K bounds (default -1000 to 1000); it always smooths with a variance of 1.5 mm².
 
 \section QmitkIVIMViewReferences Suggested Readings
 
@@ -29,6 +60,5 @@ Differentiation of pancreas carcinoma from healthy pancreatic tissue using multi
 Lemke A, Laun FB, Klauss M, Re TJ, Simon D, Delorme S, Schad LR, Stieltjes B.
 Invest Radiol. 2009 Dec;44(12):769-75.
 PMID: 19838121
-
 
 */
