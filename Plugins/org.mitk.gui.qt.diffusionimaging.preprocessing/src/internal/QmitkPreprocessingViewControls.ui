@@ -290,7 +290,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
+             <string>Negates the checked world (LPS) components of all gradients. The image data are not changed.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -367,7 +367,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
+             <string>Reorders the world (LPS) components of all gradients, e.g. &quot;y x z&quot; swaps x and y. The image data are not changed.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -1324,7 +1324,7 @@ QGroupBox {
           </sizepolicy>
          </property>
          <property name="title">
-          <string>Measurment frame</string>
+          <string>Measurement frame</string>
          </property>
          <layout class="QGridLayout" name="gridLayout">
           <property name="leftMargin">
