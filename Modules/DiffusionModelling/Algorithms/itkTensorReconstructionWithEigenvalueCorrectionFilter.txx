@@ -212,11 +212,9 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
         }
       }
 
-#ifdef WIN32
-#pragma omp parallel for
-#else
-#pragma omp parallel for collapse(3)
-#endif
+  // Serial on purpose: the voxels are smoothed in place (pixel2 is a view into the image buffer)
+  // from neighbours that may have been smoothed already, so the result depends on the visiting
+  // order. Run in parallel, it changed from run to run.
   for (int x=0;x<(int)size[0];x++)
     for (int y=0;y<(int)size[1];y++)
       for (int z=0;z<(int)size[2];z++)
@@ -240,7 +238,6 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
           for (int i=0;i<nof;i++)
             pixel2[i]=org_vec[i];
 
-#pragma omp critical
           m_GradientImagePointer->SetPixel(ix, pixel2);
         }
       }
@@ -458,7 +455,6 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
   if (temp_number <= 0.0)
   {
     tempsum=0;
-#pragma omp critical
     mask->SetPixel(ix,0);
   }
   else
@@ -550,13 +546,9 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
   //detected as bad one, B0 image is smoothed obligatory. All other gradient images are smoothed only when value of attenuation
   //is out of declared bounds for too high or too low attenuation.
 
-  // declaration of important variables
-
-#ifdef WIN32
-#pragma omp parallel for
-#else
-#pragma omp parallel for collapse(3)
-#endif
+  // Serial on purpose, like the first smoothing pass in GenerateData: pt is a view into
+  // corrected_diffusion, so each voxel is smoothed in place from neighbours that may have been
+  // smoothed already, and the result depends on the visiting order.
   for (int z=0;z<(int)size[2];z++)
     for (int x=0;x<(int)size[0];x++)
       for (int y=0;y<(int)size[1];y++)
@@ -636,7 +628,6 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
                 if (temp_number <= 0.0)
                 {
                   tempsum=0;
-#pragma omp critical
                   mask->SetPixel(ix,0);
                 }
                 else
@@ -691,7 +682,6 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
               if (temp_number <= 0.0)
               {
                 tempsum=0;
-#pragma omp critical
                 mask->SetPixel(ix,0);
               }
               else
@@ -708,13 +698,6 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
             pt[i]=org_data[i];
           }
 
-#pragma omp critical
-          corrected_diffusion->SetPixel(ix, pt);
-        }
-        else
-        {
-          GradientVectorType  pt = corrected_diffusion->GetPixel(ix);
-#pragma omp critical
           corrected_diffusion->SetPixel(ix, pt);
         }
       }
@@ -830,9 +813,6 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
 {
   // The method changes voxels in the mask that poses a certain value with other value.
 
-  itk::Index<3> ix;
-  double temp_mask_value=0;
-
 #ifdef WIN32
 #pragma omp parallel for
 #else
@@ -842,8 +822,8 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
     for(int y=0;y<(int)size[1];y++)
       for(int z=0;z<(int)size[2];z++)
       {
-        ix[0] = x; ix[1] = y; ix[2] = z;
-        temp_mask_value=mask->GetPixel(ix);
+        itk::Index<3> ix = {{(itk::IndexValueType)x,(itk::IndexValueType)y,(itk::IndexValueType)z}};
+        double temp_mask_value=mask->GetPixel(ix);
 
         if(temp_mask_value>previous_mask)
         {
