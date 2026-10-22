@@ -58,7 +58,14 @@ int mitkFiberGenerationTest(int argc, char* argv[])
             filter->SetFixSeed(true);
             filter->Update();
             std::vector< mitk::FiberBundle::Pointer > fiberBundles = filter->GetFiberBundles();
-            MITK_TEST_CONDITION_REQUIRED(uniform->Equals(fiberBundles.at(0)),"check uniform bundle")
+            bool equal = uniform->Equals(fiberBundles.at(0));
+            if (!equal)
+            {
+              std::string out = mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "uniform.fib";
+              MITK_INFO << "Saving test bundle to " << out;
+              mitk::IOUtil::Save(fiberBundles.at(0), out);
+            }
+            MITK_TEST_CONDITION_REQUIRED(equal,"check uniform bundle")
         }
 
         // check gaussian fiber distribution
@@ -69,7 +76,14 @@ int mitkFiberGenerationTest(int argc, char* argv[])
             filter->SetFixSeed(true);
             filter->Update();
             std::vector< mitk::FiberBundle::Pointer > fiberBundles = filter->GetFiberBundles();
-            MITK_TEST_CONDITION_REQUIRED(gaussian->Equals(fiberBundles.at(0)),"check gaussian bundle")
+            bool equal = gaussian->Equals(fiberBundles.at(0));
+            if (!equal)
+            {
+              std::string out = mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "gaussian.fib";
+              MITK_INFO << "Saving test bundle to " << out;
+              mitk::IOUtil::Save(fiberBundles.at(0), out);
+            }
+            MITK_TEST_CONDITION_REQUIRED(equal,"check gaussian bundle")
         }
     }
     catch(...) {

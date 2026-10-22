@@ -98,8 +98,17 @@ Facts the layout does not show:
 ## Porting state
 
 In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
-line apps, plugins, user manuals) compile and link without warnings; the tests have not run yet.
-Remove an item once it is fixed; add what the tests reveal.
+line apps, plugins, user manuals) compile and link without warnings, and all 14 diffusion tests
+pass. The Workbench has not been started. Remove an item once it is fixed.
+
+- Three test references were regenerated in the local `debug/MITK-Data` checkout only and must
+  be pushed to MITK-Data (`release/` clones its own copy):
+  `DiffusionImaging/Fiberfox/uniform.fib` and `gaussian.fib` (MITK clamps ellipse control points
+  to the plane since `git -C mitk show bbc5c77b27`, which moves a point of `Fiducial_2.pf`) and
+  `DiffusionImaging/gibbsTractogram.fib` (from 2014; Gibbs tracking changed since, e.g. its random
+  generator in 2019).
+- The two `DiffusionRegistration` tests are compiled but deliberately not registered; they were
+  commented out before the 2024 test refactoring.
 
 - MITK's `org.mitk.gui.qt.segmentation` does not compile with Python off: `MakeError` in
   `mitk/Plugins/org.mitk.gui.qt.segmentation/src/internal/QmitkSegmentationRestRoutes.cpp:465`

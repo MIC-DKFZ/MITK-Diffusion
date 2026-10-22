@@ -83,8 +83,8 @@ public:
     renderingHelper.SetMapperIDToRender2D();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath()+"fib_2D.png");
-    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath()+"fib_2D.png");
+    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_2D.png");
+    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_2D.png");
     mitk::Image::Pointer ref_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Rendering/fib_2D.png"));
     MITK_ASSERT_EQUAL(test_image, ref_image, "Check if images are equal.");
   }
@@ -96,8 +96,8 @@ public:
     renderingHelper.SetMapperIDToRender3D();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath()+"fib_3D.png");
-    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath()+"fib_3D.png");
+    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_3D.png");
+    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_3D.png");
     mitk::Image::Pointer ref_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Rendering/fib_3D.png"));
     MITK_ASSERT_EQUAL(test_image, ref_image, "Check if images are equal.");
   }
@@ -111,8 +111,8 @@ public:
     renderingHelper.SetMapperIDToRender3D();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath()+"fib_tubes_3D.png");
-    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath()+"fib_tubes_3D.png");
+    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_tubes_3D.png");
+    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_tubes_3D.png");
     mitk::Image::Pointer ref_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Rendering/fib_tubes_3D.png"));
     MITK_ASSERT_EQUAL(test_image, ref_image, "Check if images are equal.");
   }
@@ -126,8 +126,8 @@ public:
     renderingHelper.SetMapperIDToRender3D();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath()+"fib_ribbon_3D.png");
-    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath()+"fib_ribbon_3D.png");
+    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_ribbon_3D.png");
+    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_ribbon_3D.png");
     mitk::Image::Pointer ref_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Rendering/fib_ribbon_3D.png"));
     MITK_ASSERT_EQUAL(test_image, ref_image, "Check if images are equal.");
   }
@@ -141,8 +141,8 @@ public:
     renderingHelper.SetMapperIDToRender3D();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath()+"fib_line_3D.png");
-    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath()+"fib_line_3D.png");
+    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_line_3D.png");
+    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_line_3D.png");
     mitk::Image::Pointer ref_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Rendering/fib_line_3D.png"));
     MITK_ASSERT_EQUAL(test_image, ref_image, "Check if images are equal.");
   }
@@ -157,8 +157,8 @@ public:
     renderingHelper.SetMapperIDToRender3D();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath()+"fib_color_3D.png");
-    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath()+"fib_color_3D.png");
+    renderingHelper.SaveReferenceScreenShot(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_color_3D.png");
+    mitk::Image::Pointer test_image = mitk::IOUtil::Load<mitk::Image>(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "fib_color_3D.png");
     mitk::Image::Pointer ref_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Rendering/fib_color_3D.png"));
     MITK_ASSERT_EQUAL(test_image, ref_image, "Check if images are equal.");
   }

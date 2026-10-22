@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkNonLocalMeansDenoisingFilter.h"
 #include "mitkITKImageImport.h"
 #include <mitkImageCast.h>
+#include <mitkDiffusionPropertyHelper.h>
 
 class mitkNonLocalMeansDenoisingTestSuite : public mitk::TestFixture
 {
@@ -53,6 +54,9 @@ public:
     std::string imagePath = GetTestDataFilePath("DiffusionImaging/Denoising/test_multi.dwi");
 
     m_Image =  mitk::IOUtil::Load<mitk::Image>(imagePath);
+    // Also makes the driver link MitkDiffusionImage, which --as-needed drops otherwise; its
+    // activator registers the DWI reader that the line above needs.
+    CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(m_Image));
     m_ReferenceImage = nullptr;
     m_DenoisedImage = mitk::Image::New();
 

@@ -103,13 +103,13 @@ public:
       {
         if (fabs( weights->GetValue(i)/ref_weights->GetValue(i)-1 )>0.01)
         {
-          mitk::IOUtil::Save(test, mitk::IOUtil::GetTempPath()+out_name);
+          mitk::IOUtil::Save(test, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + out_name);
           CPPUNIT_ASSERT_MESSAGE("Weights should be equal", false);
         }
       }
       else if (weights->GetValue(i)>0)
       {
-        mitk::IOUtil::Save(test, mitk::IOUtil::GetTempPath()+out_name);
+        mitk::IOUtil::Save(test, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + out_name);
         CPPUNIT_ASSERT_MESSAGE("Weights should be equal", false);
       }
     }
@@ -136,7 +136,7 @@ public:
         {
           itk::ImageFileWriter< mitk::PeakImage::ItkPeakImageType >::Pointer writer = itk::ImageFileWriter< mitk::PeakImage::ItkPeakImageType >::New();
           writer->SetInput(testImage);
-          writer->SetFileName(mitk::IOUtil::GetTempPath()+name);
+          writer->SetFileName(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + name);
           writer->Update();
 
           MITK_INFO << it1.Get() << " - " << it2.Get();
@@ -148,7 +148,7 @@ public:
       {
         itk::ImageFileWriter< mitk::PeakImage::ItkPeakImageType >::Pointer writer = itk::ImageFileWriter< mitk::PeakImage::ItkPeakImageType >::New();
         writer->SetInput(testImage);
-        writer->SetFileName(mitk::IOUtil::GetTempPath()+name);
+        writer->SetFileName(mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + name);
         writer->Update();
 
         CPPUNIT_ASSERT_MESSAGE("Peak images should be equal 2", false);

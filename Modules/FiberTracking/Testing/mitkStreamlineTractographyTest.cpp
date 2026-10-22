@@ -186,16 +186,16 @@ public:
     mitk::FiberBundle::Pointer ref = LoadReferenceFib(ref_file);
     if (ref.IsNull())
     {
-      mitk::IOUtil::Save(test_fib, mitk::IOUtil::GetTempPath()+ref_file);
-      CPPUNIT_FAIL("Reference file not found. Saving test file to " + mitk::IOUtil::GetTempPath() + ref_file);
+      mitk::IOUtil::Save(test_fib, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
+      CPPUNIT_FAIL("Reference file not found. Saving test file to " + mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
     }
     else
     {
       bool is_equal = ref->Equals(test_fib);
       if (!is_equal)
       {
-        mitk::IOUtil::Save(test_fib, mitk::IOUtil::GetTempPath()+ref_file);
-        CPPUNIT_FAIL("Tractograms are not equal! Saving test file to " + mitk::IOUtil::GetTempPath() + ref_file);
+        mitk::IOUtil::Save(test_fib, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
+        CPPUNIT_FAIL("Tractograms are not equal! Saving test file to " + mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
       }
     }
   }
@@ -205,8 +205,8 @@ public:
     mitk::Image::Pointer ref = LoadReferenceImage(ref_file);
     if (ref.IsNull())
     {
-      mitk::IOUtil::Save(test_img, mitk::IOUtil::GetTempPath()+ref_file);
-      CPPUNIT_FAIL("Reference file not found. Saving test file to " + mitk::IOUtil::GetTempPath() + ref_file);
+      mitk::IOUtil::Save(test_img, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
+      CPPUNIT_FAIL("Reference file not found. Saving test file to " + mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
     }
     else
     {
@@ -429,7 +429,7 @@ public:
     img->InitializeByItk(outImg.GetPointer());
     img->SetVolume(outImg->GetBufferPointer());
 
-    mitk::IOUtil::Save(img, mitk::IOUtil::GetTempPath()+"Test_Odf6.nrrd");
+    mitk::IOUtil::Save(img, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "Test_Odf6.nrrd");
     CheckImageResult("Test_Odf6.nrrd", img);
 
     delete handler;

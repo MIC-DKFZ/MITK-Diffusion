@@ -548,7 +548,8 @@ void QmitkGibbsTrackingView::LoadTrackingParameters()
   tinyxml2::XMLDocument doc;
   doc.LoadFile(filename.toStdString().c_str());
 
-  tinyxml2::XMLNode * hRoot = doc.FirstChild();
+  // RootElement(), not FirstChild(): with an <?xml?> declaration, that is the first child.
+  tinyxml2::XMLNode * hRoot = doc.RootElement();
   auto pElem = hRoot->FirstChildElement("parameter_set");
 
   QString iterations(pElem->Attribute("iterations"));
