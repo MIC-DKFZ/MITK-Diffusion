@@ -238,10 +238,6 @@ void QmitkPreprocessingView::ApplyEdit(const QString& description, const QString
 
 void QmitkPreprocessingView::DoAlignImages()
 {
-  auto image = this->SelectedImage();
-  if (image.IsNull())
-    return;
-
   auto targetNode = m_Controls->m_AlignImageBox->GetSelectedNode();
   if (targetNode.IsNull())
     return;
@@ -249,9 +245,10 @@ void QmitkPreprocessingView::DoAlignImages()
   if (targetImage == nullptr)
     return;
 
-  image->SetOrigin(targetImage->GetGeometry()->GetOrigin());
-  mitk::RenderingManager::GetInstance()->InitializeViews(image->GetTimeGeometry(), mitk::RenderingManager::REQUEST_UPDATE_ALL, true);
-  mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+  // Like every other edit, the result is a new image; only the origin is taken over.
+  mitk::DiffusionImageEditing::HeaderChange change;
+  change.origin = targetImage->GetGeometry()->GetOrigin();
+  this->ApplyEdit("Aligning", "_aligned", [&](const mitk::Image* image) { return mitk::DiffusionImageEditing::ApplyHeader(image, change); }, true);
 }
 
 void QmitkPreprocessingView::DoFlipAxis()
