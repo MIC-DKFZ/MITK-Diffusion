@@ -38,15 +38,14 @@ namespace
 
   /**
    * Returns the rotation M from the measurement frame to world coordinates, so that the world
-   * tensor is M * T * M^T. The standard NRRD field holds the frame vectors F as rows, and M = F^T,
-   * the same convention as for DWI gradients (modified = MF^T * original). MITK's own
-   * "measurement frame" key is applied as earlier MITK versions intended, M = F.
-   * No frame or an all-zero frame gives nothing.
+   * tensor is M * T * M^T. Both the standard NRRD field and MITK's own "measurement frame" key hold
+   * the frame vectors F as rows, and M = F^T, the same convention as for DWI gradients
+   * (modified = MF^T * original). No MITK version wrote a frame into tensor files, so MITK's key
+   * needs no legacy direction. No frame or an all-zero frame gives nothing.
    */
   std::optional<FrameType> ReadFrameToWorld(const itk::MetaDataDictionary& dictionary)
   {
     std::optional<FrameType> frame;
-    bool mitkKey = false;
 
     // ITK stores the standard NRRD field (written by Slicer, DTIPrep, ITK) as a matrix, not as a string.
     std::vector<std::vector<double>> rows;
@@ -67,12 +66,11 @@ namespace
                  &mitkFrame(0, 0), &mitkFrame(0, 1), &mitkFrame(0, 2), &mitkFrame(1, 0), &mitkFrame(1, 1), &mitkFrame(1, 2), &mitkFrame(2, 0), &mitkFrame(2, 1), &mitkFrame(2, 2)) != 9)
         mitkThrow() << "Invalid measurement frame " << value;
       frame = mitkFrame;
-      mitkKey = true;
     }
 
     if (!frame || frame->GetVnlMatrix().absolute_value_max() <= 1e-9)
       return std::nullopt;
-    return mitkKey ? *frame : FrameType(frame->GetTranspose());
+    return FrameType(frame->GetTranspose());
   }
 }
 

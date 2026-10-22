@@ -87,10 +87,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
         CPPUNIT_ASSERT_DOUBLES_EQUAL(expected(r, c), actual(r, c), 1e-5);
   }
 
-  /**
-   * The frame vectors are the rows of F; the world tensor is F^T T F, as for DWI gradients.
-   * MITK's own key is applied as F T F^T, as earlier MITK versions intended.
-   */
+  /** The frame vectors are the rows of F; the world tensor is F^T T F, as for DWI gradients. */
   void CheckFrame(const std::string &name, const Matrix3 &frameRows, bool mitkKey)
   {
     const double elements[6] = {3, 0.2, 0, 1, 0, 0.5};
@@ -104,8 +101,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
       frame << (mitkKey ? " ( " : "(") << frameRows(r, 0) << (mitkKey ? " , " : ",") << frameRows(r, 1) << (mitkKey ? " , " : ",")
             << frameRows(r, 2) << (mitkKey ? " )" : ") ");
 
-    const Matrix3 expected = mitkKey ? frameRows * ToMatrix(elements) * frameRows.transpose()
-                                     : frameRows.transpose() * ToMatrix(elements) * frameRows;
+    const Matrix3 expected = frameRows.transpose() * ToMatrix(elements) * frameRows;
     AssertEqual(expected, ReadTensor(WriteTensorNrrd(name, elements, frame.str())));
   }
 
