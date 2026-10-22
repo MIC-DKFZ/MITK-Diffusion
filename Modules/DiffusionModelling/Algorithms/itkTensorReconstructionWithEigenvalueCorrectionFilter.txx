@@ -15,9 +15,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 #ifndef _itk_TensorReconstructionWithEigenvalueCorrectionFilter_txx_
 #define _itk_TensorReconstructionWithEigenvalueCorrectionFilter_txx_
-#endif
+
 #include "itkImageRegionConstIterator.h"
-#include <math.h>
+#include <cmath>
 #include "itkImage.h"
 #include "itkImageRegionIterator.h"
 #include <itkImageDuplicator.h>
@@ -37,7 +37,7 @@ void
 TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorPixelType>
 ::GenerateData ()
 {
-  typename GradientImagesType::Pointer input_image = static_cast< GradientImagesType * >( this->ProcessObject::GetInput(0) );
+  const GradientImagesType *input_image = this->GetInput();
   if (m_GradientDirectionContainer.IsNull())
     itkExceptionMacro(<< "No gradient directions set.");
   if (input_image->GetVectorLength() != m_GradientDirectionContainer->Size())
@@ -300,9 +300,11 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
   TurnMask(size,mask,previous_mask,set_mask);
   // simply defining all possible tensors as with negative eigenvalues
 
-  //Preprocessing is performed in multiple iterations as long as the next iteration does not increase the number of bad voxels.
-  //The final DWI should be the one that has a smaller or equal number of bad voxels as in the
-  //previous iteration. To obtain this temporary DWI image must be stored in memory.
+  // Preprocessing is performed in multiple passes as long as a pass reduces the number of voxels
+  // with negative eigenvalues. The loop stops at the first pass that does not; CorrectDiffusionImage
+  // still runs once after that decision, and the final tensors are computed from that DWI, not
+  // from the DWI with the fewest such voxels. Whether this is what the method intends is not
+  // verified against its paper; the order is kept because the results depend on it.
 
   // ! Initial Calculation of Tensors
   std::cout << "Initial tensor calculation" << std::endl;
@@ -371,7 +373,7 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
     ++outputIterator;
   }
 
-  this->SetNthOutput(0, tensorImg);
+  this->GraftOutput(tensorImg);
 }
 
 
@@ -384,24 +386,15 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
 {
   this->m_GradientDirectionContainer = gradientDirection;
 
-
-  unsigned int numImages = gradientDirection->Size();
-  this->m_NumberOfBaselineImages = 0;
-
-  this->m_NumberOfGradientDirections = numImages - this->m_NumberOfBaselineImages;
-
   // ensure that the gradient image we received has as many components as
   // the number of gradient directions
-  if( gradientImage->GetVectorLength() != this->m_NumberOfBaselineImages + this->m_NumberOfGradientDirections )
+  if( gradientImage->GetVectorLength() != gradientDirection->Size() )
   {
-    itkExceptionMacro( << this->m_NumberOfGradientDirections << " gradients + " << this->m_NumberOfBaselineImages
-                       << "baselines = " << this->m_NumberOfGradientDirections + this->m_NumberOfBaselineImages
-                       << " directions specified but image has " << gradientImage->GetVectorLength()
-                       << " components.");
+    itkExceptionMacro( << gradientDirection->Size() << " directions specified but image has "
+                       << gradientImage->GetVectorLength() << " components.");
   }
 
-  this->ProcessObject::SetNthInput( 0,
-                                    const_cast< GradientImagesType* >(gradientImage) );
+  this->SetInput(gradientImage);
 }
 
 template <class TDiffusionPixelType, class TTensorPixelType>
@@ -468,28 +461,6 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
   return tempsum;// smoothed value of voxel
 }
 
-
-template <class TDiffusionPixelType, class TTensorPixelType>
-void
-TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorPixelType>
-::CalculateAttenuation(vnl_vector<double> org_data,vnl_vector<double> &atten,int nof, int numberb0)
-{
-  double mean_b=0.0;
-
-  for (int i=0;i<nof;i++)
-    if(m_B0Mask[i]>0)
-      mean_b=mean_b+org_data[i];
-
-  mean_b=mean_b/numberb0;
-  int cnt=0;
-  for (int i=0;i<nof;i++)
-    if(m_B0Mask[i]==0)
-    {
-      //if(org_data[i]<0.001){org_data[i]=0.01;}
-      atten[cnt]=org_data[i]/mean_b;
-      cnt++;
-    }
-}
 
 template <class TDiffusionPixelType, class TTensorPixelType>
 double
@@ -709,7 +680,7 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
 template <class TDiffusionPixelType, class TTensorPixelType>
 void
 TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorPixelType>
-::GenerateTensorImage(int nof,int numberb0,itk::Size<3> size,itk::VectorImage<short, 3>::Pointer corrected_diffusion,itk::Image<short, 3>::Pointer mask,double , typename itk::Image< itk::DiffusionTensor3D<TTensorPixelType>, 3 >::Pointer tensorImg)
+::GenerateTensorImage(int nof,int numberb0,itk::Size<3> size,typename GradientImagesType::Pointer corrected_diffusion,itk::Image<short, 3>::Pointer mask,double , typename itk::Image< itk::DiffusionTensor3D<TTensorPixelType>, 3 >::Pointer tensorImg)
 {
   // in this method the whole tensor image is updated with a tensors for defined voxels ( defined by a value of mask);
 
@@ -838,9 +809,4 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
 
 } // end of namespace
 
-
-
-
-
-
-
+#endif
