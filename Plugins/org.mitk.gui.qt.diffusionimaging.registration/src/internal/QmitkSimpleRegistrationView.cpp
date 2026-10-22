@@ -321,7 +321,13 @@ void QmitkSimpleRegistrationView::StartTractoRegistration()
   mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_TractoBox->GetSelectedNode()->GetData());
   mitk::MAPRegistrationWrapper::Pointer reg = dynamic_cast<mitk::MAPRegistrationWrapper*>(m_Controls->m_RegObjectBox->GetSelectedNode()->GetData());
 
+  // Only affine registrations have a matrix; the box also offers deformable ones made elsewhere.
   mitk::MITKRegistrationHelper::Affine3DTransformType::Pointer affine = mitk::MITKRegistrationHelper::getAffineMatrix(reg, false);
+  if (affine.IsNull())
+  {
+    QMessageBox::warning(nullptr, "Tractogram not transformed", "Only affine registrations can be applied to tractograms.");
+    return;
+  }
 
   mitk::FiberBundle::Pointer fib_copy = fib->GetDeepCopy();
   fib_copy->TransformFibers(affine);
