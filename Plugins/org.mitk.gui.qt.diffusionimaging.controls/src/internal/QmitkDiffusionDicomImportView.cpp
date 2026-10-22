@@ -33,8 +33,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkIOUtil.h"
 
 // diffusion module includes
-#include "mitkDicomDiffusionImageHeaderReader.h"
-#include "mitkDicomDiffusionImageReader.h"
 #include "mitkImage.h"
 #include <mitkDiffusionPropertyHelper.h>
 
