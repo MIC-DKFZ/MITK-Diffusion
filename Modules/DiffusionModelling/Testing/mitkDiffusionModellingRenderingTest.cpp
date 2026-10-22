@@ -28,6 +28,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionModellingRenderingTestSuite);
   MITK_TEST(GlyphFilter_NoGlyphsAllowed_NoCrash);
+  MITK_TEST(GlyphFilter_Striding_SpreadsOverInput);
   CPPUNIT_TEST_SUITE_END();
 
   static std::vector<double> s_GlyphPositions;
@@ -70,6 +71,16 @@ public:
   void GlyphFilter_NoGlyphsAllowed_NoCrash()
   {
     CPPUNIT_ASSERT(GlyphPositions(0).empty());
+  }
+
+  // With 10 points and at most 4 glyphs, the truncated ratio 2 gave glyphs at 0, 2, 4, 6 only.
+  void GlyphFilter_Striding_SpreadsOverInput()
+  {
+    const auto positions = GlyphPositions(4);
+    CPPUNIT_ASSERT(positions.size() <= 4);
+    CPPUNIT_ASSERT(!positions.empty());
+    CPPUNIT_ASSERT(positions.back() >= 8);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(10), GlyphPositions(10).size());
   }
 };
 
