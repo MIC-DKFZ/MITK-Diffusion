@@ -29,7 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkComposeImageFilter.h>
 #include <itkDiscreteGaussianImageFilter.h>
 
-/** K bounds with lower >= upper admit no K, and equal bounds give the penalty band zero width. */
+/** K bounds with lower >= upper admit no K, and the penalty divides by the bound range. */
 static void VerifyKurtosisBounds(const vnl_vector_fixed<double, 2>& bounds)
 {
   if (!(bounds[0] < bounds[1]))
