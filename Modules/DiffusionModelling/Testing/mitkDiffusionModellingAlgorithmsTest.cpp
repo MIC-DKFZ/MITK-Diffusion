@@ -23,6 +23,7 @@ found in the LICENSE file.
 #include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
+#include <itkTensorToL2NormImageFilter.h>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -34,6 +35,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(EigenvalueCorrection_ThreadCount_SameResult);
   MITK_TEST(PrincipalDirection_PeakImageGeometry);
   MITK_TEST(EigenvalueCorrection_InvalidGradients_Throws);
+  MITK_TEST(TensorToL2Norm_FrobeniusNorm);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -136,6 +138,26 @@ public:
     directions.resize(5);
     directions.emplace_back(0, 0, 0);
     CPPUNIT_ASSERT_THROW(CorrectEigenvalues(directions), itk::ExceptionObject);
+  }
+
+  // The norm used for the synthesized baseline of TensorImageToDiffusionImageFilter mixed
+  // products of different off-diagonal elements instead of their squares.
+  void TensorToL2Norm_FrobeniusNorm()
+  {
+    auto image = TensorImageType::New();
+    TensorImageType::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    image->SetRegions(region);
+    image->Allocate();
+    const float elements[6] = {1, 2, 3, 4, 5, 6}; // xx, xy, xz, yy, yz, zz
+    image->FillBuffer(itk::DiffusionTensor3D<float>(elements));
+
+    auto filter = itk::TensorToL2NormImageFilter<TensorImageType, itk::Image<float, 3>>::New();
+    filter->SetInput(image);
+    filter->Update();
+
+    const double expected = std::sqrt(1.0 + 16 + 36 + 2 * (4 + 9 + 25));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, filter->GetOutput()->GetPixel({{0, 0, 0}}), 1e-5);
   }
 
   // The 4D peak image takes the tensor image's geometry; its fourth origin component was left
