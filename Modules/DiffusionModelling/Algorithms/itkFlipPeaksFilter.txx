@@ -13,8 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkFlipPeaksFilter_cpp
-#define __itkFlipPeaksFilter_cpp
+#ifndef itkFlipPeaksFilter_txx
+#define itkFlipPeaksFilter_txx
 
 #include "itkFlipPeaksFilter.h"
 #include <itkImageRegionConstIterator.h>
@@ -98,4 +98,4 @@ void FlipPeaksFilter< PixelType>
 
 }
 
-#endif // __itkFlipPeaksFilter_cpp
+#endif // itkFlipPeaksFilter_txx

@@ -72,7 +72,7 @@ private:
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkShCoefficientImageExporter.cpp"
+#include "itkShCoefficientImageExporter.txx"
 #endif
 
 #endif //__itkShCoefficientImageExporter_h_

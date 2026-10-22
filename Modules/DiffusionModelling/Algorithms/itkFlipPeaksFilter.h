@@ -75,7 +75,7 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkFlipPeaksFilter.cpp"
+#include "itkFlipPeaksFilter.txx"
 #endif
 
 #endif //__itkFlipPeaksFilter_h_

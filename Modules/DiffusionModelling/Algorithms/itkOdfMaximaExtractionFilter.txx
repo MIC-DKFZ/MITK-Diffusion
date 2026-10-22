@@ -13,8 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkOdfMaximaExtractionFilter_cpp
-#define __itkOdfMaximaExtractionFilter_cpp
+#ifndef itkOdfMaximaExtractionFilter_txx
+#define itkOdfMaximaExtractionFilter_txx
 
 #include "itkOdfMaximaExtractionFilter.h"
 #include <itkImageRegionConstIterator.h>
@@ -361,4 +361,4 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 
 }
 
-#endif // __itkOdfMaximaExtractionFilter_cpp
+#endif // itkOdfMaximaExtractionFilter_txx

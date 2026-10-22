@@ -174,7 +174,7 @@ Image< unsigned char, 3 > >
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkOdfMaximaExtractionFilter.cpp"
+#include "itkOdfMaximaExtractionFilter.txx"
 #endif
 
 #endif //__itkOdfMaximaExtractionFilter_h_

@@ -66,7 +66,7 @@ private:
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkShCoefficientImageImporter.cpp"
+#include "itkShCoefficientImageImporter.txx"
 #endif
 
 #endif //__itkShCoefficientImageImporter_h_

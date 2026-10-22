@@ -13,8 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkShCoefficientImageImporter_cpp
-#define __itkShCoefficientImageImporter_cpp
+#ifndef itkShCoefficientImageImporter_txx
+#define itkShCoefficientImageImporter_txx
 
 #include <ctime>
 #include <cstdio>
@@ -104,4 +104,4 @@ void ShCoefficientImageImporter< PixelType, ShOrder >
 
 }
 
-#endif // __itkShCoefficientImageImporter_cpp
+#endif // itkShCoefficientImageImporter_txx

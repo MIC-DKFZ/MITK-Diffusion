@@ -13,8 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkShToOdfImageFilter_cpp
-#define __itkShToOdfImageFilter_cpp
+#ifndef itkShToOdfImageFilter_txx
+#define itkShToOdfImageFilter_txx
 
 #include <time.h>
 #include <stdio.h>
@@ -78,4 +78,4 @@ void ShToOdfImageFilter< PixelType, ShOrder >::CalcShBasis()
 
 }
 
-#endif // __itkShToOdfImageFilter_cpp
+#endif // itkShToOdfImageFilter_txx

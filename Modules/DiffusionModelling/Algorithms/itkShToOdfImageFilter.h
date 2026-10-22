@@ -75,7 +75,7 @@ private:
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkShToOdfImageFilter.cpp"
+#include "itkShToOdfImageFilter.txx"
 #endif
 
 #endif //__itkShToOdfImageFilter_h_
