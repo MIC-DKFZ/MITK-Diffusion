@@ -66,10 +66,12 @@ public:
     ~RemoveDwiChannelFilter() {}
     void PrintSelf(std::ostream& os, Indent indent) const override;
 
+    void GenerateOutputInformation() override;
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
     std::vector< unsigned int >                 m_ChannelIndices;
+    std::vector< unsigned int >                 m_KeptChannels;   ///< input channels copied to the output, in order
     typename DirectionContainerType::ConstPointer    m_Directions;
     typename DirectionContainerType::Pointer    m_NewDirections;
 };
