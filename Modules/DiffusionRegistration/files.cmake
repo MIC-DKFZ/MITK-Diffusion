@@ -1,11 +1,11 @@
 set(H_FILES
   mitkDWIHeadMotionCorrectionFilter.h
-  mitkDiffusionImageCorrectionFilter.h
+  mitkDiffusionImageMapping.h
 )
 
 set(CPP_FILES
   mitkDWIHeadMotionCorrectionFilter.cpp
-  mitkDiffusionImageCorrectionFilter.cpp
+  mitkDiffusionImageMapping.cpp
 )
 
 set(RESOURCE_FILES

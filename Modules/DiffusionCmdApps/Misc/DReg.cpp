@@ -31,70 +31,21 @@ See LICENSE.txt or http://www.mitk.org for details.
 #endif
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkMAPAlgorithmHelper.h>
-#include <itkVectorIndexSelectionCastImageFilter.h>
 #include <mitkRegistrationHelper.h>
 #include <mitkImageMappingHelper.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
-#include <itkComposeImageFilter.h>
-#include <mitkITKImageImport.h>
-#include <mitkDiffusionImageCorrectionFilter.h>
+#include <mitkDiffusionImageMapping.h>
 #include <mitkDiffusionDataIOHelper.h>
 
 typedef mitk::DiffusionPropertyHelper DPH;
-using ChannelExtractorType = itk::VectorIndexSelectionCastImageFilter<DPH::ImageType, itk::Image<DPH::DiffusionPixelType, 3>>;
 
 
 mitk::Image::Pointer apply_transform(mitk::Image::Pointer moving, mitk::Image::Pointer fixed_single, mitk::MAPRegistrationWrapper::Pointer reg, bool resample)
 {
-  mitk::Image::Pointer registered_image;
   if (!resample)
-  {
-    registered_image = mitk::ImageMappingHelper::refineGeometry(moving, reg, true);
-  }
-  else
-  {
-    if (!mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(moving))
-    {
-      registered_image = mitk::ImageMappingHelper::map(moving, reg, false, 0, fixed_single->GetGeometry(), false, 0, mitk::ImageMappingInterpolator::BSpline_3);
-    }
-    else
-    {
-      typedef itk::Image<mitk::DiffusionPropertyHelper::DiffusionPixelType, 3> ITKDiffusionVolumeType;
-      typedef itk::ComposeImageFilter < ITKDiffusionVolumeType > ComposeFilterType;
-      auto composer = ComposeFilterType::New();
-
-      auto itkVectorImagePointer = mitk::DiffusionPropertyHelper::GetItkVectorImage(moving);
-      for (unsigned int i=0; i<itkVectorImagePointer->GetVectorLength(); ++i)
-      {
-        auto filter = ChannelExtractorType::New();
-        filter->SetInput( itkVectorImagePointer);
-        filter->SetIndex(i);
-        filter->Update();
-
-        mitk::Image::Pointer gradientVolume = mitk::Image::New();
-        gradientVolume->InitializeByItk( filter->GetOutput() );
-        gradientVolume->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-
-        mitk::Image::Pointer registered_mitk_image = mitk::ImageMappingHelper::map(gradientVolume, reg, false, 0, fixed_single->GetGeometry(), false, 0, mitk::ImageMappingInterpolator::BSpline_3);
-
-        auto registered_itk_image = ITKDiffusionVolumeType::New();
-        mitk::CastToItkImage(registered_mitk_image, registered_itk_image);
-        composer->SetInput(i, registered_itk_image);
-      }
-      composer->Update();
-
-      registered_image = mitk::GrabItkImageMemory( composer->GetOutput() );
-      mitk::DiffusionPropertyHelper::CopyProperties(moving, registered_image, true);
-
-      typedef mitk::DiffusionImageCorrectionFilter CorrectionFilterType;
-      CorrectionFilterType::Pointer corrector = CorrectionFilterType::New();
-      corrector->SetImage( registered_image );
-      corrector->CorrectDirections( mitk::MITKRegistrationHelper::getAffineMatrix(reg, false)->GetMatrix().GetVnlMatrix() );
-    }
-  }
-
-  return registered_image;
+    return mitk::ImageMappingHelper::refineGeometry(moving, reg, true);
+  return mitk::DiffusionImageMapping::MapImage(moving, reg, fixed_single->GetGeometry(), mitk::ImageMappingInterpolator::BSpline_3);
 }
 
 
@@ -146,34 +97,10 @@ int main(int argc, char* argv[])
     mitk::MAPAlgorithmHelper helper(algo);
 
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(fixed))
-    {
-      DPH::ImageType::Pointer itkVectorImagePointer = DPH::ImageType::New();
-      mitk::CastToItkImage(fixed, itkVectorImagePointer);
-
-      auto filter = ChannelExtractorType::New();
-      filter->SetInput( itkVectorImagePointer);
-      filter->SetIndex(0);
-      filter->Update();
-
-      fixed_single = mitk::Image::New();
-      fixed_single->InitializeByItk( filter->GetOutput() );
-      fixed_single->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-    }
+      fixed_single = mitk::DiffusionImageMapping::ExtractVolume(fixed, 0);
 
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(moving))
-    {
-      DPH::ImageType::Pointer itkVectorImagePointer = DPH::ImageType::New();
-      mitk::CastToItkImage(moving, itkVectorImagePointer);
-
-      auto filter = ChannelExtractorType::New();
-      filter->SetInput( itkVectorImagePointer);
-      filter->SetIndex(0);
-      filter->Update();
-
-      moving_single = mitk::Image::New();
-      moving_single->InitializeByItk( filter->GetOutput() );
-      moving_single->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-    }
+      moving_single = mitk::DiffusionImageMapping::ExtractVolume(moving, 0);
 
     helper.SetData(moving_single, fixed_single);
     mitk::MAPRegistrationWrapper::Pointer reg = helper.GetMITKRegistrationWrapper();

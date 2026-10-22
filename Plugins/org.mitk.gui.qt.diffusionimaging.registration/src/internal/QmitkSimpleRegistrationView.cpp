@@ -29,9 +29,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateDataType.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkImageMappingHelper.h>
-#include <mitkITKImageImport.h>
-#include <mitkImageCast.h>
-#include <itkVectorIndexSelectionCastImageFilter.h>
 // MatchPoint's ITKInitializedMultiResImageRegistrationAlgorithm::doSetProperty() assigns a bool
 // that unwrapMetaProperty() may leave unset; GCC's optimizer reports that in Release builds
 // despite -isystem. MatchPoint is a MITK external, so the warning is silenced for its headers.
@@ -44,10 +41,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
-#include <itkComposeImageFilter.h>
 #include <mitkFiberBundle.h>
 #include <mitkRegistrationHelper.h>
-#include <mitkDiffusionImageCorrectionFilter.h>
+#include <mitkDiffusionImageMapping.h>
 
 // Qt
 #include <QMessageBox>
@@ -96,45 +92,17 @@ void QmitkSimpleRegistrationView::StartRegistration()
 
   pJob->setAutoDelete(true);
 
+  // Of a DWI, the volume chosen in the channel box is registered.
   m_MovingImageNode = m_Controls->m_MovingImageBox->GetSelectedNode();
   mitk::Image::Pointer movingImage = dynamic_cast<mitk::Image*>(m_MovingImageNode->GetData());
   if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(movingImage))
-  {
-    ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
-    mitk::CastToItkImage(movingImage, itkVectorImagePointer);
-
-    auto filter = itk::VectorIndexSelectionCastImageFilter<ItkDwiType, ITKDiffusionVolumeType>::New();
-    filter->SetInput( itkVectorImagePointer);
-    filter->SetIndex(m_Controls->m_MovingChannelBox->value());
-    filter->Update();
-
-    mitk::Image::Pointer newImage = mitk::Image::New();
-    newImage->InitializeByItk( filter->GetOutput() );
-    newImage->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-
-    pJob->m_spMovingData = newImage;
-  }
+    pJob->m_spMovingData = mitk::DiffusionImageMapping::ExtractVolume(movingImage, m_Controls->m_MovingChannelBox->value());
   else
     pJob->m_spMovingData = movingImage;
 
-
   mitk::Image::Pointer fixedImage = dynamic_cast<mitk::Image*>(m_Controls->m_FixedImageBox->GetSelectedNode()->GetData());
   if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(fixedImage))
-  {
-    ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
-    mitk::CastToItkImage(fixedImage, itkVectorImagePointer);
-
-    auto filter = itk::VectorIndexSelectionCastImageFilter<ItkDwiType, ITKDiffusionVolumeType>::New();
-    filter->SetInput( itkVectorImagePointer);
-    filter->SetIndex(m_Controls->m_FixedChannelBox->value());
-    filter->Update();
-
-    mitk::Image::Pointer newImage = mitk::Image::New();
-    newImage->InitializeByItk( filter->GetOutput() );
-    newImage->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-
-    pJob->m_spTargetData = newImage;
-  }
+    pJob->m_spTargetData = mitk::DiffusionImageMapping::ExtractVolume(fixedImage, m_Controls->m_FixedChannelBox->value());
   else
     pJob->m_spTargetData = fixedImage;
 
@@ -173,65 +141,19 @@ void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWr
   mitk::Image::Pointer movingImage = dynamic_cast<mitk::Image*>(m_MovingImageNode->GetData());
   mitk::Image::Pointer image;
 
-  if (m_RegistrationType==0 && !m_Controls->m_ResampleBox->isChecked())
+  try
   {
-    image = mitk::ImageMappingHelper::refineGeometry(movingImage, spResultRegistration, true);
-
-    mitk::DiffusionPropertyHelper::CopyProperties(movingImage, image, true);
-    auto reg = spResultRegistration->GetRegistration();
-    if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(movingImage))
-    {
-      typedef mitk::DiffusionImageCorrectionFilter CorrectionFilterType;
-      CorrectionFilterType::Pointer corrector = CorrectionFilterType::New();
-      corrector->SetImage( image );
-      corrector->CorrectDirections( mitk::MITKRegistrationHelper::getAffineMatrix(reg, false)->GetMatrix().GetVnlMatrix() );
-    }
-  }
-  else
-  {
-    if (!mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(movingImage))
-    {
-      image = mitk::ImageMappingHelper::map(movingImage, spResultRegistration, false, 0, job->m_spTargetData->GetGeometry(), false, 0, mitk::ImageMappingInterpolator::BSpline_3);
-    }
+    // A rigid result can be applied to the geometry alone, without resampling.
+    if (m_RegistrationType==0 && !m_Controls->m_ResampleBox->isChecked())
+      image = mitk::DiffusionImageMapping::RefineGeometry(movingImage, spResultRegistration);
     else
-    {
-      typedef itk::ComposeImageFilter < ITKDiffusionVolumeType > ComposeFilterType;
-      ComposeFilterType::Pointer composer = ComposeFilterType::New();
-
-      ItkDwiType::Pointer itkVectorImagePointer = mitk::DiffusionPropertyHelper::GetItkVectorImage(movingImage);
-      for (unsigned int i=0; i<itkVectorImagePointer->GetVectorLength(); ++i)
-      {
-        auto filter = itk::VectorIndexSelectionCastImageFilter<ItkDwiType, ITKDiffusionVolumeType>::New();
-        filter->SetInput( itkVectorImagePointer);
-        filter->SetIndex(i);
-        filter->Update();
-
-        mitk::Image::Pointer gradientVolume = mitk::Image::New();
-        gradientVolume->InitializeByItk( filter->GetOutput() );
-        gradientVolume->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-
-        mitk::Image::Pointer registered_mitk_image = mitk::ImageMappingHelper::map(gradientVolume, spResultRegistration, false, 0, job->m_spTargetData->GetGeometry(), false, 0, mitk::ImageMappingInterpolator::BSpline_3);
-
-        ITKDiffusionVolumeType::Pointer registered_itk_image = ITKDiffusionVolumeType::New();
-        mitk::CastToItkImage(registered_mitk_image, registered_itk_image);
-        composer->SetInput(i, registered_itk_image);
-      }
-
-      composer->Update();
-
-      image = mitk::GrabItkImageMemory( composer->GetOutput() );
-      mitk::DiffusionPropertyHelper::CopyProperties(movingImage, image, true);
-
-      auto reg = spResultRegistration->GetRegistration();
-      typedef mitk::DiffusionImageCorrectionFilter CorrectionFilterType;
-      CorrectionFilterType::Pointer corrector = CorrectionFilterType::New();
-      corrector->SetImage( image );
-      corrector->CorrectDirections( mitk::MITKRegistrationHelper::getAffineMatrix(reg, false)->GetMatrix().GetVnlMatrix() );
-    }
+      image = mitk::DiffusionImageMapping::MapImage(movingImage, spResultRegistration, job->m_spTargetData->GetGeometry(), mitk::ImageMappingInterpolator::BSpline_3);
   }
-
-  if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(image))
-    mitk::DiffusionPropertyHelper::InitializeImage( image );
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Registration failed", QString("The registration could not be applied: ") + e.what());
+    return;
+  }
   mitk::DiffusionPropertyHelper::CopyDICOMProperties(movingImage, image);
 
   mitk::DataNode::Pointer resultNode = mitk::DataNode::New();

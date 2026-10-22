@@ -1,5 +1,5 @@
 SET(MODULE_CUSTOM_TESTS
-  mitkDiffusionImageCorrectionFilterTest.cpp
+  mitkDiffusionImageMappingTest.cpp
   mitkDiffusionHeadMotionCorrectionFilterTest.cpp
 )
 

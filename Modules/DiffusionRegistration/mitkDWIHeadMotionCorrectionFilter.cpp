@@ -45,7 +45,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkComposeImageFilter.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkImageCast.h>
-#include <mitkDiffusionImageCorrectionFilter.h>
+#include <mitkDiffusionImageMapping.h>
 #include <mitkImageWriteAccessor.h>
 #include <mitkProperties.h>
 #include <mitkBValueMapProperty.h>
@@ -109,8 +109,10 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
   mitk::MultiModalAffineDefaultRegistrationAlgorithm< ITKDiffusionVolumeType >::Pointer algo = mitk::MultiModalAffineDefaultRegistrationAlgorithm< ITKDiffusionVolumeType >::New();
   mitk::MAPAlgorithmHelper helper(algo);
 
-  typedef vnl_matrix_fixed< double, 3, 3> TransformMatrixType;
-  std::vector< TransformMatrixType > estimated_transforms;
+  // One transform per volume; the reference keeps its gradient.
+  mitk::DiffusionImageMapping::MatrixType identity;
+  identity.set_identity();
+  std::vector< mitk::DiffusionImageMapping::MatrixType > estimated_transforms(num_gradients, identity);
   for (int i=0; i<num_gradients; ++i)
   {
     if (i==first_unweighted_index)
@@ -130,7 +132,7 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
     helper.SetData(movingImage, fixedImage);
     mitk::MAPRegistrationWrapper::Pointer reg = helper.GetMITKRegistrationWrapper();
     mitk::MITKRegistrationHelper::Affine3DTransformType::Pointer affine = mitk::MITKRegistrationHelper::getAffineMatrix(reg, false);
-    estimated_transforms.push_back(affine->GetMatrix().GetVnlMatrix());
+    estimated_transforms[i] = affine->GetMatrix().GetVnlMatrix();
 
     mitk::Image::Pointer registered_mitk_image = mitk::ImageMappingHelper::map(movingImage, reg, false, 0, nullptr, false, 0, mitk::ImageMappingInterpolator::BSpline_3);
     ITKDiffusionVolumeType::Pointer registered_itk_image = ITKDiffusionVolumeType::New();
@@ -144,13 +146,7 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
 
   m_CorrectedImage = mitk::GrabItkImageMemory( composer->GetOutput() );
   DPH::CopyProperties(input, m_CorrectedImage, true);
-
-  typedef mitk::DiffusionImageCorrectionFilter CorrectionFilterType;
-  CorrectionFilterType::Pointer corrector = CorrectionFilterType::New();
-  corrector->SetImage( m_CorrectedImage );
-  corrector->CorrectDirections( estimated_transforms );
-
-  DPH::InitializeImage(m_CorrectedImage);
+  mitk::DiffusionImageMapping::RotateGradients(m_CorrectedImage, estimated_transforms);
 }
 
 #endif // MITKDWIHEADMOTIONCORRECTIONFILTER_CPP
