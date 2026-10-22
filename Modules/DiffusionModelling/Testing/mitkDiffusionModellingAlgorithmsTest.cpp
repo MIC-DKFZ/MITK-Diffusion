@@ -18,22 +18,31 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkOdfImage.h>
+#include <mitkPeakImage.h>
 #include <mitkShImage.h>
 #include <mitkTensorImage.h>
 
 #include <itkAdcImageFilter.h>
+#include <itkDiffusionOdfGeneralizedFaImageFilter.h>
 #include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
+#include <itkFlipPeaksFilter.h>
 #include <itkImageRegionConstIterator.h>
+#include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkOdfMaximaExtractionFilter.h>
 #include <itkDiffusionTensor3DReconstructionImageFilter.h>
 #include <itkOdfToRgbImageFilter.h>
 #include <itkShCoefficientImageImporter.h>
 #include <itkShToRgbImageFilter.h>
+#include <itkTensorDerivedMeasurementsFilter.h>
 #include <itkTensorImageToDiffusionImageFilter.h>
+#include <itkTensorImageToOdfImageFilter.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 #include <itkTensorToL2NormImageFilter.h>
+#include <itkTensorToRgbImageFilter.h>
 
 #include <algorithm>
+#include <cstdint>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -57,6 +66,15 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(OdfToRgb_ZeroOdf_Black);
   MITK_TEST(Sh_InvalidCoefficientCounts_Throw);
   MITK_TEST(PrincipalDirection_FaThreshold_NoDirection);
+  MITK_TEST(TensorMeasures_MatchReferences);
+  MITK_TEST(Gfa_MatchesReference);
+  MITK_TEST(ShToOdf_MatchesReference);
+  MITK_TEST(ShBasis_ConventionsAndEvaluationAgree);
+  MITK_TEST(Convert_WrongImageType_Throws);
+  MITK_TEST(RgbFilters_RecordedOutput);
+  MITK_TEST(TensorToOdf_RecordedOutput);
+  MITK_TEST(PrincipalDirection_RecordedOutput);
+  MITK_TEST(FlipPeaks_NegatesChosenAxes);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -534,6 +552,294 @@ public:
     CPPUNIT_ASSERT_EQUAL(0.0, peaks->GetOrigin()[3]);
     CPPUNIT_ASSERT_EQUAL(1.0, peaks->GetSpacing()[3]);
     CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(3), peaks->GetLargestPossibleRegion().GetSize(3));
+  }
+
+  using ScalarImageType = itk::Image<float, 3>;
+
+  ScalarImageType::Pointer LoadScalarImage(const std::string &path)
+  {
+    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(path));
+    ScalarImageType::Pointer itkImage;
+    mitk::CastToItkImage(image, itkImage);
+    return itkImage;
+  }
+
+  static ScalarImageType::Pointer TensorMeasure(mitk::TensorImage::ItkTensorImageType *tensors, itk::TensorDerivedMeasurementsFilter<float>::Measure measure)
+  {
+    auto filter = itk::TensorDerivedMeasurementsFilter<float>::New();
+    filter->SetInput(tensors);
+    filter->SetMeasure(measure);
+    filter->Update();
+    return filter->GetOutput();
+  }
+
+  /** Largest absolute difference between two scalar images of the same size. */
+  static double MaxDifference(const ScalarImageType *expected, const ScalarImageType *actual)
+  {
+    CPPUNIT_ASSERT(expected->GetLargestPossibleRegion().GetSize() == actual->GetLargestPossibleRegion().GetSize());
+    itk::ImageRegionConstIterator<ScalarImageType> itExpected(expected, expected->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<ScalarImageType> itActual(actual, actual->GetLargestPossibleRegion());
+    double maxDifference = 0;
+    for (; !itExpected.IsAtEnd(); ++itExpected, ++itActual)
+      maxDifference = std::max(maxDifference, std::fabs(static_cast<double>(itExpected.Get()) - itActual.Get()));
+    return maxDifference;
+  }
+
+  // FA, RA, AD and RD reproduce the MITK-Data references. The MD reference was made by an older
+  // version and is not used; MD is checked against the trace, L2 and L3 against the eigenvalues.
+  void TensorMeasures_MatchReferences()
+  {
+    using FilterType = itk::TensorDerivedMeasurementsFilter<float>;
+    auto tensors = LoadItkTensors("DiffusionImaging/tensorImage.dti");
+
+    const std::pair<FilterType::Measure, std::string> references[] = {
+      {FilterType::FA, "FA"}, {FilterType::RA, "RA"}, {FilterType::AD, "AD"}, {FilterType::RD, "RD"}};
+    for (const auto &[measure, name] : references)
+    {
+      auto reference = LoadScalarImage("DiffusionImaging/tensorImage_" + name + ".nrrd");
+      CPPUNIT_ASSERT_MESSAGE(name, MaxDifference(reference, TensorMeasure(tensors, measure)) < 1e-6);
+    }
+
+    auto ca = TensorMeasure(tensors, FilterType::CA);
+    auto md = TensorMeasure(tensors, FilterType::MD);
+    auto l2 = TensorMeasure(tensors, FilterType::L2);
+    auto l3 = TensorMeasure(tensors, FilterType::L3);
+    itk::ImageRegionConstIterator<mitk::TensorImage::ItkTensorImageType> it(tensors, tensors->GetLargestPossibleRegion());
+    unsigned int anisotropic = 0;
+    for (; !it.IsAtEnd(); ++it)
+    {
+      const auto index = it.GetIndex();
+      FilterType::TensorType::EigenValuesArrayType ev;
+      it.Get().ComputeEigenValues(ev);
+      // MD comes from the float eigenvalues, so its error scales with the largest eigenvalue.
+      const double scale = std::max({std::fabs(ev[0]), std::fabs(ev[1]), std::fabs(ev[2])});
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(it.Get().GetTrace() / 3.0, md->GetPixel(index), 1e-5 * scale + 1e-12);
+      CPPUNIT_ASSERT_EQUAL(ev[1], l2->GetPixel(index));
+      CPPUNIT_ASSERT_EQUAL(ev[0], l3->GetPixel(index));
+      if (ev[2] > 0 && ev[0] > 0)
+      {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0 - (ev[0] + ev[1]) / (2.0 * ev[2]), ca->GetPixel(index), 1e-6);
+        ++anisotropic;
+      }
+    }
+    CPPUNIT_ASSERT(anisotropic > 0);
+  }
+
+  // GFA of the ODFs in qBallImage.qbi as stored in MITK-Data.
+  void Gfa_MatchesReference()
+  {
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/qBallImage.qbi"));
+    auto filter = itk::DiffusionOdfGeneralizedFaImageFilter<float, float, ODF_SAMPLING_SIZE>::New();
+    filter->SetInput(mitk::convert::GetItkOdfFromOdfImage(odfImage.GetPointer()));
+    filter->SetComputationMethod(itk::DiffusionOdfGeneralizedFaImageFilter<float, float, ODF_SAMPLING_SIZE>::GFA_STANDARD);
+    filter->Update();
+    CPPUNIT_ASSERT(MaxDifference(LoadScalarImage("DiffusionImaging/qBallImage_GFA.nrrd"), filter->GetOutput()) < 1e-6);
+  }
+
+  // The MRtrix CSD coefficients (order 8) sampled on the ODF directions give the ODF file that
+  // was made from them.
+  void ShToOdf_MatchesReference()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &functor);
+    CPPUNIT_ASSERT_EQUAL(8u, shImage->ShOrder());
+    auto odfs = mitk::convert::GetItkOdfFromShImage(shImage.GetPointer());
+    auto reference = mitk::convert::GetItkOdfFromOdfImage(mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image.qbi")).GetPointer());
+
+    CPPUNIT_ASSERT(odfs->GetLargestPossibleRegion() == reference->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> it(odfs, odfs->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> itReference(reference, reference->GetLargestPossibleRegion());
+    double maxDifference = 0;
+    for (; !it.IsAtEnd(); ++it, ++itReference)
+      for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+        maxDifference = std::max(maxDifference, std::fabs(static_cast<double>(it.Get()[i]) - itReference.Get()[i]));
+    CPPUNIT_ASSERT(maxDifference < 2e-6);
+
+    shImage->SetShConvention(mitk::ShImage::FSL);
+    auto odfsFsl = mitk::convert::GetItkOdfFromShImage(shImage.GetPointer());
+    CPPUNIT_ASSERT(odfsFsl->GetPixel({{30, 30, 1}}) != odfs->GetPixel({{30, 30, 1}}));
+  }
+
+  /** Unit vectors spread evenly over the sphere (Fibonacci lattice), as columns. */
+  static vnl_matrix<double> SphereDirections(unsigned int count)
+  {
+    vnl_matrix<double> directions(3, count);
+    const double golden = itk::Math::pi * (3.0 - std::sqrt(5.0));
+    for (unsigned int i = 0; i < count; ++i)
+    {
+      const double z = 1.0 - (2.0 * i + 1.0) / count;
+      const double r = std::sqrt(1.0 - z * z);
+      directions(0, i) = r * std::cos(golden * i);
+      directions(1, i) = r * std::sin(golden * i);
+      directions(2, i) = z;
+    }
+    return directions;
+  }
+
+  // Pins both SH conventions: the FSL/Dipy basis is orthonormal; MITK's "MRtrix" basis (MRtrix
+  // 0.2) is orthogonal with norm 1/2 for m != 0. GetValue, the basis matrix and the reconstruction
+  // filters' basis (spherical input) give the same values.
+  void ShBasis_ConventionsAndEvaluationAgree()
+  {
+    const unsigned int order = 8;
+    const unsigned int numCoeffs = 45;
+    const auto directions = SphereDirections(20000);
+    for (bool mrtrix : {true, false})
+    {
+      const vnl_matrix<float> floatBasis = mitk::sh::CalcShBasisForDirections(order, directions, mrtrix);
+      vnl_matrix<double> basis(floatBasis.rows(), floatBasis.cols());
+      for (unsigned int r = 0; r < basis.rows(); ++r)
+        for (unsigned int c = 0; c < basis.cols(); ++c)
+          basis(r, c) = floatBasis(r, c);
+      CPPUNIT_ASSERT_EQUAL(numCoeffs, basis.cols());
+      const vnl_matrix<double> gram = basis.transpose() * basis * (4.0 * itk::Math::pi / directions.cols());
+      for (unsigned int k = 0, j = 0; k <= order; k += 2)
+      {
+        for (int m = -static_cast<int>(k); m <= static_cast<int>(k); ++m, ++j)
+        {
+          const double expectedNorm = (mrtrix && m != 0) ? 0.5 : 1.0;
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedNorm, gram(j, j), 1e-3);
+          for (unsigned int j2 = 0; j2 < numCoeffs; ++j2)
+            if (j2 != j)
+              CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, gram(j, j2), 1e-3);
+        }
+      }
+    }
+
+    vnl_vector<float> coefficients(numCoeffs);
+    for (unsigned int i = 0; i < numCoeffs; ++i)
+      coefficients[i] = std::sin(1.0f + i);
+    const auto someDirections = SphereDirections(50);
+    vnl_matrix<double> spherical(3, someDirections.cols());
+    for (unsigned int i = 0; i < someDirections.cols(); ++i)
+    {
+      double sph[3];
+      mitk::gradients::Cart2Sph(someDirections(0, i), someDirections(1, i), someDirections(2, i), sph);
+      for (unsigned int r = 0; r < 3; ++r)
+        spherical(r, i) = sph[r];
+    }
+    const vnl_matrix<double> reconstructionBasis = mitk::sh::ComputeSphericalHarmonicsBasis(spherical, order);
+    for (bool mrtrix : {true, false})
+    {
+      const vnl_vector<float> values = mitk::sh::CalcShBasisForDirections(order, someDirections, mrtrix) * coefficients;
+      for (unsigned int i = 0; i < someDirections.cols(); ++i)
+      {
+        const vnl_vector_fixed<double, 3> dir(someDirections(0, i), someDirections(1, i), someDirections(2, i));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(values[i], mitk::sh::GetValue(coefficients, order, dir, mrtrix), 1e-5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(values[i], mitk::sh::GetValue(coefficients, order, spherical(1, i), spherical(0, i), mrtrix), 1e-5);
+      }
+    }
+    const vnl_matrix<float> mrtrixBasis = mitk::sh::CalcShBasisForDirections(order, someDirections, true);
+    for (unsigned int i = 0; i < someDirections.cols(); ++i)
+      for (unsigned int j = 0; j < numCoeffs; ++j)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrixBasis(i, j), reconstructionBasis(i, j), 1e-6);
+  }
+
+  void Convert_WrongImageType_Throws()
+  {
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi"));
+    CPPUNIT_ASSERT_THROW(mitk::convert::GetItkOdfFromShImage(tensorImage.GetPointer()), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(mitk::convert::GetOdfFromShImage(odfImage.GetPointer()), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(mitk::convert::GetItkShFromShImage<15>(odfImage.GetPointer()), mitk::Exception);
+  }
+
+  /** FNV-1a hash of all RGBA bytes in buffer order. */
+  static std::uint64_t Hash(const RgbaImageType *image)
+  {
+    std::uint64_t hash = 14695981039346656037ull;
+    itk::ImageRegionConstIterator<RgbaImageType> it(image, image->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+      for (unsigned int c = 0; c < 4; ++c)
+        hash = (hash ^ it.Get()[c]) * 1099511628211ull;
+    return hash;
+  }
+
+  // Colour maps of tensor, ODF and SH images as computed before the RGB code was shared.
+  void RgbFilters_RecordedOutput()
+  {
+    auto tensorRgb = itk::TensorToRgbImageFilter<mitk::TensorImage::ItkTensorImageType>::New();
+    tensorRgb->SetInput(LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    tensorRgb->Update();
+
+    auto odfRgb = itk::OdfToRgbImageFilter<mitk::OdfImage::ItkOdfImageType>::New();
+    odfRgb->SetInput(mitk::convert::GetItkOdfFromOdfImage(mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image.qbi")).GetPointer()));
+    odfRgb->Update();
+
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &functor);
+    auto shRgb = itk::ShToRgbImageFilter<itk::Image<itk::Vector<float, 45>, 3>, 8>::New();
+    shRgb->SetInput(mitk::convert::GetItkShFromShImage<45>(shImage.GetPointer()));
+    shRgb->SetShConvention(mitk::ShImage::MRTRIX);
+    shRgb->Update();
+
+    CPPUNIT_ASSERT_EQUAL(std::uint64_t(7043315695314250899ull), Hash(tensorRgb->GetOutput()));
+    // csd_image.qbi was sampled from csd_image_sh.nii.gz, so both give the same colours.
+    CPPUNIT_ASSERT_EQUAL(std::uint64_t(17028873552555350804ull), Hash(odfRgb->GetOutput()));
+    CPPUNIT_ASSERT_EQUAL(std::uint64_t(17028873552555350804ull), Hash(shRgb->GetOutput()));
+  }
+
+  // ODFs of test_dti.dti, summarized by the sum and the sum of squares of all values.
+  void TensorToOdf_RecordedOutput()
+  {
+    auto filter = itk::TensorImageToOdfImageFilter<float, float>::New();
+    filter->SetInput(LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    filter->Update();
+    double sum = 0;
+    double sumOfSquares = 0;
+    itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> it(filter->GetOutput(), filter->GetOutput()->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+      for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      {
+        sum += it.Get()[i];
+        sumOfSquares += it.Get()[i] * it.Get()[i];
+      }
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(362.99999671805926, sum, 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.4703429208501879, sumOfSquares, 1e-9);
+  }
+
+  // Principal directions of test_dti.dti, summarized per component.
+  void PrincipalDirection_RecordedOutput()
+  {
+    auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
+    filter->SetInput(LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    filter->Update();
+
+    double sums[3] = {0, 0, 0};
+    using PeakImageType = itk::Image<float, 4>;
+    itk::ImageRegionConstIteratorWithIndex<PeakImageType> it(filter->GetPeakImage(), filter->GetPeakImage()->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+      sums[it.GetIndex()[3]] += std::fabs(it.Get());
+    unsigned int withDirection = 0;
+    itk::ImageRegionConstIterator<MaskImageType> itNum(filter->GetOutput(), filter->GetOutput()->GetLargestPossibleRegion());
+    for (; !itNum.IsAtEnd(); ++itNum)
+      withDirection += itNum.Get();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(33.890375792980194, sums[0], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(21.773321121931076, sums[1], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(12.989389510825276, sums[2], 1e-6);
+    CPPUNIT_ASSERT_EQUAL(47u, withDirection);
+  }
+
+  void FlipPeaks_NegatesChosenAxes()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"Peak Image"}, std::vector<std::string>());
+    auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &functor);
+    auto peaks = peakImage->GetItkPeakImage();
+    const bool flips[][3] = {{true, false, false}, {false, true, true}};
+    for (const auto &flip : flips)
+    {
+      auto filter = itk::FlipPeaksFilter<float>::New();
+      filter->SetInput(peaks);
+      filter->SetFlipX(flip[0]);
+      filter->SetFlipY(flip[1]);
+      filter->SetFlipZ(flip[2]);
+      filter->Update();
+      CPPUNIT_ASSERT(filter->GetOutput()->GetLargestPossibleRegion() == peaks->GetLargestPossibleRegion());
+      itk::ImageRegionConstIteratorWithIndex<mitk::PeakImage::ItkPeakImageType> it(peaks, peaks->GetLargestPossibleRegion());
+      itk::ImageRegionConstIterator<mitk::PeakImage::ItkPeakImageType> itFlipped(filter->GetOutput(), peaks->GetLargestPossibleRegion());
+      for (; !it.IsAtEnd(); ++it, ++itFlipped)
+        CPPUNIT_ASSERT_EQUAL(flip[it.GetIndex()[3] % 3] ? -it.Get() : it.Get(), itFlipped.Get());
+    }
   }
 };
 

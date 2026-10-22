@@ -21,6 +21,7 @@ found in the LICENSE file.
 #include <mitkTensorImage.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
+#include <mitkBaseDataSerializer.h>
 
 #include <mitkITKImageImport.h>
 
@@ -32,6 +33,7 @@ found in the LICENSE file.
 #include <vnl/vnl_matrix_fixed.h>
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -59,6 +61,10 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(PeakReader_MrtrixPeaks_ConvertedToLps);
   MITK_TEST(ShIO_OriginKeepsDoublePrecision);
   MITK_TEST(TensorReader_NiftiWrongComponentCount_Throws);
+  MITK_TEST(Readers_RecordedContent);
+  MITK_TEST(TensorAndOdfIO_RoundTrip);
+  MITK_TEST(PeakImage_PolydataHasOneLinePerPeak);
+  MITK_TEST(Serializers_RoundTrip);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -479,6 +485,172 @@ public:
     itksys::SystemTools::CopyAFile(niftiPath, dtiPath);
 
     CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load(dtiPath), std::exception);
+  }
+
+  /** FNV-1a hash of the whole pixel buffer of an image. */
+  static std::uint64_t Hash(mitk::Image *image)
+  {
+    std::size_t size = image->GetPixelType().GetSize();
+    for (unsigned int d = 0; d < image->GetDimension(); ++d)
+      size *= image->GetDimension(d);
+    mitk::ImageReadAccessor access(image);
+    auto bytes = static_cast<const unsigned char *>(access.GetData());
+    std::uint64_t hash = 14695981039346656037ull;
+    for (std::size_t i = 0; i < size; ++i)
+      hash = (hash ^ bytes[i]) * 1099511628211ull;
+    return hash;
+  }
+
+  static void AssertEqualGeometry(mitk::Image *expected, mitk::Image *actual)
+  {
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      CPPUNIT_ASSERT_EQUAL(expected->GetDimension(i), actual->GetDimension(i));
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected->GetGeometry()->GetOrigin()[i], actual->GetGeometry()->GetOrigin()[i], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected->GetGeometry()->GetSpacing()[i], actual->GetGeometry()->GetSpacing()[i], 1e-6);
+      for (unsigned int j = 0; j < 3; ++j)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected->GetGeometry()->GetIndexToWorldTransform()->GetMatrix()[i][j],
+                                     actual->GetGeometry()->GetIndexToWorldTransform()->GetMatrix()[i][j], 1e-6);
+    }
+  }
+
+  // Pixel buffers and geometry of MITK-Data files as read before the readers were restructured.
+  void Readers_RecordedContent()
+  {
+    mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
+    mitk::PreferenceListReaderOptionsFunctor peakFunctor({"Peak Image"}, std::vector<std::string>());
+    struct Recorded
+    {
+      mitk::Image::Pointer image;
+      std::uint64_t hash;
+      double origin[3];
+      double spacing[3];
+    };
+    const Recorded recorded[] = {
+      {mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/tensorImage.dti")).GetPointer(),
+       910238346892541248ull, {0, 0, 0}, {3, 3, 3}},
+      {mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/FWE/ReferenceTensorImage.dti")).GetPointer(),
+       14634070166575176342ull, {-14.1639, 13.4743, -12.6538}, {2, 2, 2}},
+      {mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi")).GetPointer(),
+       17363730383617297091ull, {1, 1, 1}, {2, 2, 2}},
+      {mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image.qbi")).GetPointer(),
+       13068465665225140656ull, {0, 0, 0}, {3, 3, 3}},
+      {mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor).GetPointer(),
+       13341037711982211669ull, {0.615, 1.0005, 0.7045}, {1.23, 2.001, 1.409}},
+      {mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &shFunctor).GetPointer(),
+       8054354499704950156ull, {0, 0, 0}, {3, 3, 3}},
+      {mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &peakFunctor).GetPointer(),
+       1038741785062553984ull, {0.615, 1.0005, 0.7045}, {1.23, 2.001, 1.409}},
+      {mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/FiberFit/csd_peak_image.nii.gz"), &peakFunctor).GetPointer(),
+       14391242496329318739ull, {0, 0, 0}, {3, 3, 3}}};
+    for (const auto &[image, hash, origin, spacing] : recorded)
+    {
+      CPPUNIT_ASSERT_EQUAL(hash, Hash(image));
+      for (unsigned int i = 0; i < 3; ++i)
+      {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(origin[i], image->GetGeometry()->GetOrigin()[i], 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(spacing[i], image->GetGeometry()->GetSpacing()[i], 1e-6);
+      }
+    }
+  }
+
+  // Tensor and ODF images survive saving in each of their formats bit for bit.
+  void TensorAndOdfIO_RoundTrip()
+  {
+    for (const std::string file : {"DiffusionImaging/tensorImage.dti", "DiffusionImaging/FWE/ReferenceTensorImage.dti"})
+    {
+      auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath(file));
+      const std::string path = m_TempDir + "/tensor.dti";
+      mitk::IOUtil::Save(tensorImage, path);
+      auto reloaded = mitk::IOUtil::Load<mitk::TensorImage>(path);
+      AssertEqualPixels(tensorImage, reloaded);
+      AssertEqualGeometry(tensorImage, reloaded);
+    }
+
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi"));
+    for (const std::string extension : {".odf", ".qbi"})
+    {
+      const std::string path = m_TempDir + "/odf" + extension;
+      mitk::IOUtil::Save(odfImage, path);
+      auto reloaded = mitk::IOUtil::Load<mitk::OdfImage>(path);
+      AssertEqualPixels(odfImage, reloaded);
+      AssertEqualGeometry(odfImage, reloaded);
+    }
+  }
+
+  // The peak polydata holds one two-point line per peak longer than 0.001, with a colour per point.
+  void PeakImage_PolydataHasOneLinePerPeak()
+  {
+    for (const std::string file : {"DiffusionImaging/peak_image_test.nii.gz", "DiffusionImaging/FiberFit/csd_peak_image.nii.gz"})
+    {
+      auto peakImage = LoadPeaks(GetTestDataFilePath(file), std::nullopt);
+      auto itkPeaks = peakImage->GetItkPeakImage();
+      const auto size = itkPeaks->GetLargestPossibleRegion().GetSize();
+      vtkIdType expectedLines = 0;
+      for (itk::IndexValueType z = 0; z < static_cast<itk::IndexValueType>(size[2]); ++z)
+        for (itk::IndexValueType y = 0; y < static_cast<itk::IndexValueType>(size[1]); ++y)
+          for (itk::IndexValueType x = 0; x < static_cast<itk::IndexValueType>(size[0]); ++x)
+            for (itk::IndexValueType p = 0; p < static_cast<itk::IndexValueType>(size[3]); p += 3)
+            {
+              double squaredLength = 0;
+              for (itk::IndexValueType c = 0; c < 3; ++c)
+              {
+                const double v = itkPeaks->GetPixel({{x, y, z, p + c}});
+                squaredLength += v * v;
+              }
+              if (std::sqrt(squaredLength) >= 0.001)
+                ++expectedLines;
+            }
+
+      auto polyData = peakImage->GetPolyData();
+      CPPUNIT_ASSERT_MESSAGE(file, expectedLines > 0);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(file, expectedLines, polyData->GetNumberOfLines());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(file, 2 * expectedLines, polyData->GetNumberOfPoints());
+      auto colors = polyData->GetPointData()->GetArray("FIBER_COLORS");
+      CPPUNIT_ASSERT(colors != nullptr);
+      CPPUNIT_ASSERT_EQUAL(polyData->GetNumberOfPoints(), colors->GetNumberOfTuples());
+    }
+  }
+
+  /** Runs the scene serializer registered for the data's class into the temp directory. */
+  std::string Serialize(mitk::BaseData *data, const std::string &hint)
+  {
+    const std::string serializerName = std::string(data->GetNameOfClass()) + "Serializer";
+    auto candidates = itk::ObjectFactoryBase::CreateAllInstance(serializerName.c_str());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(serializerName, std::size_t(1), candidates.size());
+    auto serializer = dynamic_cast<mitk::BaseDataSerializer *>(candidates.front().GetPointer());
+    CPPUNIT_ASSERT(serializer != nullptr);
+    serializer->SetData(data);
+    serializer->SetFilenameHint(hint);
+    serializer->SetWorkingDirectory(m_TempDir);
+    const std::string filename = serializer->Serialize();
+    CPPUNIT_ASSERT_MESSAGE(serializerName, !filename.empty());
+    return m_TempDir + "/" + filename;
+  }
+
+  // Scene files keep tensor, ODF, SH and peak images with their type and pixels.
+  void Serializers_RoundTrip()
+  {
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensorReloaded = mitk::IOUtil::Load<mitk::TensorImage>(Serialize(tensorImage, "tensor"));
+    AssertEqualPixels(tensorImage, tensorReloaded);
+    AssertEqualGeometry(tensorImage, tensorReloaded);
+
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi"));
+    auto odfReloaded = mitk::IOUtil::Load<mitk::OdfImage>(Serialize(odfImage, "odf"));
+    AssertEqualPixels(odfImage, odfReloaded);
+    AssertEqualGeometry(odfImage, odfReloaded);
+
+    mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    auto shReloaded = mitk::IOUtil::Load<mitk::ShImage>(Serialize(shImage, "sh"), &shFunctor);
+    AssertEqualPixels(shImage, shReloaded);
+    AssertEqualGeometry(shImage, shReloaded);
+
+    auto peakImage = LoadPeaks(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), std::nullopt);
+    auto peakReloaded = LoadPeaks(Serialize(peakImage, "peaks"), std::nullopt);
+    AssertEqualPixels(peakImage, peakReloaded);
+    AssertEqualGeometry(peakImage, peakReloaded);
   }
 };
 

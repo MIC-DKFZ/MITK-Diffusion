@@ -22,7 +22,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vnl/algo/vnl_svd.h"
 #include "itkVectorContainer.h"
 #include "itkVectorImage.h"
-#include <mitkFiberBundle.h>
 #include <itkOrientationDistributionFunction.h>
 #include <mitkPeakImage.h>
 
