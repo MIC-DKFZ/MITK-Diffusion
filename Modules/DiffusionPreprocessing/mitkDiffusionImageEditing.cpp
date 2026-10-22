@@ -207,3 +207,15 @@ bool mitk::DiffusionImageEditing::AppliesImageRotationToGradients(const Image* d
   GradientTransformAccess::GetGradientTransform(dwi, rotation, frame);
   return rotation.has_value();
 }
+
+mitk::Image::Pointer mitk::DiffusionImageEditing::ClearGradientRotation(const Image* dwi)
+{
+  if (!PropHelper::IsDiffusionWeightedImage(dwi))
+    mitkThrow() << "Not a diffusion-weighted image.";
+  Image::Pointer newImage = dwi->Clone();
+  PropHelper::SetApplyMatrixToGradients(newImage, false);
+  // Without this the modified gradients, which filters and writers use, would change only at the
+  // next InitializeImage call of some later action.
+  PropHelper::InitializeImage(newImage);
+  return newImage;
+}

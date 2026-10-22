@@ -32,6 +32,7 @@ class mitkDiffusionImageEditingTestSuite : public mitk::TestFixture
   MITK_TEST(ApplyHeader_NewFrame_AppliedToOriginalGradients);
   MITK_TEST(ApplyHeader_OnlyOrigin_KeepsEverythingElse);
   MITK_TEST(ApplyHeader_InvalidValues_Throw);
+  MITK_TEST(ClearGradientRotation_RotatedLegacyImage_RemovesRotation);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -290,6 +291,20 @@ public:
     direction[0][1] = 0.5;
     skewed.direction = direction;
     CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::ApplyHeader(m_Dwi, skewed), mitk::Exception);
+  }
+  void ClearGradientRotation_RotatedLegacyImage_RemovesRotation()
+  {
+    SetRotation(m_Dwi, RotationZ());
+    auto image = WithImageRotationFlag(true);
+    CPPUNIT_ASSERT(mitk::DiffusionImageEditing::AppliesImageRotationToGradients(image));
+    const auto original = PropHelper::GetOriginalGradientContainer(image);
+
+    auto cleared = mitk::DiffusionImageEditing::ClearGradientRotation(image);
+
+    // The modified gradients change at once: the frame applied to the originals, no rotation.
+    CPPUNIT_ASSERT(!mitk::DiffusionImageEditing::AppliesImageRotationToGradients(cleared));
+    AssertGradientsEqual(Transformed(original, PropHelper::GetMeasurementFrame(image).transpose()).GetPointer(), PropHelper::GetGradientContainer(cleared), 1e-12);
+    AssertStableUnderInitialize(cleared);
   }
 };
 

@@ -1073,7 +1073,8 @@ void QmitkPreprocessingView::OnImageSelectionChanged()
   m_Controls->m_RemoveGradientButton->setEnabled(foundDwiVolume);
   m_Controls->m_ExtractGradientButton->setEnabled(foundDwiVolume);
   m_Controls->m_FlipGradientsButton->setEnabled(foundDwiVolume);
-  m_Controls->m_ClearRotationButton->setEnabled(foundDwiVolume);
+  // Only images whose gradients include the image rotation (legacy NRRD, DICOM) have one to clear.
+  m_Controls->m_ClearRotationButton->setEnabled(foundDwiVolume && mitk::DiffusionImageEditing::AppliesImageRotationToGradients(image));
 
   m_Controls->m_DirectionMatrixTable->setEnabled(foundImageVolume);
   m_Controls->m_ModifyHeader->setEnabled(foundImageVolume);
@@ -1174,9 +1175,7 @@ void QmitkPreprocessingView::DoClearRotationOfGradients()
   if(!PropHelper::IsDiffusionWeightedImage(image))
     return;
 
-  mitk::Image::Pointer newDwi = image->Clone();
-
-  PropHelper::SetApplyMatrixToGradients(newDwi, false);
+  mitk::Image::Pointer newDwi = mitk::DiffusionImageEditing::ClearGradientRotation(image);
 
   mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
   imageNode->SetData( newDwi );

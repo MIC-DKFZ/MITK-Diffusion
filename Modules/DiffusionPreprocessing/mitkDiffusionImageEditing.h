@@ -71,6 +71,9 @@ namespace mitk
 
     /** \brief Whether the modified gradients of the DWI include the image rotation (legacy NRRD, DICOM). */
     MITKDIFFUSIONPREPROCESSING_EXPORT bool AppliesImageRotationToGradients(const Image* dwi);
+
+    /** \brief Recomputes the modified gradients of the DWI without the image rotation. */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer ClearGradientRotation(const Image* dwi);
   }
 }
 

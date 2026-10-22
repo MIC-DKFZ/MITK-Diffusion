@@ -348,7 +348,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>By default, the image matrix is applied to the image gradients. This button removes this additional rotation.</string>
+             <string>Recomputes the gradients without the rotation of the image matrix. Only DWIs whose gradients include it have one to clear: NRRD files of earlier MITK versions and DICOM. Other DWIs store world gradients.</string>
             </property>
             <property name="statusTip">
              <string/>
