@@ -62,6 +62,14 @@ namespace mitk
 
     Options options = this->GetOptions();
     bool mrtrix_sh = us::any_cast<bool>(options["Assume MRtrix/MITK style SH convention (else FSL/Dipy)"]);
+
+    // ShImageWriter marks FSL/Dipy coefficients; the mark overrides the option.
+    const auto& dictionary = img->GetMetaDataDictionary();
+    std::string convention;
+    if ((itk::ExposeMetaData<std::string>(dictionary, "MITK_SH_convention", convention) && convention == "FSL")
+        || (itk::ExposeMetaData<std::string>(dictionary, "ITK_FileNotes", convention) && convention == "MITK_SH_convention=FSL"))
+      mrtrix_sh = false;
+
     if (!mrtrix_sh)
       shImage->SetShConvention(mitk::ShImage::SH_CONVENTION::FSL);
 

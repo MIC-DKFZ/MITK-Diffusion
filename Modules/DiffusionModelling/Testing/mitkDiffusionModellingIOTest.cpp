@@ -53,6 +53,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(ShAndPeakIO_DotsInFileName);
   MITK_TEST(MimeTypes_ShAndPeakReadersOnlyForMatchingFiles);
   MITK_TEST(ShWriter_NewNiftiFile_ReadsBackAsSh);
+  MITK_TEST(ShIO_ConventionSurvivesSaving);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -365,6 +366,25 @@ public:
     const std::string path = m_TempDir + "/sh.nii.gz";
     mitk::IOUtil::Save(shImage, path);
     AssertEqualPixels(shImage, mitk::IOUtil::Load<mitk::ShImage>(path, &shFunctor));
+  }
+
+  // An image read as FSL/Dipy SH was saved without its convention and read back as MRtrix.
+  void ShIO_ConventionSurvivesSaving()
+  {
+    mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    for (auto convention : {mitk::ShImage::FSL, mitk::ShImage::MRTRIX})
+    {
+      shImage->SetShConvention(convention);
+      for (const std::string extension : {".nii.gz", ".shi"})
+      {
+        const std::string path = m_TempDir + "/convention" + std::to_string(convention) + extension;
+        mitk::IOUtil::Save(shImage, path);
+        auto reloaded = mitk::IOUtil::Load<mitk::ShImage>(path, &shFunctor);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(path, convention, reloaded->GetShConvention());
+        AssertEqualPixels(shImage, reloaded);
+      }
+    }
   }
 };
 

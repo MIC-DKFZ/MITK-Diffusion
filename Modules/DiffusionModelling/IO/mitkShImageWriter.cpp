@@ -57,6 +57,17 @@ void mitk::ShImageWriter::WriteShImage(InputType::ConstPointer input)
   typedef itk::ImageFileWriter<ShImage::ShOnDiskType> WriterType;
   WriterType::Pointer writer = WriterType::New();
   ShImage::ShOnDiskType::Pointer image = exporter->GetOutputImage();
+
+  // FSL/Dipy coefficients are marked in the file (NRRD key, NIfTI descrip), so that they read back
+  // with their convention; files in MITK's own MRtrix convention stay as before.
+  if (input->GetShConvention() == ShImage::FSL)
+  {
+    if (ext==".shi" || ext==".nrrd")
+      itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "MITK_SH_convention", "FSL");
+    else
+      itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "ITK_FileNotes", "MITK_SH_convention=FSL");
+  }
+
   writer->SetInput( image );
 
   if (ext==".shi")
