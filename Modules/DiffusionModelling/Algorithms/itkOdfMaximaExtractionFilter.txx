@@ -185,7 +185,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   }
 
   if (m_Toolkit==Toolkit::MRTRIX)
-    m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, dir_matrix);
+    m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, dir_matrix, true);
   else
     m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, dir_matrix, false);
 
