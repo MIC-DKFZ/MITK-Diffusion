@@ -69,29 +69,16 @@ void mitk::ShImageWriter::WriteShImage(InputType::ConstPointer input)
   writer->SetFileName(this->GetOutputLocation().c_str());
   writer->SetUseCompression(true);
 
-  try
-  {
-    writer->Update();
-  }
-  catch (const itk::ExceptionObject& e)
-  {
-    MITK_INFO << e.what();
-  }
+  writer->Update();
 }
 
 void mitk::ShImageWriter::Write()
 {
   InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
   if (input.IsNull())
-  {
-    MITK_ERROR <<"Sorry, input to ShImageWriter is nullptr!";
-    return;
-  }
+    mitkThrow() << "Sorry, input to ShImageWriter is nullptr!";
   if ( this->GetOutputLocation().empty() )
-  {
-    MITK_ERROR << "Sorry, filename has not been set!";
-    return ;
-  }
+    mitkThrow() << "Sorry, filename has not been set!";
 
   switch (input->GetImageDescriptor()->GetChannelTypeById(0).GetNumberOfComponents())
   {

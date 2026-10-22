@@ -45,15 +45,9 @@ void mitk::NrrdTensorImageWriter::Write()
 {
   InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
   if (input.IsNull() )
-  {
-    MITK_ERROR <<"Sorry, input to NrrdTensorImageWriter is nullptr!";
-    return;
-  }
+    mitkThrow() << "Sorry, input to NrrdTensorImageWriter is nullptr!";
   if ( this->GetOutputLocation().empty() )
-  {
-    MITK_ERROR << "Sorry, filename has not been set!" ;
-    return ;
-  }
+    mitkThrow() << "Sorry, filename has not been set!";
   mitk::LocaleSwitch localeSwitch("C");
 
   itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
@@ -70,14 +64,7 @@ void mitk::NrrdTensorImageWriter::Write()
   nrrdWriter->SetFileName(this->GetOutputLocation().c_str());
   nrrdWriter->UseCompressionOn();
 
-  try
-  {
-    nrrdWriter->Update();
-  }
-  catch (const itk::ExceptionObject& e)
-  {
-    std::cout << e.GetDescription() << std::endl;
-  }
+  nrrdWriter->Update();
 }
 
 mitk::NrrdTensorImageWriter* mitk::NrrdTensorImageWriter::Clone() const

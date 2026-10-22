@@ -44,15 +44,9 @@ void mitk::NrrdOdfImageWriter::Write()
 {
   InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
     if (input.IsNull())
-    {
-        MITK_ERROR <<"Sorry, input to NrrdOdfImageWriter is nullptr!";
-        return;
-    }
+        mitkThrow() << "Sorry, input to NrrdOdfImageWriter is nullptr!";
     if ( this->GetOutputLocation().empty() )
-    {
-        MITK_ERROR << "Sorry, filename has not been set!";
-        return ;
-    }
+        mitkThrow() << "Sorry, filename has not been set!";
 
     mitk::LocaleSwitch localeSwitch("C");
 
@@ -99,14 +93,7 @@ void mitk::NrrdOdfImageWriter::Write()
     nrrdWriter->UseCompressionOn();
 
 
-    try
-    {
-      nrrdWriter->Update();
-    }
-    catch (const itk::ExceptionObject& e)
-    {
-      MITK_INFO << e.what();
-    }
+    nrrdWriter->Update();
 }
 
 mitk::NrrdOdfImageWriter* mitk::NrrdOdfImageWriter::Clone() const

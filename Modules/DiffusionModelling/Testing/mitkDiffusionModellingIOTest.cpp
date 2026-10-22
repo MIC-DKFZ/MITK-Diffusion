@@ -12,6 +12,9 @@ found in the LICENSE file.
 
 #include <mitkIOUtil.h>
 #include <mitkImagePixelReadAccessor.h>
+#include <mitkOdfImage.h>
+#include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkShImage.h>
 #include <mitkTensorImage.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
@@ -36,6 +39,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(TensorReader_NoFrame_Unchanged);
   MITK_TEST(TensorReader_Nrrd_LeavesNoTemporaryFiles);
   MITK_TEST(TensorReader_Nifti_LeavesNoTemporaryFiles);
+  MITK_TEST(Writers_UnwritableLocation_Throw);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -201,6 +205,23 @@ public:
     const double elements[6] = {1, 2, 3, 4, 5, 6};
     AssertEqual(ToMatrix(elements), ReadTensor(dtiPath));
     CPPUNIT_ASSERT_EQUAL(before, CountTemporaryTensorCopies());
+  }
+
+  void Writers_UnwritableLocation_Throw()
+  {
+    const std::string missingDir = m_TempDir + "/missing/";
+
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(tensorImage, missingDir + "tensor.dti"), std::exception);
+
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi"));
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(odfImage, missingDir + "odf.odf"), std::exception);
+
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(shImage, missingDir + "sh.shi"), std::exception);
+
+    CPPUNIT_ASSERT(!itksys::SystemTools::FileExists(missingDir));
   }
 };
 
