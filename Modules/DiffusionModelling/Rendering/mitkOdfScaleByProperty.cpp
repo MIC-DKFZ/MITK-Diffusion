@@ -20,14 +20,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 mitk::OdfScaleByProperty::OdfScaleByProperty( )
 {
-  this->AddInterpolationTypes();
+  this->AddScaleByTypes();
   this->SetValue( static_cast<IdType>( ODFSB_NONE ) );
 }
 
 
 mitk::OdfScaleByProperty::OdfScaleByProperty( const IdType& value )
 {
-  this->AddInterpolationTypes();
+  this->AddScaleByTypes();
   if ( IsValidEnumerationValue( value ) )
   {
     this->SetValue( value ) ;
@@ -40,7 +40,7 @@ mitk::OdfScaleByProperty::OdfScaleByProperty( const IdType& value )
 
 mitk::OdfScaleByProperty::OdfScaleByProperty( const std::string& value )
 {
-  this->AddInterpolationTypes();
+  this->AddScaleByTypes();
   if ( IsValidEnumerationValue( value ) )
   {
     this->SetValue( value );
@@ -57,7 +57,7 @@ int mitk::OdfScaleByProperty::GetScaleBy() const
   return static_cast<int>( this->GetValueAsId() );
 }
 
-void mitk::OdfScaleByProperty::AddInterpolationTypes()
+void mitk::OdfScaleByProperty::AddScaleByTypes()
 {
   AddEnum( "None", static_cast<IdType>( ODFSB_NONE ) );
   AddEnum( "GFA", static_cast<IdType>( ODFSB_GFA ) );
