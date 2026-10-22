@@ -18,6 +18,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define ITKB0IMAGEEXTRACTIONTOSEPARATEIMAGEFILTER_H
 
 #include "itkImageToImageFilter.h"
+#include <itkVectorContainer.h>
+#include <itkVectorImage.h>
 
 namespace itk
 {

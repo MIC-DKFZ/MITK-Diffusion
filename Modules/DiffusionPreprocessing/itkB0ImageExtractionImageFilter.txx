@@ -46,6 +46,9 @@ namespace itk {
     ::GenerateData()
   {
 
+    if (m_Directions.IsNull() || m_Directions->Size() != this->GetInput()->GetVectorLength())
+      itkExceptionMacro("The number of gradient directions does not match the number of image volumes.");
+
     typename GradientDirectionContainerType::ConstIterator begin = m_Directions->Begin();
     typename GradientDirectionContainerType::ConstIterator end = m_Directions->End();
 
@@ -63,6 +66,9 @@ namespace itk {
       ++index;
       ++begin;
     }
+    // Without a b0 volume the average would silently be an all-zero image.
+    if (indices.empty())
+      itkExceptionMacro("The image has no b0 volume (gradient direction (0,0,0)).");
 
     typedef itk::Image<float,3> TempImageType;
     TempImageType::Pointer tmp = TempImageType::New();

@@ -51,6 +51,9 @@ void itk::B0ImageExtractionToSeparateImageFilter<
 TInputImagePixelType, TOutputImagePixelType >::GenerateData()
 {
 
+  if (m_Directions.IsNull() || m_Directions->Size() != this->GetInput()->GetVectorLength())
+    itkExceptionMacro("The number of gradient directions does not match the number of image volumes.");
+
   GradContainerIteratorType begin = m_Directions->Begin();
   GradContainerIteratorType end = m_Directions->End();
 
@@ -68,6 +71,9 @@ TInputImagePixelType, TOutputImagePixelType >::GenerateData()
     ++index;
     ++begin;
   }
+  // Without a b0 volume the output would silently have no time steps.
+  if (indices.empty())
+    itkExceptionMacro("The image has no b0 volume (gradient direction (0,0,0)).");
 
   // declare the output image
   // this will have the b0 images stored as timesteps
