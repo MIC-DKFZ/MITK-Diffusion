@@ -83,8 +83,6 @@ namespace itk
       Superclass::PrintSelf (os, indent);
     }
 
-    void BeforeThreadedGenerateData( void ) override;
-
     void DynamicThreadedGenerateData( const
       OutputImageRegionType &outputRegionForThread) override;
 
@@ -94,9 +92,6 @@ namespace itk
 
     TensorImageToOdfImageFilter (const Self&);
     void operator=(const Self&);
-
-    typename InputImageType::Pointer m_ItkTensorImage;
-    typename OutputImageType::Pointer m_ItkOdfImage;
   };
 
 } // end of namespace

@@ -103,12 +103,6 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 {
   typename CoefficientImageType::Pointer ShCoeffImage = static_cast< CoefficientImageType* >( this->ProcessObject::GetInput(0) );
   itk::Vector<double,3> spacing = ShCoeffImage->GetSpacing();
-  double minSpacing = spacing[0];
-  if (spacing[1]<minSpacing)
-    minSpacing = spacing[1];
-  if (spacing[2]<minSpacing)
-    minSpacing = spacing[2];
-
   mitk::Point3D origin = ShCoeffImage->GetOrigin();
   itk::Matrix<double, 3, 3> direction = ShCoeffImage->GetDirection();
   ImageRegion<3> imageRegion = ShCoeffImage->GetLargestPossibleRegion();
@@ -133,13 +127,8 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     m_MaskImage->Allocate();
     m_MaskImage->FillBuffer(1);
   }
-  m_NumDirectionsImage = ItkUcharImgType::New();
-  m_NumDirectionsImage->SetSpacing( spacing );
-  m_NumDirectionsImage->SetOrigin( origin );
-  m_NumDirectionsImage->SetDirection( direction );
-  m_NumDirectionsImage->SetRegions( imageRegion );
-  m_NumDirectionsImage->Allocate();
-  m_NumDirectionsImage->FillBuffer(0);
+  // Masked voxels and voxels with an ODF maximum near 0 are skipped and keep 0 directions.
+  this->GetOutput()->FillBuffer(0);
 
   // calculate SH basis
   OdfType odf;
@@ -316,7 +305,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
         m_PeakImage->SetPixel(idx4, dir[j]);
       }
     }
-    m_NumDirectionsImage->SetPixel(idx3, num);
+    this->GetOutput()->SetPixel(idx3, num);
     ++disp;
     ++cit;
   }

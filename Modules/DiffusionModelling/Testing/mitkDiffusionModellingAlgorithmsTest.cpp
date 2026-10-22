@@ -76,6 +76,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(PrincipalDirection_RecordedOutput);
   MITK_TEST(FlipPeaks_NegatesChosenAxes);
   MITK_TEST(MaximaExtraction_RecordedOutput);
+  MITK_TEST(Filters_OutputTakenBeforeUpdate_GetsResult);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -860,6 +861,34 @@ public:
       for (unsigned int c = 0; c < 4; ++c)
         CPPUNIT_ASSERT_EQUAL(r < 3 && c < 3 ? coefficients->GetDirection()[r][c] : (r == c ? 1.0 : 0.0), peaks->GetDirection()[r][c]);
     }
+  }
+
+  // Three filters replaced their primary output during the update, so an output taken before
+  // Update(), as in a pipeline, stayed empty.
+  void Filters_OutputTakenBeforeUpdate_GetsResult()
+  {
+    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+
+    auto toOdf = itk::TensorImageToOdfImageFilter<float, float>::New();
+    toOdf->SetInput(tensors);
+    auto odfs = toOdf->GetOutput();
+    toOdf->Update();
+    CPPUNIT_ASSERT(odfs == toOdf->GetOutput());
+    CPPUNIT_ASSERT(odfs->GetLargestPossibleRegion() == tensors->GetLargestPossibleRegion());
+
+    auto principal = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
+    principal->SetInput(tensors);
+    auto numDirections = principal->GetOutput();
+    principal->Update();
+    CPPUNIT_ASSERT(numDirections == principal->GetOutput());
+
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto maxima = itk::OdfMaximaExtractionFilter<float, 4, ODF_SAMPLING_SIZE>::New();
+    maxima->SetInput(mitk::convert::GetItkShFromShImage<15>(shImage.GetPointer()));
+    auto numPeaks = maxima->GetOutput();
+    maxima->Update();
+    CPPUNIT_ASSERT(numPeaks == maxima->GetNumDirectionsImage());
   }
 
   void FlipPeaks_NegatesChosenAxes()

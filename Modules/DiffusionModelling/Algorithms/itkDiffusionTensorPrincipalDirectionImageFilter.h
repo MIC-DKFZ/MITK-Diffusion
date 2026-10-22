@@ -77,6 +77,13 @@ public:
     ~DiffusionTensorPrincipalDirectionImageFilter() {}
     void PrintSelf(std::ostream& os, Indent indent) const;
 
+    /** The peak image always covers the whole input, so the primary output does too, also when
+      * the filter is updated again with an input of another size. */
+    void EnlargeOutputRequestedRegion(DataObject *output) override
+    {
+      output->SetRequestedRegionToLargestPossibleRegion();
+    }
+
     void BeforeThreadedGenerateData();
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread );
     void AfterThreadedGenerateData();

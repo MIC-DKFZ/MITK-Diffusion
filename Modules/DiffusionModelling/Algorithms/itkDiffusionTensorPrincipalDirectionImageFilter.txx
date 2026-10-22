@@ -65,15 +65,8 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::BeforeThre
     m_MaskImage->FillBuffer(1);
   }
 
-  typename OutputImageType::Pointer outputImage = OutputImageType::New();
-  outputImage->SetSpacing( spacing3 );
-  outputImage->SetOrigin( origin3 );
-  outputImage->SetDirection( direction3 );
-  outputImage->SetRegions( imageRegion3 );
-  outputImage->Allocate();
-  outputImage->FillBuffer(0);
-  this->SetNthOutput(0, outputImage);
-
+  // The number of directions is written only for voxels inside the mask with a non-zero tensor.
+  this->GetOutput()->FillBuffer(0);
 
   m_PeakImage = PeakImageType::New();
   mitk::CopyGeometryTo4D(inputImagePointer, m_PeakImage, 3);

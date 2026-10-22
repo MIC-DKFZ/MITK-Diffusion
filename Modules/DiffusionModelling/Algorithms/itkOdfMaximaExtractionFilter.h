@@ -93,7 +93,8 @@ Image< unsigned char, 3 > >
     itkSetMacro( Iterations, int)
 
     // output
-    itkGetMacro( NumDirectionsImage, ItkUcharImgType::Pointer )
+    /** Number of peaks per voxel; the filter's primary output. */
+    ItkUcharImgType::Pointer GetNumDirectionsImage() { return this->GetOutput(); }
     itkGetMacro( PeakImage, PeakImageType::Pointer )
 
     itkSetMacro( Toolkit, Toolkit)  ///< define SH coefficient convention (depends on toolkit)
@@ -102,6 +103,13 @@ Image< unsigned char, 3 > >
     protected:
     OdfMaximaExtractionFilter();
     ~OdfMaximaExtractionFilter() override {}
+
+    /** The peak image always covers the whole input, so the primary output does too, also when
+      * the filter is updated again with an input of another size. */
+    void EnlargeOutputRequestedRegion(DataObject *output) override
+    {
+      output->SetRequestedRegionToLargestPossibleRegion();
+    }
 
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
@@ -148,7 +156,6 @@ Image< unsigned char, 3 > >
     const int                                   m_NumCoeffs;            ///< number of spherical harmonics coefficients
 
     PeakImageType::Pointer                      m_PeakImage;
-    ItkUcharImgType::Pointer                    m_NumDirectionsImage;     ///< number of peaks per voxel
     ItkUcharImgType::Pointer                    m_MaskImage;              ///< only voxels inside the binary mask are processed
     bool                                        m_MaskGenerated = false;  ///< m_MaskImage was generated for the current update only
 
