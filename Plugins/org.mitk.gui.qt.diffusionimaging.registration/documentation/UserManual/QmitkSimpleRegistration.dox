@@ -1,8 +1,26 @@
 /**
 \page org_mitk_views_simpleregistrationview Registration
 
-This view enables the simple rigid or affine registration of two images. It is also possible to transform a tractogram with a registration object obtained from a previous registration of two images.
+This view registers a moving image to a fixed image with a rigid or an affine transformation
+(MatchPoint's multi-modal default algorithms), and applies a registration to a tractogram.
 
-For a diffusion-weighted image, the volume used for the registration is selected separately for the fixed and the moving image. All volumes of a moving DWI are mapped, and its gradient directions are rotated with the image. Only one registration runs at a time; if it fails, a message shows the reason. Tractograms can be transformed only with affine registrations.
+<b>Image Registration</b>: choose the fixed and the moving image and the <b>Registration Type</b>,
+then press <b>Start Registration</b>. For a diffusion-weighted image (DWI), the spin box next to it
+selects the volume used to compute the registration. The result appears as a new image named
+after the moving image:
+
+\li A rigid registration only moves the geometry of the moving image, without resampling, unless
+<b>Always Resample to Target</b> is checked. An affine registration always resamples the moving
+image onto the grid of the fixed image, with B-spline interpolation.
+\li All volumes of a moving DWI are mapped, and its gradient directions are rotated with the
+image.
+\li With <b>Output Registration Object</b> the registration is also added to the Data Manager, for
+example to transform a tractogram later.
+
+Only one registration runs at a time; if it fails, a message shows the reason.
+
+<b>Tractography Registration</b>: choose a tractogram and a registration object and press
+<b>Start Tractography Registration</b>. The transformed tractogram appears below the input, named
+"_registered". Only affine (including rigid) registrations can be applied to tractograms.
 
 */
