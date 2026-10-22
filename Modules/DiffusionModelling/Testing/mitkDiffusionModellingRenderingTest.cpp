@@ -10,6 +10,8 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkOdfNormalizationMethodProperty.h>
+#include <mitkOdfScaleByProperty.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -34,6 +36,8 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphFilter_Striding_SpreadsOverInput);
   MITK_TEST(ThickPlane_SettersApplyAndModify);
   MITK_TEST(OdfSource_KeepsInputAndUsesDefaults);
+  MITK_TEST(OdfProperties_CloneKeepsType);
+  MITK_TEST(OdfPropertySerializers_MissingValue_Null);
   CPPUNIT_TEST_SUITE_END();
 
   static std::vector<double> s_GlyphPositions;
@@ -130,6 +134,36 @@ public:
     const auto mtime = source->GetMTime();
     source->SetColor(10, 20, 30);
     CPPUNIT_ASSERT(source->GetMTime() > mtime);
+  }
+
+  // Clone() returned nullptr; cloning a property list made the mapper fall back to other settings.
+  void OdfProperties_CloneKeepsType()
+  {
+    auto normalization = mitk::OdfNormalizationMethodProperty::New(mitk::ODFN_NONE);
+    auto normalizationClone = normalization->Clone();
+    CPPUNIT_ASSERT(normalizationClone.IsNotNull());
+    CPPUNIT_ASSERT_EQUAL(int(mitk::ODFN_NONE), int(normalizationClone->GetNormalization()));
+    mitk::BaseProperty::Pointer baseClone = static_cast<mitk::BaseProperty *>(normalization.GetPointer())->Clone();
+    CPPUNIT_ASSERT(dynamic_cast<mitk::OdfNormalizationMethodProperty *>(baseClone.GetPointer()) != nullptr);
+
+    auto scaleBy = mitk::OdfScaleByProperty::New(mitk::ODFSB_GFA);
+    auto scaleByClone = scaleBy->Clone();
+    CPPUNIT_ASSERT(scaleByClone.IsNotNull());
+    CPPUNIT_ASSERT_EQUAL(int(mitk::ODFSB_GFA), int(scaleByClone->GetScaleBy()));
+  }
+
+  // A scene element without "value" built a std::string from nullptr.
+  void OdfPropertySerializers_MissingValue_Null()
+  {
+    tinyxml2::XMLDocument document;
+    auto element = document.NewElement("property");
+    CPPUNIT_ASSERT(mitk::OdfNormalizationMethodPropertySerializer::New()->Deserialize(element).IsNull());
+    CPPUNIT_ASSERT(mitk::OdfScaleByPropertySerializer::New()->Deserialize(element).IsNull());
+
+    element->SetAttribute("value", "Maximum");
+    auto property = mitk::OdfNormalizationMethodPropertySerializer::New()->Deserialize(element);
+    CPPUNIT_ASSERT(property.IsNotNull());
+    CPPUNIT_ASSERT_EQUAL(std::string("Maximum"), property->GetValueAsString());
   }
 };
 

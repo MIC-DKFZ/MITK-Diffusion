@@ -44,6 +44,7 @@ public:
   mitkClassMacro( OdfScaleByProperty, EnumerationProperty );
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
+  mitkCloneMacro(Self)
 
   mitkNewMacro1Param(OdfScaleByProperty, const IdType&);
 
@@ -63,6 +64,8 @@ protected:
   /** Sets reslice interpolation mode to default (ODFSB_NONE).
    */
   OdfScaleByProperty( );
+
+  OdfScaleByProperty(const OdfScaleByProperty&) = default;
 
   /**
    * Constructor. Sets reslice interpolation to the given value.
@@ -99,8 +102,10 @@ class MITKDIFFUSIONMODELLING_EXPORT OdfScaleByPropertySerializer : public Enumer
     {
       if (!element) return nullptr;
 
-      std::string s = "";
-      s = std::string(element->Attribute("value"));
+      // A malformed scene file may lack the attribute.
+      const char* value = element->Attribute("value");
+      if (value == nullptr) return nullptr;
+      std::string s(value);
 
       OdfScaleByProperty::Pointer property = OdfScaleByProperty::New();
       property->SetValue( s );

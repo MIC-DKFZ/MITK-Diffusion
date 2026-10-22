@@ -47,6 +47,7 @@ public:
   mitkClassMacro( OdfNormalizationMethodProperty, EnumerationProperty );
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
+  mitkCloneMacro(Self)
 
   mitkNewMacro1Param(OdfNormalizationMethodProperty, const IdType&);
 
@@ -83,6 +84,8 @@ protected:
    */
   OdfNormalizationMethodProperty( );
 
+  OdfNormalizationMethodProperty(const OdfNormalizationMethodProperty&) = default;
+
   /**
    * Constructor. Sets reslice interpolation to the given value.
    */
@@ -118,8 +121,10 @@ class MITKDIFFUSIONMODELLING_EXPORT OdfNormalizationMethodPropertySerializer : p
     {
       if (!element) return nullptr;
 
-      std::string s = "";
-      s = std::string(element->Attribute("value"));
+      // A malformed scene file may lack the attribute.
+      const char* value = element->Attribute("value");
+      if (value == nullptr) return nullptr;
+      std::string s(value);
 
       OdfNormalizationMethodProperty::Pointer property = OdfNormalizationMethodProperty::New();
       property->SetValue( s );
