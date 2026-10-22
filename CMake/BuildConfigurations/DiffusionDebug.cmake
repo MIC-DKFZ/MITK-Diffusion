@@ -39,6 +39,16 @@ set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.reconstruction" ON CACHE BOOL "
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.registration" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.tractography" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.measurementtoolbox" ON CACHE BOOL "" FORCE)
+# MITK views the former MITK Diffusion application shipped with; the movie maker holds the
+# screenshot maker.
+set("MITK_BUILD_org.mitk.gui.qt.moviemaker" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.volumevisualization" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.basicimageprocessing" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.renderwindowmanager" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.matchpoint.core.helper" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.matchpoint.algorithm.browser" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.matchpoint.algorithm.control" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.matchpoint.mapper" ON CACHE BOOL "" FORCE)
 # MITK's segmentation plugin does not compile without Python: MakeError in
 # QmitkSegmentationRestRoutes.cpp is unused then, and -Werror rejects it.
 set("MITK_BUILD_org.mitk.gui.qt.segmentation" OFF CACHE BOOL "" FORCE)
