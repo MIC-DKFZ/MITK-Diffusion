@@ -43,6 +43,7 @@ found in the LICENSE file.
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -77,6 +78,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(FlipPeaks_NegatesChosenAxes);
   MITK_TEST(MaximaExtraction_RecordedOutput);
   MITK_TEST(Filters_OutputTakenBeforeUpdate_GetsResult);
+  MITK_TEST(EigenvalueCorrection_RecordedOutput);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -140,6 +142,24 @@ public:
     }
     CPPUNIT_ASSERT_MESSAGE("Corrected tensors are not all zero", nonZero > 0);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("Tensor components that differ between 1 and N threads", 0u, differing);
+  }
+
+  // Corrected tensors of diffusionImage.hdwi as computed before the filter was restructured: a hash
+  // of the bits of all tensor components, so any numerical change shows.
+  void EigenvalueCorrection_RecordedOutput()
+  {
+    auto tensors = CorrectEigenvalues(LoadDwi("DiffusionImaging/diffusionImage.hdwi"));
+    std::uint64_t hash = 14695981039346656037ull;
+    itk::ImageRegionConstIterator<TensorImageType> it(tensors, tensors->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+      for (unsigned int i = 0; i < 6; ++i)
+      {
+        float value = it.Get()[i];
+        std::uint32_t bits;
+        std::memcpy(&bits, &value, sizeof(bits));
+        hash = (hash ^ bits) * 1099511628211ull;
+      }
+    CPPUNIT_ASSERT_EQUAL(std::uint64_t(5156811477493567636ull), hash);
   }
 
   /** Runs the eigenvalue correction on a constant 2x2x2 DWI with the given gradients (b=1000). */
