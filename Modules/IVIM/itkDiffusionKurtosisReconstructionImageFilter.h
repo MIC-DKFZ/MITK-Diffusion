@@ -40,9 +40,9 @@ namespace itk
       public vnl_least_squares_function
   {
   public:
-    /** full lsq_function constructor */
+    /** full lsq_function constructor; the residuals are the measurements and the bound penalty */
     kurtosis_fit_lsq_function( unsigned int num_params, unsigned int num_measurements, UseGradient g=no_gradient)
-      : vnl_least_squares_function( num_params, num_measurements, g),
+      : vnl_least_squares_function( num_params, num_measurements + 1, g),
         m_use_bounds(false),
         m_use_logscale(false),
         m_skip_fit(false)
@@ -128,11 +128,13 @@ namespace itk
 
     virtual void f(const vnl_vector<double> &x, vnl_vector<double> &fx)
     {
-      for ( unsigned int s=0; s < fx.size(); s++ )
+      // Levenberg-Marquardt squares the residuals itself; the penalty is a residual of its own so
+      // that it does not distort the least-squares fit of the measurements.
+      for ( unsigned int s=0; s < meas.size(); s++ )
       {
-        const double factor = ( meas[s] - M(x, s) );
-        fx[s] = factor * factor + penalty_term(x);
+        fx[s] = meas[s] - M(x, s);
       }
+      fx[meas.size()] = penalty_term(x);
 
       MITK_DEBUG("Fit.x_and_f") << x << " | " << fx;
     }

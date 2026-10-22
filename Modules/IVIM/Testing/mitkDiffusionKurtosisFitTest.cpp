@@ -39,6 +39,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(Map_SeveralBZeroValues_UsesTheirMean);
   MITK_TEST(Snapshot_NoBZero_FitsS0);
   MITK_TEST(TestMulti_RotatedVolumes_SameMaps);
+  MITK_TEST(Snapshot_NoisyVoxel_MinimizesSquaredResiduals);
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
   MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
   CPPUNIT_TEST_SUITE_END();
@@ -272,8 +273,54 @@ public:
       for (std::size_t i = 0; i < expected.d.size(); ++i)
       {
         // Only the summation order of the residuals differs.
-        AssertClose(expected.d[i], actual.d[i], 1e-5);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected.k[i], actual.k[i], 1e-3);
+        AssertClose(expected.d[i], actual.d[i], 1e-7);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected.k[i], actual.k[i], 1e-5);
+      }
+    }
+  }
+
+  void Snapshot_NoisyVoxel_MinimizesSquaredResiduals()
+  {
+    // Deterministic noise of up to 2 % of S0 on the diffusion-weighted measurements.
+    auto signal = KurtosisSignal(m_BValues, 10000, m_Truth[0].d, m_Truth[0].k);
+    for (std::size_t i = 2; i < signal.size(); ++i)
+      signal[i] = std::round(signal[i] + 200 * std::sin(2.3 * i));
+    auto image = MakeImage({signal});
+
+    auto filter = FilterType::New();
+    for (auto scale : {itk::STRAIGHT, itk::LOGARITHMIC})
+    {
+      for (bool omit : {false, true})
+      {
+        itk::KurtosisFitConfiguration config;
+        config.fit_scale = scale;
+        config.omit_bzero = omit;
+        auto snapshot = filter->GetSnapshot(image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
+        const double s0 = omit ? snapshot.m_BzeroFit : 10000;
+
+        auto cost = [&](double d, double k, double bzero)
+        {
+          double sum = 0;
+          for (std::size_t i = 2; i < signal.size(); ++i)
+          {
+            const double b = m_BValues[i];
+            const double exponent = -b * d + b * b * d * d * k / 6;
+            const double residual = scale == itk::STRAIGHT ? signal[i] - bzero * std::exp(exponent)
+                                                           : std::log(signal[i]) - std::log(bzero) - exponent;
+            sum += residual * residual;
+          }
+          return sum;
+        };
+
+        // A least-squares fit is a minimum of the sum of squared residuals in every direction.
+        const double minimum = cost(snapshot.m_D, snapshot.m_K, s0);
+        for (double h : {-1e-3, 1e-3})
+        {
+          CPPUNIT_ASSERT(minimum <= cost(snapshot.m_D * (1 + h), snapshot.m_K, s0));
+          CPPUNIT_ASSERT(minimum <= cost(snapshot.m_D, snapshot.m_K + h, s0));
+          if (omit)
+            CPPUNIT_ASSERT(minimum <= cost(snapshot.m_D, snapshot.m_K, s0 * (1 + h)));
+        }
       }
     }
   }
@@ -292,14 +339,14 @@ public:
     // -1000..1000 for K, which also switches on the D bounds. Voxel (5, 5, 1) is in the center of
     // the 11x11x3 image.
     const std::vector<Recorded> recorded = {
-      {itk::STRAIGHT, false, false, {0.000903944109, 0.1654352682}, {0.0009347549604, 0.2663042347}},
-      {itk::STRAIGHT, false, true, {0.000903944109, 0.1654352682}, {0.0009347549604, 0.2663042347}},
-      {itk::STRAIGHT, true, false, {0.001005211123, 0.1868300536}, {0.0009721510836, 0.3095819658}},
-      {itk::STRAIGHT, true, true, {0.00100521124, 0.1868300133}, {0.0009721510836, 0.3095819658}},
-      {itk::LOGARITHMIC, false, false, {0.0008564114338, -0.3039194411}, {0.0008082221038, -0.396188412}},
-      {itk::LOGARITHMIC, false, true, {0.0008564114338, -0.3039194411}, {0.0008082221038, -0.396188412}},
-      {itk::LOGARITHMIC, true, false, {0.000807258211, -4.050063143}, {0.0006364114273, -1.180144152}},
-      {itk::LOGARITHMIC, true, true, {0.000807258211, -4.050063143}, {0.0006364114273, -1.180144152}}};
+      {itk::STRAIGHT, false, false, {0.0009008328477, 0.1515096989}, {0.0009268454835, 0.2226285478}},
+      {itk::STRAIGHT, false, true, {0.0009008328477, 0.1515096989}, {0.0009268454835, 0.2226285478}},
+      {itk::STRAIGHT, true, false, {0.0009817003019, 0.1622455809}, {0.00110582413, 0.3973556333}},
+      {itk::STRAIGHT, true, true, {0.0009817003019, 0.1622455809}, {0.00110582413, 0.3973556333}},
+      {itk::LOGARITHMIC, false, false, {0.0008966618675, 0.05628250346}, {0.0009126120018, 0.1061738054}},
+      {itk::LOGARITHMIC, false, true, {0.0008966618675, 0.05628250346}, {0.0009126120018, 0.1061738054}},
+      {itk::LOGARITHMIC, true, false, {0.0009180578462, -0.1275466042}, {0.000944010572, 0.149562029}},
+      {itk::LOGARITHMIC, true, true, {0.0009180578462, -0.1275466042}, {0.000944010572, 0.149562029}}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 1;
@@ -335,10 +382,10 @@ public:
     // from 133 to 498 around their mean 204, the first one is 498; with S0 = 204 the least-squares
     // K of the straight fit is far below 0.
     const std::vector<Recorded> recorded = {
-      {itk::STRAIGHT, false, {0.0002090617194, -17.49915809}, 1},
-      {itk::STRAIGHT, true, {0.0007311146486, 0.3211416009}, 296.7392811},
-      {itk::LOGARITHMIC, false, {0.0007964425652, 0.2017387146}, 1},
-      {itk::LOGARITHMIC, true, {0.001737580899, 0.4587319693}, 535.7428001}};
+      {itk::STRAIGHT, false, {0.0001729772504, -30.32595512}, 1},
+      {itk::STRAIGHT, true, {0.0007854624584, 0.1797012849}, 324.7276248},
+      {itk::LOGARITHMIC, false, {0.000462749254, -2.514910376}, 1},
+      {itk::LOGARITHMIC, true, {0.00138620692, 0.406600739}, 470.2786719}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi"));
     auto filter = FilterType::New();
