@@ -455,6 +455,7 @@ void QmitkIVIMView::FittIVIMStart()
     filter->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(img));
     filter->SetGradientDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(img));
     filter->SetSmoothingSigma( m_Controls->m_SigmaSpinBox->value() );
+    filter->SetOmitUnweightedValue( m_Controls->m_OmitBZeroCB->isChecked() );
 
     if( m_Controls->m_UseKurtosisBoundsCB->isChecked() )
       filter->SetBoundariesForKurtosis( m_Controls->m_KurtosisRangeWidget->minimumValue(), m_Controls->m_KurtosisRangeWidget->maximumValue() );
