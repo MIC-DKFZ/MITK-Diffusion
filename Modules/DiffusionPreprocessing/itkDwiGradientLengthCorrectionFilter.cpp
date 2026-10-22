@@ -33,7 +33,8 @@ PURPOSE.  See the above copyright notices for more information.
 #include "itkDwiGradientLengthCorrectionFilter.h"
 
 itk::DwiGradientLengthCorrectionFilter::DwiGradientLengthCorrectionFilter()
-  : m_ReferenceBValue(0)
+  : m_NewBValue(0)
+  , m_ReferenceBValue(0)
   , m_RoundingValue(0)
   , m_ReferenceGradientDirectionContainer(nullptr)
   , m_OutputGradientDirectionContainer(nullptr)
@@ -63,6 +64,11 @@ void itk::DwiGradientLengthCorrectionFilter::GenerateData()
     if (roundedBValue<m_NewBValue && roundedBValue>1)
       m_NewBValue = roundedBValue;
   }
+
+  // The new reference b-value is the smallest rounded b-value of a weighted volume; without one it
+  // would stay at the maximum double.
+  if (m_NewBValue == itk::NumericTraits<double>::max())
+    itkExceptionMacro("No diffusion-weighted volume: no b-value rounds to more than 1.");
 
   it = m_ReferenceGradientDirectionContainer->Begin();
   for(; it != m_ReferenceGradientDirectionContainer->End(); ++it)
