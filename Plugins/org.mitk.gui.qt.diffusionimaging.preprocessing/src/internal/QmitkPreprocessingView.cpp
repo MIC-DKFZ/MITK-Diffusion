@@ -1352,7 +1352,6 @@ void QmitkPreprocessingView::DoShowGradientDirections()
     maxIndex = 2;
   }
 
-  mitk::Point3D origin = image->GetGeometry()->GetOrigin();
   mitk::PointSet::Pointer originSet = mitk::PointSet::New();
 
   typedef mitk::BValueMapProperty::BValueMap BValueMap;
@@ -1361,6 +1360,7 @@ void QmitkPreprocessingView::DoShowGradientDirections()
   auto gradientContainer = PropHelper::GetGradientContainer(image);
 
   mitk::BaseGeometry::Pointer geometry = image->GetGeometry();
+  const mitk::Point3D center = geometry->GetCenter();
   int shellCount = 1;
 
   for(BValueMapIterator it = bValMap.begin(); it!=bValMap.end(); ++it)
@@ -1368,40 +1368,17 @@ void QmitkPreprocessingView::DoShowGradientDirections()
     mitk::PointSet::Pointer pointset = mitk::PointSet::New();
     for (unsigned int j=0; j<it->second.size(); j++)
     {
-      mitk::Point3D ip;
+      // The gradients are world vectors drawn around the image centre; the centre computed per
+      // world axis from origin and spacing is wrong for a non-identity direction matrix.
       vnl_vector_fixed< double, 3 > v = gradientContainer->at(it->second[j]);
+      mitk::Point3D ip = center;
+      for (unsigned int d=0; d<3; ++d)
+        ip[d] += v[d]*maxSize*geometry->GetSpacing()[maxIndex]/2;
+
       if (v.magnitude()>mitk::eps)
-      {
-        ip[0] = v[0]*maxSize*geometry->GetSpacing()[maxIndex]/2
-            + origin[0]-0.5*geometry->GetSpacing()[0]
-            + geometry->GetSpacing()[0]*image->GetDimension(0)/2;
-
-        ip[1] = v[1]*maxSize*geometry->GetSpacing()[maxIndex]/2
-            + origin[1]-0.5*geometry->GetSpacing()[1]
-            + geometry->GetSpacing()[1]*image->GetDimension(1)/2;
-
-        ip[2] = v[2]*maxSize*geometry->GetSpacing()[maxIndex]/2
-            + origin[2]-0.5*geometry->GetSpacing()[2]
-            + geometry->GetSpacing()[2]*image->GetDimension(2)/2;
-
         pointset->InsertPoint(j, ip);
-      }
       else if (originSet->IsEmpty())
-      {
-        ip[0] = v[0]*maxSize*geometry->GetSpacing()[maxIndex]/2
-            + origin[0]-0.5*geometry->GetSpacing()[0]
-            + geometry->GetSpacing()[0]*image->GetDimension(0)/2;
-
-        ip[1] = v[1]*maxSize*geometry->GetSpacing()[maxIndex]/2
-            + origin[1]-0.5*geometry->GetSpacing()[1]
-            + geometry->GetSpacing()[1]*image->GetDimension(1)/2;
-
-        ip[2] = v[2]*maxSize*geometry->GetSpacing()[maxIndex]/2
-            + origin[2]-0.5*geometry->GetSpacing()[2]
-            + geometry->GetSpacing()[2]*image->GetDimension(2)/2;
-
         originSet->InsertPoint(j, ip);
-      }
     }
     if ( it->first < mitk::eps ) { continue; }
 
