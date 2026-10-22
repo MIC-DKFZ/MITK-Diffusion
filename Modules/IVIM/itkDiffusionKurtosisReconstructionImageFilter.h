@@ -215,7 +215,10 @@ namespace itk
   };
 
   /** @struct kurtosis_fit_omit_unweighted
-      @brief A fitting function handling the unweighted signal b_0 as a fitted parameter */
+      @brief A fitting function handling the unweighted signal b_0 as a fitted parameter
+
+      In log scale the third parameter is log(S_0), so that S_0 cannot become negative during the fit.
+      */
   struct kurtosis_fit_omit_unweighted
       : public kurtosis_fit_lsq_function
   {
@@ -233,7 +236,7 @@ namespace itk
       double result = Diff( x[0], x[1], bvalue);
 
       if( m_use_logscale )
-        return log( x[2] ) + result;
+        return x[2] + result;
       else
         return x[2] * result ;
     }

@@ -42,6 +42,8 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(Snapshot_NoBZero_FitsS0);
   MITK_TEST(TestMulti_RotatedVolumes_SameMaps);
   MITK_TEST(Snapshot_NoisyVoxel_MinimizesSquaredResiduals);
+  MITK_TEST(MapLog_ZeroMeasurement_LeftOut);
+  MITK_TEST(Map_NoSignal_Zero);
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
   MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
   CPPUNIT_TEST_SUITE_END();
@@ -352,6 +354,40 @@ public:
     }
   }
 
+  void MapLog_ZeroMeasurement_LeftOut()
+  {
+    auto signal = KurtosisSignal(m_BValues, 10000, m_Truth[1].d, m_Truth[1].k);
+    signal[5] = 0;
+    for (bool omit : {false, true})
+    {
+      auto filter = MakeFilter(MakeImage({signal}), m_Gradients, 3000);
+      filter->SetFittingScale(itk::LOGARITHMIC);
+      filter->SetOmitUnweightedValue(omit);
+      filter->Update();
+      auto maps = GetMaps(filter);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[1].d, maps.d[0], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[1].k, maps.k[0], 1e-3);
+    }
+  }
+
+  void Map_NoSignal_Zero()
+  {
+    const std::vector<double> zeros(m_BValues.size(), 0.0);
+    for (auto scale : {itk::STRAIGHT, itk::LOGARITHMIC})
+    {
+      for (bool omit : {false, true})
+      {
+        auto filter = MakeFilter(MakeImage({zeros}), m_Gradients, 3000);
+        filter->SetFittingScale(scale);
+        filter->SetOmitUnweightedValue(omit);
+        filter->Update();
+        auto maps = GetMaps(filter);
+        CPPUNIT_ASSERT_EQUAL(0.0, maps.d[0]);
+        CPPUNIT_ASSERT_EQUAL(0.0, maps.k[0]);
+      }
+    }
+  }
+
   void TestMulti_Maps_MatchRecordedValues()
   {
     struct Recorded
@@ -370,10 +406,10 @@ public:
       {itk::STRAIGHT, false, true, {0.0009008328477, 0.1515096989}, {0.0009268454835, 0.2226285478}},
       {itk::STRAIGHT, true, false, {0.0009817003019, 0.1622455809}, {0.00110582413, 0.3973556333}},
       {itk::STRAIGHT, true, true, {0.0009817003019, 0.1622455809}, {0.00110582413, 0.3973556333}},
-      {itk::LOGARITHMIC, false, false, {0.0008966618675, 0.05628250346}, {0.0009126120018, 0.1061738054}},
-      {itk::LOGARITHMIC, false, true, {0.0008966618675, 0.05628250346}, {0.0009126120018, 0.1061738054}},
-      {itk::LOGARITHMIC, true, false, {0.0009180578462, -0.1275466042}, {0.000944010572, 0.149562029}},
-      {itk::LOGARITHMIC, true, true, {0.0009180578462, -0.1275466042}, {0.000944010572, 0.149562029}}};
+      {itk::LOGARITHMIC, false, false, {0.0008955485404, 0.04730226457}, {0.0009126120018, 0.1061738054}},
+      {itk::LOGARITHMIC, false, true, {0.0008955485404, 0.04730226457}, {0.0009126120018, 0.1061738054}},
+      {itk::LOGARITHMIC, true, false, {0.0009155695528, -0.1464026451}, {0.0009440105723, 0.1495620297}},
+      {itk::LOGARITHMIC, true, true, {0.0009155695528, -0.1464026451}, {0.0009440105723, 0.1495620297}}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 1;
@@ -412,7 +448,7 @@ public:
       {itk::STRAIGHT, false, {0.0001729772504, -30.32595512}, 1},
       {itk::STRAIGHT, true, {0.0007854624584, 0.1797012849}, 324.7276248},
       {itk::LOGARITHMIC, false, {0.000462749254, -2.514910376}, 1},
-      {itk::LOGARITHMIC, true, {0.00138620692, 0.406600739}, 470.2786719}};
+      {itk::LOGARITHMIC, true, {0.001386206961, 0.4066007701}, 470.2786883}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi"));
     auto filter = FilterType::New();

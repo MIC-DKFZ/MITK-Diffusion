@@ -40,7 +40,8 @@ namespace itk
 {
   /** The measurements a kurtosis fit uses. S0 is the mean of the b=0 measurements, not the first
       volume, so the volume order does not matter; it is fitted instead when asked to or when there
-      is no b=0 measurement. */
+      is no b=0 measurement. The log-scale fit leaves out non-positive measurements, which have no
+      logarithm. */
   struct KurtosisFitData
   {
     vnl_vector<double> measurements;
@@ -67,7 +68,8 @@ static itk::KurtosisFitData AssembleKurtosisFitData( const itk::VariableLengthVe
       ++data.bzero_count;
     }
     // skip bvalues higher than the limit provided, if the flag is activated
-    else if( !kf_config.exclude_high_b || bvalues[i] <= kf_config.b_upper_threshold )
+    else if( ( !kf_config.exclude_high_b || bvalues[i] <= kf_config.b_upper_threshold )
+             && ( kf_config.fit_scale != itk::LOGARITHMIC || input.GetElement(i) >= vnl_math::eps ) )
     {
       measurements.push_back( input.GetElement(i) );
       fit_bvalues.push_back( bvalues[i] );
@@ -82,8 +84,17 @@ static itk::KurtosisFitData AssembleKurtosisFitData( const itk::VariableLengthVe
   return data;
 }
 
+/** True when Levenberg-Marquardt gave up or never started; x then still holds the start values. */
+static bool KurtosisFitFailed( const vnl_levenberg_marquardt& fit, const vnl_vector<double>& x )
+{
+  const auto code = fit.get_failure_code();
+  return code == vnl_nonlinear_minimizer::ERROR_FAILURE || code == vnl_nonlinear_minimizer::ERROR_DODGY_INPUT
+         || !x.is_finite();
+}
+
 /** Fits one voxel; result holds the start values (D, K, S0) on input and the fitted (D, K, S0) on
-    output, S0 being the b=0 mean when it is not fitted. */
+    output, S0 being the b=0 mean when it is not fitted. A voxel without signal, with fewer usable
+    measurements than parameters or whose fit fails gets 0, as voxels outside the mask do. */
 template< class TInputPixelType>
 static void FitSingleVoxel( const itk::VariableLengthVector< TInputPixelType > &input,
                             const vnl_vector<double>& bvalues,
@@ -99,6 +110,14 @@ static void FitSingleVoxel( const itk::VariableLengthVector< TInputPixelType > &
   MITK_DEBUG("KurtosisFilter.FitSingleVoxel.Meas") << data.measurements;
   MITK_DEBUG("KurtosisFilter.FitSingleVoxel.Bval") << data.bvalues;
 
+  const unsigned int num_params = data.fit_bzero ? 3 : 2;
+  if( data.measurements.size() < num_params || data.measurements.max_value() < vnl_math::eps
+      || ( !data.fit_bzero && data.bzero < vnl_math::eps ) )
+  {
+    result.fill(0);
+    return;
+  }
+
   // perform fit on data vectors
   if( data.fit_bzero )
   {
@@ -112,9 +131,21 @@ static void FitSingleVoxel( const itk::VariableLengthVector< TInputPixelType > &
     kurtosis_cost_fn.set_K_bounds( kf_config.K_limits );
    }
 
+   const bool logscale = kf_config.fit_scale == itk::LOGARITHMIC;
+   if( logscale )
+     result[2] = log( std::max( result[2], 1.0 ) );
+
    vnl_levenberg_marquardt nonlinear_fit( kurtosis_cost_fn );
    nonlinear_fit.minimize( result );
+   if( KurtosisFitFailed( nonlinear_fit, result ) )
+   {
+     result.fill(0);
+     return;
+   }
    kurtosis_cost_fn.clamp_to_bounds( result );
+
+   if( logscale )
+     result[2] = exp( result[2] );
   }
   else
   {
@@ -132,6 +163,11 @@ static void FitSingleVoxel( const itk::VariableLengthVector< TInputPixelType > &
    vnl_vector<double> d_and_k = result.extract( 2 );
    vnl_levenberg_marquardt nonlinear_fit( kurtosis_cost_fn );
    nonlinear_fit.minimize( d_and_k );
+   if( KurtosisFitFailed( nonlinear_fit, d_and_k ) )
+   {
+     result.fill(0);
+     return;
+   }
    kurtosis_cost_fn.clamp_to_bounds( d_and_k );
    result[0] = d_and_k[0];
    result[1] = d_and_k[1];
