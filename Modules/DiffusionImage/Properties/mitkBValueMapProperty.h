@@ -37,11 +37,11 @@ namespace mitk
     * key   := b value
     * value := indicesVector
     */
-    typedef std::map< unsigned int , std::vector< unsigned int >  >   BValueMap;
-    typedef unsigned int                                              IndexType;
-    typedef vnl_vector_fixed< double, 3 >                             ValueType;
-    typedef ValueType                                                 GradientDirectionType;
-    typedef itk::VectorContainer< IndexType, GradientDirectionType >  GradientDirectionsContainerType;
+    using BValueMap = std::map<unsigned int, std::vector<unsigned int>>;
+    using IndexType = unsigned int;
+    using ValueType = vnl_vector_fixed< double, 3 >;
+    using GradientDirectionType = ValueType;
+    using GradientDirectionsContainerType = itk::VectorContainer< IndexType, GradientDirectionType >;
     mitkClassMacro(BValueMapProperty, BaseProperty)
 
     itkFactorylessNewMacro(Self)

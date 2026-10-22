@@ -67,9 +67,7 @@ DiffusionImageNiftiReader* DiffusionImageNiftiReader::Clone() const
 }
 
 
-DiffusionImageNiftiReader::
-~DiffusionImageNiftiReader()
-{}
+DiffusionImageNiftiReader::~DiffusionImageNiftiReader() = default;
 
   DiffusionImageNiftiReader::
 DiffusionImageNiftiReader()
@@ -109,7 +107,7 @@ DiffusionImageNiftiReader::OutputType::Pointer DiffusionImageNiftiReader::Intern
 
       itk::Bruker2dseqImageIO::Pointer bruker_io = itk::Bruker2dseqImageIO::New();
 
-      typedef itk::Image<DiffusionPixelType,4> ImageType4D;
+      using ImageType4D = itk::Image<DiffusionPixelType,4>;
       ImageType4D::Pointer img4 = ImageType4D::New();
       bool bruker = false;
 
@@ -119,7 +117,7 @@ DiffusionImageNiftiReader::OutputType::Pointer DiffusionImageNiftiReader::Intern
         itk::NiftiImageIO::Pointer io2 = itk::NiftiImageIO::New();
         if (!io2->CanReadFile(this->GetInputLocation().c_str()))
           mitkThrow() << "ITK cannot read the NIfTI file " << this->GetInputLocation();
-        typedef itk::ImageFileReader<ImageType4D> FileReaderType;
+        using FileReaderType = itk::ImageFileReader<ImageType4D>;
         FileReaderType::Pointer reader = FileReaderType::New();
         reader->SetFileName( this->GetInputLocation() );
         reader->SetImageIO(io2);
@@ -129,7 +127,7 @@ DiffusionImageNiftiReader::OutputType::Pointer DiffusionImageNiftiReader::Intern
       else if(bruker_io->CanReadFile(this->GetInputLocation().c_str()))
       {
         MITK_INFO << "Reading bruker 2dseq file";
-        typedef itk::ImageFileReader<ImageType4D> FileReaderType;
+        using FileReaderType = itk::ImageFileReader<ImageType4D>;
         FileReaderType::Pointer reader = FileReaderType::New();
         reader->SetFileName( this->GetInputLocation() );
         reader->SetImageIO(bruker_io);
@@ -190,7 +188,7 @@ DiffusionImageNiftiReader::OutputType::Pointer DiffusionImageNiftiReader::Intern
       itkVectorImage->Allocate();
 
       itk::ImageRegionIterator<VectorImageType>   it ( itkVectorImage,  itkVectorImage->GetLargestPossibleRegion() );
-      typedef VectorImageType::PixelType VecPixType;
+      using VecPixType = VectorImageType::PixelType;
       for (it.GoToBegin(); !it.IsAtEnd(); ++it)
       {
         VecPixType vec = it.Get();

@@ -95,8 +95,8 @@ protected:
   std::vector< std::string > m_Study_names;
   std::vector< std::string > m_Series_names;
 
-  bool m_ResolveMosaic;
-  bool m_ApplyRotationToGradients;
+  bool m_ResolveMosaic = true;
+  bool m_ApplyRotationToGradients = true;
 
   std::vector< std::string > m_sop_instance_uids;
   std::vector< std::string > m_frame_of_reference_uids;

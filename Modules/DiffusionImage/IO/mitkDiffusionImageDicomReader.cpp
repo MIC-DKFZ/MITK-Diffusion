@@ -45,9 +45,7 @@ DiffusionImageDicomReader* DiffusionImageDicomReader::Clone() const
 }
 
 
-DiffusionImageDicomReader::
-~DiffusionImageDicomReader()
-{}
+DiffusionImageDicomReader::~DiffusionImageDicomReader() = default;
 
 DiffusionImageDicomReader::
 DiffusionImageDicomReader()

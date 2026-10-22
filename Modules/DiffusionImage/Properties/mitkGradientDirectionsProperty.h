@@ -31,10 +31,10 @@ namespace mitk
   class MITKDIFFUSIONIMAGE_EXPORT GradientDirectionsProperty : public mitk::BaseProperty
   {
   public:
-    typedef unsigned int                                             IndexType;
-    typedef vnl_vector_fixed< double, 3 >                            ValueType;
-    typedef ValueType                                                GradientDirectionType;
-    typedef itk::VectorContainer< IndexType, GradientDirectionType > GradientDirectionsContainerType;
+    using IndexType = unsigned int;
+    using ValueType = vnl_vector_fixed< double, 3 >;
+    using GradientDirectionType = ValueType;
+    using GradientDirectionsContainerType = itk::VectorContainer< IndexType, GradientDirectionType >;
 
     mitkClassMacro(GradientDirectionsProperty, BaseProperty)
 

@@ -169,9 +169,7 @@ namespace mitk
   }
 
 
-  DiffusionImageNrrdReader::
-  ~DiffusionImageNrrdReader()
-  {}
+  DiffusionImageNrrdReader::~DiffusionImageNrrdReader() = default;
 
   DiffusionImageNrrdReader::
   DiffusionImageNrrdReader()
@@ -208,7 +206,7 @@ namespace mitk
         MITK_INFO << "DiffusionImageNrrdReader: reading image information";
         VectorImageType::Pointer itkVectorImage;
         {
-          typedef itk::ImageFileReader<VectorImageType> FileReaderType;
+          using FileReaderType = itk::ImageFileReader<VectorImageType>;
           FileReaderType::Pointer reader = FileReaderType::New();
           reader->SetFileName(this->GetInputLocation());
           itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();

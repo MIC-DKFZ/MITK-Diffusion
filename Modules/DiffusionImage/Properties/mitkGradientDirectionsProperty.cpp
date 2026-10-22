@@ -37,9 +37,7 @@ mitk::GradientDirectionsProperty::GradientDirectionsProperty(const GradientDirec
   m_GradientDirectionsContainer = gradientDirectionsContainer;
 }
 
-mitk::GradientDirectionsProperty::~GradientDirectionsProperty()
-{
-}
+mitk::GradientDirectionsProperty::~GradientDirectionsProperty() = default;
 
 const mitk::GradientDirectionsProperty::GradientDirectionsContainerType::Pointer mitk::GradientDirectionsProperty::GetGradientDirectionsContainerCopy() const
 {

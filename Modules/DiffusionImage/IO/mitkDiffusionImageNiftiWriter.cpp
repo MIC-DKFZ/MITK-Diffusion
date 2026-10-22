@@ -45,8 +45,7 @@ mitk::DiffusionImageNiftiWriter::DiffusionImageNiftiWriter(const mitk::Diffusion
 {
 }
 
-mitk::DiffusionImageNiftiWriter::~DiffusionImageNiftiWriter()
-{}
+mitk::DiffusionImageNiftiWriter::~DiffusionImageNiftiWriter() = default;
 
 void mitk::DiffusionImageNiftiWriter::Write()
 {
@@ -66,7 +65,7 @@ void mitk::DiffusionImageNiftiWriter::Write()
   VectorImageType::Pointer itkImg;
   mitk::CastToItkImage(input,itkImg);
 
-  typedef itk::VectorImage<short,3> ImageType;
+  using ImageType = itk::VectorImage<short,3>;
 
   const auto mimeType = this->GetRegisteredMimeType();
 
@@ -76,7 +75,7 @@ void mitk::DiffusionImageNiftiWriter::Write()
 
   MITK_INFO << "Writing Nifti-Image";
 
-  typedef itk::Image<short,4> ImageType4D;
+  using ImageType4D = itk::Image<short,4>;
   ImageType4D::Pointer img4 = ImageType4D::New();
 
   ImageType::SpacingType spacing = itkImg->GetSpacing();
@@ -128,7 +127,7 @@ void mitk::DiffusionImageNiftiWriter::Write()
   img4->Allocate();
 
   itk::ImageRegionIterator<ImageType>   it (itkImg, itkImg->GetLargestPossibleRegion() );
-  typedef ImageType::PixelType VecPixType;
+  using VecPixType = ImageType::PixelType;
 
   for (it.GoToBegin(); !it.IsAtEnd(); ++it)
   {
@@ -146,7 +145,7 @@ void mitk::DiffusionImageNiftiWriter::Write()
 
   itk::NiftiImageIO::Pointer io4 = itk::NiftiImageIO::New();
 
-  typedef itk::ImageFileWriter<ImageType4D> WriterType4;
+  using WriterType4 = itk::ImageFileWriter<ImageType4D>;
   WriterType4::Pointer nrrdWriter4 = WriterType4::New();
   nrrdWriter4->UseInputMetaDataDictionaryOn();
   nrrdWriter4->SetInput( img4 );

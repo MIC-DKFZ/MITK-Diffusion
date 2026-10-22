@@ -161,11 +161,11 @@ public:
 class MITKDIFFUSIONIMAGE_EXPORT gradients
 {
 private:
-  typedef std::vector<unsigned int> IndiciesVector;
-  typedef mitk::BValueMapProperty::BValueMap  BValueMap;
+  using IndiciesVector = std::vector<unsigned int>;
+  using BValueMap = mitk::BValueMapProperty::BValueMap;
 
-  typedef DiffusionPropertyHelper::GradientDirectionsContainerType GradientDirectionContainerType;
-  typedef DiffusionPropertyHelper::GradientDirectionType GradientDirectionType;
+  using GradientDirectionContainerType = DiffusionPropertyHelper::GradientDirectionsContainerType;
+  using GradientDirectionType = DiffusionPropertyHelper::GradientDirectionType;
 
 public:
 

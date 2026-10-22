@@ -47,8 +47,7 @@ mitk::DiffusionImageNrrdWriter::DiffusionImageNrrdWriter(const mitk::DiffusionIm
 {
 }
 
-mitk::DiffusionImageNrrdWriter::~DiffusionImageNrrdWriter()
-{}
+mitk::DiffusionImageNrrdWriter::~DiffusionImageNrrdWriter() = default;
 
 void mitk::DiffusionImageNrrdWriter::Write()
 {
@@ -92,7 +91,7 @@ void mitk::DiffusionImageNrrdWriter::Write()
   itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
   io->UseCompressionOn();
 
-  typedef itk::ImageFileWriter<VectorImageType> WriterType;
+  using WriterType = itk::ImageFileWriter<VectorImageType>;
   WriterType::Pointer nrrdWriter = WriterType::New();
   nrrdWriter->UseInputMetaDataDictionaryOn();
   nrrdWriter->SetInput( itkImg );

@@ -54,16 +54,9 @@ static void PerformHeaderAnalysis( mitk::DiffusionHeaderDICOMFileReader::DICOMHe
             << "  :: \t"<< weighted_images << " b > 0";
 }
 
-mitk::DiffusionDICOMFileReader::DiffusionDICOMFileReader()
-{
-  m_ApplyRotationToGradients = true;
-  m_ResolveMosaic = true;
-}
+mitk::DiffusionDICOMFileReader::DiffusionDICOMFileReader() = default;
 
-mitk::DiffusionDICOMFileReader::~DiffusionDICOMFileReader()
-{
-
-}
+mitk::DiffusionDICOMFileReader::~DiffusionDICOMFileReader() = default;
 
 bool mitk::DiffusionDICOMFileReader
 ::LoadImages()
