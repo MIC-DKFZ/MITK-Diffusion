@@ -75,6 +75,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(TensorToOdf_RecordedOutput);
   MITK_TEST(PrincipalDirection_RecordedOutput);
   MITK_TEST(FlipPeaks_NegatesChosenAxes);
+  MITK_TEST(MaximaExtraction_RecordedOutput);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -818,6 +819,47 @@ public:
     CPPUNIT_ASSERT_DOUBLES_EQUAL(21.773321121931076, sums[1], 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(12.989389510825276, sums[2], 1e-6);
     CPPUNIT_ASSERT_EQUAL(47u, withDirection);
+  }
+
+  // Peaks of sh_image_test.nii.gz as extracted before the 3D/4D geometry code was shared,
+  // summarized per component, with the number of peaks and the 4D geometry.
+  void MaximaExtraction_RecordedOutput()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto coefficients = mitk::convert::GetItkShFromShImage<15>(shImage.GetPointer());
+
+    using FilterType = itk::OdfMaximaExtractionFilter<float, 4, ODF_SAMPLING_SIZE>;
+    auto filter = FilterType::New();
+    filter->SetInput(coefficients);
+    filter->SetMaxNumPeaks(3);
+    filter->Update();
+
+    auto peaks = filter->GetPeakImage();
+    double sums[3] = {0, 0, 0};
+    itk::ImageRegionConstIteratorWithIndex<FilterType::PeakImageType> it(peaks, peaks->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+      sums[it.GetIndex()[3] % 3] += std::fabs(it.Get());
+    unsigned int numPeaks = 0;
+    itk::ImageRegionConstIterator<MaskImageType> itNum(filter->GetNumDirectionsImage(), filter->GetNumDirectionsImage()->GetLargestPossibleRegion());
+    for (; !itNum.IsAtEnd(); ++itNum)
+      numPeaks += itNum.Get();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(303.91917738690972, sums[0], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(505.74287556356285, sums[1], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(414.1981383588427, sums[2], 1e-6);
+    CPPUNIT_ASSERT_EQUAL(809u, numPeaks);
+
+    CPPUNIT_ASSERT(filter->GetNumDirectionsImage()->GetLargestPossibleRegion() == coefficients->GetLargestPossibleRegion());
+    CPPUNIT_ASSERT(filter->GetNumDirectionsImage()->IsSameImageGeometryAs(coefficients));
+    const itk::Size<4> peakSize = {{10, 10, 3, 9}};
+    CPPUNIT_ASSERT(peaks->GetLargestPossibleRegion().GetSize() == peakSize);
+    for (unsigned int r = 0; r < 4; ++r)
+    {
+      CPPUNIT_ASSERT_EQUAL(r < 3 ? coefficients->GetSpacing()[r] : 1.0, peaks->GetSpacing()[r]);
+      CPPUNIT_ASSERT_EQUAL(r < 3 ? coefficients->GetOrigin()[r] : 0.0, peaks->GetOrigin()[r]);
+      for (unsigned int c = 0; c < 4; ++c)
+        CPPUNIT_ASSERT_EQUAL(r < 3 && c < 3 ? coefficients->GetDirection()[r][c] : (r == c ? 1.0 : 0.0), peaks->GetDirection()[r][c]);
+    }
   }
 
   void FlipPeaks_NegatesChosenAxes()
