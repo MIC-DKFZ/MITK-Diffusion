@@ -12,6 +12,7 @@ found in the LICENSE file.
 
 #include <mitkIOUtil.h>
 #include <mitkImagePixelReadAccessor.h>
+#include <mitkFileReaderSelector.h>
 #include <mitkImageReadAccessor.h>
 #include <mitkOdfImage.h>
 #include <mitkPeakImage.h>
@@ -33,6 +34,7 @@ found in the LICENSE file.
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 
 class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
@@ -49,6 +51,8 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(Clone_KeepsTypeAndPixels);
   MITK_TEST(PeakImage_SetCustomColorWithoutPolydata);
   MITK_TEST(ShAndPeakIO_DotsInFileName);
+  MITK_TEST(MimeTypes_ShAndPeakReadersOnlyForMatchingFiles);
+  MITK_TEST(ShWriter_NewNiftiFile_ReadsBackAsSh);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -327,6 +331,40 @@ public:
     const std::string peakPath = m_TempDir + "/peaks.v2.nrrd";
     mitk::IOUtil::Save(peakImage, peakPath);
     AssertEqualPixels(peakImage, mitk::IOUtil::Load<mitk::PeakImage>(peakPath, &peakFunctor));
+  }
+
+  static std::set<std::string> ReaderDescriptions(const std::string &path)
+  {
+    std::set<std::string> descriptions;
+    for (const auto &item : mitk::FileReaderSelector(path).Get())
+      descriptions.insert(item.GetDescription());
+    return descriptions;
+  }
+
+  // The SH and peak mime types were registered as plain copies without their content checks, so
+  // both readers were offered for every NIfTI and NRRD file.
+  void MimeTypes_ShAndPeakReadersOnlyForMatchingFiles()
+  {
+    for (const std::string file : {"DiffusionImaging/mean_FA.nii.gz", "DiffusionImaging/tensorImage_FA.nrrd"})
+    {
+      const auto descriptions = ReaderDescriptions(GetTestDataFilePath(file));
+      CPPUNIT_ASSERT_MESSAGE(file, descriptions.count("SH Image") == 0);
+      CPPUNIT_ASSERT_MESSAGE(file, descriptions.count("Peak Image") == 0);
+    }
+
+    const auto shDescriptions = ReaderDescriptions(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"));
+    CPPUNIT_ASSERT(shDescriptions.count("SH Image") == 1);
+    CPPUNIT_ASSERT(shDescriptions.count("Peak Image") == 1);
+  }
+
+  // Writers are chosen through the mime type of the output path, which does not exist yet.
+  void ShWriter_NewNiftiFile_ReadsBackAsSh()
+  {
+    mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    const std::string path = m_TempDir + "/sh.nii.gz";
+    mitk::IOUtil::Save(shImage, path);
+    AssertEqualPixels(shImage, mitk::IOUtil::Load<mitk::ShImage>(path, &shFunctor));
   }
 };
 

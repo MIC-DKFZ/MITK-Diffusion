@@ -26,7 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 
 mitk::NrrdOdfImageWriter::NrrdOdfImageWriter()
-  : AbstractFileWriter(mitk::OdfImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::ODF_MIMETYPE() ), mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_DESCRIPTION())
+  : AbstractFileWriter(mitk::OdfImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_DESCRIPTION())
 {
   RegisterService();
 }

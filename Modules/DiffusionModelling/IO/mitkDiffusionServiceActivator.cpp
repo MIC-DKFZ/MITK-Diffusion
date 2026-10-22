@@ -75,9 +75,14 @@ namespace mitk
   {
   public:
 
-    void Load(us::ModuleContext* ) override
+    void Load(us::ModuleContext* context) override
     {
+      // Registered here as the full objects, so that the content checks of the SH and peak types
+      // (AppliesTo) are used; the readers and writers refer to them by name. With the default rank,
+      // MITK's image reader stays the default for plain 4D NIfTI and NRRD files.
       m_MimeTypes = mitk::DiffusionIOMimeTypes::Get();
+      for (auto mimeType : m_MimeTypes)
+        m_MimeTypeRegistrations.push_back(context->RegisterService(mimeType));
 
       m_NrrdTensorImageReader = new NrrdTensorImageReader();
       m_NrrdOdfImageReader = new NrrdOdfImageReader();
@@ -104,11 +109,6 @@ namespace mitk
     {
       m_MapperProviders.clear();
 
-      for (unsigned int loop(0); loop < m_MimeTypes.size(); ++loop)
-      {
-        delete m_MimeTypes.at(loop);
-      }
-
       delete m_NrrdTensorImageReader;
       delete m_NrrdOdfImageReader;
       delete m_ShImageReader;
@@ -117,6 +117,11 @@ namespace mitk
       delete m_NrrdTensorImageWriter;
       delete m_NrrdOdfImageWriter;
       delete m_ShImageWriter;
+
+      for (auto& registration : m_MimeTypeRegistrations)
+        registration.Unregister();
+      for (auto mimeType : m_MimeTypes)
+        delete mimeType;
     }
 
   private:
@@ -131,6 +136,7 @@ namespace mitk
     ShImageWriter * m_ShImageWriter;
 
     std::vector<mitk::CustomMimeType*> m_MimeTypes;
+    std::vector<us::ServiceRegistration<mitk::CustomMimeType>> m_MimeTypeRegistrations;
 
     std::vector<std::unique_ptr<IMapperProvider>> m_MapperProviders;
   };

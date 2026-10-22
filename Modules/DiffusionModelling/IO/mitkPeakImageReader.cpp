@@ -37,7 +37,7 @@ namespace mitk
   }
 
   PeakImageReader::PeakImageReader()
-    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE() ), mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_DESCRIPTION() )
+    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_DESCRIPTION() )
   {
     m_ServiceReg = this->RegisterService();
   }

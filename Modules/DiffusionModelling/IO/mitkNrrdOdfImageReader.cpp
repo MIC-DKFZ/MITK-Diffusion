@@ -34,7 +34,7 @@ namespace mitk
   }
 
   NrrdOdfImageReader::NrrdOdfImageReader()
-    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::ODF_MIMETYPE() ), mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_DESCRIPTION() )
+    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_DESCRIPTION() )
   {
     m_ServiceReg = this->RegisterService();
   }

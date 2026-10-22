@@ -59,6 +59,13 @@ DiffusionIOMimeTypes::SHImageMimeType::SHImageMimeType() : CustomMimeType(SH_MIM
 
 bool DiffusionIOMimeTypes::SHImageMimeType::AppliesTo(const std::string &path) const
 {
+  if (!CustomMimeType::AppliesTo(path))
+    return false;
+  // MITK bug 18572: writers are chosen through AppliesTo too, with the path of a file to be
+  // written, whose content cannot be checked yet.
+  if (!itksys::SystemTools::FileExists(path))
+    return true;
+
   std::string ext = itksys::SystemTools::GetFilenameLastExtension(path);
   if (ext==".shi")
     return true;
@@ -103,6 +110,7 @@ bool DiffusionIOMimeTypes::SHImageMimeType::AppliesTo(const std::string &path) c
     {}
   }
 
+  try
   {
     itk::NiftiImageIO::Pointer io = itk::NiftiImageIO::New();
     if ( io->CanReadFile( path.c_str() ) )
@@ -137,6 +145,8 @@ bool DiffusionIOMimeTypes::SHImageMimeType::AppliesTo(const std::string &path) c
       }
     }
   }
+  catch(...)
+  {}
 
   return false;
 }
@@ -188,6 +198,12 @@ DiffusionIOMimeTypes::PeakImageMimeType::PeakImageMimeType() : CustomMimeType(PE
 
 bool DiffusionIOMimeTypes::PeakImageMimeType::AppliesTo(const std::string &path) const
 {
+  if (!CustomMimeType::AppliesTo(path))
+    return false;
+  // MITK bug 18572, see SHImageMimeType::AppliesTo.
+  if (!itksys::SystemTools::FileExists(path))
+    return true;
+
   std::string ext = itksys::SystemTools::GetFilenameLastExtension(path);
   if (ext==".peak")
     return true;

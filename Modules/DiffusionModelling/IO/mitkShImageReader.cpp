@@ -37,7 +37,7 @@ namespace mitk
   }
 
   ShImageReader::ShImageReader()
-    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION() )
+    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION() )
   {
     Options defaultOptions;
     defaultOptions["Assume MRtrix/MITK style SH convention (else FSL/Dipy)"] = true;

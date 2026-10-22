@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkNrrdImageIO.h>
 
 mitk::ShImageWriter::ShImageWriter()
-  : AbstractFileWriter(mitk::ShImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION())
+  : AbstractFileWriter(mitk::ShImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION())
 {
   RegisterService();
 }
