@@ -40,6 +40,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(TensorReader_Nrrd_LeavesNoTemporaryFiles);
   MITK_TEST(TensorReader_Nifti_LeavesNoTemporaryFiles);
   MITK_TEST(Writers_UnwritableLocation_Throw);
+  MITK_TEST(OdfReader_WrongVectorLength_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -222,6 +223,22 @@ public:
     CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(shImage, missingDir + "sh.shi"), std::exception);
 
     CPPUNIT_ASSERT(!itksys::SystemTools::FileExists(missingDir));
+  }
+
+  // The reader copied 252 values per voxel whatever the file held.
+  void OdfReader_WrongVectorLength_Throws()
+  {
+    const std::string path = m_TempDir + "/short.odf";
+    std::ofstream file(path);
+    file << "NRRD0004\ntype: float\ndimension: 4\nspace: left-posterior-superior\nsizes: 251 1 1 1\n"
+         << "space directions: none (1,0,0) (0,1,0) (0,0,1)\nkinds: vector domain domain domain\n"
+         << "endian: little\nencoding: ascii\nspace origin: (0,0,0)\n\n";
+    for (unsigned int i = 0; i < 251; ++i)
+      file << "0.1 ";
+    file << "\n";
+    file.close();
+
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load(path), std::exception);
   }
 };
 

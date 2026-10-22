@@ -67,6 +67,10 @@ namespace mitk
         reader->Update();
         ImageType::Pointer img = reader->GetOutput();
 
+        // Each voxel is copied as a fixed vector of ODF_SAMPLING_SIZE values.
+        if (img->GetNumberOfComponentsPerPixel() != ODF_SAMPLING_SIZE)
+          mitkThrow() << "The ODF image has " << img->GetNumberOfComponentsPerPixel() << " values per voxel instead of " << ODF_SAMPLING_SIZE << ".";
+
         typedef itk::Image<itk::Vector<float,ODF_SAMPLING_SIZE>,3> VecImgType;
         VecImgType::Pointer vecImg = VecImgType::New();
         vecImg->SetSpacing( img->GetSpacing() );   // Set the image spacing
