@@ -68,9 +68,9 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
 
     private:
 
-    bool                                        m_FlipX;
-    bool                                        m_FlipY;
-    bool                                        m_FlipZ;
+    bool                                        m_FlipX = false;
+    bool                                        m_FlipY = false;
+    bool                                        m_FlipZ = false;
 };
 
 }
