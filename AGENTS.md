@@ -155,6 +155,11 @@ Run from the workspace root. Both superbuild trees use Unix Makefiles; for Relea
 - Long tasks go in major steps; ask for confirmation after each. When a session grows long, hand
   over at a checkpoint: write `prompts/NN-<topic>.md` (next number) with the state, decisions,
   anchored facts and remaining steps, and give the user the start sentence.
+- Every handoff (a `prompts/` file or a `handoff` plan) is started in a new chat in the
+  workspace root with `carry out this plan: <absolute path>`; the user never switches to a
+  worktree or opens a second window. A plan for work in a worktree therefore names the
+  worktree and pins every edit, git command (`git -C <worktree>`), build and test to it by
+  absolute path, and the main checkout stays untouched.
 
 ### Git: never commit or push unasked
 
