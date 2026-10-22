@@ -42,6 +42,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkScalarImageToHistogramGenerator.h"
 #include "itkRegionOfInterestImageFilter.h"
 #include "itkImageRegionConstIteratorWithIndex.h"
+#include <itkVectorIndexSelectionCastImageFilter.h>
 
 // itk/mitk
 #include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h"
@@ -383,22 +384,14 @@ void QmitkIVIMView::AutoThreshold()
 
   MITK_INFO << "Performing Histogram Analysis on Channel" << index;
 
+  // A DWI cannot be cast to a scalar image, so the b=0 channel is extracted.
   typedef itk::Image<short,3> ImgType;
-  ImgType::Pointer img = ImgType::New();
-  mitk::CastToItkImage(dimg, img);
-
-  itk::ImageRegionIterator<ImgType> itw (img, img->GetLargestPossibleRegion() );
-  itw.GoToBegin();
-
-  itk::ImageRegionConstIterator<VecImgType> itr (vecimg, vecimg->GetLargestPossibleRegion() );
-  itr.GoToBegin();
-
-  while(!itr.IsAtEnd())
-  {
-    itw.Set(itr.Get().GetElement(index));
-    ++itr;
-    ++itw;
-  }
+  typedef itk::VectorIndexSelectionCastImageFilter<VecImgType, ImgType> ChannelFilterType;
+  ChannelFilterType::Pointer channelFilter = ChannelFilterType::New();
+  channelFilter->SetInput(vecimg);
+  channelFilter->SetIndex(index);
+  channelFilter->Update();
+  ImgType::Pointer img = channelFilter->GetOutput();
 
   typedef itk::Statistics::ScalarImageToHistogramGenerator< ImgType >
       HistogramGeneratorType;
@@ -473,7 +466,15 @@ void QmitkIVIMView::FittIVIMStart()
       filter->SetImageMask( maskItk );
     }
 
-    filter->Update();
+    try
+    {
+      filter->Update();
+    }
+    catch (const itk::ExceptionObject& e)
+    {
+      QMessageBox::warning( nullptr, "Kurtosis fit", QString("Kurtosis fit failed: ") + e.GetDescription() );
+      return;
+    }
 
     mitk::LookupTable::Pointer kurt_map_lut = mitk::LookupTable::New();
     kurt_map_lut->SetType( mitk::LookupTable::JET );
@@ -515,9 +516,9 @@ void QmitkIVIMView::FittIVIMStart()
   }
   else
   {
-    FittIVIM(vecimg, mitk::DiffusionPropertyHelper::GetGradientContainer(img), mitk::DiffusionPropertyHelper::GetReferenceBValue(img), true, dummy);
-
-    OutputToDatastorage(m_Controls->m_DwiBox->GetSelectedNode());
+    // A failed fit keeps the maps of the last single-voxel preview, which must not be stored.
+    if (FittIVIM(vecimg, mitk::DiffusionPropertyHelper::GetGradientContainer(img), mitk::DiffusionPropertyHelper::GetReferenceBValue(img), true, dummy))
+      OutputToDatastorage(m_Controls->m_DwiBox->GetSelectedNode());
   }
 }
 
