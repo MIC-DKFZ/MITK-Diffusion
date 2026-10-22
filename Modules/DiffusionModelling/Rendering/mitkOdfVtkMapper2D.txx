@@ -703,7 +703,7 @@ void  mitk::OdfVtkMapper2D<T,N>
       }
       catch( itk::ExceptionObject& err )
       {
-        std::cout << err << std::endl;
+        MITK_ERROR << err;
       }
 
       localStorage->m_OdfsPlanes[index]->AddInputConnection(glyphGenerator->GetOutputPort());
@@ -832,6 +832,16 @@ void mitk::OdfVtkMapper2D<T,N>
     else if ( pointData->GetArrayName( 0 ) == nullptr )
     {
       m_VtkImage->GetPointData()->GetArray(0)->SetName("vector");
+    }
+
+    // GlyphMethod handles only these counts; checked here, because an exception from inside the
+    // VTK pipeline would leave the mapper.
+    const int components = pointData->GetArray(0)->GetNumberOfComponents();
+    if (components != 6 && components != ODF_SAMPLING_SIZE && components != 15 && components != 28
+        && components != 45 && components != 66 && components != 91)
+    {
+      MITK_ERROR << "The ODF mapper cannot draw images with " << components << " components per voxel.";
+      return;
     }
 
     m_ProbeFilter->SetSourceData(m_VtkImage); // m_VtkImage is your original vtkImageData
