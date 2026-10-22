@@ -97,14 +97,10 @@ Facts the layout does not show:
 
 ## Porting state
 
-In the `DiffusionDebug` build, all diffusion modules, their test drivers and the command line
-apps compile and link; the plugins are not built yet. Remove an item once it is fixed; add what
-the build reveals.
+In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
+line apps, plugins, user manuals) compile and link without warnings; the tests have not run yet.
+Remove an item once it is fixed; add what the tests reveal.
 
-- The IVIM view plots with `QmitkChartWidget`, which MITK removed with its `Chart` module
-  (`git -C mitk show 1bd606f7cf`; MITK moved its charts to `QmitkPlotWidget`, Qwt).
-  `Plugins/org.mitk.gui.qt.diffusionimaging.ivim/src/internal/QmitkIVIMView.cpp:176-253` and
-  `QmitkIVIMViewControls.ui:178` still use it; the plugin no longer depends on `MitkChart`.
 - MITK's `org.mitk.gui.qt.segmentation` does not compile with Python off: `MakeError` in
   `mitk/Plugins/org.mitk.gui.qt.segmentation/src/internal/QmitkSegmentationRestRoutes.cpp:465`
   is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.

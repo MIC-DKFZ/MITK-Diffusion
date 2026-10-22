@@ -77,7 +77,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkVtkPropRenderer.h>
 #include <mitkInteractionConst.h>
 #include <mitkInteractionPositionEvent.h>
-#include <mitkProgressBar.h>
 #include <vtkSmartPointer.h>
 #include <vtkSphereSource.h>
 #include <vtkPolyDataMapper.h>

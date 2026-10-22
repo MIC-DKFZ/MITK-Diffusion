@@ -32,8 +32,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkPeakImage.h>
 #include <mitkLabelSetImage.h>
-#include <mitkDICOMSegmentationConstants.h>
-#include <mitkDICOMSegmentationPropertyHelper.cpp>
 #include <mitkDICOMQIPropertyHelper.h>
 
 // ITK
@@ -494,39 +492,11 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
       mitk::Label::Pointer label = multilabelImage->GetLabel(1);
       label->SetName("Tractogram");
 
-      // Add Segmented Property Category Code Sequence tags (0062, 0003): Sequence defining the general category of this
-      // segment.
-      // (0008,0100) Code Value
-      label->SetProperty(
-            DICOMTagPathToPropertyName(DICOMSegmentationConstants::SEGMENT_CATEGORY_CODE_VALUE_PATH()).c_str(),
-            TemporoSpatialStringProperty::New("T-D000A"));
+      // Segmented Property Category Code Sequence (0062, 0003): the general category of this segment.
+      label->SetSegmentedPropertyCategory(DICOMCodeSequence("T-D000A", "SRT", "Anatomical Structure"));
 
-      // (0008,0102) Coding Scheme Designator
-      label->SetProperty(
-            DICOMTagPathToPropertyName(DICOMSegmentationConstants::SEGMENT_CATEGORY_CODE_SCHEME_PATH()).c_str(),
-            TemporoSpatialStringProperty::New("SRT"));
-
-      // (0008,0104) Code Meaning
-      label->SetProperty(
-            DICOMTagPathToPropertyName(DICOMSegmentationConstants::SEGMENT_CATEGORY_CODE_MEANING_PATH()).c_str(),
-            TemporoSpatialStringProperty::New("Anatomical Structure"));
-      //------------------------------------------------------------
-      // Add Segmented Property Type Code Sequence (0062, 000F): Sequence defining the specific property type of this
-      // segment.
-      // (0008,0100) Code Value
-      label->SetProperty(
-            DICOMTagPathToPropertyName(DICOMSegmentationConstants::SEGMENT_TYPE_CODE_VALUE_PATH()).c_str(),
-            TemporoSpatialStringProperty::New("DUMMY"));
-
-      // (0008,0102) Coding Scheme Designator
-      label->SetProperty(
-            DICOMTagPathToPropertyName(DICOMSegmentationConstants::SEGMENT_TYPE_CODE_SCHEME_PATH()).c_str(),
-            TemporoSpatialStringProperty::New("SRT"));
-
-      // (0008,0104) Code Meaning
-      label->SetProperty(
-            DICOMTagPathToPropertyName(DICOMSegmentationConstants::SEGMENT_TYPE_CODE_MEANING_PATH()).c_str(),
-            TemporoSpatialStringProperty::New(name));
+      // Segmented Property Type Code Sequence (0062, 000F): the specific property type of this segment.
+      label->SetSegmentedPropertyType(DICOMCodeSequenceWithModifiers("DUMMY", "SRT", name));
 
       //Error: is undeclared//      mitk::DICOMQIPropertyHandler::DeriveDICOMSourceProperties(m_SelectedImage, multilabelImage);
 

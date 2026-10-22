@@ -25,6 +25,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "qmessagebox.h"
 #include "qclipboard.h"
 
+// qwt
+#include <qwt_plot_renderer.h>
+#include <qwt_scale_engine.h>
+
 // mitk
 #include "mitkImage.h"
 #include "mitkImageCast.h"
@@ -59,6 +63,11 @@ QmitkIVIMView::QmitkIVIMView()
   , m_Active(false)
   , m_Visible(false)
   , m_HoldUpdate(false)
+  , m_DPartCurveId(0)
+  , m_FitCurveId(0)
+  , m_SignalCurveId(0)
+  , m_SecondFitSignalCurveId(0)
+  , m_SecondFitSignalCurve(nullptr)
 {
 }
 
@@ -151,7 +160,7 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
   // release update block after the UI-elements were all set
   this->m_HoldUpdate = false;
 
-  QmitkIVIMView::InitChartIvim();
+  InitChart("S/S0");
 
   m_ListenerActive = false;
 
@@ -166,91 +175,53 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
 void QmitkIVIMView::OnModelTabChanged(int tab)
 {
   if (tab==0)
-    InitChartIvim();
+    InitChart("S/S0");
   else if (tab==1)
-    InitChartKurtosis();
+    InitChart("S");
 
   UpdateGui();
 }
 
 void QmitkIVIMView::AddSecondFitPlot()
 {
-  if (m_Controls->m_ChartWidget->GetDataElementByLabel("signal values (used for second fit)") == nullptr)
-  {
-    std::vector< std::pair<double, double> > init_data;
-    m_Controls->m_ChartWidget->AddData2D(init_data, "signal values (used for second fit)", QmitkChartWidget::ChartType::scatter);
-    m_Controls->m_ChartWidget->SetColor("signal values (used for second fit)", "white");
-    m_Controls->m_ChartWidget->SetMarkerSymbol("signal values (used for second fit)", QmitkChartWidget::MarkerSymbol::x_thin);
-
-    m_Controls->m_ChartWidget->Show(true);
-    m_Controls->m_ChartWidget->SetShowDataPoints(false);
-    m_Controls->m_ChartWidget->SetShowSubchart(false);
-  }
+  m_SecondFitSignalCurve->setVisible(true);
+  m_SecondFitSignalCurve->setItemAttribute(QwtPlotItem::Legend, true);
 }
 
+// QmitkPlotWidget cannot remove a single curve, so the second-fit curve is hidden instead.
 void QmitkIVIMView::RemoveSecondFitPlot()
 {
-  if (m_Controls->m_ChartWidget->GetDataElementByLabel("signal values (used for second fit)") != nullptr)
-  {
-    m_Controls->m_ChartWidget->RemoveData("signal values (used for second fit)");
-
-    m_Controls->m_ChartWidget->Show(true);
-    m_Controls->m_ChartWidget->SetShowDataPoints(false);
-    m_Controls->m_ChartWidget->SetShowSubchart(false);
-  }
+  m_SecondFitSignalCurve->setVisible(false);
+  m_SecondFitSignalCurve->setItemAttribute(QwtPlotItem::Legend, false);
 }
 
-void QmitkIVIMView::InitChartIvim()
+void QmitkIVIMView::InitChart(const char* yAxisTitle)
 {
-  m_Controls->m_ChartWidget->Clear();
-  std::vector< std::pair<double, double> > init_data;
-  m_Controls->m_ChartWidget->AddData2D(init_data, "D-part of fitted model", QmitkChartWidget::ChartType::line);
-  m_Controls->m_ChartWidget->AddData2D(init_data, "fitted model", QmitkChartWidget::ChartType::line);
-  m_Controls->m_ChartWidget->AddData2D(init_data, "signal values", QmitkChartWidget::ChartType::scatter);
+  QmitkPlotWidget* plot = m_Controls->m_ChartWidget;
+  plot->Clear();
 
-  m_Controls->m_ChartWidget->SetColor("fitted model", "red");
-  m_Controls->m_ChartWidget->SetColor("signal values", "white");
-  m_Controls->m_ChartWidget->SetColor("D-part of fitted model", "cyan");
-  m_Controls->m_ChartWidget->SetYAxisScale(QmitkChartWidget::AxisScale::log);
+  // The canvas is white, so dark colors replace the white of the former dark chart theme.
+  m_DPartCurveId = plot->InsertCurve("D-part of fitted model");
+  plot->SetCurvePen(m_DPartCurveId, QPen(Qt::blue, 2, Qt::DashLine));
 
-  m_Controls->m_ChartWidget->SetYAxisLabel("S/S0");
-  m_Controls->m_ChartWidget->SetXAxisLabel("b-value");
+  m_FitCurveId = plot->InsertCurve("fitted model");
+  plot->SetCurvePen(m_FitCurveId, QPen(Qt::red, 2));
 
-  m_Controls->m_ChartWidget->SetLineStyle("fitted model", QmitkChartWidget::LineStyle::solid);
-  m_Controls->m_ChartWidget->SetLineStyle("D-part of fitted model", QmitkChartWidget::LineStyle::dashed);
+  m_SignalCurveId = plot->InsertCurve("signal values");
+  plot->SetCurvePen(m_SignalCurveId, QPen(Qt::NoPen));
+  plot->SetCurveSymbol(m_SignalCurveId, new QwtSymbol(QwtSymbol::Diamond, QBrush(Qt::black), QPen(Qt::black), QSize(8, 8)));
 
-  m_Controls->m_ChartWidget->SetMarkerSymbol("signal values", QmitkChartWidget::MarkerSymbol::diamond);
+  m_SecondFitSignalCurveId = plot->InsertCurve("signal values (used for second fit)");
+  plot->SetCurvePen(m_SecondFitSignalCurveId, QPen(Qt::NoPen));
+  plot->SetCurveSymbol(m_SecondFitSignalCurveId, new QwtSymbol(QwtSymbol::XCross, QBrush(), QPen(Qt::darkGray), QSize(8, 8)));
+  m_SecondFitSignalCurve = static_cast<QwtPlotCurve*>(plot->GetPlot()->itemList(QwtPlotItem::Rtti_PlotCurve).back());
+  RemoveSecondFitPlot();
 
-  m_Controls->m_ChartWidget->Show(true);
-  m_Controls->m_ChartWidget->SetShowDataPoints(false);
-  m_Controls->m_ChartWidget->SetShowSubchart(false);
-
-}
-
-void QmitkIVIMView::InitChartKurtosis()
-{
-  m_Controls->m_ChartWidget->Clear();
-  std::vector< std::pair<double, double> > init_data;
-  m_Controls->m_ChartWidget->AddData2D(init_data, "D-part of fitted model", QmitkChartWidget::ChartType::line);
-  m_Controls->m_ChartWidget->AddData2D(init_data, "fitted model", QmitkChartWidget::ChartType::line);
-  m_Controls->m_ChartWidget->AddData2D(init_data, "signal values", QmitkChartWidget::ChartType::scatter);
-
-  m_Controls->m_ChartWidget->SetColor("fitted model", "red");
-  m_Controls->m_ChartWidget->SetColor("signal values", "white");
-  m_Controls->m_ChartWidget->SetColor("D-part of fitted model", "cyan");
-  m_Controls->m_ChartWidget->SetYAxisScale(QmitkChartWidget::AxisScale::log);
-
-  m_Controls->m_ChartWidget->SetYAxisLabel("S");
-  m_Controls->m_ChartWidget->SetXAxisLabel("b-value");
-
-  m_Controls->m_ChartWidget->SetLineStyle("fitted model", QmitkChartWidget::LineStyle::solid);
-  m_Controls->m_ChartWidget->SetLineStyle("D-part of fitted model", QmitkChartWidget::LineStyle::dashed);
-
-  m_Controls->m_ChartWidget->SetMarkerSymbol("signal values", QmitkChartWidget::MarkerSymbol::diamond);
-
-  m_Controls->m_ChartWidget->Show(true);
-  m_Controls->m_ChartWidget->SetShowDataPoints(false);
-  m_Controls->m_ChartWidget->SetShowSubchart(false);
+  plot->SetAxisTitle(QwtPlot::xBottom, "b-value");
+  plot->SetAxisTitle(QwtPlot::yLeft, yAxisTitle);
+  plot->GetPlot()->setAxisScaleEngine(QwtPlot::yLeft, new QwtLogScaleEngine);
+  plot->SetLegend(new QwtLegend, QwtPlot::BottomLegend);
+  plot->Replot();
 }
 
 void QmitkIVIMView::SetFocus()
@@ -786,7 +757,7 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
   std::vector< std::pair<double, double> > d_line;
   d_line.emplace_back(0, S0);
   d_line.emplace_back(maxb, S0*exp(-maxb * m_KurtosisSnap.m_D));
-  m_Controls->m_ChartWidget->UpdateData2D(d_line, "D-part of fitted model");
+  m_Controls->m_ChartWidget->SetCurveData(m_DPartCurveId, d_line);
 
   const unsigned int num_samples = 50;
   std::vector< std::pair<double, double> > y;
@@ -796,7 +767,7 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
     double b = (((1.0)*i)/(1.0*num_samples))*maxb;
     y.emplace_back(b, S0 * exp( -b * m_KurtosisSnap.m_D + b*b * m_KurtosisSnap.m_D * m_KurtosisSnap.m_D * m_KurtosisSnap.m_K / 6.0 ));
   }
-  m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
+  m_Controls->m_ChartWidget->SetCurveData(m_FitCurveId, y);
 
   std::vector< std::pair<double, double> > y_meas;
   for (unsigned int i=0; i<m_KurtosisSnap.measurements.size(); ++i)
@@ -805,7 +776,8 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
       y_meas.emplace_back(m_KurtosisSnap.bvalues[i], m_KurtosisSnap.measurements[i]);
   }
 
-  m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
+  m_Controls->m_ChartWidget->SetCurveData(m_SignalCurveId, y_meas);
+  m_Controls->m_ChartWidget->Replot();
 
   return true;
 }
@@ -883,7 +855,7 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
     std::vector< std::pair<double, double> > d_line;
     d_line.emplace_back(0, 1-m_IvimSnap.currentFunceiled);
     d_line.emplace_back(maxb, d_line[0].second*exp(-maxb * m_IvimSnap.currentD));
-    m_Controls->m_ChartWidget->UpdateData2D(d_line, "D-part of fitted model");
+    m_Controls->m_ChartWidget->SetCurveData(m_DPartCurveId, d_line);
 
     std::vector< std::pair<double, double> > y;
     int nsampling = 50;
@@ -893,13 +865,13 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
       double x = (((1.0)*i)/(1.0*nsampling))*maxb;
       y.emplace_back(x, f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar)));
     }
-    m_Controls->m_ChartWidget->UpdateData2D(y, "fitted model");
+    m_Controls->m_ChartWidget->SetCurveData(m_FitCurveId, y);
 
     std::vector< std::pair<double, double> > y_meas;
     for (unsigned int i=0; i<m_IvimSnap.meas1.size(); ++i)
       y_meas.emplace_back(m_IvimSnap.bvals1[i], m_IvimSnap.meas1[i]);
 
-    m_Controls->m_ChartWidget->UpdateData2D(y_meas, "signal values");
+    m_Controls->m_ChartWidget->SetCurveData(m_SignalCurveId, y_meas);
 
     if(m_IvimSnap.bvals2.size() > 0)
     {
@@ -908,12 +880,13 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
       for (int i=0; i<static_cast<int>(m_IvimSnap.bvals2.size()); ++i)
         additonal_meas.emplace_back(m_IvimSnap.bvals2[i], m_IvimSnap.meas2[i]);
 
-      m_Controls->m_ChartWidget->UpdateData2D(additonal_meas, "signal values (used for second fit)");
+      m_Controls->m_ChartWidget->SetCurveData(m_SecondFitSignalCurveId, additonal_meas);
     }
     else
     {
       RemoveSecondFitPlot();
     }
+    m_Controls->m_ChartWidget->Replot();
   }
   catch (itk::ExceptionObject &ex)
   {
@@ -1037,7 +1010,9 @@ void QmitkIVIMView::ClipboardCurveButtonClicked()
 
 void QmitkIVIMView::SavePlotButtonClicked()
 {
-  m_Controls->m_ChartWidget->SavePlotAsImage();
+  // Opens a file dialog to choose the file name and format.
+  QwtPlotRenderer renderer;
+  renderer.exportTo(m_Controls->m_ChartWidget->GetPlot(), "ivim_plot.png");
 }
 
 

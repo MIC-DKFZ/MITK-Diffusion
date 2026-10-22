@@ -25,7 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itksys/SystemTools.hxx"
 
 // mitk includes
-#include "mitkProgressBar.h"
+#include <mitkProgressTask.h>
 #include "mitkStatusBar.h"
 #include "mitkProperties.h"
 #include "mitkRenderingManager.h"
@@ -364,7 +364,8 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
     PrintMemoryUsage();
     QString status;
     mitk::DataNode::Pointer node;
-    mitk::ProgressBar::GetInstance()->AddStepsToDo(2*nrFolders);
+    // Indeterminate: the import has no step to report; the task ends when this function returns.
+    mitk::ProgressTask progress("Importing diffusion DICOM");
 
     gdcm::Directory::FilenamesType complete_list;
     while(m_Controls->listWidget->count())

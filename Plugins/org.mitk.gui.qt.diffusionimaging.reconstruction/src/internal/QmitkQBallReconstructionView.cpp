@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "QmitkQBallReconstructionView.h"
 
 #include <QMessageBox>
-#include "mitkProgressBar.h"
 #include "mitkNodePredicateDataType.h"
 #include "QmitkDataStorageComboBox.h"
 #include "itkDiffusionQballReconstructionImageFilter.h"
@@ -427,7 +426,6 @@ void QmitkQBallReconstructionView::NumericalQBallReconstruction(mitk::DataNode::
     mitk::DataNode::Pointer new_node = mitk::DataNode::New();
     new_node->SetData( image );
     new_node->SetName(nodename+nodePostfix);
-    mitk::ProgressBar::GetInstance()->Progress();
 
     GetDataStorage()->Add(new_node, node);
 
