@@ -38,7 +38,7 @@ namespace mitk
   public:
 
     typedef mitk::TensorImage OutputType;
-    typedef itk::Matrix< float, 3, 3 > MeasurementFrameType;
+    typedef itk::Matrix< double, 3, 3 > MeasurementFrameType;
 
     NrrdTensorImageReader(const NrrdTensorImageReader& other);
     NrrdTensorImageReader();
@@ -54,8 +54,6 @@ namespace mitk
     NrrdTensorImageReader* Clone() const override;
 
     us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
-
-    TensorImage::PixelType ConvertMatrixTypeToFixedArrayType(const TensorImage::PixelType::Superclass::MatrixType & matrix);
   };
 
 } //namespace MITK

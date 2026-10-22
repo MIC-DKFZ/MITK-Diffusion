@@ -30,6 +30,52 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
 
+#include <optional>
+
+namespace
+{
+  using FrameType = mitk::NrrdTensorImageReader::MeasurementFrameType;
+
+  /**
+   * Returns the rotation M from the measurement frame to world coordinates, so that the world
+   * tensor is M * T * M^T. The standard NRRD field holds the frame vectors F as rows, and M = F^T,
+   * the same convention as for DWI gradients (modified = MF^T * original). MITK's own
+   * "measurement frame" key is applied as earlier MITK versions intended, M = F.
+   * No frame or an all-zero frame gives nothing.
+   */
+  std::optional<FrameType> ReadFrameToWorld(const itk::MetaDataDictionary& dictionary)
+  {
+    std::optional<FrameType> frame;
+    bool mitkKey = false;
+
+    // ITK stores the standard NRRD field (written by Slicer, DTIPrep, ITK) as a matrix, not as a string.
+    std::vector<std::vector<double>> rows;
+    if (itk::ExposeMetaData(dictionary, "NRRD_measurement frame", rows) && rows.size() == 3 && rows[0].size() == 3 && rows[1].size() == 3 && rows[2].size() == 3)
+    {
+      FrameType standardFrame;
+      for (unsigned int r = 0; r < 3; ++r)
+        for (unsigned int c = 0; c < 3; ++c)
+          standardFrame(r, c) = rows[r][c];
+      frame = standardFrame;
+    }
+
+    std::string value;
+    if (!frame && itk::ExposeMetaData<std::string>(dictionary, "measurement frame", value))
+    {
+      FrameType mitkFrame;
+      if (sscanf(value.c_str(), " ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) ",
+                 &mitkFrame(0, 0), &mitkFrame(0, 1), &mitkFrame(0, 2), &mitkFrame(1, 0), &mitkFrame(1, 1), &mitkFrame(1, 2), &mitkFrame(2, 0), &mitkFrame(2, 1), &mitkFrame(2, 2)) != 9)
+        mitkThrow() << "Invalid measurement frame " << value;
+      frame = mitkFrame;
+      mitkKey = true;
+    }
+
+    if (!frame || frame->GetVnlMatrix().absolute_value_max() <= 1e-9)
+      return std::nullopt;
+    return mitkKey ? *frame : FrameType(frame->GetTranspose());
+  }
+}
+
 namespace mitk
 {
 
@@ -230,68 +276,17 @@ namespace mitk
           typedef TensorImage::PixelType FixPixType;
           int numComponents = img->GetNumberOfComponentsPerPixel();
 
-          itk::MetaDataDictionary imgMetaDictionary = img->GetMetaDataDictionary();
-          std::vector<std::string> imgMetaKeys = imgMetaDictionary.GetKeys();
-          std::vector<std::string>::const_iterator itKey = imgMetaKeys.begin();
-          std::string metaString;
-
-          bool readFrame = false;
-          double xx, xy, xz, yx, yy, yz, zx, zy, zz;
-          MeasurementFrameType measFrame;
-          measFrame.SetIdentity();
-          MeasurementFrameType measFrameTransp;
-          measFrameTransp.SetIdentity();
-
-          for (; itKey != imgMetaKeys.end(); itKey ++)
-          {
-            itk::ExposeMetaData<std::string> (imgMetaDictionary, *itKey, metaString);
-            if (itKey->find("measurement frame") != std::string::npos)
-            {
-              sscanf(metaString.c_str(), " ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) \n", &xx, &xy, &xz, &yx, &yy, &yz, &zx, &zy, &zz);
-
-              if (xx>10e-10 || xy>10e-10 || xz>10e-10 ||
-                yx>10e-10 || yy>10e-10 || yz>10e-10 ||
-                zx>10e-10 || zy>10e-10 || zz>10e-10 )
-              {
-                readFrame = true;
-
-                measFrame(0,0) = xx;
-                measFrame(0,1) = xy;
-                measFrame(0,2) = xz;
-                measFrame(1,0) = yx;
-                measFrame(1,1) = yy;
-                measFrame(1,2) = yz;
-                measFrame(2,0) = zx;
-                measFrame(2,1) = zy;
-                measFrame(2,2) = zz;
-
-                measFrameTransp = measFrame.GetTranspose();
-              }
-            }
-          }
+          const std::optional<FrameType> frameToWorld = ReadFrameToWorld(img->GetMetaDataDictionary());
 
           if (numComponents==6)
           {
             while (!it.IsAtEnd())
             {
-              // T'=RTR'
               VarPixType vec = it.Get();
               FixPixType fixVec(vec.GetDataPointer());
 
-              if(readFrame)
-              {
-                TensorImage::PixelType tensor;
-                tensor.SetElement(0, vec.GetElement(0));
-                tensor.SetElement(1, vec.GetElement(1));
-                tensor.SetElement(2, vec.GetElement(2));
-                tensor.SetElement(3, vec.GetElement(3));
-                tensor.SetElement(4, vec.GetElement(4));
-                tensor.SetElement(5, vec.GetElement(5));
-
-                tensor = ConvertMatrixTypeToFixedArrayType(tensor.PreMultiply(measFrame));
-                tensor = ConvertMatrixTypeToFixedArrayType(tensor.PostMultiply(measFrameTransp));
-                fixVec = tensor;
-              }
+              if (frameToWorld)
+                fixVec = fixVec.Rotate(*frameToWorld);
 
               ot.Set(fixVec);
               ++ot;
@@ -311,11 +306,8 @@ namespace mitk
               tensor.SetElement(4, vec.GetElement(5));
               tensor.SetElement(5, vec.GetElement(8));
 
-              if(readFrame)
-              {
-                tensor = ConvertMatrixTypeToFixedArrayType(tensor.PreMultiply(measFrame));
-                tensor = ConvertMatrixTypeToFixedArrayType(tensor.PostMultiply(measFrameTransp));
-              }
+              if (frameToWorld)
+                tensor = tensor.Rotate(*frameToWorld);
 
               FixPixType fixVec(tensor);
               ot.Set(fixVec);
@@ -368,11 +360,8 @@ namespace mitk
               else
                 throw itk::ImageFileReaderException(__FILE__, __LINE__, "Unknown number of komponents for DTI file. Should be 6 or 9!");
 
-              if(readFrame)
-              {
-                tensor = ConvertMatrixTypeToFixedArrayType(tensor.PreMultiply(measFrame));
-                tensor = ConvertMatrixTypeToFixedArrayType(tensor.PostMultiply(measFrameTransp));
-              }
+              if (frameToWorld)
+                tensor = tensor.Rotate(*frameToWorld);
               FixPixType fixVec(tensor);
               ot.Set(fixVec);
               ++ot;
@@ -402,23 +391,6 @@ namespace mitk
 
     return result;
   }
-
-TensorImage::PixelType NrrdTensorImageReader
-::ConvertMatrixTypeToFixedArrayType(const TensorImage::PixelType::Superclass::MatrixType & matrix)
-{
-    /*       | 0  1  2  |
-      *       | X  3  4  |
-      *       | X  X  5  |
-      */
-    TensorImage::PixelType arr;
-    arr.SetElement(0,matrix(0,0));
-    arr.SetElement(1,matrix(0,1));
-    arr.SetElement(2,matrix(0,2));
-    arr.SetElement(3,matrix(1,1));
-    arr.SetElement(4,matrix(1,2));
-    arr.SetElement(5,matrix(2,2));
-    return arr;
-}
 
 } //namespace MITK
 
