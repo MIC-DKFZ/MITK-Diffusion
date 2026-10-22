@@ -50,6 +50,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionImageCorrectionFilter.h>
 
 // Qt
+#include <QMessageBox>
 #include <QThreadPool>
 
 #define _USE_MATH_DEFINES
@@ -61,6 +62,7 @@ QmitkSimpleRegistrationView::QmitkSimpleRegistrationView()
   : QmitkAbstractView()
   , m_Controls( 0 )
   , m_RegistrationType(0)
+  , m_RegistrationRunning(false)
 {
 
 }
@@ -73,6 +75,10 @@ QmitkSimpleRegistrationView::~QmitkSimpleRegistrationView()
 
 void QmitkSimpleRegistrationView::StartRegistration()
 {
+  // The result slot uses the moving image and type of the running job.
+  if (m_RegistrationRunning)
+    return;
+
   QmitkRegistrationJob* pJob;
 
   if (m_Controls->m_RegBox->currentIndex()==0)
@@ -138,12 +144,28 @@ void QmitkSimpleRegistrationView::StartRegistration()
   connect(pJob, SIGNAL(RegResultIsAvailable(mitk::MAPRegistrationWrapper::Pointer, const QmitkRegistrationJob*)), this,
           SLOT(OnRegResultIsAvailable(mitk::MAPRegistrationWrapper::Pointer, const QmitkRegistrationJob*)),
           Qt::BlockingQueuedConnection);
+  connect(pJob, SIGNAL(Error(QString)), this, SLOT(OnRegistrationError(QString)));
+  connect(pJob, SIGNAL(Finished()), this, SLOT(OnRegistrationFinished()));
+
+  m_RegistrationRunning = true;
+  m_Controls->m_RegistrationStartButton->setEnabled(false);
+  m_Controls->m_RegistrationStartButton->setText("Registration in progress ...");
 
   QThreadPool* threadPool = QThreadPool::globalInstance();
   threadPool->start(pJob);
+}
 
-  m_Controls->m_RegistrationStartButton->setEnabled(false);
-  m_Controls->m_RegistrationStartButton->setText("Registration in progress ...");
+void QmitkSimpleRegistrationView::OnRegistrationError(QString message)
+{
+  QMessageBox::warning(nullptr, "Registration failed", message);
+}
+
+void QmitkSimpleRegistrationView::OnRegistrationFinished()
+{
+  m_RegistrationRunning = false;
+  m_MovingImageNode = nullptr;
+  m_Controls->m_RegistrationStartButton->setText("Start Registration");
+  UpdateStartButton();
 }
 
 void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWrapper::Pointer spResultRegistration, const QmitkRegistrationJob* job)
@@ -252,11 +274,6 @@ void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWr
 
   this->GetRenderWindowPart()->RequestUpdate();
 
-  m_Controls->m_RegistrationStartButton->setEnabled(true);
-  m_Controls->m_RegistrationStartButton->setText("Start Registration");
-
-  m_MovingImageNode = nullptr;
-
   TractoChanged();
 }
 
@@ -330,16 +347,8 @@ void QmitkSimpleRegistrationView::FixedImageChanged()
   if (m_Controls->m_FixedImageBox->GetSelectedNode().IsNotNull())
   {
     mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(m_Controls->m_FixedImageBox->GetSelectedNode()->GetData());
-    int channels = image->GetNumberOfChannels();
-    int dims = image->GetDimension();
     int fourth_dim_size = image->GetTimeSteps();
     bool isdiff = mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(image);
-
-    if (dims==4 || channels>1)
-    {
-      m_Controls->m_FixedChannelBox->setEnabled(false);
-      m_Controls->m_RegistrationStartButton->setEnabled(false);
-    }
 
     if (isdiff)
     {
@@ -353,14 +362,12 @@ void QmitkSimpleRegistrationView::FixedImageChanged()
     {
       m_Controls->m_FixedChannelBox->setEnabled(false);
     }
-
-    m_Controls->m_RegistrationStartButton->setEnabled(true);
   }
   else
   {
     m_Controls->m_FixedChannelBox->setEnabled(false);
-    m_Controls->m_RegistrationStartButton->setEnabled(false);
   }
+  UpdateStartButton();
 }
 
 void QmitkSimpleRegistrationView::MovingImageChanged()
@@ -368,16 +375,8 @@ void QmitkSimpleRegistrationView::MovingImageChanged()
   if (m_Controls->m_MovingImageBox->GetSelectedNode().IsNotNull())
   {
     mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(m_Controls->m_MovingImageBox->GetSelectedNode()->GetData());
-    int channels = image->GetNumberOfChannels();
-    int dims = image->GetDimension();
     int fourth_dim_size = image->GetTimeSteps();
     bool isdiff = mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(image);
-
-    if (dims==4 || channels>1)
-    {
-      m_Controls->m_MovingChannelBox->setEnabled(false);
-      m_Controls->m_RegistrationStartButton->setEnabled(false);
-    }
 
     if (isdiff)
     {
@@ -391,14 +390,27 @@ void QmitkSimpleRegistrationView::MovingImageChanged()
     {
       m_Controls->m_MovingChannelBox->setEnabled(false);
     }
-
-    m_Controls->m_RegistrationStartButton->setEnabled(true);
   }
   else
   {
     m_Controls->m_MovingChannelBox->setEnabled(false);
-    m_Controls->m_RegistrationStartButton->setEnabled(false);
   }
+  UpdateStartButton();
+}
+
+void QmitkSimpleRegistrationView::UpdateStartButton()
+{
+  // 3D images with one channel, and DWIs, of which one volume is registered.
+  auto canRegister = [](const mitk::DataNode* node)
+  {
+    const mitk::Image* image = node != nullptr ? dynamic_cast<const mitk::Image*>(node->GetData()) : nullptr;
+    if (image == nullptr)
+      return false;
+    return mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(image) || (image->GetDimension() != 4 && image->GetNumberOfChannels() == 1);
+  };
+  m_Controls->m_RegistrationStartButton->setEnabled(!m_RegistrationRunning
+                                                    && canRegister(m_Controls->m_FixedImageBox->GetSelectedNode())
+                                                    && canRegister(m_Controls->m_MovingImageBox->GetSelectedNode()));
 }
 
 void QmitkSimpleRegistrationView::OnSelectionChanged(berry::IWorkbenchPart::Pointer, const QList<mitk::DataNode::Pointer>& )

@@ -60,15 +60,22 @@ protected slots:
   void StartRegistration();
   void StartTractoRegistration();
   void OnRegResultIsAvailable(mitk::MAPRegistrationWrapper::Pointer spResultRegistration, const QmitkRegistrationJob* pRegJob);
+  void OnRegistrationError(QString message);
+  void OnRegistrationFinished();
 
 protected:
 
   /// \brief called by QmitkAbstractView when DataManager's selection has changed
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
 
+  /** Enables "Start" if both images can be registered and no registration runs. */
+  void UpdateStartButton();
+
   Ui::QmitkSimpleRegistrationViewControls* m_Controls;
+  /** Moving image and type of the running registration; only one runs at a time. */
   mitk::DataNode::Pointer  m_MovingImageNode;
   int  m_RegistrationType;
+  bool m_RegistrationRunning;
 
 private:
 
