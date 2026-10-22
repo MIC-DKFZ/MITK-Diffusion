@@ -31,7 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageMappingHelper.h>
 #include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
-#include <itkExtractDwiChannelFilter.h>
+#include <itkVectorIndexSelectionCastImageFilter.h>
 // MatchPoint's ITKInitializedMultiResImageRegistrationAlgorithm::doSetProperty() assigns a bool
 // that unwrapMetaProperty() may leave unset; GCC's optimizer reports that in Release builds
 // despite -isystem. MatchPoint is a MITK external, so the warning is silenced for its headers.
@@ -103,9 +103,9 @@ void QmitkSimpleRegistrationView::StartRegistration()
     ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
     mitk::CastToItkImage(movingImage, itkVectorImagePointer);
 
-    itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
+    auto filter = itk::VectorIndexSelectionCastImageFilter<ItkDwiType, ITKDiffusionVolumeType>::New();
     filter->SetInput( itkVectorImagePointer);
-    filter->SetChannelIndex(m_Controls->m_MovingChannelBox->value());
+    filter->SetIndex(m_Controls->m_MovingChannelBox->value());
     filter->Update();
 
     mitk::Image::Pointer newImage = mitk::Image::New();
@@ -124,9 +124,9 @@ void QmitkSimpleRegistrationView::StartRegistration()
     ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
     mitk::CastToItkImage(fixedImage, itkVectorImagePointer);
 
-    itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
+    auto filter = itk::VectorIndexSelectionCastImageFilter<ItkDwiType, ITKDiffusionVolumeType>::New();
     filter->SetInput( itkVectorImagePointer);
-    filter->SetChannelIndex(m_Controls->m_FixedChannelBox->value());
+    filter->SetIndex(m_Controls->m_FixedChannelBox->value());
     filter->Update();
 
     mitk::Image::Pointer newImage = mitk::Image::New();
@@ -201,9 +201,9 @@ void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWr
       ItkDwiType::Pointer itkVectorImagePointer = mitk::DiffusionPropertyHelper::GetItkVectorImage(movingImage);
       for (unsigned int i=0; i<itkVectorImagePointer->GetVectorLength(); ++i)
       {
-        itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
+        auto filter = itk::VectorIndexSelectionCastImageFilter<ItkDwiType, ITKDiffusionVolumeType>::New();
         filter->SetInput( itkVectorImagePointer);
-        filter->SetChannelIndex(i);
+        filter->SetIndex(i);
         filter->Update();
 
         mitk::Image::Pointer gradientVolume = mitk::Image::New();

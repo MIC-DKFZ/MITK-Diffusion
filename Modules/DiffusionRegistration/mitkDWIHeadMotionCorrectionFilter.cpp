@@ -24,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkImageTimeSelector.h"
 
-#include <itkExtractDwiChannelFilter.h>
+#include <itkVectorIndexSelectionCastImageFilter.h>
 // MatchPoint's ITKInitializedMultiResImageRegistrationAlgorithm::doSetProperty() assigns a bool
 // that unwrapMetaProperty() may leave unset; GCC's optimizer reports that in Release builds
 // despite -isystem. MatchPoint is a MITK external, so the warning is silenced for its headers.
@@ -56,7 +56,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImage.h>
 
 typedef mitk::DiffusionPropertyHelper DPH;
-typedef itk::ExtractDwiChannelFilter< short > ExtractorType;
+using ExtractorType = itk::VectorIndexSelectionCastImageFilter<mitk::DWIHeadMotionCorrectionFilter::ITKDiffusionImageType, mitk::DWIHeadMotionCorrectionFilter::ITKDiffusionVolumeType>;
 
 mitk::DWIHeadMotionCorrectionFilter::DWIHeadMotionCorrectionFilter()
 {
@@ -94,7 +94,7 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
 
   ExtractorType::Pointer filter = ExtractorType::New();
   filter->SetInput( itkVectorImagePointer);
-  filter->SetChannelIndex(first_unweighted_index);
+  filter->SetIndex(first_unweighted_index);
   filter->Update();
 
   mitk::Image::Pointer fixedImage = mitk::Image::New();
@@ -120,7 +120,7 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
 
     ExtractorType::Pointer filter = ExtractorType::New();
     filter->SetInput( itkVectorImagePointer);
-    filter->SetChannelIndex(i);
+    filter->SetIndex(i);
     filter->Update();
 
     mitk::Image::Pointer movingImage = mitk::Image::New();

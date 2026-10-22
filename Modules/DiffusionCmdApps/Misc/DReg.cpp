@@ -31,7 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #endif
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkMAPAlgorithmHelper.h>
-#include <itkExtractDwiChannelFilter.h>
+#include <itkVectorIndexSelectionCastImageFilter.h>
 #include <mitkRegistrationHelper.h>
 #include <mitkImageMappingHelper.h>
 #include <itksys/SystemTools.hxx>
@@ -42,6 +42,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionDataIOHelper.h>
 
 typedef mitk::DiffusionPropertyHelper DPH;
+using ChannelExtractorType = itk::VectorIndexSelectionCastImageFilter<DPH::ImageType, itk::Image<DPH::DiffusionPixelType, 3>>;
 
 
 mitk::Image::Pointer apply_transform(mitk::Image::Pointer moving, mitk::Image::Pointer fixed_single, mitk::MAPRegistrationWrapper::Pointer reg, bool resample)
@@ -66,9 +67,9 @@ mitk::Image::Pointer apply_transform(mitk::Image::Pointer moving, mitk::Image::P
       auto itkVectorImagePointer = mitk::DiffusionPropertyHelper::GetItkVectorImage(moving);
       for (unsigned int i=0; i<itkVectorImagePointer->GetVectorLength(); ++i)
       {
-        itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
+        auto filter = ChannelExtractorType::New();
         filter->SetInput( itkVectorImagePointer);
-        filter->SetChannelIndex(i);
+        filter->SetIndex(i);
         filter->Update();
 
         mitk::Image::Pointer gradientVolume = mitk::Image::New();
@@ -149,9 +150,9 @@ int main(int argc, char* argv[])
       DPH::ImageType::Pointer itkVectorImagePointer = DPH::ImageType::New();
       mitk::CastToItkImage(fixed, itkVectorImagePointer);
 
-      itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
+      auto filter = ChannelExtractorType::New();
       filter->SetInput( itkVectorImagePointer);
-      filter->SetChannelIndex(0);
+      filter->SetIndex(0);
       filter->Update();
 
       fixed_single = mitk::Image::New();
@@ -164,9 +165,9 @@ int main(int argc, char* argv[])
       DPH::ImageType::Pointer itkVectorImagePointer = DPH::ImageType::New();
       mitk::CastToItkImage(moving, itkVectorImagePointer);
 
-      itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
+      auto filter = ChannelExtractorType::New();
       filter->SetInput( itkVectorImagePointer);
-      filter->SetChannelIndex(0);
+      filter->SetIndex(0);
       filter->Update();
 
       moving_single = mitk::Image::New();

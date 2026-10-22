@@ -51,7 +51,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkCropImageFilter.h>
 #include <itkDiffusionTensor3DReconstructionImageFilter.h>
 #include <itkRemoveDwiChannelFilter.h>
-#include <itkExtractDwiChannelFilter.h>
+#include <itkVectorIndexSelectionCastImageFilter.h>
 #include <mitkBValueMapProperty.h>
 #include <mitkGradientDirectionsProperty.h>
 #include <mitkMeasurementFrameProperty.h>
@@ -308,9 +308,9 @@ void QmitkPreprocessingView::DoExtractGradient()
   mitk::CastToItkImage(image, itkVectorImagePointer);
 
   unsigned int channel = m_Controls->m_ExtractGradientBox->value();
-  itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
+  auto filter = itk::VectorIndexSelectionCastImageFilter<ItkDwiType, itk::Image<DiffusionPixelType, 3>>::New();
   filter->SetInput( itkVectorImagePointer);
-  filter->SetChannelIndex(channel);
+  filter->SetIndex(channel);
   filter->Update();
 
   mitk::Image::Pointer newImage = mitk::Image::New();
