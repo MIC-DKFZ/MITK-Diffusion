@@ -93,6 +93,8 @@ void mitk::PeakImageMapper3D::GenerateDataForRenderer(mitk::BaseRenderer *render
   }
 
   mitk::PeakImage* peakImage = this->GetInput();
+  if (peakImage == nullptr)
+    return;
   vtkSmartPointer<vtkPolyData> polyData = peakImage->GetPolyData();
   if (polyData == nullptr)
     return;
@@ -111,9 +113,8 @@ void mitk::PeakImageMapper3D::GenerateDataForRenderer(mitk::BaseRenderer *render
   const DataNode* node = this->GetDataNode();
   mitk::ClippingProperty* prop = dynamic_cast<mitk::ClippingProperty*>(node->GetProperty("3DClipping"));
 
-  mitk::Image* image = dynamic_cast<mitk::Image*>(node->GetData());
   localStorage->m_Mapper->RemoveAllClippingPlanes();
-  mitk::Vector3D spacing = image->GetGeometry()->GetSpacing();
+  mitk::Vector3D spacing = peakImage->GetGeometry()->GetSpacing();
   double clipping_plane_thickness = 1;
   if(spacing[0]<spacing[1] && spacing[0]<spacing[2])
     clipping_plane_thickness = spacing[0];
@@ -123,7 +124,11 @@ void mitk::PeakImageMapper3D::GenerateDataForRenderer(mitk::BaseRenderer *render
     clipping_plane_thickness = spacing[2];
   clipping_plane_thickness /= 2.0;
 
-  mitk::Vector3D plane_normal = prop->GetNormal();
+  // Without a "3DClipping" property the peaks are not clipped.
+  mitk::Vector3D plane_normal;
+  plane_normal.Fill(0.0);
+  if (prop != nullptr)
+    plane_normal = prop->GetNormal();
   if (plane_normal.GetNorm()>0.0)
   {
     plane_normal.Normalize();

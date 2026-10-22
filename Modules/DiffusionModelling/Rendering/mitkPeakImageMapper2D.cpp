@@ -82,6 +82,8 @@ void mitk::PeakImageMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *render
   //the handler of local storage gets feeded in this method with requested data for related renderwindow
   LocalStorage *localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
 
+  if (peakImage == nullptr)
+    return;
   vtkSmartPointer<vtkPolyData> polyData = peakImage->GetPolyData();
   if (polyData == nullptr)
     return;
@@ -96,9 +98,7 @@ void mitk::PeakImageMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *render
   mitk::PlaneGeometry::ConstPointer planeGeo = sliceContr->GetCurrentPlaneGeometry();
   mitk::Point3D plane_origin = planeGeo->GetOrigin();
 
-  mitk::DataNode* node = this->GetDataNode();
-  mitk::Image* image = dynamic_cast<mitk::Image*>(node->GetData());
-  mitk::Vector3D spacing = image->GetGeometry()->GetSpacing();
+  mitk::Vector3D spacing = peakImage->GetGeometry()->GetSpacing();
 
   localStorage->m_Mapper->RemoveAllClippingPlanes();
   float clipping_plane_thickness = 1;
