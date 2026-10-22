@@ -12,6 +12,9 @@ found in the LICENSE file.
 
 #include <mitkIOUtil.h>
 #include <mitkOdfImage.h>
+#include <mitkPeakImage.h>
+#include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkSliceNavigationController.h>
 #include <mitkRenderingTestHelper.h>
 #include <mitkTensorImage.h>
 #include <mitkTestFixture.h>
@@ -20,10 +23,14 @@ found in the LICENSE file.
 
 #include <vtkActor.h>
 #include <vtkMapper.h>
+#include <vtkPlane.h>
+#include <vtkPlaneCollection.h>
 #include <vtkPointData.h>
 #include <vtkPolyData.h>
 #include <vtkPropAssembly.h>
 #include <vtkPropCollection.h>
+
+#include <cmath>
 
 /**
  * The 2D mapper of tensor images in an offscreen render window: which glyphs it hands to VTK.
@@ -34,6 +41,7 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionModellingMapperTestSuite);
   MITK_TEST(TensorImage_GlyphsOfEachView);
   MITK_TEST(GlyphsSwitchedOff_NoGlyphs);
+  MITK_TEST(PeakImage_SlabFollowsPlane);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::RenderingTestHelper m_RenderingTestHelper;
@@ -114,6 +122,56 @@ public:
     m_Node->SetBoolProperty("VisibleOdfs_S", true);
     m_Node->SetBoolProperty("VisibleOdfs_C", true);
     CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) == nullptr);
+  }
+
+  // The 2D peak mapper clips its lines to half the smallest spacing (1.23 / 2) around the plane the
+  // renderer shows, with the same two planes moved along.
+  void PeakImage_SlabFollowsPlane()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"Peak Image"}, std::vector<std::string>());
+    auto peakNode = mitk::DataNode::New();
+    peakNode->SetData(mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &functor));
+    m_RenderingTestHelper.GetDataStorage()->Remove(m_Node);
+    m_RenderingTestHelper.AddNodeToStorage(peakNode);
+    m_RenderingTestHelper.SetViewDirection(mitk::AnatomicalPlane::Axial);
+    m_RenderingTestHelper.Render();
+
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+    auto mapper = dynamic_cast<mitk::VtkMapper *>(peakNode->GetMapper(mitk::BaseRenderer::Standard2D));
+    auto actor = vtkActor::SafeDownCast(mapper->GetVtkProp(renderer));
+    CPPUNIT_ASSERT(actor != nullptr);
+    auto peakImage = dynamic_cast<mitk::PeakImage *>(peakNode->GetData());
+    CPPUNIT_ASSERT(actor->GetMapper()->GetInputDataObject(0, 0) == peakImage->GetPolyData().GetPointer());
+    vtkPlaneCollection *planes = actor->GetMapper()->GetClippingPlanes();
+    CPPUNIT_ASSERT_EQUAL(2, planes->GetNumberOfItems());
+    vtkPlane *lower = planes->GetItem(0);
+    vtkPlane *upper = planes->GetItem(1);
+
+    double previousOffset = 0;
+    for (int step = 0; step < 2; ++step)
+    {
+      const mitk::PlaneGeometry *plane = renderer->GetCurrentWorldPlaneGeometry();
+      mitk::Vector3D normal = plane->GetNormal();
+      normal.Normalize();
+      const double planeOffset = normal * plane->GetOrigin().GetVectorFromOrigin();
+      double lowerOffset = 0;
+      double upperOffset = 0;
+      for (int c = 0; c < 3; ++c)
+      {
+        lowerOffset += normal[c] * lower->GetOrigin()[c];
+        upperOffset += normal[c] * upper->GetOrigin()[c];
+      }
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(planeOffset - 1.23 / 2, lowerOffset, 1e-5);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(planeOffset + 1.23 / 2, upperOffset, 1e-5);
+      if (step > 0)
+        CPPUNIT_ASSERT(std::fabs(planeOffset - previousOffset) > 1);
+      previousOffset = planeOffset;
+
+      // Next slice: the same plane objects move along.
+      renderer->GetSliceNavigationController()->GetStepper()->Next();
+      m_RenderingTestHelper.Render();
+      CPPUNIT_ASSERT(planes->GetItem(0) == lower && planes->GetItem(1) == upper);
+    }
   }
 };
 

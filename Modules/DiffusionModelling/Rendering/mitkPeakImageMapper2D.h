@@ -1,86 +1,72 @@
-/*===================================================================
+/*============================================================================
 
 The Medical Imaging Interaction Toolkit (MITK)
 
-Copyright (c) German Cancer Research Center.
-
+Copyright (c) German Cancer Research Center (DKFZ)
 All rights reserved.
 
-This software is distributed WITHOUT ANY WARRANTY; without
-even the implied warranty of MERCHANTABILITY or FITNESS FOR
-A PARTICULAR PURPOSE.
+Use of this source code is governed by a 3-clause BSD license that can be
+found in the LICENSE file.
 
-See LICENSE.txt or http://www.mitk.org for details.
+============================================================================*/
 
-===================================================================*/
+#ifndef mitkPeakImageMapper2D_h
+#define mitkPeakImageMapper2D_h
 
-#ifndef PeakImageMapper2D_H_HEADER_INCLUDED
-#define PeakImageMapper2D_H_HEADER_INCLUDED
-
-//MITK Rendering
-#include <mitkCommon.h>
-#include <mitkBaseRenderer.h>
-#include <mitkVtkMapper.h>
-#include <mitkPeakImage.h>
-#include <vtkSmartPointer.h>
 #include <MitkDiffusionModellingExports.h>
 
-#define MITKPeakImageMapper2D_POLYDATAMAPPER vtkOpenGLPolyDataMapper
+#include <mitkLocalStorageHandler.h>
+#include <mitkPeakImage.h>
+#include <mitkVtkMapper.h>
 
-class vtkActor;
-class mitkBaseRenderer;
-class MITKPeakImageMapper2D_POLYDATAMAPPER;
-class vtkCutter;
-class vtkPlane;
-class vtkPolyData;
+#include <vtkActor.h>
+#include <vtkPlane.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkSmartPointer.h>
 
-
-
-namespace mitk {
-
-struct IShaderRepository;
-
-class MITKDIFFUSIONMODELLING_EXPORT PeakImageMapper2D : public VtkMapper
+namespace mitk
 {
+  /**
+   * \brief 2D mapper of peak images: the peak lines of the voxel layer the renderer's plane cuts.
+   *
+   * The peak polydata is in world coordinates; two clipping planes keep a slab of half the
+   * smallest voxel spacing on each side of the plane.
+   */
+  class MITKDIFFUSIONMODELLING_EXPORT PeakImageMapper2D : public VtkMapper
+  {
+  public:
+    mitkClassMacro(PeakImageMapper2D, VtkMapper);
+    itkFactorylessNewMacro(Self);
+    itkCloneMacro(Self);
 
-public:
-    mitkClassMacro(PeakImageMapper2D, VtkMapper)
-    itkFactorylessNewMacro(Self)
-    itkCloneMacro(Self)
+    PeakImage *GetInput();
 
-    mitk::PeakImage* GetInput();
-    void Update(mitk::BaseRenderer * renderer) override;
-    static void SetDefaultProperties(DataNode* node, BaseRenderer* renderer = nullptr, bool overwrite = false );
-    void UpdateVtkTransform(mitk::BaseRenderer *renderer) override;
-    vtkProp* GetVtkProp(mitk::BaseRenderer* renderer) override;
+    static void SetDefaultProperties(DataNode *node, BaseRenderer *renderer = nullptr, bool overwrite = false);
 
-    class  LocalStorage : public mitk::Mapper::BaseLocalStorage
+    /** The peak polydata is already in world coordinates. */
+    void UpdateVtkTransform(BaseRenderer *) override {}
+    vtkProp *GetVtkProp(BaseRenderer *renderer) override;
+
+    class LocalStorage : public Mapper::BaseLocalStorage
     {
     public:
-        vtkSmartPointer<vtkActor> m_PointActor;
-        vtkSmartPointer<MITKPeakImageMapper2D_POLYDATAMAPPER> m_Mapper;
+      LocalStorage();
 
-        itk::TimeStamp m_LastUpdateTime;
-        LocalStorage();
-
-        ~LocalStorage() override
-        {
-        }
+      vtkSmartPointer<vtkActor> m_Actor;
+      vtkSmartPointer<vtkPolyDataMapper> m_Mapper;
+      vtkSmartPointer<vtkPlane> m_LowerPlane;
+      vtkSmartPointer<vtkPlane> m_UpperPlane;
     };
 
-    /** \brief This member holds all three LocalStorages for the three 2D render windows. */
-    mitk::LocalStorageHandler<LocalStorage> m_LocalStorageHandler;
+  protected:
+    PeakImageMapper2D() = default;
+    ~PeakImageMapper2D() override = default;
 
-protected:
-    PeakImageMapper2D();
-    ~PeakImageMapper2D() override;
-    void GenerateDataForRenderer(mitk::BaseRenderer*) override;
+    void GenerateDataForRenderer(BaseRenderer *renderer) override;
 
-private:
-    vtkSmartPointer<vtkLookupTable> m_lut;
-};
-
-
-}//end namespace
+  private:
+    LocalStorageHandler<LocalStorage> m_LocalStorageHandler;
+  };
+}
 
 #endif

@@ -1,183 +1,84 @@
-/*===================================================================
+/*============================================================================
 
 The Medical Imaging Interaction Toolkit (MITK)
 
-Copyright (c) German Cancer Research Center.
-
+Copyright (c) German Cancer Research Center (DKFZ)
 All rights reserved.
 
-This software is distributed WITHOUT ANY WARRANTY; without
-even the implied warranty of MERCHANTABILITY or FITNESS FOR
-A PARTICULAR PURPOSE.
+Use of this source code is governed by a 3-clause BSD license that can be
+found in the LICENSE file.
 
-See LICENSE.txt or http://www.mitk.org for details.
-
-===================================================================*/
+============================================================================*/
 
 #include "mitkPeakImageMapper2D.h"
-#include "mitkBaseRenderer.h"
-#include "mitkDataNode.h"
-#include <vtkActor.h>
-#include <vtkOpenGLPolyDataMapper.h>
-#include <vtkOpenGLHelper.h>
-#include <vtkShaderProgram.h>
-#include <vtkPlane.h>
-#include <vtkPolyData.h>
-#include <vtkPointData.h>
-#include <vtkProperty.h>
-#include <vtkLookupTable.h>
-#include <vtkPoints.h>
-#include <vtkCamera.h>
-#include <vtkPolyLine.h>
-#include <vtkRenderer.h>
-#include <vtkCellArray.h>
-#include <vtkMatrix4x4.h>
-#include <vtkTubeFilter.h>
+#include "mitkPeakImageMapperHelper.h"
+
+#include <mitkBaseRenderer.h>
+#include <mitkDataNode.h>
 #include <mitkPlaneGeometry.h>
-#include <mitkSliceNavigationController.h>
-#include <mitkCoreServices.h>
+#include <mitkProperties.h>
 
-
-mitk::PeakImageMapper2D::PeakImageMapper2D()
-{
-  m_lut = vtkSmartPointer<vtkLookupTable>::New();
-  m_lut->Build();
-}
-
-mitk::PeakImageMapper2D::~PeakImageMapper2D()
-{
-}
-
-
-mitk::PeakImage* mitk::PeakImageMapper2D::GetInput()
-{
-  return dynamic_cast< mitk::PeakImage * > ( GetDataNode()->GetData() );
-}
-
-void mitk::PeakImageMapper2D::UpdateVtkTransform(mitk::BaseRenderer *)
-{
-  // don't apply transform since the peak polydata is already in world coordinates.
-  return;
-}
-
-void mitk::PeakImageMapper2D::Update(mitk::BaseRenderer * renderer)
-{
-  mitk::DataNode* node = this->GetDataNode();
-  if (node == nullptr)
-    return;
-
-  bool visible = true;
-  node->GetVisibility(visible, renderer, "visible");
-  if ( !visible )
-    return;
-
-  this->GenerateDataForRenderer( renderer );
-}
-
-// vtkActors and Mappers are feeded here
-void mitk::PeakImageMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *renderer)
-{
-  mitk::PeakImage* peakImage = this->GetInput();
-
-  //the handler of local storage gets feeded in this method with requested data for related renderwindow
-  LocalStorage *localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
-
-  if (peakImage == nullptr)
-    return;
-  vtkSmartPointer<vtkPolyData> polyData = peakImage->GetPolyData();
-  if (polyData == nullptr)
-    return;
-
-  localStorage->m_Mapper->ScalarVisibilityOn();
-  localStorage->m_Mapper->SetScalarModeToUsePointFieldData();
-  localStorage->m_Mapper->SetLookupTable(m_lut);  //apply the properties after the slice was set
-  localStorage->m_Mapper->SelectColorArray("FIBER_COLORS");
-  localStorage->m_Mapper->SetInputData(polyData);
-
-  // The plane this renderer shows; it differs from the slice navigation controller's for renderers
-  // whose world geometry is set directly.
-  mitk::PlaneGeometry::ConstPointer planeGeo = renderer->GetCurrentWorldPlaneGeometry();
-  if (planeGeo.IsNull())
-    return;
-  mitk::Point3D plane_origin = planeGeo->GetOrigin();
-
-  mitk::Vector3D spacing = peakImage->GetGeometry()->GetSpacing();
-
-  localStorage->m_Mapper->RemoveAllClippingPlanes();
-  float clipping_plane_thickness = 1;
-  if(spacing[0]<spacing[1] && spacing[0]<spacing[2])
-    clipping_plane_thickness = spacing[0];
-  else if (spacing[1] < spacing[2])
-    clipping_plane_thickness = spacing[1];
-  else
-    clipping_plane_thickness = spacing[2];
-  clipping_plane_thickness /= 2.0;
-
-  mitk::Vector3D plane_normal = planeGeo->GetNormal();
-  plane_normal.Normalize();
-  double vnormal[3];
-  double vp1[3];
-  double vp2[3];
-
-  vp1[0] = plane_origin[0] - plane_normal[0] * clipping_plane_thickness;
-  vp1[1] = plane_origin[1] - plane_normal[1] * clipping_plane_thickness;
-  vp1[2] = plane_origin[2] - plane_normal[2] * clipping_plane_thickness;
-
-  vp2[0] = plane_origin[0] + plane_normal[0] * clipping_plane_thickness;
-  vp2[1] = plane_origin[1] + plane_normal[1] * clipping_plane_thickness;
-  vp2[2] = plane_origin[2] + plane_normal[2] * clipping_plane_thickness;
-
-  {
-    vnormal[0] = vp2[0] - vp1[0];
-    vnormal[1] = vp2[1] - vp1[1];
-    vnormal[2] = vp2[2] - vp1[2];
-
-    vtkSmartPointer<vtkPlane> plane = vtkSmartPointer<vtkPlane>::New();
-    plane->SetOrigin(vp1);
-    plane->SetNormal(vnormal);
-    localStorage->m_Mapper->AddClippingPlane(plane);
-  }
-  {
-    vnormal[0] = vp1[0] - vp2[0];
-    vnormal[1] = vp1[1] - vp2[1];
-    vnormal[2] = vp1[2] - vp2[2];
-
-    vtkSmartPointer<vtkPlane> plane = vtkSmartPointer<vtkPlane>::New();
-    plane->SetOrigin(vp2);
-    plane->SetNormal(vnormal);
-    localStorage->m_Mapper->AddClippingPlane(plane);
-  }
-
-  localStorage->m_PointActor->SetMapper(localStorage->m_Mapper);
-
-  float linewidth = 1.0;
-  this->GetDataNode()->GetFloatProperty("shape.linewidth",linewidth);
-  localStorage->m_PointActor->GetProperty()->SetLineWidth(linewidth);
-
-  // We have been modified => save this for next Update()
-  localStorage->m_LastUpdateTime.Modified();
-}
-
-
-vtkProp* mitk::PeakImageMapper2D::GetVtkProp(mitk::BaseRenderer *renderer)
-{
-  this->Update(renderer);
-  return m_LocalStorageHandler.GetLocalStorage(renderer)->m_PointActor;
-}
-
-
-void mitk::PeakImageMapper2D::SetDefaultProperties(mitk::DataNode* node, mitk::BaseRenderer* renderer, bool overwrite)
-{
-  Superclass::SetDefaultProperties(node, renderer, overwrite);
-
-  //add other parameters to propertylist
-  node->AddProperty( "color", mitk::ColorProperty::New(1.0,1.0,1.0), renderer, overwrite);
-  node->AddProperty( "shape.linewidth", mitk::FloatProperty::New(1.0), renderer, overwrite);
-}
-
+#include <vtkPolyData.h>
+#include <vtkProperty.h>
 
 mitk::PeakImageMapper2D::LocalStorage::LocalStorage()
+  : m_Actor(vtkSmartPointer<vtkActor>::New()),
+    m_Mapper(vtkSmartPointer<vtkPolyDataMapper>::New()),
+    m_LowerPlane(vtkSmartPointer<vtkPlane>::New()),
+    m_UpperPlane(vtkSmartPointer<vtkPlane>::New())
 {
-  m_PointActor = vtkSmartPointer<vtkActor>::New();
-  m_Mapper = vtkSmartPointer<MITKPeakImageMapper2D_POLYDATAMAPPER>::New();
+  PeakImageMapperHelper::ColorByFiberColors(m_Mapper);
+  m_Mapper->AddClippingPlane(m_LowerPlane);
+  m_Mapper->AddClippingPlane(m_UpperPlane);
+  m_Actor->SetMapper(m_Mapper);
+}
+
+mitk::PeakImage *mitk::PeakImageMapper2D::GetInput()
+{
+  return dynamic_cast<PeakImage *>(this->GetDataNode()->GetData());
+}
+
+void mitk::PeakImageMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
+{
+  LocalStorage *localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
+  const DataNode *node = this->GetDataNode();
+  bool visible = true;
+  node->GetVisibility(visible, renderer, "visible");
+  PeakImage *peakImage = this->GetInput();
+  // The plane this renderer shows; it differs from the slice navigation controller's for renderers
+  // whose world geometry is set directly.
+  const PlaneGeometry *plane = renderer->GetCurrentWorldPlaneGeometry();
+  if (!visible || peakImage == nullptr || plane == nullptr)
+    return;
+
+  // The planes move with every slice change; only the clipping planes change then.
+  PeakImageMapperHelper::SetSlab(localStorage->m_LowerPlane, localStorage->m_UpperPlane, plane->GetOrigin(), plane->GetNormal(),
+                                 PeakImageMapperHelper::HalfMinSpacing(*peakImage->GetGeometry()));
+
+  const auto lastTime = localStorage->GetLastGenerateDataTime().GetMTime();
+  if (!localStorage->IsGenerateDataRequired(renderer, this, this->GetDataNode()) && lastTime >= node->GetPropertyList()->GetMTime() &&
+      lastTime >= node->GetPropertyList(renderer)->GetMTime())
+    return;
+  localStorage->UpdateGenerateDataTime();
+
+  const vtkSmartPointer<vtkPolyData> polyData = peakImage->GetPolyData();
+  if (polyData == nullptr)
+    return;
+  localStorage->m_Mapper->SetInputData(polyData);
+
+  float lineWidth = 1.0;
+  node->GetFloatProperty("shape.linewidth", lineWidth);
+  localStorage->m_Actor->GetProperty()->SetLineWidth(lineWidth);
+}
+
+vtkProp *mitk::PeakImageMapper2D::GetVtkProp(BaseRenderer *renderer)
+{
+  return m_LocalStorageHandler.GetLocalStorage(renderer)->m_Actor;
+}
+
+void mitk::PeakImageMapper2D::SetDefaultProperties(DataNode *node, BaseRenderer *renderer, bool overwrite)
+{
+  Superclass::SetDefaultProperties(node, renderer, overwrite);
+  node->AddProperty("color", ColorProperty::New(1.0, 1.0, 1.0), renderer, overwrite);
+  node->AddProperty("shape.linewidth", FloatProperty::New(1.0), renderer, overwrite);
 }
