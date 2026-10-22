@@ -19,18 +19,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImage.h"
 #include <mitkProperties.h>
 #include "itkShToRgbImageFilter.h"
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 mitk::ShImage::ShImage() : Image()
-  , m_ShOrder(0)
-  , m_NumCoefficients(0)
   , m_ShConvention(SH_CONVENTION::MRTRIX)
 {
   m_RgbImage = nullptr;
 }
 
 mitk::ShImage::ShImage(const ShImage& other) : Image(other)
-  , m_ShOrder(other.m_ShOrder)
-  , m_NumCoefficients(other.m_NumCoefficients)
   , m_ShConvention(other.m_ShConvention)
 {
 }
@@ -40,41 +37,21 @@ mitk::ShImage::~ShImage()
 
 }
 
-unsigned int mitk::ShImage::NumCoefficients()
+unsigned int mitk::ShImage::NumCoefficients() const
 {
-  if (m_NumCoefficients==0 || m_ShOrder==0)
-  {
-    m_NumCoefficients = static_cast<unsigned int>(this->m_ImageDescriptor->GetChannelTypeById(0).GetNumberOfComponents());
-    int c=3, d=2-2*static_cast<int>(m_NumCoefficients);
-    int D = c*c-4*d;
-    if (D>0)
-    {
-      int s = (-c+static_cast<int>(sqrt(D)))/2;
-      if (s<0)
-        s = (-c-static_cast<int>(sqrt(D)))/2;
-      m_ShOrder = static_cast<unsigned int>(s);
-    }
-    else if (D==0)
-      m_ShOrder = static_cast<unsigned int>(-c/2);
-  }
-  return m_NumCoefficients;
+  return static_cast<unsigned int>(this->m_ImageDescriptor->GetChannelTypeById(0).GetNumberOfComponents());
 }
 
-unsigned int mitk::ShImage::ShOrder()
+unsigned int mitk::ShImage::ShOrder() const
 {
-  NumCoefficients();
-  return m_ShOrder;
+  return mitk::sh::ShOrder(static_cast<int>(this->NumCoefficients()));
 }
 
 vtkImageData* mitk::ShImage::GetVtkImageData(int t, int n)
 {
   if(m_RgbImage.IsNull())
-  {
-    ShOrder();
-    NumCoefficients();
     ConstructRgbImage();
-  }
-   return m_RgbImage->GetVtkImageData(t,n);
+  return m_RgbImage->GetVtkImageData(t,n);
 }
 
 const vtkImageData*mitk::ShImage::GetVtkImageData(int t, int n) const
@@ -144,17 +121,17 @@ vtkImageData* mitk::ShImage::GetNonRgbVtkImageData(int t, int n)
 
 void mitk::ShImage::PrintSelf(std::ostream &os, itk::Indent indent) const
 {
-  os << indent << "Spherical harmonics order: " << m_ShOrder << std::endl;
-  os << indent << "Number of coefficients: " << m_NumCoefficients << std::endl;
+  if (this->IsInitialized())
+    os << indent << "Number of coefficients: " << this->NumCoefficients() << std::endl;
   Superclass::PrintSelf(os, indent);
 }
 
-mitk::ShImage::SH_CONVENTION mitk::ShImage::ShImage::GetShConvention() const
+mitk::ShImage::SH_CONVENTION mitk::ShImage::GetShConvention() const
 {
   return m_ShConvention;
 }
 
-void mitk::ShImage::ShImage::SetShConvention(SH_CONVENTION ShConvention)
+void mitk::ShImage::SetShConvention(SH_CONVENTION ShConvention)
 {
   m_ShConvention = ShConvention;
 }

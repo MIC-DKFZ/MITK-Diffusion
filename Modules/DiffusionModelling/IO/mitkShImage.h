@@ -53,8 +53,9 @@ namespace mitk
 
     virtual void ConstructRgbImage() const;
 
-    unsigned int ShOrder();
-    unsigned int NumCoefficients();
+    /** SH order of the coefficients; throws if their number belongs to no even order. */
+    unsigned int ShOrder() const;
+    unsigned int NumCoefficients() const;
 
     SH_CONVENTION GetShConvention() const;
     void SetShConvention(SH_CONVENTION ShConvention);
@@ -70,8 +71,6 @@ namespace mitk
     void  PrintSelf(std::ostream &os, itk::Indent indent) const override;
 
     mutable mitk::Image::Pointer m_RgbImage;
-    unsigned int m_ShOrder;
-    unsigned int m_NumCoefficients;
     SH_CONVENTION m_ShConvention;  // use mrtrix style SH convention
   };
 
