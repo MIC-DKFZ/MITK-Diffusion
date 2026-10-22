@@ -41,7 +41,6 @@ namespace mitk
     itkCloneMacro(Self);
 
     vtkProp *GetVtkProp(BaseRenderer *renderer) override;
-    bool IsLODEnabled(BaseRenderer * /*renderer*/) const override { return true; }
 
     static void SetDefaultProperties(DataNode *node, BaseRenderer *renderer = nullptr, bool overwrite = false);
 

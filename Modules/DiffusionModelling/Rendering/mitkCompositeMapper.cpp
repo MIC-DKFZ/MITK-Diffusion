@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkCompositeMapper.h"
 
 #include <mitkLevelWindowProperty.h>
-#include <mitkRenderingManager.h>
 
 mitk::CompositeMapper::CompositeMapper()
   : m_OdfMapper(OdfVtkMapper2D::New()), m_ImgMapper(ImageVtkMapper2D::New())
@@ -31,10 +30,7 @@ int mitk::CompositeMapper::MitkRenderOverlay(BaseRenderer *renderer)
 
 int mitk::CompositeMapper::MitkRenderOpaqueGeometry(BaseRenderer *renderer)
 {
-  const int rendered = m_ImgMapper->MitkRenderOpaqueGeometry(renderer) + m_OdfMapper->MitkRenderOpaqueGeometry(renderer);
-  if (RenderingManager::GetInstance()->GetNextLOD(renderer) == 0)
-    renderer->Modified();
-  return rendered;
+  return m_ImgMapper->MitkRenderOpaqueGeometry(renderer) + m_OdfMapper->MitkRenderOpaqueGeometry(renderer);
 }
 
 int mitk::CompositeMapper::MitkRenderTranslucentGeometry(BaseRenderer *renderer)
