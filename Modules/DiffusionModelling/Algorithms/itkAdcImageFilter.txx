@@ -51,6 +51,11 @@ AdcImageFilter< TInPixelType, TOutPixelType>
       static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
   outputImage->FillBuffer(0.0);
 
+  const auto* input = static_cast<const InputImageType*>(this->ProcessObject::GetInput(0));
+  if (m_GradientDirections.IsNull() || m_GradientDirections->Size() != input->GetVectorLength())
+    mitkThrow() << "Number of gradient directions does not match the number of image volumes!";
+
+  // Volumes with b <= 1 s/mm^2 are unweighted; both modes classify by this b-value.
   m_B_values.set_size(m_GradientDirections->Size());
   int nonzero = 0;
   for (unsigned int i=0; i<m_GradientDirections->Size(); i++)
@@ -60,7 +65,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>
     double b = m_B_value*twonorm*twonorm;
     m_B_values[i] = b;
 
-    if (g.magnitude()>0.001)
+    if (b>1)
       nonzero++;
   }
 
@@ -77,6 +82,8 @@ AdcImageFilter< TInPixelType, TOutPixelType>
 
   if (m_B_values.size() == m_Nonzero_B_values.size())
     mitkThrow() << "Unweighted (b=0 s/mm²) image volume missing!";
+  if (m_Nonzero_B_values.empty())
+    mitkThrow() << "Diffusion-weighted image volume missing!";
 
 }
 
@@ -140,8 +147,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>
       int c = 0;
       for (unsigned int i=0; i<inputImagePointer->GetVectorLength(); i++)
       {
-        GradientDirectionType g = m_GradientDirections->GetElement(i);
-        if (g.magnitude()<0.001)
+        if (m_B_values[i]<=1)
         {
           if (pix[i]>0)
           {
@@ -158,19 +164,14 @@ AdcImageFilter< TInPixelType, TOutPixelType>
         c = 0;
         for (unsigned int i=0; i<inputImagePointer->GetVectorLength(); i++)
         {
-          GradientDirectionType g = m_GradientDirections->GetElement(i);
-          if (g.magnitude()>0.001)
+          const double b = m_B_values[i];
+          if (b>1)
           {
-            double twonorm = g.two_norm();
-            double b = m_B_value*twonorm*twonorm;
-            if (b>0)
+            double S = pix[i];
+            if (S>0 && S0>0)
             {
-              double S = pix[i];
-              if (S>0 && S0>0)
-              {
-                outval -= std::log(S/S0)/b;
-                c++;
-              }
+              outval -= std::log(S/S0)/b;
+              c++;
             }
           }
         }

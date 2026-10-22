@@ -20,6 +20,7 @@ found in the LICENSE file.
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkTensorImage.h>
 
+#include <itkAdcImageFilter.h>
 #include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
@@ -36,6 +37,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(PrincipalDirection_PeakImageGeometry);
   MITK_TEST(EigenvalueCorrection_InvalidGradients_Throws);
   MITK_TEST(TensorToL2Norm_FrobeniusNorm);
+  MITK_TEST(Adc_NearZeroBValue_CountsAsBaseline);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -158,6 +160,48 @@ public:
 
     const double expected = std::sqrt(1.0 + 16 + 36 + 2 * (4 + 9 + 25));
     CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, filter->GetOutput()->GetPixel({{0, 0, 0}}), 1e-5);
+  }
+
+  static double Adc(bool fitSignal)
+  {
+    // b_ref = 1000. Volume 1 has |g| = 0.02, i.e. b = 0.4 s/mm^2: unweighted, but above the
+    // |g| > 0.001 limit that one part of the filter used. Six volumes at b = 1000 with D = 0.001.
+    const double D = 0.001;
+    const double g[8][3] = {{0, 0, 0}, {0.02, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.7071068, 0.7071068, 0}, {0.7071068, 0, 0.7071068}, {0, 0.7071068, 0.7071068}};
+
+    auto dwi = itk::VectorImage<short, 3>::New();
+    itk::VectorImage<short, 3>::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    dwi->SetRegions(region);
+    dwi->SetVectorLength(8);
+    dwi->Allocate();
+    itk::VariableLengthVector<short> pixel(8);
+    auto gradients = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+    for (unsigned int i = 0; i < 8; ++i)
+    {
+      mitk::DiffusionPropertyHelper::GradientDirectionType direction;
+      direction[0] = g[i][0];
+      direction[1] = g[i][1];
+      direction[2] = g[i][2];
+      gradients->push_back(direction);
+      const double b = 1000 * direction.squared_magnitude();
+      pixel[i] = static_cast<short>(std::round(10000 * std::exp(-(b > 1 ? b : 0) * D)));
+    }
+    dwi->FillBuffer(pixel);
+
+    auto filter = itk::AdcImageFilter<short, double>::New();
+    filter->SetInput(dwi);
+    filter->SetGradientDirections(gradients.GetPointer());
+    filter->SetB_value(1000);
+    filter->SetFitSignal(fitSignal);
+    filter->Update();
+    return filter->GetOutput()->GetPixel({{0, 0, 0}});
+  }
+
+  void Adc_NearZeroBValue_CountsAsBaseline()
+  {
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(false), 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(true), 1e-6);
   }
 
   // The 4D peak image takes the tensor image's geometry; its fourth origin component was left
