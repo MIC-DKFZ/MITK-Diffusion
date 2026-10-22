@@ -27,7 +27,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkRegularizedIVIMReconstructionFilter.h"
 
+#include <mitkBValueMapProperty.h>
 #include <mitkLog.h>
+
+#include <algorithm>
 
 #define IVIM_FOO -100000
 
@@ -84,26 +87,18 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
   }
 
   // Compute the indicies of the baseline images and gradient images
-  // If no b=0 mm/s² gradients ar found, the next lowest b-value is used.
-  GradientDirectionContainerType::ConstIterator gdcit = this->m_GradientDirectionContainer->Begin();
-  double minNorm = itk::NumericTraits<double>::max();
-  while( gdcit != this->m_GradientDirectionContainer->End() )
-  {
-    double norm = gdcit.Value().one_norm();
-    if (norm<minNorm)
-      minNorm = norm;
-    ++gdcit;
-  }
+  // If no b=0 mm/s² gradients ar found, the next lowest b-value is used. The b-values are rounded
+  // as in the b-value map of the DWI, so all directions of the lowest shell are baselines.
+  double minB = itk::NumericTraits<double>::max();
+  for (auto gdcit = this->m_GradientDirectionContainer->Begin(); gdcit != this->m_GradientDirectionContainer->End(); ++gdcit)
+    minB = std::min(minB, mitk::BValueMapProperty::GetBValue(gdcit.Value(), m_BValue));
 
-  minNorm += 0.001;
-  gdcit = this->m_GradientDirectionContainer->Begin();
-  while( gdcit != this->m_GradientDirectionContainer->End() )
+  for (auto gdcit = this->m_GradientDirectionContainer->Begin(); gdcit != this->m_GradientDirectionContainer->End(); ++gdcit)
   {
-    if(gdcit.Value().one_norm() <= minNorm)
+    if(mitk::BValueMapProperty::GetBValue(gdcit.Value(), m_BValue) <= minB)
       m_Snap.baselineind.push_back(gdcit.Index());
     else
       m_Snap.gradientind.push_back(gdcit.Index());
-    ++gdcit;
   }
   if (m_Snap.gradientind.size()==0)
     itkExceptionMacro("Only one b-value supplied. At least two needed for IVIM fit.");
@@ -261,7 +256,8 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
   {
     InputVectorType measvec = iit.Get();
 
-    typename NumericTraits<InputPixelType>::AccumulateType b0 = NumericTraits<InputPixelType>::Zero;
+    // in double, an integer mean would be truncated
+    double b0 = 0;
 
     m_Snap.meas_for_threshold.set_size(m_Snap.num_weighted);
     m_Snap.allmeas.set_size(m_Snap.num_weighted);

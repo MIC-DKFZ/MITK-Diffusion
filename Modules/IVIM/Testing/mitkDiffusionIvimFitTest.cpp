@@ -31,6 +31,8 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Fwe_AllMethods_MatchRecordedValues);
   MITK_TEST(Defaults_ThresholdsAndDStarNotSet_SameAsViewDefaults);
   MITK_TEST(Update_ReferenceBValueNotSet_Throws);
+  MITK_TEST(Baselines_NoBZero_AllDirectionsOfLowestShell);
+  MITK_TEST(Baselines_Mean_NotTruncated);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float>;
@@ -149,13 +151,13 @@ public:
       Parameters mean;
       Parameters center;
     };
-    // Recorded from the code before the review #13 fixes, b threshold 170, D* 0.06 for the fixed
-    // D* method; voxel (5, 5, 5) is in the center of the 11^3 image.
+    // Values recorded from the fit to catch unintended changes, b threshold 170, D* 0.06 for the
+    // fixed D* method; voxel (5, 5, 5) is in the center of the 11^3 image.
     const std::vector<Recorded> recorded = {
-      {FilterType::IVIM_FIT_ALL, {0.4292342052, 0.0005106752415, 0.01820434694}, {0.8115641475, 0.0005265806685, 0.01223030128}},
-      {FilterType::IVIM_DSTAR_FIX, {0.2712541107, 0.0007509498357, 0.05999999866}, {0.7812179327, 0.0006338245585, 0.05999999866}},
-      {FilterType::IVIM_D_THEN_DSTAR, {0.271253102, 0.0007509525527, 0.0302335529}, {0.7812152505, 0.000633834512, 0.01441000029}},
-      {FilterType::IVIM_LINEAR_D_THEN_F, {0.3726078892, 0.0005149761726, 0.02103719706}, {0.7865120173, 0.000659120793, 0.01441000029}}};
+      {FilterType::IVIM_FIT_ALL, {0.4289386548, 0.0005090772679, 0.01859561014}, {0.8115641475, 0.0005265806685, 0.01223030128}},
+      {FilterType::IVIM_DSTAR_FIX, {0.2727057611, 0.000750951204, 0.05999999866}, {0.7812179327, 0.0006338245585, 0.05999999866}},
+      {FilterType::IVIM_D_THEN_DSTAR, {0.2727045735, 0.0007509544281, 0.02995032977}, {0.7812152505, 0.000633834512, 0.01441000029}},
+      {FilterType::IVIM_LINEAR_D_THEN_F, {0.3739919173, 0.0005149761726, 0.02083793334}, {0.7865120173, 0.000659120793, 0.01441000029}}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 5;
@@ -210,6 +212,36 @@ public:
     filter->SetGradientDirections(MakeGradients(m_BValues, 1000).GetPointer());
     filter->SetMethod(FilterType::IVIM_FIT_ALL);
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  void Baselines_NoBZero_AllDirectionsOfLowestShell()
+  {
+    // The three b=10 directions have different 1-norms.
+    const std::vector<double> bValues = {10, 10, 10, 100, 200, 400, 600, 800, 1000};
+    auto gradients = MakeGradients(bValues, 1000);
+    const double scale = std::sqrt(10.0 / 1000);
+    gradients->SetElement(1, GradientType(scale / std::sqrt(2.0), scale / std::sqrt(2.0), 0));
+    gradients->SetElement(2, GradientType(scale / std::sqrt(3.0), scale / std::sqrt(3.0), scale / std::sqrt(3.0)));
+
+    auto image = MakeImage({IvimSignal(bValues, 10000, 0.1, 0.001, 0.02)});
+    auto filter = MakeFilter(image, gradients, 1000, FilterType::IVIM_FIT_ALL);
+    filter->Update();
+    auto snapshot = filter->GetSnapshot();
+    CPPUNIT_ASSERT(snapshot.baselineind == std::vector<unsigned int>({0, 1, 2}));
+    CPPUNIT_ASSERT_EQUAL(6, snapshot.num_weighted);
+  }
+
+  void Baselines_Mean_NotTruncated()
+  {
+    std::vector<double> signal = IvimSignal(m_BValues, 1000, 0.1, 0.001, 0.02);
+    signal[0] = 1000;
+    signal[1] = 1001;
+    auto image = MakeImage({signal});
+    auto filter = MakeFilter(image, MakeGradients(m_BValues, 1000), 1000, FilterType::IVIM_FIT_ALL);
+    filter->Update();
+    auto snapshot = filter->GetSnapshot();
+    for (int i = 0; i < snapshot.num_weighted; ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(std::round(signal[i + 2]) / 1000.5, snapshot.allmeas[i], 1e-6);
   }
 };
 
