@@ -7,4 +7,6 @@ if(BUILD_MODULE_IVIM)
   DEPENDS MitkDiffusionImage
 )
 
+  add_subdirectory(Testing)
+
 endif()
