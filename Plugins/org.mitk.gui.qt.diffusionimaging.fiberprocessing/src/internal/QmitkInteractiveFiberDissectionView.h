@@ -31,6 +31,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkStreamlineFeatureExtractor.h>
 #include <mitkStatisticModel.h> 
 
+#include <mitkTensorImage.h>
+#include <mitkDataStorage.h>
+#include <mitkDataNode.h>
+#include <mitkImage.h>
+#include <itkImage.h>
+#include <random>
+#include <mitkPointSet.h>
+#include <mitkPointSetShapeProperty.h>
+#include <QTimer>
+#include <QmitkStdMultiWidget.h>
+#include <QmitkSliceNavigationListener.h>
+#include <mitkILifecycleAwarePart.h>
 #include <itkCastImageFilter.h>
 #include <itkVTKImageImport.h>
 #include <itkVTKImageExport.h>
@@ -45,6 +57,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkSmartPointer.h>
 #include <vtkSelection.h>
 #include <vtkSelectionNode.h>
+#include <vtkExtractSelection.h>
 #include <vtkFloatArray.h>
 #include <vtkCellPicker.h>
 
@@ -56,6 +69,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 /*!
 \brief View to dissect fiber bundles with active learning
 */
+
 class QmitkInteractiveFiberDissectionView : public QmitkAbstractView
 {
   // this is needed for all Qt objects that should have a Qt meta-object
@@ -75,6 +89,8 @@ public:
 
   virtual void CreateQtPartControl(QWidget *parent) override;
 
+
+
   virtual void SetFocus() override;
 
 protected slots:
@@ -82,20 +98,27 @@ protected slots:
   void UpdateGui();     ///< update button activity etc. dpending on current datamanager selection
   void RemovefromBundleBrush( bool checked );
   void CreateSubset();
+  void CreateReductionSubset();
   void CreateSphereSegmentation();
   void ExtractRandomFibersFromTractogram();
   void StartAlgorithm();
+  void StartAlgorithmGen();
+  void StartGeneralizationAlgorithm();
   void CreatePredictionNode();
   void CreateUncertaintySampleNode();
   void CreateDistanceSampleNode();
   void RemovefromUncertaintyBrush( bool checked );
-  void RemovefromDistanceBrush( bool checked );
+  void RemovefromDistanceBrush( bool checked);
   void RemovefromPredictionBrush( bool checked );
   void ResampleTractogram();
   void SFFPrototypes();
   void CreateUncertantyMap();
   void ResetClassifier();
 
+
+  void addGeneralizationBundles(bool reset);
+  void addGeneralizationSavedPosBundles();
+  void addGeneralizationSavedNegBundles();
 
 
 
@@ -109,6 +132,13 @@ protected:
   void OnEndInteraction();
   void CreateStreamlineInteractor();
   void CreateStreamlineInteractorBrush();
+  void StartLabelingBrush(mitk::DataNode::Pointer toLabelNode, bool fromPrediction);
+  void StopLabelingBrush();
+  void UncheckLabelingBrushes();
+  bool HelpMessagesEnabled() const;
+  /** Trains the classifier on the given labels and shows the prediction. Starts a new session in the first cycle. */
+  bool RunClassifier(mitk::FiberBundle::Pointer plus, mitk::FiberBundle::Pointer minus);
+  void AddSavedGeneralizationBundle(const mitk::DataNode *selectedNode, mitk::DataNode::Pointer &genNode, const std::string &name, float r, float g, float b);
 
   Ui::QmitkInteractiveFiberDissectionViewControls* m_Controls;
 
@@ -125,6 +155,9 @@ protected:
   int m_prototypecounter;
   int m_posOffsetcounter;
   int m_init_subset;
+  int m_generalizationMode;
+
+
 
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
@@ -138,6 +171,8 @@ protected:
   mitk::FiberBundle::Pointer            m_Prediction;
   mitk::FiberBundle::Pointer            m_UncertaintyLabel;
   mitk::FiberBundle::Pointer            m_DistanceLabel;
+  mitk::FiberBundle::Pointer            cur_negativeBundle;
+  mitk::FiberBundle::Pointer            cur_positiveBundle;
 
 
   mitk::DataNode::Pointer               m_positiveBundleNode;
@@ -147,8 +182,18 @@ protected:
   mitk::DataNode::Pointer               m_UncertaintyLabelNode;
   mitk::DataNode::Pointer               m_DistanceLabelNode;
   mitk::DataNode::Pointer               m_reducedFibersDataNode;
+  mitk::DataNode::Pointer               m_reducedFibersTractogramNode;
+
   mitk::DataNode::Pointer               m_Prototypes;
-  mitk::DataNode::Pointer               m_newtestnode;
+
+ // This code is for atTRACTive generalization
+  mitk::FiberBundle::Pointer            m_positiveGenBundle;
+  mitk::FiberBundle::Pointer            m_negativeGenBundle;
+  mitk::DataNode::Pointer               m_positiveGenBundleNode;
+  mitk::DataNode::Pointer               m_negativeGenBundleNode;
+
+
+
 
   vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
   vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
@@ -163,7 +208,6 @@ protected:
   std::shared_ptr< mitk::StreamlineFeatureExtractor > classifier;
 
 
-  std::vector<std::vector<unsigned int>> m_index;
 
 };
 

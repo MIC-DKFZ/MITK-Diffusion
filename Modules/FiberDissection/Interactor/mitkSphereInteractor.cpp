@@ -215,6 +215,8 @@ void mitk::SphereInteractor::ExtractFibers()
 
     vtkPolyData* polyData = m_workingBundle->GetFiberPolyData();
 
+    vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
+
     vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
     vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
     vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
@@ -268,13 +270,17 @@ void mitk::SphereInteractor::ExtractFibers()
         // Create a new vtkPolyData object and set it to the new fibers
         m_reducedFibersBundle->GetFiberPolyData()->SetPoints(vNewPoints);
         m_reducedFibersBundle->GetFiberPolyData()->SetLines(vNewLines);
+//    vNewPolyData->SetPoints(vNewPoints);
+//    vNewPolyData->SetLines(vNewLines);
 
 
         m_reducedFibersBundle->ColorFibersByOrientation();
 
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+//    m_reducedFibersBundle->SetFiberPolyData(vNewPolyData);
     m_reducedFibersBundle->SetFiberWeights(weights);
-
+    m_reducedFibersBundle->GetFiberPolyData()->RemoveDeletedCells();
+    m_reducedFibersBundle->RequestUpdate();
     m_startDataNode->SetVisibility(false);
     m_endDataNode->SetVisibility(false);
     m_workingBundleNode->SetVisibility(false);
