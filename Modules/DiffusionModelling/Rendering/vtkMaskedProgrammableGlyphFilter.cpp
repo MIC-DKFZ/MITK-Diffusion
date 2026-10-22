@@ -64,7 +64,8 @@ int vtkMaskedProgrammableGlyphFilter::RequestData(
   {
     vtkIdType numPts = this->MaskPoints->GetPolyDataInput(0)->GetNumberOfPoints();
     this->MaskPoints->SetMaximumNumberOfPoints(MaximumNumberOfPoints);
-    this->MaskPoints->SetOnRatio(numPts / MaximumNumberOfPoints);
+    // "ShowMaxNumber" 0 is allowed by the generic property editor; vtkMaskPoints then keeps no point.
+    this->MaskPoints->SetOnRatio(MaximumNumberOfPoints > 0 ? numPts / MaximumNumberOfPoints : 1);
     this->Superclass::SetInputConnection(this->MaskPoints->GetOutputPort());
     this->MaskPoints->Update();
   }
