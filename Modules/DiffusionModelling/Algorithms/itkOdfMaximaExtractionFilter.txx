@@ -24,16 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkOrientationDistributionFunction.h>
 #include <itkContinuousIndex.h>
 
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkCellArray.h>
-#include <vtkPoints.h>
-#include <vtkPolyLine.h>
-
-#include <boost/math/special_functions.hpp>
 #include <boost/timer/progress_display.hpp>
-
-using namespace boost::math;
 
 namespace itk {
 
@@ -261,11 +252,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       x[0] = spherical[1];  // theta
       x[1] = spherical[0];  // phi
 
-      VnlCostFunction cost;
-      if (m_Toolkit==Toolkit::MRTRIX)
-        cost.SetProblem(coeffs, ShOrder, true, max);
-      else
-        cost.SetProblem(coeffs, ShOrder, false, max);
+      ShCostFunction cost(coeffs, m_Toolkit==Toolkit::MRTRIX);
 
       vnl_lbfgsb minimizer(cost);
       minimizer.set_f_tolerance(1e-6);

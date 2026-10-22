@@ -16,13 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkFlipPeaksFilter_h_
 #define __itkFlipPeaksFilter_h_
 
-#include "itkImageToImageFilter.h"
-#include "vnl/vnl_vector_fixed.h"
-#include "vnl/vnl_matrix.h"
-#include "vnl/algo/vnl_svd.h"
-#include "itkVectorContainer.h"
-#include "itkVectorImage.h"
-#include <itkOrientationDistributionFunction.h>
+#include <itkImageToImageFilter.h>
 #include <mitkPeakImage.h>
 
 namespace itk{
@@ -59,11 +53,9 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
 
     protected:
     FlipPeaksFilter();
-    ~FlipPeaksFilter(){}
+    ~FlipPeaksFilter() override {}
 
-    void BeforeThreadedGenerateData() override;
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
-    void AfterThreadedGenerateData();
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
     private:
 

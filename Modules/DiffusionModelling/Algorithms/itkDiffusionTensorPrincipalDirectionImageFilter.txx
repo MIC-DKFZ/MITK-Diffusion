@@ -17,9 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkDiffusionTensorPrincipalDirectionImageFilter_txx
 #define __itkDiffusionTensorPrincipalDirectionImageFilter_txx
 
-#include <time.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "itkDiffusionTensorPrincipalDirectionImageFilter.h"
 #include "itkImageRegionConstIterator.h"
@@ -27,13 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionIterator.h"
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
-#include <boost/timer/progress_display.hpp>
 
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkCellArray.h>
-#include <vtkPoints.h>
-#include <vtkPolyLine.h>
 
 namespace itk {
 

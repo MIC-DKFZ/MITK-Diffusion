@@ -22,9 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkShCoefficientImageExporter.h"
 #include <itkImageRegionIterator.h>
-#include <boost/math/special_functions.hpp>
 
-using namespace boost::math;
 
 namespace itk {
 

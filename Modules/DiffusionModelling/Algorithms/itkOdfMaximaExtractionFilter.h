@@ -28,40 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/algo/vnl_lbfgsb.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 
-class VnlCostFunction : public vnl_cost_function
-{
-public:
-
-  bool mrtrix;
-  int ShOrder;
-  vnl_vector<float> coeffs;
-  double max;
-  void SetProblem(vnl_vector<float>& coeffs, int ShOrder, bool mrtrix, double max)
-  {
-    this->coeffs = coeffs;
-    this->ShOrder = ShOrder;
-    this->mrtrix = mrtrix;
-    this->max = max;
-  }
-
-  VnlCostFunction(const int NumVars=2) : vnl_cost_function(NumVars)
-  {
-  }
-
-  // cost function
-  double f(vnl_vector<double> const &x)
-  {
-    return -mitk::sh::GetValue(coeffs, ShOrder, x[0], x[1], mrtrix);
-  }
-
-  // gradient of cost function
-  void gradf(vnl_vector<double> const &x, vnl_vector<double> &dx)
-  {
-    fdgradf(x, dx);
-  }
-};
-
-
 namespace itk{
 
 /**
@@ -135,11 +101,11 @@ Image< unsigned char, 3 > >
 
     protected:
     OdfMaximaExtractionFilter();
-    ~OdfMaximaExtractionFilter(){}
+    ~OdfMaximaExtractionFilter() override {}
 
-    void BeforeThreadedGenerateData();
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
-    void AfterThreadedGenerateData();
+    void BeforeThreadedGenerateData() override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
+    void AfterThreadedGenerateData() override;
 
     /** Extract all local maxima from the densely sampled ODF surface. Thresholding possible. **/
     double FindCandidatePeaks(OdfType& odf, double odfMax, std::vector< DirectionType >& inDirs);
@@ -148,6 +114,30 @@ Image< unsigned char, 3 > >
     std::vector< DirectionType > MeanShiftClustering(std::vector< DirectionType >& inDirs);
 
     private:
+
+    /** Negative SH value at (theta, phi), minimized to refine a peak direction. */
+    class ShCostFunction : public vnl_cost_function
+    {
+    public:
+      ShCostFunction(const vnl_vector<float> &coefficients, bool mrtrix)
+        : vnl_cost_function(2), m_Coefficients(coefficients), m_Mrtrix(mrtrix)
+      {
+      }
+
+      double f(vnl_vector<double> const &x) override
+      {
+        return -mitk::sh::GetValue(m_Coefficients, ShOrder, x[0], x[1], m_Mrtrix);
+      }
+
+      void gradf(vnl_vector<double> const &x, vnl_vector<double> &dx) override
+      {
+        fdgradf(x, dx);
+      }
+
+    private:
+      vnl_vector<float> m_Coefficients;
+      bool m_Mrtrix;
+    };
 
     NormalizationMethods                        m_NormalizationMethod;  ///< normalization method of ODF peaks
     unsigned int                                m_MaxNumPeaks;          ///< maximum number of peaks per voxel. if more peaks are detected, only the largest are kept.
