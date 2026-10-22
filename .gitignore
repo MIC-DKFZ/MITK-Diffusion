@@ -1,1 +1,7 @@
 .vscode/settings.json
+
+# Local agent state: GitLab token, worktrees and Claude Code's per-user files
+.env
+.worktrees/
+.claude/settings.local.json
+.claude/worktrees/
