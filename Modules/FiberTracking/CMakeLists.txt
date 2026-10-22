@@ -27,9 +27,9 @@ if(NOT _missing_deps)
     message(SEND_ERROR "${status_msg} (error code ${status_code})")
   endif()
 
-  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Resources)
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/resource)
   execute_process(COMMAND ${CMAKE_COMMAND} -E  tar xzf ../FibertrackingLUT.tar.gz
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Resources
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/resource
                   RESULT_VARIABLE result
                   ERROR_VARIABLE err_msg)
   if(result)
@@ -39,7 +39,6 @@ if(NOT _missing_deps)
 endif()
 
 MITK_CREATE_MODULE(
-  SUBPROJECTS MITK-Diffusion
   INCLUDE_DIRS Algorithms Algorithms/TrackingHandlers Algorithms/GibbsTracking ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${_module_deps}
 )

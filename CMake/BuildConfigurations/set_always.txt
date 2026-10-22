@@ -1,6 +1,5 @@
 
 set(MITK_BUILD_ALL_APPS OFF CACHE BOOL "Build all MITK applications" FORCE)
-set(MITK_BUILD_APP_CoreApp OFF CACHE BOOL "Build the MITK CoreApp" FORCE)
 set(MITK_BUILD_APP_Workbench ON CACHE BOOL "Build the MITK Workbench" FORCE)
 
 # Build neither all plugins nor examples
@@ -13,13 +12,6 @@ set(BLUEBERRY_USE_QT_HELP ON CACHE BOOL "Enable support for integrating bundle d
 
 # Enable console window
 set(MITK_SHOW_CONSOLE_WINDOW ON CACHE BOOL "Use this to enable or disable the console window when starting MITK GUI Applications" FORCE)
-
-set(MITK_APPS_SHOWVIEWTOOLBAR OFF CACHE BOOL "" FORCE)
-set(MITK_APPS_SHOWPERSPECTIVETOOLBAR ON CACHE BOOL "" FORCE)
-
-set(MITK_APPS_VIEWEXCLUDELIST "" CACHE STRING "" FORCE)
-set(MITK_APPS_PERSPECTIVEEXCLUDELIST "org.mitk.extapp.defaultperspective;org.mitk.mitkworkbench.perspectives.visualization;" CACHE STRING "" FORCE)
-
 
 # modules
 set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)
