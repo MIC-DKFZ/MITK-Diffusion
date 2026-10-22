@@ -56,7 +56,8 @@ public:
   /**
    * @brief Correct each gradient direction according to the given transform
    *
-   * The size of the input is expected to correspond to the count of gradient images in the image.
+   * One transform per volume in volume order, except for the first volume of the lowest shell (the
+   * reference of head-motion correction), whose gradient is kept.
    */
   void CorrectDirections( const TransformsVectorType& );
 

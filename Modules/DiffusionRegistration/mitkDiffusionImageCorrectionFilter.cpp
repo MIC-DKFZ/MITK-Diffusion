@@ -104,12 +104,14 @@ void mitk::DiffusionImageCorrectionFilter::CorrectDirections( const TransformMat
   {
     mitkThrow() << " No diffusion image given! ";
   }
-  TransformsVectorType transfVec;
-  for (unsigned int i=0; i< DPH::GetGradientContainer(m_SourceImage)->Size();i++)
-  {
-    transfVec.push_back(transformation);
-  }
-  this->CorrectDirections(transfVec);
+  // One transform for the whole image rotates every gradient. The per-volume overload skips the
+  // reference volume of head-motion correction, which would leave a weighted volume unrotated here
+  // whenever the lowest shell is not b = 0. Zero (b0) gradients are kept as they are.
+  const TransformMatrixType rotation = GetRotationComponent(transformation);
+  DPH::GradientDirectionsContainerType::Pointer corrected_directions = DPH::GradientDirectionsContainerType::New();
+  for (const auto& direction : DPH::GetGradientContainer(m_SourceImage)->CastToSTLConstContainer())
+    corrected_directions->push_back(direction.two_norm() > 0 ? rotation * direction : direction);
+  DPH::SetGradientContainer(m_SourceImage, corrected_directions);
 }
 
 #endif
