@@ -110,8 +110,13 @@ namespace itk
     void GenerateOutputInformation() override;
     void GenerateData() override;
 
-    /** Smallest angle between two used directions, antipodal directions counted as equal. */
-    double Costs(const IndicesVector& used) const;
+    /** Angles between the directions of a shell, antipodal directions counted as equal; n x n for
+     * the n volumes of the shell, indexed by position in the shell. */
+    std::vector<double> PairAngles(const IndicesVector& shell) const;
+
+    /** Smallest angle between two used directions (positions in the shell) and the positions in
+     * used of that pair; 2 pi and used.size() if there is no pair. */
+    static double SmallestAngle(const IndicesVector& used, const std::vector<double>& angles, std::size_t n, std::size_t& first, std::size_t& second);
 
     GradientDirectionContainerType::ConstPointer m_GradientDirections;   ///< container for the subsampled output gradient directions
     GradientDirectionContainerType::ConstPointer m_OriginalGradientDirections;   ///< input gradient directions
