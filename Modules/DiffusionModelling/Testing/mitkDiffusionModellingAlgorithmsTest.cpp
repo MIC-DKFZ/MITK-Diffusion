@@ -18,11 +18,13 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkShImage.h>
 #include <mitkTensorImage.h>
 
 #include <itkAdcImageFilter.h>
 #include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
+#include <itkOdfMaximaExtractionFilter.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 #include <itkTensorToL2NormImageFilter.h>
 
@@ -38,6 +40,9 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(EigenvalueCorrection_InvalidGradients_Throws);
   MITK_TEST(TensorToL2Norm_FrobeniusNorm);
   MITK_TEST(Adc_NearZeroBValue_CountsAsBaseline);
+  MITK_TEST(PrincipalDirection_MaskOfOtherSize_Throws);
+  MITK_TEST(PrincipalDirection_SecondInput_SameAsFreshFilter);
+  MITK_TEST(MaximaExtraction_MaskOfOtherSize_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -202,6 +207,75 @@ public:
   {
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(false), 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(true), 1e-6);
+  }
+
+  using MaskImageType = itk::Image<unsigned char, 3>;
+
+  template <class TImage>
+  static MaskImageType::Pointer MaskLargerThan(const TImage *image)
+  {
+    auto mask = MaskImageType::New();
+    auto region = image->GetLargestPossibleRegion();
+    region.SetSize(0, region.GetSize(0) + 1);
+    mask->SetRegions(region);
+    mask->SetSpacing(image->GetSpacing());
+    mask->SetOrigin(image->GetOrigin());
+    mask->SetDirection(image->GetDirection());
+    mask->Allocate();
+    mask->FillBuffer(1);
+    return mask;
+  }
+
+  mitk::TensorImage::ItkTensorImageType::Pointer LoadItkTensors(const std::string &path)
+  {
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath(path));
+    return mitk::convert::GetItkTensorFromTensorImage(tensorImage.GetPointer());
+  }
+
+  // Masks are read with the input's voxel indices; another size meant out-of-bounds access.
+  void PrincipalDirection_MaskOfOtherSize_Throws()
+  {
+    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
+    filter->SetInput(tensors);
+    filter->SetMaskImage(MaskLargerThan(tensors.GetPointer()));
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  // The all-ones mask generated without a user mask was kept and reused for the next input.
+  void PrincipalDirection_SecondInput_SameAsFreshFilter()
+  {
+    auto smallTensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("DiffusionImaging/FWE/ReferenceTensorImage.dti");
+
+    auto reused = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
+    reused->SetInput(smallTensors);
+    reused->Update();
+    reused->SetInput(tensors);
+    reused->Update();
+
+    auto fresh = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
+    fresh->SetInput(tensors);
+    fresh->Update();
+
+    using PeakImageType = itk::Image<float, 4>;
+    itk::ImageRegionConstIterator<PeakImageType> itReused(reused->GetPeakImage(), reused->GetPeakImage()->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<PeakImageType> itFresh(fresh->GetPeakImage(), fresh->GetPeakImage()->GetLargestPossibleRegion());
+    CPPUNIT_ASSERT(reused->GetPeakImage()->GetLargestPossibleRegion() == fresh->GetPeakImage()->GetLargestPossibleRegion());
+    for (; !itFresh.IsAtEnd(); ++itFresh, ++itReused)
+      CPPUNIT_ASSERT_EQUAL(itFresh.Get(), itReused.Get());
+  }
+
+  void MaximaExtraction_MaskOfOtherSize_Throws()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto coefficients = mitk::convert::GetItkShFromShImage<15>(shImage.GetPointer());
+
+    auto filter = itk::OdfMaximaExtractionFilter<float, 4, 20242>::New();
+    filter->SetInput(coefficients);
+    filter->SetMaskImage(MaskLargerThan(coefficients.GetPointer()));
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
   }
 
   // The 4D peak image takes the tensor image's geometry; its fourth origin component was left

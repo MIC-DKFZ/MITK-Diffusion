@@ -22,7 +22,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vnl/algo/vnl_svd.h"
 #include "itkVectorContainer.h"
 #include "itkVectorImage.h"
-#include <mitkFiberBundle.h>
 #include <mitkPeakImage.h>
 #include <mitkShImage.h>
 #include <itkOrientationDistributionFunction.h>
@@ -161,6 +160,7 @@ Image< unsigned char, 3 > >
     PeakImageType::Pointer                      m_PeakImage;
     ItkUcharImgType::Pointer                    m_NumDirectionsImage;     ///< number of peaks per voxel
     ItkUcharImgType::Pointer                    m_MaskImage;              ///< only voxels inside the binary mask are processed
+    bool                                        m_MaskGenerated = false;  ///< m_MaskImage was generated for the current update only
 
     Toolkit                                     m_Toolkit;
     bool                                        m_FlipX;

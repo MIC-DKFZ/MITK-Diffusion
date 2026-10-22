@@ -57,7 +57,12 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::BeforeThre
   itk::Matrix<double, 3, 3> direction3 = inputImagePointer->GetDirection();
   ImageRegion<3> imageRegion3 = inputImagePointer->GetLargestPossibleRegion();
 
-  if (m_MaskImage.IsNull())
+  // The mask is read with the input's voxel indices.
+  if (m_MaskImage.IsNotNull() && (m_MaskImage->GetLargestPossibleRegion() != imageRegion3 || !m_MaskImage->IsSameImageGeometryAs(inputImagePointer)))
+    itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the tensor image.");
+
+  m_MaskGenerated = m_MaskImage.IsNull();
+  if (m_MaskGenerated)
   {
     m_MaskImage = ItkUcharImgType::New();
     m_MaskImage->SetSpacing( spacing3 );
@@ -107,7 +112,9 @@ template< class TTensorPixelType>
 void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
 ::AfterThreadedGenerateData()
 {
-
+  // A mask generated for this input must not be reused for the next one.
+  if (m_MaskGenerated)
+    m_MaskImage = nullptr;
 }
 
 template< class TTensorPixelType>

@@ -121,12 +121,9 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   itk::Matrix<double, 3, 3> direction = ShCoeffImage->GetDirection();
   ImageRegion<3> imageRegion = ShCoeffImage->GetLargestPossibleRegion();
 
-  if (m_MaskImage.IsNotNull())
-  {
-    origin = m_MaskImage->GetOrigin();
-    direction = m_MaskImage->GetDirection();
-    imageRegion = m_MaskImage->GetLargestPossibleRegion();
-  }
+  // The mask is read with the input's voxel indices.
+  if (m_MaskImage.IsNotNull() && (m_MaskImage->GetLargestPossibleRegion() != imageRegion || !m_MaskImage->IsSameImageGeometryAs(ShCoeffImage)))
+    itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the SH image.");
 
   itk::Vector<double, 3> spacing3 = ShCoeffImage->GetSpacing();
   itk::Point<float, 3> origin3 = ShCoeffImage->GetOrigin();
@@ -157,7 +154,8 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   m_PeakImage->Allocate();
   m_PeakImage->FillBuffer(0.0);
 
-  if (m_MaskImage.IsNull())
+  m_MaskGenerated = m_MaskImage.IsNull();
+  if (m_MaskGenerated)
   {
     m_MaskImage = ItkUcharImgType::New();
     m_MaskImage->SetSpacing( spacing );
@@ -204,7 +202,9 @@ template< class PixelType, int ShOrder, int NrOdfDirections >
 void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 ::AfterThreadedGenerateData()
 {
-
+  // A mask generated for this input must not be reused for the next one.
+  if (m_MaskGenerated)
+    m_MaskImage = nullptr;
 }
 
 template< class PixelType, int ShOrder, int NrOdfDirections >
