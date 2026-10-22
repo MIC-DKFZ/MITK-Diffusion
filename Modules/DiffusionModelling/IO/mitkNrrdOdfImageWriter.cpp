@@ -101,15 +101,3 @@ mitk::NrrdOdfImageWriter* mitk::NrrdOdfImageWriter::Clone() const
   return new NrrdOdfImageWriter(*this);
 }
 
-mitk::IFileWriter::ConfidenceLevel mitk::NrrdOdfImageWriter::GetConfidenceLevel() const
-{
-  InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
-  if (input.IsNull() )
-  {
-    return Unsupported;
-  }
-  else
-  {
-    return Supported;
-  }
-}

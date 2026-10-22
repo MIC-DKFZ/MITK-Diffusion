@@ -121,15 +121,3 @@ mitk::ShImageWriter* mitk::ShImageWriter::Clone() const
   return new ShImageWriter(*this);
 }
 
-mitk::IFileWriter::ConfidenceLevel mitk::ShImageWriter::GetConfidenceLevel() const
-{
-  InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
-  if (input.IsNull() )
-  {
-    return Unsupported;
-  }
-  else
-  {
-    return Supported;
-  }
-}

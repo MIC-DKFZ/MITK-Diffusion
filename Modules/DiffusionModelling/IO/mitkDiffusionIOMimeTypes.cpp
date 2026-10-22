@@ -21,11 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkMetaDataDictionary.h>
 #include <itkMetaDataObject.h>
 #include <mitkLog.h>
-#include <dcmtk/dcmtract/trctractographyresults.h>
-#include <mitkDICOMDCMTKTagScanner.h>
-#include <itkGDCMImageIO.h>
 #include <itkNiftiImageIO.h>
-#include <itkBruker2dseqImageIO.h>
 
 namespace mitk
 {
@@ -34,7 +30,7 @@ std::vector<CustomMimeType*> DiffusionIOMimeTypes::Get()
 {
   std::vector<CustomMimeType*> mimeTypes;
 
-  // order matters here (descending rank for mime types)
+  // Registered with the default rank by the service activator.
   mimeTypes.push_back(DTI_MIMETYPE().Clone());
   mimeTypes.push_back(ODF_MIMETYPE().Clone());
   mimeTypes.push_back(SH_MIMETYPE().Clone());

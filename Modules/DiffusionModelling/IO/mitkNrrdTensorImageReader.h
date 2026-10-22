@@ -52,8 +52,6 @@ namespace mitk
 
   private:
     NrrdTensorImageReader* Clone() const override;
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
 } //namespace MITK

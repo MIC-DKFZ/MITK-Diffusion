@@ -74,16 +74,4 @@ vtkImageData* mitk::OdfImage::GetNonRgbVtkImageData(int t, int n)
   return Superclass::GetVtkImageData(t,n);
 }
 
-//
-//void mitk::OdfImage::CopyConstruct(mitk::Image::Pointer img)
-//{
-//  m_LargestPossibleRegion = img->GetLargestPossibleRegion();
-//  m_RequestedRegion = img->GetRequestedRegion();
-//  m_Channels.push_back(img->GetChannelData(0).GetPointer());
-//  m_Volumes.push_back(img->GetVolumeData(0).GetPointer());
-//  m_Slices.push_back(img->GetSliceData(0).GetPointer());
-//  m_Dimension = img->GetDimension();
-//  m_Dimensions = img->GetDimensions();
-//  m_PixelType = img->GetPixelType();
-//}
 

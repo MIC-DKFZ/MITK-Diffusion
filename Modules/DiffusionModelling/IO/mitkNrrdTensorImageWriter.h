@@ -25,7 +25,7 @@ namespace mitk
 {
 
 /**
- * Writes diffusion volumes to a file
+ * Writes tensor images to NRRD files (.dti)
  * @ingroup Process
  */
 class NrrdTensorImageWriter : public mitk::AbstractFileWriter
@@ -40,7 +40,6 @@ public:
     using AbstractFileWriter::Write;
     void Write() override;
 
-    ConfidenceLevel GetConfidenceLevel() const override;
 
 protected:
 

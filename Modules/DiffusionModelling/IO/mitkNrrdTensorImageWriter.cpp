@@ -72,15 +72,3 @@ mitk::NrrdTensorImageWriter* mitk::NrrdTensorImageWriter::Clone() const
   return new NrrdTensorImageWriter(*this);
 }
 
-mitk::IFileWriter::ConfidenceLevel mitk::NrrdTensorImageWriter::GetConfidenceLevel() const
-{
-  InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
-  if (input.IsNull() )
-  {
-    return Unsupported;
-  }
-  else
-  {
-    return Supported;
-  }
-}

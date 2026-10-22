@@ -25,7 +25,7 @@ namespace mitk
 {
 
 /**
- * Writes diffusion volumes to a file
+ * Writes SH images (.shi, .nii.gz, .nii, .nrrd)
  * @ingroup Process
  */
   class ShImageWriter : public mitk::AbstractFileWriter
@@ -41,7 +41,6 @@ namespace mitk
     using AbstractFileWriter::Write;
     void Write() override;
 
-    ConfidenceLevel GetConfidenceLevel() const override;
 
   protected:
 
@@ -55,4 +54,4 @@ namespace mitk
 
 } // end of namespace mitk
 
-#endif //_MITK_NRRDODF_WRITER__H_
+#endif

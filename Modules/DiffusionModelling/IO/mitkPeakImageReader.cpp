@@ -72,7 +72,7 @@ namespace mitk
     defaultOptions[ConvertMrtrixOption] = true;
     this->SetDefaultOptions(defaultOptions);
 
-    m_ServiceReg = this->RegisterService();
+    this->RegisterService();
   }
 
   PeakImageReader::~PeakImageReader()

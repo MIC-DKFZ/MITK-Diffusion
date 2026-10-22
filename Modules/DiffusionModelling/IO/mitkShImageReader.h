@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkNrrdShImageReader_h
-#define __mitkNrrdShImageReader_h
+#ifndef mitkShImageReader_h
+#define mitkShImageReader_h
 
 #include "mitkCommon.h"
 #include "itkVectorContainer.h"
@@ -54,10 +54,8 @@ namespace mitk
 
     template <int sh_order>
     mitk::Image::Pointer ConvertShImage(ShImage::ShOnDiskType::Pointer img);
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
 } //namespace MITK
 
-#endif // __mitkNrrdShImageReader_h
+#endif

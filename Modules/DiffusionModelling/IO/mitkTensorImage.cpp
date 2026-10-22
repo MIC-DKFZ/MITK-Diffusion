@@ -23,10 +23,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "vtkImageData.h"
 
-// #ifdef _OPENMP
-// #include "omp.h"
-// #endif
-
 mitk::TensorImage::TensorImage() : Image()
 {
   m_RgbImage = nullptr;

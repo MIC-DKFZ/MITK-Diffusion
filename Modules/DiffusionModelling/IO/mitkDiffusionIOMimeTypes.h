@@ -63,11 +63,8 @@ public:
   static std::string PEAK_MIMETYPE_DESCRIPTION();
 
 
-private:
-
-  // purposely not implemented
-  DiffusionIOMimeTypes();
-  DiffusionIOMimeTypes(const DiffusionIOMimeTypes&);
+  DiffusionIOMimeTypes() = delete;
+  DiffusionIOMimeTypes(const DiffusionIOMimeTypes&) = delete;
 };
 
 }

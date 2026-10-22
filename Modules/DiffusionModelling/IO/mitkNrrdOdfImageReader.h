@@ -45,14 +45,8 @@ namespace mitk
     using AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
 
-  protected:
-
-
-  private:
   private:
     NrrdOdfImageReader* Clone() const override;
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
 } //namespace MITK

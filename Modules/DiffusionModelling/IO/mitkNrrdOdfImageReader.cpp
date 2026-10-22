@@ -36,7 +36,7 @@ namespace mitk
   NrrdOdfImageReader::NrrdOdfImageReader()
     : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::ODF_MIMETYPE_DESCRIPTION() )
   {
-    m_ServiceReg = this->RegisterService();
+    this->RegisterService();
   }
 
   NrrdOdfImageReader::~NrrdOdfImageReader()
@@ -108,7 +108,7 @@ namespace mitk
       }
       catch(...)
       {
-        throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested vessel tree file!");
+        throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested ODF file!");
       }
     }
     return result;

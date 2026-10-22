@@ -24,7 +24,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <MitkDiffusionModellingExports.h>
 
 
-#define TENSOR_NUM_ELEMENTS 6
 
 namespace mitk
 {

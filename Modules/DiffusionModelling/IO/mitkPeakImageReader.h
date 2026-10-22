@@ -44,8 +44,6 @@ namespace mitk
 
   private:
     PeakImageReader* Clone() const override;
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
 } //namespace MITK

@@ -43,7 +43,7 @@ namespace mitk
     defaultOptions["Assume MRtrix/MITK style SH convention (else FSL/Dipy)"] = true;
     this->SetDefaultOptions(defaultOptions);
 
-    m_ServiceReg = this->RegisterService();
+    this->RegisterService();
   }
 
   ShImageReader::~ShImageReader()
@@ -135,7 +135,7 @@ namespace mitk
       }
       catch(...)
       {
-        throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested vessel tree file!");
+        throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested SH file!");
       }
     }
     return result;

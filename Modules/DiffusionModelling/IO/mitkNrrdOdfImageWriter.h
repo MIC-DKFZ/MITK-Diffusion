@@ -25,7 +25,7 @@ namespace mitk
 {
 
 /**
- * Writes diffusion volumes to a file
+ * Writes ODF images to NRRD files (.odf, .qbi)
  * @ingroup Process
  */
   class NrrdOdfImageWriter : public mitk::AbstractFileWriter
@@ -40,7 +40,6 @@ namespace mitk
     using AbstractFileWriter::Write;
     void Write() override;
 
-    ConfidenceLevel GetConfidenceLevel() const override;
 
   protected:
 
