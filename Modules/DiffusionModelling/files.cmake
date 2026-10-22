@@ -24,10 +24,6 @@ set(CPP_FILES
   IO/mitkPeakImageSerializer.h
 
   # Mapper etc.
-  Rendering/vtkMaskedProgrammableGlyphFilter.cpp
-  Rendering/mitkVectorImageVtkGlyphMapper3D.cpp
-  Rendering/vtkOdfSource.cxx
-  Rendering/vtkThickPlane.cxx
   Rendering/mitkOdfNormalizationMethodProperty.cpp
   Rendering/mitkOdfScaleByProperty.cpp
   Rendering/mitkCompositeMapper.cpp

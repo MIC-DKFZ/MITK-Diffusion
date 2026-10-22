@@ -1,5 +1,4 @@
-# The rendering test calls vtkProgrammableGlyphFilter methods of the ODF glyph filter directly.
-MITK_CREATE_MODULE_TESTS(PACKAGE_DEPENDS VTK|FiltersProgrammable)
+MITK_CREATE_MODULE_TESTS()
 
 mitkAddCustomModuleTest(mitkPeakShImageReaderTest mitkPeakShImageReaderTest)
 mitkAddCustomModuleTest(mitkImageReconstructionTest mitkImageReconstructionTest)
