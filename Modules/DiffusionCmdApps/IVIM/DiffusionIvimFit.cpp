@@ -43,7 +43,7 @@ void IvimMapComputation( mitk::Image::Pointer input,
   parameters.signalThreshold = 0;
   parameters.fitDStar = true;
 
-  const auto maps = mitk::ivim::ComputeMaps(input, parameters);
+  const auto maps = mitk::ivim::ComputeMaps(input, nullptr, parameters);
 
   mitk::IOUtil::Save( maps.dStar, output_prefix + "_Dstar_map." + output_type );
   mitk::IOUtil::Save( maps.d, output_prefix + "_D_map." + output_type );

@@ -46,6 +46,19 @@ namespace itk
     if (m_GradientDirections->Size() != this->GetInput()->GetNumberOfComponentsPerPixel())
       itkExceptionMacro("The input has " << this->GetInput()->GetNumberOfComponentsPerPixel() << " volumes but "
                                          << m_GradientDirections->Size() << " gradient directions.");
+
+    // The mask is iterated with the output region, so it has to share the geometry of the input.
+    if (m_ImageMask.IsNotNull())
+    {
+      const auto* input = this->GetInput();
+      if (m_ImageMask->GetLargestPossibleRegion() != input->GetLargestPossibleRegion() ||
+          !m_ImageMask->IsCongruentImageGeometry(input,
+                                                  ImageToImageFilterCommon::GetGlobalDefaultCoordinateTolerance(),
+                                                  ImageToImageFilterCommon::GetGlobalDefaultDirectionTolerance()))
+      {
+        itkExceptionMacro("The mask image does not have the size, origin, spacing and direction of the diffusion-weighted image.");
+      }
+    }
   }
 
   template <class TIn, class TOut>
@@ -63,17 +76,27 @@ namespace itk
     ImageRegionIterator<OutputImageType> dIt(this->GetOutput(1), outputRegionForThread);
     ImageRegionIterator<OutputImageType> dStarIt(this->GetOutput(2), outputRegionForThread);
 
+    ImageRegionConstIterator<MaskImageType> maskIt;
+    if (m_ImageMask.IsNotNull())
+      maskIt = ImageRegionConstIterator<MaskImageType>(m_ImageMask, outputRegionForThread);
+
     vnl_vector<double> signal(this->GetInput()->GetNumberOfComponentsPerPixel());
     for (; !inputIt.IsAtEnd(); ++inputIt, ++fIt, ++dIt, ++dStarIt)
     {
-      const auto pixel = inputIt.Get();
-      for (unsigned int i = 0; i < signal.size(); ++i)
-        signal[i] = pixel[i];
-
-      const auto fit = mitk::ivim::FitVoxel(signal, m_Protocol, m_FitParameters);
+      mitk::ivim::VoxelFit fit;
+      if (m_ImageMask.IsNull() || maskIt.Get() > 0)
+      {
+        const auto pixel = inputIt.Get();
+        for (unsigned int i = 0; i < signal.size(); ++i)
+          signal[i] = pixel[i];
+        fit = mitk::ivim::FitVoxel(signal, m_Protocol, m_FitParameters);
+      }
       fIt.Set(fit.f);
       dIt.Set(fit.d);
       dStarIt.Set(fit.dStar);
+
+      if (m_ImageMask.IsNotNull())
+        ++maskIt;
     }
   }
 

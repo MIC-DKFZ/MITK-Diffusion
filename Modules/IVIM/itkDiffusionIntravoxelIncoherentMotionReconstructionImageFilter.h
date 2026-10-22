@@ -45,6 +45,7 @@ namespace itk
     using InputImageType = typename Superclass::InputImageType;
     using OutputImageType = typename Superclass::OutputImageType;
     using OutputImageRegionType = typename Superclass::OutputImageRegionType;
+    using MaskImageType = Image<short, 3>;
     using GradientDirectionContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
 
     /** The gradient of each volume of the input, scaled so that b = reference b-value * |g|^2. */
@@ -52,6 +53,10 @@ namespace itk
 
     /** The reference b-value of the gradients; no default, the filter throws when it is not set. */
     itkSetMacro(BValue, double);
+
+    /** Restricts the fit to voxels where the mask is not 0, others get 0; the mask must have the
+        geometry of the input. */
+    itkSetConstObjectMacro(ImageMask, MaskImageType);
 
     void SetFitParameters(const mitk::ivim::FitParameters& parameters)
     {
@@ -74,6 +79,7 @@ namespace itk
   private:
     GradientDirectionContainerType::ConstPointer m_GradientDirections;
     double m_BValue{0};
+    MaskImageType::ConstPointer m_ImageMask;
     mitk::ivim::FitParameters m_FitParameters;
 
     /** Made from the gradients for each run and only read by the threads. */

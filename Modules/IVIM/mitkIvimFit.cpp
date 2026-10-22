@@ -438,7 +438,7 @@ mitk::ivim::VoxelFit mitk::ivim::FitVoxel(const vnl_vector<double>& signal,
   return fit;
 }
 
-mitk::ivim::Maps mitk::ivim::ComputeMaps(const Image* dwi, const FitParameters& parameters)
+mitk::ivim::Maps mitk::ivim::ComputeMaps(const Image* dwi, const Image* mask, const FitParameters& parameters)
 {
   using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<DiffusionPropertyHelper::DiffusionPixelType, float>;
 
@@ -450,6 +450,13 @@ mitk::ivim::Maps mitk::ivim::ComputeMaps(const Image* dwi, const FitParameters& 
   filter->SetBValue(DiffusionPropertyHelper::GetReferenceBValue(dwi));
   filter->SetGradientDirections(DiffusionPropertyHelper::GetGradientContainer(dwi));
   filter->SetFitParameters(parameters);
+
+  if (mask != nullptr)
+  {
+    auto itkMask = FilterType::MaskImageType::New();
+    CastToItkImage(mask, itkMask);
+    filter->SetImageMask(itkMask);
+  }
   filter->Update();
 
   FilterType::OutputImageType::Pointer f = filter->GetOutput(0);

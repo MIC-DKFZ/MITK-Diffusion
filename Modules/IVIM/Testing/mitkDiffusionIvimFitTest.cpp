@@ -18,6 +18,7 @@ found in the LICENSE file.
 
 #include "mitkIvimTestHelpers.h"
 
+#include <algorithm>
 #include <iomanip>
 
 using namespace mitk::IvimTesting;
@@ -40,6 +41,10 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(FitVoxel_SignalThreshold_FitInputsAndMapValues);
   MITK_TEST(Fwe_MultiThreaded_SameAsSingleThreaded);
   MITK_TEST(ComputeMaps_Fwe_SameAsFilterWithDwiGeometry);
+  MITK_TEST(Map_Mask_FitsOnlyInside);
+  MITK_TEST(Update_MaskOfOtherSize_Throws);
+  MITK_TEST(Update_MaskWithOtherOrigin_Throws);
+  MITK_TEST(ComputeMaps_FweMask_SameAsUnmaskedInside);
   MITK_TEST(GetDiffusionSignal_Fwe_VoxelSignalOrNothingOutside);
   MITK_TEST(AverageDiffusionSignalInMask_TwoVoxels_MeanNotRounded);
   MITK_TEST(AverageDiffusionSignalInMask_NoOverlap_NoVoxels);
@@ -409,7 +414,7 @@ public:
       filter->Update();
       const auto expected = GetMaps(filter);
 
-      const auto maps = mitk::ivim::ComputeMaps(dwi.dwi, MakeParameters(method));
+      const auto maps = mitk::ivim::ComputeMaps(dwi.dwi, nullptr, MakeParameters(method));
       CPPUNIT_ASSERT(expected.f == Values(maps.f.GetPointer()));
       CPPUNIT_ASSERT(expected.d == Values(maps.d.GetPointer()));
       CPPUNIT_ASSERT(expected.dStar == Values(maps.dStar.GetPointer()));
@@ -417,6 +422,91 @@ public:
       {
         CPPUNIT_ASSERT(mitk::Equal(map->GetGeometry()->GetOrigin(), dwi.dwi->GetGeometry()->GetOrigin()));
         CPPUNIT_ASSERT(mitk::Equal(map->GetGeometry()->GetSpacing(), dwi.dwi->GetGeometry()->GetSpacing()));
+      }
+    }
+  }
+
+  /** A mask along x with the geometry of the synthetic image when size is m_Truth.size(). */
+  static FilterType::MaskImageType::Pointer MakeLineMask(unsigned int size, short value)
+  {
+    auto mask = FilterType::MaskImageType::New();
+    FilterType::MaskImageType::SizeType maskSize = {{size, 1, 1}};
+    mask->SetRegions(maskSize);
+    mask->Allocate();
+    mask->FillBuffer(value);
+    return mask;
+  }
+
+  void Map_Mask_FitsOnlyInside()
+  {
+    for (auto method : {Method::FitAll, Method::DStarFixed, Method::DThenDStar, Method::LinearDThenF})
+    {
+      auto unmasked = MakeFilter(MakeSyntheticImage(), MakeGradients(m_BValues, 1000), 1000, method);
+      unmasked->Update();
+      const auto expected = GetMaps(unmasked);
+
+      auto mask = MakeLineMask(m_Truth.size(), 1);
+      mask->SetPixel({{1, 0, 0}}, 0);
+      auto filter = MakeFilter(MakeSyntheticImage(), MakeGradients(m_BValues, 1000), 1000, method);
+      filter->SetImageMask(mask);
+      filter->Update();
+      const auto maps = GetMaps(filter);
+
+      CPPUNIT_ASSERT_EQUAL(expected.f[0], maps.f[0]);
+      CPPUNIT_ASSERT_EQUAL(expected.d[0], maps.d[0]);
+      CPPUNIT_ASSERT_EQUAL(expected.dStar[0], maps.dStar[0]);
+      CPPUNIT_ASSERT(expected.d[1] != 0);
+      CPPUNIT_ASSERT_EQUAL(0.0, maps.f[1]);
+      CPPUNIT_ASSERT_EQUAL(0.0, maps.d[1]);
+      CPPUNIT_ASSERT_EQUAL(0.0, maps.dStar[1]);
+    }
+  }
+
+  void Update_MaskOfOtherSize_Throws()
+  {
+    auto filter = MakeFilter(MakeSyntheticImage(), MakeGradients(m_BValues, 1000), 1000, Method::FitAll);
+    filter->SetImageMask(MakeLineMask(m_Truth.size() - 1, 1));
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  void Update_MaskWithOtherOrigin_Throws()
+  {
+    auto mask = MakeLineMask(m_Truth.size(), 1);
+    FilterType::MaskImageType::PointType origin;
+    origin.Fill(1);
+    mask->SetOrigin(origin);
+    auto filter = MakeFilter(MakeSyntheticImage(), MakeGradients(m_BValues, 1000), 1000, Method::FitAll);
+    filter->SetImageMask(mask);
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  void ComputeMaps_FweMask_SameAsUnmaskedInside()
+  {
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    const std::vector<itk::Index<3>> inside = {{{5, 5, 5}}, {{2, 7, 4}}, {{10, 0, 3}}};
+    std::vector<std::size_t> insideOffsets;
+    for (const auto& index : inside)
+      insideOffsets.push_back(index[0] + 11 * index[1] + 121 * index[2]);
+    const auto mask = MakeMask(dwi.image, inside);
+
+    for (auto method : {Method::FitAll, Method::DStarFixed, Method::DThenDStar, Method::LinearDThenF})
+    {
+      const auto unmasked = mitk::ivim::ComputeMaps(dwi.dwi, nullptr, MakeParameters(method));
+      const auto masked = mitk::ivim::ComputeMaps(dwi.dwi, mask, MakeParameters(method));
+      const std::vector<std::pair<mitk::Image::Pointer, mitk::Image::Pointer>> pairs = {
+        {unmasked.f, masked.f}, {unmasked.d, masked.d}, {unmasked.dStar, masked.dStar}};
+      for (const auto& [expectedMap, actualMap] : pairs)
+      {
+        const auto expected = Values(expectedMap.GetPointer());
+        const auto actual = Values(actualMap.GetPointer());
+        CPPUNIT_ASSERT_EQUAL(expected.size(), actual.size());
+        // The unmasked map is not 0 outside the mask, so the mask makes a difference.
+        CPPUNIT_ASSERT(std::count(expected.begin(), expected.end(), 0.0) < static_cast<std::ptrdiff_t>(expected.size() / 2));
+        for (std::size_t i = 0; i < expected.size(); ++i)
+        {
+          const bool isInside = std::find(insideOffsets.begin(), insideOffsets.end(), i) != insideOffsets.end();
+          CPPUNIT_ASSERT_EQUAL(isInside ? expected[i] : 0.0, actual[i]);
+        }
       }
     }
   }

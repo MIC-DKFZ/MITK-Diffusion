@@ -12,7 +12,7 @@ The plot shows the fit of the model selected by the tab (IVIM or Kurtosis) to th
 
 The buttons below the plot copy the b-values and measurements of the voxel (for IVIM as S/S0) with the fitted parameters ("Signal values to clipboard") or only the fitted parameters ("Fit-parameters to clipboard") to the clipboard, or save the plot as an image file.
 
-<b>Generate Parameter Maps</b> fits every voxel of the image with the settings of the selected tab and adds the maps checked under "Output Maps" below the image in the Data Manager. Voxels that cannot be fitted, for example without signal or with too few usable measurements, get 0.
+<b>Generate Parameter Maps</b> fits every voxel of the image with the settings of the selected tab and adds the maps checked under "Output Maps" below the image in the Data Manager. With a ROI selected, only the voxels inside the ROI are fitted and the others get 0; the ROI must then have the size and geometry of the image. Voxels that cannot be fitted, for example without signal or with too few usable measurements, get 0 too.
 
 \section QmitkIVIMViewIvim IVIM
 
@@ -31,7 +31,7 @@ Parameters:
 \li <b>Ignore b&lt; (first fit)</b> (methods 3 and 4): the b-value threshold in s/mm² of the first fit.
 \li <b>Output Maps</b>: the maps of f, D and D* to generate, named "f Fit-n", "D Fit-n" and "D* Fit-n" with the method number n. For methods 3 and 4, D* is searched only when its map is checked; the preview always shows it.
 
-The IVIM maps cover the whole image; the ROI is used only for the preview. The plot shows S/S0, the measurements of the first fit and, for methods 3 and 4, those of the D* search.
+The plot shows S/S0, the measurements of the first fit and, for methods 3 and 4, those of the D* search.
 
 \section QmitkIVIMViewKurtosis Kurtosis
 
@@ -43,7 +43,7 @@ The kurtosis model describes the signal with the apparent diffusion coefficient 
 \li <b>Smoothing variance (mm²)</b>: the variance of a Gaussian smoothing applied to each volume before the maps are fitted; 0 means no smoothing.
 \li <b>Output Maps</b>: the maps of D and K, named "Kurtosis_DMap_Method-..." and "Kurtosis_KMap_Method-..." with the fit type.
 
-The kurtosis maps are fitted only inside the ROI if one is selected (other voxels get 0); the ROI must have the size and geometry of the image. The plot shows S, the measurements and the fitted curve.
+The plot shows S, the measurements and the fitted curve.
 
 \section QmitkIVIMViewCmdApps Command line tools
 

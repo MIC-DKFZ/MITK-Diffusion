@@ -101,9 +101,10 @@ namespace mitk::ivim
     Image::Pointer dStar;
   };
 
-  /** Fits every voxel of a DWI, multithreaded. Throws mitk::Exception or itk::ExceptionObject when
-      the image is no DWI or has only one b-value. */
-  MITKIVIM_EXPORT Maps ComputeMaps(const Image* dwi, const FitParameters& parameters);
+  /** Fits every voxel of a DWI, multithreaded. Voxels where the optional mask is 0 get 0; the mask
+      must have the geometry of the DWI. Throws mitk::Exception or itk::ExceptionObject when the image
+      is no DWI, has only one b-value or the mask does not fit. */
+  MITKIVIM_EXPORT Maps ComputeMaps(const Image* dwi, const Image* mask, const FitParameters& parameters);
 }
 
 #endif

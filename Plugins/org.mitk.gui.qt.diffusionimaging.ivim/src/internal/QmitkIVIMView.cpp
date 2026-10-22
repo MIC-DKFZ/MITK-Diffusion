@@ -365,14 +365,14 @@ void QmitkIVIMView::FittIVIMStart()
   }
   const auto* dwi = dynamic_cast<mitk::Image*>(dwiNode->GetData());
 
+  const mitk::Image* mask = nullptr;
+  if (m_Controls->m_MaskBox->GetSelectedNode().IsNotNull())
+    mask = dynamic_cast<mitk::Image*>(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
+
   try
   {
     if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
     {
-      const mitk::Image* mask = nullptr;
-      if (m_Controls->m_MaskBox->GetSelectedNode().IsNotNull())
-        mask = dynamic_cast<mitk::Image*>(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
-
       const auto maps = mitk::kurtosis::ComputeMaps(dwi, mask, this->GetKurtosisFitConfiguration(), m_Controls->m_SigmaSpinBox->value());
       const QString method = "_Method-" + m_Controls->m_KurtosisFitScale->currentText();
       if (m_Controls->m_CheckKurtD->isChecked())
@@ -382,7 +382,7 @@ void QmitkIVIMView::FittIVIMStart()
     }
     else
     {
-      const auto maps = mitk::ivim::ComputeMaps(dwi, this->GetIvimFitParameters());
+      const auto maps = mitk::ivim::ComputeMaps(dwi, mask, this->GetIvimFitParameters());
       const QString method = QString::number(m_Controls->m_MethodCombo->currentIndex() + 1);
       if (m_Controls->m_CheckDStar->isChecked())
         this->AddMapNode(maps.dStar, "D* Fit-" + method, 0.2, dwiNode);
