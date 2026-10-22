@@ -27,6 +27,11 @@ class mitkDiffusionImageEditingTestSuite : public mitk::TestFixture
   MITK_TEST(FlipAxes_RotatedImage_MirrorsGradientsAlongImageAxis);
   MITK_TEST(FlipAxes_ScalarImage_MirrorsData);
   MITK_TEST(FlipAxes_MultiComponentImage_Throws);
+  MITK_TEST(ApplyHeader_NewDirection_GradientsTurnWithImageOrStay);
+  MITK_TEST(ApplyHeader_FromRotatedLegacyImage_GradientsTurnBack);
+  MITK_TEST(ApplyHeader_NewFrame_AppliedToOriginalGradients);
+  MITK_TEST(ApplyHeader_OnlyOrigin_KeepsEverythingElse);
+  MITK_TEST(ApplyHeader_InvalidValues_Throw);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -80,6 +85,32 @@ class mitkDiffusionImageEditingTestSuite : public mitk::TestFixture
       index[0] = n - 1 - index[0];
       CPPUNIT_ASSERT(it.Get() == in->GetPixel(index));
     }
+  }
+
+  /** The DWI with the image-rotation flag set as given and its gradients derived again. */
+  mitk::Image::Pointer WithImageRotationFlag(bool applyImageRotation)
+  {
+    auto image = m_Dwi->Clone();
+    PropHelper::SetApplyMatrixToGradients(image, applyImageRotation);
+    PropHelper::InitializeImage(image);
+    return image;
+  }
+
+  static PropHelper::GradientDirectionsContainerType::Pointer Transformed(PropHelper::GradientDirectionsContainerType::ConstPointer gradients, const MatrixType& matrix)
+  {
+    auto result = PropHelper::GradientDirectionsContainerType::New();
+    for (const auto& g : gradients->CastToSTLConstContainer())
+      result->push_back(matrix * g);
+    return result;
+  }
+
+  /** The gradients stay as they are when InitializeImage derives them again, as later edits do. */
+  static void AssertStableUnderInitialize(mitk::Image* image)
+  {
+    auto expected = PropHelper::GetGradientContainer(image);
+    auto copy = image->Clone();
+    PropHelper::InitializeImage(copy);
+    AssertGradientsEqual(expected, PropHelper::GetGradientContainer(copy), 1e-12);
   }
 
 public:
@@ -169,6 +200,96 @@ public:
     auto image = mitk::GrabItkImageMemory(itkImage.GetPointer());
     CPPUNIT_ASSERT(!PropHelper::IsDiffusionWeightedImage(image));
     CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::FlipAxes(image, {true, false, false}), mitk::Exception);
+  }
+  void ApplyHeader_NewDirection_GradientsTurnWithImageOrStay()
+  {
+    // The result must not depend on the image-rotation flag of the input.
+    for (bool flag : {true, false})
+    {
+      auto image = WithImageRotationFlag(flag);
+      const auto gradients = PropHelper::GetGradientContainer(image);
+      for (bool rotate : {true, false})
+      {
+        mitk::DiffusionImageEditing::HeaderChange change;
+        change.direction = RotationZ();
+        change.rotateGradientsWithImage = rotate;
+        auto result = mitk::DiffusionImageEditing::ApplyHeader(image, change);
+
+        // test.dwi has an identity direction matrix, so turning with the image applies RotationZ.
+        MatrixType identity;
+        identity.set_identity();
+        AssertGradientsEqual(Transformed(gradients, rotate ? RotationZ() : identity).GetPointer(), PropHelper::GetGradientContainer(result), 1e-12);
+        CPPUNIT_ASSERT(!mitk::DiffusionImageEditing::AppliesImageRotationToGradients(result));
+        AssertStableUnderInitialize(result);
+        CPPUNIT_ASSERT(PropHelper::GetOriginalGradientContainer(result)->Size() == gradients->Size());
+      }
+    }
+  }
+
+  void ApplyHeader_FromRotatedLegacyImage_GradientsTurnBack()
+  {
+    // A legacy image applies its rotation to the gradients; resetting the direction matrix with
+    // "rotate with the image" turns them back by the inverse rotation.
+    SetRotation(m_Dwi, RotationZ());
+    auto image = WithImageRotationFlag(true);
+    const auto gradients = PropHelper::GetGradientContainer(image);
+
+    mitk::DiffusionImageEditing::HeaderChange change;
+    MatrixType identity;
+    identity.set_identity();
+    change.direction = identity;
+    auto result = mitk::DiffusionImageEditing::ApplyHeader(image, change);
+
+    AssertGradientsEqual(Transformed(gradients, RotationZ().transpose()).GetPointer(), PropHelper::GetGradientContainer(result), 1e-12);
+    AssertStableUnderInitialize(result);
+  }
+
+  void ApplyHeader_NewFrame_AppliedToOriginalGradients()
+  {
+    auto image = WithImageRotationFlag(false);
+    const auto original = PropHelper::GetOriginalGradientContainer(image);
+
+    // Frame axes as rows: modified = frame^T * original.
+    mitk::DiffusionImageEditing::HeaderChange change;
+    change.measurementFrame = RotationZ();
+    auto result = mitk::DiffusionImageEditing::ApplyHeader(image, change);
+
+    AssertGradientsEqual(Transformed(original, RotationZ().transpose()).GetPointer(), PropHelper::GetGradientContainer(result), 1e-12);
+    AssertGradientsEqual(original, PropHelper::GetOriginalGradientContainer(result), 0.0);
+    AssertStableUnderInitialize(result);
+  }
+
+  void ApplyHeader_OnlyOrigin_KeepsEverythingElse()
+  {
+    mitk::DiffusionImageEditing::HeaderChange change;
+    mitk::Point3D origin;
+    origin[0] = 1.5;
+    origin[1] = -2;
+    origin[2] = 7;
+    change.origin = origin;
+    auto result = mitk::DiffusionImageEditing::ApplyHeader(m_Dwi, change);
+
+    CPPUNIT_ASSERT(mitk::Equal(origin, result->GetGeometry()->GetOrigin(), 1e-12, true));
+    CPPUNIT_ASSERT(mitk::Equal(m_Dwi->GetGeometry()->GetSpacing(), result->GetGeometry()->GetSpacing(), 1e-12, true));
+    CPPUNIT_ASSERT(mitk::MatrixEqualElementWise(m_Dwi->GetGeometry()->GetIndexToWorldTransform()->GetMatrix(), result->GetGeometry()->GetIndexToWorldTransform()->GetMatrix(), 1e-12));
+    AssertGradientsEqual(PropHelper::GetGradientContainer(m_Dwi), PropHelper::GetGradientContainer(result), 0.0);
+  }
+
+  void ApplyHeader_InvalidValues_Throw()
+  {
+    mitk::DiffusionImageEditing::HeaderChange zeroSpacing;
+    mitk::Vector3D spacing;
+    spacing.Fill(1.0);
+    spacing[1] = 0;
+    zeroSpacing.spacing = spacing;
+    CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::ApplyHeader(m_Dwi, zeroSpacing), mitk::Exception);
+
+    mitk::DiffusionImageEditing::HeaderChange skewed;
+    MatrixType direction;
+    direction.set_identity();
+    direction[0][1] = 0.5;
+    skewed.direction = direction;
+    CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::ApplyHeader(m_Dwi, skewed), mitk::Exception);
   }
 };
 

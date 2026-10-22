@@ -1138,10 +1138,10 @@ QGroupBox {
              <number>4</number>
             </property>
             <property name="minimum">
-             <double>0.000000000000000</double>
+             <double>0.000100000000000</double>
             </property>
             <property name="maximum">
-             <double>99.989999999999995</double>
+             <double>10000.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -1150,12 +1150,24 @@ QGroupBox {
             <property name="decimals">
              <number>4</number>
             </property>
+            <property name="minimum">
+             <double>0.000100000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10000.000000000000000</double>
+            </property>
            </widget>
           </item>
           <item row="0" column="1">
            <widget class="QDoubleSpinBox" name="m_HeaderSpacingY">
             <property name="decimals">
              <number>4</number>
+            </property>
+            <property name="minimum">
+             <double>0.000100000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10000.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -1429,6 +1441,19 @@ QGroupBox {
            </spacer>
           </item>
          </layout>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QCheckBox" name="m_RotateGradientsWithImageBox">
+         <property name="toolTip">
+          <string>For DWIs: if checked, a new direction matrix turns the gradients with the image, so they keep their relation to the voxel grid (as FSL bvecs do). If unchecked, the gradients stay fixed in world coordinates.</string>
+         </property>
+         <property name="text">
+          <string>Rotate gradients with the image</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item row="7" column="0">

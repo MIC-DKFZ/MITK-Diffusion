@@ -19,6 +19,7 @@ found in the LICENSE file.
 #include <mitkImage.h>
 
 #include <array>
+#include <optional>
 
 namespace mitk
 {
@@ -41,6 +42,35 @@ namespace mitk
      * one component.
      */
     MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer FlipAxes(const Image* image, const std::array<bool, 3>& axes);
+
+    /** \brief The header fields to change; fields left empty keep their exact current value. */
+    struct HeaderChange
+    {
+      std::optional<Vector3D> spacing;
+      std::optional<Point3D> origin;
+      /** Columns: world direction of each image axis; they are normalized and must be orthogonal. */
+      std::optional<MatrixType> direction;
+      /** Replaces the stored measurement frame (frame axes as rows); DWIs only. */
+      std::optional<MatrixType> measurementFrame;
+      /**
+       * Whether the gradients of a DWI turn with a new direction matrix, i.e. keep their relation to
+       * the voxel grid (as FSL bvecs do). Otherwise they stay fixed in world.
+       */
+      bool rotateGradientsWithImage = true;
+    };
+
+    /**
+     * \brief Changes spacing, origin, direction matrix and measurement frame.
+     *
+     * When the direction matrix or the frame of a DWI changes, the new modified gradients are
+     * computed explicitly and stored as the measurement frame applied to the kept original
+     * gradients, with the image rotation switched off; they then no longer depend on whether the
+     * input applied the image rotation.
+     */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer ApplyHeader(const Image* image, const HeaderChange& change);
+
+    /** \brief Whether the modified gradients of the DWI include the image rotation (legacy NRRD, DICOM). */
+    MITKDIFFUSIONPREPROCESSING_EXPORT bool AppliesImageRotationToGradients(const Image* dwi);
   }
 }
 

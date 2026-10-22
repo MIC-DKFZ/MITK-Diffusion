@@ -70,6 +70,54 @@ const std::string QmitkPreprocessingView::VIEW_ID =
 
 typedef float TTensorPixelType;
 
+namespace
+{
+  /**
+   * The values of three spin boxes with 4 decimals; components the user did not edit keep their
+   * exact current value. Empty if nothing was edited.
+   */
+  std::optional<mitk::Vector3D> ReadEditedVector(const mitk::Vector3D& current, const std::array<double, 3>& boxValues)
+  {
+    mitk::Vector3D result = current;
+    bool edited = false;
+    for (unsigned int i=0; i<3; ++i)
+    {
+      if (std::abs(boxValues[i] - current[i]) > 0.5e-4)
+      {
+        result[i] = boxValues[i];
+        edited = true;
+      }
+    }
+    return edited ? std::optional<mitk::Vector3D>(result) : std::nullopt;
+  }
+
+  /**
+   * The values of a 3x3 table; entries whose text is still the displayed current value keep the
+   * exact current value. Empty if nothing was edited; throws for text that is not a number.
+   */
+  std::optional<mitk::DiffusionImageEditing::MatrixType> ReadEditedMatrix(const QTableWidget* table, const mitk::DiffusionImageEditing::MatrixType& current)
+  {
+    mitk::DiffusionImageEditing::MatrixType result = current;
+    bool edited = false;
+    for (int r=0; r<3; ++r)
+    {
+      for (int c=0; c<3; ++c)
+      {
+        const QTableWidgetItem* item = table->item(r, c);
+        if (item == nullptr || item->text() == QString::number(current[r][c]))
+          continue;
+        bool ok = false;
+        const double value = item->text().toDouble(&ok);
+        if (!ok)
+          mitkThrow() << "\"" << item->text().toStdString() << "\" is not a number.";
+        result[r][c] = value;
+        edited = true;
+      }
+    }
+    return edited ? std::optional<mitk::DiffusionImageEditing::MatrixType>(result) : std::nullopt;
+  }
+}
+
 
 QmitkPreprocessingView::QmitkPreprocessingView()
   : QmitkAbstractView(),
@@ -715,52 +763,40 @@ void QmitkPreprocessingView::DoApplyHeader()
   mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
   if ( image == nullptr ) { return; }
 
-  bool isDiffusionImage( PropHelper::IsDiffusionWeightedImage(image) );
-  mitk::Image::Pointer newImage = image->Clone();
+  // Only edited fields are passed on: the spin boxes and tables show rounded values, and
+  // re-applying them would also round what the user did not touch.
+  mitk::DiffusionImageEditing::HeaderChange change;
+  change.rotateGradientsWithImage = m_Controls->m_RotateGradientsWithImageBox->isChecked();
 
-  mitk::Vector3D spacing;
-  spacing[0] = m_Controls->m_HeaderSpacingX->value();
-  spacing[1] = m_Controls->m_HeaderSpacingY->value();
-  spacing[2] = m_Controls->m_HeaderSpacingZ->value();
-  newImage->GetGeometry()->SetSpacing( spacing );
-
-  mitk::Point3D origin;
-  origin[0] = m_Controls->m_HeaderOriginX->value();
-  origin[1] = m_Controls->m_HeaderOriginY->value();
-  origin[2] = m_Controls->m_HeaderOriginZ->value();
-  newImage->GetGeometry()->SetOrigin(origin);
-
-  vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
-  matrix->SetElement(0,3,newImage->GetGeometry()->GetOrigin()[0]);
-  matrix->SetElement(1,3,newImage->GetGeometry()->GetOrigin()[1]);
-  matrix->SetElement(2,3,newImage->GetGeometry()->GetOrigin()[2]);
-  for (int r=0; r<3; r++)
+  const mitk::BaseGeometry* geometry = image->GetGeometry();
+  change.spacing = ReadEditedVector(geometry->GetSpacing(), { m_Controls->m_HeaderSpacingX->value(), m_Controls->m_HeaderSpacingY->value(), m_Controls->m_HeaderSpacingZ->value() });
+  const auto origin = ReadEditedVector(geometry->GetOrigin().GetVectorFromOrigin(), { m_Controls->m_HeaderOriginX->value(), m_Controls->m_HeaderOriginY->value(), m_Controls->m_HeaderOriginZ->value() });
+  if (origin)
   {
-    for (int c=0; c<3; c++)
-    {
-      QTableWidgetItem* item = m_Controls->m_DirectionMatrixTable->item(r,c);
-      if (!item)
-        continue;
-      matrix->SetElement(r,c,item->text().toDouble());
-    }
+    mitk::Point3D newOrigin;
+    for (unsigned int i=0; i<3; ++i)
+      newOrigin[i] = (*origin)[i];
+    change.origin = newOrigin;
   }
-  newImage->GetGeometry()->SetIndexToWorldTransformByVtkMatrixWithoutChangingSpacing(matrix);
 
-  if ( isDiffusionImage )
+  mitk::Image::Pointer newImage;
+  try
   {
-    vnl_matrix_fixed< double, 3, 3 > mf;
+    mitk::DiffusionImageEditing::MatrixType direction;
     for (int r=0; r<3; r++)
-    {
       for (int c=0; c<3; c++)
-      {
-        QTableWidgetItem* item = m_Controls->m_MeasurementFrameTable->item(r,c);
-        if (!item)
-          continue;
-        mf[r][c] = item->text().toDouble();
-      }
-    }
-    PropHelper::SetMeasurementFrame(newImage, mf);
-    PropHelper::InitializeImage( newImage );
+        direction[r][c] = geometry->GetVtkMatrix()->GetElement(r,c)/geometry->GetSpacing()[c];
+    change.direction = ReadEditedMatrix(m_Controls->m_DirectionMatrixTable, direction);
+
+    if (PropHelper::IsDiffusionWeightedImage(image))
+      change.measurementFrame = ReadEditedMatrix(m_Controls->m_MeasurementFrameTable, PropHelper::GetMeasurementFrame(image));
+
+    newImage = mitk::DiffusionImageEditing::ApplyHeader(image, change);
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Warning", QString("The header could not be applied: ") + e.what());
+    return;
   }
 
   mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
