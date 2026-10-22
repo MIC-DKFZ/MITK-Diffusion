@@ -49,6 +49,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Update_MaskWithOtherOrigin_Throws);
   MITK_TEST(Map_MaskGridDiffersByRounding_SameAsExactMask);
   MITK_TEST(Update_MaskGridDiffersBeyondRounding_Throws);
+  MITK_TEST(HasVoxelGridOf_OriginShift_ToleranceInMillimetres);
   MITK_TEST(ComputeMaps_FweMaskWithRoundedOrigin_FitsInside);
   MITK_TEST(ComputeMaps_FweMask_SameAsUnmaskedInside);
   MITK_TEST(ComputeMaps_FractionalMask_FitsWhereGreaterThanZero);
@@ -550,6 +551,29 @@ public:
       auto filter = MakeFilter(MakeSyntheticImage(), MakeGradients(m_BValues, 1000), 1000, Method::FitAll);
       filter->SetImageMask(mask);
       CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+    }
+  }
+
+  void HasVoxelGridOf_OriginShift_ToleranceInMillimetres()
+  {
+    // 1e-4 mm at any spacing; 1e-4 of a voxel would accept 1.5e-4 mm at 2 mm and reject 0.75e-4 mm
+    // at 0.5 mm, as would a tolerance multiplied instead of divided by the spacing.
+    using ImageType = itk::Image<double, 3>;
+    for (double spacing : {0.5, 2.0})
+    {
+      auto image = ImageType::New();
+      image->SetRegions(ImageType::SizeType{{4, 4, 4}});
+      ImageType::SpacingType spacingVector;
+      spacingVector.Fill(spacing);
+      image->SetSpacing(spacingVector);
+      for (const auto& [originShift, hasVoxelGrid] : {std::pair(0.75e-4, true), std::pair(1.5e-4, false)})
+      {
+        auto mask = ImageType::New();
+        mask->CopyInformation(image);
+        mask->SetRegions(image->GetLargestPossibleRegion());
+        MoveVoxelGrid(mask, originShift, 0);
+        CPPUNIT_ASSERT_EQUAL(hasVoxelGrid, mitk::HasVoxelGridOf(mask, image));
+      }
     }
   }
 
