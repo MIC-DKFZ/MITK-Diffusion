@@ -67,7 +67,9 @@ namespace mitk
     : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_DESCRIPTION() )
   {
     Options defaultOptions;
-    defaultOptions[ConvertMrtrixOption] = false;
+    // On by default: only files whose descrip names MRtrix are converted, MITK-written peak files
+    // have none and read as before.
+    defaultOptions[ConvertMrtrixOption] = true;
     this->SetDefaultOptions(defaultOptions);
 
     m_ServiceReg = this->RegisterService();

@@ -427,6 +427,7 @@ public:
         ++nonZero;
     }
     CPPUNIT_ASSERT(nonZero > 0);
+    CPPUNIT_ASSERT(Values(LoadPeaks(mrtrixFile, std::nullopt)) == convertedValues);
 
     vtkPoints *points = raw->GetPolyData()->GetPoints();
     CPPUNIT_ASSERT(points->GetNumberOfPoints() > 0);
