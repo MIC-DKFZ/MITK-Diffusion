@@ -14,18 +14,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkRemoveDwiChannelFilter_txx
-#define __itkRemoveDwiChannelFilter_txx
-
-#include <time.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#define _USE_MATH_DEFINES
-#include <math.h>
+#ifndef itkRemoveDwiChannelFilter_txx
+#define itkRemoveDwiChannelFilter_txx
 
 #include "itkImageRegionConstIterator.h"
-#include "itkImageRegionConstIteratorWithIndex.h"
 #include "itkImageRegionIterator.h"
 
 #include <set>
@@ -90,14 +82,6 @@ void RemoveDwiChannelFilter< TInPixelType>::DynamicThreadedGenerateData(const Ou
   }
 }
 
-template< class TInPixelType >
-void
-RemoveDwiChannelFilter< TInPixelType>
-::PrintSelf(std::ostream& os, Indent indent) const
-{
-  Superclass::PrintSelf(os,indent);
 }
 
-}
-
-#endif // __itkRemoveDwiChannelFilter_txx
+#endif

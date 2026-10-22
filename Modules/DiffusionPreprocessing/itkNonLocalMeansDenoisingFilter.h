@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkNonLocalMeansDenoisingFilter_h_
-#define __itkNonLocalMeansDenoisingFilter_h_
+#ifndef itkNonLocalMeansDenoisingFilter_h
+#define itkNonLocalMeansDenoisingFilter_h
 
 #include "itkImageToImageFilter.h"
 #include "itkVectorImage.h"
@@ -38,14 +38,14 @@ namespace itk{
   public:
 
     /** Typedefs */
-    typedef NonLocalMeansDenoisingFilter                                                          Self;
-    typedef SmartPointer<Self>                                                                    Pointer;
-    typedef SmartPointer<const Self>                                                              ConstPointer;
-    typedef ImageToImageFilter< VectorImage < TPixelType, 3 >, VectorImage < TPixelType, 3 > >    Superclass;
-    typedef typename Superclass::InputImageType                                                   InputImageType;
-    typedef typename Superclass::OutputImageType                                                  OutputImageType;
-    typedef typename Superclass::OutputImageRegionType                                            OutputImageRegionType;
-    typedef Image <TPixelType, 3>                                                                 MaskImageType;
+    using Self = NonLocalMeansDenoisingFilter;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
+    using Superclass = ImageToImageFilter< VectorImage < TPixelType, 3 >, VectorImage < TPixelType, 3 > >;
+    using InputImageType = typename Superclass::InputImageType;
+    using OutputImageType = typename Superclass::OutputImageType;
+    using OutputImageRegionType = typename Superclass::OutputImageRegionType;
+    using MaskImageType = Image <TPixelType, 3>;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
@@ -106,7 +106,7 @@ namespace itk{
 
   protected:
     NonLocalMeansDenoisingFilter();
-    ~NonLocalMeansDenoisingFilter() override {}
+    ~NonLocalMeansDenoisingFilter() override = default;
 
     /**
      * @brief Calculations which need to be done before the denoising starts
@@ -148,4 +148,4 @@ namespace itk{
 #include "itkNonLocalMeansDenoisingFilter.txx"
 #endif
 
-#endif //__itkNonLocalMeansDenoisingFilter_h_
+#endif

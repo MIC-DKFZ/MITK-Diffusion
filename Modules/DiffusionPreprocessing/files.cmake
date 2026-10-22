@@ -1,23 +1,24 @@
 set(H_FILES
-
   itkB0ImageExtractionImageFilter.h
+  itkB0ImageExtractionImageFilter.txx
   itkB0ImageExtractionToSeparateImageFilter.h
-
+  itkB0ImageExtractionToSeparateImageFilter.txx
   itkElectrostaticRepulsionDiffusionGradientReductionFilter.h
+  itkElectrostaticRepulsionDiffusionGradientReductionFilter.txx
   itkMergeDiffusionImagesFilter.h
-  itkResampleDwiImageFilter.h
-  itkRemoveDwiChannelFilter.h
+  itkMergeDiffusionImagesFilter.txx
   itkNonLocalMeansDenoisingFilter.h
+  itkNonLocalMeansDenoisingFilter.txx
+  itkRemoveDwiChannelFilter.h
+  itkRemoveDwiChannelFilter.txx
+  itkResampleDwiImageFilter.h
+  itkResampleDwiImageFilter.txx
   mitkB0Indices.h
   mitkDiffusionImageDenoising.h
   mitkDiffusionImageEditing.h
 )
 
 set(CPP_FILES
-
-  itkB0ImageExtractionImageFilter.txx
-  itkB0ImageExtractionToSeparateImageFilter.txx
-
   mitkDiffusionImageDenoising.cpp
   mitkDiffusionImageEditing.cpp
 )

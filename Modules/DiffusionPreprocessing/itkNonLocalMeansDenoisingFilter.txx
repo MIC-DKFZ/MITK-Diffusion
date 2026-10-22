@@ -14,19 +14,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkNonLocalMeansDenoisingFilter_txx
-#define __itkNonLocalMeansDenoisingFilter_txx
+#ifndef itkNonLocalMeansDenoisingFilter_txx
+#define itkNonLocalMeansDenoisingFilter_txx
 
-#include <ctime>
-#include <cstdio>
-#include <cstdlib>
-
-#define _USE_MATH_DEFINES
 #include <cmath>
 
 #include "itkImageRegionIterator.h"
 #include "itkNeighborhoodIterator.h"
 #include <itkImageRegionIteratorWithIndex.h>
+#include <mitkLog.h>
 #include <vector>
 
 namespace itk {
@@ -155,7 +151,7 @@ NonLocalMeansDenoisingFilter< TPixelType >
 
 
 
-  typedef ImageRegionIteratorWithIndex <InputImageType> InputIteratorType;
+  using InputIteratorType = ImageRegionIteratorWithIndex <InputImageType>;
   typename InputImageType::Pointer inputImagePointer = nullptr;
   inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
 
@@ -391,7 +387,6 @@ NonLocalMeansDenoisingFilter< TPixelType >
     ++mit;
   }
 
-  MITK_INFO << "One Thread finished calculation";
 }
 
 template< class TPixelType >
@@ -415,4 +410,4 @@ void NonLocalMeansDenoisingFilter< TPixelType >::SetInputMask(MaskImageType* mas
 }
 }
 
-#endif // __itkNonLocalMeansDenoisingFilter_txx
+#endif
