@@ -414,9 +414,9 @@ TensorImage::PixelType NrrdTensorImageReader
     arr.SetElement(0,matrix(0,0));
     arr.SetElement(1,matrix(0,1));
     arr.SetElement(2,matrix(0,2));
-    arr.SetElement(3,matrix(1,3));
-    arr.SetElement(4,matrix(1,4));
-    arr.SetElement(5,matrix(2,5));
+    arr.SetElement(3,matrix(1,1));
+    arr.SetElement(4,matrix(1,2));
+    arr.SetElement(5,matrix(2,2));
     return arr;
 }
 
