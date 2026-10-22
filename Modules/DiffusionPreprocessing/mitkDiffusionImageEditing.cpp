@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include "mitkDiffusionImageEditing.h"
 
 #include <itkFlipImageFilter.h>
+#include <itkMergeDiffusionImagesFilter.h>
 #include <mitkITKImageImport.h>
 #include <mitkImageAccessByItk.h>
 #include <mitkImageCast.h>
@@ -217,5 +218,38 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::ClearGradientRotation(const Im
   // Without this the modified gradients, which filters and writers use, would change only at the
   // next InitializeImage call of some later action.
   PropHelper::InitializeImage(newImage);
+  return newImage;
+}
+
+mitk::Image::Pointer mitk::DiffusionImageEditing::MergeDwis(const std::vector<const Image*>& dwis)
+{
+  using FilterType = itk::MergeDiffusionImagesFilter<PropHelper::DiffusionPixelType>;
+  FilterType::DwiImageContainerType images;
+  FilterType::GradientListContainerType gradients;
+  std::vector<double> bValues;
+  for (auto dwi : dwis)
+  {
+    if (!PropHelper::IsDiffusionWeightedImage(dwi))
+      mitkThrow() << "Only diffusion-weighted images can be merged.";
+    DwiType::Pointer itkDwi;
+    CastToItkImage(dwi, itkDwi);
+    images.push_back(itkDwi);
+    gradients.push_back(PropHelper::GetGradientContainer(dwi));
+    bValues.push_back(PropHelper::GetReferenceBValue(dwi));
+  }
+
+  // The filter checks that the images share their geometry.
+  auto filter = FilterType::New();
+  filter->SetImageVolumes(images);
+  filter->SetGradientLists(gradients);
+  filter->SetBValues(bValues);
+  filter->Update();
+
+  // The merged gradients are world vectors. Without the image-rotation flag InitializeImage would
+  // switch it on and treat them as legacy gradients, which later changes of the image matrix turn.
+  Image::Pointer newImage = GrabItkImageMemory(filter->GetOutput());
+  MatrixType identity;
+  identity.set_identity();
+  PropHelper::InitializeImage(newImage, filter->GetOutputGradients().GetPointer(), filter->GetB_Value(), identity, false);
   return newImage;
 }

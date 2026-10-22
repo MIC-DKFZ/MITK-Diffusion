@@ -26,7 +26,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkB0ImageExtractionToSeparateImageFilter.h"
 #include "itkVectorContainer.h"
 #include <itkElectrostaticRepulsionDiffusionGradientReductionFilter.h>
-#include <itkMergeDiffusionImagesFilter.h>
 #include <mitkDiffusionImageEditing.h>
 #include <itkDwiGradientLengthCorrectionFilter.h>
 #include <itkDwiNormilzationFilter.h>
@@ -1491,16 +1490,11 @@ void QmitkPreprocessingView::DoReduceGradientDirections()
 
 void QmitkPreprocessingView::MergeDwis()
 {
-  typedef GradProp::GradientDirectionsContainerType GradientContainerType;
-
   mitk::DataNode::Pointer node = m_Controls->m_SelctedImageComboBox->GetSelectedNode();
   if (node.IsNull()) { return; }
 
   mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
   if ( image == nullptr ) { return; }
-
-  bool isDiffusionImage( PropHelper::IsDiffusionWeightedImage(image) );
-  if ( !isDiffusionImage ) { return; }
 
   mitk::DataNode::Pointer node2 = m_Controls->m_MergeDwiBox->GetSelectedNode();
   if (node2.IsNull()) { return; }
@@ -1508,53 +1502,20 @@ void QmitkPreprocessingView::MergeDwis()
   mitk::Image::Pointer image2 = dynamic_cast<mitk::Image*>(node2->GetData());
   if ( image2 == nullptr ) { return; }
 
-  typedef itk::VectorImage<DiffusionPixelType,3> DwiImageType;
-  typedef std::vector< DwiImageType::Pointer >   DwiImageContainerType;
-
-  typedef std::vector< GradientContainerType::ConstPointer >  GradientListContainerType;
-
-  DwiImageContainerType       imageContainer;
-  GradientListContainerType   gradientListContainer;
-  std::vector< double >       bValueContainer;
-
-  QString name = "";
+  mitk::Image::Pointer newImage;
+  try
   {
-    ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
-    mitk::CastToItkImage(image, itkVectorImagePointer);
-
-    imageContainer.push_back( itkVectorImagePointer );
-    gradientListContainer.push_back(PropHelper::GetGradientContainer(image));
-    bValueContainer.push_back(PropHelper::GetReferenceBValue(image));
-
-    name += node->GetName().c_str();
+    newImage = mitk::DiffusionImageEditing::MergeDwis({ image, image2 });
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Warning", QString("The images could not be merged: ") + e.what());
+    return;
   }
 
-  {
-    ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
-    mitk::CastToItkImage(image2, itkVectorImagePointer);
-
-    imageContainer.push_back( itkVectorImagePointer );
-    gradientListContainer.push_back(PropHelper::GetGradientContainer(image2));
-    bValueContainer.push_back(PropHelper::GetReferenceBValue(image2));
-
-    name += "+";
-    name += node2->GetName().c_str();
-  }
-
-  typedef itk::MergeDiffusionImagesFilter<short> FilterType;
-  FilterType::Pointer filter = FilterType::New();
-  filter->SetImageVolumes(imageContainer);
-  filter->SetGradientLists(gradientListContainer);
-  filter->SetBValues(bValueContainer);
-  filter->Update();
-
-  vnl_matrix_fixed< double, 3, 3 > mf; mf.set_identity();
-  mitk::Image::Pointer newImage = mitk::GrabItkImageMemory( filter->GetOutput() );
-
-  PropHelper::SetGradientContainer(newImage, filter->GetOutputGradients());
-  PropHelper::SetMeasurementFrame(newImage, mf);
-  PropHelper::SetReferenceBValue(newImage, filter->GetB_Value());
-  PropHelper::InitializeImage( newImage );
+  QString name = node->GetName().c_str();
+  name += "+";
+  name += node2->GetName().c_str();
 
   mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
   imageNode->SetData( newImage );

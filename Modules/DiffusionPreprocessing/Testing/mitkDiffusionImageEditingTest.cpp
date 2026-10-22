@@ -33,6 +33,8 @@ class mitkDiffusionImageEditingTestSuite : public mitk::TestFixture
   MITK_TEST(ApplyHeader_OnlyOrigin_KeepsEverythingElse);
   MITK_TEST(ApplyHeader_InvalidValues_Throw);
   MITK_TEST(ClearGradientRotation_RotatedLegacyImage_RemovesRotation);
+  MITK_TEST(MergeDwis_RotatedLegacyImages_WorldGradientsWithoutRotation);
+  MITK_TEST(MergeDwis_NotADwiOrOtherGeometry_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -305,6 +307,37 @@ public:
     CPPUNIT_ASSERT(!mitk::DiffusionImageEditing::AppliesImageRotationToGradients(cleared));
     AssertGradientsEqual(Transformed(original, PropHelper::GetMeasurementFrame(image).transpose()).GetPointer(), PropHelper::GetGradientContainer(cleared), 1e-12);
     AssertStableUnderInitialize(cleared);
+  }
+  void MergeDwis_RotatedLegacyImages_WorldGradientsWithoutRotation()
+  {
+    SetRotation(m_Dwi, RotationZ());
+    auto image = WithImageRotationFlag(true);
+    const auto gradients = PropHelper::GetGradientContainer(image);
+
+    auto merged = mitk::DiffusionImageEditing::MergeDwis({image, image});
+
+    auto expected = PropHelper::GradientDirectionsContainerType::New();
+    for (unsigned int copy = 0; copy < 2; ++copy)
+      for (const auto& g : gradients->CastToSTLConstContainer())
+        expected->push_back(g);
+    AssertGradientsEqual(expected.GetPointer(), PropHelper::GetGradientContainer(merged), 1e-9);
+    CPPUNIT_ASSERT(!mitk::DiffusionImageEditing::AppliesImageRotationToGradients(merged));
+    AssertStableUnderInitialize(merged);
+    CPPUNIT_ASSERT(mitk::Equal(*image->GetGeometry(), *merged->GetGeometry(), mitk::eps, true));
+  }
+
+  void MergeDwis_NotADwiOrOtherGeometry_Throws()
+  {
+    auto scalar = mitk::Image::New();
+    scalar->Initialize(mitk::MakeScalarPixelType<short>(), *m_Dwi->GetGeometry());
+    CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::MergeDwis({m_Dwi, scalar}), mitk::Exception);
+
+    mitk::DiffusionImageEditing::HeaderChange change;
+    mitk::Point3D origin;
+    origin.Fill(10);
+    change.origin = origin;
+    auto moved = mitk::DiffusionImageEditing::ApplyHeader(m_Dwi, change);
+    CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::MergeDwis({m_Dwi, moved}), itk::ExceptionObject);
   }
 };
 

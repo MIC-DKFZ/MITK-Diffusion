@@ -20,6 +20,7 @@ found in the LICENSE file.
 
 #include <array>
 #include <optional>
+#include <vector>
 
 namespace mitk
 {
@@ -74,6 +75,14 @@ namespace mitk
 
     /** \brief Recomputes the modified gradients of the DWI without the image rotation. */
     MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer ClearGradientRotation(const Image* dwi);
+
+    /**
+     * \brief Concatenates the volumes of DWIs with the same geometry.
+     *
+     * The gradients are rescaled to the largest reference b-value and stored as world vectors with
+     * an identity frame and without the image rotation.
+     */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer MergeDwis(const std::vector<const Image*>& dwis);
   }
 }
 
