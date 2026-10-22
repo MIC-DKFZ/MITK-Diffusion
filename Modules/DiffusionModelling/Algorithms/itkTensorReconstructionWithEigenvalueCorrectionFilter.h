@@ -140,13 +140,6 @@ protected:
 
   void GenerateData() override;
 
-  typedef enum
-  {
-    GradientIsInASingleImage = 1,
-    GradientIsInManyImages,
-    Else
-  } GradientImageTypeEnumeration;
-
 private:
 
   double CheckNeighbours(int x, int y, int z,int f, itk::Size<3> size, itk::Image<short, 3> ::Pointer mask,typename GradientImagesType::Pointer corrected_diffusion_temp);
@@ -170,21 +163,18 @@ private:
   double CheckNegatives ( itk::Size<3> size, itk::Image<short, 3>::Pointer mask, typename itk::Image< itk::DiffusionTensor3D<TTensorPixelType>, 3 >::Pointer tensorImg );
 
 
-  /** Gradient image was specified in a single image or in multiple images */
-  GradientImageTypeEnumeration                      m_GradientImageTypeEnumeration;
-
   /** Number of gradient measurements */
-  unsigned int                                      m_NumberOfGradientDirections;
+  unsigned int                                      m_NumberOfGradientDirections = 0;
 
   /** container to hold gradient directions */
   GradientDirectionContainerType::ConstPointer           m_GradientDirectionContainer;
 
 
   /** b-value */
-  TTensorPixelType                                  m_BValue;
+  TTensorPixelType                                  m_BValue = 0;
 
   /** Number of baseline images */
-  unsigned int                                      m_NumberOfBaselineImages;
+  unsigned int                                      m_NumberOfBaselineImages = 0;
 
   ImageType::Pointer                                m_CorrectedDiffusionVolumes;
 

@@ -371,13 +371,6 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
 ::SetGradientImage( GradientDirectionContainerType::ConstPointer gradientDirection,
                     const GradientImagesType *gradientImage )
 {
-
-  if( m_GradientImageTypeEnumeration == GradientIsInManyImages )
-  {
-    itkExceptionMacro( << "Cannot call both methods:"
-                       << "AddGradientImage and SetGradientImage. Please call only one of them.");
-  }
-
   this->m_GradientDirectionContainer = gradientDirection;
 
 
@@ -398,7 +391,6 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
 
   this->ProcessObject::SetNthInput( 0,
                                     const_cast< GradientImagesType* >(gradientImage) );
-  m_GradientImageTypeEnumeration = GradientIsInASingleImage;
 }
 
 template <class TDiffusionPixelType, class TTensorPixelType>
