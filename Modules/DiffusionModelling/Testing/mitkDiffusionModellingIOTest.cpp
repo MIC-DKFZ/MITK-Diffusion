@@ -57,6 +57,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(ShWriter_NewNiftiFile_ReadsBackAsSh);
   MITK_TEST(ShIO_ConventionSurvivesSaving);
   MITK_TEST(PeakReader_MrtrixPeaks_ConvertedToLps);
+  MITK_TEST(ShIO_OriginKeepsDoublePrecision);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -437,6 +438,24 @@ public:
     // Peak files without the MRtrix description, e.g. all MITK-written ones, read unchanged.
     const std::string mitkFile = GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz");
     CPPUNIT_ASSERT(Values(LoadPeaks(mitkFile, false)) == Values(LoadPeaks(mitkFile, true)));
+  }
+
+  // The SH importer and exporter converted origins through float.
+  void ShIO_OriginKeepsDoublePrecision()
+  {
+    mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    mitk::Point3D origin;
+    origin[0] = 0.1;
+    origin[1] = -20.3;
+    origin[2] = 1000.7;
+    shImage->GetGeometry()->SetOrigin(origin);
+
+    const std::string path = m_TempDir + "/origin.shi";
+    mitk::IOUtil::Save(shImage, path);
+    auto reloaded = mitk::IOUtil::Load<mitk::ShImage>(path, &shFunctor);
+    for (unsigned int i = 0; i < 3; ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(origin[i], reloaded->GetGeometry()->GetOrigin()[i], 1e-12);
   }
 };
 

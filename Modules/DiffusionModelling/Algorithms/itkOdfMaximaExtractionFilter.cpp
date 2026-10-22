@@ -126,12 +126,12 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the SH image.");
 
   itk::Vector<double, 3> spacing3 = ShCoeffImage->GetSpacing();
-  itk::Point<float, 3> origin3 = ShCoeffImage->GetOrigin();
+  itk::Point<double, 3> origin3 = ShCoeffImage->GetOrigin();
   itk::Matrix<double, 3, 3> direction3 = ShCoeffImage->GetDirection();
   itk::ImageRegion<3> imageRegion3 = ShCoeffImage->GetLargestPossibleRegion();
 
   itk::Vector<double, 4> spacing4;
-  itk::Point<float, 4> origin4;
+  itk::Point<double, 4> origin4;
   itk::Matrix<double, 4, 4> direction4;
   itk::ImageRegion<4> imageRegion4;
 

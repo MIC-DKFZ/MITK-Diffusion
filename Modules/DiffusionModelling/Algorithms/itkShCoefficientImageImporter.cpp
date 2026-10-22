@@ -39,13 +39,13 @@ void ShCoefficientImageImporter< PixelType, ShOrder >
   if (m_InputImage.IsNull())
     return;
 
-  Vector<float, 4> spacing4 = m_InputImage->GetSpacing();
-  Point<float, 4> origin4 = m_InputImage->GetOrigin();
+  Vector<double, 4> spacing4 = m_InputImage->GetSpacing();
+  Point<double, 4> origin4 = m_InputImage->GetOrigin();
   Matrix<double, 4, 4> direction4 = m_InputImage->GetDirection();
   ImageRegion<4> imageRegion4 = m_InputImage->GetLargestPossibleRegion();
 
   Vector<double, 3> spacing3;
-  Point<float, 3> origin3;
+  Point<double, 3> origin3;
   Matrix<double, 3, 3> direction3;
   ImageRegion<3> imageRegion3;
 

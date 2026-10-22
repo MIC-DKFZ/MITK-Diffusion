@@ -42,12 +42,12 @@ void ShCoefficientImageExporter< PixelType, ShOrder >
         return;
 
     Vector<double, 4> spacing4;
-    Point<float, 4> origin4;
+    Point<double, 4> origin4;
     Matrix<double, 4, 4> direction4; direction4.SetIdentity();
     ImageRegion<4> imageRegion4;
 
     Vector<double, 3> spacing3 = m_InputImage->GetSpacing();
-    Point<float, 3> origin3 = m_InputImage->GetOrigin();
+    Point<double, 3> origin3 = m_InputImage->GetOrigin();
     Matrix<double, 3, 3> direction3 = m_InputImage->GetDirection();
     ImageRegion<3> imageRegion3 = m_InputImage->GetLargestPossibleRegion();
 

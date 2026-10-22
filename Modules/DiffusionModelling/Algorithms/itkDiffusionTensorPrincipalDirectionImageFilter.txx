@@ -84,7 +84,7 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::BeforeThre
 
 
   itk::Vector<double, 4> spacing4;
-  itk::Point<float, 4> origin4;
+  itk::Point<double, 4> origin4;
   itk::Matrix<double, 4, 4> direction4;
   itk::ImageRegion<4> imageRegion4;
 
