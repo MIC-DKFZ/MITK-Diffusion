@@ -29,8 +29,13 @@ using DPH = mitk::DiffusionPropertyHelper;
 void IvimMapComputation( mitk::Image::Pointer input,
                          std::string output_prefix ,
                          std::string output_type,
+                         std::string maskPath,
                          double b_thresh, int type, double dstar)
 {
+  mitk::Image::Pointer mask;
+  if (!maskPath.empty())
+    mask = mitk::IOUtil::Load<mitk::Image>(maskPath);
+
   MITK_INFO << "Starting fit";
 
   // The fit types are the methods in the order of the IVIM view.
@@ -43,7 +48,7 @@ void IvimMapComputation( mitk::Image::Pointer input,
   parameters.signalThreshold = 0;
   parameters.fitDStar = true;
 
-  const auto maps = mitk::ivim::ComputeMaps(input, nullptr, parameters);
+  const auto maps = mitk::ivim::ComputeMaps(input, mask, parameters);
 
   mitk::IOUtil::Save( maps.dStar, output_prefix + "_Dstar_map." + output_type );
   mitk::IOUtil::Save( maps.d, output_prefix + "_D_map." + output_type );
@@ -68,6 +73,7 @@ int main( int argc, char* argv[] )
   parser.addArgument("b_threshold", "", mitkCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit", 170.0);
   parser.addArgument("fit_type", "", mitkCommandLineParser::Int, "Fit:", "Jointly fit D, f and D* (0); Fit D&f with fixed D* (1); Fit D&f (high b), then fit D* (2); Linearly fit D&f (high b), then fit D* (3)", 2);
   parser.addArgument("dstar", "", mitkCommandLineParser::Float, "D*:", "Fixed D* for fit type 1", 0.06);
+  parser.addArgument("mask", "m", mitkCommandLineParser::String, "Masking Image: ", "Fit only where this image is not 0 (others get 0); it must have the geometry of the input", us::Any(), true, false, false, mitkCommandLineParser::Input);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
 
@@ -82,6 +88,10 @@ int main( int argc, char* argv[] )
   int fit_type = 2;
   double dstar = 0.06;
   std::string  out_type = "nrrd";
+  std::string maskPath;
+
+  if (parsedArgs.count("mask"))
+    maskPath = us::any_cast<std::string>(parsedArgs["mask"]);
 
   if (parsedArgs.count("output_type"))
     out_type = us::any_cast<std::string>(parsedArgs["output_type"]);
@@ -113,6 +123,7 @@ int main( int argc, char* argv[] )
     IvimMapComputation( inputImage,
                         out_prefix ,
                         out_type,
+                        maskPath,
                         b_thresh,
                         fit_type,
                         dstar);
