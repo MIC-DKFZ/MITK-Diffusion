@@ -27,6 +27,7 @@ using namespace mitk::IvimTesting;
 class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionKurtosisFitTestSuite);
+  MITK_TEST(Configuration_Default_StraightWithoutLimits);
   MITK_TEST(MapStraight_SyntheticVoxels_RecoversDAndK);
   MITK_TEST(MapLog_SyntheticVoxels_RecoversDAndK);
   MITK_TEST(MapOmitBZero_SyntheticVoxels_RecoversDAndK);
@@ -109,6 +110,17 @@ public:
   {
     m_Image = nullptr;
     m_Gradients = nullptr;
+  }
+
+  void Configuration_Default_StraightWithoutLimits()
+  {
+    itk::KurtosisFitConfiguration config;
+    CPPUNIT_ASSERT(config.fit_scale == itk::STRAIGHT);
+    CPPUNIT_ASSERT(!config.omit_bzero);
+    CPPUNIT_ASSERT(!config.use_K_limits);
+    CPPUNIT_ASSERT_EQUAL(0.0, config.K_limits[0]);
+    CPPUNIT_ASSERT_EQUAL(0.0, config.K_limits[1]);
+    CPPUNIT_ASSERT(!config.exclude_high_b);
   }
 
   void MapStraight_SyntheticVoxels_RecoversDAndK()

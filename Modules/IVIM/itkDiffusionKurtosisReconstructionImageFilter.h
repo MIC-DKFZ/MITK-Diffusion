@@ -36,7 +36,7 @@ namespace itk
   /** @struct Kurtosis_fit_lsq_function
       @brief A base least-squares function for the diffusion kurtosis fit (non-IVIM)
 
-      The basic function fits the signal to S_0 = S * exp [ -b * D + -b^2 * D^2 * K^2 ]
+      The basic function fits the signal to S = S_0 * exp [ -b * D + b^2 * D^2 * K / 6 ]
       */
   struct kurtosis_fit_lsq_function :
       public vnl_least_squares_function
@@ -252,7 +252,9 @@ namespace itk
   {
     KurtosisFitConfiguration()
       : omit_bzero(false)
+      , fit_scale(STRAIGHT)
       , use_K_limits(false)
+      , K_limits(0.0, 0.0)
       , exclude_high_b(false)
       , b_upper_threshold(10e9)
     {}
