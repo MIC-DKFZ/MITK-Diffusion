@@ -14,61 +14,44 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-// Blueberry
-#include <berryISelectionService.h>
-#include <berryIWorkbenchWindow.h>
-
-// Qmitk
 #include "QmitkDenoisingView.h"
-#include <mitkImageCast.h>
-#include <mitkDiffusionPropertyHelper.h>
-#include <mitkITKImageImport.h>
 
-#include <mitkDiffusionPropertyHelper.h>
-
-#include <mitkNodePredicateDataType.h>
-#include <mitkNodePredicateProperty.h>
-#include <mitkNodePredicateAnd.h>
-#include <itkMaskImageFilter.h>
-#include <itkSpatialNeighborSubsampler.h>
-#include <QMessageBox>
-#include <mitkNodePredicateIsDWI.h>
 #include <mitkDiffusionImageDenoising.h>
+#include <mitkNodePredicateIsDWI.h>
+
+#include <QMessageBox>
+#include <QtConcurrentRun>
 
 const std::string QmitkDenoisingView::VIEW_ID = "org.mitk.views.denoisingview";
 
 QmitkDenoisingView::QmitkDenoisingView()
   : QmitkAbstractView()
-  , m_Controls( 0 )
-  , m_ImageNode(nullptr)
 {
 }
 
 QmitkDenoisingView::~QmitkDenoisingView()
 {
-
+  // The worker must not outlive the view it reports to.
+  m_Watcher.waitForFinished();
 }
 
 void QmitkDenoisingView::CreateQtPartControl( QWidget *parent )
 {
-  // build up qt view, unless already done
-  if ( !m_Controls )
-  {
-    // create GUI widgets from the Qt Designer's .ui file
-    m_Controls = new Ui::QmitkDenoisingViewControls;
-    m_Controls->setupUi( parent );
+  if (m_Controls)
+    return;
 
-    connect( (QObject*)(m_Controls->m_ApplyButton), SIGNAL(clicked()), this, SLOT(StartDenoising()));
-    connect( (QObject*)(m_Controls->m_SelectFilterComboBox), SIGNAL(activated(int)), this, SLOT(UpdateGui()));
-    connect( (QObject*)(m_Controls->m_InputImageBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()));
+  m_Controls = std::make_unique<Ui::QmitkDenoisingViewControls>();
+  m_Controls->setupUi(parent);
 
+  connect(m_Controls->m_ApplyButton, &QAbstractButton::clicked, this, &QmitkDenoisingView::StartDenoising);
+  connect(m_Controls->m_SelectFilterComboBox, &QComboBox::activated, this, &QmitkDenoisingView::UpdateGui);
+  connect(m_Controls->m_InputImageBox, &QComboBox::currentIndexChanged, this, &QmitkDenoisingView::UpdateGui);
+  connect(&m_Watcher, &QFutureWatcher<Result>::finished, this, &QmitkDenoisingView::OnDenoisingFinished);
 
-    m_Controls->m_InputImageBox->SetDataStorage(this->GetDataStorage());
-    mitk::NodePredicateIsDWI::Pointer isImagePredicate = mitk::NodePredicateIsDWI::New();
-    m_Controls->m_InputImageBox->SetPredicate( isImagePredicate );
+  m_Controls->m_InputImageBox->SetDataStorage(this->GetDataStorage());
+  m_Controls->m_InputImageBox->SetPredicate(mitk::NodePredicateIsDWI::New());
 
-    UpdateGui();
-  }
+  this->UpdateGui();
 }
 
 void QmitkDenoisingView::SetFocus()
@@ -76,23 +59,15 @@ void QmitkDenoisingView::SetFocus()
   m_Controls->m_SelectFilterComboBox->setFocus();
 }
 
-void QmitkDenoisingView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& )
-{
-
-}
-
 void QmitkDenoisingView::StartDenoising()
 {
-  m_ImageNode = m_Controls->m_InputImageBox->GetSelectedNode();
-  if (m_ImageNode.IsNull())
+  if (m_Watcher.isRunning())
     return;
-  mitk::Image::Pointer input_image = dynamic_cast<mitk::Image*>(m_ImageNode->GetData());
 
-  if (!mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(input_image))
-  {
-    QMessageBox::warning(nullptr, "Image not processed", "Input is not a diffusion-weighted image!");
+  auto node = m_Controls->m_InputImageBox->GetSelectedNode();
+  if (node.IsNull())
     return;
-  }
+  mitk::Image::ConstPointer inputImage = dynamic_cast<mitk::Image*>(node->GetData());
 
   mitk::DiffusionImageDenoising::Parameters parameters;
   parameters.tvLambda = m_Controls->m_TvLambdaBox->value();
@@ -103,69 +78,73 @@ void QmitkDenoisingView::StartDenoising()
   parameters.nlmPatchRadius = m_Controls->m_NlmPatchSizeBox->value();
   parameters.nlmIterations = m_Controls->m_NlmIterationsBox->value();
 
-  QString name;
+  QString method;
   switch (m_Controls->m_SelectFilterComboBox->currentIndex())
   {
   case 0:
     parameters.method = mitk::DiffusionImageDenoising::Method::TotalVariation;
-    name = "TotalVariation";
+    method = "TotalVariation";
     break;
   case 1:
     parameters.method = mitk::DiffusionImageDenoising::Method::Gaussian;
-    name = "Gauss";
+    method = "Gauss";
     break;
   case 2:
     parameters.method = mitk::DiffusionImageDenoising::Method::NonLocalMeans;
-    name = "NLM";
+    method = "NLM";
     break;
   default:
     return;
   }
 
-  mitk::Image::Pointer denoised_image;
-  try
+  m_ImageNode = node;
+  m_ResultName = QString::fromStdString(node->GetName()) + "_" + method;
+  m_Controls->m_ApplyButton->setEnabled(false);
+  m_Controls->m_ApplyButton->setText("Denoising ...");
+
+  // The worker only reads the input; exceptions are passed back as text.
+  m_Watcher.setFuture(QtConcurrent::run([inputImage, parameters]()
   {
-    denoised_image = mitk::DiffusionImageDenoising::Denoise(input_image, parameters);
-  }
-  catch (const std::exception& e)
+    Result result;
+    try
+    {
+      result.image = mitk::DiffusionImageDenoising::Denoise(inputImage, parameters);
+    }
+    catch (const std::exception& e)
+    {
+      result.error = e.what();
+    }
+    return result;
+  }));
+}
+
+void QmitkDenoisingView::OnDenoisingFinished()
+{
+  const Result result = m_Watcher.result();
+  m_Controls->m_ApplyButton->setText("Start");
+  this->UpdateGui();
+
+  if (result.image.IsNull())
   {
-    QMessageBox::warning(nullptr, "Image not processed", QString("Denoising failed: ") + e.what());
+    QMessageBox::warning(nullptr, "Image not processed", QString("Denoising failed: ") + QString::fromStdString(result.error));
     return;
   }
 
-  mitk::DataNode::Pointer denoised_image_node = mitk::DataNode::New();
-  denoised_image_node->SetName( name.toStdString() );
-  denoised_image_node->SetData( denoised_image );
-  GetDataStorage()->Add(denoised_image_node, m_ImageNode);
+  auto node = mitk::DataNode::New();
+  node->SetName(m_ResultName.toStdString());
+  node->SetData(result.image);
+  // The input may have been removed while the denoising ran.
+  auto dataStorage = this->GetDataStorage();
+  dataStorage->Add(node, dataStorage->Exists(m_ImageNode) ? m_ImageNode.GetPointer() : nullptr);
+  m_ImageNode = nullptr;
 }
 
 void QmitkDenoisingView::UpdateGui()
 {
-  m_Controls->m_ApplyButton->setEnabled(false);
-  m_Controls->m_TvFrame->setVisible(false);
-  m_Controls->m_NlmFrame->setVisible(false);
-  m_Controls->m_GaussFrame->setVisible(false);
+  const int method = m_Controls->m_SelectFilterComboBox->currentIndex();
+  m_Controls->m_TvFrame->setVisible(method == 0);
+  m_Controls->m_GaussFrame->setVisible(method == 1);
+  m_Controls->m_NlmFrame->setVisible(method == 2);
 
-  switch (m_Controls->m_SelectFilterComboBox->currentIndex())
-  {
-  case 0:
-  {
-    m_Controls->m_TvFrame->setVisible(true);
-    break;
-  }
-  case 1:
-  {
-    m_Controls->m_GaussFrame->setVisible(true);
-    break;
-  }
-  case 2:
-  {
-    m_Controls->m_NlmFrame->setVisible(true);
-    break;
-  }
-  }
-
-  if (m_Controls->m_InputImageBox->GetSelectedNode().IsNotNull())
-    m_Controls->m_ApplyButton->setEnabled(true);
+  m_Controls->m_ApplyButton->setEnabled(!m_Watcher.isRunning() && m_Controls->m_InputImageBox->GetSelectedNode().IsNotNull());
 }
-
