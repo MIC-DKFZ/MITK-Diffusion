@@ -257,6 +257,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
           DirectionType v2 = candidates.at(j);
           double val2 = v2.magnitude();
           double angle = fabs(dot_product(v1,v2)/(val*val2));
+          // Of two peaks of exactly equal length both are kept, e.g. antipodal duplicates.
           if (angle>m_AngularThreshold && val<val2)
           {
             flag = false;

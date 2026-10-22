@@ -82,7 +82,9 @@ Image< unsigned char, 3 > >
     itkSetMacro( MaxNumPeaks, unsigned int)                 ///< maximum number of peaks per voxel. if more peaks are detected, only the largest are kept.
     itkSetMacro( RelativePeakThreshold, double)             ///< threshold on the peak length relative to the largest peak inside the current voxel
     itkSetMacro( AbsolutePeakThreshold, double)             ///< hard threshold on the peak length of all local maxima
-    itkSetMacro( AngularThreshold, double)                  ///< directions closer together than the specified threshold are discarded
+    /** Cosine, not an angle: of two peaks whose |cos| of the angle between them exceeds it, the
+      * shorter is discarded. Default 0.9 (about 25.8 degrees); the view converts degrees with cos(). */
+    itkSetMacro( AngularThreshold, double)
     itkSetMacro( MaskImage, ItkUcharImgType::Pointer)       ///< only voxels inside the binary mask are processed
     itkSetMacro( NormalizationMethod, NormalizationMethods) ///< normalization method of ODF peaks
     itkSetMacro( FlipX, bool)                               ///< flip peaks in x direction
@@ -123,7 +125,9 @@ Image< unsigned char, 3 > >
 
     private:
 
-    /** Negative SH value at (theta, phi), minimized to refine a peak direction. */
+    /** Negative SH value at (theta, phi), minimized to refine a peak direction. mitk::sh::GetValue
+      * evaluates in float, which makes the finite-difference gradient noisy; it stays float so
+      * that peak and reconstruction results do not change. */
     class ShCostFunction : public vnl_cost_function
     {
     public:
