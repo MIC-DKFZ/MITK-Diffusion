@@ -13,11 +13,6 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_cpp
-#define __itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_cpp
-
-#include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h"
-
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionIterator.h>
 
@@ -95,5 +90,3 @@ namespace itk
       os << indent << "GradientDirections: (not set)" << std::endl;
   }
 }
-
-#endif // __itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_cpp

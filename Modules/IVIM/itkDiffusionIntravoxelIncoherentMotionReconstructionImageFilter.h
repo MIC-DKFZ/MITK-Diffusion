@@ -13,8 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_h
-#define __itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_h
+#ifndef itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_h
+#define itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_h
 
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
@@ -81,8 +81,6 @@ namespace itk
   };
 }
 
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.cpp"
-#endif
+#include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.tpp"
 
-#endif //__itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_h
+#endif

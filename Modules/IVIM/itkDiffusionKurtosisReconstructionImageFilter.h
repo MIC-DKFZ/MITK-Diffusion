@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef DIFFUSIONKURTOSISRECONSTRUCTIONIMAGEFILTER_H
-#define DIFFUSIONKURTOSISRECONSTRUCTIONIMAGEFILTER_H
+#ifndef itkDiffusionKurtosisReconstructionImageFilter_h
+#define itkDiffusionKurtosisReconstructionImageFilter_h
 
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
@@ -95,8 +95,6 @@ namespace itk
   };
 }
 
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkDiffusionKurtosisReconstructionImageFilter.cpp"
-#endif
+#include "itkDiffusionKurtosisReconstructionImageFilter.tpp"
 
-#endif // DIFFUSIONKURTOSISRECONSTRUCTIONIMAGEFILTER_H
+#endif
