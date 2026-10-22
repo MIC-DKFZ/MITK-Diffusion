@@ -4,7 +4,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/set_release.txt)
 set(MITK_USE_BLUEBERRY OFF CACHE BOOL "" FORCE)
 set(MITK_USE_CTK OFF CACHE BOOL "" FORCE)
 set(MITK_USE_Qt6 OFF CACHE BOOL "" FORCE)
-set(MITK_USE_Qwt OFF CACHE BOOL "" FORCE)
+set(MITK_USE_Qt6Qwt6 OFF CACHE BOOL "" FORCE)
 
 set(MITK_DOXYGEN_GENERATE_QCH_FILES OFF CACHE BOOL "Use doxygen to generate Qt compressed help files for MITK docs" FORCE)
 set(BLUEBERRY_USE_QT_HELP OFF CACHE BOOL "Enable support for integrating bundle documentation into Qt Help" FORCE)

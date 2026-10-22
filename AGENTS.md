@@ -13,9 +13,10 @@ Paths below are relative to the **workspace root**, the folder that holds `mitk-
 
 MITK Diffusion covers dMRI preprocessing, tensor/ODF/SH reconstruction, IVIM and kurtosis
 fitting, streamline and global (Gibbs) tractography, fiber processing, and Fiberfox dMRI
-simulation. It has no application of its own: its build configurations turn the MITK Workbench
-into "MITK Diffusion" (or a smaller product such as Fiberfox or IVIM) and build the command line
-tools. The code was last built against MITK of 2024/2025; the current goal is to bring it up to
+simulation. It has no application of its own: its build configurations choose which diffusion
+plugins the MITK Workbench is built with (all, or a smaller set such as Fiberfox or IVIM) and
+which command line tools are built. Current MITK has no setting for the product name, so the
+application is the "MITK Workbench". The code was last built against MITK of 2024/2025; the current goal is to bring it up to
 date with current MITK (see "Porting state").
 
 ## Two repositories
@@ -89,21 +90,20 @@ Facts the layout does not show:
 - Debug builds and `MITK_USE_Python3=ON` do not go together in MITK, so `DiffusionDebug` forces
   Python off, and `DiffusionRelease` inherits that to keep both builds alike. Its build type is
   forced to `Debug`, `set_release.txt` forces `Release`.
-- Configuring `FiberTracking` downloads a lookup-table tarball from mitk.org, so it needs network.
+- Configuring `FiberTracking` downloads a lookup-table tarball from mitk.org into its binary
+  `resource/` folder, so it needs network. MITK embeds module resources only from `resource/`.
 - Module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each `Testing/`
   folder and read input from `${MITK_DATA_DIR}/DiffusionImaging/`.
 
 ## Porting state
 
-Found by reading the code, not yet by a configure or build run. Remove an item once it is fixed;
-add what the first configure and build reveal.
+The `DiffusionDebug` inner configure passes; nothing is compiled yet. Remove an item once it is
+fixed; add what the build reveals.
 
-- Every `mitk_create_module` and `mitk_create_plugin` call passes `SUBPROJECTS MITK-Diffusion`.
-  MITK no longer knows that argument: in a module it lands in the module name, in a plugin it is
-  ignored. `CMake/CTestSubprojectList.cmake` is no longer read.
-- The build configurations set variables MITK no longer reads, so they have no effect:
-  `MITK_CUSTOM_PRODUCT_NAME`, `MITK_APPS_*` (from the Workbench customization branch T30337),
-  `MITK_USE_Qwt` (now `MITK_USE_Qt6Qwt6`), `MITK_BUILD_APP_Diffusion`.
+- The IVIM view plots with `QmitkChartWidget`, which MITK removed with its `Chart` module
+  (`git -C mitk show 1bd606f7cf`; MITK moved its charts to `QmitkPlotWidget`, Qwt).
+  `Plugins/org.mitk.gui.qt.diffusionimaging.ivim/src/internal/QmitkIVIMView.cpp:176-253` and
+  `QmitkIVIMViewControls.ui:178` still use it; the plugin no longer depends on `MitkChart`.
 - Whether current MITK-Data still contains `DiffusionImaging/` is not checked.
 - `mitk-diffusion/README.md` build section is outdated (Qt 6.6.1, GitHub URLs, manual inner
   reconfigure).
@@ -115,7 +115,7 @@ Run from the workspace root. Both superbuild trees use Unix Makefiles; for Relea
 
 | Command | Effect |
 | --- | --- |
-| `cmake --build debug -j$(nproc)` | Superbuild: externals, then MITK + diffusion. Needed once, and after changing a `MITK_USE_*` option or an external. Takes long. |
+| `cmake --build debug -j$(nproc)` | Superbuild: externals, then MITK + diffusion. Needed once, and after changing a `MITK_USE_*` option or an external. Takes long; every run repeats each external's update, configure, build and install steps and recompiles parts of some. |
 | `cmake --build debug/MITK-build -j$(nproc)` | Rebuild MITK + diffusion: the normal edit-compile loop. |
 | `cmake --build debug/MITK-build --target MitkFiberTracking -j$(nproc)` | One module (`Mitk<Module>`); a plugin target is its folder name with `_` for `.`, e.g. `org_mitk_gui_qt_diffusionimaging_tractography`. |
 | `cmake debug/MITK-build` | Re-configure the inner build after editing CMake files in `mitk-diffusion/`. |

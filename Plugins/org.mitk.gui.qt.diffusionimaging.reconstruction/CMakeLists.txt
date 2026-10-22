@@ -3,7 +3,6 @@
 project(org_mitk_gui_qt_diffusionimaging_reconstruction)
 
 mitk_create_plugin(
-  SUBPROJECTS MITK-Diffusion
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_RECONSTRUCTION_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
   MODULE_DEPENDS MitkQtWidgetsExt MitkDiffusionPreprocessing

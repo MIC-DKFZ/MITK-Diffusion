@@ -2,7 +2,6 @@ include(${CMAKE_CURRENT_LIST_DIR}/set_always.txt)
 include(${CMAKE_CURRENT_LIST_DIR}/set_release.txt)
 
 message(STATUS "Configuring MITK IVIM Build")
-set(MITK_CUSTOM_PRODUCT_NAME "MITK IVIM" CACHE STRING "" FORCE)
 
 # Enable non-optional external dependencies
 set(MITK_USE_MatchPoint OFF CACHE BOOL "" FORCE)
@@ -13,9 +12,7 @@ set(MITK_USE_OpenCV OFF CACHE BOOL "" FORCE)
 
 # Disable all apps but MITK Workbench
 set(MITK_BUILD_ALL_APPS OFF CACHE BOOL "Build all MITK applications" FORCE)
-set(MITK_BUILD_APP_CoreApp OFF CACHE BOOL "Build the MITK CoreApp" FORCE)
 set(MITK_BUILD_APP_Workbench ON CACHE BOOL "Build the MITK Workbench" FORCE)
-set(MITK_BUILD_APP_Diffusion OFF CACHE BOOL "Build MITK Diffusion" FORCE)
 
 # enable modules
 set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)

@@ -1,5 +1,4 @@
 MITK_CREATE_MODULE(
-  SUBPROJECTS MITK-Diffusion
   INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} Properties IO IO/DicomImport Modification
   DEPENDS MitkCore MitkSceneSerializationBase MitkDICOM
   PACKAGE_DEPENDS

@@ -2,7 +2,6 @@ include(${CMAKE_CURRENT_LIST_DIR}/set_always.txt)
 include(${CMAKE_CURRENT_LIST_DIR}/set_release.txt)
 
 message(STATUS "Configuring MITK Fiber Tractography Build")
-set(MITK_CUSTOM_PRODUCT_NAME "MITK Fiber Tractography" CACHE STRING "" FORCE)
 
 # Enable non-optional external dependencies
 set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
