@@ -123,9 +123,6 @@ In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diff
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
 all 28 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
-- `mitkDWHeadMotionCorrectionTest` and `mitkPyramidImageRegistrationMethodTest` in
-  `DiffusionRegistration` are compiled but deliberately not registered; they were commented out
-  before the 2024 test refactoring.
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,
   `Fiberfox`, `IVIM`, `atTRACTive`; MITK's own `Minimal` too),
