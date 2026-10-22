@@ -102,14 +102,17 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
   mitk::Image::Pointer fixedImage = mitk::Image::New();
   fixedImage->InitializeByItk( filter->GetOutput() );
   fixedImage->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-  composer->SetInput(0, filter->GetOutput());
+
+  // The output keeps the volume order of the input, the reference at its own index, because the
+  // gradients are corrected in that order.
+  std::vector< ITKDiffusionVolumeType::Pointer > volumes(num_gradients);
+  volumes[first_unweighted_index] = filter->GetOutput();
 
   mitk::MultiModalAffineDefaultRegistrationAlgorithm< ITKDiffusionVolumeType >::Pointer algo = mitk::MultiModalAffineDefaultRegistrationAlgorithm< ITKDiffusionVolumeType >::New();
   mitk::MAPAlgorithmHelper helper(algo);
 
   typedef vnl_matrix_fixed< double, 3, 3> TransformMatrixType;
   std::vector< TransformMatrixType > estimated_transforms;
-  std::vector< ITKDiffusionVolumeType::Pointer > registered_itk_images;
   for (int i=0; i<num_gradients; ++i)
   {
     if (i==first_unweighted_index)
@@ -134,15 +137,11 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
     mitk::Image::Pointer registered_mitk_image = mitk::ImageMappingHelper::map(movingImage, reg, false, 0, nullptr, false, 0, mitk::ImageMappingInterpolator::BSpline_3);
     ITKDiffusionVolumeType::Pointer registered_itk_image = ITKDiffusionVolumeType::New();
     mitk::CastToItkImage(registered_mitk_image, registered_itk_image);
-    registered_itk_images.push_back(registered_itk_image);
+    volumes[i] = registered_itk_image;
     }
 
-  int i=1;
-  for (auto image : registered_itk_images)
-  {
-    composer->SetInput(i, image);
-    ++i;
-  }
+  for (int i=0; i<num_gradients; ++i)
+    composer->SetInput(i, volumes[i]);
   composer->Update();
 
   m_CorrectedImage = mitk::GrabItkImageMemory( composer->GetOutput() );
