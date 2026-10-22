@@ -23,6 +23,7 @@ found in the LICENSE file.
 #include <itkImageFileReader.h>
 #include <itkImageFileWriter.h>
 #include <itkMetaDataObject.h>
+#include <itkNiftiImageIO.h>
 #include <itkNrrdImageIO.h>
 #include <itksys/SystemTools.hxx>
 
@@ -48,6 +49,7 @@ class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
   MITK_TEST(NiftiReader_NegativeDeterminant_RotatesBvecs);
   MITK_TEST(NiftiWriter_ObliqueImage_WritesFslBvecs);
   MITK_TEST(NiftiWriter_RoundTrip_KeepsDataAndGradients);
+  MITK_TEST(NiftiReader_Volumes_BecomeVectorComponents);
   MITK_TEST(PlainNrrdWriter_Dwi_WritesNoDiffusionKeys);
   MITK_TEST(ReaderSelection_PlainImages_NoDwiReader);
   MITK_TEST(ReaderSelection_DiffusionFiles_DwiReaderIsDefault);
@@ -386,6 +388,32 @@ public:
     auto image = mitk::IOUtil::Load<mitk::Image>(path, &functor);
     // bvals are written as integers, so gradient lengths come back rounded to the b-value.
     AssertSameDwi(source, image, 1e-6);
+  }
+
+  void NiftiReader_Volumes_BecomeVectorComponents()
+  {
+    // Volume t of the 4-D file is component t of each voxel.
+    const auto path = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/diffusion_image.nii.gz");
+    auto functor = DwiReaderFunctor();
+    auto dwi = PropHelper::GetItkVectorImage(mitk::IOUtil::Load<mitk::Image>(path, &functor));
+
+    using Image4D = itk::Image<short, 4>;
+    auto reader = itk::ImageFileReader<Image4D>::New();
+    reader->SetImageIO(itk::NiftiImageIO::New());
+    reader->SetFileName(path);
+    reader->Update();
+    auto volumes = reader->GetOutput();
+
+    const auto size = volumes->GetLargestPossibleRegion().GetSize();
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(size[3]), dwi->GetVectorLength());
+    for (itk::IndexValueType z = 0; z < static_cast<itk::IndexValueType>(size[2]); ++z)
+      for (itk::IndexValueType y = 0; y < static_cast<itk::IndexValueType>(size[1]); ++y)
+        for (itk::IndexValueType x = 0; x < static_cast<itk::IndexValueType>(size[0]); ++x)
+        {
+          const auto pixel = dwi->GetPixel({{x, y, z}});
+          for (itk::IndexValueType t = 0; t < static_cast<itk::IndexValueType>(size[3]); ++t)
+            CPPUNIT_ASSERT_EQUAL(volumes->GetPixel({{x, y, z, t}}), pixel[t]);
+        }
   }
 
   void PlainNrrdWriter_Dwi_WritesNoDiffusionKeys()

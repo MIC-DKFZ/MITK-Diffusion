@@ -31,6 +31,9 @@ class mitkDiffusionImageHelperFunctionsTestSuite : public mitk::TestFixture
   MITK_TEST(WriteBvalsBvecs_ReadBack_SameGradients);
   MITK_TEST(UniqueDirections_ShellsWithSameDirections_CountedOnce);
   MITK_TEST(FslBvecsMeasurementFrame_Determinant_FlipsXOnlyIfPositive);
+  MITK_TEST(IntersectImage_Segment_LengthPerVoxel);
+  MITK_TEST(RotationMatrices_VnlAndItk_Equal);
+  MITK_TEST(Cart2Sph_Sph2Cart_RoundTrip);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientType = mitk::DiffusionPropertyHelper::GradientDirectionType;
@@ -165,6 +168,63 @@ public:
     las(1, 1) = -1;
     frame = mitk::gradients::FslBvecsMeasurementFrame(las);
     CPPUNIT_ASSERT(frame == las.GetVnlMatrix().transpose());
+  }
+
+  void IntersectImage_Segment_LengthPerVoxel()
+  {
+    itk::Vector<double, 3> spacing;
+    spacing[0] = 2;
+    spacing[1] = 1;
+    spacing[2] = 1;
+
+    // Along x from 0.2 to 1.6 (in index units): 0.3 in voxel 0, 1.0 in voxel 1, 0.1 in voxel 2.
+    itk::ContinuousIndex<float, 3> sf, ef;
+    sf[0] = 0.2f; sf[1] = 0; sf[2] = 0;
+    ef[0] = 1.6f; ef[1] = 0; ef[2] = 0;
+    itk::Index<3> si = {{0, 0, 0}}, ei = {{2, 0, 0}};
+    auto segments = mitk::imv::IntersectImage(spacing, si, ei, sf, ef);
+    CPPUNIT_ASSERT_EQUAL(size_t(3), segments.size());
+    const double expected[3] = {0.6, 2.0, 0.2};
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      CPPUNIT_ASSERT_EQUAL(itk::IndexValueType(i), segments[i].first[0]);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected[i], segments[i].second, 1e-6);
+    }
+
+    // Backwards and within one voxel.
+    itk::Index<3> backStart = {{2, 0, 0}}, backEnd = {{0, 0, 0}};
+    double total = 0;
+    for (const auto& segment : mitk::imv::IntersectImage(spacing, backStart, backEnd, ef, sf))
+      total += segment.second;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.8, total, 1e-6);
+
+    itk::ContinuousIndex<float, 3> inside = sf;
+    inside[1] = 0.3f;
+    itk::Index<3> same = {{0, 0, 0}}, same2 = {{0, 0, 0}};
+    auto single = mitk::imv::IntersectImage(spacing, same, same2, sf, inside);
+    CPPUNIT_ASSERT_EQUAL(size_t(1), single.size());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3, single[0].second, 1e-6);
+  }
+
+  void RotationMatrices_VnlAndItk_Equal()
+  {
+    const auto vnlRotation = mitk::imv::GetRotationMatrixVnl<double>(10, -20, 30);
+    const auto itkRotation = mitk::imv::GetRotationMatrixItk<double>(10, -20, 30);
+    for (unsigned int r = 0; r < 3; ++r)
+      for (unsigned int c = 0; c < 3; ++c)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(vnlRotation(r, c), itkRotation(r, c), 1e-12);
+    // z * y * x, so a pure z rotation turns x into y.
+    const auto rz = mitk::imv::GetRotationMatrixVnl<double>(0, 0, 90);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, (rz * Vec(1, 0, 0) - Vec(0, 1, 0)).two_norm(), 1e-12);
+  }
+
+  void Cart2Sph_Sph2Cart_RoundTrip()
+  {
+    const auto v = Vec(0.3, -0.4, 1.2);
+    double spherical[3];
+    mitk::gradients::Cart2Sph(v[0], v[1], v[2], spherical);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(v.two_norm(), spherical[2], 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, (mitk::gradients::Sph2Cart(spherical[1], spherical[0], spherical[2]) - v).two_norm(), 1e-12);
   }
 };
 
