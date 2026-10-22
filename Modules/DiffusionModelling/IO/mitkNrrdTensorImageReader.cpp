@@ -28,12 +28,45 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkImageDataItem.h"
 #include <mitkLocaleSwitch.h>
 #include <mitkIOUtil.h>
-#include <mitkLexicalCast.h>
+#include <itksys/SystemTools.hxx>
 
+#include <fstream>
 #include <optional>
 
 namespace
 {
+  bool HasNrrdMagic(const std::string& file)
+  {
+    std::ifstream stream(file, std::ios::binary);
+    char magic[4] = {};
+    stream.read(magic, 4);
+    return stream && std::string(magic, 4) == "NRRD";
+  }
+
+  /** A copy of a file with a NIfTI extension, which niftilib needs; removed when it goes out of scope. */
+  class TemporaryNiftiCopy
+  {
+  public:
+    explicit TemporaryNiftiCopy(const std::string& file)
+      : m_Path(mitk::IOUtil::CreateTemporaryFile("temp_dti_XXXXXX.nii.gz"))
+    {
+      itksys::SystemTools::CopyAFile(file, m_Path);
+    }
+
+    ~TemporaryNiftiCopy()
+    {
+      itksys::SystemTools::RemoveFile(m_Path);
+    }
+
+    TemporaryNiftiCopy(const TemporaryNiftiCopy&) = delete;
+    TemporaryNiftiCopy& operator=(const TemporaryNiftiCopy&) = delete;
+
+    const std::string& GetPath() const { return m_Path; }
+
+  private:
+    std::string m_Path;
+  };
+
   using FrameType = mitk::NrrdTensorImageReader::MeasurementFrameType;
 
   /**
@@ -109,16 +142,13 @@ namespace mitk
 
         try
         {
-          std::string fname3 = mitk::IOUtil::GetTempPath()+"/temp_dti.nii.gz";
+          // Tensor files written by MITK are NRRD and go straight to the NRRD branch below; only
+          // other files are tried as NIfTI, through a temporary copy.
+          if (HasNrrdMagic(location))
+            throw itk::ImageFileReaderException(__FILE__, __LINE__, "NRRD file");
 
-          int c = 0;
-          while( itksys::SystemTools::FileExists(fname3) )
-          {
-            fname3 = mitk::IOUtil::GetTempPath()+"/temp_dti_" + boost::lexical_cast<std::string>(c) + ".nii.gz";
-            ++c;
-          }
-
-          itksys::SystemTools::CopyAFile(location.c_str(), fname3.c_str());
+          const TemporaryNiftiCopy niftiCopy(location);
+          const std::string fname3 = niftiCopy.GetPath();
 
           typedef itk::VectorImage<float,3> ImageType;
           itk::NiftiImageIO::Pointer io = itk::NiftiImageIO::New();

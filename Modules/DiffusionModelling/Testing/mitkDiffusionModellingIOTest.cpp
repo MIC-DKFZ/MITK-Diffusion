@@ -16,10 +16,14 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
+#include <mitkITKImageImport.h>
+
+#include <itkVectorImage.h>
 #include <itksys/SystemTools.hxx>
 #include <vnl/vnl_matrix_fixed.h>
 
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
@@ -30,6 +34,8 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(TensorReader_MitkFrameKey_RotatedToWorld);
   MITK_TEST(TensorReader_PermutationFrame_RotatedToWorld);
   MITK_TEST(TensorReader_NoFrame_Unchanged);
+  MITK_TEST(TensorReader_Nrrd_LeavesNoTemporaryFiles);
+  MITK_TEST(TensorReader_Nifti_LeavesNoTemporaryFiles);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -116,6 +122,18 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
     return f;
   }
 
+  /** The tensor reader tries non-NRRD files as NIfTI through a copy named temp_dti*. */
+  static unsigned int CountTemporaryTensorCopies()
+  {
+    unsigned int count = 0;
+    for (const auto &entry : std::filesystem::directory_iterator(mitk::IOUtil::GetTempPath()))
+    {
+      if (entry.path().filename().string().starts_with("temp_dti"))
+        ++count;
+    }
+    return count;
+  }
+
 public:
   void setUp() override
   {
@@ -151,6 +169,38 @@ public:
   {
     const double elements[6] = {3, 0.2, 0, 1, 0, 0.5};
     AssertEqual(ToMatrix(elements), ReadTensor(WriteTensorNrrd("noframe.dti", elements, "")));
+  }
+
+  void TensorReader_Nrrd_LeavesNoTemporaryFiles()
+  {
+    const unsigned int before = CountTemporaryTensorCopies();
+    mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/tensorImage.dti"));
+    CPPUNIT_ASSERT_EQUAL(before, CountTemporaryTensorCopies());
+  }
+
+  void TensorReader_Nifti_LeavesNoTemporaryFiles()
+  {
+    using VectorImageType = itk::VectorImage<float, 3>;
+    auto image = VectorImageType::New();
+    VectorImageType::RegionType region;
+    region.SetSize({{2, 1, 1}});
+    image->SetRegions(region);
+    image->SetVectorLength(6);
+    image->Allocate();
+    itk::VariableLengthVector<float> pixel(6);
+    for (unsigned int i = 0; i < 6; ++i)
+      pixel[i] = i + 1;
+    image->FillBuffer(pixel);
+
+    const std::string niftiPath = m_TempDir + "/tensor.nii.gz";
+    mitk::IOUtil::Save(mitk::GrabItkImageMemory(image.GetPointer()), niftiPath);
+    const std::string dtiPath = m_TempDir + "/tensor.dti";
+    itksys::SystemTools::CopyAFile(niftiPath, dtiPath);
+
+    const unsigned int before = CountTemporaryTensorCopies();
+    const double elements[6] = {1, 2, 3, 4, 5, 6};
+    AssertEqual(ToMatrix(elements), ReadTensor(dtiPath));
+    CPPUNIT_ASSERT_EQUAL(before, CountTemporaryTensorCopies());
   }
 };
 
