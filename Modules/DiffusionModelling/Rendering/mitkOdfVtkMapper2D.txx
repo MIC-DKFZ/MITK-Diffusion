@@ -37,6 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vtkPointData.h"
 #include "vtkTransformFilter.h"
 #include "vtkTransform.h"
+#include <vtkNew.h>
 #include "vtkOdfSource.h"
 #include "vtkDoubleArray.h"
 #include "vtkLookupTable.h"
@@ -496,7 +497,11 @@ void  mitk::OdfVtkMapper2D<T,N>
   inversetransform->Identity();
   inversetransform->Concatenate(vtktransform->GetLinearInverse());
   double myscale[3];
-  ((vtkTransform*)vtktransform)->GetScale(myscale);
+  // The node's transform is a vtkMatrixToLinearTransform, not a vtkTransform; read the scale
+  // through a vtkTransform built from its matrix.
+  vtkNew<vtkTransform> scaleTransform;
+  scaleTransform->SetMatrix(vtktransform->GetMatrix());
+  scaleTransform->GetScale(myscale);
   myscale[0] = fabs(myscale[0]);
   myscale[1] = fabs(myscale[1]);
   myscale[2] = fabs(myscale[2]);
