@@ -80,6 +80,7 @@ void vtkThickPlane::SetPose (double _n1, double _n2, double _n3, double _o1, dou
     Normal[0] = -Normal[0];
     Normal[1] = -Normal[1];
     Normal[2] = -Normal[2];
+    this->Modified();
   }
 }
 
@@ -109,7 +110,7 @@ void vtkThickPlane::SetNormal (double _arg[3])
 void vtkThickPlane::SetOrigin (double _arg1, double _arg2, double _arg3)
 {
   vtkDebugMacro(<< this->GetClassName() << " (" << this << "): setting " << Origin << " to (" << _arg1 << "," << _arg2 << "," << _arg3 << ")");
-  if ((this->Normal[0] != _arg1)||(this->Normal[1] != _arg2)||(this->Normal[2] != _arg3))
+  if ((this->Origin[0] != _arg1)||(this->Origin[1] != _arg2)||(this->Origin[2] != _arg3))
   {
     this->Origin[0] = _arg1;
     this->Origin[1] = _arg2;
@@ -125,7 +126,12 @@ void vtkThickPlane::SetOrigin (double _arg[3])
 
 void vtkThickPlane::SetThickness (double _arg)
 {
-  Thickness = std::abs(_arg);
+  // A zoom about the view centre changes only the thickness; the glyphs must be clipped again.
+  if (Thickness != std::abs(_arg))
+  {
+    Thickness = std::abs(_arg);
+    this->Modified();
+  }
 }
 
 #define VTK_PLANE_TOL 1.0e-06

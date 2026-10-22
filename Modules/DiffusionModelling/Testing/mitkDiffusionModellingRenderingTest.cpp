@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <vtkMaskedProgrammableGlyphFilter.h>
+#include <vtkThickPlane.h>
 
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
@@ -29,6 +30,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionModellingRenderingTestSuite);
   MITK_TEST(GlyphFilter_NoGlyphsAllowed_NoCrash);
   MITK_TEST(GlyphFilter_Striding_SpreadsOverInput);
+  MITK_TEST(ThickPlane_SettersApplyAndModify);
   CPPUNIT_TEST_SUITE_END();
 
   static std::vector<double> s_GlyphPositions;
@@ -81,6 +83,23 @@ public:
     CPPUNIT_ASSERT(!positions.empty());
     CPPUNIT_ASSERT(positions.back() >= 8);
     CPPUNIT_ASSERT_EQUAL(std::size_t(10), GlyphPositions(10).size());
+  }
+
+  // SetOrigin compared the new origin with the normal, and SetThickness did not mark the plane as
+  // modified, so the glyph clipping did not follow a zoom.
+  void ThickPlane_SettersApplyAndModify()
+  {
+    auto plane = vtkSmartPointer<vtkThickPlane>::New();
+    plane->SetPose(0, 0, 1, 5, 5, 5);
+    plane->SetPose(0, 0, 1, 0, 0, 1);
+    CPPUNIT_ASSERT_EQUAL(1.0, plane->GetOrigin()[2]);
+    CPPUNIT_ASSERT_EQUAL(0.0, plane->GetOrigin()[0]);
+
+    plane->SetThickness(2);
+    const auto mtime = plane->GetMTime();
+    plane->SetThickness(3);
+    CPPUNIT_ASSERT(plane->GetMTime() > mtime);
+    CPPUNIT_ASSERT_EQUAL(3.0, plane->GetThickness());
   }
 };
 

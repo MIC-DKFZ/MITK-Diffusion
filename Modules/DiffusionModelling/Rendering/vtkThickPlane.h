@@ -63,7 +63,7 @@ public:
   virtual void SetThickness (double _arg);
   vtkGetMacro(Thickness,double);
 
-  int count;
+  int count = 0;
 
 protected:
   vtkThickPlane();
@@ -82,8 +82,8 @@ protected:
 
   double Normal[3];
   double Origin[3];
-  double Thickness;
-  double Distance;
+  double Thickness = 0.0;
+  double Distance = 0.0;
 
 private:
   vtkThickPlane(const vtkThickPlane&);  // Not implemented.
