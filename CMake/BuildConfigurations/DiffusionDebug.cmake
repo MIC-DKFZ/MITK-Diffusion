@@ -2,6 +2,13 @@ include(${CMAKE_CURRENT_LIST_DIR}/set_always.txt)
 
 message(STATUS "Configuring MITK Diffusion with all Plugins")
 set(MITK_CUSTOM_PRODUCT_NAME "MITK Diffusion" CACHE STRING "" FORCE)
+set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
+
+# MITK does not support Debug builds with Python, and MITK Diffusion does not use it. Forced off
+# because a configuration selected before (e.g. MITK's default WorkbenchRelease) leaves both on in
+# the cache. DiffusionRelease includes this file, so its feature set matches the Debug build.
+set(MITK_USE_Python3 OFF CACHE BOOL "" FORCE)
+set(MITK_USE_pybind11 OFF CACHE BOOL "" FORCE)
 
 # Enable non-optional external dependencies
 set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
