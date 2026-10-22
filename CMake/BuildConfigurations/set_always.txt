@@ -44,13 +44,13 @@ set(BUILD_MODULE_IVIM OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_MriSimulation OFF CACHE BOOL "" FORCE)
 
 # cmdapps
-set(BUILD_DiffusionFiberQuantificationCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber quantification" FORCE)
-set(BUILD_DiffusionFiberProcessingCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber processing" FORCE)
-set(BUILD_DiffusionFiberfoxCmdApps OFF CACHE BOOL "Build commandline tools for diffusion data simulation (Fiberfox)" FORCE)
-set(BUILD_DiffusionMiscCmdApps OFF CACHE BOOL "Build miscellaneous commandline tools for diffusion" FORCE)
-set(BUILD_DiffusionQuantificationCmdApps OFF CACHE BOOL "Build commandline tools for diffusion quantification (ADC, ...)" FORCE)
-set(BUILD_DiffusionTractographyCmdApps OFF CACHE BOOL "Build commandline tools for diffusion fiber tractography" FORCE)
-set(BUILD_DiffusionIVIMCmdApps OFF CACHE BOOL "Build commandline tools for IVIM" FORCE)
+set(BUILD_DiffusionFiberQuantificationCmdApps OFF CACHE BOOL "" FORCE)
+set(BUILD_DiffusionFiberProcessingCmdApps OFF CACHE BOOL "" FORCE)
+set(BUILD_DiffusionFiberfoxCmdApps OFF CACHE BOOL "" FORCE)
+set(BUILD_DiffusionMiscCmdApps OFF CACHE BOOL "" FORCE)
+set(BUILD_DiffusionQuantificationCmdApps OFF CACHE BOOL "" FORCE)
+set(BUILD_DiffusionTractographyCmdApps OFF CACHE BOOL "" FORCE)
+set(BUILD_DiffusionIVIMCmdApps OFF CACHE BOOL "" FORCE)
 
 # plugins
 set("MITK_BUILD_org.mitk.gui.qt.viewnavigator" ON CACHE BOOL "" FORCE) # always ON

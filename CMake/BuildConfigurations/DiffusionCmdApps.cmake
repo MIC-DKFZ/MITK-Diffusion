@@ -12,28 +12,25 @@ set(MITK_DOXYGEN_GENERATE_QCH_FILES OFF CACHE BOOL "Use doxygen to generate Qt c
 set(BLUEBERRY_USE_QT_HELP OFF CACHE BOOL "Enable support for integrating bundle documentation into Qt Help" FORCE)
 
 set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
-set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
-set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
-set(MITK_USE_OpenCV OFF CACHE BOOL "" FORCE)
 
-# FiberDissection, the only user of OpenCV, is off: no command line app uses it.
+# The Misc command line apps link MitkTestingHelper, which MITK builds only with testing on.
+set(BUILD_TESTING ON CACHE BOOL "Build the MITK tests" FORCE)
+
+# modules; FiberDissection, the only user of OpenCV, stays off: no command line app uses it.
 set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
-set(BUILD_MODULE_FiberDissection OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberTracking ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_IVIM ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_MriSimulation ON CACHE BOOL "" FORCE)
-# The Misc command line apps link MitkTestingHelper, which MITK builds only with testing on.
-set(BUILD_TESTING ON CACHE BOOL "Build the MITK tests" FORCE)
 
-# enable command line tools
-set(BUILD_DiffusionFiberQuantificationCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber quantification" FORCE)
-set(BUILD_DiffusionFiberProcessingCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber processing" FORCE)
-set(BUILD_DiffusionFiberfoxCmdApps ON CACHE BOOL "Build commandline tools for diffusion data simulation (Fiberfox)" FORCE)
-set(BUILD_DiffusionMiscCmdApps ON CACHE BOOL "Build miscellaneous commandline tools for diffusion" FORCE)
-set(BUILD_DiffusionQuantificationCmdApps ON CACHE BOOL "Build commandline tools for diffusion quantification (IVIM, ADC, ...)" FORCE)
-set(BUILD_DiffusionTractographyCmdApps ON CACHE BOOL "Build commandline tools for diffusion fiber tractography" FORCE)
+# cmdapps
+set(BUILD_DiffusionFiberQuantificationCmdApps ON CACHE BOOL "" FORCE)
+set(BUILD_DiffusionFiberProcessingCmdApps ON CACHE BOOL "" FORCE)
+set(BUILD_DiffusionFiberfoxCmdApps ON CACHE BOOL "" FORCE)
+set(BUILD_DiffusionMiscCmdApps ON CACHE BOOL "" FORCE)
+set(BUILD_DiffusionQuantificationCmdApps ON CACHE BOOL "" FORCE)
+set(BUILD_DiffusionTractographyCmdApps ON CACHE BOOL "" FORCE)
 set(BUILD_DiffusionIVIMCmdApps ON CACHE BOOL "" FORCE)
