@@ -105,6 +105,78 @@ namespace
       return std::nullopt;
     return FrameType(frame->GetTranspose());
   }
+
+  using TensorImageType = mitk::TensorImage::ItkTensorImageType;
+  using TensorType = mitk::TensorImage::PixelType;
+
+  /**
+   * The tensor of 6 values (xx, xy, xz, yy, yz, zz) or of a full 3x3 matrix in row-major order,
+   * stride values apart.
+   */
+  TensorType ToTensor(const float *values, unsigned int numValues, std::size_t stride)
+  {
+    const unsigned int fromSix[6] = {0, 1, 2, 3, 4, 5};
+    const unsigned int fromNine[6] = {0, 1, 2, 4, 5, 8};
+    const unsigned int *elements = numValues == 9 ? fromNine : fromSix;
+    TensorType tensor;
+    for (unsigned int i = 0; i < 6; ++i)
+      tensor[i] = values[elements[i] * stride];
+    return tensor;
+  }
+
+  /**
+   * Reads a tensor file with a new IO of the given type: a 3D image of 6 or 9 components per voxel,
+   * or a 4D image of 6 or 9 volumes. The metadata of the file go to dictionary.
+   */
+  template <class TImageIO>
+  TensorImageType::Pointer ReadTensors(const std::string &file, itk::MetaDataDictionary &dictionary)
+  {
+    using VectorImageType = itk::VectorImage<float, 3>;
+    auto reader = itk::ImageFileReader<VectorImageType>::New();
+    reader->SetImageIO(TImageIO::New());
+    reader->SetFileName(file);
+    reader->Update();
+    const VectorImageType::Pointer vectors = reader->GetOutput();
+    dictionary = vectors->GetMetaDataDictionary();
+
+    auto tensors = TensorImageType::New();
+    tensors->SetSpacing(vectors->GetSpacing());
+    tensors->SetOrigin(vectors->GetOrigin());
+    tensors->SetDirection(vectors->GetDirection());
+    tensors->SetRegions(vectors->GetLargestPossibleRegion());
+    tensors->Allocate();
+    itk::ImageRegionIterator<TensorImageType> ot(tensors, tensors->GetLargestPossibleRegion());
+
+    const unsigned int numComponents = vectors->GetNumberOfComponentsPerPixel();
+    if (numComponents == 6 || numComponents == 9)
+    {
+      itk::ImageRegionConstIterator<VectorImageType> it(vectors, vectors->GetLargestPossibleRegion());
+      for (; !it.IsAtEnd(); ++it, ++ot)
+        ot.Set(ToTensor(it.Get().GetDataPointer(), numComponents, 1));
+      return tensors;
+    }
+    if (numComponents != 1)
+      mitkThrow() << "Unknown number of components for DTI file: " << numComponents << ". Should be 6 or 9!";
+
+    // A 4D file of one volume per tensor element.
+    using VolumesType = itk::Image<float, 4>;
+    auto volumeReader = itk::ImageFileReader<VolumesType>::New();
+    volumeReader->SetImageIO(TImageIO::New());
+    volumeReader->SetFileName(file);
+    volumeReader->Update();
+    const VolumesType::Pointer volumes = volumeReader->GetOutput();
+    const auto size = volumes->GetLargestPossibleRegion().GetSize();
+    if (size[3] != 6 && size[3] != 9)
+      mitkThrow() << "Unknown number of volumes for DTI file: " << size[3] << ". Should be 6 or 9!";
+    const std::size_t volumeSize = size[0] * size[1] * size[2];
+    if (volumeSize != tensors->GetLargestPossibleRegion().GetNumberOfPixels())
+      mitkThrow() << "The volumes of the DTI file do not match its first volume.";
+
+    const float *values = volumes->GetBufferPointer();
+    for (std::size_t voxel = 0; !ot.IsAtEnd(); ++ot, ++voxel)
+      ot.Set(ToTensor(values + voxel, size[3], volumeSize));
+    return tensors;
+  }
 }
 
 namespace mitk
@@ -127,304 +199,45 @@ namespace mitk
 
   std::vector<itk::SmartPointer<BaseData> > NrrdTensorImageReader::DoRead()
   {
-    std::vector<itk::SmartPointer<mitk::BaseData> > result;
-    std::string location = GetInputLocation();
-
-    if ( location == "")
-    {
+    const std::string location = GetInputLocation();
+    if (location.empty())
       throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, the filename is empty!");
-    }
-    else
+
+    TensorImageType::Pointer tensors;
+    try
     {
-      try
+      mitk::LocaleSwitch localeSwitch("C");
+      itk::MetaDataDictionary dictionary;
+      if (HasNrrdMagic(location))
       {
-        mitk::LocaleSwitch localeSwitch("C");
-
-        try
+        tensors = ReadTensors<itk::NrrdImageIO>(location, dictionary);
+        if (const auto frameToWorld = ReadFrameToWorld(dictionary))
         {
-          // Tensor files written by MITK are NRRD and go straight to the NRRD branch below; only
-          // other files are tried as NIfTI, through a temporary copy.
-          if (HasNrrdMagic(location))
-            throw itk::ImageFileReaderException(__FILE__, __LINE__, "NRRD file");
-
-          const TemporaryNiftiCopy niftiCopy(location);
-          const std::string fname3 = niftiCopy.GetPath();
-
-          typedef itk::VectorImage<float,3> ImageType;
-          itk::NiftiImageIO::Pointer io = itk::NiftiImageIO::New();
-          typedef itk::ImageFileReader<ImageType> FileReaderType;
-          FileReaderType::Pointer reader = FileReaderType::New();
-          reader->SetImageIO(io);
-          reader->SetFileName(fname3);
-          reader->Update();
-          ImageType::Pointer img = reader->GetOutput();
-
-          TensorImage::ItkTensorImageType::Pointer vecImg = TensorImage::ItkTensorImageType::New();
-          vecImg->SetSpacing( img->GetSpacing() );   // Set the image spacing
-          vecImg->SetOrigin( img->GetOrigin() );     // Set the image origin
-          vecImg->SetDirection( img->GetDirection() );  // Set the image direction
-          vecImg->SetRegions( img->GetLargestPossibleRegion());
-          vecImg->Allocate();
-
-          itk::ImageRegionIterator<TensorImage::ItkTensorImageType> ot (vecImg, vecImg->GetLargestPossibleRegion() );
-          ot.GoToBegin();
-
-          itk::ImageRegionIterator<ImageType> it (img, img->GetLargestPossibleRegion() );
-          it.GoToBegin();
-
-          typedef ImageType::PixelType  VarPixType;
-          typedef TensorImage::PixelType FixPixType;
-          int numComponents = img->GetNumberOfComponentsPerPixel();
-
-          if (numComponents==6)
-          {
-            MITK_INFO << "Trying to load dti as 6-comp nifti ...";
-            while (!it.IsAtEnd())
-            {
-              VarPixType vec = it.Get();
-              FixPixType fixVec(vec.GetDataPointer());
-
-              TensorImage::PixelType tensor;
-              tensor.SetElement(0, vec.GetElement(0));
-              tensor.SetElement(1, vec.GetElement(1));
-              tensor.SetElement(2, vec.GetElement(2));
-              tensor.SetElement(3, vec.GetElement(3));
-              tensor.SetElement(4, vec.GetElement(4));
-              tensor.SetElement(5, vec.GetElement(5));
-
-              fixVec = tensor;
-
-              ot.Set(fixVec);
-              ++ot;
-              ++it;
-            }
-          }
-          else if(numComponents==9)
-          {
-            MITK_INFO << "Trying to load dti as 9-comp nifti ...";
-            while (!it.IsAtEnd())
-            {
-              VarPixType vec = it.Get();
-              TensorImage::PixelType tensor;
-              tensor.SetElement(0, vec.GetElement(0));
-              tensor.SetElement(1, vec.GetElement(1));
-              tensor.SetElement(2, vec.GetElement(2));
-              tensor.SetElement(3, vec.GetElement(4));
-              tensor.SetElement(4, vec.GetElement(5));
-              tensor.SetElement(5, vec.GetElement(8));
-
-              FixPixType fixVec(tensor);
-              ot.Set(fixVec);
-              ++ot;
-              ++it;
-            }
-          }
-          else if (numComponents==1)
-          {
-            MITK_INFO << "Trying to load dti as 4D nifti ...";
-            typedef itk::Image<float,4> ImageType;
-            typedef itk::ImageFileReader<ImageType> FileReaderType;
-            FileReaderType::Pointer reader = FileReaderType::New();
-            reader->SetImageIO(io);
-            reader->SetFileName(fname3);
-            reader->Update();
-            ImageType::Pointer img = reader->GetOutput();
-
-            itk::Size<4> size = img->GetLargestPossibleRegion().GetSize();
-
-            while (!ot.IsAtEnd())
-            {
-              TensorImage::PixelType tensor;
-              ImageType::IndexType idx;
-              idx[0] = ot.GetIndex()[0]; idx[1] = ot.GetIndex()[1]; idx[2] = ot.GetIndex()[2];
-
-              if (size[3]==6)
-              {
-                for (unsigned int te=0; te<size[3]; te++)
-                {
-                  idx[3] = te;
-                  tensor.SetElement(te, img->GetPixel(idx));
-                }
-              }
-              else if (size[3]==9)
-              {
-                idx[3] = 0;
-                tensor.SetElement(0, img->GetPixel(idx));
-                idx[3] = 1;
-                tensor.SetElement(1, img->GetPixel(idx));
-                idx[3] = 2;
-                tensor.SetElement(2, img->GetPixel(idx));
-                idx[3] = 4;
-                tensor.SetElement(3, img->GetPixel(idx));
-                idx[3] = 5;
-                tensor.SetElement(4, img->GetPixel(idx));
-                idx[3] = 8;
-                tensor.SetElement(5, img->GetPixel(idx));
-              }
-              else
-                throw itk::ImageFileReaderException(__FILE__, __LINE__, "Unknown number of components for DTI file. Should be 6 or 9!");
-
-              FixPixType fixVec(tensor);
-              ot.Set(fixVec);
-              ++ot;
-            }
-          }
-          else
-            throw itk::ImageFileReaderException(__FILE__, __LINE__, "Unknown number of components for DTI file. Should be 6 or 9!");
-
-          OutputType::Pointer resultImage = OutputType::New();
-          resultImage->InitializeByItk( vecImg.GetPointer() );
-          resultImage->SetVolume( vecImg->GetBufferPointer() );
-          result.push_back( resultImage.GetPointer() );
+          itk::ImageRegionIterator<TensorImageType> it(tensors, tensors->GetLargestPossibleRegion());
+          for (; !it.IsAtEnd(); ++it)
+            it.Set(it.Get().Rotate(*frameToWorld));
         }
-        catch(...)
-        {
-          // Errors of other files come from the NIfTI attempt and say what is wrong.
-          if (!HasNrrdMagic(location))
-            throw;
-
-          MITK_INFO << "Trying to load dti as nrrd ...";
-
-          typedef itk::VectorImage<float,3> ImageType;
-          itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-          typedef itk::ImageFileReader<ImageType> FileReaderType;
-          FileReaderType::Pointer reader = FileReaderType::New();
-          reader->SetImageIO(io);
-          reader->SetFileName(location);
-          reader->Update();
-          ImageType::Pointer img = reader->GetOutput();
-
-          TensorImage::ItkTensorImageType::Pointer vecImg = TensorImage::ItkTensorImageType::New();
-          vecImg->SetSpacing( img->GetSpacing() );   // Set the image spacing
-          vecImg->SetOrigin( img->GetOrigin() );     // Set the image origin
-          vecImg->SetDirection( img->GetDirection() );  // Set the image direction
-          vecImg->SetRegions( img->GetLargestPossibleRegion());
-          vecImg->Allocate();
-
-          itk::ImageRegionIterator<TensorImage::ItkTensorImageType> ot (vecImg, vecImg->GetLargestPossibleRegion() );
-          ot.GoToBegin();
-
-          itk::ImageRegionIterator<ImageType> it (img, img->GetLargestPossibleRegion() );
-          it.GoToBegin();
-
-          typedef ImageType::PixelType  VarPixType;
-          typedef TensorImage::PixelType FixPixType;
-          int numComponents = img->GetNumberOfComponentsPerPixel();
-
-          const std::optional<FrameType> frameToWorld = ReadFrameToWorld(img->GetMetaDataDictionary());
-
-          if (numComponents==6)
-          {
-            while (!it.IsAtEnd())
-            {
-              VarPixType vec = it.Get();
-              FixPixType fixVec(vec.GetDataPointer());
-
-              if (frameToWorld)
-                fixVec = fixVec.Rotate(*frameToWorld);
-
-              ot.Set(fixVec);
-              ++ot;
-              ++it;
-            }
-          }
-          else if(numComponents==9)
-          {
-            while (!it.IsAtEnd())
-            {
-              VarPixType vec = it.Get();
-              TensorImage::PixelType tensor;
-              tensor.SetElement(0, vec.GetElement(0));
-              tensor.SetElement(1, vec.GetElement(1));
-              tensor.SetElement(2, vec.GetElement(2));
-              tensor.SetElement(3, vec.GetElement(4));
-              tensor.SetElement(4, vec.GetElement(5));
-              tensor.SetElement(5, vec.GetElement(8));
-
-              if (frameToWorld)
-                tensor = tensor.Rotate(*frameToWorld);
-
-              FixPixType fixVec(tensor);
-              ot.Set(fixVec);
-              ++ot;
-              ++it;
-            }
-          }
-          else if (numComponents==1)
-          {
-            typedef itk::Image<float,4> ImageType;
-            itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-            typedef itk::ImageFileReader<ImageType> FileReaderType;
-            FileReaderType::Pointer reader = FileReaderType::New();
-            reader->SetImageIO(io);
-            reader->SetFileName(location);
-            reader->Update();
-            ImageType::Pointer img = reader->GetOutput();
-
-            itk::Size<4> size = img->GetLargestPossibleRegion().GetSize();
-
-            while (!ot.IsAtEnd())
-            {
-              TensorImage::PixelType tensor;
-              ImageType::IndexType idx;
-              idx[0] = ot.GetIndex()[0]; idx[1] = ot.GetIndex()[1]; idx[2] = ot.GetIndex()[2];
-
-              if (size[3]==6)
-              {
-                for (unsigned int te=0; te<size[3]; te++)
-                {
-                  idx[3] = te;
-                  tensor.SetElement(te, img->GetPixel(idx));
-                }
-              }
-              else if (size[3]==9)
-              {
-                idx[3] = 0;
-                tensor.SetElement(0, img->GetPixel(idx));
-                idx[3] = 1;
-                tensor.SetElement(1, img->GetPixel(idx));
-                idx[3] = 2;
-                tensor.SetElement(2, img->GetPixel(idx));
-                idx[3] = 4;
-                tensor.SetElement(3, img->GetPixel(idx));
-                idx[3] = 5;
-                tensor.SetElement(4, img->GetPixel(idx));
-                idx[3] = 8;
-                tensor.SetElement(5, img->GetPixel(idx));
-              }
-              else
-                throw itk::ImageFileReaderException(__FILE__, __LINE__, "Unknown number of komponents for DTI file. Should be 6 or 9!");
-
-              if (frameToWorld)
-                tensor = tensor.Rotate(*frameToWorld);
-              FixPixType fixVec(tensor);
-              ot.Set(fixVec);
-              ++ot;
-            }
-          }
-          else
-          {
-            throw itk::ImageFileReaderException(__FILE__, __LINE__, "Image has wrong number of pixel components!");
-          }
-
-          OutputType::Pointer resultImage = OutputType::New();
-          resultImage->InitializeByItk( vecImg.GetPointer() );
-          resultImage->SetVolume( vecImg->GetBufferPointer() );
-          result.push_back( resultImage.GetPointer() );
-        }
-
       }
-      catch(std::exception& e)
+      else
       {
-        throw itk::ImageFileReaderException(__FILE__, __LINE__, e.what());
-      }
-      catch(...)
-      {
-        throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested DTI file!");
+        // Other files are tried as NIfTI (FSL element order, no frame), through a copy with a NIfTI
+        // extension, which niftilib needs.
+        const TemporaryNiftiCopy niftiCopy(location);
+        tensors = ReadTensors<itk::NiftiImageIO>(niftiCopy.GetPath(), dictionary);
       }
     }
+    catch(const std::exception& e)
+    {
+      throw itk::ImageFileReaderException(__FILE__, __LINE__, e.what());
+    }
+    catch(...)
+    {
+      throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested DTI file!");
+    }
 
-    return result;
+    auto resultImage = OutputType::New();
+    mitk::GrabItkImageMemory(tensors.GetPointer(), resultImage.GetPointer());
+    return { resultImage.GetPointer() };
   }
 
 } //namespace MITK
