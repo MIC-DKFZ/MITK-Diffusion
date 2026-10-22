@@ -217,8 +217,9 @@ public:
 
   void FitParameters_Default_AppDefaults()
   {
-    // Those of MitkDiffusionIvimFit; the IVIM view starts with the same thresholds and D*.
+    // Those of MitkDiffusionIvimFit; the IVIM view starts with the same method, thresholds and D*.
     const mitk::ivim::FitParameters parameters{};
+    CPPUNIT_ASSERT(parameters.method == Method::DThenDStar);
     CPPUNIT_ASSERT_EQUAL(170.0, parameters.bThreshold);
     CPPUNIT_ASSERT_EQUAL(0.0, parameters.signalThreshold);
     CPPUNIT_ASSERT_EQUAL(0.06, parameters.dStar);

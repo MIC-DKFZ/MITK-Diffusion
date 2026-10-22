@@ -37,10 +37,11 @@ namespace mitk::ivim
     LinearDThenF
   };
 
-  /** The defaults are those of the IVIM view and the command line app. */
+  /** The defaults are those of MitkDiffusionIvimFit. The IVIM view starts with the same method,
+      thresholds and D*; it fits D* for its maps only when the D* map is checked. */
   struct FitParameters
   {
-    Method method = Method::DStarFixed;
+    Method method = Method::DThenDStar;
     /** The two-step methods fit f and D to the b-values above this threshold (s/mm^2). */
     double bThreshold = 170;
     /** Diffusion-weighted signals at or below this value (in the unit of the DWI) are left out. */
