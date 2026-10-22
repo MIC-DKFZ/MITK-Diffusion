@@ -41,7 +41,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkMaskedAlgorithmHelper.h>
 #include <mitkImageMappingHelper.h>
 #include <mitkRegistrationHelper.h>
-#include <mitkRegistrationWrapper.h>
 #include <mitkRegistrationWrapperMapper3D.h>
 
 #include <itkComposeImageFilter.h>
