@@ -17,6 +17,9 @@ found in the LICENSE file.
 
 #include "mitkIvimTestHelpers.h"
 
+#include <itkImageRegionConstIterator.h>
+#include <itkImageRegionIterator.h>
+
 #include <iomanip>
 
 using namespace mitk::IvimTesting;
@@ -32,6 +35,10 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(Update_KBoundsEqual_Throws);
   MITK_TEST(Snapshot_KBoundsReversed_Throws);
   MITK_TEST(Snapshot_SyntheticVoxel_RecoversDAndK);
+  MITK_TEST(Snapshot_BZeroLast_SameAsBZeroFirst);
+  MITK_TEST(Map_SeveralBZeroValues_UsesTheirMean);
+  MITK_TEST(Snapshot_NoBZero_FitsS0);
+  MITK_TEST(TestMulti_RotatedVolumes_SameMaps);
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
   MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
   CPPUNIT_TEST_SUITE_END();
@@ -176,6 +183,101 @@ public:
     }
   }
 
+  void Snapshot_BZeroLast_SameAsBZeroFirst()
+  {
+    const auto signal = KurtosisSignal(m_BValues, 10000, m_Truth[1].d, m_Truth[1].k);
+    const std::vector<double> reversedBValues(m_BValues.rbegin(), m_BValues.rend());
+    const std::vector<double> reversedSignal(signal.rbegin(), signal.rend());
+    auto image = MakeImage({signal});
+    auto reversedImage = MakeImage({reversedSignal});
+
+    auto filter = FilterType::New();
+    for (auto scale : {itk::STRAIGHT, itk::LOGARITHMIC})
+    {
+      itk::KurtosisFitConfiguration config;
+      config.fit_scale = scale;
+      auto expected = filter->GetSnapshot(image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
+      auto actual = filter->GetSnapshot(
+        reversedImage->GetPixel({{0, 0, 0}}), MakeGradients(reversedBValues, 3000).GetPointer(), 3000, config);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[1].d, expected.m_D, 1e-6);
+      AssertClose(expected.m_D, actual.m_D, 1e-6);
+      AssertClose(expected.m_K, actual.m_K, 1e-6);
+    }
+  }
+
+  void Map_SeveralBZeroValues_UsesTheirMean()
+  {
+    // The two b=0 measurements scatter around the S0 of the diffusion-weighted ones.
+    auto signal = KurtosisSignal(m_BValues, 10000, m_Truth[0].d, m_Truth[0].k);
+    signal[0] = 9000;
+    signal[1] = 11000;
+    auto filter = MakeFilter(MakeImage({signal}), m_Gradients, 3000);
+    filter->Update();
+    auto maps = GetMaps(filter);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, maps.d[0], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, maps.k[0], 1e-3);
+  }
+
+  void Snapshot_NoBZero_FitsS0()
+  {
+    const std::vector<double> bValues(m_BValues.begin() + 2, m_BValues.end());
+    auto image = MakeImage({KurtosisSignal(bValues, 10000, m_Truth[0].d, m_Truth[0].k)});
+    auto filter = FilterType::New();
+    itk::KurtosisFitConfiguration config;
+    config.fit_scale = itk::STRAIGHT;
+    auto snapshot = filter->GetSnapshot(image->GetPixel({{0, 0, 0}}), MakeGradients(bValues, 3000).GetPointer(), 3000, config);
+    CPPUNIT_ASSERT(snapshot.m_fittedBZero);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, snapshot.m_D, 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, snapshot.m_K, 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.m_BzeroFit, 5);
+    CPPUNIT_ASSERT_EQUAL(0.0, snapshot.m_Bzero);
+  }
+
+  void TestMulti_RotatedVolumes_SameMaps()
+  {
+    // test_multi.dwi starts with its b=0 volumes; rotated by 3 it starts with a b=3000 volume.
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    const unsigned int n = dwi.image->GetVectorLength();
+    const unsigned int shift = 3;
+
+    auto rotated = VectorImageType::New();
+    rotated->CopyInformation(dwi.image);
+    rotated->SetRegions(dwi.image->GetLargestPossibleRegion());
+    rotated->SetVectorLength(n);
+    rotated->Allocate();
+    itk::ImageRegionConstIterator<VectorImageType> in(dwi.image, dwi.image->GetLargestPossibleRegion());
+    itk::ImageRegionIterator<VectorImageType> out(rotated, rotated->GetLargestPossibleRegion());
+    for (; !in.IsAtEnd(); ++in, ++out)
+    {
+      VectorImageType::PixelType pixel(n);
+      for (unsigned int i = 0; i < n; ++i)
+        pixel[i] = in.Get()[(i + n - shift) % n];
+      out.Set(pixel);
+    }
+    auto rotatedGradients = GradientContainerType::New();
+    for (unsigned int i = 0; i < n; ++i)
+      rotatedGradients->InsertElement(i, dwi.gradients->ElementAt((i + n - shift) % n));
+
+    for (auto scale : {itk::STRAIGHT, itk::LOGARITHMIC})
+    {
+      auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
+      filter->SetFittingScale(scale);
+      filter->Update();
+      auto rotatedFilter = MakeFilter(rotated, rotatedGradients, dwi.referenceBValue);
+      rotatedFilter->SetFittingScale(scale);
+      rotatedFilter->Update();
+
+      auto expected = GetMaps(filter);
+      auto actual = GetMaps(rotatedFilter);
+      for (std::size_t i = 0; i < expected.d.size(); ++i)
+      {
+        // Only the summation order of the residuals differs.
+        AssertClose(expected.d[i], actual.d[i], 1e-5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected.k[i], actual.k[i], 1e-3);
+      }
+    }
+  }
+
   void TestMulti_Maps_MatchRecordedValues()
   {
     struct Recorded
@@ -186,16 +288,16 @@ public:
       Parameters mean;
       Parameters center;
     };
-    // Recorded from the code before the review #13 fixes, without smoothing; bounds are
+    // Values recorded from the fit, without smoothing, to catch unintended changes; bounds are
     // -1000..1000 for K, which also switches on the D bounds. Voxel (5, 5, 1) is in the center of
     // the 11x11x3 image.
     const std::vector<Recorded> recorded = {
-      {itk::STRAIGHT, false, false, {0.000901996893, 0.1557640243}, {0.0009686530652, 0.305857804}},
-      {itk::STRAIGHT, false, true, {0.000901996893, 0.1557640243}, {0.0009686530652, 0.305857804}},
+      {itk::STRAIGHT, false, false, {0.000903944109, 0.1654352682}, {0.0009347549604, 0.2663042347}},
+      {itk::STRAIGHT, false, true, {0.000903944109, 0.1654352682}, {0.0009347549604, 0.2663042347}},
       {itk::STRAIGHT, true, false, {0.001005211123, 0.1868300536}, {0.0009721510836, 0.3095819658}},
       {itk::STRAIGHT, true, true, {0.00100521124, 0.1868300133}, {0.0009721510836, 0.3095819658}},
-      {itk::LOGARITHMIC, false, false, {0.0008550592113, -0.3114681976}, {0.0008324263819, -0.3285284332}},
-      {itk::LOGARITHMIC, false, true, {0.0008550592113, -0.3114681976}, {0.0008324263819, -0.3285284332}},
+      {itk::LOGARITHMIC, false, false, {0.0008564114338, -0.3039194411}, {0.0008082221038, -0.396188412}},
+      {itk::LOGARITHMIC, false, true, {0.0008564114338, -0.3039194411}, {0.0008082221038, -0.396188412}},
       {itk::LOGARITHMIC, true, false, {0.000807258211, -4.050063143}, {0.0006364114273, -1.180144152}},
       {itk::LOGARITHMIC, true, true, {0.000807258211, -4.050063143}, {0.0006364114273, -1.180144152}}};
 
@@ -229,11 +331,13 @@ public:
       Parameters fit;
       double fittedBZero;
     };
-    // Recorded from the code before the review #13 fixes; the voxel's b=0 mean is 204.
+    // Values recorded from the fit to catch unintended changes. The voxel's b=0 measurements scatter
+    // from 133 to 498 around their mean 204, the first one is 498; with S0 = 204 the least-squares
+    // K of the straight fit is far below 0.
     const std::vector<Recorded> recorded = {
-      {itk::STRAIGHT, false, {0.001429863493, 0.6580090553}, 1},
+      {itk::STRAIGHT, false, {0.0002090617194, -17.49915809}, 1},
       {itk::STRAIGHT, true, {0.0007311146486, 0.3211416009}, 296.7392811},
-      {itk::LOGARITHMIC, false, {0.001667458657, 0.4647482036}, 1},
+      {itk::LOGARITHMIC, false, {0.0007964425652, 0.2017387146}, 1},
       {itk::LOGARITHMIC, true, {0.001737580899, 0.4587319693}, 535.7428001}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi"));

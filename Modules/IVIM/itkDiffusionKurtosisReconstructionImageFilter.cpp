@@ -36,64 +36,76 @@ static void VerifyKurtosisBounds(const vnl_vector_fixed<double, 2>& bounds)
     itkGenericExceptionMacro("Lower kurtosis bound " << bounds[0] << " is not below the upper bound " << bounds[1] << ".");
 }
 
+namespace itk
+{
+  /** The measurements a kurtosis fit uses. S0 is the mean of the b=0 measurements, not the first
+      volume, so the volume order does not matter; it is fitted instead when asked to or when there
+      is no b=0 measurement. */
+  struct KurtosisFitData
+  {
+    vnl_vector<double> measurements;
+    vnl_vector<double> bvalues;
+    double bzero = 0;
+    unsigned int bzero_count = 0;
+    bool fit_bzero = false;
+  };
+}
+
+template< class TInputPixelType>
+static itk::KurtosisFitData AssembleKurtosisFitData( const itk::VariableLengthVector< TInputPixelType > &input,
+                                                     const vnl_vector<double>& bvalues,
+                                                     const itk::KurtosisFitConfiguration& kf_config)
+{
+  std::vector<double> measurements;
+  std::vector<double> fit_bvalues;
+  itk::KurtosisFitData data;
+  for( unsigned int i=0; i<bvalues.size(); ++i )
+  {
+    if( bvalues[i] < vnl_math::eps )
+    {
+      data.bzero += input.GetElement(i);
+      ++data.bzero_count;
+    }
+    // skip bvalues higher than the limit provided, if the flag is activated
+    else if( !kf_config.exclude_high_b || bvalues[i] <= kf_config.b_upper_threshold )
+    {
+      measurements.push_back( input.GetElement(i) );
+      fit_bvalues.push_back( bvalues[i] );
+    }
+  }
+
+  if( data.bzero_count > 0 )
+    data.bzero /= data.bzero_count;
+  data.fit_bzero = kf_config.omit_bzero || data.bzero_count == 0;
+  data.measurements = vnl_vector<double>( measurements.data(), measurements.size() );
+  data.bvalues = vnl_vector<double>( fit_bvalues.data(), fit_bvalues.size() );
+  return data;
+}
+
+/** Fits one voxel; result holds the start values (D, K, S0) on input and the fitted (D, K, S0) on
+    output, S0 being the b=0 mean when it is not fitted. */
 template< class TInputPixelType>
 static void FitSingleVoxel( const itk::VariableLengthVector< TInputPixelType > &input,
                             const vnl_vector<double>& bvalues,
                             vnl_vector<double>& result,
-                            itk::KurtosisFitConfiguration kf_config)
+                            const itk::KurtosisFitConfiguration& kf_config)
 {
   // check for length
   assert( input.Size() == bvalues.size() );
+  assert( result.size() == 3 );
 
-  // assembly data vectors for fitting
-  auto bvalueIter = bvalues.begin();
-  unsigned int unused_values = 0;
-  while( bvalueIter != bvalues.end() )
-  {
-    if( *bvalueIter < vnl_math::eps && kf_config.omit_bzero )
-    {
-      ++unused_values;
-    }
-    ++bvalueIter;
-  }
+  const auto data = AssembleKurtosisFitData( input, bvalues, kf_config );
 
-  // initialize data vectors with the estimated size (after filtering)
-  vnl_vector<double> fit_measurements( input.Size() - unused_values, 0 );
-  vnl_vector<double> fit_bvalues( input.Size() - unused_values, 0 );
-
-  bvalueIter = bvalues.begin();
-  unsigned int running_index = 0;
-  unsigned int skip_count = 0;
-  while( bvalueIter != bvalues.end() )
-  {
-        // skip b=0 if the corresponding flag is set
-    if( ( kf_config.omit_bzero && *bvalueIter < vnl_math::eps )
-        // skip bvalues higher than the limit provided, if the flag is activated
-        || ( kf_config.exclude_high_b && *bvalueIter > kf_config.b_upper_threshold ) )
-    {
-      ++skip_count;
-    }
-    else
-    {
-      fit_measurements[ running_index - skip_count ]  = input.GetElement(running_index);
-      fit_bvalues[ running_index - skip_count] = *bvalueIter;
-    }
-
-    ++running_index;
-    ++bvalueIter;
-  }
-
-
-  MITK_DEBUG("KurtosisFilter.FitSingleVoxel.Meas") << fit_measurements;
-  MITK_DEBUG("KurtosisFilter.FitSingleVoxel.Bval") << fit_bvalues;
+  MITK_DEBUG("KurtosisFilter.FitSingleVoxel.Meas") << data.measurements;
+  MITK_DEBUG("KurtosisFilter.FitSingleVoxel.Bval") << data.bvalues;
 
   // perform fit on data vectors
-  if( kf_config.omit_bzero )
+  if( data.fit_bzero )
   {
-   itk::kurtosis_fit_omit_unweighted kurtosis_cost_fn( fit_measurements.size() );
+   itk::kurtosis_fit_omit_unweighted kurtosis_cost_fn( data.measurements.size() );
    // configuration
    kurtosis_cost_fn.set_fit_logscale( static_cast<bool>(kf_config.fit_scale) );
-   kurtosis_cost_fn.initialize( fit_measurements, fit_bvalues );
+   kurtosis_cost_fn.initialize( data.measurements, data.bvalues );
 
    if( kf_config.use_K_limits)
    {
@@ -105,19 +117,23 @@ static void FitSingleVoxel( const itk::VariableLengthVector< TInputPixelType > &
   }
   else
   {
-   itk::kurtosis_fit_lsq_function kurtosis_cost_fn( fit_measurements.size() );
+   itk::kurtosis_fit_lsq_function kurtosis_cost_fn( data.measurements.size() );
    // configuration
    kurtosis_cost_fn.set_fit_logscale( static_cast<bool>(kf_config.fit_scale) );
-   kurtosis_cost_fn.initialize( fit_measurements, fit_bvalues );
+   kurtosis_cost_fn.initialize( data.measurements, data.bvalues );
+   kurtosis_cost_fn.set_bzero( data.bzero );
 
    if( kf_config.use_K_limits)
    {
     kurtosis_cost_fn.set_K_bounds( kf_config.K_limits );
    }
 
-
+   vnl_vector<double> d_and_k = result.extract( 2 );
    vnl_levenberg_marquardt nonlinear_fit( kurtosis_cost_fn );
-   nonlinear_fit.minimize(result);
+   nonlinear_fit.minimize( d_and_k );
+   result[0] = d_and_k[0];
+   result[1] = d_and_k[1];
+   result[2] = data.bzero;
   }
 
   MITK_DEBUG("KurtosisFilter.FitSingleVoxel.Rslt") << result;
@@ -309,94 +325,34 @@ itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelTyp
   if (kf_conf.use_K_limits)
     VerifyKurtosisBounds(kf_conf.K_limits);
 
-  // initialize
-  vnl_vector<double> initial_position;
-  bool omit_bzero = kf_conf.omit_bzero;
+  vnl_vector<double> fit = this->m_InitialPosition;
+  FitSingleVoxel( input, bvalues, fit, kf_conf );
 
-  if( !omit_bzero )
-  {
-    initial_position.set_size(2);
-    initial_position[0] = this->m_InitialPosition[0];
-    initial_position[1] = this->m_InitialPosition[1];
-  }
-  else
-  {
-    initial_position.set_size(3);
-    initial_position = this->m_InitialPosition;
-  }
-
-  // fit
-  FitSingleVoxel( input, bvalues, initial_position, kf_conf );
+  const auto data = AssembleKurtosisFitData( input, bvalues, kf_conf );
 
   // assembly result snapshot
   KurtosisSnapshot result;
-  result.m_D = initial_position[0];
-  result.m_K = initial_position[1];
+  result.m_D = fit[0];
+  result.m_K = fit[1];
+  result.m_Bzero = data.bzero;
+  result.m_fittedBZero = data.fit_bzero;
 
-  if( omit_bzero )
+  if( data.fit_bzero )
   {
-    result.m_f = 1 - initial_position[2] / std::fmax(0.01, input.GetElement(0));
-    result.m_BzeroFit = initial_position[2];
+    result.m_BzeroFit = fit[2];
+    if( data.bzero_count > 0 )
+      result.m_f = 1 - fit[2] / std::fmax(0.01, data.bzero);
   }
   else
     result.m_f = 1;
 
-  // assembly data vectors for fitting
-  auto bvalueIter = bvalues.begin();
-  unsigned int unused_values = 0;
-  while( bvalueIter != bvalues.end() )
-  {
-    if( *bvalueIter < vnl_math::eps && omit_bzero )
-    {
-      ++unused_values;
-    }
-    ++bvalueIter;
-  }
-
-  // initialize data vectors with the estimated size (after filtering)
-  vnl_vector<double> fit_measurements( input.Size() - unused_values, 0 );
-  vnl_vector<double> fit_bvalues( input.Size() - unused_values, 0 );
-
-  // original data
-  vnl_vector<double> orig_measurements( input.Size(), 0 );
-
-  bvalueIter = bvalues.begin();
-  unsigned int running_index = 0;
-  unsigned int skip_count = 0;
-  unsigned int bzero_count = 0;
-  result.m_Bzero = 0;
-  while( bvalueIter != bvalues.end() )
-  {
-    if( *bvalueIter < vnl_math::eps && omit_bzero )
-    {
-      ++skip_count;
-    }
-    else
-    {
-      fit_measurements[ running_index - skip_count ]  = input.GetElement(running_index);
-      fit_bvalues[ running_index - skip_count ] = *bvalueIter;
-    }
-
-    if( *bvalueIter < vnl_math::eps )
-    {
-      result.m_Bzero += input.GetElement(running_index);
-      ++bzero_count;
-    }
-
-    orig_measurements[ running_index ] = input.GetElement(running_index);
-
-    ++running_index;
-    ++bvalueIter;
-  }
-  result.m_Bzero /= bzero_count;
-
-  result.fit_bvalues = fit_bvalues;
-  result.fit_measurements = fit_measurements;
+  result.fit_bvalues = data.bvalues;
+  result.fit_measurements = data.measurements;
 
   result.bvalues = bvalues;
-  result.measurements = orig_measurements;
-
-  result.m_fittedBZero = omit_bzero;
+  result.measurements = vnl_vector<double>( input.Size() );
+  for( unsigned int i=0; i<input.Size(); ++i )
+    result.measurements[i] = input.GetElement(i);
 
   return result;
 }
@@ -437,9 +393,12 @@ template< class TInputPixelType, class TOutputPixelType>
 void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelType>
 ::SetInitialSolution(const vnl_vector<double>& x0 )
 {
-  assert( x0.size() == (2 + static_cast<int>( this->m_OmitBZero )) );
+  assert( x0.size() == 2 || x0.size() == 3 );
 
-  this->m_InitialPosition = x0;
+  this->m_InitialPosition[0] = x0[0];
+  this->m_InitialPosition[1] = x0[1];
+  if( x0.size() == 3 )
+    this->m_InitialPosition[2] = x0[2];
 }
 
 template< class TInputPixelType, class TOutputPixelType>
@@ -469,24 +428,10 @@ void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPix
   fit_config.use_K_limits = this->m_UseKBounds;
   fit_config.K_limits = this->m_KurtosisBounds;
 
-  vnl_vector<double> initial_position;
-  if( !this->m_OmitBZero )
-  {
-    initial_position.set_size(2);
-    initial_position[0] = this->m_InitialPosition[0];
-    initial_position[1] = this->m_InitialPosition[1];
-
-  }
-  else
-  {
-    initial_position.set_size(3);
-    initial_position = this->m_InitialPosition;
-  }
-
   while( !inputIter.IsAtEnd() )
   {
     // set (reset) each iteration
-    vnl_vector<double> result = initial_position;
+    vnl_vector<double> result = this->m_InitialPosition;
 
     // fit single voxel (if inside mask )
     if( maskIter.Get() > 0 )

@@ -54,6 +54,25 @@ namespace itk
     {}
 
 
+    /** Set the measured S0 that the 2-parameter fit scales the model with; call it after
+        set_fit_logscale. */
+    void set_bzero( double bzero )
+    {
+      if( m_use_logscale )
+      {
+        // would produce NaN values, skip the fit
+        if( bzero < vnl_math::eps )
+        {
+          m_skip_fit = true;
+          throw_failure();
+          return;
+        }
+        m_bzero = log( bzero );
+      }
+      else
+        m_bzero = bzero;
+    }
+
     /** Initialize the function by setting measurements and the corresponding b-values */
     void initialize( vnl_vector< double > const& _meas, vnl_vector< double> const& _bvals )
     {
@@ -139,9 +158,9 @@ namespace itk
       double result = Diff( x[0], x[1], bvalue);
 
       if( m_use_logscale )
-        return meas[0] + result;
+        return m_bzero + result;
       else
-        return meas[0] * result ;
+        return m_bzero * result ;
     }
 
     /** Penalty term on D and K during fitting, make sure the vector that is passed in contains (D, K) in this ordering */
@@ -186,6 +205,9 @@ namespace itk
 
     vnl_vector<double> meas;
     vnl_vector<double> bvalues;
+
+    /** S0, or its logarithm in log scale */
+    double m_bzero = 0;
 
   };
 
@@ -315,9 +337,8 @@ public:
   typedef itk::Image<itk::Vector<double, 3>, 3> InitialFitImageType;
 
   //-- input (Set) methods
-  /** Set the initial solution for fitting, make sure the length and the values correspond to the parameters
-    *   x0 = ( S_0, ADC_0, AKC_0 ) when also the S_0 is estimated
-    *   x0 = ( ADC_0, AKC_0 ) when the S_0 is used in fitting
+  /** Set the initial solution for fitting, x0 = ( ADC_0, AKC_0 ) or ( ADC_0, AKC_0, S_0 ); the start
+    * value of S_0 is used only when S_0 is fitted.
     */
   void SetInitialSolution(const vnl_vector<double>& x0 );
 
