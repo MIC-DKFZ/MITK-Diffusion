@@ -16,8 +16,8 @@ fitting, streamline and global (Gibbs) tractography, fiber processing, and Fiber
 simulation. It has no application of its own: its build configurations choose which diffusion
 plugins the MITK Workbench is built with (all, or a smaller set such as Fiberfox or IVIM) and
 which command line tools are built. Current MITK has no setting for the product name, so the
-application is the "MITK Workbench". The code was last built against MITK of 2024/2025; the current goal is to bring it up to
-date with current MITK (see "Porting state").
+application is the "MITK Workbench". The code follows MITK's `develop` branch; it no longer
+builds against the v2026.06 release. "Porting state" lists what is still open.
 
 ## Two repositories
 
@@ -28,8 +28,9 @@ date with current MITK (see "Porting state").
 
 The workspace root is not a git repository. Besides the build trees it holds `prompts/`
 (handoff prompts for new sessions), `gitlab_issues/` (issue drafts and handoff plans from the
-skills), a one-line `CLAUDE.md` importing this file and `.claude`, a symlink to
-`mitk-diffusion/.claude`: Claude Code
+skills), `mitk-data/` (a clone of https://git.dkfz.de/mic/mitk-data for committing test data;
+the build trees read their own `MITK-Data` checkouts), a one-line `CLAUDE.md` importing this
+file and `.claude`, a symlink to `mitk-diffusion/.claude`: Claude Code
 reads `.claude/settings.json` only from the folder a session starts in, and loads skills from a
 subfolder only once a file there is touched. Edit both under `mitk-diffusion/`. Check
 `git -C mitk-diffusion status --short --branch` before and after working.
@@ -66,8 +67,7 @@ extension: `CMake/` (module path), `CMakeExternals/ExternalProjectList.cmake` (s
 dependencies), `CMake/BuildConfigurations/*.cmake` (offered as `MITK_BUILD_CONFIGURATION`),
 `CMake/PackageDepends/`, `Modules/ModuleList.cmake` and `Plugins/PluginList.cmake` (see the
 `MITK_EXTENSION_DIR` loops in `mitk/CMakeLists.txt`). The superbuild builds the externals, then
-configures and builds `MITK-build` itself (its `MITK-Configure` step); the manual reconfigure
-the README describes is no longer needed.
+configures and builds `MITK-build` itself (its `MITK-Configure` step).
 
 The selected build configuration is re-included on **every** configure and `FORCE`s its cache
 values, so a variable it sets cannot be changed in the cache; change the configuration file.
@@ -97,19 +97,25 @@ Facts the layout does not show:
 
 ## Porting state
 
-In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
-line apps, plugins, user manuals) compile and link without warnings, and all 14 diffusion tests
-pass. The Workbench has not been started. Remove an item once it is fixed.
+In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
+test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
+all 14 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
-- Three test references were regenerated in the local `debug/MITK-Data` checkout only and must
-  be pushed to MITK-Data (`release/` clones its own copy):
+- Three regenerated test references are committed in `mitk-data/` (`c962623`) but not pushed;
+  `debug/MITK-Data` and `release/MITK-Data` hold them as uncommitted copies until upstream has
+  them:
   `DiffusionImaging/Fiberfox/uniform.fib` and `gaussian.fib` (MITK clamps ellipse control points
   to the plane since `git -C mitk show bbc5c77b27`, which moves a point of `Fiducial_2.pf`) and
   `DiffusionImaging/gibbsTractogram.fib` (from 2014; Gibbs tracking changed since, e.g. its random
   generator in 2019).
 - The two `DiffusionRegistration` tests are compiled but deliberately not registered; they were
   commented out before the 2024 test refactoring.
-
+- MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
+  configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,
+  `Fiberfox`, `IVIM`, `atTRACTive`; MITK's own `Minimal` too),
+  `mitk/Modules/QtWidgets/test/CMakeLists.txt:108` configures a test driver that does not exist.
+  With Qt off (`DiffusionCmdApps`), the same happens there and in
+  `mitk/Modules/RESTAPI/test/CMakeLists.txt:5-13` and `mitk/Modules/Agent/test/CMakeLists.txt:4`.
 - MITK's `org.mitk.gui.qt.segmentation` does not compile with Python off: `MakeError` in
   `mitk/Plugins/org.mitk.gui.qt.segmentation/src/internal/QmitkSegmentationRestRoutes.cpp:465`
   is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.
@@ -117,8 +123,6 @@ pass. The Workbench has not been started. Remove an item once it is fixed.
   `Tractography`, `Fiberfox` and `IVIM` switch it on without switching Python on.
 - `FiberfoxParameters` (`Modules/MriSimulation/mitkFiberfoxParameters.h`) deep-copies its signal
   models on copy construction but shares them on assignment, and never deletes them.
-- `mitk-diffusion/README.md` build section is outdated (Qt 6.6.1, GitHub URLs, manual inner
-  reconfigure).
 
 ## Commands
 
