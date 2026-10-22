@@ -7,15 +7,28 @@ conversation, so every fact it relies on must be in it, with a file and line it 
 ```markdown
 # Plan: <issue title>
 
-Handoff plan for a new session in `<repo>/.worktrees/<branch>`. Read `AGENTS.md` first; its
-rules apply throughout. Its paths are relative to `<ws>`, which is not this session's working
-directory. Checked against `<base>` at `<base commit>`.
+Handoff plan, carried out by a session started in the workspace root `<ws>` (started with
+"carry out this plan: <this file>"). All work happens in the worktree `<wt>` =
+`<repo>/.worktrees/<branch>`; see "Working in the worktree". `AGENTS.md` is loaded and its
+rules apply throughout. Checked against `<base>` at `<base commit>`.
 
 ## Issue and branch (already created)
 
 - Issue: #<nr> <title> - <link>
-- Branch: `<branch>` from `<base>` at `<base commit>`, worktree `<repo>/.worktrees/<branch>`
+- Branch: `<branch>` from `<base>` at `<base commit>`, worktree `<wt>`
 - Commit message (from the issue skill): `<message>`
+
+## Working in the worktree
+
+- Read, search and edit only under `<wt>`, always by absolute path. A `mitk-diffusion/...` path
+  in `AGENTS.md`, a skill or this plan means `<wt>/...` for this task. The main checkout
+  `<repo>` is not edited.
+- Git only as `git -C <wt> ...`. At start and end, `git -C <wt> status --short --branch` shows
+  `<branch>`, and `git -C <repo> status --short --branch` is the same as at the start.
+- Skills that default to `mitk-diffusion/` (e.g. `review`) get paths under `<wt>` as scope.
+- Builds and tests use `<tree>`, the build tree bound to `<wt>` (see "Environment").
+- Other sessions may work in other worktrees at the same time; their worktrees and build trees
+  are not touched.
 
 ## Decisions already made by the user
 
@@ -34,10 +47,10 @@ directory. Checked against `<base>` at `<base commit>`.
 ## Environment
 
 - MITK: `<ws>/mitk`, read-only.
-- Build and tests: <where, as the user decided - build tree, configure command, targets; or
-  "no build" and why>.
-- The worktree has no `.env` (git-ignored): no `GITLAB_TOKEN`.
-  Nothing here may create GitLab content.
+- Build and tests: <where, as the user decided - build tree `<tree>`, configure command,
+  targets; or "no build" and why>.
+- GitLab: `.env` is readable from `<ws>`, but nothing here creates GitLab content; issue text
+  goes into a file for the user.
 - <memory facts the work depends on, copied>
 
 ## Work, in order
@@ -79,11 +92,13 @@ Why these sections:
 
 - **Issue and branch** says what already exists, so the session neither creates a second issue
   nor branches again.
+- **Working in the worktree** exists because the session starts in the workspace root, so the
+  user needs no second window; without it, edits and git commands land in the main checkout.
 - **Decisions** stop the session from re-asking or second-guessing what the user settled.
 - **Facts with anchors** replace the investigation. The session checks an anchor instead of
   searching, and a fact marked unverified is not built on blindly.
-- **Environment** carries what lives outside the worktree (MITK, the build tree, the memory,
-  the missing `.env`), which a worktree session cannot discover.
+- **Environment** carries what lives outside the worktree (MITK, the build tree, the memory
+  facts), so the session does not have to rediscover it.
 - **Work in order** is ordered so each step can be tested before the next builds on it.
 - **Open points** keep decisions that belong to the user with the user.
 - **Finish** is the explicit permission to commit, scoped to this branch, which AGENTS.md

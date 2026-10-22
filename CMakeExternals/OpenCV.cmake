@@ -14,14 +14,6 @@ if(MITK_USE_OpenCV)
 
   if(NOT DEFINED OpenCV_DIR)
 
-    set(additional_cmake_args)
-
-    if(CTEST_USE_LAUNCHERS)
-      list(APPEND additional_cmake_args
-        "-DCMAKE_PROJECT_${proj}_INCLUDE:FILEPATH=${CMAKE_ROOT}/Modules/CTestUseLaunchers.cmake"
-      )
-    endif()
-
     mitk_query_custom_ep_vars()
 
     ExternalProject_Add(${proj}
@@ -48,7 +40,6 @@ if(MITK_USE_OpenCV)
         -DWITH_IPP:BOOL=OFF
         -DBUILD_IPP_IW:BOOL=OFF
         -DENABLE_PRECOMPILED_HEADERS:BOOL=OFF
-        ${additional_cmake_args}
         ${${proj}_CUSTOM_CMAKE_ARGS}
       CMAKE_CACHE_ARGS
         ${ep_common_cache_args}

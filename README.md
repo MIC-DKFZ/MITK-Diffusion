@@ -7,30 +7,14 @@ Copyright © German Cancer Research Center (DKFZ), [Division of Medical Image Co
 
 The MITK Diffusion application [[1,2]](#References) offers a selection of image analysis algorithms for the processing of diffusion-weighted MR images. It encompasses the research of the Division of Medical Image Computing at the German Cancer Research Center (DKFZ).
 
-* [Downloads](#Downloads)
-* [Requirements](#Requirements)
 * [Features](#Features)
 * [Related Links](#Related-Links)
 * [Image Gallery](#Image-Gallery)
 * [Building MITK Diffusion from source](#Building-MITK-Diffusion-from-source)
 * [User Manual](http://docs.mitk.org/diffusion/nightly/)
-* [Report a Bug](https://phabricator.mitk.org/maniphest/task/edit/form/29/)
+* [Report a Bug](https://github.com/MIC-DKFZ/MITK-Diffusion/issues)
 * [References](#References)
 * [Contact](#Contact)
-
-## Downloads
-
-Please have a look at the [requirements](#Requirements) for running MITK Diffusion with all its features successfully!
-
-The latest builds come as executable setup wizards that install MITK Diffusion on your system or alternatively as simple .tar.gz or .zip archive where you can execute MITK Diffusion and the command line apps "manually". You can find the newest installers [here](http://www.mitk.org/download/diffusion/nightly/).
-
-If you encounter any bugs, please report them here on github or use the [MITK-users mailing list](http://mitk.org/wiki/MITK_Mailinglist). We are grateful for any feedback!
-
-
-### Requirements
-
-**For Windows users**:
-MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be installed on the system. The MITK Diffusion installer automatically installs this redistributable for you if not already present on the system, but it needs administrative privileges to do so. So to install the redistributable, **run the MITK Diffusion installer as administrator**.
 
 ## Features
 
@@ -130,39 +114,36 @@ MITK Diffusion requires the Microsoft Visual C++ 2017 Redistributable to be inst
 
 ## Image Gallery
 
-![](http://mitk.org/images/8/8f/MitkDiffusion.png) Screenshot of the MITK Diffusion Welcome Screen
+![](Documentation/Gallery/scalar-maps.png) Scalar map visualization
 <br/><br/><br/>
 
-![](http://mitk.org/images/0/09/ScalarMaps.png) Scalar map visualization
+![](Documentation/Gallery/tensors.png) Tensor Visualization
 <br/><br/><br/>
 
-![](http://mitk.org/images/3/3b/Data_Tensors.png) Tensor Visualization
+![](Documentation/Gallery/odfs.png) ODF visualization
 <br/><br/><br/>
 
-![](http://mitk.org/images/5/5c/Data_ODF.png) ODF visualization
+![](Documentation/Gallery/peaks.png) Peak visualization (uniform white coloring)
 <br/><br/><br/>
 
-![](http://mitk.org/images/7/73/Data_Peaks.png) Peak visualization (uniform white coloring)
+![](Documentation/Gallery/streamline-tractography.png) Interactive tractography in MITK Diffusion. The tractogram updates automatically on parameter change and movement of the spherical seed region.
 <br/><br/><br/>
 
-![](http://mitk.org/images/6/68/StreamlineTractography.png) Interactive tractography in MITK Diffusion. The tractogram updates automatically on parameter change and movement of the spherical seed region.
+![](Documentation/Gallery/tract-dissection.png) Tract dissection using manually drawn ROIs.
 <br/><br/><br/>
 
-![](http://mitk.org/images/3/3a/Extraction_1.png) Tract dissection using manually drawn ROIs.
+![](Documentation/Gallery/fiber-fit.png) Automatic streamline weighting (similar to SIFT2 or LiFE)
 <br/><br/><br/>
 
-![](http://mitk.org/images/f/f5/FiberFit.png) Automatic streamline weighting (similar to SIFT2 or LiFE)
+![](Documentation/Gallery/fiberfox-pipeline.png) Illustration of the dMRI phantom simulation process using Fiberfox.
 <br/><br/><br/>
 
-![](http://mitk.org/images/3/33/Fiberfox.png) Illustration of the dMRI phantom simulation process using Fiberfox.
-<br/><br/><br/>
-
-<img src="http://mitk.org/images/e/ec/Eddy.gif" width="250" height="200" /><img src="http://mitk.org/images/a/ad/Spike_and_motion.gif" width="250" height="200" /><img src="http://mitk.org/images/8/8e/Drift.gif" width="250" height="200" />
-<img src="http://mitk.org/images/0/08/645551_axial_motion_ghost_eddy.gif" width="250" height="200" /><img src="http://mitk.org/images/5/55/Ringing.gif" width="250" height="200" /><img src="http://mitk.org/images/3/37/683256_Distortions_Sagittal.gif" width="250" height="200" />\
+<img src="Documentation/Gallery/artifact-eddy-currents.gif" width="250" height="200" /><img src="Documentation/Gallery/artifact-spike-and-motion.gif" width="250" height="200" /><img src="Documentation/Gallery/artifact-drift.gif" width="250" height="200" />
+<img src="Documentation/Gallery/artifact-motion-ghost-eddy.gif" width="250" height="200" /><img src="Documentation/Gallery/artifact-ringing.gif" width="250" height="200" /><img src="Documentation/Gallery/artifact-distortions.gif" width="250" height="200" />\
 Illustration of simulated dMRI images with various artifacts (a bit excessive for illustration purposes): eddy current distortions (1), motion and spike (2), intensity drift (3), motion, eddy and noise (4), ringing (5), B0 inhomogeneity distortions (6), from left to right.
 <br/><br/><br/>
 
-![](http://mitk.org/images/0/08/RandomFibers_Example.png)
+![](Documentation/Gallery/random-fibers.png)
 Automatically generated random fiber configuration for Fiberfox simulations.
 <br/><br/><br/>
 
@@ -185,15 +166,13 @@ The superbuild first builds the third-party libraries, then configures and build
 `MITK_BUILD_CONFIGURATION` chooses what is built:
 
 * `DiffusionRelease`: all modules, plugins and command line apps, with tests and Python.
-* `DiffusionDebug`: the same as a debug build, without Python.
-* `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`: a Workbench with only those plugins.
+* `DiffusionDebug`: the same as a debug build, without Python and therefore without MITK's segmentation plugin, which needs Python to compile.
+* `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`: a Workbench with only the plugins for that task; all but `atTRACTive` also build the command line apps for it.
 * `DiffusionCmdApps`: only the command line apps, without Qt.
 
 The smaller configurations currently stop during the MITK configure step because of a bug in MITK that occurs when tests or Qt are switched off; `DiffusionRelease` and `DiffusionDebug` are not affected.
 
 ## References
-
-All publications of the Division of Medical Image Computing can be found [https://www.dkfz.de/en/mic/publications/ here].
 
 [1] Fritzsche, Klaus H., Peter F. Neher, Ignaz Reicht, Thomas van Bruggen, Caspar Goch, Marco Reisert, Marco Nolden, et al. “MITK Diffusion Imaging.” Methods of Information in Medicine 51, no. 5 (2012): 441.
 
@@ -217,4 +196,4 @@ All publications of the Division of Medical Image Computing can be found [https:
 
 
 ## Contact
-If you have questions about the application or if you would like to give us feedback, don't hesitate to contact us using [our mailing list](http://mitk.org/wiki/MITK_Mailinglist) or, for questions that are of no interest for the community, [directly](https://www.dkfz.de/en/mic/team/people/Peter_Neher.html).
+If you have questions about the application, found a bug or would like to give us feedback, don't hesitate to open a [GitHub issue](https://github.com/MIC-DKFZ/MITK-Diffusion/issues) or, for questions that are of no interest for the community, to contact us [directly](https://www.dkfz.de/en/medical-image-computing#c6771).
