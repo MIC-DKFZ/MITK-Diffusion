@@ -60,6 +60,10 @@ NonLocalMeansDenoisingFilter< TPixelType >
   MITK_INFO << "Use Joint Information: " << std::boolalpha << m_UseJointInformation;
 
 
+  // The weights are exp(-distance / variance).
+  if (!(m_Variance > 0))
+    itkExceptionMacro("The noise variance must be positive.");
+
   typename InputImageType::Pointer inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
   if (m_Mask.IsNull())
   {
@@ -203,8 +207,9 @@ NonLocalMeansDenoisingFilter< TPixelType >
                         // Compare neighborhoods ni & nj
                         if (inputImagePointer->GetLargestPossibleRegion().IsInside(indexI) && inputImagePointer->GetLargestPossibleRegion().IsInside(indexJ))
                         {
-                          int diff = inputImagePointer->GetPixel(indexI)[i] - inputImagePointer->GetPixel(indexJ)[i];
-                          sumk += (double)(diff*diff);
+                          // In double: the square of an int difference overflows for |diff| > 46340.
+                          const double diff = static_cast<double>(inputImagePointer->GetPixel(indexI)[i]) - static_cast<double>(inputImagePointer->GetPixel(indexJ)[i]);
+                          sumk += diff*diff;
                           ++size;
                         }
                       }
@@ -298,8 +303,16 @@ NonLocalMeansDenoisingFilter< TPixelType >
                       // Compare neighborhoods ni & nj
                       if (inputImagePointer->GetLargestPossibleRegion().IsInside(indexI) && inputImagePointer->GetLargestPossibleRegion().IsInside(indexJ))
                       {
-                        typename InputImageType::PixelType diff = inputImagePointer->GetPixel(indexI) - inputImagePointer->GetPixel(indexJ);
-                        sumk += (double)(diff.GetSquaredNorm());
+                        // Per element in double: subtracting the pixel vectors would wrap in TPixelType.
+                        const typename InputImageType::PixelType valuesI = inputImagePointer->GetPixel(indexI);
+                        const typename InputImageType::PixelType valuesJ = inputImagePointer->GetPixel(indexJ);
+                        double squaredNorm = 0;
+                        for (unsigned int c = 0; c < valuesI.GetSize(); ++c)
+                        {
+                          const double diff = static_cast<double>(valuesI[c]) - static_cast<double>(valuesJ[c]);
+                          squaredNorm += diff*diff;
+                        }
+                        sumk += squaredNorm;
                         ++size;
                       }
                     }
