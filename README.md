@@ -169,31 +169,27 @@ Automatically generated random fiber configuration for Fiberfox simulations.
 
 ## Building MITK Diffusion from source
 
-Please not that we moved away from a separate MITK Diffusion application and are instead building configurations of the MITK Workbench. In a (near)-future version of MITK, customizations of the Workbench will be possible to change the display and executable name etc.
-A workaround is to use the MITK branch https://github.com/MITK/MITK/tree/feature/T30337-WorkbenchCustomizations2, which already enables some of those customizations but the final mechanism fot that will be different. 
+MITK Diffusion has no application of its own. It is an extension of [MITK](https://github.com/MITK/MITK): the MITK superbuild picks it up through `MITK_EXTENSION_DIRS` and builds the MITK Workbench with the diffusion plugins, plus the command line apps.
 
-* Install [Qt](https://www.qt.io/) on your system (currently 6.6.1).
-* Clone MITK from [github](https://github.com/MIC-DKFZ/MITK-Diffusion.git) using [Git version control](https://git-scm.com/).
-* Clone MITK Diffusion from [github](https://github.com/MITK/MITK.git).
-* Configure the MITK Superbuild using [CMake](https://cmake.org/).
-    * Choose the MITK source code directory and an empty binary directory.
-    * Click "Configure".
-    * Set the option MITK_EXTENSION_DIRS to "/path/to/my/mitk-diffusion-repository".
-    * Click "Configure".
-    * Set the option MITK_BUILD_CONFIGURATION to "DiffusionRelease" or any other desired configuration. There are various configurations to build e.g. only IVIM modules or only tractography. The DiffusionRelease/DiffusionDebug configurations contain all modules.
-    * Click "Generate".
+MITK Diffusion follows the MITK `develop` branch; it does not build against the MITK release v2026.06. Install the [prerequisites of MITK](https://docs.mitk.org/nightly/BuildInstructionsPage.html#BuildInstructions_Prerequisites), among them Qt 6.10 or newer and CMake 3.28 or newer (3.31 on Windows).
 
-* Start the Superbuild:
-    * Linux: Open a console window, navigate to the build folder and type "make -j8" (optionally supply the number threads to be used for a parallel build with -j).
-    * Windows (requires visual studio): Open the MITK Superbuild solution file and build all projects.
-    * The Superbuild may take some time.
-    * After the Superbuild has finished, change the cmake binary directory from "/path/to/my/build" to "/path/to/my/build/MITK-build" and configure+generate again.
-    * Build again in "/path/to/my/build/MITK-build" using make (linux/mac) or the VS solution file.
-    * The build may again take some time and should yield the binaries in "/path/to/my/build/MITK-build/bin"
+```
+git clone -b develop https://github.com/MITK/MITK.git
+git clone https://github.com/MIC-DKFZ/MITK-Diffusion.git
+cmake -S MITK -B build -D MITK_EXTENSION_DIRS=/absolute/path/to/MITK-Diffusion -D MITK_BUILD_CONFIGURATION=DiffusionRelease -D Qt6_DIR=/path/to/Qt/6.x/gcc_64/lib/cmake/Qt6
+cmake --build build -j8
+```
 
-More detailed build instructions can be found in the [documentation](http://docs.mitk.org/nightly/BuildInstructionsPage.html).
+The superbuild first builds the third-party libraries, then configures and builds MITK and MITK Diffusion in `build/MITK-build`; this takes a while. The Workbench (`MitkWorkbench`) and the command line apps end up in `build/MITK-build/bin`. After changing MITK Diffusion code, building `build/MITK-build` is enough: `cmake --build build/MITK-build -j8`. On Windows with Visual Studio, add `--config Release` to the build commands. The MITK [build instructions](https://docs.mitk.org/nightly/BuildInstructionsPage.html) have the details for each platform.
 
-Continuous integration: https://cdash.mitk.org/index.php?project=MITK-Diffusion
+`MITK_BUILD_CONFIGURATION` chooses what is built:
+
+* `DiffusionRelease`: all modules, plugins and command line apps, with tests and Python.
+* `DiffusionDebug`: the same as a debug build, without Python.
+* `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`: a Workbench with only those plugins.
+* `DiffusionCmdApps`: only the command line apps, without Qt.
+
+The smaller configurations currently stop during the MITK configure step because of a bug in MITK that occurs when tests or Qt are switched off; `DiffusionRelease` and `DiffusionDebug` are not affected.
 
 ## References
 
