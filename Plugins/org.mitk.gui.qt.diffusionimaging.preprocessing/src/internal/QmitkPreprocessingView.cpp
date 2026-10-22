@@ -336,6 +336,18 @@ void QmitkPreprocessingView::DoCropImage()
   mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
   if ( image == nullptr ) { return; }
 
+  // itk::CropImageFilter only asserts that something remains (abort in Debug builds).
+  const unsigned int lowerCrop[3] = { static_cast<unsigned int>(m_Controls->m_XstartBox->value()), static_cast<unsigned int>(m_Controls->m_YstartBox->value()), static_cast<unsigned int>(m_Controls->m_ZstartBox->value()) };
+  const unsigned int upperCrop[3] = { static_cast<unsigned int>(m_Controls->m_XendBox->value()), static_cast<unsigned int>(m_Controls->m_YendBox->value()), static_cast<unsigned int>(m_Controls->m_ZendBox->value()) };
+  for (unsigned int i=0; i<3; ++i)
+  {
+    if (image->GetDimension() < 3 || lowerCrop[i] + upperCrop[i] >= image->GetDimension(i))
+    {
+      QMessageBox::warning(nullptr, "Warning", QString("Cropping would leave no voxel along axis %1, or the image is not 3D.").arg(i));
+      return;
+    }
+  }
+
   bool isDiffusionImage( PropHelper::IsDiffusionWeightedImage(image) );
   if ( isDiffusionImage )
   {
@@ -389,13 +401,13 @@ void QmitkPreprocessingView::DoCropImage()
                                                             true );
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
   }
-  else if( image->GetPixelType().GetNumberOfComponents() )
+  else if( image->GetPixelType().GetNumberOfComponents() == 1 && image->GetDimension() == 3 )
   {
     AccessFixedDimensionByItk(image, TemplatedCropImage,3);
   }
   else
   {
-    QMessageBox::warning(nullptr,"Warning", QString("Operation not supported in multi-component images") );
+    QMessageBox::warning(nullptr,"Warning", QString("Operation supported only for 3D images with one component and for DWIs") );
   }
 }
 
@@ -598,13 +610,13 @@ void QmitkPreprocessingView::DoResampleImage()
     imageNode->SetVisibility(true);
     GetDataStorage()->Add(imageNode, node);
   }
-  else if( image->GetPixelType().GetNumberOfComponents() )
+  else if( image->GetPixelType().GetNumberOfComponents() == 1 && image->GetDimension() == 3 )
   {
     AccessFixedDimensionByItk(image, TemplatedResampleImage,3);
   }
   else
   {
-    QMessageBox::warning(nullptr,"Warning", QString("Operation not supported in multi-component images") );
+    QMessageBox::warning(nullptr,"Warning", QString("Operation supported only for 3D images with one component and for DWIs") );
   }
 }
 
