@@ -25,7 +25,9 @@ found in the LICENSE file.
 #include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkOdfMaximaExtractionFilter.h>
+#include <itkDiffusionTensor3DReconstructionImageFilter.h>
 #include <itkShToRgbImageFilter.h>
+#include <itkTensorImageToDiffusionImageFilter.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 #include <itkTensorToL2NormImageFilter.h>
 
@@ -47,6 +49,9 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(PrincipalDirection_SecondInput_SameAsFreshFilter);
   MITK_TEST(MaximaExtraction_MaskOfOtherSize_Throws);
   MITK_TEST(ShToRgb_MatchesOdfOfBothConventions);
+  MITK_TEST(TensorToDwi_RoundTrip);
+  MITK_TEST(TensorToDwi_SecondInput_SameAsFreshFilter);
+  MITK_TEST(TensorToDwi_Mask_AppliesToBaseline);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -331,6 +336,99 @@ public:
           ++coloured;
       }
       CPPUNIT_ASSERT(coloured > 0);
+    }
+  }
+
+  using DwiToTensorFilterType = itk::TensorImageToDiffusionImageFilter<float, short>;
+
+  static DwiToTensorFilterType::GradientListType::Pointer TensorToDwiGradients()
+  {
+    auto gradients = DwiToTensorFilterType::GradientListType::New();
+    const double g[13][3] = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.7071068, 0.7071068, 0}, {0.7071068, 0, 0.7071068},
+                             {0, 0.7071068, 0.7071068}, {0.7071068, -0.7071068, 0}, {0.7071068, 0, -0.7071068}, {0, 0.7071068, -0.7071068},
+                             {0.5773503, 0.5773503, 0.5773503}, {-0.5773503, 0.5773503, 0.5773503}, {0.5773503, -0.5773503, 0.5773503}};
+    for (const auto &direction : g)
+      gradients->push_back(DwiToTensorFilterType::GradientType(direction[0], direction[1], direction[2]));
+    return gradients;
+  }
+
+  static itk::VectorImage<short, 3>::Pointer TensorToDwi(TensorImageType *tensors, itk::Image<short, 3> *mask = nullptr)
+  {
+    auto filter = DwiToTensorFilterType::New();
+    filter->SetInput(tensors);
+    filter->SetGradientList(TensorToDwiGradients().GetPointer());
+    filter->SetBValue(1000);
+    if (mask != nullptr)
+      filter->SetMaskImage(mask);
+    filter->Update();
+    return filter->GetOutput();
+  }
+
+  // Simulated signals fitted with ITK's tensor reconstruction give the input tensors back.
+  void TensorToDwi_RoundTrip()
+  {
+    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto dwi = TensorToDwi(tensors);
+    CPPUNIT_ASSERT_EQUAL(13u, dwi->GetNumberOfComponentsPerPixel());
+
+    auto reconstruction = itk::DiffusionTensor3DReconstructionImageFilter<short, short, float>::New();
+    reconstruction->SetGradientImage(TensorToDwiGradients().GetPointer(), dwi);
+    reconstruction->SetBValue(1000);
+    reconstruction->Update();
+
+    unsigned int compared = 0;
+    itk::ImageRegionConstIterator<TensorImageType> itIn(tensors, tensors->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<TensorImageType> itOut(reconstruction->GetOutput(), tensors->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<itk::VectorImage<short, 3>> itDwi(dwi, dwi->GetLargestPossibleRegion());
+    for (; !itIn.IsAtEnd(); ++itIn, ++itOut, ++itDwi)
+    {
+      // Weak baselines lose precision in the short signal.
+      if (itDwi.Get()[0] < 2000)
+        continue;
+      for (unsigned int i = 0; i < 6; ++i)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(itIn.Get()[i], itOut.Get()[i], 1e-5);
+      ++compared;
+    }
+    CPPUNIT_ASSERT(compared > 10);
+  }
+
+  // The baseline generated for the first input was kept and used for the next one.
+  void TensorToDwi_SecondInput_SameAsFreshFilter()
+  {
+    auto smallTensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("DiffusionImaging/FWE/ReferenceTensorImage.dti");
+
+    auto reused = DwiToTensorFilterType::New();
+    reused->SetGradientList(TensorToDwiGradients().GetPointer());
+    reused->SetBValue(1000);
+    reused->SetInput(smallTensors);
+    reused->Update();
+    reused->SetInput(tensors);
+    reused->UpdateLargestPossibleRegion();
+
+    auto fresh = TensorToDwi(tensors);
+    CPPUNIT_ASSERT(reused->GetOutput()->GetLargestPossibleRegion() == fresh->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<itk::VectorImage<short, 3>> itReused(reused->GetOutput(), fresh->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<itk::VectorImage<short, 3>> itFresh(fresh, fresh->GetLargestPossibleRegion());
+    for (; !itFresh.IsAtEnd(); ++itFresh, ++itReused)
+      CPPUNIT_ASSERT(itFresh.Get() == itReused.Get());
+  }
+
+  // The mask zeroed only the diffusion-weighted volumes.
+  void TensorToDwi_Mask_AppliesToBaseline()
+  {
+    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto mask = itk::Image<short, 3>::New();
+    mask->SetRegions(tensors->GetLargestPossibleRegion());
+    mask->Allocate();
+    mask->FillBuffer(0);
+
+    auto dwi = TensorToDwi(tensors, mask);
+    itk::ImageRegionConstIterator<itk::VectorImage<short, 3>> it(dwi, dwi->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+    {
+      for (unsigned int i = 0; i < dwi->GetNumberOfComponentsPerPixel(); ++i)
+        CPPUNIT_ASSERT_EQUAL(short(0), it.Get()[i]);
     }
   }
 

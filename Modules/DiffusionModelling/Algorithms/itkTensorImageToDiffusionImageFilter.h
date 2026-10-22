@@ -135,13 +135,13 @@ namespace itk
       Superclass::PrintSelf (os, indent);
     }
 
+    void GenerateOutputInformation() override;
+
     virtual void BeforeThreadedGenerateData( void ) override;
 
     virtual void DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread) override;
 
-    //void GenerateData();
-
-    virtual void UpdateOutputInformation() override;
+    void AfterThreadedGenerateData() override;
 
 
   private:
@@ -152,6 +152,7 @@ namespace itk
     GradientListType::ConstPointer       m_GradientList;
     double                               m_BValue;
     typename BaselineImageType::Pointer  m_BaselineImage;
+    typename BaselineImageType::Pointer  m_UsedBaselineImage; ///< external or generated baseline of the current update
 
     OutputScalarType                     m_Min;
     OutputScalarType                     m_Max;
