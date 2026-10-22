@@ -12,6 +12,7 @@ set(H_FILES
   itkRemoveDwiChannelFilter.h
   itkNonLocalMeansDenoisingFilter.h
   itkVectorImageToImageFilter.h
+  mitkDiffusionImageDenoising.h
   mitkDiffusionImageEditing.h
 )
 
@@ -22,6 +23,7 @@ set(CPP_FILES
   itkExtractDwiChannelFilter.txx
 
   itkDwiGradientLengthCorrectionFilter.cpp
+  mitkDiffusionImageDenoising.cpp
   mitkDiffusionImageEditing.cpp
 )
 

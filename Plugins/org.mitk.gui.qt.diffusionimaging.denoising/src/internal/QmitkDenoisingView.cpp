@@ -29,17 +29,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateDataType.h>
 #include <mitkNodePredicateProperty.h>
 #include <mitkNodePredicateAnd.h>
-#include <itkTotalVariationDenoisingImageFilter.h>
-#include <itkNonLocalMeansDenoisingFilter.h>
-#include <itkDiscreteGaussianImageFilter.h>
-#include <itkPatchBasedDenoisingImageFilter.h>
 #include <itkMaskImageFilter.h>
-#include <itkVectorImageToImageFilter.h>
-#include <itkComposeImageFilter.h>
-#include <itkGaussianRandomSpatialNeighborSubsampler.h>
 #include <itkSpatialNeighborSubsampler.h>
 #include <QMessageBox>
 #include <mitkNodePredicateIsDWI.h>
+#include <mitkDiffusionImageDenoising.h>
 
 const std::string QmitkDenoisingView::VIEW_ID = "org.mitk.views.denoisingview";
 
@@ -89,13 +83,9 @@ void QmitkDenoisingView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*par
 
 void QmitkDenoisingView::StartDenoising()
 {
-  typedef itk::DiscreteGaussianImageFilter < DwiVolumeType, DwiVolumeType >             GaussianFilterType;
-  typedef itk::PatchBasedDenoisingImageFilter < DwiVolumeType, DwiVolumeType >          NlmFilterType;
-  typedef itk::VectorImageToImageFilter < DiffusionPixelType >                          ExtractFilterType;
-  typedef itk::ComposeImageFilter < itk::Image<DiffusionPixelType, 3> >                 ComposeFilterType;
-
-
   m_ImageNode = m_Controls->m_InputImageBox->GetSelectedNode();
+  if (m_ImageNode.IsNull())
+    return;
   mitk::Image::Pointer input_image = dynamic_cast<mitk::Image*>(m_ImageNode->GetData());
 
   if (!mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(input_image))
@@ -104,98 +94,47 @@ void QmitkDenoisingView::StartDenoising()
     return;
   }
 
-  DwiImageType::Pointer itkVectorImagePointer = mitk::DiffusionPropertyHelper::GetItkVectorImage(input_image);
+  mitk::DiffusionImageDenoising::Parameters parameters;
+  parameters.tvLambda = m_Controls->m_TvLambdaBox->value();
+  parameters.tvIterations = m_Controls->m_TvIterationsBox->value();
+  parameters.gaussVariance = m_Controls->m_GaussVarianceBox->value();
+  parameters.nlmSearchRadius = m_Controls->m_NlmSearchRadiusBox->value();
+  parameters.nlmNumberOfPatches = m_Controls->m_NlmNumPatchesBox->value();
+  parameters.nlmPatchRadius = m_Controls->m_NlmPatchSizeBox->value();
+  parameters.nlmIterations = m_Controls->m_NlmIterationsBox->value();
 
-  mitk::Image::Pointer denoised_image = nullptr;
-  mitk::DataNode::Pointer denoised_image_node = mitk::DataNode::New();
-
+  QString name;
   switch (m_Controls->m_SelectFilterComboBox->currentIndex())
   {
   case 0:
-  {
-    ComposeFilterType::Pointer composer = ComposeFilterType::New();
-    for (unsigned int i=0; i<itkVectorImagePointer->GetVectorLength(); ++i)
-    {
-      ExtractFilterType::Pointer extractor = ExtractFilterType::New();
-      extractor->SetInput( itkVectorImagePointer );
-      extractor->SetIndex( i );
-      extractor->Update();
-      DwiVolumeType::Pointer gradient_volume = extractor->GetOutput();
-      itk::TotalVariationDenoisingImageFilter< DwiVolumeType, DwiVolumeType >::Pointer filter = itk::TotalVariationDenoisingImageFilter< DwiVolumeType, DwiVolumeType >::New();
-      filter->SetInput(gradient_volume);
-      filter->SetLambda(m_Controls->m_TvLambdaBox->value());
-      filter->SetNumberIterations(m_Controls->m_TvIterationsBox->value());
-      filter->Update();
-      composer->SetInput(i, filter->GetOutput());
-    }
-    composer->Update();
-    denoised_image = mitk::GrabItkImageMemory(composer->GetOutput());
-    denoised_image_node->SetName( "TotalVariation" );
+    parameters.method = mitk::DiffusionImageDenoising::Method::TotalVariation;
+    name = "TotalVariation";
     break;
-  }
   case 1:
-  {
-    ExtractFilterType::Pointer extractor = ExtractFilterType::New();
-    extractor->SetInput( itkVectorImagePointer );
-    ComposeFilterType::Pointer composer = ComposeFilterType::New();
-    for (unsigned int i = 0; i < itkVectorImagePointer->GetVectorLength(); ++i)
-    {
-      extractor->SetIndex(i);
-      extractor->Update();
-      GaussianFilterType::Pointer filter = GaussianFilterType::New();
-      filter->SetVariance(m_Controls->m_GaussVarianceBox->value());
-      filter->SetInput(extractor->GetOutput());
-      filter->Update();
-      composer->SetInput(i, filter->GetOutput());
-    }
-    composer->Update();
-    denoised_image = mitk::GrabItkImageMemory(composer->GetOutput());
-    denoised_image_node->SetName( "Gauss" );
+    parameters.method = mitk::DiffusionImageDenoising::Method::Gaussian;
+    name = "Gauss";
     break;
-  }
   case 2:
-  {
-    typedef itk::Statistics::GaussianRandomSpatialNeighborSubsampler< NlmFilterType::PatchSampleType, DwiVolumeType::RegionType > SamplerType;
-    // sampling the image to find similar patches
-    SamplerType::Pointer sampler = SamplerType::New();
-    sampler->SetRadius( m_Controls->m_NlmSearchRadiusBox->value() );
-    sampler->SetVariance( m_Controls->m_NlmSearchRadiusBox->value()*m_Controls->m_NlmSearchRadiusBox->value() );
-    sampler->SetNumberOfResultsRequested( m_Controls->m_NlmNumPatchesBox->value() );
-
-    MITK_INFO << "Starting NLM denoising";
-    ExtractFilterType::Pointer extractor = ExtractFilterType::New();
-    extractor->SetInput( itkVectorImagePointer );
-    ComposeFilterType::Pointer composer = ComposeFilterType::New();
-    for (unsigned int i = 0; i < itkVectorImagePointer->GetVectorLength(); ++i)
-    {
-      extractor->SetIndex(i);
-      extractor->Update();
-      NlmFilterType::Pointer filter = NlmFilterType::New();
-      filter->SetInput(extractor->GetOutput());
-      filter->SetPatchRadius(m_Controls->m_NlmPatchSizeBox->value());
-      filter->SetNoiseModel(NlmFilterType::NoiseModelEnum::RICIAN);
-      filter->UseSmoothDiscPatchWeightsOn();
-      filter->UseFastTensorComputationsOn();
-
-      filter->SetNumberOfIterations(m_Controls->m_NlmIterationsBox->value());
-      filter->SetSmoothingWeight( 1 );
-      filter->SetKernelBandwidthEstimation(true);
-
-      filter->SetSampler( sampler );
-      filter->Update();
-      composer->SetInput(i, filter->GetOutput());
-      MITK_INFO << "Gradient " << i << " finished";
-    }
-    composer->Update();
-    denoised_image = mitk::GrabItkImageMemory(composer->GetOutput());
-    denoised_image_node->SetName( "NLM" );
+    parameters.method = mitk::DiffusionImageDenoising::Method::NonLocalMeans;
+    name = "NLM";
     break;
-  }
+  default:
+    return;
   }
 
-  mitk::DiffusionPropertyHelper::CopyProperties(input_image, denoised_image, true);
-  mitk::DiffusionPropertyHelper::InitializeImage( denoised_image );
+  mitk::Image::Pointer denoised_image;
+  try
+  {
+    denoised_image = mitk::DiffusionImageDenoising::Denoise(input_image, parameters);
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Image not processed", QString("Denoising failed: ") + e.what());
+    return;
+  }
 
+  mitk::DataNode::Pointer denoised_image_node = mitk::DataNode::New();
+  denoised_image_node->SetName( name.toStdString() );
   denoised_image_node->SetData( denoised_image );
   GetDataStorage()->Add(denoised_image_node, m_ImageNode);
 }

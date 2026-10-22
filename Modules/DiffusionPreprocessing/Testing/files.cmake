@@ -7,4 +7,5 @@ set(MODULE_CUSTOM_TESTS
   mitkDiffusionGradientLengthCorrectionFilterTest.cpp
   mitkDiffusionB0ExtractionFilterTest.cpp
   mitkDiffusionImageEditingTest.cpp
+  mitkDiffusionImageDenoisingTest.cpp
 )
