@@ -62,6 +62,26 @@ namespace mitk::kurtosis
   /** Throws mitk::Exception when the K bounds admit no K. */
   MITKIVIM_EXPORT void VerifyConfiguration(const FitConfiguration& configuration);
 
+  /** Fits voxel after voxel with the b-values of one DWI in buffers allocated once, so that the
+      parameter maps allocate no memory per voxel in this module (Levenberg-Marquardt still does).
+      Not thread-safe: one fitter per thread. */
+  class MITKIVIM_EXPORT VoxelFitter
+  {
+  public:
+    /** Throws mitk::Exception as VerifyConfiguration. */
+    VoxelFitter(const vnl_vector<double>& bValues, const FitConfiguration& configuration);
+
+    /** The fit FitVoxel gives for the signal. */
+    VoxelFit Fit(const vnl_vector<double>& signal);
+
+  private:
+    vnl_vector<double> m_BValues;
+    FitConfiguration m_Configuration;
+    /** The measurements of the fit, in its scale, and their b-values in their first entries. */
+    vnl_vector<double> m_Measurements;
+    vnl_vector<double> m_FitBValues;
+  };
+
   /** Fits the signal of one voxel, all volumes in the order of bValues. A voxel without signal,
       with fewer usable measurements than parameters or whose fit fails gets D = K = 0 (and fitted
       S0 = 0). Stateless and thread-safe; throws mitk::Exception as VerifyConfiguration. */

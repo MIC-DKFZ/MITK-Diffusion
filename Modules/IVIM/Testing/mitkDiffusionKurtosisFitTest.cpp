@@ -45,6 +45,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(Snapshot_NoisyVoxel_MinimizesSquaredResiduals);
   MITK_TEST(MapLog_ZeroMeasurement_LeftOut);
   MITK_TEST(Map_NoSignal_Zero);
+  MITK_TEST(VoxelFitter_ReusedForVoxels_SameAsFitVoxel);
   MITK_TEST(Map_Mask_FitsOnlyInside);
   MITK_TEST(Update_MaskOfOtherSize_Throws);
   MITK_TEST(Update_MaskWithOtherOrigin_Throws);
@@ -434,6 +435,42 @@ public:
         auto maps = GetMaps(filter);
         CPPUNIT_ASSERT_EQUAL(0.0, maps.d[0]);
         CPPUNIT_ASSERT_EQUAL(0.0, maps.k[0]);
+      }
+    }
+  }
+
+  void VoxelFitter_ReusedForVoxels_SameAsFitVoxel()
+  {
+    // The fitter keeps its buffers from voxel to voxel; in log scale, voxels with zero measurements
+    // have fewer of them than the voxels before.
+    auto full = KurtosisSignal(m_BValues, 10000, m_Truth[0].d, m_Truth[0].k);
+    auto fewer = KurtosisSignal(m_BValues, 8000, m_Truth[1].d, m_Truth[1].k);
+    fewer[3] = 0;
+    fewer[8] = 0;
+    fewer[13] = 0;
+    const std::vector<double> noSignal(m_BValues.size(), 0);
+    const std::vector<std::vector<double>> sequence = {full, fewer, full, noSignal, fewer, full};
+
+    const vnl_vector<double> bValues(m_BValues.data(), m_BValues.size());
+    for (auto scale : {FitScale::Straight, FitScale::Logarithmic})
+    {
+      for (bool omitBZero : {false, true})
+      {
+        mitk::kurtosis::FitConfiguration configuration;
+        configuration.scale = scale;
+        configuration.omitBZero = omitBZero;
+        mitk::kurtosis::VoxelFitter fitter(bValues, configuration);
+        for (const auto& voxel : sequence)
+        {
+          const vnl_vector<double> signal(voxel.data(), voxel.size());
+          const auto expected = mitk::kurtosis::FitVoxel(signal, bValues, configuration);
+          const auto actual = fitter.Fit(signal);
+          CPPUNIT_ASSERT_EQUAL(expected.d, actual.d);
+          CPPUNIT_ASSERT_EQUAL(expected.k, actual.k);
+          CPPUNIT_ASSERT_EQUAL(expected.meanBZero, actual.meanBZero);
+          CPPUNIT_ASSERT_EQUAL(expected.bZeroFitted, actual.bZeroFitted);
+          CPPUNIT_ASSERT_EQUAL(expected.fittedBZero, actual.fittedBZero);
+        }
       }
     }
   }

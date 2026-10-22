@@ -27,7 +27,7 @@ namespace itk
   /**
     @class DiffusionKurtosisReconstructionImageFilter
     @brief Maps of the kurtosis model parameters D (output 0) and K (output 1), fitted voxel by voxel
-    with mitk::kurtosis::FitVoxel.
+    with a mitk::kurtosis::VoxelFitter per thread.
     */
   template <class TInputPixelType, class TOutputPixelType>
   class DiffusionKurtosisReconstructionImageFilter

@@ -114,6 +114,7 @@ namespace itk
     if (m_ImageMask.IsNotNull())
       maskIt = ImageRegionConstIterator<MaskImageType>(m_ImageMask, outputRegionForThread);
 
+    mitk::kurtosis::VoxelFitter fitter(m_BValues, m_FitConfiguration);
     vnl_vector<double> signal(m_BValues.size());
     for (; !inputIt.IsAtEnd(); ++inputIt, ++dIt, ++kIt)
     {
@@ -123,7 +124,7 @@ namespace itk
         const auto pixel = inputIt.Get();
         for (unsigned int i = 0; i < signal.size(); ++i)
           signal[i] = pixel[i];
-        fit = mitk::kurtosis::FitVoxel(signal, m_BValues, m_FitConfiguration);
+        fit = fitter.Fit(signal);
       }
       dIt.Set(fit.d);
       kIt.Set(fit.k);
