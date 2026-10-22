@@ -94,8 +94,11 @@ void mitk::PeakImageMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *render
   localStorage->m_Mapper->SelectColorArray("FIBER_COLORS");
   localStorage->m_Mapper->SetInputData(polyData);
 
-  mitk::SliceNavigationController::Pointer sliceContr = renderer->GetSliceNavigationController();
-  mitk::PlaneGeometry::ConstPointer planeGeo = sliceContr->GetCurrentPlaneGeometry();
+  // The plane this renderer shows; it differs from the slice navigation controller's for renderers
+  // whose world geometry is set directly.
+  mitk::PlaneGeometry::ConstPointer planeGeo = renderer->GetCurrentWorldPlaneGeometry();
+  if (planeGeo.IsNull())
+    return;
   mitk::Point3D plane_origin = planeGeo->GetOrigin();
 
   mitk::Vector3D spacing = peakImage->GetGeometry()->GetSpacing();
