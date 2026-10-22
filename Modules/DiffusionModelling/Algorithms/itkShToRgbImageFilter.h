@@ -30,8 +30,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace itk
 {
 
+  // Clamps to [0,1]; NaN (e.g. the anisotropy of an all-zero ODF) becomes 0, as converting it to
+  // unsigned char is undefined.
   #define __IMG_DAT_ITEM__CEIL_ZERO_ONE__(val) (val) =       \
-  ( (val) < 0 ) ? ( 0 ) : ( ( (val)>1 ) ? ( 1 ) : ( (val) ) );
+  ( !((val) > 0) ) ? ( 0 ) : ( ( (val)>1 ) ? ( 1 ) : ( (val) ) );
 
 
 /** \class ShToRgbImageFilter

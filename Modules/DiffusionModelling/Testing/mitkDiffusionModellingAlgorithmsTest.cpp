@@ -26,6 +26,7 @@ found in the LICENSE file.
 #include <itkImageRegionConstIterator.h>
 #include <itkOdfMaximaExtractionFilter.h>
 #include <itkDiffusionTensor3DReconstructionImageFilter.h>
+#include <itkOdfToRgbImageFilter.h>
 #include <itkShToRgbImageFilter.h>
 #include <itkTensorImageToDiffusionImageFilter.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
@@ -52,6 +53,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(TensorToDwi_RoundTrip);
   MITK_TEST(TensorToDwi_SecondInput_SameAsFreshFilter);
   MITK_TEST(TensorToDwi_Mask_AppliesToBaseline);
+  MITK_TEST(OdfToRgb_ZeroOdf_Black);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -430,6 +432,32 @@ public:
       for (unsigned int i = 0; i < dwi->GetNumberOfComponentsPerPixel(); ++i)
         CPPUNIT_ASSERT_EQUAL(short(0), it.Get()[i]);
     }
+  }
+
+  // The GFA of an all-zero ODF is NaN, which was converted to unsigned char unclamped.
+  void OdfToRgb_ZeroOdf_Black()
+  {
+    using OdfImageType = itk::Image<itk::Vector<float, ODF_SAMPLING_SIZE>, 3>;
+    auto odfs = OdfImageType::New();
+    OdfImageType::RegionType region;
+    region.SetSize({{2, 1, 1}});
+    odfs->SetRegions(region);
+    odfs->Allocate();
+    itk::Vector<float, ODF_SAMPLING_SIZE> odf;
+    odf.Fill(0);
+    odfs->SetPixel({{0, 0, 0}}, odf);
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      odf[i] = std::fabs(itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>::GetDirection(i)[0]);
+    odfs->SetPixel({{1, 0, 0}}, odf);
+
+    auto filter = itk::OdfToRgbImageFilter<OdfImageType>::New();
+    filter->SetInput(odfs);
+    filter->Update();
+
+    const auto zero = filter->GetOutput()->GetPixel({{0, 0, 0}});
+    CPPUNIT_ASSERT_EQUAL(0, int(zero.GetRed()) + int(zero.GetGreen()) + int(zero.GetBlue()) + int(zero.GetAlpha()));
+    const auto xOdf = filter->GetOutput()->GetPixel({{1, 0, 0}});
+    CPPUNIT_ASSERT(xOdf.GetRed() > xOdf.GetGreen() && xOdf.GetRed() > xOdf.GetBlue());
   }
 
   // The 4D peak image takes the tensor image's geometry; its fourth origin component was left
