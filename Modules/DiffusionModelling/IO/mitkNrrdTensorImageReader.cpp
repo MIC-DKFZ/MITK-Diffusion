@@ -269,6 +269,9 @@ namespace mitk
               ++ot;
             }
           }
+          else
+            throw itk::ImageFileReaderException(__FILE__, __LINE__, "Unknown number of components for DTI file. Should be 6 or 9!");
+
           OutputType::Pointer resultImage = OutputType::New();
           resultImage->InitializeByItk( vecImg.GetPointer() );
           resultImage->SetVolume( vecImg->GetBufferPointer() );
@@ -276,6 +279,10 @@ namespace mitk
         }
         catch(...)
         {
+          // Errors of other files come from the NIfTI attempt and say what is wrong.
+          if (!HasNrrdMagic(location))
+            throw;
+
           MITK_INFO << "Trying to load dti as nrrd ...";
 
           typedef itk::VectorImage<float,3> ImageType;

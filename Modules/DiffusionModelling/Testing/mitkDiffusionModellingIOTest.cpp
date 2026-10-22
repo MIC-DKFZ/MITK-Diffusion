@@ -58,6 +58,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(ShIO_ConventionSurvivesSaving);
   MITK_TEST(PeakReader_MrtrixPeaks_ConvertedToLps);
   MITK_TEST(ShIO_OriginKeepsDoublePrecision);
+  MITK_TEST(TensorReader_NiftiWrongComponentCount_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -456,6 +457,28 @@ public:
     auto reloaded = mitk::IOUtil::Load<mitk::ShImage>(path, &shFunctor);
     for (unsigned int i = 0; i < 3; ++i)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(origin[i], reloaded->GetGeometry()->GetOrigin()[i], 1e-12);
+  }
+
+  // A NIfTI file with neither 6 nor 9 tensor components gave an uninitialized tensor image.
+  void TensorReader_NiftiWrongComponentCount_Throws()
+  {
+    using VectorImageType = itk::VectorImage<float, 3>;
+    auto image = VectorImageType::New();
+    VectorImageType::RegionType region;
+    region.SetSize({{2, 1, 1}});
+    image->SetRegions(region);
+    image->SetVectorLength(4);
+    image->Allocate();
+    itk::VariableLengthVector<float> pixel(4);
+    pixel.Fill(1);
+    image->FillBuffer(pixel);
+
+    const std::string niftiPath = m_TempDir + "/four.nii.gz";
+    mitk::IOUtil::Save(mitk::GrabItkImageMemory(image.GetPointer()), niftiPath);
+    const std::string dtiPath = m_TempDir + "/four.dti";
+    itksys::SystemTools::CopyAFile(niftiPath, dtiPath);
+
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load(dtiPath), std::exception);
   }
 };
 
