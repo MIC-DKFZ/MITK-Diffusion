@@ -70,29 +70,16 @@ void IvimMapComputation( mitk::Image::Pointer input,
   ivim_filter->SetBValue( DPH::GetReferenceBValue( input.GetPointer() ) );
   ivim_filter->SetGradientDirections( DPH::GetGradientContainer( input.GetPointer() ) );
 
-  switch (type)
-  {
-  case 0:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_FIT_ALL);
-    break;
-  case 1:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_DSTAR_FIX);
-    break;
-  case 2:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_D_THEN_DSTAR);
-    break;
-  case 3:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_LINEAR_D_THEN_F);
-    break;
-  default:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_D_THEN_DSTAR);
-  }
-
-  ivim_filter->SetBThres(b_thresh);
-  ivim_filter->SetDStar(dstar);
-  ivim_filter->SetS0Thres(0);
-  ivim_filter->SetFitDStar(true);
-  ivim_filter->SetNumberOfWorkUnits(1);
+  // The fit types are the methods in the order of the IVIM view.
+  if (type < 0 || type > 3)
+    type = 2;
+  mitk::ivim::FitParameters parameters;
+  parameters.method = static_cast<mitk::ivim::Method>(type);
+  parameters.bThreshold = b_thresh;
+  parameters.dStar = dstar;
+  parameters.signalThreshold = 0;
+  parameters.fitDStar = true;
+  ivim_filter->SetFitParameters(parameters);
 
   try
   {

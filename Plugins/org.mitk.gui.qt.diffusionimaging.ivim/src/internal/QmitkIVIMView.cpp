@@ -398,8 +398,6 @@ void QmitkIVIMView::FittIVIMStart()
   VecImgType::Pointer vecimg = VecImgType::New();
   mitk::CastToItkImage(img, vecimg);
 
-  OutImgType::IndexType dummy;
-
   if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
   {
     // KURTOSIS
@@ -476,9 +474,7 @@ void QmitkIVIMView::FittIVIMStart()
   }
   else
   {
-    // A failed fit keeps the maps of the last single-voxel preview, which must not be stored.
-    if (FittIVIM(vecimg, mitk::DiffusionPropertyHelper::GetGradientContainer(img), mitk::DiffusionPropertyHelper::GetReferenceBValue(img), true, dummy))
-      OutputToDatastorage(m_Controls->m_DwiBox->GetSelectedNode());
+    ComputeIvimMaps(vecimg, mitk::DiffusionPropertyHelper::GetGradientContainer(img), mitk::DiffusionPropertyHelper::GetReferenceBValue(img));
   }
 }
 
@@ -591,11 +587,9 @@ void QmitkIVIMView::OnSliceChanged()
     }
     else
     {
-      FittIVIM(roiImage,
-               mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-               mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
-               false,
-               crosspos);
+      FitIvimVoxel(roiImage->GetPixel(newstart),
+                   mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
+                   mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg));
     }
   }
   else
@@ -678,11 +672,9 @@ void QmitkIVIMView::OnSliceChanged()
     }
     else
     {
-      FittIVIM(roiImage,
-               mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-               mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
-               false,
-               index);
+      FitIvimVoxel(roiImage->GetPixel(index),
+                   mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
+                   mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg));
     }
 
     // do not update until selection changed, the values will remain the same as long as the mask is selected!
@@ -750,111 +742,107 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
 }
 
 
-bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType::ConstPointer dirs, float bval, bool multivoxel, OutImgType::IndexType &crosspos)
+mitk::ivim::FitParameters QmitkIVIMView::GetIvimFitParameters() const
+{
+  mitk::ivim::FitParameters parameters;
+  parameters.method = static_cast<mitk::ivim::Method>(m_Controls->m_MethodCombo->currentIndex());
+  parameters.signalThreshold = m_Controls->m_S0ThreshLabel->text().toDouble();
+  parameters.dStar = m_Controls->m_DStarLabel->text().toDouble();
+  parameters.bThreshold = m_Controls->m_BThreshLabel->text().toDouble();
+  parameters.fitDStar = m_Controls->m_CheckDStar->isChecked();
+  return parameters;
+}
+
+void QmitkIVIMView::FitIvimVoxel(const VecImgType::PixelType& pixel, DirContainerType::ConstPointer dirs, float bval)
+{
+  // The preview always shows D*, also when no D* map is generated.
+  auto parameters = this->GetIvimFitParameters();
+  parameters.fitDStar = true;
+
+  vnl_vector<double> signal(pixel.GetSize());
+  for (unsigned int i = 0; i < signal.size(); ++i)
+    signal[i] = pixel[i];
+
+  try
+  {
+    m_IvimProtocol = mitk::ivim::MakeProtocol(dirs, bval);
+    m_IvimFit = mitk::ivim::FitVoxel(signal, m_IvimProtocol, parameters);
+  }
+  catch (const itk::ExceptionObject& ex)
+  {
+    MITK_INFO << ex;
+    m_Controls->m_Warning->setText(QString("IVIM fit not possible: ") + ex.GetDescription());
+    m_Controls->m_Warning->setVisible(true);
+    return;
+  }
+
+  QString param_label_text("f=%1, D=%2, D*=%3");
+  param_label_text = param_label_text.arg(m_IvimFit.f, 4);
+  param_label_text = param_label_text.arg(m_IvimFit.d, 4);
+  param_label_text = param_label_text.arg(m_IvimFit.dStar, 4);
+  m_Controls->m_FittedParamsLabel->setText(param_label_text);
+
+  const double maxb = m_IvimProtocol.bValues.max_value();
+
+  std::vector< std::pair<double, double> > d_line;
+  d_line.emplace_back(0, 1 - m_IvimFit.unclampedF);
+  d_line.emplace_back(maxb, d_line[0].second * exp(-maxb * m_IvimFit.d));
+  m_Controls->m_ChartWidget->SetCurveData(m_DPartCurveId, d_line);
+
+  std::vector< std::pair<double, double> > y;
+  const int nsampling = 50;
+  const double f = 1 - m_IvimFit.unclampedF;
+  for (int i = 0; i <= nsampling; i++)
+  {
+    const double x = (((1.0) * i) / (1.0 * nsampling)) * maxb;
+    y.emplace_back(x, f * exp(-x * m_IvimFit.d) + (1 - f) * exp(-x * (m_IvimFit.d + m_IvimFit.dStar)));
+  }
+  m_Controls->m_ChartWidget->SetCurveData(m_FitCurveId, y);
+
+  std::vector< std::pair<double, double> > y_meas;
+  for (unsigned int i = 0; i < m_IvimFit.firstFitMeasurements.size(); ++i)
+    y_meas.emplace_back(m_IvimFit.firstFitBValues[i], m_IvimFit.firstFitMeasurements[i]);
+  m_Controls->m_ChartWidget->SetCurveData(m_SignalCurveId, y_meas);
+
+  if (m_IvimFit.secondFitBValues.size() > 0)
+  {
+    AddSecondFitPlot();
+    std::vector< std::pair<double, double> > additonal_meas;
+    for (unsigned int i = 0; i < m_IvimFit.secondFitBValues.size(); ++i)
+      additonal_meas.emplace_back(m_IvimFit.secondFitBValues[i], m_IvimFit.secondFitMeasurements[i]);
+    m_Controls->m_ChartWidget->SetCurveData(m_SecondFitSignalCurveId, additonal_meas);
+  }
+  else
+  {
+    RemoveSecondFitPlot();
+  }
+  m_Controls->m_ChartWidget->Replot();
+}
+
+void QmitkIVIMView::ComputeIvimMaps(VecImgType* vecimg, DirContainerType::ConstPointer dirs, float bval)
 {
   IVIMFilterType::Pointer filter = IVIMFilterType::New();
   filter->SetInput(vecimg);
   filter->SetGradientDirections(dirs);
   filter->SetBValue(bval);
+  filter->SetFitParameters(this->GetIvimFitParameters());
 
-  switch(m_Controls->m_MethodCombo->currentIndex())
+  try
   {
-
-  case 0:
-    filter->SetMethod(IVIMFilterType::IVIM_FIT_ALL);
-    filter->SetS0Thres(m_Controls->m_S0ThreshLabel->text().toDouble());
-    break;
-
-  case 1:
-    filter->SetMethod(IVIMFilterType::IVIM_DSTAR_FIX);
-    filter->SetDStar(m_Controls->m_DStarLabel->text().toDouble());
-    filter->SetS0Thres(m_Controls->m_S0ThreshLabel->text().toDouble());
-    break;
-
-  case 2:
-    filter->SetMethod(IVIMFilterType::IVIM_D_THEN_DSTAR);
-    filter->SetBThres(m_Controls->m_BThreshLabel->text().toDouble());
-    filter->SetS0Thres(m_Controls->m_S0ThreshLabel->text().toDouble());
-    filter->SetFitDStar(m_Controls->m_CheckDStar->isChecked());
-    break;
-
-  case 3:
-    filter->SetMethod(IVIMFilterType::IVIM_LINEAR_D_THEN_F);
-    filter->SetBThres(m_Controls->m_BThreshLabel->text().toDouble());
-    filter->SetS0Thres(m_Controls->m_S0ThreshLabel->text().toDouble());
-    filter->SetFitDStar(m_Controls->m_CheckDStar->isChecked());
-    break;
-
-  }
-
-  if(!multivoxel)
-  {
-    filter->SetFitDStar(true);
-  }
-
-  filter->SetNumberOfWorkUnits(1);
-  filter->SetVerbose(false);
-  filter->SetCrossPosition(crosspos);
-
-  try{
     filter->Update();
-    m_IvimSnap = filter->GetSnapshot();
-    m_DStarMap = filter->GetOutput(2);
-    m_DMap = filter->GetOutput(1);
-    m_fMap = filter->GetOutput();
-
-    QString param_label_text("f=%1, D=%2, D*=%3");
-    param_label_text = param_label_text.arg(m_IvimSnap.currentF,4);
-    param_label_text = param_label_text.arg(m_IvimSnap.currentD,4);
-    param_label_text = param_label_text.arg(m_IvimSnap.currentDStar,4);
-    m_Controls->m_FittedParamsLabel->setText(param_label_text);
-
-    double maxb = m_IvimSnap.bvalues.max_value();
-
-    std::vector< std::pair<double, double> > d_line;
-    d_line.emplace_back(0, 1-m_IvimSnap.currentFunceiled);
-    d_line.emplace_back(maxb, d_line[0].second*exp(-maxb * m_IvimSnap.currentD));
-    m_Controls->m_ChartWidget->SetCurveData(m_DPartCurveId, d_line);
-
-    std::vector< std::pair<double, double> > y;
-    int nsampling = 50;
-    double f = 1-m_IvimSnap.currentFunceiled;
-    for(int i=0; i<=nsampling; i++)
-    {
-      double x = (((1.0)*i)/(1.0*nsampling))*maxb;
-      y.emplace_back(x, f*exp(- x * m_IvimSnap.currentD) + (1-f)*exp(- x * (m_IvimSnap.currentD+m_IvimSnap.currentDStar)));
-    }
-    m_Controls->m_ChartWidget->SetCurveData(m_FitCurveId, y);
-
-    std::vector< std::pair<double, double> > y_meas;
-    for (unsigned int i=0; i<m_IvimSnap.meas1.size(); ++i)
-      y_meas.emplace_back(m_IvimSnap.bvals1[i], m_IvimSnap.meas1[i]);
-
-    m_Controls->m_ChartWidget->SetCurveData(m_SignalCurveId, y_meas);
-
-    if(m_IvimSnap.bvals2.size() > 0)
-    {
-      AddSecondFitPlot();
-      std::vector< std::pair<double, double> > additonal_meas;
-      for (int i=0; i<static_cast<int>(m_IvimSnap.bvals2.size()); ++i)
-        additonal_meas.emplace_back(m_IvimSnap.bvals2[i], m_IvimSnap.meas2[i]);
-
-      m_Controls->m_ChartWidget->SetCurveData(m_SecondFitSignalCurveId, additonal_meas);
-    }
-    else
-    {
-      RemoveSecondFitPlot();
-    }
-    m_Controls->m_ChartWidget->Replot();
   }
-  catch (itk::ExceptionObject &ex)
+  catch (const itk::ExceptionObject& ex)
   {
-    MITK_INFO << ex ;
-    m_Controls->m_Warning->setText(QString("IVIM fit not possible: ")+ex.GetDescription());
+    MITK_INFO << ex;
+    m_Controls->m_Warning->setText(QString("IVIM fit not possible: ") + ex.GetDescription());
     m_Controls->m_Warning->setVisible(true);
-    return false;
+    return;
   }
-  return true;
+
+  m_fMap = filter->GetOutput(0);
+  m_DMap = filter->GetOutput(1);
+  m_DStarMap = filter->GetOutput(2);
+  this->OutputToDatastorage(m_Controls->m_DwiBox->GetSelectedNode());
 }
 
 void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
@@ -954,8 +942,8 @@ void QmitkIVIMView::ClipboardCurveButtonClicked()
   {
     std::stringstream ss;
     QString clipboard("Normalized Measurement Points\n");
-    ss << m_IvimSnap.bvalues << "\n" << m_IvimSnap.allmeas << "\n\n";
-    ss << "Fitted Values ( f  D  D* ) \n" << m_IvimSnap.currentF << " " << m_IvimSnap.currentD << " " << m_IvimSnap.currentDStar;
+    ss << m_IvimProtocol.bValues << "\n" << m_IvimFit.allMeasurements << "\n\n";
+    ss << "Fitted Values ( f  D  D* ) \n" << m_IvimFit.f << " " << m_IvimFit.d << " " << m_IvimFit.dStar;
 
 
     ss << "\n\n";
@@ -993,9 +981,9 @@ void QmitkIVIMView::ClipboardStatisticsButtonClicked()
   {
     QString clipboard( "f \t D \t D* \n" );
     clipboard = clipboard.append( "%L1 \t %L2 \t %L3" )
-        .arg( m_IvimSnap.currentF, 0, 'f', 10 )
-        .arg( m_IvimSnap.currentD, 0, 'f', 10 )
-        .arg( m_IvimSnap.currentDStar, 0, 'f', 10 ) ;
+        .arg( m_IvimFit.f, 0, 'f', 10 )
+        .arg( m_IvimFit.d, 0, 'f', 10 )
+        .arg( m_IvimFit.dStar, 0, 'f', 10 ) ;
 
     QApplication::clipboard()->setText(clipboard, QClipboard::Clipboard );
   }

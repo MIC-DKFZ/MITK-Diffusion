@@ -16,379 +16,68 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_h
 #define __itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_h
 
-#include "itkImageToImageFilter.h"
-//#include "vnl/vnl_matrix.h"
-#include "vnl/vnl_vector_fixed.h"
-#include "vnl/vnl_matrix.h"
-#include "vnl/algo/vnl_svd.h"
-#include "itkVectorContainer.h"
-#include "itkVectorImage.h"
-//#include "QuadProg.h"
-#include "itkVectorImage.h"
+#include <itkImageToImageFilter.h>
+#include <itkVectorImage.h>
 
-#include "vnl/vnl_least_squares_function.h"
-#include "vnl/vnl_cost_function.h"
-#include "vnl/algo/vnl_levenberg_marquardt.h"
-#include "vnl/vnl_math.h"
+#include <mitkIvimFit.h>
 
-#define IVIM_CEIL(val,u,o) (val) =       \
-  ( (val) < (u) ) ? ( (u) ) : ( ( (val)>(o) ) ? ( (o) ) : ( (val) ) );
-
-namespace itk{
-
-  /** baseclass for IVIM fitting algorithms */
-  struct IVIM_base
+namespace itk
+{
+  /** \class DiffusionIntravoxelIncoherentMotionReconstructionImageFilter
+      \brief Maps of the IVIM parameters f (output 0), D (output 1) and D* (output 2), fitted voxel by
+      voxel with mitk::ivim::FitVoxel; the voxels are independent, so the filter runs multithreaded. */
+  template <class TInputPixelType, class TOutputPixelType>
+  class DiffusionIntravoxelIncoherentMotionReconstructionImageFilter
+    : public ImageToImageFilter<VectorImage<TInputPixelType, 3>, Image<TOutputPixelType, 3>>
   {
-
-    void set_measurements(const vnl_vector<double>& x)
-    {
-      measurements.set_size(x.size());
-      measurements.copy_in(x.data_block());
-    }
-
-    void set_bvalues(const vnl_vector<double>& x)
-    {
-      bvalues.set_size(x.size());
-      bvalues.copy_in(x.data_block());
-    }
-
-    vnl_vector<double> measurements;
-    vnl_vector<double> bvalues;
-
-    int N;
-
-  };
-
-  /** Fitt all three parameters */
-  struct IVIM_3param : public IVIM_base, vnl_least_squares_function
-  {
-
-    IVIM_3param(unsigned int number_of_measurements) :
-        vnl_least_squares_function(3, number_of_measurements, no_gradient)
-    {
-      N = get_number_of_residuals();
-    }
-
-    void f(const vnl_vector<double>& x, vnl_vector<double>& fx) override {
-
-      double ef = x[0];
-      double D = x[1];
-      double Dstar = x[2];
-
-      for(int s=0; s<N; ++s)
-      {
-        double approx = (1-ef)*exp(-bvalues[s]*D)+ef*exp(-bvalues[s]*(D+Dstar));
-        fx[s] = std::fabs( measurements[s] - approx );
-
-        if (D<0)
-          fx[s] -= D*100000;
-        if (Dstar<0)
-          fx[s] -= Dstar*100000;
-
-        if (D>0.003)
-          fx[s] += D*100000;
-        if (Dstar>0.3)
-          fx[s] += Dstar*100000;
-      }
-
-    }
-  };
-
-  /** fit by setting DStar to a fix value */
-  struct IVIM_fixdstar : public IVIM_base, vnl_least_squares_function
-  {
-
-    IVIM_fixdstar(unsigned int number_of_measurements, double DStar) :
-        vnl_least_squares_function(2, number_of_measurements, no_gradient)
-    {
-      N = get_number_of_residuals();
-      fixDStar = DStar;
-    }
-
-    void f(const vnl_vector<double>& x, vnl_vector<double>& fx) override {
-
-      double ef = x[0];
-      double D = x[1];
-
-      for(int s=0; s<N; s++)
-      {
-        double approx = (1-ef)*exp(-bvalues[s]*D)+ef*exp(-bvalues[s]*(D+fixDStar));
-        fx[s] = std::fabs( measurements[s] - approx );
-
-        if (D<0)
-          fx[s] -= D*100000;
-
-        if (D>0.003)
-          fx[s] += D*100000;
-      }
-
-    }
-
-    double fixDStar;
-
-  };
-
-  /** fit a monoexponential curve only estimating D and f */
-  struct IVIM_d_and_f : public IVIM_base, vnl_least_squares_function
-  {
-
-    IVIM_d_and_f(unsigned int number_of_measurements) :
-        vnl_least_squares_function(2, number_of_measurements, no_gradient)
-    {
-      N = get_number_of_residuals();
-    }
-
-    void f(const vnl_vector<double>& x, vnl_vector<double>& fx) override {
-
-      double D = x[0];
-      double f = x[1];
-
-      for(int s=0; s<N; s++)
-      {
-        double approx = (1-f) * exp(-bvalues[s]*D);
-        fx[s] = std::fabs( measurements[s] - approx );
-
-        if (D<0)
-          fx[s] -= D*100000;
-
-        if (D>0.003)
-          fx[s] += D*100000;
-      }
-
-    }
-  };
-
-  /** fiting DStar and f with fix value of D */
-  struct IVIM_fixd : public IVIM_base, vnl_least_squares_function
-  {
-
-    IVIM_fixd(unsigned int number_of_measurements, double D) :
-        vnl_least_squares_function(2, number_of_measurements, no_gradient)
-    {
-      N = get_number_of_residuals();
-      fixD = D;
-    }
-
-    void f(const vnl_vector<double>& x, vnl_vector<double>& fx) override {
-
-      double ef = x[0];
-      double Dstar = x[1];
-
-      for(int s=0; s<N; s++)
-      {
-        double approx = (1-ef)*exp(-bvalues[s]*fixD)+ef*exp(-bvalues[s]*(fixD+Dstar));
-        fx[s] = std::fabs( measurements[s] - approx );
-
-        if (Dstar<0)
-          fx[s] -= Dstar*100000;
-
-        if (Dstar>0.3)
-          fx[s] += Dstar*100000;
-      }
-
-    }
-
-    double fixD;
-  };
-
-  /** fiting DStar with given f and D */
-  struct IVIM_dstar_only : public IVIM_base, vnl_least_squares_function
-  {
-
-    IVIM_dstar_only(unsigned int number_of_measurements, double D, double f) :
-        vnl_least_squares_function(1, number_of_measurements, no_gradient)
-    {
-      N = get_number_of_residuals();
-      fixD = D;
-      fixF = f;
-    }
-
-    void f(const vnl_vector<double>& x, vnl_vector<double>& fx) override {
-
-      double Dstar = x[0];
-
-      for(int s=0; s<N; s++)
-      {
-        double approx = (1-fixF)*exp(-bvalues[s]*fixD)+fixF*exp(-bvalues[s]*(fixD+Dstar));
-        fx[s] = std::fabs( measurements[s] - approx );
-
-        if (Dstar<0)
-          fx[s] -= Dstar*100000;
-
-        if (Dstar>0.3)
-          fx[s] += Dstar*100000;
-      }
-
-    }
-
-    double fixD;
-    double fixF;
-  };
-
-  struct MeasAndBvals
-  {
-    vnl_vector<double> meas;
-    vnl_vector<double> bvals;
-    int N;
-  };
-
-  /** \class DiffusionIntravoxelIncoherentMotionReconstructionImageFilter */
-  template< class TInputPixelType,
-  class TOutputPixelType>
-  class DiffusionIntravoxelIncoherentMotionReconstructionImageFilter :
-  public ImageToImageFilter< VectorImage< TInputPixelType,  3 >,
-  Image< TOutputPixelType, 3 > >
-  {
-
   public:
+    ITK_DISALLOW_COPY_AND_MOVE(DiffusionIntravoxelIncoherentMotionReconstructionImageFilter);
 
-    struct IVIMSnapshot
+    using Self = DiffusionIntravoxelIncoherentMotionReconstructionImageFilter;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
+    using Superclass = ImageToImageFilter<VectorImage<TInputPixelType, 3>, Image<TOutputPixelType, 3>>;
+
+    itkFactorylessNewMacro(Self);
+    itkCloneMacro(Self);
+    itkOverrideGetNameOfClassMacro(DiffusionIntravoxelIncoherentMotionReconstructionImageFilter);
+
+    using InputImageType = typename Superclass::InputImageType;
+    using OutputImageType = typename Superclass::OutputImageType;
+    using OutputImageRegionType = typename Superclass::OutputImageRegionType;
+    using GradientDirectionContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
+
+    /** The gradient of each volume of the input, scaled so that b = reference b-value * |g|^2. */
+    itkSetConstObjectMacro(GradientDirections, GradientDirectionContainerType);
+
+    /** The reference b-value of the gradients; no default, the filter throws when it is not set. */
+    itkSetMacro(BValue, double);
+
+    void SetFitParameters(const mitk::ivim::FitParameters& parameters)
     {
-      double currentF;
-      double currentFunceiled;
-      double currentD;
-      double currentDStar;
-
-      bool iterated_sequence; // wether each measurement has its own b0-acqu.
-      std::vector<unsigned int> baselineind; // baseline image indicies
-      std::vector<unsigned int> gradientind; // gradient image indicies
-      vnl_vector<double> bvalues;            // bvalues != 0
-
-      int num_weighted;                                 // total number of measurements
-
-      vnl_vector<double> meas_for_threshold;   // all measurements, thresholded blanked out
-      vnl_vector<double> allmeas;            // all measurements
-
-      int num_high;                    // number of used measurements
-      std::vector<int> high_indices;   // indices of used measurements
-      vnl_vector<double> high_bvalues; // bvals of used measurements
-      vnl_vector<double> high_meas;    // used measurements
-
-      // fit 1
-      vnl_vector<double> meas1;
-      vnl_vector<double> bvals1;
-
-      // fit 2
-      vnl_vector<double> meas2;
-      vnl_vector<double> bvals2;
-    };
-
-    enum IVIM_Method
-    {
-      IVIM_FIT_ALL,
-      IVIM_DSTAR_FIX,
-      IVIM_D_THEN_DSTAR,
-      IVIM_LINEAR_D_THEN_F
-    };
-
-    typedef DiffusionIntravoxelIncoherentMotionReconstructionImageFilter Self;
-    typedef SmartPointer<Self>                      Pointer;
-    typedef SmartPointer<const Self>                ConstPointer;
-    typedef ImageToImageFilter< VectorImage< TInputPixelType, 3>,
-      Image< TOutputPixelType,3 > >                 Superclass;
-
-    /** Method for creation through the object factory. */
-    itkFactorylessNewMacro(Self)
-    itkCloneMacro(Self)
-
-    /** Runtime information support. */
-    itkTypeMacro(DiffusionIntravoxelIncoherentMotionReconstructionImageFilter,
-                 ImageToImageFilter);
-
-    typedef TOutputPixelType                         OutputPixelType;
-
-    typedef TInputPixelType                          InputPixelType;
-
-    /** Reference image data,  This image is aquired in the absence
-   * of a diffusion sensitizing field gradient */
-    typedef typename Superclass::InputImageType      InputImageType;
-
-    typedef Image< OutputPixelType, 3 >              OutputImageType;
-
-    typedef typename Superclass::OutputImageRegionType
-        OutputImageRegionType;
-
-    /** Holds each magnetic field gradient used to acquire one DWImage */
-    typedef vnl_vector_fixed< double, 3 >            GradientDirectionType;
-
-    /** Container to hold gradient directions of the 'n' DW measurements */
-    typedef VectorContainer< unsigned int,
-    GradientDirectionType >                  GradientDirectionContainerType;
-
-    /** set method to add gradient directions and its corresponding
-   * image. The image here is a VectorImage. The user is expected to pass the
-   * gradient directions in a container. The ith element of the container
-   * corresponds to the gradient direction of the ith component image the
-   * VectorImage.  For the baseline image, a vector of all zeros
-   * should be set.*/
-    void SetGradientDirections( GradientDirectionContainerType::ConstPointer );
-
-    void SetBValue(double bval){m_BValue = bval;}
-    void SetBThres(double bval){m_BThres = bval;}
-    void SetS0Thres(double val){m_S0Thres = val;}
-    void SetDStar(double dstar){m_DStar  = dstar;}
-    void SetFitDStar(bool fit){m_FitDStar  = fit;}
-    void SetVerbose(bool verbose){m_Verbose = verbose;}
-    void SetCrossPosition(typename InputImageType::IndexType crosspos){this->m_CrossPosition = crosspos;}
-    void SetMethod(IVIM_Method method){m_Method = method;}
-
-    IVIMSnapshot GetSnapshot(){return m_Snap;}
-
-    /** Return the gradient direction. idx is 0 based */
-    virtual GradientDirectionType GetGradientDirection( unsigned int idx) const
-    {
-      if( idx >= m_NumberOfGradientDirections )
-      {
-        itkExceptionMacro( << "Gradient direction " << idx << "does not exist" );
-      }
-      return m_GradientDirectionContainer->ElementAt( idx+1 );
+      m_FitParameters = parameters;
+      this->Modified();
     }
+
+    const mitk::ivim::FitParameters& GetFitParameters() const { return m_FitParameters; }
 
   protected:
     DiffusionIntravoxelIncoherentMotionReconstructionImageFilter();
-    ~DiffusionIntravoxelIncoherentMotionReconstructionImageFilter() {};
-    void PrintSelf(std::ostream& os, Indent indent) const;
+    ~DiffusionIntravoxelIncoherentMotionReconstructionImageFilter() override = default;
 
+    void PrintSelf(std::ostream& os, Indent indent) const override;
     void VerifyPreconditions() const override;
-    void BeforeThreadedGenerateData();
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
-
-    MeasAndBvals ApplyS0Threshold(vnl_vector<double> &meas, vnl_vector<double> &bvals);
+    void BeforeThreadedGenerateData() override;
+    void DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread) override;
 
   private:
-
-    /** container to hold gradient directions */
-    GradientDirectionContainerType::ConstPointer           m_GradientDirectionContainer;
-
-    /** Number of gradient measurements */
-    unsigned int                                      m_NumberOfGradientDirections{0};
-
-    /** Reference b-value; no default, the filter throws when it is not set. */
+    GradientDirectionContainerType::ConstPointer m_GradientDirections;
     double m_BValue{0};
+    mitk::ivim::FitParameters m_FitParameters;
 
-    // The defaults are those of the IVIM view and the command line app.
-    double m_BThres{170};
-
-    double m_S0Thres{0};
-
-    double m_DStar{0.06};
-
-    IVIM_Method m_Method;
-
-    typename OutputImageType::Pointer m_DMap;
-
-    typename OutputImageType::Pointer m_DStarMap;
-
-    bool m_FitDStar;
-
-    IVIMSnapshot m_Snap;
-
-    bool m_Verbose;
-
-    typename InputImageType::IndexType m_CrossPosition{};
-
+    /** Made from the gradients for each run and only read by the threads. */
+    mitk::ivim::Protocol m_Protocol;
   };
-
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
@@ -396,4 +85,3 @@ namespace itk{
 #endif
 
 #endif //__itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter_h
-

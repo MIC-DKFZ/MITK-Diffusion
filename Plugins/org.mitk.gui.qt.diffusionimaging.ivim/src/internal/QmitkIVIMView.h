@@ -68,7 +68,6 @@ public:
   virtual void SetFocus() override;
 
   void OutputToDatastorage(mitk::DataNode::Pointer node);
-  bool FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType::ConstPointer dirs, float bval, bool multivoxel, OutImgType::IndexType &crosspos);
 
   void Activated() override;
   void Deactivated() override;
@@ -107,6 +106,11 @@ protected:
   /// \brief called by QmitkAbstractView when DataManager's selection has changed
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
 
+  mitk::ivim::FitParameters GetIvimFitParameters() const;
+  /** Fits and plots the signal of the selected voxel or the ROI average. */
+  void FitIvimVoxel(const VecImgType::PixelType& pixel, DirContainerType::ConstPointer dirs, float bval);
+  void ComputeIvimMaps(VecImgType* vecimg, DirContainerType::ConstPointer dirs, float bval);
+
   bool FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContainerType::ConstPointer dirs, float bval, OutImgType::IndexType &crosspos);
 
   Ui::QmitkIVIMViewControls* m_Controls;
@@ -115,7 +119,8 @@ protected:
   OutImgType::Pointer m_DMap;
   OutImgType::Pointer m_fMap;
 
-  IVIMFilterType::IVIMSnapshot m_IvimSnap;
+  mitk::ivim::Protocol m_IvimProtocol;
+  mitk::ivim::VoxelFit m_IvimFit;
   KurtosisFilterType::KurtosisSnapshot m_KurtosisSnap;
 
   bool m_Active;
