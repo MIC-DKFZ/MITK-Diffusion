@@ -43,6 +43,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #endif
 #include <mitkFiberBundle.h>
 #include <mitkRegistrationHelper.h>
+#include <mitkDiffusionImageEditing.h>
 #include <mitkDiffusionImageMapping.h>
 
 // Qt
@@ -96,13 +97,13 @@ void QmitkSimpleRegistrationView::StartRegistration()
   m_MovingImageNode = m_Controls->m_MovingImageBox->GetSelectedNode();
   mitk::Image::Pointer movingImage = dynamic_cast<mitk::Image*>(m_MovingImageNode->GetData());
   if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(movingImage))
-    pJob->m_spMovingData = mitk::DiffusionImageMapping::ExtractVolume(movingImage, m_Controls->m_MovingChannelBox->value());
+    pJob->m_spMovingData = mitk::DiffusionImageEditing::ExtractVolume(movingImage, m_Controls->m_MovingChannelBox->value());
   else
     pJob->m_spMovingData = movingImage;
 
   mitk::Image::Pointer fixedImage = dynamic_cast<mitk::Image*>(m_Controls->m_FixedImageBox->GetSelectedNode()->GetData());
   if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(fixedImage))
-    pJob->m_spTargetData = mitk::DiffusionImageMapping::ExtractVolume(fixedImage, m_Controls->m_FixedChannelBox->value());
+    pJob->m_spTargetData = mitk::DiffusionImageEditing::ExtractVolume(fixedImage, m_Controls->m_FixedChannelBox->value());
   else
     pJob->m_spTargetData = fixedImage;
 

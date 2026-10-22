@@ -13,7 +13,7 @@ found in the LICENSE file.
 #include "mitkDiffusionImageMapping.h"
 
 #include <itkComposeImageFilter.h>
-#include <itkVectorIndexSelectionCastImageFilter.h>
+#include <mitkDiffusionImageEditing.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
@@ -105,22 +105,6 @@ void mitk::DiffusionImageMapping::RotateGradients(Image* dwi, const std::vector<
   SetRotatedGradients(dwi, rotations);
 }
 
-mitk::Image::Pointer mitk::DiffusionImageMapping::ExtractVolume(const Image* dwi, unsigned int index)
-{
-  if (!PropHelper::IsDiffusionWeightedImage(dwi))
-    mitkThrow() << "Not a diffusion-weighted image.";
-  PropHelper::ImageType::Pointer itkDwi;
-  CastToItkImage(dwi, itkDwi);
-  auto extractor = itk::VectorIndexSelectionCastImageFilter<PropHelper::ImageType, VolumeType>::New();
-  extractor->SetInput(itkDwi);
-  extractor->SetIndex(index);
-  extractor->Update();
-  // Disconnected, the volume does not keep the extractor and the ITK view of the whole DWI alive.
-  VolumeType::Pointer volume = extractor->GetOutput();
-  volume->DisconnectPipeline();
-  return GrabItkImageMemory(volume);
-}
-
 mitk::Image::Pointer mitk::DiffusionImageMapping::MapImage(const Image* moving, const MAPRegistrationWrapper* registration, const BaseGeometry* target, ImageMappingInterpolator::Type interpolator)
 {
   if (moving == nullptr || registration == nullptr)
@@ -134,7 +118,7 @@ mitk::Image::Pointer mitk::DiffusionImageMapping::MapImage(const Image* moving, 
   const unsigned int numberOfVolumes = PropHelper::GetGradientContainer(moving)->Size();
   for (unsigned int i = 0; i < numberOfVolumes; ++i)
   {
-    auto mapped = ImageMappingHelper::map(ExtractVolume(moving, i), registration, false, 0, target, false, 0, interpolator);
+    auto mapped = ImageMappingHelper::map(DiffusionImageEditing::ExtractVolume(moving, i), registration, false, 0, target, false, 0, interpolator);
     VolumeType::Pointer itkVolume;
     CastToItkImage(mapped, itkVolume);
     composer->SetInput(i, itkVolume);

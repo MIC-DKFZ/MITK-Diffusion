@@ -14,80 +14,44 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _QMITKPREPROCESSINGVIEW_H_INCLUDED
-#define _QMITKPREPROCESSINGVIEW_H_INCLUDED
+#ifndef QmitkPreprocessingView_h
+#define QmitkPreprocessingView_h
 
 #include <QmitkAbstractView.h>
 #include <mitkILifecycleAwarePart.h>
 
 #include "ui_QmitkPreprocessingViewControls.h"
 
-// st includes
-#include <string>
-
-// itk includes
-#include <itkImage.h>
-#include <itkVectorImage.h>
-
-// mitk includes
+#include <mitkDataNode.h>
 #include <mitkImage.h>
-#include <mitkDiffusionPropertyHelper.h>
-#include <vtkMatrix4x4.h>
-#include <vtkSmartPointer.h>
-#include <mitkImageToItk.h>
 
-typedef short DiffusionPixelType;
+#include <functional>
+#include <memory>
 
-struct PrpSelListener;
-
-/*!
- * \ingroup org_mitk_gui_qt_preprocessing_internal
+/**
+ * \brief Views and edits DWIs and other images: gradients, volumes, header, resampling, cropping.
  *
- * \brief Viewing and modifying diffusion weighted images (gradient reduction, resampling, b-value projection, ...)
- *
+ * The edits themselves are mitk::DiffusionImageEditing functions; each result becomes a new node
+ * below the edited one.
  */
 class QmitkPreprocessingView : public QmitkAbstractView, public mitk::ILifecycleAwarePart
 {
-
-  friend struct PrpSelListener;
-
-  // this is needed for all Qt objects that should have a MOC object (everything that derives from QObject)
   Q_OBJECT
 
-  public:
+public:
 
   static const std::string VIEW_ID;
 
-  typedef mitk::DiffusionPropertyHelper::GradientDirectionType            GradientDirectionType;
-  typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType  GradientDirectionContainerType;
-  typedef itk::VectorImage< short, 3 >                                    ItkDwiType;
-  typedef itk::Image< unsigned char, 3 >                                  UcharImageType;
-  typedef itk::Image< double, 3 >                                         ItkDoubleImageType;
-  typedef mitk::DiffusionPropertyHelper                                   PropHelper;
-  typedef mitk::GradientDirectionsProperty                                GradProp;
-
   QmitkPreprocessingView();
-  virtual ~QmitkPreprocessingView();
+  ~QmitkPreprocessingView() override;
 
-  virtual void CreateQtPartControl(QWidget *parent) override;
+  void CreateQtPartControl(QWidget *parent) override;
+  void SetFocus() override;
 
-  /// \brief Creation of the connections of main and control widget
-  virtual void CreateConnections();
-
-  virtual void Activated() override;
-
-  virtual void Deactivated() override;
-
-  virtual void Visible() override;
-
-  virtual void Hidden() override;
-
-  ///
-  /// Sets the focus to an internal widget.
-  ///
-  virtual void SetFocus() override;
-
-  static const int nrconvkernels;
+  void Activated() override;
+  void Deactivated() override;
+  void Visible() override;
+  void Hidden() override;
 
 protected slots:
 
@@ -112,38 +76,31 @@ protected slots:
   void DoAlignImages();
   void DoSwapGradientDimensions();
 
-protected:
+private:
 
-  void DoADCFit();
-  void DoAKCFit();
-  void DoBiExpFit();
-  void DoADCAverage();
+  void CreateConnections();
 
-  template < typename TPixel, unsigned int VImageDimension >
-  void TemplatedCropImage( itk::Image<TPixel, VImageDimension>* itkImage);
+  /** The node chosen in the view's image box and its image, or nullptr. */
+  mitk::DataNode::Pointer SelectedNode() const;
+  mitk::Image::Pointer SelectedImage() const;
 
-  template < typename TPixel, unsigned int VImageDimension >
-  void TemplatedResampleImage( itk::Image<TPixel, VImageDimension>* itkImage);
+  /**
+   * Runs an edit of the selected image, reports exceptions in a message box, and adds the result
+   * as a new node named after the selected node plus suffix below it.
+   */
+  void ApplyEdit(const QString& description, const QString& suffix, const std::function<mitk::Image::Pointer(const mitk::Image*)>& edit, bool reinitializeViews);
 
-  /** Called by ExtractB0 if check-box activated, extracts all b0 images without averaging */
-  void DoExtractBOWithoutAveraging();
+  void AddResult(mitk::DataNode* parent, mitk::BaseData* data, const QString& name, bool reinitializeViews);
 
-  void UpdateBValueTableWidget(int);
+  void UpdateBValueTableWidget();
   void UpdateGradientDetails();
-
-  /// \brief called by QmitkAbstractView when DataManager's selection has changed
-  virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
-
-  Ui::QmitkPreprocessingViewControls* m_Controls;
-
-  void SetDefaultNodeProperties(mitk::DataNode::Pointer node, std::string name);
-
   void CleanBValueTableWidget();
+  void ClearHeaderTables();
 
+  std::unique_ptr<Ui::QmitkPreprocessingViewControls> m_Controls;
+
+  /** The node the controls show; Visible() refreshes them only for another node. */
+  mitk::DataNode::Pointer m_ShownNode;
 };
 
-
-
-
-#endif // _QMITKPREPROCESSINGVIEW_H_INCLUDED
-
+#endif

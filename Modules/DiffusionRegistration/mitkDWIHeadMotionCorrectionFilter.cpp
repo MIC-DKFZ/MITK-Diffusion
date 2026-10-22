@@ -34,6 +34,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkComposeImageFilter.h>
 #include <itkImageDuplicator.h>
+#include <mitkDiffusionImageEditing.h>
 #include <mitkDiffusionImageMapping.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkITKImageImport.h>
@@ -65,7 +66,7 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
   const unsigned int reference = bValueMap.begin()->second.front();
   MITK_INFO << "Reference b-value: " << bValueMap.begin()->first << " (volume " << reference << ")";
 
-  mitk::Image::Pointer fixedImage = mitk::DiffusionImageMapping::ExtractVolume(input, reference);
+  mitk::Image::Pointer fixedImage = mitk::DiffusionImageEditing::ExtractVolume(input, reference);
 
   // The output keeps the volume order of the input, the reference at its own index, because the
   // gradients are corrected in that order.
@@ -95,7 +96,7 @@ void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
       continue;
 
     MITK_INFO << "Correcting volume " << i;
-    mitk::Image::Pointer movingImage = mitk::DiffusionImageMapping::ExtractVolume(input, i);
+    mitk::Image::Pointer movingImage = mitk::DiffusionImageEditing::ExtractVolume(input, i);
 
     helper.SetData(movingImage, fixedImage);
     mitk::MAPRegistrationWrapper::Pointer registration = helper.GetMITKRegistrationWrapper();

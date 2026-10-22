@@ -35,6 +35,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageMappingHelper.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkDiffusionImageEditing.h>
 #include <mitkDiffusionImageMapping.h>
 #include <mitkDiffusionDataIOHelper.h>
 
@@ -97,10 +98,10 @@ int main(int argc, char* argv[])
     mitk::MAPAlgorithmHelper helper(algo);
 
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(fixed))
-      fixed_single = mitk::DiffusionImageMapping::ExtractVolume(fixed, 0);
+      fixed_single = mitk::DiffusionImageEditing::ExtractVolume(fixed, 0);
 
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(moving))
-      moving_single = mitk::DiffusionImageMapping::ExtractVolume(moving, 0);
+      moving_single = mitk::DiffusionImageEditing::ExtractVolume(moving, 0);
 
     helper.SetData(moving_single, fixed_single);
     mitk::MAPRegistrationWrapper::Pointer reg = helper.GetMITKRegistrationWrapper();

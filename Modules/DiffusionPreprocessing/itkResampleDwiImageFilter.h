@@ -53,6 +53,47 @@ inline Point<double, 3> ResampledImageOrigin(const Point<double, 3>& origin, con
   return newOrigin;
 }
 
+/** \brief How a resampled grid is given: relative to the input, as factor, spacing or size. */
+enum class ResampleGridMode { SamplingFactor, Spacing, Size };
+
+/**
+ * \brief Spacing and region of a resampled grid.
+ *
+ * SamplingFactor: spacing / value, size * value. Spacing: value, size * spacing / value. Size:
+ * value, spacing * size / value. The sizes are truncated.
+ */
+inline void ResampledImageGrid(const Vector<double, 3>& spacing, const ImageRegion<3>& region, ResampleGridMode mode, const Vector<double, 3>& value, Vector<double, 3>& newSpacing, ImageRegion<3>& newRegion)
+{
+  newSpacing = spacing;
+  newRegion = region;
+  switch (mode)
+  {
+  case ResampleGridMode::SamplingFactor:
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      newSpacing[i] /= value[i];
+      newRegion.SetSize(i, newRegion.GetSize(i)*value[i]);
+    }
+    break;
+  case ResampleGridMode::Spacing:
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      const double sampling = spacing[i]/value[i];
+      newRegion.SetSize(i, newRegion.GetSize(i)*sampling);
+    }
+    newSpacing = value;
+    break;
+  case ResampleGridMode::Size:
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      newRegion.SetSize(i, value[i]);
+      const double sampling = (double)newRegion.GetSize(i)/region.GetSize(i);
+      newSpacing[i] /= sampling;
+    }
+    break;
+  }
+}
+
 /**
  * \brief Resamples a DWI channel by channel onto a grid with the same outer corner and direction.
  *
@@ -93,7 +134,7 @@ public:
     /** Output spacing = input spacing / factor, output size = input size * factor. */
     void SetSamplingFactor(DoubleVectorType sampling)
     {
-        m_GridMode = GridMode::SamplingFactor;
+        m_GridMode = ResampleGridMode::SamplingFactor;
         m_GridValue = sampling;
         this->Modified();
     }
@@ -101,7 +142,7 @@ public:
     /** Output size = input size * input spacing / spacing. */
     void SetNewSpacing(DoubleVectorType spacing)
     {
-        m_GridMode = GridMode::Spacing;
+        m_GridMode = ResampleGridMode::Spacing;
         m_GridValue = spacing;
         this->Modified();
     }
@@ -109,7 +150,7 @@ public:
     /** Output spacing = input spacing * input size / size. */
     void SetNewImageSize(ImageRegion<3> region)
     {
-        m_GridMode = GridMode::Size;
+        m_GridMode = ResampleGridMode::Size;
         for (unsigned int i = 0; i < 3; ++i)
             m_GridValue[i] = region.GetSize(i);
         this->Modified();
@@ -125,9 +166,7 @@ protected:
     void EnlargeOutputRequestedRegion(DataObject* output) override;
     void GenerateData() override;
 
-    enum class GridMode { SamplingFactor, Spacing, Size };
-
-    GridMode         m_GridMode = GridMode::SamplingFactor;
+    ResampleGridMode m_GridMode = ResampleGridMode::SamplingFactor;
     DoubleVectorType m_GridValue;
     Interpolation    m_Interpolation;
 };

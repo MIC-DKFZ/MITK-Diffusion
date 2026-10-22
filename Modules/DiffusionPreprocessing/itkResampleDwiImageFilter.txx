@@ -65,43 +65,10 @@ ResampleDwiImageFilter<TScalarType>
     if (input == nullptr || output == nullptr)
         return;
 
-    // The sizes are truncated, as the view and the command line tools always did.
     const DoubleVectorType oldSpacing = input->GetSpacing();
-    const ImageRegion<3> oldRegion = input->GetLargestPossibleRegion();
-    DoubleVectorType newSpacing = oldSpacing;
-    ImageRegion<3> newRegion = oldRegion;
-    switch (m_GridMode)
-    {
-    case GridMode::SamplingFactor:
-    {
-        for (unsigned int i = 0; i < 3; ++i)
-        {
-            newSpacing[i] /= m_GridValue[i];
-            newRegion.SetSize(i, newRegion.GetSize(i)*m_GridValue[i]);
-        }
-        break;
-    }
-    case GridMode::Spacing:
-    {
-        for (unsigned int i = 0; i < 3; ++i)
-        {
-            const double sampling = oldSpacing[i]/m_GridValue[i];
-            newRegion.SetSize(i, newRegion.GetSize(i)*sampling);
-        }
-        newSpacing = m_GridValue;
-        break;
-    }
-    case GridMode::Size:
-    {
-        for (unsigned int i = 0; i < 3; ++i)
-        {
-            newRegion.SetSize(i, m_GridValue[i]);
-            const double sampling = (double)newRegion.GetSize(i)/oldRegion.GetSize(i);
-            newSpacing[i] /= sampling;
-        }
-        break;
-    }
-    }
+    DoubleVectorType newSpacing;
+    ImageRegion<3> newRegion;
+    ResampledImageGrid(oldSpacing, input->GetLargestPossibleRegion(), m_GridMode, m_GridValue, newSpacing, newRegion);
 
     output->SetSpacing(newSpacing);
     output->SetOrigin(ResampledImageOrigin(input->GetOrigin(), input->GetDirection(), oldSpacing, newSpacing));

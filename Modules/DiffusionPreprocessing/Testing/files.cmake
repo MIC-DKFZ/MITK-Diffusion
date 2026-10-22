@@ -8,4 +8,5 @@ set(MODULE_CUSTOM_TESTS
   mitkDiffusionB0ExtractionFilterTest.cpp
   mitkDiffusionImageEditingTest.cpp
   mitkDiffusionImageDenoisingTest.cpp
+  mitkDiffusionVolumeEditingTest.cpp
 )

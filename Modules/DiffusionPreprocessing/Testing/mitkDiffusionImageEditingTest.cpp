@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
+#include <itkImageRegionConstIterator.h>
 #include <itkImageRegionConstIteratorWithIndex.h>
 #include <mitkDiffusionImageEditing.h>
 #include <mitkDiffusionPropertyHelper.h>
@@ -35,6 +36,9 @@ class mitkDiffusionImageEditingTestSuite : public mitk::TestFixture
   MITK_TEST(ClearGradientRotation_RotatedLegacyImage_RemovesRotation);
   MITK_TEST(MergeDwis_RotatedLegacyImages_WorldGradientsWithoutRotation);
   MITK_TEST(MergeDwis_NotADwiOrOtherGeometry_Throws);
+  MITK_TEST(Crop_DwiAndVolume_KeepsWorldPositionOfVoxels);
+  MITK_TEST(Crop_NothingLeft_Throws);
+  MITK_TEST(Resample_DwiAndVolume_SameGridAndValues);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -114,6 +118,27 @@ class mitkDiffusionImageEditingTestSuite : public mitk::TestFixture
     auto copy = image->Clone();
     PropHelper::InitializeImage(copy);
     AssertGradientsEqual(expected, PropHelper::GetGradientContainer(copy), 1e-12);
+  }
+
+  using VolumeType = itk::Image<PropHelper::DiffusionPixelType, 3>;
+
+  static VolumeType::Pointer ToItkVolume(const mitk::Image* image)
+  {
+    VolumeType::Pointer itkImage;
+    mitk::CastToItkImage(image, itkImage);
+    return itkImage;
+  }
+
+  /** Same geometry and the same values as channel c of the DWI. */
+  static void AssertVolumeIsChannel(mitk::Image* volume, mitk::Image* dwi, unsigned int c)
+  {
+    CPPUNIT_ASSERT(mitk::Equal(*dwi->GetGeometry(), *volume->GetGeometry(), 1e-9, 1e-9, true));
+    auto itkVolume = ToItkVolume(volume);
+    auto itkDwi = PropHelper::GetItkVectorImage(dwi);
+    itk::ImageRegionConstIterator<VolumeType> v(itkVolume, itkVolume->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<DwiType> d(itkDwi, itkDwi->GetLargestPossibleRegion());
+    for (; !v.IsAtEnd(); ++v, ++d)
+      CPPUNIT_ASSERT_EQUAL(d.Get()[c], v.Get());
   }
 
 public:
@@ -338,6 +363,76 @@ public:
     change.origin = origin;
     auto moved = mitk::DiffusionImageEditing::ApplyHeader(m_Dwi, change);
     CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::MergeDwis({m_Dwi, moved}), itk::ExceptionObject);
+  }
+
+  void Crop_DwiAndVolume_KeepsWorldPositionOfVoxels()
+  {
+    // test.dwi: 11 x 11 x 3 voxels; turned so that the shift of the origin runs through the
+    // direction matrix.
+    SetRotation(m_Dwi, RotationZ());
+    PropHelper::InitializeImage(m_Dwi);
+    const std::array<unsigned int, 3> lower = {1, 2, 0};
+    const std::array<unsigned int, 3> upper = {2, 1, 1};
+    auto cropped = mitk::DiffusionImageEditing::Crop(m_Dwi, lower, upper);
+
+    CPPUNIT_ASSERT_EQUAL(8u, cropped->GetDimension(0));
+    CPPUNIT_ASSERT_EQUAL(8u, cropped->GetDimension(1));
+    CPPUNIT_ASSERT_EQUAL(2u, cropped->GetDimension(2));
+    AssertGradientsEqual(PropHelper::GetGradientContainer(m_Dwi), PropHelper::GetGradientContainer(cropped), 1e-12);
+
+    // Voxel (i, j, k) of the result is voxel (i + 1, j + 2, k) of the input, at the same place.
+    mitk::Point3D first;
+    m_Dwi->GetGeometry()->IndexToWorld(mitk::Point3D(std::array<double, 3>{1, 2, 0}.data()), first);
+    for (unsigned int d = 0; d < 3; ++d)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(first[d], cropped->GetGeometry()->GetOrigin()[d], 1e-9);
+    auto in = PropHelper::GetItkVectorImage(m_Dwi);
+    auto out = PropHelper::GetItkVectorImage(cropped);
+    itk::ImageRegionConstIteratorWithIndex<DwiType> it(out, out->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+    {
+      auto index = it.GetIndex();
+      index[0] += 1;
+      index[1] += 2;
+      CPPUNIT_ASSERT(it.Get() == in->GetPixel(index));
+    }
+
+    // A volume of the DWI is cropped alike.
+    auto volume = mitk::DiffusionImageEditing::Crop(mitk::DiffusionImageEditing::ExtractVolume(m_Dwi, 3), lower, upper);
+    AssertVolumeIsChannel(volume, cropped, 3);
+  }
+
+  void Crop_NothingLeft_Throws()
+  {
+    CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::Crop(m_Dwi, {5, 0, 0}, {6, 0, 0}), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::Crop(m_Dwi, {0, 0, 3}, {0, 0, 0}), mitk::Exception);
+  }
+
+  void Resample_DwiAndVolume_SameGridAndValues()
+  {
+    // A flipped y axis, as ITK reads most clinical NIfTI files.
+    MatrixType flip;
+    flip.set_identity();
+    flip[1][1] = -1;
+    SetRotation(m_Dwi, flip);
+    PropHelper::InitializeImage(m_Dwi);
+    auto volume = mitk::DiffusionImageEditing::ExtractVolume(m_Dwi, 7);
+
+    using mitk::DiffusionImageEditing::Interpolation;
+    using mitk::DiffusionImageEditing::ResampleGrid;
+    const std::vector<std::pair<ResampleGrid, mitk::Vector3D>> grids = {
+      {ResampleGrid::SamplingFactor, mitk::Vector3D(std::array<double, 3>{1.5, 0.7, 2.0}.data())},
+      {ResampleGrid::Spacing, mitk::Vector3D(std::array<double, 3>{3.0, 1.0, 2.5}.data())},
+      {ResampleGrid::Size, mitk::Vector3D(std::array<double, 3>{5, 20, 3}.data())}};
+    for (const auto& [grid, value] : grids)
+    {
+      for (auto interpolation : {Interpolation::NearestNeighbour, Interpolation::Linear, Interpolation::BSpline, Interpolation::WindowedSinc})
+      {
+        auto resampledDwi = mitk::DiffusionImageEditing::Resample(m_Dwi, grid, value, interpolation);
+        AssertGradientsEqual(PropHelper::GetGradientContainer(m_Dwi), PropHelper::GetGradientContainer(resampledDwi), 1e-12);
+        AssertVolumeIsChannel(mitk::DiffusionImageEditing::Resample(volume, grid, value, interpolation), resampledDwi, 7);
+      }
+    }
+    CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::Resample(m_Dwi, ResampleGrid::Spacing, mitk::Vector3D(0.0), Interpolation::Linear), mitk::Exception);
   }
 };
 

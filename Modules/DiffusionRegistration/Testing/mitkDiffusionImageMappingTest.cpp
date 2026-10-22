@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <mapPreCachedRegistrationKernel.h>
 #include <mapRegistration.h>
 #include <mapRegistrationManipulator.h>
+#include <mitkDiffusionImageEditing.h>
 #include <mitkDiffusionImageMapping.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkIOUtil.h>
@@ -31,7 +32,6 @@ class mitkDiffusionImageMappingTestSuite : public mitk::TestFixture
   MITK_TEST(RotateGradients_OneMatrixNoB0_RotatesFirstVolumeToo);
   MITK_TEST(RotateGradients_OneAffinePerVolume_RotatesEachVolumeByItsOwn);
   MITK_TEST(RotationComponent_SingularMatrix_Throws);
-  MITK_TEST(ExtractVolume_EachIndex_CopiesTheChannel);
   MITK_TEST(MapImage_IdentityRegistration_KeepsVolumesAndGradients);
   MITK_TEST(MapImage_Rotation_MapsEachVolumeAndRotatesGradients);
   MITK_TEST(RefineGeometry_Rotation_TurnsGeometryAndGradients);
@@ -176,24 +176,6 @@ public:
     CPPUNIT_ASSERT_THROW(mitk::DiffusionImageMapping::RotationComponent(singular), mitk::Exception);
   }
 
-  void ExtractVolume_EachIndex_CopiesTheChannel()
-  {
-    // The volumes are kept while the DWI is accessed again: they must not hold an access to it.
-    const unsigned int n = PropHelper::GetGradientContainer(m_Image)->Size();
-    std::vector<mitk::Image::Pointer> volumes;
-    for (unsigned int i : {0u, 1u, n - 1})
-      volumes.push_back(mitk::DiffusionImageMapping::ExtractVolume(m_Image, i));
-    auto dwi = PropHelper::GetItkVectorImage(m_Image);
-    unsigned int k = 0;
-    for (unsigned int i : {0u, 1u, n - 1})
-    {
-      auto volume = volumes[k++];
-      CPPUNIT_ASSERT(mitk::Equal(*m_Image->GetGeometry(), *volume->GetGeometry(), mitk::eps, mitk::eps, false));
-      CheckEqualVolumes(ToItk(volume), dwi, i);
-    }
-    CPPUNIT_ASSERT_THROW(mitk::DiffusionImageMapping::ExtractVolume(m_Image, dwi->GetVectorLength()), itk::ExceptionObject);
-  }
-
   void MapImage_IdentityRegistration_KeepsVolumesAndGradients()
   {
     auto result = mitk::DiffusionImageMapping::MapImage(m_Image, mitk::GenerateIdentityRegistration3D(), m_Image->GetGeometry(), mitk::ImageMappingInterpolator::NearestNeighbor);
@@ -224,7 +206,7 @@ public:
     CPPUNIT_ASSERT_EQUAL(n, output->GetVectorLength());
     for (unsigned int i : {0u, 5u, n - 1})
     {
-      auto expected = mitk::ImageMappingHelper::map(mitk::DiffusionImageMapping::ExtractVolume(m_Image, i), registration.GetPointer(), false, 0, m_Image->GetGeometry(), false, 0, mitk::ImageMappingInterpolator::Linear);
+      auto expected = mitk::ImageMappingHelper::map(mitk::DiffusionImageEditing::ExtractVolume(m_Image, i), registration.GetPointer(), false, 0, m_Image->GetGeometry(), false, 0, mitk::ImageMappingInterpolator::Linear);
       CheckEqualVolumes(ToItk(expected), output, i);
     }
   }

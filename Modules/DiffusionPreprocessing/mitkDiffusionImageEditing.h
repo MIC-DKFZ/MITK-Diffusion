@@ -19,6 +19,7 @@ found in the LICENSE file.
 #include <mitkImage.h>
 
 #include <array>
+#include <map>
 #include <optional>
 #include <vector>
 
@@ -103,6 +104,59 @@ namespace mitk
 
     /** \brief The DWI with rounded b-values (see above). */
     MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer RoundBValues(const Image* dwi, int roundingValue);
+
+    /**
+     * \brief Removes the given numbers of voxels at the lower and upper end of each axis.
+     *
+     * The remaining voxels keep their world position. Supports DWIs and 3D images with one
+     * component; throws if no voxel would remain along an axis.
+     */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer Crop(const Image* image, const std::array<unsigned int, 3>& lower, const std::array<unsigned int, 3>& upper);
+
+    enum class ResampleGrid { SamplingFactor, Spacing, Size };
+    enum class Interpolation { NearestNeighbour, Linear, BSpline, WindowedSinc };
+
+    /**
+     * \brief Resamples onto a grid given relative to the input (itk::ResampledImageGrid) that keeps
+     * the outer corner of the image and its direction.
+     *
+     * Supports DWIs (volume by volume) and 3D images with one component.
+     */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer Resample(const Image* image, ResampleGrid grid, const Vector3D& value, Interpolation interpolation);
+
+    /** \brief One volume of a DWI as a 3D image with the DWI's geometry and no properties. */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer ExtractVolume(const Image* dwi, unsigned int index);
+
+    /** \brief The DWI without the given volumes; an index listed twice counts once. */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer RemoveVolumes(const Image* dwi, const std::vector<unsigned int>& indices);
+
+    /** \brief The average of the b0 volumes (see mitk::IsB0) as a 3D image without properties. */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer ExtractB0(const Image* dwi);
+
+    /** \brief The b0 volumes (see mitk::IsB0) as the time steps of a 3D+t image without properties. */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer ExtractB0Volumes(const Image* dwi);
+
+    /** \brief Negates the selected world (LPS) components of every gradient. */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer FlipGradients(const Image* dwi, const std::array<bool, 3>& components);
+
+    /**
+     * \brief Reorders the world (LPS) components of every gradient: component i of the result is
+     * component order[i] of the input. Throws if order is not a permutation of 0, 1 and 2.
+     */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer PermuteGradientComponents(const Image* dwi, const std::array<unsigned int, 3>& order);
+
+    /** \brief Negates every gradient with a negative x (world) component. */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer MirrorGradientsToHalfSphere(const Image* dwi);
+
+    /**
+     * \brief Keeps per selected shell (b-value of the DWI's b-value map) the given number of
+     * evenly spread directions (itk::ElectrostaticRepulsionDiffusionGradientReductionFilter); with
+     * useFirstN the first ones. Volumes of shells not listed are dropped.
+     */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer ReduceGradients(const Image* dwi, const std::map<unsigned int, unsigned int>& directionsPerShell, bool useFirstN);
+
+    /** \brief Averages volumes whose gradients agree within the precision (DiffusionPropertyHelper::AverageRedundantGradients). */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer AverageRepeatedGradients(const Image* dwi, double precision);
   }
 }
 

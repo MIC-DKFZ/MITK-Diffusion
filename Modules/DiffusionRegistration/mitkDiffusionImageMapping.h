@@ -53,9 +53,6 @@ namespace mitk
     /** \brief As above with one affine matrix per volume, in volume order. */
     MITKDIFFUSIONREGISTRATION_EXPORT void RotateGradients(Image* dwi, const std::vector<MatrixType>& affines);
 
-    /** \brief One volume of a DWI as a 3D image with the DWI's geometry. */
-    MITKDIFFUSIONREGISTRATION_EXPORT Image::Pointer ExtractVolume(const Image* dwi, unsigned int index);
-
     /**
      * \brief Resamples an image into the target geometry with the registration, a DWI volume by volume.
      *
