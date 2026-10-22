@@ -178,10 +178,16 @@ public:
 
   void ExtractVolume_EachIndex_CopiesTheChannel()
   {
+    // The volumes are kept while the DWI is accessed again: they must not hold an access to it.
+    const unsigned int n = PropHelper::GetGradientContainer(m_Image)->Size();
+    std::vector<mitk::Image::Pointer> volumes;
+    for (unsigned int i : {0u, 1u, n - 1})
+      volumes.push_back(mitk::DiffusionImageMapping::ExtractVolume(m_Image, i));
     auto dwi = PropHelper::GetItkVectorImage(m_Image);
-    for (unsigned int i : {0u, 1u, dwi->GetVectorLength() - 1})
+    unsigned int k = 0;
+    for (unsigned int i : {0u, 1u, n - 1})
     {
-      auto volume = mitk::DiffusionImageMapping::ExtractVolume(m_Image, i);
+      auto volume = volumes[k++];
       CPPUNIT_ASSERT(mitk::Equal(*m_Image->GetGeometry(), *volume->GetGeometry(), mitk::eps, mitk::eps, false));
       CheckEqualVolumes(ToItk(volume), dwi, i);
     }

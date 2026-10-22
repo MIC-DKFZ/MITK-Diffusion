@@ -115,7 +115,10 @@ mitk::Image::Pointer mitk::DiffusionImageMapping::ExtractVolume(const Image* dwi
   extractor->SetInput(itkDwi);
   extractor->SetIndex(index);
   extractor->Update();
-  return GrabItkImageMemory(extractor->GetOutput());
+  // Disconnected, the volume does not keep the extractor and the ITK view of the whole DWI alive.
+  VolumeType::Pointer volume = extractor->GetOutput();
+  volume->DisconnectPipeline();
+  return GrabItkImageMemory(volume);
 }
 
 mitk::Image::Pointer mitk::DiffusionImageMapping::MapImage(const Image* moving, const MAPRegistrationWrapper* registration, const BaseGeometry* target, ImageMappingInterpolator::Type interpolator)
