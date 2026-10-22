@@ -29,36 +29,23 @@ See LICENSE.txt or http://www.mitk.org for details.
   14 PURPOSE.  See the above copyright notices for more information.
   15
   16 =========================================================================*/
-#ifndef _itk_MergeDiffusionImagesFilter_txx_
-#define _itk_MergeDiffusionImagesFilter_txx_
-#endif
+#ifndef itkMergeDiffusionImagesFilter_txx
+#define itkMergeDiffusionImagesFilter_txx
 
 #include "itkMergeDiffusionImagesFilter.h"
-#include <itkImageRegionIterator.h>
-#include <itkImageRegionConstIterator.h>
-#include <boost/timer/progress_display.hpp>
+
+#include <itkImageToImageFilterCommon.h>
 #include <mitkB0Indices.h>
 
 namespace itk
 {
 
 template <class TScalarType>
-MergeDiffusionImagesFilter<TScalarType>::MergeDiffusionImagesFilter()
-{
-
-}
-
-template <class TScalarType>
-MergeDiffusionImagesFilter<TScalarType>::~MergeDiffusionImagesFilter()
-{
-
-}
-
-template <class TScalarType>
 void MergeDiffusionImagesFilter<TScalarType>
 ::SetImageVolumes(DwiImageContainerType cont)
 {
     m_ImageVolumes=cont;
+    this->Modified();
 }
 
 template <class TScalarType>
@@ -66,6 +53,7 @@ void MergeDiffusionImagesFilter<TScalarType>
 ::SetGradientLists(GradientListContainerType cont)
 {
     m_GradientLists=cont;
+    this->Modified();
 }
 
 template <class TScalarType>
@@ -73,10 +61,11 @@ void MergeDiffusionImagesFilter<TScalarType>
 ::SetBValues(std::vector< double > bvals)
 {
     m_BValues=bvals;
+    this->Modified();
 }
 
 template <class TScalarType>
-MergeDiffusionImagesFilter<TScalarType>::GradientListType::Pointer MergeDiffusionImagesFilter<TScalarType>
+typename MergeDiffusionImagesFilter<TScalarType>::GradientListType::Pointer MergeDiffusionImagesFilter<TScalarType>
 ::GetOutputGradients()
 {
     return m_OutputGradients;
@@ -92,29 +81,28 @@ double MergeDiffusionImagesFilter<TScalarType>
 template <class TScalarType>
 void
 MergeDiffusionImagesFilter<TScalarType>
-::GenerateData ()
+::GenerateOutputInformation()
 {
-
     if( m_ImageVolumes.size()<2 )
-      throw itk::ExceptionObject (__FILE__,__LINE__,"Error: cannot combine less than two DWIs.");
+      itkExceptionMacro("Error: cannot combine less than two DWIs.");
 
     if( m_GradientLists.size()!=m_ImageVolumes.size() || m_ImageVolumes.size()!=m_BValues.size() || m_BValues.size()!=m_GradientLists.size() )
-      throw itk::ExceptionObject (__FILE__,__LINE__,"Error: need same number of b-values, image volumes and gradient containers.");
+      itkExceptionMacro("Error: need same number of b-values, image volumes and gradient containers.");
 
     typename DwiImageType::Pointer img = m_ImageVolumes.at(0);
 
-    m_NumGradients = 0;
+    unsigned int numGradients = 0;
     for (unsigned int i=0; i<m_GradientLists.size(); i++)
     {
-        m_NumGradients += m_GradientLists.at(i)->Size();
+        numGradients += m_GradientLists.at(i)->Size();
         typename DwiImageType::Pointer tmp = m_ImageVolumes.at(i);
         if ( img->GetLargestPossibleRegion()!=tmp->GetLargestPossibleRegion() )
-            throw itk::ExceptionObject (__FILE__,__LINE__,"Error: images are not of same size.");
+            itkExceptionMacro("Error: images are not of same size.");
         // Voxels are merged by index into the geometry of the first image.
         if ( !img->IsCongruentImageGeometry(tmp, ImageToImageFilterCommon::GetGlobalDefaultCoordinateTolerance(), ImageToImageFilterCommon::GetGlobalDefaultDirectionTolerance()) )
-            throw itk::ExceptionObject (__FILE__,__LINE__,"Error: images do not have the same spacing, origin and direction.");
+            itkExceptionMacro("Error: images do not have the same spacing, origin and direction.");
         if ( m_GradientLists.at(i)->Size()!=tmp->GetVectorLength() )
-            throw itk::ExceptionObject (__FILE__,__LINE__,"Error: number of gradients does not match the number of image volumes.");
+            itkExceptionMacro("Error: number of gradients does not match the number of image volumes.");
     }
 
     m_BValue = 0;
@@ -122,68 +110,64 @@ MergeDiffusionImagesFilter<TScalarType>
       if (bval>m_BValue)
         m_BValue = bval;
 
-    // The gradients are rescaled relative to the largest reference b-value below.
+    // The gradients are rescaled relative to the largest reference b-value.
     for (const auto& gradients : m_GradientLists)
       for (const auto& g : gradients->CastToSTLConstContainer())
         if (g.two_norm()>0.0001 && m_BValue<=0)
-          throw itk::ExceptionObject (__FILE__,__LINE__,"Error: diffusion-weighted volumes need a positive reference b-value.");
-    m_OutputGradients = GradientListType::New();
+          itkExceptionMacro("Error: diffusion-weighted volumes need a positive reference b-value.");
 
-    typename DwiImageType::Pointer outImage = DwiImageType::New();
-    outImage->SetSpacing( img->GetSpacing() );   // Set the image spacing
-    outImage->SetOrigin( img->GetOrigin() );     // Set the image origin
-    outImage->SetDirection( img->GetDirection() );  // Set the image direction
-    outImage->SetLargestPossibleRegion( img->GetLargestPossibleRegion());
-    outImage->SetBufferedRegion( img->GetLargestPossibleRegion() );
-    outImage->SetRequestedRegion( img->GetLargestPossibleRegion() );
-    outImage->SetVectorLength(m_NumGradients);
+    typename DwiImageType::Pointer outImage = this->GetOutput();
+    outImage->CopyInformation(img);
+    outImage->SetLargestPossibleRegion( img->GetLargestPossibleRegion() );
+    outImage->SetVectorLength(numGradients);
+}
+
+template <class TScalarType>
+void
+MergeDiffusionImagesFilter<TScalarType>
+::GenerateData ()
+{
+    GradientType zeroG; zeroG.fill(0.0);
+    m_OutputGradients = GradientListType::New();
+    for (unsigned int i=0; i<m_GradientLists.size(); i++)
+    {
+        for (const auto& input : m_GradientLists.at(i)->CastToSTLConstContainer())
+        {
+            GradientType g = input;
+            if (!mitk::IsB0(g, m_BValues.at(i)))
+            {
+                double mag = g.two_norm();
+                double frac = m_BValues.at(i)*mag*mag/m_BValue;
+                g.normalize();
+                g *= sqrt(frac);
+            }
+            else
+                g = zeroG;
+            m_OutputGradients->push_back(g);
+        }
+    }
+
+    typename DwiImageType::Pointer outImage = this->GetOutput();
+    outImage->SetBufferedRegion(outImage->GetLargestPossibleRegion());
     outImage->Allocate();
 
-    this->SetNumberOfRequiredOutputs(1);
-    this->SetNthOutput (0, outImage);
-
-    typedef ImageRegionIterator<DwiImageType>               IteratorOutputType;
-    IteratorOutputType      itOut (this->GetOutput(), this->GetOutput()->GetLargestPossibleRegion());
-
-    MITK_INFO << "MergeDiffusionImagesFilter: merging images";
-    GradientType zeroG; zeroG.fill(0.0);
-    boost::timer::progress_display disp(this->GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels());
-    while(!itOut.IsAtEnd())
+    // Each output pixel holds the volumes of the inputs one after the other; the buffers hold the
+    // elements of each pixel one after the other.
+    const unsigned int outLength = outImage->GetVectorLength();
+    const SizeValueType numberOfPixels = outImage->GetLargestPossibleRegion().GetNumberOfPixels();
+    TScalarType* out = outImage->GetBufferPointer();
+    unsigned int offset = 0;
+    for (const auto& img : m_ImageVolumes)
     {
-        ++disp;
-        DwiPixelType out;
-        out.SetSize(m_NumGradients);
-        out.Fill(0);
-
-        int c=0;
-        for (unsigned int i=0; i<m_GradientLists.size(); i++)
-        {
-            GradientListType::ConstPointer gradients = m_GradientLists.at(i);
-            typename DwiImageType::Pointer img = m_ImageVolumes.at(i);
-
-            for (unsigned int j=0; j<gradients->Size(); j++)
-            {
-                GradientType g = gradients->GetElement(j);
-                double mag = g.two_norm();
-
-                if (!mitk::IsB0(g, m_BValues.at(i)))
-                {
-                    double frac = m_BValues.at(i)*mag*mag/m_BValue;
-                    g.normalize();
-                    g *= sqrt(frac);
-                }
-                else
-                    g = zeroG;
-
-                m_OutputGradients->InsertElement(c, g);
-                out[c] = static_cast<TScalarType>(img->GetPixel(itOut.GetIndex())[j]);
-                c++;
-            }
-        }
-
-        itOut.Set(out);
-        ++itOut;
+        const unsigned int vectorLength = img->GetVectorLength();
+        const TScalarType* in = img->GetBufferPointer();
+        for (SizeValueType p=0; p<numberOfPixels; ++p)
+            for (unsigned int j=0; j<vectorLength; j++)
+                out[p*outLength + offset + j] = in[p*vectorLength + j];
+        offset += vectorLength;
     }
 }
 
 } // end of namespace
+
+#endif
