@@ -58,9 +58,6 @@ public:
   typedef TensorDerivedMeasurementsFilter         Self;
   typedef SmartPointer<Self>                      Pointer;
   typedef SmartPointer<const Self>                ConstPointer;
-  typedef ImageToImageFilter< TensorType,
-                              OutputImageType >
-                                                  SuperClass;
 
    /** Method for creation through the object factory. */
   itkFactorylessNewMacro(Self)

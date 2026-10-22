@@ -29,12 +29,6 @@ class ShCoefficientImageExporter : public ProcessObject
 
 public:
 
-    enum NormalizationMethods {
-        NO_NORM,
-        SINGLE_VEC_NORM,
-        SPACING_COMPENSATION
-    };
-
 
     typedef ShCoefficientImageExporter Self;
     typedef SmartPointer<Self>                      Pointer;

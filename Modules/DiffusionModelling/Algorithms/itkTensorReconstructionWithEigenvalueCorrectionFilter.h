@@ -107,8 +107,6 @@ public:
   /** Get the pseudeInverse that was calculated in the process of tensor estimation */
   itkGetMacro(PseudoInverse, vnl_matrix<double>)
 
-  /** FIXME: added by Sebastian Wirkert due to compile error otherwise. */
-  itkGetMacro(CorrectedDiffusionVolumes, ImageType::Pointer)
 
   /** Outputs the design matrix that was calculated in the process of tensor estimation */
   itkGetMacro(H, vnl_matrix<double>)
@@ -176,7 +174,6 @@ private:
   /** Number of baseline images */
   unsigned int                                      m_NumberOfBaselineImages = 0;
 
-  ImageType::Pointer                                m_CorrectedDiffusionVolumes;
 
   double                                             m_B0Threshold;
 

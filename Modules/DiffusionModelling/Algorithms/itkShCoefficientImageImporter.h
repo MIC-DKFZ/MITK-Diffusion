@@ -35,7 +35,6 @@ public:
     typedef ProcessObject                           Superclass;
     typedef itk::Image< float, 4 >                  InputImageType;
     typedef Image< Vector< PixelType, (ShOrder*ShOrder + ShOrder + 2)/2 + ShOrder >, 3 > CoefficientImageType;
-    typedef Image< Vector< PixelType, ODF_SAMPLING_SIZE >, 3 > OdfImageType;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)

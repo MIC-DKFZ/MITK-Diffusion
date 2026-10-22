@@ -62,7 +62,6 @@ public:
     typedef vnl_vector_fixed< double, 3 >               DirectionType;
     typedef Image< float, 4 >                           PeakImageType;
 
-    void SetImage( const InputImageType *image );
 
     // input
     itkSetMacro( MaskImage, ItkUcharImgType::Pointer)

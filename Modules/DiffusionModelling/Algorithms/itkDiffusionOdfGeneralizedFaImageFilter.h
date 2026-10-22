@@ -91,7 +91,6 @@ public:
 
   itkStaticConstMacro(NOdfDirections,int,NrOdfDirections);
 
-  void SetOdfImage( const InputImageType *image );
 
   itkGetMacro(ComputationMethod, GfaComputationMethod);
   itkSetMacro(ComputationMethod, GfaComputationMethod);

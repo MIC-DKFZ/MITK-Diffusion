@@ -68,8 +68,6 @@ void ShCoefficientImageExporter< PixelType, ShOrder >
     m_OutputImage->Allocate();
     m_OutputImage->FillBuffer(0.0);
 
-    typedef ImageRegionConstIterator< InputImageType > InputIteratorType;
-    InputIteratorType it(m_InputImage, m_InputImage->GetLargestPossibleRegion());
     int numCoeffs = imageRegion4.GetSize(3);
 
     int x = imageRegion3.GetSize(0);

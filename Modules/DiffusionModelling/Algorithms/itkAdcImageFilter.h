@@ -58,7 +58,6 @@ public:
   typedef typename Superclass::OutputImageType OutputImageType;
   typedef typename Superclass::OutputImageRegionType OutputImageRegionType;
 
-  itkSetMacro( MaskImage, ItkUcharImageType::Pointer )
   itkSetMacro( FitSignal, bool )
   itkSetMacro( B_value, double )
   itkSetMacro( GradientDirections, GradientContainerType )
@@ -120,7 +119,6 @@ public:
   vnl_vector<double> m_B_values;
   vnl_vector<double> m_Nonzero_B_values;
   GradientContainerType m_GradientDirections;
-  ItkUcharImageType::Pointer m_MaskImage;
 
   double FitSingleVoxel( const typename InputImageType::PixelType &input);
 
