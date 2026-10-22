@@ -64,15 +64,14 @@ public:
   itkCloneMacro(Self)
 
   /** Runtime information support. */
-  itkTypeMacro(TensorDerivedMeasurementsFilter, ImageToImageFilter);
+  itkOverrideGetNameOfClassMacro(TensorDerivedMeasurementsFilter);
 
   itkSetMacro(Measure, Measure);
 
 
 protected:
   TensorDerivedMeasurementsFilter();
-  ~TensorDerivedMeasurementsFilter() {};
-  //void PrintSelf(std::ostream& os, Indent indent) const;
+  ~TensorDerivedMeasurementsFilter() override = default;
 
   Measure m_Measure;
 

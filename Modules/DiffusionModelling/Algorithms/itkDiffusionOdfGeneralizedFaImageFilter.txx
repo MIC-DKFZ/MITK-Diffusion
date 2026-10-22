@@ -210,7 +210,6 @@ namespace itk {
       ++git; // Gradient  image iterator
     }
 
-    std::cout << "One Thread finished calculation" << std::endl;
   }
 
   template< class TOdfPixelType,

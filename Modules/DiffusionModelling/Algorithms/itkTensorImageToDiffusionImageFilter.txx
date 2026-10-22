@@ -31,7 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
   16 =========================================================================*/
 #ifndef _itk_TensorImageToDiffusionImageFilter_txx_
 #define _itk_TensorImageToDiffusionImageFilter_txx_
-#endif
 
 #include "itkTensorImageToDiffusionImageFilter.h"
 #include "itkTensorToL2NormImageFilter.h"
@@ -199,3 +198,5 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 }
 
 } // end of namespace
+
+#endif

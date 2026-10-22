@@ -52,7 +52,7 @@ public:
   itkCloneMacro(Self)
 
   /** Runtime information support. */
-  itkTypeMacro(AdcImageFilter, ImageToImageFilter)
+  itkOverrideGetNameOfClassMacro(AdcImageFilter)
 
   typedef typename Superclass::InputImageType InputImageType;
   typedef typename Superclass::OutputImageType OutputImageType;
@@ -108,7 +108,7 @@ public:
 
   protected:
     AdcImageFilter();
-  ~AdcImageFilter() override {}
+  ~AdcImageFilter() override = default;
   void PrintSelf(std::ostream& os, Indent indent) const override;
 
   void BeforeThreadedGenerateData() override;

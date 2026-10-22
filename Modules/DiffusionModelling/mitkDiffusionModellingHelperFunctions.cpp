@@ -45,7 +45,7 @@ namespace
   }
 
   template <int ShOrder>
-  mitk::OdfImage::ItkOdfImageType::Pointer ShToOdf(mitk::ShImage *shImage)
+  mitk::OdfImage::ItkOdfImageType::Pointer ShToOdf(const mitk::ShImage *shImage)
   {
     using ShConverterType = itk::ShToOdfImageFilter<float, ShOrder>;
     typename ShConverterType::InputImageType::Pointer coefficients = ShConverterType::InputImageType::New();
@@ -98,9 +98,9 @@ double mitk::sh::Yj(int m, int k, float theta, float phi, bool mrtrix)
     return mag*static_cast<double>(sin(-m*phi));
 }
 
-mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromShImage(mitk::Image::Pointer mitkImage)
+mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromShImage(const mitk::Image *mitkImage)
 {
-  auto *shImage = dynamic_cast<mitk::ShImage*>(mitkImage.GetPointer());
+  const auto *shImage = dynamic_cast<const mitk::ShImage*>(mitkImage);
   if (shImage == nullptr)
     mitkThrow() << "Input image is not a SH image!";
   switch (shImage->ShOrder())
@@ -122,14 +122,14 @@ mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromShImage(mit
   }
 }
 
-mitk::OdfImage::Pointer mitk::convert::GetOdfFromShImage(mitk::Image::Pointer mitkImage)
+mitk::OdfImage::Pointer mitk::convert::GetOdfFromShImage(const mitk::Image *mitkImage)
 {
   auto image = mitk::OdfImage::New();
   mitk::GrabItkImageMemory(GetItkOdfFromShImage(mitkImage).GetPointer(), image.GetPointer());
   return image;
 }
 
-mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromTensorImage(mitk::Image::Pointer mitkImage)
+mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromTensorImage(const mitk::Image *mitkImage)
 {
   typedef itk::TensorImageToOdfImageFilter< float, float > FilterType;
   FilterType::Pointer filter = FilterType::New();
@@ -138,7 +138,7 @@ mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromTensorImage
   return filter->GetOutput();
 }
 
-mitk::TensorImage::ItkTensorImageType::Pointer mitk::convert::GetItkTensorFromTensorImage(mitk::Image::Pointer mitkImage)
+mitk::TensorImage::ItkTensorImageType::Pointer mitk::convert::GetItkTensorFromTensorImage(const mitk::Image *mitkImage)
 {
   typedef mitk::ImageToItk< mitk::TensorImage::ItkTensorImageType > CasterType;
   CasterType::Pointer caster = CasterType::New();
@@ -147,14 +147,14 @@ mitk::TensorImage::ItkTensorImageType::Pointer mitk::convert::GetItkTensorFromTe
   return caster->GetOutput();
 }
 
-mitk::OdfImage::Pointer mitk::convert::GetOdfFromTensorImage(mitk::Image::Pointer mitkImage)
+mitk::OdfImage::Pointer mitk::convert::GetOdfFromTensorImage(const mitk::Image *mitkImage)
 {
   auto image = mitk::OdfImage::New();
   mitk::GrabItkImageMemory(GetItkOdfFromTensorImage(mitkImage).GetPointer(), image.GetPointer());
   return image;
 }
 
-mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromOdfImage(mitk::Image::Pointer mitkImage)
+mitk::OdfImage::ItkOdfImageType::Pointer mitk::convert::GetItkOdfFromOdfImage(const mitk::Image *mitkImage)
 {
   typedef mitk::ImageToItk< mitk::OdfImage::ItkOdfImageType > CasterType;
   CasterType::Pointer caster = CasterType::New();

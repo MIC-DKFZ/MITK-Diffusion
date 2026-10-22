@@ -42,7 +42,7 @@ public:
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(ShCoefficientImageExporter, ProcessObject)
+    itkOverrideGetNameOfClassMacro(ShCoefficientImageExporter)
 
     // input
     itkSetMacro( InputImage, typename InputImageType::Pointer) ///< sh coefficient image in FSL file format
@@ -54,7 +54,7 @@ public:
 
 protected:
     ShCoefficientImageExporter();
-    ~ShCoefficientImageExporter() override{}
+    ~ShCoefficientImageExporter() override = default;
 
     typename InputImageType::Pointer m_InputImage;
     CoefficientImageType::Pointer m_OutputImage;

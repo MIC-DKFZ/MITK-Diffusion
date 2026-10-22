@@ -52,7 +52,7 @@ public:
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(DiffusionTensorPrincipalDirectionImageFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(DiffusionTensorPrincipalDirectionImageFilter)
 
     typedef TTensorPixelType                            TensorComponentType;
     typedef typename Superclass::InputImageType         InputImageType;
@@ -74,8 +74,7 @@ public:
 
     protected:
         DiffusionTensorPrincipalDirectionImageFilter();
-    ~DiffusionTensorPrincipalDirectionImageFilter() {}
-    void PrintSelf(std::ostream& os, Indent indent) const;
+    ~DiffusionTensorPrincipalDirectionImageFilter() override = default;
 
     /** The peak image always covers the whole input, so the primary output does too, also when
       * the filter is updated again with an input of another size. */
@@ -84,9 +83,9 @@ public:
       output->SetRequestedRegionToLargestPossibleRegion();
     }
 
-    void BeforeThreadedGenerateData();
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread );
-    void AfterThreadedGenerateData();
+    void BeforeThreadedGenerateData() override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread ) override;
+    void AfterThreadedGenerateData() override;
 
 private:
 

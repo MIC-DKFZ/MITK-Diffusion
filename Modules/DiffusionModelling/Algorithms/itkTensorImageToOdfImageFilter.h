@@ -63,7 +63,7 @@ namespace itk
     typedef SmartPointer<Self> Pointer;
     typedef SmartPointer<const Self> ConstPointer;
 
-    itkTypeMacro (TensorImageToOdfImageFilter, ImageToImageFilter);
+    itkOverrideGetNameOfClassMacro(TensorImageToOdfImageFilter);
 
     itkStaticConstMacro (ImageDimension, unsigned int,
       OutputImageType::ImageDimension);
@@ -76,7 +76,7 @@ namespace itk
     TensorImageToOdfImageFilter(){
       
     };
-    ~TensorImageToOdfImageFilter() override{};
+    ~TensorImageToOdfImageFilter() override = default;
 
     void PrintSelf (std::ostream& os, Indent indent) const override
     {
@@ -90,8 +90,7 @@ namespace itk
 
   private:
 
-    TensorImageToOdfImageFilter (const Self&);
-    void operator=(const Self&);
+    ITK_DISALLOW_COPY_AND_MOVE(TensorImageToOdfImageFilter);
   };
 
 } // end of namespace

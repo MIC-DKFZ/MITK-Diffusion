@@ -71,7 +71,7 @@ namespace itk
     typedef SmartPointer<Self> Pointer;
     typedef SmartPointer<const Self> ConstPointer;
 
-    itkTypeMacro (TensorImageToDiffusionImageFilter, ImageToImageFilter);
+    itkOverrideGetNameOfClassMacro(TensorImageToDiffusionImageFilter);
 
     itkStaticConstMacro (ImageDimension, unsigned int,
       OutputImageType::ImageDimension);
@@ -94,11 +94,15 @@ namespace itk
 
 
     void SetBValue( const double& bval)
-    { m_BValue = bval; }
+    {
+      m_BValue = bval;
+      this->Modified();
+    }
 
     void SetMaskImage( MaskImageType::Pointer maskimage )
     {
       m_MaskImage = maskimage;
+      this->Modified();
     }
 
 
@@ -111,6 +115,7 @@ namespace itk
     void SetExternalBaselineImage( typename BaselineImageType::Pointer bimage)
     {
       m_BaselineImage = bimage;
+      this->Modified();
     }
 
     itkSetMacro(Min, OutputScalarType);
@@ -121,14 +126,14 @@ namespace itk
     TensorImageToDiffusionImageFilter()
     {
       m_BValue = 1.0;
-      m_BaselineImage = 0;
+      m_BaselineImage = nullptr;
       m_Min = 0.0;
       m_Max = 10000.0;
 
       
     }
 
-    virtual ~TensorImageToDiffusionImageFilter(){}
+    ~TensorImageToDiffusionImageFilter() override = default;
 
     void PrintSelf (std::ostream& os, Indent indent) const override
     {
@@ -137,17 +142,16 @@ namespace itk
 
     void GenerateOutputInformation() override;
 
-    virtual void BeforeThreadedGenerateData( void ) override;
+    void BeforeThreadedGenerateData() override;
 
-    virtual void DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread) override;
+    void DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread) override;
 
     void AfterThreadedGenerateData() override;
 
 
   private:
 
-    TensorImageToDiffusionImageFilter (const Self&);
-    void operator=(const Self&);
+    ITK_DISALLOW_COPY_AND_MOVE(TensorImageToDiffusionImageFilter);
 
     GradientListType::ConstPointer       m_GradientList;
     double                               m_BValue;

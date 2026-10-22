@@ -63,7 +63,7 @@ Image< unsigned char, 3 > >
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(OdfMaximaExtractionFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(OdfMaximaExtractionFilter)
 
     typedef typename Superclass::InputImageType           CoefficientImageType;
     typedef typename CoefficientImageType::RegionType     CoefficientImageRegionType;
@@ -102,7 +102,7 @@ Image< unsigned char, 3 > >
 
     protected:
     OdfMaximaExtractionFilter();
-    ~OdfMaximaExtractionFilter() override {}
+    ~OdfMaximaExtractionFilter() override = default;
 
     /** The peak image always covers the whole input, so the primary output does too, also when
       * the filter is updated again with an input of another size. */

@@ -75,8 +75,7 @@ public:
   itkCloneMacro(Self)
 
   /** Runtime information support. */
-  itkTypeMacro(DiffusionOdfGeneralizedFaImageFilter,
-                                                   ImageToImageFilter);
+  itkOverrideGetNameOfClassMacro(DiffusionOdfGeneralizedFaImageFilter);
 
   typedef TOdfPixelType                 OdfComponentType;
 
@@ -103,7 +102,7 @@ public:
 
 protected:
   DiffusionOdfGeneralizedFaImageFilter();
-  ~DiffusionOdfGeneralizedFaImageFilter() override {};
+  ~DiffusionOdfGeneralizedFaImageFilter() override = default;
   void PrintSelf(std::ostream& os, Indent indent) const override;
 
   void BeforeThreadedGenerateData() override;

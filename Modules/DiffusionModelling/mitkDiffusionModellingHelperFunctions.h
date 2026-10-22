@@ -34,15 +34,14 @@ namespace mitk{
 class MITKDIFFUSIONMODELLING_EXPORT convert
 {
 public:
-  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromTensorImage(mitk::Image::Pointer mitkImage);
-  static mitk::OdfImage::Pointer GetOdfFromTensorImage(mitk::Image::Pointer mitkImage);
-  static mitk::TensorImage::ItkTensorImageType::Pointer GetItkTensorFromTensorImage(mitk::Image::Pointer mitkImage);
+  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromTensorImage(const mitk::Image *mitkImage);
+  static mitk::OdfImage::Pointer GetOdfFromTensorImage(const mitk::Image *mitkImage);
+  static mitk::TensorImage::ItkTensorImageType::Pointer GetItkTensorFromTensorImage(const mitk::Image *mitkImage);
 
   template<unsigned int NUM_COEFFS>
-  static typename itk::Image< itk::Vector<float, NUM_COEFFS>, 3>::Pointer GetItkShFromShImage(mitk::Image::Pointer mitkImage)
+  static typename itk::Image< itk::Vector<float, NUM_COEFFS>, 3>::Pointer GetItkShFromShImage(const mitk::Image *mitkImage)
   {
-    mitk::ShImage::Pointer mitkShImage = dynamic_cast<mitk::ShImage*>(mitkImage.GetPointer());
-    if (mitkShImage.IsNull())
+    if (dynamic_cast<const mitk::ShImage*>(mitkImage) == nullptr)
       mitkThrow() << "Input image is not a SH image!";
 
     typename itk::Image< itk::Vector<float, NUM_COEFFS>, 3>::Pointer itkvol;
@@ -52,9 +51,9 @@ public:
   }
 
   /** ODFs sampled from the SH coefficients in the image's SH convention; orders 2 to 12. */
-  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromShImage(mitk::Image::Pointer mitkImage);
-  static mitk::OdfImage::Pointer GetOdfFromShImage(mitk::Image::Pointer mitkImage);
-  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromOdfImage(mitk::Image::Pointer mitkImage);
+  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromShImage(const mitk::Image *mitkImage);
+  static mitk::OdfImage::Pointer GetOdfFromShImage(const mitk::Image *mitkImage);
+  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromOdfImage(const mitk::Image *mitkImage);
 };
 
 /**

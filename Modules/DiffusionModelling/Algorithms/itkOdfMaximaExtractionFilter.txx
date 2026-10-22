@@ -309,7 +309,6 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     ++disp;
     ++cit;
   }
-  MITK_INFO << "One thread finished extraction";
 }
 
 }

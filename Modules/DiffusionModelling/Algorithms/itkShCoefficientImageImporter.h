@@ -41,7 +41,7 @@ public:
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(ShCoefficientImageImporter, ProcessObject)
+    itkOverrideGetNameOfClassMacro(ShCoefficientImageImporter)
 
     // input
     itkSetMacro( InputImage, InputImageType::Pointer) ///< sh coefficient image in FSL file format
@@ -53,7 +53,7 @@ public:
 
 protected:
     ShCoefficientImageImporter();
-    ~ShCoefficientImageImporter() override{}
+    ~ShCoefficientImageImporter() override = default;
 
     InputImageType::Pointer                   m_InputImage;
     typename CoefficientImageType::Pointer    m_CoefficientImage; ///< mitk style image containing the SH coefficients

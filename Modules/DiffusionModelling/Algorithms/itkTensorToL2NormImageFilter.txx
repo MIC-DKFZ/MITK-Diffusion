@@ -31,7 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 =========================================================================*/
 #ifndef _itk_TensorToL2NormImageFilter_txx_
 #define _itk_TensorToL2NormImageFilter_txx_
-#endif
 
 #include "itkTensorToL2NormImageFilter.h"
 #include <itkImageRegionIterator.h>
@@ -75,3 +74,5 @@ void TensorToL2NormImageFilter<TInputImage, TOutputImage>::DynamicThreadedGenera
 
 
 } // end of namespace
+
+#endif

@@ -41,7 +41,7 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(FlipPeaksFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(FlipPeaksFilter)
 
     typedef typename Superclass::InputImageType InputImageType;
     typedef typename Superclass::OutputImageType OutputImageType;
@@ -53,7 +53,7 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
 
     protected:
     FlipPeaksFilter();
-    ~FlipPeaksFilter() override {}
+    ~FlipPeaksFilter() override = default;
 
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 

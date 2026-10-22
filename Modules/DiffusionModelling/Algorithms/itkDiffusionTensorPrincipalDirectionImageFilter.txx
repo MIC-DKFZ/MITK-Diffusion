@@ -146,11 +146,6 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
             out[0] = sqrt( vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2] );
             out[1] = atan2( vec[1], vec[0] );
             out[2] = 0.5*itk::Math::pi - atan( vec[2] / sqrt( vec[0] * vec[0] + vec[1] * vec[1] ) );
-
-            if(out[1]>itk::Math::pi)
-            {
-              out[1] = out[1] - itk::Math::pi;
-            }
           }
           else
           {
@@ -176,15 +171,8 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
     ++numDirectionsIterator;
     ++tensorIterator;
   }
-
-  std::cout << "One Thread finished extraction" << std::endl;
 }
 
-template< class TTensorPixelType>
-void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
-::PrintSelf(std::ostream& , Indent ) const
-{
-}
 
 }
 #endif
