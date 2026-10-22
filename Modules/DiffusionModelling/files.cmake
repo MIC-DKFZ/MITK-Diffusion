@@ -93,7 +93,6 @@ set(H_FILES
   Algorithms/itkTensorDerivedMeasurementsFilter.h
   Algorithms/itkTensorImageToDiffusionImageFilter.h
   Algorithms/itkTensorToL2NormImageFilter.h
-  Algorithms/itkGaussianInterpolateImageFunction.h
   
   Algorithms/itkDiffusionTensorPrincipalDirectionImageFilter.h
   Algorithms/itkTensorReconstructionWithEigenvalueCorrectionFilter.h
