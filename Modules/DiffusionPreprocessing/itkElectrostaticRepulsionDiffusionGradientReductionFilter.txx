@@ -46,6 +46,7 @@ template <class TInputScalarType, class TOutputScalarType>
 ElectrostaticRepulsionDiffusionGradientReductionFilter<TInputScalarType, TOutputScalarType>
 ::ElectrostaticRepulsionDiffusionGradientReductionFilter()
   : m_UseFirstN(false)
+  , m_RandomSeed(0)
 {
   this->SetNumberOfRequiredInputs( 1 );
 }
@@ -107,7 +108,7 @@ ElectrostaticRepulsionDiffusionGradientReductionFilter<TInputScalarType, TOutput
   int shellCounter = 0;
   for(BValueMap::iterator it = m_InputBValueMap.begin(); it != m_InputBValueMap.end(); it++ )
   {
-    randgen->SetSeed();
+    randgen->SetSeed(m_RandomSeed);
 
     m_UsedGradientIndices.clear();
     m_UnusedGradientIndices.clear();

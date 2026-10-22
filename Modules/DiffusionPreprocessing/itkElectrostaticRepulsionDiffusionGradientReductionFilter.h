@@ -86,6 +86,9 @@ namespace itk
     itkGetMacro(GradientDirections, GradientDirectionContainerType::ConstPointer)
     itkSetMacro(GradientDirections, GradientDirectionContainerType::ConstPointer)
     itkSetMacro(UseFirstN, bool)
+    /** Seed of the random search, the same for every shell; a fixed seed makes the selection reproducible. Default 0. */
+    itkSetMacro(RandomSeed, unsigned int)
+    itkGetMacro(RandomSeed, unsigned int)
 
     IndicesVector GetUsedGradientIndices(){return m_UsedGradientIndices;}
     void SetOriginalBValueMap(BValueMap inp){m_OriginalBValueMap = inp;}
@@ -112,6 +115,7 @@ namespace itk
     BValueMap m_OriginalBValueMap;
     BValueMap m_InputBValueMap;
     bool      m_UseFirstN;
+    unsigned int m_RandomSeed;
 
     std::vector<unsigned int> m_NumGradientDirections;
   };
