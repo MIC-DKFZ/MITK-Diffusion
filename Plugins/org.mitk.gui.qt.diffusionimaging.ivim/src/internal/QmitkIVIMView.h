@@ -111,7 +111,9 @@ protected:
   void FitIvimVoxel(const VecImgType::PixelType& pixel, DirContainerType::ConstPointer dirs, float bval);
   void ComputeIvimMaps(VecImgType* vecimg, DirContainerType::ConstPointer dirs, float bval);
 
-  bool FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContainerType::ConstPointer dirs, float bval, OutImgType::IndexType &crosspos);
+  mitk::kurtosis::FitConfiguration GetKurtosisFitConfiguration() const;
+  /** Fits and plots the signal of the selected voxel or the ROI average. */
+  void FitKurtosisVoxel(const VecImgType::PixelType& pixel, DirContainerType::ConstPointer dirs, float bval);
 
   Ui::QmitkIVIMViewControls* m_Controls;
 
@@ -121,7 +123,9 @@ protected:
 
   mitk::ivim::Protocol m_IvimProtocol;
   mitk::ivim::VoxelFit m_IvimFit;
-  KurtosisFilterType::KurtosisSnapshot m_KurtosisSnap;
+  vnl_vector<double> m_KurtosisBValues;
+  vnl_vector<double> m_KurtosisMeasurements;
+  mitk::kurtosis::VoxelFit m_KurtosisFit;
 
   bool m_Active;
   bool m_Visible;

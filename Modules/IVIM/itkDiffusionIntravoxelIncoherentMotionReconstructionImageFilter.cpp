@@ -41,6 +41,13 @@ namespace itk
       itkExceptionMacro("Gradient directions not set.");
     if (m_BValue <= 0)
       itkExceptionMacro("Reference b-value not set.");
+  }
+
+  template <class TIn, class TOut>
+  void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>::VerifyInputInformation() const
+  {
+    Superclass::VerifyInputInformation();
+
     if (m_GradientDirections->Size() != this->GetInput()->GetNumberOfComponentsPerPixel())
       itkExceptionMacro("The input has " << this->GetInput()->GetNumberOfComponentsPerPixel() << " volumes but "
                                          << m_GradientDirections->Size() << " gradient directions.");

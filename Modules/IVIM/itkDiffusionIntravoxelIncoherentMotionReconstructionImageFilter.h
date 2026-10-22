@@ -67,6 +67,7 @@ namespace itk
 
     void PrintSelf(std::ostream& os, Indent indent) const override;
     void VerifyPreconditions() const override;
+    void VerifyInputInformation() const override;
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread) override;
 

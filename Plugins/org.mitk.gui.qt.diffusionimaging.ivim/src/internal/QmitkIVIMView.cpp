@@ -405,13 +405,8 @@ void QmitkIVIMView::FittIVIMStart()
     filter->SetInput(vecimg);
     filter->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(img));
     filter->SetGradientDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(img));
-    filter->SetSmoothingSigma( m_Controls->m_SigmaSpinBox->value() );
-    filter->SetOmitUnweightedValue( m_Controls->m_OmitBZeroCB->isChecked() );
-
-    if( m_Controls->m_UseKurtosisBoundsCB->isChecked() )
-      filter->SetBoundariesForKurtosis( m_Controls->m_KurtosisRangeWidget->minimumValue(), m_Controls->m_KurtosisRangeWidget->maximumValue() );
-
-    filter->SetFittingScale( static_cast<itk::FitScale>(m_Controls->m_KurtosisFitScale->currentIndex() ) );
+    filter->SetSmoothingVariance( m_Controls->m_SigmaSpinBox->value() );
+    filter->SetFitConfiguration( this->GetKurtosisFitConfiguration() );
 
     if( m_Controls->m_MaskBox->GetSelectedNode().IsNotNull() )
     {
@@ -580,10 +575,9 @@ void QmitkIVIMView::OnSliceChanged()
 
     if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
     {
-      FitKurtosis(roiImage,
-                  mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                  mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
-                  newstart);
+      FitKurtosisVoxel(roiImage->GetPixel(newstart),
+                       mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
+                       mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg));
     }
     else
     {
@@ -665,10 +659,9 @@ void QmitkIVIMView::OnSliceChanged()
 
     if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
     {
-      FitKurtosis(roiImage,
-                  mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                  mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg),
-                  index);
+      FitKurtosisVoxel(roiImage->GetPixel(index),
+                       mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
+                       mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg));
     }
     else
     {
@@ -684,38 +677,49 @@ void QmitkIVIMView::OnSliceChanged()
   vecimg->SetRegions( vecimg->GetLargestPossibleRegion() );
 }
 
-bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContainerType::ConstPointer dirs, float bval, OutImgType::IndexType &crosspos )
+mitk::kurtosis::FitConfiguration QmitkIVIMView::GetKurtosisFitConfiguration() const
 {
-  KurtosisFilterType::Pointer filter = KurtosisFilterType::New();
-
-  itk::KurtosisFitConfiguration fit_config;
-  fit_config.omit_bzero =  m_Controls->m_OmitBZeroCB->isChecked();
-  if( m_Controls->m_UseKurtosisBoundsCB->isChecked() )
+  mitk::kurtosis::FitConfiguration configuration;
+  configuration.omitBZero = m_Controls->m_OmitBZeroCB->isChecked();
+  configuration.scale = static_cast<mitk::kurtosis::FitScale>(m_Controls->m_KurtosisFitScale->currentIndex());
+  if (m_Controls->m_UseKurtosisBoundsCB->isChecked())
   {
-    fit_config.use_K_limits = true;
-    vnl_vector_fixed<double, 2> k_limits;
-    k_limits[0] = m_Controls->m_KurtosisRangeWidget->minimumValue();
-    k_limits[1] = m_Controls->m_KurtosisRangeWidget->maximumValue();
-
-    fit_config.K_limits = k_limits;
+    configuration.useKBounds = true;
+    configuration.kLowerBound = m_Controls->m_KurtosisRangeWidget->minimumValue();
+    configuration.kUpperBound = m_Controls->m_KurtosisRangeWidget->maximumValue();
   }
-  fit_config.fit_scale = static_cast<itk::FitScale>(m_Controls->m_KurtosisFitScale->currentIndex() );
+  return configuration;
+}
 
-  m_KurtosisSnap = filter->GetSnapshot( vecimg->GetPixel( crosspos ), dirs, bval, fit_config );
+void QmitkIVIMView::FitKurtosisVoxel(const VecImgType::PixelType& pixel, DirContainerType::ConstPointer dirs, float bval)
+{
+  m_KurtosisMeasurements.set_size(pixel.GetSize());
+  for (unsigned int i = 0; i < m_KurtosisMeasurements.size(); ++i)
+    m_KurtosisMeasurements[i] = pixel[i];
+
+  try
+  {
+    m_KurtosisBValues = mitk::kurtosis::GetBValues(dirs, bval);
+    m_KurtosisFit = mitk::kurtosis::FitVoxel(m_KurtosisMeasurements, m_KurtosisBValues, this->GetKurtosisFitConfiguration());
+  }
+  catch (const itk::ExceptionObject& ex)
+  {
+    m_Controls->m_Warning->setText(QString("Kurtosis fit not possible: ") + ex.GetDescription());
+    m_Controls->m_Warning->setVisible(true);
+    return;
+  }
 
   QString param_label_text("K=%2, D=%1");
-  param_label_text = param_label_text.arg( m_KurtosisSnap.m_K, 4);
-  param_label_text = param_label_text.arg( m_KurtosisSnap.m_D, 4);
+  param_label_text = param_label_text.arg( m_KurtosisFit.k, 4);
+  param_label_text = param_label_text.arg( m_KurtosisFit.d, 4);
   m_Controls->m_FittedParamsLabel->setText(param_label_text);
 
-  const double maxb = m_KurtosisSnap.bvalues.max_value();
-  double S0 = m_KurtosisSnap.m_Bzero;
-  if (m_KurtosisSnap.m_fittedBZero)
-    S0 = m_KurtosisSnap.m_BzeroFit;
+  const double maxb = m_KurtosisBValues.max_value();
+  const double S0 = m_KurtosisFit.bZeroFitted ? m_KurtosisFit.fittedBZero : m_KurtosisFit.meanBZero;
 
   std::vector< std::pair<double, double> > d_line;
   d_line.emplace_back(0, S0);
-  d_line.emplace_back(maxb, S0*exp(-maxb * m_KurtosisSnap.m_D));
+  d_line.emplace_back(maxb, S0*exp(-maxb * m_KurtosisFit.d));
   m_Controls->m_ChartWidget->SetCurveData(m_DPartCurveId, d_line);
 
   const unsigned int num_samples = 50;
@@ -724,23 +728,20 @@ bool QmitkIVIMView::FitKurtosis( itk::VectorImage<short, 3> *vecimg, DirContaine
   for( unsigned int i=0; i<=num_samples; ++i)
   {
     double b = (((1.0)*i)/(1.0*num_samples))*maxb;
-    y.emplace_back(b, S0 * exp( -b * m_KurtosisSnap.m_D + b*b * m_KurtosisSnap.m_D * m_KurtosisSnap.m_D * m_KurtosisSnap.m_K / 6.0 ));
+    y.emplace_back(b, S0 * exp( -b * m_KurtosisFit.d + b*b * m_KurtosisFit.d * m_KurtosisFit.d * m_KurtosisFit.k / 6.0 ));
   }
   m_Controls->m_ChartWidget->SetCurveData(m_FitCurveId, y);
 
   std::vector< std::pair<double, double> > y_meas;
-  for (unsigned int i=0; i<m_KurtosisSnap.measurements.size(); ++i)
+  for (unsigned int i=0; i<m_KurtosisMeasurements.size(); ++i)
   {
-    if (!m_Controls->m_OmitBZeroCB->isChecked() || m_KurtosisSnap.bvalues[i] > 0.01)
-      y_meas.emplace_back(m_KurtosisSnap.bvalues[i], m_KurtosisSnap.measurements[i]);
+    if (!m_Controls->m_OmitBZeroCB->isChecked() || m_KurtosisBValues[i] > 0.01)
+      y_meas.emplace_back(m_KurtosisBValues[i], m_KurtosisMeasurements[i]);
   }
 
   m_Controls->m_ChartWidget->SetCurveData(m_SignalCurveId, y_meas);
   m_Controls->m_ChartWidget->Replot();
-
-  return true;
 }
-
 
 mitk::ivim::FitParameters QmitkIVIMView::GetIvimFitParameters() const
 {
@@ -924,11 +925,11 @@ void QmitkIVIMView::ClipboardCurveButtonClicked()
     std::stringstream ss;
     QString clipboard("Measurement Points\n");
 
-    ss << m_KurtosisSnap.bvalues << "\n" << m_KurtosisSnap.measurements << "\n\n";
-    ss << "Fitted Values ( D  K  [b_0] ) \n" << m_KurtosisSnap.m_D << " " << m_KurtosisSnap.m_K;
+    ss << m_KurtosisBValues << "\n" << m_KurtosisMeasurements << "\n\n";
+    ss << "Fitted Values ( D  K  [b_0] ) \n" << m_KurtosisFit.d << " " << m_KurtosisFit.k;
 
-    if( m_KurtosisSnap.m_fittedBZero )
-      ss << " " << m_KurtosisSnap.m_BzeroFit;
+    if( m_KurtosisFit.bZeroFitted )
+      ss << " " << m_KurtosisFit.fittedBZero;
 
     ss << "\n\n";
     clipboard.append( QString( ss.str().c_str() ));
@@ -972,8 +973,8 @@ void QmitkIVIMView::ClipboardStatisticsButtonClicked()
 
     QString clipboard( "D \t K \n" );
     clipboard = clipboard.append( "%L1 \t %L2" )
-        .arg( m_KurtosisSnap.m_D, 0, 'f', 10 )
-        .arg( m_KurtosisSnap.m_K, 0, 'f', 10 ) ;
+        .arg( m_KurtosisFit.d, 0, 'f', 10 )
+        .arg( m_KurtosisFit.k, 0, 'f', 10 ) ;
 
     QApplication::clipboard()->setText(clipboard, QClipboard::Clipboard );
   }

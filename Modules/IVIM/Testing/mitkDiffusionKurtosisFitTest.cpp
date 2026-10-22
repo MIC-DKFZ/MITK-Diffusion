@@ -56,6 +56,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionKurtosisReconstructionImageFilter<short, double>;
+  using FitScale = mitk::kurtosis::FitScale;
 
   struct Parameters
   {
@@ -82,6 +83,42 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
     filter->SetReferenceBValue(referenceBValue);
     filter->SetGradientDirections(gradients);
     return filter;
+  }
+
+  static void SetScale(FilterType* filter, FitScale scale)
+  {
+    auto configuration = filter->GetFitConfiguration();
+    configuration.scale = scale;
+    filter->SetFitConfiguration(configuration);
+  }
+
+  static void SetOmitBZero(FilterType* filter, bool omit)
+  {
+    auto configuration = filter->GetFitConfiguration();
+    configuration.omitBZero = omit;
+    filter->SetFitConfiguration(configuration);
+  }
+
+  /** As MitkDiffusionKurtosisFit and the view set them; they also bound D. */
+  static void SetKBounds(FilterType* filter, double lower, double upper)
+  {
+    auto configuration = filter->GetFitConfiguration();
+    configuration.useKBounds = true;
+    configuration.kLowerBound = lower;
+    configuration.kUpperBound = upper;
+    filter->SetFitConfiguration(configuration);
+  }
+
+  /** The fit the view shows for one voxel. */
+  static mitk::kurtosis::VoxelFit FitPixel(const VectorImageType::PixelType& pixel,
+                                           const GradientContainerType* gradients,
+                                           double referenceBValue,
+                                           const mitk::kurtosis::FitConfiguration& configuration)
+  {
+    vnl_vector<double> signal(pixel.GetSize());
+    for (unsigned int i = 0; i < signal.size(); ++i)
+      signal[i] = pixel[i];
+    return mitk::kurtosis::FitVoxel(signal, mitk::kurtosis::GetBValues(gradients, referenceBValue), configuration);
   }
 
   static Maps GetMaps(FilterType* filter)
@@ -116,13 +153,12 @@ public:
 
   void Configuration_Default_StraightWithoutLimits()
   {
-    itk::KurtosisFitConfiguration config;
-    CPPUNIT_ASSERT(config.fit_scale == itk::STRAIGHT);
-    CPPUNIT_ASSERT(!config.omit_bzero);
-    CPPUNIT_ASSERT(!config.use_K_limits);
-    CPPUNIT_ASSERT_EQUAL(0.0, config.K_limits[0]);
-    CPPUNIT_ASSERT_EQUAL(0.0, config.K_limits[1]);
-    CPPUNIT_ASSERT(!config.exclude_high_b);
+    mitk::kurtosis::FitConfiguration config;
+    CPPUNIT_ASSERT(config.scale == FitScale::Straight);
+    CPPUNIT_ASSERT(!config.omitBZero);
+    CPPUNIT_ASSERT(!config.useKBounds);
+    CPPUNIT_ASSERT_EQUAL(0.0, config.kLowerBound);
+    CPPUNIT_ASSERT_EQUAL(0.0, config.kUpperBound);
   }
 
   void MapStraight_SyntheticVoxels_RecoversDAndK()
@@ -135,7 +171,7 @@ public:
   void MapLog_SyntheticVoxels_RecoversDAndK()
   {
     auto filter = MakeFilter(m_Image, m_Gradients, 3000);
-    filter->SetFittingScale(itk::LOGARITHMIC);
+    SetScale(filter, FitScale::Logarithmic);
     filter->Update();
     AssertRecovered(GetMaps(filter), 1e-6, 1e-3);
   }
@@ -143,7 +179,7 @@ public:
   void MapOmitBZero_SyntheticVoxels_RecoversDAndK()
   {
     auto filter = MakeFilter(m_Image, m_Gradients, 3000);
-    filter->SetOmitUnweightedValue(true);
+    SetOmitBZero(filter, true);
     filter->Update();
     AssertRecovered(GetMaps(filter), 1e-6, 1e-3);
   }
@@ -151,7 +187,7 @@ public:
   void MapBounds_KInsideBounds_RecoversDAndK()
   {
     auto filter = MakeFilter(m_Image, m_Gradients, 3000);
-    filter->SetBoundariesForKurtosis(0, 3);
+    SetKBounds(filter, 0, 3);
     filter->Update();
     AssertRecovered(GetMaps(filter), 1e-6, 1e-3);
   }
@@ -160,7 +196,7 @@ public:
   {
     // MitkDiffusionKurtosisFit passes -1000..1000 when no bounds are given.
     auto filter = MakeFilter(m_Image, m_Gradients, 3000);
-    filter->SetBoundariesForKurtosis(-1000, 1000);
+    SetKBounds(filter, -1000, 1000);
     filter->Update();
     AssertRecovered(GetMaps(filter), 1e-6, 1e-3);
   }
@@ -168,7 +204,7 @@ public:
   void MapBounds_KJustInsideBounds_Recovered()
   {
     auto filter = MakeFilter(MakeImage({KurtosisSignal(m_BValues, 10000, 0.001, 0.03)}), m_Gradients, 3000);
-    filter->SetBoundariesForKurtosis(0, 3);
+    SetKBounds(filter, 0, 3);
     filter->Update();
     auto maps = GetMaps(filter);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, maps.d[0], 1e-6);
@@ -182,7 +218,7 @@ public:
                                         KurtosisSignal(m_BValues, 10000, 0.008, 0)}),
                              m_Gradients,
                              3000);
-    filter->SetBoundariesForKurtosis(0, 3);
+    SetKBounds(filter, 0, 3);
     filter->Update();
     auto maps = GetMaps(filter);
     CPPUNIT_ASSERT_EQUAL(0.0, maps.k[0]);
@@ -193,40 +229,38 @@ public:
   void Update_KBoundsEqual_Throws()
   {
     auto filter = MakeFilter(m_Image, m_Gradients, 3000);
-    filter->SetBoundariesForKurtosis(1000, 1000);
+    SetKBounds(filter, 1000, 1000);
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
   }
 
   void Snapshot_KBoundsReversed_Throws()
   {
-    auto filter = FilterType::New();
-    itk::KurtosisFitConfiguration config;
-    config.fit_scale = itk::STRAIGHT;
-    config.use_K_limits = true;
-    config.K_limits[0] = 3;
-    config.K_limits[1] = 0;
-    CPPUNIT_ASSERT_THROW(filter->GetSnapshot(m_Image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config),
+    mitk::kurtosis::FitConfiguration config;
+    config.scale = FitScale::Straight;
+    config.useKBounds = true;
+    config.kLowerBound = 3;
+    config.kUpperBound = 0;
+    CPPUNIT_ASSERT_THROW(FitPixel(m_Image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config),
                          itk::ExceptionObject);
   }
 
   void Snapshot_SyntheticVoxel_RecoversDAndK()
   {
-    auto filter = FilterType::New();
-    for (auto scale : {itk::STRAIGHT, itk::LOGARITHMIC})
+    CPPUNIT_ASSERT_EQUAL(m_BValues.size(), static_cast<std::size_t>(mitk::kurtosis::GetBValues(m_Gradients, 3000).size()));
+    for (auto scale : {FitScale::Straight, FitScale::Logarithmic})
     {
       for (bool omit : {false, true})
       {
-        itk::KurtosisFitConfiguration config;
-        config.fit_scale = scale;
-        config.omit_bzero = omit;
-        auto snapshot = filter->GetSnapshot(m_Image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, snapshot.m_D, 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, snapshot.m_K, 1e-3);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.m_Bzero, 1e-9);
-        CPPUNIT_ASSERT_EQUAL(omit, snapshot.m_fittedBZero);
-        CPPUNIT_ASSERT_EQUAL(m_BValues.size(), static_cast<std::size_t>(snapshot.bvalues.size()));
+        mitk::kurtosis::FitConfiguration config;
+        config.scale = scale;
+        config.omitBZero = omit;
+        auto snapshot = FitPixel(m_Image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, snapshot.d, 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, snapshot.k, 1e-3);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.meanBZero, 1e-9);
+        CPPUNIT_ASSERT_EQUAL(omit, snapshot.bZeroFitted);
         if (omit)
-          CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.m_BzeroFit, 5);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.fittedBZero, 5);
       }
     }
   }
@@ -239,17 +273,16 @@ public:
     auto image = MakeImage({signal});
     auto reversedImage = MakeImage({reversedSignal});
 
-    auto filter = FilterType::New();
-    for (auto scale : {itk::STRAIGHT, itk::LOGARITHMIC})
+    for (auto scale : {FitScale::Straight, FitScale::Logarithmic})
     {
-      itk::KurtosisFitConfiguration config;
-      config.fit_scale = scale;
-      auto expected = filter->GetSnapshot(image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
-      auto actual = filter->GetSnapshot(
+      mitk::kurtosis::FitConfiguration config;
+      config.scale = scale;
+      auto expected = FitPixel(image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
+      auto actual = FitPixel(
         reversedImage->GetPixel({{0, 0, 0}}), MakeGradients(reversedBValues, 3000).GetPointer(), 3000, config);
-      CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[1].d, expected.m_D, 1e-6);
-      AssertClose(expected.m_D, actual.m_D, 1e-6);
-      AssertClose(expected.m_K, actual.m_K, 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[1].d, expected.d, 1e-6);
+      AssertClose(expected.d, actual.d, 1e-6);
+      AssertClose(expected.k, actual.k, 1e-6);
     }
   }
 
@@ -270,15 +303,14 @@ public:
   {
     const std::vector<double> bValues(m_BValues.begin() + 2, m_BValues.end());
     auto image = MakeImage({KurtosisSignal(bValues, 10000, m_Truth[0].d, m_Truth[0].k)});
-    auto filter = FilterType::New();
-    itk::KurtosisFitConfiguration config;
-    config.fit_scale = itk::STRAIGHT;
-    auto snapshot = filter->GetSnapshot(image->GetPixel({{0, 0, 0}}), MakeGradients(bValues, 3000).GetPointer(), 3000, config);
-    CPPUNIT_ASSERT(snapshot.m_fittedBZero);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, snapshot.m_D, 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, snapshot.m_K, 1e-3);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.m_BzeroFit, 5);
-    CPPUNIT_ASSERT_EQUAL(0.0, snapshot.m_Bzero);
+    mitk::kurtosis::FitConfiguration config;
+    config.scale = FitScale::Straight;
+    auto snapshot = FitPixel(image->GetPixel({{0, 0, 0}}), MakeGradients(bValues, 3000).GetPointer(), 3000, config);
+    CPPUNIT_ASSERT(snapshot.bZeroFitted);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, snapshot.d, 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, snapshot.k, 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.fittedBZero, 5);
+    CPPUNIT_ASSERT_EQUAL(0.0, snapshot.meanBZero);
   }
 
   void TestMulti_RotatedVolumes_SameMaps()
@@ -306,13 +338,13 @@ public:
     for (unsigned int i = 0; i < n; ++i)
       rotatedGradients->InsertElement(i, dwi.gradients->ElementAt((i + n - shift) % n));
 
-    for (auto scale : {itk::STRAIGHT, itk::LOGARITHMIC})
+    for (auto scale : {FitScale::Straight, FitScale::Logarithmic})
     {
       auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
-      filter->SetFittingScale(scale);
+      SetScale(filter, scale);
       filter->Update();
       auto rotatedFilter = MakeFilter(rotated, rotatedGradients, dwi.referenceBValue);
-      rotatedFilter->SetFittingScale(scale);
+      SetScale(rotatedFilter, scale);
       rotatedFilter->Update();
 
       auto expected = GetMaps(filter);
@@ -334,16 +366,15 @@ public:
       signal[i] = std::round(signal[i] + 200 * std::sin(2.3 * i));
     auto image = MakeImage({signal});
 
-    auto filter = FilterType::New();
-    for (auto scale : {itk::STRAIGHT, itk::LOGARITHMIC})
+    for (auto scale : {FitScale::Straight, FitScale::Logarithmic})
     {
       for (bool omit : {false, true})
       {
-        itk::KurtosisFitConfiguration config;
-        config.fit_scale = scale;
-        config.omit_bzero = omit;
-        auto snapshot = filter->GetSnapshot(image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
-        const double s0 = omit ? snapshot.m_BzeroFit : 10000;
+        mitk::kurtosis::FitConfiguration config;
+        config.scale = scale;
+        config.omitBZero = omit;
+        auto snapshot = FitPixel(image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
+        const double s0 = omit ? snapshot.fittedBZero : 10000;
 
         auto cost = [&](double d, double k, double bzero)
         {
@@ -352,7 +383,7 @@ public:
           {
             const double b = m_BValues[i];
             const double exponent = -b * d + b * b * d * d * k / 6;
-            const double residual = scale == itk::STRAIGHT ? signal[i] - bzero * std::exp(exponent)
+            const double residual = scale == FitScale::Straight ? signal[i] - bzero * std::exp(exponent)
                                                            : std::log(signal[i]) - std::log(bzero) - exponent;
             sum += residual * residual;
           }
@@ -360,13 +391,13 @@ public:
         };
 
         // A least-squares fit is a minimum of the sum of squared residuals in every direction.
-        const double minimum = cost(snapshot.m_D, snapshot.m_K, s0);
+        const double minimum = cost(snapshot.d, snapshot.k, s0);
         for (double h : {-1e-3, 1e-3})
         {
-          CPPUNIT_ASSERT(minimum <= cost(snapshot.m_D * (1 + h), snapshot.m_K, s0));
-          CPPUNIT_ASSERT(minimum <= cost(snapshot.m_D, snapshot.m_K + h, s0));
+          CPPUNIT_ASSERT(minimum <= cost(snapshot.d * (1 + h), snapshot.k, s0));
+          CPPUNIT_ASSERT(minimum <= cost(snapshot.d, snapshot.k + h, s0));
           if (omit)
-            CPPUNIT_ASSERT(minimum <= cost(snapshot.m_D, snapshot.m_K, s0 * (1 + h)));
+            CPPUNIT_ASSERT(minimum <= cost(snapshot.d, snapshot.k, s0 * (1 + h)));
         }
       }
     }
@@ -379,8 +410,8 @@ public:
     for (bool omit : {false, true})
     {
       auto filter = MakeFilter(MakeImage({signal}), m_Gradients, 3000);
-      filter->SetFittingScale(itk::LOGARITHMIC);
-      filter->SetOmitUnweightedValue(omit);
+      SetScale(filter, FitScale::Logarithmic);
+      SetOmitBZero(filter, omit);
       filter->Update();
       auto maps = GetMaps(filter);
       CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[1].d, maps.d[0], 1e-6);
@@ -391,13 +422,13 @@ public:
   void Map_NoSignal_Zero()
   {
     const std::vector<double> zeros(m_BValues.size(), 0.0);
-    for (auto scale : {itk::STRAIGHT, itk::LOGARITHMIC})
+    for (auto scale : {FitScale::Straight, FitScale::Logarithmic})
     {
       for (bool omit : {false, true})
       {
         auto filter = MakeFilter(MakeImage({zeros}), m_Gradients, 3000);
-        filter->SetFittingScale(scale);
-        filter->SetOmitUnweightedValue(omit);
+        SetScale(filter, scale);
+        SetOmitBZero(filter, omit);
         filter->Update();
         auto maps = GetMaps(filter);
         CPPUNIT_ASSERT_EQUAL(0.0, maps.d[0]);
@@ -470,7 +501,7 @@ public:
   {
     struct Recorded
     {
-      itk::FitScale scale;
+      FitScale scale;
       bool omit;
       bool bounds;
       Parameters mean;
@@ -480,27 +511,27 @@ public:
     // -1000..1000 for K, which also switches on the D bounds. Voxel (5, 5, 1) is in the center of
     // the 11x11x3 image.
     const std::vector<Recorded> recorded = {
-      {itk::STRAIGHT, false, false, {0.0009008328477, 0.1515096989}, {0.0009268454835, 0.2226285478}},
-      {itk::STRAIGHT, false, true, {0.0009008328477, 0.1515096989}, {0.0009268454835, 0.2226285478}},
-      {itk::STRAIGHT, true, false, {0.0009817003019, 0.1622455809}, {0.00110582413, 0.3973556333}},
-      {itk::STRAIGHT, true, true, {0.0009817003019, 0.1622455809}, {0.00110582413, 0.3973556333}},
-      {itk::LOGARITHMIC, false, false, {0.0008955485404, 0.04730226457}, {0.0009126120018, 0.1061738054}},
-      {itk::LOGARITHMIC, false, true, {0.0008955485404, 0.04730226457}, {0.0009126120018, 0.1061738054}},
-      {itk::LOGARITHMIC, true, false, {0.0009155695528, -0.1464026451}, {0.0009440105723, 0.1495620297}},
-      {itk::LOGARITHMIC, true, true, {0.0009155695528, -0.1464026451}, {0.0009440105723, 0.1495620297}}};
+      {FitScale::Straight, false, false, {0.0009008328477, 0.1515096989}, {0.0009268454835, 0.2226285478}},
+      {FitScale::Straight, false, true, {0.0009008328477, 0.1515096989}, {0.0009268454835, 0.2226285478}},
+      {FitScale::Straight, true, false, {0.0009817003019, 0.1622455809}, {0.00110582413, 0.3973556333}},
+      {FitScale::Straight, true, true, {0.0009817003019, 0.1622455809}, {0.00110582413, 0.3973556333}},
+      {FitScale::Logarithmic, false, false, {0.0008955485404, 0.04730226457}, {0.0009126120018, 0.1061738054}},
+      {FitScale::Logarithmic, false, true, {0.0008955485404, 0.04730226457}, {0.0009126120018, 0.1061738054}},
+      {FitScale::Logarithmic, true, false, {0.0009155695528, -0.1464026451}, {0.0009440105723, 0.1495620297}},
+      {FitScale::Logarithmic, true, true, {0.0009155695528, -0.1464026451}, {0.0009440105723, 0.1495620297}}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 1;
     for (const auto& r : recorded)
     {
       auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
-      filter->SetFittingScale(r.scale);
-      filter->SetOmitUnweightedValue(r.omit);
+      SetScale(filter, r.scale);
+      SetOmitBZero(filter, r.omit);
       if (r.bounds)
-        filter->SetBoundariesForKurtosis(-1000, 1000);
+        SetKBounds(filter, -1000, 1000);
       filter->Update();
       auto maps = GetMaps(filter);
-      MITK_INFO << std::setprecision(10) << "scale " << r.scale << " omit " << r.omit << " bounds " << r.bounds
+      MITK_INFO << std::setprecision(10) << "scale " << static_cast<int>(r.scale) << " omit " << r.omit << " bounds " << r.bounds
                 << ": mean D " << Mean(maps.d) << ", mean K " << Mean(maps.k) << "; center D " << maps.d[center]
                 << ", K " << maps.k[center];
       AssertClose(r.mean.d, Mean(maps.d));
@@ -514,7 +545,7 @@ public:
   {
     struct Recorded
     {
-      itk::FitScale scale;
+      FitScale scale;
       bool omit;
       Parameters fit;
       double fittedBZero;
@@ -523,25 +554,24 @@ public:
     // from 133 to 498 around their mean 204, the first one is 498; with S0 = 204 the least-squares
     // K of the straight fit is far below 0.
     const std::vector<Recorded> recorded = {
-      {itk::STRAIGHT, false, {0.0001729772504, -30.32595512}, 1},
-      {itk::STRAIGHT, true, {0.0007854624584, 0.1797012849}, 324.7276248},
-      {itk::LOGARITHMIC, false, {0.000462749254, -2.514910376}, 1},
-      {itk::LOGARITHMIC, true, {0.001386206961, 0.4066007701}, 470.2786883}};
+      {FitScale::Straight, false, {0.0001729772504, -30.32595512}, 1},
+      {FitScale::Straight, true, {0.0007854624584, 0.1797012849}, 324.7276248},
+      {FitScale::Logarithmic, false, {0.000462749254, -2.514910376}, 1},
+      {FitScale::Logarithmic, true, {0.001386206961, 0.4066007701}, 470.2786883}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi"));
-    auto filter = FilterType::New();
     for (const auto& r : recorded)
     {
-      itk::KurtosisFitConfiguration config;
-      config.fit_scale = r.scale;
-      config.omit_bzero = r.omit;
-      auto snapshot = filter->GetSnapshot(dwi.image->GetPixel({{0, 0, 0}}), dwi.gradients, dwi.referenceBValue, config);
-      MITK_INFO << std::setprecision(10) << "scale " << r.scale << " omit " << r.omit << ": D " << snapshot.m_D << ", K "
-                << snapshot.m_K << ", S0 " << snapshot.m_Bzero << ", fitted S0 " << snapshot.m_BzeroFit;
-      AssertClose(r.fit.d, snapshot.m_D);
-      AssertClose(r.fit.k, snapshot.m_K);
-      AssertClose(r.fittedBZero, snapshot.m_BzeroFit);
-      AssertClose(204, snapshot.m_Bzero);
+      mitk::kurtosis::FitConfiguration config;
+      config.scale = r.scale;
+      config.omitBZero = r.omit;
+      auto snapshot = FitPixel(dwi.image->GetPixel({{0, 0, 0}}), dwi.gradients, dwi.referenceBValue, config);
+      MITK_INFO << std::setprecision(10) << "scale " << static_cast<int>(r.scale) << " omit " << r.omit << ": D " << snapshot.d << ", K "
+                << snapshot.k << ", S0 " << snapshot.meanBZero << ", fitted S0 " << snapshot.fittedBZero;
+      AssertClose(r.fit.d, snapshot.d);
+      AssertClose(r.fit.k, snapshot.k);
+      AssertClose(r.fittedBZero, snapshot.fittedBZero);
+      AssertClose(204, snapshot.meanBZero);
     }
   }
 
@@ -565,9 +595,9 @@ public:
     for (const auto& r : recorded)
     {
       auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
-      filter->SetSmoothingSigma(1.5);
+      filter->SetSmoothingVariance(1.5);
       if (r.bounds)
-        filter->SetBoundariesForKurtosis(-1000, 1000);
+        SetKBounds(filter, -1000, 1000);
       filter->Update();
       auto maps = GetMaps(filter);
       MITK_INFO << std::setprecision(10) << "smoothed, bounds " << r.bounds << ": mean D " << Mean(maps.d)
@@ -586,7 +616,7 @@ public:
     auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
     filter->Update();
     auto zeroVarianceFilter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
-    zeroVarianceFilter->SetSmoothingSigma(0);
+    zeroVarianceFilter->SetSmoothingVariance(0);
     zeroVarianceFilter->Update();
 
     const auto expected = GetMaps(filter);

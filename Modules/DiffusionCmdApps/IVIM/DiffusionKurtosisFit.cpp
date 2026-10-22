@@ -53,55 +53,6 @@ typedef mitk::DiffusionPropertyHelper DPH;
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
 
-DPH::ImageType::Pointer GetBlurredVectorImage( DPH::ImageType::Pointer vectorImage, double sigma)
-{
-  typedef itk::DiscreteGaussianImageFilter< itk::Image<DPH::DiffusionPixelType, 3 >, itk::Image<DPH::DiffusionPixelType, 3 > > GaussianFilterType;
-
-  typedef itk::VectorIndexSelectionCastImageFilter< DPH::ImageType, itk::Image<DPH::DiffusionPixelType, 3 > > IndexSelectionType;
-  IndexSelectionType::Pointer indexSelectionFilter = IndexSelectionType::New();
-  indexSelectionFilter->SetInput( vectorImage );
-
-  typedef itk::ComposeImageFilter< itk::Image<DPH::DiffusionPixelType, 3>, DPH::ImageType > ComposeFilterType;
-  ComposeFilterType::Pointer vec_composer = ComposeFilterType::New();
-
-  for( unsigned int i=0; i<vectorImage->GetVectorLength(); ++i)
-  {
-    GaussianFilterType::Pointer gaussian_filter = GaussianFilterType::New();
-
-    indexSelectionFilter->SetIndex( i );
-
-    gaussian_filter->SetInput( indexSelectionFilter->GetOutput() );
-    gaussian_filter->SetVariance( sigma );
-
-    vec_composer->SetInput(i, gaussian_filter->GetOutput() );
-
-    gaussian_filter->Update();
-  }
-
-  try
-  {
-    vec_composer->Update();
-  }
-  catch(const itk::ExceptionObject &e)
-  {
-    mitkThrow() << "[VectorImage.GaussianSmoothing] !! Failed with ITK Exception: " << e.what();
-  }
-
-  DPH::ImageType::Pointer smoothed_vector = vec_composer->GetOutput();
-
-  /*
-  itk::ImageFileWriter< DPH::ImageType >::Pointer writer =
-      itk::ImageFileWriter< DPH::ImageType >::New();
-
-  writer->SetInput( smoothed_vector );
-  writer->SetFileName( "/tmp/itk_smoothed_vector.nrrd");
-  writer->Update();*/
-
-  return smoothed_vector;
-
-
-}
-
 void KurtosisMapComputation( mitk::Image::Pointer input,
                              std::string output_prefix ,
                              std::string output_type,
@@ -115,13 +66,17 @@ void KurtosisMapComputation( mitk::Image::Pointer input,
 
   typedef itk::DiffusionKurtosisReconstructionImageFilter< short, double > KurtosisFilterType;
   KurtosisFilterType::Pointer kurtosis_filter = KurtosisFilterType::New();
-  kurtosis_filter->SetInput( GetBlurredVectorImage( vectorImage, 1.5 ) );
+  kurtosis_filter->SetInput( vectorImage );
   kurtosis_filter->SetReferenceBValue( DPH::GetReferenceBValue( input.GetPointer() ) );
   kurtosis_filter->SetGradientDirections( DPH::GetGradientContainer( input.GetPointer() ) );
-//  kurtosis_filter->SetNumberOfThreads(1);
-  kurtosis_filter->SetOmitUnweightedValue(omitBZero);
-  kurtosis_filter->SetBoundariesForKurtosis(-lower,upper);
-//  kurtosis_filter->SetInitialSolution(const vnl_vector<double>& x0 );
+  kurtosis_filter->SetSmoothingVariance( 1.5 );
+
+  mitk::kurtosis::FitConfiguration configuration;
+  configuration.omitBZero = omitBZero;
+  configuration.useKBounds = true;
+  configuration.kLowerBound = -lower;
+  configuration.kUpperBound = upper;
+  kurtosis_filter->SetFitConfiguration( configuration );
 
 
   if(maskPath != "")
