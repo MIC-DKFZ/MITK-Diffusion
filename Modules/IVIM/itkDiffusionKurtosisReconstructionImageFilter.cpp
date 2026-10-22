@@ -29,6 +29,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkComposeImageFilter.h>
 #include <itkDiscreteGaussianImageFilter.h>
 
+/** K bounds with lower >= upper admit no K, and equal bounds give the penalty band zero width. */
+static void VerifyKurtosisBounds(const vnl_vector_fixed<double, 2>& bounds)
+{
+  if (!(bounds[0] < bounds[1]))
+    itkGenericExceptionMacro("Lower kurtosis bound " << bounds[0] << " is not below the upper bound " << bounds[1] << ".");
+}
+
 template< class TInputPixelType>
 static void FitSingleVoxel( const itk::VariableLengthVector< TInputPixelType > &input,
                             const vnl_vector<double>& bvalues,
@@ -148,6 +155,18 @@ itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelTyp
   this->SetNthOutput(1, outputPtr2.GetPointer() );
 
   
+}
+
+template< class TInputPixelType, class TOutputPixelType>
+void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelType>
+::VerifyPreconditions() const
+{
+  Superclass::VerifyPreconditions();
+
+  if (this->m_BValues.empty())
+    itkExceptionMacro("Gradient directions not set.");
+  if (this->m_UseKBounds)
+    VerifyKurtosisBounds(this->m_KurtosisBounds);
 }
 
 template< class TInputPixelType, class TOutputPixelType>
@@ -287,6 +306,9 @@ typename itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutpu
 itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelType>
 ::GetSnapshot(const itk::VariableLengthVector<TInputPixelType> &input, vnl_vector<double> bvalues, KurtosisFitConfiguration kf_conf)
 {
+  if (kf_conf.use_K_limits)
+    VerifyKurtosisBounds(kf_conf.K_limits);
+
   // initialize
   vnl_vector<double> initial_position;
   bool omit_bzero = kf_conf.omit_bzero;

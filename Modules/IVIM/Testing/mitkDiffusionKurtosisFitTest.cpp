@@ -28,6 +28,9 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(MapLog_SyntheticVoxels_RecoversDAndK);
   MITK_TEST(MapOmitBZero_SyntheticVoxels_RecoversDAndK);
   MITK_TEST(MapBounds_KInsideBounds_RecoversDAndK);
+  MITK_TEST(MapBounds_AppDefault_RecoversDAndK);
+  MITK_TEST(Update_KBoundsEqual_Throws);
+  MITK_TEST(Snapshot_KBoundsReversed_Throws);
   MITK_TEST(Snapshot_SyntheticVoxel_RecoversDAndK);
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
   MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
@@ -121,6 +124,34 @@ public:
     filter->SetBoundariesForKurtosis(0, 3);
     filter->Update();
     AssertRecovered(GetMaps(filter), 1e-6, 1e-3);
+  }
+
+  void MapBounds_AppDefault_RecoversDAndK()
+  {
+    // MitkDiffusionKurtosisFit passes -1000..1000 when no bounds are given.
+    auto filter = MakeFilter(m_Image, m_Gradients, 3000);
+    filter->SetBoundariesForKurtosis(-1000, 1000);
+    filter->Update();
+    AssertRecovered(GetMaps(filter), 1e-6, 1e-3);
+  }
+
+  void Update_KBoundsEqual_Throws()
+  {
+    auto filter = MakeFilter(m_Image, m_Gradients, 3000);
+    filter->SetBoundariesForKurtosis(1000, 1000);
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  void Snapshot_KBoundsReversed_Throws()
+  {
+    auto filter = FilterType::New();
+    itk::KurtosisFitConfiguration config;
+    config.fit_scale = itk::STRAIGHT;
+    config.use_K_limits = true;
+    config.K_limits[0] = 3;
+    config.K_limits[1] = 0;
+    CPPUNIT_ASSERT_THROW(filter->GetSnapshot(m_Image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config),
+                         itk::ExceptionObject);
   }
 
   void Snapshot_SyntheticVoxel_RecoversDAndK()

@@ -397,6 +397,8 @@ protected:
   DiffusionKurtosisReconstructionImageFilter();
   virtual ~DiffusionKurtosisReconstructionImageFilter() {}
 
+  void VerifyPreconditions() const override;
+
   void GenerateOutputInformation() override;
 
   void AfterThreadedGenerateData() override;

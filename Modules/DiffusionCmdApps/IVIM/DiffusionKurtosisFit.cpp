@@ -186,7 +186,7 @@ int main( int argc, char* argv[] )
   parser.addArgument("mask", "m", mitkCommandLineParser::String, "Masking Image: ", "ROI (segmentation)", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("help", "h", mitkCommandLineParser::Bool, "Help", "Show this help text");
   parser.addArgument("omitbzero", "om", mitkCommandLineParser::Bool, "Omit b0:", "Omit b0 value during fit (default = false)", us::Any());
-  parser.addArgument("lowerkbound", "kl", mitkCommandLineParser::Float, "lower Kbound:", "Set (unsigned) lower boundary for Kurtosis parameter (default = -1000)", us::Any());
+  parser.addArgument("lowerkbound", "kl", mitkCommandLineParser::Float, "lower Kbound:", "Magnitude of the lower boundary for the kurtosis parameter: K >= -value (default = 1000)", us::Any());
   parser.addArgument("upperkbound", "ku", mitkCommandLineParser::Float, "upper Kbound:", "Set upper boundary for Kurtosis parameter (default = 1000)", us::Any());
 
 
@@ -206,7 +206,8 @@ int main( int argc, char* argv[] )
   mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
   bool omitBZero = false;
-  double lower = -1000;
+  // The lower bound is given as a magnitude and negated below.
+  double lower = 1000;
   double upper = 1000;
   std::string  out_type = "nrrd";
 
