@@ -38,6 +38,9 @@ void ShCoefficientImageImporter< PixelType, ShOrder >
 {
   if (m_InputImage.IsNull())
     return;
+  // Each voxel's volumes are copied into a fixed vector of the template's coefficient count.
+  if (m_InputImage->GetLargestPossibleRegion().GetSize(3) != CoefficientImageType::PixelType::Dimension)
+    itkExceptionMacro(<< "The image has " << m_InputImage->GetLargestPossibleRegion().GetSize(3) << " volumes, SH order " << ShOrder << " has " << CoefficientImageType::PixelType::Dimension << " coefficients.");
 
   Vector<double, 4> spacing4 = m_InputImage->GetSpacing();
   Point<double, 4> origin4 = m_InputImage->GetOrigin();

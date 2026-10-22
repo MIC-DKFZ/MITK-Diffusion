@@ -248,22 +248,20 @@ vnl_matrix<float> mitk::sh::CalcShBasisForDirections(unsigned int sh_order, vnl_
 
 unsigned int mitk::sh::ShOrder(int num_coeffs)
 {
-  int c=3, d=2-2*num_coeffs;
-  int D = c*c-4*d;
-  if (D>0)
+  // An even order L has (L+1)(L+2)/2 coefficients.
+  for (int order = 0; (order+1)*(order+2)/2 <= num_coeffs; order += 2)
   {
-    int s = (-c+static_cast<int>(sqrt(D)))/2;
-    if (s<0)
-      s = (-c-static_cast<int>(sqrt(D)))/2;
-    return static_cast<unsigned int>(s);
+    if ((order+1)*(order+2)/2 == num_coeffs)
+      return static_cast<unsigned int>(order);
   }
-  else if (D==0)
-    return static_cast<unsigned int>(-c/2);
-  return 0;
+  mitkThrow() << num_coeffs << " is not the number of coefficients of an even SH order.";
 }
 
 float mitk::sh::GetValue(const vnl_vector<float> &coefficients, const int &sh_order, const double theta, const double phi, const bool mrtrix)
 {
+  if (sh_order < 0 || coefficients.size() < static_cast<unsigned int>((sh_order+1)*(sh_order+2)/2))
+    mitkThrow() << coefficients.size() << " coefficients are too few for SH order " << sh_order << ".";
+
   float val = 0;
   for(int k=0; k<=sh_order; k+=2)
   {
@@ -279,6 +277,9 @@ float mitk::sh::GetValue(const vnl_vector<float> &coefficients, const int &sh_or
 
 float mitk::sh::GetValue(const vnl_vector<float> &coefficients, const int &sh_order, const vnl_vector_fixed<double, 3> &dir, const bool mrtrix)
 {
+  if (sh_order < 0 || coefficients.size() < static_cast<unsigned int>((sh_order+1)*(sh_order+2)/2))
+    mitkThrow() << coefficients.size() << " coefficients are too few for SH order " << sh_order << ".";
+
   double spherical[3];
   mitk::gradients::Cart2Sph(dir[0], dir[1], dir[2], spherical);
 

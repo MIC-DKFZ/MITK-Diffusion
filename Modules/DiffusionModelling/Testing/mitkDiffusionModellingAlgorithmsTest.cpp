@@ -27,6 +27,7 @@ found in the LICENSE file.
 #include <itkOdfMaximaExtractionFilter.h>
 #include <itkDiffusionTensor3DReconstructionImageFilter.h>
 #include <itkOdfToRgbImageFilter.h>
+#include <itkShCoefficientImageImporter.h>
 #include <itkShToRgbImageFilter.h>
 #include <itkTensorImageToDiffusionImageFilter.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
@@ -54,6 +55,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(TensorToDwi_SecondInput_SameAsFreshFilter);
   MITK_TEST(TensorToDwi_Mask_AppliesToBaseline);
   MITK_TEST(OdfToRgb_ZeroOdf_Black);
+  MITK_TEST(Sh_InvalidCoefficientCounts_Throw);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -458,6 +460,35 @@ public:
     CPPUNIT_ASSERT_EQUAL(0, int(zero.GetRed()) + int(zero.GetGreen()) + int(zero.GetBlue()) + int(zero.GetAlpha()));
     const auto xOdf = filter->GetOutput()->GetPixel({{1, 0, 0}});
     CPPUNIT_ASSERT(xOdf.GetRed() > xOdf.GetGreen() && xOdf.GetRed() > xOdf.GetBlue());
+  }
+
+  // ShOrder returned garbage for counts that belong to no order, GetValue read past too few
+  // coefficients, and the importer copied any number of volumes into a fixed-size vector.
+  void Sh_InvalidCoefficientCounts_Throw()
+  {
+    const std::pair<int, unsigned int> valid[] = {{1, 0}, {6, 2}, {15, 4}, {28, 6}, {45, 8}, {66, 10}, {91, 12}};
+    for (const auto &[count, order] : valid)
+      CPPUNIT_ASSERT_EQUAL(order, mitk::sh::ShOrder(count));
+    for (int count : {0, 5, 7, 90})
+      CPPUNIT_ASSERT_THROW(mitk::sh::ShOrder(count), mitk::Exception);
+
+    vnl_vector<float> coefficients(14, 0.1f);
+    vnl_vector_fixed<double, 3> dir(0, 0, 1);
+    CPPUNIT_ASSERT_THROW(mitk::sh::GetValue(coefficients, 4, dir, true), mitk::Exception);
+    coefficients.set_size(15);
+    coefficients.fill(0.1f);
+    CPPUNIT_ASSERT_NO_THROW(mitk::sh::GetValue(coefficients, 4, dir, true));
+
+    using ImporterType = itk::ShCoefficientImageImporter<float, 4>;
+    auto volumes = ImporterType::InputImageType::New();
+    ImporterType::InputImageType::RegionType region;
+    region.SetSize({{1, 1, 1, 28}});
+    volumes->SetRegions(region);
+    volumes->Allocate();
+    volumes->FillBuffer(0);
+    auto importer = ImporterType::New();
+    importer->SetInputImage(volumes);
+    CPPUNIT_ASSERT_THROW(importer->GenerateData(), itk::ExceptionObject);
   }
 
   // The 4D peak image takes the tensor image's geometry; its fourth origin component was left
