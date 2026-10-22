@@ -5,7 +5,7 @@ project(org_mitk_gui_qt_diffusionimaging_fiberprocessing)
 mitk_create_plugin(
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_FIBERPROCESSING_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkFiberProcessing MitkQtWidgets MitkFiberDissection MitkFiberTracking MitkQtWidgetsExt
+  MODULE_DEPENDS MitkFiberProcessing MitkQtWidgets MitkFiberDissection MitkQtWidgetsExt
   PACKAGE_DEPENDS
     PRIVATE ITK|ITKVTK
 )
