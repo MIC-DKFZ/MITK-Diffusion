@@ -35,7 +35,6 @@ namespace mitk
     typedef vnl_vector_fixed< double, 3 >                            ValueType;
     typedef ValueType                                                GradientDirectionType;
     typedef itk::VectorContainer< IndexType, GradientDirectionType > GradientDirectionsContainerType;
-    typedef std::vector< itk::Vector<double,3> >                     AlternativeGradientDirectionsContainerType;
 
     mitkClassMacro(GradientDirectionsProperty, BaseProperty)
 
@@ -45,7 +44,6 @@ namespace mitk
     mitkNewMacro1Param(GradientDirectionsProperty, const GradientDirectionsProperty&);
     mitkNewMacro1Param(GradientDirectionsProperty, const GradientDirectionsContainerType::Pointer);
     mitkNewMacro1Param(GradientDirectionsProperty, const GradientDirectionsContainerType::ConstPointer);
-    mitkNewMacro1Param(GradientDirectionsProperty, const AlternativeGradientDirectionsContainerType );
 
     const GradientDirectionsContainerType::ConstPointer GetGradientDirectionsContainer() const;
     const GradientDirectionsContainerType::Pointer GetGradientDirectionsContainerCopy() const;
@@ -67,7 +65,6 @@ namespace mitk
     GradientDirectionsProperty(const GradientDirectionsProperty& other);
     GradientDirectionsProperty(const GradientDirectionsContainerType::Pointer gradientDirectionsContainer);
     GradientDirectionsProperty(const GradientDirectionsContainerType::ConstPointer gradientDirectionsContainer);
-    GradientDirectionsProperty(const AlternativeGradientDirectionsContainerType gradientDirectionsContainer);
 
     bool IsEqual(const BaseProperty& property) const override;
     bool Assign(const BaseProperty & property) override;

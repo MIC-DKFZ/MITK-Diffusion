@@ -37,17 +37,6 @@ mitk::GradientDirectionsProperty::GradientDirectionsProperty(const GradientDirec
   m_GradientDirectionsContainer = gradientDirectionsContainer;
 }
 
-mitk::GradientDirectionsProperty::GradientDirectionsProperty(const AlternativeGradientDirectionsContainerType gradientDirectionsContainer)
-{
-  auto temp = mitk::GradientDirectionsProperty::GradientDirectionsContainerType::New();
-  for(unsigned int index(0); index < gradientDirectionsContainer.size(); index++)
-  {
-    GradientDirectionType newDirection = gradientDirectionsContainer.at(index).GetVnlVector();
-    temp->InsertElement( index, newDirection);
-  }
-  m_GradientDirectionsContainer = temp;
-}
-
 mitk::GradientDirectionsProperty::~GradientDirectionsProperty()
 {
 }

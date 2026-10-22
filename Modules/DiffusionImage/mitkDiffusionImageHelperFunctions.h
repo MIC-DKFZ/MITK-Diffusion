@@ -35,7 +35,8 @@ class MITKDIFFUSIONIMAGE_EXPORT imv
 {
 public:
 
-  static std::vector< std::pair< itk::Index<3>, double > > IntersectImage(const itk::Vector<double,3>& spacing, itk::Index<3>& si, itk::Index<3>& ei, itk::ContinuousIndex<float, 3>& sf, itk::ContinuousIndex<float, 3>& ef);
+  /** Length of the segment from sf to ef (continuous indices) inside each voxel it crosses; si and ei are the voxels of sf and ef. */
+  static std::vector< std::pair< itk::Index<3>, double > > IntersectImage(const itk::Vector<double,3>& spacing, itk::Index<3> si, itk::Index<3> ei, const itk::ContinuousIndex<float, 3>& sf, const itk::ContinuousIndex<float, 3>& ef);
 
   static itk::Point<float, 3> GetItkPoint(double point[3])
   {
@@ -44,26 +45,6 @@ public:
     itkPoint[1] = static_cast<float>(point[1]);
     itkPoint[2] = static_cast<float>(point[2]);
     return itkPoint;
-  }
-
-  template< class TType >
-  static itk::Point<float, 3> GetItkPoint(double point[3])
-  {
-    itk::Point<TType, 3> itkPoint;
-    itkPoint[0] = static_cast<TType>(point[0]);
-    itkPoint[1] = static_cast<TType>(point[1]);
-    itkPoint[2] = static_cast<TType>(point[2]);
-    return itkPoint;
-  }
-
-  template< class TType >
-  static itk::Vector<float, 3> GetItkVector(double point[3])
-  {
-    itk::Vector<TType, 3> itkVector;
-    itkVector[0] = static_cast<TType>(point[0]);
-    itkVector[1] = static_cast<TType>(point[1]);
-    itkVector[2] = static_cast<TType>(point[2]);
-    return itkVector;
   }
 
   template< class TPixelType, class TOutPixelType=TPixelType >

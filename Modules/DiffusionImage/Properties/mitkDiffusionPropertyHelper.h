@@ -58,7 +58,6 @@ namespace mitk
     static ImageType::Pointer GetItkVectorImage(Image *image);
     static const BValueMapType & GetBValueMap(const mitk::Image *);
     static float GetReferenceBValue(const mitk::Image *);
-    static std::vector< int > GetBValueVector(const mitk::Image *);
     /** Identity when the image has no measurement frame. */
     static MeasurementFrameType GetMeasurementFrame(const mitk::Image *);
     static const GradientDirectionsContainerType::ConstPointer GetOriginalGradientContainer(const mitk::Image *);
@@ -73,8 +72,6 @@ namespace mitk
     static void SetOriginalGradientContainer(mitk::Image* image, GradientDirectionsContainerType::Pointer g_cont);
     static void SetGradientContainer(mitk::Image* image, GradientDirectionsContainerType::ConstPointer g_cont);
     static void SetGradientContainer(mitk::Image* image, GradientDirectionsContainerType::Pointer g_cont);
-    static void RotateGradients(mitk::Image* image, vnl_matrix_fixed<double, 3, 3> rotation_matrix, bool normalize_columns);
-    static void RotateOriginalGradients(mitk::Image* image, vnl_matrix_fixed<double, 3, 3> rotation_matrix, bool normalize_columns);
 
     static void AverageRedundantGradients(mitk::Image* image, double precision);
     static void InitializeImage(mitk::Image* image);
