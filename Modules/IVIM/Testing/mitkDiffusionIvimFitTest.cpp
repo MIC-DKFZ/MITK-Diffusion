@@ -51,6 +51,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Update_MaskGridDiffersBeyondRounding_Throws);
   MITK_TEST(ComputeMaps_FweMaskWithRoundedOrigin_FitsInside);
   MITK_TEST(ComputeMaps_FweMask_SameAsUnmaskedInside);
+  MITK_TEST(ComputeMaps_FractionalMask_FitsWhereGreaterThanZero);
   MITK_TEST(GetDiffusionSignal_Fwe_VoxelSignalOrNothingOutside);
   MITK_TEST(AverageDiffusionSignalInMask_TwoVoxels_MeanNotRounded);
   MITK_TEST(AverageDiffusionSignalInMask_NoOverlap_NoVoxels);
@@ -466,7 +467,7 @@ public:
   }
 
   /** A mask along x with the geometry of the synthetic image when size is m_Truth.size(). */
-  static FilterType::MaskImageType::Pointer MakeLineMask(unsigned int size, short value)
+  static FilterType::MaskImageType::Pointer MakeLineMask(unsigned int size, double value)
   {
     auto mask = FilterType::MaskImageType::New();
     FilterType::MaskImageType::SizeType maskSize = {{size, 1, 1}};
@@ -594,6 +595,35 @@ public:
           const bool isInside = std::find(insideOffsets.begin(), insideOffsets.end(), i) != insideOffsets.end();
           CPPUNIT_ASSERT_EQUAL(isInside ? expected[i] : 0.0, actual[i]);
         }
+      }
+    }
+  }
+
+  void ComputeMaps_FractionalMask_FitsWhereGreaterThanZero()
+  {
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    // 0.3 as in a probability or partial-volume map; 1e-300 would become 0 in a float mask; -0.3 is
+    // not greater than 0.
+    const itk::Index<3> fractional = {{5, 5, 5}};
+    const itk::Index<3> tiny = {{2, 7, 4}};
+    const itk::Index<3> negative = {{10, 0, 3}};
+    const auto mask = MakeMaskWithValues(dwi.image, {{fractional, 0.3}, {tiny, 1e-300}, {negative, -0.3}});
+
+    const auto parameters = MakeParameters(Method::DThenDStar);
+    const auto unmasked = mitk::ivim::ComputeMaps(dwi.dwi, nullptr, parameters);
+    const auto masked = mitk::ivim::ComputeMaps(dwi.dwi, mask, parameters);
+    const std::vector<std::pair<mitk::Image::Pointer, mitk::Image::Pointer>> pairs = {
+      {unmasked.f, masked.f}, {unmasked.d, masked.d}, {unmasked.dStar, masked.dStar}};
+    for (const auto& [expectedMap, actualMap] : pairs)
+    {
+      const auto expected = Values(expectedMap.GetPointer());
+      const auto actual = Values(actualMap.GetPointer());
+      for (const auto& index : {fractional, tiny, negative})
+        CPPUNIT_ASSERT(expected[FweOffset(index)] != 0);
+      for (std::size_t i = 0; i < expected.size(); ++i)
+      {
+        const bool isInside = i == FweOffset(fractional) || i == FweOffset(tiny);
+        CPPUNIT_ASSERT_EQUAL(isInside ? expected[i] : 0.0, actual[i]);
       }
     }
   }

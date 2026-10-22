@@ -49,7 +49,10 @@ namespace itk
     using InputImageType = typename Superclass::InputImageType;
     using OutputImageType = typename Superclass::OutputImageType;
     using OutputImageRegionType = typename Superclass::OutputImageRegionType;
-    using MaskImageType = Image<short, 3>;
+    // double holds every pixel type CastToItkImage converts (integers up to 32 bit, float, double)
+    // exactly, so ComputeMaps keeps the values of a fractional mask, e.g. a probability map, instead
+    // of truncating values in (0, 1) to 0.
+    using MaskImageType = Image<double, 3>;
     using GradientDirectionContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
 
     /** The reference b-value of the gradients; no default, the filter throws when it is not set. */
@@ -58,8 +61,8 @@ namespace itk
     /** The gradient of each volume of the input, scaled so that b = reference b-value * |g|^2. */
     itkSetConstObjectMacro(GradientDirections, GradientDirectionContainerType);
 
-    /** Restricts the fit to voxels where the mask is not 0, others get 0; the mask must have the
-        voxel grid of the input (mitk::HasVoxelGridOf). */
+    /** Restricts the fit to voxels where the mask is greater than 0, others get 0; the mask must
+        have the voxel grid of the input (mitk::HasVoxelGridOf). */
     itkSetConstObjectMacro(ImageMask, MaskImageType);
 
     /** The variance in mm^2, not the sigma, of a Gaussian smoothing of each volume before the fit;

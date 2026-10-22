@@ -55,6 +55,8 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(Map_MaskGridDiffersByRounding_SameAsExactMask);
   MITK_TEST(Update_MaskGridDiffersBeyondRounding_Throws);
   MITK_TEST(ComputeMaps_FweMaskWithRoundedOrigin_FitsInside);
+  MITK_TEST(ComputeMaps_FractionalMask_FitsWhereGreaterThanZero);
+  MITK_TEST(ComputeMaps_FweFractionMask_SameAsUnmaskedWhereGreaterThanZero);
   MITK_TEST(Update_InputChanged_FitsWholeNewInput);
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
   MITK_TEST(SingleVoxel_FitVoxel_MatchRecordedValues);
@@ -517,7 +519,7 @@ public:
     }
   }
 
-  FilterType::MaskImageType::Pointer MakeMask(unsigned int size, short value)
+  FilterType::MaskImageType::Pointer MakeMask(unsigned int size, double value)
   {
     auto mask = FilterType::MaskImageType::New();
     FilterType::MaskImageType::SizeType maskSize = {{size, 1, 1}};
@@ -606,6 +608,60 @@ public:
     CPPUNIT_ASSERT(expected[center] != 0);
     for (std::size_t i = 0; i < expected.size(); ++i)
       CPPUNIT_ASSERT_EQUAL(i == center ? expected[i] : 0.0, actual[i]);
+  }
+
+  void ComputeMaps_FractionalMask_FitsWhereGreaterThanZero()
+  {
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    // 0.3 as in a probability or partial-volume map; 1e-300 would become 0 in a float mask; -0.3 is
+    // not greater than 0.
+    const itk::Index<3> fractional = {{5, 5, 5}};
+    const itk::Index<3> tiny = {{2, 7, 4}};
+    const itk::Index<3> negative = {{10, 0, 3}};
+    const auto mask = MakeMaskWithValues(dwi.image, {{fractional, 0.3}, {tiny, 1e-300}, {negative, -0.3}});
+
+    const mitk::kurtosis::FitConfiguration configuration{};
+    const auto unmasked = mitk::kurtosis::ComputeMaps(dwi.dwi, nullptr, configuration, 0);
+    const auto masked = mitk::kurtosis::ComputeMaps(dwi.dwi, mask, configuration, 0);
+    for (const auto& [expectedMap, actualMap] : {std::pair(unmasked.d, masked.d), std::pair(unmasked.k, masked.k)})
+    {
+      const auto expected = Values(expectedMap.GetPointer());
+      const auto actual = Values(actualMap.GetPointer());
+      for (const auto& index : {fractional, tiny, negative})
+        CPPUNIT_ASSERT(expected[FweOffset(index)] != 0);
+      for (std::size_t i = 0; i < expected.size(); ++i)
+      {
+        const bool isInside = i == FweOffset(fractional) || i == FweOffset(tiny);
+        CPPUNIT_ASSERT_EQUAL(isInside ? expected[i] : 0.0, actual[i]);
+      }
+    }
+  }
+
+  void ComputeMaps_FweFractionMask_SameAsUnmaskedWhereGreaterThanZero()
+  {
+    // As MitkDiffusionKurtosisFit -i FWE/InputDiffusionWeightedImage.dwi -m FWE/ReferenceFWImage.nrrd:
+    // the mask is a free-water fraction map (0 to 0.957) with the origin rounded.
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    const auto mask = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/FWE/ReferenceFWImage.nrrd"));
+    const auto maskValues = Values(mask.GetPointer());
+
+    const mitk::kurtosis::FitConfiguration configuration{};
+    const auto unmasked = mitk::kurtosis::ComputeMaps(dwi.dwi, nullptr, configuration, 0);
+    const auto masked = mitk::kurtosis::ComputeMaps(dwi.dwi, mask, configuration, 0);
+    for (const auto& [expectedMap, actualMap] : {std::pair(unmasked.d, masked.d), std::pair(unmasked.k, masked.k)})
+    {
+      const auto expected = Values(expectedMap.GetPointer());
+      const auto actual = Values(actualMap.GetPointer());
+      CPPUNIT_ASSERT_EQUAL(maskValues.size(), actual.size());
+      std::size_t fittedBelowOne = 0;
+      for (std::size_t i = 0; i < actual.size(); ++i)
+      {
+        CPPUNIT_ASSERT_EQUAL(maskValues[i] > 0 ? expected[i] : 0.0, actual[i]);
+        if (maskValues[i] > 0 && maskValues[i] < 1 && actual[i] != 0)
+          ++fittedBelowOne;
+      }
+      CPPUNIT_ASSERT(fittedBelowOne > 0);
+    }
   }
 
   void Update_InputChanged_FitsWholeNewInput()

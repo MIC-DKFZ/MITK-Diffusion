@@ -23,6 +23,7 @@ found in the LICENSE file.
 
 #include <cmath>
 #include <string>
+#include <utility>
 #include <vector>
 
 /** Synthetic DWIs and MITK-Data input shared by the IVIM and kurtosis fit tests. */
@@ -131,6 +132,27 @@ namespace mitk::IvimTesting
     for (const auto& voxel : voxels)
       mask->SetPixel(voxel, 1);
     return GrabItkImageMemory(mask);
+  }
+
+  /** A double mask with the geometry of the image, the given values at the given voxels and 0
+      elsewhere. */
+  inline Image::Pointer MakeMaskWithValues(const VectorImageType* image,
+                                           const std::vector<std::pair<itk::Index<3>, double>>& values)
+  {
+    auto mask = itk::Image<double, 3>::New();
+    mask->CopyInformation(image);
+    mask->SetRegions(image->GetLargestPossibleRegion());
+    mask->Allocate();
+    mask->FillBuffer(0);
+    for (const auto& [voxel, value] : values)
+      mask->SetPixel(voxel, value);
+    return GrabItkImageMemory(mask);
+  }
+
+  /** The buffer offset of a voxel of the 11 x 11 x n FWE DWI. */
+  inline std::size_t FweOffset(const itk::Index<3>& index)
+  {
+    return index[0] + 11 * index[1] + 121 * index[2];
   }
 
   /** Moves the origin of an image and widens its spacing by the given amounts in mm. */

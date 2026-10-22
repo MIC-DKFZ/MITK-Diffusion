@@ -101,8 +101,9 @@ namespace mitk::kurtosis
   };
 
   /** Fits every voxel of a DWI, multithreaded, after a Gaussian smoothing of each volume with the
-      given variance in mm^2 (0: none). Voxels where the optional mask is 0 get 0; the mask must have
-      the voxel grid of the DWI (HasVoxelGridOf). Throws mitk::Exception or itk::ExceptionObject on invalid input. */
+      given variance in mm^2 (0: none). Voxels where the optional mask is not greater than 0 get 0;
+      the mask may be fractional and must have the voxel grid of the DWI (HasVoxelGridOf). Throws
+      mitk::Exception or itk::ExceptionObject on invalid input. */
   MITKIVIM_EXPORT Maps ComputeMaps(const Image* dwi,
                                    const Image* mask,
                                    const FitConfiguration& configuration,
