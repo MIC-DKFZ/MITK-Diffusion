@@ -56,6 +56,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(TensorToDwi_Mask_AppliesToBaseline);
   MITK_TEST(OdfToRgb_ZeroOdf_Black);
   MITK_TEST(Sh_InvalidCoefficientCounts_Throw);
+  MITK_TEST(PrincipalDirection_FaThreshold_NoDirection);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -489,6 +490,28 @@ public:
     auto importer = ImporterType::New();
     importer->SetInputImage(volumes);
     CPPUNIT_ASSERT_THROW(importer->GenerateData(), itk::ExceptionObject);
+  }
+
+  // Voxels whose peak was removed by the FA threshold were counted as having one direction.
+  void PrincipalDirection_FaThreshold_NoDirection()
+  {
+    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    for (float threshold : {0.0f, 1.1f})
+    {
+      auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
+      filter->SetInput(tensors);
+      filter->SetFaThreshold(threshold);
+      filter->Update();
+
+      unsigned int withDirection = 0;
+      itk::ImageRegionConstIterator<MaskImageType> it(filter->GetOutput(), filter->GetOutput()->GetLargestPossibleRegion());
+      for (; !it.IsAtEnd(); ++it)
+        withDirection += it.Get();
+      if (threshold > 1)
+        CPPUNIT_ASSERT_EQUAL(0u, withDirection);
+      else
+        CPPUNIT_ASSERT(withDirection > 0);
+    }
   }
 
   // The 4D peak image takes the tensor image's geometry; its fourth origin component was left

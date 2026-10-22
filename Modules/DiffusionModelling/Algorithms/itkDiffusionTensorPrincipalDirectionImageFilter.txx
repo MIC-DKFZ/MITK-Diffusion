@@ -168,6 +168,8 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
         vec.fill(0.0);
       else
       {
+        numDirectionsIterator.Set( 1 );
+
         if (!m_NormalizeVectors)
           vec *= fa;
 
@@ -203,8 +205,6 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
       m_PeakImage->SetPixel(peakIndex, out[1]);
       peakIndex[3] = 2;
       m_PeakImage->SetPixel(peakIndex, out[2]);
-
-      numDirectionsIterator.Set( 1 );
     }
 
     ++numDirectionsIterator;
