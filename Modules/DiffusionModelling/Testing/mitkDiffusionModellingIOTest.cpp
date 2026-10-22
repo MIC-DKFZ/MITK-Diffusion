@@ -24,6 +24,8 @@ found in the LICENSE file.
 #include <mitkITKImageImport.h>
 
 #include <itkVectorImage.h>
+#include <vtkPointData.h>
+#include <vtkUnsignedCharArray.h>
 #include <itksys/SystemTools.hxx>
 #include <vnl/vnl_matrix_fixed.h>
 
@@ -45,6 +47,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(Writers_UnwritableLocation_Throw);
   MITK_TEST(OdfReader_WrongVectorLength_Throws);
   MITK_TEST(Clone_KeepsTypeAndPixels);
+  MITK_TEST(PeakImage_SetCustomColorWithoutPolydata);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -277,6 +280,26 @@ public:
     mitk::ShImage::Pointer shClone = shImage->Clone();
     CPPUNIT_ASSERT(shClone.IsNotNull());
     CPPUNIT_ASSERT_EQUAL(mitk::ShImage::FSL, shClone->GetShConvention());
+  }
+
+  // A peak image created by a view has no polydata until it is rendered; colouring it crashed.
+  void PeakImage_SetCustomColorWithoutPolydata()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"Peak Image"}, std::vector<std::string>());
+    auto loaded = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &functor);
+    auto itkPeaks = loaded->GetItkPeakImage();
+
+    auto peaks = mitk::PeakImage::New();
+    peaks->InitializeByItk(itkPeaks.GetPointer());
+    peaks->SetVolume(itkPeaks->GetBufferPointer());
+    peaks->SetCustomColor(255, 0, 0);
+
+    auto colors = dynamic_cast<vtkUnsignedCharArray *>(peaks->GetPolyData()->GetPointData()->GetArray("FIBER_COLORS"));
+    CPPUNIT_ASSERT(colors != nullptr);
+    CPPUNIT_ASSERT(colors->GetNumberOfTuples() > 0);
+    CPPUNIT_ASSERT_EQUAL(peaks->GetPolyData()->GetNumberOfPoints(), colors->GetNumberOfTuples());
+    CPPUNIT_ASSERT_EQUAL(255, static_cast<int>(colors->GetTypedComponent(0, 0)));
+    CPPUNIT_ASSERT_EQUAL(0, static_cast<int>(colors->GetTypedComponent(0, 1)));
   }
 };
 

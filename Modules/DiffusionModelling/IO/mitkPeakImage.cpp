@@ -146,8 +146,10 @@ mitk::PeakImage::ItkPeakImageType::Pointer mitk::PeakImage::GetItkPeakImage()
 
 void mitk::PeakImage::SetCustomColor(float r, float g, float b)
 {
+  // The polydata is built on demand; an image that was never rendered has none yet.
+  vtkPolyData* polyData = this->GetPolyData();
   vtkPoints* extrPoints = nullptr;
-  extrPoints = m_PolyData->GetPoints();
+  extrPoints = polyData->GetPoints();
   int numOfPoints = 0;
   if (extrPoints!=nullptr)
     numOfPoints = static_cast<int>(extrPoints->GetNumberOfPoints());
@@ -160,7 +162,7 @@ void mitk::PeakImage::SetCustomColor(float r, float g, float b)
   colors->SetName("FIBER_COLORS");
 
   unsigned char rgba[4] = {0,0,0,0};
-  for(long i=0; i<m_PolyData->GetNumberOfPoints(); ++i)
+  for(long i=0; i<polyData->GetNumberOfPoints(); ++i)
   {
     rgba[0] = static_cast<unsigned char>(r);
     rgba[1] = static_cast<unsigned char>(g);
@@ -169,7 +171,7 @@ void mitk::PeakImage::SetCustomColor(float r, float g, float b)
     colors->InsertTypedTuple(i, rgba);
   }
 
-  m_PolyData->GetPointData()->AddArray(colors);
+  polyData->GetPointData()->AddArray(colors);
   this->Modified();
 }
 
@@ -183,8 +185,9 @@ void mitk::PeakImage::ColorByOrientation()
   //  + one fiber with 0 points
   //=================================================
 
+  vtkPolyData* polyData = this->GetPolyData();
   vtkPoints* extrPoints = nullptr;
-  extrPoints = m_PolyData->GetPoints();
+  extrPoints = polyData->GetPoints();
   int numOfPoints = 0;
   if (extrPoints!=nullptr)
     numOfPoints = static_cast<int>(extrPoints->GetNumberOfPoints());
@@ -198,11 +201,11 @@ void mitk::PeakImage::ColorByOrientation()
   colors->SetNumberOfComponents(componentSize);
   colors->SetName("FIBER_COLORS");
 
-  int num_peaks = static_cast<int>(m_PolyData->GetNumberOfLines());
+  int num_peaks = static_cast<int>(polyData->GetNumberOfLines());
   if (num_peaks < 1)
     return;
 
-  vtkCellArray* fiberList = m_PolyData->GetLines();
+  vtkCellArray* fiberList = polyData->GetLines();
   fiberList->InitTraversal();
   for (int fi=0; fi<num_peaks; ++fi)
   {
@@ -233,6 +236,6 @@ void mitk::PeakImage::ColorByOrientation()
     }
   }
 
-  m_PolyData->GetPointData()->AddArray(colors);
+  polyData->GetPointData()->AddArray(colors);
   this->Modified();
 }
