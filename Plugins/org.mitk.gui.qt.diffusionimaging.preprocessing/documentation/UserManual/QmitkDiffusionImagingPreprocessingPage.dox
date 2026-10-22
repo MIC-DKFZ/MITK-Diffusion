@@ -24,4 +24,14 @@ In the Header tab you can selectively change geometry information of the image a
 
 Miscellaneous tools in the Other tab allow for ADC map calculation and the extraction of the b0 image with the possibility of averaging all b0 images.
 
+\section QmitkDiffusionImagingPreprocessingPageGradients Gradient directions and image geometry
+
+MITK Diffusion stores the gradient directions of a DWI as world (LPS) vectors. The tools that change the geometry or the gradients keep them consistent with the image data:
+
+\li <b>Flip axis</b> mirrors the image along the checked image (voxel) axes and keeps its geometry. The gradients of a DWI are mirrored along the same axes, i.e. along the world directions of these image axes.
+\li <b>Apply new header information</b> applies only the fields that were edited; voxel sizes must be positive and the columns of the direction matrix orthogonal. When the direction matrix of a DWI changes and <b>Rotate gradients with the image</b> is checked (default), the gradients turn with the image and keep their relation to the voxel grid, as FSL bvecs do; unchecked, they stay fixed in world coordinates. An edited measurement frame is applied to the original gradients of the DWI.
+\li <b>Clear rotation of gradients</b> recomputes the gradients without the rotation of the image matrix. It is available only for DWIs whose gradients include that rotation: NRRD files of earlier MITK versions and DICOM data.
+\li <b>Flip gradients</b> and <b>Reorder gradient dimensions</b> act on the world (LPS) components of the gradients and leave the image data unchanged. Reordering requires each of x, y and z once.
+\li <b>Merge selected DWIs</b> requires two DWIs with the same size, voxel size, origin and direction matrix.
+
 */

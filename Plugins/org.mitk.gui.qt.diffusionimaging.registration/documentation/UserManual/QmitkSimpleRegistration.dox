@@ -3,4 +3,6 @@
 
 This view enables the simple rigid or affine registration of two images. It is also possible to transform a tractogram with a registration object obtained from a previous registration of two images.
 
+For a diffusion-weighted image, the volume used for the registration is selected separately for the fixed and the moving image. All volumes of a moving DWI are mapped, and its gradient directions are rotated with the image. Only one registration runs at a time; if it fails, a message shows the reason. Tractograms can be transformed only with affine registrations.
+
 */
