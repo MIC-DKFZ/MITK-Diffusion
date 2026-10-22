@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkCompositeMapper.h>
 #include <mitkIOUtil.h>
 #include <mitkOdfImage.h>
 #include <mitkPeakImage.h>
@@ -42,6 +43,7 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   MITK_TEST(TensorImage_GlyphsOfEachView);
   MITK_TEST(GlyphsSwitchedOff_NoGlyphs);
   MITK_TEST(PeakImage_SlabFollowsPlane);
+  MITK_TEST(CompositeMapper_PropAndImageMapperSlot);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::RenderingTestHelper m_RenderingTestHelper;
@@ -172,6 +174,28 @@ public:
       m_RenderingTestHelper.Render();
       CPPUNIT_ASSERT(planes->GetItem(0) == lower && planes->GetItem(1) == upper);
     }
+  }
+
+  // MITK's 3D plane mapper takes the colour map's mapper from slot 3 of a "CompositeMapper" node.
+  // The prop is one assembly per renderer that the node's pick and render code can find.
+  void CompositeMapper_PropAndImageMapperSlot()
+  {
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) != nullptr);
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+    auto composite = dynamic_cast<mitk::CompositeMapper *>(m_Node->GetMapper(mitk::BaseRenderer::Standard2D));
+    CPPUNIT_ASSERT(composite != nullptr);
+    CPPUNIT_ASSERT_EQUAL(std::string("CompositeMapper"), std::string(composite->GetNameOfClass()));
+    CPPUNIT_ASSERT(m_Node->GetMapper(3) == composite->GetImageMapper().GetPointer());
+
+    vtkProp *prop = composite->GetVtkProp(renderer);
+    CPPUNIT_ASSERT(prop == composite->GetVtkProp(renderer));
+    CPPUNIT_ASSERT(composite->HasVtkProp(prop, renderer));
+    auto parts = vtkPropAssembly::SafeDownCast(prop)->GetParts();
+    CPPUNIT_ASSERT_EQUAL(2, parts->GetNumberOfItems());
+    parts->InitTraversal();
+    CPPUNIT_ASSERT(composite->HasVtkProp(parts->GetNextProp(), renderer));
+    CPPUNIT_ASSERT(composite->HasVtkProp(parts->GetNextProp(), renderer));
   }
 };
 
