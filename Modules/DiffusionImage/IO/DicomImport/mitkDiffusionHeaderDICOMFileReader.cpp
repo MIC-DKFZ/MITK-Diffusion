@@ -46,9 +46,10 @@ bool mitk::RevealBinaryTag(const gdcm::Tag tag, const gdcm::DataSet& dataset, st
   {
     MITK_DEBUG << "Found tag " << tag.PrintAsPipeSeparatedString();
 
-    const gdcm::DataElement& de = dataset.GetDataElement( tag );
-    target = std::string( de.GetByteValue()->GetPointer(),
-                          de.GetByteValue()->GetLength() );
+    const gdcm::ByteValue* value = dataset.GetDataElement( tag ).GetByteValue();
+    if (value == nullptr)
+      return false;
+    target = std::string( value->GetPointer(), value->GetLength() );
     return true;
 
   }
@@ -59,17 +60,19 @@ bool mitk::RevealBinaryTag(const gdcm::Tag tag, const gdcm::DataSet& dataset, st
   }
 }
 
-bool mitk::RevealBinaryTagC(const gdcm::Tag tag, const gdcm::DataSet& dataset, char * target_array )
+bool mitk::RevealBinaryTagC(const gdcm::Tag tag, const gdcm::DataSet& dataset, char * target_array, size_t target_size )
 {
   if( dataset.FindDataElement( tag ) )
   {
     MITK_DEBUG << "Found tag " << tag.PrintAsPipeSeparatedString();
 
-    const gdcm::DataElement& de = dataset.GetDataElement( tag );
-
-    size_t bytesize = de.GetValue().GetLength(); //  GetLength();
-    //target_array = new char[bytesize];
-    memcpy( target_array, de.GetByteValue()->GetPointer(), bytesize);
+    const gdcm::ByteValue* value = dataset.GetDataElement( tag ).GetByteValue();
+    if (value == nullptr || value->GetLength() != target_size)
+    {
+      MITK_WARN << "Unexpected size of tag " << tag.PrintAsPipeSeparatedString();
+      return false;
+    }
+    memcpy( target_array, value->GetPointer(), target_size);
 
     return true;
 

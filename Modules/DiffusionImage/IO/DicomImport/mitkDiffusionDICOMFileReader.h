@@ -42,6 +42,12 @@ public:
 
   bool CanHandleFile(const std::string &filename) override;
 
+  /**
+   * The header reader for the DICOM Manufacturer (0008,0070) and ImageType (0008,0008) values;
+   * null for unsupported vendors. isMosaic tells whether the images are Siemens mosaics.
+   */
+  static DiffusionHeaderDICOMFileReader::Pointer CreateHeaderReader(const std::string& vendor, const std::string& imageType, bool& isMosaic);
+
   void SetResolveMosaic( bool flag )
   {
     m_ResolveMosaic = flag;

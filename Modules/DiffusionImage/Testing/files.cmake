@@ -3,4 +3,5 @@ set(MODULE_CUSTOM_TESTS
   mitkDiffusionPropertyHelperTest.cpp
   mitkDiffusionImageIOTest.cpp
   mitkDiffusionImageHelperFunctionsTest.cpp
+  mitkDiffusionDicomHeaderTest.cpp
 )

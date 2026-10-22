@@ -4,6 +4,7 @@ mitkAddCustomModuleTest(mitkDiffusionPropertySerializerTest mitkDiffusionPropert
 mitkAddCustomModuleTest(mitkDiffusionPropertyHelperTest mitkDiffusionPropertyHelperTest)
 mitkAddCustomModuleTest(mitkDiffusionImageIOTest mitkDiffusionImageIOTest)
 mitkAddCustomModuleTest(mitkDiffusionImageHelperFunctionsTest mitkDiffusionImageHelperFunctionsTest)
+mitkAddCustomModuleTest(mitkDiffusionDicomHeaderTest mitkDiffusionDicomHeaderTest)
 
 # Freed memory is filled and not cached on glibc, so reads after free in the property helper show
 # up as wrong gradients instead of passing by chance.

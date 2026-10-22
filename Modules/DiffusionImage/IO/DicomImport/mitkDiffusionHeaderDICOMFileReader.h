@@ -110,9 +110,14 @@ protected:
  *
  * @return true if a string was found, false otherwise
  */
-bool RevealBinaryTag(const gdcm::Tag tag, const gdcm::DataSet& dataset, std::string& target);
+MITKDIFFUSIONIMAGE_EXPORT bool RevealBinaryTag(const gdcm::Tag tag, const gdcm::DataSet& dataset, std::string& target);
 
-bool RevealBinaryTagC(const gdcm::Tag tag, const gdcm::DataSet& dataset, char* target_array );
+/**
+ * @brief Copies the binary value of a gdcm tag into target_array
+ *
+ * Copies nothing and returns false unless the value has exactly target_size bytes.
+ */
+MITKDIFFUSIONIMAGE_EXPORT bool RevealBinaryTagC(const gdcm::Tag tag, const gdcm::DataSet& dataset, char* target_array, size_t target_size );
 
 
 } // end namespace mitk

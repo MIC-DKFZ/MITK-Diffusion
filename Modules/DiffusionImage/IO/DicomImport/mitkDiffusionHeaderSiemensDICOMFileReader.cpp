@@ -34,6 +34,10 @@ static bool GetTagFromHierarchy( std::vector< gdcm::Tag > hierarchy, const gdcm:
   if (seq==nullptr)
     return false;
 
+  // Items are numbered from 1.
+  if (seq->GetNumberOfItems() < 1)
+    return false;
+
   // last level of hierarchy, retrieve the first apperance
   if( hierarchy.size() == 1 )
   {
@@ -56,14 +60,9 @@ static bool GetTagFromHierarchy( std::vector< gdcm::Tag > hierarchy, const gdcm:
   {
     if( seq->FindDataElement( hierarchy.at(1) ) )
     {
-      for( gdcm::SequenceOfItems::SizeType i=1; i< seq->GetNumberOfItems(); i++ )
-      {
-        gdcm::Item& item = seq->GetItem(i);
-        gdcm::DataSet &nestedds = item.GetNestedDataSet();
-
-        // recursive call
-        return GetTagFromHierarchy( std::vector< gdcm::Tag >( hierarchy.begin() + 1, hierarchy.end() ), t_tag, nestedds, target);
-      }
+      // recursive call into the first item
+      gdcm::DataSet &nestedds = seq->GetItem(1).GetNestedDataSet();
+      return GetTagFromHierarchy( std::vector< gdcm::Tag >( hierarchy.begin() + 1, hierarchy.end() ), t_tag, nestedds, target);
     }
 
     return false;
@@ -211,7 +210,7 @@ bool mitk::DiffusionHeaderSiemensDICOMFileReader
 
     DiffusionImageDICOMHeaderInformation values;
     double dbvalue = 0;
-    if( mitk::RevealBinaryTagC( t_sie_bvalue, bvalueset, (char*) &dbvalue) )
+    if( mitk::RevealBinaryTagC( t_sie_bvalue, bvalueset, (char*) &dbvalue, sizeof(dbvalue)) )
     {
       MITK_INFO("siemens.dicom.diffusion.bvalue") << dbvalue;
       values.b_value = std::ceil( dbvalue );
@@ -229,7 +228,7 @@ bool mitk::DiffusionHeaderSiemensDICOMFileReader
       GetTagFromHierarchy( g_hierarchy, t_sie_gradient, dataset, bvalueset );
 
       double gr_dir_arr[3] = {1,0,-1};
-      if( mitk::RevealBinaryTagC( t_sie_gradient, bvalueset, (char*) &gr_dir_arr ) )
+      if( mitk::RevealBinaryTagC( t_sie_gradient, bvalueset, (char*) &gr_dir_arr, sizeof(gr_dir_arr) ) )
       {
         MITK_INFO("siemens.dicom.diffusion.gradient") << "(" << gr_dir_arr[0] <<"," << gr_dir_arr[1] <<"," <<gr_dir_arr[2] <<")";
       }
