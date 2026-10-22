@@ -103,7 +103,7 @@ namespace mitk {
 
     static void SetDefaultProperties(DataNode* node, BaseRenderer* renderer = nullptr, bool overwrite = false )
     {
-      mitk::OdfVtkMapper2D<float,ODF_SAMPLING_SIZE>::SetDefaultProperties(node, renderer, overwrite);
+      mitk::OdfVtkMapper2D::SetDefaultProperties(node, renderer, overwrite);
       mitk::CopyImageMapper2D::SetDefaultProperties(node, renderer, overwrite);
 
       mitk::LevelWindow opaclevwin;
@@ -149,7 +149,7 @@ namespace mitk {
 
   private:
 
-    mitk::OdfVtkMapper2D<float,ODF_SAMPLING_SIZE>::Pointer m_OdfMapper;
+    mitk::OdfVtkMapper2D::Pointer m_OdfMapper;
     mitk::CopyImageMapper2D::Pointer m_ImgMapper;
     vtkSmartPointer<vtkPropAssembly> m_PropAssembly;
 

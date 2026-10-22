@@ -31,6 +31,8 @@ set(CPP_FILES
   Rendering/mitkOdfNormalizationMethodProperty.cpp
   Rendering/mitkOdfScaleByProperty.cpp
   Rendering/mitkCompositeMapper.cpp
+  Rendering/mitkOdfGlyphGenerator.cpp
+  Rendering/mitkOdfVtkMapper2D.cpp
   Rendering/mitkPeakImageMapper2D.cpp
   Rendering/mitkPeakImageMapper3D.cpp
 
@@ -67,6 +69,7 @@ set(H_FILES
   IO/mitkPeakImageSerializer.cpp
 
   # Rendering
+  Rendering/mitkOdfGlyphGenerator.h
   Rendering/mitkOdfVtkMapper2D.h
   Rendering/mitkCompositeMapper.h
   Rendering/mitkPeakImageMapper2D.h

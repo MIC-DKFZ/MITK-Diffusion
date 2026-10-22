@@ -52,7 +52,7 @@ mitk::OdfScaleByProperty::OdfScaleByProperty( const std::string& value )
 }
 
 
-int mitk::OdfScaleByProperty::GetScaleBy()
+int mitk::OdfScaleByProperty::GetScaleBy() const
 {
   return static_cast<int>( this->GetValueAsId() );
 }

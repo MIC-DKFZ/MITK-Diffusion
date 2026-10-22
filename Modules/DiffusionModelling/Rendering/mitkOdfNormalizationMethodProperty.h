@@ -56,7 +56,7 @@ public:
   /**
    * Returns the current interpolation value as defined by VTK constants.
    */
-  virtual int GetNormalization();
+  virtual int GetNormalization() const;
 
   /**
    * Sets the interpolation type to ODFN_MINMAX.

@@ -52,7 +52,7 @@ mitk::OdfNormalizationMethodProperty::OdfNormalizationMethodProperty( const std:
 }
 
 
-int mitk::OdfNormalizationMethodProperty::GetNormalization()
+int mitk::OdfNormalizationMethodProperty::GetNormalization() const
 {
   return static_cast<int>( this->GetValueAsId() );
 }

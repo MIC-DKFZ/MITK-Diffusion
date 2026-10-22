@@ -53,7 +53,7 @@ public:
   /**
    * Returns the current interpolation value as defined by VTK constants.
    */
-  virtual int GetScaleBy();
+  virtual int GetScaleBy() const;
 
   virtual void SetScaleByNothing();
   virtual void SetScaleByGFA();
