@@ -342,7 +342,6 @@ NonLocalMeansDenoisingFilter< TPixelType >
                   p.push_back(m);
                 }
                 else
-                  ++size;
                 {
                   p.push_back(pixelJ);
                 }

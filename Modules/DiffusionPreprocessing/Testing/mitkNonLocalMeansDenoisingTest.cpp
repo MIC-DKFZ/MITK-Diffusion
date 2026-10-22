@@ -172,7 +172,7 @@ public:
 
   void Denoise_NLMvr_shouldReturnTrue()
   {
-    std::string referenceImagePath = GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMvr.dwi");
+    std::string referenceImagePath = GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMvr_v2.dwi");
     m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(referenceImagePath);
 
     m_DenoisingFilter->SetUseRicianAdaption(true);
