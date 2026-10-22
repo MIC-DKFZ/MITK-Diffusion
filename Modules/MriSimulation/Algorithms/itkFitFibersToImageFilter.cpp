@@ -567,7 +567,7 @@ void FitFibersToImageFilter::GenerateData()
 
   MITK_INFO << "Weighting fibers";
   m_RmsDiffPerBundle.set_size(m_Tractograms.size());
-  std::streambuf *old = cout.rdbuf(); // <-- save
+  std::streambuf *old = std::cout.rdbuf(); // <-- save
   std::stringstream ss;
   std::cout.rdbuf (ss.rdbuf());
   if (m_FitIndividualFibers)

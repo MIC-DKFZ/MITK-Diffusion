@@ -5,7 +5,7 @@ set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
 
 # MITK does not support Debug builds with Python, and MITK Diffusion does not use it. Forced off
 # because a configuration selected before (e.g. MITK's default WorkbenchRelease) leaves both on in
-# the cache. DiffusionRelease includes this file, so its feature set matches the Debug build.
+# the cache. DiffusionRelease includes this file and switches Python back on.
 set(MITK_USE_Python3 OFF CACHE BOOL "" FORCE)
 set(MITK_USE_pybind11 OFF CACHE BOOL "" FORCE)
 
@@ -47,7 +47,9 @@ set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.preprocessing" ON CACHE BOOL ""
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.reconstruction" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.registration" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.tractography" ON CACHE BOOL "" FORCE)
-set("MITK_BUILD_org.mitk.gui.qt.segmentation" ON CACHE BOOL "" FORCE)
+# MITK's segmentation plugin does not compile without Python: MakeError in
+# QmitkSegmentationRestRoutes.cpp is unused then, and -Werror rejects it.
+set("MITK_BUILD_org.mitk.gui.qt.segmentation" OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.measurementtoolbox" ON CACHE BOOL "" FORCE)
 
 # as default, build tests

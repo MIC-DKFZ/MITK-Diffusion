@@ -68,10 +68,10 @@ int vtkOdfSource::RequestData(
   polys->InitTraversal();
   vtkSmartPointer<vtkPoints> newPoints = vtkSmartPointer<vtkPoints>::New();
   int numPoints = TemplateOdf->GetPoints()->GetNumberOfPoints();
-  newPoints->Allocate(numPoints);
+  newPoints->Reserve(numPoints);
 
   vtkSmartPointer<vtkUnsignedCharArray> point_colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  point_colors->Allocate(output->GetNumberOfPoints() * 4);
+  point_colors->ReserveValues(output->GetNumberOfPoints() * 4);
   point_colors->SetNumberOfComponents(4);
   point_colors->SetName("ODF_COLORS");
   unsigned char rgba[4];

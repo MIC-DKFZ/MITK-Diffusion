@@ -151,7 +151,7 @@ void mitk::PeakImage::SetCustomColor(float r, float g, float b)
   int componentSize = 4;
 
   vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  colors->Allocate(numOfPoints * componentSize);
+  colors->ReserveValues(numOfPoints * componentSize);
   colors->SetNumberOfComponents(componentSize);
   colors->SetName("FIBER_COLORS");
 
@@ -190,7 +190,7 @@ void mitk::PeakImage::ColorByOrientation()
   int componentSize = 4;
 
   vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  colors->Allocate(numOfPoints * componentSize);
+  colors->ReserveValues(numOfPoints * componentSize);
   colors->SetNumberOfComponents(componentSize);
   colors->SetName("FIBER_COLORS");
 

@@ -34,6 +34,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkFiberBundleMimeTypes.h"
 
+#include <mitkMapperProviderBase.h>
+#include <mitkFiberBundleMapper2D.h>
+#include <mitkFiberBundleMapper3D.h>
+
+#include <memory>
+
 namespace mitk
 {
   /**
@@ -77,10 +83,15 @@ namespace mitk
       m_PlanarFigureCompositeWriter = new PlanarFigureCompositeWriter();
 
       mitk::DiffusionPropertyHelper::SetupProperties();
+
+      m_MapperProviders.push_back(std::make_unique<MapperProviderBase<FiberBundleMapper2D, FiberBundle>>(BaseRenderer::Standard2D));
+      m_MapperProviders.push_back(std::make_unique<MapperProviderBase<FiberBundleMapper3D, FiberBundle>>(BaseRenderer::Standard3D));
     }
 
     void Unload(us::ModuleContext*) override
     {
+      m_MapperProviders.clear();
+
       for (unsigned int loop(0); loop < m_MimeTypes.size(); ++loop)
       {
         delete m_MimeTypes.at(loop);
@@ -115,6 +126,7 @@ namespace mitk
 
     std::vector<mitk::CustomMimeType*> m_MimeTypes;
 
+    std::vector<std::unique_ptr<IMapperProvider>> m_MapperProviders;
   };
 }
 

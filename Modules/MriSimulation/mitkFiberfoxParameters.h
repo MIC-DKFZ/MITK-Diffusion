@@ -304,6 +304,8 @@ namespace mitk
 
     FiberfoxParameters();
     FiberfoxParameters(const FiberfoxParameters &params);
+    /** Member-wise: unlike the copy constructor, it shares the signal models with params. */
+    FiberfoxParameters& operator=(const FiberfoxParameters &params) = default;
     ~FiberfoxParameters();
 
     /** Not templated parameters */

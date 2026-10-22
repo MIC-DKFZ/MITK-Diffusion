@@ -19,7 +19,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
-#include <mitkCoreObjectFactory.h>
 #include <mitkPlanarFigure.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
@@ -163,7 +162,7 @@ int main(int argc, char* argv[])
     // load fiber bundle
     mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(inFib);
 
-    std::streambuf *old = cout.rdbuf(); // <-- save
+    std::streambuf *old = std::cout.rdbuf(); // <-- save
     std::stringstream ss;
     std::cout.rdbuf (ss.rdbuf());       // <-- redirect
     std::vector< ItkFloatImgType::Pointer > roi_images;

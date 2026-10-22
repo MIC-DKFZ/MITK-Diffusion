@@ -28,7 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_matrix_fixed.h>
 
 #include "mitkImage.h"
-#include "mitkBaseProcess.h"
 
 #include "mitkPyramidRegistrationMethodHelper.h"
 #include <itkWindowedSincInterpolateImageFunction.h>

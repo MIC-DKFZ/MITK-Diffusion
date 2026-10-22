@@ -21,7 +21,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // MITK includes
 #include "mitkImageSource.h"
-#include "mitkFileReader.h"
 
 #include <mitkDiffusionPropertyHelper.h>
 

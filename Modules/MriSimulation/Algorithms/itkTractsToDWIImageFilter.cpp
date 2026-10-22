@@ -833,12 +833,12 @@ void TractsToDWIImageFilter< PixelType >::InitializeFiberData()
 
   vtkSmartPointer<vtkFloatArray> weights = m_FiberBundle->GetFiberWeights();
   float mean_weight = 0;
-  for (int i=0; i<weights->GetSize(); i++)
+  for (int i=0; i<weights->GetNumberOfValues(); i++)
     mean_weight += weights->GetValue(i);
-  mean_weight /= weights->GetSize();
+  mean_weight /= weights->GetNumberOfValues();
 
   if (mean_weight>0.000001)
-    for (int i=0; i<weights->GetSize(); i++)
+    for (int i=0; i<weights->GetNumberOfValues(); i++)
       m_FiberBundle->SetFiberWeight(i, weights->GetValue(i)/mean_weight);
   else
     PrintToLog("\nWarning: streamlines have VERY low weights. Average weight: " + boost::lexical_cast<std::string>(mean_weight) + ". Possible source of calculation errors.", false, true, true);

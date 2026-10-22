@@ -10,7 +10,6 @@ set(CPP_FILES
 
   IO/mitkDiffusionServiceActivator.cpp
   IO/mitkDiffusionIOMimeTypes.cpp
-  IO/mitkDiffusionCoreObjectFactory.cpp
 
   IO/mitkNrrdTensorImageReader.cpp
   IO/mitkNrrdTensorImageWriter.cpp
@@ -54,7 +53,6 @@ set(H_FILES
   IO/mitkPeakImage.h
 
   IO/mitkDiffusionIOMimeTypes.h
-  IO/mitkDiffusionCoreObjectFactory.h
 
   IO/mitkNrrdTensorImageReader.h
   IO/mitkNrrdTensorImageWriter.h

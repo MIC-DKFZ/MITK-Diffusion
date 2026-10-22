@@ -74,10 +74,10 @@ public:
 
     vtkProp* GetVtkProp(mitk::BaseRenderer* renderer) override;
     bool IsVisibleOdfs(mitk::BaseRenderer* renderer);
-    void MitkRenderOverlay(mitk::BaseRenderer* renderer) override;
-    void MitkRenderOpaqueGeometry(mitk::BaseRenderer* renderer) override;
-    void MitkRenderTranslucentGeometry(mitk::BaseRenderer* renderer) override;
-    void MitkRenderVolumetricGeometry(mitk::BaseRenderer*  /*renderer*/) override{}
+    int MitkRenderOverlay(mitk::BaseRenderer* renderer) override;
+    int MitkRenderOpaqueGeometry(mitk::BaseRenderer* renderer) override;
+    int MitkRenderTranslucentGeometry(mitk::BaseRenderer* renderer) override;
+    int MitkRenderVolumetricGeometry(mitk::BaseRenderer*  /*renderer*/) override{ return 0; }
 
     OdfDisplayGeometry MeasureDisplayedGeometry(mitk::BaseRenderer* renderer);
     double GetMinImageSpacing( int index );

@@ -30,7 +30,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkCleanPolyData.h>
 #include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
-#include <vtkTransformPolyDataFilter.h>
 #include <mitkLexicalCast.h>
 
 #include "dcmtk/ofstd/ofcond.h"

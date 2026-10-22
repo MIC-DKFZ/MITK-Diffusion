@@ -175,7 +175,7 @@ QGroupBox {
     </widget>
    </item>
    <item row="6" column="0">
-    <widget class="QmitkChartWidget" name="m_ChartWidget" native="true">
+    <widget class="QmitkPlotWidget" name="m_ChartWidget" native="true">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
        <horstretch>0</horstretch>
@@ -1202,9 +1202,9 @@ QGroupBox {
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>QmitkChartWidget</class>
+   <class>QmitkPlotWidget</class>
    <extends>QWidget</extends>
-   <header>QmitkChartWidget.h</header>
+   <header>QmitkPlotWidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

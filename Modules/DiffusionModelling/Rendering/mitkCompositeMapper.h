@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef COMPOSITEMAPPER_H_HEADER_INCLUDED
 #define COMPOSITEMAPPER_H_HEADER_INCLUDED
 
-#include "mitkGLMapper.h"
 #include "mitkVtkMapper.h"
 #include "mitkOdfImage.h"
 #include "mitkImageVtkMapper2D.h"
@@ -49,32 +48,33 @@ namespace mitk {
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
 
-    void MitkRenderOverlay(BaseRenderer* renderer) override
+    int MitkRenderOverlay(BaseRenderer* renderer) override
     {
-      m_ImgMapper->MitkRenderOverlay(renderer);
-      m_OdfMapper->MitkRenderOverlay(renderer);
+      return m_ImgMapper->MitkRenderOverlay(renderer)
+           + m_OdfMapper->MitkRenderOverlay(renderer);
     }
 
-    void MitkRenderOpaqueGeometry(BaseRenderer* renderer) override
+    int MitkRenderOpaqueGeometry(BaseRenderer* renderer) override
     {
-      m_ImgMapper->MitkRenderOpaqueGeometry(renderer);
-      m_OdfMapper->MitkRenderOpaqueGeometry(renderer);
+      int rendered = m_ImgMapper->MitkRenderOpaqueGeometry(renderer)
+                   + m_OdfMapper->MitkRenderOpaqueGeometry(renderer);
       if( mitk::RenderingManager::GetInstance()->GetNextLOD( renderer ) == 0 )
       {
         renderer->Modified();
       }
+      return rendered;
     }
 
-    void MitkRenderTranslucentGeometry(BaseRenderer* renderer) override
+    int MitkRenderTranslucentGeometry(BaseRenderer* renderer) override
     {
-      m_ImgMapper->MitkRenderTranslucentGeometry(renderer);
-      m_OdfMapper->MitkRenderTranslucentGeometry(renderer);
+      return m_ImgMapper->MitkRenderTranslucentGeometry(renderer)
+           + m_OdfMapper->MitkRenderTranslucentGeometry(renderer);
     }
 
-    void MitkRenderVolumetricGeometry(BaseRenderer* renderer) override
+    int MitkRenderVolumetricGeometry(BaseRenderer* renderer) override
     {
-      m_ImgMapper->MitkRenderVolumetricGeometry(renderer);
-      m_OdfMapper->MitkRenderVolumetricGeometry(renderer);
+      return m_ImgMapper->MitkRenderVolumetricGeometry(renderer)
+           + m_OdfMapper->MitkRenderVolumetricGeometry(renderer);
     }
 
     void SetDataNode(DataNode* node) override

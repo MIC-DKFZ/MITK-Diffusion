@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkFiberBundleMimeTypes.h"
 #include "dcmtk/config/osconfig.h"    /* make sure OS specific configuration is included first */
 #include "dcmtk/dcmtract/trctractographyresults.h"
+#include "dcmtk/dcmdata/dcuid.h"
 
 mitk::FiberBundleDicomWriter::FiberBundleDicomWriter()
   : mitk::AbstractFileWriter(mitk::FiberBundle::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME(), "DICOM Fiber Bundle Writer")

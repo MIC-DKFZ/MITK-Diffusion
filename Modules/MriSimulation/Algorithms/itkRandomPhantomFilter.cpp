@@ -440,7 +440,7 @@ void RandomPhantomFilter::GenerateData()
     MITK_INFO << "Num. fiducials: " << c;
     MITK_INFO << "------------\n";
 
-    std::streambuf *old = cout.rdbuf(); // <-- save
+    std::streambuf *old = std::cout.rdbuf(); // <-- save
     std::stringstream ss;
     std::cout.rdbuf (ss.rdbuf());       // <-- redirect
     itk::FibersFromPlanarFiguresFilter::Pointer filter = itk::FibersFromPlanarFiguresFilter::New();

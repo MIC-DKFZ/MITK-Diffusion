@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define __mitkPlanarFigureCompositeReader_h
 
 #include <mitkCommon.h>
-#include <mitkFileReader.h>
 #include <vtkSmartPointer.h>
 
 #include <mitkAbstractFileReader.h>

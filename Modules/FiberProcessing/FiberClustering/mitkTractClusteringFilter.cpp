@@ -336,7 +336,7 @@ void TractClusteringFilter::MergeDuplicateClusters(std::vector< TractClusteringF
   {
     std::cout << "                                                                                                     \r";
     std::cout << "Number of clusters: " << clusters.size() << '\r';
-    cout.flush();
+    std::cout.flush();
 
     found = false;
     for (int k1=start; k1<(int)clusters.size(); ++k1)

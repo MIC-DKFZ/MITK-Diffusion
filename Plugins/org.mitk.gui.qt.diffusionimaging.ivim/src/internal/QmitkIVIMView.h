@@ -32,7 +32,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h"
 #include "itkDiffusionKurtosisReconstructionImageFilter.h"
 #include <QmitkSliceNavigationListener.h>
-#include <QmitkChartWidget.h>
+#include <QmitkPlotWidget.h>
 
 /*!
   \brief QmitkIVIMView
@@ -102,8 +102,7 @@ protected slots:
 
 protected:
 
-  void InitChartIvim();
-  void InitChartKurtosis();
+  void InitChart(const char* yAxisTitle);
   void AddSecondFitPlot();
   void RemoveSecondFitPlot();
 
@@ -127,6 +126,12 @@ protected:
 
   bool m_HoldUpdate;
   QmitkSliceNavigationListener  m_SliceChangeListener;
+
+  unsigned int m_DPartCurveId;
+  unsigned int m_FitCurveId;
+  unsigned int m_SignalCurveId;
+  unsigned int m_SecondFitSignalCurveId;
+  QwtPlotCurve* m_SecondFitSignalCurve;
 
 };
 

@@ -31,7 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <mitkImageAccessByItk.h>
-#include <mitkProgressBar.h>
 #include <mitkIOUtil.h>
 #include <mitkNodePredicateDataType.h>
 #include <mitkNodePredicateDimension.h>

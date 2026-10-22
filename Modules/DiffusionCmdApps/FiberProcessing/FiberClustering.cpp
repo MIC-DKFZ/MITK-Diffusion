@@ -230,7 +230,7 @@ int main(int argc, char* argv[])
     std::vector<mitk::FiberBundle::Pointer> centroids = clusterer->GetOutCentroids();
 
     MITK_INFO << "Saving clusters";
-    std::streambuf *old = cout.rdbuf(); // <-- save
+    std::streambuf *old = std::cout.rdbuf(); // <-- save
     std::stringstream ss;
     std::cout.rdbuf (ss.rdbuf());       // <-- redirect
 

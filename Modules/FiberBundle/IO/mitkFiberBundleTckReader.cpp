@@ -31,7 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTrackvis.h>
 #include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
-#include <vtkTransformPolyDataFilter.h>
+#include <vtkTransformFilter.h>
 #include <mitkLexicalCast.h>
 
 
@@ -142,12 +142,12 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleTckReader::DoRe
       matrix->SetElement(1,1,-matrix->GetElement(1,1));
       geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
 
-      vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+      vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
       transformFilter->SetInputData(fiberPolyData);
       transformFilter->SetTransform(geometry->GetVtkTransform());
       transformFilter->Update();
 
-      FiberBundle::Pointer fib = FiberBundle::New(transformFilter->GetOutput());
+      FiberBundle::Pointer fib = FiberBundle::New(transformFilter->GetPolyDataOutput());
       result.push_back(fib.GetPointer());
     }
 

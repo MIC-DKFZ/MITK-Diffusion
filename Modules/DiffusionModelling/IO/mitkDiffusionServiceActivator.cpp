@@ -32,8 +32,42 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkDiffusionIOMimeTypes.h"
 
+#include <mitkMapperProviderBase.h>
+#include <mitkVolumeMapperVtkSmart3D.h>
+#include <mitkCompositeMapper.h>
+#include <mitkPeakImageMapper2D.h>
+#include <mitkPeakImageMapper3D.h>
+#include <mitkOdfImage.h>
+#include <mitkTensorImage.h>
+#include <mitkShImage.h>
+#include <mitkPeakImage.h>
+
+#include <memory>
+
 namespace mitk
 {
+  namespace
+  {
+    /**
+    \brief Provides the CompositeMapper and puts its image mapper into mapper slot 3, where
+    PlaneGeometryDataVtkMapper3D takes it from to show the slices in the 3D view.
+    */
+    template <typename TData>
+    class CompositeMapperProvider : public MapperProviderBase<CompositeMapper, TData>
+    {
+    public:
+      CompositeMapperProvider() : MapperProviderBase<CompositeMapper, TData>(BaseRenderer::Standard2D) {}
+
+      Mapper::Pointer CreateMapper(DataNode* node) const override
+      {
+        auto mapper = CompositeMapper::New();
+        mapper->SetDataNode(node);
+        node->SetMapper(3, mapper->GetImageMapper());
+        return mapper.GetPointer();
+      }
+    };
+  }
+
   /**
   \brief Registers reader and writer services.
   */
@@ -54,10 +88,22 @@ namespace mitk
       m_ShImageWriter = new ShImageWriter();
 
       m_PeakImageReader = new PeakImageReader();
+
+      // MITK's 3D volume mapper declines subclasses of Image, so they register it themselves.
+      m_MapperProviders.push_back(std::make_unique<CompositeMapperProvider<OdfImage>>());
+      m_MapperProviders.push_back(std::make_unique<CompositeMapperProvider<TensorImage>>());
+      m_MapperProviders.push_back(std::make_unique<CompositeMapperProvider<ShImage>>());
+      m_MapperProviders.push_back(std::make_unique<MapperProviderBase<VolumeMapperVtkSmart3D, OdfImage>>(BaseRenderer::Standard3D));
+      m_MapperProviders.push_back(std::make_unique<MapperProviderBase<VolumeMapperVtkSmart3D, TensorImage>>(BaseRenderer::Standard3D));
+      m_MapperProviders.push_back(std::make_unique<MapperProviderBase<VolumeMapperVtkSmart3D, ShImage>>(BaseRenderer::Standard3D));
+      m_MapperProviders.push_back(std::make_unique<MapperProviderBase<PeakImageMapper2D, PeakImage>>(BaseRenderer::Standard2D));
+      m_MapperProviders.push_back(std::make_unique<MapperProviderBase<PeakImageMapper3D, PeakImage>>(BaseRenderer::Standard3D));
     }
 
     void Unload(us::ModuleContext*) override
     {
+      m_MapperProviders.clear();
+
       for (unsigned int loop(0); loop < m_MimeTypes.size(); ++loop)
       {
         delete m_MimeTypes.at(loop);
@@ -86,6 +132,7 @@ namespace mitk
 
     std::vector<mitk::CustomMimeType*> m_MimeTypes;
 
+    std::vector<std::unique_ptr<IMapperProvider>> m_MapperProviders;
   };
 }
 

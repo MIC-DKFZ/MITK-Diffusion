@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPolyLine.h>
 #include <vtkCellArray.h>
 #include <vtkCellData.h>
-#include <vtkIdFilter.h>
+#include <vtkGenerateIds.h>
 #include <vtkClipPolyData.h>
 #include <vtkPlane.h>
 #include <vtkDoubleArray.h>
@@ -37,7 +37,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPolygon.h>
 #include <vtkCleanPolyData.h>
 #include <boost/timer/progress_display.hpp>
-#include <vtkTransformPolyDataFilter.h>
 #include <mitkTransferFunction.h>
 #include <vtkLookupTable.h>
 #include <mitkLookupTable.h>
@@ -528,7 +527,7 @@ void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool weight_fibers, mi
   //colors and alpha value for each single point, RGBA = 4 components
   unsigned char rgba[4] = {0,0,0,0};
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  m_FiberColors->Allocate(numOfPoints * 4);
+  m_FiberColors->ReserveValues(numOfPoints * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
@@ -639,7 +638,7 @@ void mitk::FiberBundle::ColorFibersByOrientation()
   //colors and alpha value for each single point, RGBA = 4 components
   unsigned char rgba[4] = {0,0,0,0};
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  m_FiberColors->Allocate(numOfPoints * 4);
+  m_FiberColors->ReserveValues(numOfPoints * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
@@ -741,7 +740,7 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
   //colors and alpha value for each single point, RGBA = 4 components
   unsigned char rgba[4] = {0,0,0,0};
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
+  m_FiberColors->ReserveValues(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
@@ -917,7 +916,7 @@ template <typename TPixel>
 void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
+  m_FiberColors->ReserveValues(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
@@ -992,7 +991,7 @@ void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::P
 void mitk::FiberBundle::ColorFibersByFiberWeights(bool opacity, mitk::LookupTable::LookupTableType type)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
+  m_FiberColors->ReserveValues(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
@@ -1052,7 +1051,7 @@ void mitk::FiberBundle::SetSingleFiberColor(float r, float g, float b, unsigned 
 {
 //    if (m_FiberColors==nullptr)
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
+  m_FiberColors->ReserveValues(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
@@ -1106,7 +1105,7 @@ void mitk::FiberBundle::SetSingleFiberColor(float r, float g, float b, unsigned 
 void mitk::FiberBundle::SetFiberColors(float r, float g, float b, float alpha)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  m_FiberColors->Allocate(m_FiberPolyData->GetNumberOfPoints() * 4);
+  m_FiberColors->ReserveValues(m_FiberPolyData->GetNumberOfPoints() * 4);
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
 
@@ -1128,7 +1127,7 @@ void mitk::FiberBundle::GenerateFiberIds()
   if (m_FiberPolyData == nullptr)
     return;
 
-  vtkSmartPointer<vtkIdFilter> idFiberFilter = vtkSmartPointer<vtkIdFilter>::New();
+  vtkSmartPointer<vtkGenerateIds> idFiberFilter = vtkSmartPointer<vtkGenerateIds>::New();
   idFiberFilter->SetInputData(m_FiberPolyData);
   idFiberFilter->CellIdsOn();
   //  idFiberFilter->PointIdsOn(); // point id's are not needed
@@ -1136,7 +1135,7 @@ void mitk::FiberBundle::GenerateFiberIds()
   idFiberFilter->FieldDataOn();
   idFiberFilter->Update();
 
-  m_FiberIdDataSet = idFiberFilter->GetOutput();
+  m_FiberIdDataSet = idFiberFilter->GetPolyDataOutput();
 }
 
 mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgType* mask, bool invert)
@@ -2641,7 +2640,7 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
   if (m_FiberWeights!=nullptr)
   {
     std::vector< float > weights;
-    for (int i=0; i<m_FiberWeights->GetSize(); i++)
+    for (int i=0; i<m_FiberWeights->GetNumberOfValues(); i++)
       weights.push_back(m_FiberWeights->GetValue(i));
 
     std::sort(weights.begin(), weights.end());

@@ -27,7 +27,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkCommandLineParser.h"
 #include <boost/algorithm/string.hpp>
 #include <itkFlipImageFilter.h>
-#include <mitkCoreObjectFactory.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkShImage.h>
 #include <mitkDiffusionModellingHelperFunctions.h>

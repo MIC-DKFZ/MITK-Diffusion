@@ -24,7 +24,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageToItk.h>
 #include <mitkTensorImage.h>
 
-#include <mitkCoreObjectFactory.h>
 #include "mitkCommandLineParser.h"
 #include <itkShCoefficientImageImporter.h>
 #include <itkFlipImageFilter.h>

@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkRegularizedIVIMReconstructionFilter.h"
 
-#include <mitkLogMacros.h>
+#include <mitkLog.h>
 
 #define IVIM_FOO -100000
 

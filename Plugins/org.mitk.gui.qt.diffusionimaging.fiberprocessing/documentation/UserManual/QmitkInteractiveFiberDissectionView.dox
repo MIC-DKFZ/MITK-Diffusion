@@ -1,25 +1,25 @@
 /**
-\page org_mitk_views_fiberclustering atTRACTive
+\page org_mitk_views_interactivefiberdissection atTRACTive
 
 Interactively train a classifier for tract dissection. The workflow implemented in atTRACTive has been published in [1].
 
-\section SecInput Input Data
+\section SecDissectionInput Input Data
 
 - Selected Fiber Bundle: Currently selected fiber bundle (can be necessary for operations not belonging to ATTRACTIVE).
 - Training Fiber Bundle: Fibers belonging to that bundle are chosen to be annotated, and the model predicts on all streamlines from that bundle. It is possible to switch the bundle during the iterations, e.g., train first with Tractogram 1 and once the prediction is accurate, switch to Tractogram 2 and predict on its data.
 
-\section SecParams Preprocessing
+\section SecDissectionPreprocessing Preprocessing
 
 - Resample Bundle: Necessary to calculate dissimilarity features proposed by Olivetti et al. [2]. Needs to be done prior to training.
 - Number of prototypes: Define the number of prototypes and hence, the number of features to be generated per streamline. More prototypes mean more features and eventually increase the performance of the classifier. However, more features also mean more computational effort. We found 75 to be a good tradeoff since during the segmentation process iterative features are calculated (refer to our publication [2]).
 
-\section SecMetrics Active Learning
+\section SecDissectionActiveLearning Active Learning
 Iteratively use active learning to extract the individual chosen target tract by annotating streamlines that the classifier proposes to the human expert by its own uncertainty.
 
 1. Initialization:
 
 From Region-based Tractography:
-If the tractogram contains a good balance of fibers belonging to the target tract and fibers not belonging to it, you can simply click the "Add" button. A subset of randomly selected fibers will be presented for annotation. Swipe over the fibers and press <alt> if a fiber belongs to the target tract, or <shift> if it doesn't. Annotated fibers are visible in the Datamanager (+Bundle for fibers belonging to the target tract and -Bundle for fibers not belonging to it). Annotations can be corrected by swiping the cursor over the fibers and pressing <ctrl>.
+If the tractogram contains a good balance of fibers belonging to the target tract and fibers not belonging to it, you can simply click the "Add" button. A subset of randomly selected fibers will be presented for annotation. Swipe over the fibers and press Alt if a fiber belongs to the target tract, or Shift if it doesn't. Annotated fibers are visible in the Datamanager (+Bundle for fibers belonging to the target tract and -Bundle for fibers not belonging to it). Annotations can be corrected by swiping the cursor over the fibers and pressing Ctrl.
 
 From Whole Brain Tractography:
 Since the number of fibers in specific white matter tracts might only be a fraction of the whole tractogram's fibers, randomly sampling might not catch enough or even any target fibers. To improve this, draw two ROIs (Regions of Interest). Create the start ROI by using the mouse middle button to define a sphere's center. The sphere's radius is set by cursor movement, and clicking the middle button creates the start ROI. Repeat for the end ROI, generating a "reducedBundle" Bundle. Random sampling is then performed on this reducedBundle. Annotation proceeds as before by clicking the "Add" button.
