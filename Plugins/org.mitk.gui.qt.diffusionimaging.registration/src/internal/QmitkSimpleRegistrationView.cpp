@@ -120,7 +120,7 @@ void QmitkSimpleRegistrationView::StartRegistration()
 
     itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
     filter->SetInput( itkVectorImagePointer);
-    filter->SetChannelIndex(m_Controls->m_MovingChannelBox->value());
+    filter->SetChannelIndex(m_Controls->m_FixedChannelBox->value());
     filter->Update();
 
     mitk::Image::Pointer newImage = mitk::Image::New();
