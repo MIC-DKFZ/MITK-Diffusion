@@ -14,11 +14,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-// Blueberry
-#include <berryISelectionService.h>
-#include <berryIWorkbenchWindow.h>
-
-// Qmitk
 #include "QmitkIVIMView.h"
 
 // qt
@@ -40,13 +35,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // itk
 #include "itkScalarImageToHistogramGenerator.h"
-#include "itkRegionOfInterestImageFilter.h"
-#include "itkImageRegionConstIteratorWithIndex.h"
 #include <itkVectorIndexSelectionCastImageFilter.h>
 
 // itk/mitk
 #include <mitkDiffusionSignalSampling.h>
-#include "mitkImageCast.h"
 #include <mitkImageStatisticsHolder.h>
 #include <mitkNodePredicateIsDWI.h>
 #include <mitkNodePredicateDimension.h>
@@ -57,23 +49,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 const std::string QmitkIVIMView::VIEW_ID = "org.mitk.views.ivim";
 
-QmitkIVIMView::QmitkIVIMView()
-  : QmitkAbstractView()
-  , m_Controls( 0 )
-  , m_Active(false)
-  , m_Visible(false)
-  , m_HoldUpdate(false)
-  , m_DPartCurveId(0)
-  , m_FitCurveId(0)
-  , m_SignalCurveId(0)
-  , m_SecondFitSignalCurveId(0)
-  , m_SecondFitSignalCurve(nullptr)
-{
-}
+QmitkIVIMView::QmitkIVIMView() = default;
 
-QmitkIVIMView::~QmitkIVIMView()
-{
-}
+QmitkIVIMView::~QmitkIVIMView() = default;
 
 void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
 {
@@ -84,36 +62,35 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
   if ( !m_Controls )
   {
     // create GUI widgets from the Qt Designer's .ui file
-    m_Controls = new Ui::QmitkIVIMViewControls;
+    m_Controls = std::make_unique<Ui::QmitkIVIMViewControls>();
     m_Controls->setupUi( parent );
 
-    connect( m_Controls->m_ButtonStart, SIGNAL(clicked()), this, SLOT(FittIVIMStart()) );
-    connect( m_Controls->m_ButtonAutoThres, SIGNAL(clicked()), this, SLOT(AutoThreshold()) );
+    connect( m_Controls->m_ButtonStart, &QAbstractButton::clicked, this, &QmitkIVIMView::FittIVIMStart );
+    connect( m_Controls->m_ButtonAutoThres, &QAbstractButton::clicked, this, &QmitkIVIMView::AutoThreshold );
 
-    connect( m_Controls->m_MethodCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(OnIvimFitChanged(int)) );
+    connect( m_Controls->m_MethodCombo, &QComboBox::currentIndexChanged, this, &QmitkIVIMView::OnIvimFitChanged );
 
-    connect( m_Controls->m_DStarSlider, SIGNAL(valueChanged(int)), this, SLOT(DStarSlider(int)) );
-    connect( m_Controls->m_BThreshSlider, SIGNAL(valueChanged(int)), this, SLOT(BThreshSlider(int)) );
-    connect( m_Controls->m_S0ThreshSlider, SIGNAL(valueChanged(int)), this, SLOT(S0ThreshSlider(int)) );
+    connect( m_Controls->m_DStarSlider, &QAbstractSlider::valueChanged, this, &QmitkIVIMView::DStarSlider );
+    connect( m_Controls->m_BThreshSlider, &QAbstractSlider::valueChanged, this, &QmitkIVIMView::BThreshSlider );
+    connect( m_Controls->m_S0ThreshSlider, &QAbstractSlider::valueChanged, this, &QmitkIVIMView::S0ThreshSlider );
 
-    connect( m_Controls->m_CheckDStar, SIGNAL(clicked()), this, SLOT(Checkbox()) );
-    connect( m_Controls->m_CheckD, SIGNAL(clicked()), this, SLOT(Checkbox()) );
-    connect( m_Controls->m_Checkf, SIGNAL(clicked()), this, SLOT(Checkbox()) );
+    connect( m_Controls->m_CheckDStar, &QAbstractButton::clicked, this, &QmitkIVIMView::OnSliceChanged );
+    connect( m_Controls->m_CheckD, &QAbstractButton::clicked, this, &QmitkIVIMView::OnSliceChanged );
+    connect( m_Controls->m_Checkf, &QAbstractButton::clicked, this, &QmitkIVIMView::OnSliceChanged );
 
-    connect( m_Controls->m_CurveClipboard, SIGNAL(clicked()), this, SLOT(ClipboardCurveButtonClicked()) );
-    connect( m_Controls->m_ValuesClipboard, SIGNAL(clicked()), this, SLOT(ClipboardStatisticsButtonClicked()) );
-    connect( m_Controls->m_SavePlot, SIGNAL(clicked()), this, SLOT(SavePlotButtonClicked()) );
+    connect( m_Controls->m_CurveClipboard, &QAbstractButton::clicked, this, &QmitkIVIMView::ClipboardCurveButtonClicked );
+    connect( m_Controls->m_ValuesClipboard, &QAbstractButton::clicked, this, &QmitkIVIMView::ClipboardStatisticsButtonClicked );
+    connect( m_Controls->m_SavePlot, &QAbstractButton::clicked, this, &QmitkIVIMView::SavePlotButtonClicked );
 
-    // connect all kurtosis actions to a recompute
-    connect( m_Controls->m_KurtosisRangeWidget, SIGNAL( rangeChanged(double, double)), this, SLOT(OnKurtosisParamsChanged() ) );
-    connect( m_Controls->m_OmitBZeroCB, SIGNAL( stateChanged(int) ), this, SLOT( OnKurtosisParamsChanged() ) );
-    connect( m_Controls->m_KurtosisFitScale, SIGNAL( currentIndexChanged(int)), this, SLOT( OnKurtosisParamsChanged() ) );
-    connect( m_Controls->m_UseKurtosisBoundsCB, SIGNAL(clicked() ), this, SLOT( OnKurtosisParamsChanged() ) );
+    // all kurtosis parameters refit the preview
+    connect( m_Controls->m_KurtosisRangeWidget, &ctkRangeWidget::rangeChanged, this, &QmitkIVIMView::OnSliceChanged );
+    connect( m_Controls->m_OmitBZeroCB, &QAbstractButton::toggled, this, &QmitkIVIMView::OnSliceChanged );
+    connect( m_Controls->m_KurtosisFitScale, &QComboBox::currentIndexChanged, this, &QmitkIVIMView::OnSliceChanged );
+    connect( m_Controls->m_UseKurtosisBoundsCB, &QAbstractButton::clicked, this, &QmitkIVIMView::OnSliceChanged );
 
     m_Controls->m_DwiBox->SetDataStorage(this->GetDataStorage());
-    mitk::NodePredicateIsDWI::Pointer isDwi = mitk::NodePredicateIsDWI::New();
-    m_Controls->m_DwiBox->SetPredicate( isDwi );
-    connect( (QObject*)(m_Controls->m_DwiBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()));
+    m_Controls->m_DwiBox->SetPredicate( mitk::NodePredicateIsDWI::New() );
+    connect( m_Controls->m_DwiBox, &QComboBox::currentIndexChanged, this, &QmitkIVIMView::UpdateGui );
 
     m_Controls->m_MaskBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_MaskBox->SetZeroEntryText("--");
@@ -121,19 +98,14 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
     mitk::NodePredicateProperty::Pointer isBinaryPredicate = mitk::NodePredicateProperty::New("binary", mitk::BoolProperty::New(true));
     mitk::NodePredicateDimension::Pointer is3D = mitk::NodePredicateDimension::New(3);
     m_Controls->m_MaskBox->SetPredicate( mitk::NodePredicateAnd::New(isBinaryPredicate, mitk::NodePredicateAnd::New(isImagePredicate, is3D)) );
-    connect( (QObject*)(m_Controls->m_MaskBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()));
+    connect( m_Controls->m_MaskBox, &QComboBox::currentIndexChanged, this, &QmitkIVIMView::UpdateGui );
 
-    connect( (QObject*)(m_Controls->m_ModelTabSelectionWidget), SIGNAL(currentChanged(int)), this, SLOT(OnModelTabChanged(int)));
+    connect( m_Controls->m_ModelTabSelectionWidget, &QTabWidget::currentChanged, this, &QmitkIVIMView::OnModelTabChanged );
   }
 
-  QString dstar = QString::number(m_Controls->m_DStarSlider->value()/1000.0);
-  m_Controls->m_DStarLabel->setText(dstar);
-
-  QString bthresh = QString::number(m_Controls->m_BThreshSlider->value()*5.0);
-  m_Controls->m_BThreshLabel->setText(bthresh);
-
-  QString s0thresh = QString::number(m_Controls->m_S0ThreshSlider->value()*0.5);
-  m_Controls->m_S0ThreshLabel->setText(s0thresh);
+  m_Controls->m_DStarLabel->setText(QString::number(this->GetDStar()));
+  m_Controls->m_BThreshLabel->setText(QString::number(this->GetBThreshold()));
+  m_Controls->m_S0ThreshLabel->setText(QString::number(this->GetSignalThreshold()));
 
   m_Controls->m_Warning->setVisible(false);
 
@@ -143,25 +115,37 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
   m_Controls->m_KurtosisRangeWidget->setRange( 0.0, 10.0 );
   m_Controls->m_KurtosisRangeWidget->setMaximumValue( 5.0 );
 
-  // LogScale not working yet, have to fix that first
-  // m_Controls->m_KurtosisFitScale->setEnabled(false);
-
-
-  //m_Controls->m_MaximalBValueWidget->setVisible( false );
-
   // release update block after the UI-elements were all set
   this->m_HoldUpdate = false;
 
   InitChart("S/S0");
 
-  m_ListenerActive = false;
+  this->ActivateSliceListener();
+}
 
-  if (this->GetRenderWindowPart())
-  {
-    m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
-    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
-    m_ListenerActive = true;
-  }
+void QmitkIVIMView::ActivateSliceListener()
+{
+  if (m_ListenerActive || !this->GetRenderWindowPart())
+    return;
+
+  m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
+  connect(&m_SliceChangeListener, &QmitkSliceNavigationListener::SliceChanged, this, &QmitkIVIMView::OnSliceChanged);
+  m_ListenerActive = true;
+}
+
+double QmitkIVIMView::GetDStar() const
+{
+  return m_Controls->m_DStarSlider->value() / 1000.0;
+}
+
+double QmitkIVIMView::GetBThreshold() const
+{
+  return m_Controls->m_BThreshSlider->value() * 5.0;
+}
+
+double QmitkIVIMView::GetSignalThreshold() const
+{
+  return m_Controls->m_S0ThreshSlider->value() * 0.5;
 }
 
 void QmitkIVIMView::OnModelTabChanged(int tab)
@@ -221,11 +205,6 @@ void QmitkIVIMView::SetFocus()
   m_Controls->m_ButtonAutoThres->setFocus();
 }
 
-void QmitkIVIMView::Checkbox()
-{
-  OnSliceChanged();
-}
-
 void QmitkIVIMView::OnIvimFitChanged(int val)
 {
   switch(val)
@@ -255,27 +234,21 @@ void QmitkIVIMView::OnIvimFitChanged(int val)
   OnSliceChanged();
 }
 
-void QmitkIVIMView::DStarSlider (int val)
+void QmitkIVIMView::DStarSlider()
 {
-  QString sval = QString::number(val/1000.0);
-  m_Controls->m_DStarLabel->setText(sval);
-
+  m_Controls->m_DStarLabel->setText(QString::number(this->GetDStar()));
   OnSliceChanged();
 }
 
-void QmitkIVIMView::BThreshSlider (int val)
+void QmitkIVIMView::BThreshSlider()
 {
-  QString sval = QString::number(val*5.0);
-  m_Controls->m_BThreshLabel->setText(sval);
-
+  m_Controls->m_BThreshLabel->setText(QString::number(this->GetBThreshold()));
   OnSliceChanged();
 }
 
-void QmitkIVIMView::S0ThreshSlider (int val)
+void QmitkIVIMView::S0ThreshSlider()
 {
-  QString sval = QString::number(val*0.5);
-  m_Controls->m_S0ThreshLabel->setText(sval);
-
+  m_Controls->m_S0ThreshLabel->setText(QString::number(this->GetSignalThreshold()));
   OnSliceChanged();
 }
 
@@ -299,11 +272,6 @@ void QmitkIVIMView::UpdateGui()
   m_Controls->m_BottomControlsFrame->setEnabled( m_Controls->m_DwiBox->GetSelectedNode().IsNotNull() );
 
   OnSliceChanged();
-}
-
-void QmitkIVIMView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& )
-{
-//  UpdateGui();
 }
 
 void QmitkIVIMView::AutoThreshold()
@@ -380,9 +348,12 @@ void QmitkIVIMView::AutoThreshold()
 
   maxValue *= 2;
 
-  int sliderPos = maxValue * 2;
+  // The slider position is twice the threshold; the slider grows when the threshold is beyond its
+  // range, so that the slider always holds the threshold the fit uses.
+  const int sliderPos = maxValue * 2;
+  if (sliderPos > m_Controls->m_S0ThreshSlider->maximum())
+    m_Controls->m_S0ThreshSlider->setMaximum(sliderPos);
   m_Controls->m_S0ThreshSlider->setValue(sliderPos);
-  S0ThreshSlider(sliderPos);
 }
 
 void QmitkIVIMView::FittIVIMStart()
@@ -450,11 +421,6 @@ void QmitkIVIMView::AddMapNode(mitk::Image* map, const QString& name, std::optio
   this->GetDataStorage()->Add(node, parent);
 }
 
-void QmitkIVIMView::OnKurtosisParamsChanged()
-{
-  OnSliceChanged();
-}
-
 void QmitkIVIMView::OnSliceChanged()
 {
   if(m_HoldUpdate || !m_Visible)
@@ -472,12 +438,7 @@ void QmitkIVIMView::OnSliceChanged()
   if (!this->GetRenderWindowPart())
     return;
 
-  if (!m_ListenerActive)
-  {
-    m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
-    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
-    m_ListenerActive = true;
-  }
+  this->ActivateSliceListener();
 
   vnl_vector<double> signal;
   if(maskImg.IsNull())
@@ -587,9 +548,9 @@ mitk::ivim::FitParameters QmitkIVIMView::GetIvimFitParameters() const
 {
   mitk::ivim::FitParameters parameters;
   parameters.method = static_cast<mitk::ivim::Method>(m_Controls->m_MethodCombo->currentIndex());
-  parameters.signalThreshold = m_Controls->m_S0ThreshLabel->text().toDouble();
-  parameters.dStar = m_Controls->m_DStarLabel->text().toDouble();
-  parameters.bThreshold = m_Controls->m_BThreshLabel->text().toDouble();
+  parameters.signalThreshold = this->GetSignalThreshold();
+  parameters.dStar = this->GetDStar();
+  parameters.bThreshold = this->GetBThreshold();
   parameters.fitDStar = m_Controls->m_CheckDStar->isChecked();
   return parameters;
 }
@@ -731,24 +692,16 @@ void QmitkIVIMView::ClipboardStatisticsButtonClicked()
 
 void QmitkIVIMView::Activated()
 {
-  m_Active = true;
 }
 
 void QmitkIVIMView::Deactivated()
 {
-  m_Active = false;
 }
 
 void QmitkIVIMView::Visible()
 {
   m_Visible = true;
-
-  if (this->GetRenderWindowPart() && !m_ListenerActive)
-  {
-    m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
-    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
-    m_ListenerActive = true;
-  }
+  this->ActivateSliceListener();
 }
 
 void QmitkIVIMView::Hidden()

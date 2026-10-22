@@ -17,16 +17,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef _QMITKIVIMVIEW_H_INCLUDED
 #define _QMITKIVIMVIEW_H_INCLUDED
 
-#include <berryISelectionListener.h>
-
 #include <QmitkAbstractView.h>
 #include <mitkILifecycleAwarePart.h>
-#include <mitkIRenderWindowPartListener.h>
 
 #include "ui_QmitkIVIMViewControls.h"
 
-#include "itkVectorImage.h"
-#include "itkImage.h"
+#include <itkVectorImage.h>
 
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkIvimFit.h>
@@ -34,18 +30,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QmitkSliceNavigationListener.h>
 #include <QmitkPlotWidget.h>
 
+#include <memory>
 #include <optional>
 
-/*!
-  \brief QmitkIVIMView
-
-  \warning  This application module is not yet documented. Use "svn blame/praise/annotate" and ask the author to provide basic documentation.
+/**
+  \brief Fits the IVIM or the kurtosis model to the signal at the crosshair, or to the mean signal
+  of a mask, plots it, and generates parameter maps of a DWI.
 */
-
 class QmitkIVIMView : public QmitkAbstractView, public mitk::ILifecycleAwarePart
 {
-  // this is needed for all Qt objects that should have a Qt meta-object
-  // (everything that derives from QObject and wants to have signal/slots)
   Q_OBJECT
 
 public:
@@ -53,19 +46,15 @@ public:
   static const std::string VIEW_ID;
 
   QmitkIVIMView();
-  virtual ~QmitkIVIMView();
+  ~QmitkIVIMView() override;
 
-  typedef mitk::DiffusionPropertyHelper::GradientDirectionType GradientDirectionType;
-  typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType DirContainerType;
-  typedef itk::VectorImage<short,3> VecImgType;
+  using GradientDirectionType = mitk::DiffusionPropertyHelper::GradientDirectionType;
+  using DirContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
+  using VecImgType = itk::VectorImage<short, 3>;
 
-  virtual void CreateQtPartControl(QWidget *parent) override;
+  void CreateQtPartControl(QWidget *parent) override;
 
-  ///
-  /// Sets the focus to an internal widget.
-  ///
-  virtual void SetFocus() override;
-
+  void SetFocus() override;
 
   void Activated() override;
   void Deactivated() override;
@@ -76,23 +65,21 @@ protected slots:
 
   void OnSliceChanged();
 
-  /// \brief Called when the user clicks the GUI button
+  /** Generates the parameter maps of the selected DWI. */
   void FittIVIMStart();
   void AutoThreshold();
 
   void OnModelTabChanged(int tab);
 
   void OnIvimFitChanged(int val);
-  void Checkbox();
 
-  void DStarSlider(int val);
-  void BThreshSlider(int val);
-  void S0ThreshSlider(int val);
+  void DStarSlider();
+  void BThreshSlider();
+  void S0ThreshSlider();
   void ClipboardStatisticsButtonClicked();
   void ClipboardCurveButtonClicked();
   void SavePlotButtonClicked();
 
-  void OnKurtosisParamsChanged();
   void UpdateGui();
 
 protected:
@@ -100,9 +87,12 @@ protected:
   void InitChart(const char* yAxisTitle);
   void AddSecondFitPlot();
   void RemoveSecondFitPlot();
+  void ActivateSliceListener();
 
-  /// \brief called by QmitkAbstractView when DataManager's selection has changed
-  virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
+  /** The values of the sliders. */
+  double GetDStar() const;
+  double GetBThreshold() const;
+  double GetSignalThreshold() const;
 
   mitk::ivim::FitParameters GetIvimFitParameters() const;
   /** Fits and plots the signal of the selected voxel or the ROI average. */
@@ -115,7 +105,7 @@ protected:
   /** Adds a map below the DWI with a jet lookup table and, if given, the level window [0, max]. */
   void AddMapNode(mitk::Image* map, const QString& name, std::optional<double> levelWindowMax, mitk::DataNode* parent);
 
-  Ui::QmitkIVIMViewControls* m_Controls;
+  std::unique_ptr<Ui::QmitkIVIMViewControls> m_Controls;
 
   mitk::ivim::Protocol m_IvimProtocol;
   mitk::ivim::VoxelFit m_IvimFit;
@@ -123,22 +113,20 @@ protected:
   vnl_vector<double> m_KurtosisMeasurements;
   mitk::kurtosis::VoxelFit m_KurtosisFit;
 
-  bool m_Active;
-  bool m_Visible;
-  bool m_ListenerActive;
+  bool m_Visible = false;
+  bool m_ListenerActive = false;
 
-  bool m_HoldUpdate;
-  QmitkSliceNavigationListener  m_SliceChangeListener;
+  /** Keeps the preview while the controls are set up and while a mask is selected, whose mean
+      signal does not change with the crosshair. */
+  bool m_HoldUpdate = false;
+  QmitkSliceNavigationListener m_SliceChangeListener;
 
-  unsigned int m_DPartCurveId;
-  unsigned int m_FitCurveId;
-  unsigned int m_SignalCurveId;
-  unsigned int m_SecondFitSignalCurveId;
-  QwtPlotCurve* m_SecondFitSignalCurve;
-
+  unsigned int m_DPartCurveId = 0;
+  unsigned int m_FitCurveId = 0;
+  unsigned int m_SignalCurveId = 0;
+  unsigned int m_SecondFitSignalCurveId = 0;
+  QwtPlotCurve* m_SecondFitSignalCurve = nullptr;
 };
-
-
 
 #endif // _QMITKIVIMVIEW_H_INCLUDED
 
