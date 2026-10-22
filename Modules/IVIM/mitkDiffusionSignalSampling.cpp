@@ -36,7 +36,8 @@ std::optional<vnl_vector<double>> mitk::GetDiffusionSignal(const Image* dwi, con
 
 mitk::MaskedDiffusionSignal mitk::AverageDiffusionSignalInMask(const Image* dwi, const Image* mask)
 {
-  using MaskImageType = itk::Image<float, 3>;
+  // The mask rule of ComputeMaps: double keeps every mask value, a voxel counts where it is > 0.
+  using MaskImageType = itk::Image<double, 3>;
 
   auto vectorImage = DiffusionPropertyHelper::ImageType::New();
   CastToItkImage(dwi, vectorImage);
@@ -53,7 +54,7 @@ mitk::MaskedDiffusionSignal mitk::AverageDiffusionSignalInMask(const Image* dwi,
     vectorImage->TransformIndexToPhysicalPoint(it.GetIndex(), point);
 
     MaskImageType::IndexType maskIndex;
-    if (itkMask->TransformPhysicalPointToIndex(point, maskIndex) && itkMask->GetPixel(maskIndex) != 0)
+    if (itkMask->TransformPhysicalPointToIndex(point, maskIndex) && itkMask->GetPixel(maskIndex) > 0)
     {
       const auto pixel = it.Get();
       for (unsigned int i = 0; i < sum.size(); ++i)

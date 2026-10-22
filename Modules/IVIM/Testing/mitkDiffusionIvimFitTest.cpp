@@ -55,6 +55,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(GetDiffusionSignal_Fwe_VoxelSignalOrNothingOutside);
   MITK_TEST(AverageDiffusionSignalInMask_TwoVoxels_MeanNotRounded);
   MITK_TEST(AverageDiffusionSignalInMask_NoOverlap_NoVoxels);
+  MITK_TEST(AverageDiffusionSignalInMask_FractionalMask_VoxelsGreaterThanZero);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float>;
@@ -677,6 +678,23 @@ public:
     const auto roi = mitk::AverageDiffusionSignalInMask(dwi.dwi, mask);
     CPPUNIT_ASSERT_EQUAL(0u, roi.numberOfVoxels);
     CPPUNIT_ASSERT(roi.mean.empty());
+  }
+
+  void AverageDiffusionSignalInMask_FractionalMask_VoxelsGreaterThanZero()
+  {
+    // The voxels ComputeMaps fits with this mask (ComputeMaps_FractionalMask_FitsWhereGreaterThanZero).
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    const itk::Index<3> fractional = {{5, 5, 5}};
+    const itk::Index<3> tiny = {{2, 7, 4}};
+    const itk::Index<3> negative = {{10, 0, 3}};
+    const auto mask = MakeMaskWithValues(dwi.image, {{fractional, 0.3}, {tiny, 1e-300}, {negative, -0.3}});
+
+    const auto roi = mitk::AverageDiffusionSignalInMask(dwi.dwi, mask);
+    CPPUNIT_ASSERT_EQUAL(2u, roi.numberOfVoxels);
+    const auto a = dwi.image->GetPixel(fractional);
+    const auto b = dwi.image->GetPixel(tiny);
+    for (unsigned int i = 0; i < a.GetSize(); ++i)
+      CPPUNIT_ASSERT_EQUAL((a[i] + b[i]) / 2.0, roi.mean[i]);
   }
 };
 

@@ -35,8 +35,9 @@ namespace mitk
     unsigned int numberOfVoxels = 0;
   };
 
-  /** Averages the DWI voxels whose centres lie in a non-zero voxel of the mask. The mask is sampled
-      at the physical points of the DWI voxels, so it may have another geometry. */
+  /** Averages the DWI voxels whose centres lie in a voxel of the mask greater than 0, as in the
+      maps. The mask is sampled at the physical points of the DWI voxels, so it may have another
+      geometry. */
   MITKIVIM_EXPORT MaskedDiffusionSignal AverageDiffusionSignalInMask(const Image* dwi, const Image* mask);
 }
 
