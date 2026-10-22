@@ -151,7 +151,11 @@ private:
     /** SH basis for the N glyph directions, computed on first use per coefficient count and convention. */
     static const vnl_matrix<float>& GetShBasis(int numCoefficients, bool mrtrix);
 
-    /** SH convention of the image that is being drawn, set per update like the other settings. */
+    /**
+     * Type and SH convention of the image that is being drawn, set per update like the other
+     * settings. An SH image of order 2 has six components, like a tensor image.
+     */
+    static bool                                       m_IsShImage;
     static bool                                       m_ShMrtrix;
 };
 

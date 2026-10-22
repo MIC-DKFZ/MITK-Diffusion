@@ -100,6 +100,9 @@ vtkSmartPointer<vtkDoubleArray> mitk::OdfVtkMapper2D<T, N>::m_ColourScalars = nu
 
 
 template<class T, int N>
+bool mitk::OdfVtkMapper2D<T, N>::m_IsShImage = false;
+
+template<class T, int N>
 bool mitk::OdfVtkMapper2D<T, N>::m_ShMrtrix = true;
 
 template<class T, int N>
@@ -290,7 +293,7 @@ void  mitk::OdfVtkMapper2D<T,N>
 
   vtkDataArray* scalars = data->GetScalars();
 
-  if( scalars->GetNumberOfComponents()==6 && !m_ToggleTensorEllipsoidView )
+  if( !m_IsShImage && scalars->GetNumberOfComponents()==6 && !m_ToggleTensorEllipsoidView )
   {
 
     float tensorelems[6] = {
@@ -304,7 +307,7 @@ void  mitk::OdfVtkMapper2D<T,N>
     itk::DiffusionTensor3D<float> tensor(tensorelems);
     odf.InitFromTensor(tensor);
   }
-  else if( scalars->GetNumberOfComponents()==6 && m_ToggleTensorEllipsoidView )
+  else if( !m_IsShImage && scalars->GetNumberOfComponents()==6 && m_ToggleTensorEllipsoidView )
   {
     float tensorelems[6] = {
         (float)scalars->GetTuple(id)[0],
@@ -317,7 +320,7 @@ void  mitk::OdfVtkMapper2D<T,N>
     itk::DiffusionTensor3D<float> tensor( tensorelems );
     odf.InitFromEllipsoid( tensor );
   }
-  else if (scalars->GetNumberOfComponents() == ODF_SAMPLING_SIZE)
+  else if (!m_IsShImage && scalars->GetNumberOfComponents() == ODF_SAMPLING_SIZE)
   {
     for(int i=0; i<N; i++)
       odf[i] = (double)scalars->GetTuple(id)[i];
@@ -918,6 +921,7 @@ void  mitk::OdfVtkMapper2D<T,N>
 
   // SH images read with the FSL/Dipy convention need the matching basis, as for their colour map.
   auto shImage = dynamic_cast<const ShImage*>(this->GetDataNode()->GetData());
+  m_IsShImage = shImage != nullptr;
   m_ShMrtrix = shImage == nullptr || shImage->GetShConvention() == ShImage::MRTRIX;
 
   this->GetDataNode()->GetFloatProperty( "IndexParam1", m_IndexParam1);
