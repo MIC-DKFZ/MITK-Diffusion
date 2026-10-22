@@ -242,22 +242,36 @@ template< class TInputPixelType, class TOutputPixelType>
 void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelType>
 ::BeforeThreadedGenerateData()
 {
-  // if we have a region set, convert it to a mask image, which is to be used as default for telling
-  // we need to set the image anyway, so by default the mask is overall 1
-  if( m_MaskImage.IsNull() )
+  // The mask is iterated with the output region by index, so it has to share the geometry of the input.
+  if( m_MaskImage.IsNotNull() )
   {
-    m_MaskImage = MaskImageType::New();
-    m_MaskImage->SetRegions( this->GetInput()->GetLargestPossibleRegion() );
-    m_MaskImage->CopyInformation( this->GetInput() );
-    m_MaskImage->Allocate();
+    const auto* input = this->GetInput();
+    if( m_MaskImage->GetLargestPossibleRegion() != input->GetLargestPossibleRegion()
+        || !m_MaskImage->IsCongruentImageGeometry( input,
+                                                   ImageToImageFilterCommon::GetGlobalDefaultCoordinateTolerance(),
+                                                   ImageToImageFilterCommon::GetGlobalDefaultDirectionTolerance() ) )
+    {
+      itkExceptionMacro( "The mask image does not have the size, origin, spacing and direction of the diffusion-weighted image." );
+    }
+    m_FitMask = m_MaskImage;
+  }
+  // if we have a region set, convert it to a mask image, which is to be used as default for telling
+  // we need to set the image anyway, so by default the mask is overall 1; it is made for each run,
+  // because the input can change between runs
+  else
+  {
+    m_FitMask = MaskImageType::New();
+    m_FitMask->SetRegions( this->GetInput()->GetLargestPossibleRegion() );
+    m_FitMask->CopyInformation( this->GetInput() );
+    m_FitMask->Allocate();
 
     if( this->m_MapOutputRegion.GetNumberOfPixels() > 0 )
     {
 
-      m_MaskImage->FillBuffer(0);
+      m_FitMask->FillBuffer(0);
 
       typedef itk::ImageRegionIteratorWithIndex< MaskImageType > MaskIteratorType;
-      MaskIteratorType maskIter( this->m_MaskImage, this->m_MapOutputRegion );
+      MaskIteratorType maskIter( this->m_FitMask, this->m_MapOutputRegion );
       maskIter.GoToBegin();
 
       while( !maskIter.IsAtEnd() )
@@ -269,7 +283,7 @@ void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPix
     }
     else
     {
-      m_MaskImage->FillBuffer(1);
+      m_FitMask->FillBuffer(1);
     }
 
 
@@ -456,7 +470,7 @@ void itk::DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPix
   inputIter.GoToBegin();
 
   typedef itk::ImageRegionConstIteratorWithIndex< MaskImageType > MaskIteratorType;
-  MaskIteratorType maskIter( this->m_MaskImage, outputRegionForThread );
+  MaskIteratorType maskIter( this->m_FitMask, outputRegionForThread );
   maskIter.GoToBegin();
 
   KurtosisFitConfiguration fit_config;

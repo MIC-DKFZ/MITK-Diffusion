@@ -44,6 +44,10 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(Snapshot_NoisyVoxel_MinimizesSquaredResiduals);
   MITK_TEST(MapLog_ZeroMeasurement_LeftOut);
   MITK_TEST(Map_NoSignal_Zero);
+  MITK_TEST(Map_Mask_FitsOnlyInside);
+  MITK_TEST(Update_MaskOfOtherSize_Throws);
+  MITK_TEST(Update_MaskWithOtherOrigin_Throws);
+  MITK_TEST(Update_InputChanged_FitsWholeNewInput);
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
   MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
   CPPUNIT_TEST_SUITE_END();
@@ -385,6 +389,66 @@ public:
         CPPUNIT_ASSERT_EQUAL(0.0, maps.d[0]);
         CPPUNIT_ASSERT_EQUAL(0.0, maps.k[0]);
       }
+    }
+  }
+
+  FilterType::MaskImageType::Pointer MakeMask(unsigned int size, short value)
+  {
+    auto mask = FilterType::MaskImageType::New();
+    FilterType::MaskImageType::SizeType maskSize = {{size, 1, 1}};
+    mask->SetRegions(maskSize);
+    mask->Allocate();
+    mask->FillBuffer(value);
+    return mask;
+  }
+
+  void Map_Mask_FitsOnlyInside()
+  {
+    auto mask = MakeMask(m_Truth.size(), 1);
+    mask->SetPixel({{1, 0, 0}}, 0);
+    auto filter = MakeFilter(m_Image, m_Gradients, 3000);
+    filter->SetImageMask(mask);
+    filter->Update();
+    auto maps = GetMaps(filter);
+    CPPUNIT_ASSERT_EQUAL(0.0, maps.d[1]);
+    CPPUNIT_ASSERT_EQUAL(0.0, maps.k[1]);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[2].d, maps.d[2], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[2].k, maps.k[2], 1e-3);
+  }
+
+  void Update_MaskOfOtherSize_Throws()
+  {
+    auto filter = MakeFilter(m_Image, m_Gradients, 3000);
+    filter->SetImageMask(MakeMask(m_Truth.size() - 1, 1));
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  void Update_MaskWithOtherOrigin_Throws()
+  {
+    auto mask = MakeMask(m_Truth.size(), 1);
+    FilterType::MaskImageType::PointType origin;
+    origin.Fill(1);
+    mask->SetOrigin(origin);
+    auto filter = MakeFilter(m_Image, m_Gradients, 3000);
+    filter->SetImageMask(mask);
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  void Update_InputChanged_FitsWholeNewInput()
+  {
+    auto filter = MakeFilter(m_Image, m_Gradients, 3000);
+    filter->Update();
+
+    std::vector<std::vector<double>> signals(5, KurtosisSignal(m_BValues, 10000, m_Truth[0].d, m_Truth[0].k));
+    filter->SetInput(MakeImage(signals));
+    // Update() would keep the requested region of the first, smaller input.
+    filter->UpdateLargestPossibleRegion();
+    auto maps = GetMaps(filter);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(5), maps.d.size());
+    for (std::size_t i = 0; i < maps.d.size(); ++i)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, maps.d[i], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, maps.k[i], 1e-3);
     }
   }
 

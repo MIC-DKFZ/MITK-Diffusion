@@ -381,6 +381,8 @@ public:
     this->m_ApplyPriorSmoothing = true;
   }
 
+  /** Restrict the fit to voxels where the mask is not 0, others get 0; the mask must have the
+      geometry of the input. */
   void SetImageMask( MaskImageType::Pointer mask );
 
   /** Set smoothing sigma (default = 1.5 ), automatically enables smoothing prior to fitting */
@@ -446,6 +448,9 @@ protected:
   OutputImageRegionType m_MapOutputRegion;
 
   MaskImageType::Pointer m_MaskImage;
+
+  /** The mask of the current run: m_MaskImage or one made from the map output region. */
+  MaskImageType::Pointer m_FitMask;
 
   typename InputImageType::Pointer m_ProcessedInputImage;
 
