@@ -27,6 +27,33 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
 #include <mitkLocaleSwitch.h>
+#include <itkImageRegionIteratorWithIndex.h>
+#include <itkMetaDataObject.h>
+
+namespace
+{
+  // constexpr: the reader is constructed by the module activator during static initialization.
+  constexpr const char* ConvertMrtrixOption = "Convert MRtrix peaks (RAS) to MITK (LPS)";
+
+  /**
+   * MRtrix (sh2peaks) writes peak directions in scanner RAS coordinates, MITK uses world LPS
+   * vectors. MRtrix files are recognized by their NIfTI descrip. The NaN that MRtrix writes for
+   * missing peaks is already set to 0 by niftilib.
+   */
+  void ConvertMrtrixPeaks(mitk::PeakImage::ItkPeakImageType* peaks)
+  {
+    std::string description;
+    if (!itk::ExposeMetaData<std::string>(peaks->GetMetaDataDictionary(), "ITK_FileNotes", description) || !description.starts_with("MRtrix"))
+      return;
+
+    itk::ImageRegionIteratorWithIndex<mitk::PeakImage::ItkPeakImageType> it(peaks, peaks->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+    {
+      if (it.GetIndex()[3] % 3 != 2)
+        it.Set(-it.Get());
+    }
+  }
+}
 
 namespace mitk
 {
@@ -39,6 +66,10 @@ namespace mitk
   PeakImageReader::PeakImageReader()
     : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_DESCRIPTION() )
   {
+    Options defaultOptions;
+    defaultOptions[ConvertMrtrixOption] = false;
+    this->SetDefaultOptions(defaultOptions);
+
     m_ServiceReg = this->RegisterService();
   }
 
@@ -68,6 +99,9 @@ namespace mitk
       reader->SetImageIO(io);
     }
     reader->Update();
+    if (us::any_cast<bool>(this->GetOptions()[ConvertMrtrixOption]))
+      ConvertMrtrixPeaks(reader->GetOutput());
+
     Image::Pointer resultImage = dynamic_cast<Image*>(PeakImage::New().GetPointer());
     mitk::CastToMitkImage(reader->GetOutput(), resultImage);
     resultImage->SetVolume(reader->GetOutput()->GetBufferPointer());

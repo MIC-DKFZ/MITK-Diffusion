@@ -98,7 +98,8 @@ void mitk::PeakImage::ConstructPolydata()
           idx4[3] += 1;
           dir[2] = itkImg->GetPixel(idx4);
 
-          if (dir.magnitude()<0.001f)
+          // Also skips NaN directions: niftilib sets them to 0, NRRD peak files may contain them.
+          if (!(dir.magnitude()>=0.001f))
             continue;
 
 #pragma omp critical

@@ -26,6 +26,7 @@ found in the LICENSE file.
 
 #include <itkVectorImage.h>
 #include <vtkPointData.h>
+#include <vtkPoints.h>
 #include <vtkUnsignedCharArray.h>
 #include <itksys/SystemTools.hxx>
 #include <vnl/vnl_matrix_fixed.h>
@@ -34,6 +35,7 @@ found in the LICENSE file.
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <set>
 #include <sstream>
 
@@ -54,6 +56,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(MimeTypes_ShAndPeakReadersOnlyForMatchingFiles);
   MITK_TEST(ShWriter_NewNiftiFile_ReadsBackAsSh);
   MITK_TEST(ShIO_ConventionSurvivesSaving);
+  MITK_TEST(PeakReader_MrtrixPeaks_ConvertedToLps);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -385,6 +388,54 @@ public:
         AssertEqualPixels(shImage, reloaded);
       }
     }
+  }
+
+  static mitk::PeakImage::Pointer LoadPeaks(const std::string &path, std::optional<bool> convertMrtrix)
+  {
+    mitk::IFileReader::Options options;
+    if (convertMrtrix)
+      options["Convert MRtrix peaks (RAS) to MITK (LPS)"] = *convertMrtrix;
+    mitk::PreferenceListReaderOptionsFunctor functor({"Peak Image"}, options);
+    return mitk::IOUtil::Load<mitk::PeakImage>(path, &functor);
+  }
+
+  static std::vector<float> Values(mitk::PeakImage *peaks)
+  {
+    auto itkPeaks = peaks->GetItkPeakImage();
+    return std::vector<float>(itkPeaks->GetBufferPointer(), itkPeaks->GetBufferPointer() + itkPeaks->GetLargestPossibleRegion().GetNumberOfPixels());
+  }
+
+  // MRtrix writes RAS directions; MITK's peaks are LPS.
+  void PeakReader_MrtrixPeaks_ConvertedToLps()
+  {
+    const std::string mrtrixFile = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_peak_image.nii.gz");
+    auto raw = LoadPeaks(mrtrixFile, false);
+    auto converted = LoadPeaks(mrtrixFile, true);
+
+    const auto rawValues = Values(raw);
+    const auto convertedValues = Values(converted);
+    CPPUNIT_ASSERT_EQUAL(rawValues.size(), convertedValues.size());
+    const unsigned int numVoxels = raw->GetDimension(0) * raw->GetDimension(1) * raw->GetDimension(2);
+    unsigned int nonZero = 0;
+    for (std::size_t i = 0; i < rawValues.size(); ++i)
+    {
+      // The file holds NaN for missing peaks; niftilib reads them as 0.
+      CPPUNIT_ASSERT(std::isfinite(rawValues[i]));
+      const bool isZ = (i / numVoxels) % 3 == 2;
+      CPPUNIT_ASSERT_EQUAL(isZ ? rawValues[i] : -rawValues[i], convertedValues[i]);
+      if (rawValues[i] != 0)
+        ++nonZero;
+    }
+    CPPUNIT_ASSERT(nonZero > 0);
+
+    vtkPoints *points = raw->GetPolyData()->GetPoints();
+    CPPUNIT_ASSERT(points->GetNumberOfPoints() > 0);
+    for (vtkIdType i = 0; i < points->GetNumberOfPoints(); ++i)
+      CPPUNIT_ASSERT(std::isfinite(points->GetPoint(i)[0]) && std::isfinite(points->GetPoint(i)[1]) && std::isfinite(points->GetPoint(i)[2]));
+
+    // Peak files without the MRtrix description, e.g. all MITK-written ones, read unchanged.
+    const std::string mitkFile = GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz");
+    CPPUNIT_ASSERT(Values(LoadPeaks(mitkFile, false)) == Values(LoadPeaks(mitkFile, true)));
   }
 };
 
