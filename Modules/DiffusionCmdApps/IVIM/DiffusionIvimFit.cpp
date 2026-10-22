@@ -112,7 +112,7 @@ void IvimMapComputation( mitk::Image::Pointer input,
   d_image->SetVolume( ivim_filter->GetOutput(1)->GetBufferPointer() );
 
   mitk::Image::Pointer dstar_image = mitk::Image::New();
-  dstar_image->InitializeByItk( ivim_filter->GetOutput(1) );
+  dstar_image->InitializeByItk( ivim_filter->GetOutput(2) );
   dstar_image->SetVolume( ivim_filter->GetOutput(2)->GetBufferPointer() );
 
   std::string outputf_FileName = output_prefix + "_f_map." + output_type;
@@ -127,7 +127,7 @@ void IvimMapComputation( mitk::Image::Pointer input,
   }
   catch( const itk::ExceptionObject& e)
   {
-    mitkThrow() << "Failed to save the KurtosisFit Results due to exception: " << e.what();
+    mitkThrow() << "Failed to save the IVIM fit results due to exception: " << e.what();
   }
 
 }
@@ -145,9 +145,9 @@ int main( int argc, char* argv[] )
 
   // mandatory arguments
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Preifx: ", "Prefix for the output images", us::Any(), false);
-  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ", std::string(".nrrd"));
-  parser.addArgument("b_threshold", "", mitkCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit^", 170.0);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Prefix: ", "Prefix for the output images", us::Any(), false);
+  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. 'nii' or 'nrrd' ", std::string("nrrd"));
+  parser.addArgument("b_threshold", "", mitkCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit", 170.0);
   parser.addArgument("fit_type", "", mitkCommandLineParser::Int, "Fit:", "Jointly fit D, f and D* (0); Fit D&f with fixed D* (1); Fit D&f (high b), then fit D* (2); Linearly fit D&f (high b), then fit D* (3)", 2);
   parser.addArgument("dstar", "", mitkCommandLineParser::Float, "D*:", "Fixed D* for fit type 1", 0.06);
 
@@ -159,9 +159,6 @@ int main( int argc, char* argv[] )
   // mandatory arguments
   std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string out_prefix = us::any_cast<std::string>(parsedArgs["o"]);
-
-  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-  mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
   double b_thresh = 170;
   int fit_type = 2;
@@ -180,17 +177,33 @@ int main( int argc, char* argv[] )
   if (parsedArgs.count("dstar"))
     dstar = us::any_cast<float>(parsedArgs["dstar"]);
 
-  if( !DPH::IsDiffusionWeightedImage( inputImage ) )
+  // The file names are <prefix>_<map>.<type>, so "nrrd" and ".nrrd" both work.
+  if (!out_type.empty() && out_type.front() == '.')
+    out_type.erase(0, 1);
+
+  try
   {
-    MITK_ERROR("DiffusionIVIMFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
+    mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
+
+    if( !DPH::IsDiffusionWeightedImage( inputImage ) )
+    {
+      MITK_ERROR("DiffusionIVIMFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
+      return EXIT_FAILURE;
+    }
+
+    IvimMapComputation( inputImage,
+                        out_prefix ,
+                        out_type,
+                        b_thresh,
+                        fit_type,
+                        dstar);
+  }
+  catch (const std::exception& e)
+  {
+    MITK_ERROR << e.what();
     return EXIT_FAILURE;
   }
 
-  IvimMapComputation( inputImage,
-                      out_prefix ,
-                      out_type,
-                      b_thresh,
-                      fit_type,
-                      dstar);
-
+  return EXIT_SUCCESS;
 }

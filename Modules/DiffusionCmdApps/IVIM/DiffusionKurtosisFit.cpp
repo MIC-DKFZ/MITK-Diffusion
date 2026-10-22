@@ -174,13 +174,13 @@ int main( int argc, char* argv[] )
   parser.setTitle("Diffusion Kurtosis Fit");
   parser.setCategory("Diffusion Related Measures");
   parser.setContributor("MIC");
-  parser.setDescription("Fitting Kurtosis");
+  parser.setDescription("Fitting Kurtosis. The input is smoothed with a Gaussian of variance 1.5 mm^2 before the fit.");
   parser.setArgumentPrefix("--","-");
 
   // mandatory arguments
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Preifx: ", "Prefix for the output images, will append _ADC, _AKC accordingly ", us::Any(), false);
-  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ");
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Prefix: ", "Prefix for the output images, will append _ADC, _AKC accordingly ", us::Any(), false);
+  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. 'nii' or 'nrrd' (default)");
 
   // optional arguments
   parser.addArgument("mask", "m", mitkCommandLineParser::String, "Masking Image: ", "ROI (segmentation)", us::Any(), true, false, false, mitkCommandLineParser::Input);
@@ -201,9 +201,6 @@ int main( int argc, char* argv[] )
   std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string out_prefix = us::any_cast<std::string>(parsedArgs["o"]);
   std::string maskPath = "";
-
-  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-  mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
   bool omitBZero = false;
   // The lower bound is given as a magnitude and negated below.
@@ -236,20 +233,34 @@ int main( int argc, char* argv[] )
     upper = us::any_cast<float>(parsedArgs["upperkbound"]);
   }
 
-  if( !DPH::IsDiffusionWeightedImage( inputImage ) )
+  // The file names are <prefix>_<map>.<type>, so "nrrd" and ".nrrd" both work.
+  if (!out_type.empty() && out_type.front() == '.')
+    out_type.erase(0, 1);
+
+  try
   {
-    MITK_ERROR("DiffusionKurtosisFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
+    mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
+
+    if( !DPH::IsDiffusionWeightedImage( inputImage ) )
+    {
+      MITK_ERROR("DiffusionKurtosisFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
+      return EXIT_FAILURE;
+    }
+
+    KurtosisMapComputation( inputImage,
+                            out_prefix ,
+                            out_type,
+                            maskPath,
+                            omitBZero,
+                            lower,
+                            upper);
+  }
+  catch (const std::exception& e)
+  {
+    MITK_ERROR << e.what();
     return EXIT_FAILURE;
   }
 
-
-
-KurtosisMapComputation( inputImage,
-                        out_prefix ,
-                        out_type,
-                        maskPath,
-                        omitBZero,
-                        lower,
-                        upper);
-
+  return EXIT_SUCCESS;
 }
