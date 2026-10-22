@@ -20,6 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageToImageFilter.h"
 #include "itkVectorImage.h"
 
+#include <atomic>
+
 
 namespace itk{
   /** @class NonLocalMeansDenoisingFilter
@@ -88,7 +90,7 @@ namespace itk{
      *
      * @return the number of calculated Voxels until yet, useful for the use of a progressbars.
      */
-    itkGetMacro(CurrentVoxelCount, unsigned int)
+    virtual unsigned int GetCurrentVoxelCount() const { return m_CurrentVoxelCount; }
 
 
     /** @brief Set the input image. **/
@@ -132,7 +134,7 @@ namespace itk{
     int m_ComparisonRadius;                           ///< Radius of the comparisonblock.
     bool m_UseJointInformation;                       ///< Flag to use joint information.
     bool m_UseRicianAdaption;                         ///< Flag to use rician adaption.
-    unsigned int m_CurrentVoxelCount;                 ///< Amount of processed voxels.
+    std::atomic<unsigned int> m_CurrentVoxelCount;    ///< Amount of processed voxels, counted by all work units.
     double m_Variance;                                ///< Estimated noise variance.
     typename MaskImageType::Pointer m_Mask;           ///< Pointer to the mask image.
   };

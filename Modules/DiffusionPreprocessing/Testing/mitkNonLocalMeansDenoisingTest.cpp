@@ -30,6 +30,7 @@ class mitkNonLocalMeansDenoisingTestSuite : public mitk::TestFixture
   MITK_TEST(Denoise_NLMr_shouldReturnTrue);
   MITK_TEST(Denoise_NLMv_shouldReturnTrue);
   MITK_TEST(Denoise_NLMvr_shouldReturnTrue);
+  MITK_TEST(Denoise_SeveralWorkUnits_SameResultAndCountsEveryVoxel);
   CPPUNIT_TEST_SUITE_END();
 
 private:
@@ -165,6 +166,22 @@ public:
     m_DenoisedImage->SetPropertyList(m_Image->GetPropertyList()->Clone());
 
     MITK_ASSERT_EQUAL( m_DenoisedImage, m_ReferenceImage, "NLMvr should always return the same result.");
+  }
+
+  void Denoise_SeveralWorkUnits_SameResultAndCountsEveryVoxel()
+  {
+    m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMg.dwi"));
+
+    // All work units increment the progress counter.
+    m_DenoisingFilter->SetNumberOfWorkUnits(4);
+    m_DenoisingFilter->SetUseRicianAdaption(false);
+    m_DenoisingFilter->SetUseJointInformation(false);
+    m_DenoisingFilter->Update();
+
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(m_DenoisingFilter->GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels()), m_DenoisingFilter->GetCurrentVoxelCount());
+    mitk::GrabItkImageMemory(m_DenoisingFilter->GetOutput(), m_DenoisedImage);
+    m_DenoisedImage->SetPropertyList(m_Image->GetPropertyList()->Clone());
+    MITK_ASSERT_EQUAL(m_DenoisedImage, m_ReferenceImage, "NLMg with several work units should return the single-unit result.");
   }
 
 };
