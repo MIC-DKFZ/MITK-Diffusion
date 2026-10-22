@@ -40,6 +40,7 @@ namespace mitk
     mitkClassMacro( PeakImage, Image )
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
+    mitkCloneMacro(Self)
 
     void ConstructPolydata();
 
@@ -57,6 +58,7 @@ namespace mitk
 
   protected:
     PeakImage();
+    PeakImage(const PeakImage& other);
     ~PeakImage() override;
 
     mutable vtkSmartPointer< vtkPolyData > m_PolyData;

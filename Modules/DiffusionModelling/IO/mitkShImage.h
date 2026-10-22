@@ -43,6 +43,7 @@ namespace mitk
     mitkClassMacro( ShImage, Image )
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
+    mitkCloneMacro(Self)
 
     virtual const vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0) const;
     virtual vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0);
@@ -60,6 +61,7 @@ namespace mitk
 
   protected:
     ShImage();
+    ShImage(const ShImage& other);
     ~ShImage() override;
 
     template<int num_components>

@@ -12,7 +12,9 @@ found in the LICENSE file.
 
 #include <mitkIOUtil.h>
 #include <mitkImagePixelReadAccessor.h>
+#include <mitkImageReadAccessor.h>
 #include <mitkOdfImage.h>
+#include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkShImage.h>
 #include <mitkTensorImage.h>
@@ -26,6 +28,7 @@ found in the LICENSE file.
 #include <vnl/vnl_matrix_fixed.h>
 
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -41,6 +44,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(TensorReader_Nifti_LeavesNoTemporaryFiles);
   MITK_TEST(Writers_UnwritableLocation_Throw);
   MITK_TEST(OdfReader_WrongVectorLength_Throws);
+  MITK_TEST(Clone_KeepsTypeAndPixels);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -239,6 +243,40 @@ public:
     file.close();
 
     CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load(path), std::exception);
+  }
+
+  /** Clones through the mitk::Image interface, as views do, and compares class and pixel buffer. */
+  static void CheckClone(mitk::Image *image)
+  {
+    mitk::Image::Pointer clone = image->Clone();
+    CPPUNIT_ASSERT(clone.IsNotNull());
+    CPPUNIT_ASSERT_EQUAL(std::string(image->GetNameOfClass()), std::string(clone->GetNameOfClass()));
+    CPPUNIT_ASSERT(clone.GetPointer() != image);
+
+    const auto size = image->GetPixelType().GetSize() * image->GetDimension(0) * image->GetDimension(1) * image->GetDimension(2);
+    mitk::ImageReadAccessor original(image);
+    mitk::ImageReadAccessor copy(clone);
+    CPPUNIT_ASSERT(std::memcmp(original.GetData(), copy.GetData(), size) == 0);
+  }
+
+  // Clone() returned nullptr for these types, and cloning through mitk::Image lost the type.
+  void Clone_KeepsTypeAndPixels()
+  {
+    CheckClone(mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti")));
+    CheckClone(mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi")));
+
+    mitk::PreferenceListReaderOptionsFunctor peakFunctor({"Peak Image"}, std::vector<std::string>());
+    auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &peakFunctor);
+    CheckClone(peakImage);
+    CPPUNIT_ASSERT(peakImage->Clone().IsNotNull());
+
+    mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    shImage->SetShConvention(mitk::ShImage::FSL);
+    CheckClone(shImage);
+    mitk::ShImage::Pointer shClone = shImage->Clone();
+    CPPUNIT_ASSERT(shClone.IsNotNull());
+    CPPUNIT_ASSERT_EQUAL(mitk::ShImage::FSL, shClone->GetShConvention());
   }
 };
 

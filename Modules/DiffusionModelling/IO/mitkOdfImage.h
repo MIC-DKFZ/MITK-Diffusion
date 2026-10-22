@@ -41,6 +41,7 @@ namespace mitk
     mitkClassMacro( OdfImage, Image )
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
+    mitkCloneMacro(Self)
 
     virtual const vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0) const;
     virtual vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0);
@@ -52,6 +53,7 @@ namespace mitk
 
   protected:
     OdfImage();
+    OdfImage(const OdfImage& other);
     ~OdfImage() override;
 
     mutable mitk::Image::Pointer m_RgbImage;

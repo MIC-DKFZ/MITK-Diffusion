@@ -44,6 +44,7 @@ namespace mitk
     mitkClassMacro( TensorImage, Image )
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
+    mitkCloneMacro(Self)
 
     virtual vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0);
 
@@ -54,6 +55,7 @@ namespace mitk
 
   protected:
     TensorImage();
+    TensorImage(const TensorImage& other);
     ~TensorImage() override;
 
     mutable mitk::Image::Pointer m_RgbImage;

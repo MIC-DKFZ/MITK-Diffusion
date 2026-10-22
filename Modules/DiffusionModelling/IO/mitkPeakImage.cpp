@@ -29,6 +29,10 @@ mitk::PeakImage::PeakImage() : Image()
   m_PolyData = nullptr;
 }
 
+mitk::PeakImage::PeakImage(const PeakImage& other) : Image(other)
+{
+}
+
 mitk::PeakImage::~PeakImage()
 {
 

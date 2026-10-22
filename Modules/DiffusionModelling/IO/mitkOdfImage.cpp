@@ -25,6 +25,10 @@ mitk::OdfImage::OdfImage() : Image()
   m_RgbImage = nullptr;
 }
 
+mitk::OdfImage::OdfImage(const OdfImage& other) : Image(other)
+{
+}
+
 mitk::OdfImage::~OdfImage()
 {
 

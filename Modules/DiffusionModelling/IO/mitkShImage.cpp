@@ -28,6 +28,13 @@ mitk::ShImage::ShImage() : Image()
   m_RgbImage = nullptr;
 }
 
+mitk::ShImage::ShImage(const ShImage& other) : Image(other)
+  , m_ShOrder(other.m_ShOrder)
+  , m_NumCoefficients(other.m_NumCoefficients)
+  , m_ShConvention(other.m_ShConvention)
+{
+}
+
 mitk::ShImage::~ShImage()
 {
 

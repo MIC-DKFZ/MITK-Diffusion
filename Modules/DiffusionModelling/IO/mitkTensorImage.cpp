@@ -32,6 +32,10 @@ mitk::TensorImage::TensorImage() : Image()
   m_RgbImage = nullptr;
 }
 
+mitk::TensorImage::TensorImage(const TensorImage& other) : Image(other)
+{
+}
+
 mitk::TensorImage::~TensorImage()
 {
 
