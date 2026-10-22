@@ -29,6 +29,8 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(DThenDStar_SyntheticVoxels_RecoversParameters);
   MITK_TEST(LinearDThenF_SyntheticVoxels_RecoversParameters);
   MITK_TEST(Fwe_AllMethods_MatchRecordedValues);
+  MITK_TEST(Defaults_ThresholdsAndDStarNotSet_SameAsViewDefaults);
+  MITK_TEST(Update_ReferenceBValueNotSet_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float>;
@@ -74,13 +76,17 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
     return {Values(filter->GetOutput(0)), Values(filter->GetOutput(1)), Values(filter->GetOutput(2))};
   }
 
-  Maps FitSynthetic(FilterType::IVIM_Method method, double dStar = 0.06)
+  VectorImageType::Pointer MakeSyntheticImage()
   {
     std::vector<std::vector<double>> signals;
     for (const auto& p : m_Truth)
       signals.push_back(IvimSignal(m_BValues, 10000, p.f, p.d, p.dStar));
+    return MakeImage(signals);
+  }
 
-    auto image = MakeImage(signals);
+  Maps FitSynthetic(FilterType::IVIM_Method method, double dStar = 0.06)
+  {
+    auto image = MakeSyntheticImage();
     auto gradients = MakeGradients(m_BValues, 1000);
     auto filter = MakeFilter(image, gradients, 1000, method);
     filter->SetDStar(dStar);
@@ -168,6 +174,42 @@ public:
       AssertClose(r.center.d, maps.d[center]);
       AssertClose(r.center.dStar, maps.dStar[center]);
     }
+  }
+
+  void Defaults_ThresholdsAndDStarNotSet_SameAsViewDefaults()
+  {
+    auto image = MakeSyntheticImage();
+    auto gradients = MakeGradients(m_BValues, 1000);
+    const std::vector<FilterType::IVIM_Method> methods = {
+      FilterType::IVIM_FIT_ALL, FilterType::IVIM_DSTAR_FIX, FilterType::IVIM_D_THEN_DSTAR, FilterType::IVIM_LINEAR_D_THEN_F};
+    for (auto method : methods)
+    {
+      auto explicitFilter = MakeFilter(image, gradients, 1000, method);
+      explicitFilter->Update();
+
+      auto defaultFilter = FilterType::New();
+      defaultFilter->SetInput(image);
+      defaultFilter->SetGradientDirections(gradients.GetPointer());
+      defaultFilter->SetBValue(1000);
+      defaultFilter->SetMethod(method);
+      defaultFilter->SetNumberOfWorkUnits(1);
+      defaultFilter->Update();
+
+      auto expected = GetMaps(explicitFilter);
+      auto actual = GetMaps(defaultFilter);
+      CPPUNIT_ASSERT(expected.f == actual.f);
+      CPPUNIT_ASSERT(expected.d == actual.d);
+      CPPUNIT_ASSERT(expected.dStar == actual.dStar);
+    }
+  }
+
+  void Update_ReferenceBValueNotSet_Throws()
+  {
+    auto filter = FilterType::New();
+    filter->SetInput(MakeSyntheticImage());
+    filter->SetGradientDirections(MakeGradients(m_BValues, 1000).GetPointer());
+    filter->SetMethod(FilterType::IVIM_FIT_ALL);
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
   }
 };
 

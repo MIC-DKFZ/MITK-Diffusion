@@ -57,7 +57,7 @@ typedef mitk::DiffusionPropertyHelper DPH;
 void IvimMapComputation( mitk::Image::Pointer input,
                          std::string output_prefix ,
                          std::string output_type,
-                         double b_thresh, int type)
+                         double b_thresh, int type, double dstar)
 {
   MITK_INFO << "Starting fit";
   DPH::ImageType::Pointer vectorImage = DPH::ImageType::New();
@@ -89,6 +89,7 @@ void IvimMapComputation( mitk::Image::Pointer input,
   }
 
   ivim_filter->SetBThres(b_thresh);
+  ivim_filter->SetDStar(dstar);
   ivim_filter->SetS0Thres(0);
   ivim_filter->SetFitDStar(true);
   ivim_filter->SetNumberOfWorkUnits(1);
@@ -148,6 +149,7 @@ int main( int argc, char* argv[] )
   parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ", std::string(".nrrd"));
   parser.addArgument("b_threshold", "", mitkCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit^", 170.0);
   parser.addArgument("fit_type", "", mitkCommandLineParser::Int, "Fit:", "Jointly fit D, f and D* (0); Fit D&f with fixed D* (1); Fit D&f (high b), then fit D* (2); Linearly fit D&f (high b), then fit D* (3)", 2);
+  parser.addArgument("dstar", "", mitkCommandLineParser::Float, "D*:", "Fixed D* for fit type 1", 0.06);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
 
@@ -163,6 +165,7 @@ int main( int argc, char* argv[] )
 
   double b_thresh = 170;
   int fit_type = 2;
+  double dstar = 0.06;
   std::string  out_type = "nrrd";
 
   if (parsedArgs.count("output_type"))
@@ -174,6 +177,9 @@ int main( int argc, char* argv[] )
   if (parsedArgs.count("fit_type"))
     fit_type = us::any_cast<int>(parsedArgs["fit_type"]);
 
+  if (parsedArgs.count("dstar"))
+    dstar = us::any_cast<float>(parsedArgs["dstar"]);
+
   if( !DPH::IsDiffusionWeightedImage( inputImage ) )
   {
     MITK_ERROR("DiffusionIVIMFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
@@ -184,6 +190,7 @@ int main( int argc, char* argv[] )
                       out_prefix ,
                       out_type,
                       b_thresh,
-                      fit_type);
+                      fit_type,
+                      dstar);
 
 }

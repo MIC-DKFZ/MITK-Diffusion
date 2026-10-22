@@ -356,6 +356,7 @@ namespace itk{
     ~DiffusionIntravoxelIncoherentMotionReconstructionImageFilter() {};
     void PrintSelf(std::ostream& os, Indent indent) const;
 
+    void VerifyPreconditions() const override;
     void BeforeThreadedGenerateData();
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
     void AfterThreadedGenerateData();
@@ -370,15 +371,17 @@ namespace itk{
     GradientDirectionContainerType::ConstPointer           m_GradientDirectionContainer;
 
     /** Number of gradient measurements */
-    unsigned int                                      m_NumberOfGradientDirections;
+    unsigned int                                      m_NumberOfGradientDirections{0};
 
-    double m_BValue;
+    /** Reference b-value; no default, the filter throws when it is not set. */
+    double m_BValue{0};
 
-    double m_BThres;
+    // The defaults are those of the IVIM view and the command line app.
+    double m_BThres{170};
 
-    double m_S0Thres;
+    double m_S0Thres{0};
 
-    double m_DStar;
+    double m_DStar{0.06};
 
     IVIM_Method m_Method;
 
@@ -396,13 +399,13 @@ namespace itk{
 
     typename InitialFitImageType::Pointer m_InitialFitImage;
 
-    int m_NumberIterations; // for total variation
+    int m_NumberIterations{10}; // for total variation
 
     vnl_vector<double> m_tmp_allmeas;
 
-    double m_Lambda;
+    double m_Lambda{0.0001};
 
-    typename InputImageType::IndexType m_CrossPosition;
+    typename InputImageType::IndexType m_CrossPosition{};
 
   };
 

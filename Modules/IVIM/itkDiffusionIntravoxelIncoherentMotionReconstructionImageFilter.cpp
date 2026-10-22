@@ -59,6 +59,18 @@ DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 
 template< class TIn, class TOut>
 void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
+::VerifyPreconditions() const
+{
+  Superclass::VerifyPreconditions();
+
+  if (m_GradientDirectionContainer.IsNull())
+    itkExceptionMacro("Gradient directions not set.");
+  if (m_BValue <= 0)
+    itkExceptionMacro("Reference b-value not set.");
+}
+
+template< class TIn, class TOut>
+void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 ::BeforeThreadedGenerateData()
 {
 
