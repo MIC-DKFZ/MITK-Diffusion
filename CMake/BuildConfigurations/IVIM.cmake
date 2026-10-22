@@ -6,9 +6,12 @@ message(STATUS "Configuring MITK IVIM Build")
 # Enable non-optional external dependencies
 set(MITK_USE_MatchPoint OFF CACHE BOOL "" FORCE)
 set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
-set(MITK_USE_DCMQI ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenCV OFF CACHE BOOL "" FORCE)
+
+# Release builds support Python, which MITK's segmentation plugin needs to compile.
+set(MITK_USE_Python3 ON CACHE BOOL "" FORCE)
+set(MITK_USE_pybind11 ON CACHE BOOL "" FORCE)
 
 # Disable all apps but MITK Workbench
 set(MITK_BUILD_ALL_APPS OFF CACHE BOOL "Build all MITK applications" FORCE)

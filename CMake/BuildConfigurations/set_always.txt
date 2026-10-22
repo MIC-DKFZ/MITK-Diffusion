@@ -1,3 +1,8 @@
+# Shared start of every MITK Diffusion build configuration. MITK includes the selected
+# configuration on every configure, and its FORCEd values override the cache. Every variable
+# that any configuration changes is therefore reset here first, so the result depends only on
+# the selected configuration, not on the one the tree was configured with before.
+# The file ends in .txt because MITK offers every *.cmake in this folder as a configuration.
 
 set(MITK_BUILD_ALL_APPS OFF CACHE BOOL "Build all MITK applications" FORCE)
 set(MITK_BUILD_APP_Workbench ON CACHE BOOL "Build the MITK Workbench" FORCE)
@@ -12,6 +17,20 @@ set(BLUEBERRY_USE_QT_HELP ON CACHE BOOL "Enable support for integrating bundle d
 
 # Enable console window
 set(MITK_SHOW_CONSOLE_WINDOW ON CACHE BOOL "Use this to enable or disable the console window when starting MITK GUI Applications" FORCE)
+
+# External dependencies. DCMTK (DICOM IO of DiffusionImage and FiberBundle) and OpenMP are
+# needed everywhere; configurations switch on MatchPoint, OpenCV and Python where needed.
+set(MITK_USE_BLUEBERRY ON CACHE BOOL "" FORCE)
+set(MITK_USE_CTK ON CACHE BOOL "" FORCE)
+set(MITK_USE_Qt6 ON CACHE BOOL "" FORCE)
+set(MITK_USE_Qt6Qwt6 ON CACHE BOOL "" FORCE)
+set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
+set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
+set(MITK_USE_MatchPoint OFF CACHE BOOL "" FORCE)
+set(MITK_USE_OpenCV OFF CACHE BOOL "" FORCE)
+# MITK does not support Debug builds with Python, and MITK Diffusion does not use it.
+set(MITK_USE_Python3 OFF CACHE BOOL "" FORCE)
+set(MITK_USE_pybind11 OFF CACHE BOOL "" FORCE)
 
 # modules
 set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)

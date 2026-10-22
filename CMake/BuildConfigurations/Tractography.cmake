@@ -6,9 +6,12 @@ message(STATUS "Configuring MITK Fiber Tractography Build")
 # Enable non-optional external dependencies
 set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
-set(MITK_USE_DCMQI ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenCV OFF CACHE BOOL "" FORCE)
+
+# Release builds support Python, which MITK's segmentation plugin needs to compile.
+set(MITK_USE_Python3 ON CACHE BOOL "" FORCE)
+set(MITK_USE_pybind11 ON CACHE BOOL "" FORCE)
 
 # enable modules
 set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)

@@ -1,6 +1,8 @@
 include(${CMAKE_CURRENT_LIST_DIR}/set_always.txt)
 include(${CMAKE_CURRENT_LIST_DIR}/set_release.txt)
 
+message(STATUS "Configuring MITK Diffusion Command Line Apps Build")
+
 set(MITK_USE_BLUEBERRY OFF CACHE BOOL "" FORCE)
 set(MITK_USE_CTK OFF CACHE BOOL "" FORCE)
 set(MITK_USE_Qt6 OFF CACHE BOOL "" FORCE)
@@ -11,18 +13,20 @@ set(BLUEBERRY_USE_QT_HELP OFF CACHE BOOL "Enable support for integrating bundle 
 
 set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
 set(MITK_USE_DCMTK ON CACHE BOOL "" FORCE)
-set(MITK_USE_DCMQI ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenMP ON CACHE BOOL "" FORCE)
+set(MITK_USE_OpenCV OFF CACHE BOOL "" FORCE)
 
+# FiberDissection, the only user of OpenCV, is off: no command line app uses it.
 set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
-set(BUILD_MODULE_FiberDissection ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberDissection OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberTracking ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_IVIM ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_MriSimulation ON CACHE BOOL "" FORCE)
+# The Misc command line apps link MitkTestingHelper, which MITK builds only with testing on.
 set(BUILD_TESTING ON CACHE BOOL "Build the MITK tests" FORCE)
 
 # enable command line tools
