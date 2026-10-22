@@ -36,7 +36,12 @@ subfolder only once a file there is touched. Edit both under `mitk-diffusion/`. 
 `git -C mitk-diffusion status --short --branch` before and after working.
 
 Git worktrees go under `mitk-diffusion/.worktrees/` (git-ignored). A build tree is bound to one
-`MITK_EXTENSION_DIRS` path, so `debug/` and `release/` build only the main checkout.
+`MITK_EXTENSION_DIRS` path, so `debug/` and `release/` build only the main checkout. A worktree
+gets a Debug inner build of its own in `wt-build/<worktree name>`, configured by
+`mitk-diffusion/.claude/scripts/configure-worktree-build.sh` (see "Commands"); it reuses the
+externals in `debug/ep` and the test data in `debug/MITK-Data`. `mitkConfig.h` embeds the
+extension path, so the first build of a tree compiles nearly all of MITK: keep the tree as long
+as its worktree exists, and rerun the script after a superbuild in `debug/`.
 
 When MITK changed an interface, adapt mitk-diffusion to it. MITK usually migrated its own modules
 in the same commit, so `git -C mitk log -S'<old symbol>'` shows the intended replacement. If a
@@ -53,9 +58,9 @@ mitk-diffusion code too. Read the matching rule before touching CMake, a module 
 | `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters. `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk and DICOM tractography IO. `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`. |
 | `mitk-diffusion/Modules/DiffusionCmdApps/` | Command line tools, one subfolder per group, each group switched by a `BUILD_Diffusion*CmdApps` option; an app is a name in its group's list in that `CMakeLists.txt`. |
 | `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. |
-| `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI). Each starts with `set_always.txt`, which switches every diffusion module, cmd-app group and plugin off; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
+| `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI). Each starts with `set_always.txt`, which resets every variable a configuration changes (external packages; every diffusion module, cmd-app group and plugin off), and then switches on what it contains; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
 | `mitk-diffusion/CMakeExternals/`, `CMake/PackageDepends/` | OpenCV, which MITK no longer provides, added to the superbuild by the extension. |
-| `mitk-diffusion/.claude/` | Skills (`bug-report`, `feature-request`, `improvement-request`, `handoff`, `investigate`, `review`), `settings.json`, and `scripts/create_gitlab_issue.py`, which searches and creates issues in the GitLab project with `GITLAB_TOKEN` from `mitk-diffusion/.env` (git-ignored). |
+| `mitk-diffusion/.claude/` | Skills (`bug-report`, `feature-request`, `improvement-request`, `handoff`, `investigate`, `review`), `settings.json`, `scripts/create_gitlab_issue.py`, which searches and creates issues in the GitLab project with `GITLAB_TOKEN` from `mitk-diffusion/.env` (git-ignored), and `scripts/configure-worktree-build.sh` for a worktree's build tree. |
 | `mitk/` | MITK itself, see above. |
 | `debug/` | Superbuild tree, Debug, `MITK_BUILD_CONFIGURATION=DiffusionDebug`; externals in `debug/ep/`, the MITK + diffusion build in `debug/MITK-build/`, test data checkout in `debug/MITK-Data/`. |
 | `release/` | The same as a Release build, `DiffusionRelease`. |
@@ -71,11 +76,18 @@ configures and builds `MITK-build` itself (its `MITK-Configure` step).
 
 The selected build configuration is re-included on **every** configure and `FORCE`s its cache
 values, so a variable it sets cannot be changed in the cache; change the configuration file.
+`set_always.txt` first resets every variable any configuration changes, so switching a tree to
+another configuration gives the same result as a fresh tree. MITK evaluates some packages before
+it applies the configuration, so the first configure after a switch can fail; the second is clean.
 
-**Wiring for a new module or plugin.** Module: its folder, an `option(BUILD_MODULE_<Name>)` guard
-in its `CMakeLists.txt`, an entry in `ModuleList.cmake` after its dependencies, an `OFF` line in
-`set_always.txt` and an `ON` line in each configuration that should contain it. Plugin: the same
-via `PluginList.cmake` and `MITK_BUILD_<plugin>`. A forgotten line silently leaves it unbuilt.
+**Wiring for a new module, cmd-app group or plugin.** Module: its folder, an
+`option(BUILD_MODULE_<Name>)` guard in its `CMakeLists.txt`, an entry in `ModuleList.cmake` after
+its dependencies, an `OFF` line in `set_always.txt` and an `ON` line in each configuration that
+should contain it. Cmd-app group: its subfolder with an `option(BUILD_Diffusion<Group>CmdApps)`,
+an `add_subdirectory` in `Modules/DiffusionCmdApps/CMakeLists.txt`, and the same `OFF` and `ON`
+lines. Plugin: the same via `PluginList.cmake` and `MITK_BUILD_<plugin>`. A forgotten line
+silently leaves it unbuilt. A plugin whose modules are off fails the configure, but a module or
+cmd app with a missing dependency is only listed as disabled in the configure's feature summary.
 
 Facts the layout does not show:
 
@@ -87,9 +99,10 @@ Facts the layout does not show:
   `mitkFunctionRequireBoostLibraries` (example: `MITK_USE_Python3` in `mitk/CMakeLists.txt`).
   mitk-diffusion requests its libraries in `CMakeExternals/ExternalProjectList.cmake`; a new
   Boost include needs its library added there before the next superbuild.
-- Debug builds and `MITK_USE_Python3=ON` do not go together in MITK, so `DiffusionDebug` forces
-  Python off; `DiffusionRelease` includes it and switches Python on again. Its build type is
-  forced to `Debug`, `set_release.txt` forces `Release`.
+- Debug builds and `MITK_USE_Python3=ON` do not go together in MITK, so `set_always.txt` switches
+  Python off; `DiffusionRelease` (which includes `DiffusionDebug`), `Tractography`, `Fiberfox`
+  and `IVIM` switch it on for MITK's segmentation plugin. `DiffusionDebug` forces the build type
+  `Debug`, `set_release.txt` forces `Release`.
 - Configuring `FiberTracking` downloads a lookup-table tarball from mitk.org into its binary
   `resource/` folder, so it needs network. MITK embeds module resources only from `resource/`.
 - Module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each `Testing/`
@@ -112,8 +125,8 @@ all 14 diffusion tests pass. The Workbench has not been started. Remove an item 
 - MITK's `org.mitk.gui.qt.segmentation` does not compile with Python off: `MakeError` in
   `mitk/Plugins/org.mitk.gui.qt.segmentation/src/internal/QmitkSegmentationRestRoutes.cpp:465`
   is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.
-  `DiffusionDebug` switches the plugin off, `DiffusionRelease` (Python on) keeps it;
-  `Tractography`, `Fiberfox` and `IVIM` switch it on without switching Python on.
+  `DiffusionDebug` leaves the plugin off; `DiffusionRelease`, `Tractography`, `Fiberfox` and
+  `IVIM` switch Python on and build it.
 - `FiberfoxParameters` (`Modules/MriSimulation/mitkFiberfoxParameters.h`) deep-copies its signal
   models on copy construction but shares them on assignment, and never deletes them.
 
@@ -130,6 +143,8 @@ Run from the workspace root. Both superbuild trees use Unix Makefiles; for Relea
 | `cmake debug/MITK-build` | Re-configure the inner build after editing CMake files in `mitk-diffusion/`. |
 | `ctest --test-dir debug/MITK-build -R Fiber` | Run tests matching a pattern; `-N` lists without running. Never call a test driver directly. |
 | `debug/MITK-build/bin/MitkWorkbench` | Start the Workbench with the diffusion plugins; command line apps are in the same `bin/`. |
+| `mitk-diffusion/.claude/scripts/configure-worktree-build.sh mitk-diffusion/.worktrees/<name> wt-build/<name>` | Configure a worktree's own build tree (about 20 s), and re-configure it after editing CMake files. Extra arguments override the initial cache, e.g. `-DMITK_BUILD_CONFIGURATION=Fiberfox` in a throwaway tree to check another configuration. Build it like `debug/MITK-build`. |
+| `mkdir -p wt-build/<name>/tmp && TMPDIR=wt-build/<name>/tmp ctest --test-dir wt-build/<name> -R Fiber` | Tests in a worktree's tree. Failing tests write to the system temp folder; a `TMPDIR` per tree keeps parallel sessions apart. |
 
 ## Working rules
 

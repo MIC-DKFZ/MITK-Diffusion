@@ -1,4 +1,4 @@
-mitkFunctionAddExternalProject(NAME OpenCV ON)
+mitkFunctionAddExternalProject(NAME OpenCV ON DOC "Use OpenCV (needed by the FiberDissection module)")
 
 # Here rather than in set_always.txt: this file is included for every build configuration
 # (also Custom), in the superbuild and in the inner build.
