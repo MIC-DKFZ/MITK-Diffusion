@@ -34,6 +34,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Baselines_NoBZero_AllDirectionsOfLowestShell);
   MITK_TEST(Baselines_Mean_NotTruncated);
   MITK_TEST(Fit_NoBaselineSignal_Zero);
+  MITK_TEST(LinearDThenF_OneShellAboveThreshold_DFromThatShell);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float>;
@@ -262,6 +263,18 @@ public:
       CPPUNIT_ASSERT_EQUAL(0.0, maps.d[0]);
       CPPUNIT_ASSERT_EQUAL(0.0, maps.dStar[0]);
     }
+  }
+
+  void LinearDThenF_OneShellAboveThreshold_DFromThatShell()
+  {
+    const std::vector<double> bValues = {0, 0, 10, 20, 50, 100, 1000, 1000, 1000};
+    const auto signal = IvimSignal(bValues, 10000, 0.1, 0.001, 0.02);
+    auto filter = MakeFilter(MakeImage({signal}), MakeGradients(bValues, 1000), 1000, FilterType::IVIM_LINEAR_D_THEN_F);
+    filter->Update();
+    auto maps = GetMaps(filter);
+    CPPUNIT_ASSERT_EQUAL(0.0, maps.f[0]);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-std::log(std::round(signal.back()) / 10000) / 1000, maps.d[0], 1e-8);
+    CPPUNIT_ASSERT_EQUAL(0.0, maps.dStar[0]);
   }
 };
 

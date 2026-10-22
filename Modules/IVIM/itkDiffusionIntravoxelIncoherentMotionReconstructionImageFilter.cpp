@@ -369,7 +369,8 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
             opt_idx = i;
           }
         }
-        m_Snap.currentDStar = min_val + opt_idx * ((max_val-min_val) / num_its);
+        // no candidate has a finite error when D or f is not finite
+        m_Snap.currentDStar = opt_idx < 0 ? 0 : min_val + opt_idx * ((max_val-min_val) / num_its);
       }
 
       break;
@@ -464,18 +465,28 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       bval_m /= input.N;
       meas_m /= input.N;
 
+      // With a single b-value above the threshold the line through (b, log S) is undefined (D was
+      // -inf); as for a single measurement, D then comes from the mean log signal and f is 0.
+      if (input.bvals.max_value() - input.bvals.min_value() < 1)
+      {
+        m_Snap.currentD = - meas_m / bval_m;
+        m_Snap.currentF = 0;
+        m_Snap.currentDStar = 0;
+        break;
+      }
+
       vnl_matrix<double> X(input.N,2);
-	  bool nan_element = false;
+      bool nan_element = false;
       for(int i=0; i<input.N; i++)
       {
         X(i,0) = input.bvals[i] - bval_m;
         X(i,1) = input.meas[i] - meas_m;
-		if (std::isnan(X(i,1)) || std::isnan(X(i,1)))
-		  nan_element = true;
+        if (!std::isfinite(X(i,0)) || !std::isfinite(X(i,1)))
+          nan_element = true;
       }
 
       if (!nan_element)
-	  {
+      {
       vnl_matrix<double> XX = X.transpose() * X;
       vnl_symmetric_eigensystem<double> eigs(XX);
 
@@ -519,9 +530,10 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
           }
         }
 
-        m_Snap.currentDStar = min_val + opt_idx * ((max_val-min_val) / num_its);
+        // no candidate has a finite error when D or f is not finite
+        m_Snap.currentDStar = opt_idx < 0 ? 0 : min_val + opt_idx * ((max_val-min_val) / num_its);
       }
-	  }
+      }
       // MITK_INFO << "choosing " << opt_idx << " => " << DStar;
       //          x_dstar_only[0] = 0.01;
       //          // f 0.1 Dstar 0.01 D 0.001
