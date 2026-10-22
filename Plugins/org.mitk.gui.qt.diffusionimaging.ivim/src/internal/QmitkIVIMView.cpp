@@ -46,7 +46,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // itk/mitk
 #include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h"
-#include "itkRegularizedIVIMReconstructionFilter.h"
 #include "mitkImageCast.h"
 #include <mitkImageStatisticsHolder.h>
 #include <mitkNodePredicateIsDWI.h>
@@ -96,8 +95,6 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
     connect( m_Controls->m_DStarSlider, SIGNAL(valueChanged(int)), this, SLOT(DStarSlider(int)) );
     connect( m_Controls->m_BThreshSlider, SIGNAL(valueChanged(int)), this, SLOT(BThreshSlider(int)) );
     connect( m_Controls->m_S0ThreshSlider, SIGNAL(valueChanged(int)), this, SLOT(S0ThreshSlider(int)) );
-    connect( m_Controls->m_NumItSlider, SIGNAL(valueChanged(int)), this, SLOT(NumItsSlider(int)) );
-    connect( m_Controls->m_LambdaSlider, SIGNAL(valueChanged(int)), this, SLOT(LambdaSlider(int)) );
 
     connect( m_Controls->m_CheckDStar, SIGNAL(clicked()), this, SLOT(Checkbox()) );
     connect( m_Controls->m_CheckD, SIGNAL(clicked()), this, SLOT(Checkbox()) );
@@ -137,12 +134,6 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
 
   QString s0thresh = QString::number(m_Controls->m_S0ThreshSlider->value()*0.5);
   m_Controls->m_S0ThreshLabel->setText(s0thresh);
-
-  QString numits = QString::number(m_Controls->m_NumItSlider->value());
-  m_Controls->m_NumItsLabel->setText(numits);
-
-  QString lambda = QString::number(m_Controls->m_LambdaSlider->value()*.00001);
-  m_Controls->m_LambdaLabel->setText(lambda);
 
   m_Controls->m_Warning->setVisible(false);
 
@@ -243,36 +234,21 @@ void QmitkIVIMView::OnIvimFitChanged(int val)
     m_Controls->m_DstarFrame->setVisible(false);
     m_Controls->m_NeglSiFrame->setVisible(true);
     m_Controls->m_NeglBframe->setVisible(false);
-    m_Controls->m_IterationsFrame->setVisible(false);
-    m_Controls->m_LambdaFrame->setVisible(false);
     break;
   case 1:
     m_Controls->m_DstarFrame->setVisible(true);
     m_Controls->m_NeglSiFrame->setVisible(true);
     m_Controls->m_NeglBframe->setVisible(false);
-    m_Controls->m_IterationsFrame->setVisible(false);
-    m_Controls->m_LambdaFrame->setVisible(false);
     break;
   case 2:
     m_Controls->m_DstarFrame->setVisible(false);
     m_Controls->m_NeglSiFrame->setVisible(true);
     m_Controls->m_NeglBframe->setVisible(true);
-    m_Controls->m_IterationsFrame->setVisible(false);
-    m_Controls->m_LambdaFrame->setVisible(false);
     break;
   case 3:
     m_Controls->m_DstarFrame->setVisible(false);
     m_Controls->m_NeglSiFrame->setVisible(true);
     m_Controls->m_NeglBframe->setVisible(true);
-    m_Controls->m_IterationsFrame->setVisible(false);
-    m_Controls->m_LambdaFrame->setVisible(false);
-    break;
-  case 4:
-    m_Controls->m_DstarFrame->setVisible(false);
-    m_Controls->m_NeglSiFrame->setVisible(false);
-    m_Controls->m_NeglBframe->setVisible(false);
-    m_Controls->m_IterationsFrame->setVisible(false);
-    m_Controls->m_LambdaFrame->setVisible(false);
     break;
   }
 
@@ -299,22 +275,6 @@ void QmitkIVIMView::S0ThreshSlider (int val)
 {
   QString sval = QString::number(val*0.5);
   m_Controls->m_S0ThreshLabel->setText(sval);
-
-  OnSliceChanged();
-}
-
-void QmitkIVIMView::NumItsSlider (int val)
-{
-  QString sval = QString::number(val);
-  m_Controls->m_NumItsLabel->setText(sval);
-
-  OnSliceChanged();
-}
-
-void QmitkIVIMView::LambdaSlider (int val)
-{
-  QString sval = QString::number(val*.00001);
-  m_Controls->m_LambdaLabel->setText(sval);
 
   OnSliceChanged();
 }
@@ -559,8 +519,6 @@ void QmitkIVIMView::OnSliceChanged()
   if(maskImg.IsNull())
   {
     int roisize = 0;
-    if(m_Controls->m_MethodCombo->currentIndex() == 4)
-      roisize = 3;
 
     mitk::Point3D pos = this->GetRenderWindowPart()->GetSelectedPosition();
 
@@ -827,14 +785,6 @@ bool QmitkIVIMView::FittIVIM(itk::VectorImage<short,3>* vecimg, DirContainerType
     filter->SetFitDStar(m_Controls->m_CheckDStar->isChecked());
     break;
 
-  case 4:
-    filter->SetMethod(IVIMFilterType::IVIM_REGULARIZED);
-    filter->SetBThres(m_Controls->m_BThreshLabel->text().toDouble());
-    filter->SetS0Thres(m_Controls->m_S0ThreshLabel->text().toDouble());
-    filter->SetNumberIterations(m_Controls->m_NumItsLabel->text().toInt());
-    filter->SetLambda(m_Controls->m_LambdaLabel->text().toDouble());
-    filter->SetFitDStar(m_Controls->m_CheckDStar->isChecked());
-    break;
   }
 
   if(!multivoxel)

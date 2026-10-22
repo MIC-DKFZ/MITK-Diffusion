@@ -91,8 +91,6 @@ protected slots:
   void DStarSlider(int val);
   void BThreshSlider(int val);
   void S0ThreshSlider(int val);
-  void NumItsSlider(int val);
-  void LambdaSlider(int val);
   void ClipboardStatisticsButtonClicked();
   void ClipboardCurveButtonClicked();
   void SavePlotButtonClicked();

@@ -278,8 +278,7 @@ namespace itk{
       IVIM_FIT_ALL,
       IVIM_DSTAR_FIX,
       IVIM_D_THEN_DSTAR,
-      IVIM_LINEAR_D_THEN_F,
-      IVIM_REGULARIZED
+      IVIM_LINEAR_D_THEN_F
     };
 
     typedef DiffusionIntravoxelIncoherentMotionReconstructionImageFilter Self;
@@ -316,10 +315,6 @@ namespace itk{
     typedef VectorContainer< unsigned int,
     GradientDirectionType >                  GradientDirectionContainerType;
 
-    // vector image typedefs for regularized fit
-    typedef itk::VectorImage<float,3> VectorImageType;
-    typedef itk::Image<itk::Vector<double, 3>, 3> InitialFitImageType;
-
     /** set method to add gradient directions and its corresponding
    * image. The image here is a VectorImage. The user is expected to pass the
    * gradient directions in a container. The ith element of the container
@@ -334,8 +329,6 @@ namespace itk{
     void SetDStar(double dstar){m_DStar  = dstar;}
     void SetFitDStar(bool fit){m_FitDStar  = fit;}
     void SetVerbose(bool verbose){m_Verbose = verbose;}
-    void SetNumberIterations(int num){m_NumberIterations = num;}
-    void SetLambda(double lambda){m_Lambda = lambda;}
     void SetCrossPosition(typename InputImageType::IndexType crosspos){this->m_CrossPosition = crosspos;}
     void SetMethod(IVIM_Method method){m_Method = method;}
 
@@ -359,13 +352,10 @@ namespace itk{
     void VerifyPreconditions() const override;
     void BeforeThreadedGenerateData();
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
-    void AfterThreadedGenerateData();
 
     MeasAndBvals ApplyS0Threshold(vnl_vector<double> &meas, vnl_vector<double> &bvals);
 
   private:
-
-    double myround(double number);
 
     /** container to hold gradient directions */
     GradientDirectionContainerType::ConstPointer           m_GradientDirectionContainer;
@@ -394,16 +384,6 @@ namespace itk{
     IVIMSnapshot m_Snap;
 
     bool m_Verbose;
-
-    typename VectorImageType::Pointer m_InternalVectorImage;
-
-    typename InitialFitImageType::Pointer m_InitialFitImage;
-
-    int m_NumberIterations{10}; // for total variation
-
-    vnl_vector<double> m_tmp_allmeas;
-
-    double m_Lambda{0.0001};
 
     typename InputImageType::IndexType m_CrossPosition{};
 

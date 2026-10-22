@@ -23,9 +23,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "vnl/vnl_matrix.h"
 #include "vnl/algo/vnl_symmetric_eigensystem.h"
-#include <vnl/algo/vnl_lbfgsb.h>
-
-#include "itkRegularizedIVIMReconstructionFilter.h"
 
 #include <mitkBValueMapProperty.h>
 #include <mitkLog.h>
@@ -147,7 +144,7 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
   }
 
   // extract bvals higher than threshold
-  if(m_Method == IVIM_D_THEN_DSTAR || m_Method == IVIM_LINEAR_D_THEN_F || m_Method == IVIM_REGULARIZED)
+  if(m_Method == IVIM_D_THEN_DSTAR || m_Method == IVIM_LINEAR_D_THEN_F)
   {
     for(int i=0; i<m_Snap.num_weighted; i++)
       if(m_Snap.bvalues[i]>m_BThres)
@@ -221,41 +218,6 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
 
   InputIteratorType iit(inputImagePointer, outputRegionForThread );
   iit.GoToBegin();
-
-  // init internal vector image for regularized fit
-  m_InternalVectorImage = VectorImageType::New();
-  m_InternalVectorImage->SetSpacing( inputImagePointer->GetSpacing() );   // Set the image spacing
-  m_InternalVectorImage->SetOrigin( inputImagePointer->GetOrigin() );     // Set the image origin
-  m_InternalVectorImage->SetDirection( inputImagePointer->GetDirection() );  // Set the image direction
-  m_InternalVectorImage->SetRegions( inputImagePointer->GetLargestPossibleRegion() );
-
-  m_InitialFitImage = InitialFitImageType::New();
-  m_InitialFitImage->SetSpacing( inputImagePointer->GetSpacing() );   // Set the image spacing
-  m_InitialFitImage->SetOrigin( inputImagePointer->GetOrigin() );     // Set the image origin
-  m_InitialFitImage->SetDirection( inputImagePointer->GetDirection() );  // Set the image direction
-  m_InitialFitImage->SetRegions( inputImagePointer->GetLargestPossibleRegion() );
-
-  if(m_Method == IVIM_REGULARIZED)
-  {
-    m_InternalVectorImage->SetVectorLength(m_Snap.num_high);
-    m_InternalVectorImage->Allocate();
-    VectorImageType::PixelType varvec(m_Snap.num_high);
-    for(int i=0; i<m_Snap.num_high; i++) varvec[i] = IVIM_FOO;
-    m_InternalVectorImage->FillBuffer(varvec);
-
-    m_InitialFitImage->Allocate();
-    InitialFitImageType::PixelType vec;
-    vec[0] = 0.5; vec[1] = 0.01; vec[2]=0.001;
-    m_InitialFitImage->FillBuffer(vec);
-  }
-
-  typedef itk::ImageRegionIterator<VectorImageType> VectorIteratorType;
-  VectorIteratorType vecit(m_InternalVectorImage, outputRegionForThread );
-  vecit.GoToBegin();
-
-  typedef itk::ImageRegionIterator<InitialFitImageType> InitIteratorType;
-  InitIteratorType initit(m_InitialFitImage, outputRegionForThread );
-  initit.GoToBegin();
 
   while( !iit.IsAtEnd() )
   {
@@ -552,71 +514,6 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
       break;
     }
 
-    case IVIM_REGULARIZED:
-    {
-      //m_Snap.high_meas, m_Snap.high_bvalues;
-      for(int i=0; i<m_Snap.num_high; i++)
-        m_Snap.high_meas[i] = m_Snap.meas_for_threshold[m_Snap.high_indices.at(i)];
-
-      MeasAndBvals input = ApplyS0Threshold(m_Snap.high_meas, m_Snap.high_bvalues);
-
-      vnl_vector< double > x_donly(2);
-      x_donly[0] = 0.001;
-      x_donly[1] = 0.1;
-
-      if(input.N >= 2)
-      {
-        IVIM_d_and_f f_donly(input.N);
-        f_donly.set_bvalues(input.bvals);
-        f_donly.set_measurements(input.meas);
-        //MITK_INFO << "initial fit N=" << input.N << ", min-b = " << input.bvals[0] << ", max-b = " << input.bvals[input.N-1];
-        vnl_levenberg_marquardt lm_donly(f_donly);
-        lm_donly.set_f_tolerance(0.0001);
-        lm_donly.minimize(x_donly);
-      }
-
-      typename InitialFitImageType::PixelType initvec;
-      initvec[0] = x_donly[1];
-      initvec[1] = x_donly[0];
-      initit.Set(initvec);
-      //MITK_INFO << "Init vox " << initit.GetIndex() << " with " << initvec[0] << "; " << initvec[1];
-      ++initit;
-
-      int N = m_Snap.high_meas.size();
-      typename VectorImageType::PixelType vec(N);
-      for(int i=0; i<N; i++)
-      {
-        vec[i] = m_Snap.high_meas[i];
-//        MITK_INFO << "vec" << i << " = " << m_Snap.high_meas[i];
-      }
-
-      vecit.Set(vec);
-
-      if(!m_Verbose)
-      {
-        // report the middle voxel
-        if(  vecit.GetIndex()[0] == static_cast<itk::IndexValueType>(m_InternalVectorImage->GetLargestPossibleRegion().GetSize(0)-1)/2
-             && vecit.GetIndex()[1] == static_cast<itk::IndexValueType>(m_InternalVectorImage->GetLargestPossibleRegion().GetSize(1)-1)/2
-             && vecit.GetIndex()[2] == static_cast<itk::IndexValueType>(m_InternalVectorImage->GetLargestPossibleRegion().GetSize(2)-1)/2 )
-        {
-          MeasAndBvals input = ApplyS0Threshold(m_Snap.high_meas, m_Snap.high_bvalues);
-          m_Snap.bvals1 = input.bvals;
-          m_Snap.meas1 = input.meas;
-
-          MeasAndBvals input2 = ApplyS0Threshold(m_Snap.meas_for_threshold, m_Snap.bvalues);
-          m_Snap.bvals2 = input2.bvals;
-          m_Snap.meas2 = input2.meas;
-
-          m_tmp_allmeas = m_Snap.allmeas;
-        }
-
-        m_Snap.currentF = 0;
-        m_Snap.currentD = 0;
-        m_Snap.currentDStar = 0;
-      }
-
-      break;
-    }
     }
     m_Snap.currentFunceiled = m_Snap.currentF;
     IVIM_CEIL( m_Snap.currentF, 0.0, 1.0 );
@@ -631,88 +528,12 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
     ++oit1;
     ++oit2;
     ++iit;
-    ++vecit;
   }
 
   if(m_Verbose)
   {
     std::cout << "One Thread finished reconstruction" << std::endl;
   }
-}
-
-template< class TIn, class TOut>
-void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
-::AfterThreadedGenerateData()
-{
-  if(m_Method == IVIM_REGULARIZED)
-  {
-    typename OutputImageType::Pointer outputImage =
-        static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
-    ImageRegionIterator< OutputImageType > oit0(outputImage, outputImage->GetLargestPossibleRegion());
-    oit0.GoToBegin();
-
-    typename OutputImageType::Pointer dImage =
-        static_cast< OutputImageType * >(this->ProcessObject::GetOutput(1));
-    ImageRegionIterator< OutputImageType > oit1(dImage, dImage->GetLargestPossibleRegion());
-    oit1.GoToBegin();
-
-    typename OutputImageType::Pointer dstarImage =
-        static_cast< OutputImageType * >(this->ProcessObject::GetOutput(2));
-    ImageRegionIterator< OutputImageType > oit2(dstarImage, dstarImage->GetLargestPossibleRegion());
-    oit2.GoToBegin();
-
-    typedef itk::RegularizedIVIMReconstructionFilter
-        <double,double,float> RegFitType;
-    RegFitType::Pointer filter = RegFitType::New();
-    filter->SetInput(m_InitialFitImage);
-    filter->SetReferenceImage(m_InternalVectorImage);
-    filter->SetBValues(m_Snap.high_bvalues);
-    filter->SetNumberIterations(m_NumberIterations);
-    filter->SetNumberOfWorkUnits(1);
-    filter->SetLambda(m_Lambda);
-    filter->Update();
-    typename RegFitType::OutputImageType::Pointer outimg = filter->GetOutput();
-
-    ImageRegionConstIterator< RegFitType::OutputImageType > iit(outimg, outimg->GetLargestPossibleRegion());
-    iit.GoToBegin();
-
-    while( !iit.IsAtEnd() )
-    {
-      double f = iit.Get()[0];
-      IVIM_CEIL( f, 0.0, 1.0 );
-
-      oit0.Set( myround(f) );
-      oit1.Set( myround(iit.Get()[1]) );
-      oit2.Set( myround(iit.Get()[2]) );
-
-      if(!m_Verbose)
-      {
-        // report the middle voxel
-        if(  iit.GetIndex()[0] == static_cast<itk::IndexValueType>(outimg->GetLargestPossibleRegion().GetSize(0)-1)/2
-             && iit.GetIndex()[1] == static_cast<itk::IndexValueType>(outimg->GetLargestPossibleRegion().GetSize(2)-1)/2
-             && iit.GetIndex()[2] == static_cast<itk::IndexValueType>(outimg->GetLargestPossibleRegion().GetSize(1)-1)/2 )
-        {
-          m_Snap.currentF = f;
-          m_Snap.currentD = iit.Get()[1];
-          m_Snap.currentDStar = iit.Get()[2];
-          m_Snap.allmeas = m_tmp_allmeas;
-          MITK_INFO << "setting " << f << ";" << iit.Get()[1] << ";" << iit.Get()[2];
-        }
-      }
-
-      ++oit0;
-      ++oit1;
-      ++oit2;
-      ++iit;
-    }
-  }
-}
-
-template< class TIn, class TOut>
-double DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
-::myround(double number)
-{
-  return number < 0.0 ? ceil(number - 0.5) : floor(number + 0.5);
 }
 
 template< class TIn, class TOut>
