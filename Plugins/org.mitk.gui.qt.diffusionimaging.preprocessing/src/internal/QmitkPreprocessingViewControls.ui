@@ -716,7 +716,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Merges selected DWIs of same dimension. If several b-values are present, the resulting image will contain multiple b-shells.</string>
+             <string>Mirrors the image along the checked image (voxel) axes; the geometry stays the same. The gradients of a DWI are mirrored along the same axes.</string>
             </property>
             <property name="statusTip">
              <string/>

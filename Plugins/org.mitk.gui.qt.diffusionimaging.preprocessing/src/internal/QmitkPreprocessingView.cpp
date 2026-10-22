@@ -27,6 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkVectorContainer.h"
 #include <itkElectrostaticRepulsionDiffusionGradientReductionFilter.h>
 #include <itkMergeDiffusionImagesFilter.h>
+#include <mitkDiffusionImageEditing.h>
 #include <itkDwiGradientLengthCorrectionFilter.h>
 #include <itkDwiNormilzationFilter.h>
 
@@ -57,7 +58,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkGradientDirectionsProperty.h>
 #include <mitkMeasurementFrameProperty.h>
 #include <itkImageDuplicator.h>
-#include <itkFlipImageFilter.h>
 #include <mitkITKImageImport.h>
 
 #include <boost/algorithm/string.hpp>
@@ -176,88 +176,18 @@ void QmitkPreprocessingView::DoFlipAxis()
   mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
   if ( image == nullptr ) { return; }
 
-  bool isDiffusionImage( PropHelper::IsDiffusionWeightedImage(node) );
+  const std::array<bool, 3> flipAxes = { m_Controls->m_FlipX->isChecked(), m_Controls->m_FlipY->isChecked(), m_Controls->m_FlipZ->isChecked() };
 
-  if (isDiffusionImage)
+  mitk::Image::Pointer newImage;
+  try
   {
-    ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
-    mitk::CastToItkImage(image, itkVectorImagePointer);
-
-    itk::FixedArray<bool, 3> flipAxes;
-    flipAxes[0] = m_Controls->m_FlipX->isChecked();
-    flipAxes[1] = m_Controls->m_FlipY->isChecked();
-    flipAxes[2] = m_Controls->m_FlipZ->isChecked();
-
-    itk::FlipImageFilter< ItkDwiType >::Pointer flipper = itk::FlipImageFilter< ItkDwiType >::New();
-    flipper->SetInput(itkVectorImagePointer);
-    flipper->SetFlipAxes(flipAxes);
-    flipper->Update();
-
-    auto oldGradients = PropHelper::GetGradientContainer(image);
-    auto newGradients = GradProp::GradientDirectionsContainerType::New();
-
-    for (unsigned int i=0; i<oldGradients->Size(); i++)
-    {
-      GradProp::GradientDirectionType g = oldGradients->GetElement(i);
-      GradProp::GradientDirectionType newG = g;
-      if (flipAxes[0]) { newG[0] *= -1; }
-
-      if (flipAxes[1]) { newG[1] *= -1; }
-
-      if (flipAxes[2]) { newG[2] *= -1; }
-
-      newGradients->InsertElement(i, newG);
-    }
-
-    mitk::Image::Pointer newImage = mitk::GrabItkImageMemory( flipper->GetOutput() );
-    PropHelper::CopyProperties(image, newImage, true);
-    PropHelper::SetGradientContainer(newImage, newGradients);
-    PropHelper::InitializeImage(newImage);
-    newImage->GetGeometry()->SetOrigin(image->GetGeometry()->GetOrigin());
-
-    mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
-    imageNode->SetData( newImage );
-    QString name = node->GetName().c_str();
-
-    imageNode->SetName((name+"_flipped").toStdString().c_str());
-    GetDataStorage()->Add(imageNode, node);
-
-    mitk::RenderingManager::GetInstance()->InitializeViews( imageNode->GetData()->GetTimeGeometry(), mitk::RenderingManager::REQUEST_UPDATE_ALL, true );
-    mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+    newImage = mitk::DiffusionImageEditing::FlipAxes(image, flipAxes);
   }
-  else if( image->GetPixelType().GetNumberOfComponents() == 1 )
+  catch (const std::exception& e)
   {
-    AccessFixedDimensionByItk(image, TemplatedFlipAxis,3);
+    QMessageBox::warning(nullptr, "Warning", QString("Flipping failed: ") + e.what());
+    return;
   }
-  else
-  {
-    QMessageBox::warning(nullptr,"Warning", QString("Operation not supported in multi-component images") );
-  }
-}
-
-
-template < typename TPixel, unsigned int VImageDimension >
-void QmitkPreprocessingView::TemplatedFlipAxis(itk::Image<TPixel, VImageDimension>* itkImage)
-{
-  mitk::DataNode::Pointer node = m_Controls->m_SelctedImageComboBox->GetSelectedNode();
-  if (node.IsNull()) { return; }
-
-  mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(node->GetData());
-  if ( image == nullptr ) { return; }
-
-  itk::FixedArray<bool, 3> flipAxes;
-  flipAxes[0] = m_Controls->m_FlipX->isChecked();
-  flipAxes[1] = m_Controls->m_FlipY->isChecked();
-  flipAxes[2] = m_Controls->m_FlipZ->isChecked();
-
-  typename itk::FlipImageFilter< itk::Image<TPixel, VImageDimension> >::Pointer flipper
-      = itk::FlipImageFilter< itk::Image<TPixel, VImageDimension> >::New();
-  flipper->SetInput(itkImage);
-  flipper->SetFlipAxes(flipAxes);
-  flipper->Update();
-
-  mitk::Image::Pointer newImage = mitk::GrabItkImageMemory( flipper->GetOutput() );
-  newImage->GetGeometry()->SetOrigin(image->GetGeometry()->GetOrigin());
 
   mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
   imageNode->SetData( newImage );
@@ -266,9 +196,7 @@ void QmitkPreprocessingView::TemplatedFlipAxis(itk::Image<TPixel, VImageDimensio
   imageNode->SetName((name+"_flipped").toStdString().c_str());
   GetDataStorage()->Add(imageNode, node);
 
-  mitk::RenderingManager::GetInstance()->InitializeViews( imageNode->GetData()->GetTimeGeometry(),
-                                                          mitk::RenderingManager::REQUEST_UPDATE_ALL,
-                                                          true );
+  mitk::RenderingManager::GetInstance()->InitializeViews( imageNode->GetData()->GetTimeGeometry(), mitk::RenderingManager::REQUEST_UPDATE_ALL, true );
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
 

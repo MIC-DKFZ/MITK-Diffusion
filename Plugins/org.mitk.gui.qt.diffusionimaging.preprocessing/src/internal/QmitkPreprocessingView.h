@@ -120,9 +120,6 @@ protected:
   void DoADCAverage();
 
   template < typename TPixel, unsigned int VImageDimension >
-  void TemplatedFlipAxis( itk::Image<TPixel, VImageDimension>* itkImage);
-
-  template < typename TPixel, unsigned int VImageDimension >
   void TemplatedCropImage( itk::Image<TPixel, VImageDimension>* itkImage);
 
   template < typename TPixel, unsigned int VImageDimension >
