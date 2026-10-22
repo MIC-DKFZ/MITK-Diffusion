@@ -385,7 +385,8 @@ public:
       geometry of the input. */
   void SetImageMask( MaskImageType::Pointer mask );
 
-  /** Set smoothing sigma (default = 1.5 ), automatically enables smoothing prior to fitting */
+  /** Set the variance in mm^2, not the sigma, of the Gaussian smoothing (default = 1.5); automatically
+      enables smoothing prior to fitting */
   void SetSmoothingSigma( double sigma )
   {
     this->m_SmoothingSigma = sigma;

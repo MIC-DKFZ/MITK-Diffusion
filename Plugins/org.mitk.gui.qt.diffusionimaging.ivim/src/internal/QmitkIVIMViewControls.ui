@@ -883,7 +883,7 @@ QGroupBox {
                <item row="8" column="0">
                 <widget class="QLabel" name="label_10">
                  <property name="text">
-                  <string>Smoothing sigma</string>
+                  <string>Smoothing variance (mm²)</string>
                  </property>
                 </widget>
                </item>
@@ -980,7 +980,7 @@ QGroupBox {
                <item row="8" column="2">
                 <widget class="QDoubleSpinBox" name="m_SigmaSpinBox">
                  <property name="toolTip">
-                  <string>Signa for gaussian smoothing applied prior to map computation</string>
+                  <string>Variance in mm² of the Gaussian smoothing applied prior to map computation; 0 means no smoothing.</string>
                  </property>
                  <property name="minimum">
                   <double>0.000000000000000</double>
