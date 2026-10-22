@@ -24,7 +24,7 @@ builds against the v2026.06 release. "Porting state" lists what is still open.
 | Path | Repository | Role |
 | --- | --- | --- |
 | `mitk-diffusion/` | https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion, branch `master` | The project. All changes go here; GitLab issues are filed here. |
-| `mitk/` | https://git.dkfz.de/mic/mitk.git, local branch `my-working` | The base. **Do not change it.** |
+| `mitk/` | https://git.dkfz.de/mic/mitk.git | The base. **Do not change it.** |
 
 The workspace root is not a git repository. Besides the build trees it holds `prompts/`
 (handoff prompts for new sessions), `gitlab_issues/` (issue drafts and handoff plans from the
@@ -101,13 +101,6 @@ In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diff
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
 all 14 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
-- Three regenerated test references are committed in `mitk-data/` (`c962623`) but not pushed;
-  `debug/MITK-Data` and `release/MITK-Data` hold them as uncommitted copies until upstream has
-  them:
-  `DiffusionImaging/Fiberfox/uniform.fib` and `gaussian.fib` (MITK clamps ellipse control points
-  to the plane since `git -C mitk show bbc5c77b27`, which moves a point of `Fiducial_2.pf`) and
-  `DiffusionImaging/gibbsTractogram.fib` (from 2014; Gibbs tracking changed since, e.g. its random
-  generator in 2019).
 - The two `DiffusionRegistration` tests are compiled but deliberately not registered; they were
   commented out before the 2024 test refactoring.
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
@@ -156,10 +149,9 @@ Run from the workspace root. Both superbuild trees use Unix Makefiles; for Relea
   over at a checkpoint: write `prompts/NN-<topic>.md` (next number) with the state, decisions,
   anchored facts and remaining steps, and give the user the start sentence.
 - Every handoff (a `prompts/` file or a `handoff` plan) is started in a new chat in the
-  workspace root with `carry out this plan: <absolute path>`; the user never switches to a
-  worktree or opens a second window. A plan for work in a worktree therefore names the
-  worktree and pins every edit, git command (`git -C <worktree>`), build and test to it by
-  absolute path, and the main checkout stays untouched.
+  workspace root with `carry out this plan: <absolute path>`. A plan for work in a worktree
+  therefore names the worktree and pins every edit, git command (`git -C <worktree>`), build
+  and test to it by absolute path, and the main checkout stays untouched.
 
 ### Git: never commit or push unasked
 
