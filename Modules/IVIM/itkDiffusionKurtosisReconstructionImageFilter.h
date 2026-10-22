@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVectorImage.h>
 
 #include <mitkKurtosisFit.h>
+#include <mitkMaskGeometry.h>
 
 namespace itk
 {
@@ -58,7 +59,7 @@ namespace itk
     itkSetConstObjectMacro(GradientDirections, GradientDirectionContainerType);
 
     /** Restricts the fit to voxels where the mask is not 0, others get 0; the mask must have the
-        geometry of the input. */
+        voxel grid of the input (mitk::HasVoxelGridOf). */
     itkSetConstObjectMacro(ImageMask, MaskImageType);
 
     /** The variance in mm^2, not the sigma, of a Gaussian smoothing of each volume before the fit;

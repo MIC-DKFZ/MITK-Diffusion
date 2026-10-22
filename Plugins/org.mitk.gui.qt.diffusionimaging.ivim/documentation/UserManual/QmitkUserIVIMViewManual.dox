@@ -12,7 +12,7 @@ The plot shows the fit of the model selected by the tab (IVIM or Kurtosis) to th
 
 The buttons below the plot copy the b-values and measurements of the voxel (for IVIM as S/S0) with the fitted parameters ("Signal values to clipboard") or only the fitted parameters ("Fit-parameters to clipboard") to the clipboard, or save the plot as an image file.
 
-<b>Generate Parameter Maps</b> fits every voxel of the image with the settings of the selected tab and adds the maps checked under "Output Maps" below the image in the Data Manager. With a ROI selected, only the voxels inside the ROI are fitted and the others get 0; the ROI must then have the size and geometry of the image. Voxels that cannot be fitted, for example without signal or with too few usable measurements, get 0 too.
+<b>Generate Parameter Maps</b> fits every voxel of the image with the settings of the selected tab and adds the maps checked under "Output Maps" below the image in the Data Manager. With a ROI selected, only the voxels inside the ROI are fitted and the others get 0; the ROI must then have the size and geometry of the image, apart from rounding differences of up to 0.0001 mm in origin and spacing. Voxels that cannot be fitted, for example without signal or with too few usable measurements, get 0 too.
 
 \section QmitkIVIMViewIvim IVIM
 

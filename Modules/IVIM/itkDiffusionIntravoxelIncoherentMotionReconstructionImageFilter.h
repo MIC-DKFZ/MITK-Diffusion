@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVectorImage.h>
 
 #include <mitkIvimFit.h>
+#include <mitkMaskGeometry.h>
 
 namespace itk
 {
@@ -56,7 +57,7 @@ namespace itk
     itkSetMacro(BValue, double);
 
     /** Restricts the fit to voxels where the mask is not 0, others get 0; the mask must have the
-        geometry of the input. */
+        voxel grid of the input (mitk::HasVoxelGridOf). */
     itkSetConstObjectMacro(ImageMask, MaskImageType);
 
     void SetFitParameters(const mitk::ivim::FitParameters& parameters)

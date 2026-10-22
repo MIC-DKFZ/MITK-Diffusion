@@ -52,18 +52,9 @@ namespace itk
       itkExceptionMacro("The input has " << this->GetInput()->GetNumberOfComponentsPerPixel() << " volumes but "
                                          << m_GradientDirections->Size() << " gradient directions.");
 
-    // The mask is iterated with the output region, so it has to share the geometry of the input.
-    if (m_ImageMask.IsNotNull())
-    {
-      const auto* input = this->GetInput();
-      if (m_ImageMask->GetLargestPossibleRegion() != input->GetLargestPossibleRegion() ||
-          !m_ImageMask->IsCongruentImageGeometry(input,
-                                                  ImageToImageFilterCommon::GetGlobalDefaultCoordinateTolerance(),
-                                                  ImageToImageFilterCommon::GetGlobalDefaultDirectionTolerance()))
-      {
-        itkExceptionMacro("The mask image does not have the size, origin, spacing and direction of the diffusion-weighted image.");
-      }
-    }
+    // The mask is iterated with the output region, so it has to share the voxel grid of the input.
+    if (m_ImageMask.IsNotNull() && !mitk::HasVoxelGridOf(m_ImageMask, this->GetInput()))
+      itkExceptionMacro("The mask image does not have the size, origin, spacing and direction of the diffusion-weighted image.");
   }
 
   template <class TInputPixelType, class TOutputPixelType>

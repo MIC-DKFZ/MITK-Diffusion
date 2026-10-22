@@ -49,6 +49,9 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(Map_Mask_FitsOnlyInside);
   MITK_TEST(Update_MaskOfOtherSize_Throws);
   MITK_TEST(Update_MaskWithOtherOrigin_Throws);
+  MITK_TEST(Map_MaskGridDiffersByRounding_SameAsExactMask);
+  MITK_TEST(Update_MaskGridDiffersBeyondRounding_Throws);
+  MITK_TEST(ComputeMaps_FweMaskWithRoundedOrigin_FitsInside);
   MITK_TEST(Update_InputChanged_FitsWholeNewInput);
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
   MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
@@ -515,6 +518,55 @@ public:
     auto filter = MakeFilter(m_Image, m_Gradients, 3000);
     filter->SetImageMask(mask);
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  void Map_MaskGridDiffersByRounding_SameAsExactMask()
+  {
+    auto exactMaskFilter = MakeFilter(m_Image, m_Gradients, 3000);
+    exactMaskFilter->SetImageMask(MakeMask(m_Truth.size(), 1));
+    exactMaskFilter->Update();
+    const auto expected = GetMaps(exactMaskFilter);
+    CPPUNIT_ASSERT(expected.d[0] != 0);
+
+    auto mask = MakeMask(m_Truth.size(), 1);
+    MoveVoxelGrid(mask, 1e-5, 1e-5);
+    auto filter = MakeFilter(m_Image, m_Gradients, 3000);
+    filter->SetImageMask(mask);
+    filter->Update();
+    const auto actual = GetMaps(filter);
+    CPPUNIT_ASSERT(expected.d == actual.d);
+    CPPUNIT_ASSERT(expected.k == actual.k);
+  }
+
+  void Update_MaskGridDiffersBeyondRounding_Throws()
+  {
+    // 1e-3 mm is far less than a voxel, but ten times MITK's tolerance for rounding.
+    for (const auto& [originShift, spacingChange] : {std::pair(1e-3, 0.0), std::pair(0.0, 1e-3)})
+    {
+      auto mask = MakeMask(m_Truth.size(), 1);
+      MoveVoxelGrid(mask, originShift, spacingChange);
+      auto filter = MakeFilter(m_Image, m_Gradients, 3000);
+      filter->SetImageMask(mask);
+      CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+    }
+  }
+
+  void ComputeMaps_FweMaskWithRoundedOrigin_FitsInside()
+  {
+    // MitkDiffusionKurtosisFit -i FWE/InputDiffusionWeightedImage.dwi -m FWE/ReferenceFWImage.nrrd
+    // used to stop with "The mask image does not have the size, origin, spacing and direction ...".
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    const itk::Index<3> inside = {{5, 5, 5}};
+    const auto mask =
+      MakeMaskWithRoundedOrigin(dwi.image, {inside}, GetTestDataFilePath("DiffusionImaging/FWE/ReferenceFWImage.nrrd"));
+
+    const mitk::kurtosis::FitConfiguration configuration{};
+    const auto expected = Values(mitk::kurtosis::ComputeMaps(dwi.dwi, nullptr, configuration, 0).d.GetPointer());
+    const auto actual = Values(mitk::kurtosis::ComputeMaps(dwi.dwi, mask, configuration, 0).d.GetPointer());
+    const std::size_t center = 5 + 11 * 5 + 121 * 5;
+    CPPUNIT_ASSERT(expected[center] != 0);
+    for (std::size_t i = 0; i < expected.size(); ++i)
+      CPPUNIT_ASSERT_EQUAL(i == center ? expected[i] : 0.0, actual[i]);
   }
 
   void Update_InputChanged_FitsWholeNewInput()

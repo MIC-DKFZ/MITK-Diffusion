@@ -133,6 +133,36 @@ namespace mitk::IvimTesting
     return GrabItkImageMemory(mask);
   }
 
+  /** Moves the origin of an image and widens its spacing by the given amounts in mm. */
+  inline void MoveVoxelGrid(itk::ImageBase<3>* image, double originShift, double spacingChange)
+  {
+    auto origin = image->GetOrigin();
+    auto spacing = image->GetSpacing();
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      origin[i] += originShift;
+      spacing[i] += spacingChange;
+    }
+    image->SetOrigin(origin);
+    image->SetSpacing(spacing);
+  }
+
+  /** A mask of the FWE DWI, 1 at the given voxels, with the origin of
+      DiffusionImaging/FWE/ReferenceFWImage.nrrd: that image was stored with fewer digits than the
+      DWI, so its origin differs from the DWI's by rounding (up to 4.5e-5 mm). */
+  inline Image::Pointer MakeMaskWithRoundedOrigin(const VectorImageType* image,
+                                                  const std::vector<itk::Index<3>>& voxels,
+                                                  const std::string& roundedImagePath)
+  {
+    auto mask = MakeMask(image, voxels);
+    const auto roundedOrigin = IOUtil::Load<Image>(roundedImagePath)->GetGeometry()->GetOrigin();
+    const auto origin = mask->GetGeometry()->GetOrigin();
+    CPPUNIT_ASSERT(!Equal(origin, roundedOrigin, 1e-5));
+    CPPUNIT_ASSERT(Equal(origin, roundedOrigin, 1e-4));
+    mask->GetGeometry()->SetOrigin(roundedOrigin);
+    return mask;
+  }
+
   /** Recorded map values are compared relative to their size; the maps are float images. */
   inline void AssertClose(double expected, double actual, double relativeTolerance = 1e-5)
   {
