@@ -32,8 +32,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
 #include <itkExtractDwiChannelFilter.h>
+// MatchPoint's ITKInitializedMultiResImageRegistrationAlgorithm::doSetProperty() assigns a bool
+// that unwrapMetaProperty() may leave unset; GCC's optimizer reports that in Release builds
+// despite -isystem. MatchPoint is a MITK external, so the warning is silenced for its headers.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include <mitkMultiModalRigidDefaultRegistrationAlgorithm.h>
 #include <mitkMultiModalAffineDefaultRegistrationAlgorithm.h>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #include <itkComposeImageFilter.h>
 #include <mitkFiberBundle.h>
 #include <mitkRegistrationHelper.h>
