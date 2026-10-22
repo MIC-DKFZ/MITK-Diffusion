@@ -18,6 +18,8 @@ found in the LICENSE file.
 #include <mitkOdfImage.h>
 #include <mitkOdfNormalizationMethodProperty.h>
 #include <mitkOdfScaleByProperty.h>
+#include <mitkOdfVtkMapper2D.h>
+#include <mitkProperties.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkShImage.h>
 #include <mitkSlicedGeometry3D.h>
@@ -55,6 +57,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_ShMatchesOdfOfBothConventions);
   MITK_TEST(GlyphGenerator_Order2ShIsNoTensor);
   MITK_TEST(GlyphGenerator_UnsupportedImage_Throws);
+  MITK_TEST(OdfMapper_DefaultProperties_KeepExistingValues);
   CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -453,6 +456,30 @@ public:
     const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 0, 0, 0, 1));
     CPPUNIT_ASSERT(slice.has_value());
     CPPUNIT_ASSERT_THROW(mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, AllGlyphs()), mitk::Exception);
+  }
+
+  // Defaults no longer overwrite what the node already has, unless asked to.
+  void OdfMapper_DefaultProperties_KeepExistingValues()
+  {
+    auto node = mitk::DataNode::New();
+    node->SetData(mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti")));
+    node->SetBoolProperty("VisibleOdfs_T", true);
+    node->SetFloatProperty("Scaling", 7);
+    node->SetIntProperty("layer", 3);
+
+    mitk::OdfVtkMapper2D::SetDefaultProperties(node);
+    bool visibleOdfs = false;
+    float scaling = 0;
+    int layer = 0;
+    CPPUNIT_ASSERT(node->GetBoolProperty("VisibleOdfs_T", visibleOdfs) && visibleOdfs);
+    CPPUNIT_ASSERT(node->GetFloatProperty("Scaling", scaling) && scaling == 7);
+    CPPUNIT_ASSERT(node->GetIntProperty("layer", layer) && layer == 3);
+    CPPUNIT_ASSERT(node->GetProperty("DoRefresh") == nullptr);
+
+    mitk::OdfVtkMapper2D::SetDefaultProperties(node, nullptr, true);
+    CPPUNIT_ASSERT(node->GetBoolProperty("VisibleOdfs_T", visibleOdfs) && !visibleOdfs);
+    CPPUNIT_ASSERT(node->GetFloatProperty("Scaling", scaling) && scaling == 3);
+    CPPUNIT_ASSERT(node->GetIntProperty("layer", layer) && layer == 100);
   }
 };
 

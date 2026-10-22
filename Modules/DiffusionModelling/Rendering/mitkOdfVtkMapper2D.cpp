@@ -144,34 +144,27 @@ void mitk::OdfVtkMapper2D::ResetMapper(BaseRenderer *renderer)
   localStorage->m_Actor->VisibilityOff();
 }
 
-void mitk::OdfVtkMapper2D::SetDefaultProperties(DataNode *node, BaseRenderer * /*renderer*/, bool /*overwrite*/)
+void mitk::OdfVtkMapper2D::SetDefaultProperties(DataNode *node, BaseRenderer *renderer, bool overwrite)
 {
-  node->SetProperty("ShowMaxNumber", IntProperty::New(500));
-  node->SetProperty("Normalization", OdfNormalizationMethodProperty::New());
+  node->AddProperty("ShowMaxNumber", IntProperty::New(500), renderer, overwrite);
+  node->AddProperty("Normalization", OdfNormalizationMethodProperty::New(), renderer, overwrite);
 
   auto scaleBy = OdfScaleByProperty::New();
   scaleBy->SetScaleByGFA();
-  node->SetProperty("ScaleBy", scaleBy);
+  node->AddProperty("ScaleBy", scaleBy, renderer, overwrite);
 
-  if (dynamic_cast<TensorImage *>(node->GetData()))
-  {
-    node->AddProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", BoolProperty::New(true));
-    node->SetProperty("Scaling", FloatProperty::New(3.0));
-  }
-  else
-  {
-    node->AddProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", BoolProperty::New(false));
-    node->SetProperty("Scaling", FloatProperty::New(1.5));
-  }
+  // Tensors are drawn larger and coloured by their principal direction.
+  const bool isTensorImage = dynamic_cast<TensorImage *>(node->GetData()) != nullptr;
+  node->AddProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", BoolProperty::New(isTensorImage), renderer, overwrite);
+  node->AddProperty("Scaling", FloatProperty::New(isTensorImage ? 3.0 : 1.5), renderer, overwrite);
 
-  node->SetProperty("IndexParam1", FloatProperty::New(2));
-  node->SetProperty("IndexParam2", FloatProperty::New(1));
-  node->SetProperty("visible", BoolProperty::New(true));
-  node->SetProperty("VisibleOdfs_T", BoolProperty::New(false));
-  node->SetProperty("VisibleOdfs_C", BoolProperty::New(false));
-  node->SetProperty("VisibleOdfs_S", BoolProperty::New(false));
-  node->SetProperty("layer", IntProperty::New(100));
-  node->SetProperty("DoRefresh", BoolProperty::New(true));
-  node->AddProperty("DiffusionCore.Rendering.OdfVtkMapper.SwitchTensorView", BoolProperty::New(true));
-  node->AddProperty("DiffusionCore.Rendering.OdfVtkMapper.RandomModeBit", BoolProperty::New(true));
+  node->AddProperty("IndexParam1", FloatProperty::New(2), renderer, overwrite);
+  node->AddProperty("IndexParam2", FloatProperty::New(1), renderer, overwrite);
+  node->AddProperty("visible", BoolProperty::New(true), renderer, overwrite);
+  node->AddProperty("VisibleOdfs_T", BoolProperty::New(false), renderer, overwrite);
+  node->AddProperty("VisibleOdfs_C", BoolProperty::New(false), renderer, overwrite);
+  node->AddProperty("VisibleOdfs_S", BoolProperty::New(false), renderer, overwrite);
+  node->AddProperty("layer", IntProperty::New(100), renderer, overwrite);
+  node->AddProperty("DiffusionCore.Rendering.OdfVtkMapper.SwitchTensorView", BoolProperty::New(true), renderer, overwrite);
+  node->AddProperty("DiffusionCore.Rendering.OdfVtkMapper.RandomModeBit", BoolProperty::New(true), renderer, overwrite);
 }
