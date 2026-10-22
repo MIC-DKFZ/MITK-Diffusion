@@ -25,8 +25,11 @@ found in the LICENSE file.
 #include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkOdfMaximaExtractionFilter.h>
+#include <itkShToRgbImageFilter.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 #include <itkTensorToL2NormImageFilter.h>
+
+#include <algorithm>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -43,6 +46,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(PrincipalDirection_MaskOfOtherSize_Throws);
   MITK_TEST(PrincipalDirection_SecondInput_SameAsFreshFilter);
   MITK_TEST(MaximaExtraction_MaskOfOtherSize_Throws);
+  MITK_TEST(ShToRgb_MatchesOdfOfBothConventions);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -276,6 +280,58 @@ public:
     filter->SetInput(coefficients);
     filter->SetMaskImage(MaskLargerThan(coefficients.GetPointer()));
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  using RgbaImageType = itk::Image<itk::RGBAPixel<unsigned char>, 3>;
+
+  static RgbaImageType::Pointer ShToRgb(itk::Image<itk::Vector<float, 15>, 3> *coefficients, mitk::ShImage::SH_CONVENTION convention, unsigned int workUnits)
+  {
+    auto filter = itk::ShToRgbImageFilter<itk::Image<itk::Vector<float, 15>, 3>, 4>::New();
+    filter->SetInput(coefficients);
+    filter->SetShConvention(convention);
+    filter->SetNumberOfWorkUnits(workUnits);
+    filter->Update();
+    return filter->GetOutput();
+  }
+
+  // Each work unit used to reallocate the shared output and recompute the SH basis; the colour of
+  // each voxel is its ODF's principal direction times GFA, in the image's SH convention.
+  void ShToRgb_MatchesOdfOfBothConventions()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto coefficients = mitk::convert::GetItkShFromShImage<15>(shImage.GetPointer());
+
+    for (auto convention : {mitk::ShImage::MRTRIX, mitk::ShImage::FSL})
+    {
+      auto rgbSingle = ShToRgb(coefficients, convention, 1);
+      auto rgbMulti = ShToRgb(coefficients, convention, 8);
+
+      shImage->SetShConvention(convention);
+      auto odfs = mitk::convert::GetItkOdfFromShImage(shImage.GetPointer());
+
+      CPPUNIT_ASSERT(rgbMulti->GetLargestPossibleRegion() == coefficients->GetLargestPossibleRegion());
+      itk::ImageRegionConstIterator<RgbaImageType> itSingle(rgbSingle, rgbSingle->GetLargestPossibleRegion());
+      itk::ImageRegionConstIterator<RgbaImageType> itMulti(rgbMulti, rgbMulti->GetLargestPossibleRegion());
+      itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> itOdf(odfs, odfs->GetLargestPossibleRegion());
+      unsigned int coloured = 0;
+      for (; !itSingle.IsAtEnd(); ++itSingle, ++itMulti, ++itOdf)
+      {
+        CPPUNIT_ASSERT(itSingle.Get() == itMulti.Get());
+
+        itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE> odf;
+        for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+          odf[i] = itOdf.Get()[i];
+        const int pd = odf.GetPrincipalDiffusionDirectionIndex();
+        const auto dir = pd == -1 ? vnl_vector_fixed<double, 3>(0.0) : odf.GetDirection(pd);
+        const double gfa = std::clamp<double>(odf.GetGeneralizedFractionalAnisotropy(), 0, 1);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(std::clamp(std::fabs(dir[0]) * gfa, 0.0, 1.0) * 255, itSingle.Get().GetRed(), 1.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(std::clamp(std::fabs(dir[2]) * gfa, 0.0, 1.0) * 255, itSingle.Get().GetBlue(), 1.0);
+        if (itSingle.Get().GetAlpha() > 0)
+          ++coloured;
+      }
+      CPPUNIT_ASSERT(coloured > 0);
+    }
   }
 
   // The 4D peak image takes the tensor image's geometry; its fourth origin component was left

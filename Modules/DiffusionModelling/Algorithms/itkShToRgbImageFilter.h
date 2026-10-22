@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkShImage.h>
 #include <itkPointShell.h>
+#include <memory>
 
 namespace itk
 {
@@ -83,17 +84,19 @@ protected:
   ~ShToRgbImageFilter() override{}
 
   mitk::ShImage::SH_CONVENTION m_ShConvention = mitk::ShImage::SH_CONVENTION::MRTRIX;
+  vnl_matrix<float> m_ShBasis;
+
+  /** The SH basis is the same for all work units; ITK has allocated the output already. */
+  void BeforeThreadedGenerateData() override
+  {
+    const std::unique_ptr<vnl_matrix_fixed<double, 3, ODF_SAMPLING_SIZE>> directions(itk::PointShell<ODF_SAMPLING_SIZE, vnl_matrix_fixed<double, 3, ODF_SAMPLING_SIZE> >::DistributePointShell());
+    m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, directions->as_matrix(), m_ShConvention == mitk::ShImage::SH_CONVENTION::MRTRIX);
+  }
 
   void DynamicThreadedGenerateData( const typename OutputImageType::RegionType &outputRegionForThread) override
   {
     typename InputImageType::Pointer coeff_image = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
     typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
-
-    outputImage->SetSpacing( coeff_image->GetSpacing() );   // Set the image spacing
-    outputImage->SetOrigin( coeff_image->GetOrigin() );     // Set the image origin
-    outputImage->SetDirection( coeff_image->GetDirection() );  // Set the image direction
-    outputImage->SetRegions( coeff_image->GetLargestPossibleRegion());
-    outputImage->Allocate();
 
     typedef ImageRegionConstIterator< InputImageType > OdfImageIteratorType;
     OdfImageIteratorType it(coeff_image, outputRegionForThread);
@@ -105,7 +108,6 @@ protected:
     oit.GoToBegin();
 
     typedef itk::OrientationDistributionFunction<float,ODF_SAMPLING_SIZE> OdfType;
-    vnl_matrix<float> sh2Basis =  mitk::sh::CalcShBasisForDirections(ShOrder, itk::PointShell<ODF_SAMPLING_SIZE, vnl_matrix_fixed<double, 3, ODF_SAMPLING_SIZE> >::DistributePointShell()->as_matrix(), m_ShConvention);
 
     while(!it.IsAtEnd() && !oit.IsAtEnd())
     {
@@ -115,7 +117,7 @@ protected:
       vnl_vector< float > coeffs(x.GetNumberOfComponents());
       for(unsigned int i=0; i<x.GetNumberOfComponents(); i++)
         coeffs[i] = (float)x[i];
-      odf_vals = ( sh2Basis * coeffs ).data_block();
+      odf_vals = ( m_ShBasis * coeffs ).data_block();
 
       OdfType odf;
       for(int i=0; i<ODF_SAMPLING_SIZE; i++)
