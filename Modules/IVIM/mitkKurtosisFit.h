@@ -71,7 +71,8 @@ namespace mitk::kurtosis
     /** Throws mitk::Exception as VerifyConfiguration. */
     VoxelFitter(const vnl_vector<double>& bValues, const FitConfiguration& configuration);
 
-    /** The fit FitVoxel gives for the signal. */
+    /** The fit FitVoxel gives for the signal. Throws mitk::Exception when the signal does not have
+        one value per b-value. */
     VoxelFit Fit(const vnl_vector<double>& signal);
 
   private:
@@ -84,7 +85,8 @@ namespace mitk::kurtosis
 
   /** Fits the signal of one voxel, all volumes in the order of bValues. A voxel without signal,
       with fewer usable measurements than parameters or whose fit fails gets D = K = 0 (and fitted
-      S0 = 0). Stateless and thread-safe; throws mitk::Exception as VerifyConfiguration. */
+      S0 = 0). Stateless and thread-safe; throws mitk::Exception as VerifyConfiguration and
+      VoxelFitter::Fit. */
   MITKIVIM_EXPORT VoxelFit FitVoxel(const vnl_vector<double>& signal,
                                     const vnl_vector<double>& bValues,
                                     const FitConfiguration& configuration);

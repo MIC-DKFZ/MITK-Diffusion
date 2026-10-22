@@ -15,6 +15,7 @@ found in the LICENSE file.
 
 #include <itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h>
 #include <mitkDiffusionSignalSampling.h>
+#include <mitkException.h>
 
 #include "mitkIvimTestHelpers.h"
 
@@ -41,6 +42,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(FitVoxel_SignalThreshold_FitInputsAndMapValues);
   MITK_TEST(Fwe_MultiThreaded_SameAsSingleThreaded);
   MITK_TEST(VoxelFitter_ReusedForVoxels_SameAsFitVoxel);
+  MITK_TEST(FitVoxel_SignalOfOtherLength_Throws);
   MITK_TEST(ComputeMaps_Fwe_SameAsFilterWithDwiGeometry);
   MITK_TEST(Map_Mask_FitsOnlyInside);
   MITK_TEST(Update_MaskOfOtherSize_Throws);
@@ -429,6 +431,16 @@ public:
         CPPUNIT_ASSERT(expected.secondFitBValues == actual.secondFitBValues);
         CPPUNIT_ASSERT(expected.secondFitMeasurements == actual.secondFitMeasurements);
       }
+    }
+  }
+
+  void FitVoxel_SignalOfOtherLength_Throws()
+  {
+    const auto protocol = mitk::ivim::MakeProtocol(MakeGradients(m_BValues, 1000), 1000);
+    for (auto size : {m_BValues.size() - 1, m_BValues.size() + 1})
+    {
+      const vnl_vector<double> signal(size, 100.0);
+      CPPUNIT_ASSERT_THROW(mitk::ivim::FitVoxel(signal, protocol, MakeParameters(Method::FitAll)), mitk::Exception);
     }
   }
 

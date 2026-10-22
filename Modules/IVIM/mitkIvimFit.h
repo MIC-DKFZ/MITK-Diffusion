@@ -101,7 +101,8 @@ namespace mitk::ivim
   public:
     VoxelFitter(const Protocol& protocol, const FitParameters& parameters);
 
-    /** The parameters FitVoxel gives for the signal. */
+    /** The parameters FitVoxel gives for the signal. Throws mitk::Exception when the signal does not
+        have one value per volume of the protocol. */
     ModelParameters Fit(const vnl_vector<double>& signal);
 
     /** The last fit with copies of the measurements it used. */
@@ -128,7 +129,8 @@ namespace mitk::ivim
   };
 
   /** Fits the signal of one voxel, all volumes of the DWI in their order. A voxel without baseline
-      signal or with too few measurements above the thresholds gets 0. Stateless and thread-safe. */
+      signal or with too few measurements above the thresholds gets 0. Stateless and thread-safe;
+      throws mitk::Exception as VoxelFitter::Fit. */
   MITKIVIM_EXPORT VoxelFit FitVoxel(const vnl_vector<double>& signal,
                                     const Protocol& protocol,
                                     const FitParameters& parameters);

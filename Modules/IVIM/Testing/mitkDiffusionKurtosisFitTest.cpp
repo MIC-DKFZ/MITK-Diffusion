@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itkDiffusionKurtosisReconstructionImageFilter.h>
+#include <mitkException.h>
 
 #include "mitkIvimTestHelpers.h"
 
@@ -46,6 +47,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(MapLog_ZeroMeasurement_LeftOut);
   MITK_TEST(Map_NoSignal_Zero);
   MITK_TEST(VoxelFitter_ReusedForVoxels_SameAsFitVoxel);
+  MITK_TEST(FitVoxel_SignalOfOtherLength_Throws);
   MITK_TEST(Map_Mask_FitsOnlyInside);
   MITK_TEST(Update_MaskOfOtherSize_Throws);
   MITK_TEST(Update_MaskWithOtherOrigin_Throws);
@@ -475,6 +477,16 @@ public:
           CPPUNIT_ASSERT_EQUAL(expected.fittedBZero, actual.fittedBZero);
         }
       }
+    }
+  }
+
+  void FitVoxel_SignalOfOtherLength_Throws()
+  {
+    const vnl_vector<double> bValues(m_BValues.data(), m_BValues.size());
+    for (auto size : {m_BValues.size() - 1, m_BValues.size() + 1})
+    {
+      const vnl_vector<double> signal(size, 100.0);
+      CPPUNIT_ASSERT_THROW(mitk::kurtosis::FitVoxel(signal, bValues, mitk::kurtosis::FitConfiguration{}), mitk::Exception);
     }
   }
 

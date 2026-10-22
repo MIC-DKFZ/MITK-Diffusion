@@ -214,6 +214,10 @@ mitk::kurtosis::VoxelFitter::VoxelFitter(const vnl_vector<double>& bValues, cons
 
 mitk::kurtosis::VoxelFit mitk::kurtosis::VoxelFitter::Fit(const vnl_vector<double>& signal)
 {
+  // The b-values index the signal; the view fits signals of a DWI they were not made from.
+  if (signal.size() != m_BValues.size())
+    mitkThrow() << "The signal has " << signal.size() << " values but there are " << m_BValues.size() << " b-values.";
+
   const auto data = AssembleFitData(signal, m_BValues, m_Configuration, m_Measurements, m_FitBValues);
 
   VoxelFit fit;
