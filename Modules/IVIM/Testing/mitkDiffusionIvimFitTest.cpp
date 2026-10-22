@@ -35,6 +35,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Baselines_Mean_NotTruncated);
   MITK_TEST(Fit_NoBaselineSignal_Zero);
   MITK_TEST(LinearDThenF_OneShellAboveThreshold_DFromThatShell);
+  MITK_TEST(Update_SecondRun_SameSnapshotAndMaps);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float>;
@@ -275,6 +276,26 @@ public:
     CPPUNIT_ASSERT_EQUAL(0.0, maps.f[0]);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-std::log(std::round(signal.back()) / 10000) / 1000, maps.d[0], 1e-8);
     CPPUNIT_ASSERT_EQUAL(0.0, maps.dStar[0]);
+  }
+
+  void Update_SecondRun_SameSnapshotAndMaps()
+  {
+    auto filter = MakeFilter(MakeSyntheticImage(), MakeGradients(m_BValues, 1000), 1000, FilterType::IVIM_D_THEN_DSTAR);
+    filter->Update();
+    auto first = filter->GetSnapshot();
+    auto firstMaps = GetMaps(filter);
+
+    filter->Modified();
+    filter->Update();
+    auto second = filter->GetSnapshot();
+    auto secondMaps = GetMaps(filter);
+
+    CPPUNIT_ASSERT(first.baselineind == second.baselineind);
+    CPPUNIT_ASSERT(first.gradientind == second.gradientind);
+    CPPUNIT_ASSERT(first.high_indices == second.high_indices);
+    CPPUNIT_ASSERT(firstMaps.f == secondMaps.f);
+    CPPUNIT_ASSERT(firstMaps.d == secondMaps.d);
+    CPPUNIT_ASSERT(firstMaps.dStar == secondMaps.dStar);
   }
 };
 

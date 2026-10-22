@@ -86,6 +86,11 @@ void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>
                        << "But its of type: " << gradientImageClassName );
   }
 
+  // the indices of a previous run would be appended to
+  m_Snap.baselineind.clear();
+  m_Snap.gradientind.clear();
+  m_Snap.high_indices.clear();
+
   // Compute the indicies of the baseline images and gradient images
   // If no b=0 mm/s² gradients ar found, the next lowest b-value is used. The b-values are rounded
   // as in the b-value map of the DWI, so all directions of the lowest shell are baselines.
