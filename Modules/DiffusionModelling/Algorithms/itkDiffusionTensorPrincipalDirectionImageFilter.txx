@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionIterator.h"
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
+#include <mitkImageGeometry4D.h>
 
 
 namespace itk {
@@ -74,27 +75,8 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::BeforeThre
   this->SetNthOutput(0, outputImage);
 
 
-  itk::Vector<double, 4> spacing4;
-  itk::Point<double, 4> origin4;
-  itk::Matrix<double, 4, 4> direction4;
-  itk::ImageRegion<4> imageRegion4;
-
-  spacing4[0] = spacing3[0]; spacing4[1] = spacing3[1]; spacing4[2] = spacing3[2]; spacing4[3] = 1;
-  origin4[0] = origin3[0]; origin4[1] = origin3[1]; origin4[2] = origin3[2]; origin4[3] = 0;
-  for (int r=0; r<3; r++)
-    for (int c=0; c<3; c++)
-      direction4[r][c] = direction3[r][c];
-  direction4[3][3] = 1;
-  imageRegion4.SetSize(0, imageRegion3.GetSize()[0]);
-  imageRegion4.SetSize(1, imageRegion3.GetSize()[1]);
-  imageRegion4.SetSize(2, imageRegion3.GetSize()[2]);
-  imageRegion4.SetSize(3, 3);
-
   m_PeakImage = PeakImageType::New();
-  m_PeakImage->SetSpacing( spacing4 );
-  m_PeakImage->SetOrigin( origin4 );
-  m_PeakImage->SetDirection( direction4 );
-  m_PeakImage->SetRegions( imageRegion4 );
+  mitk::CopyGeometryTo4D(inputImagePointer, m_PeakImage, 3);
   m_PeakImage->Allocate();
   m_PeakImage->FillBuffer(0.0);
 }

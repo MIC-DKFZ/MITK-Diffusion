@@ -96,6 +96,7 @@ set(H_FILES
   Algorithms/itkOdfToRgbImageFilter.h
   Algorithms/itkShToRgbImageFilter.h
   Algorithms/mitkDirectionColor.h
+  Algorithms/mitkImageGeometry4D.h
   Algorithms/itkDiffusionTensorPrincipalDirectionImageFilter.h
   Algorithms/itkTensorReconstructionWithEigenvalueCorrectionFilter.h
   Algorithms/itkShCoefficientImageImporter.h

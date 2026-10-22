@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkShCoefficientImageImporter.h"
 #include <itkImageRegionIterator.h>
-#include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkImageGeometry4D.h>
 
 namespace itk {
 
@@ -42,34 +42,12 @@ void ShCoefficientImageImporter< PixelType, ShOrder >
   if (m_InputImage->GetLargestPossibleRegion().GetSize(3) != CoefficientImageType::PixelType::Dimension)
     itkExceptionMacro(<< "The image has " << m_InputImage->GetLargestPossibleRegion().GetSize(3) << " volumes, SH order " << ShOrder << " has " << CoefficientImageType::PixelType::Dimension << " coefficients.");
 
-  Vector<double, 4> spacing4 = m_InputImage->GetSpacing();
-  Point<double, 4> origin4 = m_InputImage->GetOrigin();
-  Matrix<double, 4, 4> direction4 = m_InputImage->GetDirection();
-  ImageRegion<4> imageRegion4 = m_InputImage->GetLargestPossibleRegion();
-
-  Vector<double, 3> spacing3;
-  Point<double, 3> origin3;
-  Matrix<double, 3, 3> direction3;
-  ImageRegion<3> imageRegion3;
-
-  spacing3[0] = spacing4[0]; spacing3[1] = spacing4[1]; spacing3[2] = spacing4[2];
-  origin3[0] = origin4[0]; origin3[1] = origin4[1]; origin3[2] = origin4[2];
-  for (int r=0; r<3; r++)
-    for (int c=0; c<3; c++)
-      direction3[r][c] = direction4[r][c];
-  imageRegion3.SetSize(0, imageRegion4.GetSize()[0]);
-  imageRegion3.SetSize(1, imageRegion4.GetSize()[1]);
-  imageRegion3.SetSize(2, imageRegion4.GetSize()[2]);
-
+  const ImageRegion<4> imageRegion4 = m_InputImage->GetLargestPossibleRegion();
   m_CoefficientImage = CoefficientImageType::New();
-  m_CoefficientImage->SetSpacing( spacing3 );
-  m_CoefficientImage->SetOrigin( origin3 );
-  m_CoefficientImage->SetDirection( direction3 );
-  m_CoefficientImage->SetRegions( imageRegion3 );
+  mitk::CopyGeometryTo3D(m_InputImage, m_CoefficientImage);
   m_CoefficientImage->Allocate();
-  Vector< PixelType, (ShOrder*ShOrder + ShOrder + 2)/2 + ShOrder > nullVec2; nullVec2.Fill(0.0);
-  m_CoefficientImage->FillBuffer(nullVec2);
 
+  const auto start = imageRegion4.GetIndex();
   int x = imageRegion4.GetSize(0);
   int y = imageRegion4.GetSize(1);
   int z = imageRegion4.GetSize(2);
@@ -85,19 +63,19 @@ void ShCoefficientImageImporter< PixelType, ShOrder >
       for (int c=0; c<z; c++)
       {
         typename InputImageType::IndexType index;
-        index.SetElement(0,a);
-        index.SetElement(1,b);
-        index.SetElement(2,c);
+        index.SetElement(0,start[0]+a);
+        index.SetElement(1,start[1]+b);
+        index.SetElement(2,start[2]+c);
         typename CoefficientImageType::PixelType pix;
         for (int d=0; d<numCoeffs; d++)
         {
-          index.SetElement(3,d);
+          index.SetElement(3,start[3]+d);
           pix[d] = m_InputImage->GetPixel(index);
         }
         typename CoefficientImageType::IndexType index2;
-        index2.SetElement(0,a);
-        index2.SetElement(1,b);
-        index2.SetElement(2,c);
+        index2.SetElement(0,start[0]+a);
+        index2.SetElement(1,start[1]+b);
+        index2.SetElement(2,start[2]+c);
         m_CoefficientImage->SetPixel(index2, pix);
       }
 }
