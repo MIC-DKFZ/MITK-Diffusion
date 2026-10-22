@@ -44,23 +44,25 @@ int vtkOdfSource::RequestData(
   // get the ouptut
   vtkPolyData *output = vtkPolyData::SafeDownCast(outInfo->Get(vtkDataObject::DATA_OBJECT()));
 
+  // Normalized copies; the input Odf stays as set, so that another normalization can be applied to it.
+  OdfType odf = Odf;
   OdfType colorOdf;
   switch(Normalization)
   {
   case mitk::ODFN_MINMAX:
-    Odf = Odf.MinMaxNormalize();
-    colorOdf = Odf;
+    odf = Odf.MinMaxNormalize();
+    colorOdf = odf;
     break;
   case mitk::ODFN_MAX:
-    Odf = Odf.MaxNormalize();
-    colorOdf = Odf;
+    odf = Odf.MaxNormalize();
+    colorOdf = odf;
     break;
   case mitk::ODFN_NONE:
     colorOdf = Odf.MaxNormalize();
     break;
   default:
-    Odf = Odf.MaxNormalize();
-    colorOdf = Odf;
+    odf = Odf.MaxNormalize();
+    colorOdf = odf;
   }
 
   vtkCellArray* polys = TemplateOdf->GetPolys();
@@ -71,7 +73,7 @@ int vtkOdfSource::RequestData(
   newPoints->Reserve(numPoints);
 
   vtkSmartPointer<vtkUnsignedCharArray> point_colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  point_colors->ReserveValues(output->GetNumberOfPoints() * 4);
+  point_colors->ReserveValues(numPoints * 4);
   point_colors->SetNumberOfComponents(4);
   point_colors->SetName("ODF_COLORS");
   unsigned char rgba[4];
@@ -81,7 +83,7 @@ int vtkOdfSource::RequestData(
   {
     double p[3];
     TemplateOdf->GetPoints()->GetPoint(j,p);
-    double val = Odf.GetElement(j);
+    double val = odf.GetElement(j);
     p[0] *= val*Scale*AdditionalScale*0.5;
     p[1] *= val*Scale*AdditionalScale*0.5;
     p[2] *= val*Scale*AdditionalScale*0.5;

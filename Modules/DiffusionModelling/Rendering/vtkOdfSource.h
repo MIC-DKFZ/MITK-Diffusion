@@ -56,9 +56,13 @@ public:
 
   void SetColor(int r, int g, int b)
   {
-    this->r = r;
-    this->g = g;
-    this->b = b;
+    if (this->r != r || this->g != g || this->b != b)
+    {
+      this->r = r;
+      this->g = g;
+      this->b = b;
+      this->Modified();
+    }
   }
 
 protected:
@@ -70,8 +74,8 @@ protected:
 
   OdfType Odf;
   double  Scale;
-  double  AdditionalScale;
-  int     Normalization;
+  double  AdditionalScale = 1;
+  int     Normalization = mitk::ODFN_MAX;
   int r;
   int g;
   int b;

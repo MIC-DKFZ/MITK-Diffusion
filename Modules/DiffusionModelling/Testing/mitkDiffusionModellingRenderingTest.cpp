@@ -14,12 +14,14 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <vtkMaskedProgrammableGlyphFilter.h>
+#include <vtkOdfSource.h>
 #include <vtkThickPlane.h>
 
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkSmartPointer.h>
 
+#include <cmath>
 #include <vector>
 
 /**
@@ -31,6 +33,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphFilter_NoGlyphsAllowed_NoCrash);
   MITK_TEST(GlyphFilter_Striding_SpreadsOverInput);
   MITK_TEST(ThickPlane_SettersApplyAndModify);
+  MITK_TEST(OdfSource_KeepsInputAndUsesDefaults);
   CPPUNIT_TEST_SUITE_END();
 
   static std::vector<double> s_GlyphPositions;
@@ -100,6 +103,33 @@ public:
     plane->SetThickness(3);
     CPPUNIT_ASSERT(plane->GetMTime() > mtime);
     CPPUNIT_ASSERT_EQUAL(3.0, plane->GetThickness());
+  }
+
+  // The source overwrote its input ODF with the normalized one, AdditionalScale was uninitialized
+  // and SetColor did not mark the source as modified.
+  void OdfSource_KeepsInputAndUsesDefaults()
+  {
+    vtkOdfSource::OdfType odf;
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      odf[i] = 2 + (i % 2);
+
+    auto source = vtkSmartPointer<vtkOdfSource>::New();
+    source->SetOdf(odf);
+    source->SetNormalization(mitk::ODFN_MINMAX);
+    source->Update();
+    CPPUNIT_ASSERT_EQUAL(3.0f, source->GetOdf()[1]);
+    CPPUNIT_ASSERT_EQUAL(1.0, source->GetAdditionalScale());
+
+    // Min-max normalized values are 0 and 1; glyph points lie at 0.5 * value * scale.
+    vtkPoints *points = source->GetOutput()->GetPoints();
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(ODF_SAMPLING_SIZE), points->GetNumberOfPoints());
+    double p[3];
+    points->GetPoint(1, p);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, std::sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]), 1e-6);
+
+    const auto mtime = source->GetMTime();
+    source->SetColor(10, 20, 30);
+    CPPUNIT_ASSERT(source->GetMTime() > mtime);
   }
 };
 
