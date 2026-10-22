@@ -45,7 +45,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVectorIndexSelectionCastImageFilter.h>
 
 // itk/mitk
-#include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h"
+#include <mitkDiffusionSignalSampling.h>
 #include "mitkImageCast.h"
 #include <mitkImageStatisticsHolder.h>
 #include <mitkNodePredicateIsDWI.h>
@@ -387,90 +387,67 @@ void QmitkIVIMView::AutoThreshold()
 
 void QmitkIVIMView::FittIVIMStart()
 {
-  if (m_Controls->m_DwiBox->GetSelectedNode().IsNull())
+  auto dwiNode = m_Controls->m_DwiBox->GetSelectedNode();
+  if (dwiNode.IsNull())
   {
     QMessageBox::information( nullptr, "IVIM", "No valid diffusion-weighted image selected.");
     return;
   }
-  mitk::Image* img = dynamic_cast<mitk::Image*>(m_Controls->m_DwiBox->GetSelectedNode()->GetData());
+  const auto* dwi = dynamic_cast<mitk::Image*>(dwiNode->GetData());
 
-
-  VecImgType::Pointer vecimg = VecImgType::New();
-  mitk::CastToItkImage(img, vecimg);
-
-  if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
+  try
   {
-    // KURTOSIS
-    KurtosisFilterType::Pointer filter = KurtosisFilterType::New();
-    filter->SetInput(vecimg);
-    filter->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(img));
-    filter->SetGradientDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(img));
-    filter->SetSmoothingVariance( m_Controls->m_SigmaSpinBox->value() );
-    filter->SetFitConfiguration( this->GetKurtosisFitConfiguration() );
-
-    if( m_Controls->m_MaskBox->GetSelectedNode().IsNotNull() )
+    if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
     {
-      mitk::Image::Pointer maskImg = dynamic_cast<mitk::Image*>(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
-      typedef itk::Image<short, 3> MaskImgType;
+      const mitk::Image* mask = nullptr;
+      if (m_Controls->m_MaskBox->GetSelectedNode().IsNotNull())
+        mask = dynamic_cast<mitk::Image*>(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
 
-      MaskImgType::Pointer maskItk;
-      CastToItkImage( maskImg, maskItk );
-
-      filter->SetImageMask( maskItk );
+      const auto maps = mitk::kurtosis::ComputeMaps(dwi, mask, this->GetKurtosisFitConfiguration(), m_Controls->m_SigmaSpinBox->value());
+      const QString method = "_Method-" + m_Controls->m_KurtosisFitScale->currentText();
+      if (m_Controls->m_CheckKurtD->isChecked())
+        this->AddMapNode(maps.d, "Kurtosis_DMap" + method, std::nullopt, dwiNode);
+      if (m_Controls->m_CheckKurtK->isChecked())
+        this->AddMapNode(maps.k, "Kurtosis_KMap" + method, std::nullopt, dwiNode);
     }
-
-    try
+    else
     {
-      filter->Update();
+      const auto maps = mitk::ivim::ComputeMaps(dwi, this->GetIvimFitParameters());
+      const QString method = QString::number(m_Controls->m_MethodCombo->currentIndex() + 1);
+      if (m_Controls->m_CheckDStar->isChecked())
+        this->AddMapNode(maps.dStar, "D* Fit-" + method, 0.2, dwiNode);
+      if (m_Controls->m_CheckD->isChecked())
+        this->AddMapNode(maps.d, "D Fit-" + method, 0.003, dwiNode);
+      if (m_Controls->m_Checkf->isChecked())
+        this->AddMapNode(maps.f, "f Fit-" + method, 1, dwiNode);
     }
-    catch (const itk::ExceptionObject& e)
-    {
-      QMessageBox::warning( nullptr, "Kurtosis fit", QString("Kurtosis fit failed: ") + e.GetDescription() );
-      return;
-    }
-
-    mitk::LookupTable::Pointer kurt_map_lut = mitk::LookupTable::New();
-    kurt_map_lut->SetType( mitk::LookupTable::JET );
-    mitk::LookupTableProperty::Pointer kurt_lut_prop =
-        mitk::LookupTableProperty::New();
-    kurt_lut_prop->SetLookupTable( kurt_map_lut );
-
-    mitk::Image::Pointer dimage = mitk::Image::New();
-    dimage->InitializeByItk( filter->GetOutput(0) );
-    dimage->SetVolume( filter->GetOutput(0)->GetBufferPointer());
-
-    mitk::Image::Pointer kimage = mitk::Image::New();
-    kimage->InitializeByItk( filter->GetOutput(1) );
-    kimage->SetVolume( filter->GetOutput(1)->GetBufferPointer());
-
-    QString new_dname = "Kurtosis_DMap";
-    new_dname.append("_Method-"+m_Controls->m_KurtosisFitScale->currentText());
-    QString new_kname = "Kurtosis_KMap";
-    new_kname.append("_Method-"+m_Controls->m_KurtosisFitScale->currentText());
-
-    if( m_Controls->m_CheckKurtD->isChecked() )
-    {
-      mitk::DataNode::Pointer dnode = mitk::DataNode::New();
-      dnode->SetData( dimage );
-      dnode->SetName(new_dname.toLatin1());
-      dnode->SetProperty("LookupTable", kurt_lut_prop );
-      GetDataStorage()->Add(dnode, m_Controls->m_DwiBox->GetSelectedNode());
-    }
-
-    if( m_Controls->m_CheckKurtK->isChecked() )
-    {
-      mitk::DataNode::Pointer knode = mitk::DataNode::New();
-      knode->SetData( kimage );
-      knode->SetName(new_kname.toLatin1());
-      knode->SetProperty("LookupTable", kurt_lut_prop );
-      GetDataStorage()->Add(knode, m_Controls->m_DwiBox->GetSelectedNode());
-    }
-
   }
-  else
+  catch (const itk::ExceptionObject& e)
   {
-    ComputeIvimMaps(vecimg, mitk::DiffusionPropertyHelper::GetGradientContainer(img), mitk::DiffusionPropertyHelper::GetReferenceBValue(img));
+    QMessageBox::warning( nullptr, "IVIM", QString("Fit failed: ") + e.GetDescription() );
+    return;
   }
+
+  if (this->GetRenderWindowPart())
+    this->GetRenderWindowPart()->RequestUpdate();
+}
+
+void QmitkIVIMView::AddMapNode(mitk::Image* map, const QString& name, std::optional<double> levelWindowMax, mitk::DataNode* parent)
+{
+  auto lut = mitk::LookupTable::New();
+  lut->SetType(mitk::LookupTable::JET);
+
+  auto node = mitk::DataNode::New();
+  node->SetData(map);
+  node->SetName(name.toStdString());
+  node->SetProperty("LookupTable", mitk::LookupTableProperty::New(lut));
+  if (levelWindowMax)
+  {
+    mitk::LevelWindow levelWindow;
+    levelWindow.SetRangeMinMax(0, *levelWindowMax);
+    node->SetProperty("levelwindow", mitk::LevelWindowProperty::New(levelWindow));
+  }
+  this->GetDataStorage()->Add(node, parent);
 }
 
 void QmitkIVIMView::OnKurtosisParamsChanged()
@@ -502,179 +479,44 @@ void QmitkIVIMView::OnSliceChanged()
     m_ListenerActive = true;
   }
 
-  VecImgType::Pointer vecimg = VecImgType::New();
-  mitk::CastToItkImage(diffusionImg, vecimg);
-
-  VecImgType::Pointer roiImage = VecImgType::New();
-
+  vnl_vector<double> signal;
   if(maskImg.IsNull())
   {
-    int roisize = 0;
-
-    mitk::Point3D pos = this->GetRenderWindowPart()->GetSelectedPosition();
-
-    VecImgType::IndexType crosspos;
-    diffusionImg->GetGeometry()->WorldToIndex(pos, crosspos);
-    if (!vecimg->GetLargestPossibleRegion().IsInside(crosspos))
+    const auto voxelSignal = mitk::GetDiffusionSignal(diffusionImg, this->GetRenderWindowPart()->GetSelectedPosition());
+    if (!voxelSignal)
     {
       m_Controls->m_Warning->setText(QString("Crosshair position not inside of selected diffusion weighted image. Reinit needed!"));
       m_Controls->m_Warning->setVisible(true);
       return;
     }
-    else
-      m_Controls->m_Warning->setVisible(false);
-
-    VecImgType::IndexType index;
-    index[0] = crosspos[0] - roisize; index[0] = index[0] < 0 ? 0 : index[0];
-    index[1] = crosspos[1] - roisize; index[1] = index[1] < 0 ? 0 : index[1];
-    index[2] = crosspos[2] - roisize; index[2] = index[2] < 0 ? 0 : index[2];
-
-    VecImgType::SizeType size;
-    size[0] = roisize*2+1;
-    size[1] = roisize*2+1;
-    size[2] = roisize*2+1;
-
-    VecImgType::SizeType maxSize = vecimg->GetLargestPossibleRegion().GetSize();
-    size[0] = index[0]+size[0] > maxSize[0] ? maxSize[0]-index[0] : size[0];
-    size[1] = index[1]+size[1] > maxSize[1] ? maxSize[1]-index[1] : size[1];
-    size[2] = index[2]+size[2] > maxSize[2] ? maxSize[2]-index[2] : size[2];
-
-    VecImgType::RegionType region;
-    region.SetSize( size );
-    region.SetIndex( index );
-    vecimg->SetRequestedRegion( region );
-
-    VecImgType::IndexType  newstart;
-    newstart.Fill(0);
-
-    VecImgType::RegionType newregion;
-    newregion.SetSize( size );
-    newregion.SetIndex( newstart );
-
-    roiImage->CopyInformation( vecimg );
-    roiImage->SetRegions( newregion );
-    roiImage->SetOrigin( pos );
-    roiImage->Allocate();
-//    roiImage->SetPixel(newstart, vecimg->GetPixel(index));
-
-    typedef itk::ImageRegionIterator<VecImgType> VectorIteratorType;
-    VectorIteratorType vecit(vecimg, vecimg->GetRequestedRegion() );
-    vecit.GoToBegin();
-
-    typedef itk::ImageRegionIterator<VecImgType> VectorIteratorType;
-    VectorIteratorType vecit2(roiImage, roiImage->GetLargestPossibleRegion() );
-    vecit2.GoToBegin();
-
-    while( !vecit.IsAtEnd() )
-    {
-      vecit2.Set(vecit.Get());
-
-      ++vecit;
-      ++vecit2;
-    }
-
-    if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
-    {
-      FitKurtosisVoxel(roiImage->GetPixel(newstart),
-                       mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                       mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg));
-    }
-    else
-    {
-      FitIvimVoxel(roiImage->GetPixel(newstart),
-                   mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                   mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg));
-    }
+    signal = *voxelSignal;
   }
   else
   {
-    typedef itk::Image<float,3> MaskImgType;
-
-    MaskImgType::Pointer maskItk;
-    CastToItkImage( maskImg, maskItk );
-
-    mitk::Point3D pos;
-    pos[0] = 0;
-    pos[1] = 0;
-    pos[2] = 0;
-
-    VecImgType::IndexType index;
-    index[0] = 0;
-    index[1] = 0;
-    index[2] = 0;
-
-    VecImgType::SizeType size;
-    size[0] = 1;
-    size[1] = 1;
-    size[2] = 1;
-
-    VecImgType::RegionType region;
-    region.SetSize( size );
-    region.SetIndex( index );
-    vecimg->SetRequestedRegion( region );
-
-    // iterators over output and input
-    itk::ImageRegionConstIteratorWithIndex<VecImgType>
-        vecit(vecimg, vecimg->GetLargestPossibleRegion());
-
-    itk::VariableLengthVector<double> avg(vecimg->GetVectorLength());
-    avg.Fill(0);
-
-    float numPixels = 0;
-    while ( ! vecit.IsAtEnd() )
-    {
-      VecImgType::PointType point;
-      vecimg->TransformIndexToPhysicalPoint(vecit.GetIndex(), point);
-
-      MaskImgType::IndexType index;
-
-      if(maskItk->TransformPhysicalPointToIndex(point, index) && maskItk->GetPixel(index) != 0)
-      {
-        avg += vecit.Get();
-        numPixels += 1.0;
-      }
-
-      // update iterators
-      ++vecit;
-
-    }
-
-    if (numPixels == 0)
+    // The mean is fitted in double, not rounded to the pixel type of the DWI.
+    const auto roi = mitk::AverageDiffusionSignalInMask(diffusionImg, maskImg);
+    if (roi.numberOfVoxels == 0)
     {
       m_Controls->m_Warning->setText(QString("The mask does not overlap the diffusion-weighted image."));
       m_Controls->m_Warning->setVisible(true);
       return;
     }
 
-    avg /= numPixels;
-
-    m_Controls->m_Warning->setText(QString("Averaging ")+QString::number((int)numPixels)+QString(" voxels!"));
+    m_Controls->m_Warning->setText(QString("Averaging ")+QString::number(roi.numberOfVoxels)+QString(" voxels!"));
     m_Controls->m_Warning->setVisible(true);
-
-    roiImage->CopyInformation( vecimg );
-    roiImage->SetRegions( region );
-    roiImage->SetOrigin( pos );
-    roiImage->Allocate();
-    roiImage->SetPixel(index, avg);
-
-    if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
-    {
-      FitKurtosisVoxel(roiImage->GetPixel(index),
-                       mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                       mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg));
-    }
-    else
-    {
-      FitIvimVoxel(roiImage->GetPixel(index),
-                   mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg),
-                   mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg));
-    }
-
-    // do not update until selection changed, the values will remain the same as long as the mask is selected!
-    m_HoldUpdate = true;
+    signal = roi.mean;
   }
 
-  vecimg->SetRegions( vecimg->GetLargestPossibleRegion() );
+  const auto dirs = mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg);
+  const auto bval = mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg);
+  if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
+    FitKurtosisVoxel(signal, dirs, bval);
+  else
+    FitIvimVoxel(signal, dirs, bval);
+
+  // do not update until selection changed, the values will remain the same as long as the mask is selected!
+  if (maskImg.IsNotNull())
+    m_HoldUpdate = true;
 }
 
 mitk::kurtosis::FitConfiguration QmitkIVIMView::GetKurtosisFitConfiguration() const
@@ -691,11 +533,9 @@ mitk::kurtosis::FitConfiguration QmitkIVIMView::GetKurtosisFitConfiguration() co
   return configuration;
 }
 
-void QmitkIVIMView::FitKurtosisVoxel(const VecImgType::PixelType& pixel, DirContainerType::ConstPointer dirs, float bval)
+void QmitkIVIMView::FitKurtosisVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, float bval)
 {
-  m_KurtosisMeasurements.set_size(pixel.GetSize());
-  for (unsigned int i = 0; i < m_KurtosisMeasurements.size(); ++i)
-    m_KurtosisMeasurements[i] = pixel[i];
+  m_KurtosisMeasurements = signal;
 
   try
   {
@@ -754,15 +594,11 @@ mitk::ivim::FitParameters QmitkIVIMView::GetIvimFitParameters() const
   return parameters;
 }
 
-void QmitkIVIMView::FitIvimVoxel(const VecImgType::PixelType& pixel, DirContainerType::ConstPointer dirs, float bval)
+void QmitkIVIMView::FitIvimVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, float bval)
 {
   // The preview always shows D*, also when no D* map is generated.
   auto parameters = this->GetIvimFitParameters();
   parameters.fitDStar = true;
-
-  vnl_vector<double> signal(pixel.GetSize());
-  for (unsigned int i = 0; i < signal.size(); ++i)
-    signal[i] = pixel[i];
 
   try
   {
@@ -818,103 +654,6 @@ void QmitkIVIMView::FitIvimVoxel(const VecImgType::PixelType& pixel, DirContaine
     RemoveSecondFitPlot();
   }
   m_Controls->m_ChartWidget->Replot();
-}
-
-void QmitkIVIMView::ComputeIvimMaps(VecImgType* vecimg, DirContainerType::ConstPointer dirs, float bval)
-{
-  IVIMFilterType::Pointer filter = IVIMFilterType::New();
-  filter->SetInput(vecimg);
-  filter->SetGradientDirections(dirs);
-  filter->SetBValue(bval);
-  filter->SetFitParameters(this->GetIvimFitParameters());
-
-  try
-  {
-    filter->Update();
-  }
-  catch (const itk::ExceptionObject& ex)
-  {
-    MITK_INFO << ex;
-    m_Controls->m_Warning->setText(QString("IVIM fit not possible: ") + ex.GetDescription());
-    m_Controls->m_Warning->setVisible(true);
-    return;
-  }
-
-  m_fMap = filter->GetOutput(0);
-  m_DMap = filter->GetOutput(1);
-  m_DStarMap = filter->GetOutput(2);
-  this->OutputToDatastorage(m_Controls->m_DwiBox->GetSelectedNode());
-}
-
-void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
-{
-  mitk::LookupTable::Pointer lut = mitk::LookupTable::New();
-  lut->SetType( mitk::LookupTable::JET );
-  mitk::LookupTableProperty::Pointer lut_prop = mitk::LookupTableProperty::New();
-  lut_prop->SetLookupTable( lut );
-
-  if(m_Controls->m_CheckDStar->isChecked())
-  {
-    mitk::Image::Pointer dstarimage = mitk::Image::New();
-    dstarimage->InitializeByItk(m_DStarMap.GetPointer());
-    dstarimage->SetVolume(m_DStarMap->GetBufferPointer());
-    QString newname2 = ""; newname2 = newname2.append("D* Fit-%1").arg(m_Controls->m_MethodCombo->currentIndex()+1);
-    mitk::DataNode::Pointer node2=mitk::DataNode::New();
-    node2->SetData( dstarimage );
-    node2->SetName(newname2.toLatin1());
-    node2->SetProperty("LookupTable", lut_prop );
-
-    mitk::LevelWindowProperty::Pointer levWinProp = mitk::LevelWindowProperty::New();
-    mitk::LevelWindow levelwindow;
-    levelwindow.SetRangeMinMax(0, 0.2);
-    levWinProp->SetLevelWindow(levelwindow);
-    node2->SetProperty("levelwindow", levWinProp);
-
-    GetDataStorage()->Add(node2, node);
-  }
-
-  if(m_Controls->m_CheckD->isChecked())
-  {
-    mitk::Image::Pointer dimage = mitk::Image::New();
-    dimage->InitializeByItk(m_DMap.GetPointer());
-    dimage->SetVolume(m_DMap->GetBufferPointer());
-    QString newname1 = ""; newname1 = newname1.append("D Fit-%1").arg(m_Controls->m_MethodCombo->currentIndex()+1);
-    mitk::DataNode::Pointer node1=mitk::DataNode::New();
-    node1->SetData( dimage );
-    node1->SetName(newname1.toLatin1());
-    node1->SetProperty("LookupTable", lut_prop );
-
-    mitk::LevelWindowProperty::Pointer levWinProp = mitk::LevelWindowProperty::New();
-    mitk::LevelWindow levelwindow;
-    levelwindow.SetRangeMinMax(0, 0.003);
-    levWinProp->SetLevelWindow(levelwindow);
-    node1->SetProperty("levelwindow", levWinProp);
-
-    GetDataStorage()->Add(node1, node);
-  }
-
-  if(m_Controls->m_Checkf->isChecked())
-  {
-    mitk::Image::Pointer image = mitk::Image::New();
-    image->InitializeByItk(m_fMap.GetPointer());
-    image->SetVolume(m_fMap->GetBufferPointer());
-    QString newname0 = ""; newname0 = newname0.append("f Fit-%1").arg(m_Controls->m_MethodCombo->currentIndex()+1);
-    mitk::DataNode::Pointer node3=mitk::DataNode::New();
-    node3->SetData( image );
-    node3->SetName(newname0.toLatin1());
-    node3->SetProperty("LookupTable", lut_prop );
-
-    mitk::LevelWindowProperty::Pointer levWinProp = mitk::LevelWindowProperty::New();
-    mitk::LevelWindow levelwindow;
-    levelwindow.SetRangeMinMax(0, 1);
-    levWinProp->SetLevelWindow(levelwindow);
-    node3->SetProperty("levelwindow", levWinProp);
-
-    GetDataStorage()->Add(node3, node);
-  }
-
-  if (this->GetRenderWindowPart())
-    this->GetRenderWindowPart()->RequestUpdate();
 }
 
 void QmitkIVIMView::ClipboardCurveButtonClicked()

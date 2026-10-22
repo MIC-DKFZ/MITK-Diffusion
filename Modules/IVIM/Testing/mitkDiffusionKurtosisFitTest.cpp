@@ -53,6 +53,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
   MITK_TEST(TestMulti_Smoothed_MatchRecordedValues);
   MITK_TEST(TestMulti_SmoothingVarianceZero_SameAsNoSmoothing);
+  MITK_TEST(ComputeMaps_TestMultiAppSettings_MatchRecordedValues);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionKurtosisReconstructionImageFilter<short, double>;
@@ -623,6 +624,37 @@ public:
     const auto actual = GetMaps(zeroVarianceFilter);
     CPPUNIT_ASSERT(expected.d == actual.d);
     CPPUNIT_ASSERT(expected.k == actual.k);
+  }
+
+  void ComputeMaps_TestMultiAppSettings_MatchRecordedValues()
+  {
+    // MitkDiffusionKurtosisFit's defaults: smoothing variance 1.5 mm^2, K bounds -1000..1000. The
+    // values are those of TestMulti_Smoothed_MatchRecordedValues.
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    mitk::kurtosis::FitConfiguration configuration;
+    configuration.useKBounds = true;
+    configuration.kLowerBound = -1000;
+    configuration.kUpperBound = 1000;
+
+    const auto maps = mitk::kurtosis::ComputeMaps(dwi.dwi, nullptr, configuration, 1.5);
+    const auto d = Values(maps.d.GetPointer());
+    const auto k = Values(maps.k.GetPointer());
+    const std::size_t center = 5 + 11 * 5 + 121 * 1;
+    AssertClose(0.0009027673453, Mean(d));
+    AssertClose(0.122532678, Mean(k));
+    AssertClose(0.0008759313526, d[center]);
+    AssertClose(0.4594837527, k[center]);
+
+    // The mask restricts the fit, not the smoothing.
+    const itk::Index<3> centerIndex = {{5, 5, 1}};
+    const auto masked = mitk::kurtosis::ComputeMaps(dwi.dwi, mitk::IvimTesting::MakeMask(dwi.image, {centerIndex}), configuration, 1.5);
+    const auto maskedD = Values(masked.d.GetPointer());
+    const auto maskedK = Values(masked.k.GetPointer());
+    for (std::size_t i = 0; i < d.size(); ++i)
+    {
+      CPPUNIT_ASSERT_EQUAL(i == center ? d[i] : 0.0, maskedD[i]);
+      CPPUNIT_ASSERT_EQUAL(i == center ? k[i] : 0.0, maskedK[i]);
+    }
   }
 };
 

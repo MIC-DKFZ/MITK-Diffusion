@@ -14,44 +14,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include "mitkCommandLineParser.h"
-#include <mitkIOUtil.h>
+#include <mitkCommandLineParser.h>
 #include <mitkDiffusionPropertyHelper.h>
-
-#include <mitkImageCaster.h>
-#include <itkDiffusionKurtosisReconstructionImageFilter.h>
-
-#include "mitkImage.h"
-#include <iostream>
-#include <usAny.h>
-#include <fstream>
-#include "mitkIOUtil.h"
-
-#include <itkFileTools.h>
-#include <itksys/SystemTools.hxx>
-
-
-//vnl_includes
-#include "vnl/vnl_math.h"
-#include "vnl/vnl_cost_function.h"
-#include "vnl/vnl_least_squares_function.h"
-#include "vnl/algo/vnl_lbfgsb.h"
-#include "vnl/algo/vnl_lbfgs.h"
-
-#include "vnl/algo/vnl_levenberg_marquardt.h"
-
-typedef mitk::DiffusionPropertyHelper DPH;
-
-#include <itkGaussianBlurImageFunction.h>
-#include <itkUnaryFunctorImageFilter.h>
-
-#include <itkImageFileWriter.h>
-
-#include <itkVectorIndexSelectionCastImageFilter.h>
-#include <itkComposeImageFilter.h>
-#include <itkDiscreteGaussianImageFilter.h>
+#include <mitkIOUtil.h>
+#include <mitkKurtosisFit.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
+#include <usAny.h>
+
+#include <iostream>
+
+using DPH = mitk::DiffusionPropertyHelper;
 
 void KurtosisMapComputation( mitk::Image::Pointer input,
                              std::string output_prefix ,
@@ -61,64 +34,21 @@ void KurtosisMapComputation( mitk::Image::Pointer input,
                              double lower,
                              double upper )
 {
-  DPH::ImageType::Pointer vectorImage = DPH::ImageType::New();
-  mitk::CastToItkImage( input, vectorImage );
-
-  typedef itk::DiffusionKurtosisReconstructionImageFilter< short, double > KurtosisFilterType;
-  KurtosisFilterType::Pointer kurtosis_filter = KurtosisFilterType::New();
-  kurtosis_filter->SetInput( vectorImage );
-  kurtosis_filter->SetReferenceBValue( DPH::GetReferenceBValue( input.GetPointer() ) );
-  kurtosis_filter->SetGradientDirections( DPH::GetGradientContainer( input.GetPointer() ) );
-  kurtosis_filter->SetSmoothingVariance( 1.5 );
+  mitk::Image::Pointer mask;
+  if (!maskPath.empty())
+    mask = mitk::IOUtil::Load<mitk::Image>(maskPath);
 
   mitk::kurtosis::FitConfiguration configuration;
   configuration.omitBZero = omitBZero;
   configuration.useKBounds = true;
   configuration.kLowerBound = -lower;
   configuration.kUpperBound = upper;
-  kurtosis_filter->SetFitConfiguration( configuration );
 
+  // The app has always smoothed its input with this variance (mm^2) before the fit.
+  const auto maps = mitk::kurtosis::ComputeMaps(input, mask, configuration, 1.5);
 
-  if(maskPath != "")
-  {
-    mitk::Image::Pointer segmentation;
-    segmentation = mitk::IOUtil::Load<mitk::Image>(maskPath);
-    typedef itk::Image< short , 3>            MaskImageType;
-    MaskImageType::Pointer vectorSeg = MaskImageType::New() ;
-    mitk::CastToItkImage( segmentation, vectorSeg );
-    kurtosis_filter->SetImageMask(vectorSeg) ;
-  }
-
-  try
-  {
-    kurtosis_filter->Update();
-  }
-  catch( const itk::ExceptionObject& e)
-  {
-    mitkThrow() << "Kurtosis fit failed with an ITK Exception: " << e.what();
-  }
-
-  mitk::Image::Pointer d_image = mitk::Image::New();
-  d_image->InitializeByItk( kurtosis_filter->GetOutput(0) );
-  d_image->SetVolume( kurtosis_filter->GetOutput(0)->GetBufferPointer() );
-
-  mitk::Image::Pointer k_image = mitk::Image::New();
-  k_image->InitializeByItk( kurtosis_filter->GetOutput(1) );
-  k_image->SetVolume( kurtosis_filter->GetOutput(1)->GetBufferPointer() );
-
-  std::string outputD_FileName = output_prefix + "_ADC_map." + output_type;
-  std::string outputK_FileName = output_prefix + "_AKC_map." + output_type;
-
-  try
-  {
-    mitk::IOUtil::Save(  d_image,  outputD_FileName );
-    mitk::IOUtil::Save(  k_image,  outputK_FileName );
-  }
-  catch( const itk::ExceptionObject& e)
-  {
-    mitkThrow() << "Failed to save the KurtosisFit Results due to exception: " << e.what();
-  }
-
+  mitk::IOUtil::Save( maps.d, output_prefix + "_ADC_map." + output_type );
+  mitk::IOUtil::Save( maps.k, output_prefix + "_AKC_map." + output_type );
 }
 
 int main( int argc, char* argv[] )
@@ -147,7 +77,7 @@ int main( int argc, char* argv[] )
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
 
-  if (parsedArgs.size()==0 || parsedArgs.count("help") || parsedArgs.count("h")){
+  if (parsedArgs.size()==0 || parsedArgs.count("help")){
     std::cout << parser.helpText();
     return EXIT_SUCCESS;
   }
@@ -163,27 +93,27 @@ int main( int argc, char* argv[] )
   double upper = 1000;
   std::string  out_type = "nrrd";
 
-  if (parsedArgs.count("mask") || parsedArgs.count("m"))
+  if (parsedArgs.count("mask"))
   {
     maskPath = us::any_cast<std::string>(parsedArgs["mask"]);
   }
 
-  if (parsedArgs.count("output_type") || parsedArgs.count("ot"))
+  if (parsedArgs.count("output_type"))
   {
     out_type = us::any_cast<std::string>(parsedArgs["output_type"]);
   }
 
-  if (parsedArgs.count("omitbzero") || parsedArgs.count("om"))
+  if (parsedArgs.count("omitbzero"))
   {
     omitBZero = us::any_cast<bool>(parsedArgs["omitbzero"]);
   }
 
-  if (parsedArgs.count("lowerkbound") || parsedArgs.count("kl"))
+  if (parsedArgs.count("lowerkbound"))
   {
     lower = us::any_cast<float>(parsedArgs["lowerkbound"]);
   }
 
-  if (parsedArgs.count("upperkbound") || parsedArgs.count("ku"))
+  if (parsedArgs.count("upperkbound"))
   {
     upper = us::any_cast<float>(parsedArgs["upperkbound"]);
   }

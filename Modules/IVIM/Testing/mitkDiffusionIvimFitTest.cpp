@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h>
+#include <mitkDiffusionSignalSampling.h>
 
 #include "mitkIvimTestHelpers.h"
 
@@ -38,6 +39,10 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Update_SecondRun_SameMaps);
   MITK_TEST(FitVoxel_SignalThreshold_FitInputsAndMapValues);
   MITK_TEST(Fwe_MultiThreaded_SameAsSingleThreaded);
+  MITK_TEST(ComputeMaps_Fwe_SameAsFilterWithDwiGeometry);
+  MITK_TEST(GetDiffusionSignal_Fwe_VoxelSignalOrNothingOutside);
+  MITK_TEST(AverageDiffusionSignalInMask_TwoVoxels_MeanNotRounded);
+  MITK_TEST(AverageDiffusionSignalInMask_NoOverlap_NoVoxels);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float>;
@@ -393,6 +398,78 @@ public:
       CPPUNIT_ASSERT(expected.d == actual.d);
       CPPUNIT_ASSERT(expected.dStar == actual.dStar);
     }
+  }
+
+  void ComputeMaps_Fwe_SameAsFilterWithDwiGeometry()
+  {
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    for (auto method : {Method::FitAll, Method::DStarFixed, Method::DThenDStar, Method::LinearDThenF})
+    {
+      auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue, method);
+      filter->Update();
+      const auto expected = GetMaps(filter);
+
+      const auto maps = mitk::ivim::ComputeMaps(dwi.dwi, MakeParameters(method));
+      CPPUNIT_ASSERT(expected.f == Values(maps.f.GetPointer()));
+      CPPUNIT_ASSERT(expected.d == Values(maps.d.GetPointer()));
+      CPPUNIT_ASSERT(expected.dStar == Values(maps.dStar.GetPointer()));
+      for (const auto& map : {maps.f, maps.d, maps.dStar})
+      {
+        CPPUNIT_ASSERT(mitk::Equal(map->GetGeometry()->GetOrigin(), dwi.dwi->GetGeometry()->GetOrigin()));
+        CPPUNIT_ASSERT(mitk::Equal(map->GetGeometry()->GetSpacing(), dwi.dwi->GetGeometry()->GetSpacing()));
+      }
+    }
+  }
+
+  void GetDiffusionSignal_Fwe_VoxelSignalOrNothingOutside()
+  {
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    const itk::Index<3> index = {{5, 4, 3}};
+    mitk::Point3D world;
+    dwi.dwi->GetGeometry()->IndexToWorld(index, world);
+
+    const auto signal = mitk::GetDiffusionSignal(dwi.dwi, world);
+    CPPUNIT_ASSERT(signal.has_value());
+    const auto pixel = dwi.image->GetPixel(index);
+    CPPUNIT_ASSERT_EQUAL(pixel.GetSize(), static_cast<unsigned int>(signal->size()));
+    for (unsigned int i = 0; i < pixel.GetSize(); ++i)
+      CPPUNIT_ASSERT_EQUAL(static_cast<double>(pixel[i]), (*signal)[i]);
+
+    world[0] += 1000;
+    CPPUNIT_ASSERT(!mitk::GetDiffusionSignal(dwi.dwi, world).has_value());
+  }
+
+  void AverageDiffusionSignalInMask_TwoVoxels_MeanNotRounded()
+  {
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    const itk::Index<3> first = {{5, 5, 5}};
+    const itk::Index<3> second = {{6, 5, 5}};
+    const auto roi = mitk::AverageDiffusionSignalInMask(dwi.dwi, MakeMask(dwi.image, {first, second}));
+
+    CPPUNIT_ASSERT_EQUAL(2u, roi.numberOfVoxels);
+    const auto a = dwi.image->GetPixel(first);
+    const auto b = dwi.image->GetPixel(second);
+    bool oddSum = false;
+    for (unsigned int i = 0; i < a.GetSize(); ++i)
+    {
+      CPPUNIT_ASSERT_EQUAL((a[i] + b[i]) / 2.0, roi.mean[i]);
+      oddSum = oddSum || (a[i] + b[i]) % 2 != 0;
+    }
+    // A mean rounded to the pixel type would differ there.
+    CPPUNIT_ASSERT(oddSum);
+  }
+
+  void AverageDiffusionSignalInMask_NoOverlap_NoVoxels()
+  {
+    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto mask = MakeMask(dwi.image, {{{5, 5, 5}}});
+    auto origin = mask->GetGeometry()->GetOrigin();
+    origin[0] += 1000;
+    mask->GetGeometry()->SetOrigin(origin);
+
+    const auto roi = mitk::AverageDiffusionSignalInMask(dwi.dwi, mask);
+    CPPUNIT_ASSERT_EQUAL(0u, roi.numberOfVoxels);
+    CPPUNIT_ASSERT(roi.mean.empty());
   }
 };
 

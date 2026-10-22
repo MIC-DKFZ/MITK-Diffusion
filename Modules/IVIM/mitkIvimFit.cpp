@@ -12,8 +12,12 @@ found in the LICENSE file.
 
 #include "mitkIvimFit.h"
 
+#include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h"
+
 #include <mitkBValueMapProperty.h>
 #include <mitkExceptionMacro.h>
+#include <mitkITKImageImport.h>
+#include <mitkImageCast.h>
 
 #include <vnl/algo/vnl_levenberg_marquardt.h>
 #include <vnl/algo/vnl_symmetric_eigensystem.h>
@@ -432,4 +436,24 @@ mitk::ivim::VoxelFit mitk::ivim::FitVoxel(const vnl_vector<double>& signal,
   fit.unclampedF = fit.f;
   fit.f = std::clamp(fit.f, 0.0, 1.0);
   return fit;
+}
+
+mitk::ivim::Maps mitk::ivim::ComputeMaps(const Image* dwi, const FitParameters& parameters)
+{
+  using FilterType = itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<DiffusionPropertyHelper::DiffusionPixelType, float>;
+
+  auto vectorImage = DiffusionPropertyHelper::ImageType::New();
+  CastToItkImage(dwi, vectorImage);
+
+  auto filter = FilterType::New();
+  filter->SetInput(vectorImage);
+  filter->SetBValue(DiffusionPropertyHelper::GetReferenceBValue(dwi));
+  filter->SetGradientDirections(DiffusionPropertyHelper::GetGradientContainer(dwi));
+  filter->SetFitParameters(parameters);
+  filter->Update();
+
+  FilterType::OutputImageType::Pointer f = filter->GetOutput(0);
+  FilterType::OutputImageType::Pointer d = filter->GetOutput(1);
+  FilterType::OutputImageType::Pointer dStar = filter->GetOutput(2);
+  return {GrabItkImageMemory(f), GrabItkImageMemory(d), GrabItkImageMemory(dStar)};
 }

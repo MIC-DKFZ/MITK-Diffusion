@@ -29,10 +29,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImage.h"
 
 #include <mitkDiffusionPropertyHelper.h>
-#include "itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h"
-#include "itkDiffusionKurtosisReconstructionImageFilter.h"
+#include <mitkIvimFit.h>
+#include <mitkKurtosisFit.h>
 #include <QmitkSliceNavigationListener.h>
 #include <QmitkPlotWidget.h>
+
+#include <optional>
 
 /*!
   \brief QmitkIVIMView
@@ -55,10 +57,7 @@ public:
 
   typedef mitk::DiffusionPropertyHelper::GradientDirectionType GradientDirectionType;
   typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType DirContainerType;
-  typedef itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float> IVIMFilterType;
-  typedef itk::DiffusionKurtosisReconstructionImageFilter<short, float> KurtosisFilterType;
   typedef itk::VectorImage<short,3> VecImgType;
-  typedef itk::Image<float,3> OutImgType;
 
   virtual void CreateQtPartControl(QWidget *parent) override;
 
@@ -67,7 +66,6 @@ public:
   ///
   virtual void SetFocus() override;
 
-  void OutputToDatastorage(mitk::DataNode::Pointer node);
 
   void Activated() override;
   void Deactivated() override;
@@ -108,18 +106,16 @@ protected:
 
   mitk::ivim::FitParameters GetIvimFitParameters() const;
   /** Fits and plots the signal of the selected voxel or the ROI average. */
-  void FitIvimVoxel(const VecImgType::PixelType& pixel, DirContainerType::ConstPointer dirs, float bval);
-  void ComputeIvimMaps(VecImgType* vecimg, DirContainerType::ConstPointer dirs, float bval);
+  void FitIvimVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, float bval);
 
   mitk::kurtosis::FitConfiguration GetKurtosisFitConfiguration() const;
   /** Fits and plots the signal of the selected voxel or the ROI average. */
-  void FitKurtosisVoxel(const VecImgType::PixelType& pixel, DirContainerType::ConstPointer dirs, float bval);
+  void FitKurtosisVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, float bval);
+
+  /** Adds a map below the DWI with a jet lookup table and, if given, the level window [0, max]. */
+  void AddMapNode(mitk::Image* map, const QString& name, std::optional<double> levelWindowMax, mitk::DataNode* parent);
 
   Ui::QmitkIVIMViewControls* m_Controls;
-
-  OutImgType::Pointer m_DStarMap;
-  OutImgType::Pointer m_DMap;
-  OutImgType::Pointer m_fMap;
 
   mitk::ivim::Protocol m_IvimProtocol;
   mitk::ivim::VoxelFit m_IvimFit;

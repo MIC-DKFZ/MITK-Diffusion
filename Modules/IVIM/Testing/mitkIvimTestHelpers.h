@@ -15,6 +15,7 @@ found in the LICENSE file.
 
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkIOUtil.h>
+#include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
@@ -82,6 +83,7 @@ namespace mitk::IvimTesting
 
   struct LoadedDwi
   {
+    Image::Pointer dwi;
     VectorImageType::Pointer image;
     GradientContainerType::ConstPointer gradients;
     double referenceBValue;
@@ -93,6 +95,7 @@ namespace mitk::IvimTesting
     auto dwi = IOUtil::Load<Image>(path, &functor);
 
     LoadedDwi result;
+    result.dwi = dwi;
     result.image = VectorImageType::New();
     CastToItkImage(dwi, result.image);
     result.gradients = DiffusionPropertyHelper::GetGradientContainer(dwi);
@@ -108,6 +111,26 @@ namespace mitk::IvimTesting
     for (std::size_t i = 0; i < image->GetLargestPossibleRegion().GetNumberOfPixels(); ++i)
       values.push_back(buffer[i]);
     return values;
+  }
+
+  inline std::vector<double> Values(const Image* map)
+  {
+    itk::Image<double, 3>::Pointer itkMap;
+    CastToItkImage(map, itkMap);
+    return Values(itkMap.GetPointer());
+  }
+
+  /** A mask with the geometry of the image, 1 at the given voxels and 0 elsewhere. */
+  inline Image::Pointer MakeMask(const VectorImageType* image, const std::vector<itk::Index<3>>& voxels)
+  {
+    auto mask = itk::Image<short, 3>::New();
+    mask->CopyInformation(image);
+    mask->SetRegions(image->GetLargestPossibleRegion());
+    mask->Allocate();
+    mask->FillBuffer(0);
+    for (const auto& voxel : voxels)
+      mask->SetPixel(voxel, 1);
+    return GrabItkImageMemory(mask);
   }
 
   /** Recorded map values are compared relative to their size; the maps are float images. */

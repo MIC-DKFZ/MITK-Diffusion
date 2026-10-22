@@ -1,6 +1,7 @@
 set(H_FILES
   mitkIvimFit.h
   mitkKurtosisFit.h
+  mitkDiffusionSignalSampling.h
   itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h
   itkDiffusionKurtosisReconstructionImageFilter.h
 )
@@ -8,6 +9,7 @@ set(H_FILES
 set(CPP_FILES
   mitkIvimFit.cpp
   mitkKurtosisFit.cpp
+  mitkDiffusionSignalSampling.cpp
   itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.cpp
   itkDiffusionKurtosisReconstructionImageFilter.cpp
 )

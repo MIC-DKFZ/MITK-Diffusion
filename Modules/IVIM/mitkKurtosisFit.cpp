@@ -12,7 +12,11 @@ found in the LICENSE file.
 
 #include "mitkKurtosisFit.h"
 
+#include "itkDiffusionKurtosisReconstructionImageFilter.h"
+
 #include <mitkExceptionMacro.h>
+#include <mitkITKImageImport.h>
+#include <mitkImageCast.h>
 
 #include <vnl/algo/vnl_levenberg_marquardt.h>
 #include <vnl/vnl_least_squares_function.h>
@@ -238,4 +242,34 @@ mitk::kurtosis::VoxelFit mitk::kurtosis::FitVoxel(const vnl_vector<double>& sign
   if (data.fitBZero)
     fit.fittedBZero = logScale ? std::exp(x[2]) : x[2];
   return fit;
+}
+
+mitk::kurtosis::Maps mitk::kurtosis::ComputeMaps(const Image* dwi,
+                                                 const Image* mask,
+                                                 const FitConfiguration& configuration,
+                                                 double smoothingVariance)
+{
+  using FilterType = itk::DiffusionKurtosisReconstructionImageFilter<DiffusionPropertyHelper::DiffusionPixelType, double>;
+
+  auto vectorImage = DiffusionPropertyHelper::ImageType::New();
+  CastToItkImage(dwi, vectorImage);
+
+  auto filter = FilterType::New();
+  filter->SetInput(vectorImage);
+  filter->SetReferenceBValue(DiffusionPropertyHelper::GetReferenceBValue(dwi));
+  filter->SetGradientDirections(DiffusionPropertyHelper::GetGradientContainer(dwi));
+  filter->SetSmoothingVariance(smoothingVariance);
+  filter->SetFitConfiguration(configuration);
+
+  if (mask != nullptr)
+  {
+    auto itkMask = FilterType::MaskImageType::New();
+    CastToItkImage(mask, itkMask);
+    filter->SetImageMask(itkMask);
+  }
+  filter->Update();
+
+  FilterType::OutputImageType::Pointer d = filter->GetOutput(0);
+  FilterType::OutputImageType::Pointer k = filter->GetOutput(1);
+  return {GrabItkImageMemory(d), GrabItkImageMemory(k)};
 }

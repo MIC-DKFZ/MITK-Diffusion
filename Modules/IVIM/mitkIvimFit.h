@@ -92,6 +92,18 @@ namespace mitk::ivim
   MITKIVIM_EXPORT VoxelFit FitVoxel(const vnl_vector<double>& signal,
                                     const Protocol& protocol,
                                     const FitParameters& parameters);
+
+  /** Float maps of the parameters with the geometry of the DWI. */
+  struct Maps
+  {
+    Image::Pointer f;
+    Image::Pointer d;
+    Image::Pointer dStar;
+  };
+
+  /** Fits every voxel of a DWI, multithreaded. Throws mitk::Exception or itk::ExceptionObject when
+      the image is no DWI or has only one b-value. */
+  MITKIVIM_EXPORT Maps ComputeMaps(const Image* dwi, const FitParameters& parameters);
 }
 
 #endif
