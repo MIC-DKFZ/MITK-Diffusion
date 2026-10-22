@@ -1,7 +1,8 @@
-MITK_CREATE_MODULE_TESTS()
+MITK_CREATE_MODULE_TESTS(PACKAGE_DEPENDS PRIVATE ITK|ITKIONRRD)
 
 mitkAddCustomModuleTest(mitkDiffusionPropertySerializerTest mitkDiffusionPropertySerializerTest)
 mitkAddCustomModuleTest(mitkDiffusionPropertyHelperTest mitkDiffusionPropertyHelperTest)
+mitkAddCustomModuleTest(mitkDiffusionImageIOTest mitkDiffusionImageIOTest)
 
 # Freed memory is filled and not cached on glibc, so reads after free in the property helper show
 # up as wrong gradients instead of passing by chance.

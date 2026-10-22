@@ -31,8 +31,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <fstream>
 
 mitk::DiffusionImageNiftiWriter::DiffusionImageNiftiWriter()
-  : AbstractFileWriter(mitk::Image::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION())
+  : AbstractFileWriter(mitk::Image::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_NAME() ), mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION())
 {
+  // Above MITK's plain image writers, so that DWIs are saved with their gradients by default;
+  // GetConfidenceLevel() rejects images that are not DWIs.
+  this->SetRanking(10);
   RegisterService();
 }
 
@@ -47,10 +50,6 @@ mitk::DiffusionImageNiftiWriter::~DiffusionImageNiftiWriter()
 void mitk::DiffusionImageNiftiWriter::Write()
 {
   mitk::Image::ConstPointer input = dynamic_cast<const mitk::Image *>(this->GetInput());
-
-  VectorImageType::Pointer itkImg;
-  mitk::CastToItkImage(input,itkImg);
-
   if (input.IsNull())
   {
     MITK_ERROR <<"Sorry, input to DiffusionImageNiftiWriter is nullptr!";
@@ -63,55 +62,17 @@ void mitk::DiffusionImageNiftiWriter::Write()
   }
   mitk::LocaleSwitch localeSwitch("C");
 
-  char keybuffer[512];
-  char valbuffer[512];
-
-  //itk::MetaDataDictionary dic = input->GetImage()->GetMetaDataDictionary();
-
-  vnl_matrix_fixed<double,3,3> measurementFrame = mitk::DiffusionPropertyHelper::GetMeasurementFrame(input);
-  if (measurementFrame(0,0) || measurementFrame(0,1) || measurementFrame(0,2) ||
-    measurementFrame(1,0) || measurementFrame(1,1) || measurementFrame(1,2) ||
-    measurementFrame(2,0) || measurementFrame(2,1) || measurementFrame(2,2))
-  {
-    sprintf( valbuffer, " (%lf,%lf,%lf) (%lf,%lf,%lf) (%lf,%lf,%lf)", measurementFrame(0,0), measurementFrame(0,1), measurementFrame(0,2), measurementFrame(1,0), measurementFrame(1,1), measurementFrame(1,2), measurementFrame(2,0), measurementFrame(2,1), measurementFrame(2,2));
-    itk::EncapsulateMetaData<std::string>(itkImg->GetMetaDataDictionary(),std::string("measurement frame"),std::string(valbuffer));
-  }
-
-  sprintf( valbuffer, "DWMRI");
-  itk::EncapsulateMetaData<std::string>(itkImg->GetMetaDataDictionary(),std::string("modality"),std::string(valbuffer));
-
-  if(mitk::DiffusionPropertyHelper::GetGradientContainer(input)->Size())
-  {
-    sprintf( valbuffer, "%1f", mitk::DiffusionPropertyHelper::GetReferenceBValue(input) );
-    itk::EncapsulateMetaData<std::string>(itkImg->GetMetaDataDictionary(),std::string("DWMRI_b-value"),std::string(valbuffer));
-  }
-
-  for(unsigned int i=0; i<mitk::DiffusionPropertyHelper::GetGradientContainer(input)->Size(); i++)
-  {
-    sprintf( keybuffer, "DWMRI_gradient_%04d", i );
-
-    /*if(itk::ExposeMetaData<std::string>(input->GetMetaDataDictionary(),
-    std::string(keybuffer),tmp))
-    continue;*/
-
-    sprintf( valbuffer, "%1f %1f %1f", mitk::DiffusionPropertyHelper::GetGradientContainer(input)->ElementAt(i).get(0),
-      mitk::DiffusionPropertyHelper::GetGradientContainer(input)->ElementAt(i).get(1), mitk::DiffusionPropertyHelper::GetGradientContainer(input)->ElementAt(i).get(2));
-
-    itk::EncapsulateMetaData<std::string>(itkImg->GetMetaDataDictionary(),std::string(keybuffer),std::string(valbuffer));
-  }
+  VectorImageType::Pointer itkImg;
+  mitk::CastToItkImage(input,itkImg);
 
   typedef itk::VectorImage<short,3> ImageType;
 
-  std::string ext = this->GetMimeType()->GetExtension(this->GetOutputLocation());
-  ext = itksys::SystemTools::LowerCase(ext);
+  const auto mimeType = this->GetRegisteredMimeType();
 
   // default extension is .nii.gz
-  if( ext == "")
-  {
-    ext = ".nii.gz";
-    this->SetOutputLocation(this->GetOutputLocation() + ext);
-  }
-  if (ext == ".nii" || ext == ".nii.gz")
+  if (!mimeType.MatchesExtension(this->GetOutputLocation()))
+    this->SetOutputLocation(this->GetOutputLocation() + ".nii.gz");
+
   {
     MITK_INFO << "Writing Nifti-Image";
 
@@ -204,26 +165,31 @@ void mitk::DiffusionImageNiftiWriter::Write()
 
 
     std::string base_path = itksys::SystemTools::GetFilenamePath(this->GetOutputLocation());
-    std::string bvals_file = this->GetMimeType()->GetFilenameWithoutExtension(this->GetOutputLocation());
+    std::string bvals_file = mimeType.GetFilenameWithoutExtension(this->GetOutputLocation());
     if (!base_path.empty())
         bvals_file = base_path + "/" + bvals_file;
     bvals_file += ".bvals";
 
-    std::string bvecs_file = this->GetMimeType()->GetFilenameWithoutExtension(this->GetOutputLocation());
+    std::string bvecs_file = mimeType.GetFilenameWithoutExtension(this->GetOutputLocation());
     if (!base_path.empty())
         bvecs_file = base_path + "/" + bvecs_file;
     bvecs_file += ".bvecs";
 
-    if(mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(input)->Size())
+    // Images whose original gradients were never derived (no InitializeImage) keep only the
+    // modified ones.
+    auto gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(input);
+    if (input->GetProperty(mitk::DiffusionPropertyHelper::GetOriginalGradientContainerPropertyName().c_str()).IsNotNull()
+        && mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(input)->Size() > 0)
     {
       MITK_INFO << "Saving original gradient directions";
-      mitk::gradients::WriteBvalsBvecs(bvals_file, bvecs_file, mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(input), mitk::DiffusionPropertyHelper::GetReferenceBValue(input));
+      gradients = mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(input);
     }
-    else if(mitk::DiffusionPropertyHelper::GetGradientContainer(input)->Size())
+    else
     {
       MITK_INFO << "Original gradient directions not found. Saving modified gradient directions";
-      mitk::gradients::WriteBvalsBvecs(bvals_file, bvecs_file, mitk::DiffusionPropertyHelper::GetGradientContainer(input), mitk::DiffusionPropertyHelper::GetReferenceBValue(input));
     }
+    if (gradients->Size() > 0)
+      mitk::gradients::WriteBvalsBvecs(bvals_file, bvecs_file, gradients, mitk::DiffusionPropertyHelper::GetReferenceBValue(input));
   }
 }
 

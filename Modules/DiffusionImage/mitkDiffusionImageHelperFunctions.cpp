@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkBox.h>
 #include <vtkMath.h>
 #include <itksys/SystemTools.hxx>
+#include <limits>
 
 // Intersect a finite line (with end points p0 and p1) with all of the
 // cells of a vtkImageData
@@ -250,6 +251,7 @@ void mitk::gradients::WriteBvalsBvecs(std::string bvals_file, std::string bvecs_
 
   std::ofstream myfile2;
   myfile2.open (bvecs_file.c_str());
+  myfile2.precision(std::numeric_limits<double>::max_digits10);
   for(int j=0; j<3; j++)
   {
     for(unsigned int i=0; i<gradients->Size(); i++)

@@ -50,9 +50,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLocaleSwitch.h>
 #include "mitkIOUtil.h"
 #include <mitkDiffusionImageHelperFunctions.h>
-#include <vtkNIFTIImageReader.h>
-#include <vtkNIFTIImageHeader.h>
-#include <vtkImageIterator.h>
 
 namespace mitk
 {
@@ -74,34 +71,9 @@ DiffusionImageNiftiReader::
 ~DiffusionImageNiftiReader()
 {}
 
-IFileReader::ConfidenceLevel DiffusionImageNiftiReader::GetConfidenceLevel() const
-{
-  // The mime type is registered with plain .nii/.nii.gz extensions (no AppliesTo override
-  // is active due to object slicing in the AbstractFileReader constructor). We therefore
-  // replicate the DiffusionImageNiftiMimeType::AppliesTo() logic here: a NIfTI file is
-  // only treated as DWI when the required bvec/bval sidecar files are present.
-  const std::string path = this->GetInputLocation();
-  const std::string ext = itksys::SystemTools::LowerCase(itksys::SystemTools::GetFilenameExtension(path));
-  if (ext == ".nii" || ext == ".nii.gz")
-  {
-    const std::string base_path = itksys::SystemTools::GetFilenamePath(path);
-    std::string base = itksys::SystemTools::GetFilenameWithoutLastExtension(
-                         itksys::SystemTools::GetFilenameWithoutLastExtension(path));
-    if (!base_path.empty())
-      base = base_path + "/" + base;
-
-    const bool has_sidecar =
-      (itksys::SystemTools::FileExists(base + ".bvec") && itksys::SystemTools::FileExists(base + ".bval")) ||
-      (itksys::SystemTools::FileExists(base + ".bvecs") && itksys::SystemTools::FileExists(base + ".bvals"));
-    if (!has_sidecar)
-      return IFileReader::Unsupported;
-  }
-  return AbstractFileReader::GetConfidenceLevel();
-}
-
   DiffusionImageNiftiReader::
 DiffusionImageNiftiReader()
-  : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE() ), mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION() )
+  : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_NAME() ), mitk::DiffusionImageMimeTypes::DWI_NIFTI_MIMETYPE_DESCRIPTION() )
 
 {
   Options defaultOptions;
@@ -147,8 +119,8 @@ void DiffusionImageNiftiReader::InternalRead()
       MITK_INFO << "DiffusionImageNiftiReader: reading image information";
       VectorImageType::Pointer itkVectorImage;
 
-      std::string ext = this->GetMimeType()->GetExtension( this->GetInputLocation() );
-      ext = itksys::SystemTools::LowerCase( ext );
+      const auto mimeType = this->GetRegisteredMimeType();
+      const bool isNifti = mimeType.MatchesExtension(this->GetInputLocation());
 
       itk::Bruker2dseqImageIO::Pointer bruker_io = itk::Bruker2dseqImageIO::New();
 
@@ -156,89 +128,18 @@ void DiffusionImageNiftiReader::InternalRead()
       ImageType4D::Pointer img4 = ImageType4D::New();
       bool bruker = false;
 
-      if(ext == ".nii" || ext == ".nii.gz")
+      if (isNifti)
       {
         // create reader and read file
         itk::NiftiImageIO::Pointer io2 = itk::NiftiImageIO::New();
-        if (io2->CanReadFile(this->GetInputLocation().c_str()))
-        {
-          typedef itk::ImageFileReader<ImageType4D> FileReaderType;
-          FileReaderType::Pointer reader = FileReaderType::New();
-          reader->SetFileName( this->GetInputLocation() );
-          reader->SetImageIO(io2);
-          reader->Update();
-          img4 = reader->GetOutput();
-        }
-        else
-        {
-          vtkSmartPointer<vtkNIFTIImageReader> reader = vtkSmartPointer<vtkNIFTIImageReader>::New();
-          if (reader->CanReadFile(this->GetInputLocation().c_str()))
-          {
-            reader->SetFileName(this->GetInputLocation().c_str());
-            reader->SetTimeAsVector(true);
-            reader->Update();
-            auto vtk_image = reader->GetOutput();
-            auto header = reader->GetNIFTIHeader();
-            auto dim = header->GetDim(0);
-            auto matrix = reader->GetQFormMatrix();
-            if (matrix == nullptr)
-              matrix = reader->GetSFormMatrix();
-            itk::Matrix<double, 4, 4> direction; direction.SetIdentity();
-            itk::Matrix<double, 4, 4> ras_lps; ras_lps.SetIdentity();
-            ras_lps[0][0] = -1;
-            ras_lps[1][1] = -1;
-            if (matrix != nullptr)
-            {
-              for (int r=0; r<dim; r++)
-                  for (int c=0; c<dim; c++)
-                      direction[r][c] = matrix->GetElement(r, c);
-            }
-            direction = direction*ras_lps;
-
-            itk::Vector< double, 4 > spacing; spacing.Fill(1.0);
-            vtk_image->GetSpacing(spacing.GetDataPointer());
-
-            itk::Point< double, 4 > origin; origin.Fill(0.0);
-            vtk_image->GetOrigin(origin.GetDataPointer());
-
-            itk::ImageRegion< 4 > region;
-            for (int i=0; i<4; ++i)
-              if (i<dim)
-                region.SetSize(i, header->GetDim(i+1));
-              else
-                region.SetSize(i, 1);
-
-            img4->SetSpacing( spacing );
-            img4->SetOrigin( origin );
-            img4->SetDirection( direction );
-            img4->SetRegions( region );
-            img4->Allocate();
-            img4->FillBuffer(0);
-
-            switch (header->GetDim(0)) {
-            case 4:
-              for (int g=0; g<header->GetDim(4); g++)
-                for (int z=0; z<header->GetDim(3); z++)
-                  for (int y=0; y<header->GetDim(2); y++)
-                    for (int x=0; x<header->GetDim(1); x++)
-                    {
-                      double val = vtk_image->GetScalarComponentAsDouble(x, y, z, g);
-
-                      ImageType4D::IndexType idx;
-                      idx[0] = x;
-                      idx[1] = y;
-                      idx[2] = z;
-                      idx[3] = g;
-                      img4->SetPixel(idx, val);
-                    }
-              break;
-            default:
-              mitkThrow() << "Image dimension " << header->GetDim(0) << " not supported!";
-              break;
-            }
-          }
-        }
-
+        if (!io2->CanReadFile(this->GetInputLocation().c_str()))
+          mitkThrow() << "ITK cannot read the NIfTI file " << this->GetInputLocation();
+        typedef itk::ImageFileReader<ImageType4D> FileReaderType;
+        FileReaderType::Pointer reader = FileReaderType::New();
+        reader->SetFileName( this->GetInputLocation() );
+        reader->SetImageIO(io2);
+        reader->Update();
+        img4 = reader->GetOutput();
       }
       else if(bruker_io->CanReadFile(this->GetInputLocation().c_str()))
       {
@@ -326,10 +227,10 @@ void DiffusionImageNiftiReader::InternalRead()
       double BValue = -1;
       // Diffusion Image information END
 
-      if(ext == ".nii" || ext == ".nii.gz")
+      if (isNifti)
       {
         std::string base_path = itksys::SystemTools::GetFilenamePath(this->GetInputLocation());
-        std::string base = this->GetMimeType()->GetFilenameWithoutExtension(this->GetInputLocation());
+        std::string base = mimeType.GetFilenameWithoutExtension(this->GetInputLocation());
         if (!base_path.empty())
         {
           base = base_path + "/" + base;
@@ -362,7 +263,7 @@ void DiffusionImageNiftiReader::InternalRead()
       {
         MITK_INFO << "Parsing bruker method file for gradient information.";
         std::string base_path = itksys::SystemTools::GetFilenamePath(this->GetInputLocation());
-        std::string base = this->GetMimeType()->GetFilenameWithoutExtension(this->GetInputLocation());
+        std::string base = mimeType.GetFilenameWithoutExtension(this->GetInputLocation());
         base_path += "/../../";
         std::string method_file = base_path + "method";
 
@@ -478,6 +379,9 @@ void DiffusionImageNiftiReader::InternalRead()
         }
         DiffusionVectors = temp;
       }
+
+      if (DiffusionVectors->Size() != itkVectorImage->GetVectorLength())
+        mitkThrow() << "Found " << DiffusionVectors->Size() << " gradients for " << itkVectorImage->GetVectorLength() << " volumes";
 
       outputForCache = mitk::GrabItkImageMemory( itkVectorImage);
 

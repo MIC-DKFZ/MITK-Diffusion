@@ -74,7 +74,7 @@ DiffusionImageDicomReader::
 
 DiffusionImageDicomReader::
 DiffusionImageDicomReader()
-  : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_DICOM_MIMETYPE() ), mitk::DiffusionImageMimeTypes::DWI_DICOM_MIMETYPE_DESCRIPTION() )
+  : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_DICOM_MIMETYPE_NAME() ), mitk::DiffusionImageMimeTypes::DWI_DICOM_MIMETYPE_DESCRIPTION() )
 {
   Options defaultOptions;
   defaultOptions["Apply image rotation to gradients"] = true;
