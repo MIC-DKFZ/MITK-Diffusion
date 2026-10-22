@@ -14,7 +14,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include <mitkCoreObjectFactory.h>
 #include "mitkImage.h"
 #include "itkAnalyticalDiffusionQballReconstructionImageFilter.h"
 #include <mitkLexicalCast.h>

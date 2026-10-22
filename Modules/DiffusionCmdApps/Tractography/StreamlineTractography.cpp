@@ -25,7 +25,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <iostream>
 #include <fstream>
 #include <itksys/SystemTools.hxx>
-#include <mitkCoreObjectFactory.h>
 #include <itksys/SystemTools.hxx>
 
 #include <mitkFiberBundle.h>

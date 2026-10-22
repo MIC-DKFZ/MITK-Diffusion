@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <metaCommand.h>
 #include "mitkCommandLineParser.h"
 #include <usAny.h>
-#include <mitkCoreObjectFactory.h>
 #include <mitkFiberBundle.h>
 #include <mitkDiffusionDataIOHelper.h>
 #include <itkRandomPhantomFilter.h>

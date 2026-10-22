@@ -27,7 +27,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
-#include <mitkCoreObjectFactory.h>
 #include <mitkIOUtil.h>
 #include <itkFiberCurvatureFilter.h>
 #include <mitkDiffusionDataIOHelper.h>

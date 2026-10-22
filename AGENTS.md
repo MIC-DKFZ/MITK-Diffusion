@@ -97,8 +97,8 @@ Facts the layout does not show:
 
 ## Porting state
 
-In the `DiffusionDebug` build, all diffusion modules and their test drivers compile and link;
-the command line apps and plugins are not built yet. Remove an item once it is fixed; add what
+In the `DiffusionDebug` build, all diffusion modules, their test drivers and the command line
+apps compile and link; the plugins are not built yet. Remove an item once it is fixed; add what
 the build reveals.
 
 - The IVIM view plots with `QmitkChartWidget`, which MITK removed with its `Chart` module

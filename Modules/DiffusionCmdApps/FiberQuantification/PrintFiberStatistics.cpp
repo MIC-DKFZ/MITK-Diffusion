@@ -20,7 +20,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
-#include <mitkCoreObjectFactory.h>
 #include <mitkPlanarFigure.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
