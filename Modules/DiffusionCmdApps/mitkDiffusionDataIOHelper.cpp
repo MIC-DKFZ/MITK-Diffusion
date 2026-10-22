@@ -45,7 +45,7 @@ std::vector< std::string > mitk::DiffusionDataIOHelper::get_file_list(const std:
 std::vector< mitk::Image::Pointer > mitk::DiffusionDataIOHelper::load_mitk_images(const std::vector<std::string> files, std::vector<std::string>* filenames)
 {
   mitk::LocaleSwitch localeSwitch("C");
-  std::streambuf *old = cout.rdbuf(); // <-- save
+  std::streambuf *old = std::cout.rdbuf(); // <-- save
   std::stringstream ss;
   std::cout.rdbuf (ss.rdbuf());       // <-- redirect
   std::vector< mitk::Image::Pointer > out;

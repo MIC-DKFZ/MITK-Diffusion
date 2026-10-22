@@ -97,14 +97,20 @@ Facts the layout does not show:
 
 ## Porting state
 
-The `DiffusionDebug` inner configure passes; nothing is compiled yet. Remove an item once it is
-fixed; add what the build reveals.
+In the `DiffusionDebug` build, all diffusion modules and their test drivers compile and link;
+the command line apps and plugins are not built yet. Remove an item once it is fixed; add what
+the build reveals.
 
 - The IVIM view plots with `QmitkChartWidget`, which MITK removed with its `Chart` module
   (`git -C mitk show 1bd606f7cf`; MITK moved its charts to `QmitkPlotWidget`, Qwt).
   `Plugins/org.mitk.gui.qt.diffusionimaging.ivim/src/internal/QmitkIVIMView.cpp:176-253` and
   `QmitkIVIMViewControls.ui:178` still use it; the plugin no longer depends on `MitkChart`.
-- Whether current MITK-Data still contains `DiffusionImaging/` is not checked.
+- MITK's `org.mitk.gui.qt.segmentation`, which the diffusion configurations switch on, does not
+  compile with Python off: `MakeError` in
+  `mitk/Plugins/org.mitk.gui.qt.segmentation/src/internal/QmitkSegmentationRestRoutes.cpp:465`
+  is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.
+- `FiberfoxParameters` (`Modules/MriSimulation/mitkFiberfoxParameters.h`) deep-copies its signal
+  models on copy construction but shares them on assignment, and never deletes them.
 - `mitk-diffusion/README.md` build section is outdated (Qt 6.6.1, GitHub URLs, manual inner
   reconfigure).
 

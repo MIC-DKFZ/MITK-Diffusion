@@ -20,7 +20,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <MitkDiffusionImageExports.h>
 
-#include <mitkFileReader.h>
 #include "itkImageSeriesReader.h"
 #include "itkImageFileReader.h"
 #include "itkImage.h"

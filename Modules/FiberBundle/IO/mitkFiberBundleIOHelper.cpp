@@ -44,7 +44,7 @@ std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::s
 
 std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(const std::vector<std::string> files, std::vector<std::string>* filenames)
 {
-  std::streambuf *old = cout.rdbuf(); // <-- save
+  std::streambuf *old = std::cout.rdbuf(); // <-- save
   std::stringstream ss;
   std::cout.rdbuf (ss.rdbuf());       // <-- redirect
   std::vector< mitk::FiberBundle::Pointer > out;

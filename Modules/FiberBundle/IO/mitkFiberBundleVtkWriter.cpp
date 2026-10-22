@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkXMLPolyDataWriter.h>
 #include "mitkFiberBundleMimeTypes.h"
 #include <vtkUnsignedCharArray.h>
-#include <vtkTransformPolyDataFilter.h>
+#include <vtkTransformFilter.h>
 
 mitk::FiberBundleVtkWriter::FiberBundleVtkWriter()
   : mitk::AbstractFileWriter(mitk::FiberBundle::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::FIBERBUNDLE_VTK_MIMETYPE_NAME(), "VTK Fiber Bundle Writer")
@@ -111,11 +111,11 @@ void mitk::FiberBundleVtkWriter::Write()
 
       geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
 
-      vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+      vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
       transformFilter->SetInputData(fibPoly);
       transformFilter->SetTransform(geometry->GetVtkTransform());
       transformFilter->Update();
-      fibPoly = transformFilter->GetOutput();
+      fibPoly = transformFilter->GetPolyDataOutput();
     }
 
 

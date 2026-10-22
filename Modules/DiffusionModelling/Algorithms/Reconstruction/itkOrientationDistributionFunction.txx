@@ -26,7 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <ciso646>
 #include <vnl/vnl_vector_fixed.hxx>
 #include <vnl/vnl_cross.h>
-#include <mitkLogMacros.h>
+#include <mitkLog.h>
 #include <vtkDelaunay2D.h>
 #include <vtkPlane.h>
 

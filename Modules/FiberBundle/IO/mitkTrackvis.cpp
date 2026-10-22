@@ -1,5 +1,5 @@
 #include <mitkTrackvis.h>
-#include <vtkTransformPolyDataFilter.h>
+#include <vtkTransformFilter.h>
 
 TrackVisFiberReader::TrackVisFiberReader()  { m_Filename = ""; m_FilePointer = nullptr; }
 
@@ -87,11 +87,11 @@ short TrackVisFiberReader::write(const mitk::FiberBundle *fib)
 
     geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
 
-    vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+    vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
     transformFilter->SetInputData(poly);
     transformFilter->SetTransform(geometry->GetVtkTransform()->GetInverse());
     transformFilter->Update();
-    poly = transformFilter->GetOutput();
+    poly = transformFilter->GetPolyDataOutput();
   }
 
   for (unsigned int i=0; i<fib->GetNumFibers(); i++)
@@ -265,11 +265,11 @@ short TrackVisFiberReader::read( mitk::FiberBundle* fib, bool use_matrix, bool f
   }
   geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
 
-  vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+  vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
   transformFilter->SetInputData(fiberPolyData);
   transformFilter->SetTransform(geometry->GetVtkTransform());
   transformFilter->Update();
-  fib->SetFiberPolyData(transformFilter->GetOutput());
+  fib->SetFiberPolyData(transformFilter->GetPolyDataOutput());
   fib->SetTrackVisHeader(geometry.GetPointer());
   fib->SetTrackVisHeader(m_Header);
 

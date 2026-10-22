@@ -36,7 +36,6 @@ found in the LICENSE file.
 #include <vtkRenderWindowInteractor.h>
 #include <vtkVector.h>
 #include <vtkPolyLine.h>
-#include <vtkVectorOperators.h>
 #include <vtkSelectEnclosedPoints.h>
 
 

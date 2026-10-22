@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkNrrdImageIO.h>
 #include <itkMetaDataDictionary.h>
 #include <itkMetaDataObject.h>
-#include <mitkLogMacros.h>
+#include <mitkLog.h>
 #include <dcmtk/dcmtract/trctractographyresults.h>
 #include <mitkDICOMDCMTKTagScanner.h>
 #include <itkGDCMImageIO.h>

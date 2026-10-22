@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define __mitkFiberBundleTckReader_h
 
 #include <mitkCommon.h>
-#include <mitkFileReader.h>
 #include <mitkFiberBundle.h>
 #include <vtkSmartPointer.h>
 

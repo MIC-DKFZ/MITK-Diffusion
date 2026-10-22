@@ -163,7 +163,7 @@ int main(int argc, char* argv[])
     // load fiber bundle
     mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(inFib);
 
-    std::streambuf *old = cout.rdbuf(); // <-- save
+    std::streambuf *old = std::cout.rdbuf(); // <-- save
     std::stringstream ss;
     std::cout.rdbuf (ss.rdbuf());       // <-- redirect
     std::vector< ItkFloatImgType::Pointer > roi_images;

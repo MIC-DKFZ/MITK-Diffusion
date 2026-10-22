@@ -684,7 +684,7 @@ void StreamlineTrackingFilter::GenerateData()
         std::cout << "Tried: " << m_Progress << "/" << num_seeds << " | Accepted: " << m_CurrentTracts << "/" << m_Parameters->m_MaxNumFibers << '\r';
       else
         std::cout << "Tried: " << m_Progress << "/" << num_seeds << " | Accepted: " << m_CurrentTracts << '\r';
-      cout.flush();
+      std::cout.flush();
     }
 
     const itk::Point<float> worldPos = m_SeedPoints.at(static_cast<unsigned int>(temp_i));

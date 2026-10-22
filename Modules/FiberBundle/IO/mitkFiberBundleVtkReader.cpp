@@ -34,7 +34,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkXMLDataReader.h>
 #include "mitkFiberBundleMimeTypes.h"
 #include <vtkUnsignedCharArray.h>
-#include <vtkTransformPolyDataFilter.h>
+#include <vtkTransformFilter.h>
 
 
 mitk::FiberBundleVtkReader::FiberBundleVtkReader()
@@ -93,7 +93,7 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
   }
   geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
 
-  vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+  vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
 
 
   try
@@ -114,7 +114,7 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
           transformFilter->SetInputData(fiberPolyData);
           transformFilter->SetTransform(geometry->GetVtkTransform());
           transformFilter->Update();
-          fiberPolyData = transformFilter->GetOutput();
+          fiberPolyData = transformFilter->GetPolyDataOutput();
         }
         FiberBundle::Pointer fiberBundle = FiberBundle::New(fiberPolyData);
         fiberBundle->setIsRAS(ras);
@@ -167,7 +167,7 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
           transformFilter->SetInputData(fiberPolyData);
           transformFilter->SetTransform(geometry->GetVtkTransform());
           transformFilter->Update();
-          fiberPolyData = transformFilter->GetOutput();
+          fiberPolyData = transformFilter->GetPolyDataOutput();
         }
         FiberBundle::Pointer fiberBundle = FiberBundle::New(fiberPolyData);
         fiberBundle->setIsRAS(ras);

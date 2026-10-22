@@ -95,9 +95,9 @@ public:
     vtkSmartPointer<vtkFloatArray> weights = test->GetFiberWeights();
     vtkSmartPointer<vtkFloatArray> ref_weights = ref->GetFiberWeights();
 
-    CPPUNIT_ASSERT_MESSAGE("Number of weights should be equal", weights->GetSize()==ref_weights->GetSize());
+    CPPUNIT_ASSERT_MESSAGE("Number of weights should be equal", weights->GetNumberOfValues()==ref_weights->GetNumberOfValues());
 
-    for (int i=0; i<weights->GetSize(); ++i)
+    for (int i=0; i<weights->GetNumberOfValues(); ++i)
     {
       if (ref_weights->GetValue(i)>0)
       {

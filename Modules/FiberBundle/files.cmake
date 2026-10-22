@@ -8,7 +8,6 @@ set(H_FILES
 
   mitkFiberBundle.h
 
-  IO/mitkFiberBundleObjectFactory.h
   IO/mitkFiberBundleMimeTypes.h
   IO/mitkFiberBundleIOHelper.h
 
@@ -37,7 +36,6 @@ set(CPP_FILES
 
   IO/mitkFiberBundleServiceActivator.cpp
   IO/mitkFiberBundleMimeTypes.cpp
-  IO/mitkFiberBundleObjectFactory.cpp
   IO/mitkFiberBundleIOHelper.cpp
 
   IO/mitkTrackvis.cpp

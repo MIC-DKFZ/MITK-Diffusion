@@ -4,7 +4,6 @@ set(H_FILES
     mitkDiffusionImageHelperFunctions.h
 
     IO/mitkDiffusionImageMimeTypes.h
-    IO/mitkDiffusionImageObjectFactory.h
 
     IO/mitkDiffusionImageDicomReader.h
     IO/mitkDiffusionImageNrrdReader.h
@@ -41,7 +40,6 @@ set(CPP_FILES
 
     IO/mitkDiffusionImageServiceActivator.cpp
     IO/mitkDiffusionImageMimeTypes.cpp
-    IO/mitkDiffusionImageObjectFactory.cpp
 
     IO/mitkDiffusionImageDicomReader.cpp
     IO/mitkDiffusionImageNrrdReader.cpp

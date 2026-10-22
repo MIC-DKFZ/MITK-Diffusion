@@ -35,7 +35,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vtkLinearTransform.h"
 #include "vtkCamera.h"
 #include "vtkPointData.h"
-#include "vtkTransformPolyDataFilter.h"
+#include "vtkTransformFilter.h"
 #include "vtkTransform.h"
 #include "vtkOdfSource.h"
 #include "vtkDoubleArray.h"
@@ -54,7 +54,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkFixedArray.h"
 
-#include <mitkGL.h>
 #include "vtkOpenGLRenderer.h"
 
 #define _USE_MATH_DEFINES
@@ -389,8 +388,8 @@ typename mitk::OdfVtkMapper2D<T,N>::OdfDisplayGeometry mitk::OdfVtkMapper2D<T,N>
   double vp[ 3 ], vnormal[ 3 ];
   Point3D point = worldPlaneGeometry->GetOrigin();
   Vector3D normal = worldPlaneGeometry->GetNormal(); normal.Normalize();
-  vnl2vtk( point.GetVnlVector(), vp );
-  vnl2vtk( normal.GetVnlVector(), vnormal );
+  mitk::ToArray( vp, point );
+  mitk::ToArray( vnormal, normal );
 
   Point2D dispSizeInMM = renderer->GetViewportSizeInMM();
 
@@ -676,7 +675,7 @@ void  mitk::OdfVtkMapper2D<T,N>
       normals->FlipNormalsOff();
       normals->NonManifoldTraversalOff();
 
-      vtkSmartPointer<vtkTransformPolyDataFilter> trans = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+      vtkSmartPointer<vtkTransformFilter> trans = vtkSmartPointer<vtkTransformFilter>::New();
       trans->SetInputConnection( normals->GetOutputPort() );
       trans->SetTransform(m_OdfTransform);
 
@@ -746,40 +745,45 @@ bool mitk::OdfVtkMapper2D<T,N>
 }
 
 template<class T, int N>
-void  mitk::OdfVtkMapper2D<T,N>
+int  mitk::OdfVtkMapper2D<T,N>
 ::MitkRenderOverlay(mitk::BaseRenderer* renderer)
 {
   if ( this->IsVisibleOdfs(renderer)==false )
-    return;
+    return 0;
 
   if ( this->GetVtkProp(renderer)->GetVisibility() )
-    this->GetVtkProp(renderer)->RenderOverlay(renderer->GetVtkRenderer());
+    return this->GetVtkProp(renderer)->RenderOverlay(renderer->GetVtkRenderer());
+
+  return 0;
 }
 
 template<class T, int N>
-void  mitk::OdfVtkMapper2D<T,N>
+int  mitk::OdfVtkMapper2D<T,N>
 ::MitkRenderOpaqueGeometry(mitk::BaseRenderer* renderer)
 {
   if ( this->IsVisibleOdfs( renderer )==false )
-    return;
+    return 0;
 
   if ( this->GetVtkProp(renderer)->GetVisibility() )
   {
     // adapt cam pos
-    this->GetVtkProp(renderer)->RenderOpaqueGeometry( renderer->GetVtkRenderer() );
+    return this->GetVtkProp(renderer)->RenderOpaqueGeometry( renderer->GetVtkRenderer() );
   }
+
+  return 0;
 }
 
 template<class T, int N>
-void  mitk::OdfVtkMapper2D<T,N>
+int  mitk::OdfVtkMapper2D<T,N>
 ::MitkRenderTranslucentGeometry(mitk::BaseRenderer* renderer)
 {
   if ( this->IsVisibleOdfs(renderer)==false )
-    return;
+    return 0;
 
   if ( this->GetVtkProp(renderer)->GetVisibility() )
-    this->GetVtkProp(renderer)->RenderTranslucentPolygonalGeometry(renderer->GetVtkRenderer());
+    return this->GetVtkProp(renderer)->RenderTranslucentPolygonalGeometry(renderer->GetVtkRenderer());
 
+  return 0;
 }
 
 template<class T, int N>
@@ -928,7 +932,7 @@ bool mitk::OdfVtkMapper2D<T,N>
 
   double vnormal[ 3 ];
   Vector3D normal = worldPlaneGeometry->GetNormal(); normal.Normalize();
-  vnl2vtk( normal.GetVnlVector(), vnormal );
+  mitk::ToArray( vnormal, normal );
 
   mitk::Image* currentImage = dynamic_cast<mitk::Image* >( this->GetDataNode()->GetData() );
   if( currentImage == nullptr )
