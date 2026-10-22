@@ -594,8 +594,8 @@ public:
 
   void ComputeMaps_FweMaskWithRoundedOrigin_FitsInside()
   {
-    // MitkDiffusionKurtosisFit -i FWE/InputDiffusionWeightedImage.dwi -m FWE/ReferenceFWImage.nrrd
-    // used to stop with "The mask image does not have the size, origin, spacing and direction ...".
+    // A mask stored with fewer digits than the DWI, as FWE/ReferenceFWImage.nrrd, has the DWI's voxel
+    // grid and is fitted (MitkDiffusionKurtosisFit -m), not rejected for its origin.
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
     const itk::Index<3> inside = {{5, 5, 5}};
     const auto mask =

@@ -224,7 +224,9 @@ mitk::kurtosis::VoxelFitter::VoxelFitter(const vnl_vector<double>& bValues, cons
 
 mitk::kurtosis::VoxelFit mitk::kurtosis::VoxelFitter::Fit(const vnl_vector<double>& signal)
 {
-  // The b-values index the signal; the view fits signals of a DWI they were not made from.
+  // The b-values index the signal. FitVoxel and Fit are public, so they also run without the
+  // filter's check of the volume count (the view's preview); a DWI whose gradients do not match its
+  // volumes would then be read out of bounds.
   if (signal.size() != m_BValues.size())
     mitkThrow() << "The signal has " << signal.size() << " values but there are " << m_BValues.size() << " b-values.";
 

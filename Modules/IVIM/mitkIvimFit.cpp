@@ -389,7 +389,9 @@ mitk::ivim::VoxelFitter::VoxelFitter(const Protocol& protocol, const FitParamete
 
 mitk::ivim::ModelParameters mitk::ivim::VoxelFitter::Fit(const vnl_vector<double>& signal)
 {
-  // The protocol indexes the signal; the view fits signals of a DWI the protocol was not made from.
+  // The protocol indexes the signal. FitVoxel and Fit are public, so they also run without the
+  // filter's check of the volume count (the view's preview); a DWI whose gradients do not match its
+  // volumes would then be read out of bounds.
   const auto numberOfVolumes = m_Protocol.baselineIndices.size() + m_Protocol.weightedIndices.size();
   if (signal.size() != numberOfVolumes)
     mitkThrow() << "The signal has " << signal.size() << " values but the protocol " << numberOfVolumes << " volumes.";
