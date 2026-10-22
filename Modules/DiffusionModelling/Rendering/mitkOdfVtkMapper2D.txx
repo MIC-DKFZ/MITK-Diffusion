@@ -58,6 +58,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <map>
+#include <memory>
+#include <mutex>
 
 #include <ciso646>
 
@@ -97,17 +100,24 @@ vtkSmartPointer<vtkDoubleArray> mitk::OdfVtkMapper2D<T, N>::m_ColourScalars = nu
 
 
 template<class T, int N>
-vnl_matrix<float> mitk::OdfVtkMapper2D<T, N>::m_Sh2Basis =  mitk::sh::CalcShBasisForDirections(2, itk::PointShell<N, vnl_matrix_fixed<double, 3, N> >::DistributePointShell()->as_matrix());
+bool mitk::OdfVtkMapper2D<T, N>::m_ShMrtrix = true;
+
 template<class T, int N>
-vnl_matrix<float> mitk::OdfVtkMapper2D<T, N>::m_Sh4Basis =  mitk::sh::CalcShBasisForDirections(4, itk::PointShell<N, vnl_matrix_fixed<double, 3, N> >::DistributePointShell()->as_matrix());
-template<class T, int N>
-vnl_matrix<float> mitk::OdfVtkMapper2D<T, N>::m_Sh6Basis =  mitk::sh::CalcShBasisForDirections(6, itk::PointShell<N, vnl_matrix_fixed<double, 3, N> >::DistributePointShell()->as_matrix());
-template<class T, int N>
-vnl_matrix<float> mitk::OdfVtkMapper2D<T, N>::m_Sh8Basis =  mitk::sh::CalcShBasisForDirections(8, itk::PointShell<N, vnl_matrix_fixed<double, 3, N> >::DistributePointShell()->as_matrix());
-template<class T, int N>
-vnl_matrix<float> mitk::OdfVtkMapper2D<T, N>::m_Sh10Basis =  mitk::sh::CalcShBasisForDirections(10, itk::PointShell<N, vnl_matrix_fixed<double, 3, N> >::DistributePointShell()->as_matrix());
-template<class T, int N>
-vnl_matrix<float> mitk::OdfVtkMapper2D<T, N>::m_Sh12Basis =  mitk::sh::CalcShBasisForDirections(12, itk::PointShell<N, vnl_matrix_fixed<double, 3, N> >::DistributePointShell()->as_matrix());
+const vnl_matrix<float>& mitk::OdfVtkMapper2D<T, N>::GetShBasis(int numCoefficients, bool mrtrix)
+{
+  static std::mutex mutex;
+  static std::map<std::pair<int, bool>, vnl_matrix<float>> bases;
+
+  const std::lock_guard<std::mutex> lock(mutex);
+  const auto key = std::make_pair(numCoefficients, mrtrix);
+  auto basis = bases.find(key);
+  if (basis == bases.end())
+  {
+    const std::unique_ptr<vnl_matrix_fixed<double, 3, N>> directions(itk::PointShell<N, vnl_matrix_fixed<double, 3, N> >::DistributePointShell());
+    basis = bases.emplace(key, mitk::sh::CalcShBasisForDirections(mitk::sh::ShOrder(numCoefficients), directions->as_matrix(), mrtrix)).first;
+  }
+  return basis->second;
+}
 
 
 template<class T, int N>
@@ -323,22 +333,12 @@ void  mitk::OdfVtkMapper2D<T,N>
     switch (nrCoeffs)
     {
     case 6:
-      odf_vals = ( m_Sh2Basis * coeffs ).data_block();
-      break;
     case 15:
-      odf_vals = ( m_Sh4Basis * coeffs ).data_block();
-      break;
     case 28:
-      odf_vals = ( m_Sh6Basis * coeffs ).data_block();
-      break;
     case 45:
-      odf_vals = ( m_Sh8Basis * coeffs ).data_block();
-      break;
     case 66:
-      odf_vals = ( m_Sh10Basis * coeffs ).data_block();
-      break;
     case 91:
-      odf_vals = ( m_Sh12Basis * coeffs ).data_block();
+      odf_vals = ( GetShBasis(nrCoeffs, m_ShMrtrix) * coeffs ).data_block();
       break;
     default :
       mitkThrow() << "SH order larger 12 not supported in current ODF mapper version";
@@ -915,6 +915,10 @@ void  mitk::OdfVtkMapper2D<T,N>
   OdfScaleByProperty* sbp = dynamic_cast<OdfScaleByProperty*>(this->GetDataNode()->GetProperty( "ScaleBy" ));
   if(sbp)
     m_ScaleBy = sbp->GetScaleBy();
+
+  // SH images read with the FSL/Dipy convention need the matching basis, as for their colour map.
+  auto shImage = dynamic_cast<const ShImage*>(this->GetDataNode()->GetData());
+  m_ShMrtrix = shImage == nullptr || shImage->GetShConvention() == ShImage::MRTRIX;
 
   this->GetDataNode()->GetFloatProperty( "IndexParam1", m_IndexParam1);
   this->GetDataNode()->GetFloatProperty( "IndexParam2", m_IndexParam2);

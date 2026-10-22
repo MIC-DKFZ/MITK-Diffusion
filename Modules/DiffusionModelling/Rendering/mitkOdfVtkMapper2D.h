@@ -148,12 +148,11 @@ private:
     mitk::LocalStorageHandler<LocalStorage>           m_LSH;
     vtkSmartPointer<vtkImageProbeFilter>              m_ProbeFilter;
 
-    static vnl_matrix<float>                          m_Sh2Basis;
-    static vnl_matrix<float>                          m_Sh4Basis;
-    static vnl_matrix<float>                          m_Sh6Basis;
-    static vnl_matrix<float>                          m_Sh8Basis;
-    static vnl_matrix<float>                          m_Sh10Basis;
-    static vnl_matrix<float>                          m_Sh12Basis;
+    /** SH basis for the N glyph directions, computed on first use per coefficient count and convention. */
+    static const vnl_matrix<float>& GetShBasis(int numCoefficients, bool mrtrix);
+
+    /** SH convention of the image that is being drawn, set per update like the other settings. */
+    static bool                                       m_ShMrtrix;
 };
 
 } // namespace mitk
