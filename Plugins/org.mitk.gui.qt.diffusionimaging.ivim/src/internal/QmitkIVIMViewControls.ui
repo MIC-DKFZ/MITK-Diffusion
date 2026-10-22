@@ -1075,7 +1075,7 @@ QGroupBox {
    <item row="8" column="0">
     <widget class="QPushButton" name="m_SavePlot">
      <property name="toolTip">
-      <string>Copy the signal values in the current voxel to the clipboard.</string>
+      <string>Save the plot as an image file.</string>
      </property>
      <property name="text">
       <string>Save plot as image</string>

@@ -351,7 +351,7 @@ void QmitkIVIMView::AutoThreshold()
   if (m_Controls->m_DwiBox->GetSelectedNode().IsNull())
   {
     // Nothing selected. Inform the user and return
-    QMessageBox::information( nullptr, "Template", "Please load and select a diffusion image before starting image processing.");
+    QMessageBox::information( nullptr, "IVIM", "Please load and select a diffusion image before starting image processing.");
     return;
   }
 
@@ -360,7 +360,7 @@ void QmitkIVIMView::AutoThreshold()
   if (!dimg)
   {
     // Nothing selected. Inform the user and return
-    QMessageBox::information( nullptr, "Template", "No valid diffusion image was found.");
+    QMessageBox::information( nullptr, "IVIM", "No valid diffusion image was found.");
     return;
   }
 
@@ -429,7 +429,7 @@ void QmitkIVIMView::FittIVIMStart()
 {
   if (m_Controls->m_DwiBox->GetSelectedNode().IsNull())
   {
-    QMessageBox::information( nullptr, "Template", "No valid diffusion-weighted image selected.");
+    QMessageBox::information( nullptr, "IVIM", "No valid diffusion-weighted image selected.");
     return;
   }
   mitk::Image* img = dynamic_cast<mitk::Image*>(m_Controls->m_DwiBox->GetSelectedNode()->GetData());
@@ -691,6 +691,13 @@ void QmitkIVIMView::OnSliceChanged()
       // update iterators
       ++vecit;
 
+    }
+
+    if (numPixels == 0)
+    {
+      m_Controls->m_Warning->setText(QString("The mask does not overlap the diffusion-weighted image."));
+      m_Controls->m_Warning->setVisible(true);
+      return;
     }
 
     avg /= numPixels;
@@ -967,7 +974,8 @@ void QmitkIVIMView::OutputToDatastorage(mitk::DataNode::Pointer node)
     GetDataStorage()->Add(node3, node);
   }
 
-  this->GetRenderWindowPart()->RequestUpdate();
+  if (this->GetRenderWindowPart())
+    this->GetRenderWindowPart()->RequestUpdate();
 }
 
 void QmitkIVIMView::ClipboardCurveButtonClicked()
