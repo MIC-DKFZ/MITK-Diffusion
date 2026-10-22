@@ -424,6 +424,15 @@ void mitk::DiffusionPropertyHelper::InitializeImage(mitk::Image* image)
   }
 }
 
+void mitk::DiffusionPropertyHelper::InitializeImage(mitk::Image* image, GradientDirectionsContainerType::ConstPointer originalGradients, float referenceBValue, const MeasurementFrameType& measurementFrame, bool applyImageRotation)
+{
+  SetOriginalGradientContainer(image, originalGradients);
+  SetMeasurementFrame(image, measurementFrame);
+  SetReferenceBValue(image, referenceBValue);
+  SetApplyMatrixToGradients(image, applyImageRotation);
+  InitializeImage(image);
+}
+
 bool mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(const mitk::DataNode* node)
 {
   if ( node==nullptr )

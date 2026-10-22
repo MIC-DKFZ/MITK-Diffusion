@@ -89,27 +89,25 @@ void mitk::DiffusionImageNrrdWriter::Write()
   if (!this->GetRegisteredMimeType().MatchesExtension(this->GetOutputLocation()))
     this->SetOutputLocation(this->GetOutputLocation() + ".nrrd");
 
-  {
-    itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-    io->UseCompressionOn();
+  itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
+  io->UseCompressionOn();
 
-    typedef itk::ImageFileWriter<VectorImageType> WriterType;
-    WriterType::Pointer nrrdWriter = WriterType::New();
-    nrrdWriter->UseInputMetaDataDictionaryOn();
-    nrrdWriter->SetInput( itkImg );
-    nrrdWriter->SetImageIO(io);
-    nrrdWriter->SetFileName(this->GetOutputLocation());
-    nrrdWriter->UseCompressionOn();
-    nrrdWriter->SetImageIO(io);
-    try
-    {
-      nrrdWriter->Update();
-    }
-    catch (const itk::ExceptionObject& e)
-    {
-      std::cout << e.GetDescription() << std::endl;
-      throw;
-    }
+  typedef itk::ImageFileWriter<VectorImageType> WriterType;
+  WriterType::Pointer nrrdWriter = WriterType::New();
+  nrrdWriter->UseInputMetaDataDictionaryOn();
+  nrrdWriter->SetInput( itkImg );
+  nrrdWriter->SetImageIO(io);
+  nrrdWriter->SetFileName(this->GetOutputLocation());
+  nrrdWriter->UseCompressionOn();
+  nrrdWriter->SetImageIO(io);
+  try
+  {
+    nrrdWriter->Update();
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    std::cout << e.GetDescription() << std::endl;
+    throw;
   }
 }
 

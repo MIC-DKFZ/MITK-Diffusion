@@ -44,7 +44,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageWriteAccessor.h>
 #include <mitkImageDataItem.h>
 #include <mitkIOUtil.h>
-#include <mitkLocaleSwitch.h>
 #include <itksys/Directory.hxx>
 #include <gdcmDirectory.h>
 #include <mitkStringProperty.h>
@@ -92,28 +91,16 @@ DiffusionImageDicomReader::DoRead()
 std::vector<itk::SmartPointer<mitk::BaseData> > DiffusionImageDicomReader::InternalRead()
 {
   std::vector<itk::SmartPointer<mitk::BaseData> > result_images;
-  OutputType::Pointer outputForCache = OutputType::New();
   if ( this->GetInputLocation() == "")
   {
     throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, the filename to be read is empty!");
   }
   else
   {
-    const std::string& locale = "C";
-    const std::string& currLocale = setlocale( LC_ALL, nullptr );
+    // A reader instance may read more than once; GetReadFiles() reports the last read.
+    m_ReadFiles.clear();
 
-    if ( locale.compare(currLocale)!=0 )
-    {
-      try
-      {
-        setlocale(LC_ALL, locale.c_str());
-      }
-      catch(...)
-      {
-        MITK_INFO << "Could not set locale " << locale;
-      }
-    }
-
+    // LoadDiffusionDicomSeries() parses the DICOM headers under a C locale.
     try
     {
       Options options = this->GetOptions();
@@ -176,50 +163,17 @@ std::vector<itk::SmartPointer<mitk::BaseData> > DiffusionImageDicomReader::Inter
       const bool applyRotation = us::any_cast<bool>(options["Apply image rotation to gradients"]);
       for (const auto& image : DiffusionDICOMFileReader::LoadDiffusionDicomSeries(complete_list, split_mosaic, applyRotation, folderName))
         result_images.push_back(image.GetPointer());
-
-
-      // Since we have already read the tree, we can store it in a cache variable
-      // so that it can be assigned to the DataObject in GenerateData();
-      m_OutputCache = outputForCache;
-      m_CacheTime.Modified();
-
-      try
-      {
-        setlocale(LC_ALL, currLocale.c_str());
-      }
-      catch(...)
-      {
-        MITK_INFO << "Could not reset locale " << currLocale;
-      }
     }
     catch(std::exception& e)
     {
-      try
-      {
-        setlocale(LC_ALL, currLocale.c_str());
-      }
-      catch(...)
-      {
-        MITK_INFO << "Could not reset locale " << currLocale;
-      }
-
       MITK_INFO << "Std::Exception while reading file!!";
       MITK_INFO << e.what();
       throw itk::ImageFileReaderException(__FILE__, __LINE__, e.what());
     }
     catch(...)
     {
-      try
-      {
-        setlocale(LC_ALL, currLocale.c_str());
-      }
-      catch(...)
-      {
-        MITK_INFO << "Could not reset locale " << currLocale;
-      }
-
       MITK_INFO << "Exception while reading file!!";
-      throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested vessel tree file!");
+      throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested file!");
     }
   }
 

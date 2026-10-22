@@ -74,6 +74,12 @@ namespace mitk
 
     static void AverageRedundantGradients(mitk::Image* image, double precision);
     static void InitializeImage(mitk::Image* image);
+    /**
+     * Sets what a file defines (gradients as stored, reference b-value, measurement frame, whether
+     * the image rotation is applied to the gradients) and derives the rest with InitializeImage(image).
+     * Used by the DWI readers, after the pixel data and geometry are set.
+     */
+    static void InitializeImage(mitk::Image* image, GradientDirectionsContainerType::ConstPointer originalGradients, float referenceBValue, const MeasurementFrameType& measurementFrame, bool applyImageRotation);
 
     static GradientDirectionsContainerType::Pointer CalcAveragedDirectionSet(double precision, GradientDirectionsContainerType::ConstPointer directions);
 

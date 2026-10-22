@@ -56,9 +56,6 @@ namespace mitk
     typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType  GradientDirectionContainerType;
 
   protected:
-    OutputType::Pointer m_OutputCache;
-    itk::TimeStamp m_CacheTime;
-
     std::vector<itk::SmartPointer<BaseData> > InternalRead();
 
   private:

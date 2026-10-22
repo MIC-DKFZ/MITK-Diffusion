@@ -84,24 +84,13 @@ DiffusionImageNiftiReader::
 DoRead()
 {
   std::vector<itk::SmartPointer<mitk::BaseData> > result;
-
-  // Since everything is completely read in GenerateOutputInformation() it is stored
-  // in a cache variable. A timestamp is associated.
-  // If the timestamp of the cache variable is newer than the MTime, we only need to
-  // assign the cache variable to the DataObject.
-  // Otherwise, the tree must be read again from the file and OuputInformation must
-  // be updated!
-
-  if(m_OutputCache.IsNull()) InternalRead();
-
-  result.push_back(m_OutputCache.GetPointer());
+  result.push_back(InternalRead().GetPointer());
   return result;
 }
 
 
-void DiffusionImageNiftiReader::InternalRead()
+DiffusionImageNiftiReader::OutputType::Pointer DiffusionImageNiftiReader::InternalRead()
 {
-  OutputType::Pointer outputForCache = OutputType::New();
   if ( this->GetInputLocation() == "")
   {
     throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, the filename to be read is empty!");
@@ -380,23 +369,12 @@ void DiffusionImageNiftiReader::InternalRead()
       if (DiffusionVectors->Size() != itkVectorImage->GetVectorLength())
         mitkThrow() << "Found " << DiffusionVectors->Size() << " gradients for " << itkVectorImage->GetVectorLength() << " volumes";
 
-      outputForCache = mitk::GrabItkImageMemory( itkVectorImage);
+      OutputType::Pointer output = mitk::GrabItkImageMemory( itkVectorImage);
 
-      // create BValueMap
-      mitk::BValueMapProperty::BValueMap BValueMap = mitk::BValueMapProperty::CreateBValueMap(DiffusionVectors,BValue);
-      mitk::DiffusionPropertyHelper::SetOriginalGradientContainer(outputForCache, DiffusionVectors);
-      mitk::DiffusionPropertyHelper::SetMeasurementFrame(outputForCache, MeasurementFrame);
-      mitk::DiffusionPropertyHelper::SetBValueMap(outputForCache, BValueMap);
-      mitk::DiffusionPropertyHelper::SetReferenceBValue(outputForCache, BValue);
       // The measurement frame already contains the image rotation (FSL bvecs; Bruker images have an
       // identity matrix), so the modified gradients are world vectors.
-      mitk::DiffusionPropertyHelper::SetApplyMatrixToGradients(outputForCache, false);
-      mitk::DiffusionPropertyHelper::InitializeImage(outputForCache);
-
-      // Since we have already read the tree, we can store it in a cache variable
-      // so that it can be assigned to the DataObject in GenerateData();
-      m_OutputCache = outputForCache;
-      m_CacheTime.Modified();
+      mitk::DiffusionPropertyHelper::InitializeImage(output, DiffusionVectors, BValue, MeasurementFrame, false);
+      return output;
     }
     catch(std::exception& e)
     {

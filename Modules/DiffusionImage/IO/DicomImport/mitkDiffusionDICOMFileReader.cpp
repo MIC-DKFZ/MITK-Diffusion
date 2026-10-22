@@ -140,10 +140,6 @@ bool mitk::DiffusionDICOMFileReader
     directions->push_back( grad );
   }
 
-  // initialize the output image
-  mitk::DiffusionPropertyHelper::SetOriginalGradientContainer(output_image, directions);
-  mitk::DiffusionPropertyHelper::SetReferenceBValue(output_image, max_bvalue);
-
   if( is_mosaic && this->m_ResolveMosaic )
   {
     mitk::DiffusionHeaderSiemensMosaicDICOMFileReader::Pointer mosaic_reader =
@@ -164,8 +160,12 @@ bool mitk::DiffusionDICOMFileReader
     mitk::CastToMitkImage( helper.LoadToVector<short, 3>( filenames ), output_image );
   }
 
-  mitk::DiffusionPropertyHelper::SetApplyMatrixToGradients(output_image, m_ApplyRotationToGradients);
-  mitk::DiffusionPropertyHelper::InitializeImage(output_image);
+  // DICOM keeps the gradient handling it had before the NRRD/NIfTI convention of world-vector
+  // gradients (no DICOM test data yet): header vectors, rotated by the image matrix if
+  // m_ApplyRotationToGradients, without measurement frame.
+  mitk::DiffusionPropertyHelper::MeasurementFrameType identity;
+  identity.set_identity();
+  mitk::DiffusionPropertyHelper::InitializeImage(output_image, directions.GetPointer(), max_bvalue, identity, m_ApplyRotationToGradients);
   output_image->SetProperty("diffusion.dicom.importname", mitk::StringProperty::New( helper.GetOutputName(filenames) ) );
 
   block.SetMitkImage( (mitk::Image::Pointer) output_image );
