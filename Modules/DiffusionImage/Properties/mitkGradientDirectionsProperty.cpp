@@ -75,19 +75,9 @@ const mitk::GradientDirectionsProperty::GradientDirectionsContainerType::ConstPo
 bool mitk::GradientDirectionsProperty::IsEqual(const BaseProperty& property) const
 {
 
-  GradientDirectionsContainerType::ConstPointer lhs = this->m_GradientDirectionsContainer;
-  GradientDirectionsContainerType::ConstPointer rhs = static_cast<const Self&>(property).m_GradientDirectionsContainer;
-
-  if(lhs->Size() != rhs->Size()) return false;
-
-  GradientDirectionsContainerType::ConstIterator lhsit = lhs->Begin();
-  GradientDirectionsContainerType::ConstIterator rhsit = rhs->Begin();
-
-  bool equal = true;
-  for(unsigned int i = 0 ; i < lhs->Size(); i++, ++lhsit, ++rhsit)
-    equal |= lhsit.Value() == rhsit.Value();
-
-  return  equal;
+  const auto& lhs = this->m_GradientDirectionsContainer->CastToSTLConstContainer();
+  const auto& rhs = static_cast<const Self&>(property).m_GradientDirectionsContainer->CastToSTLConstContainer();
+  return lhs == rhs;
 }
 
 bool mitk::GradientDirectionsProperty::Assign(const BaseProperty& property)

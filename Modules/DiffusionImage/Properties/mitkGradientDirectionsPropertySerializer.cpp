@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkGradientDirectionsProperty.h"
 #include "MitkDiffusionImageExports.h"
 #include <tinyxml2.h>
+#include <limits>
 
 namespace mitk
 {
@@ -52,6 +53,7 @@ class MITKDIFFUSIONIMAGE_EXPORT GradientDirectionsPropertySerializer : public Ba
         while (it != end) {
           auto  child = doc.NewElement("entry");
           std::stringstream ss;
+          ss.precision(std::numeric_limits<double>::max_digits10);
           ss << it.Value();
           child->SetAttribute("value", ss.str().c_str());
           element->InsertEndChild(child);
@@ -71,14 +73,13 @@ class MITKDIFFUSIONIMAGE_EXPORT GradientDirectionsPropertySerializer : public Ba
       mitk::GradientDirectionsProperty::GradientDirectionsContainerType::Pointer gdc;
       gdc = mitk::GradientDirectionsProperty::GradientDirectionsContainerType::New();
 
-      const tinyxml2::XMLElement* entry = element->FirstChildElement( "entry" )->ToElement();
+      const tinyxml2::XMLElement* entry = element->FirstChildElement( "entry" );
       while(entry != nullptr){
 
-        std::stringstream ss;
-        std::string value;
-
-	    value = std::string(entry->Attribute("value"));
-        ss << value;
+        const char* value = entry->Attribute("value");
+        if (value == nullptr)
+          return nullptr;
+        std::stringstream ss(value);
 
         vnl_vector_fixed<double, 3> vector;
         vector.read_ascii(ss);

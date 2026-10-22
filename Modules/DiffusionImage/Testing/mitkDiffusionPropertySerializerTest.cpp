@@ -33,8 +33,8 @@ class mitkDiffusionPropertySerializerTestSuite : public mitk::TestFixture
 
   CPPUNIT_TEST_SUITE(mitkDiffusionPropertySerializerTestSuite);
   MITK_TEST(Equal_SerializeandDeserialize_ReturnsTrue);
-
-  //MITK_TEST(Equal_DifferentChannels_ReturnFalse);
+  MITK_TEST(Equal_DifferentGradientDirections_ReturnsFalse);
+  MITK_TEST(Deserialize_MissingEntriesOrAttributes_DoesNotCrash);
 
 
   CPPUNIT_TEST_SUITE_END();
@@ -78,7 +78,8 @@ public:
     mitk::GradientDirectionsProperty::GradientDirectionsContainerType::Pointer gdc;
     gdc = mitk::GradientDirectionsProperty::GradientDirectionsContainerType::New();
 
-    double a[3] = {3.0,4.0,1.4};
+    // Values with more than six significant digits catch serialization at default stream precision.
+    double a[3] = {0.70710678118654752,-0.57735026918962576,1.4};
     vnl_vector_fixed<double,3> vec1;
     vec1.set(a);
     gdc->push_back(vec1);
@@ -99,8 +100,9 @@ public:
 
     mitk::MeasurementFrameProperty::MeasurementFrameType mft;
 
-    double row0[3] = {1,0,0};
-    double row1[3] = {0,1,0};
+    // Not symmetric, so a transposed round trip fails.
+    double row0[3] = {0.8660254037844386,-0.5,0};
+    double row1[3] = {0.5,0.8660254037844386,0};
     double row2[3] = {0,0,1};
 
     mft.set_row(0,row0);
@@ -108,7 +110,7 @@ public:
     mft.set_row(2,row2);
 
     measurementframe_prop = mitk::MeasurementFrameProperty::New(mft).GetPointer();
-    propList->ReplaceProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str(), measurementframe_prop);
+    propList->ReplaceProperty(mitk::DiffusionPropertyHelper::GetMeasurementFramePropertyName().c_str(), measurementframe_prop);
   }
 
   void tearDown() override
@@ -159,6 +161,34 @@ public:
     }
   }
 
+  void Equal_DifferentGradientDirections_ReturnsFalse()
+  {
+    auto other = mitk::GradientDirectionsProperty::GradientDirectionsContainerType::New();
+    for (const auto& g : gradientdirection_prop->GetGradientDirectionsContainer()->CastToSTLConstContainer())
+      other->push_back(-g);
+    auto otherProp = mitk::GradientDirectionsProperty::New(other);
+    CPPUNIT_ASSERT(!(*otherProp == *gradientdirection_prop));
+  }
+
+  void Deserialize_MissingEntriesOrAttributes_DoesNotCrash()
+  {
+    tinyxml2::XMLDocument doc;
+    auto noEntries = doc.NewElement("element");
+    auto entryWithoutAttributes = doc.NewElement("element");
+    entryWithoutAttributes->InsertEndChild(doc.NewElement("entry"));
+
+    for (std::string name : {"GradientDirectionsPropertySerializer", "MeasurementFramePropertySerializer", "BValueMapPropertySerializer"})
+    {
+      auto serializers = itk::ObjectFactoryBase::CreateAllInstance(name.c_str());
+      CPPUNIT_ASSERT_EQUAL(size_t(1), serializers.size());
+      auto serializer = dynamic_cast<mitk::BasePropertySerializer *>(serializers.begin()->GetPointer());
+
+      // Without entries, gradients and b-value map are empty; a frame cannot be built.
+      auto fromNoEntries = serializer->Deserialize(noEntries);
+      CPPUNIT_ASSERT_EQUAL(name != "MeasurementFramePropertySerializer", fromNoEntries.IsNotNull());
+      CPPUNIT_ASSERT(serializer->Deserialize(entryWithoutAttributes).IsNull());
+    }
+  }
 };
 
 MITK_TEST_SUITE_REGISTRATION(mitkDiffusionPropertySerializer)

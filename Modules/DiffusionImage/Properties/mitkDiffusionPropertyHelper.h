@@ -31,8 +31,8 @@ namespace mitk
   /** \brief Helper class for mitk::Images containing diffusion weighted data
   *
   * This class takes a pointer to a mitk::Image containing diffusion weighted information and provides
-  * functions to manipulate the diffusion meta-data. Will log an error if required information is
-  * missing.
+  * functions to manipulate the diffusion meta-data. The getters throw mitk::Exception if the image
+  * lacks the requested property.
   */
 
   class MITKDIFFUSIONIMAGE_EXPORT DiffusionPropertyHelper
@@ -55,7 +55,8 @@ namespace mitk
     static const BValueMapType & GetBValueMap(const mitk::Image *);
     static float GetReferenceBValue(const mitk::Image *);
     static std::vector< int > GetBValueVector(const mitk::Image *);
-    static const MeasurementFrameType & GetMeasurementFrame(const mitk::Image *);
+    /** Identity when the image has no measurement frame. */
+    static MeasurementFrameType GetMeasurementFrame(const mitk::Image *);
     static const GradientDirectionsContainerType::ConstPointer GetOriginalGradientContainer(const mitk::Image *);
     static const GradientDirectionsContainerType::ConstPointer GetGradientContainer(const mitk::Image *);
 
@@ -80,6 +81,7 @@ namespace mitk
 
     static const std::string GetBvaluePropertyName() { return BVALUEMAPPROPERTYNAME; }
     static const std::string GetGradientContainerPropertyName() { return GRADIENTCONTAINERPROPERTYNAME; }
+    static const std::string GetOriginalGradientContainerPropertyName() { return ORIGINALGRADIENTCONTAINERPROPERTYNAME; }
     static const std::string GetMeasurementFramePropertyName() { return MEASUREMENTFRAMEPROPERTYNAME; }
 
     static void CopyDICOMProperties(const BaseData *source, BaseData *target);

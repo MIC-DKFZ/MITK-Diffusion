@@ -100,16 +100,17 @@ public:
 
     BValueMapProperty::BValueMap map;
 
-    const tinyxml2::XMLElement* entry = element->FirstChildElement( "entry" )->ToElement();
+    const tinyxml2::XMLElement* entry = element->FirstChildElement( "entry" );
     while(entry != nullptr){
 
-      std::string key, value;
-	  key = std::string(entry->Attribute("key"));
-	  value = std::string(entry->Attribute("value"));
+      const char* key = entry->Attribute("key");
+      const char* value = entry->Attribute("value");
+      if (key == nullptr || value == nullptr)
+        return nullptr;
 
-      std::vector<unsigned int> indices = split(value.c_str(), ',');
+      std::vector<unsigned int> indices = split(value, ',');
 
-      map[std::atoi(key.c_str())] = indices;
+      map[std::atoi(key)] = indices;
       entry = entry->NextSiblingElement( "entry" );
     }
 
