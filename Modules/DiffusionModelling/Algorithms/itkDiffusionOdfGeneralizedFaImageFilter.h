@@ -112,8 +112,8 @@ protected:
 
   GfaComputationMethod m_ComputationMethod;
 
-  double m_Param1;
-  double m_Param2;
+  double m_Param1 = 0;
+  double m_Param2 = 0;
 
 };
 

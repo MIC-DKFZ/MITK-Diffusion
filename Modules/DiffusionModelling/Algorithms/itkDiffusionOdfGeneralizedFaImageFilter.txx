@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <cstdlib>
 
 #define _USE_MATH_DEFINES
+#include <algorithm>
 #include <cmath>
 
 #include "itkImageRegionConstIterator.h"
@@ -34,6 +35,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkOrientationDistributionFunction.h"
 
 namespace itk {
+
+  /** Index of quantile q in n sorted values; rounding up must not reach n. */
+  inline std::size_t GfaQuantileIndex(double q, unsigned int n)
+  {
+    return std::min<std::size_t>(static_cast<std::size_t>(std::floor(q * n + 0.5)), n - 1);
+  }
 
   template< class TOdfPixelType,
   class TGfaPixelType,
@@ -100,8 +107,8 @@ namespace itk {
             sorted[i] = b[i];
           }
           std::sort( sorted.begin(), sorted.end() );
-          double q60 = sorted[floor(0.6*(double)NrOdfDirections+0.5)];
-          double q95 = sorted[floor(0.95*(double)NrOdfDirections+0.5)];
+          double q60 = sorted[GfaQuantileIndex(0.6, NrOdfDirections)];
+          double q95 = sorted[GfaQuantileIndex(0.95, NrOdfDirections)];
           outval = q95/q60 - 1.0;
           break;
         }
@@ -113,8 +120,8 @@ namespace itk {
             sorted[i] = b[i];
           }
           std::sort( sorted.begin(), sorted.end() );
-          //double q40 = sorted[floor(0.4*(double)NrOdfDirections+0.5)];
-          double q95 = sorted[floor(0.95*(double)NrOdfDirections+0.5)];
+          //double q40 = sorted[GfaQuantileIndex(0.4, NrOdfDirections)];
+          double q95 = sorted[GfaQuantileIndex(0.95, NrOdfDirections)];
           outval = q95;
           break;
         }
@@ -154,8 +161,8 @@ namespace itk {
             sorted[i] = b[i];
           }
           std::sort( sorted.begin(), sorted.end() );
-          //double q40 = sorted[floor(0.4*(double)NrOdfDirections+0.5)];
-          double q05 = sorted[floor(0.05*(double)NrOdfDirections+0.5)];
+          //double q40 = sorted[GfaQuantileIndex(0.4, NrOdfDirections)];
+          double q05 = sorted[GfaQuantileIndex(0.05, NrOdfDirections)];
           outval = q05;
           break;
         }
@@ -172,8 +179,8 @@ namespace itk {
             sorted[i] = b[i];
           }
           std::sort( sorted.begin(), sorted.end() );
-          double q05 = sorted[floor(0.05*(double)NrOdfDirections+0.5)];
-          double q40 = sorted[floor(0.4*(double)NrOdfDirections+0.5)];
+          double q05 = sorted[GfaQuantileIndex(0.05, NrOdfDirections)];
+          double q40 = sorted[GfaQuantileIndex(0.4, NrOdfDirections)];
           outval = q40/q05 - 1.0;
           break;
         }
