@@ -705,13 +705,7 @@ void QmitkPreprocessingView::TemplatedResampleImage( itk::Image<TPixel, VImageDi
   }
   }
 
-  itk::Point<double,3> origin = itkImage->GetOrigin();
-  origin[0] -= itkImage->GetSpacing()[0]/2;
-  origin[1] -= itkImage->GetSpacing()[1]/2;
-  origin[2] -= itkImage->GetSpacing()[2]/2;
-  origin[0] += newSpacing[0]/2;
-  origin[1] += newSpacing[1]/2;
-  origin[2] += newSpacing[2]/2;
+  const itk::Point<double,3> origin = itk::ResampledImageOrigin(itkImage->GetOrigin(), itkImage->GetDirection(), itkImage->GetSpacing(), newSpacing);
 
   typedef itk::Image<TPixel, VImageDimension> ImageType;
   typename ImageType::Pointer outImage = ImageType::New();

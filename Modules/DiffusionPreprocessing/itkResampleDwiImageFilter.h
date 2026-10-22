@@ -39,6 +39,21 @@ namespace itk
 {
 
 /**
+ * \brief Origin (centre of voxel 0) of a resampled grid that keeps the outer corner of voxel 0
+ * where it is in the input. The half-voxel shifts run along the image axes, i.e. through the
+ * direction matrix; shifting along the world axes moves images with a flipped or oblique axis.
+ * The two shifts are applied one after the other so that axis-aligned images get the same origin
+ * to the last bit as before.
+ */
+inline Point<double, 3> ResampledImageOrigin(const Point<double, 3>& origin, const Matrix<double, 3, 3>& direction, const Vector<double, 3>& spacing, const Vector<double, 3>& newSpacing)
+{
+  Point<double, 3> newOrigin = origin;
+  newOrigin -= direction * (spacing * 0.5);
+  newOrigin += direction * (newSpacing * 0.5);
+  return newOrigin;
+}
+
+/**
 * \brief Resample DWI channel by channel.   */
 
 template <class TScalarType>

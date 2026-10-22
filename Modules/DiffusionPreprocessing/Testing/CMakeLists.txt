@@ -1,3 +1,4 @@
 MITK_CREATE_MODULE_TESTS()
 
 mitkAddCustomModuleTest(mitkNonLocalMeansDenoisingTest mitkNonLocalMeansDenoisingTest)
+mitkAddCustomModuleTest(mitkDiffusionResampleDwiImageFilterTest mitkDiffusionResampleDwiImageFilterTest)
