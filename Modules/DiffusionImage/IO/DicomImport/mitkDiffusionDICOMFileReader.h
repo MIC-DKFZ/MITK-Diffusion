@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkDICOMITKSeriesGDCMReader.h"
 #include "mitkDiffusionHeaderDICOMFileReader.h"
 #include "mitkClassicDICOMSeriesReader.h"
+#include <mitkImage.h>
 
 namespace mitk
 {
@@ -47,6 +48,18 @@ public:
    * null for unsupported vendors. isMosaic tells whether the images are Siemens mosaics.
    */
   static DiffusionHeaderDICOMFileReader::Pointer CreateHeaderReader(const std::string& vendor, const std::string& imageType, bool& isMosaic);
+
+  /**
+   * Loads the diffusion-weighted images in the given DICOM files, one image per series found;
+   * used by the DWI DICOM reader, the DICOM import view and the DICOM loader command line app.
+   * The files are split by series and geometry and sorted by image position, acquisition number,
+   * acquisition time, trigger time and SOP instance UID. Siemens mosaics are split into slices if
+   * resolveMosaic is set. Each image gets the "name" property (series description, else study
+   * description, else fallbackName, else the "diffusion.dicom.importname" property) and the
+   * properties DICOM.patient_id, DICOM.patient_name, DICOM.study_instance_uid,
+   * DICOM.series_instance_uid, DICOM.sop_instance_uid and DICOM.frame_of_reference_uid.
+   */
+  static std::vector<Image::Pointer> LoadDiffusionDicomSeries(const StringList& files, bool resolveMosaic, bool applyRotationToGradients, const std::string& fallbackName = "");
 
   void SetResolveMosaic( bool flag )
   {

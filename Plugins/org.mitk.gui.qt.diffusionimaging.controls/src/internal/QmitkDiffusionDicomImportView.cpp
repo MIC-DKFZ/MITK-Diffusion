@@ -37,9 +37,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionPropertyHelper.h>
 
 #include "mitkDiffusionDICOMFileReader.h"
-#include "mitkDICOMTagBasedSorter.h"
-#include "mitkDICOMSortByTag.h"
-#include "mitkSortByImagePositionPatient.h"
 
 #include "gdcmDirectory.h"
 #include "gdcmScanner.h"
@@ -439,112 +436,12 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
     }
 
     {
-      mitk::DiffusionDICOMFileReader::Pointer gdcmReader = mitk::DiffusionDICOMFileReader::New();
-      mitk::DICOMTagBasedSorter::Pointer tagSorter = mitk::DICOMTagBasedSorter::New();
-
-      // Use tags as in Qmitk
-      // all the things that split by tag in DicomSeriesReader
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0010) ); // Number of Rows
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0011) ); // Number of Columns
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0030) ); // Pixel Spacing
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x1164) ); // Imager Pixel Spacing
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x0037) ); // Image Orientation (Patient) // TODO add tolerance parameter (l. 1572 of original code)
-      // TODO handle as real vectors! cluster with configurable errors!
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x000e) ); // Series Instance UID
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x0050) ); // Slice Thickness
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0008) ); // Number of Frames
-      //tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x0052) ); // Frame of Reference UID
-
-      // gdcmReader->AddSortingElement( tagSorter );
-      //mitk::DICOMFileReaderTestHelper::TestOutputsContainInputs( gdcmReader );
-
-      mitk::DICOMSortCriterion::ConstPointer sorting =
-          mitk::SortByImagePositionPatient::New(  // Image Position (Patient)
-                                                  //mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0020, 0x0013), // instance number
-                                                  mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0020, 0x0012), // aqcuisition number
-                                                                             mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0032), // aqcuisition time
-                                                                                                        mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0018, 0x1060), // trigger time
-                                                                                                                                   mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0018) // SOP instance UID (last resort, not really meaningful but decides clearly)
-                                                                                                                                                              ).GetPointer()
-                                                                                                                                   ).GetPointer()
-                                                                                                        ).GetPointer()
-                                                                             ).GetPointer()
-                                                  // ).GetPointer()
-                                                  ).GetPointer();
-      tagSorter->SetSortCriterion( sorting );
-
-      // mosaic
-      gdcmReader->SetResolveMosaic( this->m_Controls->m_SplitMosaicCheckBox->isChecked() );
-      gdcmReader->AddSortingElement( tagSorter );
-      gdcmReader->SetInputFiles( complete_list );
-      try
+      const auto images = mitk::DiffusionDICOMFileReader::LoadDiffusionDicomSeries( complete_list, this->m_Controls->m_SplitMosaicCheckBox->isChecked(), true );
+      for( const auto& loaded_image : images )
       {
-        gdcmReader->AnalyzeInputFiles();
-      }
-      catch( const itk::ExceptionObject &e)
-      {
-        MITK_ERROR << "Failed to analyze data. " << e.what();
-      }
-      catch( const std::exception &se)
-      {
-        MITK_ERROR << "Std Exception " << se.what();
-      }
-
-      gdcmReader->LoadImages();
-
-      for( unsigned int o = 0; o < gdcmReader->GetNumberOfOutputs(); o++ )
-      {
-        mitk::Image::Pointer loaded_image = gdcmReader->GetOutput(o).GetMitkImage();
-
-        std::string outname;
-        if (gdcmReader->GetSeriesName(o)!="-")
-          outname = gdcmReader->GetSeriesName(o);
-        else if (gdcmReader->GetStudyName(o)!="-")
-          outname = gdcmReader->GetStudyName(o);
-        else
-          loaded_image->GetPropertyList()->GetStringProperty("diffusion.dicom.importname", outname );
-
-        std::string val = "-";
-
-        if (gdcmReader->patient_ids().size()>o)
-        {
-          val = gdcmReader->patient_ids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.patient_id",val.c_str());
-        }
-
-        if (gdcmReader->patient_names().size()>o)
-        {
-          val = gdcmReader->patient_names().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.patient_name",val.c_str());
-        }
-
-        if (gdcmReader->study_instance_uids().size()>o)
-        {
-          val = gdcmReader->study_instance_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.study_instance_uid",val.c_str());
-        }
-
-        if (gdcmReader->series_instance_uids().size()>o)
-        {
-          val = gdcmReader->series_instance_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid",val.c_str());
-        }
-
-        if (gdcmReader->sop_instance_uids().size()>o)
-        {
-          val = gdcmReader->sop_instance_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.sop_instance_uid",val.c_str());
-        }
-
-        if (gdcmReader->frame_of_reference_uids().size()>o)
-        {
-          val = gdcmReader->frame_of_reference_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.frame_of_reference_uid",val.c_str());
-        }
-
         node = mitk::DataNode::New();
         node->SetData( loaded_image );
-        node->SetName( outname.c_str() );
+        node->SetName( loaded_image->GetProperty("name")->GetValueAsString() );
 
         GetDataStorage()->Add(node);
       }

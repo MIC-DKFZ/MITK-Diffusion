@@ -39,9 +39,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkCustomMimeType.h"
 #include "mitkDiffusionImageMimeTypes.h"
 #include <mitkDiffusionDICOMFileReader.h>
-#include <mitkDICOMTagBasedSorter.h>
-#include <mitkSortByImagePositionPatient.h>
-#include <mitkDICOMSortByTag.h>
 
 #include <mitkITKImageImport.h>
 #include <mitkImageWriteAccessor.h>
@@ -176,102 +173,9 @@ std::vector<itk::SmartPointer<mitk::BaseData> > DiffusionImageDicomReader::Inter
         }
       }
 
-      mitk::DiffusionDICOMFileReader::Pointer gdcmReader = mitk::DiffusionDICOMFileReader::New();
-      mitk::DICOMTagBasedSorter::Pointer tagSorter = mitk::DICOMTagBasedSorter::New();
-
-      // Use tags as in Qmitk
-      // all the things that split by tag in ClassicDicomSeriesReader
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0010) ); // Number of Rows
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0011) ); // Number of Columns
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0030) ); // Pixel Spacing
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x1164) ); // Imager Pixel Spacing
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x0037) ); // Image Orientation (Patient) // TODO add tolerance parameter (l. 1572 of original code)
-      // TODO handle as real vectors! cluster with configurable errors!
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x000e) ); // Series Instance UID
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x0050) ); // Slice Thickness
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0008) ); // Number of Frames
-      //tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x0052) ); // Frame of Reference UID
-
-      auto tag_sop_instance_uid = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0018), nullptr ); // SOP instance UID (last resort, not really meaningful but decides clearly)
-      auto tag_trigger_time = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0018, 0x1060), tag_sop_instance_uid.GetPointer() ); // trigger time
-      auto tag_aqcuisition_time = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0032), tag_trigger_time.GetPointer()); // aqcuisition time
-      auto tag_aqcuisition_number = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0020, 0x0012), tag_aqcuisition_time.GetPointer()); // aqcuisition number
-      mitk::DICOMSortCriterion::ConstPointer sorting = mitk::SortByImagePositionPatient::New(tag_aqcuisition_number.GetPointer()).GetPointer();
-      tagSorter->SetSortCriterion( sorting );
-
-      // mosaic
-      gdcmReader->SetResolveMosaic( split_mosaic );
-      gdcmReader->AddSortingElement( tagSorter );
-      gdcmReader->SetInputFiles( complete_list );
-      gdcmReader->SetApplyRotationToGradients(us::any_cast<bool>(options["Apply image rotation to gradients"]));
-      try
-      {
-        gdcmReader->AnalyzeInputFiles();
-      }
-      catch( const itk::ExceptionObject &e)
-      {
-        MITK_ERROR << "Failed to analyze data. " << e.what();
-      }
-      catch( const std::exception &se)
-      {
-        MITK_ERROR << "Std Exception " << se.what();
-      }
-
-      gdcmReader->LoadImages();
-
-      for( unsigned int o = 0; o < gdcmReader->GetNumberOfOutputs(); o++ )
-      {
-        mitk::Image::Pointer loaded_image = gdcmReader->GetOutput(o).GetMitkImage();
-
-        StringProperty::Pointer nameProp;
-        if (gdcmReader->GetSeriesName(o)!="-")
-          nameProp = StringProperty::New(gdcmReader->GetSeriesName(o));
-        else if (gdcmReader->GetStudyName(o)!="-")
-          nameProp = StringProperty::New(gdcmReader->GetStudyName(o));
-        else
-          nameProp = StringProperty::New(folderName);
-
-        loaded_image->SetProperty("name", nameProp);
-
-        std::string val = "-";
-
-        if (gdcmReader->patient_ids().size()>o)
-        {
-          val = gdcmReader->patient_ids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.patient_id",val.c_str());
-        }
-
-        if (gdcmReader->patient_names().size()>o)
-        {
-          val = gdcmReader->patient_names().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.patient_name",val.c_str());
-        }
-
-        if (gdcmReader->study_instance_uids().size()>o)
-        {
-          val = gdcmReader->study_instance_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.study_instance_uid",val.c_str());
-        }
-
-        if (gdcmReader->series_instance_uids().size()>o)
-        {
-          val = gdcmReader->series_instance_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid",val.c_str());
-        }
-
-        if (gdcmReader->sop_instance_uids().size()>o)
-        {
-          val = gdcmReader->sop_instance_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.sop_instance_uid",val.c_str());
-        }
-
-        if (gdcmReader->frame_of_reference_uids().size()>o)
-        {
-          val = gdcmReader->frame_of_reference_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.frame_of_reference_uid",val.c_str());
-        }
-        result_images.push_back(loaded_image.GetPointer());
-      }
+      const bool applyRotation = us::any_cast<bool>(options["Apply image rotation to gradients"]);
+      for (const auto& image : DiffusionDICOMFileReader::LoadDiffusionDicomSeries(complete_list, split_mosaic, applyRotation, folderName))
+        result_images.push_back(image.GetPointer());
 
 
       // Since we have already read the tree, we can store it in a cache variable

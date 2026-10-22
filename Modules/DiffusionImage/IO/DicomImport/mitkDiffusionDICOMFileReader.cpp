@@ -27,6 +27,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkStringProperty.h"
 #include <mitkImageCast.h>
+#include <mitkDICOMTagBasedSorter.h>
+#include <mitkDICOMSortByTag.h>
+#include <mitkSortByImagePositionPatient.h>
+#include <mitkLocaleSwitch.h>
 
 static void PerformHeaderAnalysis( mitk::DiffusionHeaderDICOMFileReader::DICOMHeaderListType headers )
 {
@@ -423,6 +427,85 @@ mitk::DiffusionHeaderDICOMFileReader::Pointer mitk::DiffusionDICOMFileReader
   if (contains("Philips"))
     return mitk::DiffusionHeaderPhilipsDICOMFileReader::New().GetPointer();
   return nullptr;
+}
+
+std::vector<mitk::Image::Pointer> mitk::DiffusionDICOMFileReader
+::LoadDiffusionDicomSeries(const StringList& files, bool resolveMosaic, bool applyRotationToGradients, const std::string& fallbackName)
+{
+  // The header readers parse decimal numbers with the C library.
+  mitk::LocaleSwitch localeSwitch("C");
+
+  // In addition to the series split of ClassicDICOMSeriesReader, split by geometry, so that every
+  // output is one 3D+t block.
+  mitk::DICOMTagBasedSorter::Pointer tagSorter = mitk::DICOMTagBasedSorter::New();
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0010) ); // Number of Rows
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0011) ); // Number of Columns
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0030) ); // Pixel Spacing
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x1164) ); // Imager Pixel Spacing
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x0037) ); // Image Orientation (Patient)
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x000e) ); // Series Instance UID
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x0050) ); // Slice Thickness
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0008) ); // Number of Frames
+
+  auto tag_sop_instance_uid = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0018), nullptr ); // SOP instance UID (last resort, not really meaningful but decides clearly)
+  auto tag_trigger_time = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0018, 0x1060), tag_sop_instance_uid.GetPointer() ); // trigger time
+  auto tag_aqcuisition_time = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0032), tag_trigger_time.GetPointer()); // aqcuisition time
+  auto tag_aqcuisition_number = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0020, 0x0012), tag_aqcuisition_time.GetPointer()); // aqcuisition number
+  mitk::DICOMSortCriterion::ConstPointer sorting = mitk::SortByImagePositionPatient::New(tag_aqcuisition_number.GetPointer()).GetPointer();
+  tagSorter->SetSortCriterion( sorting );
+
+  Pointer reader = Self::New();
+  reader->SetResolveMosaic( resolveMosaic );
+  reader->SetApplyRotationToGradients( applyRotationToGradients );
+  reader->AddSortingElement( tagSorter );
+  reader->SetInputFiles( files );
+  try
+  {
+    reader->AnalyzeInputFiles();
+  }
+  catch( const itk::ExceptionObject &e)
+  {
+    MITK_ERROR << "Failed to analyze data. " << e.what();
+  }
+  catch( const std::exception &se)
+  {
+    MITK_ERROR << "Std Exception " << se.what();
+  }
+
+  reader->LoadImages();
+
+  std::vector<Image::Pointer> images;
+  for( unsigned int o = 0; o < reader->GetNumberOfOutputs(); o++ )
+  {
+    Image::Pointer image = reader->GetOutput(o).GetMitkImage();
+
+    std::string name = reader->GetSeriesName(o);
+    if (name == "-")
+      name = reader->GetStudyName(o);
+    if (name == "-")
+    {
+      name = fallbackName;
+      if (name.empty())
+        image->GetPropertyList()->GetStringProperty("diffusion.dicom.importname", name);
+    }
+    image->SetProperty("name", StringProperty::New(name));
+
+    const std::pair<const char*, const std::vector<std::string>*> dicomValues[] = {
+      {"DICOM.patient_id", &reader->m_patient_ids},
+      {"DICOM.patient_name", &reader->m_patient_names},
+      {"DICOM.study_instance_uid", &reader->m_study_instance_uids},
+      {"DICOM.series_instance_uid", &reader->m_series_instance_uids},
+      {"DICOM.sop_instance_uid", &reader->m_sop_instance_uids},
+      {"DICOM.frame_of_reference_uid", &reader->m_frame_of_reference_uids}};
+    for (const auto& [key, values] : dicomValues)
+    {
+      if (values->size() > o)
+        image->GetPropertyList()->SetStringProperty(key, values->at(o).c_str());
+    }
+
+    images.push_back(image);
+  }
+  return images;
 }
 
 bool mitk::DiffusionDICOMFileReader
