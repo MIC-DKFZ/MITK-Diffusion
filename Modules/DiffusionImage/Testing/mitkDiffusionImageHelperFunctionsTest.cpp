@@ -18,6 +18,7 @@ found in the LICENSE file.
 
 #include <itksys/SystemTools.hxx>
 
+#include <algorithm>
 #include <format>
 #include <fstream>
 
@@ -34,6 +35,7 @@ class mitkDiffusionImageHelperFunctionsTestSuite : public mitk::TestFixture
   MITK_TEST(IntersectImage_Segment_LengthPerVoxel);
   MITK_TEST(RotationMatrices_VnlAndItk_Equal);
   MITK_TEST(Cart2Sph_Sph2Cart_RoundTrip);
+  MITK_TEST(VectorImageToVolumes_VolumesToVectorImage_TransposeAndKeepGeometry);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientType = mitk::DiffusionPropertyHelper::GradientDirectionType;
@@ -225,6 +227,65 @@ public:
     mitk::gradients::Cart2Sph(v[0], v[1], v[2], spherical);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(v.two_norm(), spherical[2], 1e-12);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, (mitk::gradients::Sph2Cart(spherical[1], spherical[0], spherical[2]) - v).two_norm(), 1e-12);
+  }
+
+  void VectorImageToVolumes_VolumesToVectorImage_TransposeAndKeepGeometry()
+  {
+    // Component t of voxel (x, y, z) is volume t of the 4-D image; an odd size and an oblique
+    // geometry catch swapped strides and lost geometry.
+    using VectorImageType = itk::VectorImage<short, 3>;
+    const unsigned int numberOfVolumes = 5;
+    const itk::Size<3> size = {{3, 4, 2}};
+    auto value = [](itk::IndexValueType x, itk::IndexValueType y, itk::IndexValueType z, itk::IndexValueType t)
+    { return static_cast<short>(x + 10 * y + 100 * z + 1000 * t); };
+
+    auto image = VectorImageType::New();
+    image->SetRegions(VectorImageType::RegionType(size));
+    image->SetVectorLength(numberOfVolumes);
+    image->SetSpacing(itk::MakeVector(0.5, 1.5, 2.0));
+    image->SetOrigin(itk::MakePoint(-10.0, 20.0, 5.0));
+    image->SetDirection(VectorImageType::DirectionType(mitk::imv::GetRotationMatrixVnl<double>(30, 0, 40)));
+    image->Allocate();
+    for (itk::IndexValueType z = 0; z < 2; ++z)
+      for (itk::IndexValueType y = 0; y < 4; ++y)
+        for (itk::IndexValueType x = 0; x < 3; ++x)
+        {
+          VectorImageType::PixelType pixel(numberOfVolumes);
+          for (unsigned int t = 0; t < numberOfVolumes; ++t)
+            pixel[t] = value(x, y, z, t);
+          image->SetPixel({{x, y, z}}, pixel);
+        }
+
+    auto volumes = mitk::imv::VectorImageToVolumes(image.GetPointer());
+    const auto size4 = volumes->GetLargestPossibleRegion().GetSize();
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(numberOfVolumes), size4[3]);
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      CPPUNIT_ASSERT_EQUAL(size[i], size4[i]);
+      CPPUNIT_ASSERT_EQUAL(image->GetSpacing()[i], volumes->GetSpacing()[i]);
+      CPPUNIT_ASSERT_EQUAL(image->GetOrigin()[i], volumes->GetOrigin()[i]);
+      for (unsigned int j = 0; j < 3; ++j)
+        CPPUNIT_ASSERT_EQUAL(image->GetDirection()[i][j], volumes->GetDirection()[i][j]);
+      CPPUNIT_ASSERT_EQUAL(0.0, volumes->GetDirection()[i][3]);
+      CPPUNIT_ASSERT_EQUAL(0.0, volumes->GetDirection()[3][i]);
+    }
+    CPPUNIT_ASSERT_EQUAL(1.0, volumes->GetSpacing()[3]);
+    CPPUNIT_ASSERT_EQUAL(0.0, volumes->GetOrigin()[3]);
+    CPPUNIT_ASSERT_EQUAL(1.0, volumes->GetDirection()[3][3]);
+    for (itk::IndexValueType t = 0; t < numberOfVolumes; ++t)
+      for (itk::IndexValueType z = 0; z < 2; ++z)
+        for (itk::IndexValueType y = 0; y < 4; ++y)
+          for (itk::IndexValueType x = 0; x < 3; ++x)
+            CPPUNIT_ASSERT_EQUAL(value(x, y, z, t), volumes->GetPixel({{x, y, z, t}}));
+
+    auto back = mitk::imv::VolumesToVectorImage(volumes.GetPointer());
+    CPPUNIT_ASSERT_EQUAL(numberOfVolumes, back->GetVectorLength());
+    CPPUNIT_ASSERT(back->GetLargestPossibleRegion() == image->GetLargestPossibleRegion());
+    CPPUNIT_ASSERT(back->GetSpacing() == image->GetSpacing());
+    CPPUNIT_ASSERT(back->GetOrigin() == image->GetOrigin());
+    CPPUNIT_ASSERT(back->GetDirection() == image->GetDirection());
+    const auto numberOfValues = size[0] * size[1] * size[2] * numberOfVolumes;
+    CPPUNIT_ASSERT(std::equal(image->GetBufferPointer(), image->GetBufferPointer() + numberOfValues, back->GetBufferPointer()));
   }
 };
 

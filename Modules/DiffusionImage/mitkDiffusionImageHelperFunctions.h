@@ -23,6 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_vector_fixed.h>
 #include <itkVectorContainer.h>
 #include <itkImage.h>
+#include <itkVectorImage.h>
 #include <itkLinearInterpolateImageFunction.h>
 #include <mitkImage.h>
 #include <mitkDiffusionPropertyHelper.h>
@@ -155,6 +156,95 @@ public:
 
     itk::Matrix< TType, 3, 3 > rot = rotZ*rotY*rotX;
     return rot;
+  }
+
+  /**
+   * DWI volumes stored as one 4-D image (the NIfTI layout, volume t is the slowest index) as MITK's
+   * vector image (volume t is component t of each voxel), with the geometry of the first three
+   * dimensions.
+   */
+  template< class TPixelType >
+  static typename itk::VectorImage< TPixelType, 3 >::Pointer VolumesToVectorImage(const itk::Image< TPixelType, 4 >* volumes)
+  {
+    using VectorImageType = itk::VectorImage< TPixelType, 3 >;
+    const auto& region4 = volumes->GetBufferedRegion();
+    typename VectorImageType::RegionType region;
+    typename VectorImageType::SpacingType spacing;
+    typename VectorImageType::PointType origin;
+    typename VectorImageType::DirectionType direction;
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      region.SetIndex(i, region4.GetIndex(i));
+      region.SetSize(i, region4.GetSize(i));
+      spacing[i] = volumes->GetSpacing()[i];
+      origin[i] = volumes->GetOrigin()[i];
+      for (unsigned int j = 0; j < 3; ++j)
+        direction[i][j] = volumes->GetDirection()[i][j];
+    }
+
+    auto image = VectorImageType::New();
+    image->SetRegions(region);
+    image->SetSpacing(spacing);
+    image->SetOrigin(origin);
+    image->SetDirection(direction);
+    image->SetVectorLength(region4.GetSize(3));
+    image->Allocate();
+
+    // The buffers are transposed directly: the 4-D image stores one volume after the other, the
+    // vector image all volumes of a voxel next to each other. GetPixel/SetPixel per value takes
+    // about ten times as long as the NIfTI file IO itself.
+    const std::size_t numberOfVolumes = region4.GetSize(3);
+    const std::size_t numberOfVoxels = region.GetNumberOfPixels();
+    const TPixelType* in = volumes->GetBufferPointer();
+    TPixelType* out = image->GetBufferPointer();
+    for (std::size_t v = 0; v < numberOfVoxels; ++v)
+      for (std::size_t t = 0; t < numberOfVolumes; ++t)
+        out[v * numberOfVolumes + t] = in[t * numberOfVoxels + v];
+    return image;
+  }
+
+  /** Inverse of VolumesToVectorImage; the fourth dimension gets spacing 1, origin 0 and no rotation. */
+  template< class TPixelType >
+  static typename itk::Image< TPixelType, 4 >::Pointer VectorImageToVolumes(const itk::VectorImage< TPixelType, 3 >* image)
+  {
+    using VolumesType = itk::Image< TPixelType, 4 >;
+    const auto& region = image->GetBufferedRegion();
+    typename VolumesType::RegionType region4;
+    typename VolumesType::SpacingType spacing4;
+    typename VolumesType::PointType origin4;
+    typename VolumesType::DirectionType direction4;
+    spacing4.Fill(1);
+    origin4.Fill(0);
+    direction4.SetIdentity();
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      region4.SetIndex(i, region.GetIndex(i));
+      region4.SetSize(i, region.GetSize(i));
+      spacing4[i] = image->GetSpacing()[i];
+      origin4[i] = image->GetOrigin()[i];
+      for (unsigned int j = 0; j < 3; ++j)
+        direction4[i][j] = image->GetDirection()[i][j];
+    }
+    region4.SetIndex(3, 0);
+    region4.SetSize(3, image->GetVectorLength());
+
+    auto volumes = VolumesType::New();
+    volumes->SetRegions(region4);
+    volumes->SetSpacing(spacing4);
+    volumes->SetOrigin(origin4);
+    volumes->SetDirection(direction4);
+    volumes->Allocate();
+
+    // Voxel by voxel as in VolumesToVectorImage: the vector image is read sequentially, each volume
+    // is written sequentially.
+    const std::size_t numberOfVolumes = image->GetVectorLength();
+    const std::size_t numberOfVoxels = region.GetNumberOfPixels();
+    const TPixelType* in = image->GetBufferPointer();
+    TPixelType* out = volumes->GetBufferPointer();
+    for (std::size_t v = 0; v < numberOfVoxels; ++v)
+      for (std::size_t t = 0; t < numberOfVolumes; ++t)
+        out[t * numberOfVoxels + v] = in[v * numberOfVolumes + t];
+    return volumes;
   }
 };
 

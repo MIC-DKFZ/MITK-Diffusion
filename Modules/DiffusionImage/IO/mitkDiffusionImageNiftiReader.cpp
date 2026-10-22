@@ -30,7 +30,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkProperties.h>
 
 // ITK includes
-#include <itkImageRegionIterator.h>
 #include <itkMetaDataObject.h>
 #include "itksys/SystemTools.hxx"
 #include "itkImageFileReader.h"
@@ -137,70 +136,13 @@ DiffusionImageNiftiReader::OutputType::Pointer DiffusionImageNiftiReader::Intern
       }
 
       // convert 4D file to vector image
-      itkVectorImage = VectorImageType::New();
-
-      VectorImageType::SpacingType spacing;
-      ImageType4D::SpacingType spacing4 = img4->GetSpacing();
-      for(int i=0; i<3; i++)
-        spacing[i] = spacing4[i];
-      itkVectorImage->SetSpacing( spacing );   // Set the image spacing
-
-      VectorImageType::PointType origin;
-      ImageType4D::PointType origin4 = img4->GetOrigin();
-      for(int i=0; i<3; i++)
-        origin[i] = origin4[i];
-      itkVectorImage->SetOrigin( origin );     // Set the image origin
-
-      VectorImageType::DirectionType direction;
+      itkVectorImage = mitk::imv::VolumesToVectorImage(img4.GetPointer());
       if (bruker)
       {
         MITK_INFO << "Setting image matrix to identity (bruker hack!!!)";
+        VectorImageType::DirectionType direction;
         direction.SetIdentity();
-      }
-      else
-      {
-        ImageType4D::DirectionType direction4 = img4->GetDirection();
-        for(int i=0; i<3; i++)
-          for(int j=0; j<3; j++)
-            direction[i][j] = direction4[i][j];
-      }
-      itkVectorImage->SetDirection( direction );  // Set the image direction
-
-      VectorImageType::RegionType region;
-      ImageType4D::RegionType region4 = img4->GetLargestPossibleRegion();
-
-      VectorImageType::RegionType::SizeType size;
-      ImageType4D::RegionType::SizeType size4 = region4.GetSize();
-
-      for(int i=0; i<3; i++)
-        size[i] = size4[i];
-
-      VectorImageType::RegionType::IndexType index;
-      ImageType4D::RegionType::IndexType index4 = region4.GetIndex();
-      for(int i=0; i<3; i++)
-        index[i] = index4[i];
-
-      region.SetSize(size);
-      region.SetIndex(index);
-      itkVectorImage->SetRegions( region );
-
-      itkVectorImage->SetVectorLength(size4[3]);
-      itkVectorImage->Allocate();
-
-      itk::ImageRegionIterator<VectorImageType>   it ( itkVectorImage,  itkVectorImage->GetLargestPossibleRegion() );
-      using VecPixType = VectorImageType::PixelType;
-      for (it.GoToBegin(); !it.IsAtEnd(); ++it)
-      {
-        VecPixType vec = it.Get();
-        VectorImageType::IndexType currentIndex = it.GetIndex();
-        for(int i=0; i<3; i++)
-          index4[i] = currentIndex[i];
-        for(unsigned int ind=0; ind<vec.Size(); ind++)
-        {
-          index4[3] = ind;
-          vec[ind] = img4->GetPixel(index4);
-        }
-        it.Set(vec);
+        itkVectorImage->SetDirection(direction);
       }
 
       // Diffusion Image information START
