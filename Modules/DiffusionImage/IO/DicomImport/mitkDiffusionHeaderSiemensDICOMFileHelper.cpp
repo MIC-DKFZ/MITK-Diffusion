@@ -20,11 +20,18 @@ bool mitk::ParseInputString( std::string input, std::vector<double>& values, Sie
 {
   // TODO : Compute offset based on the format_specs, where does the 84 come from???
   int offset = 84;
+  if (format_specs.NameLength >= input.size())
+    return false;
   int vm = *(input.c_str() + format_specs.NameLength );
 
   for (int k = 0; k < vm; k++)
   {
+    // Stop at the end of truncated or unexpected headers instead of reading past them.
+    if (offset + 16 > static_cast<int>(input.size()))
+      break;
     int itemLength = *(input.c_str() + offset + 4);
+    if (itemLength < 0 || offset + 16 + itemLength > static_cast<int>(input.size()))
+      break;
 
     int strideSize = static_cast<int> (ceil(static_cast<double>(itemLength)/4) * 4);
     std::string valueString = input.substr( offset+16, itemLength );

@@ -46,21 +46,17 @@ namespace mitk
 
     using AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
-    ConfidenceLevel GetConfidenceLevel() const override;
 
-    typedef short                                                           DiffusionPixelType;
+    using DiffusionPixelType = short;
 
-    typedef mitk::Image                                                     OutputType;
-    typedef mitk::DiffusionPropertyHelper::ImageType                        VectorImageType;
-    typedef mitk::DiffusionPropertyHelper::GradientDirectionType            GradientDirectionType;
-    typedef mitk::DiffusionPropertyHelper::MeasurementFrameType             MeasurementFrameType;
-    typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType  GradientDirectionContainerType;
+    using OutputType = mitk::Image;
+    using VectorImageType = mitk::DiffusionPropertyHelper::ImageType;
+    using GradientDirectionType = mitk::DiffusionPropertyHelper::GradientDirectionType;
+    using MeasurementFrameType = mitk::DiffusionPropertyHelper::MeasurementFrameType;
+    using GradientDirectionContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
 
   protected:
-    OutputType::Pointer m_OutputCache;
-    itk::TimeStamp m_CacheTime;
-
-    void InternalRead();
+    OutputType::Pointer InternalRead();
 
   private:
 

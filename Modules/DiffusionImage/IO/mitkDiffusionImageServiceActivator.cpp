@@ -15,6 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 #include <usModuleActivator.h>
 #include <usModuleContext.h>
+#include <usServiceProperties.h>
 
 
 #include <mitkDiffusionImageNrrdReader.h>
@@ -42,9 +43,17 @@ namespace mitk
   {
   public:
 
-    void Load(us::ModuleContext* ) override
+    void Load(us::ModuleContext* context) override
     {
+      // Registered here as the full objects, so that their AppliesTo checks (DWMRI modality, bvals/bvecs
+      // next to the NIfTI file, diffusion DICOM tags) are used; the readers and writers refer to them by
+      // name. The ranking makes the DWI readers and writers the default for diffusion data over MITK's
+      // plain NRRD and NIfTI IO.
       m_MimeTypes = mitk::DiffusionImageMimeTypes::Get();
+      us::ServiceProperties props;
+      props[us::ServiceConstants::SERVICE_RANKING()] = 10;
+      for (auto mimeType : m_MimeTypes)
+        m_MimeTypeRegistrations.push_back(context->RegisterService(mimeType, props));
 
       m_DiffusionImageNrrdReader = new DiffusionImageNrrdReader();
       m_DiffusionImageNrrdWriter = new DiffusionImageNrrdWriter();
@@ -59,17 +68,17 @@ namespace mitk
 
     void Unload(us::ModuleContext*) override
     {
-      for (unsigned int loop(0); loop < m_MimeTypes.size(); ++loop)
-      {
-        delete m_MimeTypes.at(loop);
-      }
-
       delete m_DiffusionImageNrrdReader;
       delete m_DiffusionImageNiftiReader;
       delete m_DiffusionImageDicomReader;
 
       delete m_DiffusionImageNrrdWriter;
       delete m_DiffusionImageNiftiWriter;
+
+      for (auto& registration : m_MimeTypeRegistrations)
+        registration.Unregister();
+      for (auto mimeType : m_MimeTypes)
+        delete mimeType;
     }
 
   private:
@@ -82,6 +91,7 @@ namespace mitk
     DiffusionImageNiftiWriter * m_DiffusionImageNiftiWriter;
 
     std::vector<mitk::CustomMimeType*> m_MimeTypes;
+    std::vector<us::ServiceRegistration<mitk::CustomMimeType>> m_MimeTypeRegistrations;
   };
 }
 

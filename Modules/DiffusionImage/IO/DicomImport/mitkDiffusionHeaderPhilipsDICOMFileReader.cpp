@@ -45,7 +45,7 @@ bool mitk::DiffusionHeaderPhilipsDICOMFileReader::ReadDiffusionHeader(std::strin
 
   // reveal b-value
   float bvalue = 0;
-  if( RevealBinaryTagC( philips_bvalue_tag, gdcmReader.GetFile().GetDataSet(), (char*) &bvalue) )
+  if( RevealBinaryTagC( philips_bvalue_tag, gdcmReader.GetFile().GetDataSet(), (char*) &bvalue, sizeof(bvalue)) )
   {
 
     header_info.b_value = std::ceil( bvalue );
@@ -61,7 +61,7 @@ bool mitk::DiffusionHeaderPhilipsDICOMFileReader::ReadDiffusionHeader(std::strin
 
   gdcm::Tag philips_new_bvalue_tag( 0x0018,0x9087 );
   double dbvalue = 0;
-  if( RevealBinaryTagC( philips_new_bvalue_tag, gdcmReader.GetFile().GetDataSet(), (char*) &dbvalue) )
+  if( RevealBinaryTagC( philips_new_bvalue_tag, gdcmReader.GetFile().GetDataSet(), (char*) &dbvalue, sizeof(dbvalue)) )
   {
     MITK_INFO("philips.dicom.diffusion.bvalue") << dbvalue;
   }
@@ -78,7 +78,7 @@ bool mitk::DiffusionHeaderPhilipsDICOMFileReader::ReadDiffusionHeader(std::strin
     gdcm::Tag philips_gradient_direction_new( 0x0018, 0x9089 );
     double gr_dir_arr[3] = {1,0,-1};
 
-    if( RevealBinaryTagC( philips_gradient_direction_new, gdcmReader.GetFile().GetDataSet(), (char*) &gr_dir_arr ) )
+    if( RevealBinaryTagC( philips_gradient_direction_new, gdcmReader.GetFile().GetDataSet(), (char*) &gr_dir_arr, sizeof(gr_dir_arr) ) )
     {
       MITK_INFO("philips.dicom.diffusion.gradient") << "(" << gr_dir_arr[0] <<"," << gr_dir_arr[1] <<"," <<gr_dir_arr[2] <<")";
     }

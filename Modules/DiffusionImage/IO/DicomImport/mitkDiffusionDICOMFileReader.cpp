@@ -27,6 +27,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkStringProperty.h"
 #include <mitkImageCast.h>
+#include <mitkDICOMTagBasedSorter.h>
+#include <mitkDICOMSortByTag.h>
+#include <mitkSortByImagePositionPatient.h>
+#include <mitkLocaleSwitch.h>
 
 static void PerformHeaderAnalysis( mitk::DiffusionHeaderDICOMFileReader::DICOMHeaderListType headers )
 {
@@ -50,16 +54,9 @@ static void PerformHeaderAnalysis( mitk::DiffusionHeaderDICOMFileReader::DICOMHe
             << "  :: \t"<< weighted_images << " b > 0";
 }
 
-mitk::DiffusionDICOMFileReader::DiffusionDICOMFileReader()
-{
-  m_ApplyRotationToGradients = true;
-  m_ResolveMosaic = true;
-}
+mitk::DiffusionDICOMFileReader::DiffusionDICOMFileReader() = default;
 
-mitk::DiffusionDICOMFileReader::~DiffusionDICOMFileReader()
-{
-
-}
+mitk::DiffusionDICOMFileReader::~DiffusionDICOMFileReader() = default;
 
 bool mitk::DiffusionDICOMFileReader
 ::LoadImages()
@@ -130,14 +127,11 @@ bool mitk::DiffusionDICOMFileReader
     mitk::DiffusionPropertyHelper::GradientDirectionType grad = header.g_vector;
 
     grad.normalize();
-    grad *= sqrt( header.b_value / max_bvalue );
+    // A series of b=0 images only has no reference b-value.
+    grad *= max_bvalue > 0 ? sqrt( header.b_value / max_bvalue ) : 0.0;
 
     directions->push_back( grad );
   }
-
-  // initialize the output image
-  mitk::DiffusionPropertyHelper::SetOriginalGradientContainer(output_image, directions);
-  mitk::DiffusionPropertyHelper::SetReferenceBValue(output_image, max_bvalue);
 
   if( is_mosaic && this->m_ResolveMosaic )
   {
@@ -149,6 +143,8 @@ bool mitk::DiffusionDICOMFileReader
     mosaic_reader->RetrieveMosaicInformation( filenames.at(0).at(0) );
 
     mitk::MosaicDescriptor mdesc = mosaic_reader->GetMosaicDescriptor();
+    if (mdesc.nimages == 0)
+      mitkThrow() << "No NumberOfImagesInMosaic in " << filenames.at(0).at(0);
     mitk::CastToMitkImage( helper.LoadMosaicToVector<short, 3>( filenames, mdesc ), output_image );
 
   }
@@ -157,8 +153,12 @@ bool mitk::DiffusionDICOMFileReader
     mitk::CastToMitkImage( helper.LoadToVector<short, 3>( filenames ), output_image );
   }
 
-  mitk::DiffusionPropertyHelper::SetApplyMatrixToGradients(output_image, m_ApplyRotationToGradients);
-  mitk::DiffusionPropertyHelper::InitializeImage(output_image);
+  // DICOM keeps the gradient handling it had before the NRRD/NIfTI convention of world-vector
+  // gradients (no DICOM test data yet): header vectors, rotated by the image matrix if
+  // m_ApplyRotationToGradients, without measurement frame.
+  mitk::DiffusionPropertyHelper::MeasurementFrameType identity;
+  identity.set_identity();
+  mitk::DiffusionPropertyHelper::InitializeImage(output_image, directions.GetPointer(), max_bvalue, identity, m_ApplyRotationToGradients);
   output_image->SetProperty("diffusion.dicom.importname", mitk::StringProperty::New( helper.GetOutputName(filenames) ) );
 
   block.SetMitkImage( (mitk::Image::Pointer) output_image );
@@ -202,6 +202,15 @@ void mitk::DiffusionDICOMFileReader
 {
   m_Study_names.clear();
   m_Series_names.clear();
+  m_OutputHeaderContainer.clear();
+  m_OutputReaderContainer.clear();
+  m_IsMosaicData.clear();
+  m_sop_instance_uids.clear();
+  m_frame_of_reference_uids.clear();
+  m_series_instance_uids.clear();
+  m_study_instance_uids.clear();
+  m_patient_names.clear();
+  m_patient_ids.clear();
   this->SetGroup3DandT(true);
 
   Superclass::AnalyzeInputFiles();
@@ -258,48 +267,26 @@ void mitk::DiffusionDICOMFileReader
     gdcmScanner.AddTag( t_patient_name );
     gdcmScanner.AddTag( t_patient_id );
 
+    // Per-output DICOM values; stored only once the output turns out to be valid, so that they
+    // stay in step with the outputs.
+    auto tagValue = [&](const gdcm::Tag& tag) {
+      const char* value = gdcmScanner.GetValue( frame_0->Filename.c_str(), tag );
+      return value != nullptr ? std::string(value) : std::string("-");
+    };
+    std::string sop_instance_uid, frame_of_reference_uid, series_instance_uid, study_instance_uid, patient_name, patient_id;
+
     if( gdcmScanner.Scan( inputFilename ) )
     {
+      sop_instance_uid = tagValue(t_sop_instance_uid);
+      frame_of_reference_uid = tagValue(t_frame_of_reference_uid);
+      series_instance_uid = tagValue(t_series_instance_uid);
+      study_instance_uid = tagValue(t_study_instance_uid);
+      patient_name = tagValue(t_patient_name);
+      patient_id = tagValue(t_patient_id);
 
       // retrieve both vendor and image type
       const char* ch_vendor = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_vendor );
       const char* ch_image_type = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_imagetype );
-
-      const char* temp = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_sop_instance_uid );
-      if (temp!=nullptr)
-        m_sop_instance_uids.push_back(std::string(temp));
-      else
-        m_sop_instance_uids.push_back("-");
-
-      temp = nullptr; temp = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_frame_of_reference_uid );
-      if (temp!=nullptr)
-        m_frame_of_reference_uids.push_back(std::string(temp));
-      else
-        m_frame_of_reference_uids.push_back("-");
-
-      temp = nullptr; temp = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_series_instance_uid );
-      if (temp!=nullptr)
-        m_series_instance_uids.push_back(std::string(temp));
-      else
-        m_series_instance_uids.push_back("-");
-
-      temp = nullptr; temp = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_study_instance_uid );
-      if (temp!=nullptr)
-        m_study_instance_uids.push_back(std::string(temp));
-      else
-        m_study_instance_uids.push_back("-");
-
-      temp = nullptr; temp = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_patient_name );
-      if (temp!=nullptr)
-        m_patient_names.push_back(std::string(temp));
-      else
-        m_patient_names.push_back("-");
-
-      temp = nullptr; temp = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_patient_id );
-      if (temp!=nullptr)
-        m_patient_ids.push_back(std::string(temp));
-      else
-        m_patient_ids.push_back("-");
 
       if( ch_vendor == nullptr || ch_image_type == nullptr )
       {
@@ -314,33 +301,7 @@ void mitk::DiffusionDICOMFileReader
       std::string image_type = std::string( ch_image_type );
       MITK_INFO("diffusion.dicomreader") << "Output " << outputidx+1 << "  Got vendor: " << vendor << " image type " << image_type;
 
-      // parse vendor tag
-      if(    vendor.find("SIEMENS") != std::string::npos || vendor.find("Siemens HealthCare GmbH") || vendor.find("Siemens Healthineers") != std::string::npos )
-      {
-        if( image_type.find("MOSAIC") != std::string::npos )
-        {
-          headerReader = mitk::DiffusionHeaderSiemensMosaicDICOMFileReader::New();
-          isMosaic = true;
-        }
-        else
-        {
-          headerReader = mitk::DiffusionHeaderSiemensDICOMFileReader::New();
-        }
-
-      }
-      else if( vendor.find("GE") != std::string::npos )
-      {
-        headerReader = mitk::DiffusionHeaderGEDICOMFileReader::New();
-      }
-      else if( vendor.find("Philips") != std::string::npos )
-      {
-        headerReader = mitk::DiffusionHeaderPhilipsDICOMFileReader::New();
-      }
-      else
-      {
-        // unknown vendor
-      }
-
+      headerReader = CreateHeaderReader(vendor, image_type, isMosaic);
       if( headerReader.IsNull() )
       {
         MITK_ERROR << "No header reader for given vendor. ";
@@ -355,13 +316,13 @@ void mitk::DiffusionDICOMFileReader
       continue;
     }
 
-    bool canread = false;
-    // iterate over the threeD+t block
+    // iterate over the threeD+t block; every volume needs its diffusion header
+    bool canread = true;
 
     int numberOfTimesteps = block_0.GetIntProperty("timesteps", 1);
     int framesPerTimestep = block_0.GetImageFrameList().size() / numberOfTimesteps;
 
-    for( int idx = 0; idx < numberOfTimesteps; idx++ )
+    for( int idx = 0; idx < numberOfTimesteps && canread; idx++ )
     {
       int access_idx = idx * framesPerTimestep;
       DICOMImageFrameInfo::Pointer frame = this->GetOutput( outputidx ).GetImageFrameList().at( access_idx );
@@ -378,6 +339,13 @@ void mitk::DiffusionDICOMFileReader
       m_OutputReaderContainer.push_back( headerReader );
       valid_input_list.push_back(true);
 
+      m_sop_instance_uids.push_back(sop_instance_uid);
+      m_frame_of_reference_uids.push_back(frame_of_reference_uid);
+      m_series_instance_uids.push_back(series_instance_uid);
+      m_study_instance_uids.push_back(study_instance_uid);
+      m_patient_names.push_back(patient_name);
+      m_patient_ids.push_back(patient_id);
+
       const char* ch_StudyDescription = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_StudyDescription );
       const char* ch_SeriesDescription = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_SeriesDescription );
       if( ch_StudyDescription != nullptr )
@@ -389,6 +357,10 @@ void mitk::DiffusionDICOMFileReader
         m_Series_names.push_back(ch_SeriesDescription);
       else
         m_Series_names.push_back("-");
+    }
+    else
+    {
+      valid_input_list.push_back(false);
     }
   }
 
@@ -407,7 +379,7 @@ void mitk::DiffusionDICOMFileReader
   this->SetNumberOfOutputs( valid_outputs.size() );
 
   // insert only the valid ones
-  for ( unsigned int outputidx = 0; valid_outputs.size(); ++outputidx )
+  for ( unsigned int outputidx = 0; outputidx < valid_outputs.size(); ++outputidx )
     this->SetOutput( outputidx, valid_outputs.at( outputidx ) );
 
   for( unsigned int outputidx = 0; outputidx < this->GetNumberOfOutputs(); outputidx++ )
@@ -427,6 +399,107 @@ void mitk::DiffusionDICOMFileReader
   }
 }
 
+
+mitk::DiffusionHeaderDICOMFileReader::Pointer mitk::DiffusionDICOMFileReader
+::CreateHeaderReader(const std::string& vendor, const std::string& imageType, bool& isMosaic)
+{
+  isMosaic = false;
+  auto contains = [&vendor](const char* text) { return vendor.find(text) != std::string::npos; };
+
+  if (contains("SIEMENS") || contains("Siemens HealthCare GmbH") || contains("Siemens Healthineers"))
+  {
+    if (imageType.find("MOSAIC") != std::string::npos)
+    {
+      isMosaic = true;
+      return mitk::DiffusionHeaderSiemensMosaicDICOMFileReader::New().GetPointer();
+    }
+    return mitk::DiffusionHeaderSiemensDICOMFileReader::New().GetPointer();
+  }
+  if (contains("GE"))
+    return mitk::DiffusionHeaderGEDICOMFileReader::New().GetPointer();
+  if (contains("Philips"))
+    return mitk::DiffusionHeaderPhilipsDICOMFileReader::New().GetPointer();
+  return nullptr;
+}
+
+std::vector<mitk::Image::Pointer> mitk::DiffusionDICOMFileReader
+::LoadDiffusionDicomSeries(const StringList& files, bool resolveMosaic, bool applyRotationToGradients, const std::string& fallbackName)
+{
+  // The header readers parse decimal numbers with the C library.
+  mitk::LocaleSwitch localeSwitch("C");
+
+  // In addition to the series split of ClassicDICOMSeriesReader, split by geometry, so that every
+  // output is one 3D+t block.
+  mitk::DICOMTagBasedSorter::Pointer tagSorter = mitk::DICOMTagBasedSorter::New();
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0010) ); // Number of Rows
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0011) ); // Number of Columns
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0030) ); // Pixel Spacing
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x1164) ); // Imager Pixel Spacing
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x0037) ); // Image Orientation (Patient)
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x000e) ); // Series Instance UID
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x0050) ); // Slice Thickness
+  tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0008) ); // Number of Frames
+
+  auto tag_sop_instance_uid = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0018), nullptr ); // SOP instance UID (last resort, not really meaningful but decides clearly)
+  auto tag_trigger_time = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0018, 0x1060), tag_sop_instance_uid.GetPointer() ); // trigger time
+  auto tag_aqcuisition_time = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0032), tag_trigger_time.GetPointer()); // aqcuisition time
+  auto tag_aqcuisition_number = mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0020, 0x0012), tag_aqcuisition_time.GetPointer()); // aqcuisition number
+  mitk::DICOMSortCriterion::ConstPointer sorting = mitk::SortByImagePositionPatient::New(tag_aqcuisition_number.GetPointer()).GetPointer();
+  tagSorter->SetSortCriterion( sorting );
+
+  Pointer reader = Self::New();
+  reader->SetResolveMosaic( resolveMosaic );
+  reader->SetApplyRotationToGradients( applyRotationToGradients );
+  reader->AddSortingElement( tagSorter );
+  reader->SetInputFiles( files );
+  try
+  {
+    reader->AnalyzeInputFiles();
+  }
+  catch( const itk::ExceptionObject &e)
+  {
+    MITK_ERROR << "Failed to analyze data. " << e.what();
+  }
+  catch( const std::exception &se)
+  {
+    MITK_ERROR << "Std Exception " << se.what();
+  }
+
+  reader->LoadImages();
+
+  std::vector<Image::Pointer> images;
+  for( unsigned int o = 0; o < reader->GetNumberOfOutputs(); o++ )
+  {
+    Image::Pointer image = reader->GetOutput(o).GetMitkImage();
+
+    std::string name = reader->GetSeriesName(o);
+    if (name == "-")
+      name = reader->GetStudyName(o);
+    if (name == "-")
+    {
+      name = fallbackName;
+      if (name.empty())
+        image->GetPropertyList()->GetStringProperty("diffusion.dicom.importname", name);
+    }
+    image->SetProperty("name", StringProperty::New(name));
+
+    const std::pair<const char*, const std::vector<std::string>*> dicomValues[] = {
+      {"DICOM.patient_id", &reader->m_patient_ids},
+      {"DICOM.patient_name", &reader->m_patient_names},
+      {"DICOM.study_instance_uid", &reader->m_study_instance_uids},
+      {"DICOM.series_instance_uid", &reader->m_series_instance_uids},
+      {"DICOM.sop_instance_uid", &reader->m_sop_instance_uids},
+      {"DICOM.frame_of_reference_uid", &reader->m_frame_of_reference_uids}};
+    for (const auto& [key, values] : dicomValues)
+    {
+      if (values->size() > o)
+        image->GetPropertyList()->SetStringProperty(key, values->at(o).c_str());
+    }
+
+    images.push_back(image);
+  }
+  return images;
+}
 
 bool mitk::DiffusionDICOMFileReader
 ::CanHandleFile(const std::string & /* filename */)

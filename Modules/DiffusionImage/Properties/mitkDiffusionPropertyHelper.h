@@ -26,25 +26,29 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDataNode.h>
 #include <usModuleActivator.h>
 
+#include <optional>
+
 namespace mitk
 {
   /** \brief Helper class for mitk::Images containing diffusion weighted data
   *
   * This class takes a pointer to a mitk::Image containing diffusion weighted information and provides
-  * functions to manipulate the diffusion meta-data. Will log an error if required information is
-  * missing.
+  * functions to manipulate the diffusion meta-data. The getters throw mitk::Exception if the image
+  * lacks the requested property. The class has static functions only.
   */
 
   class MITKDIFFUSIONIMAGE_EXPORT DiffusionPropertyHelper
   {
   public:
 
-    typedef short                                                         DiffusionPixelType;
-    typedef mitk::BValueMapProperty::BValueMap                            BValueMapType;
-    typedef GradientDirectionsProperty::GradientDirectionType             GradientDirectionType;
-    typedef GradientDirectionsProperty::GradientDirectionsContainerType   GradientDirectionsContainerType;
-    typedef mitk::MeasurementFrameProperty::MeasurementFrameType          MeasurementFrameType;
-    typedef itk::VectorImage< DiffusionPixelType, 3>                      ImageType;
+    using DiffusionPixelType = short;
+    using BValueMapType = mitk::BValueMapProperty::BValueMap;
+    using GradientDirectionType = GradientDirectionsProperty::GradientDirectionType;
+    using GradientDirectionsContainerType = GradientDirectionsProperty::GradientDirectionsContainerType;
+    using MeasurementFrameType = mitk::MeasurementFrameProperty::MeasurementFrameType;
+    using ImageType = itk::VectorImage<DiffusionPixelType, 3>;
+
+    DiffusionPropertyHelper() = delete;
 
     static bool IsDiffusionWeightedImage(const mitk::Image *);
     static bool IsDiffusionWeightedImage(const mitk::DataNode* node);
@@ -54,8 +58,8 @@ namespace mitk
     static ImageType::Pointer GetItkVectorImage(Image *image);
     static const BValueMapType & GetBValueMap(const mitk::Image *);
     static float GetReferenceBValue(const mitk::Image *);
-    static std::vector< int > GetBValueVector(const mitk::Image *);
-    static const MeasurementFrameType & GetMeasurementFrame(const mitk::Image *);
+    /** Identity when the image has no measurement frame. */
+    static MeasurementFrameType GetMeasurementFrame(const mitk::Image *);
     static const GradientDirectionsContainerType::ConstPointer GetOriginalGradientContainer(const mitk::Image *);
     static const GradientDirectionsContainerType::ConstPointer GetGradientContainer(const mitk::Image *);
 
@@ -68,11 +72,15 @@ namespace mitk
     static void SetOriginalGradientContainer(mitk::Image* image, GradientDirectionsContainerType::Pointer g_cont);
     static void SetGradientContainer(mitk::Image* image, GradientDirectionsContainerType::ConstPointer g_cont);
     static void SetGradientContainer(mitk::Image* image, GradientDirectionsContainerType::Pointer g_cont);
-    static void RotateGradients(mitk::Image* image, vnl_matrix_fixed<double, 3, 3> rotation_matrix, bool normalize_columns);
-    static void RotateOriginalGradients(mitk::Image* image, vnl_matrix_fixed<double, 3, 3> rotation_matrix, bool normalize_columns);
 
     static void AverageRedundantGradients(mitk::Image* image, double precision);
     static void InitializeImage(mitk::Image* image);
+    /**
+     * Sets what a file defines (gradients as stored, reference b-value, measurement frame, whether
+     * the image rotation is applied to the gradients) and derives the rest with InitializeImage(image).
+     * Used by the DWI readers, after the pixel data and geometry are set.
+     */
+    static void InitializeImage(mitk::Image* image, GradientDirectionsContainerType::ConstPointer originalGradients, float referenceBValue, const MeasurementFrameType& measurementFrame, bool applyImageRotation);
 
     static GradientDirectionsContainerType::Pointer CalcAveragedDirectionSet(double precision, GradientDirectionsContainerType::ConstPointer directions);
 
@@ -80,14 +88,12 @@ namespace mitk
 
     static const std::string GetBvaluePropertyName() { return BVALUEMAPPROPERTYNAME; }
     static const std::string GetGradientContainerPropertyName() { return GRADIENTCONTAINERPROPERTYNAME; }
+    static const std::string GetOriginalGradientContainerPropertyName() { return ORIGINALGRADIENTCONTAINERPROPERTYNAME; }
     static const std::string GetMeasurementFramePropertyName() { return MEASUREMENTFRAMEPROPERTYNAME; }
 
     static void CopyDICOMProperties(const BaseData *source, BaseData *target);
 
   protected:
-
-    DiffusionPropertyHelper();
-    ~DiffusionPropertyHelper();
 
     static const std::string GRADIENTCONTAINERPROPERTYNAME;
     static const std::string ORIGINALGRADIENTCONTAINERPROPERTYNAME;
@@ -113,6 +119,12 @@ namespace mitk
     static void UnApplyMeasurementFrameAndRotationMatrix(mitk::Image* image);
 
     /**
+    * \brief The factors of ApplyMeasurementFrameAndRotationMatrix: the image rotation (direction
+    * matrix) and the measurement frame, each empty if the image's flags say it is not applied
+    */
+    static void GetGradientTransform(const mitk::Image* image, std::optional<MeasurementFrameType>& rotation, std::optional<MeasurementFrameType>& frame);
+
+    /**
     * \brief Update the BValueMap (m_B_ValueMap) using the current gradient directions (m_Directions)
     *
     * \warning Have to be called after each manipulation on the GradientDirectionContainer
@@ -122,9 +134,6 @@ namespace mitk
 
     /// Determines whether gradients can be considered to be equal
     static bool AreAlike(GradientDirectionType g1, GradientDirectionType g2, double precision);
-
-    /// Get the b value belonging to an index
-    static float GetB_Value(const mitk::Image* image, unsigned int i);
   };
 }
 #endif

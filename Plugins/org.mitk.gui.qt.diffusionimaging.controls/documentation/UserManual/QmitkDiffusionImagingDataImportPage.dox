@@ -11,11 +11,11 @@ MITK Diffusion uses a left-posterior-superior coordinate system convention. Othe
 
 This section describes the different file formats of raw diffusion-weighted images that are supported by MITK Diffusion.
 General points:
-\li MITK Diffusion internally applies the image rotation matrix to the diffusion-gradient vectors while loading the image. The original gradient directions are retained and used when saving the image again.
+\li Inside MITK Diffusion, the diffusion-gradient vectors are given in world coordinates (LPS), independent of the image orientation. While loading, MITK converts the vectors of the file to world coordinates (see the measurement frame of NRRD files and the bvecs convention of NIfTI files below); while saving, it converts them back, so that loading the saved file gives the same gradient vectors.
 
 \subsection dwi_nrrd NRRD (.nrrd/.dwi)
 
-NRRD (http://teem.sourceforge.net/nrrd/format.html) is the default file format for saving diffusion-weighted images with MITK Diffusion. The gradient and b-value information is directly stored in the file header. The image information is stored as a 3D vector image. Storing the file as .dwi or .nrrd is equivalent, only the file ending is different. Diffusion-weighted images are discerned from other images by the tag "modality:=DWMRI" in the NRRD image header. The gradient information is stored in the NRRD header in the following way:
+NRRD (http://teem.sourceforge.net/nrrd/format.html) is the default file format for saving diffusion-weighted images with MITK Diffusion. The gradient and b-value information is directly stored in the file header. The image information is stored as a 3D vector image. Storing the file as .dwi or .nrrd is equivalent, only the file ending is different. NRRD files with a detached header (.nhdr, .hdwi) can be read as well. Diffusion-weighted images are discerned from other images by the tag "modality:=DWMRI" in the NRRD image header. The gradient information is stored in the NRRD header in the following way:
 
 DWMRI_b-value:=1000.000000
 
@@ -29,11 +29,11 @@ DWMRI_gradient_0002:=-0.051773 0.252917 0.966102
 
 The b-value of the individual gradient directions is encoded via the squared norm of the respective vector. The tag "DWMRI_b-value" defines which b-value corresponds to a vector with norm 1.
 
-In some cases, dMRI NRRD files contain an additional "measurement frame" matrix, which specifies an additional rotation of the gradient vectors. This matrix is automatically applied when loading the file. The original gradient directions are retained and used when saving the image again.
+dMRI NRRD files can contain a "measurement frame" matrix, which defines the coordinate system of the gradient vectors. It is applied when loading the file, as the NRRD format defines it. MITK Diffusion saves the gradient vectors in world coordinates together with an identity measurement frame. Files saved by earlier versions of MITK Diffusion are recognized by their own "measurement frame:=" entry and are loaded as before.
 
 \subsection dwi_nifti NIFTI (.nii/.ni.gz)
 
-Diffusion-weighted images can be saved and loaded as NIFTI files (NIFTI-1 https://nifti.nimh.nih.gov/nifti-1). The gradient vector information is stored in to separate files for b-values (filename.bvals) and gradient vectors (filename.bvecs). When loading a nifti file (.nii or .nii.gz), MITK Diffusion looks for these two additional files (.bval/.bvals and .bvec/.bvecs) and if they are found, MITK will offer to load the image as diffusion-weighted image. In contrast to the NRRD format, all gradient vectors should have a length of 1. The b-values are stored explicietly in the .bval/.bvals file. When loaded into MITK, this information is again encoded into the gradient vectors, as it is done in the NRRD file format.
+Diffusion-weighted images can be saved and loaded as NIFTI files (NIFTI-1 https://nifti.nimh.nih.gov/nifti-1). The gradient vector information is stored in to separate files for b-values (filename.bvals) and gradient vectors (filename.bvecs). When loading a nifti file (.nii or .nii.gz), MITK Diffusion looks for these two additional files (.bval/.bvals and .bvec/.bvecs) and if they are found, MITK will offer to load the image as diffusion-weighted image. In contrast to the NRRD format, all gradient vectors should have a length of 1. The b-values are stored explicietly in the .bval/.bvals file. When loaded into MITK, this information is again encoded into the gradient vectors, as it is done in the NRRD file format. Files named "bvals" and "bvecs" in the folder of the image (as in the data of the Human Connectome Project) are found as well. The gradient vectors follow the convention of FSL, which MRtrix uses too: they are given in the voxel coordinate system of the image, with the x component negated if the image matrix has a positive determinant. MITK Diffusion reads and writes bvecs files in this convention.
 
 \subsection dwi_dicom DICOM
 

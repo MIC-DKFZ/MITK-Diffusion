@@ -6,7 +6,12 @@
 mitk::DiffusionHeaderSiemensMosaicDICOMFileReader::DiffusionHeaderSiemensMosaicDICOMFileReader()
   : DiffusionHeaderSiemensDICOMFileReader()
 {
-
+  m_MosaicDescriptor.nimages = 0;
+  m_MosaicDescriptor.slicenormalup = true;
+  m_MosaicDescriptor.spacing.Fill(1.0);
+  m_MosaicDescriptor.direction.SetIdentity();
+  for (auto& o : m_MosaicDescriptor.origin)
+    o = 0;
 }
 
 mitk::DiffusionHeaderSiemensMosaicDICOMFileReader
@@ -46,7 +51,7 @@ void mitk::DiffusionHeaderSiemensMosaicDICOMFileReader
       std::stringstream iplss( inplace_spacing );
       std::string buffer;
       unsigned int idx=0;
-      while( std::getline( iplss, buffer, '\\' ) )
+      while( idx < 2 && std::getline( iplss, buffer, '\\' ) )
       {
         std::istringstream substream(buffer);
         substream >> this->m_MosaicDescriptor.spacing[idx++];
@@ -55,12 +60,12 @@ void mitk::DiffusionHeaderSiemensMosaicDICOMFileReader
 
   // (0020,0032) DS [-802.51815986633\-801.18644070625\-30.680992126465] #  50, 3 ImagePositionPatient
   std::string position_patient;
-  if( RevealBinaryTag( gdcm::Tag( 0x0028, 0x0032), dataset, position_patient) )
+  if( RevealBinaryTag( gdcm::Tag( 0x0020, 0x0032), dataset, position_patient) )
   {
-    std::stringstream ppass( inplace_spacing );
+    std::stringstream ppass( position_patient );
     std::string buffer;
     unsigned int idx=0;
-    while( std::getline( ppass, buffer, '\\' ) )
+    while( idx < 3 && std::getline( ppass, buffer, '\\' ) )
     {
       std::istringstream substream(buffer);
       substream >> this->m_MosaicDescriptor.origin[idx++];
@@ -105,8 +110,11 @@ bool mitk::DiffusionHeaderSiemensMosaicDICOMFileReader
                         specs
                         );
 
-      header_values.n_images = value_array[0];
-      this->m_MosaicDescriptor.nimages = value_array[0];
+      if (!value_array.empty())
+      {
+        header_values.n_images = value_array[0];
+        this->m_MosaicDescriptor.nimages = value_array[0];
+      }
     }
 
     tag_position = siemens_diffusionheader_str.find("SliceNormalVector", 0);
@@ -135,9 +143,9 @@ bool mitk::DiffusionHeaderSiemensMosaicDICOMFileReader
 
 
     m_HeaderInformationList.push_back( header_values );
-
+    return true;
   }
 
-  return (m_HeaderInformationList.size() > 0);
+  return false;
 
 }

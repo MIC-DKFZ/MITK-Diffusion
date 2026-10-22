@@ -107,12 +107,21 @@ Facts the layout does not show:
   `resource/` folder, so it needs network. MITK embeds module resources only from `resource/`.
 - Module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each `Testing/`
   folder and read input from `${MITK_DATA_DIR}/DiffusionImaging/`.
+- Gradient convention: the modified gradients (`DiffusionPropertyHelper::GetGradientContainer`),
+  which all filters, mappers, trackers and Fiberfox use, are world (LPS) vectors,
+  `modified = MF^T * original` with the stored measurement frame `MF` (frame axes as rows) and
+  without the image rotation. NIfTI bvals/bvecs follow FSL, as MRtrix does (voxel frame, x negated
+  when the image matrix has a positive determinant); NRRD uses the standard `measurement frame`
+  field. NRRD files of earlier MITK versions (only MITK's `measurement frame:=` key) are read as
+  before, with the image rotation applied; DICOM import is unchanged and has no test data.
+  `ctest -R 'mitkDiffusion(Property|Image|Dicom)'` runs the `DiffusionImage` tests of readers,
+  writers and property helper.
 
 ## Porting state
 
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 14 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
+all 18 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
 - The two `DiffusionRegistration` tests are compiled but deliberately not registered; they were
   commented out before the 2024 test refactoring.

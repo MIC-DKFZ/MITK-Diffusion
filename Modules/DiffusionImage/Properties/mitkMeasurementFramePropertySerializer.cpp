@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkMeasurementFrameProperty.h"
 #include <MitkDiffusionImageExports.h>
 #include <tinyxml2.h>
+#include <limits>
 
 namespace mitk
 {
@@ -47,6 +48,7 @@ class MITKDIFFUSIONIMAGE_EXPORT MeasurementFramePropertySerializer : public Base
 
         auto  child = doc.NewElement("entry");
         std::stringstream ss;
+        ss.precision(std::numeric_limits<double>::max_digits10);
         ss << mft;
         child->SetAttribute("value", ss.str().c_str());
         element->InsertEndChild(child);
@@ -60,13 +62,11 @@ class MITKDIFFUSIONIMAGE_EXPORT MeasurementFramePropertySerializer : public Base
     {
       if (!element) return nullptr;
 
-      const tinyxml2::XMLElement* entry = element->FirstChildElement( "entry" )->ToElement();
-
-      std::stringstream ss;
-      std::string value;
-
-	  value = std::string(entry->Attribute("value"));
-      ss << value;
+      const tinyxml2::XMLElement* entry = element->FirstChildElement( "entry" );
+      const char* value = entry != nullptr ? entry->Attribute("value") : nullptr;
+      if (value == nullptr)
+        return nullptr;
+      std::stringstream ss(value);
 
       MeasurementFrameProperty::MeasurementFrameType matrix;
       matrix.read_ascii(ss);

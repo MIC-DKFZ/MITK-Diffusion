@@ -16,18 +16,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkDiffusionImageHelperFunctions.h"
 
-#include <boost/math/special_functions/legendre.hpp>
-#include <boost/math/special_functions/spherical_harmonic.hpp>
-#include <boost/version.hpp>
-#include <boost/algorithm/string.hpp>
 #include "itkVectorContainer.h"
 #include <vtkBox.h>
-#include <vtkMath.h>
 #include <itksys/SystemTools.hxx>
+#include <charconv>
+#include <fstream>
+#include <limits>
+#include <sstream>
+#include <vnl/vnl_det.h>
 
 // Intersect a finite line (with end points p0 and p1) with all of the
 // cells of a vtkImageData
-std::vector< std::pair< itk::Index<3>, double > > mitk::imv::IntersectImage(const itk::Vector<double,3>& spacing, itk::Index<3>& si, itk::Index<3>& ei, itk::ContinuousIndex<float, 3>& sf, itk::ContinuousIndex<float, 3>& ef)
+std::vector< std::pair< itk::Index<3>, double > > mitk::imv::IntersectImage(const itk::Vector<double,3>& spacing, itk::Index<3> si, itk::Index<3> ei, const itk::ContinuousIndex<float, 3>& sf, const itk::ContinuousIndex<float, 3>& ef)
 {
   std::vector< std::pair< itk::Index<3>, double > > out;
   if (si == ei)
@@ -124,92 +124,68 @@ std::vector< std::pair< itk::Index<3>, double > > mitk::imv::IntersectImage(cons
 //------------------------- gradients-function ------------------------------------
 
 
+namespace
+{
+  /** The numbers of each non-empty line of a text file. */
+  std::vector<std::vector<double>> ReadNumberRows(const std::string& file, const std::string& what)
+  {
+    if (!itksys::SystemTools::FileExists(file))
+      mitkThrow() << what << " file not existing: " << file;
+    std::ifstream stream(file);
+    if (!stream.is_open())
+      mitkThrow() << what << " file could not be opened: " << file;
+
+    std::vector<std::vector<double>> rows;
+    std::string line;
+    while (std::getline(stream, line))
+    {
+      std::vector<double> row;
+      std::istringstream tokens(line);
+      std::string token;
+      while (tokens >> token)
+      {
+        double value = 0;
+        const auto [end, error] = std::from_chars(token.data(), token.data() + token.size(), value);
+        if (error != std::errc() || end != token.data() + token.size())
+          mitkThrow() << "Encountered invalid " << what << " file entry >" << token << "< in " << file;
+        row.push_back(value);
+      }
+      if (!row.empty())
+        rows.push_back(row);
+    }
+    return rows;
+  }
+}
+
 mitk::gradients::GradientDirectionContainerType::ConstPointer mitk::gradients::ReadBvalsBvecs(std::string bvals_file, std::string bvecs_file, double& reference_bval)
 {
-  mitk::gradients::GradientDirectionContainerType::Pointer directioncontainer = mitk::gradients::GradientDirectionContainerType::New();
+  std::vector<double> bval_entries;
+  for (const auto& row : ReadNumberRows(bvals_file, "bvals"))
+    bval_entries.insert(bval_entries.end(), row.begin(), row.end());
+  const auto bvec_rows = ReadNumberRows(bvecs_file, "bvecs");
 
-  std::vector<float> bvec_entries;
-  if (!itksys::SystemTools::FileExists(bvecs_file))
-    mitkThrow() << "bvecs file not existing: " << bvecs_file;
-  else
+  const auto n = bval_entries.size();
+  // FSL writes three rows of n values. A file with one gradient per line is rejected rather than
+  // transposed silently, since its frame is not known.
+  if (bvec_rows.size() != 3 || bvec_rows[0].size() != n || bvec_rows[1].size() != n || bvec_rows[2].size() != n)
   {
-    std::string line;
-    std::ifstream myfile (bvecs_file.c_str());
-    if (myfile.is_open())
-    {
-      while (std::getline(myfile, line))
-      {
-        std::vector<std::string> strs;
-        boost::split(strs,line,boost::is_any_of("\t \n\r"));
-        for (auto token : strs)
-        {
-          if (!token.empty())
-          {
-            try
-            {
-              bvec_entries.push_back(boost::lexical_cast<float>(token));
-            }
-            catch(...)
-            {
-              mitkThrow() << "Encountered invalid bvecs file entry >" << token << "<";
-            }
-          }
-        }
-      }
-      myfile.close();
-    }
-    else
-    {
-      mitkThrow() << "bvecs file could not be opened: " << bvals_file;
-    }
+    mitkThrow() << "bvecs file " << bvecs_file << " has " << bvec_rows.size() << " rows; expected 3 rows of "
+                << n << " values, one per b-value in " << bvals_file;
   }
 
   reference_bval = -1;
-  std::vector<float> bval_entries;
-  if (!itksys::SystemTools::FileExists(bvals_file))
-    mitkThrow() << "bvals file not existing: " << bvals_file;
-  else
-  {
-    std::string line;
-    std::ifstream myfile (bvals_file.c_str());
-    if (myfile.is_open())
-    {
-      while (std::getline(myfile, line))
-      {
-        std::vector<std::string> strs;
-        boost::split(strs,line,boost::is_any_of("\t \n\r"));
-        for (auto token : strs)
-        {
-          if (!token.empty())
-          {
-            try {
-              bval_entries.push_back(boost::lexical_cast<float>(token));
-              if (bval_entries.back()>reference_bval)
-                reference_bval = bval_entries.back();
-            }
-            catch(...)
-            {
-              mitkThrow() << "Encountered invalid bvals file entry >" << token << "<";
-            }
-          }
-        }
-      }
-      myfile.close();
-    }
-    else
-    {
-      mitkThrow() << "bvals file could not be opened: " << bvals_file;
-    }
-  }
+  for (auto b : bval_entries)
+    reference_bval = std::max(reference_bval, b);
 
-  for(unsigned int i=0; i<bval_entries.size(); i++)
+  auto directioncontainer = mitk::gradients::GradientDirectionContainerType::New();
+  for (unsigned int i = 0; i < n; i++)
   {
     double b_val = bval_entries.at(i);
 
     mitk::gradients::GradientDirectionType vec;
-    vec[0] = bvec_entries.at(i);
-    vec[1] = bvec_entries.at(i+bval_entries.size());
-    vec[2] = bvec_entries.at(i+2*bval_entries.size());
+    vec[0] = bvec_rows[0][i];
+    vec[1] = bvec_rows[1][i];
+    vec[2] = bvec_rows[2][i];
 
     if (b_val>0 && vec.magnitude() < 0.001) // could be IVIM data --> set vec to  1,0,0
     {
@@ -237,19 +213,28 @@ mitk::gradients::GradientDirectionContainerType::ConstPointer mitk::gradients::R
   return GradientDirectionContainerType::ConstPointer(directioncontainer);
 }
 
+mitk::DiffusionPropertyHelper::MeasurementFrameType mitk::gradients::FslBvecsMeasurementFrame(const itk::Matrix<double, 3, 3>& direction)
+{
+  // FSL gives bvecs in the voxel frame, with x negated when the voxel-to-world matrix has a positive
+  // determinant (RAS and LPS matrices have the same determinant). The world vector is then
+  // direction * flip * bvec; measurement frames hold the frame axes as rows.
+  vnl_matrix_fixed<double, 3, 3> toWorld = direction.GetVnlMatrix();
+  if (vnl_det(toWorld) > 0)
+    toWorld.set_column(0, -toWorld.get_column(0));
+  return toWorld.transpose();
+}
+
 void mitk::gradients::WriteBvalsBvecs(std::string bvals_file, std::string bvecs_file, GradientDirectionContainerType::ConstPointer gradients, double reference_bval)
 {
   std::ofstream myfile;
   myfile.open (bvals_file.c_str());
   for(unsigned int i=0; i<gradients->Size(); i++)
-  {
-    double twonorm = gradients->ElementAt(i).two_norm();
-    myfile << std::round(reference_bval*twonorm*twonorm) << " ";
-  }
+    myfile << mitk::BValueMapProperty::GetBValue(gradients->ElementAt(i), reference_bval) << " ";
   myfile.close();
 
   std::ofstream myfile2;
   myfile2.open (bvecs_file.c_str());
+  myfile2.precision(std::numeric_limits<double>::max_digits10);
   for(int j=0; j<3; j++)
   {
     for(unsigned int i=0; i<gradients->Size(); i++)
@@ -284,7 +269,9 @@ std::vector<unsigned int> mitk::gradients::GetAllUniqueDirections(const BValueMa
       bool directionExist = false;
       while(containerIt != directioncontainer.end())
       {
-        if (fabs(dot_product(refGradientsContainer->ElementAt(*containerIt), refGradientsContainer->ElementAt(wntIndex)))  > 0.9998)
+        // The gradient length encodes the b-value; only the directions are compared.
+        if (fabs(dot_product(GradientDirectionType(refGradientsContainer->ElementAt(*containerIt)).normalize(),
+                             GradientDirectionType(refGradientsContainer->ElementAt(wntIndex)).normalize())) > 0.9998)
         {
           directionExist = true;
           break;
@@ -301,33 +288,6 @@ std::vector<unsigned int> mitk::gradients::GetAllUniqueDirections(const BValueMa
   return directioncontainer;
 }
 
-
-bool mitk::gradients::CheckForDifferingShellDirections(const BValueMap & refBValueMap, GradientDirectionContainerType::ConstPointer refGradientsContainer)
-{
-  auto mapIterator = refBValueMap.begin();
-
-  if(refBValueMap.find(0) != refBValueMap.end() && refBValueMap.size() > 1)
-    mapIterator++; //skip bzero Values
-
-  for( ; mapIterator != refBValueMap.end(); mapIterator++){
-
-    auto mapIterator_2 = refBValueMap.begin();
-    if(refBValueMap.find(0) != refBValueMap.end() && refBValueMap.size() > 1)
-      mapIterator_2++; //skip bzero Values
-
-    for( ; mapIterator_2 != refBValueMap.end(); mapIterator_2++){
-
-      if(mapIterator_2 == mapIterator) continue;
-
-      IndiciesVector currentShell = mapIterator->second;
-      IndiciesVector testShell = mapIterator_2->second;
-      for (unsigned int i = 0; i< currentShell.size(); i++)
-        if (fabs(dot_product(refGradientsContainer->ElementAt(currentShell[i]), refGradientsContainer->ElementAt(testShell[i])))  <= 0.9998) { return true; }
-
-    }
-  }
-  return false;
-}
 
 void mitk::gradients::Cart2Sph(double x, double y, double z, double *spherical)
 {
@@ -405,7 +365,8 @@ mitk::gradients::GradientDirectionContainerType::Pointer mitk::gradients::Create
       bool directionExist = false;
       while(containerIt != directioncontainer->End())
       {
-        if (fabs(dot_product(containerIt.Value(), origninalGradentcontainer->ElementAt(wntIndex)))  > 0.9998)
+        // The gradient length encodes the b-value; only the directions are compared.
+        if (fabs(dot_product(containerIt.Value(), GradientDirectionType(origninalGradentcontainer->ElementAt(wntIndex)).normalize())) > 0.9998)
         {
           directionExist = true;
           break;

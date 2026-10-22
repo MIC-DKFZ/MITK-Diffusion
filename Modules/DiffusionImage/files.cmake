@@ -1,6 +1,5 @@
 set(H_FILES
 
-    mitkDiffusionImageHeaderInformation.h
     mitkDiffusionImageHelperFunctions.h
 
     IO/mitkDiffusionImageMimeTypes.h
@@ -12,11 +11,6 @@ set(H_FILES
     IO/mitkDiffusionImageNiftiWriter.h
 
     # DicomImport
-    IO/DicomImport/mitkDicomDiffusionImageHeaderReader.h
-    IO/DicomImport/mitkGEDicomDiffusionImageHeaderReader.h
-    IO/DicomImport/mitkPhilipsDicomDiffusionImageHeaderReader.h
-    IO/DicomImport/mitkSiemensDicomDiffusionImageHeaderReader.h
-    IO/DicomImport/mitkSiemensMosaicDicomDiffusionImageHeaderReader.h
     IO/DicomImport/mitkDiffusionDICOMFileReader.h
     IO/DicomImport/mitkDiffusionHeaderDICOMFileReader.h
     IO/DicomImport/mitkDiffusionHeaderSiemensDICOMFileReader.h
@@ -30,12 +24,12 @@ set(H_FILES
     Properties/mitkGradientDirectionsProperty.h
     Properties/mitkMeasurementFrameProperty.h
     Properties/mitkDiffusionPropertyHelper.h
+    Properties/mitkNodePredicateIsDWI.h
 
 )
 
 set(CPP_FILES
 
-    mitkDiffusionImageHeaderInformation.cpp
     mitkDiffusionImageHelperFunctions.cpp
 
     IO/mitkDiffusionImageServiceActivator.cpp
@@ -48,11 +42,6 @@ set(CPP_FILES
     IO/mitkDiffusionImageNiftiWriter.cpp
 
     # DicomImport
-    IO/DicomImport/mitkDicomDiffusionImageHeaderReader.cpp
-    IO/DicomImport/mitkGEDicomDiffusionImageHeaderReader.cpp
-    IO/DicomImport/mitkPhilipsDicomDiffusionImageHeaderReader.cpp
-    IO/DicomImport/mitkSiemensDicomDiffusionImageHeaderReader.cpp
-    IO/DicomImport/mitkSiemensMosaicDicomDiffusionImageHeaderReader.cpp
     IO/DicomImport/mitkDiffusionDICOMFileReader.cpp
     IO/DicomImport/mitkDiffusionHeaderDICOMFileReader.cpp
     IO/DicomImport/mitkDiffusionHeaderSiemensDICOMFileReader.cpp

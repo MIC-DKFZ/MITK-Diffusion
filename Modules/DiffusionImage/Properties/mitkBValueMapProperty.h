@@ -37,11 +37,11 @@ namespace mitk
     * key   := b value
     * value := indicesVector
     */
-    typedef std::map< unsigned int , std::vector< unsigned int >  >   BValueMap;
-    typedef unsigned int                                              IndexType;
-    typedef vnl_vector_fixed< double, 3 >                             ValueType;
-    typedef ValueType                                                 GradientDirectionType;
-    typedef itk::VectorContainer< IndexType, GradientDirectionType >  GradientDirectionsContainerType;
+    using BValueMap = std::map<unsigned int, std::vector<unsigned int>>;
+    using IndexType = unsigned int;
+    using ValueType = vnl_vector_fixed< double, 3 >;
+    using GradientDirectionType = ValueType;
+    using GradientDirectionsContainerType = itk::VectorContainer< IndexType, GradientDirectionType >;
     mitkClassMacro(BValueMapProperty, BaseProperty)
 
     itkFactorylessNewMacro(Self)
@@ -54,7 +54,11 @@ namespace mitk
     void SetBValueMap(const BValueMap & map);
 
     static BValueMap CreateBValueMap(const GradientDirectionsContainerType * gdc, float referenceBValue);
-    static float GetBValueOfGradientDirection(unsigned int i, float referenceBValue, const GradientDirectionsContainerType *gdc);
+    /**
+     * The b-value of a gradient whose squared length is its b-value relative to the reference
+     * b-value, rounded half away from zero. The one b-value computation of the module.
+     */
+    static double GetBValue(const GradientDirectionType& gradient, double referenceBValue);
 
     std::string GetValueAsString() const override
     { return ""; }
