@@ -88,7 +88,7 @@ Facts the layout does not show:
   mitk-diffusion requests its libraries in `CMakeExternals/ExternalProjectList.cmake`; a new
   Boost include needs its library added there before the next superbuild.
 - Debug builds and `MITK_USE_Python3=ON` do not go together in MITK, so `DiffusionDebug` forces
-  Python off, and `DiffusionRelease` inherits that to keep both builds alike. Its build type is
+  Python off; `DiffusionRelease` includes it and switches Python on again. Its build type is
   forced to `Debug`, `set_release.txt` forces `Release`.
 - Configuring `FiberTracking` downloads a lookup-table tarball from mitk.org into its binary
   `resource/` folder, so it needs network. MITK embeds module resources only from `resource/`.
@@ -105,10 +105,11 @@ the build reveals.
   (`git -C mitk show 1bd606f7cf`; MITK moved its charts to `QmitkPlotWidget`, Qwt).
   `Plugins/org.mitk.gui.qt.diffusionimaging.ivim/src/internal/QmitkIVIMView.cpp:176-253` and
   `QmitkIVIMViewControls.ui:178` still use it; the plugin no longer depends on `MitkChart`.
-- MITK's `org.mitk.gui.qt.segmentation`, which the diffusion configurations switch on, does not
-  compile with Python off: `MakeError` in
+- MITK's `org.mitk.gui.qt.segmentation` does not compile with Python off: `MakeError` in
   `mitk/Plugins/org.mitk.gui.qt.segmentation/src/internal/QmitkSegmentationRestRoutes.cpp:465`
   is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.
+  `DiffusionDebug` switches the plugin off, `DiffusionRelease` (Python on) keeps it;
+  `Tractography`, `Fiberfox` and `IVIM` switch it on without switching Python on.
 - `FiberfoxParameters` (`Modules/MriSimulation/mitkFiberfoxParameters.h`) deep-copies its signal
   models on copy construction but shares them on assignment, and never deletes them.
 - `mitk-diffusion/README.md` build section is outdated (Qt 6.6.1, GitHub URLs, manual inner
