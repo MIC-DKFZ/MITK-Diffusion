@@ -806,17 +806,14 @@ void mitk::OdfVtkMapper2D<T,N>
   mitk::Image::Pointer input = const_cast<mitk::Image*>( this->GetInput() );
   if ( input.IsNull() ) return ;
 
-  std::string classname("TensorImage");
-  if(classname.compare(input->GetNameOfClass())==0)
-    m_VtkImage = dynamic_cast<mitk::TensorImage*>( this->GetInput() )->GetNonRgbVtkImageData();
-
-  std::string qclassname("OdfImage");
-  if(qclassname.compare(input->GetNameOfClass())==0)
-    m_VtkImage = dynamic_cast<mitk::OdfImage*>( this->GetInput() )->GetNonRgbVtkImageData();
-
-  std::string shclassname("ShImage");
-  if(shclassname.compare(input->GetNameOfClass())==0)
-    m_VtkImage = dynamic_cast<mitk::ShImage*>( this->GetInput() )->GetNonRgbVtkImageData();
+  // Reset, so that no image of an earlier update is drawn for unsupported data.
+  m_VtkImage = nullptr;
+  if (auto tensorImage = dynamic_cast<mitk::TensorImage*>(input.GetPointer()))
+    m_VtkImage = tensorImage->GetNonRgbVtkImageData();
+  else if (auto odfImage = dynamic_cast<mitk::OdfImage*>(input.GetPointer()))
+    m_VtkImage = odfImage->GetNonRgbVtkImageData();
+  else if (auto shImage = dynamic_cast<mitk::ShImage*>(input.GetPointer()))
+    m_VtkImage = shImage->GetNonRgbVtkImageData();
 
   if( m_VtkImage )
   {

@@ -143,7 +143,7 @@ private:
     std::vector< vtkSmartPointer<vtkClipPolyData> >   m_Clippers1;
     std::vector< vtkSmartPointer<vtkThickPlane> >     m_ThickPlanes2;
     std::vector< vtkSmartPointer<vtkClipPolyData> >   m_Clippers2;
-    vtkImageData*                                     m_VtkImage ;
+    vtkImageData*                                     m_VtkImage = nullptr;
     std::vector< OdfDisplayGeometry >                 m_LastDisplayGeometry;
     mitk::LocalStorageHandler<LocalStorage>           m_LSH;
     vtkSmartPointer<vtkImageProbeFilter>              m_ProbeFilter;
