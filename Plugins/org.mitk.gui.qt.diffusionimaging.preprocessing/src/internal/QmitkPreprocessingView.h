@@ -62,7 +62,6 @@ protected slots:
   void DoReduceGradientDirections();
   void DoShowGradientDirections();
   void DoHalfSphereGradientDirections();
-  void UpdateDwiBValueMapRounder(int i);
   void DoLengthCorrection();
   void DoResampleImage();
   void DoCropImage();

@@ -175,7 +175,6 @@ void QmitkPreprocessingView::CreateConnections()
   connect(m_Controls->m_MirrorGradientToHalfSphereButton, &QAbstractButton::clicked, this, &QmitkPreprocessingView::DoHalfSphereGradientDirections);
   connect(m_Controls->m_SwapGradientsButton, &QAbstractButton::clicked, this, &QmitkPreprocessingView::DoSwapGradientDimensions);
   connect(m_Controls->m_MergeDwisButton, &QAbstractButton::clicked, this, &QmitkPreprocessingView::MergeDwis);
-  connect(m_Controls->m_B_ValueMap_Rounder_SpinBox, &QSpinBox::valueChanged, this, &QmitkPreprocessingView::UpdateDwiBValueMapRounder);
   connect(m_Controls->m_CreateLengthCorrectedDwi, &QAbstractButton::clicked, this, &QmitkPreprocessingView::DoLengthCorrection);
   connect(m_Controls->m_ResampleImageButton, &QAbstractButton::clicked, this, &QmitkPreprocessingView::DoResampleImage);
   connect(m_Controls->m_ResampleTypeBox, &QComboBox::currentIndexChanged, this, &QmitkPreprocessingView::DoUpdateInterpolationGui);
@@ -378,18 +377,10 @@ void QmitkPreprocessingView::DoApplyHeader()
 
 void QmitkPreprocessingView::DoLengthCorrection()
 {
+  // The rounding value is only read here. The b-value table shows the image's shells unrounded,
+  // because "Reduce" looks its rows up in the image's b-value map.
   const int roundingValue = m_Controls->m_B_ValueMap_Rounder_SpinBox->value();
   this->ApplyEdit("Rounding the b-values", "_rounded", [&](const mitk::Image* image) { return mitk::DiffusionImageEditing::RoundBValues(image, roundingValue); }, false);
-}
-
-void QmitkPreprocessingView::UpdateDwiBValueMapRounder(int)
-{
-  auto image = this->SelectedImage();
-  if (image.IsNull() || !PropHelper::IsDiffusionWeightedImage(image))
-    return;
-
-  this->UpdateBValueTableWidget();
-  this->UpdateGradientDetails();
 }
 
 void QmitkPreprocessingView::CleanBValueTableWidget()
