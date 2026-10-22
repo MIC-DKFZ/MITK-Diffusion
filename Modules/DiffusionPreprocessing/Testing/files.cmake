@@ -4,7 +4,7 @@ set(MODULE_CUSTOM_TESTS
   mitkDiffusionRemoveDwiChannelFilterTest.cpp
   mitkDiffusionMergeDiffusionImagesFilterTest.cpp
   mitkDiffusionGradientReductionFilterTest.cpp
-  mitkDiffusionGradientLengthCorrectionFilterTest.cpp
+  mitkDiffusionBValueRoundingTest.cpp
   mitkDiffusionB0ExtractionFilterTest.cpp
   mitkDiffusionImageEditingTest.cpp
   mitkDiffusionImageDenoisingTest.cpp

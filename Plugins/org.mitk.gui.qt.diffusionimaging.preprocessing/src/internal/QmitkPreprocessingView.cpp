@@ -27,7 +27,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkVectorContainer.h"
 #include <itkElectrostaticRepulsionDiffusionGradientReductionFilter.h>
 #include <mitkDiffusionImageEditing.h>
-#include <itkDwiGradientLengthCorrectionFilter.h>
 
 // mitk includes
 #include "QmitkDataStorageComboBox.h"
@@ -836,25 +835,16 @@ void QmitkPreprocessingView::DoLengthCorrection()
   if (!PropHelper::IsDiffusionWeightedImage(image))
     return;
 
-  typedef itk::DwiGradientLengthCorrectionFilter FilterType;
-
-  ItkDwiType::Pointer itkVectorImagePointer = PropHelper::GetItkVectorImage(image);
-
-  FilterType::Pointer filter = FilterType::New();
-  filter->SetRoundingValue( m_Controls->m_B_ValueMap_Rounder_SpinBox->value());
-  filter->SetReferenceBValue(PropHelper::GetReferenceBValue(image));
-  filter->SetReferenceGradientDirectionContainer(PropHelper::GetGradientContainer(image));
-  filter->Update();
-
-  mitk::Image::Pointer newImage = mitk::Image::New();
-  newImage->InitializeByItk( itkVectorImagePointer.GetPointer() );
-  newImage->SetImportVolume( itkVectorImagePointer->GetBufferPointer(), 0, 0, mitk::Image::CopyMemory);
-  itkVectorImagePointer->GetPixelContainer()->ContainerManageMemoryOff();
-
-  PropHelper::CopyProperties(image, newImage, true);
-  PropHelper::SetGradientContainer(newImage, filter->GetOutputGradientDirectionContainer());
-  PropHelper::SetReferenceBValue(newImage, filter->GetNewBValue());
-  PropHelper::InitializeImage( newImage );
+  mitk::Image::Pointer newImage;
+  try
+  {
+    newImage = mitk::DiffusionImageEditing::RoundBValues(image, m_Controls->m_B_ValueMap_Rounder_SpinBox->value());
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Warning", QString("The b-values could not be rounded: ") + e.what());
+    return;
+  }
 
   mitk::DataNode::Pointer imageNode = mitk::DataNode::New();
   imageNode->SetData( newImage );

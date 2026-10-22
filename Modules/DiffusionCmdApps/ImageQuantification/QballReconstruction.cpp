@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
-#include <itkDwiGradientLengthCorrectionFilter.h>
+#include <mitkDiffusionImageEditing.h>
 
 template<int L>
 void TemplatedMultishellQBallReconstruction(float lambda, mitk::Image::Pointer dwi, bool output_sampled, int threshold, std::string outfilename)
@@ -178,16 +178,7 @@ int main(int argc, char* argv[])
     if (round_bvalues>0)
     {
       MITK_INFO << "Rounding b-values";
-      typedef itk::DwiGradientLengthCorrectionFilter FilterType;
-      FilterType::Pointer filter = FilterType::New();
-      filter->SetRoundingValue(round_bvalues);
-      filter->SetReferenceBValue(static_cast<double>(mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi)));
-      filter->SetReferenceGradientDirectionContainer(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi));
-      filter->Update();
-      mitk::DiffusionPropertyHelper::SetReferenceBValue(dwi, static_cast<float>(filter->GetNewBValue()));
-      mitk::DiffusionPropertyHelper::CopyProperties(dwi, dwi, true);
-      mitk::DiffusionPropertyHelper::SetGradientContainer(dwi, filter->GetOutputGradientDirectionContainer());
-      mitk::DiffusionPropertyHelper::InitializeImage(dwi);
+      dwi = mitk::DiffusionImageEditing::RoundBValues(dwi, round_bvalues);
     }
 
     auto bMap = mitk::DiffusionPropertyHelper::GetBValueMap(dwi);

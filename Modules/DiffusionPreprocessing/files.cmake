@@ -6,7 +6,6 @@ set(H_FILES
   itkElectrostaticRepulsionDiffusionGradientReductionFilter.h
   itkMergeDiffusionImagesFilter.h
   itkResampleDwiImageFilter.h
-  itkDwiGradientLengthCorrectionFilter.h
   itkRemoveDwiChannelFilter.h
   itkNonLocalMeansDenoisingFilter.h
   mitkB0Indices.h
@@ -19,7 +18,6 @@ set(CPP_FILES
   itkB0ImageExtractionImageFilter.txx
   itkB0ImageExtractionToSeparateImageFilter.txx
 
-  itkDwiGradientLengthCorrectionFilter.cpp
   mitkDiffusionImageDenoising.cpp
   mitkDiffusionImageEditing.cpp
 )

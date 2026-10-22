@@ -23,6 +23,9 @@ found in the LICENSE file.
 #include <vtkMatrix4x4.h>
 #include <vtkSmartPointer.h>
 
+#include <cmath>
+#include <limits>
+
 namespace
 {
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -219,6 +222,64 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::ClearGradientRotation(const Im
   PropHelper::SetApplyMatrixToGradients(newImage, false);
   // Without this the modified gradients, which filters and writers use, would change only at the
   // next InitializeImage call of some later action.
+  PropHelper::InitializeImage(newImage);
+  return newImage;
+}
+
+mitk::DiffusionImageEditing::RoundedBValues mitk::DiffusionImageEditing::RoundBValues(const PropHelper::GradientDirectionsContainerType* gradients, double referenceBValue, int roundingValue)
+{
+  if (gradients == nullptr || referenceBValue == 0 || roundingValue < 1)
+    mitkThrow() << "Rounding b-values needs gradients, a reference b-value and a rounding value of at least 1.";
+
+  auto roundedBValue = [&](const PropHelper::GradientDirectionType& g)
+  {
+    const double twonorm = g.two_norm();
+    const double bValue = referenceBValue * twonorm * twonorm;
+    const double rounded = int((bValue + 0.5 * roundingValue) / roundingValue) * roundingValue;
+    return rounded;
+  };
+
+  // A volume whose b-value rounds to 0 is a b0 volume, as in the b-value map (mitk::IsB0), here
+  // with the given rounding value.
+  RoundedBValues result;
+  result.referenceBValue = std::numeric_limits<double>::max();
+  for (const auto& g : gradients->CastToSTLConstContainer())
+  {
+    const double rounded = roundedBValue(g);
+    if (rounded < result.referenceBValue && rounded > 0)
+      result.referenceBValue = rounded;
+  }
+  if (result.referenceBValue == std::numeric_limits<double>::max())
+    mitkThrow() << "No diffusion-weighted volume: every b-value rounds to 0.";
+
+  result.gradients = PropHelper::GradientDirectionsContainerType::New();
+  for (const auto& g : gradients->CastToSTLConstContainer())
+  {
+    const double rounded = roundedBValue(g);
+    PropHelper::GradientDirectionType newGradient;
+    newGradient.fill(0.0);
+    if (rounded > 0)
+    {
+      newGradient = g;
+      newGradient.normalize();
+      newGradient *= std::sqrt(rounded / result.referenceBValue);
+    }
+    result.gradients->push_back(newGradient);
+  }
+  return result;
+}
+
+mitk::Image::Pointer mitk::DiffusionImageEditing::RoundBValues(const Image* dwi, int roundingValue)
+{
+  if (!PropHelper::IsDiffusionWeightedImage(dwi))
+    mitkThrow() << "Not a diffusion-weighted image.";
+  const RoundedBValues rounded = RoundBValues(PropHelper::GetGradientContainer(dwi), PropHelper::GetReferenceBValue(dwi), roundingValue);
+
+  // The rounded gradients are new modified gradients; InitializeImage derives the originals.
+  Image::Pointer newImage = dwi->Clone();
+  newImage->GetPropertyList()->RemoveProperty(PropHelper::GetOriginalGradientContainerPropertyName());
+  PropHelper::SetGradientContainer(newImage, rounded.gradients);
+  PropHelper::SetReferenceBValue(newImage, rounded.referenceBValue);
   PropHelper::InitializeImage(newImage);
   return newImage;
 }

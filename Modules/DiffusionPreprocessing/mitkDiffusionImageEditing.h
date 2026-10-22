@@ -83,6 +83,26 @@ namespace mitk
      * an identity frame and without the image rotation.
      */
     MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer MergeDwis(const std::vector<const Image*>& dwis);
+
+    /** \brief Gradients with rounded b-values and the reference b-value they refer to. */
+    struct RoundedBValues
+    {
+      DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer gradients;
+      double referenceBValue = 0;
+    };
+
+    /**
+     * \brief Rounds the b-value of each gradient to a multiple of the rounding value.
+     *
+     * The new reference b-value is the smallest rounded b-value above 0; the gradients are rescaled
+     * to it, and a gradient whose b-value rounds to 0 becomes the zero vector (a b0 volume). Throws
+     * for a reference b-value of 0, a rounding value below 1 and gradients without a weighted
+     * volume.
+     */
+    MITKDIFFUSIONPREPROCESSING_EXPORT RoundedBValues RoundBValues(const DiffusionPropertyHelper::GradientDirectionsContainerType* gradients, double referenceBValue, int roundingValue);
+
+    /** \brief The DWI with rounded b-values (see above). */
+    MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer RoundBValues(const Image* dwi, int roundingValue);
   }
 }
 
