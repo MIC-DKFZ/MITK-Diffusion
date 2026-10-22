@@ -229,10 +229,7 @@ void mitk::gradients::WriteBvalsBvecs(std::string bvals_file, std::string bvecs_
   std::ofstream myfile;
   myfile.open (bvals_file.c_str());
   for(unsigned int i=0; i<gradients->Size(); i++)
-  {
-    double twonorm = gradients->ElementAt(i).two_norm();
-    myfile << std::round(reference_bval*twonorm*twonorm) << " ";
-  }
+    myfile << mitk::BValueMapProperty::GetBValue(gradients->ElementAt(i), reference_bval) << " ";
   myfile.close();
 
   std::ofstream myfile2;

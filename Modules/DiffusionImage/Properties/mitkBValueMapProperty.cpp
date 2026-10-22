@@ -16,10 +16,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkBValueMapProperty.h"
 
-mitk::BValueMapProperty::BValueMapProperty()
-  : m_BValueMap()
-{
-}
+#include <cmath>
+
+mitk::BValueMapProperty::BValueMapProperty() = default;
 
 mitk::BValueMapProperty::BValueMapProperty(const BValueMapProperty& other)
   : mitk::BaseProperty(other)
@@ -32,9 +31,7 @@ mitk::BValueMapProperty::BValueMapProperty(const BValueMap& bValueMap)
   m_BValueMap = bValueMap;
 }
 
-mitk::BValueMapProperty::~BValueMapProperty()
-{
-}
+mitk::BValueMapProperty::~BValueMapProperty() = default;
 
 const mitk::BValueMapProperty::BValueMap & mitk::BValueMapProperty::GetBValueMap() const
 {
@@ -63,36 +60,19 @@ mitk::BValueMapProperty::BValueMap mitk::BValueMapProperty::CreateBValueMap(cons
 
   mitk::BValueMapProperty::GradientDirectionsContainerType::ConstIterator gdcit;
   for( gdcit = gdc->Begin(); gdcit != gdc->End(); ++gdcit)
-  {
-    float keyBValue = mitk::BValueMapProperty::GetBValueOfGradientDirection(gdcit.Index(),referenceBValue, gdc);
-    map[keyBValue].push_back(gdcit.Index());
-  }
+    map[GetBValue(gdcit.Value(), referenceBValue)].push_back(gdcit.Index());
 
   return map;
 }
 
-
-float mitk::BValueMapProperty::GetBValueOfGradientDirection(unsigned int i, float referenceBValue, const mitk::BValueMapProperty::GradientDirectionsContainerType * gdc)
+double mitk::BValueMapProperty::GetBValue(const GradientDirectionType& gradient, double referenceBValue)
 {
-  if(i > gdc->Size()-1)
-    return -1;
-
-  if(gdc->ElementAt(i).one_norm() <= 0.0)
-  {
+  if (gradient.one_norm() <= 0.0)
     return 0;
-  }
-  else
-  {
-    double twonorm = gdc->ElementAt(i).two_norm();
-    double bval = referenceBValue*twonorm*twonorm;
 
-    if (bval<0)
-      bval = ceil(bval - 0.5);
-    else
-      bval = floor(bval + 0.5);
-
-    return bval;
-  }
+  const double twonorm = gradient.two_norm();
+  const double bValue = referenceBValue*twonorm*twonorm;
+  return bValue < 0 ? std::ceil(bValue - 0.5) : std::floor(bValue + 0.5);
 }
 
 itk::LightObject::Pointer  mitk::BValueMapProperty::InternalClone() const

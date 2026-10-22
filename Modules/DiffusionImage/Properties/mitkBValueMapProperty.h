@@ -54,7 +54,11 @@ namespace mitk
     void SetBValueMap(const BValueMap & map);
 
     static BValueMap CreateBValueMap(const GradientDirectionsContainerType * gdc, float referenceBValue);
-    static float GetBValueOfGradientDirection(unsigned int i, float referenceBValue, const GradientDirectionsContainerType *gdc);
+    /**
+     * The b-value of a gradient whose squared length is its b-value relative to the reference
+     * b-value, rounded half away from zero. The one b-value computation of the module.
+     */
+    static double GetBValue(const GradientDirectionType& gradient, double referenceBValue);
 
     std::string GetValueAsString() const override
     { return ""; }
