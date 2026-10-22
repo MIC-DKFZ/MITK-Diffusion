@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itkBSplineInterpolateImageFunction.h>
+#include <itkCastImageFilter.h>
 #include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkLinearInterpolateImageFunction.h>
 #include <itkNearestNeighborInterpolateImageFunction.h>
@@ -30,6 +31,7 @@ class mitkDiffusionResampleDwiImageFilterTestSuite : public mitk::TestFixture
   MITK_TEST(Resample_IdentityDirection_KeepsCorner);
   MITK_TEST(Resample_FlippedAxis_KeepsCorner);
   MITK_TEST(Resample_EachSetterAndInterpolation_ResamplesEveryChannelAlike);
+  MITK_TEST(Resample_SetterBeforeInputAndUpstreamFilter_RunsPipeline);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -206,6 +208,24 @@ public:
       CPPUNIT_ASSERT_DOUBLES_EQUAL(22.0 / 20, filter->GetOutput()->GetSpacing()[1], 1e-12);
       CheckChannels(m_Dwi, filter->GetOutput(), interpolation);
     }
+  }
+
+  void Resample_SetterBeforeInputAndUpstreamFilter_RunsPipeline()
+  {
+    // The grid may be requested before the input is known, and an upstream filter that has not run
+    // yet runs with the resampler.
+    auto filter = FilterType::New();
+    itk::Vector<double, 3> factor;
+    factor.Fill(2.0);
+    filter->SetSamplingFactor(factor);
+    filter->SetInterpolation(FilterType::Interpolate_Linear);
+    auto upstream = itk::CastImageFilter<DwiType, DwiType>::New();
+    upstream->SetInput(m_Dwi);
+    filter->SetInput(upstream->GetOutput());
+    filter->Update();
+
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(22), filter->GetOutput()->GetLargestPossibleRegion().GetSize(0));
+    CheckChannels(m_Dwi, filter->GetOutput(), FilterType::Interpolate_Linear);
   }
 };
 

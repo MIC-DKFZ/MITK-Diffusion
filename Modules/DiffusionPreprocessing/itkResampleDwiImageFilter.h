@@ -29,8 +29,8 @@ the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef _itk_ResampleDwiImageFilter_h_
-#define _itk_ResampleDwiImageFilter_h_
+#ifndef itkResampleDwiImageFilter_h
+#define itkResampleDwiImageFilter_h
 
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
@@ -54,13 +54,16 @@ inline Point<double, 3> ResampledImageOrigin(const Point<double, 3>& origin, con
 }
 
 /**
-* \brief Resample DWI channel by channel.   */
-
+ * \brief Resamples a DWI channel by channel onto a grid with the same outer corner and direction.
+ *
+ * The grid is given by a sampling factor, a new spacing or a new size, each relative to the input;
+ * the derived sizes are truncated. The setters only store the request, so they may be called
+ * before the input is set.
+ */
 template <class TScalarType>
 class ResampleDwiImageFilter
         : public ImageToImageFilter<itk::VectorImage<TScalarType,3>, itk::VectorImage<TScalarType,3> >
 {
-
 public:
 
     enum Interpolation {
@@ -70,15 +73,13 @@ public:
         Interpolate_WindowedSinc
     };
 
-    typedef ResampleDwiImageFilter Self;
-    typedef SmartPointer<Self>                      Pointer;
-    typedef SmartPointer<const Self>                ConstPointer;
-    typedef ImageToImageFilter< itk::VectorImage<TScalarType,3>, itk::VectorImage<TScalarType,3> >
-    Superclass;
-
-    typedef itk::Vector< double, 3 > DoubleVectorType;
-    typedef itk::VectorImage<TScalarType,3> DwiImageType;
-    typedef itk::Image<TScalarType,3> DwiChannelType;
+    using Self = ResampleDwiImageFilter;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
+    using Superclass = ImageToImageFilter<itk::VectorImage<TScalarType,3>, itk::VectorImage<TScalarType,3>>;
+    using DoubleVectorType = itk::Vector<double, 3>;
+    using DwiImageType = itk::VectorImage<TScalarType,3>;
+    using DwiChannelType = itk::Image<TScalarType,3>;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
@@ -89,63 +90,47 @@ public:
 
     itkSetMacro( Interpolation, Interpolation )
 
+    /** Output spacing = input spacing / factor, output size = input size * factor. */
     void SetSamplingFactor(DoubleVectorType sampling)
     {
-        m_NewSpacing = this->GetInput()->GetSpacing();
-        m_NewSpacing[0] /= sampling[0];
-        m_NewSpacing[1] /= sampling[1];
-        m_NewSpacing[2] /= sampling[2];
-        m_NewImageRegion = this->GetInput()->GetLargestPossibleRegion();
-        m_NewImageRegion.SetSize(0, m_NewImageRegion.GetSize(0)*sampling[0]);
-        m_NewImageRegion.SetSize(1, m_NewImageRegion.GetSize(1)*sampling[1]);
-        m_NewImageRegion.SetSize(2, m_NewImageRegion.GetSize(2)*sampling[2]);
+        m_GridMode = GridMode::SamplingFactor;
+        m_GridValue = sampling;
+        this->Modified();
     }
+
+    /** Output size = input size * input spacing / spacing. */
     void SetNewSpacing(DoubleVectorType spacing)
     {
-        DoubleVectorType oldSpacing = this->GetInput()->GetSpacing();
-        DoubleVectorType sampling;
-        sampling[0] = oldSpacing[0]/spacing[0];
-        sampling[1] = oldSpacing[1]/spacing[1];
-        sampling[2] = oldSpacing[2]/spacing[2];
-
-        m_NewSpacing = spacing;
-        m_NewImageRegion = this->GetInput()->GetLargestPossibleRegion();
-        m_NewImageRegion.SetSize(0, m_NewImageRegion.GetSize(0)*sampling[0]);
-        m_NewImageRegion.SetSize(1, m_NewImageRegion.GetSize(1)*sampling[1]);
-        m_NewImageRegion.SetSize(2, m_NewImageRegion.GetSize(2)*sampling[2]);
+        m_GridMode = GridMode::Spacing;
+        m_GridValue = spacing;
+        this->Modified();
     }
+
+    /** Output spacing = input spacing * input size / size. */
     void SetNewImageSize(ImageRegion<3> region)
     {
-        ImageRegion<3> oldRegion = this->GetInput()->GetLargestPossibleRegion();
-        DoubleVectorType sampling;
-        sampling[0] = (double)region.GetSize(0)/oldRegion.GetSize(0);
-        sampling[1] = (double)region.GetSize(1)/oldRegion.GetSize(1);
-        sampling[2] = (double)region.GetSize(2)/oldRegion.GetSize(2);
-
-        m_NewImageRegion = region;
-        m_NewSpacing = this->GetInput()->GetSpacing();
-        m_NewSpacing[0] /= sampling[0];
-        m_NewSpacing[1] /= sampling[1];
-        m_NewSpacing[2] /= sampling[2];
+        m_GridMode = GridMode::Size;
+        for (unsigned int i = 0; i < 3; ++i)
+            m_GridValue[i] = region.GetSize(i);
+        this->Modified();
     }
 
-    void UpdateOutputInformation() override;
+protected:
+    ResampleDwiImageFilter();
+    ~ResampleDwiImageFilter() override = default;
 
-    virtual void PropagateRequestedRegion(){}
-
-    void PropagateRequestedRegion(itk::DataObject *) override{}
-
-    protected:
-        ResampleDwiImageFilter();
-    ~ResampleDwiImageFilter() override{}
-
+    void GenerateOutputInformation() override;
+    /** Every channel is resampled from the whole input. */
+    void GenerateInputRequestedRegion() override;
+    void EnlargeOutputRequestedRegion(DataObject* output) override;
     void GenerateData() override;
 
-    DoubleVectorType m_NewSpacing;
-    ImageRegion<3>   m_NewImageRegion;
+    enum class GridMode { SamplingFactor, Spacing, Size };
+
+    GridMode         m_GridMode = GridMode::SamplingFactor;
+    DoubleVectorType m_GridValue;
     Interpolation    m_Interpolation;
 };
-
 
 } // end of namespace
 
@@ -153,6 +138,5 @@ public:
 #ifndef ITK_MANUAL_INSTANTIATION
 #include "itkResampleDwiImageFilter.txx"
 #endif
-
 
 #endif
