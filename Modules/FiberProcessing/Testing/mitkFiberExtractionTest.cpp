@@ -112,7 +112,7 @@ int mitkFiberExtractionTest(int argc, char* argv[])
       mitk::FiberBundle::Pointer passing = extractor->GetPositives().at(0);
       bool ok = passing->Equals(testFibs);
       if(!ok)
-        mitk::IOUtil::Save(passing, mitk::IOUtil::GetTempPath()+"passing_mask.fib");
+        mitk::IOUtil::Save(passing, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "passing_mask.fib");
 
       MITK_TEST_CONDITION_REQUIRED(ok,"check passing mask extraction");
     }
@@ -129,7 +129,7 @@ int mitkFiberExtractionTest(int argc, char* argv[])
       mitk::FiberBundle::Pointer ending = extractor->GetPositives().at(0);
       bool ok = ending->Equals(testFibs);
       if(!ok)
-        mitk::IOUtil::Save(ending, mitk::IOUtil::GetTempPath()+"ending_mask.fib");
+        mitk::IOUtil::Save(ending, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "ending_mask.fib");
 
       MITK_TEST_CONDITION_REQUIRED(ending->Equals(testFibs),"check ending in mask extraction");
     }

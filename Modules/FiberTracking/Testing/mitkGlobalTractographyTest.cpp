@@ -90,16 +90,16 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
     mitk::FiberBundle::Pointer ref = LoadReferenceFib(ref_file);
     if (ref.IsNull())
     {
-      mitk::IOUtil::Save(test_fib, mitk::IOUtil::GetTempPath()+ref_file);
-      CPPUNIT_FAIL("Reference file not found. Saving test file to " + mitk::IOUtil::GetTempPath() + ref_file);
+      mitk::IOUtil::Save(test_fib, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
+      CPPUNIT_FAIL("Reference file not found. Saving test file to " + mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
     }
     else
     {
       bool is_equal = ref->Equals(test_fib);
       if (!is_equal)
       {
-        mitk::IOUtil::Save(test_fib, mitk::IOUtil::GetTempPath()+ref_file);
-        CPPUNIT_FAIL("Tractograms are not equal! Saving test file to " + mitk::IOUtil::GetTempPath() + ref_file);
+        mitk::IOUtil::Save(test_fib, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
+        CPPUNIT_FAIL("Tractograms are not equal! Saving test file to " + mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + ref_file);
       }
     }
   }

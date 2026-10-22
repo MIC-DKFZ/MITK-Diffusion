@@ -146,9 +146,9 @@ public:
         bool cond = CompareDwi(itkTestImagePointer, itkRefImagePointer);
         if (!cond)
         {
-          MITK_INFO << "Saving test image to " << mitk::IOUtil::GetTempPath()+out;
-          mitk::IOUtil::Save(testImage, "DWI_NIFTI", mitk::IOUtil::GetTempPath()+out);
-          mitk::IOUtil::Save(refImage, "DWI_NIFTI", mitk::IOUtil::GetTempPath()+ "REF_" + out);
+          MITK_INFO << "Saving test image to " << mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + out;
+          mitk::IOUtil::Save(testImage, "DWI_NIFTI", mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + out);
+          mitk::IOUtil::Save(refImage, "DWI_NIFTI", mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "REF_" + out);
         }
         CPPUNIT_ASSERT_MESSAGE("Simulated images should be equal", cond);
       }
