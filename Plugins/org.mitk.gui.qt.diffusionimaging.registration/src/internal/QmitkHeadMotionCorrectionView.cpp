@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // MITK
 #include <mitkDiffusionPropertyHelper.h>
-#include <mitkNodePredicateDataType.h>
+#include <mitkNodePredicateIsDWI.h>
 
 // Qt
 #include <QMessageBox>
@@ -69,8 +69,7 @@ void QmitkHeadMotionCorrectionView::CreateQtPartControl( QWidget *parent )
     this->m_Parent = parent;
 
     m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
-    mitk::TNodePredicateDataType<mitk::Image>::Pointer isImagePredicate = mitk::TNodePredicateDataType<mitk::Image>::New();
-    m_Controls->m_ImageBox->SetPredicate(isImagePredicate);
+    m_Controls->m_ImageBox->SetPredicate(mitk::NodePredicateIsDWI::New());
     UpdateGUI();
   }
 }

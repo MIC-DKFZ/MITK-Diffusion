@@ -272,7 +272,8 @@ void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWr
     GetDataStorage()->Add(registration_node, resultNode);
   }
 
-  this->GetRenderWindowPart()->RequestUpdate();
+  // Also without an open render window part, where GetRenderWindowPart() is nullptr.
+  mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 
   TractoChanged();
 }
