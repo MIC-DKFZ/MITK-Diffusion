@@ -25,6 +25,7 @@ found in the LICENSE file.
 
 #include <mitkITKImageImport.h>
 
+#include <itkImageFileWriter.h>
 #include <itkVectorImage.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
@@ -65,6 +66,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(TensorAndOdfIO_RoundTrip);
   MITK_TEST(PeakImage_PolydataHasOneLinePerPeak);
   MITK_TEST(Serializers_RoundTrip);
+  MITK_TEST(TensorReader_NiftiLayouts_ElementMapping);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -651,6 +653,56 @@ public:
     auto peakReloaded = LoadPeaks(Serialize(peakImage, "peaks"), std::nullopt);
     AssertEqualPixels(peakImage, peakReloaded);
     AssertEqualGeometry(peakImage, peakReloaded);
+  }
+
+  /** Writes the image with ITK as NIfTI and renames the file to .dti, as users do with FSL tensors. */
+  template <class TImage>
+  std::string WriteNiftiAsDti(TImage *image, const std::string &name)
+  {
+    const std::string niftiPath = m_TempDir + "/" + name + ".nii.gz";
+    auto writer = itk::ImageFileWriter<TImage>::New();
+    writer->SetInput(image);
+    writer->SetFileName(niftiPath);
+    writer->Update();
+    const std::string dtiPath = m_TempDir + "/" + name + ".dti";
+    itksys::SystemTools::CopyAFile(niftiPath, dtiPath);
+    return dtiPath;
+  }
+
+  // NIfTI tensors: 6 components xx, xy, xz, yy, yz, zz; 9 components a full row-major matrix;
+  // or the same as 6 or 9 volumes of a 4D image.
+  void TensorReader_NiftiLayouts_ElementMapping()
+  {
+    const double fromSix[6] = {1, 2, 3, 4, 5, 6};
+    const double fromNine[6] = {1, 2, 3, 5, 6, 9};
+
+    using VectorImageType = itk::VectorImage<float, 3>;
+    auto vectorImage = VectorImageType::New();
+    VectorImageType::RegionType region;
+    region.SetSize({{2, 1, 1}});
+    vectorImage->SetRegions(region);
+    vectorImage->SetVectorLength(9);
+    vectorImage->Allocate();
+    itk::VariableLengthVector<float> pixel(9);
+    for (unsigned int i = 0; i < 9; ++i)
+      pixel[i] = i + 1;
+    vectorImage->FillBuffer(pixel);
+    AssertEqual(ToMatrix(fromNine), ReadTensor(WriteNiftiAsDti(vectorImage.GetPointer(), "nine")));
+
+    using VolumeImageType = itk::Image<float, 4>;
+    for (unsigned int numVolumes : {6u, 9u})
+    {
+      auto volumes = VolumeImageType::New();
+      VolumeImageType::RegionType volumeRegion;
+      volumeRegion.SetSize({{2, 1, 1, numVolumes}});
+      volumes->SetRegions(volumeRegion);
+      volumes->Allocate();
+      for (itk::IndexValueType v = 0; v < numVolumes; ++v)
+        for (itk::IndexValueType x = 0; x < 2; ++x)
+          volumes->SetPixel({{x, 0, 0, v}}, v + 1);
+      AssertEqual(ToMatrix(numVolumes == 6 ? fromSix : fromNine),
+                  ReadTensor(WriteNiftiAsDti(volumes.GetPointer(), "volumes" + std::to_string(numVolumes))));
+    }
   }
 };
 
