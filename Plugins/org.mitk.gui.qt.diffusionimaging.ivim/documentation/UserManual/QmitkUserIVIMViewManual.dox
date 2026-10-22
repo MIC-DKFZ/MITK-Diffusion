@@ -16,7 +16,7 @@ The buttons below the plot copy the b-values and measurements of the voxel (for 
 
 \section QmitkIVIMViewIvim IVIM
 
-The IVIM model is a bi-exponential model of the signal ratio S/S0 with the perfusion fraction f, the diffusion coefficient D and the pseudo-diffusion coefficient D*: S/S0 = (1-f) exp(-bD) + f exp(-b(D+D*)). S0 is the mean of the b=0 volumes; without b=0 volumes the volumes of the lowest b-value serve as S0. The fit methods differ in how they estimate the three parameters:
+The IVIM model is a bi-exponential model of the signal ratio S/S0 with the perfusion fraction f, the diffusion coefficient D and the pseudo-diffusion coefficient D*: S/S0 = (1-f) exp(-bD) + f exp(-b(D+D*)). S0 is the mean of the b=0 volumes, the volumes whose b-value rounds to 0 s/mm²; without b=0 volumes the volumes of the lowest b-value serve as S0. The fit methods differ in how they estimate the three parameters:
 
 \li <b>1. Jointly fit D, f and D*</b>: all three parameters are estimated in one non-linear fit.
 \li <b>2. Fit D &amp; f with fixed D* value</b>: only f and D are estimated; D* is the value of the D* slider.
@@ -35,7 +35,7 @@ The plot shows S/S0, the measurements of the first fit and, for methods 3 and 4,
 
 \section QmitkIVIMViewKurtosis Kurtosis
 
-The kurtosis model describes the signal with the apparent diffusion coefficient D and the kurtosis K: S = S0 exp(-bD + b²D²K/6). S0 is the mean of the b=0 volumes.
+The kurtosis model describes the signal with the apparent diffusion coefficient D and the kurtosis K: S = S0 exp(-bD + b²D²K/6). S0 is the mean of the b=0 volumes, as for IVIM the volumes whose b-value rounds to 0 s/mm².
 
 \li <b>Select Fit Type</b>: "Straight Fit" fits S, "Logarithmic Fit" fits log S; the logarithmic fit leaves out measurements at or below 0.
 \li <b>Omit b=0 Measurements</b>: S0 is fitted as a third parameter instead of taken from the b=0 volumes. Without b=0 volumes, S0 is always fitted.

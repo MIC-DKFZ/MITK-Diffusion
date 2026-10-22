@@ -41,6 +41,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(FitVoxel_SyntheticVoxel_RecoversDAndK);
   MITK_TEST(FitVoxel_BZeroLast_SameAsBZeroFirst);
   MITK_TEST(Map_SeveralBZeroValues_UsesTheirMean);
+  MITK_TEST(FitVoxel_BZeroWithTinyGradient_SameAsExactBZero);
   MITK_TEST(FitVoxel_NoBZero_FitsS0);
   MITK_TEST(TestMulti_RotatedVolumes_SameMaps);
   MITK_TEST(FitVoxel_NoisyVoxel_MinimizesSquaredResiduals);
@@ -304,6 +305,32 @@ public:
     auto maps = GetMaps(filter);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, maps.d[0], 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, maps.k[0], 1e-3);
+  }
+
+  void FitVoxel_BZeroWithTinyGradient_SameAsExactBZero()
+  {
+    // b = 0.3 s/mm^2 is b=0 in the b-value map of the DWI and for the IVIM baselines; the fit takes
+    // S0 from these volumes instead of fitting it.
+    auto tinyGradients = MakeGradients(m_BValues, 3000);
+    const double tiny = std::sqrt(0.3 / 3000);
+    tinyGradients->SetElement(0, GradientType(tiny, 0, 0));
+    tinyGradients->SetElement(1, GradientType(0, tiny, 0));
+    const auto bValues = mitk::kurtosis::GetBValues(tinyGradients, 3000);
+    CPPUNIT_ASSERT_EQUAL(0.0, bValues[0]);
+    CPPUNIT_ASSERT_EQUAL(0.0, bValues[1]);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(500, bValues[2], 1e-9);
+
+    for (auto scale : {FitScale::Straight, FitScale::Logarithmic})
+    {
+      mitk::kurtosis::FitConfiguration config;
+      config.scale = scale;
+      const auto expected = FitPixel(m_Image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
+      const auto actual = FitPixel(m_Image->GetPixel({{0, 0, 0}}), tinyGradients.GetPointer(), 3000, config);
+      CPPUNIT_ASSERT(!actual.bZeroFitted);
+      CPPUNIT_ASSERT_EQUAL(expected.meanBZero, actual.meanBZero);
+      CPPUNIT_ASSERT_EQUAL(expected.d, actual.d);
+      CPPUNIT_ASSERT_EQUAL(expected.k, actual.k);
+    }
   }
 
   void FitVoxel_NoBZero_FitsS0()

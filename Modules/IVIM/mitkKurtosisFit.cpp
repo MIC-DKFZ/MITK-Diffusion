@@ -14,6 +14,7 @@ found in the LICENSE file.
 
 #include "itkDiffusionKurtosisReconstructionImageFilter.h"
 
+#include <mitkBValueMapProperty.h>
 #include <mitkExceptionMacro.h>
 #include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
@@ -187,7 +188,16 @@ vnl_vector<double> mitk::kurtosis::GetBValues(const DiffusionPropertyHelper::Gra
   vnl_vector<double> bValues(gradients->Size());
   for (unsigned int i = 0; i < gradients->Size(); ++i)
   {
-    const double twoNorm = gradients->ElementAt(i).two_norm();
+    const auto& gradient = gradients->ElementAt(i);
+    // The b=0 volumes, whose mean is S0, are those the b-value map of the DWI counts as b=0, as for
+    // the IVIM baselines; b=0 volumes stored with a tiny gradient would otherwise switch the voxel
+    // to the fit of S0.
+    if (BValueMapProperty::GetBValue(gradient, referenceBValue) == 0)
+    {
+      bValues[i] = 0;
+      continue;
+    }
+    const double twoNorm = gradient.two_norm();
     bValues[i] = referenceBValue * twoNorm * twoNorm;
   }
   return bValues;
