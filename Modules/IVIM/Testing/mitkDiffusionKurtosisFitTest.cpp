@@ -36,13 +36,13 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(MapBounds_KJustInsideBounds_Recovered);
   MITK_TEST(MapBounds_DAndKOutsideBounds_OnTheBounds);
   MITK_TEST(Update_KBoundsEqual_Throws);
-  MITK_TEST(Snapshot_KBoundsReversed_Throws);
-  MITK_TEST(Snapshot_SyntheticVoxel_RecoversDAndK);
-  MITK_TEST(Snapshot_BZeroLast_SameAsBZeroFirst);
+  MITK_TEST(FitVoxel_KBoundsReversed_Throws);
+  MITK_TEST(FitVoxel_SyntheticVoxel_RecoversDAndK);
+  MITK_TEST(FitVoxel_BZeroLast_SameAsBZeroFirst);
   MITK_TEST(Map_SeveralBZeroValues_UsesTheirMean);
-  MITK_TEST(Snapshot_NoBZero_FitsS0);
+  MITK_TEST(FitVoxel_NoBZero_FitsS0);
   MITK_TEST(TestMulti_RotatedVolumes_SameMaps);
-  MITK_TEST(Snapshot_NoisyVoxel_MinimizesSquaredResiduals);
+  MITK_TEST(FitVoxel_NoisyVoxel_MinimizesSquaredResiduals);
   MITK_TEST(MapLog_ZeroMeasurement_LeftOut);
   MITK_TEST(Map_NoSignal_Zero);
   MITK_TEST(VoxelFitter_ReusedForVoxels_SameAsFitVoxel);
@@ -54,7 +54,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(ComputeMaps_FweMaskWithRoundedOrigin_FitsInside);
   MITK_TEST(Update_InputChanged_FitsWholeNewInput);
   MITK_TEST(TestMulti_Maps_MatchRecordedValues);
-  MITK_TEST(SingleVoxel_Snapshots_MatchRecordedValues);
+  MITK_TEST(SingleVoxel_FitVoxel_MatchRecordedValues);
   MITK_TEST(TestMulti_Smoothed_MatchRecordedValues);
   MITK_TEST(TestMulti_SmoothingVarianceZero_SameAsNoSmoothing);
   MITK_TEST(ComputeMaps_TestMultiAppSettings_MatchRecordedValues);
@@ -238,7 +238,7 @@ public:
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
   }
 
-  void Snapshot_KBoundsReversed_Throws()
+  void FitVoxel_KBoundsReversed_Throws()
   {
     mitk::kurtosis::FitConfiguration config;
     config.scale = FitScale::Straight;
@@ -249,7 +249,7 @@ public:
                          itk::ExceptionObject);
   }
 
-  void Snapshot_SyntheticVoxel_RecoversDAndK()
+  void FitVoxel_SyntheticVoxel_RecoversDAndK()
   {
     CPPUNIT_ASSERT_EQUAL(m_BValues.size(), static_cast<std::size_t>(mitk::kurtosis::GetBValues(m_Gradients, 3000).size()));
     for (auto scale : {FitScale::Straight, FitScale::Logarithmic})
@@ -259,18 +259,18 @@ public:
         mitk::kurtosis::FitConfiguration config;
         config.scale = scale;
         config.omitBZero = omit;
-        auto snapshot = FitPixel(m_Image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, snapshot.d, 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, snapshot.k, 1e-3);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.meanBZero, 1e-9);
-        CPPUNIT_ASSERT_EQUAL(omit, snapshot.bZeroFitted);
+        auto fit = FitPixel(m_Image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, fit.d, 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, fit.k, 1e-3);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, fit.meanBZero, 1e-9);
+        CPPUNIT_ASSERT_EQUAL(omit, fit.bZeroFitted);
         if (omit)
-          CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.fittedBZero, 5);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, fit.fittedBZero, 5);
       }
     }
   }
 
-  void Snapshot_BZeroLast_SameAsBZeroFirst()
+  void FitVoxel_BZeroLast_SameAsBZeroFirst()
   {
     const auto signal = KurtosisSignal(m_BValues, 10000, m_Truth[1].d, m_Truth[1].k);
     const std::vector<double> reversedBValues(m_BValues.rbegin(), m_BValues.rend());
@@ -304,18 +304,18 @@ public:
     CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, maps.k[0], 1e-3);
   }
 
-  void Snapshot_NoBZero_FitsS0()
+  void FitVoxel_NoBZero_FitsS0()
   {
     const std::vector<double> bValues(m_BValues.begin() + 2, m_BValues.end());
     auto image = MakeImage({KurtosisSignal(bValues, 10000, m_Truth[0].d, m_Truth[0].k)});
     mitk::kurtosis::FitConfiguration config;
     config.scale = FitScale::Straight;
-    auto snapshot = FitPixel(image->GetPixel({{0, 0, 0}}), MakeGradients(bValues, 3000).GetPointer(), 3000, config);
-    CPPUNIT_ASSERT(snapshot.bZeroFitted);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, snapshot.d, 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, snapshot.k, 1e-3);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, snapshot.fittedBZero, 5);
-    CPPUNIT_ASSERT_EQUAL(0.0, snapshot.meanBZero);
+    auto fit = FitPixel(image->GetPixel({{0, 0, 0}}), MakeGradients(bValues, 3000).GetPointer(), 3000, config);
+    CPPUNIT_ASSERT(fit.bZeroFitted);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].d, fit.d, 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(m_Truth[0].k, fit.k, 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10000, fit.fittedBZero, 5);
+    CPPUNIT_ASSERT_EQUAL(0.0, fit.meanBZero);
   }
 
   void TestMulti_RotatedVolumes_SameMaps()
@@ -363,7 +363,7 @@ public:
     }
   }
 
-  void Snapshot_NoisyVoxel_MinimizesSquaredResiduals()
+  void FitVoxel_NoisyVoxel_MinimizesSquaredResiduals()
   {
     // Deterministic noise of up to 2 % of S0 on the diffusion-weighted measurements.
     auto signal = KurtosisSignal(m_BValues, 10000, m_Truth[0].d, m_Truth[0].k);
@@ -378,8 +378,8 @@ public:
         mitk::kurtosis::FitConfiguration config;
         config.scale = scale;
         config.omitBZero = omit;
-        auto snapshot = FitPixel(image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
-        const double s0 = omit ? snapshot.fittedBZero : 10000;
+        auto fit = FitPixel(image->GetPixel({{0, 0, 0}}), m_Gradients.GetPointer(), 3000, config);
+        const double s0 = omit ? fit.fittedBZero : 10000;
 
         auto cost = [&](double d, double k, double bzero)
         {
@@ -396,13 +396,13 @@ public:
         };
 
         // A least-squares fit is a minimum of the sum of squared residuals in every direction.
-        const double minimum = cost(snapshot.d, snapshot.k, s0);
+        const double minimum = cost(fit.d, fit.k, s0);
         for (double h : {-1e-3, 1e-3})
         {
-          CPPUNIT_ASSERT(minimum <= cost(snapshot.d * (1 + h), snapshot.k, s0));
-          CPPUNIT_ASSERT(minimum <= cost(snapshot.d, snapshot.k + h, s0));
+          CPPUNIT_ASSERT(minimum <= cost(fit.d * (1 + h), fit.k, s0));
+          CPPUNIT_ASSERT(minimum <= cost(fit.d, fit.k + h, s0));
           if (omit)
-            CPPUNIT_ASSERT(minimum <= cost(snapshot.d, snapshot.k, s0 * (1 + h)));
+            CPPUNIT_ASSERT(minimum <= cost(fit.d, fit.k, s0 * (1 + h)));
         }
       }
     }
@@ -631,7 +631,7 @@ public:
     }
   }
 
-  void SingleVoxel_Snapshots_MatchRecordedValues()
+  void SingleVoxel_FitVoxel_MatchRecordedValues()
   {
     struct Recorded
     {
@@ -655,13 +655,13 @@ public:
       mitk::kurtosis::FitConfiguration config;
       config.scale = r.scale;
       config.omitBZero = r.omit;
-      auto snapshot = FitPixel(dwi.image->GetPixel({{0, 0, 0}}), dwi.gradients, dwi.referenceBValue, config);
-      MITK_INFO << std::setprecision(10) << "scale " << static_cast<int>(r.scale) << " omit " << r.omit << ": D " << snapshot.d << ", K "
-                << snapshot.k << ", S0 " << snapshot.meanBZero << ", fitted S0 " << snapshot.fittedBZero;
-      AssertClose(r.fit.d, snapshot.d);
-      AssertClose(r.fit.k, snapshot.k);
-      AssertClose(r.fittedBZero, snapshot.fittedBZero);
-      AssertClose(204, snapshot.meanBZero);
+      auto fit = FitPixel(dwi.image->GetPixel({{0, 0, 0}}), dwi.gradients, dwi.referenceBValue, config);
+      MITK_INFO << std::setprecision(10) << "scale " << static_cast<int>(r.scale) << " omit " << r.omit << ": D " << fit.d << ", K "
+                << fit.k << ", S0 " << fit.meanBZero << ", fitted S0 " << fit.fittedBZero;
+      AssertClose(r.fit.d, fit.d);
+      AssertClose(r.fit.k, fit.k);
+      AssertClose(r.fittedBZero, fit.fittedBZero);
+      AssertClose(204, fit.meanBZero);
     }
   }
 

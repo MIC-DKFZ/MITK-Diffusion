@@ -31,7 +31,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(DThenDStar_SyntheticVoxels_RecoversParameters);
   MITK_TEST(LinearDThenF_SyntheticVoxels_RecoversParameters);
   MITK_TEST(Fwe_AllMethods_MatchRecordedValues);
-  MITK_TEST(Defaults_ThresholdsAndDStarNotSet_SameAsViewDefaults);
+  MITK_TEST(FitParameters_Default_AppDefaults);
   MITK_TEST(Update_ReferenceBValueNotSet_Throws);
   MITK_TEST(Baselines_NoBZero_AllDirectionsOfLowestShell);
   MITK_TEST(Baselines_Mean_NotTruncated);
@@ -215,32 +215,14 @@ public:
     }
   }
 
-  void Defaults_ThresholdsAndDStarNotSet_SameAsViewDefaults()
+  void FitParameters_Default_AppDefaults()
   {
-    auto image = MakeSyntheticImage();
-    auto gradients = MakeGradients(m_BValues, 1000);
-    const std::vector<Method> methods = {
-      Method::FitAll, Method::DStarFixed, Method::DThenDStar, Method::LinearDThenF};
-    for (auto method : methods)
-    {
-      auto explicitFilter = MakeFilter(image, gradients, 1000, method);
-      explicitFilter->Update();
-
-      mitk::ivim::FitParameters defaultParameters;
-      defaultParameters.method = method;
-      auto defaultFilter = FilterType::New();
-      defaultFilter->SetInput(image);
-      defaultFilter->SetGradientDirections(gradients.GetPointer());
-      defaultFilter->SetBValue(1000);
-      defaultFilter->SetFitParameters(defaultParameters);
-      defaultFilter->Update();
-
-      auto expected = GetMaps(explicitFilter);
-      auto actual = GetMaps(defaultFilter);
-      CPPUNIT_ASSERT(expected.f == actual.f);
-      CPPUNIT_ASSERT(expected.d == actual.d);
-      CPPUNIT_ASSERT(expected.dStar == actual.dStar);
-    }
+    // Those of MitkDiffusionIvimFit; the IVIM view starts with the same thresholds and D*.
+    const mitk::ivim::FitParameters parameters{};
+    CPPUNIT_ASSERT_EQUAL(170.0, parameters.bThreshold);
+    CPPUNIT_ASSERT_EQUAL(0.0, parameters.signalThreshold);
+    CPPUNIT_ASSERT_EQUAL(0.06, parameters.dStar);
+    CPPUNIT_ASSERT(parameters.fitDStar);
   }
 
   void Update_ReferenceBValueNotSet_Throws()
