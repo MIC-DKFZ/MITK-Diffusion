@@ -17,6 +17,10 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
+#include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkTensorImage.h>
+
+#include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 
@@ -28,6 +32,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionModellingAlgorithmsTestSuite);
   MITK_TEST(EigenvalueCorrection_ThreadCount_SameResult);
+  MITK_TEST(PrincipalDirection_PeakImageGeometry);
   CPPUNIT_TEST_SUITE_END();
 
   using TensorImageType = itk::Image<itk::DiffusionTensor3D<float>, 3>;
@@ -91,6 +96,28 @@ public:
     }
     CPPUNIT_ASSERT_MESSAGE("Corrected tensors are not all zero", nonZero > 0);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("Tensor components that differ between 1 and N threads", 0u, differing);
+  }
+
+  // The 4D peak image takes the tensor image's geometry; its fourth origin component was left
+  // uninitialized while a write went past the 3D origin.
+  void PrincipalDirection_PeakImageGeometry()
+  {
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/FWE/ReferenceTensorImage.dti"));
+    auto itkTensorImage = mitk::convert::GetItkTensorFromTensorImage(tensorImage.GetPointer());
+
+    auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
+    filter->SetInput(itkTensorImage);
+    filter->Update();
+    auto peaks = filter->GetPeakImage();
+
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(itkTensorImage->GetOrigin()[i], peaks->GetOrigin()[i], 1e-4);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(itkTensorImage->GetSpacing()[i], peaks->GetSpacing()[i], 1e-9);
+    }
+    CPPUNIT_ASSERT_EQUAL(0.0, peaks->GetOrigin()[3]);
+    CPPUNIT_ASSERT_EQUAL(1.0, peaks->GetSpacing()[3]);
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(3), peaks->GetLargestPossibleRegion().GetSize(3));
   }
 };
 

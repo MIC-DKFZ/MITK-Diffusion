@@ -29,7 +29,7 @@ This file is based heavily on a corresponding ITK filter.
 #include <itkVectorContainer.h>
 #include <itkVectorImage.h>
 #include <itkDiffusionTensor3D.h>
-#include <mitkFiberBundle.h>
+#include <mitkPoint.h>
 
 namespace itk{
 /** \brief Extracts principal eigenvectors of the input tensors
