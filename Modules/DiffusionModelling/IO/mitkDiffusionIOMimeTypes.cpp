@@ -59,7 +59,7 @@ DiffusionIOMimeTypes::SHImageMimeType::SHImageMimeType() : CustomMimeType(SH_MIM
 
 bool DiffusionIOMimeTypes::SHImageMimeType::AppliesTo(const std::string &path) const
 {
-  std::string ext = itksys::SystemTools::GetFilenameExtension(path);
+  std::string ext = itksys::SystemTools::GetFilenameLastExtension(path);
   if (ext==".shi")
     return true;
 
@@ -188,7 +188,7 @@ DiffusionIOMimeTypes::PeakImageMimeType::PeakImageMimeType() : CustomMimeType(PE
 
 bool DiffusionIOMimeTypes::PeakImageMimeType::AppliesTo(const std::string &path) const
 {
-  std::string ext = itksys::SystemTools::GetFilenameExtension(path);
+  std::string ext = itksys::SystemTools::GetFilenameLastExtension(path);
   if (ext==".peak")
     return true;
 

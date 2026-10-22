@@ -51,7 +51,7 @@ namespace mitk
     mitk::LocaleSwitch localeSwitch("C");
     std::vector<itk::SmartPointer<mitk::BaseData> > result;
     std::string location = GetInputLocation();
-    std::string ext = itksys::SystemTools::GetFilenameExtension(location);
+    std::string ext = itksys::SystemTools::GetFilenameLastExtension(location);
     MITK_INFO << "Reading " << location;
 
     typedef itk::ImageFileReader<PeakImage::ItkPeakImageType> FileReaderType;

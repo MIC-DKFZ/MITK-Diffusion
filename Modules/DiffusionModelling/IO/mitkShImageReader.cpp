@@ -85,7 +85,7 @@ namespace mitk
     {
       try
       {
-        std::string ext = itksys::SystemTools::GetFilenameExtension(location);
+        std::string ext = itksys::SystemTools::GetFilenameLastExtension(location);
         typedef itk::ImageFileReader< ShImage::ShOnDiskType > FileReaderType;
         FileReaderType::Pointer reader = FileReaderType::New();
         reader->SetFileName(location);

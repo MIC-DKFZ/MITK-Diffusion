@@ -52,7 +52,7 @@ void mitk::ShImageWriter::WriteShImage(InputType::ConstPointer input)
   exporter->SetInputImage(itk_image);
   exporter->GenerateData();
 
-  std::string ext = itksys::SystemTools::GetFilenameExtension(this->GetOutputLocation());
+  std::string ext = itksys::SystemTools::GetFilenameLastExtension(this->GetOutputLocation());
 
   typedef itk::ImageFileWriter<ShImage::ShOnDiskType> WriterType;
   WriterType::Pointer writer = WriterType::New();

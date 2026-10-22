@@ -48,6 +48,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(OdfReader_WrongVectorLength_Throws);
   MITK_TEST(Clone_KeepsTypeAndPixels);
   MITK_TEST(PeakImage_SetCustomColorWithoutPolydata);
+  MITK_TEST(ShAndPeakIO_DotsInFileName);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -300,6 +301,32 @@ public:
     CPPUNIT_ASSERT_EQUAL(peaks->GetPolyData()->GetNumberOfPoints(), colors->GetNumberOfTuples());
     CPPUNIT_ASSERT_EQUAL(255, static_cast<int>(colors->GetTypedComponent(0, 0)));
     CPPUNIT_ASSERT_EQUAL(0, static_cast<int>(colors->GetTypedComponent(0, 1)));
+  }
+
+  static void AssertEqualPixels(mitk::Image *expected, mitk::Image *actual)
+  {
+    CPPUNIT_ASSERT_EQUAL(std::string(expected->GetNameOfClass()), std::string(actual->GetNameOfClass()));
+    const auto size = expected->GetPixelType().GetSize() * expected->GetDimension(0) * expected->GetDimension(1) * expected->GetDimension(2) * (expected->GetDimension() > 3 ? expected->GetDimension(3) : 1);
+    CPPUNIT_ASSERT_EQUAL(size, actual->GetPixelType().GetSize() * actual->GetDimension(0) * actual->GetDimension(1) * actual->GetDimension(2) * (actual->GetDimension() > 3 ? actual->GetDimension(3) : 1));
+    mitk::ImageReadAccessor expectedAccess(expected);
+    mitk::ImageReadAccessor actualAccess(actual);
+    CPPUNIT_ASSERT(std::memcmp(expectedAccess.GetData(), actualAccess.GetData(), size) == 0);
+  }
+
+  // The readers and the SH writer chose their ITK IO by everything after the first dot.
+  void ShAndPeakIO_DotsInFileName()
+  {
+    mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    const std::string shPath = m_TempDir + "/sh.v2.shi";
+    mitk::IOUtil::Save(shImage, shPath);
+    AssertEqualPixels(shImage, mitk::IOUtil::Load<mitk::ShImage>(shPath, &shFunctor));
+
+    mitk::PreferenceListReaderOptionsFunctor peakFunctor({"Peak Image"}, std::vector<std::string>());
+    auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &peakFunctor);
+    const std::string peakPath = m_TempDir + "/peaks.v2.nrrd";
+    mitk::IOUtil::Save(peakImage, peakPath);
+    AssertEqualPixels(peakImage, mitk::IOUtil::Load<mitk::PeakImage>(peakPath, &peakFunctor));
   }
 };
 
