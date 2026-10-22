@@ -22,7 +22,8 @@ found in the LICENSE file.
 #include <vnl/algo/vnl_levenberg_marquardt.h>
 #include <vnl/algo/vnl_symmetric_eigensystem.h>
 #include <vnl/vnl_least_squares_function.h>
-#include <vnl/vnl_matrix.h>
+#include <vnl/vnl_matrix_fixed.h>
+#include <vnl/vnl_vector_ref.h>
 
 #include <algorithm>
 #include <cmath>
@@ -30,10 +31,7 @@ found in the LICENSE file.
 
 namespace
 {
-  using mitk::ivim::FitParameters;
-  using mitk::ivim::Method;
-  using mitk::ivim::Protocol;
-  using mitk::ivim::VoxelFit;
+  using mitk::ivim::ModelParameters;
 
   /** The residuals are absolute differences; a parameter outside its range adds a penalty
       proportional to its value to every residual. */
@@ -171,12 +169,18 @@ namespace
   }
 
   /** D* of the second step of the two-step methods: the best of 100 values in [0.001, 0.15), or 0
-      when no candidate has a finite error (D or f not finite). */
-  double SearchDStar(const vnl_vector<double>& bValues, const vnl_vector<double>& measurements, double d, double f)
+      when no candidate has a finite error (D or f not finite). residualBuffer has room for the
+      residuals of all measurements. */
+  double SearchDStar(const vnl_vector<double>& bValues,
+                     const vnl_vector<double>& measurements,
+                     double d,
+                     double f,
+                     vnl_vector<double>& residualBuffer)
   {
     DStarCost cost(bValues, measurements, d, f);
-    vnl_vector<double> x(1);
-    vnl_vector<double> fx(measurements.size());
+    double candidate = 0;
+    vnl_vector_ref<double> x(1, &candidate);
+    vnl_vector_ref<double> fx(measurements.size(), residualBuffer.data_block());
 
     constexpr int numberOfCandidates = 100;
     constexpr double minDStar = .001;
@@ -197,36 +201,39 @@ namespace
     return bestCandidate < 0 ? 0 : minDStar + bestCandidate * ((maxDStar - minDStar) / numberOfCandidates);
   }
 
-  /** The measurements of the fit as S/S0 and their b-values. */
+  /** The measurements of a fit as S/S0 and their b-values, views of the buffers of a VoxelFitter. */
   struct Measurements
   {
-    vnl_vector<double> bValues;
-    vnl_vector<double> values;
+    vnl_vector_ref<double> bValues;
+    vnl_vector_ref<double> values;
   };
 
-  /** The usable measurements, above the b threshold if highOnly, in the order of the protocol. */
+  /** Copies the usable measurements, above the b threshold if highOnly, in the order of the protocol
+      to the start of the buffers. */
   Measurements Select(const vnl_vector<double>& normalized,
                       const std::vector<bool>& usable,
                       const vnl_vector<double>& bValues,
                       double bThreshold,
-                      bool highOnly)
+                      bool highOnly,
+                      vnl_vector<double>& bValueBuffer,
+                      vnl_vector<double>& valueBuffer)
   {
-    std::vector<double> selectedBValues;
-    std::vector<double> selectedValues;
+    unsigned int count = 0;
     for (unsigned int i = 0; i < normalized.size(); ++i)
     {
       if (usable[i] && (!highOnly || bValues[i] > bThreshold))
       {
-        selectedBValues.push_back(bValues[i]);
-        selectedValues.push_back(normalized[i]);
+        bValueBuffer[count] = bValues[i];
+        valueBuffer[count] = normalized[i];
+        ++count;
       }
     }
-    return {vnl_vector<double>(selectedBValues.data(), selectedBValues.size()),
-            vnl_vector<double>(selectedValues.data(), selectedValues.size())};
+    return {vnl_vector_ref<double>(count, bValueBuffer.data_block()),
+            vnl_vector_ref<double>(count, valueBuffer.data_block())};
   }
 
   /** With one usable measurement above the b threshold, D follows from it alone and f is 0. */
-  bool FitSingleMeasurement(const Measurements& m, VoxelFit& fit)
+  bool FitSingleMeasurement(const Measurements& m, ModelParameters& fit)
   {
     if (m.values.size() >= 2)
       return false;
@@ -235,35 +242,43 @@ namespace
     return true;
   }
 
-  void FitDThenDStar(const Measurements& high, const Measurements& all, bool fitDStar, VoxelFit& fit)
+  /** Returns whether D* was searched with the measurements all. */
+  bool FitDThenDStar(const Measurements& high,
+                     const Measurements& all,
+                     bool fitDStar,
+                     ModelParameters& fit,
+                     vnl_vector<double>& residualBuffer)
   {
     if (FitSingleMeasurement(high, fit))
-      return;
+      return false;
 
     DAndFCost cost(high.bValues, high.values);
-    vnl_vector<double> x(2);
-    x[0] = 0.001;
-    x[1] = 0.1;
+    double start[2] = {0.001, 0.1};
+    vnl_vector_ref<double> x(2, start);
     Minimize(cost, x);
     fit.d = x[0];
     fit.f = x[1];
 
-    if (fitDStar)
-    {
-      fit.secondFitBValues = all.bValues;
-      fit.secondFitMeasurements = all.values;
-      if (all.values.size() >= 2)
-        fit.dStar = SearchDStar(all.bValues, all.values, fit.d, fit.f);
-    }
+    if (!fitDStar)
+      return false;
+    if (all.values.size() >= 2)
+      fit.dStar = SearchDStar(all.bValues, all.values, fit.d, fit.f, residualBuffer);
+    return true;
   }
 
-  void FitLinearDThenF(const Measurements& high, const Measurements& all, bool fitDStar, VoxelFit& fit)
+  /** Returns whether D* was searched with the measurements all. */
+  bool FitLinearDThenF(const Measurements& high,
+                       const Measurements& all,
+                       bool fitDStar,
+                       ModelParameters& fit,
+                       vnl_vector<double>& logBuffer,
+                       vnl_vector<double>& residualBuffer)
   {
     if (FitSingleMeasurement(high, fit))
-      return;
+      return false;
 
     const unsigned int n = high.values.size();
-    vnl_vector<double> logValues(n);
+    vnl_vector_ref<double> logValues(n, logBuffer.data_block());
     for (unsigned int i = 0; i < n; ++i)
       logValues[i] = std::log(high.values[i]);
 
@@ -282,33 +297,35 @@ namespace
     if (high.bValues.max_value() - high.bValues.min_value() < 1)
     {
       fit.d = -meanLog / meanB;
-      return;
+      return false;
     }
 
-    // The line is the principal axis of the centred points (total least squares).
-    vnl_matrix<double> centred(n, 2);
+    // The line is the principal axis of the centred points (total least squares). The scatter
+    // matrix of the centred points is summed point by point, in the order of vnl's matrix product.
+    vnl_matrix_fixed<double, 2, 2> scatter(0.0);
     for (unsigned int i = 0; i < n; ++i)
     {
-      centred(i, 0) = high.bValues[i] - meanB;
-      centred(i, 1) = logValues[i] - meanLog;
-      if (!std::isfinite(centred(i, 0)) || !std::isfinite(centred(i, 1)))
-        return;
+      const double centredB = high.bValues[i] - meanB;
+      const double centredLog = logValues[i] - meanLog;
+      if (!std::isfinite(centredB) || !std::isfinite(centredLog))
+        return false;
+      scatter(0, 0) += centredB * centredB;
+      scatter(0, 1) += centredB * centredLog;
+      scatter(1, 1) += centredLog * centredLog;
     }
+    scatter(1, 0) = scatter(0, 1);
 
-    const vnl_symmetric_eigensystem<double> eigensystem(centred.transpose() * centred);
-    const vnl_vector<double> axis = eigensystem.get_eigenvalue(0) > eigensystem.get_eigenvalue(1)
-                                      ? eigensystem.get_eigenvector(0)
-                                      : eigensystem.get_eigenvector(1);
-    fit.f = 1 - std::exp(meanLog - meanB * (axis(1) / axis(0)));
-    fit.d = -axis(1) / axis(0);
+    const vnl_symmetric_eigensystem<double> eigensystem(scatter.as_ref());
+    const unsigned int axis = eigensystem.get_eigenvalue(0) > eigensystem.get_eigenvalue(1) ? 0 : 1;
+    const double slope = eigensystem.V(1, axis) / eigensystem.V(0, axis);
+    fit.f = 1 - std::exp(meanLog - meanB * slope);
+    fit.d = -slope;
 
-    if (fitDStar)
-    {
-      fit.secondFitBValues = all.bValues;
-      fit.secondFitMeasurements = all.values;
-      if (all.values.size() >= 2)
-        fit.dStar = SearchDStar(all.bValues, all.values, fit.d, fit.f);
-    }
+    if (!fitDStar)
+      return false;
+    if (all.values.size() >= 2)
+      fit.dStar = SearchDStar(all.bValues, all.values, fit.d, fit.f, residualBuffer);
+    return true;
   }
 }
 
@@ -356,51 +373,61 @@ mitk::ivim::Protocol mitk::ivim::MakeProtocol(const DiffusionPropertyHelper::Gra
   return protocol;
 }
 
-mitk::ivim::VoxelFit mitk::ivim::FitVoxel(const vnl_vector<double>& signal,
-                                          const Protocol& protocol,
-                                          const FitParameters& parameters)
+mitk::ivim::VoxelFitter::VoxelFitter(const Protocol& protocol, const FitParameters& parameters)
+  : m_Protocol(protocol),
+    m_Parameters(parameters),
+    m_Normalized(protocol.weightedIndices.size()),
+    m_Usable(protocol.weightedIndices.size()),
+    m_FirstBValues(protocol.weightedIndices.size()),
+    m_FirstMeasurements(protocol.weightedIndices.size()),
+    m_SecondBValues(protocol.weightedIndices.size()),
+    m_SecondMeasurements(protocol.weightedIndices.size()),
+    m_LogMeasurements(protocol.weightedIndices.size()),
+    m_Residuals(protocol.weightedIndices.size())
 {
-  const auto numberOfWeighted = protocol.weightedIndices.size();
+}
+
+mitk::ivim::ModelParameters mitk::ivim::VoxelFitter::Fit(const vnl_vector<double>& signal)
+{
+  const auto numberOfWeighted = m_Protocol.weightedIndices.size();
 
   double b0 = 0;
-  if (!protocol.iteratedSequence)
+  if (!m_Protocol.iteratedSequence)
   {
-    for (auto i : protocol.baselineIndices)
+    for (auto i : m_Protocol.baselineIndices)
       b0 += signal[i];
-    if (!protocol.baselineIndices.empty())
-      b0 /= protocol.baselineIndices.size();
+    if (!m_Protocol.baselineIndices.empty())
+      b0 /= m_Protocol.baselineIndices.size();
   }
 
   // Without baseline signal the signal ratios are undefined, so the measurements are left out and
   // the voxel gets 0.
-  VoxelFit fit;
-  fit.allMeasurements.set_size(numberOfWeighted);
-  std::vector<bool> usable(numberOfWeighted);
   for (std::size_t i = 0; i < numberOfWeighted; ++i)
   {
-    if (protocol.iteratedSequence)
-      b0 = signal[protocol.baselineIndices[i]];
-    const double s = signal[protocol.weightedIndices[i]];
-    fit.allMeasurements[i] = b0 > 0 ? s / b0 : 0;
-    usable[i] = b0 > 0 && s > parameters.signalThreshold;
+    if (m_Protocol.iteratedSequence)
+      b0 = signal[m_Protocol.baselineIndices[i]];
+    const double s = signal[m_Protocol.weightedIndices[i]];
+    m_Normalized[i] = b0 > 0 ? s / b0 : 0;
+    m_Usable[i] = b0 > 0 && s > m_Parameters.signalThreshold;
   }
 
-  const bool twoStep = parameters.method == Method::DThenDStar || parameters.method == Method::LinearDThenF;
-  const auto first = Select(fit.allMeasurements, usable, protocol.bValues, parameters.bThreshold, twoStep);
-  fit.firstFitBValues = first.bValues;
-  fit.firstFitMeasurements = first.values;
+  const auto method = m_Parameters.method;
+  const bool twoStep = method == Method::DThenDStar || method == Method::LinearDThenF;
+  const auto first = Select(
+    m_Normalized, m_Usable, m_Protocol.bValues, m_Parameters.bThreshold, twoStep, m_FirstBValues, m_FirstMeasurements);
+  m_NumberOfFirst = first.values.size();
+  m_NumberOfSecond = 0;
 
-  switch (parameters.method)
+  ModelParameters fit;
+  switch (method)
   {
     case Method::FitAll:
     {
       if (first.values.size() < 3)
         break;
       AllParametersCost cost(first.bValues, first.values);
-      vnl_vector<double> x(3);
-      x[0] = 0.1;
-      x[1] = 0.001;
-      x[2] = 0.01;
+      double start[3] = {0.1, 0.001, 0.01};
+      vnl_vector_ref<double> x(3, start);
       Minimize(cost, x);
       fit.f = x[0];
       fit.d = x[1];
@@ -411,31 +438,55 @@ mitk::ivim::VoxelFit mitk::ivim::FitVoxel(const vnl_vector<double>& signal,
     {
       if (first.values.size() < 2)
         break;
-      FixedDStarCost cost(first.bValues, first.values, parameters.dStar);
-      vnl_vector<double> x(2);
-      x[0] = 0.1;
-      x[1] = 0.001;
+      FixedDStarCost cost(first.bValues, first.values, m_Parameters.dStar);
+      double start[2] = {0.1, 0.001};
+      vnl_vector_ref<double> x(2, start);
       Minimize(cost, x);
       fit.f = x[0];
       fit.d = x[1];
-      fit.dStar = parameters.dStar;
+      fit.dStar = m_Parameters.dStar;
       break;
     }
     case Method::DThenDStar:
     case Method::LinearDThenF:
     {
-      const auto all = Select(fit.allMeasurements, usable, protocol.bValues, parameters.bThreshold, false);
-      if (parameters.method == Method::DThenDStar)
-        FitDThenDStar(first, all, parameters.fitDStar, fit);
-      else
-        FitLinearDThenF(first, all, parameters.fitDStar, fit);
+      const auto all = Select(
+        m_Normalized, m_Usable, m_Protocol.bValues, m_Parameters.bThreshold, false, m_SecondBValues, m_SecondMeasurements);
+      const bool searchedDStar =
+        method == Method::DThenDStar
+          ? FitDThenDStar(first, all, m_Parameters.fitDStar, fit, m_Residuals)
+          : FitLinearDThenF(first, all, m_Parameters.fitDStar, fit, m_LogMeasurements, m_Residuals);
+      if (searchedDStar)
+        m_NumberOfSecond = all.values.size();
       break;
     }
   }
 
   fit.unclampedF = fit.f;
   fit.f = std::clamp(fit.f, 0.0, 1.0);
+  m_LastFit = fit;
   return fit;
+}
+
+mitk::ivim::VoxelFit mitk::ivim::VoxelFitter::GetVoxelFit() const
+{
+  VoxelFit fit;
+  static_cast<ModelParameters&>(fit) = m_LastFit;
+  fit.allMeasurements = m_Normalized;
+  fit.firstFitBValues = vnl_vector<double>(m_FirstBValues.data_block(), m_NumberOfFirst);
+  fit.firstFitMeasurements = vnl_vector<double>(m_FirstMeasurements.data_block(), m_NumberOfFirst);
+  fit.secondFitBValues = vnl_vector<double>(m_SecondBValues.data_block(), m_NumberOfSecond);
+  fit.secondFitMeasurements = vnl_vector<double>(m_SecondMeasurements.data_block(), m_NumberOfSecond);
+  return fit;
+}
+
+mitk::ivim::VoxelFit mitk::ivim::FitVoxel(const vnl_vector<double>& signal,
+                                          const Protocol& protocol,
+                                          const FitParameters& parameters)
+{
+  VoxelFitter fitter(protocol, parameters);
+  fitter.Fit(signal);
+  return fitter.GetVoxelFit();
 }
 
 mitk::ivim::Maps mitk::ivim::ComputeMaps(const Image* dwi, const Image* mask, const FitParameters& parameters)

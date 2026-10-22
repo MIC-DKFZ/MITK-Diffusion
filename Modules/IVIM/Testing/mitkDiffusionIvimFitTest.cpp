@@ -40,6 +40,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Update_SecondRun_SameMaps);
   MITK_TEST(FitVoxel_SignalThreshold_FitInputsAndMapValues);
   MITK_TEST(Fwe_MultiThreaded_SameAsSingleThreaded);
+  MITK_TEST(VoxelFitter_ReusedForVoxels_SameAsFitVoxel);
   MITK_TEST(ComputeMaps_Fwe_SameAsFilterWithDwiGeometry);
   MITK_TEST(Map_Mask_FitsOnlyInside);
   MITK_TEST(Update_MaskOfOtherSize_Throws);
@@ -402,6 +403,46 @@ public:
       CPPUNIT_ASSERT(expected.f == actual.f);
       CPPUNIT_ASSERT(expected.d == actual.d);
       CPPUNIT_ASSERT(expected.dStar == actual.dStar);
+    }
+  }
+
+  void VoxelFitter_ReusedForVoxels_SameAsFitVoxel()
+  {
+    // The fitter keeps its buffers from voxel to voxel; voxels with fewer usable measurements after
+    // voxels with more must not see measurements of the earlier ones.
+    auto full = IvimSignal(m_BValues, 10000, 0.1, 0.001, 0.02);
+    auto fewer = IvimSignal(m_BValues, 10000, 0.3, 0.0007, 0.05);
+    for (std::size_t i = 4; i < fewer.size(); i += 3)
+      fewer[i] = 100;
+    auto noBaseline = full;
+    noBaseline[0] = 0;
+    noBaseline[1] = 0;
+    const std::vector<std::vector<double>> sequence = {full, fewer, full, noBaseline, fewer, full};
+
+    const auto protocol = mitk::ivim::MakeProtocol(MakeGradients(m_BValues, 1000), 1000);
+    for (auto method : {Method::FitAll, Method::DStarFixed, Method::DThenDStar, Method::LinearDThenF})
+    {
+      auto parameters = MakeParameters(method);
+      parameters.signalThreshold = 500;
+      mitk::ivim::VoxelFitter fitter(protocol, parameters);
+      for (const auto& voxel : sequence)
+      {
+        const vnl_vector<double> signal(voxel.data(), voxel.size());
+        const auto expected = mitk::ivim::FitVoxel(signal, protocol, parameters);
+        const auto fitted = fitter.Fit(signal);
+        const auto actual = fitter.GetVoxelFit();
+
+        CPPUNIT_ASSERT_EQUAL(expected.f, fitted.f);
+        CPPUNIT_ASSERT_EQUAL(expected.unclampedF, fitted.unclampedF);
+        CPPUNIT_ASSERT_EQUAL(expected.d, fitted.d);
+        CPPUNIT_ASSERT_EQUAL(expected.dStar, fitted.dStar);
+        CPPUNIT_ASSERT_EQUAL(expected.d, actual.d);
+        CPPUNIT_ASSERT(expected.allMeasurements == actual.allMeasurements);
+        CPPUNIT_ASSERT(expected.firstFitBValues == actual.firstFitBValues);
+        CPPUNIT_ASSERT(expected.firstFitMeasurements == actual.firstFitMeasurements);
+        CPPUNIT_ASSERT(expected.secondFitBValues == actual.secondFitBValues);
+        CPPUNIT_ASSERT(expected.secondFitMeasurements == actual.secondFitMeasurements);
+      }
     }
   }
 

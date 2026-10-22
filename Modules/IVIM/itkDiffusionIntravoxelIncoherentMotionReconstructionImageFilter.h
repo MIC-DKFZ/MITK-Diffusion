@@ -25,7 +25,8 @@ namespace itk
 {
   /** \class DiffusionIntravoxelIncoherentMotionReconstructionImageFilter
       \brief Maps of the IVIM parameters f (output 0), D (output 1) and D* (output 2), fitted voxel by
-      voxel with mitk::ivim::FitVoxel; the voxels are independent, so the filter runs multithreaded. */
+      voxel with a mitk::ivim::VoxelFitter per thread; the voxels are independent, so the filter runs
+      multithreaded. */
   template <class TInputPixelType, class TOutputPixelType>
   class DiffusionIntravoxelIncoherentMotionReconstructionImageFilter
     : public ImageToImageFilter<VectorImage<TInputPixelType, 3>, Image<TOutputPixelType, 3>>

@@ -80,16 +80,17 @@ namespace itk
     if (m_ImageMask.IsNotNull())
       maskIt = ImageRegionConstIterator<MaskImageType>(m_ImageMask, outputRegionForThread);
 
+    mitk::ivim::VoxelFitter fitter(m_Protocol, m_FitParameters);
     vnl_vector<double> signal(this->GetInput()->GetNumberOfComponentsPerPixel());
     for (; !inputIt.IsAtEnd(); ++inputIt, ++fIt, ++dIt, ++dStarIt)
     {
-      mitk::ivim::VoxelFit fit;
+      mitk::ivim::ModelParameters fit;
       if (m_ImageMask.IsNull() || maskIt.Get() > 0)
       {
         const auto pixel = inputIt.Get();
         for (unsigned int i = 0; i < signal.size(); ++i)
           signal[i] = pixel[i];
-        fit = mitk::ivim::FitVoxel(signal, m_Protocol, m_FitParameters);
+        fit = fitter.Fit(signal);
       }
       fIt.Set(fit.f);
       dIt.Set(fit.d);

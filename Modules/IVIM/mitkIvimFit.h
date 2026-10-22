@@ -68,14 +68,19 @@ namespace mitk::ivim
   MITKIVIM_EXPORT Protocol MakeProtocol(const DiffusionPropertyHelper::GradientDirectionsContainerType* gradients,
                                         double referenceBValue);
 
-  /** The fit of one voxel and the measurements it used, which the IVIM view plots. */
-  struct VoxelFit
+  /** The fitted parameters of one voxel. */
+  struct ModelParameters
   {
     /** f clamped to [0, 1]. */
     double f = 0;
     double unclampedF = 0;
     double d = 0;
     double dStar = 0;
+  };
+
+  /** The fit of one voxel and the measurements it used, which the IVIM view plots. */
+  struct VoxelFit : ModelParameters
+  {
     /** S/S0 of all diffusion-weighted volumes, in the order of Protocol::weightedIndices; 0 without
         baseline signal. */
     vnl_vector<double> allMeasurements;
@@ -85,6 +90,40 @@ namespace mitk::ivim
     /** The b-values and S/S0 of the D* search of the two-step methods; empty otherwise. */
     vnl_vector<double> secondFitBValues;
     vnl_vector<double> secondFitMeasurements;
+  };
+
+  /** Fits voxel after voxel of one protocol in buffers allocated once, so that the parameter maps
+      allocate no memory per voxel in this module (Levenberg-Marquardt still does). Not thread-safe:
+      one fitter per thread. */
+  class MITKIVIM_EXPORT VoxelFitter
+  {
+  public:
+    VoxelFitter(const Protocol& protocol, const FitParameters& parameters);
+
+    /** The parameters FitVoxel gives for the signal. */
+    ModelParameters Fit(const vnl_vector<double>& signal);
+
+    /** The last fit with copies of the measurements it used. */
+    VoxelFit GetVoxelFit() const;
+
+  private:
+    Protocol m_Protocol;
+    FitParameters m_Parameters;
+    ModelParameters m_LastFit;
+
+    /** VoxelFit::allMeasurements and which of them are above the thresholds. */
+    vnl_vector<double> m_Normalized;
+    std::vector<bool> m_Usable;
+    /** The measurements of the first fit and of the D* search in their first entries. */
+    vnl_vector<double> m_FirstBValues;
+    vnl_vector<double> m_FirstMeasurements;
+    unsigned int m_NumberOfFirst = 0;
+    vnl_vector<double> m_SecondBValues;
+    vnl_vector<double> m_SecondMeasurements;
+    unsigned int m_NumberOfSecond = 0;
+    /** Work space of the line fit and the D* search. */
+    vnl_vector<double> m_LogMeasurements;
+    vnl_vector<double> m_Residuals;
   };
 
   /** Fits the signal of one voxel, all volumes of the DWI in their order. A voxel without baseline
