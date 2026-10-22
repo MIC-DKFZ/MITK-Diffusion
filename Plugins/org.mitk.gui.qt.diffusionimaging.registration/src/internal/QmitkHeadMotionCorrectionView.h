@@ -14,29 +14,28 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-
-
-#include <berryISelectionListener.h>
-#include <berryIStructuredSelection.h>
+#ifndef QmitkHeadMotionCorrectionView_h
+#define QmitkHeadMotionCorrectionView_h
 
 #include <QmitkAbstractView.h>
+
 #include "ui_QmitkHeadMotionCorrectionViewControls.h"
 
+#include <mitkDataNode.h>
 #include <mitkImage.h>
 
-#include <QThread>
-#include <QTime>
+#include <QFutureWatcher>
 
-typedef short DiffusionPixelType;
+#include <memory>
+#include <string>
 
-/*!
-\brief View for diffusion image registration / head motion correction
-*/
+/**
+ * \brief View for head-motion correction of DWIs (mitk::DWIHeadMotionCorrectionFilter).
+ *
+ * The correction runs in a worker thread, so the application stays responsive; one run at a time.
+ */
 class QmitkHeadMotionCorrectionView : public QmitkAbstractView
 {
-
-  // this is needed for all Qt objects that should have a Qt meta-object
-  // (everything that derives from QObject and wants to have signal/slots)
   Q_OBJECT
 
 public:
@@ -44,32 +43,29 @@ public:
   static const std::string VIEW_ID;
 
   QmitkHeadMotionCorrectionView();
-  virtual ~QmitkHeadMotionCorrectionView();
+  ~QmitkHeadMotionCorrectionView() override;
 
-  virtual void CreateQtPartControl(QWidget *parent) override;
+  void CreateQtPartControl(QWidget *parent) override;
   void SetFocus() override;
 
 protected slots:
 
   void StartCorrection();
-  void UpdateGUI();             ///< update button activity etc. dpending on current datamanager selection
-
-
-protected:
-
-  /// \brief called by QmitkAbstractView when DataManager's selection has changed
-  virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
-
-  Ui::QmitkHeadMotionCorrectionViewControls* m_Controls;
-
-  mitk::Image::Pointer      m_DiffusionImage;
-  std::vector< mitk::DataNode::Pointer >            m_SelectedDiffusionNodes;
+  void OnCorrectionFinished();
+  void UpdateGUI();             ///< update button activity depending on the selected image
 
 private:
 
-  void UpdateRegistrationStatus();  ///< update textual status display of the Registration process
+  /** The corrected image, or the reason why there is none. */
+  struct Result
+  {
+    mitk::Image::Pointer image;
+    std::string error;
+  };
 
-  // the Qt parent of our GUI (NOT of this object)
-  QWidget* m_Parent;
-
+  std::unique_ptr<Ui::QmitkHeadMotionCorrectionViewControls> m_Controls;
+  QFutureWatcher<Result> m_Watcher;
+  mitk::DataNode::Pointer m_ImageNode;  ///< input of the running correction
 };
+
+#endif
