@@ -20,6 +20,8 @@ found in the LICENSE file.
 #include <vtkParametricSpline.h>
 
 #include <array>
+#include <functional>
+#include <queue>
 
 // Resampling, smoothing and compression of the fibers of mitk::FiberBundle; fiber count and
 // weights stay.
@@ -131,72 +133,79 @@ void mitk::FiberBundle::Compress(float error)
       }
     }
 
-    // calculate curvatures
-    auto numPoints = vertices.size();
-    std::vector< int > removedPoints; removedPoints.resize(numPoints, 0);
-    removedPoints[0]=-1; removedPoints[numPoints-1]=-1;
+    // Removes, one at a time, the inner point whose distance to the segment between its kept
+    // neighbours is smallest (the lowest index among equal distances), until no distance is below
+    // the error. Kept points form a linked list, and the candidates wait in a heap ordered by
+    // (distance, index): a removal changes only the distances of its two neighbours, so each
+    // removal costs O(log n) instead of a scan of the whole fiber.
+    const std::size_t numPoints = vertices.size();
+    std::vector< std::size_t > prev(numPoints), next(numPoints);
+    for (std::size_t j=0; j<numPoints; ++j)
+    {
+      prev[j] = j-1;
+      next[j] = j+1;
+    }
+    std::vector< bool > removed(numPoints, false);
+    std::vector< unsigned int > version(numPoints, 0);
+
+    // height of the triangle (pred, cand, succ) over the side pred-succ (Heron's formula)
+    auto distanceToChord = [&](std::size_t j)
+    {
+      const vnl_vector_fixed< double, 3 >& candV = vertices[j];
+      const vnl_vector_fixed< double, 3 >& pred = vertices[prev[j]];
+      const vnl_vector_fixed< double, 3 >& succ = vertices[next[j]];
+      double a = (candV-pred).magnitude();
+      double b = (candV-succ).magnitude();
+      double c = (pred-succ).magnitude();
+      double s=0.5*(a+b+c);
+      return (2.0/c)*sqrt(fabs(s*(s-a)*(s-b)*(s-c)));
+    };
+
+    struct Candidate
+    {
+      double distance;
+      std::size_t index;
+      unsigned int version;
+      bool operator>(const Candidate& other) const
+      {
+        return distance!=other.distance ? distance>other.distance : index>other.index;
+      }
+    };
+    std::priority_queue< Candidate, std::vector<Candidate>, std::greater<Candidate> > candidates;
+    // NaN (coinciding neighbours) and distances from the error on are never removed.
+    auto pushIfBelowError = [&](std::size_t j)
+    {
+      const double hc = distanceToChord(j);
+      if (hc<static_cast<double>(error))
+        candidates.push({hc, j, version[j]});
+    };
+    for (std::size_t j=1; j+1<numPoints; ++j)
+      pushIfBelowError(j);
 
     unsigned int remCounter = 0;
-
-    bool pointFound = true;
-    while (pointFound)
+    while (!candidates.empty())
     {
-      pointFound = false;
-      double minError = static_cast<double>(error);
-      unsigned int removeIndex = 0;
+      const Candidate best = candidates.top();
+      candidates.pop();
+      if (removed[best.index] || best.version!=version[best.index])
+        continue;
 
-      for (unsigned int j=0; j<vertices.size(); j++)
-      {
-        if (removedPoints[j]==0)
+      removed[best.index] = true;
+      remCounter++;
+      const std::size_t p = prev[best.index];
+      const std::size_t s = next[best.index];
+      next[p] = s;
+      prev[s] = p;
+      for (const std::size_t neighbour : {p, s})
+        if (neighbour!=0 && neighbour!=numPoints-1)
         {
-          vnl_vector_fixed< double, 3 > candV = vertices.at(j);
-
-          int validP = -1;
-          vnl_vector_fixed< double, 3 > pred;
-          for (int k=static_cast<int>(j)-1; k>=0; k--)
-            if (removedPoints[static_cast<unsigned int>(k)]<=0)
-            {
-              pred = vertices.at(static_cast<unsigned int>(k));
-              validP = k;
-              break;
-            }
-          int validS = -1;
-          vnl_vector_fixed< double, 3 > succ;
-          for (unsigned int k=j+1; k<numPoints; k++)
-            if (removedPoints[k]<=0)
-            {
-              succ = vertices.at(k);
-              validS = static_cast<int>(k);
-              break;
-            }
-
-          if (validP>=0 && validS>=0)
-          {
-            double a = (candV-pred).magnitude();
-            double b = (candV-succ).magnitude();
-            double c = (pred-succ).magnitude();
-            double s=0.5*(a+b+c);
-            double hc=(2.0/c)*sqrt(fabs(s*(s-a)*(s-b)*(s-c)));
-
-            if (hc<minError)
-            {
-              removeIndex = j;
-              minError = hc;
-              pointFound = true;
-            }
-          }
+          ++version[neighbour];
+          pushIfBelowError(neighbour);
         }
-      }
-
-      if (pointFound)
-      {
-        removedPoints[removeIndex] = 1;
-        remCounter++;
-      }
     }
 
-    for (unsigned int j=0; j<numPoints; j++)
-      if (removedPoints[j]<=0)
+    for (std::size_t j=0; j<numPoints; j++)
+      if (!removed[j])
         compressedFibers[static_cast<std::size_t>(i)].push_back(vertices.at(j));
     removedPerFiber[static_cast<std::size_t>(i)] = remCounter;
   }
