@@ -17,6 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <vtkDoubleArray.h>
 #include <vtkPointData.h>
+#include <vtkFloatArray.h>
 #include <boost/timer/progress_display.hpp>
 
 namespace itk{
@@ -38,13 +39,17 @@ FiberCurvatureFilter::~FiberCurvatureFilter()
 void FiberCurvatureFilter::GenerateData()
 {
     vtkSmartPointer<vtkPolyData> inputPoly = m_InputFiberBundle->GetFiberPolyData();
-    vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
-    vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
+    using Piece = std::vector< vnl_vector_fixed< double, 3 > >;
+
+    // The pieces of each fiber are collected per fiber and assembled in fiber order afterwards, so
+    // that the output does not depend on the number of threads.
+    const int numFibers = inputPoly->GetNumberOfCells();
+    std::vector< std::vector< Piece > > fiberPieces(numFibers);
 
     MITK_INFO << "Applying curvature threshold";
-    boost::timer::progress_display disp(inputPoly->GetNumberOfCells());
+    boost::timer::progress_display disp(numFibers);
 #pragma omp parallel for
-    for (int i=0; i<inputPoly->GetNumberOfCells(); i++)
+    for (int i=0; i<numFibers; i++)
     {
         std::vector< vnl_vector_fixed< double, 3 > > vertices;
 
@@ -67,7 +72,8 @@ void FiberCurvatureFilter::GenerateData()
 
         // calculate curvatures
         int numPoints = vertices.size();
-        vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+        std::vector< Piece >& pieces = fiberPieces[i];
+        Piece container;
         for (int j=0; j<numPoints; j++)
         {
             double dist = 0;
@@ -122,34 +128,40 @@ void FiberCurvatureFilter::GenerateData()
                 dev /= vectors.size();
 
             if (dev<m_AngularDeviation)
-            {
-#pragma omp critical
-              {
-                vtkIdType id = vtkNewPoints->InsertNextPoint(vertices.at(j).data_block());
-                container->GetPointIds()->InsertNextId(id);
-              }
-            }
+                container.push_back(vertices.at(j));
             else
             {
                 if (m_RemoveFibers)
                 {
-                    container = vtkSmartPointer<vtkPolyLine>::New();
+                    pieces.clear();
+                    container.clear();
                     break;
                 }
 
-                if (container->GetNumberOfPoints()>0)
-                {
-#pragma omp critical
-                    vtkNewCells->InsertNextCell(container);
-                }
-                container = vtkSmartPointer<vtkPolyLine>::New();
+                // A single point is no fiber.
+                if (container.size()>1)
+                    pieces.push_back(container);
+                container.clear();
             }
         }
 
-#pragma omp critical
+        if (container.size()>1)
+            pieces.push_back(container);
+    }
+
+    vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
+    vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
+    // Each piece keeps the weight of its fiber (e.g. SIFT2 or FitFibersToImage weights).
+    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
+    for (int i=0; i<numFibers; i++)
+    {
+        for (const auto& piece : fiberPieces[i])
         {
-          if (container->GetNumberOfPoints()>0)
-              vtkNewCells->InsertNextCell(container);
+            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+            for (const auto& point : piece)
+                container->GetPointIds()->InsertNextId(vtkNewPoints->InsertNextPoint(point.data_block()));
+            vtkNewCells->InsertNextCell(container);
+            weights->InsertNextValue(m_InputFiberBundle->GetFiberWeight(i));
         }
     }
 
@@ -157,6 +169,7 @@ void FiberCurvatureFilter::GenerateData()
     outputPoly->SetPoints(vtkNewPoints);
     outputPoly->SetLines(vtkNewCells);
     m_OutputFiberBundle = mitk::FiberBundle::New(outputPoly);
+    m_OutputFiberBundle->SetFiberWeights(weights);
     m_OutputFiberBundle->SetTrackVisHeader(m_InputFiberBundle->GetTrackVisHeader());
 }
 
