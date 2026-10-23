@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <mitkFiberBundle.h>
 #include <mitkFiberBundleIOHelper.h>
 #include <mitkFiberBundleDicomReferenceTags.h>
+#include <mitkPlanarFigureComposite.h>
 #include <mitkImage.h>
 #include <mitkTemporoSpatialStringProperty.h>
 #include <mitkIOMimeTypes.h>
@@ -77,6 +78,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(CopyDicomReferenceTags_BothNamingsAndMissingTags);
   MITK_TEST(TrkWriter_Header_DescribesReferenceGrid);
   MITK_TEST(DicomReader_NoAlgorithmIdentification_LoadsAndKeepsLocale);
+  MITK_TEST(PlanarFigureComposite_RoundTripAndBrokenFile_KeepLocale);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -384,6 +386,38 @@ public:
     CPPUNIT_ASSERT_MESSAGE("File without algorithm identification loads", loaded.IsNotNull());
     CPPUNIT_ASSERT(loaded->Equals(fib, 0.001));
     CPPUNIT_ASSERT_EQUAL(std::string("0"), StringProperty(loaded, "DICOM.algo_family_code.value"));
+  }
+
+  void PlanarFigureComposite_RoundTripAndBrokenFile_KeepLocale()
+  {
+    auto composite = mitk::PlanarFigureComposite::New();
+    composite->setOperationType(mitk::PlanarFigureComposite::NOT);
+    const std::string path = m_TempDir + "/composite.pfc";
+    const std::string broken = m_TempDir + "/broken.pfc";
+    std::ofstream(broken) << "no xml";
+
+    const std::string before = std::setlocale(LC_ALL, nullptr);
+    const char *testLocale = std::setlocale(LC_ALL, "C.UTF-8");
+    const std::string expected = testLocale != nullptr ? testLocale : before;
+    mitk::IOUtil::Save(composite, path);
+    const std::string afterWriting = std::setlocale(LC_ALL, nullptr);
+    auto loaded = mitk::IOUtil::Load<mitk::PlanarFigureComposite>(path);
+    bool brokenThrew = false;
+    try
+    {
+      mitk::IOUtil::Load(broken);
+    }
+    catch (...)
+    {
+      brokenThrew = true;
+    }
+    const std::string afterBroken = std::setlocale(LC_ALL, nullptr);
+    std::setlocale(LC_ALL, before.c_str());
+
+    CPPUNIT_ASSERT_EQUAL(mitk::PlanarFigureComposite::NOT, loaded->getOperationType());
+    CPPUNIT_ASSERT(brokenThrew);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("Locale after writing", expected, afterWriting);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("Locale after a failed read", expected, afterBroken);
   }
 
   void TckReader_AllFloatTypes_ReadSamePoints()

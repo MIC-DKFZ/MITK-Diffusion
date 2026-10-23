@@ -49,12 +49,10 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::PlanarFigureCompositeReade
 {
 
     std::vector<itk::SmartPointer<mitk::BaseData> > result;
+    // No locale switch: the file holds one integer, and a switch by hand stayed in force for the
+    // whole process when the XML parser threw.
     try
     {
-        const std::string& locale = "C";
-        const std::string& currLocale = setlocale( LC_ALL, nullptr );
-        setlocale(LC_ALL, locale.c_str());
-
         std::string filename = this->GetInputLocation();
 
         std::string ext = itksys::SystemTools::GetFilenameLastExtension(filename);
@@ -85,8 +83,6 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::PlanarFigureCompositeReade
 
         std::vector<itk::SmartPointer<mitk::BaseData> > result;
         result.push_back(pfc.GetPointer());
-
-        setlocale(LC_ALL, currLocale.c_str());
 
         return result;
     }

@@ -61,16 +61,10 @@ void mitk::PlanarFigureCompositeWriter::Write()
         mitkThrow() << "Stream not good.";
     }
 
+    // No locale switch: the file holds one integer, and a switch by hand stayed in force for the
+    // whole process when writing threw.
     try
     {
-        const std::string& locale = "C";
-        const std::string& currLocale = setlocale( LC_ALL, nullptr );
-        setlocale(LC_ALL, locale.c_str());
-
-        std::locale previousLocale(out->getloc());
-        std::locale I("C");
-        out->imbue(I);
-
         std::string filename = this->GetOutputLocation().c_str();
 
         mitk::PlanarFigureComposite::ConstPointer input = dynamic_cast<const mitk::PlanarFigureComposite*>(this->GetInput());
@@ -82,8 +76,6 @@ void mitk::PlanarFigureCompositeWriter::Write()
         type.put("comptype", input->getOperationType());
         boost::property_tree::xml_writer_settings<std::string> writerSettings(' ', 2);
         boost::property_tree::xml_parser::write_xml(filename, type, std::locale(), writerSettings);
-
-        setlocale(LC_ALL, currLocale.c_str());
     }
     catch(...)
     {
