@@ -1,0 +1,104 @@
+/*============================================================================
+
+The Medical Imaging Interaction Toolkit (MITK)
+
+Copyright (c) German Cancer Research Center (DKFZ)
+All rights reserved.
+
+Use of this source code is governed by a 3-clause BSD license that can be
+found in the LICENSE file.
+
+============================================================================*/
+
+#include <itkImageRegionConstIterator.h>
+#include <itkImageRegionIterator.h>
+
+namespace itk
+{
+  template <class TIn, class TOut>
+  DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter()
+  {
+    this->SetNumberOfRequiredInputs(1);
+    this->SetNumberOfRequiredOutputs(3);
+    for (unsigned int i = 0; i < 3; ++i)
+      this->SetNthOutput(i, OutputImageType::New().GetPointer());
+  }
+
+  template <class TIn, class TOut>
+  void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>::VerifyPreconditions() const
+  {
+    Superclass::VerifyPreconditions();
+
+    if (m_GradientDirections.IsNull())
+      itkExceptionMacro("Gradient directions not set.");
+    if (m_BValue <= 0)
+      itkExceptionMacro("Reference b-value not set.");
+  }
+
+  template <class TIn, class TOut>
+  void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>::VerifyInputInformation() const
+  {
+    Superclass::VerifyInputInformation();
+
+    if (m_GradientDirections->Size() != this->GetInput()->GetNumberOfComponentsPerPixel())
+      itkExceptionMacro("The input has " << this->GetInput()->GetNumberOfComponentsPerPixel() << " volumes but "
+                                         << m_GradientDirections->Size() << " gradient directions.");
+
+    // The mask is iterated with the output region, so it has to share the voxel grid of the input.
+    if (m_ImageMask.IsNotNull() && !mitk::HasVoxelGridOf(m_ImageMask, this->GetInput()))
+      itkExceptionMacro("The mask image does not have the size, origin, spacing and direction of the diffusion-weighted image.");
+  }
+
+  template <class TIn, class TOut>
+  void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>::BeforeThreadedGenerateData()
+  {
+    m_Protocol = mitk::ivim::MakeProtocol(m_GradientDirections, m_BValue);
+  }
+
+  template <class TIn, class TOut>
+  void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>::DynamicThreadedGenerateData(
+    const OutputImageRegionType& outputRegionForThread)
+  {
+    ImageRegionConstIterator<InputImageType> inputIt(this->GetInput(), outputRegionForThread);
+    ImageRegionIterator<OutputImageType> fIt(this->GetOutput(0), outputRegionForThread);
+    ImageRegionIterator<OutputImageType> dIt(this->GetOutput(1), outputRegionForThread);
+    ImageRegionIterator<OutputImageType> dStarIt(this->GetOutput(2), outputRegionForThread);
+
+    ImageRegionConstIterator<MaskImageType> maskIt;
+    if (m_ImageMask.IsNotNull())
+      maskIt = ImageRegionConstIterator<MaskImageType>(m_ImageMask, outputRegionForThread);
+
+    mitk::ivim::VoxelFitter fitter(m_Protocol, m_FitParameters);
+    vnl_vector<double> signal(this->GetInput()->GetNumberOfComponentsPerPixel());
+    for (; !inputIt.IsAtEnd(); ++inputIt, ++fIt, ++dIt, ++dStarIt)
+    {
+      mitk::ivim::ModelParameters fit;
+      if (m_ImageMask.IsNull() || maskIt.Get() > 0)
+      {
+        const auto pixel = inputIt.Get();
+        for (unsigned int i = 0; i < signal.size(); ++i)
+          signal[i] = pixel[i];
+        fit = fitter.Fit(signal);
+      }
+      fIt.Set(fit.f);
+      dIt.Set(fit.d);
+      dStarIt.Set(fit.dStar);
+
+      if (m_ImageMask.IsNotNull())
+        ++maskIt;
+    }
+  }
+
+  template <class TIn, class TOut>
+  void DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<TIn, TOut>::PrintSelf(std::ostream& os,
+                                                                                          Indent indent) const
+  {
+    Superclass::PrintSelf(os, indent);
+    os << indent << "BValue: " << m_BValue << std::endl;
+    os << indent << "Method: " << static_cast<int>(m_FitParameters.method) << std::endl;
+    if (m_GradientDirections)
+      os << indent << "GradientDirections: " << m_GradientDirections << std::endl;
+    else
+      os << indent << "GradientDirections: (not set)" << std::endl;
+  }
+}
