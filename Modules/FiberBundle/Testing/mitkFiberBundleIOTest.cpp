@@ -58,6 +58,7 @@ found in the LICENSE file.
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 /** Regression tests for the fiber bundle readers and writers. Files are written to a temporary
@@ -74,6 +75,8 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TrkReader_InvalidFiles_Throw);
   MITK_TEST(TrkReader_NonRasVoxelOrders_FollowTrackVisDefinition);
   MITK_TEST(TrkReader_LegacyMitkLpsFile_ReadAsBefore);
+  MITK_TEST(TrkReader_VoxelOrderDisagreesWithMatrix_ReadAsNibabel);
+  MITK_TEST(TrkReader_LegacyMitkRasFile_ReadAsBefore);
   MITK_TEST(TrkReader_NoMatrixRecorded_UsesVoxelOrder);
   MITK_TEST(TrkWriter_RoundTrip_KeepsPoints);
   MITK_TEST(TrkWriter_Header_IsReproducibleAndMatchesData);
@@ -247,8 +250,47 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
     }
   }
 
-  /** The bundle holds TrkFibers() mapped as the TrackVis format defines it,
-   *  RAS = vox_to_ras * (voxmm / voxel_size - 0.5), converted to LPS. */
+  /** RAS of a TrackVis point as nibabel and dipy read it (get_affine_trackvis_to_rasmm), for
+   *  axis-aligned matrices: the voxel index voxmm / voxel_size - 0.5 is taken from the axes the voxel
+   *  order names to those of vox_to_ras (component i of the matrix index is the voxel-order index
+   *  of the same world axis, negated within dim when the directions differ), then mapped by vox_to_ras. */
+  static std::array<double, 3> SpecRas(const TrkHeader &header, const float voxmm[3])
+  {
+    auto matrixAxis = [&header](int c)
+    {
+      int r = 0;
+      for (int k = 1; k < 3; ++k)
+        if (std::fabs(header.vox_to_ras[k][c]) > std::fabs(header.vox_to_ras[r][c]))
+          r = k;
+      return std::make_pair(r, header.vox_to_ras[r][c] < 0 ? -1 : 1);
+    };
+    auto orderAxis = [&header](int i)
+    {
+      const auto pos = std::string("RLAPSI").find(header.voxel_order[i]);
+      return std::make_pair(static_cast<int>(pos / 2), pos % 2 == 0 ? 1 : -1);
+    };
+    double index[3];
+    for (int i = 0; i < 3; ++i)
+      index[i] = voxmm[i] / header.voxel_size[i] - 0.5;
+    double matrixIndex[3];
+    for (int i = 0; i < 3; ++i)
+      for (int j = 0; j < 3; ++j)
+        if (matrixAxis(j).first == orderAxis(i).first)
+        {
+          const bool flip = matrixAxis(j).second != orderAxis(i).second;
+          matrixIndex[i] = flip ? header.dim[i] - 1 - index[j] : index[j];
+        }
+    std::array<double, 3> ras;
+    for (int r = 0; r < 3; ++r)
+    {
+      ras[r] = header.vox_to_ras[r][3];
+      for (int c = 0; c < 3; ++c)
+        ras[r] += header.vox_to_ras[r][c] * matrixIndex[c];
+    }
+    return ras;
+  }
+
+  /** The bundle holds TrkFibers() mapped as nibabel and dipy read the header (SpecRas), converted to LPS. */
   static void AssertTrkFibersSpecMap(mitk::FiberBundle *fib, const TrkHeader &header, const std::string &message)
   {
     const auto fibers = TrkFibers();
@@ -259,13 +301,8 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
       CPPUNIT_ASSERT_EQUAL_MESSAGE(message, static_cast<vtkIdType>(fibers[i].size()), cell->GetNumberOfPoints());
       for (unsigned int j = 0; j < fibers[i].size(); ++j)
       {
-        double ras[3];
-        for (int r = 0; r < 3; ++r)
-        {
-          ras[r] = header.vox_to_ras[r][3];
-          for (int c = 0; c < 3; ++c)
-            ras[r] += header.vox_to_ras[r][c] * (fibers[i][j][c] / header.voxel_size[c] - 0.5);
-        }
+        const float voxmm[3] = {static_cast<float>(fibers[i][j][0]), static_cast<float>(fibers[i][j][1]), static_cast<float>(fibers[i][j][2])};
+        const auto ras = SpecRas(header, voxmm);
         const double *p = cell->GetPoints()->GetPoint(j);
         CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -ras[0], p[0], 1e-4);
         CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -ras[1], p[1], 1e-4);
@@ -725,6 +762,61 @@ public:
       }
   }
 
+  void TrkReader_VoxelOrderDisagreesWithMatrix_ReadAsNibabel()
+  {
+    const std::string path = m_TempDir + "/fibers.trk";
+
+    // nibabel writes voxel order "RAS" when a script passes only the affine of an LAS image
+    auto header = MakeTrkHeader("RAS", {{{-2, 0, 0, 30}, {0, 2, 0, -20}, {0, 0, 2, 5}, {0, 0, 0, 1}}});
+    header.n_count = 2;
+    WriteTrk(path, header);
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(path);
+    AssertTrkFibersSpecMap(fib, header, "RAS order, LAS matrix");
+    // voxmm (3, 4, 5) is index (1, 1.5, 2) of the RAS order, index (18, 1.5, 2) of the LAS matrix
+    const double *p = fib->GetFiberPolyData()->GetPoint(0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, p[0], 1e-4);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(17.0, p[1], 1e-4);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(9.0, p[2], 1e-4);
+
+    header = MakeTrkHeader("LPS", RasAffine());
+    header.n_count = 2;
+    WriteTrk(path, header);
+    AssertTrkFibersSpecMap(mitk::IOUtil::Load<mitk::FiberBundle>(path), header, "LPS order, RAS matrix");
+
+    header = MakeTrkHeader("ASR", RasAffine());
+    header.n_count = 2;
+    WriteTrk(path, header);
+    AssertTrkFibersSpecMap(mitk::IOUtil::Load<mitk::FiberBundle>(path), header, "permuted order");
+  }
+
+  void TrkReader_LegacyMitkRasFile_ReadAsBefore()
+  {
+    // As MITK wrote by default from 2023 to 2026: voxel order RAS with MITK's LPS index-to-world
+    // matrix (here of an LAS image, whose axes nibabel reads as RPS), n_count 0, default
+    // image_orientation_patient; read with the matrix and x, y negated, without reorientation.
+    auto header = MakeTrkHeader("RAS", {{{2, 0, 0, -30}, {0, -2, 0, 20}, {0, 0, 2, 5}, {0, 0, 0, 1}}});
+    header.image_orientation_patient[0] = 1;
+    header.image_orientation_patient[4] = 1;
+    const std::string path = m_TempDir + "/legacy.trk";
+    WriteTrk(path, header);
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(path);
+
+    const auto fibers = TrkFibers();
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(fibers.size()), fib->GetNumFibers());
+    for (unsigned int i = 0; i < fibers.size(); ++i)
+      for (unsigned int j = 0; j < fibers[i].size(); ++j)
+      {
+        const double *p = fib->GetFiberPolyData()->GetCell(i)->GetPoints()->GetPoint(j);
+        for (int r = 0; r < 3; ++r)
+        {
+          double ras = header.vox_to_ras[r][3];
+          for (int c = 0; c < 3; ++c)
+            ras += header.vox_to_ras[r][c] * (fibers[i][j][c] / header.voxel_size[c] - 0.5);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(r < 2 ? -ras : ras, p[r], 1e-4);
+        }
+      }
+  }
+
   void TrkReader_NoMatrixRecorded_UsesVoxelOrder()
   {
     // vox_to_ras[3][3] == 0 means "not recorded"; points are voxmm, flipped to LPS by voxel order
@@ -964,8 +1056,8 @@ public:
     CPPUNIT_ASSERT_EQUAL(std::string("TEST0002"), StringProperty(fib, "DICOM.patient_id"));
   }
 
-  /** Reads a .trk file as the TrackVis format defines it, RAS = vox_to_ras * (voxmm / voxel_size - 0.5);
-   *  inside tells whether all points lie in the declared volume (nibabel's bounding box check). */
+  /** Reads a .trk file as nibabel and dipy do (SpecRas); inside tells whether all points lie in the
+   *  declared volume (dipy's bounding box check). */
   static std::vector<std::array<double, 3>> ReadTrkAsSpec(const std::string &path, TrkHeader &header, bool &inside)
   {
     std::ifstream in(path, std::ios::binary);
@@ -979,13 +1071,7 @@ public:
       {
         float voxmm[3];
         in.read(reinterpret_cast<char *>(voxmm), 12);
-        std::array<double, 3> p;
-        for (int r = 0; r < 3; ++r)
-        {
-          p[r] = header.vox_to_ras[r][3];
-          for (int c = 0; c < 3; ++c)
-            p[r] += header.vox_to_ras[r][c] * (voxmm[c] / header.voxel_size[c] - 0.5);
-        }
+        const auto p = SpecRas(header, voxmm);
         for (int c = 0; c < 3; ++c)
           inside = inside && voxmm[c] >= 0 && voxmm[c] <= header.dim[c] * header.voxel_size[c];
         ras.push_back(p);

@@ -32,11 +32,14 @@ namespace mitk::TrackVisFile
 
   /** Map from the center-based voxmm coordinates of a TrackVis file (voxmm - voxel_size/2) to
    *  MITK's LPS world, shared by reader and writer so that MITK reads back what it wrote.
-   *  - Matrix recorded (version 2, vox_to_ras[3][3] != 0) and applied: by the TrackVis definition
-   *    vox_to_ras maps voxel indices to RAS whatever the voxel order, so x and y are negated.
-   *    Exception: MITK's own files with voxel order "LPS", n_count 0 and the default
-   *    image_orientation_patient (written by default from 2019-12 to 2023-01 and since then with
-   *    "Use LPS") store MITK's LPS index-to-world matrix; it is applied as it is.
+   *  - Matrix recorded (version 2, vox_to_ras[3][3] != 0) and applied: as nibabel and dipy read
+   *    TrackVis files, RAS = vox_to_ras * R * (voxmm/voxel_size - 0.5), where R reorders and flips
+   *    the voxel axes named by voxel_order to the axes of vox_to_ras within dim (identity when they
+   *    agree); x and y are negated for LPS.
+   *    Exceptions, MITK's own files (n_count 0 and the default image_orientation_patient):
+   *    voxel order "LPS" (written by default from 2019-12 to 2023-01 and with "Use LPS" until 2026)
+   *    stores MITK's LPS index-to-world matrix, which is applied as it is; voxel order "RAS"
+   *    (written by default from 2023 to 2026) is read without R, as those versions wrote it.
    *  - No matrix (version 1 or vox_to_ras[3][3] == 0) or not applied: identity, with the axes
    *    flipped by voxel order (R, A, I), as MITK always read such files. */
   vtkSmartPointer<vtkMatrix4x4> VoxmmToLps(const Header& header, bool useMatrix);

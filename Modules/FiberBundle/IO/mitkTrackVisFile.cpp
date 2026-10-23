@@ -16,16 +16,26 @@ found in the LICENSE file.
 #include <mitkExceptionMacro.h>
 #include <mitkGeometry3D.h>
 
+#include <vnl/algo/vnl_svd.h>
+#include <vnl/vnl_matrix.h>
 #include <vtkCellArray.h>
 #include <vtkLinearTransform.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkTransformFilter.h>
 
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -50,6 +60,139 @@ namespace
     transformFilter->SetTransform(geometry->GetVtkTransform());
     transformFilter->Update();
     return transformFilter->GetPolyDataOutput();
+  }
+
+  /** Per voxel axis: the world axis (0 = R-L, 1 = A-P, 2 = S-I) and the direction along it (1
+   *  towards R, A or S, -1 towards L, P or I). */
+  using AxisCodes = std::array<std::pair<int, int>, 3>;
+
+  /** The world axes of the voxel axes of the matrix's 3x3 part, determined as nibabel does
+   *  (nibabel.orientations.io_orientation: columns normalized, the closest matrix without shear
+   *  by polar decomposition, axes assigned from the strongest column on); none when the matrix
+   *  does not determine three axes (nibabel rejects such a vox_to_ras). */
+  std::optional<AxisCodes> MatrixAxisCodes(const double matrix[3][3])
+  {
+    vnl_matrix<double> rs(3, 3);
+    for (int c=0; c<3; ++c)
+    {
+      double zoom = 0;
+      for (int r=0; r<3; ++r)
+      {
+        if (!std::isfinite(matrix[r][c]))
+          return std::nullopt;
+        zoom += matrix[r][c]*matrix[r][c];
+      }
+      zoom = zoom>0 ? std::sqrt(zoom) : 1.0;
+      for (int r=0; r<3; ++r)
+        rs(r, c) = matrix[r][c]/zoom;
+    }
+    vnl_svd<double> svd(rs);
+    const double tolerance = svd.W(0)*3*std::numeric_limits<double>::epsilon();
+    vnl_matrix<double> rotation(3, 3, 0.0);
+    for (unsigned int k=0; k<3; ++k)
+      if (svd.W(k)>tolerance)
+        rotation += outer_product(svd.U().get_column(k), svd.V().get_column(k));
+
+    std::array<int, 3> inputAxes = {0, 1, 2};
+    std::array<double, 3> strength = {0, 0, 0};
+    for (int c=0; c<3; ++c)
+      for (int r=0; r<3; ++r)
+        strength[c] = std::max(strength[c], rotation(r, c)*rotation(r, c));
+    std::stable_sort(inputAxes.begin(), inputAxes.end(), [&strength](int a, int b) { return strength[a]>strength[b]; });
+
+    AxisCodes codes;
+    for (int in : inputAxes)
+    {
+      int out = 0;
+      for (int r=1; r<3; ++r)
+        if (std::fabs(rotation(r, in))>std::fabs(rotation(out, in)))
+          out = r;
+      if (std::fabs(rotation(out, in))<=1e-8)
+        return std::nullopt;
+      codes[in] = {out, rotation(out, in)<0 ? -1 : 1};
+      for (int c=0; c<3; ++c)
+        rotation(out, c) = 0;
+    }
+    return codes;
+  }
+
+  std::optional<AxisCodes> MatrixAxisCodes(const mitk::TrackVisFile::Header& header)
+  {
+    double matrix[3][3];
+    for (int r=0; r<3; ++r)
+      for (int c=0; c<3; ++c)
+        matrix[r][c] = header.vox_to_ras[r][c];
+    return MatrixAxisCodes(matrix);
+  }
+
+  /** The axes the voxel order names; an empty voxel order is TrackVis's default "LPS", as for
+   *  nibabel. None for an order that does not name each axis once. */
+  std::optional<AxisCodes> VoxelOrderAxisCodes(const mitk::TrackVisFile::Header& header)
+  {
+    std::string order(header.voxel_order, std::find(header.voxel_order, header.voxel_order + 3, '\0'));
+    if (order.empty())
+      order = "LPS";
+    if (order.size()!=3)
+      return std::nullopt;
+    AxisCodes codes;
+    bool named[3] = {false, false, false};
+    for (int i=0; i<3; ++i)
+    {
+      const std::string letter(1, static_cast<char>(std::toupper(static_cast<unsigned char>(order[i]))));
+      const std::size_t pos = std::string("RLAPSI").find(letter);
+      if (pos==std::string::npos || named[pos/2])
+        return std::nullopt;
+      named[pos/2] = true;
+      codes[i] = {static_cast<int>(pos/2), pos%2==0 ? 1 : -1};
+    }
+    return codes;
+  }
+
+  bool HasMatrix(const mitk::TrackVisFile::Header& header)
+  {
+    return header.version >= 2 && header.vox_to_ras[3][3] != 0;
+  }
+
+  /** Header of MITK's own files of 2019 to 2026: n_count 0 and the default
+   *  image_orientation_patient, voxel order "LPS" or "RAS" (see VoxmmToLps). */
+  bool IsLegacyMitkHeader(const mitk::TrackVisFile::Header& header, const char* voxelOrder)
+  {
+    return std::strncmp(header.voxel_order, voxelOrder, 3) == 0 && header.n_count == 0
+        && header.image_orientation_patient[0] == 1 && header.image_orientation_patient[1] == 0
+        && header.image_orientation_patient[2] == 0 && header.image_orientation_patient[3] == 0
+        && header.image_orientation_patient[4] == 1 && header.image_orientation_patient[5] == 0;
+  }
+
+  /** nibabel's map from the voxel indices of the voxel order to those of the axes of vox_to_ras
+   *  (get_affine_trackvis_to_rasmm: ornt_transform, then inv_ornt_aff with dim); none when both
+   *  name the same axes in the same directions, or when one of them names no axes. */
+  vtkSmartPointer<vtkMatrix4x4> VoxelOrderToMatrixAxes(const mitk::TrackVisFile::Header& header)
+  {
+    const auto start = VoxelOrderAxisCodes(header);
+    const auto end = MatrixAxisCodes(header);
+    if (!start || !end || *start == *end)
+      return nullptr;
+
+    // per voxel-order axis i: the matrix axis with the same world axis, and whether it is flipped
+    std::array<std::pair<int, int>, 3> transform;
+    for (int j=0; j<3; ++j)
+      for (int i=0; i<3; ++i)
+        if ((*end)[j].first == (*start)[i].first)
+        {
+          transform[i] = {j, (*end)[j].second == (*start)[i].second ? 1 : -1};
+          break;
+        }
+
+    vtkSmartPointer<vtkMatrix4x4> matrix = vtkSmartPointer<vtkMatrix4x4>::New();
+    matrix->Zero();
+    matrix->SetElement(3, 3, 1);
+    for (int i=0; i<3; ++i)
+    {
+      matrix->SetElement(i, transform[i].first, transform[i].second);
+      if (transform[i].second<0)
+        matrix->SetElement(i, 3, header.dim[i] - 1);
+    }
+    return matrix;
   }
 
   /** The inverse of the voxmm-to-LPS map of the header, as the geometry transform computes it. */
@@ -87,22 +230,27 @@ vtkSmartPointer<vtkMatrix4x4> mitk::TrackVisFile::VoxmmToLps(const Header& heade
   vtkSmartPointer<vtkMatrix4x4> matrix = vtkSmartPointer<vtkMatrix4x4>::New();
   matrix->Identity();
 
-  const bool hasMatrix = header.version >= 2 && header.vox_to_ras[3][3] != 0;
-  const bool legacyMitkLps = std::strncmp(header.voxel_order, "LPS", 3) == 0 && header.n_count == 0
-      && header.image_orientation_patient[0] == 1 && header.image_orientation_patient[1] == 0
-      && header.image_orientation_patient[2] == 0 && header.image_orientation_patient[3] == 0
-      && header.image_orientation_patient[4] == 1 && header.image_orientation_patient[5] == 0;
+  const bool legacyMitkLps = IsLegacyMitkHeader(header, "LPS");
 
   bool negate[3] = {header.voxel_order[0]=='R', header.voxel_order[1]=='A', header.voxel_order[2]=='I'};
-  if (useMatrix && hasMatrix)
+  if (useMatrix && HasMatrix(header))
   {
+    vtkSmartPointer<vtkMatrix4x4> voxToRas = vtkSmartPointer<vtkMatrix4x4>::New();
+    for (int i=0; i<4; ++i)
+      for (int j=0; j<4; ++j)
+        voxToRas->SetElement(i, j, header.vox_to_ras[i][j]);
+    if (!legacyMitkLps && !IsLegacyMitkHeader(header, "RAS"))
+      if (auto reorientation = VoxelOrderToMatrixAxes(header))
+        vtkMatrix4x4::Multiply4x4(voxToRas, reorientation, voxToRas);
     for (int i=0; i<4; ++i)
       for (int j=0; j<4; ++j)
       {
+        // Divided in float, as MITK always did (same points as before); the reorientation only
+        // reorders and negates the columns of the float matrix.
         if (j<3)
-          matrix->SetElement(i, j, header.vox_to_ras[i][j]/header.voxel_size[j]);
+          matrix->SetElement(i, j, static_cast<float>(voxToRas->GetElement(i, j))/header.voxel_size[j]);
         else
-          matrix->SetElement(i, j, header.vox_to_ras[i][j]);
+          matrix->SetElement(i, j, voxToRas->GetElement(i, j));
       }
     negate[0] = !legacyMitkLps;
     negate[1] = !legacyMitkLps;
