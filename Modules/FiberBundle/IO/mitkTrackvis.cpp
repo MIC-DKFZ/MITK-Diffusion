@@ -136,9 +136,7 @@ short TrackVisFiberReader::write(const mitk::FiberBundle *fib)
     vtkPoints* points = cell->GetPoints();
 
     unsigned int     numSaved, pos = 0;
-    //float* tmp = new float[3*maxSteps];
-    std::vector< float > tmp;
-    tmp.reserve(3*numPoints);
+    std::vector< float > tmp(3*static_cast<std::size_t>(numPoints));
 
     numSaved = numPoints;
     for(unsigned int i=0; i<numSaved ;i++)
