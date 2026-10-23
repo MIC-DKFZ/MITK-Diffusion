@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
+#include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 #include <itkDiffusionQballReconstructionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkOrientationDistributionFunction.h>
@@ -36,12 +37,14 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(SingleShellFilters_TwoShells_Throw);
   MITK_TEST(SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint);
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
+  MITK_TEST(MultiShell_UnsupportedShells_Throw);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
   using DwiType = itk::VectorImage<short, 3>;
   using NumericalFilterType = itk::DiffusionQballReconstructionImageFilter<short, short, float, ODF_SAMPLING_SIZE>;
   using AnalyticalFilterType = itk::AnalyticalDiffusionQballReconstructionImageFilter<short, short, float, 4, ODF_SAMPLING_SIZE>;
+  using MultiShellFilterType = itk::DiffusionMultiShellQballReconstructionImageFilter<short, short, float, 4, ODF_SAMPLING_SIZE>;
 
   static constexpr double ReferenceBValue = 1000;
 
@@ -261,6 +264,25 @@ public:
     auto analyticalShort = Analytical(shortVector);
     analyticalShort->Update();
     CheckEqual(analyticalExact->GetOutput(), analyticalShort->GetOutput());
+  }
+
+  static std::string MultiShellError(const std::vector<double> &bValues)
+  {
+    auto dwi = Simulate(Shells(bValues));
+    auto filter = MultiShellFilterType::New();
+    filter->SetGradientImage(dwi.gradients, dwi.image, ReferenceBValue);
+    filter->SetLambda(0.006);
+    return UpdateError(filter.GetPointer());
+  }
+
+  // Only three shells b, 2b, 3b have an implementation; every other selection returned images that
+  // were never written.
+  void MultiShell_UnsupportedShells_Throw()
+  {
+    CPPUNIT_ASSERT(MultiShellError({1000, 2000}).find("Only three equidistant shells") != std::string::npos);
+    CPPUNIT_ASSERT(MultiShellError({1000}).find("Only three equidistant shells") != std::string::npos);
+    CPPUNIT_ASSERT(MultiShellError({1000, 1500, 2000}).find("b = 1000, 1500, 2000") != std::string::npos);
+    CPPUNIT_ASSERT_EQUAL(std::string(), MultiShellError({1000, 2000, 3000}));
   }
 };
 

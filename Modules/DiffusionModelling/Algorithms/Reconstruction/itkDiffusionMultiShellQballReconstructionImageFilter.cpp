@@ -401,9 +401,12 @@ template< class T, class TG, class TO, int L, int NODF>
 void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 ::BeforeThreadedGenerateData()
 {
-  m_ReconstructionType = Mode_Standard1Shell;
+  // Only the analytical solution for three equidistant shells (Aganj 2010) is implemented. The
+  // other modes wrote nothing (or no coefficients), so their outputs kept uninitialized memory.
+  if (m_BValueMap.size() != 4)
+    itkExceptionMacro(<< "Only three equidistant shells are supported, the selection has " << m_BValueMap.size() - 1 << ".");
 
-  if(m_BValueMap.size() == 4 ){
+  {
 
     BValueMapIteraotr it = m_BValueMap.begin();
     it++; // skip b0 entry
@@ -420,7 +423,10 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
     IndiciesVector shell3 = it->second;
 
     // arithmetic progrssion
-    if(bValue_shell2 - bValue_shell1 == bValue_shell1 && bValue_shell3 - bValue_shell2 == bValue_shell1 )
+    if(!(bValue_shell2 - bValue_shell1 == bValue_shell1 && bValue_shell3 - bValue_shell2 == bValue_shell1))
+      itkExceptionMacro(<< "Only three equidistant shells (b, 2b, 3b) are supported, the selection has b = "
+                        << bValue_shell1 << ", " << bValue_shell2 << ", " << bValue_shell3 << ".");
+
     {
       // check if Interpolation is needed
       // if shells with different numbers of directions exist
@@ -571,17 +577,6 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
         ComputeReconstructionMatrix(shell1);
       }
     }
-  }
-
-  if(m_BValueMap.size() > 2 && m_ReconstructionType != Mode_Analytical3Shells)
-  {
-    m_ReconstructionType = Mode_NumericalNShells;
-  }
-  if(m_BValueMap.size() == 2){
-    BValueMapIteraotr it = m_BValueMap.begin();
-    it++; // skip b0 entry
-    IndiciesVector shell = it->second;
-    ComputeReconstructionMatrix(shell);
   }
 
 }
