@@ -599,17 +599,17 @@ public:
     return mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(path));
   }
 
-  // MITK-Data holds the indices of tensorImage.dti, which no other test uses; the function
-  // reproduces FA, RA, AD and RD. tensorImage_CA.nrrd and tensorImage_MD.nrrd are older than this
-  // repository's history and differ from today's filter (CA: 106 voxels, up to 0.031; MD: 12096
-  // voxels, up to 1.5e-3 at values of about 1e-3, so not the mean eigenvalue), so CA and MD are
-  // compared with the filter.
+  // MITK-Data holds the indices of tensorImage.dti; the function reproduces FA, AD and RD.
+  // tensorImage_CA.nrrd and tensorImage_MD.nrrd are older than this repository's history and differ
+  // from today's filter (CA: 106 voxels, up to 0.031; MD: 12096 voxels, up to 1.5e-3 at values of
+  // about 1e-3, so not the mean eigenvalue), and tensorImage_RA.nrrd holds ITK's RA formula, which
+  // the filter replaced by Basser and Pierpaoli's (mitkDiffusionModellingAlgorithmsTest checks it
+  // against the eigenvalues), so CA, MD and RA are compared with the filter.
   void TensorIndices_MatchReferences()
   {
     auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/tensorImage.dti"));
     const std::vector<std::pair<mitk::TensorIndex, std::string>> cases = {
-      {mitk::TensorIndex::FA, "FA"}, {mitk::TensorIndex::RA, "RA"}, {mitk::TensorIndex::AD, "AD"},
-      {mitk::TensorIndex::RD, "RD"}};
+      {mitk::TensorIndex::FA, "FA"}, {mitk::TensorIndex::AD, "AD"}, {mitk::TensorIndex::RD, "RD"}};
     for (const auto &[index, name] : cases)
     {
       auto reference = LoadImage("DiffusionImaging/tensorImage_" + name + ".nrrd");
@@ -618,7 +618,9 @@ public:
     }
 
     using FilterType = itk::TensorDerivedMeasurementsFilter<float>;
-    for (const auto &[index, measure] : {std::pair{mitk::TensorIndex::CA, FilterType::CA}, std::pair{mitk::TensorIndex::MD, FilterType::MD}})
+    for (const auto &[index, measure] : {std::pair{mitk::TensorIndex::CA, FilterType::CA},
+                                         std::pair{mitk::TensorIndex::MD, FilterType::MD},
+                                         std::pair{mitk::TensorIndex::RA, FilterType::RA}})
     {
       auto filter = FilterType::New();
       filter->SetInput(ItkTensors(tensors));

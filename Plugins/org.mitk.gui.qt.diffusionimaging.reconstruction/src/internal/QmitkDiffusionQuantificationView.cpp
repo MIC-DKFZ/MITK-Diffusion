@@ -49,7 +49,8 @@ namespace
       case mitk::TensorIndex::FA:
         return {"FA", 0.5, 1.0};
       case mitk::TensorIndex::RA:
-        return {"RA", 0.015, 0.03};
+        // Basser and Pierpaoli's RA ranges from 0 to sqrt(2).
+        return {"RA", 0.7, 1.4};
       case mitk::TensorIndex::AD:
         return {"AD", 0.0015, 0.003};
       case mitk::TensorIndex::RD:
