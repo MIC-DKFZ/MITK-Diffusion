@@ -59,7 +59,8 @@ QmitkOdfMaximaExtractionView::QmitkOdfMaximaExtractionView()
 // Destructor
 QmitkOdfMaximaExtractionView::~QmitkOdfMaximaExtractionView()
 {
-
+  // The generated Ui class owns no widgets (they belong to the parent widget), only itself.
+  delete m_Controls;
 }
 
 

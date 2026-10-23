@@ -61,7 +61,8 @@ QmitkTensorReconstructionView::QmitkTensorReconstructionView()
 
 QmitkTensorReconstructionView::~QmitkTensorReconstructionView()
 {
-
+  // The generated Ui class owns no widgets (they belong to the parent widget), only itself.
+  delete m_Controls;
 }
 
 void QmitkTensorReconstructionView::CreateQtPartControl(QWidget *parent)
