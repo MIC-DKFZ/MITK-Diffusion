@@ -193,15 +193,16 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
 
   if (!distances.empty())
   {
-    std::vector< Cluster > outC;
+    // The sub-clusters are collected per cluster and concatenated in cluster order, so that the
+    // result does not depend on the number of threads.
+    std::vector< std::vector< Cluster > > subClusters(C.size());
 #pragma omp parallel for
     for (int c=0; c<(int)C.size(); c++)
-    {
+      subClusters[c] = ClusterStep(C.at(c).I, distances);
 
-      std::vector< Cluster > tempC = ClusterStep(C.at(c).I, distances);
-#pragma omp critical
+    std::vector< Cluster > outC;
+    for (auto& tempC : subClusters)
       AppendCluster(outC, tempC);
-    }
     return outC;
   }
   else
@@ -278,28 +279,34 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
   {
     vnl_matrix<float> t = c1.h / c1.n;
 
-    int min_idx = -1;
-    float min_d = 99999;
-    bool flip = false;
-
+    // Distances in parallel, the nearest cluster afterwards in cluster order: with equal
+    // distances the first cluster wins whatever the number of threads.
+    std::vector< float > distances(new_clusters.size());
+    std::vector< char > flips(new_clusters.size(), 0);
 #pragma omp parallel for
     for (int k2=0; k2<(int)new_clusters.size(); ++k2)
     {
-      Cluster c2 = new_clusters.at(k2);
+      const Cluster& c2 = new_clusters.at(k2);
       vnl_matrix<float> v = c2.h / c2.n;
 
       bool f = false;
       float d = 0;
       for (auto m : m_Metrics)
         d += m->CalculateDistance(t, v, f);
-      d /= m_Metrics.size();
+      distances[k2] = d / m_Metrics.size();
+      flips[k2] = f;
+    }
 
-#pragma omp critical
-      if (d<min_d && d<m_MergeDuplicateThreshold)
+    int min_idx = -1;
+    float min_d = 99999;
+    bool flip = false;
+    for (int k2=0; k2<(int)new_clusters.size(); ++k2)
+    {
+      if (distances[k2]<min_d && distances[k2]<m_MergeDuplicateThreshold)
       {
-        min_d = d;
+        min_d = distances[k2];
         min_idx = k2;
-        flip = f;
+        flip = flips[k2];
       }
     }
 
@@ -416,6 +423,10 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
     C.push_back(c);
   }
 
+  // The nearest centroid of each fiber in parallel; the clusters are filled afterwards in fiber
+  // order, so that their fiber order and centroid sums do not depend on the number of threads.
+  std::vector< int > assignedCluster(N, -1);
+  std::vector< char > assignedFlip(N, 0);
 #pragma omp parallel for
   for (int i=0; i<N; ++i)
   {
@@ -448,23 +459,28 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
 
     if (min_cluster_index>=0 && min_cluster_distance<dist_thres)
     {
-#pragma omp critical
-      {
-        C[min_cluster_index].I.push_back(f_indices.at(i));
-        if (!flip)
-          C[min_cluster_index].h += t;
-        else
-          C[min_cluster_index].h += t.fliplr();
-        C[min_cluster_index].n += 1;
-      }
+      assignedCluster[i] = min_cluster_index;
+      assignedFlip[i] = flip;
+    }
+  }
+
+  for (int i=0; i<N; ++i)
+  {
+    const int k = assignedCluster[i];
+    if (k>=0)
+    {
+      vnl_matrix<float> t = T.at(f_indices.at(i));  // fliplr() flips in place
+      C[k].I.push_back(f_indices.at(i));
+      if (!assignedFlip[i])
+        C[k].h += t;
+      else
+        C[k].h += t.fliplr();
+      C[k].n += 1;
     }
     else
     {
-#pragma omp critical
-      {
-        no_fit.I.push_back(f_indices.at(i));
-        no_fit.n++;
-      }
+      no_fit.I.push_back(f_indices.at(i));
+      no_fit.n++;
     }
   }
   C.push_back(no_fit);
