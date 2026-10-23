@@ -491,13 +491,16 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
       node->GetIntProperty("ShowMaxNumber", val);
       m_Controls->m_ShowMaxNumber->setValue(val);
 
-      m_Controls->m_NormalizationDropdown->setCurrentIndex(dynamic_cast<mitk::EnumerationProperty*>(node->GetProperty("Normalization"))->GetValueAsId());
+      // the combo box entries follow the ids of the ODF mapper's enumeration properties
+      if (auto normalization = dynamic_cast<mitk::EnumerationProperty*>(node->GetProperty("Normalization")))
+        m_Controls->m_NormalizationDropdown->setCurrentIndex(normalization->GetValueAsId());
 
       float fval = static_cast<float>(m_Controls->m_ScalingFactor->value());
       node->GetFloatProperty("Scaling",fval);
       m_Controls->m_ScalingFactor->setValue(fval);
 
-      m_Controls->m_AdditionalScaling->setCurrentIndex(dynamic_cast<mitk::EnumerationProperty*>(node->GetProperty("ScaleBy"))->GetValueAsId());
+      if (auto scaleBy = dynamic_cast<mitk::EnumerationProperty*>(node->GetProperty("ScaleBy")))
+        m_Controls->m_AdditionalScaling->setCurrentIndex(scaleBy->GetValueAsId());
 
       bool switchTensorViewValue = false;
       node->GetBoolProperty( "DiffusionCore.Rendering.OdfVtkMapper.SwitchTensorView", switchTensorViewValue );
@@ -977,6 +980,9 @@ void QmitkControlVisualizationPropertiesView::AdditionalScaling(int additionalSc
   case 1:
     scaleBy->SetScaleByGFA();
     //m_Controls->params_frame->setVisible(true);
+    break;
+  case 2:
+    scaleBy->SetScaleByPrincipalCurvature();
     break;
   default:
     scaleBy->SetScaleByNothing();

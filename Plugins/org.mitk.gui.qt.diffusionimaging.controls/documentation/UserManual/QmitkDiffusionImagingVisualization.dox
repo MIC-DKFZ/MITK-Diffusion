@@ -5,7 +5,7 @@
 
 In this small view, the visualization of ODFs and diffusion images can be configured. Depending on the selected image in the data storage, different options are shown here.
 
-For tensor or ODF images, the visibility of glyphs in the different render windows (T)ransversal, (S)agittal, and (C)oronal can be configured here. The maximal number of glyphs to display can also be configured here for. This is usefull to keep the system response time during rendering feasible. The other options configure normalization and scaling of the glyphs.
+For tensor or ODF images, the visibility of glyphs in the different render windows (T)ransversal, (S)agittal, and (C)oronal can be configured here. The maximal number of glyphs to display can also be configured here for. This is usefull to keep the system response time during rendering feasible. The other options configure normalization (Min-Max, Max, None or Global Maximum, the largest value of the whole image) and scaling of the glyphs (None, FA/GFA or Principal Curvature).
 
 This is how a visualization with activated glyphs should look like:
 
