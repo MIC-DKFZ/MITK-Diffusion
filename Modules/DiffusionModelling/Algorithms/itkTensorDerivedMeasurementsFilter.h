@@ -54,6 +54,7 @@ public:
   typedef itk::DiffusionTensor3D<TPixel>          TensorType;
   typedef itk::Image< TensorType, 3 >             TensorImageType;
   typedef itk::Image< TPixel, 3 >                 OutputImageType;
+  typedef typename OutputImageType::RegionType    OutputImageRegionType;
 
   typedef TensorDerivedMeasurementsFilter         Self;
   typedef SmartPointer<Self>                      Pointer;
@@ -75,7 +76,7 @@ protected:
 
   Measure m_Measure;
 
-  void GenerateData() override;
+  void DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread) override;
 
 }; // end class
 
