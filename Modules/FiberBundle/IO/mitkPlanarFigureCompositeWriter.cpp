@@ -25,7 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigureComposite.h>
 
 mitk::PlanarFigureCompositeWriter::PlanarFigureCompositeWriter()
-    : mitk::AbstractFileWriter(mitk::PlanarFigureComposite::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE(), "Planar Figure Composite Writer")
+    : mitk::AbstractFileWriter(mitk::PlanarFigureComposite::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE_NAME(), "Planar Figure Composite Writer")
 {
     RegisterService();
 }

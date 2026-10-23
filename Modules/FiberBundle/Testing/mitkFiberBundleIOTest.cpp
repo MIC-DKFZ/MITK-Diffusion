@@ -20,6 +20,10 @@ found in the LICENSE file.
 #include <mitkIOUtil.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
+#include <mitkCustomMimeType.h>
+#include <usModule.h>
+#include <usModuleContext.h>
+#include <usModuleRegistry.h>
 
 #include <itksys/SystemTools.hxx>
 #include <dcmtk/dcmdata/dcdeftag.h>
@@ -49,6 +53,7 @@ found in the LICENSE file.
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -80,6 +85,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(DicomReader_NoAlgorithmIdentification_LoadsAndKeepsLocale);
   MITK_TEST(PlanarFigureComposite_RoundTripAndBrokenFile_KeepLocale);
   MITK_TEST(PlanarFigureComposite_UnknownOperation_Throws);
+  MITK_TEST(MimeTypes_RegisteredOncePerName);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -430,6 +436,31 @@ public:
     std::ofstream(path) << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<comptype>1</comptype>\n";
     CPPUNIT_ASSERT_EQUAL(mitk::PlanarFigureComposite::OR,
                          mitk::IOUtil::Load<mitk::PlanarFigureComposite>(path)->getOperationType());
+  }
+
+  void MimeTypes_RegisteredOncePerName()
+  {
+    // Loading a file loads the module and its activator. The test driver has no module context
+    // of its own; every context sees all services.
+    LoadFibers("FiberProcessing/original.fib");
+    auto module = us::ModuleRegistry::GetModule("MitkFiberBundle");
+    CPPUNIT_ASSERT(module != nullptr);
+    auto context = module->GetModuleContext();
+    std::map<std::string, int> registrations;
+    for (const auto &reference : context->GetServiceReferences<mitk::CustomMimeType>())
+    {
+      // Only this module's registrations are dereferenced: MITK's MitkDICOMRTIO leaves a
+      // registered mime type whose object is no longer valid (seen while writing this test).
+      if (reference.GetModule() == nullptr || reference.GetModule()->GetName() != "MitkFiberBundle")
+        continue;
+      const auto *mimeType = context->GetService(reference);
+      if (mimeType != nullptr)
+        ++registrations[mimeType->GetName()];
+      context->UngetService(reference);
+    }
+    const std::string base = mitk::IOMimeTypes::DEFAULT_BASE_NAME();
+    for (const std::string suffix : {".pfc", ".FiberBundle.vtk", ".FiberBundle.trk", ".FiberBundle.tck", ".FiberBundle.dcm"})
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(base + suffix, 1, registrations[base + suffix]);
   }
 
   void TckReader_AllFloatTypes_ReadSamePoints()

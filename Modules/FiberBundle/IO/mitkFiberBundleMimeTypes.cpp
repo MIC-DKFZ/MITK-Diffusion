@@ -37,7 +37,7 @@ std::vector<CustomMimeType*> FiberBundleMimeTypes::Get()
 {
   std::vector<CustomMimeType*> mimeTypes;
 
-  // order matters here (descending rank for mime types)
+  // The activator sets the ranks by name; the order here does not matter.
 
   mimeTypes.push_back(PLANARFIGURECOMPOSITE_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_VTK_MIMETYPE().Clone());

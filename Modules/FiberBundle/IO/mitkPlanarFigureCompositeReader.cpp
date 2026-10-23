@@ -29,7 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 
 mitk::PlanarFigureCompositeReader::PlanarFigureCompositeReader()
-    : mitk::AbstractFileReader( mitk::FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE(), "Planar Figure Composite Reader" )
+    : mitk::AbstractFileReader( mitk::FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE_NAME(), "Planar Figure Composite Reader" )
 {
     m_ServiceReg = this->RegisterService();
 }
