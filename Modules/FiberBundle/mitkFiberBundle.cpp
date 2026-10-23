@@ -49,6 +49,22 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 const char* mitk::FiberBundle::FIBER_ID_ARRAY = "Fiber_IDs";
 
+namespace
+{
+  /** Weight array for the fibers an operation keeps or splits, in the order of the new cells.
+   *  Operations that change the fiber count set it before UpdateFiberGeometry, which would
+   *  otherwise reset all weights to 1 (FiberFit weights must survive filtering). */
+  vtkSmartPointer<vtkFloatArray> ToWeightArray(const std::vector<float>& weights)
+  {
+    vtkSmartPointer<vtkFloatArray> array = vtkSmartPointer<vtkFloatArray>::New();
+    array->SetName("FIBER_WEIGHTS");
+    array->SetNumberOfValues(static_cast<vtkIdType>(weights.size()));
+    for (std::size_t i=0; i<weights.size(); ++i)
+      array->SetValue(static_cast<vtkIdType>(i), weights[i]);
+    return array;
+  }
+}
+
 mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
   : m_NumFibers(0)
   , m_IsRAS(false)
@@ -462,6 +478,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* 
       ids.push_back(i);
   }
 
+  std::vector<float> newWeights;
   for( int i : ids )
   {
     vtkCell* cell = m_FiberPolyData->GetCell(i);
@@ -478,6 +495,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* 
       container->GetPointIds()->InsertNextId(id);
     }
     vNewLines->InsertNextCell(container);
+    newWeights.push_back(this->GetFiberWeight(static_cast<unsigned int>(i)));
   }
   if(vNewLines->GetNumberOfCells()==0)
     return mitk::FiberBundle::New();
@@ -486,7 +504,9 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* 
   vNewPolyData->SetLines(vNewLines);
 
   // initialize fiber bundle
-  return mitk::FiberBundle::New(vNewPolyData);
+  mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(vNewPolyData);
+  newFib->SetFiberWeights(ToWeightArray(newWeights));
+  return newFib;
 }
 
 /*
@@ -1854,6 +1874,7 @@ void mitk::FiberBundle::RemoveDir(vnl_vector_fixed<double,3> dir, double thresho
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
+  std::vector<float> newWeights;
   boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
@@ -1898,9 +1919,11 @@ void mitk::FiberBundle::RemoveDir(vnl_vector_fixed<double,3> dir, double thresho
         container->GetPointIds()->InsertNextId(id);
       }
       vtkNewCells->InsertNextCell(container);
+      newWeights.push_back(this->GetFiberWeight(static_cast<unsigned int>(i)));
     }
   }
 
+  m_FiberWeights = ToWeightArray(newWeights);
   m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
   m_FiberPolyData->SetPoints(vtkNewPoints);
   m_FiberPolyData->SetLines(vtkNewCells);
@@ -1919,6 +1942,8 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
+  // split pieces keep the weight of their fiber
+  std::vector<float> newWeights;
   MITK_INFO << "Applying curvature threshold";
   boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
@@ -1968,6 +1993,7 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
       {
         j += 2;
         vtkNewCells->InsertNextCell(container);
+        newWeights.push_back(this->GetFiberWeight(static_cast<unsigned int>(i)));
         container = vtkSmartPointer<vtkPolyLine>::New();
       }
       else if (j==numPoints-3)
@@ -1977,6 +2003,7 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
         id = vtkNewPoints->InsertNextPoint(p3);
         container->GetPointIds()->InsertNextId(id);
         vtkNewCells->InsertNextCell(container);
+        newWeights.push_back(this->GetFiberWeight(static_cast<unsigned int>(i)));
       }
     }
   }
@@ -1984,6 +2011,7 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
   if (vtkNewCells->GetNumberOfCells()<=0)
     return false;
 
+  m_FiberWeights = ToWeightArray(newWeights);
   m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
   m_FiberPolyData->SetPoints(vtkNewPoints);
   m_FiberPolyData->SetLines(vtkNewCells);
@@ -2008,6 +2036,7 @@ bool mitk::FiberBundle::RemoveShortFibers(float lengthInMM)
 
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
+  std::vector<float> newWeights;
   float min = m_MaxFiberLength;
 
   boost::timer::progress_display disp(m_NumFibers);
@@ -2028,6 +2057,7 @@ bool mitk::FiberBundle::RemoveShortFibers(float lengthInMM)
         container->GetPointIds()->InsertNextId(id);
       }
       vtkNewCells->InsertNextCell(container);
+      newWeights.push_back(this->GetFiberWeight(i));
       if (m_FiberLengths.at(i)<min)
         min = m_FiberLengths.at(i);
     }
@@ -2036,6 +2066,7 @@ bool mitk::FiberBundle::RemoveShortFibers(float lengthInMM)
   if (vtkNewCells->GetNumberOfCells()<=0)
     return false;
 
+  m_FiberWeights = ToWeightArray(newWeights);
   m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
   m_FiberPolyData->SetPoints(vtkNewPoints);
   m_FiberPolyData->SetLines(vtkNewCells);
@@ -2053,6 +2084,7 @@ bool mitk::FiberBundle::RemoveLongFibers(float lengthInMM)
 
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
+  std::vector<float> newWeights;
 
   MITK_INFO << "Removing long fibers";
   boost::timer::progress_display disp(m_NumFibers);
@@ -2073,12 +2105,14 @@ bool mitk::FiberBundle::RemoveLongFibers(float lengthInMM)
         container->GetPointIds()->InsertNextId(id);
       }
       vtkNewCells->InsertNextCell(container);
+      newWeights.push_back(this->GetFiberWeight(i));
     }
   }
 
   if (vtkNewCells->GetNumberOfCells()<=0)
     return false;
 
+  m_FiberWeights = ToWeightArray(newWeights);
   m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
   m_FiberPolyData->SetPoints(vtkNewPoints);
   m_FiberPolyData->SetLines(vtkNewCells);

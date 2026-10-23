@@ -18,6 +18,13 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
+#include <itkMath.h>
+#include <vtkCell.h>
+#include <vtkPoints.h>
+
+#include <array>
+#include <cmath>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -29,11 +36,58 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ExtractFiberIdSubset_NotWithOverlappingChildren_EqualsSetDifference);
   MITK_TEST(RemoveFibersOutside_MaskMissesAllFibers_ReturnsEmptyBundle);
   MITK_TEST(ExtractFiberSubset_RoiIsNoPlanarFigure_Throws);
+  MITK_TEST(Weights_RemovingOrSplittingFibers_FollowTheirFibers);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
   {
     return mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/" + relativePath));
+  }
+
+  /** original.fib with a different weight per fiber */
+  mitk::FiberBundle::Pointer LoadWeightedFibers()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      fib->SetFiberWeight(i, 0.5f + static_cast<float>(i) / fib->GetNumFibers());
+    return fib;
+  }
+
+  using PointKey = std::array<long long, 3>;
+
+  static PointKey Key(const double *p)
+  {
+    return {std::llround(p[0] * 1000), std::llround(p[1] * 1000), std::llround(p[2] * 1000)};
+  }
+
+  /** Fibers of a bundle by the positions of their points, to find the source of a kept or split fiber. */
+  static std::map<PointKey, std::set<unsigned int>> FibersByPoint(mitk::FiberBundle *fib)
+  {
+    std::map<PointKey, std::set<unsigned int>> owners;
+    auto polyData = fib->GetFiberPolyData();
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      vtkCell *cell = polyData->GetCell(i);
+      for (vtkIdType j = 0; j < cell->GetNumberOfPoints(); ++j)
+        owners[Key(cell->GetPoints()->GetPoint(j))].insert(i);
+    }
+    return owners;
+  }
+
+  /** Every fiber of result carries the weight of the source fiber it comes from. */
+  static void AssertWeightsFollowFibers(mitk::FiberBundle *source, mitk::FiberBundle *result, const std::string &operation)
+  {
+    CPPUNIT_ASSERT_MESSAGE(operation + " keeps fibers", result->GetNumFibers() > 0);
+    auto owners = FibersByPoint(source);
+    for (unsigned int i = 0; i < result->GetNumFibers(); ++i)
+    {
+      auto it = owners.find(Key(result->GetFiberPolyData()->GetCell(i)->GetPoints()->GetPoint(0)));
+      CPPUNIT_ASSERT_MESSAGE(operation + ": fiber comes from the source", it != owners.end());
+      bool found = false;
+      for (auto owner : it->second)
+        found = found || source->GetFiberWeight(owner) == result->GetFiberWeight(i);
+      CPPUNIT_ASSERT_MESSAGE(operation + ": weight of fiber " + std::to_string(i), found);
+    }
   }
 
 public:
@@ -102,6 +156,33 @@ public:
     node->SetData(mitk::Image::New());
     CPPUNIT_ASSERT_THROW(fib->ExtractFiberSubset(node, storage), mitk::Exception);
     CPPUNIT_ASSERT_THROW(fib->ExtractFiberSubset(nullptr, storage), mitk::Exception);
+  }
+
+  void Weights_RemovingOrSplittingFibers_FollowTheirFibers()
+  {
+    auto source = LoadWeightedFibers();
+    const float medianLength = source->GetMedianFiberLength();
+
+    auto fib = source->GetDeepCopy();
+    CPPUNIT_ASSERT(fib->RemoveShortFibers(medianLength));
+    CPPUNIT_ASSERT(fib->GetNumFibers() < source->GetNumFibers());
+    AssertWeightsFollowFibers(source, fib, "RemoveShortFibers");
+
+    fib = source->GetDeepCopy();
+    CPPUNIT_ASSERT(fib->RemoveLongFibers(medianLength));
+    CPPUNIT_ASSERT(fib->GetNumFibers() < source->GetNumFibers());
+    AssertWeightsFollowFibers(source, fib, "RemoveLongFibers");
+
+    fib = source->GetDeepCopy();
+    vnl_vector_fixed<double, 3> dir(0.0, 1.0, 0.0);
+    fib->RemoveDir(dir, std::cos(5.0 * itk::Math::pi / 180));
+    AssertWeightsFollowFibers(source, fib, "RemoveDir");
+
+    auto shortFibers = source->GetDeepCopy();
+    shortFibers->RemoveLongFibers(medianLength);
+    auto subtracted = source->SubtractBundle(shortFibers);
+    CPPUNIT_ASSERT(subtracted->GetNumFibers() < source->GetNumFibers());
+    AssertWeightsFollowFibers(source, subtracted, "SubtractBundle");
   }
 };
 
