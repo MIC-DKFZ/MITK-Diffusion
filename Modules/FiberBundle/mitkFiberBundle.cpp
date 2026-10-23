@@ -1209,8 +1209,14 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgTyp
   newFiberWeights->SetName("FIBER_WEIGHTS");
   newFiberWeights->SetNumberOfValues(static_cast<vtkIdType>(fib_weights.size()));
 
+  // The fiber processing view and FiberModification continue with the result, so "no fiber
+  // left" is an empty bundle, never nullptr.
   if (vtkNewCells->GetNumberOfCells()<=0)
-    return nullptr;
+  {
+    mitk::FiberBundle::Pointer emptyFib = mitk::FiberBundle::New();
+    emptyFib->SetTrackVisHeader(this->GetTrackVisHeader());
+    return emptyFib;
+  }
 
   for (unsigned int i=0; i<newFiberWeights->GetNumberOfValues(); i++)
     newFiberWeights->SetValue(i, fib_weights.at(i));
@@ -1243,7 +1249,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgTyp
 mitk::FiberBundle::Pointer mitk::FiberBundle::ExtractFiberSubset(DataNode* roi, DataStorage* storage)
 {
   if (roi==nullptr || !(dynamic_cast<PlanarFigure*>(roi->GetData()) || dynamic_cast<PlanarFigureComposite*>(roi->GetData())) )
-    return nullptr;
+    mitkThrow() << "Fiber extraction needs a planar figure or a planar figure composite as ROI.";
 
   std::vector<unsigned int> tmp = ExtractFiberIdSubset(roi, storage);
 

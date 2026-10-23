@@ -11,6 +11,7 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <mitkFiberBundle.h>
+#include <mitkImage.h>
 #include <mitkIOUtil.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkStandaloneDataStorage.h>
@@ -26,6 +27,8 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkFiberBundleOperationsTestSuite);
   MITK_TEST(ExtractFiberIdSubset_NotWithOverlappingChildren_EqualsSetDifference);
+  MITK_TEST(RemoveFibersOutside_MaskMissesAllFibers_ReturnsEmptyBundle);
+  MITK_TEST(ExtractFiberSubset_RoiIsNoPlanarFigure_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -65,6 +68,40 @@ public:
 
     CPPUNIT_ASSERT_MESSAGE("NOT keeps exactly the fibers no child hits",
                            fib->ExtractFiberIdSubset(compositeNode, storage) == expected);
+  }
+
+  void RemoveFibersOutside_MaskMissesAllFibers_ReturnsEmptyBundle()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+
+    // A small mask far away from every fiber
+    auto mask = mitk::FiberBundle::ItkUcharImgType::New();
+    mitk::FiberBundle::ItkUcharImgType::RegionType region;
+    region.SetSize({{2, 2, 2}});
+    mask->SetRegions(region);
+    mitk::FiberBundle::ItkUcharImgType::PointType origin;
+    origin.Fill(10000.0);
+    mask->SetOrigin(origin);
+    mask->Allocate();
+    mask->FillBuffer(1);
+
+    auto inside = fib->RemoveFibersOutside(mask);
+    CPPUNIT_ASSERT_MESSAGE("Nothing inside the mask gives an empty bundle", inside.IsNotNull());
+    CPPUNIT_ASSERT_EQUAL(0u, inside->GetNumFibers());
+
+    auto outside = fib->RemoveFibersOutside(mask, true);
+    CPPUNIT_ASSERT(outside.IsNotNull());
+    CPPUNIT_ASSERT_EQUAL(fib->GetNumFibers(), outside->GetNumFibers());
+  }
+
+  void ExtractFiberSubset_RoiIsNoPlanarFigure_Throws()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    auto storage = mitk::StandaloneDataStorage::New();
+    auto node = mitk::DataNode::New();
+    node->SetData(mitk::Image::New());
+    CPPUNIT_ASSERT_THROW(fib->ExtractFiberSubset(node, storage), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(fib->ExtractFiberSubset(nullptr, storage), mitk::Exception);
   }
 };
 
