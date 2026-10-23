@@ -1646,6 +1646,9 @@ itk::Matrix< double, 3, 3 > mitk::FiberBundle::TransformMatrix(itk::Matrix< doub
 
 void mitk::FiberBundle::TransformFibers(itk::ScalableAffineTransform< mitk::ScalarType >::Pointer transform)
 {
+  if (transform.IsNull())
+    mitkThrow() << "No transform given to transform the fibers.";
+
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 

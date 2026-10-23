@@ -46,6 +46,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ResampleToNumPoints_FibersWithoutLength_Terminate);
   MITK_TEST(DerivedBundles_KeepRasFlagAndHeader);
   MITK_TEST(ApplyCurvatureThreshold_KeepsTwoPointFibersAndNoSinglePoints);
+  MITK_TEST(TransformFibers_NoTransform_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -325,6 +326,20 @@ public:
     }
     CPPUNIT_ASSERT_MESSAGE("The two-point fiber is kept", twoPointFiber);
     CPPUNIT_ASSERT_MESSAGE("The straight fiber is kept whole", straightFiber);
+  }
+
+  void TransformFibers_NoTransform_Throws()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    CPPUNIT_ASSERT_THROW(fib->TransformFibers(itk::ScalableAffineTransform<mitk::ScalarType>::Pointer()), mitk::Exception);
+
+    auto transform = itk::ScalableAffineTransform<mitk::ScalarType>::New();
+    auto translation = transform->GetTranslation();
+    translation[0] = 5.0;
+    transform->SetTranslation(translation);
+    const double x = fib->GetFiberPolyData()->GetPoint(0)[0];
+    fib->TransformFibers(transform);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(x + 5.0, fib->GetFiberPolyData()->GetPoint(0)[0], 1e-4);
   }
 };
 
