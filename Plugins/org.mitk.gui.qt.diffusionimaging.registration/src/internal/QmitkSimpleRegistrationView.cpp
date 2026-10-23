@@ -53,6 +53,37 @@ void QmitkSimpleRegistrationView::StartRegistration()
   if (m_RegistrationRunning)
     return;
 
+  // Of a DWI, the volume chosen in the channel box is registered. The inputs are prepared before
+  // the job is allocated, so a failure neither leaks the job nor leaves this slot with an exception.
+  auto movingNode = m_Controls->m_MovingImageBox->GetSelectedNode();
+  auto fixedNode = m_Controls->m_FixedImageBox->GetSelectedNode();
+  if (movingNode.IsNull() || fixedNode.IsNull())
+    return;
+  mitk::Image::Pointer movingData, targetData;
+  mitk::NodeUIDType movingUID, targetUID;
+  try
+  {
+    mitk::Image::Pointer movingImage = dynamic_cast<mitk::Image*>(movingNode->GetData());
+    if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(movingImage))
+      movingData = mitk::DiffusionImageEditing::ExtractVolume(movingImage, m_Controls->m_MovingChannelBox->value());
+    else
+      movingData = movingImage;
+
+    mitk::Image::Pointer fixedImage = dynamic_cast<mitk::Image*>(fixedNode->GetData());
+    if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(fixedImage))
+      targetData = mitk::DiffusionImageEditing::ExtractVolume(fixedImage, m_Controls->m_FixedChannelBox->value());
+    else
+      targetData = fixedImage;
+
+    targetUID = mitk::EnsureUID(fixedNode->GetData());
+    movingUID = mitk::EnsureUID(movingNode->GetData());
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Registration failed", QString("The images could not be prepared: ") + e.what());
+    return;
+  }
+
   QmitkRegistrationJob* pJob;
 
   if (m_Controls->m_RegBox->currentIndex()==0)
@@ -70,22 +101,11 @@ void QmitkSimpleRegistrationView::StartRegistration()
 
   pJob->setAutoDelete(true);
 
-  // Of a DWI, the volume chosen in the channel box is registered.
-  m_MovingImageNode = m_Controls->m_MovingImageBox->GetSelectedNode();
-  mitk::Image::Pointer movingImage = dynamic_cast<mitk::Image*>(m_MovingImageNode->GetData());
-  if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(movingImage))
-    pJob->m_spMovingData = mitk::DiffusionImageEditing::ExtractVolume(movingImage, m_Controls->m_MovingChannelBox->value());
-  else
-    pJob->m_spMovingData = movingImage;
-
-  mitk::Image::Pointer fixedImage = dynamic_cast<mitk::Image*>(m_Controls->m_FixedImageBox->GetSelectedNode()->GetData());
-  if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(fixedImage))
-    pJob->m_spTargetData = mitk::DiffusionImageEditing::ExtractVolume(fixedImage, m_Controls->m_FixedChannelBox->value());
-  else
-    pJob->m_spTargetData = fixedImage;
-
-  pJob->m_TargetDataUID = mitk::EnsureUID(m_Controls->m_FixedImageBox->GetSelectedNode()->GetData());
-  pJob->m_MovingDataUID = mitk::EnsureUID(m_Controls->m_MovingImageBox->GetSelectedNode()->GetData());
+  m_MovingImageNode = movingNode;
+  pJob->m_spMovingData = movingData;
+  pJob->m_spTargetData = targetData;
+  pJob->m_TargetDataUID = targetUID;
+  pJob->m_MovingDataUID = movingUID;
 
   connect(pJob, &QmitkRegistrationJob::RegResultIsAvailable, this, &QmitkSimpleRegistrationView::OnRegResultIsAvailable, Qt::BlockingQueuedConnection);
   connect(pJob, &QmitkRegistrationJob::Error, this, &QmitkSimpleRegistrationView::OnRegistrationError);
