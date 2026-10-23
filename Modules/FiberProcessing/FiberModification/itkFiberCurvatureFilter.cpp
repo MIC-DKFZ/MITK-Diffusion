@@ -80,7 +80,8 @@ void FiberCurvatureFilter::GenerateData()
             int c = j;
             std::vector< vnl_vector_fixed< double, 3 > > vectors;
             vnl_vector_fixed< double, 3 > meanV; meanV.fill(0.0);
-            while(dist<m_Distance/2 && c>1)
+            // Segments (c-1, c) back to the first segment (0, 1).
+            while(dist<m_Distance/2 && c>0)
             {
               vnl_vector_fixed< double, 3 > p1 = vertices.at(c-1);
               vnl_vector_fixed< double, 3 > p2 = vertices.at(c);
@@ -171,6 +172,7 @@ void FiberCurvatureFilter::GenerateData()
     m_OutputFiberBundle = mitk::FiberBundle::New(outputPoly);
     m_OutputFiberBundle->SetFiberWeights(weights);
     m_OutputFiberBundle->SetTrackVisHeader(m_InputFiberBundle->GetTrackVisHeader());
+    m_OutputFiberBundle->setIsRAS(m_InputFiberBundle->IsRAS());
 }
 
 }

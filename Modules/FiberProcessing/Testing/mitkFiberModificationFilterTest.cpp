@@ -27,6 +27,7 @@ class mitkFiberModificationFilterTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkFiberModificationFilterTestSuite);
   MITK_TEST(Curvature_SameResultForAnyThreadCount);
   MITK_TEST(Curvature_PiecesKeepFiberWeights);
+  MITK_TEST(Curvature_WindowIncludesFirstSegment);
   CPPUNIT_TEST_SUITE_END();
 
   static mitk::FiberBundle::Pointer Curvature(mitk::FiberBundle::Pointer input, bool removeFibers)
@@ -88,6 +89,29 @@ public:
     }
 
     CPPUNIT_ASSERT_EQUAL(0u, Curvature(input, true)->GetNumFibers());
+  }
+
+  void Curvature_WindowIncludesFirstSegment()
+  {
+    // A 5 mm first segment along -y, then 1 mm steps along x. Within +-5 mm of the points
+    // 1 to 4, the first segment deviates from the mean direction by more than 15 degrees on
+    // average; the window used to stop before the first segment and kept the whole fiber.
+    mitk::FiberProcessingTestHelper::Polyline fiber = {{0, 5, 0}, {0, 0, 0}};
+    for (int i = 1; i <= 20; ++i)
+      fiber.push_back({static_cast<double>(i), 0, 0});
+    auto input = mitk::FiberProcessingTestHelper::CreateBundle({fiber});
+
+    auto filter = itk::FiberCurvatureFilter::New();
+    filter->SetInputFiberBundle(input);
+    filter->SetAngularDeviation(15);
+    filter->SetDistance(10);
+    filter->SetRemoveFibers(false);
+    filter->SetUseMedian(false);
+    filter->Update();
+    auto output = filter->GetOutputFiberBundle();
+
+    CPPUNIT_ASSERT_EQUAL(1u, output->GetNumFibers());
+    CPPUNIT_ASSERT(output->GetFiberPolyData()->GetCell(0)->GetPoints()->GetPoint(0)[0] > 0.5);
   }
 };
 
