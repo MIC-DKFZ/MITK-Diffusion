@@ -87,9 +87,6 @@ void mitk::FiberBundleVtkWriter::Write()
     std::string ext = itksys::SystemTools::GetFilenameLastExtension(this->GetOutputLocation().c_str());
     Options options = this->GetOptions();
 
-    vtkSmartPointer<vtkFloatArray> weights = nullptr;
-    vtkSmartPointer<vtkUnsignedCharArray> fiberColors = nullptr;
-
     vtkSmartPointer<vtkPolyData> fibPoly = input->GetFiberPolyData();
 
     bool ras = input->IsRAS();
@@ -118,6 +115,12 @@ void mitk::FiberBundleVtkWriter::Write()
       fibPoly = transformFilter->GetPolyDataOutput();
     }
 
+    // The bundle's polydata is shared with the mappers and must not change by saving, so the
+    // weight and colour arrays are added to or removed from a shallow copy only.
+    vtkSmartPointer<vtkPolyData> outputPoly = vtkSmartPointer<vtkPolyData>::New();
+    outputPoly->ShallowCopy(fibPoly);
+    fibPoly = outputPoly;
+
 
     if (us::any_cast<bool>(options["Save fiber weights"]))
     {
@@ -126,7 +129,6 @@ void mitk::FiberBundleVtkWriter::Write()
     }
     else if (fibPoly->GetCellData()->HasArray("FIBER_WEIGHTS"))
     {
-      weights = input->GetFiberWeights();
       fibPoly->GetCellData()->RemoveArray("FIBER_WEIGHTS");
     }
 
@@ -137,7 +139,6 @@ void mitk::FiberBundleVtkWriter::Write()
     }
     else if (fibPoly->GetPointData()->HasArray("FIBER_COLORS"))
     {
-      fiberColors = input->GetFiberColors();
       fibPoly->GetPointData()->RemoveArray("FIBER_COLORS");
     }
 
@@ -182,13 +183,6 @@ void mitk::FiberBundleVtkWriter::Write()
       }
       writer->Write();
     }
-
-    // restore arrays
-    if ( weights!=nullptr )
-      fibPoly->GetPointData()->AddArray(weights);
-
-    if (fiberColors != nullptr)
-      fibPoly->GetPointData()->AddArray(fiberColors);
 
     setlocale(LC_ALL, currLocale.c_str());
     MITK_INFO << "VTK Fiber bundle written to " << filename;
