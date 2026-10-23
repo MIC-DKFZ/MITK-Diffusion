@@ -68,8 +68,26 @@ QmitkStreamlineTrackingWorker::QmitkStreamlineTrackingWorker(QmitkStreamlineTrac
 
 void QmitkStreamlineTrackingWorker::run()
 {
+  // run() is called in the tracking thread, where an escaping exception would terminate the
+  // application; the message is shown by AfterThread in the GUI thread.
+  m_View->m_TrackingError.clear();
+  try
+  {
     m_View->m_Tracker->Update();
-    m_View->m_TrackingThread.quit();
+  }
+  catch (const itk::ExceptionObject &e)
+  {
+    m_View->m_TrackingError = e.GetDescription();
+  }
+  catch (const std::exception &e)
+  {
+    m_View->m_TrackingError = e.what();
+  }
+  catch (...)
+  {
+    m_View->m_TrackingError = "Unknown error.";
+  }
+  m_View->m_TrackingThread.quit();
 }
 
 QmitkStreamlineTrackingView::QmitkStreamlineTrackingView()
@@ -487,6 +505,18 @@ void QmitkStreamlineTrackingView::AfterThread()
 {
   auto params = m_Tracker->GetParameters();
   m_TrackingTimer->stop();
+  if (!m_TrackingError.empty())
+  {
+    MITK_ERROR << "Streamline tractography failed: " << m_TrackingError;
+    QMessageBox::warning(nullptr, "Streamline tractography failed", QString::fromStdString(m_TrackingError));
+    if (m_InteractivePointSetNode.IsNotNull())
+      m_InteractivePointSetNode->SetProperty("color", mitk::ColorProperty::New(1,1,1));
+    StartStopTrackingGui(false);
+    if (m_DeleteTrackingHandler)
+      DeleteTrackingHandler();
+    UpdateGui();
+    return;
+  }
   if (!params->m_OutputProbMap)
   {
     vtkSmartPointer<vtkPolyData> fiberBundle = m_Tracker->GetFiberPolyData();

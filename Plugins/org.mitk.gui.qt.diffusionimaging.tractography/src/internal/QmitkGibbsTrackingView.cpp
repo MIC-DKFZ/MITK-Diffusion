@@ -72,12 +72,24 @@ void QmitkTrackingWorker::run()
   m_View->m_GlobalTracker->SetMinFiberLength(m_View->m_Controls->m_FiberLengthSlider->value());
   m_View->m_GlobalTracker->SetCurvatureThreshold(cos((float)m_View->m_Controls->m_CurvatureThresholdSlider->value()*itk::Math::pi/180));
   m_View->m_GlobalTracker->SetRandomSeed(m_View->m_Controls->m_RandomSeedSlider->value());
-  try{
+  // run() is called in the tracking thread, where an escaping exception would terminate the
+  // application; the message is shown by AfterThread in the GUI thread.
+  m_View->m_TrackingError.clear();
+  try
+  {
     m_View->m_GlobalTracker->Update();
   }
-  catch( mitk::Exception& e )
+  catch (const itk::ExceptionObject &e)
   {
-    MITK_ERROR << "Internal error occured: " <<  e.what() << "\nAborting";
+    m_View->m_TrackingError = e.GetDescription();
+  }
+  catch (const std::exception &e)
+  {
+    m_View->m_TrackingError = e.what();
+  }
+  catch (...)
+  {
+    m_View->m_TrackingError = "Unknown error.";
   }
   m_View->m_TrackingThread.quit();
 }
@@ -142,6 +154,18 @@ void QmitkGibbsTrackingView::AfterThread()
   m_ThreadIsRunning = false;
 
   UpdateGUI();
+
+  // After an exception the filter may not have finished; GetFiberBundle would then wait forever.
+  if (!m_TrackingError.empty())
+  {
+    MITK_ERROR << "Gibbs tracking failed: " << m_TrackingError;
+    QMessageBox::critical(nullptr, "Gibbs Tracking", QString("Tracking aborted:\n") + QString::fromStdString(m_TrackingError));
+    m_FiberBundleNode = nullptr;
+    m_GlobalTracker = nullptr;
+    m_ItkOdfImage = nullptr;
+    m_ItkTensorImage = nullptr;
+    return;
+  }
 
   if( !m_GlobalTracker->GetIsInValidState() )
   {

@@ -152,6 +152,7 @@ private:
   QTime           m_TrackingTime;
   unsigned long   m_ElapsedTime;
   QString         m_OutputFileName;
+  std::string     m_TrackingError;  ///< set by the worker thread, shown by AfterThread
 
   /** global tracker and friends */
   itk::SmartPointer<GibbsTrackingFilterType> m_GlobalTracker;

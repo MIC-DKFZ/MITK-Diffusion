@@ -90,6 +90,7 @@ public:
   TrackerType::Pointer              m_Tracker;
   QmitkStreamlineTrackingWorker     m_TrackingWorker;
   QThread                           m_TrackingThread;
+  std::string                       m_TrackingError;  ///< set by the worker thread, shown by AfterThread
 
   virtual void Activated() override;
   virtual void Deactivated() override;
