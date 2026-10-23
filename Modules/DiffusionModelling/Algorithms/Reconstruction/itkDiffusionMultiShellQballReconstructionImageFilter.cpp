@@ -19,6 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 
 #include <itkTimeProbe.h>
+#include <limits>
 #include <itkPointShell.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 
@@ -347,8 +348,11 @@ void DiffusionMultiShellQballReconstructionImageFilter<TReferenceImagePixelType,
       else
         R2(i,j) = 1e20;
     }
+    // The nearest candidate that meets the constraints (R2 < 1e20), however far away: candidate 0
+    // is the unconstrained input, for which lambda in the caller can be NaN. The vertex candidate
+    // 14 meets the constraints for every input.
     unsigned int index = 0;
-    double minvalue = 999;
+    double minvalue = std::numeric_limits<double>::max();
     for(int j = 0 ; j < 15 ; j++)
     {
       if(R2(i,j) < minvalue){
