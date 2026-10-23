@@ -624,7 +624,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Merges selected DWIs of same dimension. If several b-values are present, the resulting image will contain multiple b-shells.</string>
+             <string>Appends the volumes of the DWI chosen next to the button to the selected DWI. Both need the same size, voxel size, origin and direction matrix. If several b-values are present, the resulting image will contain multiple b-shells.</string>
             </property>
             <property name="statusTip">
              <string/>
