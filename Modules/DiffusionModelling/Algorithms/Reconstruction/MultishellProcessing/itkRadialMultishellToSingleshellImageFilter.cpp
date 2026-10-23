@@ -65,6 +65,8 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
   {
     itkExceptionMacro(<< "No ReferenceSignal (BZeroImages) found!");
   }
+  // Every non-zero entry of the map is one column of the functor's signal matrix.
+  m_Functor->CheckShells(m_BValueMap.size() - 1);
 
   // [allDirectionsContainer] Gradient DirectionContainer containing all unique directions
   m_TargetDirectionsIndicies = mitk::gradients::GetAllUniqueDirections(m_BValueMap, m_OriginalGradientDirections);

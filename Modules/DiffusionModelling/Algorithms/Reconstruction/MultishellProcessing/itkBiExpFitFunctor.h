@@ -45,13 +45,9 @@ public:
 
   void operator()(vnl_matrix<double> & newSignal,const vnl_matrix<double> & SignalMatrix, const double & S0) override;
 
-  void setTargetBValue(const double & targetBValue){m_TargetBvalue = targetBValue;}
-  void setListOfBValues(const vnl_vector<double> & BValueList){m_BValueList = BValueList;}
+  unsigned int GetNumberOfUnknowns() const override { return 3; } // ADC_slow, ADC_fast, lambda
 
 protected:
-  double m_TargetBvalue;
-  vnl_vector<double> m_BValueList;
-
   /**
    * \brief The lestSquaresFunction struct for Non-Linear-Least-Squres fit of Biexponential model
    */

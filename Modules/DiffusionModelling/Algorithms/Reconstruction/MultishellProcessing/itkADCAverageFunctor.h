@@ -42,12 +42,7 @@ public:
 
   void operator()(vnl_matrix<double> & newSignal, const vnl_matrix<double> & SignalMatrix, const double & S0) override;
 
-  void setTargetBValue(const double & targetBValue){m_TargetBvalue = targetBValue;}
-  void setListOfBValues(const vnl_vector<double> & BValueList){m_BValueList = BValueList;}
-
-protected:
-  double m_TargetBvalue;
-  vnl_vector<double> m_BValueList;
+  unsigned int GetNumberOfUnknowns() const override { return 1; } // the mean ADC
 
 };
 

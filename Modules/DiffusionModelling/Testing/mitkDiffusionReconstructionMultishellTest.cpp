@@ -40,6 +40,7 @@ class mitkDiffusionReconstructionMultishellTestSuite : public mitk::TestFixture
   MITK_TEST(ZeroBaseline_GivesZeroVoxel);
   MITK_TEST(SecondUpdate_SameResult);
   MITK_TEST(InvalidInput_Throws);
+  MITK_TEST(FunctorSettings_Checked);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -238,6 +239,46 @@ public:
     auto wrongGradients = AdcFilter(m_Dwi);
     wrongGradients->SetOriginalGradientDirections(shorter.GetPointer());
     CPPUNIT_ASSERT_THROW(wrongGradients->Update(), itk::ExceptionObject);
+  }
+
+  // The functors used whatever they were given: an unset target b-value was read uninitialized, a
+  // b-value list shorter than the shells was read past its end, and with fewer shells than unknowns
+  // Levenberg-Marquardt did not start, so every voxel got the start values.
+  void FunctorSettings_Checked()
+  {
+    auto run = [this](itk::DWIVoxelFunctor *functor, const PropHelper::BValueMapType &bValueMap) {
+      auto filter = FilterType::New();
+      filter->SetInput(m_Dwi);
+      filter->SetOriginalGradientDirections(m_Gradients.GetPointer());
+      filter->SetOriginalBValueMap(bValueMap);
+      filter->SetOriginalBValue(m_ReferenceBValue);
+      filter->SetFunctor(functor);
+      filter->Update();
+    };
+    auto twoShells = m_BValueMap;
+    twoShells.erase(std::prev(twoShells.end()));
+    const vnl_vector<double> twoBValues = m_BValues.extract(2);
+
+    auto noTarget = itk::ADCAverageFunctor::New();
+    noTarget->setListOfBValues(m_BValues);
+    CPPUNIT_ASSERT_THROW(run(noTarget, m_BValueMap), itk::ExceptionObject);
+
+    auto shortList = itk::ADCAverageFunctor::New();
+    shortList->setListOfBValues(twoBValues);
+    shortList->setTargetBValue(m_BValues.mean());
+    CPPUNIT_ASSERT_THROW(run(shortList, m_BValueMap), itk::ExceptionObject);
+
+    // Three unknowns, two shells.
+    auto biExp = itk::BiExpFitFunctor::New();
+    biExp->setListOfBValues(twoBValues);
+    biExp->setTargetBValue(m_BValues.mean());
+    CPPUNIT_ASSERT_THROW(run(biExp, twoShells), itk::ExceptionObject);
+
+    // Two unknowns, two shells.
+    auto kurtosis = itk::KurtosisFitFunctor::New();
+    kurtosis->setListOfBValues(twoBValues);
+    kurtosis->setTargetBValue(m_BValues.mean());
+    CPPUNIT_ASSERT_NO_THROW(run(kurtosis, twoShells));
   }
 };
 
