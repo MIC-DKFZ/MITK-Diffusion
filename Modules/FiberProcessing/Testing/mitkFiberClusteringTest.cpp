@@ -12,6 +12,9 @@ found in the LICENSE file.
 
 #include <mitkTractClusteringFilter.h>
 #include <mitkClusteringMetricEuclideanMean.h>
+#include <mitkClusteringMetricInnerAngles.h>
+#include <mitkClusteringMetricLength.h>
+#include <mitkClusteringMetricScalarMap.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -20,6 +23,7 @@ found in the LICENSE file.
 #include <omp.h>
 
 #include <algorithm>
+#include <cmath>
 #include <random>
 
 /** Fiber clustering on synthetic bundles whose partition is known. */
@@ -30,6 +34,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(Clusters_SameResultForAnyThreadCount);
   MITK_TEST(InputCentroids_SameResultForAnyThreadCount);
   MITK_TEST(InputCentroids_OutputKBelongsToCentroidK);
+  MITK_TEST(Metrics_FibersWithFewerThanFourPoints);
   CPPUNIT_TEST_SUITE_END();
 
   /** Three fibers along x at y = 0, 0.5, 1 mm and, 40 mm away, two at y = 40, 41 mm, with
@@ -150,6 +155,35 @@ public:
     CPPUNIT_ASSERT(indices.at(2) == std::vector<unsigned int>({0, 1, 3}));
     CPPUNIT_ASSERT_EQUAL(1u, clusterer.GetOutUnassigned()->GetNumFibers());
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-100.0, clusterer.GetOutCentroids().at(1)->GetFiberPolyData()->GetPoint(0)[1], 1e-4);
+  }
+
+  void Metrics_FibersWithFewerThanFourPoints()
+  {
+    // The metrics step through every fourth point; with fewer than four points the step was 0
+    // and the loop never ended.
+    vnl_matrix<float> s(3, 3);
+    vnl_matrix<float> t(3, 3);
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      s.set_column(i, vnl_vector_fixed<float, 3>(2.0f * i, 0, 0).as_vector());
+      t.set_column(i, vnl_vector_fixed<float, 3>(2.0f * i, 1, 0).as_vector());
+    }
+
+    auto map = itk::Image<float, 3>::New();
+    itk::Image<float, 3>::SizeType size = {{6, 3, 3}};
+    map->SetRegions(itk::Image<float, 3>::RegionType(size));
+    map->Allocate();
+    map->FillBuffer(1);
+
+    mitk::ClusteringMetricLength length;
+    mitk::ClusteringMetricInnerAngles angles;
+    mitk::ClusteringMetricScalarMap scalarMap;
+    scalarMap.SetImages({map});
+    bool flipped = true;
+    CPPUNIT_ASSERT(std::isfinite(length.CalculateDistance(s, t, flipped)));
+    CPPUNIT_ASSERT(!flipped);
+    CPPUNIT_ASSERT(std::isfinite(angles.CalculateDistance(s, t, flipped)));
+    CPPUNIT_ASSERT(std::isfinite(scalarMap.CalculateDistance(s, t, flipped)));
   }
 
   void Clusters_KeepInputWeights()

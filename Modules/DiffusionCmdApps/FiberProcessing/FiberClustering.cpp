@@ -160,6 +160,14 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
   }
 
+  // A cluster size of 0 would never reach the largest cluster distance, and the metrics compare
+  // fibers point by point.
+  if (cluster_size<=0 || fiber_points<2)
+  {
+    MITK_INFO << "--cluster_size must be positive and --fiber_points at least 2.";
+    return EXIT_FAILURE;
+  }
+
   try
   {
     typedef itk::Image< float, 3 > FloatImageType;

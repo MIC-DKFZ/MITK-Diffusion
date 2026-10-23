@@ -51,7 +51,8 @@ public:
     vnl_vector<float> dists_d; dists_d.set_size(s.cols());
     vnl_vector<float> dists_f; dists_f.set_size(s.cols());
 
-    int inc = s.cols()/4;
+    // Every fourth point; fibers with fewer than four points use every point.
+    const unsigned int inc = s.cols()>=4 ? s.cols()/4 : 1;
     for (unsigned int i=0; i<s.cols(); i += inc)
     {
       d_direct += (s.get_column(i)-t.get_column(i)).magnitude();

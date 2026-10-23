@@ -94,7 +94,8 @@ public:
     float d_direct = 0;
     float d_flipped = 0;
 
-    int inc = s.cols()/4;
+    // Every fourth point; fibers with fewer than four points use every point.
+    const unsigned int inc = s.cols()>=4 ? s.cols()/4 : 1;
     for (unsigned int i=0; i<s.cols(); i += inc)
     {
       d_direct += (s.get_column(i)-t.get_column(i)).magnitude();
