@@ -21,6 +21,8 @@ found in the LICENSE file.
 #include <mitkImageCast.h>
 #include <mitkImagePixelReadAccessor.h>
 
+#include <cmath>
+
 /**
  * The volume and gradient edits of the preprocessing view, on test_multi.dwi (99 volumes, 9 b0
  * volumes at 0, 1, 2, 33, ..., shells 1000, 2000 and 3000 of 30 directions each).
@@ -156,10 +158,11 @@ public:
     itk::ImageRegionConstIteratorWithIndex<DwiType> it(dwi, dwi->GetLargestPossibleRegion());
     for (; !it.IsAtEnd(); ++it)
     {
-      float mean = 0;
+      // The mean, rounded to short.
+      double sum = 0;
       for (auto i : b0)
-        mean = mean + it.Get()[i] / static_cast<double>(b0.size());
-      CPPUNIT_ASSERT_EQUAL(static_cast<short>(mean), average->GetPixel(it.GetIndex()));
+        sum += it.Get()[i];
+      CPPUNIT_ASSERT_EQUAL(static_cast<short>(std::round(sum / b0.size())), average->GetPixel(it.GetIndex()));
     }
 
     auto separate = mitk::DiffusionImageEditing::ExtractB0Volumes(m_Dwi);
