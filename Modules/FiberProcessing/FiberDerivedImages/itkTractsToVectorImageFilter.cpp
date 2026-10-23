@@ -54,6 +54,10 @@ vnl_vector_fixed<double, 3> TractsToVectorImageFilter< PixelType >::GetVnlVector
 template< class PixelType >
 void TractsToVectorImageFilter< PixelType >::GenerateData()
 {
+  // The 4th image dimension holds MaxNumDirections x 3 vector components.
+  if (m_MaxNumDirections < 1)
+    mitkThrow() << "The maximum number of directions per voxel must be at least 1.";
+
   mitk::BaseGeometry::Pointer geometry = m_FiberBundle->GetGeometry();
 
   // calculate new image parameters
@@ -112,7 +116,7 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
   itk::ImageRegion<4> imageRegion4;
 
   spacing4[0] = spacing3[0]; spacing4[1] = spacing3[1]; spacing4[2] = spacing3[2]; spacing4[3] = 1;
-  origin4[0] = origin3[0]; origin4[1] = origin3[1]; origin4[2] = origin3[2]; origin3[3] = 0;
+  origin4[0] = origin3[0]; origin4[1] = origin3[1]; origin4[2] = origin3[2]; origin4[3] = 0;
   for (int r=0; r<3; r++)
     for (int c=0; c<3; c++)
       direction4[r][c] = direction3[r][c];
@@ -236,17 +240,11 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
       continue;
     }
 
-    DirectionContainerType::Pointer directions;
-    if (m_MaxNumDirections>0)
-    {
-      directions = FastClustering(dirCont, peakLengths->GetElement(idx_lin));
-      std::sort( directions->begin(), directions->end(), CompareVectorLengths );
-    }
-    else
-      directions = dirCont;
+    DirectionContainerType::Pointer directions = FastClustering(dirCont, peakLengths->GetElement(idx_lin));
+    std::sort( directions->begin(), directions->end(), CompareVectorLengths );
 
     unsigned int numDir = directions->size();
-    if (m_MaxNumDirections>0 && numDir>m_MaxNumDirections)
+    if (numDir>m_MaxNumDirections)
       numDir = m_MaxNumDirections;
 
     float voxel_max_mag = 0;

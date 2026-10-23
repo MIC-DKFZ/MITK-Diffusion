@@ -82,6 +82,11 @@ int main(int argc, char* argv[])
   int maxNumDirs = 3;
   if (parsedArgs.count("numdirs"))
     maxNumDirs = us::any_cast<int>(parsedArgs["numdirs"]);
+  if (maxNumDirs < 1)
+  {
+    std::cout << "--numdirs must be at least 1." << std::endl;
+    return EXIT_FAILURE;
+  }
 
   int normalization = 1;
   if (parsedArgs.count("normalization"))
@@ -164,12 +169,12 @@ int main(int argc, char* argv[])
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (...)

@@ -3,6 +3,7 @@ SET(MODULE_CUSTOM_TESTS
   mitkFiberExtractionTest.cpp
   mitkFiberProcessingTest.cpp
   mitkFiberWeightsFileTest.cpp
+  mitkFiberDerivedImagesTest.cpp
 )
 
 
