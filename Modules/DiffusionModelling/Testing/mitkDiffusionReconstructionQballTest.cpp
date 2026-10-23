@@ -37,6 +37,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(Analytical_SecondUpdate_SameResult);
   MITK_TEST(SolidAngle_SecondUpdate_SameResult);
   MITK_TEST(SingleShellFilters_DefaultNormalization_IsStandard);
+  MITK_TEST(Numerical_Standard_HasUnitNorm);
   MITK_TEST(SingleShellFilters_TwoShells_Throw);
   MITK_TEST(SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint);
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
@@ -273,6 +274,17 @@ public:
     auto analyticalStandard = Analytical(dwi);
     analyticalStandard->Update();
     CheckEqual(analyticalStandard->GetOutput(), analyticalDefault->GetOutput());
+  }
+
+  // The numerical "standard" normalization divides by the Euclidean norm, as test_QN0.qbi holds it;
+  // its documentation claimed a division by the sum.
+  void Numerical_Standard_HasUnitNorm()
+  {
+    auto filter = Numerical(Simulate(Shells({1000})));
+    filter->Update();
+    itk::ImageRegionConstIterator<NumericalFilterType::OutputImageType> it(filter->GetOutput(), filter->GetOutput()->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, it.Get().GetNorm(), 1e-5);
   }
 
   // The single-shell filters normalized every gradient and used one b-value, so a second shell was

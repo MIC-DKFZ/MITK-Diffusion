@@ -93,7 +93,7 @@ namespace itk {
     switch( m_NormalizationMethod )
     {
 
-      // divide by sum to retreive a PDF
+      // divide by the Euclidean norm (itk::Vector::Normalize), not by the sum
     case QBR_STANDARD:
       {
         odf.Normalize();

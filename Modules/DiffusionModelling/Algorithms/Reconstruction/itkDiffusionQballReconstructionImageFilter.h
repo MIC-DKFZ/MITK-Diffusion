@@ -99,8 +99,9 @@ public:
   /** \class DiffusionQballReconstructionImageFilter
   * \brief This enum defines the normalization of the ODFs.
   * \par
-  * Standard normalization simply divides by sum of ODF-values
-  * to ensure properties of a probability density function.
+  * Standard normalization divides by the Euclidean (L2) norm of the
+  * ODF values, not by their sum: the ODFs are unit vectors, not a
+  * probability density (test_QN0.qbi holds this normalization).
   * \par
   * B-zero/b-value normalization is ADC-style log of ratio
   * between b-zero and b_i normalized by b-value.
