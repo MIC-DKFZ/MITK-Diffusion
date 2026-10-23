@@ -39,6 +39,13 @@ void TrackingHandlerTensor::InitForTracking()
   if (m_NeedsDataInit)
   {
     m_NumberOfInputs = m_TensorImages.size();
+    // all tensor images are read at the voxel index of the first one
+    for (const auto& tensorImage : m_TensorImages)
+      if (tensorImage->GetLargestPossibleRegion()!=m_TensorImages.at(0)->GetLargestPossibleRegion()
+          || !tensorImage->GetSpacing().GetVnlVector().is_equal(m_TensorImages.at(0)->GetSpacing().GetVnlVector(), 1e-6)
+          || tensorImage->GetOrigin().EuclideanDistanceTo(m_TensorImages.at(0)->GetOrigin())>1e-6
+          || !tensorImage->GetDirection().GetVnlMatrix().is_equal(m_TensorImages.at(0)->GetDirection().GetVnlMatrix(), 1e-6))
+        mitkThrow() << "All tensor images used for multi-tensor tracking need the same geometry.";
     for (int i=0; i<m_NumberOfInputs; i++)
     {
       ItkPDImgType::Pointer pdImage = ItkPDImgType::New();
@@ -189,7 +196,7 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::GetDirection(itk::Point<float, 
   itk::ContinuousIndex< float, 3> cIdx;
 
   vnl_vector_fixed<float,3> dir; dir.fill(0.0);
-  if ( !m_FaImage->TransformPhysicalPointToIndex(itkP, idx) || !m_FaImage->TransformPhysicalPointToContinuousIndex(itkP, cIdx) )
+  if ( !m_TensorImages.at(0)->TransformPhysicalPointToIndex(itkP, idx) || !m_TensorImages.at(0)->TransformPhysicalPointToContinuousIndex(itkP, cIdx) )
     return dir;
 
   int image_num = -1;
@@ -207,7 +214,7 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::GetDirection(itk::Point<float, 
     float frac[3];
     for (int d=0; d<3; ++d)
     {
-      auto size = static_cast<itk::IndexValueType>(m_FaImage->GetLargestPossibleRegion().GetSize(d));
+      auto size = static_cast<itk::IndexValueType>(m_TensorImages.at(0)->GetLargestPossibleRegion().GetSize(d));
       auto base = static_cast<itk::IndexValueType>(std::floor(cIdx[d]));
       frac[d] = 1 - (cIdx[d] - base);   // weight of the lower corner
       lo[d] = std::clamp<itk::IndexValueType>(base, 0, size-1);

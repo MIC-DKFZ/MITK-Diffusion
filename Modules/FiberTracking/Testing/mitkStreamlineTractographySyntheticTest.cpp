@@ -40,6 +40,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(DeterministicOdf_FollowsPeakBetweenSamplingDirections);
   MITK_TEST(Interpolation_TracksTheOutermostVoxelLayer);
   MITK_TEST(Flips_FollowTheFlippedField);
+  MITK_TEST(TensorFaImage_OnAnotherGrid);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -451,6 +452,43 @@ public:
     fibers = TrackWith(odfHandler, params, seeds);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("ODF fibers", vtkIdType(2), fibers->GetNumberOfCells());
     CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("ODF", 0.0, MeanSegmentAngleDeg(fibers, flipped), 1.0);
+  }
+
+  /** The FA image only stops streamlines; on a finer grid it was used to compute the voxel index
+   *  into the tensor images, which then read beyond the tensor image. */
+  void TensorFaImage_OnAnotherGrid()
+  {
+    vnl_vector_fixed<double, 3> fibre(0.8, 0.5, 0.2);
+    auto tensors = MakeTensorField(fibre);
+    auto seeds = MakeCubeSeeds();
+
+    auto fa = FloatImgType::New();
+    FloatImgType::SizeType size = {{40, 40, 40}};
+    fa->SetRegions(FloatImgType::RegionType(size));
+    FloatImgType::SpacingType spacing;
+    spacing.Fill(0.5);
+    fa->SetSpacing(spacing);
+    FloatImgType::PointType origin;
+    origin.Fill(-0.25);
+    fa->SetOrigin(origin);
+    fa->Allocate();
+    fa->FillBuffer(1.0f);
+
+    auto params = MakeParameters();
+    params->m_MinTractLengthMm = 5;
+    mitk::TrackingHandlerTensor reference;
+    reference.SetTensorImage(tensors.GetPointer());
+    auto expected = mitk::FiberBundle::New(TrackWith(reference, params, seeds));
+
+    params = MakeParameters();
+    params->m_MinTractLengthMm = 5;
+    mitk::TrackingHandlerTensor withFa;
+    withFa.SetTensorImage(tensors.GetPointer());
+    withFa.SetFaImage(fa);
+    auto result = mitk::FiberBundle::New(TrackWith(withFa, params, seeds));
+
+    CPPUNIT_ASSERT_EQUAL(2u, expected->GetNumFibers());
+    CPPUNIT_ASSERT_MESSAGE("FA image on a finer grid gives the same tractogram", expected->Equals(result));
   }
 };
 
