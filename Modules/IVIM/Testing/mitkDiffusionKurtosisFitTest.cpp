@@ -37,6 +37,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(MapBounds_KJustInsideBounds_Recovered);
   MITK_TEST(MapBounds_DAndKOutsideBounds_OnTheBounds);
   MITK_TEST(FitVoxel_AppBounds_DAtMostPoint004);
+  MITK_TEST(FitVoxel_DirectionsDiffer_PooledOverDirections);
   MITK_TEST(Update_KBoundsEqual_Throws);
   MITK_TEST(FitVoxel_KBoundsReversed_Throws);
   MITK_TEST(FitVoxel_SyntheticVoxel_RecoversDAndK);
@@ -249,6 +250,31 @@ public:
     const auto values = KurtosisSignal(m_BValues, 10000, 0.005, 0.5);
     const auto fit = mitk::kurtosis::FitVoxel(vnl_vector<double>(values.data(), values.size()), vnl_vector<double>(m_BValues.data(), m_BValues.size()), config);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.004, fit.d, 1e-8);
+  }
+
+  // One D and one K are fitted to all directions, as the manual and the header say: the
+  // logarithmic fit of directions with (D_n, K_n), each on every shell, gives the mean D_n and
+  // mean(D_n^2 K_n) / mean(D_n)^2, not a mean of the K_n.
+  void FitVoxel_DirectionsDiffer_PooledOverDirections()
+  {
+    const double d[3] = {0.0005, 0.001, 0.002};
+    const double k[3] = {0.5, 1.0, 1.5};
+    std::vector<double> bValues = {0};
+    std::vector<double> values = {1000};
+    for (double b : {1000.0, 2000.0, 3000.0})
+      for (unsigned int n = 0; n < 3; ++n)
+      {
+        bValues.push_back(b);
+        values.push_back(1000 * std::exp(-b * d[n] + b * b * d[n] * d[n] * k[n] / 6));
+      }
+
+    mitk::kurtosis::FitConfiguration config;
+    config.scale = FitScale::Logarithmic;
+    const auto fit = mitk::kurtosis::FitVoxel(vnl_vector<double>(values.data(), values.size()), vnl_vector<double>(bValues.data(), bValues.size()), config);
+    const double meanD = (d[0] + d[1] + d[2]) / 3;
+    const double meanD2K = (d[0] * d[0] * k[0] + d[1] * d[1] * k[1] + d[2] * d[2] * k[2]) / 3;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(meanD, fit.d, 1e-6 * meanD);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(meanD2K / (meanD * meanD), fit.k, 1e-5);
   }
 
   void Update_KBoundsEqual_Throws()

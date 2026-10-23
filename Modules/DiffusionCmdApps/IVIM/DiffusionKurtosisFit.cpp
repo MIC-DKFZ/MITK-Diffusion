@@ -59,7 +59,7 @@ int main( int argc, char* argv[] )
   parser.setTitle("Diffusion Kurtosis Fit");
   parser.setCategory("Diffusion Related Measures");
   parser.setContributor("MIC");
-  parser.setDescription("Fitting Kurtosis. The input is smoothed with a Gaussian of variance 1.5 mm^2 before the fit; K is kept within the K bounds and D within [0, 0.004] mm^2/s.");
+  parser.setDescription("Fitting Kurtosis: one D and one K of S = S0 exp(-bD + b^2 D^2 K/6), fitted to all diffusion-weighted volumes together whatever their direction (the kurtosis of the direction-averaged signal, not the mean kurtosis of a kurtosis tensor). The input is smoothed with a Gaussian of variance 1.5 mm^2 before the fit; K is kept within the K bounds and D within [0, 0.004] mm^2/s.");
   parser.setArgumentPrefix("--","-");
 
   // mandatory arguments

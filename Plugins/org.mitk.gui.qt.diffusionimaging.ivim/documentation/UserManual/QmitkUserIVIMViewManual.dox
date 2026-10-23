@@ -35,7 +35,7 @@ The plot shows S/S0, the measurements of the first fit and, for methods 3 and 4,
 
 \section QmitkIVIMViewKurtosis Kurtosis
 
-The kurtosis model describes the signal with the apparent diffusion coefficient D and the kurtosis K: S = S0 exp(-bD + b²D²K/6). S0 is the mean of the b=0 volumes, as for IVIM the volumes whose b-value rounds to 0 s/mm².
+The kurtosis model describes the signal with the apparent diffusion coefficient D and the kurtosis K: S = S0 exp(-bD + b²D²K/6). S0 is the mean of the b=0 volumes, as for IVIM the volumes whose b-value rounds to 0 s/mm². One D and one K are fitted to all diffusion-weighted volumes together, whatever their gradient direction. The straight fit therefore estimates the kurtosis of the direction-averaged signal (the mean signal kurtosis of dipy's MSDKI); the logarithmic fit gives the mean of the directional ADCs and, for evenly spread directions, the mean of the kurtosis tensor (MKT). Neither is the mean kurtosis (MK) of a kurtosis tensor fit, and in anisotropic tissue the two fit types give different K.
 
 \li <b>Select Fit Type</b>: "Straight Fit" fits S, "Logarithmic Fit" fits log S; the logarithmic fit leaves out measurements at or below 0.
 \li <b>Omit b=0 Measurements</b>: S0 is fitted as a third parameter instead of taken from the b=0 volumes. Without b=0 volumes, S0 is always fitted.
