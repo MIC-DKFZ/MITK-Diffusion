@@ -88,40 +88,15 @@ namespace itk {
     int NrOdfDirections,
     int NrBasisFunctionCenters>
     typename itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::OdfPixelType
-    itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::Normalize( OdfPixelType odf, double b0 )
+    itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::Normalize( OdfPixelType odf, double /*b0*/ )
   {
     switch( m_NormalizationMethod )
     {
-
       // divide by the Euclidean norm (itk::Vector::Normalize), not by the sum
     case QBR_STANDARD:
       {
         odf.Normalize();
         return odf;
-        break;
-      }
-      // ADC style
-    case QBR_B_ZERO_B_VALUE:
-      {
-        for(int i=0; i<NrOdfDirections; i++)
-        {
-          odf[i] = ((TOdfPixelType)log((TOdfPixelType)b0)-odf[i])/m_BValue;
-        }
-        return odf;
-        break;
-      }
-      // divide by b-zero value of voxel
-    case QBR_B_ZERO:
-      {
-        odf *= 1.0/b0;
-        return odf;
-        break;
-      }
-      // no normalization of ODF
-    case QBR_NONE:
-      {
-        return odf;
-        break;
       }
     }
 
@@ -136,39 +111,7 @@ namespace itk {
     int NrBasisFunctionCenters >
     vnl_vector<TOdfPixelType> itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::PreNormalize( vnl_vector<TOdfPixelType> vec )
   {
-    switch( m_NormalizationMethod )
-    {
-      // standard: no normalization before reconstruction
-    case QBR_STANDARD:
-      {
-        return vec;
-        break;
-      }
-      // log of signal
-    case QBR_B_ZERO_B_VALUE:
-      {
-        int n = vec.size();
-        for(int i=0; i<n; i++)
-        {
-          vec[i] = log(vec[i]);
-        }
-        return vec;
-        break;
-      }
-      // no normalization before reconstruction here
-    case QBR_B_ZERO:
-      {
-        return vec;
-        break;
-      }
-      // no normalization before reconstruction here
-    case QBR_NONE:
-      {
-        return vec;
-        break;
-      }
-    }
-
+    // standard: no normalization before reconstruction
     return vec;
   }
 

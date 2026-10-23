@@ -90,15 +90,13 @@ class AnalyticalDiffusionQballReconstructionImageFilter : public ImageToImageFil
 
 public:
 
+    /** Reconstruction method: Q-ball ODF (Descoteaux 2007, the ODF output divided by its sum),
+     * SH fit of the ADC profile or of the raw signal, solid-angle ODF (Aganj 2010). */
     enum Normalization {
         QBAR_STANDARD,
-        QBAR_B_ZERO_B_VALUE,
-        QBAR_B_ZERO,
-        QBAR_NONE,
         QBAR_ADC_ONLY,
         QBAR_RAW_SIGNAL,
-        QBAR_SOLID_ANGLE,
-        QBAR_NONNEG_SOLID_ANGLE
+        QBAR_SOLID_ANGLE
     };
 
     typedef AnalyticalDiffusionQballReconstructionImageFilter Self;

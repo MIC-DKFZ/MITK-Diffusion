@@ -249,7 +249,7 @@ void QmitkQBallReconstructionView::Reconstruct(int method, int normalization)
   {
     if(method == 0)
     {
-      NumericalQBallReconstruction(m_Controls->m_ImageBox->GetSelectedNode(), normalization);
+      NumericalQBallReconstruction(m_Controls->m_ImageBox->GetSelectedNode());
     }
     else if(method == 1)
     {
@@ -262,7 +262,7 @@ void QmitkQBallReconstructionView::Reconstruct(int method, int normalization)
   }
 }
 
-void QmitkQBallReconstructionView::NumericalQBallReconstruction(mitk::DataNode::Pointer node, int normalization)
+void QmitkQBallReconstructionView::NumericalQBallReconstruction(mitk::DataNode::Pointer node)
 {
   try
   {
@@ -282,39 +282,8 @@ void QmitkQBallReconstructionView::NumericalQBallReconstruction(mitk::DataNode::
     filter->SetGradientImage(mitk::DiffusionPropertyHelper::GetGradientContainer(vols), itkVectorImagePointer);
     filter->SetThreshold( static_cast<short>(m_Controls->m_QBallReconstructionThreasholdEdit->value()) );
 
-    std::string nodePostfix;
-    switch(normalization)
-    {
-    case 0:
-    {
-      filter->SetNormalizationMethod(QballReconstructionImageFilterType::QBR_STANDARD);
-      nodePostfix = "_Numerical_Qball";
-      break;
-    }
-    case 1:
-    {
-      filter->SetNormalizationMethod(QballReconstructionImageFilterType::QBR_B_ZERO_B_VALUE);
-      nodePostfix = "_Numerical_ZeroBvalueNormalization_Qball";
-      break;
-    }
-    case 2:
-    {
-      filter->SetNormalizationMethod(QballReconstructionImageFilterType::QBR_B_ZERO);
-      nodePostfix = "_NumericalQball_ZeroNormalization_Qball";
-      break;
-    }
-    case 3:
-    {
-      filter->SetNormalizationMethod(QballReconstructionImageFilterType::QBR_NONE);
-      nodePostfix = "_NumericalQball_NoNormalization_Qball";
-      break;
-    }
-    default:
-    {
-      filter->SetNormalizationMethod(QballReconstructionImageFilterType::QBR_STANDARD);
-      nodePostfix = "_NumericalQball_Qball";
-    }
-    }
+    filter->SetNormalizationMethod(QballReconstructionImageFilterType::QBR_STANDARD);
+    const std::string nodePostfix = "_Numerical_Qball";
 
     filter->Update();
 
@@ -425,24 +394,6 @@ void QmitkQBallReconstructionView::TemplatedAnalyticalQBallReconstruction(mitk::
     nodePostfix = "_Qball";
     break;
   }
-  case 1:
-  {
-    filter->SetNormalizationMethod(FilterType::QBAR_B_ZERO_B_VALUE);
-    nodePostfix = "_1_Qball";
-    break;
-  }
-  case 2:
-  {
-    filter->SetNormalizationMethod(FilterType::QBAR_B_ZERO);
-    nodePostfix = "_2_Qball";
-    break;
-  }
-  case 3:
-  {
-    filter->SetNormalizationMethod(FilterType::QBAR_NONE);
-    nodePostfix = "_3_Qball";
-    break;
-  }
   case 4:
   {
     filter->SetNormalizationMethod(FilterType::QBAR_ADC_ONLY);
@@ -459,12 +410,6 @@ void QmitkQBallReconstructionView::TemplatedAnalyticalQBallReconstruction(mitk::
   {
     filter->SetNormalizationMethod(FilterType::QBAR_SOLID_ANGLE);
     nodePostfix = "_CSA_Qball";
-    break;
-  }
-  case 7:
-  {
-    filter->SetNormalizationMethod(FilterType::QBAR_NONNEG_SOLID_ANGLE);
-    nodePostfix = "_NonNegCSA_Qball";
     break;
   }
   default:

@@ -102,17 +102,9 @@ public:
   * Standard normalization divides by the Euclidean (L2) norm of the
   * ODF values, not by their sum: the ODFs are unit vectors, not a
   * probability density (test_QN0.qbi holds this normalization).
-  * \par
-  * B-zero/b-value normalization is ADC-style log of ratio
-  * between b-zero and b_i normalized by b-value.
-  * \par
-  * B-zero normalization simply divides by b-zero reference value
   */
   enum Normalization {
-    QBR_STANDARD,
-    QBR_B_ZERO_B_VALUE,
-    QBR_B_ZERO,
-    QBR_NONE
+    QBR_STANDARD
   };
 
   typedef DiffusionQballReconstructionImageFilter Self;

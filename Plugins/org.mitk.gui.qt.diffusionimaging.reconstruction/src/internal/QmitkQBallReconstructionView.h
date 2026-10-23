@@ -95,7 +95,7 @@ protected slots:
   void MethodChoosen(int method);
   void Reconstruct(int method, int normalization);
 
-  void NumericalQBallReconstruction(mitk::DataNode::Pointer node, int normalization);
+  void NumericalQBallReconstruction(mitk::DataNode::Pointer node);
   void AnalyticalQBallReconstruction(mitk::DataNode::Pointer node, int normalization);
   void MultiQBallReconstruction(mitk::DataNode::Pointer node);
 

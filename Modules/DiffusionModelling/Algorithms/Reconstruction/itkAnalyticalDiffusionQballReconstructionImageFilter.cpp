@@ -81,26 +81,6 @@ itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType,
     return odf;
     break;
   }
-  case QBAR_B_ZERO_B_VALUE:
-  {
-    for(int i=0; i<NrOdfDirections; i++)
-    {
-      odf[i] = ((TOdfPixelType)log((TOdfPixelType)b0)-odf[i])/m_BValue;
-    }
-    return odf;
-    break;
-  }
-  case QBAR_B_ZERO:
-  {
-    odf *= 1.0/b0;
-    return odf;
-    break;
-  }
-  case QBAR_NONE:
-  {
-    return odf;
-    break;
-  }
   case QBAR_ADC_ONLY:
   {
     for(int i=0; i<NrOdfDirections; i++)
@@ -120,10 +100,6 @@ itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType,
     for(int i=0; i<NrOdfDirections; i++)
       odf[i] *= itk::Math::pi*4/NrOdfDirections;
 
-    break;
-  }
-  case QBAR_NONNEG_SOLID_ANGLE:
-  {
     break;
   }
   }
@@ -153,29 +129,6 @@ vnl_vector<TOdfPixelType> itk::AnalyticalDiffusionQballReconstructionImageFilter
     return vec;
     break;
   }
-  case QBAR_B_ZERO_B_VALUE:
-  {
-    int n = vec.size();
-    for(int i=0; i<n; i++)
-    {
-      if (vec[i]<=0)
-        vec[i] = 0.001;
-
-      vec[i] = log(vec[i]);
-    }
-    return vec;
-    break;
-  }
-  case QBAR_B_ZERO:
-  {
-    return vec;
-    break;
-  }
-  case QBAR_NONE:
-  {
-    return vec;
-    break;
-  }
   case QBAR_ADC_ONLY:
   {
     int n = vec.size();
@@ -195,7 +148,6 @@ vnl_vector<TOdfPixelType> itk::AnalyticalDiffusionQballReconstructionImageFilter
     break;
   }
   case QBAR_SOLID_ANGLE:
-  case QBAR_NONNEG_SOLID_ANGLE:
   {
     int n = vec.size();
     double b0f = (double)b0;
@@ -334,17 +286,6 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
         coeffs[0] += 1.0/(2.0*sqrt(itk::Math::pi));
         odf = ( m_SphericalHarmonicBasisMatrix * coeffs ).data_block();
         coeffPixel = coeffs.data_block();
-      }
-      else if(m_NormalizationMethod == QBAR_NONNEG_SOLID_ANGLE)
-      {
-        /** this would be the place to implement a non-negative
-              * solver for quadratic programming problem:
-              * min .5*|| Bc-s ||^2 subject to -CLPc <= 4*pi*ones
-              * (refer to MICCAI 2009 Goh et al. "Estimating ODFs with PDF constraints")
-              * .5*|| Bc-s ||^2 == .5*c'B'Bc - x'B's + .5*s's
-              */
-
-        itkExceptionMacro( << "Nonnegative Solid Angle not yet implemented");
       }
       else
       {
@@ -489,9 +430,6 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
   case QBAR_RAW_SIGNAL:
     break;
   case QBAR_STANDARD:
-  case QBAR_B_ZERO_B_VALUE:
-  case QBAR_B_ZERO:
-  case QBAR_NONE:
   {
     m_CoeffReconstructionMatrix = P * m_CoeffReconstructionMatrix;
     break;
@@ -501,8 +439,6 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
     m_CoeffReconstructionMatrix = (float)(1.0/(8.0*itk::Math::pi)) * P * L * m_CoeffReconstructionMatrix;
     break;
   }
-  case QBAR_NONNEG_SOLID_ANGLE:
-    break;
   }
 
   // needed to calculate the ODF values from the SH coefficients
