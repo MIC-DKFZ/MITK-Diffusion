@@ -61,6 +61,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(Writers_WriteErrors_Throw);
   MITK_TEST(VtkReader_NoFiberPolyData_ThrowsMitkException);
   MITK_TEST(VtkReader_ColoursOfUnusedAndReorderedPoints_StayWithTheirPoints);
+  MITK_TEST(DicomMimeType_NewDcmFile_FindsWriter);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -643,6 +644,19 @@ public:
         CPPUNIT_ASSERT_EQUAL_MESSAGE("RGB colours get an opaque alpha", 255.0, fibColours->GetComponent(id, 3));
       }
     }
+  }
+
+  void DicomMimeType_NewDcmFile_FindsWriter()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    const std::string path = m_TempDir + "/new.dcm";
+    mitk::IOUtil::Save(fib, path);
+    CPPUNIT_ASSERT(fib->Equals(mitk::IOUtil::Load<mitk::FiberBundle>(path), 0.001));
+
+    // A file too short for the DICOM preamble is no tractogram
+    const std::string shortFile = m_TempDir + "/short.dcm";
+    std::ofstream(shortFile) << "DICM";
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load<mitk::FiberBundle>(shortFile), std::exception);
   }
 };
 
