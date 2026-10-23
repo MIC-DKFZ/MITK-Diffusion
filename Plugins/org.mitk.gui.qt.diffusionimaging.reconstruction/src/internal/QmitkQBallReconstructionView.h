@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define _QMITKQBALLRECONSTRUCTIONVIEW_H_INCLUDED
 
 #include <QmitkAbstractView.h>
-#include <mitkILifecycleAwarePart.h>
 
 #include <string>
 #include <vector>
@@ -32,8 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 typedef short DiffusionPixelType;
 
-struct QbrSelListener;
-
 class QCheckBox;
 
 /*!
@@ -43,10 +40,8 @@ class QCheckBox;
  *
  * Document your class here.
  */
-class QmitkQBallReconstructionView : public QmitkAbstractView, public mitk::ILifecycleAwarePart
+class QmitkQBallReconstructionView : public QmitkAbstractView
 {
-
-  friend struct QbrSelListener;
 
   typedef mitk::DiffusionPropertyHelper::GradientDirectionType            GradientDirectionType;
   typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType  GradientDirectionContainerType;
@@ -73,20 +68,6 @@ class QmitkQBallReconstructionView : public QmitkAbstractView, public mitk::ILif
   ///
   virtual void SetFocus() override;
 
-  /// \brief Called when the view gets activated
-  virtual void Activated() override;
-
-  /// \brief Called when the view gets deactivated
-  virtual void Deactivated() override;
-
-  /// \brief Called when the view becomes visible
-  virtual void Visible() override;
-
-  /// \brief Called when the view becomes hidden
-  virtual void Hidden() override;
-
-  static const int nrconvkernels;
-
 protected slots:
 
   void UpdateGui();
@@ -98,13 +79,6 @@ protected slots:
   void NumericalQBallReconstruction(mitk::DataNode::Pointer node);
   void AnalyticalQBallReconstruction(mitk::DataNode::Pointer node, int normalization);
   void MultiQBallReconstruction(mitk::DataNode::Pointer node);
-
-
-  /**
-   * @brief PreviewThreshold Generates a preview of the values that are cut off by the thresholds
-   * @param threshold
-   */
-  void PreviewThreshold(short threshold);
 
 protected:
 

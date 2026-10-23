@@ -23,13 +23,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkDiffusionQballReconstructionImageFilter.h"
 #include "itkAnalyticalDiffusionQballReconstructionImageFilter.h"
 #include "itkDiffusionMultiShellQballReconstructionImageFilter.h"
-#include "itkB0ImageExtractionImageFilter.h"
-#include <itkBinaryThresholdImageFilter.h>
 #include "mitkOdfImage.h"
-#include <mitkImageCast.h>
 #include <mitkNodePredicateIsDWI.h>
 #include <mitkShImage.h>
-#include <boost/version.hpp>
 #include <itkShToOdfImageFilter.h>
 #include <mitkImageCast.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
@@ -38,8 +34,6 @@ const std::string QmitkQBallReconstructionView::VIEW_ID = "org.mitk.views.qballr
 
 
 typedef float TTensorPixelType;
-
-const int QmitkQBallReconstructionView::nrconvkernels = 252;
 
 
 QmitkQBallReconstructionView::QmitkQBallReconstructionView()
@@ -137,22 +131,6 @@ void QmitkQBallReconstructionView::UpdateGui()
 void QmitkQBallReconstructionView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& /*nodes*/)
 {
   UpdateGui();
-}
-
-void QmitkQBallReconstructionView::Activated()
-{
-}
-
-void QmitkQBallReconstructionView::Deactivated()
-{
-}
-
-void QmitkQBallReconstructionView::Visible()
-{
-}
-
-void QmitkQBallReconstructionView::Hidden()
-{
 }
 
 void QmitkQBallReconstructionView::ReconstructStandard()
@@ -615,55 +593,5 @@ void QmitkQBallReconstructionView::GenerateShellSelectionUI(mitk::DataNode::Poin
     box->setChecked(true);
     m_Controls->m_QBallSelectionBox->layout()->addWidget(box);
     m_ShellCheckBoxes.push_back(box);
-  }
-}
-
-void QmitkQBallReconstructionView::PreviewThreshold(short threshold)
-{
-  if (m_Controls->m_ImageBox->GetSelectedNode().IsNotNull())
-  {
-    mitk::Image* vols = static_cast<mitk::Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData());
-
-    // Extract b0 image
-    ITKDiffusionImageType::Pointer itkVectorImagePointer = ITKDiffusionImageType::New();
-    mitk::CastToItkImage(vols, itkVectorImagePointer);
-
-    typedef itk::B0ImageExtractionImageFilter<short, short> FilterType;
-    FilterType::Pointer filterB0 = FilterType::New();
-    filterB0->SetInput( itkVectorImagePointer );
-    filterB0->SetDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(vols));
-    filterB0->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(vols));
-    filterB0->Update();
-
-    mitk::Image::Pointer mitkImage = mitk::Image::New();
-
-    typedef itk::Image<short, 3> ImageType;
-    typedef itk::Image<short, 3> SegmentationType;
-    typedef itk::BinaryThresholdImageFilter<ImageType, SegmentationType> ThresholdFilterType;
-    // apply threshold
-    ThresholdFilterType::Pointer filterThreshold = ThresholdFilterType::New();
-    filterThreshold->SetInput(filterB0->GetOutput());
-    filterThreshold->SetLowerThreshold(threshold);
-    filterThreshold->SetInsideValue(0);
-    filterThreshold->SetOutsideValue(1); // mark cut off values red
-    filterThreshold->Update();
-
-    mitkImage->InitializeByItk( filterThreshold->GetOutput() );
-    mitkImage->SetVolume( filterThreshold->GetOutput()->GetBufferPointer() );
-    mitk::DataNode::Pointer node;
-    if (this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", m_Controls->m_ImageBox->GetSelectedNode()))
-    {
-      node = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", m_Controls->m_ImageBox->GetSelectedNode());
-    }
-    else
-    {
-      // create a new node, to show thresholded values
-      node = mitk::DataNode::New();
-      GetDataStorage()->Add( node, m_Controls->m_ImageBox->GetSelectedNode() );
-      node->SetProperty( "name", mitk::StringProperty::New("ThresholdOverlay"));
-      node->SetBoolProperty("helper object", true);
-    }
-    node->SetData( mitkImage );
-    mitk::RenderingManager::GetInstance()->RequestUpdateAll();
   }
 }
