@@ -237,10 +237,6 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
     FiberPolyDataBuilder builder;
 
     unequal_fibs = false;
-    MITK_INFO << "Start";
-//    cv::parallel_for_(cv::Range(0, m_FiberPolyData->GetNumberOfCells()), [&](const cv::Range &range)
-//    {
-//        for (int i = range.start; i < range.end; i++)
     for (unsigned int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
     {
 
@@ -323,8 +319,6 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
         unequal_fibs = true;
       builder.EndFiber(weight);
     }
-//    });
-//    MITK_INFO << "Done";
 
     if (builder.GetNumberOfFibers()>0)
       builder.ReplaceFibersOf(this);

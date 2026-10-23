@@ -19,14 +19,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <vtkCellArray.h>
 #include <vtkCleanPolyData.h>
-#include <vtkGenerateIds.h>
 #include <vtkUnsignedCharArray.h>
 
 #include <algorithm>
 #include <cstring>
-
-
-const char* mitk::FiberBundle::FIBER_ID_ARRAY = "Fiber_IDs";
 
 using mitk::FiberBundleDetail::CopyMetadata;
 
@@ -50,7 +46,6 @@ mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
   }
 
   this->UpdateFiberGeometry();
-  this->GenerateFiberIds();
   this->ColorFibersByOrientation();
 }
 
@@ -74,7 +69,6 @@ mitk::FiberBundle::FiberBundle(const FiberBundle& other)
   m_FiberPolyData->DeepCopy(other.m_FiberPolyData);
   m_FiberColors->DeepCopy(other.m_FiberColors);
   m_FiberWeights->DeepCopy(other.m_FiberWeights);
-  this->GenerateFiberIds();
   this->RequestUpdate();
 }
 
@@ -92,10 +86,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::GetDeepCopy()
   return newFib;
 }
 
-/*
- * set PolyData (additional flag to recompute fiber geometry, default = true)
- */
-void mitk::FiberBundle::SetFiberPolyData(vtkSmartPointer<vtkPolyData> fiberPD, bool updateGeometry)
+void mitk::FiberBundle::SetFiberPolyData(vtkSmartPointer<vtkPolyData> fiberPD)
 {
   // A new object instead of the old one changed in place: the old one may be in use elsewhere
   // (mappers, callers holding GetFiberPolyData()), and its point data, sized for the old points,
@@ -107,9 +98,7 @@ void mitk::FiberBundle::SetFiberPolyData(vtkSmartPointer<vtkPolyData> fiberPD, b
 
   m_NumFibers = static_cast<unsigned int>(m_FiberPolyData->GetNumberOfLines());
 
-  if (updateGeometry)
-    UpdateFiberGeometry();
-  GenerateFiberIds();
+  UpdateFiberGeometry();
   ColorFibersByOrientation();
 }
 
@@ -119,22 +108,6 @@ void mitk::FiberBundle::SetFiberPolyData(vtkSmartPointer<vtkPolyData> fiberPD, b
 vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GetFiberPolyData() const
 {
   return m_FiberPolyData;
-}
-
-void mitk::FiberBundle::GenerateFiberIds()
-{
-  if (m_FiberPolyData == nullptr)
-    return;
-
-  vtkSmartPointer<vtkGenerateIds> idFiberFilter = vtkSmartPointer<vtkGenerateIds>::New();
-  idFiberFilter->SetInputData(m_FiberPolyData);
-  idFiberFilter->CellIdsOn();
-  //  idFiberFilter->PointIdsOn(); // point id's are not needed
-  idFiberFilter->SetCellIdsArrayName(FIBER_ID_ARRAY);
-  idFiberFilter->FieldDataOn();
-  idFiberFilter->Update();
-
-  m_FiberIdDataSet = idFiberFilter->GetPolyDataOutput();
 }
 
 void mitk::FiberBundle::UpdateFiberGeometry()

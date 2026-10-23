@@ -46,9 +46,6 @@ public:
 
     typedef itk::Image<unsigned char, 3> ItkUcharImgType;
 
-    // fiber colorcodings
-    static const char* FIBER_ID_ARRAY;
-
     void UpdateOutputInformation() override;
     void SetRequestedRegionToLargestPossibleRegion() override;
     bool RequestedRegionIsOutsideOfTheBufferedRegion() override;
@@ -61,7 +58,6 @@ public:
     mitkNewMacro1Param(Self, vtkSmartPointer<vtkPolyData>) // custom constructor
 
     // colorcoding related methods
-    void ColorSinglePoint(int f_idx, int p_idx, double rgb[3]);
     void ColorFibersByFiberWeights(bool opacity, LookupTable::LookupTableType type);
     void ColorFibersByCurvature(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
     void ColorFibersByLength(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
@@ -69,8 +65,6 @@ public:
     template <typename TPixel>
     void ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate=true);
     void ColorFibersByOrientation();
-    void SetFiberOpacity(vtkDoubleArray *FAValArray);
-    void ResetFiberOpacity();
     void SetFiberColors(vtkSmartPointer<vtkUnsignedCharArray> fiberColors);
     void SetFiberColors(float r, float g, float b, float alpha=255);
     void SetSingleFiberColor(float r, float g, float b, unsigned int cellId, float alpha=255);
@@ -111,23 +105,6 @@ public:
       point[2] += center[2]+tz;
     }
 
-    template< class TType=float >
-    void TransformPoint(itk::Point<TType, 3>& point, TType rx, TType ry, TType rz, TType tx, TType ty, TType tz)
-    {
-      auto rot = mitk::imv::GetRotationMatrixItk<TType>(rx, ry, rz);
-      mitk::Point3D center = this->GetGeometry()->GetCenter();
-
-      point[0] -= center[0];
-      point[1] -= center[1];
-      point[2] -= center[2];
-      point = rot*point;
-      point[0] += center[0]+tx;
-      point[1] += center[1]+ty;
-      point[2] += center[2]+tz;
-    }
-
-    itk::Matrix< double, 3, 3 > TransformMatrix(itk::Matrix< double, 3, 3 > m, double rx, double ry, double rz);
-
     // add/subtract fibers
     FiberBundle::Pointer AddBundle(FiberBundle* fib);
     mitk::FiberBundle::Pointer AddBundles(std::vector< mitk::FiberBundle::Pointer > fibs);
@@ -146,10 +123,9 @@ public:
     void SetFiberWeights(float newWeight);
     void SetFiberWeight(unsigned int fiber, float weight);
     void SetFiberWeights(vtkSmartPointer<vtkFloatArray> weights);
-    void SetFiberPolyData(vtkSmartPointer<vtkPolyData>, bool updateGeometry = true);
+    void SetFiberPolyData(vtkSmartPointer<vtkPolyData>);
     vtkSmartPointer<vtkPolyData> GetFiberPolyData() const;
     itkGetConstMacro( NumFibers, unsigned int)
-    //itkGetMacro( FiberSampling, int)
     itkGetConstMacro( MinFiberLength, float )
     itkGetConstMacro( MaxFiberLength, float )
     itkGetConstMacro( MeanFiberLength, float )
@@ -217,16 +193,12 @@ protected:
 
     mitkCloneMacro(Self)
 
-    void                            GenerateFiberIds();
     void                            UpdateFiberGeometry();
 
 private:
 
     // actual fiber container
     vtkSmartPointer<vtkPolyData>  m_FiberPolyData;
-
-    // contains fiber ids
-    vtkSmartPointer<vtkDataSet>   m_FiberIdDataSet;
 
     unsigned int m_NumFibers;
 
