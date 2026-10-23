@@ -60,6 +60,10 @@ namespace mitk::ivim
     std::vector<unsigned int> weightedIndices;
     /** The b-values of weightedIndices (s/mm^2). */
     vnl_vector<double> bValues;
+    /** The mean b-value of the baselines without b=0 volumes, else 0 (s/mm^2). The signal is then
+        normalized by the lowest shell, S/S(b_min) = (1-f') exp(-b'D) + f' exp(-b'(D+D*)) with
+        b' = b - b_min, and f follows from f/(1-f) = f'/(1-f') exp(b_min D*); D and D* are the same. */
+    double baselineBValue = 0;
     /** Baselines and weighted volumes alternate in equal numbers; each weighted volume is then
         normalized by its own baseline instead of the baseline mean. */
     bool iteratedSequence = false;
@@ -83,7 +87,8 @@ namespace mitk::ivim
   struct VoxelFit : ModelParameters
   {
     /** S/S0 of all diffusion-weighted volumes, in the order of Protocol::weightedIndices; 0 without
-        baseline signal. */
+        baseline signal. Without b=0 volumes S0 is that of the fitted model, S(b_min) / model(b_min),
+        so that the measurements lie on the model curve. */
     vnl_vector<double> allMeasurements;
     /** The b-values and S/S0 of the first fit (f and D, or all parameters). */
     vnl_vector<double> firstFitBValues;
@@ -113,6 +118,8 @@ namespace mitk::ivim
     FitParameters m_Parameters;
     ModelParameters m_LastFit;
 
+    /** Protocol::bValues - Protocol::baselineBValue, the b-values of the fit. */
+    vnl_vector<double> m_FitBValues;
     /** VoxelFit::allMeasurements and which of them are above the thresholds. */
     vnl_vector<double> m_Normalized;
     std::vector<bool> m_Usable;
