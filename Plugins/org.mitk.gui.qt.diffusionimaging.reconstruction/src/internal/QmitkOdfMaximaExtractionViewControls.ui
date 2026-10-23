@@ -47,26 +47,13 @@ QGroupBox {
       <property name="bottomMargin">
        <number>0</number>
       </property>
-      <item row="2" column="0">
-       <widget class="QCommandLinkButton" name="m_ImportShCoeffs">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-        <property name="toolTip">
-         <string>Generate ODF image and MITK compatible SH coefficient from other toolkits.</string>
-        </property>
-        <property name="text">
-         <string>Start SH Coefficient Import</string>
-        </property>
-       </widget>
-      </item>
       <item row="1" column="0">
        <widget class="QCommandLinkButton" name="m_StartPeakExtractionButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="toolTip">
-         <string>Extract ODF peaks using finite differences on the densely sampled ODF surface.</string>
+         <string>Extract ODF peaks: local maxima on the densely sampled ODF, refined by gradient descent; principal eigenvectors for tensor images.</string>
         </property>
         <property name="text">
          <string>Start Peak Extraction</string>
@@ -209,7 +196,7 @@ QGroupBox {
          <item row="2" column="1">
           <widget class="QComboBox" name="m_NormalizationBox">
            <property name="toolTip">
-            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The vector fields are always coorected for image spacing and using the lagest eigenvalue in case of the tensor peak extraction. This is done for visualizytion purposes. The output direction images are not affected.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Length of the peak vectors. ODF peaks: no normalization keeps the ODF value, MAX normalizes by the largest peak of the voxel, single vector normalization to unit length. Tensor peaks: no normalization scales the principal eigenvector by the FA, the other options give unit vectors.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="currentIndex">
             <number>1</number>
@@ -350,7 +337,7 @@ QGroupBox {
          <item row="5" column="1">
           <widget class="QSpinBox" name="m_AngularThreshold">
            <property name="toolTip">
-            <string>Discard peaks that er closer to a larger peak.</string>
+            <string>Discard peaks that are closer to a larger peak.</string>
            </property>
            <property name="minimum">
             <number>0</number>
@@ -412,47 +399,6 @@ QGroupBox {
       </size>
      </property>
     </spacer>
-   </item>
-   <item row="8" column="0">
-    <widget class="QGroupBox" name="groupBox_3">
-     <property name="title">
-      <string>Spherical Harmonic Convention</string>
-     </property>
-     <layout class="QGridLayout" name="gridLayout_6">
-      <property name="leftMargin">
-       <number>6</number>
-      </property>
-      <property name="topMargin">
-       <number>6</number>
-      </property>
-      <property name="rightMargin">
-       <number>6</number>
-      </property>
-      <property name="bottomMargin">
-       <number>6</number>
-      </property>
-      <item row="0" column="0">
-       <widget class="QComboBox" name="m_ToolkitBox">
-        <property name="toolTip">
-         <string>Define SH coefficient convention (depends on toolkit)</string>
-        </property>
-        <property name="currentIndex">
-         <number>0</number>
-        </property>
-        <item>
-         <property name="text">
-          <string>MITK/MRtrix</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>FSL</string>
-         </property>
-        </item>
-       </widget>
-      </item>
-     </layout>
-    </widget>
    </item>
   </layout>
  </widget>

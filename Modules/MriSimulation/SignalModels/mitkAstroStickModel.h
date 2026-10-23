@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define _MITK_AstroStickModel_H
 
 #include <mitkDiffusionSignalModel.h>
-#include <itkPointShell.h>
+#include <mitkPointShell.h>
 
 namespace mitk {
 
@@ -66,34 +66,28 @@ public:
 
   void SetNumSticks(unsigned int order)
   {
-    vnl_matrix<double> sticks;
     switch (order)
     {
     case 1:
       m_NumSticks = 12;
-      sticks = itk::PointShell<12, vnl_matrix_fixed<double, 3, 12> >::DistributePointShell()->as_matrix();
       break;
     case 2:
       m_NumSticks = 42;
-      sticks = itk::PointShell<42, vnl_matrix_fixed<double, 3, 42> >::DistributePointShell()->as_matrix();
       break;
     case 3:
       m_NumSticks = 92;
-      sticks = itk::PointShell<92, vnl_matrix_fixed<double, 3, 92> >::DistributePointShell()->as_matrix();
       break;
     case 4:
       m_NumSticks = 162;
-      sticks = itk::PointShell<162, vnl_matrix_fixed<double, 3, 162> >::DistributePointShell()->as_matrix();
       break;
     case 5:
       m_NumSticks = 252;
-      sticks = itk::PointShell<252, vnl_matrix_fixed<double, 3, 252> >::DistributePointShell()->as_matrix();
       break;
     default:
       m_NumSticks = 42;
-      sticks = itk::PointShell<42, vnl_matrix_fixed<double, 3, 42> >::DistributePointShell()->as_matrix();
       break;
     }
+    const vnl_matrix<double> &sticks = mitk::pointshell::Directions(m_NumSticks);
     for (int i=0; i<m_NumSticks; i++)
     {
       GradientType stick;

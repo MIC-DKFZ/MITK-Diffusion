@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkAnalyticalDiffusionQballReconstructionImageFilter_h_
-#define __itkAnalyticalDiffusionQballReconstructionImageFilter_h_
+#ifndef itkAnalyticalDiffusionQballReconstructionImageFilter_h
+#define itkAnalyticalDiffusionQballReconstructionImageFilter_h
 
 #include "itkImageToImageFilter.h"
 #include "vnl/vnl_vector_fixed.h"
@@ -23,6 +23,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vnl/algo/vnl_svd.h"
 #include "itkVectorContainer.h"
 #include "itkVectorImage.h"
+
+#include <vector>
 
 
 namespace itk{
@@ -40,11 +42,10 @@ namespace itk{
  *       filter->SetGradientImage( directionsContainer, vectorImage );
  * \endcode
  * Note that this method is used to specify both the reference and gradient images.
- * This is convenient when the DWI images are read in using the
- * <a href="http://wiki.na-mic.org/Wiki/index.php/NAMIC_Wiki:DTI:Nrrd_format">NRRD</a>
- * format. Like the Nrrd format, the reference images are those components of the
- * vectorImage whose gradient direction is (0,0,0). If more than one reference image
- * is present, they are averaged prior to the reconstruction.
+ * The b-value of a component is BValue * |g|^2. The reference images are the components
+ * whose b-value rounds to 0 (BValueMapProperty::GetBValue, as in the b-value map), so
+ * also short non-zero gradient vectors; they are averaged per voxel. All other components
+ * must have one b-value (mitk::GetSingleShellGradients).
  *
  * \par Outputs
  * The output image is an image of vectors that must be understood as ODFs:
@@ -57,29 +58,28 @@ namespace itk{
  * be a null pdf for pixels in the reference image that have a value less
  * than this.
  * \li BValue - See the documentation of SetBValue().
- * \li At least 6 gradient images must be specified for the filter to be able
- * to run. If the input gradient directions g_i are majorly sampled on one half
- * of the sqhere, then each input image I_i will be duplicated and assign -g_i
- * in order to guarantee stability of the algorithm.
- * \li OdfDirections - directions of resulting orientation distribution function
- * \li EquatorNrSamplingPoints - number of sampling points on equator when
- * performing Funk Radeon Transform (FRT)
- * \li BasisFunctionCenters - the centers of the basis functions are used for
- * the sRBF (spherical radial basis functions interpolation). If not set, they
- * will be defaulted to equal m_EquatorNrSamplingPoints
+ * \li Lambda - weight of the Laplace-Beltrami regularization (Descoteaux 2007).
+ * The regularization is rotation invariant (mitk::LaplaceBeltramiPenalty) and
+ * independent of whether the directions cover one half of the sphere or both.
+ * \li NormalizationMethod - the reconstruction method, see Normalization.
+ * \li ComputeOdf - whether the ODFs sampled on the NrOdfDirections directions of
+ * mitk::pointshell are computed besides the coefficient image.
  *
  * \par Template parameters
  * The class is templated over
  * \li the pixel type of the reference and gradient images
  * (expected to be scalar data types)
  * \li the internal representation of the ODF pixels (double, float etc).
- * \li the number of OdfDirections
- * \li the number of basis function centers for the sRBF
+ * \li the (even) SH order
+ * \li the number of ODF directions
  *
  * \par References:
- * \li<a href="http://www3.interscience.wiley.com/cgi-bin/fulltext/109800293/PDFSTART">[1]</a>
- * <em>Tuch DS,
- * "Q-ball imaging", Magn Reson Med. 2004 Dec;52(6):1358-72.</em>
+ * \li <em>Tuch DS, "Q-ball imaging", Magn Reson Med. 2004;52(6):1358-72.</em>
+ * \li <em>Descoteaux M, Angelino E, Fitzgibbons S, Deriche R, "Regularized, fast, and robust
+ * analytical Q-ball imaging", Magn Reson Med. 2007;58(3):497-510.</em>
+ * \li <em>Aganj I, Lenglet C, Sapiro G, Yacoub E, Ugurbil K, Harel N, "Reconstruction of the
+ * orientation distribution function in single- and multiple-shell q-ball imaging within constant
+ * solid angle", Magn Reson Med. 2010;64(2):554-66.</em>
  *
  */
 
@@ -89,15 +89,15 @@ class AnalyticalDiffusionQballReconstructionImageFilter : public ImageToImageFil
 
 public:
 
+    /** Reconstruction method: Q-ball ODF (Descoteaux 2007, the ODF output divided by its sum),
+     * SH fit of the ADC profile or of the raw signal, solid-angle ODF (Aganj 2010). For the ADC
+     * profile the coefficient image holds the fit of ln S, the ODF output the ADC (ln S0 - fit) / b
+     * with the shell's b-value. */
     enum Normalization {
         QBAR_STANDARD,
-        QBAR_B_ZERO_B_VALUE,
-        QBAR_B_ZERO,
-        QBAR_NONE,
         QBAR_ADC_ONLY,
         QBAR_RAW_SIGNAL,
-        QBAR_SOLID_ANGLE,
-        QBAR_NONNEG_SOLID_ANGLE
+        QBAR_SOLID_ANGLE
     };
 
     typedef AnalyticalDiffusionQballReconstructionImageFilter Self;
@@ -111,7 +111,7 @@ public:
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(AnalyticalDiffusionQballReconstructionImageFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(AnalyticalDiffusionQballReconstructionImageFilter)
 
     typedef TReferenceImagePixelType                 ReferencePixelType;
 
@@ -165,18 +165,10 @@ public:
     virtual ReferenceImageType * GetReferenceImage()
     { return ( static_cast< ReferenceImageType *>(this->ProcessObject::GetInput(0)) ); }
 
-    /** Return the gradient direction. idx is 0 based */
-    virtual GradientDirectionType GetGradientDirection( unsigned int idx) const
-    {
-        if( idx >= m_NumberOfGradientDirections )
-            itkExceptionMacro( << "Gradient direction " << idx << "does not exist" );
-        return m_GradientDirectionContainer->ElementAt( idx+1 );
-    }
-
-    static void tofile2(vnl_matrix<float> *A, std::string fname);
-
-    OdfPixelType Normalize(OdfPixelType odf, typename NumericTraits<ReferencePixelType>::AccumulateType b0 );
-    vnl_vector<TOdfPixelType> PreNormalize( vnl_vector<TOdfPixelType> vec, typename NumericTraits<ReferencePixelType>::AccumulateType b0  );
+    /** The ODF as the reconstruction method defines it, from the ODF values of the signal. */
+    void Normalize(OdfPixelType &odf, double b0) const;
+    /** The values the method fits, from the diffusion-weighted signal. */
+    void PreNormalize(vnl_vector<TOdfPixelType> &vec, double b0) const;
 
     /** Threshold on the reference image data. The output ODF will be a null
    * pdf for pixels in the reference image that have a value less than this
@@ -184,19 +176,23 @@ public:
     itkSetMacro( Threshold, ReferencePixelType )
     itkGetMacro( Threshold, ReferencePixelType )
 
+    /** Reconstruction method and normalization, QBAR_STANDARD by default */
     itkSetMacro( NormalizationMethod, Normalization)
     itkGetMacro( NormalizationMethod, Normalization )
 
-    typedef Image<float, 3> FloatImageType;
     itkGetMacro( BZeroImage, typename BZeroImageType::Pointer)
-    itkGetMacro( ODFSumImage, typename FloatImageType::Pointer)
     itkGetMacro( CoefficientImage, typename CoefficientImageType::Pointer)
 
     itkSetMacro( BValue, float)
     itkSetMacro( Lambda, double )
     itkGetMacro( Lambda, double )
 
-    itkSetMacro( UseMrtrixBasis, bool )
+    /** Whether the ODFs (the primary output) are computed, true by default. Without them the
+     * output has no buffer, which saves NrOdfDirections values per voxel when only the
+     * coefficient image is used; the filter then executes again on every Update(). */
+    itkSetMacro( ComputeOdf, bool )
+    itkGetConstMacro( ComputeOdf, bool )
+    itkBooleanMacro( ComputeOdf )
 
 #ifdef ITK_USE_CONCEPT_CHECKING
     /** Begin concept checking */
@@ -224,6 +220,7 @@ protected:
     void PrintSelf(std::ostream& os, Indent indent) const override;
 
     void ComputeReconstructionMatrix();
+    void AllocateOutputs() override;
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const
                                OutputImageRegionType &outputRegionForThread) override;
@@ -239,20 +236,23 @@ private:
     unsigned int                                      m_NumberOfGradientDirections;
     /** Number of baseline images */
     unsigned int                                      m_NumberOfBaselineImages;
+    /** Volumes of the baseline and the diffusion-weighted images, set per execution */
+    std::vector<unsigned int>                         m_BaselineIndices;
+    std::vector<unsigned int>                         m_GradientIndices;
     /** Threshold on the reference image data */
     ReferencePixelType                                m_Threshold;
-    /** LeBihan's b-value for normalizing tensors */
+    /** Reference b-value: a volume's b-value is m_BValue * |g|^2 */
     float                                             m_BValue;
+    /** b-value of the one shell, set per execution; the ADC profile divides by it */
+    double                                            m_ShellBValue;
     typename BZeroImageType::Pointer                  m_BZeroImage;
     double                                            m_Lambda;
-    bool                                              m_DirectionsDuplicated;
     Normalization                                     m_NormalizationMethod;
     unsigned int                                      m_NumberCoefficients;
-    FloatImageType::Pointer                           m_ODFSumImage;
     typename CoefficientImageType::Pointer            m_CoefficientImage;
     TOdfPixelType                                     m_Delta1;
     TOdfPixelType                                     m_Delta2;
-    bool                                              m_UseMrtrixBasis;
+    bool                                              m_ComputeOdf;
 };
 
 }
@@ -261,5 +261,5 @@ private:
 #include "itkAnalyticalDiffusionQballReconstructionImageFilter.cpp"
 #endif
 
-#endif //__itkAnalyticalDiffusionQballReconstructionImageFilter_h_
+#endif //itkAnalyticalDiffusionQballReconstructionImageFilter_h
 

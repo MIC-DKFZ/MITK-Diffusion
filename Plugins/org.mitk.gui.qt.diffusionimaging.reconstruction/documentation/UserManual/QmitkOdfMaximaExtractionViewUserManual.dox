@@ -5,5 +5,13 @@ This view provides the user interface to extract the principal diffusion directi
 
 The output peaks can for example be used for streamline tractography.
 
+The spherical harmonics convention of an SH image (MITK/MRtrix or FSL/Dipy) is a property of the image: it is chosen in the reader options when an SH image of another toolkit is loaded, and the peak extraction uses it.
+
+For SH images, peaks below the relative threshold (a fraction of the largest peak of the voxel) or the absolute threshold are dropped, and of two peaks closer than the angular threshold the smaller one; at most "Max. Peaks" are kept. For tensor images, the threshold is an FA threshold (voxels with a lower FA get no direction), and only it and the vector normalization act: without normalization the principal eigenvector is scaled by the FA. The other parameters are disabled while a tensor image is selected.
+
+An optional mask restricts the extraction to its non-zero voxels; it must have the geometry of the input image.
+
+The extraction runs in the background: the application stays usable, and the start button is disabled until the peak image appears as a new node below the input image. A running computation cannot be stopped: closing the view lets it run to its end and drops its result, and quitting the application waits until it has ended.
+
 
 */

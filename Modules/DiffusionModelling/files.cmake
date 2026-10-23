@@ -36,8 +36,12 @@ set(CPP_FILES
 
   # Algorithms
   Algorithms/mitkLbfgsbMutex.cpp
+  Algorithms/Reconstruction/mitkDiffusionReconstruction.cpp
+  Algorithms/Reconstruction/mitkDiffusionReconstructionQball.cpp
+  Algorithms/Reconstruction/mitkDiffusionPeaks.cpp
+  Algorithms/Reconstruction/mitkDiffusionIndices.cpp
+  Algorithms/Reconstruction/mitkPointShell.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
-  Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkBiExpFitFunctor.cpp
 )
@@ -76,11 +80,15 @@ set(H_FILES
   Rendering/mitkPeakImageMapper3D.h
 
   # Reconstruction
+  Algorithms/Reconstruction/mitkDiffusionReconstruction.h
+  Algorithms/Reconstruction/mitkDiffusionPeaks.h
+  Algorithms/Reconstruction/mitkDiffusionIndices.h
+  Algorithms/Reconstruction/mitkSingleShellGradients.h
+  Algorithms/Reconstruction/mitkShRegularization.h
   Algorithms/Reconstruction/itkDiffusionQballReconstructionImageFilter.h
-  Algorithms/Reconstruction/mitkTeemDiffusionTensor3DReconstructionImageFilter.h
   Algorithms/Reconstruction/itkAnalyticalDiffusionQballReconstructionImageFilter.h
   Algorithms/Reconstruction/itkDiffusionMultiShellQballReconstructionImageFilter.h
-  Algorithms/Reconstruction/itkPointShell.h
+  Algorithms/Reconstruction/mitkPointShell.h
   Algorithms/Reconstruction/itkOrientationDistributionFunction.h
 
   # MultishellProcessing
@@ -89,7 +97,6 @@ set(H_FILES
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.h
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.h
   Algorithms/Reconstruction/MultishellProcessing/itkBiExpFitFunctor.h
-  Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.h
 
   # Algorithms
   Algorithms/itkDiffusionOdfGeneralizedFaImageFilter.h

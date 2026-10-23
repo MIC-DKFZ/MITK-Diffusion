@@ -55,7 +55,7 @@ mitk-diffusion code too. Read the matching rule before touching CMake, a module 
 
 | Path | What it is |
 | --- | --- |
-| `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters. `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk and DICOM tractography IO. `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`. |
+| `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters; in `Algorithms/Reconstruction/` the functions the reconstruction views and apps call (`mitkDiffusionReconstruction.h`: tensors, Q-ball, tensors to DWI; `mitkDiffusionPeaks.h`; `mitkDiffusionIndices.h`) and the ODF direction tables (`mitkPointShell.h`). `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk and DICOM tractography IO. `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`. |
 | `mitk-diffusion/Modules/DiffusionCmdApps/` | Command line tools, one subfolder per group, each group switched by a `BUILD_Diffusion*CmdApps` option; an app is a name in its group's list in that `CMakeLists.txt`. |
 | `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. |
 | `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI). Each starts with `set_always.txt`, which resets every variable a configuration changes (external packages; every diffusion module, cmd-app group and plugin off), and then switches on what it contains; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
@@ -124,6 +124,12 @@ Facts the layout does not show:
   Its option "SH convention" forces one; "FSL/Dipy" converts dipy's default basis (`descoteaux07`,
   legacy) from the FSL bvec frame. NIfTI peak images are written in RAS with the descrip
   `MITK_peak_convention=RAS` and read back to LPS; NRRD peaks are LPS.
+- Reconstruction: `mitk::pointshell::Directions(n)` holds the ODF sampling directions as data;
+  their order is part of the ODF file format (252 values per voxel) and of Fiberfox references.
+  The single-shell Q-ball methods take volumes whose b-value rounds to 0 as b0 and need one
+  non-zero shell; the multi-shell method needs b, 2b, 3b. `ReconstructQball` computes the sampled
+  ODFs only when asked (`QballParameters::sampledOdf`). `ctest -R 'ImageReconstruction|DiffusionReconstruction'`
+  runs their tests.
 - `ctest -R 'mitkDiffusionModelling|PeakShImageReader|ImageReconstruction'` runs the
   `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
   display needed) and is skipped with exit code 77 where no OpenGL context can be created.
@@ -140,7 +146,7 @@ Facts the layout does not show:
 
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 35 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
+all 41 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,

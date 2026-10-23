@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _itk_BiExpFitFunctor_h_
-#define _itk_BiExpFitFunctor_h_
+#ifndef itkBiExpFitFunctor_h
+#define itkBiExpFitFunctor_h
 
 #include "itkDWIVoxelFunctor.h"
 #include <cmath>
@@ -41,17 +41,13 @@ public:
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
   /** Runtime information support. */
-  itkTypeMacro(BiExpFitFunctor, DWIVoxelFunctor)
+  itkOverrideGetNameOfClassMacro(BiExpFitFunctor)
 
   void operator()(vnl_matrix<double> & newSignal,const vnl_matrix<double> & SignalMatrix, const double & S0) override;
 
-  void setTargetBValue(const double & targetBValue){m_TargetBvalue = targetBValue;}
-  void setListOfBValues(const vnl_vector<double> & BValueList){m_BValueList = BValueList;}
+  unsigned int GetNumberOfUnknowns() const override { return 3; } // ADC_slow, ADC_fast, lambda
 
 protected:
-  double m_TargetBvalue;
-  vnl_vector<double> m_BValueList;
-
   /**
    * \brief The lestSquaresFunction struct for Non-Linear-Least-Squres fit of Biexponential model
    */
@@ -97,7 +93,9 @@ protected:
       for(int s=0; s<N; s++)
       {
         double approx = lambda * std::exp(-b[s] * ADC_slow) + (1-lambda) * std::exp(-b[s] * ADC_fast);
-        fx[s] = std::fabs( measurements[s] - approx*S0 );
+        // Signed: the forward-difference Jacobian of |r| is wrong where a residual changes sign,
+        // which stalls Levenberg-Marquardt near exact fits.
+        fx[s] = measurements[s] - approx*S0;
       }
 
     }
