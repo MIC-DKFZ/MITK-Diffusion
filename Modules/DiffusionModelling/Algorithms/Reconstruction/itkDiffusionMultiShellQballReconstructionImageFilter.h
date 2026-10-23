@@ -167,19 +167,6 @@ private:
     void AnalyticalThreeShellReconstruction(const OutputImageRegionType& outputRegionForThread);
 
 
-    //------------------------- VNL-function ------------------------------------
-
-    template<typename CurrentValue, typename WntValue>
-    vnl_vector< WntValue> element_cast (vnl_vector< CurrentValue> const& v1)
-    {
-      vnl_vector<WntValue> result(v1.size());
-
-      for(unsigned int i = 0 ; i < v1.size(); i++)
-           result[i] = static_cast< WntValue>(v1[i]);
-
-      return result;
-    }
-
     /** |cos| of the angle between two gradients; their lengths encode the b-value. */
     static double AbsoluteCosine(const vnl_vector_fixed<double, 3> &v1, const vnl_vector_fixed<double, 3> &v2)
     {

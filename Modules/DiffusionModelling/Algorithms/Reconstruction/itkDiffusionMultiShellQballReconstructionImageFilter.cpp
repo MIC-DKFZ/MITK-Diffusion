@@ -19,6 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 
 #include <limits>
+#include <vnl/vnl_sse.h>
 #include <mitkPointShell.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include "mitkShRegularization.h"
@@ -147,184 +148,129 @@ template<class TReferenceImagePixelType, class TGradientImagePixelType, class TO
 void DiffusionMultiShellQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType,NOrderL, NrOdfDirections>
 ::Projection2( vnl_vector<double> & E1,vnl_vector<double> & E2, vnl_vector<double> & E3, double delta )
 {
-
+  // Each direction on its own, without the 4 matrices and 9 vectors per voxel of a vectorized
+  // version; the expressions are those of the vectorized one, element by element.
   const double sF = sqrt(5.0);
 
-  vnl_vector<double> vOnes(m_MaxDirections);
-  vOnes.fill(1.0);
-
-  vnl_matrix<double> T0(m_MaxDirections, 3);
-  vnl_matrix<unsigned char> C(m_MaxDirections, 7);
-  vnl_matrix<double> A(m_MaxDirections, 7);
-  vnl_matrix<double> B(m_MaxDirections, 7);
-
-  vnl_vector<double> s0(m_MaxDirections);
-  vnl_vector<double> a0(m_MaxDirections);
-  vnl_vector<double> b0(m_MaxDirections);
-  vnl_vector<double> ta(m_MaxDirections);
-  vnl_vector<double> tb(m_MaxDirections);
-  vnl_vector<double> e(m_MaxDirections);
-  vnl_vector<double> m(m_MaxDirections);
-  vnl_vector<double> a(m_MaxDirections);
-  vnl_vector<double> b(m_MaxDirections);
-
-
-  // logarithmierung aller werte in E
   for(unsigned int i = 0 ; i < m_MaxDirections; i++)
   {
-    T0(i,0) = -log(E1(i));
-    T0(i,1) = -log(E2(i));
-    T0(i,2) = -log(E3(i));
-  }
+    // logarithm of the three shells' values
+    const double t0 = -log(E1(i));
+    const double t1 = -log(E2(i));
+    const double t2 = -log(E3(i));
 
-  //T0 = -T0.apply(std::log);
+    // sum over the shells, and the first two shells normalized by it
+    const double s0 = t0 + t1 + t2;
+    const double a0 = t0 / s0;
+    const double b0 = t1 / s0;
 
+    const double ta = a0 * 3.0;
+    const double tb = b0 * 3.0;
+    const double e = tb - (ta * 2.0);
+    const double m = (tb * 2.0) + ta;
 
-  // Summeiere Zeilenweise über alle Shells sum = E1+E2+E3
-  for(unsigned int i = 0 ; i < m_MaxDirections; i++)
-  {
-    s0[i] = T0(i,0) + T0(i,1) + T0(i,2);
-  }
+    bool C[7];
+    C[0] = (tb < 1+3*delta && 0.5+1.5*(sF+1)*delta < ta && ta < 1-3* (sF+2) *delta);
+    C[1] = (e <= -1+3*(2*sF+5)*delta) && (ta>=1-3*(sF+2)*delta);
+    C[2] = (m > 3-3*sF*delta) && (-1+3*(2*sF+5)*delta<e) && (e<-3*sF*delta);
+    C[3] = (m >= 3-3*sF*delta && e >= -3 *sF * delta);
+    C[4] = (2.5 + 1.5*(5+sF)*delta < m && m < 3-3*sF*delta && e > -3*sF*delta);
+    C[5] = (ta <= 0.5+1.5 *(sF+1)*delta && m <= 2.5 + 1.5 *(5+sF) * delta);
+    C[6] = !(C[0] || C[1] || C[2] || C[3] || C[4] || C[5]);
 
-  for(unsigned int i = 0; i < m_MaxDirections; i ++)
-  {
-    // Alle Signal-Werte auf der Ersten shell E(N,0) normiert auf s0
-    a0[i] = T0(i,0) / s0[i];
-    // Alle Signal-Werte auf der Zweiten shell E(N,1) normiert auf s0
-    b0[i] = T0(i,1) / s0[i];
-  }
+    const double A[7] = {C[0] * a0,
+                         C[1] * (1.0/3.0-(sF+2)*delta),
+                         C[2] * (0.2+0.8*a0-0.4*b0-delta/sF),
+                         C[3] * (0.2+delta/sF),
+                         C[4] * (0.2*a0+0.4*b0+2*delta/sF),
+                         C[5] * (1.0/6.0+0.5*(sF+1)*delta),
+                         C[6] * a0};
+    const double B[7] = {C[0] * (1.0/3.0+delta),
+                         C[1] * (1.0/3.0+delta),
+                         C[2] * (0.4-0.4*a0+0.2*b0-2*delta/sF),
+                         C[3] * (0.4-3*delta/sF),
+                         C[4] * (0.4*a0+0.8*b0-delta/sF),
+                         C[5] * (1.0/3.0+delta),
+                         C[6] * b0};
 
-  ta = a0 * 3.0;
-  tb = b0 * 3.0;
-  e = tb - (ta * 2.0);
-  m = (tb *  2.0 ) + ta;
-
-  for(unsigned int i = 0; i <m_MaxDirections; i++)
-  {
-    C(i,0) = (tb[i] < 1+3*delta && 0.5+1.5*(sF+1)*delta < ta[i] && ta[i] < 1-3* (sF+2) *delta);
-    C(i,1) = (e[i] <= -1+3*(2*sF+5)*delta) && (ta[i]>=1-3*(sF+2)*delta);
-    C(i,2) = (m[i] > 3-3*sF*delta) && (-1+3*(2*sF+5)*delta<e[i]) && (e[i]<-3*sF*delta);
-    C(i,3) = (m[i] >= 3-3*sF*delta && e[i] >= -3 *sF * delta);
-    C(i,4) = (2.5 + 1.5*(5+sF)*delta < m[i] && m[i] < 3-3*sF*delta && e[i] > -3*sF*delta);
-    C(i,5) = (ta[i] <= 0.5+1.5 *(sF+1)*delta && m[i] <= 2.5 + 1.5 *(5+sF) * delta);
-    C(i,6) = !((bool) C(i,0) ||(bool) C(i,1) ||(bool) C(i,2) ||(bool) C(i,3) ||(bool) C(i,4) ||(bool) C(i,5) ); // ~ANY(C(i,[0-5] ),2)
-
-    A(i,0)=(bool)C(i,0) * a0(i);
-    A(i,1)=(bool)C(i,1) * (1.0/3.0-(sF+2)*delta);
-    A(i,2)=(bool)C(i,2) * (0.2+0.8*a0(i)-0.4*b0(i)-delta/sF);
-    A(i,3)=(bool)C(i,3) * (0.2+delta/sF);
-    A(i,4)=(bool)C(i,4) * (0.2*a0(i)+0.4*b0(i)+2*delta/sF);
-    A(i,5)=(bool)C(i,5) * (1.0/6.0+0.5*(sF+1)*delta);
-    A(i,6)=(bool)C(i,6) * a0(i);
-
-    B(i,0)=(bool)C(i,0) * (1.0/3.0+delta);
-    B(i,1)=(bool)C(i,1) * (1.0/3.0+delta);
-    B(i,2)=(bool)C(i,2) * (0.4-0.4*a0(i)+0.2*b0(i)-2*delta/sF);
-    B(i,3)=(bool)C(i,3) * (0.4-3*delta/sF);
-    B(i,4)=(bool)C(i,4) * (0.4*a0(i)+0.8*b0(i)-delta/sF);
-    B(i,5)=(bool)C(i,5) * (1.0/3.0+delta);
-    B(i,6)=(bool)C(i,6) * b0(i);
-  }
-
-  for(unsigned int i = 0 ; i < m_MaxDirections; i++)
-  {
-    double sumA = 0;
-    double sumB = 0;
+    double a = 0;
+    double b = 0;
     for(int j = 0 ; j < 7; j++)
     {
-      sumA += A(i,j);
-      sumB += B(i,j);
+      a += A[j];
+      b += B[j];
     }
-    a[i] = sumA;
-    b[i] = sumB;
-  }
 
-  for(unsigned int i = 0; i < m_MaxDirections; i++)
-  {
-    E1(i) = exp(-(a[i]*s0[i]));
-    E2(i) = exp(-(b[i]*s0[i]));
-    E3(i) = exp(-((1-a[i]-b[i])*s0[i]));
+    E1(i) = exp(-(a*s0));
+    E2(i) = exp(-(b*s0));
+    E3(i) = exp(-((1-a-b)*s0));
   }
-
 }
 
 template<class TReferenceImagePixelType, class TGradientImagePixelType, class TOdfPixelType, int NOrderL, int NrOdfDirections>
 void DiffusionMultiShellQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType,NOrderL, NrOdfDirections>
 ::Projection3( vnl_vector<double> & A, vnl_vector<double> & a, vnl_vector<double> & b, double delta0)
 {
-
+  // Each direction on its own, without the matrices of 15 candidates per voxel of a vectorized
+  // version; the expressions are those of the vectorized one, element by element. The candidates
+  // use delta0, the constraints 0.99 delta0.
   const double s6 = sqrt(6.0);
   const double s15 = s6/2.0;
+  const double delta = delta0;
+  const double constraintDelta = delta0 * 0.99;
 
-  vnl_vector<double> delta(a.size());
-  delta.fill(delta0);
+  for (unsigned int i=0; i < A.size(); i++)
+  {
+    const double Ai = A(i);
+    const double ai = a(i);
+    const double bi = b(i);
 
-  vnl_matrix<double> AM(a.size(), 15);
-  vnl_matrix<double> aM(a.size(), 15);
-  vnl_matrix<double> bM(a.size(), 15);
-  vnl_matrix<unsigned char> B(a.size(), 15);
+    const double AM[15] = {Ai,
+                           Ai,
+                           Ai,
+                           delta,
+                           (((Ai+ai)-bi) - (delta*s6))/3.0,
+                           delta,
+                           delta,
+                           delta,
+                           Ai,
+                           ((ai*2+Ai) - delta*(2*(s6+1)))*0.2,
+                           ((((bi*(-2))+Ai)+2) - delta*(2*(s6+1)))*0.2,
+                           delta,
+                           delta,
+                           delta,
+                           0.5-delta*(1+s15)};
+    const double aM[15] = {ai,
+                           ai,
+                           -delta + 1,
+                           ai,
+                           ((((Ai*2)+(ai*5))+bi)+delta*s6)/6.0,
+                           ai,
+                           -delta + 1,
+                           ((ai+bi)*0.5)+delta*(1+s15),
+                           -delta + 1,
+                           (((ai*4)+(Ai*2))+delta*(s6+1))*0.2,
+                           -delta + 1,
+                           delta*(s6+3),
+                           -delta + 1,
+                           -delta + 1,
+                           -delta + 1};
+    const double bM[15] = {bi,
+                           delta,
+                           bi,
+                           bi,
+                           ((((Ai*(-2))+ai)+(bi*5))-delta*s6)/6.0,
+                           delta,
+                           bi,
+                           ((ai+bi)*0.5)-delta*(1+s15),
+                           delta,
+                           delta,
+                           ((((bi*4)-(Ai*2))+1)-delta*(s6+1))*0.2,
+                           delta,
+                           delta,
+                           ((-delta)*(s6+3)) + 1,
+                           delta};
 
-  AM.set_column(0, A);
-  AM.set_column(1, A);
-  AM.set_column(2, A);
-  AM.set_column(3, delta);
-  AM.set_column(4, (A+a-b - (delta*s6))/3.0);
-  AM.set_column(5, delta);
-  AM.set_column(6, delta);
-  AM.set_column(7, delta);
-  AM.set_column(8, A);
-  AM.set_column(9, 0.2*(a*2+A-2*(s6+1)*delta));
-  AM.set_column(10,0.2*(b*(-2)+A+2-2*(s6+1)*delta));
-  AM.set_column(11, delta);
-  AM.set_column(12, delta);
-  AM.set_column(13, delta);
-  AM.set_column(14, 0.5-(1+s15)*delta);
-
-
-  aM.set_column(0, a);
-  aM.set_column(1, a);
-  aM.set_column(2, -delta + 1);
-  aM.set_column(3, a);
-  aM.set_column(4, (A*2+a*5+b+s6*delta)/6.0);
-  aM.set_column(5, a);
-  aM.set_column(6, -delta + 1);
-  aM.set_column(7, 0.5*(a+b)+(1+s15)*delta);
-  aM.set_column(8, -delta + 1);
-  aM.set_column(9, 0.2*(a*4+A*2+(s6+1)*delta));
-  aM.set_column(10, -delta + 1);
-  aM.set_column(11, (s6+3)*delta);
-  aM.set_column(12, -delta + 1);
-  aM.set_column(13, -delta + 1);
-  aM.set_column(14, -delta + 1);
-
-  bM.set_column(0, b);
-  bM.set_column(1, delta);
-  bM.set_column(2, b);
-  bM.set_column(3, b);
-  bM.set_column(4, (A*(-2)+a+b*5-s6*delta)/6.0);
-  bM.set_column(5, delta);
-  bM.set_column(6, b);
-  bM.set_column(7, 0.5*(a+b)-(1+s15)*delta);
-  bM.set_column(8, delta);
-  bM.set_column(9, delta);
-  bM.set_column(10, 0.2*(b*4-A*2+1-(s6+1)*delta));
-  bM.set_column(11, delta);
-  bM.set_column(12, delta);
-  bM.set_column(13, -delta*(s6+3) + 1);
-  bM.set_column(14, delta);
-
-  delta0 *= 0.99;
-
-  vnl_matrix<double> R2(a.size(), 15);
-  std::vector<unsigned int> I(a.size());
-
-  for (unsigned int i=0; i<AM.rows(); i++){
-    for (unsigned int j=0; j<AM.cols(); j++){
-      if (delta0 < AM(i,j) && 2*(AM(i,j)+delta0*s15)<aM(i,j)-bM(i,j) && bM(i,j)>delta0 && aM(i,j)<1-delta0)
-        R2(i,j) = (AM(i,j)-A(i))*(AM(i,j)-A(i))+ (aM(i,j)-a(i))*(aM(i,j)-a(i))+(bM(i,j)-b(i))*(bM(i,j)-b(i));
-      else
-        R2(i,j) = 1e20;
-    }
     // The nearest candidate that meets the constraints (R2 < 1e20), however far away: candidate 0
     // is the unconstrained input, for which lambda in the caller can be NaN. The vertex candidate
     // 14 meets the constraints for every input.
@@ -332,20 +278,19 @@ void DiffusionMultiShellQballReconstructionImageFilter<TReferenceImagePixelType,
     double minvalue = std::numeric_limits<double>::max();
     for(int j = 0 ; j < 15 ; j++)
     {
-      if(R2(i,j) < minvalue){
-        minvalue = R2(i,j);
+      double R2 = 1e20;
+      if (constraintDelta < AM[j] && 2*(AM[j]+constraintDelta*s15)<aM[j]-bM[j] && bM[j]>constraintDelta && aM[j]<1-constraintDelta)
+        R2 = (AM[j]-Ai)*(AM[j]-Ai)+ (aM[j]-ai)*(aM[j]-ai)+(bM[j]-bi)*(bM[j]-bi);
+      if(R2 < minvalue){
+        minvalue = R2;
         index = j;
       }
     }
-    I[i] = index;
-  }
 
-  for (unsigned int i=0; i < A.size(); i++){
-    A(i) = AM(i,(int)I[i]);
-    a(i) = aM(i,(int)I[i]);
-    b(i) = bM(i,(int)I[i]);
+    A(i) = AM[index];
+    a(i) = aM[index];
+    b(i) = bM[index];
   }
-
 }
 
 template<class TReferenceImagePixelType, class TGradientImagePixelType, class TOdfPixelType, int NOrderL, int NrOdfDirections>
@@ -526,6 +471,15 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   vnl_vector<double> DataShell2(Shell2Indiecies.size());
   vnl_vector<double> DataShell3(Shell3Indiecies.size());
 
+  // Further buffers of this work unit, so that no voxel allocates. The products are those of vnl's
+  // matrix * vector operator, in the same order.
+  vnl_vector<double> SignalVector(m_MaxDirections);
+  vnl_vector<double> coeffs(m_CoeffReconstructionMatrix.rows());
+  vnl_vector<double> odfValues(m_ODFSphericalHarmonicBasisMatrix.rows());
+  const auto multiply = [](const vnl_matrix<double> &matrix, const vnl_vector<double> &vector, vnl_vector<double> &result) {
+    vnl_sse<double>::matrix_x_vector(matrix.data_block(), vector.data_block(), result.data_block(), matrix.rows(), matrix.cols());
+  };
+
   vnl_matrix<double> tempInterpolationMatrixShell1,tempInterpolationMatrixShell2,tempInterpolationMatrixShell3;
 
   if(m_Interpolation_Flag)
@@ -612,9 +566,9 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
       if(m_Interpolation_Flag)
       {
-        E1 = tempInterpolationMatrixShell1 * DataShell1;
-        E2 = tempInterpolationMatrixShell2 * DataShell2;
-        E3 = tempInterpolationMatrixShell3 * DataShell3;
+        multiply(tempInterpolationMatrixShell1, DataShell1, E1);
+        multiply(tempInterpolationMatrixShell2, DataShell2, E2);
+        multiply(tempInterpolationMatrixShell3, DataShell3, E3);
       }else{
         E1 = (DataShell1);
         E2 = (DataShell2);
@@ -674,16 +628,20 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
       DoubleLogarithm(AlphaValues);
       DoubleLogarithm(BetaValues);
 
-      vnl_vector<double> SignalVector(element_product((LAValues) , (AlphaValues)-(BetaValues)) + (BetaValues));
+      for(unsigned int i = 0 ; i < m_MaxDirections; i++)
+        SignalVector[i] = LAValues[i] * (AlphaValues[i] - BetaValues[i]) + BetaValues[i];
 
-      vnl_vector<double> coeffs(m_CoeffReconstructionMatrix * SignalVector);
+      multiply(m_CoeffReconstructionMatrix, SignalVector, coeffs);
 
       // the first coeff is a fix value
       coeffs[0] = 1.0/(2.0*sqrt(itk::Math::pi));
-      coeffPixel = element_cast<double, TO>(coeffs).data_block();
+      for(unsigned int i = 0 ; i < coeffs.size(); i++)
+        coeffPixel[i] = static_cast<TO>(coeffs[i]);
 
       // Cast the Signal-Type from double to float for the ODF-Image
-      odf = element_cast<double, TO>(m_ODFSphericalHarmonicBasisMatrix * coeffs).data_block();
+      multiply(m_ODFSphericalHarmonicBasisMatrix, coeffs, odfValues);
+      for(unsigned int i = 0 ; i < odfValues.size(); i++)
+        odf[i] = static_cast<TO>(odfValues[i]);
       odf *= ((itk::Math::pi*4)/NODF);
     }
 
