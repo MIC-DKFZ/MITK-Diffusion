@@ -18,6 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkImageToImageFilter.h"
 #include <itkDiffusionTensor3D.h>
+#include <itkVectorContainer.h>
 #include <itkVectorImage.h>
 #include <vnl/algo/vnl_symmetric_eigensystem.h>
 

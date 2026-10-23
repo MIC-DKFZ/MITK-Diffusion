@@ -10,6 +10,9 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+// First, so that the build checks that this header compiles on its own.
+#include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
+
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
@@ -37,7 +40,6 @@ found in the LICENSE file.
 #include <itkTensorDerivedMeasurementsFilter.h>
 #include <itkTensorImageToDiffusionImageFilter.h>
 #include <itkTensorImageToOdfImageFilter.h>
-#include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 #include <itkTensorToL2NormImageFilter.h>
 #include <itkTensorToRgbImageFilter.h>
 
