@@ -30,7 +30,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkNew.h>
 
 #include <algorithm>
+#include <array>
 #include <functional>
+#include <set>
 
 namespace itk
 {
@@ -459,9 +461,11 @@ OrientationDistributionFunction<T, NOdfDirections>
 {
   // Two Delaunay triangulations in azimuth/elevation, of the directions and of the directions
   // rotated so that the first one's poles and seam lie in the middle; each keeps the triangles
-  // away from its poles and seam.
+  // away from its poles and seam. Both keep the triangles of the band between, which the mesh holds
+  // once: each glyph draws every triangle, and repeated ones would weigh twice in its normals.
   vtkNew<vtkCellArray> polys;
-  const auto triangulate = [&polys](const std::function<vnl_vector_fixed<double, 3>(unsigned int)> &direction) {
+  std::set<std::array<vtkIdType, 3>> inserted;
+  const auto triangulate = [&polys, &inserted](const std::function<vnl_vector_fixed<double, 3>(unsigned int)> &direction) {
     vtkNew<vtkPoints> points;
     for (unsigned int j = 0; j < NOdfDirections; j++)
     {
@@ -486,7 +490,9 @@ OrientationDistributionFunction<T, NOdfDirections>
         if ((std::abs(point[0]) > itk::Math::pi - 0.5) || (std::abs(point[1]) > itk::Math::pi / 2 - 0.5))
           insert = false;
       }
-      if (insert)
+      std::array<vtkIdType, 3> triangle = {pts[0], pts[1], pts[2]};
+      std::sort(triangle.begin(), triangle.end());
+      if (insert && inserted.insert(triangle).second)
         polys->InsertNextCell(npts, pts);
     }
   };

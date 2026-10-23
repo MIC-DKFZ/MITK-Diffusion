@@ -37,6 +37,7 @@ class mitkDiffusionReconstructionOdfTestSuite : public mitk::TestFixture
   MITK_TEST(Ellipsoid_EigenvaluesAboveOne_KeepRadii);
   MITK_TEST(Neighbors_IcosahedralSphere);
   MITK_TEST(BaseMesh_CoversSphere);
+  MITK_TEST(BaseMesh_NoRepeatedTriangles);
   MITK_TEST(Gfa_IsotropicAndSinglePeak);
   MITK_TEST(PrincipalDirection_OfTensor);
   CPPUNIT_TEST_SUITE_END();
@@ -207,6 +208,13 @@ public:
       triangles.insert(triangle);
     }
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(2 * ODF_SAMPLING_SIZE - 4), triangles.size());
+  }
+
+  // Every glyph draws each triangle of the base mesh; a triangle that both triangulations of
+  // BuildBaseMesh produce is held once (they held 646 cells, 146 of them repeated).
+  void BaseMesh_NoRepeatedTriangles()
+  {
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(2 * ODF_SAMPLING_SIZE - 4), OdfType::GetBaseMesh()->GetNumberOfCells());
   }
 
   void Gfa_IsotropicAndSinglePeak()
