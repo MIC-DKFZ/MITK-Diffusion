@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 
 /*!
-\brief View for tensor based deterministic streamline fiber tracking.
+\brief View to show and edit the DICOM tags of a tractogram that the DICOM tractography writer stores.
 */
 class QmitkDicomTractogramTagEditorView : public QmitkAbstractView
 {
@@ -70,5 +70,5 @@ private:
 
 
 
-#endif // _QMITKFIBERTRACKINGVIEW_H_INCLUDED
+#endif // QmitkDicomTractogramTagEditorView_h
 

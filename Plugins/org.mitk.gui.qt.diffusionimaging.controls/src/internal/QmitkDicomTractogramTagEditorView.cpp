@@ -23,8 +23,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 // Qmitk
 #include "QmitkDicomTractogramTagEditorView.h"
 #include <mitkFiberBundleDicomReferenceTags.h>
-#include <QMessageBox>
-#include "QmitkStdMultiWidget.h"
 
 // Qt
 #include <QMessageBox>
@@ -36,8 +34,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateProperty.h>
 
 const std::string QmitkDicomTractogramTagEditorView::VIEW_ID = "org.mitk.views.dicomtractogramtageditor";
-const std::string id_DataManager = "org.mitk.views.datamanager";
-using namespace berry;
+
+namespace
+{
+  /** Tag names are fixed; only the value column is edited. */
+  QTableWidgetItem* NewTagNameItem(const std::string& tag)
+  {
+    auto item = new QTableWidgetItem(tag.c_str());
+    item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+    return item;
+  }
+}
 
 QmitkDicomTractogramTagEditorView::QmitkDicomTractogramTagEditorView()
   : m_Controls(nullptr)
@@ -154,7 +161,7 @@ void QmitkDicomTractogramTagEditorView::UpdateGui()
     int row = 0;
     for (std::string tag : m_TagList)
     {
-      m_Controls->m_TagTable->setItem(row, 0, new QTableWidgetItem(tag.c_str()));
+      m_Controls->m_TagTable->setItem(row, 0, NewTagNameItem(tag));
       m_Controls->m_TagTable->setItem(row, 1, new QTableWidgetItem("0"));
       ++row;
     }
@@ -170,7 +177,7 @@ void QmitkDicomTractogramTagEditorView::UpdateGui()
   {
     std::string val = "0";
     p_list->GetStringProperty(tag.c_str(), val);
-    m_Controls->m_TagTable->setItem(row, 0, new QTableWidgetItem(tag.c_str()));
+    m_Controls->m_TagTable->setItem(row, 0, NewTagNameItem(tag));
     m_Controls->m_TagTable->setItem(row, 1, new QTableWidgetItem(val.c_str()));
     ++row;
   }
@@ -196,5 +203,5 @@ void QmitkDicomTractogramTagEditorView::OnSelectionChanged( berry::IWorkbenchPar
 
 void QmitkDicomTractogramTagEditorView::SetFocus()
 {
-
+  m_Controls->m_TractogramBox->setFocus();
 }
