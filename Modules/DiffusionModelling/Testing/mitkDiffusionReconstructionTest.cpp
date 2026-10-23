@@ -10,12 +10,15 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkDiffusionPeaks.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkDiffusionReconstruction.h>
 #include <mitkException.h>
 #include <mitkIOUtil.h>
 #include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
+#include <mitkImageToItk.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
@@ -24,10 +27,16 @@ found in the LICENSE file.
 
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
+#include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
+#include <itkImageRegionIterator.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 
+#include <vnl/algo/vnl_svd.h>
+
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -51,6 +60,9 @@ class mitkDiffusionReconstructionTestSuite : public mitk::TestFixture
   MITK_TEST(Tensors_NoDwi_Throws);
   MITK_TEST(PointShellGradients_TableAndB0);
   MITK_TEST(TensorsToDwi_WorldGradients);
+  MITK_TEST(Peaks_FslConvention_SameAsMrtrix);
+  MITK_TEST(Peaks_MaskOfOtherSize_Throws);
+  MITK_TEST(TensorPeaks_SameAsFilter);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
@@ -387,6 +399,191 @@ public:
       CPPUNIT_ASSERT((gradients->ElementAt(i) - expected->ElementAt(i)).two_norm() < 1e-12);
 
     CPPUNIT_ASSERT_THROW(mitk::TensorsToDwi(nullptr, 92, 1000), mitk::Exception);
+  }
+
+  using ShItkImageType = itk::Image<itk::Vector<float, 15>, 3>;
+  using PeakItkImageType = mitk::PeakImage::ItkPeakImageType;
+
+  static mitk::ShImage::Pointer LoadShImage()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    shImage->SetShConvention(mitk::ShImage::MRTRIX);
+    return shImage;
+  }
+
+  static vnl_matrix<double> Basis(bool mrtrix)
+  {
+    const vnl_matrix<float> basis = mitk::sh::CalcShBasisForDirections(4, mitk::pointshell::Directions(1002), mrtrix);
+    vnl_matrix<double> result(basis.rows(), basis.cols());
+    for (unsigned int r = 0; r < basis.rows(); ++r)
+      for (unsigned int c = 0; c < basis.cols(); ++c)
+        result(r, c) = basis(r, c);
+    return result;
+  }
+
+  /**
+   * The same ODFs in the FSL convention: the coefficients refitted by least squares on the 1002
+   * directions, which determine order-4 functions.
+   */
+  static mitk::ShImage::Pointer ToFsl(const mitk::ShImage *mrtrixImage)
+  {
+    const vnl_matrix<double> conversion = vnl_svd<double>(Basis(false)).pinverse() * Basis(true);
+    auto fslImage = mrtrixImage->Clone();
+    auto coefficients = mitk::ImageToItkImage<itk::Vector<float, 15>, 3>(fslImage.GetPointer());
+    for (itk::ImageRegionIterator<ShItkImageType> it(coefficients, coefficients->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+    {
+      vnl_vector<double> c(15);
+      for (unsigned int i = 0; i < 15; ++i)
+        c[i] = it.Get()[i];
+      const vnl_vector<double> converted = conversion * c;
+      ShItkImageType::PixelType pixel;
+      for (unsigned int i = 0; i < 15; ++i)
+        pixel[i] = static_cast<float>(converted[i]);
+      it.Set(pixel);
+    }
+    fslImage->SetShConvention(mitk::ShImage::FSL);
+    return fslImage;
+  }
+
+  /**
+   * The non-zero peak axes of a voxel. itk::OdfMaximaExtractionFilter keeps both of two antipodal
+   * candidates whose refined lengths are exactly equal, which depends on the last bit of the ODF
+   * values; such a duplicate axis is counted once.
+   */
+  static std::vector<Direction> Peaks(const PeakItkImageType *image, const itk::Index<3> &voxel)
+  {
+    std::vector<Direction> peaks;
+    const unsigned int count = image->GetLargestPossibleRegion().GetSize(3) / 3;
+    for (unsigned int p = 0; p < count; ++p)
+    {
+      Direction peak;
+      for (unsigned int c = 0; c < 3; ++c)
+        peak[c] = image->GetPixel({{voxel[0], voxel[1], voxel[2], 3 * p + c}});
+      const bool duplicate = std::any_of(peaks.begin(), peaks.end(), [&peak](const Direction &other) {
+        return std::abs(dot_product(peak, other)) > std::cos(1.0 * itk::Math::pi / 180) * peak.two_norm() * other.two_norm();
+      });
+      if (peak.two_norm() > 0 && !duplicate)
+        peaks.push_back(peak);
+    }
+    return peaks;
+  }
+
+  /**
+   * Largest distance between the peaks of two peak images, independent of the order of the peaks
+   * in a voxel (nearly equal peaks may swap) and of their signs; infinite where the counts differ.
+   */
+  static double PeakDifference(mitk::PeakImage *a, mitk::PeakImage *b)
+  {
+    auto peaksA = a->GetItkPeakImage();
+    auto peaksB = b->GetItkPeakImage();
+    CPPUNIT_ASSERT(peaksA->GetLargestPossibleRegion() == peaksB->GetLargestPossibleRegion());
+    const auto size = peaksA->GetLargestPossibleRegion().GetSize();
+    double largest = 0;
+    for (itk::IndexValueType z = 0; z < static_cast<itk::IndexValueType>(size[2]); ++z)
+      for (itk::IndexValueType y = 0; y < static_cast<itk::IndexValueType>(size[1]); ++y)
+        for (itk::IndexValueType x = 0; x < static_cast<itk::IndexValueType>(size[0]); ++x)
+        {
+          const auto voxelA = Peaks(peaksA, {{x, y, z}});
+          const auto voxelB = Peaks(peaksB, {{x, y, z}});
+          if (voxelA.size() != voxelB.size())
+            return std::numeric_limits<double>::infinity();
+          for (const auto &peak : voxelA)
+          {
+            double nearest = std::numeric_limits<double>::infinity();
+            for (const auto &other : voxelB)
+              nearest = std::min({nearest, (peak - other).two_norm(), (peak + other).two_norm()});
+            largest = std::max(largest, nearest);
+          }
+        }
+    return largest;
+  }
+
+  /**
+   * Mask of the voxels whose ODF varies by more than a tenth of its maximum. Every direction of an
+   * isotropic ODF (the background of sh_image_test.nii.gz) is a maximum, so its peaks depend on
+   * rounding.
+   */
+  static mitk::Image::Pointer AnisotropyMask(const mitk::ShImage *shImage, unsigned int &count)
+  {
+    auto odfs = mitk::convert::GetItkOdfFromShImage(shImage);
+    auto mask = itk::Image<unsigned char, 3>::New();
+    mask->CopyInformation(odfs);
+    mask->SetRegions(odfs->GetLargestPossibleRegion());
+    mask->Allocate();
+    count = 0;
+    itk::ImageRegionIterator<itk::Image<unsigned char, 3>> itMask(mask, mask->GetLargestPossibleRegion());
+    for (itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> it(odfs, odfs->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it, ++itMask)
+    {
+      const auto odf = it.Get();
+      const auto [min, max] = std::minmax_element(odf.Begin(), odf.End());
+      const bool anisotropic = *max - *min > 0.1 * *max;
+      itMask.Set(anisotropic ? 1 : 0);
+      count += anisotropic ? 1 : 0;
+    }
+    return mitk::GrabItkImageMemory(mask.GetPointer());
+  }
+
+  // The peaks follow the SH convention stored in the image (PL-M5): the same ODFs in the FSL
+  // convention give the same peaks, the FSL coefficients read as MRtrix ones do not (0.55 apart).
+  // The gradient descent that refines each peak (f tolerance 1e-6) stops up to 0.05 (3 degrees)
+  // apart on the broad lobes of this image when the coefficients differ in the last bits.
+  void Peaks_FslConvention_SameAsMrtrix()
+  {
+    auto mrtrixImage = LoadShImage();
+    auto fslImage = ToFsl(mrtrixImage);
+    unsigned int anisotropic = 0;
+    auto mask = AnisotropyMask(mrtrixImage, anisotropic);
+    CPPUNIT_ASSERT(anisotropic > 0);
+    mitk::PeakParameters parameters;
+
+    const auto expected = mitk::ExtractPeaks(mrtrixImage, parameters, mask);
+    const auto actual = mitk::ExtractPeaks(fslImage, parameters, mask);
+    CPPUNIT_ASSERT(PeakDifference(expected.peaks, actual.peaks) < 0.1);
+
+    fslImage->SetShConvention(mitk::ShImage::MRTRIX);
+    const auto misread = mitk::ExtractPeaks(fslImage, parameters, mask);
+    CPPUNIT_ASSERT(PeakDifference(expected.peaks, misread.peaks) > 0.1);
+  }
+
+  static mitk::Image::Pointer MaskLargerThan(const mitk::Image *image)
+  {
+    auto mask = itk::Image<unsigned char, 3>::New();
+    itk::ImageRegion<3> region;
+    for (unsigned int d = 0; d < 3; ++d)
+      region.SetSize(d, image->GetDimension(d) + (d == 0 ? 1 : 0));
+    mask->SetRegions(region);
+    mask->Allocate();
+    mask->FillBuffer(1);
+    return mitk::GrabItkImageMemory(mask.GetPointer());
+  }
+
+  void Peaks_MaskOfOtherSize_Throws()
+  {
+    auto shImage = LoadShImage();
+    CPPUNIT_ASSERT_THROW(mitk::ExtractPeaks(shImage, mitk::PeakParameters(), MaskLargerThan(shImage)), itk::ExceptionObject);
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    CPPUNIT_ASSERT_THROW(mitk::ExtractTensorPeaks(tensors, 0.2, true, MaskLargerThan(tensors)), itk::ExceptionObject);
+  }
+
+  void TensorPeaks_SameAsFilter()
+  {
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    for (bool normalize : {false, true})
+    {
+      auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
+      filter->SetInput(ItkTensors(tensors));
+      filter->SetUsePolarCoordinates(false);
+      filter->SetNormalizeVectors(normalize);
+      filter->SetFaThreshold(0.1);
+      filter->Update();
+
+      const auto result = mitk::ExtractTensorPeaks(tensors, 0.1, normalize);
+      CPPUNIT_ASSERT(SameVoxels(filter->GetPeakImage().GetPointer(), result.peaks->GetItkPeakImage().GetPointer()));
+      itk::Image<unsigned char, 3>::Pointer numberOfPeaks;
+      mitk::CastToItkImage(result.numberOfPeaks, numberOfPeaks);
+      CPPUNIT_ASSERT(SameVoxels(filter->GetOutput(), numberOfPeaks.GetPointer()));
+    }
   }
 };
 
