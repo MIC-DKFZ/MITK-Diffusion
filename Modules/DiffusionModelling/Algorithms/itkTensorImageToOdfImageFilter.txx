@@ -31,7 +31,6 @@ PURPOSE.  See the above copyright notices for more information.
 =========================================================================*/
 #ifndef _itk_TensorImageToOdfImageFilter_txx_
 #define _itk_TensorImageToOdfImageFilter_txx_
-#endif
 
 #include "itkTensorImageToOdfImageFilter.h"
 #include <itkImageRegionIterator.h>
@@ -40,26 +39,6 @@ PURPOSE.  See the above copyright notices for more information.
 
 namespace itk
 {
-template <class TInputScalarType, class TOutputScalarType>
-void
-TensorImageToOdfImageFilter<TInputScalarType, TOutputScalarType>
-::BeforeThreadedGenerateData()
-{
-  typename OutputImageType::Pointer outImage = OutputImageType::New();
-  outImage->SetSpacing( this->GetInput()->GetSpacing() );   // Set the image spacing
-  outImage->SetOrigin( this->GetInput()->GetOrigin() );     // Set the image origin
-  outImage->SetDirection( this->GetInput()->GetDirection() );  // Set the image direction
-  outImage->SetLargestPossibleRegion( this->GetInput()->GetLargestPossibleRegion());
-  outImage->SetBufferedRegion( this->GetInput()->GetLargestPossibleRegion() );
-  outImage->SetRequestedRegion( this->GetInput()->GetLargestPossibleRegion() );
-  outImage->Allocate();
-  itk::Vector<TOutputScalarType, ODF_SAMPLING_SIZE> nullv; nullv.Fill(0);
-  outImage->FillBuffer(nullv);
-
-  this->SetNumberOfRequiredOutputs (1);
-  this->SetNthOutput (0, outImage);
-}
-
 template <class TInputScalarType, class TOutputScalarType>
 void
 TensorImageToOdfImageFilter<TInputScalarType, TOutputScalarType>
@@ -105,6 +84,7 @@ TensorImageToOdfImageFilter<TInputScalarType, TOutputScalarType>
     ++itIn;
     ++itOut;
   }
-  MITK_INFO << "one thread finished ODF estimation";
 }
 } // end of namespace
+
+#endif

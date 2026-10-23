@@ -974,7 +974,7 @@ ComputeSphericalHarmonicsBasis(vnl_matrix<double> * QBallReference, vnl_matrix<d
         if(QBallReference){
           double phi = (*QBallReference)(0,i);
           double th = (*QBallReference)(1,i);
-          (*SHBasisOutput)(i,j) = mitk::sh::Yj(m,k,th,phi);
+          (*SHBasisOutput)(i,j) = mitk::sh::Yj(m,k,th,phi,true);
         }
 
         // Laplacian Baltrami Order Association

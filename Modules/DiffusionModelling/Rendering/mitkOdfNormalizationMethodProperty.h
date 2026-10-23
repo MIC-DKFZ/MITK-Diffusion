@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _MITK_OdfNormalizationMethodProperty__H_
-#define _MITK_OdfNormalizationMethodProperty__H_
+#ifndef mitkOdfNormalizationMethodProperty_h
+#define mitkOdfNormalizationMethodProperty_h
 
 #include "mitkEnumerationProperty.h"
 #include "mitkEnumerationPropertySerializer.h"
@@ -36,9 +36,10 @@ namespace mitk
   };
 
 /**
- * Encapsulates the enumeration for ODF normalization. Valid values are
- * ODFN_MINMAX, ODFN_MAX, ODFN_NONE ODFN_GLOBAL_MAX
- * Default is ODFN_MINMAX
+ * How the ODF glyphs are normalized before they are scaled: "Min-Max" (ODFN_MINMAX) maps each
+ * ODF to [0, 1], "Maximum" (ODFN_MAX) divides it by its maximum, "None" (ODFN_NONE) keeps the
+ * values. "Global Maximum" (ODFN_GLOBAL_MAX) is kept for scene files that hold it; it normalizes
+ * like "Maximum". Default is ODFN_MAX.
  */
 class MITKDIFFUSIONMODELLING_EXPORT OdfNormalizationMethodProperty : public EnumerationProperty
 {
@@ -47,63 +48,38 @@ public:
   mitkClassMacro( OdfNormalizationMethodProperty, EnumerationProperty );
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
+  mitkCloneMacro(Self)
 
   mitkNewMacro1Param(OdfNormalizationMethodProperty, const IdType&);
 
   mitkNewMacro1Param(OdfNormalizationMethodProperty, const std::string&);
 
-  /**
-   * Returns the current interpolation value as defined by VTK constants.
-   */
-  virtual int GetNormalization();
+  /** The current OdfNormalizationMethod. */
+  virtual int GetNormalization() const;
 
-  /**
-   * Sets the interpolation type to ODFN_MINMAX.
-   */
   virtual void SetNormalizationToMinMax();
-
-  /**
-   * Sets the interpolation type to ODFN_MAX.
-   */
   virtual void SetNormalizationToMax();
-
-  /**
-   * Sets the interpolation type to ODFN_NONE.
-   */
   virtual void SetNormalizationToNone();
-
-  /**
-   * Sets the interpolation type to ODFN_GLOBAL_MAX.
-   */
   virtual void SetNormalizationToGlobalMax();
 
 protected:
 
-  /** Sets reslice interpolation mode to default (VTK_RESLICE_NEAREST).
-   */
+  /** Normalization ODFN_MAX. */
   OdfNormalizationMethodProperty( );
 
-  /**
-   * Constructor. Sets reslice interpolation to the given value.
-   */
+  OdfNormalizationMethodProperty(const OdfNormalizationMethodProperty&) = default;
+
+  /** The given normalization; ODFN_MINMAX if the value is not one of OdfNormalizationMethod. */
   OdfNormalizationMethodProperty( const IdType& value );
 
-  /**
-   * Constructor. Sets reslice interpolation to the given value.
-   */
+  /** The normalization of the given name; ODFN_MINMAX if the name is unknown. */
   OdfNormalizationMethodProperty( const std::string& value );
 
-  /**
-   * this function is overridden as protected, so that the user may not add
-   * additional invalid interpolation types.
-   */
+  /** Protected, so that no other values can be added. */
   bool AddEnum( const std::string& name, const IdType& id ) override;
 
-  /**
-   * Adds the enumeration types as defined by vtk to the list of known
-   * enumeration values.
-   */
-  virtual void AddInterpolationTypes();
+  /** Adds the values of OdfNormalizationMethod with their names. */
+  virtual void AddNormalizationMethods();
 };
 
 class MITKDIFFUSIONMODELLING_EXPORT OdfNormalizationMethodPropertySerializer : public EnumerationPropertySerializer
@@ -118,8 +94,10 @@ class MITKDIFFUSIONMODELLING_EXPORT OdfNormalizationMethodPropertySerializer : p
     {
       if (!element) return nullptr;
 
-      std::string s = "";
-      s = std::string(element->Attribute("value"));
+      // A malformed scene file may lack the attribute.
+      const char* value = element->Attribute("value");
+      if (value == nullptr) return nullptr;
+      std::string s(value);
 
       OdfNormalizationMethodProperty::Pointer property = OdfNormalizationMethodProperty::New();
       property->SetValue( s );

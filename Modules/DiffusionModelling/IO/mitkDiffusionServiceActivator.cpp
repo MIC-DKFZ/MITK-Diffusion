@@ -26,10 +26,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkPeakImageReader.h>
 
-#include <mitkCoreServices.h>
-#include <mitkIPropertyDescriptions.h>
-#include <mitkIPropertyPersistence.h>
-
 #include "mitkDiffusionIOMimeTypes.h"
 
 #include <mitkMapperProviderBase.h>
@@ -75,19 +71,23 @@ namespace mitk
   {
   public:
 
-    void Load(us::ModuleContext* ) override
+    void Load(us::ModuleContext* context) override
     {
+      // Registered here as the full objects, so that the content checks of the SH and peak types
+      // (AppliesTo) are used; the readers and writers refer to them by name. With the default rank,
+      // MITK's image reader stays the default for plain 4D NIfTI and NRRD files.
       m_MimeTypes = mitk::DiffusionIOMimeTypes::Get();
+      for (auto mimeType : m_MimeTypes)
+        m_MimeTypeRegistrations.push_back(context->RegisterService(mimeType));
 
-      m_NrrdTensorImageReader = new NrrdTensorImageReader();
-      m_NrrdOdfImageReader = new NrrdOdfImageReader();
-      m_ShImageReader = new ShImageReader();
-
-      m_NrrdTensorImageWriter = new NrrdTensorImageWriter();
-      m_NrrdOdfImageWriter = new NrrdOdfImageWriter();
-      m_ShImageWriter = new ShImageWriter();
-
-      m_PeakImageReader = new PeakImageReader();
+      // Readers and writers register themselves on construction and unregister on destruction.
+      m_ReadersAndWriters.push_back(std::make_unique<NrrdTensorImageReader>());
+      m_ReadersAndWriters.push_back(std::make_unique<NrrdOdfImageReader>());
+      m_ReadersAndWriters.push_back(std::make_unique<ShImageReader>());
+      m_ReadersAndWriters.push_back(std::make_unique<PeakImageReader>());
+      m_ReadersAndWriters.push_back(std::make_unique<NrrdTensorImageWriter>());
+      m_ReadersAndWriters.push_back(std::make_unique<NrrdOdfImageWriter>());
+      m_ReadersAndWriters.push_back(std::make_unique<ShImageWriter>());
 
       // MITK's 3D volume mapper declines subclasses of Image, so they register it themselves.
       m_MapperProviders.push_back(std::make_unique<CompositeMapperProvider<OdfImage>>());
@@ -103,34 +103,20 @@ namespace mitk
     void Unload(us::ModuleContext*) override
     {
       m_MapperProviders.clear();
+      m_ReadersAndWriters.clear();
 
-      for (unsigned int loop(0); loop < m_MimeTypes.size(); ++loop)
-      {
-        delete m_MimeTypes.at(loop);
-      }
-
-      delete m_NrrdTensorImageReader;
-      delete m_NrrdOdfImageReader;
-      delete m_ShImageReader;
-      delete m_PeakImageReader;
-
-      delete m_NrrdTensorImageWriter;
-      delete m_NrrdOdfImageWriter;
-      delete m_ShImageWriter;
+      for (auto& registration : m_MimeTypeRegistrations)
+        registration.Unregister();
+      for (auto mimeType : m_MimeTypes)
+        delete mimeType;
     }
 
   private:
 
-    NrrdTensorImageReader * m_NrrdTensorImageReader;
-    NrrdOdfImageReader * m_NrrdOdfImageReader;
-    ShImageReader * m_ShImageReader;
-    PeakImageReader * m_PeakImageReader;
-
-    NrrdTensorImageWriter * m_NrrdTensorImageWriter;
-    NrrdOdfImageWriter * m_NrrdOdfImageWriter;
-    ShImageWriter * m_ShImageWriter;
+    std::vector<std::unique_ptr<IFileIO>> m_ReadersAndWriters;
 
     std::vector<mitk::CustomMimeType*> m_MimeTypes;
+    std::vector<us::ServiceRegistration<mitk::CustomMimeType>> m_MimeTypeRegistrations;
 
     std::vector<std::unique_ptr<IMapperProvider>> m_MapperProviders;
   };

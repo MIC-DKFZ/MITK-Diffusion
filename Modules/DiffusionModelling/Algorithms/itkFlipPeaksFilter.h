@@ -16,14 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkFlipPeaksFilter_h_
 #define __itkFlipPeaksFilter_h_
 
-#include "itkImageToImageFilter.h"
-#include "vnl/vnl_vector_fixed.h"
-#include "vnl/vnl_matrix.h"
-#include "vnl/algo/vnl_svd.h"
-#include "itkVectorContainer.h"
-#include "itkVectorImage.h"
-#include <mitkFiberBundle.h>
-#include <itkOrientationDistributionFunction.h>
+#include <itkImageToImageFilter.h>
 #include <mitkPeakImage.h>
 
 namespace itk{
@@ -48,7 +41,7 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(FlipPeaksFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(FlipPeaksFilter)
 
     typedef typename Superclass::InputImageType InputImageType;
     typedef typename Superclass::OutputImageType OutputImageType;
@@ -60,23 +53,21 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
 
     protected:
     FlipPeaksFilter();
-    ~FlipPeaksFilter(){}
+    ~FlipPeaksFilter() override = default;
 
-    void BeforeThreadedGenerateData() override;
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
-    void AfterThreadedGenerateData();
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
     private:
 
-    bool                                        m_FlipX;
-    bool                                        m_FlipY;
-    bool                                        m_FlipZ;
+    bool                                        m_FlipX = false;
+    bool                                        m_FlipY = false;
+    bool                                        m_FlipZ = false;
 };
 
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkFlipPeaksFilter.cpp"
+#include "itkFlipPeaksFilter.txx"
 #endif
 
 #endif //__itkFlipPeaksFilter_h_

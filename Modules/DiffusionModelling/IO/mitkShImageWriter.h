@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _MITK_SH_WRITER__H_
-#define _MITK_SH_WRITER__H_
+#ifndef mitkShImageWriter_h
+#define mitkShImageWriter_h
 
 #include <mitkAbstractFileWriter.h>
 #include <mitkShImage.h>
@@ -25,7 +25,7 @@ namespace mitk
 {
 
 /**
- * Writes diffusion volumes to a file
+ * Writes SH images (.shi, .nii.gz, .nii, .nrrd)
  * @ingroup Process
  */
   class ShImageWriter : public mitk::AbstractFileWriter
@@ -41,7 +41,6 @@ namespace mitk
     using AbstractFileWriter::Write;
     void Write() override;
 
-    ConfidenceLevel GetConfidenceLevel() const override;
 
   protected:
 
@@ -55,4 +54,4 @@ namespace mitk
 
 } // end of namespace mitk
 
-#endif //_MITK_NRRDODF_WRITER__H_
+#endif

@@ -52,13 +52,12 @@ public:
   itkCloneMacro(Self)
 
   /** Runtime information support. */
-  itkTypeMacro(AdcImageFilter, ImageToImageFilter)
+  itkOverrideGetNameOfClassMacro(AdcImageFilter)
 
   typedef typename Superclass::InputImageType InputImageType;
   typedef typename Superclass::OutputImageType OutputImageType;
   typedef typename Superclass::OutputImageRegionType OutputImageRegionType;
 
-  itkSetMacro( MaskImage, ItkUcharImageType::Pointer )
   itkSetMacro( FitSignal, bool )
   itkSetMacro( B_value, double )
   itkSetMacro( GradientDirections, GradientContainerType )
@@ -109,7 +108,7 @@ public:
 
   protected:
     AdcImageFilter();
-  ~AdcImageFilter() override {}
+  ~AdcImageFilter() override = default;
   void PrintSelf(std::ostream& os, Indent indent) const override;
 
   void BeforeThreadedGenerateData() override;
@@ -120,7 +119,6 @@ public:
   vnl_vector<double> m_B_values;
   vnl_vector<double> m_Nonzero_B_values;
   GradientContainerType m_GradientDirections;
-  ItkUcharImageType::Pointer m_MaskImage;
 
   double FitSingleVoxel( const typename InputImageType::PixelType &input);
 

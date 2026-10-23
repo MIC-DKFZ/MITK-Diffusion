@@ -27,7 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkNrrdImageIO.h>
 
 mitk::ShImageWriter::ShImageWriter()
-  : AbstractFileWriter(mitk::ShImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION())
+  : AbstractFileWriter(mitk::ShImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION())
 {
   RegisterService();
 }
@@ -37,8 +37,7 @@ mitk::ShImageWriter::ShImageWriter(const mitk::ShImageWriter& other)
 {
 }
 
-mitk::ShImageWriter::~ShImageWriter()
-{}
+mitk::ShImageWriter::~ShImageWriter() = default;
 
 template <int shOrder>
 void mitk::ShImageWriter::WriteShImage(InputType::ConstPointer input)
@@ -52,11 +51,22 @@ void mitk::ShImageWriter::WriteShImage(InputType::ConstPointer input)
   exporter->SetInputImage(itk_image);
   exporter->GenerateData();
 
-  std::string ext = itksys::SystemTools::GetFilenameExtension(this->GetOutputLocation());
+  std::string ext = itksys::SystemTools::GetFilenameLastExtension(this->GetOutputLocation());
 
   typedef itk::ImageFileWriter<ShImage::ShOnDiskType> WriterType;
   WriterType::Pointer writer = WriterType::New();
   ShImage::ShOnDiskType::Pointer image = exporter->GetOutputImage();
+
+  // FSL/Dipy coefficients are marked in the file (NRRD key, NIfTI descrip), so that they read back
+  // with their convention; files in MITK's own MRtrix convention stay as before.
+  if (input->GetShConvention() == ShImage::FSL)
+  {
+    if (ext==".shi" || ext==".nrrd")
+      itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "MITK_SH_convention", "FSL");
+    else
+      itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "ITK_FileNotes", "MITK_SH_convention=FSL");
+  }
+
   writer->SetInput( image );
 
   if (ext==".shi")
@@ -69,29 +79,16 @@ void mitk::ShImageWriter::WriteShImage(InputType::ConstPointer input)
   writer->SetFileName(this->GetOutputLocation().c_str());
   writer->SetUseCompression(true);
 
-  try
-  {
-    writer->Update();
-  }
-  catch (const itk::ExceptionObject& e)
-  {
-    MITK_INFO << e.what();
-  }
+  writer->Update();
 }
 
 void mitk::ShImageWriter::Write()
 {
   InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
   if (input.IsNull())
-  {
-    MITK_ERROR <<"Sorry, input to ShImageWriter is nullptr!";
-    return;
-  }
+    mitkThrow() << "Sorry, input to ShImageWriter is nullptr!";
   if ( this->GetOutputLocation().empty() )
-  {
-    MITK_ERROR << "Sorry, filename has not been set!";
-    return ;
-  }
+    mitkThrow() << "Sorry, filename has not been set!";
 
   switch (input->GetImageDescriptor()->GetChannelTypeById(0).GetNumberOfComponents())
   {
@@ -123,15 +120,3 @@ mitk::ShImageWriter* mitk::ShImageWriter::Clone() const
   return new ShImageWriter(*this);
 }
 
-mitk::IFileWriter::ConfidenceLevel mitk::ShImageWriter::GetConfidenceLevel() const
-{
-  InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
-  if (input.IsNull() )
-  {
-    return Unsupported;
-  }
-  else
-  {
-    return Supported;
-  }
-}

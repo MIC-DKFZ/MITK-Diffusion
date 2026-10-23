@@ -14,40 +14,34 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkDiffusionModellingHelperFunctions_h_
-#define __mitkDiffusionModellingHelperFunctions_h_
-
+#ifndef mitkDiffusionModellingHelperFunctions_h
+#define mitkDiffusionModellingHelperFunctions_h
 
 #include <MitkDiffusionModellingExports.h>
+#include <mitkDiffusionImageHelperFunctions.h>
+#include <mitkDiffusionPropertyHelper.h>
+#include <mitkImageCast.h>
+#include <mitkOdfImage.h>
+#include <mitkShImage.h>
+#include <mitkTensorImage.h>
+
+#include <vnl/vnl_matrix.h>
 #include <vnl/vnl_vector.h>
 #include <vnl/vnl_vector_fixed.h>
-#include <itkVectorContainer.h>
-#include <itkImage.h>
-#include <itkLinearInterpolateImageFunction.h>
-#include <mitkImage.h>
-#include <mitkShImage.h>
-#include <mitkDiffusionPropertyHelper.h>
-#include <mitkOdfImage.h>
-#include <mitkTensorImage.h>
-#include <itkOrientationDistributionFunction.h>
-#include <mitkImageCast.h>
-#include <mitkImageToItk.h>
-#include <mitkDiffusionImageHelperFunctions.h>
 
 namespace mitk{
 
 class MITKDIFFUSIONMODELLING_EXPORT convert
 {
 public:
-  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromTensorImage(mitk::Image::Pointer mitkImage);
-  static mitk::OdfImage::Pointer GetOdfFromTensorImage(mitk::Image::Pointer mitkImage);
-  static mitk::TensorImage::ItkTensorImageType::Pointer GetItkTensorFromTensorImage(mitk::Image::Pointer mitkImage);
+  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromTensorImage(const mitk::Image *mitkImage);
+  static mitk::OdfImage::Pointer GetOdfFromTensorImage(const mitk::Image *mitkImage);
+  static mitk::TensorImage::ItkTensorImageType::Pointer GetItkTensorFromTensorImage(const mitk::Image *mitkImage);
 
   template<unsigned int NUM_COEFFS>
-  static typename itk::Image< itk::Vector<float, NUM_COEFFS>, 3>::Pointer GetItkShFromShImage(mitk::Image::Pointer mitkImage)
+  static typename itk::Image< itk::Vector<float, NUM_COEFFS>, 3>::Pointer GetItkShFromShImage(const mitk::Image *mitkImage)
   {
-    mitk::ShImage::Pointer mitkShImage = dynamic_cast<mitk::ShImage*>(mitkImage.GetPointer());
-    if (mitkShImage.IsNull())
+    if (dynamic_cast<const mitk::ShImage*>(mitkImage) == nullptr)
       mitkThrow() << "Input image is not a SH image!";
 
     typename itk::Image< itk::Vector<float, NUM_COEFFS>, 3>::Pointer itkvol;
@@ -56,36 +50,37 @@ public:
     return itkvol;
   }
 
-  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromShImage(mitk::Image::Pointer mitkImage);
-  static mitk::OdfImage::Pointer GetOdfFromShImage(mitk::Image::Pointer mitkImage);
-  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromOdfImage(mitk::Image::Pointer mitkImage);
+  /** ODFs sampled from the SH coefficients in the image's SH convention; orders 2 to 12. */
+  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromShImage(const mitk::Image *mitkImage);
+  static mitk::OdfImage::Pointer GetOdfFromShImage(const mitk::Image *mitkImage);
+  static mitk::OdfImage::ItkOdfImageType::Pointer GetItkOdfFromOdfImage(const mitk::Image *mitkImage);
 };
 
+/**
+ * Real spherical harmonics of even order L, with (L+1)(L+2)/2 coefficients. The convention is
+ * always explicit: mrtrix = true is MITK's own basis, the one of MRtrix 0.2 (orthogonal, norm 1/2
+ * for m != 0); mrtrix = false is the orthonormal FSL/Dipy basis. Values are evaluated in float
+ * precision, which the reconstruction and tractography references depend on.
+ */
 class MITKDIFFUSIONMODELLING_EXPORT sh
 {
 public:
-  static double factorial(int number);
   static double legendre0(int l);
-  static double spherical_harmonic(int m,int l,double theta,double phi, bool complexPart);
-  static double Yj(int m, int k, float theta, float phi, bool mrtrix=true);
-  static vnl_matrix<float> CalcShBasisForDirections(unsigned int sh_order, vnl_matrix<double> U, bool mrtrix=true);
+  /** Basis function of order k and phase m at polar angle theta and azimuth phi. */
+  static double Yj(int m, int k, float theta, float phi, bool mrtrix);
+  /** Basis matrix, one row per direction; the directions are the columns of U (Cartesian). */
+  static vnl_matrix<float> CalcShBasisForDirections(unsigned int sh_order, const vnl_matrix<double> &U, bool mrtrix);
   static float GetValue(const vnl_vector<float>& coefficients, const int& sh_order, const vnl_vector_fixed<double, 3>& dir, const bool mrtrix);
   static float GetValue(const vnl_vector<float> &coefficients, const int &sh_order, const double theta, const double phi, const bool mrtrix);
+  /** Order of the given number of coefficients; throws if it belongs to no even order. */
   static unsigned int ShOrder(int num_coeffs);
+  /**
+   * Basis matrix in MITK's convention as CalcShBasisForDirections, in double, for directions
+   * given in spherical coordinates (phi in row 0, theta in row 1).
+   */
   static vnl_matrix<double> ComputeSphericalHarmonicsBasis(const vnl_matrix<double> & QBallReference, const unsigned int & LOrder);
-
-  template <unsigned int N, typename TComponent=float>
-  static void SampleOdf(const vnl_vector<float>& coefficients, itk::OrientationDistributionFunction<TComponent, N>& odf)
-  {
-    auto dirs = odf.GetDirections();
-    auto basis = CalcShBasisForDirections(ShOrder(coefficients.size()), dirs->as_matrix());
-    auto odf_vals = basis * coefficients;
-    for (unsigned int i=0; i<odf_vals.size(); ++i)
-      odf[i] = odf_vals[i];
-  }
 };
 
 }
 
-#endif //__mitkDiffusionModellingHelperFunctions_h_
-
+#endif

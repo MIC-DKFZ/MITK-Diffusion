@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _MITK_OdfScaleByProperty__H_
-#define _MITK_OdfScaleByProperty__H_
+#ifndef mitkOdfScaleByProperty_h
+#define mitkOdfScaleByProperty_h
 
 #include <MitkDiffusionModellingExports.h>
 #include "mitkEnumerationProperty.h"
@@ -33,9 +33,9 @@ namespace mitk
   };
 
 /**
- * Encapsulates the enumeration for ODF normalization. Valid values are
- *     ODFSB_NONE, ODFSB_GFA, ODFSB_PC
- * Default is ODFSB_NONE
+ * By what the ODF glyphs are scaled in addition to the "Scaling" property: "None" (ODFSB_NONE),
+ * the generalized fractional anisotropy "GFA" (ODFSB_GFA) or the "Principal Curvature"
+ * (ODFSB_PC) of each ODF. Default is ODFSB_NONE.
  */
 class MITKDIFFUSIONMODELLING_EXPORT OdfScaleByProperty : public EnumerationProperty
 {
@@ -44,15 +44,14 @@ public:
   mitkClassMacro( OdfScaleByProperty, EnumerationProperty );
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
+  mitkCloneMacro(Self)
 
   mitkNewMacro1Param(OdfScaleByProperty, const IdType&);
 
   mitkNewMacro1Param(OdfScaleByProperty, const std::string&);
 
-  /**
-   * Returns the current interpolation value as defined by VTK constants.
-   */
-  virtual int GetScaleBy();
+  /** The current OdfScaleBy value. */
+  virtual int GetScaleBy() const;
 
   virtual void SetScaleByNothing();
   virtual void SetScaleByGFA();
@@ -60,31 +59,22 @@ public:
 
 protected:
 
-  /** Sets reslice interpolation mode to default (ODFSB_NONE).
-   */
+  /** Scaling ODFSB_NONE. */
   OdfScaleByProperty( );
 
-  /**
-   * Constructor. Sets reslice interpolation to the given value.
-   */
+  OdfScaleByProperty(const OdfScaleByProperty&) = default;
+
+  /** The given scaling; ODFSB_NONE if the value is not one of OdfScaleBy. */
   OdfScaleByProperty( const IdType& value );
 
-  /**
-   * Constructor. Sets reslice interpolation to the given value.
-   */
+  /** The scaling of the given name; ODFSB_NONE if the name is unknown. */
   OdfScaleByProperty( const std::string& value );
 
-  /**
-   * this function is overridden as protected, so that the user may not add
-   * additional invalid interpolation types.
-   */
+  /** Protected, so that no other values can be added. */
   bool AddEnum( const std::string& name, const IdType& id ) override;
 
-  /**
-   * Adds the enumeration types as defined by vtk to the list of known
-   * enumeration values.
-   */
-  virtual void AddInterpolationTypes();
+  /** Adds the values of OdfScaleBy with their names. */
+  virtual void AddScaleByTypes();
 };
 
 class MITKDIFFUSIONMODELLING_EXPORT OdfScaleByPropertySerializer : public EnumerationPropertySerializer
@@ -99,8 +89,10 @@ class MITKDIFFUSIONMODELLING_EXPORT OdfScaleByPropertySerializer : public Enumer
     {
       if (!element) return nullptr;
 
-      std::string s = "";
-      s = std::string(element->Attribute("value"));
+      // A malformed scene file may lack the attribute.
+      const char* value = element->Attribute("value");
+      if (value == nullptr) return nullptr;
+      std::string s(value);
 
       OdfScaleByProperty::Pointer property = OdfScaleByProperty::New();
       property->SetValue( s );

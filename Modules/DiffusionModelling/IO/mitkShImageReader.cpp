@@ -27,7 +27,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkImageDataItem.h"
 #include <mitkLocaleSwitch.h>
 #include <itkShCoefficientImageImporter.h>
-#include <mitkImageCast.h>
 
 namespace mitk
 {
@@ -37,18 +36,16 @@ namespace mitk
   }
 
   ShImageReader::ShImageReader()
-    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION() )
+    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION() )
   {
     Options defaultOptions;
     defaultOptions["Assume MRtrix/MITK style SH convention (else FSL/Dipy)"] = true;
     this->SetDefaultOptions(defaultOptions);
 
-    m_ServiceReg = this->RegisterService();
+    this->RegisterService();
   }
 
-  ShImageReader::~ShImageReader()
-  {
-  }
+  ShImageReader::~ShImageReader() = default;
 
   template <int shOrder>
   mitk::Image::Pointer ShImageReader::ConvertShImage(ShImage::ShOnDiskType::Pointer img)
@@ -62,12 +59,20 @@ namespace mitk
 
     Options options = this->GetOptions();
     bool mrtrix_sh = us::any_cast<bool>(options["Assume MRtrix/MITK style SH convention (else FSL/Dipy)"]);
+
+    // ShImageWriter marks FSL/Dipy coefficients; the mark overrides the option.
+    const auto& dictionary = img->GetMetaDataDictionary();
+    std::string convention;
+    if ((itk::ExposeMetaData<std::string>(dictionary, "MITK_SH_convention", convention) && convention == "FSL")
+        || (itk::ExposeMetaData<std::string>(dictionary, "ITK_FileNotes", convention) && convention == "MITK_SH_convention=FSL"))
+      mrtrix_sh = false;
+
     if (!mrtrix_sh)
       shImage->SetShConvention(mitk::ShImage::SH_CONVENTION::FSL);
 
+    // The SH image takes over the buffer of the coefficient image.
     mitk::Image::Pointer resultImage = dynamic_cast<mitk::Image*>(shImage.GetPointer());
-    mitk::CastToMitkImage(importer->GetCoefficientImage(), resultImage);
-    resultImage->SetVolume(importer->GetCoefficientImage()->GetBufferPointer());
+    mitk::GrabItkImageMemoryChannel(importer->GetCoefficientImage().GetPointer(), nullptr, resultImage.GetPointer(), false);
     return resultImage;
   }
 
@@ -85,7 +90,7 @@ namespace mitk
     {
       try
       {
-        std::string ext = itksys::SystemTools::GetFilenameExtension(location);
+        std::string ext = itksys::SystemTools::GetFilenameLastExtension(location);
         typedef itk::ImageFileReader< ShImage::ShOnDiskType > FileReaderType;
         FileReaderType::Pointer reader = FileReaderType::New();
         reader->SetFileName(location);
@@ -127,7 +132,7 @@ namespace mitk
       }
       catch(...)
       {
-        throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested vessel tree file!");
+        throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested SH file!");
       }
     }
     return result;

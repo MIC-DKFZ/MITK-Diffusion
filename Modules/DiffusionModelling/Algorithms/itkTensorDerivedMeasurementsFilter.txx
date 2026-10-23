@@ -29,30 +29,13 @@ namespace itk {
   }
 
   template <class TPixel>
-      void TensorDerivedMeasurementsFilter<TPixel>::GenerateData()
+      void TensorDerivedMeasurementsFilter<TPixel>::DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread)
   {
-    typename TensorImageType::Pointer tensorImage = static_cast< TensorImageType * >( this->ProcessObject::GetInput(0) );
     typedef ImageRegionConstIterator< TensorImageType > TensorImageIteratorType;
     typedef ImageRegionIterator< OutputImageType > OutputImageIteratorType;
 
-
-    typename OutputImageType::Pointer outputImage =
-        static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
-
-    typename TensorImageType::RegionType region = tensorImage->GetLargestPossibleRegion();
-
-
-    outputImage->SetSpacing( tensorImage->GetSpacing() );   // Set the image spacing
-    outputImage->SetOrigin( tensorImage->GetOrigin() );     // Set the image origin
-    outputImage->SetDirection( tensorImage->GetDirection() );  // Set the image direction
-    outputImage->SetRegions( tensorImage->GetLargestPossibleRegion());
-    outputImage->Allocate();
-
-    TensorImageIteratorType tensorIt(tensorImage, tensorImage->GetLargestPossibleRegion());
-    OutputImageIteratorType outputIt(outputImage, outputImage->GetLargestPossibleRegion());
-
-    tensorIt.GoToBegin();
-    outputIt.GoToBegin();
+    TensorImageIteratorType tensorIt(this->GetInput(), outputRegionForThread);
+    OutputImageIteratorType outputIt(this->GetOutput(), outputRegionForThread);
 
     while(!tensorIt.IsAtEnd() && !outputIt.IsAtEnd()){
 
@@ -125,9 +108,8 @@ namespace itk {
         }
       case MD:
         {
-          typename TensorType::EigenValuesArrayType evs;
-          tensor.ComputeEigenValues(evs);
-          outputIt.Set((evs[0]+evs[1]+evs[2])/3.0);
+          // The eigenvalues sum to the trace, which needs no eigen decomposition.
+          outputIt.Set(tensor.GetTrace()/3.0);
           break;
         }
       }
@@ -135,8 +117,6 @@ namespace itk {
       ++tensorIt;
       ++outputIt;
     }
-
-
   }
 
 

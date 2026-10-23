@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
 /**
-  \brief Serializes mitk::Surface for mitk::SceneIO
+  \brief Serializes mitk::OdfImage for mitk::SceneIO
 */
 class OdfImageSerializer : public BaseDataSerializer
 {
@@ -32,8 +32,8 @@ class OdfImageSerializer : public BaseDataSerializer
     itkCloneMacro(Self)
     std::string Serialize() override;
   protected:
-    OdfImageSerializer();
-    ~OdfImageSerializer() override;
+    OdfImageSerializer() = default;
+    ~OdfImageSerializer() override = default;
 };
 } // namespace
 #endif

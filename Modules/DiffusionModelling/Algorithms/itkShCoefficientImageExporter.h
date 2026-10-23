@@ -29,12 +29,6 @@ class ShCoefficientImageExporter : public ProcessObject
 
 public:
 
-    enum NormalizationMethods {
-        NO_NORM,
-        SINGLE_VEC_NORM,
-        SPACING_COMPENSATION
-    };
-
 
     typedef ShCoefficientImageExporter Self;
     typedef SmartPointer<Self>                      Pointer;
@@ -48,7 +42,7 @@ public:
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(ShCoefficientImageExporter, ProcessObject)
+    itkOverrideGetNameOfClassMacro(ShCoefficientImageExporter)
 
     // input
     itkSetMacro( InputImage, typename InputImageType::Pointer) ///< sh coefficient image in FSL file format
@@ -60,7 +54,7 @@ public:
 
 protected:
     ShCoefficientImageExporter();
-    ~ShCoefficientImageExporter() override{}
+    ~ShCoefficientImageExporter() override = default;
 
     typename InputImageType::Pointer m_InputImage;
     CoefficientImageType::Pointer m_OutputImage;
@@ -72,7 +66,7 @@ private:
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkShCoefficientImageExporter.cpp"
+#include "itkShCoefficientImageExporter.txx"
 #endif
 
 #endif //__itkShCoefficientImageExporter_h_

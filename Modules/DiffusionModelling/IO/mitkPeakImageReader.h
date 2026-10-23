@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkPeakImageReader_h
-#define __mitkPeakImageReader_h
+#ifndef mitkPeakImageReader_h
+#define mitkPeakImageReader_h
 
 #include "mitkCommon.h"
 #include <mitkAbstractFileReader.h>
@@ -44,10 +44,8 @@ namespace mitk
 
   private:
     PeakImageReader* Clone() const override;
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
 } //namespace MITK
 
-#endif // __mitkPeakImageReader_h
+#endif

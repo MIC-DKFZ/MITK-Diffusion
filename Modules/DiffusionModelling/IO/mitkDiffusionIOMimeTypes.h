@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef MITKDiffusionIOMimeTypes_H
-#define MITKDiffusionIOMimeTypes_H
+#ifndef mitkDiffusionIOMimeTypes_h
+#define mitkDiffusionIOMimeTypes_h
 
 #include "mitkCustomMimeType.h"
 #include <string>
@@ -63,13 +63,10 @@ public:
   static std::string PEAK_MIMETYPE_DESCRIPTION();
 
 
-private:
-
-  // purposely not implemented
-  DiffusionIOMimeTypes();
-  DiffusionIOMimeTypes(const DiffusionIOMimeTypes&);
+  DiffusionIOMimeTypes() = delete;
+  DiffusionIOMimeTypes(const DiffusionIOMimeTypes&) = delete;
 };
 
 }
 
-#endif // MITKDiffusionIOMimeTypes_H
+#endif

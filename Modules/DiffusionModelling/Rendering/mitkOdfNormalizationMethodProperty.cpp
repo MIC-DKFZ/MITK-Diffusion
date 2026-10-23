@@ -20,14 +20,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 mitk::OdfNormalizationMethodProperty::OdfNormalizationMethodProperty( )
 {
-  this->AddInterpolationTypes();
+  this->AddNormalizationMethods();
   this->SetValue( static_cast<IdType>( ODFN_MAX ) );
 }
 
 
 mitk::OdfNormalizationMethodProperty::OdfNormalizationMethodProperty( const IdType& value )
 {
-  this->AddInterpolationTypes();
+  this->AddNormalizationMethods();
   if ( IsValidEnumerationValue( value ) )
   {
     this->SetValue( value ) ;
@@ -40,7 +40,7 @@ mitk::OdfNormalizationMethodProperty::OdfNormalizationMethodProperty( const IdTy
 
 mitk::OdfNormalizationMethodProperty::OdfNormalizationMethodProperty( const std::string& value )
 {
-  this->AddInterpolationTypes();
+  this->AddNormalizationMethods();
   if ( IsValidEnumerationValue( value ) )
   {
     this->SetValue( value );
@@ -52,7 +52,7 @@ mitk::OdfNormalizationMethodProperty::OdfNormalizationMethodProperty( const std:
 }
 
 
-int mitk::OdfNormalizationMethodProperty::GetNormalization()
+int mitk::OdfNormalizationMethodProperty::GetNormalization() const
 {
   return static_cast<int>( this->GetValueAsId() );
 }
@@ -82,7 +82,7 @@ void mitk::OdfNormalizationMethodProperty::SetNormalizationToGlobalMax()
 }
 
 
-void mitk::OdfNormalizationMethodProperty::AddInterpolationTypes()
+void mitk::OdfNormalizationMethodProperty::AddNormalizationMethods()
 {
   AddEnum( "Min-Max", static_cast<IdType>( ODFN_MINMAX ) );
   AddEnum( "Maximum", static_cast<IdType>( ODFN_MAX ) );

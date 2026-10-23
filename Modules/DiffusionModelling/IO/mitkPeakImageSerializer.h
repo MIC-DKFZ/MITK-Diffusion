@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
 /**
-  \brief Serializes mitk::Surface for mitk::SceneIO
+  \brief Serializes mitk::PeakImage for mitk::SceneIO
 */
 class PeakImageSerializer : public BaseDataSerializer
 {

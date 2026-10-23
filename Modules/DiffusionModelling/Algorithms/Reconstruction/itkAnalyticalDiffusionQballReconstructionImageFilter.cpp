@@ -536,7 +536,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
         int j = (k*k + k + 2)/2 + m - 1;
         L(j,j) = -k*(k+1);
         lj[j] = k;
-        B(i,j) = mitk::sh::Yj(m, k, Q(1,i), Q(0,i));
+        B(i,j) = mitk::sh::Yj(m, k, Q(1,i), Q(0,i), true);
       }
     }
   }
@@ -574,7 +574,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
   // needed to calculate the ODF values from the SH coefficients
   vnl_matrix_fixed<double, 3, NrOdfDirections>* U = itk::PointShell<NrOdfDirections, vnl_matrix_fixed<double, 3, NrOdfDirections> >::DistributePointShell();
 
-  m_SphericalHarmonicBasisMatrix  = mitk::sh::CalcShBasisForDirections(ShOrder, U->as_matrix());
+  m_SphericalHarmonicBasisMatrix  = mitk::sh::CalcShBasisForDirections(ShOrder, U->as_matrix(), true);
   m_ReconstructionMatrix = m_SphericalHarmonicBasisMatrix * m_CoeffReconstructionMatrix;
 }
 
