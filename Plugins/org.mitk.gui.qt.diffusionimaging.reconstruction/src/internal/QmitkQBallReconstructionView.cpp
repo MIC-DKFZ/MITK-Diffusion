@@ -317,10 +317,13 @@ void QmitkQBallReconstructionView::MethodChoosen(int method)
   m_Controls->m_QBallSelectionBox->setHidden(true);
   m_Controls->m_OutputOdfImage->setHidden(true);
 
-  if (method==0)
-    m_Controls->m_ShFrame->setVisible(false);
-  else
-    m_Controls->m_ShFrame->setVisible(true);
+  // The B0 threshold in m_ShFrame applies to every method, SH order and lambda only to the SH
+  // methods.
+  const bool shMethod = method != 0;
+  m_Controls->m_QBallReconstructionMaxLLevelTextLabel_2->setVisible(shMethod);
+  m_Controls->m_QBallReconstructionMaxLLevelComboBox->setVisible(shMethod);
+  m_Controls->m_QBallReconstructionLambdaTextLabel_2->setVisible(shMethod);
+  m_Controls->m_QBallReconstructionLambdaLineEdit->setVisible(shMethod);
 
   // The cases follow the entries of m_QBallReconstructionMethodComboBox, as in ReconstructStandard.
   switch(method)
