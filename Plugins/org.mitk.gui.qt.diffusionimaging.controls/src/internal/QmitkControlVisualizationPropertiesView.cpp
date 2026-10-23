@@ -92,7 +92,15 @@ QmitkControlVisualizationPropertiesView::QmitkControlVisualizationPropertiesView
 
 QmitkControlVisualizationPropertiesView::~QmitkControlVisualizationPropertiesView()
 {
+  // The observer calls back into this view; the node may outlive it.
+  this->RemoveColorObserver();
+}
 
+void QmitkControlVisualizationPropertiesView::RemoveColorObserver()
+{
+  if (m_Color.IsNotNull())
+    m_Color->RemoveObserver(m_ColorPropertyObserverTag);
+  m_Color = nullptr;
 }
 
 void QmitkControlVisualizationPropertiesView::SetTs(int currentThickSlicesMode, int num, std::string render_window)
@@ -318,6 +326,10 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
   m_Controls->m_TSMenu->setVisible(false);
 
   m_SelectedNodes.clear();
+
+  // SetCustomColor recolours the selected nodes, so the colour of a node that is no longer
+  // selected must not trigger it.
+  this->RemoveColorObserver();
 
   for (mitk::DataNode::Pointer node: nodes)
   {

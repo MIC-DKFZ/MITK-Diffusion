@@ -103,6 +103,7 @@ protected:
 
   virtual void NodeAdded(const mitk::DataNode *node) override;
   void SetCustomColor(const itk::EventObject& /*e*/);
+  void RemoveColorObserver();
   bool IsPlaneRotated();
 
   void SliceRotation(const itk::EventObject&);
