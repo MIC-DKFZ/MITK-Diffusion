@@ -107,8 +107,10 @@ void RandomPhantomFilter::TransformPlanarFigure(mitk::PlanarEllipse* pe, mitk::V
   v1.Normalize();
   v2.Normalize();
 
-  p1 = p0 + mitk::Vector2D(radius1);
-  p2 = p0 + mitk::Vector2D(radius2);
+  // along the ellipse axes; Vector2D(radius) would put both points on the diagonal, which the
+  // ellipse turns into radii sqrt(2) times too large
+  p1 = p0 + v1*radius1;
+  p2 = p0 + v2*radius2;
 
   p3 = p0 + mitk::Vector2D(v3);
   pe->SetControlPoint(1, p1);
