@@ -32,6 +32,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFastSpinEcho.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <itkImageFileWriter.h>
+#include <limits>
 
 namespace itk {
 
@@ -54,6 +55,7 @@ namespace itk {
   ::BeforeThreadedGenerateData()
   {
     m_Spike = std::complex<ScalarType>(0,0);
+    m_SpikeTick = std::numeric_limits<long>::max();
     m_SpikeLog = "";
     m_TransX = -m_Translation[0];
     m_TransY = -m_Translation[1];
@@ -238,12 +240,12 @@ namespace itk {
   }
 
   template< class ScalarType >
-  float KspaceImageFilter< ScalarType >::CoilSensitivity(VectorType& pos)
+  float KspaceImageFilter< ScalarType >::CoilSensitivity(VectorType& pos) const
   {
-    // *************************************************************************
-    // Coil ring is moving with excited slice (FIX THIS SOMETIME)
-    m_CoilPosition[2] = pos[2];
-    // *************************************************************************
+    // The coil ring moves with the excited slice. A local copy: all work units call this at once,
+    // and for oblique images pos[2] differs between pixels of one slice.
+    VectorType coilPosition = m_CoilPosition;
+    coilPosition[2] = pos[2];
 
     switch (m_Parameters->m_SignalGen.m_CoilSensitivityProfile)
     {
@@ -251,7 +253,7 @@ namespace itk {
       return 1;
       case SignalGenerationParameters::COIL_LINEAR:
       {
-        VectorType diff = pos-m_CoilPosition;
+        VectorType diff = pos-coilPosition;
         float sens = diff.GetNorm()*m_CoilSensitivityFactor + 1;
         if (sens<0)
           sens = 0;
@@ -259,7 +261,7 @@ namespace itk {
       }
       case SignalGenerationParameters::COIL_EXPONENTIAL:
       {
-        VectorType diff = pos-m_CoilPosition;
+        VectorType diff = pos-coilPosition;
         float dist = static_cast<float>(diff.GetNorm());
         return std::exp(-dist*m_CoilSensitivityFactor);
       }
@@ -299,10 +301,16 @@ namespace itk {
     else
         ky_shift = kyMax/2;
 
+    // Largest noise-free sample of this work unit (the spike amplitude). With one work unit the first
+    // of equal maxima in readout order wins; the merge below keeps that rule for any number of units.
+    std::complex<ScalarType> spike(0,0);
+    long spikeTick = -1;
+
     std::complex<ScalarType> zero = std::complex<ScalarType>(0, 0);
     while( !oit.IsAtEnd() )
     {
       int tick = oit.GetIndex()[1] * kxMax + oit.GetIndex()[0];
+      const long readoutTick = tick;
 
       // get current k-space index (depends on the chosen k-space readout scheme)
       itk::Index< 2 > kIdx = m_ReadoutScheme->GetActualKspaceIndex(tick);
@@ -457,14 +465,29 @@ namespace itk {
       }
       s /= numPix;
 
-      if (m_SpikesPerSlice>0 && sqrt(s.imag()*s.imag()+s.real()*s.real()) > sqrt(m_Spike.imag()*m_Spike.imag()+m_Spike.real()*m_Spike.real()) )
-        m_Spike = s;
+      if (m_SpikesPerSlice>0 && sqrt(s.imag()*s.imag()+s.real()*s.real()) > sqrt(spike.imag()*spike.imag()+spike.real()*spike.real()) )
+      {
+        spike = s;
+        spikeTick = readoutTick;
+      }
 
       s += outputImage->GetPixel(kIdx); // add precalculated noise
       outputImage->SetPixel(kIdx, s);
       m_KSpaceImage->SetPixel(kIdx, sqrt(s.imag()*s.imag()+s.real()*s.real()) );
 
       ++oit;
+    }
+
+    if (spikeTick>=0)
+    {
+      std::lock_guard<std::mutex> lock(m_SpikeMutex);
+      const auto magnitude = sqrt(spike.imag()*spike.imag()+spike.real()*spike.real());
+      const auto maxMagnitude = sqrt(m_Spike.imag()*m_Spike.imag()+m_Spike.real()*m_Spike.real());
+      if (magnitude > maxMagnitude || (magnitude == maxMagnitude && spikeTick < m_SpikeTick))
+      {
+        m_Spike = spike;
+        m_SpikeTick = spikeTick;
+      }
     }
   }
 

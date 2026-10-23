@@ -24,6 +24,7 @@ This file is based heavily on a corresponding ITK filter.
 
 #include <itkImageSource.h>
 #include <vector>
+#include <mutex>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkFiberfoxParameters.h>
 #include <mitkFiberBundle.h>
@@ -96,7 +97,7 @@ namespace itk{
     KspaceImageFilter();
     ~KspaceImageFilter() override {}
 
-    float CoilSensitivity(VectorType& pos);
+    float CoilSensitivity(VectorType& pos) const;
 
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
@@ -124,6 +125,8 @@ namespace itk{
 
     bool                                    m_IsBaseline;
     std::complex<ScalarType>                 m_Spike;
+    long                                    m_SpikeTick;    ///< readout position of m_Spike, decides between equal maxima
+    std::mutex                              m_SpikeMutex;
     MatrixType                              m_Transform;
     std::string                             m_SpikeLog;
 
