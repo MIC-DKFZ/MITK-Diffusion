@@ -53,6 +53,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(SetFiberPolyData_LeavesOldPolyDataAndPointDataBehind);
   MITK_TEST(SetSingleFiberColor_UsesRgbOrder);
   MITK_TEST(SetFiberColors_ChecksTheArray);
+  MITK_TEST(ColorFibersByOrientation_OnePointFibers_GetColours);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -404,6 +405,28 @@ public:
     tooShort->SetNumberOfTuples(2);
     CPPUNIT_ASSERT_THROW(fib->SetFiberColors(tooShort), mitk::Exception);
     CPPUNIT_ASSERT_THROW(fib->SetFiberColors(vtkSmartPointer<vtkUnsignedCharArray>()), mitk::Exception);
+  }
+
+  void ColorFibersByOrientation_OnePointFibers_GetColours()
+  {
+    // the one-point fiber becomes a vertex cell; its point is on no line
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}}, {{5, 5, 5}}, {{0, 3, 0}, {0, 4, 0}}});
+    auto colours = fib->GetFiberColors();
+    CPPUNIT_ASSERT_EQUAL(fib->GetFiberPolyData()->GetNumberOfPoints(), colours->GetNumberOfTuples());
+    bool found = false;
+    for (vtkIdType i = 0; i < fib->GetFiberPolyData()->GetNumberOfPoints(); ++i)
+    {
+      const double *p = fib->GetFiberPolyData()->GetPoint(i);
+      if (p[0] == 5.0)
+      {
+        found = true;
+        for (int c = 0; c < 4; ++c)
+          CPPUNIT_ASSERT_EQUAL(255.0, colours->GetComponent(i, c));
+      }
+    }
+    CPPUNIT_ASSERT(found);
+    // a copy can take the colours over
+    CPPUNIT_ASSERT(fib->GetDeepCopy().IsNotNull());
   }
 };
 
