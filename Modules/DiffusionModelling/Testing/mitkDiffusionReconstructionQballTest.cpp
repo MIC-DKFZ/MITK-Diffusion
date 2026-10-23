@@ -35,6 +35,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(Numerical_NoBaseline_Throws);
   MITK_TEST(Numerical_SecondUpdate_SameResult);
   MITK_TEST(Analytical_SecondUpdate_SameResult);
+  MITK_TEST(SolidAngle_SecondUpdate_SameResult);
   MITK_TEST(SingleShellFilters_TwoShells_Throw);
   MITK_TEST(SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint);
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
@@ -219,6 +220,31 @@ public:
     reused->SetGradientImage(dwi.gradients, dwi.image);
     reused->SetLambda(0.006);
     reused->SetNormalizationMethod(AnalyticalFilterType::QBAR_STANDARD);
+    reused->Update();
+    reused->Modified();
+    reused->Update();
+    CheckEqual(fresh->GetOutput(), reused->GetOutput());
+    CheckEqual(fresh->GetCoefficientImage().GetPointer(), reused->GetCoefficientImage().GetPointer());
+  }
+
+  // The solid-angle method set lambda to 0 after its first execution had used the given lambda, so
+  // a second Update() reconstructed without regularization.
+  void SolidAngle_SecondUpdate_SameResult()
+  {
+    auto dwi = LoadHalfSphereDwi();
+    auto fresh = AnalyticalFilterType::New();
+    fresh->SetBValue(3000);
+    fresh->SetGradientImage(dwi.gradients, dwi.image);
+    fresh->SetLambda(0.006);
+    fresh->SetNormalizationMethod(AnalyticalFilterType::QBAR_SOLID_ANGLE);
+    fresh->Update();
+    CPPUNIT_ASSERT_EQUAL(0.006, fresh->GetLambda());
+
+    auto reused = AnalyticalFilterType::New();
+    reused->SetBValue(3000);
+    reused->SetGradientImage(dwi.gradients, dwi.image);
+    reused->SetLambda(0.006);
+    reused->SetNormalizationMethod(AnalyticalFilterType::QBAR_SOLID_ANGLE);
     reused->Update();
     reused->Modified();
     reused->Update();

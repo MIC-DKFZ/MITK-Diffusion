@@ -263,9 +263,6 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
   m_CoefficientImage->SetLargestPossibleRegion( img->GetLargestPossibleRegion());
   m_CoefficientImage->SetBufferedRegion( img->GetLargestPossibleRegion() );
   m_CoefficientImage->Allocate();
-
-  if(m_NormalizationMethod == QBAR_SOLID_ANGLE || m_NormalizationMethod == QBAR_NONNEG_SOLID_ANGLE)
-    m_Lambda = 0.0;
 }
 
 template< class T, class TG, class TO, int ShOrder, int NrOdfDirections>
