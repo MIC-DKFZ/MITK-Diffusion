@@ -33,22 +33,11 @@ namespace itk{
  * orientation distribution functions (ODFs).
  *
  * \par Inputs and Usage
- * There are two ways to use this class. When you have one reference image and \c n
- * gradient images, you would use the class as
- * \code
- *       filter->SetReferenceImage( image0 );
- *       filter->AddGradientImage( direction1, image1 );
- *       filter->AddGradientImage( direction2, image2 );
- *   ...
- * \endcode
- *
- * \par
- * When you have the 'n' gradient and one or more reference images in a single
- * multi-component image (VectorImage), you can specify the images simply as
+ * The 'n' gradient and one or more reference images are given in a single
+ * multi-component image (VectorImage):
  * \code
  *       filter->SetGradientImage( directionsContainer, vectorImage );
  * \endcode
- * Note that this method is used to specify both the reference and gradient images.
  * This is convenient when the DWI images are read in using the
  * <a href="http://wiki.na-mic.org/Wiki/index.php/NAMIC_Wiki:DTI:Nrrd_format">NRRD</a>
  * format. Like the Nrrd format, the reference images are those components of the
@@ -159,9 +148,6 @@ public:
   typedef typename Superclass::OutputImageRegionType
                                                    OutputImageRegionType;
 
-  /** Typedef defining one (of the many) gradient images.  */
-  typedef Image< GradientPixelType, 3 >            GradientImageType;
-
   /** An alternative typedef defining one (of the many) gradient images.
    * It will be assumed that the vectorImage has the same dimension as the
    * Reference image and a vector length parameter of \c n (number of
@@ -182,9 +168,6 @@ public:
   itkStaticConstMacro(NOdfDirections,int,NrOdfDirections);
   itkStaticConstMacro(NBasisFunctionCenters,int,NrBasisFunctionCenters);
 
-  /** Set method to add a gradient direction and its corresponding image. */
-  void AddGradientImage( const GradientDirectionType &, const GradientImageType *image);
-
   /** Another set method to add a gradient directions and its corresponding
    * image. The image here is a VectorImage. The user is expected to pass the
    * gradient directions in a container. The ith element of the container
@@ -193,24 +176,6 @@ public:
    * should be set.*/
   void SetGradientImage( const GradientDirectionContainerType *,
                                              const GradientImagesType *image);
-
-  /** Set method to set the reference image. */
-  void SetReferenceImage( ReferenceImageType *referenceImage )
-    {
-    if( m_GradientImageTypeEnumeration == GradientIsInASingleImage)
-      {
-      itkExceptionMacro( << "Cannot call both methods:"
-      << "AddGradientImage and SetGradientImage. Please call only one of them.");
-      }
-
-    this->ProcessObject::SetNthInput( 0, referenceImage );
-
-    m_GradientImageTypeEnumeration = GradientIsInManyImages;
-    }
-
-  /** Get reference image */
-  virtual ReferenceImageType * GetReferenceImage()
-  { return ( static_cast< ReferenceImageType *>(this->ProcessObject::GetInput(0)) ); }
 
   /** Return the gradient direction. idx is 0 based */
   virtual GradientDirectionType GetGradientDirection( unsigned int idx) const
@@ -284,15 +249,6 @@ protected:
   void DynamicThreadedGenerateData( const
       OutputImageRegionType &outputRegionForThread) override;
 
-  /** enum to indicate if the gradient image is specified as a single multi-
-   * component image or as several separate images */
-  typedef enum
-    {
-    GradientIsInASingleImage = 1,
-    GradientIsInManyImages,
-    Else
-    } GradientImageTypeEnumeration;
-
 private:
 
   /* Tensor basis coeffs */
@@ -315,9 +271,6 @@ private:
 
   /** LeBihan's b-value for normalizing tensors */
   TOdfPixelType                                     m_BValue;
-
-  /** Gradient image was specified in a single image or in multiple images */
-  GradientImageTypeEnumeration                      m_GradientImageTypeEnumeration;
 
   /** Output of b-zero reference image */
   typename BZeroImageType::Pointer                  m_BZeroImage;

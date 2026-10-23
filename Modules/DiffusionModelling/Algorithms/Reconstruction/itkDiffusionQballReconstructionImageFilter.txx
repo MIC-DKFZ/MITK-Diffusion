@@ -41,7 +41,6 @@ namespace itk {
     m_NumberOfBaselineImages(1),
     m_Threshold(NumericTraits< ReferencePixelType >::NonpositiveMin()),
     m_BValue(1.0),
-    m_GradientImageTypeEnumeration(Else),
     m_DirectionsDuplicated(false)
   {
     // At least 1 inputs is necessary for a vector image.
@@ -61,31 +60,11 @@ namespace itk {
     NrBasisFunctionCenters>
     ::BeforeThreadedGenerateData()
   {
-    // If we have more than 2 inputs, then each input, except the first is a
-    // gradient image. The number of gradient images must match the number of
-    // gradient directions.
-    const unsigned int numberOfInputs = this->GetNumberOfInputs();
-
     // There need to be at least 6 gradient directions to be able to compute the
     // tensor basis
     if( m_NumberOfGradientDirections < 1 )
     {
         itkExceptionMacro( << "Your image contains no diffusion gradients!" );
-    }
-
-    // If there is only 1 gradient image, it must be an itk::VectorImage. Otherwise
-    // we must have a container of (numberOfInputs-1) itk::Image. Check to make sure
-    if ( numberOfInputs == 1
-      && m_GradientImageTypeEnumeration != GradientIsInASingleImage )
-    {
-      std::string gradientImageClassName(
-        this->ProcessObject::GetInput(0)->GetNameOfClass());
-      if ( strcmp(gradientImageClassName.c_str(),"VectorImage") != 0 )
-      {
-        itkExceptionMacro( <<
-          "There is only one Gradient image. I expect that to be a VectorImage. "
-          << "But its of type: " << gradientImageClassName );
-      }
     }
 
     // Compute reconstruction matrix that is multiplied to the data-vector
@@ -94,26 +73,13 @@ namespace itk {
 
     // Allocate the b-zero image
     m_BZeroImage = BZeroImageType::New();
-    if( m_GradientImageTypeEnumeration == GradientIsInManyImages )
-    {
-      typename ReferenceImageType::Pointer img = static_cast< ReferenceImageType * >(this->ProcessObject::GetInput(0));
-      m_BZeroImage->SetSpacing( img->GetSpacing() );   // Set the image spacing
-      m_BZeroImage->SetOrigin( img->GetOrigin() );     // Set the image origin
-      m_BZeroImage->SetDirection( img->GetDirection() );  // Set the image direction
-      m_BZeroImage->SetLargestPossibleRegion( img->GetLargestPossibleRegion());
-      m_BZeroImage->SetBufferedRegion( img->GetLargestPossibleRegion() );
-    }
-    // The gradients are specified in a single multi-component image
-    else if( m_GradientImageTypeEnumeration == GradientIsInASingleImage )
-    {
-      typename GradientImagesType::Pointer img = static_cast< GradientImagesType * >(
-        this->ProcessObject::GetInput(0) );
-      m_BZeroImage->SetSpacing( img->GetSpacing() );   // Set the image spacing
-      m_BZeroImage->SetOrigin( img->GetOrigin() );     // Set the image origin
-      m_BZeroImage->SetDirection( img->GetDirection() );  // Set the image direction
-      m_BZeroImage->SetLargestPossibleRegion( img->GetLargestPossibleRegion());
-      m_BZeroImage->SetBufferedRegion( img->GetLargestPossibleRegion() );
-    }
+    typename GradientImagesType::Pointer img = static_cast< GradientImagesType * >(
+      this->ProcessObject::GetInput(0) );
+    m_BZeroImage->SetSpacing( img->GetSpacing() );   // Set the image spacing
+    m_BZeroImage->SetOrigin( img->GetOrigin() );     // Set the image origin
+    m_BZeroImage->SetDirection( img->GetDirection() );  // Set the image direction
+    m_BZeroImage->SetLargestPossibleRegion( img->GetLargestPossibleRegion());
+    m_BZeroImage->SetBufferedRegion( img->GetLargestPossibleRegion() );
 
     m_BZeroImage->Allocate();
 
@@ -228,186 +194,87 @@ namespace itk {
     oit2.GoToBegin();
     vnl_vector<TOdfPixelType> B(m_NumberOfGradientDirections);
 
-    // Two cases here:
-    // 1. Gradients specified in multiple images
-    // 'n' iterators for each of the gradient images
-    // 2. Gradients specified in a single multi-component image
-    // one iterator for all gradient directions
+    // init input iterator
+    typedef ImageRegionConstIterator< GradientImagesType > GradientIteratorType;
+    typedef typename GradientImagesType::PixelType         GradientVectorType;
+    typename GradientImagesType::Pointer gradientImagePointer = nullptr;
+    // dynamic_cast would be nice, static because of SGI
+    gradientImagePointer = static_cast< GradientImagesType * >(
+      this->ProcessObject::GetInput(0) );
+    GradientIteratorType git(gradientImagePointer, outputRegionForThread );
+    git.GoToBegin();
 
-    if( m_GradientImageTypeEnumeration == GradientIsInManyImages )
+    // set of indicies each for the baseline images and gradient images
+    std::vector<unsigned int> baselineind; // contains baseline indicies
+    std::vector<unsigned int> gradientind; // contains gradient indicies
+    for(GradientDirectionContainerType::ConstIterator gdcit = this->m_GradientDirectionContainer->Begin();
+      gdcit != this->m_GradientDirectionContainer->End(); ++gdcit)
     {
-      // b-zero reference image iterator
-      ImageRegionConstIterator< ReferenceImageType >
-        it(static_cast< ReferenceImageType * >(this->ProcessObject::GetInput(0)),
-        outputRegionForThread);
-      it.GoToBegin();
-
-      // fill vector with gradient iterators
-      typedef ImageRegionConstIterator< GradientImageType > GradientIteratorType;
-      std::vector< GradientIteratorType * > gradientItContainer;
-      for( unsigned int i = 1; i<= m_NumberOfGradientDirections; i++ )
+      if(gdcit.Value().one_norm() <= 0.0)
       {
-        // adapt index in case we have a duplicated shell
-        int index = i;
-        if(m_DirectionsDuplicated)
-          index = i % (m_NumberOfGradientDirections/2);
-
-        // init and pushback current input image iterator
-        typename GradientImageType::Pointer gradientImagePointer = nullptr;
-        // dynamic_cast would be nice, static because of SGI
-        gradientImagePointer = static_cast< GradientImageType * >(
-          this->ProcessObject::GetInput(index) );
-        GradientIteratorType *git = new GradientIteratorType(
-          gradientImagePointer, outputRegionForThread );
-        git->GoToBegin();
-        gradientItContainer.push_back(git);
+        baselineind.push_back(gdcit.Index());
       }
-
-      // Following loop does the actual reconstruction work in each voxel
-      // (Tuch, Q-Ball Reconstruction [1])
-      while( !it.IsAtEnd() )
+      else
       {
-
-        // b-zero reference value
-        ReferencePixelType b0 = it.Get();
-
-        // init ODF
-        OdfPixelType odf(0.0);
-
-        // threshold on reference value to suppress noisy regions
-        if( (b0 != 0) && (b0 >= m_Threshold) )
-        {
-
-          // fill array of diffusion measurements
-          for( unsigned int i = 0; i< m_NumberOfGradientDirections; i++ )
-          {
-            GradientPixelType b = gradientItContainer[i]->Get();
-            B[i] = static_cast<TOdfPixelType>(b);
-            ++(*gradientItContainer[i]);
-          }
-
-          // pre-normalization according to m_NormalizationMethod
-          B = PreNormalize(B);
-
-          // actual reconstruction
-          odf = ( (*m_ReconstructionMatrix) * B ).data_block();
-
-          // post-normalization according to m_NormalizationMethod
-          odf.Normalize();
-        }
-        else
-        {
-          // in case we fall below threshold, we just increment to next voxel
-          for( unsigned int i = 0; i< m_NumberOfGradientDirections; i++ )
-          {
-            ++(*gradientItContainer[i]);
-          }
-        }
-
-        for (unsigned int i=0; i<odf.Size(); i++)
-            if (odf.GetElement(i)!=odf.GetElement(i))
-                odf.Fill(0.0);
-
-        // set and increment output iterators
-        oit.Set( odf );
-        ++oit;
-        oit2.Set( b0 );
-        ++oit2;
-        ++it;
-      }
-
-      // clean up
-      for( unsigned int i = 0; i< gradientItContainer.size(); i++ )
-      {
-        delete gradientItContainer[i];
+        gradientind.push_back(gdcit.Index());
       }
     }
-    // The gradients are specified in a single multi-component image
-    else if( m_GradientImageTypeEnumeration == GradientIsInASingleImage )
+
+    // in case we have a duplicated shell, we also duplicate or indices
+    if( m_DirectionsDuplicated )
     {
+      int gradIndSize = gradientind.size();
+      for(int i=0; i<gradIndSize; i++)
+        gradientind.push_back(gradientind[i]);
+    }
 
-      // init input iterator
-      typedef ImageRegionConstIterator< GradientImagesType > GradientIteratorType;
-      typedef typename GradientImagesType::PixelType         GradientVectorType;
-      typename GradientImagesType::Pointer gradientImagePointer = nullptr;
-      // dynamic_cast would be nice, static because of SGI
-      gradientImagePointer = static_cast< GradientImagesType * >(
-        this->ProcessObject::GetInput(0) );
-      GradientIteratorType git(gradientImagePointer, outputRegionForThread );
-      git.GoToBegin();
+    // Following loop does the actual reconstruction work in each voxel
+    // (Tuch, Q-Ball Reconstruction [1])
+    while( !git.IsAtEnd() )
+    {
+      // current vector of diffusion measurements
+      GradientVectorType b = git.Get();
 
-      // set of indicies each for the baseline images and gradient images
-      std::vector<unsigned int> baselineind; // contains baseline indicies
-      std::vector<unsigned int> gradientind; // contains gradient indicies
-      for(GradientDirectionContainerType::ConstIterator gdcit = this->m_GradientDirectionContainer->Begin();
-        gdcit != this->m_GradientDirectionContainer->End(); ++gdcit)
+      // average of current b-zero reference values
+      typename NumericTraits<ReferencePixelType>::AccumulateType b0 = NumericTraits<ReferencePixelType>::Zero;
+      for(unsigned int i = 0; i < baselineind.size(); ++i)
       {
-        if(gdcit.Value().one_norm() <= 0.0)
+        b0 += b[baselineind[i]];
+      }
+      b0 /= this->m_NumberOfBaselineImages;
+
+      // init resulting ODF
+      OdfPixelType odf(0.0);
+
+      // threshold on reference value to suppress noisy regions
+      if( (b0 != 0) && (b0 >= m_Threshold) )
+      {
+        for( unsigned int i = 0; i< m_NumberOfGradientDirections; i++ )
         {
-          baselineind.push_back(gdcit.Index());
+          B[i] = static_cast<TOdfPixelType>(b[gradientind[i]]);
         }
-        else
-        {
-          gradientind.push_back(gdcit.Index());
-        }
+
+        // pre-normalization according to m_NormalizationMethod
+        B = PreNormalize(B);
+
+        // actual reconstruction
+        odf = ( (*m_ReconstructionMatrix) * B ).data_block();
+
+        // post-normalization according to m_NormalizationMethod
+        odf = Normalize(odf, b0);
+
       }
 
-      // in case we have a duplicated shell, we also duplicate or indices
-      if( m_DirectionsDuplicated )
-      {
-        int gradIndSize = gradientind.size();
-        for(int i=0; i<gradIndSize; i++)
-          gradientind.push_back(gradientind[i]);
-      }
+      for (unsigned int i=0; i<odf.Size(); i++)
+          if (odf.GetElement(i)!=odf.GetElement(i))
+              odf.Fill(0.0);
 
-      // Following loop does the actual reconstruction work in each voxel
-      // (Tuch, Q-Ball Reconstruction [1])
-      while( !git.IsAtEnd() )
-      {
-        // current vector of diffusion measurements
-        GradientVectorType b = git.Get();
-
-        // average of current b-zero reference values
-        typename NumericTraits<ReferencePixelType>::AccumulateType b0 = NumericTraits<ReferencePixelType>::Zero;
-        for(unsigned int i = 0; i < baselineind.size(); ++i)
-        {
-          b0 += b[baselineind[i]];
-        }
-        b0 /= this->m_NumberOfBaselineImages;
-
-        // init resulting ODF
-        OdfPixelType odf(0.0);
-
-        // threshold on reference value to suppress noisy regions
-        if( (b0 != 0) && (b0 >= m_Threshold) )
-        {
-          for( unsigned int i = 0; i< m_NumberOfGradientDirections; i++ )
-          {
-            B[i] = static_cast<TOdfPixelType>(b[gradientind[i]]);
-          }
-
-          // pre-normalization according to m_NormalizationMethod
-          B = PreNormalize(B);
-
-          // actual reconstruction
-          odf = ( (*m_ReconstructionMatrix) * B ).data_block();
-
-          // post-normalization according to m_NormalizationMethod
-          odf = Normalize(odf, b0);
-
-        }
-
-        for (unsigned int i=0; i<odf.Size(); i++)
-            if (odf.GetElement(i)!=odf.GetElement(i))
-                odf.Fill(0.0);
-
-        // set and increment output iterators
-        oit.Set( odf );
-        ++oit;
-        oit2.Set( b0 );
-        ++oit2;
-        ++git; // Gradient  image iterator
-      }
+      // set and increment output iterators
+      oit.Set( odf );
+      ++oit;
+      oit2.Set( b0 );
+      ++oit2;
+      ++git; // Gradient  image iterator
     }
 
     std::cout << "One Thread finished reconstruction" << std::endl;
@@ -718,54 +585,9 @@ namespace itk {
     void DiffusionQballReconstructionImageFilter< TReferenceImagePixelType,
     TGradientImagePixelType, TOdfPixelType, NrOdfDirections,
     NrBasisFunctionCenters>
-    ::AddGradientImage( const GradientDirectionType &gradientDirection,
-    const GradientImageType *gradientImage )
-  {
-    // Make sure crazy users did not call both AddGradientImage and
-    // SetGradientImage
-    if( m_GradientImageTypeEnumeration == GradientIsInASingleImage)
-    {
-      itkExceptionMacro( << "Cannot call both methods:"
-        << "AddGradientImage and SetGradientImage. Please call only one of them.");
-    }
-
-    // If the container to hold the gradient directions hasn't been allocated
-    // yet, allocate it.
-    if( !this->m_GradientDirectionContainer )
-    {
-      this->m_GradientDirectionContainer = GradientDirectionContainerType::New();
-    }
-
-    this->m_NumberOfGradientDirections = m_GradientDirectionContainer->Size();
-
-    m_GradientDirectionContainer->InsertElement( this->m_NumberOfGradientDirections,
-      gradientDirection / gradientDirection.two_norm() );
-
-    this->ProcessObject::SetNthInput( this->m_NumberOfGradientDirections,
-      const_cast< GradientImageType* >(gradientImage) );
-
-    m_GradientImageTypeEnumeration = GradientIsInManyImages;
-  }
-
-  template< class TReferenceImagePixelType,
-  class TGradientImagePixelType,
-  class TOdfPixelType,
-    int NrOdfDirections,
-    int NrBasisFunctionCenters>
-    void DiffusionQballReconstructionImageFilter< TReferenceImagePixelType,
-    TGradientImagePixelType, TOdfPixelType, NrOdfDirections,
-    NrBasisFunctionCenters>
     ::SetGradientImage(const GradientDirectionContainerType *gradientDirection,
     const GradientImagesType *gradientImage )
   {
-    // Make sure crazy users did not call both AddGradientImage and
-    // SetGradientImage
-    if( m_GradientImageTypeEnumeration == GradientIsInManyImages )
-    {
-      itkExceptionMacro( << "Cannot call both methods:"
-        << "AddGradientImage and SetGradientImage. Please call only one of them.");
-    }
-
     this->m_GradientDirectionContainer = GradientDirectionContainerType::New();
     for(GradientDirectionContainerType::ConstIterator it = gradientDirection->Begin();
       it != gradientDirection->End(); it++)
@@ -807,7 +629,6 @@ namespace itk {
 
     this->ProcessObject::SetNthInput( 0,
       const_cast< GradientImagesType* >(gradientImage) );
-    m_GradientImageTypeEnumeration = GradientIsInASingleImage;
   }
 
 
@@ -844,14 +665,6 @@ namespace itk {
       m_NumberOfBaselineImages << std::endl;
     os << indent << "Threshold for reference B0 image: " << m_Threshold << std::endl;
     os << indent << "BValue: " << m_BValue << std::endl;
-    if ( this->m_GradientImageTypeEnumeration == GradientIsInManyImages )
-    {
-      os << indent << "Gradient images haven been supplied " << std::endl;
-    }
-    else if ( this->m_GradientImageTypeEnumeration == GradientIsInManyImages )
-    {
-      os << indent << "A multicomponent gradient image has been supplied" << std::endl;
-    }
 
     os.imbue( originalLocale );
   }
