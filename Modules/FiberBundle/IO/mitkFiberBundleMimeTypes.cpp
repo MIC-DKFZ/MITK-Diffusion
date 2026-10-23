@@ -16,9 +16,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkFiberBundleMimeTypes.h"
 
+#include <dcmtk/dcmdata/dcdeftag.h>
+#include <dcmtk/dcmdata/dcfilefo.h>
 #include <dcmtk/dcmdata/dcuid.h>
 #include <itksys/SystemTools.hxx>
-#include <mitkDICOMDCMTKTagScanner.h>
 #include <mitkIOMimeTypes.h>
 #include <mitkLog.h>
 
@@ -124,32 +125,20 @@ bool FiberBundleMimeTypes::FiberBundleDicomMimeType::AppliesTo(const std::string
     if (!file.read(head.data(), static_cast<std::streamsize>(head.size())) || std::string(head.data() + 128, 4) != "DICM")
       return false;
 
-    mitk::DICOMDCMTKTagScanner::Pointer scanner = mitk::DICOMDCMTKTagScanner::New();
-    mitk::DICOMTag SOPClassUID(0x0008, 0x0016);
-
-    mitk::StringList relevantFiles;
-    relevantFiles.push_back(path);
-
-    scanner->AddTag(SOPClassUID);
-    scanner->SetInputFiles(relevantFiles);
-    scanner->Scan();
-    mitk::DICOMTagCache::Pointer tagCache = scanner->GetScanCache();
-
-    mitk::DICOMImageFrameList imageFrameList = mitk::ConvertToDICOMImageFrameList(tagCache->GetFrameInfoList());
-    if (imageFrameList.empty())
+    // The dataset is parsed only up to the SOP Class UID (0008,0016): a tractogram holds one item
+    // per track, and parsing all of them only to tell the file type cost about 0.2 s per call for
+    // a million points (and the check runs for every DICOM file the user opens).
+    file.close();
+    DcmFileFormat dicomFile;
+    const DcmTagKey afterSopClassUid(0x0008, 0x0017);
+    if (dicomFile.loadFileUntilTag(path.c_str(), EXS_Unknown, EGL_noChange, DCM_MaxReadLength, ERM_autoDetect, afterSopClassUid).bad())
       return false;
 
-    mitk::DICOMImageFrameInfo *firstFrame = imageFrameList.begin()->GetPointer();
-
-    std::string tag_value = tagCache->GetTagValue(firstFrame, SOPClassUID).value;
-    if (tag_value.empty()) {
-      return false;
-    }
-
-    if (tag_value.compare(UID_TractographyResultsStorage)!=0)
+    OFString sopClassUid;
+    if (dicomFile.getDataset()->findAndGetOFString(DCM_SOPClassUID, sopClassUid).bad() || sopClassUid.empty())
       return false;
 
-    return true;
+    return sopClassUid == UID_TractographyResultsStorage;
   }
   catch (std::exception& e)
   {
