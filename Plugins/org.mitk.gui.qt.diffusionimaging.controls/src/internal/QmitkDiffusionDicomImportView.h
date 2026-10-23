@@ -98,9 +98,6 @@ protected:
 
   QWidget *m_Parent;
 
-
-  std::string m_Prefix;
-
 };
 
 #endif // !defined(QmitkDiffusionDicomImport_H__INCLUDED)

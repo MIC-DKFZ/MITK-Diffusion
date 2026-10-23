@@ -54,6 +54,40 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 const std::string QmitkDiffusionDicomImport::VIEW_ID = "org.mitk.views.diffusiondicomimport";
 
+namespace
+{
+  /** Files of one input folder. Without "Recursive", the files in the folder itself. With
+   *  "Recursive", the files in the folder and in all its subfolders at any depth; a prefix
+   *  restricts this to the subfolders of the input folder whose name starts with it (and
+   *  everything below them), e.g. one subfolder per acquisition. */
+  gdcm::Directory::FilenamesType CollectDicomFiles(const std::string& folder, bool recursive, const std::string& prefix)
+  {
+    if (!recursive || prefix.empty())
+    {
+      gdcm::Directory directory;
+      directory.Load(folder, recursive);
+      return directory.GetFilenames();
+    }
+
+    gdcm::Directory::FilenamesType files;
+    itksys::Directory root;
+    if (!root.Load(folder))
+      return files;
+    for (unsigned long i = 0; i < root.GetNumberOfFiles(); ++i)
+    {
+      const std::string name = root.GetFile(i);
+      const std::string path = folder + "/" + name;
+      if (name == "." || name == ".." || !name.starts_with(prefix) || !itksys::SystemTools::FileIsDirectory(path))
+        continue;
+      gdcm::Directory directory;
+      directory.Load(path, true);
+      const auto& subfolderFiles = directory.GetFilenames();
+      files.insert(files.end(), subfolderFiles.begin(), subfolderFiles.end());
+    }
+    return files;
+  }
+}
+
 
 QmitkDiffusionDicomImport::QmitkDiffusionDicomImport(QObject* /*parent*/, const char* /*name*/)
   : m_Controls(nullptr)
@@ -109,15 +143,17 @@ void QmitkDiffusionDicomImport::SetFocus()
 
 void QmitkDiffusionDicomImport::RecursiveSettingsChanged()
 {
+  // The prefix is the text of the line edit when the import starts; Set Prefix only locks it.
   m_Controls->m_SubdirPrefixLineEdit->setVisible( m_Controls->m_DicomLoadRecursiveCheckbox->isChecked() );
   m_Controls->m_SetPrefixButton->setVisible( m_Controls->m_DicomLoadRecursiveCheckbox->isChecked() );
   m_Controls->m_SubdirPrefixLineEdit->clear();
   this->m_Controls->m_SubdirPrefixLineEdit->setEnabled(true);
+  m_Controls->m_SetPrefixButton->setEnabled(true);
+  m_Controls->m_ResetPrefixButton->setVisible(false);
 }
 
 void QmitkDiffusionDicomImport::SetPrefixButtonPushed()
 {
-  m_Prefix = this->m_Controls->m_SubdirPrefixLineEdit->text().toStdString();
   if( !this->m_Controls->m_ResetPrefixButton->isVisible() )
     this->m_Controls->m_ResetPrefixButton->setVisible(true);
 
@@ -292,8 +328,6 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
 {
   itk::TimeProbesCollectorBase clock;
 
-  bool has_prefix = true;
-
   // LoadDiffusionDicomSeries switches to the C locale itself, for the time it parses.
   try
   {
@@ -320,75 +354,28 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
     {
       // RETREIVE FOLDERNAME
       QString folderName = m_Controls->listWidget->item(folderIndex)->text();
+      const auto files = CollectDicomFiles(folderName.toStdString(),
+                                           m_Controls->m_DicomLoadRecursiveCheckbox->isChecked(),
+                                           m_Controls->m_SubdirPrefixLineEdit->text().toStdString());
+      Status(QString(" ... found %1 different files").arg(files.size()));
+      complete_list.insert(complete_list.end(), files.begin(), files.end());
+    }
 
-
-      if( this->m_Controls->m_DicomLoadRecursiveCheckbox->isChecked() )
-      {
-
-        std::string subdir_prefix = "";
-        if( has_prefix )
-        {
-          subdir_prefix = this->m_Prefix;
-        }
-
-        itksys::Directory rootdir;
-        rootdir.Load( folderName.toStdString().c_str() );
-
-        for( unsigned int idx=0; idx<rootdir.GetNumberOfFiles(); idx++)
-        {
-          std::string current_path = rootdir.GetFile(idx);
-          std::string directory_path = std::string(rootdir.GetPath()) + std::string("/") + current_path;
-
-          MITK_INFO("dicom.loader.inputrootdir.test") << "ProbePath:   " << current_path;
-          MITK_INFO("dicom.loader.inputrootdir.test") << "IsDirectory: " << itksys::SystemTools::FileIsDirectory( itksys::SystemTools::ConvertToOutputPath( directory_path.c_str() ).c_str() )
-                                                      << " StartsWith: " << itksys::SystemTools::StringStartsWith( current_path.c_str(), subdir_prefix.c_str() );
-
-          // test for prefix
-          if(    itksys::SystemTools::FileIsDirectory( itksys::SystemTools::ConvertToOutputPath( directory_path.c_str() ).c_str() )
-                 && itksys::SystemTools::StringStartsWith( current_path.c_str(), subdir_prefix.c_str() )
-                 )
-          {
-
-            gdcm::Directory d;
-            d.Load( itksys::SystemTools::ConvertToOutputPath( directory_path.c_str() ) , false);
-
-            MITK_INFO("dicom.load.subdir.attempt") << "In directory " << itksys::SystemTools::ConvertToOutputPath( directory_path.c_str() );
-
-            const gdcm::Directory::FilenamesType &l1 = d.GetFilenames();
-            const unsigned int ntotalfiles = l1.size();
-            Status(QString(" ... found %1 different files").arg(ntotalfiles));
-
-            for( unsigned int i=0; i< ntotalfiles; i++)
-            {
-              complete_list.push_back( l1.at(i) );
-            }
-
-
-          }
-
-        }
-      }
-      else
-      {
-        gdcm::Directory d;
-        d.Load( folderName.toStdString().c_str(), this->m_Controls->m_DicomLoadRecursiveCheckbox->isChecked() ); // recursive !
-        const gdcm::Directory::FilenamesType &l1 = d.GetFilenames();
-        const unsigned int ntotalfiles = l1.size();
-        Status(QString(" ... found %1 different files").arg(ntotalfiles));
-
-        for( unsigned int i=0; i< ntotalfiles; i++)
-        {
-          complete_list.push_back( l1.at(i) );
-        }
-
-      }
-
-
-
+    if (complete_list.empty())
+    {
+      Error(QString("No files found in the selected folders."));
+      QMessageBox::warning(m_Parent, "Diffusion DICOM import", "No files were found in the selected folders.");
+      return;
     }
 
     {
       const auto images = mitk::DiffusionDICOMFileReader::LoadDiffusionDicomSeries( complete_list, this->m_Controls->m_SplitMosaicCheckBox->isChecked(), true );
+      if (images.empty())
+      {
+        Error(QString("No diffusion-weighted image found in the selected folders."));
+        QMessageBox::warning(m_Parent, "Diffusion DICOM import", "No diffusion-weighted image was found in the selected folders.");
+        return;
+      }
       for( const auto& loaded_image : images )
       {
         // "Merge duplicate gradients": volumes whose gradients differ by less than the given
