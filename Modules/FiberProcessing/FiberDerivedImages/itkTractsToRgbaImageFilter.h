@@ -48,7 +48,7 @@ public:
   itkSetMacro( UpsamplingFactor, float)
   itkGetMacro( UpsamplingFactor, float)
 
-  itkSetMacro( FiberBundle, mitk::FiberBundle::Pointer)
+  itkSetConstObjectMacro( FiberBundle, mitk::FiberBundle )
   itkSetMacro( InputImage, typename InputImageType::Pointer)
 
   /** Use input image geometry to initialize output image **/
@@ -63,7 +63,7 @@ protected:
   TractsToRgbaImageFilter();
   virtual ~TractsToRgbaImageFilter();
 
-  mitk::FiberBundle::Pointer        m_FiberBundle;      ///< input fiber bundle
+  mitk::FiberBundle::ConstPointer        m_FiberBundle;      ///< input fiber bundle
   float                             m_UpsamplingFactor; ///< use higher resolution for ouput image
   bool                              m_UseImageGeometry; ///< output image is given other geometry than fiberbundle (input image geometry)
   typename InputImageType::Pointer  m_InputImage;

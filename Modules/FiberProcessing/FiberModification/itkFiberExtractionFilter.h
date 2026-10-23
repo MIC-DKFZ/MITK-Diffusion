@@ -58,7 +58,7 @@ public:
     this->GenerateData();
   }
 
-  itkSetMacro( InputFiberBundle, mitk::FiberBundle::Pointer )
+  itkSetConstObjectMacro( InputFiberBundle, mitk::FiberBundle )
   /** Overlap or endpoints. The setters are written out because itkSetMacro streams the value,
    *  which an enum class does not support. */
   void SetMode(MODE mode)
@@ -110,12 +110,12 @@ protected:
 
   mitk::FiberBundle::Pointer CreateFib(const std::vector< unsigned int >& ids);
   void AddPositives(const std::vector< std::vector< unsigned int > >& positive_ids);
-  void ExtractOverlap(mitk::FiberBundle::Pointer fib);
-  void ExtractEndpoints(mitk::FiberBundle::Pointer fib);
-  void ExtractLabels(mitk::FiberBundle::Pointer fib);
+  void ExtractOverlap(const mitk::FiberBundle* fib);
+  void ExtractEndpoints(const mitk::FiberBundle* fib);
+  void ExtractLabels(const mitk::FiberBundle* fib);
   bool IsPositive(const itk::Point<float, 3>& itkP);
 
-  mitk::FiberBundle::Pointer                  m_InputFiberBundle;
+  mitk::FiberBundle::ConstPointer             m_InputFiberBundle;
   std::vector< mitk::FiberBundle::Pointer >   m_Positives;
   std::vector< mitk::FiberBundle::Pointer >   m_Negatives;
   std::vector< ItkInputImgType* >             m_RoiImages;

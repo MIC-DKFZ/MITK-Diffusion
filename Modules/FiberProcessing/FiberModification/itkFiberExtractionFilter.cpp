@@ -145,7 +145,7 @@ std::vector< std::string > FiberExtractionFilter< PixelType >::GetPositiveLabels
 }
 
 template< class PixelType >
-void FiberExtractionFilter< PixelType >::ExtractOverlap(mitk::FiberBundle::Pointer fib)
+void FiberExtractionFilter< PixelType >::ExtractOverlap(const mitk::FiberBundle* fib)
 {
   MITK_INFO << "Extracting fibers (min. overlap " << m_OverlapFraction << ")";
   vtkSmartPointer<vtkPolyData> polydata = fib->GetFiberPolyData();
@@ -218,7 +218,7 @@ void FiberExtractionFilter< PixelType >::ExtractOverlap(mitk::FiberBundle::Point
 }
 
 template< class PixelType >
-void FiberExtractionFilter< PixelType >::ExtractEndpoints(mitk::FiberBundle::Pointer fib)
+void FiberExtractionFilter< PixelType >::ExtractEndpoints(const mitk::FiberBundle* fib)
 {
   MITK_INFO << "Extracting fibers (endpoints in mask)";
   vtkSmartPointer<vtkPolyData> polydata = fib->GetFiberPolyData();
@@ -291,7 +291,7 @@ namespace
 }
 
 template< class PixelType >
-void FiberExtractionFilter< PixelType >::ExtractLabels(mitk::FiberBundle::Pointer fib)
+void FiberExtractionFilter< PixelType >::ExtractLabels(const mitk::FiberBundle* fib)
 {
   MITK_INFO << "Extracting fibers by labels";
   vtkSmartPointer<vtkPolyData> polydata = fib->GetFiberPolyData();
@@ -467,7 +467,7 @@ void FiberExtractionFilter< PixelType >::GenerateData()
   m_Positives.clear();
   m_Negatives.clear();
   m_PositiveLabels.clear();
-  mitk::FiberBundle::Pointer fib = m_InputFiberBundle;
+  const mitk::FiberBundle* fib = m_InputFiberBundle;
   if (fib->GetNumFibers()<=0)
     MITK_INFO << "No fibers in tractogram!";
 

@@ -106,7 +106,7 @@ float TractClusteringFilter::CalcOverlap(vnl_matrix<float>& t)
   return overlap;
 }
 
-std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(mitk::FiberBundle::Pointer tractogram)
+std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(const mitk::FiberBundle* tractogram)
 {
   // QuickBundles compares fibers point by point (MDF), so each fiber is resampled to m_NumPoints
   // points at equal arc length along it, both end points included (as dipy's
@@ -289,12 +289,12 @@ void TractClusteringFilter::SetMergeDuplicateThreshold(float MergeDuplicateThres
   m_MergeDuplicateThreshold = MergeDuplicateThreshold;
 }
 
-void TractClusteringFilter::SetInCentroids(const mitk::FiberBundle::Pointer &InCentroids)
+void TractClusteringFilter::SetInCentroids(const mitk::FiberBundle* InCentroids)
 {
   m_InCentroids = InCentroids;
 }
 
-void TractClusteringFilter::SetTractogram(const mitk::FiberBundle::Pointer &Tractogram)
+void TractClusteringFilter::SetTractogram(const mitk::FiberBundle* Tractogram)
 {
   m_Tractogram = Tractogram;
 }

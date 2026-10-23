@@ -61,7 +61,7 @@ public:
   itkGetMacro( OutputAbsoluteValues, bool)                      ///< output absolute values of the number of fibers per voxel
   itkSetMacro( UseImageGeometry, bool)                          ///< use input image geometry to initialize output image
   itkGetMacro( UseImageGeometry, bool)                          ///< use input image geometry to initialize output image
-  itkSetMacro( FiberBundle, mitk::FiberBundle::Pointer)         ///< input fiber bundle
+  itkSetConstObjectMacro( FiberBundle, mitk::FiberBundle )         ///< input fiber bundle
   itkSetMacro( InputImage, typename RefImageType::Pointer)      ///< use input image geometry to initialize output image
   itkGetMacro( MaxDensity, OutPixelType)
 
@@ -76,7 +76,7 @@ protected:
   ~TractDensityImageFilter() override;
 
   typename RefImageType::Pointer    m_InputImage;           ///< use input image geometry to initialize output image
-  mitk::FiberBundle::Pointer        m_FiberBundle;          ///< input fiber bundle
+  mitk::FiberBundle::ConstPointer        m_FiberBundle;          ///< input fiber bundle
   float                             m_UpsamplingFactor;     ///< use higher resolution for ouput image
   bool                              m_InvertImage;          ///< voxelvalue = 1-voxelvalue
   TDI_MODE                          m_Mode;                 ///< what should the output look like

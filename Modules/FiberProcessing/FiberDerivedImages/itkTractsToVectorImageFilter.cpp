@@ -48,7 +48,7 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
   if (m_MaxNumDirections < 1)
     mitkThrow() << "The maximum number of directions per voxel must be at least 1.";
 
-  mitk::BaseGeometry::Pointer geometry = m_FiberBundle->GetGeometry();
+  const mitk::BaseGeometry* geometry = m_FiberBundle->GetGeometry();
 
   // calculate new image parameters
   itk::Vector<double> spacing3;

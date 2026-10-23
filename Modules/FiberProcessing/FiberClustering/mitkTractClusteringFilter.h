@@ -83,9 +83,9 @@ public:
 
   void SetMetrics(const std::vector<mitk::ClusteringMetric *> &Metrics);
 
-  void SetTractogram(const mitk::FiberBundle::Pointer &Tractogram);
+  void SetTractogram(const mitk::FiberBundle* Tractogram);
 
-  void SetInCentroids(const mitk::FiberBundle::Pointer &InCentroids);
+  void SetInCentroids(const mitk::FiberBundle* InCentroids);
 
   void SetMergeDuplicateThreshold(float MergeDuplicateThreshold);
 
@@ -106,7 +106,7 @@ public:
 protected:
 
   void GenerateData();
-  std::vector< vnl_matrix<float> > ResampleFibers(FiberBundle::Pointer tractogram);
+  std::vector< vnl_matrix<float> > ResampleFibers(const FiberBundle* tractogram);
   float CalcOverlap(vnl_matrix<float>& t);
 
   std::vector< Cluster > ClusterStep(std::vector< unsigned int > f_indices, std::vector< float > distances);
@@ -118,8 +118,8 @@ protected:
 
   unsigned int                                m_NumPoints;
   std::vector< float >                        m_Distances;
-  mitk::FiberBundle::Pointer                  m_Tractogram;
-  mitk::FiberBundle::Pointer                  m_InCentroids;
+  mitk::FiberBundle::ConstPointer             m_Tractogram;
+  mitk::FiberBundle::ConstPointer             m_InCentroids;
   std::vector< mitk::FiberBundle::Pointer >   m_OutTractograms;
   std::vector< mitk::FiberBundle::Pointer >   m_OutCentroids;
   mitk::FiberBundle::Pointer                  m_OutUnassigned;

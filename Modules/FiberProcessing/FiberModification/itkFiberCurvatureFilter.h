@@ -56,7 +56,7 @@ public:
     itkSetMacro( AngularDeviation, double )
     itkSetMacro( RemoveFibers, bool )
     itkSetMacro( UseMedian, bool )
-    itkSetMacro( InputFiberBundle, mitk::FiberBundle::Pointer )
+    itkSetConstObjectMacro( InputFiberBundle, mitk::FiberBundle )
     itkGetMacro( OutputFiberBundle, mitk::FiberBundle::Pointer )
 
 protected:
@@ -66,7 +66,7 @@ protected:
     FiberCurvatureFilter();
     ~FiberCurvatureFilter() override;
 
-    mitk::FiberBundle::Pointer m_InputFiberBundle;
+    mitk::FiberBundle::ConstPointer m_InputFiberBundle;
     mitk::FiberBundle::Pointer m_OutputFiberBundle;
     double  m_AngularDeviation;
     double  m_Distance;

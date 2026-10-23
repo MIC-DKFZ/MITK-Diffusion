@@ -51,7 +51,7 @@ public:
   itkSetMacro( InvertImage, bool)
   itkGetMacro( InvertImage, bool)
 
-  itkSetMacro( FiberBundle, mitk::FiberBundle::Pointer)
+  itkSetConstObjectMacro( FiberBundle, mitk::FiberBundle )
   itkSetMacro( InputImage, typename OutputImageType::Pointer)
 
   /** Use input image geometry to initialize output image **/
@@ -67,7 +67,7 @@ protected:
   TractsToFiberEndingsImageFilter();
   virtual ~TractsToFiberEndingsImageFilter();
 
-  mitk::FiberBundle::Pointer        m_FiberBundle;          ///< input fiber bundle
+  mitk::FiberBundle::ConstPointer        m_FiberBundle;          ///< input fiber bundle
   float                             m_UpsamplingFactor;     ///< use higher resolution for ouput image
   bool                              m_InvertImage;          ///< voxelvalue = 1-voxelvalue
   bool                              m_UseImageGeometry;     ///< output image is given other geometry than fiberbundle (input image geometry)

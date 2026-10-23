@@ -69,7 +69,7 @@ public:
   itkSetMacro( MaxNumDirections, unsigned long)                       ///< If more directions are extracted, only the largest are kept.
   itkGetMacro( MaxNumDirections, unsigned long)                       ///< If more directions are extracted, only the largest are kept.
   itkSetMacro( MaskImage, ItkUcharImgType::Pointer)                   ///< only process voxels inside mask
-  itkSetMacro( FiberBundle, mitk::FiberBundle::Pointer)               ///< input fiber bundle
+  itkSetConstObjectMacro( FiberBundle, mitk::FiberBundle )               ///< input fiber bundle
   itkSetMacro( OnlyUseMaskGeometry, bool)                             ///< don't use content of mask image, only use it's geometry
   itkGetMacro( NumDirectionsImage, ItkUcharImgType::Pointer)          ///< number of directions per voxel
   itkGetMacro( DirectionImage, typename ItkDirectionImageType::Pointer)        ///< output directions
@@ -85,7 +85,7 @@ protected:
   ~TractsToVectorImageFilter() override;
 
   NormalizationMethods                m_NormalizationMethod;              ///< normalization method of peaks
-  mitk::FiberBundle::Pointer          m_FiberBundle;                      ///< input fiber bundle
+  mitk::FiberBundle::ConstPointer          m_FiberBundle;                      ///< input fiber bundle
   float                               m_AngularThreshold;                 ///< cluster directions that are closer together than the specified threshold
   ItkUcharImgType::Pointer            m_MaskImage;                        ///< only voxels inside the binary mask are processed
   unsigned long                       m_MaxNumDirections;                 ///< if more directions per voxel are extracted, only the largest are kept
