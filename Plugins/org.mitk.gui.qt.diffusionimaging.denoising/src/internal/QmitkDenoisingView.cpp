@@ -120,7 +120,9 @@ void QmitkDenoisingView::StartDenoising()
 
 void QmitkDenoisingView::OnDenoisingFinished()
 {
-  const Result result = m_Watcher.result();
+  // Taken, not copied: the watcher's future would otherwise keep the whole image alive until the
+  // next run, even after its node is removed.
+  const Result result = m_Watcher.future().takeResult();
   m_Controls->m_ApplyButton->setText("Start");
   this->UpdateGui();
 
