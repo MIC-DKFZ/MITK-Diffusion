@@ -628,9 +628,9 @@ void QmitkControlVisualizationPropertiesView::FlipPeaks()
       mitk::ImageWriteAccessor access(peaks);
       std::memcpy(access.GetData(), flipped->GetBufferPointer(), numValues*sizeof(mitk::PeakImage::PixelType));
     }
+    // GetPolyData() rebuilds the peak lines the mappers draw once the image is newer, in its
+    // current colour
     peaks->Modified();
-    // the peak lines the mappers draw are built from the buffer
-    peaks->ConstructPolydata();
   }
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }

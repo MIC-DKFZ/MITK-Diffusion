@@ -29,7 +29,7 @@ The colour button opens one colour dialog and colours all selected tractograms a
 
 \section QmitkDiffusionImagingPeakVisualizationSettings Peak Images
 
-For peak images, the view sets the line width, the colour (or the colouring by orientation), the 3D clipping as for tractograms, and whether the peaks are also shown in the 3D render window. "Flip Peaks" mirrors the peak directions of the selected peak images along the chosen axes, e.g. to correct peaks computed in another coordinate convention. The images are changed in place and keep their names and properties; afterwards the peaks are coloured by orientation.
+For peak images, the view sets the line width, the colour (or the colouring by orientation), the 3D clipping as for tractograms, and whether the peaks are also shown in the 3D render window. "Flip Peaks" mirrors the peak directions of the selected peak images along the chosen axes, e.g. to correct peaks computed in another coordinate convention. The images are changed in place and keep their names, properties and colour.
 
 \section QmitkDiffusionImagingPlanarFigures Planar Figures
 
