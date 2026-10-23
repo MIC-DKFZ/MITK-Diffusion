@@ -35,6 +35,7 @@ class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
   using DwiType = FilterType::OutputImageType;
+  using DoubleDwiType = FilterType::DoubleDwiType;
 
   mitk::FiberBundle::Pointer m_FiberBundle;
   int m_MaxThreads = 1;
@@ -89,6 +90,19 @@ public:
       const auto differences = CountDifferences<DwiType>(test->GetOutput(), reference->GetOutput());
       MITK_INFO << parameterFile << ", " << threads << " threads: " << differences << " output values differ from 1 thread";
       CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": output at " + std::to_string(threads) + " threads equals the 1-thread output", 0ul, differences);
+
+      // the complex coil images before rounding show differences in the last bits too
+      const auto real = test->GetOutputImagesReal();
+      const auto imag = test->GetOutputImagesImag();
+      CPPUNIT_ASSERT_EQUAL(reference->GetOutputImagesReal().size(), real.size());
+      unsigned long complexDifferences = 0;
+      for (std::size_t c = 0; c < real.size(); ++c)
+      {
+        complexDifferences += CountDifferences<DoubleDwiType>(real[c], reference->GetOutputImagesReal()[c]);
+        complexDifferences += CountDifferences<DoubleDwiType>(imag[c], reference->GetOutputImagesImag()[c]);
+      }
+      MITK_INFO << parameterFile << ", " << threads << " threads: " << complexDifferences << " coil image values differ from 1 thread";
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": coil images at " + std::to_string(threads) + " threads equal the 1-thread images", 0ul, complexDifferences);
     }
   }
 

@@ -990,8 +990,11 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     int numFibers = m_FiberBundle->GetNumFibers();
     boost::timer::progress_display disp(numFibers*num_gradients);
 
+    // Short fibers (mean length below 5 mm) are simulated with two threads, as before; the limit
+    // applies to the fiber loop only, not to every later OpenMP region of the process.
+    int fiberThreads = omp_get_max_threads();
     if (m_FiberBundle->GetMeanFiberLength()<5.0)
-      omp_set_num_threads(2);
+      fiberThreads = 2;
 
     PrintToLog("0%   10   20   30   40   50   60   70   80   90   100%", false, true, false);
     PrintToLog("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, false);
@@ -1030,104 +1033,130 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
         std::vector< double* > buffers;
         for (unsigned int i=0; i<m_CompartmentImages.size(); ++i)
           buffers.push_back(m_CompartmentImages.at(i)->GetBufferPointer());
-#pragma omp parallel for
-        for( int i=0; i<numFibers; ++i )
+        // The fibers are simulated in parallel, but their contributions are added to the images in
+        // fiber order afterwards: a floating-point sum depends on the order of its summands, and the
+        // result has to be the same at every thread count. Chunks bound the memory this needs.
+        struct Contribution
         {
-          if (this->GetAbortGenerateData())
-            continue;
-
-          float fiberWeight = m_FiberBundleTransformed->GetFiberWeight(i);
-          if (fiberWeight == 0)
-            continue;
-
-          int numPoints = -1;
-          std::vector< itk::Vector<double, 3> > points_copy;
-#pragma omp critical
+          int compartment;    ///< -1: intra-axonal volume image
+          std::size_t index;
+          double value;
+        };
+        const int chunkSize = 1024;
+        for (int chunkStart=0; chunkStart<numFibers; chunkStart+=chunkSize)
+        {
+          const int chunkEnd = std::min(numFibers, chunkStart+chunkSize);
+          std::vector< std::vector< Contribution > > contributions(chunkEnd-chunkStart);
+#pragma omp parallel for num_threads(fiberThreads) schedule(dynamic)
+          for( int i=chunkStart; i<chunkEnd; ++i )
           {
-            vtkCell* cell = fiberPolyData->GetCell(i);
-            numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-            for (int j=0; j<numPoints; j++)
-              points_copy.push_back(GetItkVector(points->GetPoint(j)));
-          }
-
-          if (numPoints<2)
-            continue;
-
-          double seg_volume = fiberWeight*itk::Math::pi*m_mmRadius*m_mmRadius;
-          for( int j=0; j<numPoints - 1; ++j)
-          {
+            auto& fiberContributions = contributions[i-chunkStart];
             if (this->GetAbortGenerateData())
-            {
-              j=numPoints;
               continue;
+
+            float fiberWeight = m_FiberBundleTransformed->GetFiberWeight(i);
+            if (fiberWeight == 0)
+              continue;
+
+            int numPoints = -1;
+            std::vector< itk::Vector<double, 3> > points_copy;
+#pragma omp critical
+            {
+              vtkCell* cell = fiberPolyData->GetCell(i);
+              numPoints = cell->GetNumberOfPoints();
+              vtkPoints* points = cell->GetPoints();
+              for (int j=0; j<numPoints; j++)
+                points_copy.push_back(GetItkVector(points->GetPoint(j)));
             }
 
-            itk::Vector<double> v = points_copy.at(j);
-
-            itk::Vector<double, 3> dir = points_copy.at(j+1)-v;
-            if ( dir.GetSquaredNorm()<0.0001 || dir[0]!=dir[0] || dir[1]!=dir[1] || dir[2]!=dir[2] )
+            if (numPoints<2)
               continue;
-            dir.Normalize();
 
-            auto tmp = points_copy.at(j);
-            itk::Point<float, 3> startVertex;
-            startVertex[0] = tmp[0]; startVertex[1] = tmp[1]; startVertex[2] = tmp[2];
-            itk::Index<3> startIndex;
-            itk::ContinuousIndex<float, 3> startIndexCont;
-            (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-            (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
-
-            tmp = points_copy.at(j+1);
-            itk::Point<float, 3> endVertex;
-            endVertex[0] = tmp[0]; endVertex[1] = tmp[1]; endVertex[2] = tmp[2];
-            itk::Index<3> endIndex;
-            itk::ContinuousIndex<float, 3> endIndexCont;
-            (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-            (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
-
-            std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(m_WorkingSpacing, startIndex, endIndex, startIndexCont, endIndexCont);
-
-            // generate signal for each fiber compartment
-            for (int k=0; k<numFiberCompartments; ++k)
+            double seg_volume = fiberWeight*itk::Math::pi*m_mmRadius*m_mmRadius;
+            for( int j=0; j<numPoints - 1; ++j)
             {
-              double signal_add = m_Parameters.m_FiberModelList[k]->SimulateMeasurement(g, dir)*seg_volume;
-              for (std::pair< itk::Index<3>, double > seg : segments)
+              if (this->GetAbortGenerateData())
               {
-                if (!m_TransformedMaskImage->GetLargestPossibleRegion().IsInside(seg.first) || m_TransformedMaskImage->GetPixel(seg.first)<=0)
-                  continue;
-
-                double seg_signal = seg.second*signal_add;
-
-                unsigned int linear_index = g + num_gradients*seg.first[0] + num_gradients*image_size_x*seg.first[1] + num_gradients*image_size_x*region_size_y*seg.first[2];
-
-                // update dMRI volume
-#pragma omp atomic
-                buffers[k][linear_index] += seg_signal;
-
-                // update fiber volume image
-                if (k==0)
-                {
-                  linear_index = seg.first[0] + image_size_x*seg.first[1] + image_size_x*region_size_y*seg.first[2];
-#pragma omp atomic
-                  intraAxBuffer[linear_index] += seg.second*seg_volume;
-                  double vol = intraAxBuffer[linear_index];
-                  if (vol>maxVolume) { maxVolume = vol; }
-                }
+                j=numPoints;
+                continue;
               }
 
+              itk::Vector<double> v = points_copy.at(j);
+
+              itk::Vector<double, 3> dir = points_copy.at(j+1)-v;
+              if ( dir.GetSquaredNorm()<0.0001 || dir[0]!=dir[0] || dir[1]!=dir[1] || dir[2]!=dir[2] )
+                continue;
+              dir.Normalize();
+
+              auto tmp = points_copy.at(j);
+              itk::Point<float, 3> startVertex;
+              startVertex[0] = tmp[0]; startVertex[1] = tmp[1]; startVertex[2] = tmp[2];
+              itk::Index<3> startIndex;
+              itk::ContinuousIndex<float, 3> startIndexCont;
+              (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
+              (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+
+              tmp = points_copy.at(j+1);
+              itk::Point<float, 3> endVertex;
+              endVertex[0] = tmp[0]; endVertex[1] = tmp[1]; endVertex[2] = tmp[2];
+              itk::Index<3> endIndex;
+              itk::ContinuousIndex<float, 3> endIndexCont;
+              (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
+              (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+
+              std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(m_WorkingSpacing, startIndex, endIndex, startIndexCont, endIndexCont);
+
+              // generate signal for each fiber compartment
+              for (int k=0; k<numFiberCompartments; ++k)
+              {
+                double signal_add = m_Parameters.m_FiberModelList[k]->SimulateMeasurement(g, dir)*seg_volume;
+                for (std::pair< itk::Index<3>, double > seg : segments)
+                {
+                  if (!m_TransformedMaskImage->GetLargestPossibleRegion().IsInside(seg.first) || m_TransformedMaskImage->GetPixel(seg.first)<=0)
+                    continue;
+
+                  double seg_signal = seg.second*signal_add;
+
+                  unsigned int linear_index = g + num_gradients*seg.first[0] + num_gradients*image_size_x*seg.first[1] + num_gradients*image_size_x*region_size_y*seg.first[2];
+
+                  // update dMRI volume
+                  fiberContributions.push_back({k, linear_index, seg_signal});
+
+                  // update fiber volume image
+                  if (k==0)
+                  {
+                    linear_index = seg.first[0] + image_size_x*seg.first[1] + image_size_x*region_size_y*seg.first[2];
+                    fiberContributions.push_back({-1, linear_index, seg.second*seg_volume});
+                  }
+                }
+
+              }
+            }
+
+#pragma omp critical
+            {
+              // progress report
+              ++disp;
+              unsigned long newTick = 50*disp.count()/disp.expected_count();
+              for (unsigned int tick = 0; tick<(newTick-lastTick); ++tick)
+                PrintToLog("*", false, false, false);
+              lastTick = newTick;
             }
           }
 
-#pragma omp critical
-          {
-            // progress report
-            ++disp;
-            unsigned long newTick = 50*disp.count()/disp.expected_count();
-            for (unsigned int tick = 0; tick<(newTick-lastTick); ++tick)
-              PrintToLog("*", false, false, false);
-            lastTick = newTick;
-          }
+          // add the contributions in fiber order, as one thread would
+          for (const auto& fiberContributions : contributions)
+            for (const auto& c : fiberContributions)
+            {
+              if (c.compartment<0)
+              {
+                intraAxBuffer[c.index] += c.value;
+                if (intraAxBuffer[c.index]>maxVolume)
+                  maxVolume = intraAxBuffer[c.index];
+              }
+              else
+                buffers[c.compartment][c.index] += c.value;
+            }
         }
       }
 
