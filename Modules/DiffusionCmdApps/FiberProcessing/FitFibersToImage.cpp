@@ -119,6 +119,8 @@ int main(int argc, char* argv[])
     auto input_tracts = mitk::FiberBundleIOHelper::load_fibs(fib_files, &fib_names);
 
     itk::FitFibersToImageFilter::Pointer fitter = itk::FitFibersToImageFilter::New();
+    // The filter does not own its signal model; it must live as long as the filter is used.
+    std::unique_ptr< mitk::TensorModel<> > model;
 
     mitk::BaseData::Pointer inputData = mitk::IOUtil::Load(input_image_name, &functor)[0].GetPointer();
     mitk::Image::Pointer mitk_image = dynamic_cast<mitk::Image*>(inputData.GetPointer());
@@ -135,13 +137,13 @@ int main(int argc, char* argv[])
     else if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(mitk_image))
     {
       fitter->SetDiffImage(mitk::DiffusionPropertyHelper::GetItkVectorImage(mitk_image));
-      mitk::TensorModel<>* model = new mitk::TensorModel<>();
+      model = std::make_unique< mitk::TensorModel<> >();
       model->SetBvalue(1000);
       model->SetDiffusivity1(0.0010);
       model->SetDiffusivity2(0.00015);
       model->SetDiffusivity3(0.00015);
       model->SetGradientList(mitk::DiffusionPropertyHelper::GetGradientContainer(mitk_image));
-      fitter->SetSignalModel(model);
+      fitter->SetSignalModel(model.get());
     }
     else if (mitk_image->GetDimension()==3)
     {
@@ -176,6 +178,11 @@ int main(int argc, char* argv[])
       fitter->SetRegularization(VnlCostFunction::REGU::GROUP_VARIANCE);
     else if (regu=="NONE")
       fitter->SetRegularization(VnlCostFunction::REGU::NONE);
+    else
+    {
+      std::cout << "Unknown regularization " << regu << "." << std::endl;
+      return EXIT_FAILURE;
+    }
 
     fitter->Update();
 
@@ -262,12 +269,13 @@ int main(int argc, char* argv[])
           fib->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
           mitk::IOUtil::Save(fib, outRoot + name + "_fitted.fib");
 
+          // One weight per fiber of the saved bundle, as for the joined output.
           if (save_weights)
           {
             std::ofstream logfile;
             logfile.open (outRoot + name + "_weights.txt");
-            for (unsigned int f=0; f<output_tracts.at(bundle)->GetNumFibers(); ++f)
-              logfile << output_tracts.at(bundle)->GetFiberWeight(f) << "\n";
+            for (unsigned int f=0; f<fib->GetNumFibers(); ++f)
+              logfile << fib->GetFiberWeight(f) << "\n";
             logfile.close();
           }
         }
