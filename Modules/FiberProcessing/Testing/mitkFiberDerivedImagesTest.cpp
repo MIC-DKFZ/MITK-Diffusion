@@ -33,6 +33,8 @@ class mitkFiberDerivedImagesTestSuite : public mitk::TestFixture
   MITK_TEST(Grid_DerivedImagesShareBundleGrid);
   MITK_TEST(Grid_UpsampledReferenceSubdividesVoxels);
   MITK_TEST(Density_VisitationCountsEachFiberOncePerVoxel);
+  MITK_TEST(Directions_SecondUpdateUsesNewBundleGrid);
+  MITK_TEST(Directions_NoFiberInMask_EmptyImage);
   CPPUNIT_TEST_SUITE_END();
 
   using UcharImageType = itk::Image<unsigned char, 3>;
@@ -255,6 +257,36 @@ public:
     filter->Update();
     for (int x = 0; x < 5; ++x)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, filter->GetOutput()->GetPixel({{x, 0, 0}}), 1e-9);
+  }
+
+  void Directions_SecondUpdateUsesNewBundleGrid()
+  {
+    using namespace mitk::FiberProcessingTestHelper;
+    auto first = CreateBundle({Line({0.2, 0.3, 0.4}, {5.7, 2.3, 1.4}, 4)});
+    auto second = CreateBundle({Line({20.2, 10.3, 5.4}, {29.7, 12.3, 6.4}, 4)});
+
+    auto filter = DirectionFilterType::New();
+    filter->SetFiberBundle(first);
+    filter->Update();
+    filter->SetFiberBundle(second);
+    filter->Update();
+
+    auto reference = DirectionFilterType::New();
+    reference->SetFiberBundle(second);
+    reference->Update();
+    AssertSameGrid(reference->GetNumDirectionsImage().GetPointer(), filter->GetNumDirectionsImage().GetPointer());
+  }
+
+  void Directions_NoFiberInMask_EmptyImage()
+  {
+    auto mask = CreateMask(1, 1, 3);
+    mask->FillBuffer(0);
+    auto filter = DirectionFilterType::New();
+    filter->SetFiberBundle(CrossingAndParallelFibers());
+    filter->SetMaskImage(mask);
+    CPPUNIT_ASSERT_NO_THROW(filter->Update());
+    for (int z = 0; z < 3; ++z)
+      CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(0), filter->GetNumDirectionsImage()->GetPixel({{0, 0, z}}));
   }
 };
 

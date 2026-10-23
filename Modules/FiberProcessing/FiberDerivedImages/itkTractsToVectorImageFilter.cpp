@@ -66,12 +66,15 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
   itk::Point<double> origin3;
   itk::Matrix<double, 3, 3> direction3;
   ImageRegion<3> imageRegion3;
-  if (!m_MaskImage.IsNull())
+  // Without a mask image a mask covering the bundle grid is used for this run only, so that the
+  // next Update with another bundle gets its own grid.
+  ItkUcharImgType::Pointer mask = m_MaskImage;
+  if (!mask.IsNull())
   {
-    spacing3 = m_MaskImage->GetSpacing();
-    imageRegion3 = m_MaskImage->GetLargestPossibleRegion();
-    origin3 = m_MaskImage->GetOrigin();
-    direction3 = m_MaskImage->GetDirection();
+    spacing3 = mask->GetSpacing();
+    imageRegion3 = mask->GetLargestPossibleRegion();
+    origin3 = mask->GetOrigin();
+    direction3 = mask->GetDirection();
   }
   else
   {
@@ -82,16 +85,16 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
     direction3 = grid.Direction;
     imageRegion3 = grid.Region;
 
-    m_MaskImage = ItkUcharImgType::New();
-    m_MaskImage->SetSpacing( spacing3 );
-    m_MaskImage->SetOrigin( origin3 );
-    m_MaskImage->SetDirection( direction3 );
-    m_MaskImage->SetRegions( imageRegion3 );
-    m_MaskImage->Allocate();
-    m_MaskImage->FillBuffer(1);
+    mask = ItkUcharImgType::New();
+    mask->SetSpacing( spacing3 );
+    mask->SetOrigin( origin3 );
+    mask->SetDirection( direction3 );
+    mask->SetRegions( imageRegion3 );
+    mask->Allocate();
+    mask->FillBuffer(1);
   }
   OutputImageType::RegionType::SizeType outImageSize = imageRegion3.GetSize();
-  m_OutImageSpacing = m_MaskImage->GetSpacing();
+  m_OutImageSpacing = mask->GetSpacing();
   m_ClusteredDirectionsContainer = ContainerType::New();
 
   // initialize num directions image
@@ -155,14 +158,14 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
       itk::Point<float, 3> startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
       itk::Index<3> startIndex;
       itk::ContinuousIndex<float, 3> startIndexCont;
-      (void)m_MaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-      (void)m_MaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+      (void)mask->TransformPhysicalPointToIndex(startVertex, startIndex);
+      (void)mask->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
       itk::Point<float, 3> endVertex = mitk::imv::GetItkPoint(points->GetPoint(j + 1));
       itk::Index<3> endIndex;
       itk::ContinuousIndex<float, 3> endIndexCont;
-      (void)m_MaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-      (void)m_MaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+      (void)mask->TransformPhysicalPointToIndex(endVertex, endIndex);
+      (void)mask->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
       dir[0] = endVertex[0]-startVertex[0];
       dir[1] = endVertex[1]-startVertex[1];
@@ -174,7 +177,7 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
       std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(spacing3, startIndex, endIndex, startIndexCont, endIndexCont);
       for (std::pair< itk::Index<3>, double > segment : segments)
       {
-        if (!m_MaskImage->GetLargestPossibleRegion().IsInside(segment.first) || (!m_OnlyUseMaskGeometry && m_MaskImage->GetPixel(segment.first)==0))
+        if (!mask->GetLargestPossibleRegion().IsInside(segment.first) || (!m_OnlyUseMaskGeometry && mask->GetPixel(segment.first)==0))
           continue;
 
         // add direction to container
@@ -287,8 +290,9 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
     }
   }
 
+  // A mask that no fiber passes gives an empty direction image.
   if (max_dir_mag < 0.00000001)
-    mitkThrow() << "Maximum peak size is 0.0!";
+    MITK_WARN << "No fiber direction inside the mask; the direction image is empty.";
 }
 
 
