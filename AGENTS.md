@@ -116,6 +116,12 @@ Facts the layout does not show:
   before, with the image rotation applied; DICOM import is unchanged and has no test data.
   `ctest -R 'mitkDiffusion(Property|Image|Dicom)'` runs the `DiffusionImage` tests of readers,
   writers and property helper.
+- `ctest -R 'mitkDiffusionModelling|PeakShImageReader|ImageReconstruction'` runs the
+  `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
+  display needed) and is skipped with exit code 77 where no OpenGL context can be created.
+- The netlib L-BFGS-B code behind `vnl_lbfgsb` keeps its working variables in static storage.
+  Threaded code holds `mitk::GetLbfgsbMutex()` (`Modules/DiffusionModelling/Algorithms/mitkLbfgsbMutex.h`)
+  while `minimize` runs; the cost function may release it during its evaluation.
 
 ## Porting state
 
