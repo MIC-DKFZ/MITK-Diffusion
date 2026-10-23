@@ -23,6 +23,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 namespace itk{
 /** \class DiffusionMultiShellQballReconstructionImageFilter
+    Constant solid angle ODFs of three equidistant shells (b, 2b, 3b), analytical solution of Aganj
+    et al. 2010. Every shell is normalized by the mean of all b0 volumes (key 0 of the b-value map).
+
     I. Aganj, C. Lenglet, G. Sapiro, E. Yacoub, K. Ugurbil, and N. Harel, “Reconstruction of the orientation distribution function in single and multiple shell q-ball imaging within constant solid angle,” Magnetic Resonance in Medicine, vol. 64, no. 2, pp. 554–566, 2010.
  */
 

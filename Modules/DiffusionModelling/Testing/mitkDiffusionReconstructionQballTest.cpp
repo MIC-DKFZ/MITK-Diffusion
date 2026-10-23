@@ -53,6 +53,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(MultiShell_SecondUpdate_SameResult);
   MITK_TEST(MultiShell_WithoutOdf_SameCoefficients);
   MITK_TEST(MultiShell_DuplicateGradients_Warn);
+  MITK_TEST(MultiShell_B0Groups_NormalizedByMeanOfAll);
   MITK_TEST(Standard_ShImageMatchesOdf);
   MITK_TEST(Analytical_RotatedScheme_GivesRotatedFunction);
   MITK_TEST(Analytical_HalfSphereScheme_SameAsMirrored);
@@ -508,6 +509,35 @@ public:
 
     CPPUNIT_ASSERT_EQUAL(std::string(), error);
     CPPUNIT_ASSERT(recorder->warnings.find("Diffusion Gradients equal each other") != std::string::npos);
+  }
+
+  // With a b0 count divisible by 3, each shell was normalized by "its" third of the b0 volumes in
+  // file order, so b0 volumes of 1100, 900 and 1000 gave the shells three different S0. Every shell
+  // is normalized by the mean of all b0 volumes: the result equals that of one b0 volume of 1000.
+  void MultiShell_B0Groups_NormalizedByMeanOfAll()
+  {
+    const auto oneB0 = Simulate(Shells({1000, 2000, 3000}, 3000), 3000);
+    auto gradients = Shells({1000, 2000, 3000}, 3000);
+    gradients.insert(gradients.begin(), 2, vnl_vector_fixed<double, 3>(0.0));
+    const auto threeB0 = Simulate(gradients, 3000);
+    auto pixel = threeB0.image->GetPixel({{0, 0, 0}});
+    CPPUNIT_ASSERT_EQUAL(short(1000), pixel[2]);
+    pixel[0] = 1100;
+    pixel[1] = 900;
+    threeB0.image->FillBuffer(pixel);
+
+    std::vector<MultiShellFilterType::Pointer> filters;
+    for (const auto &dwi : {oneB0, threeB0})
+    {
+      auto filter = MultiShellFilterType::New();
+      filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+      filter->SetLambda(0.006);
+      filter->Update();
+      filters.push_back(filter);
+    }
+    CPPUNIT_ASSERT_EQUAL(1000.0f, filters[1]->GetBZeroImage()->GetPixel({{1, 1, 1}}));
+    CheckEqual(filters[0]->GetCoefficientImage().GetPointer(), filters[1]->GetCoefficientImage().GetPointer());
+    CheckEqual(filters[0]->GetOutput(), filters[1]->GetOutput());
   }
 
   // The coefficient image of the non-CSA methods got the CSA constant 1/(2 sqrt(pi)) added to c0,

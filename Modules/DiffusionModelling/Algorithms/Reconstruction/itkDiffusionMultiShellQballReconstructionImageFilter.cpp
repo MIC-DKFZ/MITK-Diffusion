@@ -524,42 +524,14 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
     GradientVectorType b = gradientInputImageIterator.Get();
 
-    // calculate for each shell the corresponding b0-averages
-    double shell1b0Norm =0;
-    double shell2b0Norm =0;
-    double shell3b0Norm =0;
+    // The mean of all b0 volumes normalizes every shell (E = S/S0) and is the b0 output. A DWI does
+    // not say which b0 volume was acquired with which shell, and their order in the file need not
+    // follow the shells' order (ImageReconstruction/test_multi.dwi stores its b0 volumes before the
+    // b = 3000, 2000 and 1000 blocks), so no subset of them is assigned to a shell.
     double b0average = 0;
-    const unsigned int b0size = BZeroIndicies.size();
-
-    if(b0size == 1)
-    {
-      shell1b0Norm = b[BZeroIndicies[0]];
-      shell2b0Norm = b[BZeroIndicies[0]];
-      shell3b0Norm = b[BZeroIndicies[0]];
-      b0average = b[BZeroIndicies[0]];
-    }else if(b0size % 3 ==0)
-    {
-      for(unsigned int i = 0; i < b0size ; ++i)
-      {
-        if(i < b0size / 3)                          shell1b0Norm += b[BZeroIndicies[i]];
-        if(i >= b0size / 3 && i < (b0size / 3)*2)   shell2b0Norm += b[BZeroIndicies[i]];
-        if(i >= (b0size / 3) * 2)                   shell3b0Norm += b[BZeroIndicies[i]];
-      }
-      shell1b0Norm /= (b0size/3);
-      shell2b0Norm /= (b0size/3);
-      shell3b0Norm /= (b0size/3);
-      b0average = (shell1b0Norm + shell2b0Norm+ shell3b0Norm)/3;
-    }else
-    {
-      for(unsigned int i = 0; i <b0size ; ++i)
-      {
-        shell1b0Norm += b[BZeroIndicies[i]];
-      }
-      shell1b0Norm /= b0size;
-      shell2b0Norm = shell1b0Norm;
-      shell3b0Norm = shell1b0Norm;
-      b0average = shell1b0Norm;
-    }
+    for (const auto index : BZeroIndicies)
+      b0average += b[index];
+    b0average /= BZeroIndicies.size();
 
     bzeroIterator.Set(b0average);
     ++bzeroIterator;
@@ -578,9 +550,9 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
 
       // Normalize the Signal: Si/S0
-      S_S0Normalization(DataShell1, shell1b0Norm);
-      S_S0Normalization(DataShell2, shell2b0Norm);
-      S_S0Normalization(DataShell3, shell3b0Norm);
+      S_S0Normalization(DataShell1, b0average);
+      S_S0Normalization(DataShell2, b0average);
+      S_S0Normalization(DataShell3, b0average);
 
 
       if(m_Interpolation_Flag)
