@@ -123,10 +123,8 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GeneratePolyDataByIds(std::vecto
   auto finIt = fiberIds.begin();
   while ( finIt != fiberIds.end() )
   {
-    if (*finIt>GetNumFibers()){
-      MITK_INFO << "FiberID can not be negative or >NumFibers!!! check id Extraction!" << *finIt;
-      break;
-    }
+    if (*finIt>=GetNumFibers())
+      mitkThrow() << "Fiber id " << *finIt << " out of range (" << GetNumFibers() << " fibers).";
 
     vtkSmartPointer<vtkCell> fiber = m_FiberIdDataSet->GetCell(*finIt);//->DeepCopy(fiber);
     vtkSmartPointer<vtkPoints> fibPoints = fiber->GetPoints();

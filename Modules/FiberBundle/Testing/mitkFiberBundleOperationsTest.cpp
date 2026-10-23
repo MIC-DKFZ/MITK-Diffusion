@@ -58,6 +58,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ColorFibersByCurvature_UsesFirstSegment);
   MITK_TEST(ResampleLinear_NoStep_LeavesFibersUnchanged);
   MITK_TEST(PrintSelf_EmptyBundle_Prints);
+  MITK_TEST(GeneratePolyDataByIds_InvalidId_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -461,6 +462,16 @@ public:
     mitk::FiberBundle::New()->Print(out);
     CPPUNIT_ASSERT(out.str().find("Number of fibers: 0") != std::string::npos);
     CPPUNIT_ASSERT(out.str().find("No fiber weights") != std::string::npos);
+  }
+
+  void GeneratePolyDataByIds_InvalidId_Throws()
+  {
+    auto fib = LoadWeightedFibers();
+    auto weights = vtkSmartPointer<vtkFloatArray>::New();
+    auto polyData = fib->GeneratePolyDataByIds({0, 2}, weights);
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(2), polyData->GetNumberOfLines());
+    CPPUNIT_ASSERT_EQUAL(fib->GetFiberWeight(2), weights->GetValue(1));
+    CPPUNIT_ASSERT_THROW(fib->GeneratePolyDataByIds({0, fib->GetNumFibers()}, weights), mitk::Exception);
   }
 };
 
