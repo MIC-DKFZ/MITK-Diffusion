@@ -30,6 +30,7 @@ found in the LICENSE file.
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <set>
 #include <string>
@@ -51,6 +52,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TrkReader_LegacyMitkLpsFile_ReadAsBefore);
   MITK_TEST(TrkReader_NoMatrixRecorded_UsesVoxelOrder);
   MITK_TEST(TrkWriter_RoundTrip_KeepsPoints);
+  MITK_TEST(TrkWriter_Header_IsReproducibleAndMatchesData);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -495,6 +497,45 @@ public:
     auto las = mitk::IOUtil::Load<mitk::FiberBundle>(lasPath);
     mitk::IOUtil::Save(las, path);
     CPPUNIT_ASSERT_MESSAGE("LAS header", las->Equals(mitk::IOUtil::Load<mitk::FiberBundle>(path), 0.001));
+  }
+
+  static std::string FileContent(const std::string &path)
+  {
+    std::ifstream in(path, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+  }
+
+  void TrkWriter_Header_IsReproducibleAndMatchesData()
+  {
+    mitk::IFileWriter::Options options;
+    options["Print header"] = false;
+
+    // Two bundles loaded separately give byte-identical files
+    auto first = LoadFibers("FiberProcessing/original.fib");
+    auto second = LoadFibers("FiberProcessing/original.fib");
+    const std::string path1 = m_TempDir + "/first.trk";
+    const std::string path2 = m_TempDir + "/second.trk";
+    mitk::IOUtil::Save(first, path1, options);
+    mitk::IOUtil::Save(second, path2, options);
+    const auto content = FileContent(path1);
+    CPPUNIT_ASSERT_MESSAGE("Same bundle, same file", content == FileContent(path2));
+
+    TrkHeader header;
+    std::memcpy(&header, content.data(), sizeof(header));
+    CPPUNIT_ASSERT_EQUAL(static_cast<int>(first->GetNumFibers()), header.n_count);
+    CPPUNIT_ASSERT_EQUAL(static_cast<short>(0), header.n_scalars);
+    CPPUNIT_ASSERT_EQUAL(static_cast<short>(0), header.n_properties);
+    CPPUNIT_ASSERT_MESSAGE("Reserved bytes are zero",
+                           std::all_of(header.reserved, header.reserved + sizeof(header.reserved), [](char c) { return c == 0; }));
+
+    // A header taken over from a file with scalars and properties describes the written data
+    const std::string withScalars = m_TempDir + "/scalars.trk";
+    auto scalarHeader = MakeTrkHeader("RAS", RasAffine());
+    scalarHeader.n_count = 2;
+    WriteTrk(withScalars, scalarHeader, 2, 1);
+    auto loaded = mitk::IOUtil::Load<mitk::FiberBundle>(withScalars);
+    mitk::IOUtil::Save(loaded, path1, options);
+    CPPUNIT_ASSERT(loaded->Equals(mitk::IOUtil::Load<mitk::FiberBundle>(path1), 0.001));
   }
 };
 

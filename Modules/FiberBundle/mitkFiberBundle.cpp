@@ -45,6 +45,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <random>
 #include <algorithm>
 #include <iterator>
+#include <cstring>
 
 
 const char* mitk::FiberBundle::FIBER_ID_ARRAY = "Fiber_IDs";
@@ -77,7 +78,9 @@ mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
   : m_NumFibers(0)
   , m_IsRAS(false)
 {
-  m_TrackVisHeader.hdr_size = 0;
+  // Zeroed, because the TrackVis writer writes all 1000 bytes (unset fields would leak heap
+  // contents into the file); hdr_size 0 marks "not set yet" for GetTrackVisHeader.
+  std::memset(&m_TrackVisHeader, 0, sizeof(m_TrackVisHeader));
   m_FiberWeights = vtkSmartPointer<vtkFloatArray>::New();
   m_FiberWeights->SetName("FIBER_WEIGHTS");
 

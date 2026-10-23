@@ -62,6 +62,11 @@ short TrackVisFiberReader::create(std::string filename , mitk::FiberBundle *fib,
   m_Header = fib->GetTrackVisHeader();
   if (use_lps)
     sprintf(m_Header.voxel_order,"LPS");
+  // Only coordinates are written, and readers such as nibabel read exactly n_count tracks; a
+  // header copied from a loaded file would otherwise keep its counts.
+  m_Header.n_scalars = 0;
+  m_Header.n_properties = 0;
+  m_Header.n_count = static_cast<int>(fib->GetNumFibers());
 
   if (print_header)
     this->print_header();
