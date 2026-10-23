@@ -36,6 +36,7 @@ set(CPP_FILES
   # Algorithms
   Algorithms/mitkLbfgsbMutex.cpp
   Algorithms/Reconstruction/mitkDiffusionReconstruction.cpp
+  Algorithms/Reconstruction/mitkDiffusionReconstructionQball.cpp
   Algorithms/Reconstruction/mitkPointShell.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.cpp

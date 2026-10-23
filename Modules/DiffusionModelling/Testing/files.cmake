@@ -7,6 +7,7 @@ set(MODULE_TESTS
   mitkDiffusionReconstructionPointShellTest.cpp
   mitkDiffusionReconstructionQballTest.cpp
   mitkDiffusionReconstructionTensorTest.cpp
+  mitkDiffusionReconstructionTest.cpp
 )
 
 # Need an OpenGL context; skipped (exit code 77) without one.

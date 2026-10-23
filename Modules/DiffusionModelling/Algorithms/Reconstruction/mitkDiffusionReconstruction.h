@@ -15,8 +15,17 @@ found in the LICENSE file.
 
 #include <MitkDiffusionModellingExports.h>
 #include <mitkDiffusionPropertyHelper.h>
+#include <mitkOdfImage.h>
+#include <mitkShImage.h>
 #include <mitkTensorImage.h>
 
+#include <vector>
+
+/**
+ * Reconstruction of tensors and Q-ball ODFs from a DWI (an mitk::Image with the diffusion
+ * properties), as the reconstruction views and command line apps run them. The results carry the
+ * DICOM properties of their input.
+ */
 namespace mitk
 {
   /**
@@ -43,6 +52,52 @@ namespace mitk
     const DiffusionPropertyHelper::GradientDirectionsContainerType *gradients,
     double referenceBValue,
     double b0Threshold);
+
+  /** \brief Q-ball reconstruction methods of ReconstructQball. */
+  enum class QballMethod
+  {
+    Numerical,  ///< numerical Q-ball (Tuch 2004); ODF image only
+    Standard,   ///< analytical Q-ball in spherical harmonics (Descoteaux 2007)
+    SolidAngle, ///< constant solid angle Q-ball (Aganj 2010)
+    AdcProfile, ///< spherical harmonics fit of the ADC profile
+    RawSignal,  ///< spherical harmonics fit of the raw signal
+    MultiShell  ///< constant solid angle Q-ball of three equidistant shells (Aganj 2010)
+  };
+
+  struct QballParameters
+  {
+    QballMethod method = QballMethod::Standard;
+    /** Even SH order from 2 to 12; not used by Numerical. */
+    unsigned int shOrder = 4;
+    /** Laplace-Beltrami regularization; not used by Numerical. */
+    double lambda = 0.006;
+    /** Voxels whose mean b0 is below get zero ODFs. */
+    short b0Threshold = 0;
+    /** Also return the ODFs sampled on the ODF directions; Numerical always returns them. */
+    bool sampledOdf = false;
+    /** MultiShell only: the b-values of the shells to use, as keys of the b-value map; empty means all. */
+    std::vector<unsigned int> shells;
+  };
+
+  struct QballResult
+  {
+    /** SH coefficients in MITK's convention; null for Numerical. */
+    ShImage::Pointer sh;
+    /** ODFs sampled on the ODF directions; null unless requested (always set for Numerical). */
+    OdfImage::Pointer odf;
+  };
+
+  /**
+   * \brief Q-ball reconstruction of a DWI.
+   *
+   * The single-shell methods need one non-zero shell (see GetSingleShellGradients); MultiShell
+   * needs three equidistant shells (b, 2b, 3b) among the selected ones, and uses all b0 volumes.
+   *
+   * \throw mitk::Exception if dwi is not a DWI, for an unsupported SH order, or for a selected shell
+   * the DWI does not have; itk::ExceptionObject from the filters for a DWI the method cannot use
+   * (no b0 volume, several shells for a single-shell method, shells that are not b, 2b, 3b).
+   */
+  MITKDIFFUSIONMODELLING_EXPORT QballResult ReconstructQball(const Image *dwi, const QballParameters &parameters);
 }
 
 #endif
