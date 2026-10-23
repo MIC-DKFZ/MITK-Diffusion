@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <mitkPointSet.h>
 #include <itkLinearInterpolateImageFunction.h>
+#include <mutex>
 
 namespace itk
 {
@@ -73,7 +74,7 @@ public:
     FiberfoxParameters GetParameters(){ return m_Parameters; }
     std::vector< ItkDoubleImgType::Pointer > GetVolumeFractions() ///< one double image for each compartment containing the corresponding volume fraction per voxel
     { return m_VolumeFractions; }
-    itkGetMacro( StatusText, std::string )
+    std::string GetStatusText() const;   ///< log of the running simulation; safe to call from another thread
     itkGetMacro( PhaseImage, DoubleDwiType::Pointer )
     itkGetMacro( KspaceImage, DoubleDwiType::Pointer )
     itkGetMacro( CoilPointset, mitk::PointSet::Pointer )
@@ -133,6 +134,7 @@ protected:
     std::vector < typename DoubleDwiType::Pointer > m_OutputImagesImag;
     std::vector< ItkDoubleImgType::Pointer >    m_VolumeFractions;
     std::string                                 m_StatusText;
+    mutable std::mutex                          m_LogMutex;   ///< guards m_StatusText, m_Logfile, m_TimeProbe and the log output
 
     // MISC
     itk::TimeProbe                              m_TimeProbe;

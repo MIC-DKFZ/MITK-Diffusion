@@ -359,11 +359,14 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
           }
       }
 
-      ++disp;
-      unsigned long newTick = 50*disp.count()/disp.expected_count();
-      for (unsigned long tick = 0; tick<(newTick-lastTick); tick++)
-        PrintToLog("*", false, false, false);
-      lastTick = newTick;
+#pragma omp critical
+      {
+        ++disp;
+        unsigned long newTick = 50*disp.count()/disp.expected_count();
+        for (unsigned long tick = 0; tick<(newTick-lastTick); tick++)
+          PrintToLog("*", false, false, false);
+        lastTick = newTick;
+      }
     }
   }
 
@@ -1433,8 +1436,18 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
 
 
 template< class PixelType >
+std::string TractsToDWIImageFilter< PixelType >::GetStatusText() const
+{
+  std::lock_guard<std::mutex> lock(m_LogMutex);
+  return m_StatusText;
+}
+
+template< class PixelType >
 void TractsToDWIImageFilter< PixelType >::PrintToLog(std::string m, bool addTime, bool linebreak, bool stdOut)
 {
+  // called from the parallel loops, and the Fiberfox view reads the status text from the GUI thread
+  std::lock_guard<std::mutex> lock(m_LogMutex);
+
   // timestamp
   if (addTime)
   {
