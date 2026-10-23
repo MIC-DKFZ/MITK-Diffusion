@@ -282,44 +282,56 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::ApplyHeader(const Image* image
   if (image == nullptr)
     mitkThrow() << "No image given.";
 
-  Image::Pointer newImage = image->Clone();
-  auto geometry = newImage->GetGeometry();
-
   if (change.spacing)
   {
     for (unsigned int i = 0; i < 3; ++i)
       if (!((*change.spacing)[i] > 0))
         mitkThrow() << "The voxel size must be positive.";
-    geometry->SetSpacing(*change.spacing);
   }
 
-  if (change.origin)
-    geometry->SetOrigin(*change.origin);
-
+  std::optional<MatrixType> direction;
   if (change.direction)
   {
-    MatrixType direction = *change.direction;
+    direction = *change.direction;
     for (unsigned int c = 0; c < 3; ++c)
     {
-      const double norm = direction.get_column(c).two_norm();
+      const double norm = direction->get_column(c).two_norm();
       if (!(norm > 0))
         mitkThrow() << "The direction matrix has a zero column.";
-      direction.set_column(c, direction.get_column(c) / norm);
+      direction->set_column(c, direction->get_column(c) / norm);
     }
     for (unsigned int c = 0; c < 3; ++c)
       for (unsigned int d = c + 1; d < 3; ++d)
-        if (std::abs(dot_product(direction.get_column(c), direction.get_column(d))) > 1e-3)
+        if (std::abs(dot_product(direction->get_column(c), direction->get_column(d))) > 1e-3)
           mitkThrow() << "The columns of the direction matrix are not orthogonal.";
-
-    auto matrix = vtkSmartPointer<vtkMatrix4x4>::New();
-    for (unsigned int r = 0; r < 3; ++r)
-    {
-      for (unsigned int c = 0; c < 3; ++c)
-        matrix->SetElement(r, c, direction[r][c]);
-      matrix->SetElement(r, 3, geometry->GetOrigin()[r]);
-    }
-    geometry->SetIndexToWorldTransformByVtkMatrixWithoutChangingSpacing(matrix);
   }
+
+  // Image::Clone copies one geometry per time step. All of them change, as BaseData::SetOrigin does
+  // for the origin, so the time steps of a 3D+t image (e.g. the view's "_B0_ALL" result) stay together.
+  Image::Pointer newImage = image->Clone();
+  for (unsigned int t = 0; t < newImage->GetTimeSteps(); ++t)
+  {
+    auto geometry = newImage->GetGeometry(t);
+    if (change.spacing)
+      geometry->SetSpacing(*change.spacing);
+
+    if (change.origin)
+      geometry->SetOrigin(*change.origin);
+
+    if (direction)
+    {
+      auto matrix = vtkSmartPointer<vtkMatrix4x4>::New();
+      for (unsigned int r = 0; r < 3; ++r)
+      {
+        for (unsigned int c = 0; c < 3; ++c)
+          matrix->SetElement(r, c, (*direction)[r][c]);
+        matrix->SetElement(r, 3, geometry->GetOrigin()[r]);
+      }
+      geometry->SetIndexToWorldTransformByVtkMatrixWithoutChangingSpacing(matrix);
+    }
+  }
+  // The bounding box over all time steps, which the views are reinitialized with.
+  newImage->GetTimeGeometry()->Update();
 
   if (PropHelper::IsDiffusionWeightedImage(image) && (change.direction || change.measurementFrame))
   {

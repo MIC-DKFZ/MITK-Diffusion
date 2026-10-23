@@ -21,6 +21,9 @@ found in the LICENSE file.
 #include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
 
+#include <algorithm>
+#include <limits>
+
 class mitkDiffusionImageEditingTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionImageEditingTestSuite);
@@ -33,6 +36,7 @@ class mitkDiffusionImageEditingTestSuite : public mitk::TestFixture
   MITK_TEST(ApplyHeader_NewFrame_AppliedToOriginalGradients);
   MITK_TEST(ApplyHeader_OnlyOrigin_KeepsEverythingElse);
   MITK_TEST(ApplyHeader_InvalidValues_Throw);
+  MITK_TEST(ApplyHeader_TimeSeries_ChangesEveryTimeStep);
   MITK_TEST(ClearGradientRotation_RotatedLegacyImage_RemovesRotation);
   MITK_TEST(MergeDwis_RotatedLegacyImages_WorldGradientsWithoutRotation);
   MITK_TEST(MergeDwis_NotADwiOrOtherGeometry_Throws);
@@ -319,6 +323,65 @@ public:
     skewed.direction = direction;
     CPPUNIT_ASSERT_THROW(mitk::DiffusionImageEditing::ApplyHeader(m_Dwi, skewed), mitk::Exception);
   }
+
+  void ApplyHeader_TimeSeries_ChangesEveryTimeStep()
+  {
+    // A 3D+t image like the "_B0_ALL" result of the preprocessing view, which "Align to" accepts.
+    const unsigned int dimensions[] = {3, 2, 2, 3};
+    auto image = mitk::Image::New();
+    image->Initialize(mitk::MakeScalarPixelType<float>(), 4, dimensions);
+    const auto inputGeometry = image->GetGeometry(0)->Clone();
+
+    mitk::DiffusionImageEditing::HeaderChange change;
+    mitk::Vector3D spacing;
+    spacing[0] = 0.5;
+    spacing[1] = 2;
+    spacing[2] = 3;
+    change.spacing = spacing;
+    mitk::Point3D origin;
+    origin[0] = 1.5;
+    origin[1] = -2;
+    origin[2] = 7;
+    change.origin = origin;
+    change.direction = RotationZ();
+    auto result = mitk::DiffusionImageEditing::ApplyHeader(image, change);
+
+    mitk::AffineTransform3D::MatrixType expectedMatrix;
+    for (unsigned int r = 0; r < 3; ++r)
+      for (unsigned int c = 0; c < 3; ++c)
+        expectedMatrix[r][c] = RotationZ()[r][c] * spacing[c];
+    CPPUNIT_ASSERT_EQUAL(3u, result->GetTimeSteps());
+    for (unsigned int t = 0; t < 3; ++t)
+    {
+      const auto geometry = result->GetGeometry(t);
+      CPPUNIT_ASSERT(mitk::Equal(origin, geometry->GetOrigin(), 1e-12, true));
+      CPPUNIT_ASSERT(mitk::Equal(spacing, geometry->GetSpacing(), 1e-12, true));
+      CPPUNIT_ASSERT(mitk::MatrixEqualElementWise(expectedMatrix, geometry->GetIndexToWorldTransform()->GetMatrix(), 1e-12));
+      // The input stays as it was.
+      CPPUNIT_ASSERT(mitk::Equal(*inputGeometry, *image->GetGeometry(t), 1e-12, 1e-12, true));
+    }
+
+    // The bounding box over all time steps is that of the moved geometry.
+    mitk::Point3D lower, upper;
+    lower.Fill(std::numeric_limits<double>::max());
+    upper.Fill(std::numeric_limits<double>::lowest());
+    for (int i = 0; i < 8; ++i)
+    {
+      const auto corner = result->GetGeometry(0)->GetCornerPoint(i);
+      for (unsigned int d = 0; d < 3; ++d)
+      {
+        lower[d] = std::min(lower[d], corner[d]);
+        upper[d] = std::max(upper[d], corner[d]);
+      }
+    }
+    const auto bounds = result->GetTimeGeometry()->GetBoundsInWorld();
+    for (unsigned int d = 0; d < 3; ++d)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(lower[d], bounds[2 * d], 1e-9);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(upper[d], bounds[2 * d + 1], 1e-9);
+    }
+  }
+
   void ClearGradientRotation_RotatedLegacyImage_RemovesRotation()
   {
     SetRotation(m_Dwi, RotationZ());

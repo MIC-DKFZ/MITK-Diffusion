@@ -66,6 +66,8 @@ measurement frame must be invertible.
 <b>Align to</b> creates a copy of the selected image with the origin of the image chosen in the box
 next to it. Only the origin is taken over.
 
+Both buttons give every time step of a 3D+t image the same new values.
+
 \section QmitkDiffusionImagingPreprocessingPageOther Other tab
 
 <b>Extract baseline image</b> averages the b0 volumes of the DWI into one 3D image. With the check
