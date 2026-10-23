@@ -22,12 +22,14 @@ found in the LICENSE file.
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 #include <itkDiffusionQballReconstructionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
+#include <itkImageRegionIterator.h>
 #include <itkOrientationDistributionFunction.h>
 #include <itkOutputWindow.h>
 
 #include <vnl/vnl_rotation_matrix.h>
 
 #include <cmath>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -53,6 +55,8 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(Analytical_RotatedScheme_GivesRotatedFunction);
   MITK_TEST(Analytical_HalfSphereScheme_SameAsMirrored);
   MITK_TEST(MultiShell_RotatedScheme_GivesRotatedFunction);
+  MITK_TEST(Analytical_CoefficientImages_Snapshot);
+  MITK_TEST(MultiShell_CoefficientImage_Snapshot);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
@@ -574,6 +578,190 @@ public:
     const double difference = RelativeDifference(coefficients(dwi), coefficients(rotated), rotation);
     MITK_INFO << "Multi-shell: relative difference " << difference;
     CPPUNIT_ASSERT(difference < 1e-5);
+  }
+
+  /**
+   * Per coefficient: the sum over all voxels, the sum weighted with the voxel's position (order
+   * sensitive) and the sum of the magnitudes, which scales the tolerance.
+   */
+  struct Fingerprint
+  {
+    std::vector<double> sum;
+    std::vector<double> weightedSum;
+    std::vector<double> magnitude;
+  };
+
+  template <class TImage>
+  static Fingerprint ComputeFingerprint(const TImage *image)
+  {
+    const unsigned int n = TImage::PixelType::Dimension;
+    Fingerprint fingerprint{std::vector<double>(n, 0), std::vector<double>(n, 0), std::vector<double>(n, 0)};
+    itk::ImageRegionConstIterator<TImage> it(image, image->GetLargestPossibleRegion());
+    for (unsigned int voxel = 1; !it.IsAtEnd(); ++it, ++voxel)
+    {
+      for (unsigned int j = 0; j < n; ++j)
+      {
+        fingerprint.sum[j] += it.Get()[j];
+        fingerprint.weightedSum[j] += it.Get()[j] * voxel;
+        fingerprint.magnitude[j] += std::fabs(it.Get()[j]);
+      }
+    }
+    return fingerprint;
+  }
+
+  /**
+   * Compares with a recorded fingerprint, to 1e-5 of the coefficient's magnitude (float results;
+   * matrices built in float or double give the same within that). Prints the actual one, so that a
+   * deliberate change can record the new values.
+   */
+  static void CheckFingerprint(const std::string &name, const Fingerprint &actual, const std::vector<std::vector<double>> &expected, unsigned int voxels)
+  {
+    std::string printed = name + ":\n";
+    char line[256];
+    for (unsigned int j = 0; j < actual.sum.size(); ++j)
+    {
+      std::snprintf(line, sizeof(line), "      {%.9g, %.9g, %.9g},\n", actual.sum[j], actual.weightedSum[j], actual.magnitude[j]);
+      printed += line;
+    }
+    MITK_INFO << printed;
+    CPPUNIT_ASSERT_EQUAL(expected.size(), actual.sum.size());
+    for (unsigned int j = 0; j < expected.size(); ++j)
+    {
+      const double tolerance = 1e-5 * expected[j][2];
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected[j][0], actual.sum[j], tolerance);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected[j][1], actual.weightedSum[j], tolerance * voxels);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected[j][2], actual.magnitude[j], tolerance);
+    }
+  }
+
+  // Safety net for the refactoring: the SH coefficient images of the analytical methods on
+  // test.dwi (order 4, lambda 0.006, recorded after the rotation-invariant regularization), which
+  // mitkImageReconstructionTest does not compare.
+  void Analytical_CoefficientImages_Snapshot()
+  {
+    const std::vector<std::vector<std::vector<double>>> expected = {
+      {// QBAR_STANDARD
+       {110.098764, 20030.2708, 110.098764},
+       {-0.945952875, -148.536516, 7.44985429},
+       {-0.419237621, -113.568455, 3.69948174},
+       {-2.87495246, -549.65217, 4.77318007},
+       {0.0388465807, 35.8517226, 4.2701539},
+       {3.96220427, 736.650935, 7.43775484},
+       {-0.0744682363, -22.4021189, 1.91448027},
+       {-0.0625161116, -9.34903985, 1.40898239},
+       {0.077843259, 21.8396778, 1.76296399},
+       {0.047532897, 12.0384518, 1.44927169},
+       {0.350865015, 56.3798639, 1.28740489},
+       {0.0721025046, 15.1932815, 1.46987215},
+       {-0.46024042, -76.2721777, 1.66913374},
+       {-0.274775657, -58.7257994, 1.34924399},
+       {0.0123926252, 16.6276143, 1.7421614}},
+      {// QBAR_SOLID_ANGLE
+       {102.400415, 18636.8755, 102.400415},
+       {-0.759380179, -105.163361, 8.07398394},
+       {-0.539881952, -148.622212, 4.81820321},
+       {-2.7116349, -531.697002, 5.15303139},
+       {0.137273508, 71.6485481, 5.35884108},
+       {3.36488783, 619.904056, 8.11120257},
+       {-0.269986127, -84.8109296, 7.39077255},
+       {-0.458100004, -66.826997, 6.03848648},
+       {0.239753561, 71.1534598, 7.23841166},
+       {0.186557133, 51.3176778, 6.25114998},
+       {1.12163051, 165.110558, 5.07467991},
+       {0.452306212, 90.4690751, 6.50234122},
+       {-1.3326617, -199.024707, 6.76722107},
+       {-1.01291593, -217.04563, 5.97775919},
+       {0.178444162, 93.5178027, 7.09543195}},
+      {// QBAR_ADC_ONLY
+       {3612.27363, 656534.769, 3612.27363},
+       {8.80697709, 932.797192, 156.696386},
+       {10.1642593, 3249.60019, 114.589967},
+       {39.0239702, 8112.09749, 99.3467829},
+       {-6.98463131, -2758.46993, 122.57111},
+       {-44.0672645, -8200.73746, 157.806581},
+       {-1.19235337, -405.441566, 60.9227644},
+       {-4.67370547, -584.196646, 56.1847066},
+       {1.16081683, 498.115923, 63.7328851},
+       {0.293411099, 409.718536, 58.8336794},
+       {4.06675808, 354.426133, 42.7565335},
+       {3.75068705, 615.551964, 62.5405847},
+       {-4.71038719, -397.21013, 59.0349375},
+       {-7.66227616, -1678.03395, 57.1897678},
+       {1.78844279, 785.395658, 62.8821905}},
+      {// QBAR_RAW_SIGNAL
+       {25966.5119, 4726526.1, 25966.5119},
+       {550.193535, 89135.8514, 3882.51004},
+       {196.585148, 52502.3219, 1703.30699},
+       {1628.73361, 309720.866, 2485.84021},
+       {6.73320612, -11777.4108, 1998.05965},
+       {-2329.26624, -434431.002, 3899.32887},
+       {-54.1888093, -15448.1934, 1272.01296},
+       {-41.620254, -6395.36193, 865.675876},
+       {58.6305572, 15309.6427, 1129.29465},
+       {33.986295, 8183.05922, 885.184071},
+       {269.190782, 44753.3908, 833.23208},
+       {41.8852556, 8721.14571, 903.739103},
+       {-355.69314, -60713.1079, 1083.59605},
+       {-173.573321, -36965.1825, 823.82708},
+       {12.0895974, 11303.5728, 1119.17064}}};
+    auto dwi = LoadHalfSphereDwi();
+    for (unsigned int i = 0; i < AnalyticalMethods().size(); ++i)
+    {
+      auto filter = AnalyticalFilterType::New();
+      filter->SetBValue(3000);
+      filter->SetGradientImage(dwi.gradients, dwi.image);
+      filter->SetLambda(0.006);
+      filter->SetNormalizationMethod(AnalyticalMethods()[i]);
+      filter->Update();
+      CheckFingerprint("Method " + std::to_string(AnalyticalMethods()[i]), ComputeFingerprint(filter->GetCoefficientImage().GetPointer()), expected[i], 363);
+    }
+  }
+
+  // The same for the analytical three-shell path of the multi-shell filter (ODF and coefficients).
+  void MultiShell_CoefficientImage_Snapshot()
+  {
+    const std::vector<std::vector<double>> expectedCoefficients = {
+      {2.25675845, 10.1554129, 2.25675845},
+      {-0.0409712079, -0.205194592, 0.0409712079},
+      {0.0559643582, 0.276510762, 0.0559643582},
+      {-1.21990541, -5.47975884, 1.21990541},
+      {-0.0245401289, -0.125369248, 0.0245401289},
+      {2.98403192, 13.4066443, 2.98403192},
+      {0.0208978199, 0.12007151, 0.0208978199},
+      {0.0301319116, 0.14409147, 0.0301319116},
+      {-0.163686849, -0.702769093, 0.163686849},
+      {-0.111912864, -0.453123935, 0.111912864},
+      {0.400493655, 1.82256024, 0.400493655},
+      {0.151967209, 0.651952052, 0.151967209},
+      {-0.77078744, -3.49483662, 0.77078744},
+      {0.0823859302, 0.376306534, 0.0823859302},
+      {1.27241363, 5.81563185, 1.27241363}};
+    const std::vector<std::vector<double>> expectedOdf = {{7.99999865, 967.218973, 7.99999865}};
+    auto dwi = Simulate(Shells({1000, 2000, 3000}, 3000), 3000);
+    // Vary the voxels, so that the fingerprint sees their order: S0 grows with the voxel index.
+    unsigned int voxel = 0;
+    for (itk::ImageRegionIterator<DwiType> it(dwi.image, dwi.image->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it, ++voxel)
+    {
+      auto pixel = it.Get();
+      for (unsigned int i = 0; i < pixel.Size(); ++i)
+        pixel[i] = static_cast<short>(pixel[i] * (1 + 0.1 * voxel) + (i % 7) * voxel);
+      it.Set(pixel);
+    }
+    auto filter = MultiShellFilterType::New();
+    filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    filter->SetLambda(0.006);
+    filter->Update();
+    CheckFingerprint("Multi-shell coefficients", ComputeFingerprint(filter->GetCoefficientImage().GetPointer()), expectedCoefficients, 8);
+    const Fingerprint odf = ComputeFingerprint(filter->GetOutput());
+    // The 252 ODF values are summarized over all voxels, weighted with the direction's position.
+    Fingerprint odfSummary{{0}, {0}, {0}};
+    for (unsigned int j = 0; j < odf.sum.size(); ++j)
+    {
+      odfSummary.sum[0] += odf.sum[j];
+      odfSummary.weightedSum[0] += odf.sum[j] * (j + 1);
+      odfSummary.magnitude[0] += odf.magnitude[j];
+    }
+    CheckFingerprint("Multi-shell ODF", odfSummary, expectedOdf, 252);
   }
 
   // Half-sphere schemes were fitted with every row twice, which doubled the data term and so halved

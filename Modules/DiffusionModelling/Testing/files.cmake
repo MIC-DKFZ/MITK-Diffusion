@@ -4,6 +4,7 @@ set(MODULE_TESTS
   mitkDiffusionModellingRenderingTest.cpp
   mitkDiffusionReconstructionMultishellTest.cpp
   mitkDiffusionReconstructionOdfTest.cpp
+  mitkDiffusionReconstructionPointShellTest.cpp
   mitkDiffusionReconstructionQballTest.cpp
   mitkDiffusionReconstructionTensorTest.cpp
 )

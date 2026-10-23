@@ -15,9 +15,15 @@ found in the LICENSE file.
 
 #include <itkOrientationDistributionFunction.h>
 
+#include <vtkCellArray.h>
+#include <vtkIdList.h>
+#include <vtkPolyData.h>
+
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
+#include <set>
 
 /** Regression tests of itk::OrientationDistributionFunction. */
 class mitkDiffusionReconstructionOdfTestSuite : public mitk::TestFixture
@@ -29,6 +35,10 @@ class mitkDiffusionReconstructionOdfTestSuite : public mitk::TestFixture
   MITK_TEST(Normalizations_ConstantOdf_StayFinite);
   MITK_TEST(AssignScalar_FillsAll);
   MITK_TEST(Ellipsoid_EigenvaluesAboveOne_KeepRadii);
+  MITK_TEST(Neighbors_IcosahedralSphere);
+  MITK_TEST(BaseMesh_CoversSphere);
+  MITK_TEST(Gfa_IsotropicAndSinglePeak);
+  MITK_TEST(PrincipalDirection_OfTensor);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
@@ -157,6 +167,67 @@ public:
     for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(1000 * small[i], large[i], 1e-3 * large[i]);
     CPPUNIT_ASSERT(large.GetMaxValue() > 1);
+  }
+
+  // Safety net for the refactoring of the direction tables: the 252 directions are an icosahedron
+  // subdivision, 12 vertices with 5 neighbours and 240 with 6, and the relation is symmetric.
+  void Neighbors_IcosahedralSphere()
+  {
+    unsigned int withFive = 0;
+    unsigned int withSix = 0;
+    for (int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+    {
+      const std::vector<int> neighbors = OdfType::GetNeighbors(i);
+      withFive += neighbors.size() == 5;
+      withSix += neighbors.size() == 6;
+      for (int j : neighbors)
+      {
+        const std::vector<int> back = OdfType::GetNeighbors(j);
+        CPPUNIT_ASSERT(std::find(back.begin(), back.end(), i) != back.end());
+      }
+    }
+    CPPUNIT_ASSERT_EQUAL(12u, withFive);
+    CPPUNIT_ASSERT_EQUAL(240u, withSix);
+  }
+
+  // The glyph mesh has a point per direction and, without repeated triangles, the 500 triangles
+  // of the sphere triangulation (2V - 4).
+  void BaseMesh_CoversSphere()
+  {
+    vtkPolyData *mesh = OdfType::GetBaseMesh();
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(ODF_SAMPLING_SIZE), mesh->GetNumberOfPoints());
+    std::set<std::array<vtkIdType, 3>> triangles;
+    auto ids = vtkSmartPointer<vtkIdList>::New();
+    for (vtkIdType c = 0; c < mesh->GetNumberOfCells(); ++c)
+    {
+      mesh->GetCellPoints(c, ids);
+      CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(3), ids->GetNumberOfIds());
+      std::array<vtkIdType, 3> triangle = {ids->GetId(0), ids->GetId(1), ids->GetId(2)};
+      std::sort(triangle.begin(), triangle.end());
+      triangles.insert(triangle);
+    }
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(2 * ODF_SAMPLING_SIZE - 4), triangles.size());
+  }
+
+  void Gfa_IsotropicAndSinglePeak()
+  {
+    OdfType isotropic;
+    isotropic.Fill(1.0f / ODF_SAMPLING_SIZE);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, isotropic.GetGeneralizedFractionalAnisotropy(), 1e-6);
+    OdfType peak;
+    peak.Fill(0);
+    peak[17] = 1;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, peak.GetGeneralizedFractionalAnisotropy(), 1e-6);
+  }
+
+  // The ODF of a cylindrical tensor peaks at the table direction closest to the tensor's axis.
+  void PrincipalDirection_OfTensor()
+  {
+    const vnl_vector_fixed<double, 3> axis = OdfType::GetDirection(100);
+    OdfType odf;
+    odf.InitFromTensor(Tensor(axis[0], axis[1], axis[2]));
+    const vnl_vector_fixed<double, 3> principal = odf.GetPrincipalDiffusionDirection();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, std::fabs(dot_product(principal, axis)), 1e-6);
   }
 };
 
