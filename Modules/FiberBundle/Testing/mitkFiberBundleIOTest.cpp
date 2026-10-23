@@ -53,6 +53,7 @@ found in the LICENSE file.
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <iterator>
 #include <limits>
 #include <map>
@@ -86,6 +87,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(VtkReader_ColoursOfUnusedAndReorderedPoints_StayWithTheirPoints);
   MITK_TEST(DicomMimeType_NewDcmFile_FindsWriter);
   MITK_TEST(IOHelper_BrokenFileAndDottedNames_CoutRestored);
+  MITK_TEST(IOHelper_LoadFibAndCoutSilencer);
   MITK_TEST(CopyDicomReferenceTags_BothNamingsAndMissingTags);
   MITK_TEST(TrkWriter_Header_DescribesReferenceGrid);
   MITK_TEST(TrkWriter_LpsOptionAndOldMitkFiles_WriteConsistentHeaders);
@@ -1059,6 +1061,26 @@ public:
     std::streambuf *coutBuffer = std::cout.rdbuf();
     CPPUNIT_ASSERT_THROW(mitk::FiberBundleIOHelper::load_fibs({m_TempDir + "/plain.fib", broken}), std::exception);
     CPPUNIT_ASSERT_MESSAGE("std::cout is restored after an error", coutBuffer == std::cout.rdbuf());
+  }
+
+  void IOHelper_LoadFibAndCoutSilencer()
+  {
+    // The command line apps load their tractogram with load_fib: a file with other data must
+    // throw instead of giving a null bundle.
+    CPPUNIT_ASSERT_EQUAL(71u, mitk::FiberBundleIOHelper::load_fib(GetTestDataFilePath("DiffusionImaging/FiberProcessing/original.fib"))->GetNumFibers());
+    CPPUNIT_ASSERT_THROW(mitk::FiberBundleIOHelper::load_fib(GetTestDataFilePath("DiffusionImaging/FiberProcessing/MASK.nrrd")), mitk::Exception);
+
+    std::streambuf *coutBuffer = std::cout.rdbuf();
+    try
+    {
+      mitk::CoutSilencer silencer;
+      CPPUNIT_ASSERT_MESSAGE("std::cout is redirected", coutBuffer != std::cout.rdbuf());
+      throw std::runtime_error("leaves the scope");
+    }
+    catch (const std::runtime_error&)
+    {
+    }
+    CPPUNIT_ASSERT_MESSAGE("std::cout is restored after an exception", coutBuffer == std::cout.rdbuf());
   }
 
   void CopyDicomReferenceTags_BothNamingsAndMissingTags()

@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <usAny.h>
 #include <itkImageFileWriter.h>
 #include <mitkIOUtil.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkLexicalCast.h>
 #include <itkTractsToVectorImageFilter.h>
 #include <mitkLocaleSwitch.h>
@@ -103,7 +104,7 @@ int main(int argc, char* argv[])
     typedef itk::Image<unsigned char, 3>                                    ItkUcharImgType;
 
     // load fiber bundle
-    mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(fibFile);
+    mitk::FiberBundle::Pointer inputTractogram = mitk::FiberBundleIOHelper::load_fib(fibFile);
 
     // load/create mask image
     ItkUcharImgType::Pointer itkMaskImage = nullptr;

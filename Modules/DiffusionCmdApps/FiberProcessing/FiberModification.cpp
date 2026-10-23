@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>
@@ -33,16 +34,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionDataIOHelper.h>
 #include <itkImage.h>
 
-
-mitk::FiberBundle::Pointer LoadFib(std::string filename)
-{
-  // IOUtil throws if the file cannot be read; a file without a fiber bundle must not give a null
-  // bundle that the caller dereferences.
-  mitk::FiberBundle::Pointer fib = mitk::IOUtil::Load<mitk::FiberBundle>(filename);
-  if (fib.IsNull())
-    mitkThrow() << filename << " holds no fiber bundle.";
-  return fib;
-}
 
 /*!
 \brief Modify input tractogram: fiber resampling, compression, pruning and transformation.
@@ -224,7 +215,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
+    mitk::FiberBundle::Pointer fib = mitk::FiberBundleIOHelper::load_fib(inFileName);
 
     if (subsample>0)
       fib = fib->SubsampleFibers(subsample, random_subsample);

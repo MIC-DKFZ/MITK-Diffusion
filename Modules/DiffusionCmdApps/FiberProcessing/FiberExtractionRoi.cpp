@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigure.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <mitkStandaloneDataStorage.h>
@@ -29,32 +30,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkFiberExtractionFilter.h>
 
 #include <filesystem>
-#include <sstream>
 
 #define _USE_MATH_DEFINES
 #include <math.h>
 
 typedef itksys::SystemTools ist;
 typedef itk::Image<float, 3>    ItkFloatImgType;
-
-namespace
-{
-  /** Sends std::cout to a buffer, which hides the readers' and writers' console output, and
-   * restores it when the scope ends, also when an exception leaves the scope, so that the error
-   * message reaches the console. */
-  class CoutSilencer
-  {
-  public:
-    CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
-    ~CoutSilencer() { std::cout.rdbuf(m_Old); }
-    CoutSilencer(const CoutSilencer&) = delete;
-    CoutSilencer& operator=(const CoutSilencer&) = delete;
-
-  private:
-    std::stringstream m_Buffer;
-    std::streambuf* m_Old;
-  };
-}
 
 ItkFloatImgType::Pointer LoadItkImage(const std::string& filename)
 {
@@ -182,12 +163,12 @@ int main(int argc, char* argv[])
   try
   {
     // load fiber bundle
-    mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(inFib);
+    mitk::FiberBundle::Pointer inputTractogram = mitk::FiberBundleIOHelper::load_fib(inFib);
 
     std::vector< ItkFloatImgType::Pointer > roi_images;
     std::vector< std::string > roi_names;
     {
-      CoutSilencer silencer;
+      mitk::CoutSilencer silencer;
       for (std::size_t i=0; i<roi_files.size(); ++i)
       {
         roi_images.push_back( LoadItkImage(roi_files.at(i)) );

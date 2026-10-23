@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigure.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <mitkStandaloneDataStorage.h>
@@ -81,7 +82,7 @@ int main(int argc, char* argv[])
   try
   {
     // load fiber bundle
-    mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(inFib);
+    mitk::FiberBundle::Pointer inputTractogram = mitk::FiberBundleIOHelper::load_fib(inFib);
     mitk::FiberBundle::Pointer result;
 
     mitk::StandaloneDataStorage::Pointer storage = mitk::StandaloneDataStorage::New();

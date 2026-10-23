@@ -15,6 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkImageCast.h>
 #include <mitkCommandLineParser.h>
 #include <mitkLexicalCast.h>
@@ -30,38 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itksys/SystemTools.hxx>
 #include <mitkExceptionMacro.h>
 
-#include <sstream>
-
 typedef itksys::SystemTools ist;
-
-namespace
-{
-  /** Sends std::cout to a buffer, which hides the readers' and writers' console output, and
-   * restores it when the scope ends, also when an exception leaves the scope, so that the error
-   * message reaches the console. */
-  class CoutSilencer
-  {
-  public:
-    CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
-    ~CoutSilencer() { std::cout.rdbuf(m_Old); }
-    CoutSilencer(const CoutSilencer&) = delete;
-    CoutSilencer& operator=(const CoutSilencer&) = delete;
-
-  private:
-    std::stringstream m_Buffer;
-    std::streambuf* m_Old;
-  };
-}
-
-mitk::FiberBundle::Pointer LoadFib(std::string filename)
-{
-  // IOUtil throws if the file cannot be read; a file without a fiber bundle must not give a null
-  // bundle that the caller dereferences.
-  mitk::FiberBundle::Pointer fib = mitk::IOUtil::Load<mitk::FiberBundle>(filename);
-  if (fib.IsNull())
-    mitkThrow() << filename << " holds no fiber bundle.";
-  return fib;
-}
 
 /*!
 \brief Spatially cluster fibers
@@ -175,7 +145,7 @@ int main(int argc, char* argv[])
     typedef itk::Image< float, 3 > FloatImageType;
     typedef itk::Image< short, 3 > ShortImageType;
 
-    mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
+    mitk::FiberBundle::Pointer fib = mitk::FiberBundleIOHelper::load_fib(inFileName);
 
     float max_d = 0;
     int i=1;
@@ -194,7 +164,7 @@ int main(int argc, char* argv[])
     if (input_centroids!="")
     {
 
-      mitk::FiberBundle::Pointer in_centroids = LoadFib(input_centroids);
+      mitk::FiberBundle::Pointer in_centroids = mitk::FiberBundleIOHelper::load_fib(input_centroids);
       clusterer->SetInCentroids(in_centroids);
     }
 
@@ -267,7 +237,7 @@ int main(int argc, char* argv[])
     std::vector<mitk::FiberBundle::Pointer> centroids = clusterer->GetOutCentroids();
 
     MITK_INFO << "Saving clusters";
-    CoutSilencer silencer;
+    mitk::CoutSilencer silencer;
 
     if (!only_centroids)
     {

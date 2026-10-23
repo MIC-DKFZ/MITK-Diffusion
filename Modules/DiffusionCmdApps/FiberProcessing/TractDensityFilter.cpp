@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <itksys/SystemTools.hxx>
@@ -72,7 +73,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(inFib);
+    mitk::FiberBundle::Pointer inputTractogram = mitk::FiberBundleIOHelper::load_fib(inFib);
 
     itk::TractDensityImageFilter< ItkFloatImgType >::Pointer generator = itk::TractDensityImageFilter< ItkFloatImgType >::New();
     generator->SetFiberBundle(inputTractogram);
