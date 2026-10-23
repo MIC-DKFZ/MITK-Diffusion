@@ -41,6 +41,8 @@ public:
     int p4 = 3*s.cols()/4;
     int p5 = s.cols()-1;
 
+    // The cosines are clamped to [-1, 1]: rounding can push the cosine of parallel vectors
+    // slightly beyond, and acos then gives NaN, which opens a new cluster for every such fiber.
     float a1_s = 0;
     float a2_s = 0;
     float a3_s = 0;
@@ -52,21 +54,21 @@ public:
       vnl_vector<float> v1 = s.get_column(p1)-s.get_column(p2); v1.normalize();
       vnl_vector<float> v2 = s.get_column(p3)-s.get_column(p2); v2.normalize();
       a1_s = dot_product(v1,v2);
-      a1_s = std::acos( a1_s ) * 180.0/itk::Math::pi;
+      a1_s = std::acos( std::max(-1.0f, std::min(1.0f, a1_s)) ) * 180.0/itk::Math::pi;
     }
 
     {
       vnl_vector<float> v1 = s.get_column(p1)-s.get_column(p3); v1.normalize();
       vnl_vector<float> v2 = s.get_column(p5)-s.get_column(p3); v2.normalize();
       a2_s = dot_product(v1,v2);
-      a2_s = std::acos( a2_s ) * 180.0/itk::Math::pi;
+      a2_s = std::acos( std::max(-1.0f, std::min(1.0f, a2_s)) ) * 180.0/itk::Math::pi;
     }
 
     {
       vnl_vector<float> v1 = s.get_column(p3)-s.get_column(p4); v1.normalize();
       vnl_vector<float> v2 = s.get_column(p5)-s.get_column(p4); v2.normalize();
       a3_s = dot_product(v1,v2);
-      a3_s = std::acos( a3_s ) * 180.0/itk::Math::pi;
+      a3_s = std::acos( std::max(-1.0f, std::min(1.0f, a3_s)) ) * 180.0/itk::Math::pi;
     }
 
     //
@@ -74,21 +76,21 @@ public:
       vnl_vector<float> v1 = t.get_column(p1)-t.get_column(p2); v1.normalize();
       vnl_vector<float> v2 = t.get_column(p3)-t.get_column(p2); v2.normalize();
       a1_t = dot_product(v1,v2);
-      a1_t = std::acos( a1_t ) * 180.0/itk::Math::pi;
+      a1_t = std::acos( std::max(-1.0f, std::min(1.0f, a1_t)) ) * 180.0/itk::Math::pi;
     }
 
     {
       vnl_vector<float> v1 = t.get_column(p1)-t.get_column(p3); v1.normalize();
       vnl_vector<float> v2 = t.get_column(p5)-t.get_column(p3); v2.normalize();
       a2_t = dot_product(v1,v2);
-      a2_t = std::acos( a2_t ) * 180.0/itk::Math::pi;
+      a2_t = std::acos( std::max(-1.0f, std::min(1.0f, a2_t)) ) * 180.0/itk::Math::pi;
     }
 
     {
       vnl_vector<float> v1 = t.get_column(p3)-t.get_column(p4); v1.normalize();
       vnl_vector<float> v2 = t.get_column(p5)-t.get_column(p4); v2.normalize();
       a3_t = dot_product(v1,v2);
-      a3_t = std::acos( a3_t ) * 180.0/itk::Math::pi;
+      a3_t = std::acos( std::max(-1.0f, std::min(1.0f, a3_t)) ) * 180.0/itk::Math::pi;
     }
 
     float d_direct = 0;

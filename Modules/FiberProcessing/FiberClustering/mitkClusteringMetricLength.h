@@ -23,7 +23,7 @@ namespace mitk
 {
 
 /**
-* \brief Fiber clustering metric based on the angles between certain parts of the streamline */
+* \brief Fiber clustering metric based on the difference of the fiber lengths */
 
 class ClusteringMetricLength : public ClusteringMetric
 {
@@ -47,12 +47,13 @@ public:
     {
       d_direct += (s.get_column(i)-t.get_column(i)).magnitude();
       d_flipped += (s.get_column(i)-t.get_column(s.cols()-i-1)).magnitude();
+    }
 
-      if (i<s.cols()-1)
-      {
-        l1 += (s.get_column(i+1)-s.get_column(i)).magnitude();
-        l2 += (t.get_column(i+1)-t.get_column(i)).magnitude();
-      }
+    // The distance is the difference of the fiber lengths in mm, over all segments.
+    for (unsigned int i=0; i+1<s.cols(); ++i)
+    {
+      l1 += (s.get_column(i+1)-s.get_column(i)).magnitude();
+      l2 += (t.get_column(i+1)-t.get_column(i)).magnitude();
     }
 
     if (d_direct>d_flipped)

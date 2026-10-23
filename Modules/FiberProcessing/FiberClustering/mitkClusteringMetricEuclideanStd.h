@@ -50,11 +50,13 @@ public:
       d_flipped += dists_f[i];
     }
 
+    // Mean of the point distances plus their standard deviation, halved. The norm of the
+    // deviations from the mean is sqrt(N) times the standard deviation.
     if (d_direct>d_flipped)
     {
       float d = d_flipped/s.cols();
       dists_f -= d;
-      d += dists_f.magnitude();
+      d += dists_f.magnitude()/std::sqrt(static_cast<float>(s.cols()));
 
       flipped = true;
       return m_Scale*d/2;
@@ -62,7 +64,7 @@ public:
 
     float d = d_direct/s.cols();
     dists_d -= d;
-    d += dists_d.magnitude();
+    d += dists_d.magnitude()/std::sqrt(static_cast<float>(s.cols()));
 
     flipped = false;
     return m_Scale*d/2;

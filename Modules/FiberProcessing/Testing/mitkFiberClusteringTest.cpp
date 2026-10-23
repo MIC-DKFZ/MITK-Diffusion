@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <mitkTractClusteringFilter.h>
 #include <mitkClusteringMetricAnatomic.h>
 #include <mitkClusteringMetricEuclideanMean.h>
+#include <mitkClusteringMetricEuclideanStd.h>
 #include <mitkClusteringMetricInnerAngles.h>
 #include <mitkClusteringMetricLength.h>
 #include <mitkClusteringMetricScalarMap.h>
@@ -27,6 +28,7 @@ found in the LICENSE file.
 #include <omp.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <random>
 
@@ -43,6 +45,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(ScalarMap_SeveralMapsInParallel);
   MITK_TEST(Anatomic_PointOutsideFirstParcellation);
   MITK_TEST(Update_TwiceGivesSameOutputs);
+  MITK_TEST(Metrics_Definitions);
   CPPUNIT_TEST_SUITE_END();
 
   /** Three fibers along x at y = 0, 0.5, 1 mm and, 40 mm away, two at y = 40, 41 mm, with
@@ -314,6 +317,54 @@ public:
     clusterer.Update();
     CPPUNIT_ASSERT_EQUAL(std::size_t(2), clusterer.GetOutTractograms().size());
     CPPUNIT_ASSERT(first == clusterer.GetOutFiberIndices());
+  }
+
+  static vnl_matrix<float> Points(const std::vector<std::array<float, 3>>& points)
+  {
+    vnl_matrix<float> m(3, points.size());
+    for (unsigned int k = 0; k < points.size(); ++k)
+      for (unsigned int d = 0; d < 3; ++d)
+        m(d, k) = points[k][d];
+    return m;
+  }
+
+  void Metrics_Definitions()
+  {
+    bool flipped = true;
+
+    // EU_STD: point distances 1, 2, 3, 4 mm: (mean 2.5 + standard deviation sqrt(1.25)) / 2.
+    auto s = Points({{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}});
+    auto t = Points({{0, 1, 0}, {1, 2, 0}, {2, 3, 0}, {3, 4, 0}});
+    mitk::ClusteringMetricEuclideanStd std;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL((2.5 + std::sqrt(1.25)) / 2, std.CalculateDistance(s, t, flipped), 1e-5);
+    CPPUNIT_ASSERT(!flipped);
+
+    // LENGTH: straight fibers of 11 and 16.5 mm with 12 points.
+    std::vector<std::array<float, 3>> a, b;
+    for (int k = 0; k < 12; ++k)
+    {
+      a.push_back({static_cast<float>(k), 0, 0});
+      b.push_back({1.5f * k, 1, 0});
+    }
+    auto la = Points(a);
+    auto lb = Points(b);
+    mitk::ClusteringMetricLength length;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.5, length.CalculateDistance(la, lb, flipped), 1e-4);
+
+    // ANGLES: straight fibers in random directions have no NaN angle differences.
+    std::mt19937 rng(3);
+    std::uniform_real_distribution<float> coordinate(-50.0f, 50.0f);
+    mitk::ClusteringMetricInnerAngles angles;
+    for (int f = 0; f < 200; ++f)
+    {
+      std::array<float, 3> start = {coordinate(rng), coordinate(rng), coordinate(rng)};
+      std::array<float, 3> end = {coordinate(rng), coordinate(rng), coordinate(rng)};
+      std::vector<std::array<float, 3>> line;
+      for (int k = 0; k < 12; ++k)
+        line.push_back({start[0] + (end[0] - start[0]) * k / 11.0f, start[1] + (end[1] - start[1]) * k / 11.0f, start[2] + (end[2] - start[2]) * k / 11.0f});
+      auto m = Points(line);
+      CPPUNIT_ASSERT(std::isfinite(angles.CalculateDistance(m, m, flipped)));
+    }
   }
 
   void Clusters_KeepInputWeights()
