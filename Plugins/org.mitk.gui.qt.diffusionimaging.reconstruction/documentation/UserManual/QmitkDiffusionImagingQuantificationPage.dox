@@ -1,7 +1,12 @@
 /**
 
-\page org_mitk_views_diffusionquantification Scalar Indices
+\page org_mitk_views_diffusionquantification Diffusion Indices
 
-The scalar indices view allows the calculation of different scalar measures for raw diffusion-weighted images (MD, ADC), tensors (Fractional Anisotropy, Relative Anisotropy, Axial Diffusivity, Radial Diffusivity) or ODFs (Generalized Fractional Anisotropy).
+The diffusion indices view calculates scalar maps of the selected image:
+\li <b>Raw diffusion-weighted image:</b> MD and ADC.
+\li <b>Tensor image:</b> FA (fractional anisotropy), RA (relative anisotropy), AD (axial diffusivity), RD (radial diffusivity), MD (mean diffusivity) and 1-(λ2+λ3)/(2*λ1).
+\li <b>ODF image</b> (or spherical harmonics image): GFA (generalized fractional anisotropy, Tuch 2004).
+
+"Scale Image Values" multiplies every result by the given factor, for example 1000 to show diffusivities in 10^-3 mm²/s; the level window of the result follows the factor.
 
 */
