@@ -173,16 +173,6 @@ public:
   void SetGradientImage( const GradientDirectionContainerType *,
                                              const GradientImagesType *image);
 
-  /** Return the gradient direction. idx is 0 based */
-  virtual GradientDirectionType GetGradientDirection( unsigned int idx) const
-    {
-    if( idx >= m_NumberOfGradientDirections )
-      {
-      itkExceptionMacro( << "Gradient direction " << idx << "does not exist" );
-      }
-    return m_GradientDirectionContainer->ElementAt( idx+1 );
-    }
-
   /** Normalization performed on the reconstructed ODF according
   * to method set in m_NormalizationMethod
   */

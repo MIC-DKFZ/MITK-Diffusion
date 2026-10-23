@@ -198,7 +198,6 @@ namespace itk {
       ++git; // Gradient  image iterator
     }
 
-    std::cout << "One Thread finished reconstruction" << std::endl;
   }
 
   template< class TReferenceImagePixelType,
@@ -380,8 +379,6 @@ namespace itk {
           }
           double condition = solver->sigma_max() / solver->sigma_min();
 
-          std::cout << sigma << ": " << condition << std::endl;
-
           if( condition < minCondition )
           {
             minCondition = condition;
@@ -400,7 +397,7 @@ namespace itk {
       auto pseudoInverse = std::make_unique<vnl_matrix_inverse<double>>(H);
       H_plus = pseudoInverse->pinverse();
 
-      std::cout << "choosing sigma = " << bestSigma << std::endl;
+      itkDebugMacro( << "Interpolation kernel width sigma = " << bestSigma );
 
     }
 
@@ -424,19 +421,7 @@ namespace itk {
       }
     }
 
-    vnl_matrix<double> GH_plus(m_NumberOfEquatorSamplingPoints*NOdfDirections,m_NumberOfGradientDirections);
-
-    // simple matrix multiplication, manual cause of stack overflow using operator
-    for (unsigned i = 0; i < m_NumberOfEquatorSamplingPoints*NOdfDirections; ++i)
-    {
-      for (unsigned j = 0; j < m_NumberOfGradientDirections; ++j)
-      {
-        double accum = G(i,0) * H_plus(0,j);
-        for (unsigned k = 1; k < NOdfDirections; ++k)
-          accum += G(i,k) * H_plus(k,j);
-        GH_plus(i,j) = accum;
-      }
-    }
+    vnl_matrix<double> GH_plus = G * H_plus;
 
     typename vnl_matrix<double>::iterator it3;
     for( it3 = GH_plus.begin(); it3 != GH_plus.end(); it3++)
@@ -472,7 +457,6 @@ namespace itk {
       r /= r.sum();
       m_ReconstructionMatrix.set_row(i,r);
     }
-    std::cout << "Reconstruction Matrix computed." << std::endl;
   }
 
   template< class TReferenceImagePixelType,
