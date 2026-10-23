@@ -248,6 +248,10 @@ namespace
     }
     if (header.n_scalars < 0 || header.n_properties < 0)
       mitkThrow() << filename << " has a negative number of scalars or properties in its TrackVis header.";
+    // voxmm coordinates are divided by the voxel size (NaN points for 0)
+    for (int i=0; i<3; ++i)
+      if (!(header.voxel_size[i] > 0) || !std::isfinite(header.voxel_size[i]))
+        mitkThrow() << filename << " has an invalid voxel size " << header.voxel_size[i] << " in its TrackVis header.";
     return header;
   }
 }
@@ -346,6 +350,9 @@ mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename,
   const Header header = ReadHeader(in, filename);
   if (printHeader)
     PrintHeader(header, std::cout);
+  // As nibabel, which rejects such a header: a singular matrix maps every point to a plane or line.
+  if (useMatrix && HasMatrix(header) && !MatrixAxisCodes(header))
+    mitkThrow() << filename << ": the vox_to_ras matrix of its TrackVis header does not determine three axes.";
   const std::streamoff dataStart = in.tellg();
   in.seekg(0, std::ios::end);
   const std::streamoff fileEnd = in.tellg();

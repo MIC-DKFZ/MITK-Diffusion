@@ -710,6 +710,15 @@ public:
     WriteTrk(path, header);
     CPPUNIT_ASSERT_THROW_MESSAGE("big-endian file", mitk::IOUtil::Load(path), std::exception);
 
+    header = MakeTrkHeader("RAS", RasAffine());
+    header.voxel_size[1] = 0;
+    WriteTrk(path, header);
+    CPPUNIT_ASSERT_THROW_MESSAGE("voxel size 0", mitk::IOUtil::Load(path), std::exception);
+
+    header = MakeTrkHeader("RAS", {{{2, 0, 0, -10}, {0, 2, 0, -20}, {0, 0, 0, 5}, {0, 0, 0, 1}}});
+    WriteTrk(path, header);
+    CPPUNIT_ASSERT_THROW_MESSAGE("singular vox_to_ras", mitk::IOUtil::Load(path), std::exception);
+
     {
       std::ofstream out(path, std::ios::binary);
       const auto valid_header = MakeTrkHeader("RAS", RasAffine());
