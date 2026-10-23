@@ -11,7 +11,7 @@ mitk_check_module_dependencies(
 
 if(NOT _missing_deps)
 
-  set(lut_url http://mitk.org/download/data/FibertrackingLUT.tar.gz)
+  set(lut_url https://www.mitk.org/download/data/FibertrackingLUT.tar.gz)
   set(lut_tarball ${CMAKE_CURRENT_BINARY_DIR}/FibertrackingLUT.tar.gz)
   file(DOWNLOAD ${lut_url} ${lut_tarball}
        EXPECTED_MD5 38ecb6d4a826c9ebb0f4965eb9aeee44
