@@ -77,8 +77,9 @@ namespace
     bool end = false;
     while (std::getline(in, line))
     {
-      if (!line.empty() && line.back()=='\r')
-        line.pop_back();
+      // MRtrix pads header lines with spaces (room for later updates of count etc.)
+      const auto begin = line.find_first_not_of(" \t\r");
+      line = begin==std::string::npos ? std::string() : line.substr(begin, line.find_last_not_of(" \t\r") - begin + 1);
       if (first && line!="mrtrix tracks")
         mitkThrow() << filename << " is no MRtrix tracks file (first line \"" << line << "\").";
       first = false;
@@ -91,7 +92,8 @@ namespace
       const auto colon = line.find(':');
       if (colon==std::string::npos)
         continue;
-      const std::string key = line.substr(0, colon);
+      std::string key = line.substr(0, colon);
+      key.erase(key.find_last_not_of(" \t") + 1);
       std::istringstream value(line.substr(colon+1));
       if (key=="file")
       {

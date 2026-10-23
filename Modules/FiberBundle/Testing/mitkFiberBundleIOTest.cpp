@@ -129,8 +129,9 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   {
     const bool bigEndian = datatype.substr(datatype.size() - 2) == "BE";
     const auto fibers = TckFibers();
-    std::string header = "mrtrix tracks\n" + extraHeader + "datatype: " + datatype +
-                         "\ncount: " + std::to_string(fibers.size()) + "\nfile: . 1024\nEND\n";
+    // padded with spaces as MRtrix writes its header lines
+    std::string header = "mrtrix tracks    \n" + extraHeader + "datatype: " + datatype +
+                         "\ncount: " + std::to_string(fibers.size()) + "    \nfile: . 1024\nEND\n";
     header.resize(1024, '\0');
     std::ofstream out(path, std::ios::binary);
     out.write(header.data(), header.size());
