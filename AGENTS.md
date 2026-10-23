@@ -141,7 +141,7 @@ Facts the layout does not show:
 
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 35 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
+all 41 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,
