@@ -70,6 +70,7 @@ namespace itk
     void SetOriginalGradientDirections(GradientDirectionContainerType::ConstPointer ptr){m_OriginalGradientDirections = ptr;}
     void SetOriginalBValue(const double & val){m_OriginalBValue = val;}
     void SetOriginalBValueMap(const BValueMap & inp){m_BValueMap = inp;}
+    /** The model fitted per voxel and direction; the filter keeps a reference to it. */
     void SetFunctor(DWIVoxelFunctor * functor){m_Functor = functor;}
     GradientDirectionContainerType::Pointer GetTargetGradientDirections(){return m_TargetGradientDirections;}
     ErrorImageType::Pointer GetErrorImage(){return m_ErrorImage;}
@@ -77,10 +78,10 @@ namespace itk
 
   protected:
     RadialMultishellToSingleshellImageFilter();
-    ~RadialMultishellToSingleshellImageFilter() {}
+    ~RadialMultishellToSingleshellImageFilter() override = default;
 
-    void BeforeThreadedGenerateData();
-    void DynamicThreadedGenerateData( const OutputImageRegionType &);
+    void BeforeThreadedGenerateData() override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &) override;
 
     GradientDirectionContainerType::Pointer m_TargetGradientDirections;   ///< container for the subsampled output gradient directions
     GradientDirectionContainerType::ConstPointer m_OriginalGradientDirections;   ///< input gradient directions
@@ -93,7 +94,7 @@ namespace itk
     IndicesVector m_TargetDirectionsIndicies;
     unsigned int m_NumberTargetDirections;
 
-    DWIVoxelFunctor * m_Functor;
+    DWIVoxelFunctor::Pointer m_Functor;
 
     ErrorImageType::Pointer m_ErrorImage;
 
