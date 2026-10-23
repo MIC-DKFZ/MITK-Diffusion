@@ -29,8 +29,10 @@ found in the LICENSE file.
 #include <vtkPolyData.h>
 #include <vtkPolyLine.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <set>
 #include <sstream>
@@ -63,6 +65,21 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(AddBundlesAndCompositeWithoutStorage_NoCrash);
   MITK_TEST(Clone_CopiesFibersAndMetadataIndependently);
   MITK_TEST(FiberWeights_WrongSizeOrIndex_Throw);
+  MITK_TEST(LengthStatistics_OriginalFib_AsRecorded);
+  MITK_TEST(ResampleToNumPoints_RealFibers_GiveNPointsAndKeepEndpoints);
+  MITK_TEST(FilterByWeights_BothDirections_SplitAtThreshold);
+  MITK_TEST(AddBundles_EqualsRepeatedAddBundle);
+  MITK_TEST(RotateAroundAxis_EqualsTransformFibersWithoutTranslation);
+  MITK_TEST(GetDeepCopy_KeepsDataAndIsIndependent);
+  MITK_TEST(EmptyBundle_EveryOperation_StaysEmpty);
+  MITK_TEST(ResampleLinear_SyntheticFibers_EqualChordSpacingOnTheFiber);
+  MITK_TEST(ResampleSpline_StraightFiber_PointsOnTheLine);
+  MITK_TEST(ResampleToNumPoints_StraightFiber_EqualSpacing);
+  MITK_TEST(Compress_SyntheticFibers_RemovesOnlyPointsWithinTheError);
+  MITK_TEST(ApplyCurvatureThreshold_CircularArc_RadiusDecides);
+  MITK_TEST(ColorFibersByOrientation_ThreePointFiber_SegmentDirections);
+  MITK_TEST(ColorFibersByScalarMap_Mask_ColoursAndWeightsFromTheMask);
+  MITK_TEST(TransformFibers_ItkTransform_MovesEveryPoint);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -568,6 +585,381 @@ public:
     matching->FillValue(2.0f);
     fib->SetFiberWeights(matching);
     CPPUNIT_ASSERT_EQUAL(2.0f, fib->GetFiberWeight(numFibers - 1));
+  }
+
+  // Safety net for the restructuring of FiberBundle: the results the operations give today.
+
+  void LengthStatistics_OriginalFib_AsRecorded()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    CPPUNIT_ASSERT_EQUAL(71u, fib->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL(19066u, fib->GetNumberOfPoints());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.4, fib->GetMinFiberLength(), 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(67.8, fib->GetMaxFiberLength(), 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(53.50709, fib->GetMeanFiberLength(), 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(62.80009, fib->GetMedianFiberLength(), 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(16.07929, fib->GetLengthStDev(), 1e-3);
+    double sum = 0;
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      sum += fib->GetFiberLength(i);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(fib->GetMeanFiberLength() * fib->GetNumFibers(), sum, 1e-2);
+  }
+
+  void ResampleToNumPoints_RealFibers_GiveNPointsAndKeepEndpoints()
+  {
+    auto source = LoadWeightedFibers();
+    auto fib = source->GetDeepCopy();
+    fib->ResampleToNumPoints(12);
+    CPPUNIT_ASSERT_EQUAL(source->GetNumFibers(), fib->GetNumFibers());
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      vtkCell *sourceCell = source->GetFiberPolyData()->GetCell(i);
+      CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(12), cell->GetNumberOfPoints());
+      for (int c = 0; c < 3; ++c)
+      {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(sourceCell->GetPoints()->GetPoint(0)[c], cell->GetPoints()->GetPoint(0)[c], 1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(sourceCell->GetPoints()->GetPoint(sourceCell->GetNumberOfPoints() - 1)[c],
+                                     cell->GetPoints()->GetPoint(11)[c], 1e-3);
+      }
+      CPPUNIT_ASSERT_EQUAL(source->GetFiberWeight(i), fib->GetFiberWeight(i));
+    }
+  }
+
+  void FilterByWeights_BothDirections_SplitAtThreshold()
+  {
+    auto source = LoadWeightedFibers();
+    auto heavy = source->FilterByWeights(1.0f);
+    auto light = source->FilterByWeights(1.0f, true);
+    CPPUNIT_ASSERT(heavy->GetNumFibers() > 0 && light->GetNumFibers() > 0);
+    CPPUNIT_ASSERT_EQUAL(source->GetNumFibers(), heavy->GetNumFibers() + light->GetNumFibers());
+    for (unsigned int i = 0; i < heavy->GetNumFibers(); ++i)
+      CPPUNIT_ASSERT(heavy->GetFiberWeight(i) > 1.0f);
+    for (unsigned int i = 0; i < light->GetNumFibers(); ++i)
+      CPPUNIT_ASSERT(light->GetFiberWeight(i) <= 1.0f);
+    AssertWeightsFollowFibers(source, heavy, "FilterByWeights");
+    AssertWeightsFollowFibers(source, light, "FilterByWeights inverted");
+  }
+
+  void AddBundles_EqualsRepeatedAddBundle()
+  {
+    auto a = LoadWeightedFibers();
+    auto b = LoadFibers("fiberBundleX.fib");
+    auto c = LoadWeightedFibers();
+    c->TranslateFibers(3, 0, 0);
+    auto joined = a->AddBundles({b, c});
+    auto stepwise = a->AddBundle(b)->AddBundle(c);
+    CPPUNIT_ASSERT_EQUAL(a->GetNumFibers() + b->GetNumFibers() + c->GetNumFibers(), joined->GetNumFibers());
+    AssertIdentical(stepwise, joined, "AddBundles");
+    // the first fibers are those of a, in order
+    for (unsigned int i = 0; i < a->GetNumFibers(); ++i)
+      CPPUNIT_ASSERT_EQUAL(a->GetFiberWeight(i), joined->GetFiberWeight(i));
+  }
+
+  void RotateAroundAxis_EqualsTransformFibersWithoutTranslation()
+  {
+    auto rotated = LoadWeightedFibers();
+    auto transformed = rotated->GetDeepCopy();
+    const auto colours = rotated->GetFiberColors();
+    std::vector<unsigned char> before(colours->GetPointer(0), colours->GetPointer(0) + colours->GetNumberOfValues());
+    rotated->RotateAroundAxis(10, 20, 30);
+    transformed->TransformFibers(10, 20, 30, 0, 0, 0);
+    CPPUNIT_ASSERT(rotated->Equals(transformed, 1e-4));
+    for (unsigned int i = 0; i < rotated->GetNumFibers(); ++i)
+      CPPUNIT_ASSERT_EQUAL(transformed->GetFiberWeight(i), rotated->GetFiberWeight(i));
+    // RotateAroundAxis keeps the colours of the points
+    const auto after = rotated->GetFiberColors();
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(before.size()), after->GetNumberOfValues());
+    for (vtkIdType i = 0; i < after->GetNumberOfValues(); ++i)
+      CPPUNIT_ASSERT_EQUAL(before[i], after->GetValue(i));
+  }
+
+  void GetDeepCopy_KeepsDataAndIsIndependent()
+  {
+    auto fib = LoadWeightedFibers();
+    fib->ColorFibersByLength(false, false, mitk::LookupTable::JET);
+    fib->setIsRAS(true);
+    auto header = fib->GetTrackVisHeader();
+    header.dim[1] = 55;
+    fib->SetTrackVisHeader(header);
+
+    auto copy = fib->GetDeepCopy();
+    CPPUNIT_ASSERT(copy->GetFiberPolyData().GetPointer() != fib->GetFiberPolyData().GetPointer());
+    AssertIdentical(fib, copy, "GetDeepCopy");
+    CPPUNIT_ASSERT_EQUAL(fib->GetFiberColors()->GetNumberOfValues(), copy->GetFiberColors()->GetNumberOfValues());
+    for (vtkIdType i = 0; i < fib->GetFiberColors()->GetNumberOfValues(); ++i)
+      CPPUNIT_ASSERT_EQUAL(fib->GetFiberColors()->GetValue(i), copy->GetFiberColors()->GetValue(i));
+    CPPUNIT_ASSERT(copy->IsRAS());
+    CPPUNIT_ASSERT_EQUAL(55, static_cast<int>(copy->GetTrackVisHeader().dim[1]));
+
+    copy->TranslateFibers(1, 0, 0);
+    copy->SetFiberWeights(7.0f);
+    CPPUNIT_ASSERT(!fib->Equals(copy, 0.5));
+    CPPUNIT_ASSERT(fib->GetFiberWeight(0) != 7.0f);
+  }
+
+  void EmptyBundle_EveryOperation_StaysEmpty()
+  {
+    auto empty = []() { return mitk::FiberBundle::New(); };
+    auto check = [](mitk::FiberBundle *fib, const std::string &operation)
+    {
+      CPPUNIT_ASSERT_MESSAGE(operation, fib != nullptr);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(operation, 0u, fib->GetNumFibers());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(operation, 0u, fib->GetNumberOfPoints());
+    };
+    auto fib = empty();
+    fib->ResampleSpline(1.0f);
+    check(fib, "ResampleSpline");
+    fib->ResampleLinear(1.0);
+    check(fib, "ResampleLinear");
+    fib->ResampleToNumPoints(5);
+    check(fib, "ResampleToNumPoints");
+    fib->Compress(0.1f);
+    check(fib, "Compress");
+    // "no fiber would be left": every length is above the maximum 0
+    CPPUNIT_ASSERT(!fib->RemoveShortFibers(10));
+    CPPUNIT_ASSERT(fib->RemoveLongFibers(10));
+    CPPUNIT_ASSERT(!fib->ApplyCurvatureThreshold(5, false));
+    vnl_vector_fixed<double, 3> dir(0.0, 1.0, 0.0);
+    fib->RemoveDir(dir, 0.5);
+    fib->MirrorFibers(1);
+    fib->RotateAroundAxis(10, 0, 0);
+    fib->TranslateFibers(1, 2, 3);
+    fib->ScaleFibers(2, 2, 2);
+    fib->TransformFibers(1, 2, 3, 4, 5, 6);
+    fib->TransformFibers(itk::ScalableAffineTransform<mitk::ScalarType>::New());
+    check(fib, "transforms");
+    check(fib->FilterByWeights(0.5f), "FilterByWeights");
+    check(fib->SubsampleFibers(0.5f, false), "SubsampleFibers");
+    check(fib->AddBundle(empty()), "AddBundle");
+    check(fib->AddBundles({empty(), empty()}), "AddBundles");
+    check(fib->SubtractBundle(empty()), "SubtractBundle");
+    check(fib->GetDeepCopy(), "GetDeepCopy");
+    fib->ColorFibersByLength(true, true, mitk::LookupTable::JET);
+    fib->ColorFibersByCurvature(true, true, mitk::LookupTable::JET);
+    fib->ColorFibersByFiberWeights(true, mitk::LookupTable::JET);
+    fib->ColorFibersByOrientation();
+    fib->SetFiberColors(1, 2, 3);
+    check(fib, "colouring");
+    CPPUNIT_ASSERT(fib->Equals(empty()));
+    std::ostringstream out;
+    fib->Print(out);
+    CPPUNIT_ASSERT(out.str().find("Number of fibers: 0") != std::string::npos);
+  }
+
+  // Method checks: the geometric operations against their definitions on synthetic fibers.
+
+  static double Distance(const double *a, const double *b)
+  {
+    return std::sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]));
+  }
+
+  /** Distance of p from the polyline through the given points */
+  static double DistanceToPolyline(const double *p, const std::vector<std::array<double, 3>> &line)
+  {
+    double best = std::numeric_limits<double>::max();
+    for (std::size_t k = 0; k + 1 < line.size(); ++k)
+    {
+      double d[3], w[3];
+      double dd = 0, t = 0;
+      for (int c = 0; c < 3; ++c)
+      {
+        d[c] = line[k + 1][c] - line[k][c];
+        w[c] = p[c] - line[k][c];
+        dd += d[c] * d[c];
+        t += w[c] * d[c];
+      }
+      t = dd > 0 ? std::min(1.0, std::max(0.0, t / dd)) : 0.0;
+      double q[3];
+      for (int c = 0; c < 3; ++c)
+        q[c] = line[k][c] + t * d[c];
+      best = std::min(best, Distance(p, q));
+    }
+    return best;
+  }
+
+  void ResampleLinear_SyntheticFibers_EqualChordSpacingOnTheFiber()
+  {
+    // Linear resampling places the points on the fiber, each at the given straight-line distance
+    // from the previous one; the end point is kept.
+    const std::vector<std::vector<std::array<double, 3>>> fibers = {
+      {{0, 0, 0}, {0.3, 0, 0}, {2.5, 0, 0}, {4, 0, 0}, {10, 0, 0}},
+      {{0, 5, 0}, {4, 5, 0}, {4, 9, 0}, {4, 9, 3.3}}};
+    auto fib = MakeBundle(fibers);
+    const double step = 0.7;
+    fib->ResampleLinear(step);
+    CPPUNIT_ASSERT_EQUAL(2u, fib->GetNumFibers());
+    for (unsigned int i = 0; i < 2; ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      vtkPoints *points = cell->GetPoints();
+      const auto n = cell->GetNumberOfPoints();
+      CPPUNIT_ASSERT(n > 10);
+      for (vtkIdType j = 0; j < n; ++j)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, DistanceToPolyline(points->GetPoint(j), fibers[i]), 1e-5);
+      for (vtkIdType j = 1; j < n - 1; ++j)
+      {
+        double a[3], b[3];
+        points->GetPoint(j - 1, a);
+        points->GetPoint(j, b);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(step, Distance(a, b), 1e-5);
+      }
+      double a[3], b[3];
+      points->GetPoint(n - 2, a);
+      points->GetPoint(n - 1, b);
+      CPPUNIT_ASSERT(Distance(a, b) <= step + 1e-5);
+      for (int c = 0; c < 3; ++c)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(fibers[i].back()[c], b[c], 1e-6);
+    }
+    // the straight fiber: 10 mm in steps of 0.7 mm
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(16), fib->GetFiberPolyData()->GetCell(0)->GetNumberOfPoints());
+  }
+
+  void ResampleSpline_StraightFiber_PointsOnTheLine()
+  {
+    // The spline through collinear points is the line; ceil(length/distance) segments.
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}, {2.5, 0, 0}, {6, 0, 0}, {10, 0, 0}}});
+    fib->ResampleSpline(1.0f);
+    vtkCell *cell = fib->GetFiberPolyData()->GetCell(0);
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(11), cell->GetNumberOfPoints());
+    for (vtkIdType j = 0; j < cell->GetNumberOfPoints(); ++j)
+    {
+      const double *p = cell->GetPoints()->GetPoint(j);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, p[1], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, p[2], 1e-6);
+      CPPUNIT_ASSERT(p[0] >= -1e-6 && p[0] <= 10 + 1e-6);
+      if (j > 0)
+        CPPUNIT_ASSERT_MESSAGE("monotonic along the line", p[0] > cell->GetPoints()->GetPoint(j - 1)[0]);
+    }
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, cell->GetPoints()->GetPoint(0)[0], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, cell->GetPoints()->GetPoint(10)[0], 1e-5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, fib->GetFiberLength(0), 1e-4);
+  }
+
+  void ResampleToNumPoints_StraightFiber_EqualSpacing()
+  {
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}, {2.5, 0, 0}, {6, 0, 0}, {10, 0, 0}}});
+    fib->ResampleToNumPoints(6);
+    vtkCell *cell = fib->GetFiberPolyData()->GetCell(0);
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(6), cell->GetNumberOfPoints());
+    for (vtkIdType j = 0; j < 6; ++j)
+    {
+      const double *p = cell->GetPoints()->GetPoint(j);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0 * j, p[0], 1e-5);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, p[1], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, p[2], 1e-6);
+    }
+  }
+
+  void Compress_SyntheticFibers_RemovesOnlyPointsWithinTheError()
+  {
+    // A point is removed while its distance from the line through its kept neighbours is below
+    // the error: collinear points and a 0.05 mm wobble go, corners and a 1 mm zigzag stay.
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}, {4, 0, 0}, {5, 0, 0}},
+                           {{0, 5, 0}, {1, 5, 0}, {2, 5, 0}, {2, 6, 0}, {2, 7, 0}, {2, 8, 0}},
+                           {{0, 10, 0}, {1, 11, 0}, {2, 10, 0}, {3, 11, 0}, {4, 10, 0}},
+                           {{0, 15, 0}, {1, 15.05, 0}, {2, 15, 0}, {3, 14.95, 0}, {4, 15, 0}}});
+    fib->Compress(0.1f);
+    CPPUNIT_ASSERT_EQUAL(4u, fib->GetNumFibers());
+    std::map<long long, vtkIdType> pointsByFirstY;
+    for (unsigned int i = 0; i < 4; ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      pointsByFirstY[std::llround(cell->GetPoints()->GetPoint(0)[1])] = cell->GetNumberOfPoints();
+    }
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(2), pointsByFirstY[0]);
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(3), pointsByFirstY[5]);
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(5), pointsByFirstY[10]);
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(2), pointsByFirstY[15]);
+  }
+
+  void ApplyCurvatureThreshold_CircularArc_RadiusDecides()
+  {
+    // Three consecutive points of an arc of radius 10 have the circumradius 10.
+    std::vector<std::array<double, 3>> arc;
+    for (int a = 0; a <= 90; a += 10)
+      arc.push_back({10 * std::cos(a * itk::Math::pi / 180), 10 * std::sin(a * itk::Math::pi / 180), 0});
+    const std::vector<std::array<double, 3>> line = {{0, 20, 0}, {1, 20, 0}, {2, 20, 0}, {3, 20, 0}};
+
+    auto fib = MakeBundle({arc, line});
+    CPPUNIT_ASSERT(fib->ApplyCurvatureThreshold(9.5f, true));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("radius 10 is above 9.5 mm", 2u, fib->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(arc.size()), fib->GetFiberPolyData()->GetCell(0)->GetNumberOfPoints());
+
+    fib = MakeBundle({arc, line});
+    CPPUNIT_ASSERT(fib->ApplyCurvatureThreshold(10.5f, true));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("radius 10 is below 10.5 mm: the arc goes", 1u, fib->GetNumFibers());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.0, fib->GetFiberPolyData()->GetCell(0)->GetPoints()->GetPoint(0)[1], 1e-6);
+  }
+
+  void ColorFibersByOrientation_ThreePointFiber_SegmentDirections()
+  {
+    // End points take the direction of their segment, inner points the mean of both segments.
+    auto fib = MakeBundle({{{0, 0, 0}, {2, 0, 0}, {2, 2, 0}}});
+    auto colours = fib->GetFiberColors();
+    vtkCell *cell = fib->GetFiberPolyData()->GetCell(0);
+    const std::array<std::array<double, 4>, 3> expected = {{{255, 0, 0, 255},
+                                                             {static_cast<double>(static_cast<unsigned char>(255.0 * std::sqrt(0.5))),
+                                                              static_cast<double>(static_cast<unsigned char>(255.0 * std::sqrt(0.5))), 0, 255},
+                                                             {0, 255, 0, 255}}};
+    for (vtkIdType j = 0; j < 3; ++j)
+      for (int c = 0; c < 4; ++c)
+        CPPUNIT_ASSERT_EQUAL(expected[j][c], colours->GetComponent(cell->GetPointId(j), c));
+  }
+
+  void ColorFibersByScalarMap_Mask_ColoursAndWeightsFromTheMask()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    auto mask = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/MASK.nrrd"));
+    fib->ColorFibersByScalarMap(mask, true, true, mitk::LookupTable::JET, 1.0, false);
+    auto colours = fib->GetFiberColors();
+    CPPUNIT_ASSERT_EQUAL(fib->GetFiberPolyData()->GetNumberOfPoints(), colours->GetNumberOfTuples());
+    // without interpolation the opacity is 255 * mask value, i.e. 0 or 255
+    std::set<double> alphas;
+    for (vtkIdType i = 0; i < colours->GetNumberOfTuples(); ++i)
+      alphas.insert(colours->GetComponent(i, 3));
+    CPPUNIT_ASSERT(alphas == std::set<double>({0.0, 255.0}));
+    // the fiber weight is the mean mask value along the fiber
+    bool inside = false;
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      CPPUNIT_ASSERT(fib->GetFiberWeight(i) >= 0.0f && fib->GetFiberWeight(i) <= 1.0f);
+      inside = inside || fib->GetFiberWeight(i) > 0.0f;
+    }
+    CPPUNIT_ASSERT(inside);
+  }
+
+  void TransformFibers_ItkTransform_MovesEveryPoint()
+  {
+    auto source = LoadWeightedFibers();
+    auto fib = source->GetDeepCopy();
+    auto transform = itk::ScalableAffineTransform<mitk::ScalarType>::New();
+    itk::ScalableAffineTransform<mitk::ScalarType>::OutputVectorType axis;
+    axis[0] = 0.2;
+    axis[1] = 0.5;
+    axis[2] = 0.8;
+    transform->Rotate3D(axis, 0.3);
+    transform->Scale(1.1);
+    auto translation = transform->GetTranslation();
+    translation[0] = 1;
+    translation[1] = -2;
+    translation[2] = 3;
+    transform->SetTranslation(translation);
+    fib->TransformFibers(transform);
+    CPPUNIT_ASSERT_EQUAL(source->GetNumFibers(), fib->GetNumFibers());
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      vtkCell *sourceCell = source->GetFiberPolyData()->GetCell(i);
+      CPPUNIT_ASSERT_EQUAL(sourceCell->GetNumberOfPoints(), cell->GetNumberOfPoints());
+      for (vtkIdType j = 0; j < cell->GetNumberOfPoints(); ++j)
+      {
+        auto expected = transform->TransformPoint(itk::Point<double, 3>(sourceCell->GetPoints()->GetPoint(j)));
+        for (int c = 0; c < 3; ++c)
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(expected[c], cell->GetPoints()->GetPoint(j)[c], 1e-3);
+      }
+      CPPUNIT_ASSERT_EQUAL(source->GetFiberWeight(i), fib->GetFiberWeight(i));
+    }
   }
 };
 
