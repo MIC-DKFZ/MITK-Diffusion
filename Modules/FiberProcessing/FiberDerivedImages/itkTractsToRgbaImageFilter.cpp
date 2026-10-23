@@ -83,6 +83,7 @@ void TractsToRgbaImageFilter< OutputImageType >::GenerateData()
     vtkCell* cell = fiberPolyData->GetCell(i);
     int numPoints = cell->GetNumberOfPoints();
     vtkPoints* points = cell->GetPoints();
+    const float weight = m_FiberBundle->GetFiberWeight(i);
 
     for( int j=0; j<numPoints-1; ++j)
     {
@@ -111,10 +112,13 @@ void TractsToRgbaImageFilter< OutputImageType >::GenerateData()
           continue;
 
         itk::RGBAPixel<double> pix = double_out->GetPixel(segment.first);
-        pix[0] += dir[0] * scale;
-        pix[1] += dir[1] * scale;
-        pix[2] += dir[2] * scale;
-        pix[3] += segment.second * scale;
+        // Direction-encoded track density: |direction| and opacity weighted by the in-voxel
+        // length and the fiber weight, like the density image, not by the number of segments.
+        const double amount = segment.second * weight * scale;
+        pix[0] += dir[0] * amount;
+        pix[1] += dir[1] * amount;
+        pix[2] += dir[2] * amount;
+        pix[3] += amount;
 
         double_out->SetPixel(segment.first, pix);
       }

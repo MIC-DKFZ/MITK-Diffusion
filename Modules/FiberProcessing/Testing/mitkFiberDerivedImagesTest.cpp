@@ -35,6 +35,7 @@ class mitkFiberDerivedImagesTestSuite : public mitk::TestFixture
   MITK_TEST(Density_VisitationCountsEachFiberOncePerVoxel);
   MITK_TEST(Directions_SecondUpdateUsesNewBundleGrid);
   MITK_TEST(Directions_NoFiberInMask_EmptyImage);
+  MITK_TEST(Rgba_WeightedByLengthNotSegments);
   CPPUNIT_TEST_SUITE_END();
 
   using UcharImageType = itk::Image<unsigned char, 3>;
@@ -287,6 +288,31 @@ public:
     CPPUNIT_ASSERT_NO_THROW(filter->Update());
     for (int z = 0; z < 3; ++z)
       CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(0), filter->GetNumDirectionsImage()->GetPixel({{0, 0, z}}));
+  }
+
+  void Rgba_WeightedByLengthNotSegments()
+  {
+    // Voxel x = 0: a fiber along y sampled with 0.1 mm steps (ten segments in the voxel); voxel
+    // x = 2: a fiber along z with one segment through the voxel. Both have 1 mm in their voxel,
+    // so both voxels get the full intensity of their colour channel and the same opacity.
+    auto reference = UcharImageType::New();
+    UcharImageType::SizeType size = {{3, 1, 1}};
+    reference->SetRegions(UcharImageType::RegionType(size));
+    reference->Allocate();
+
+    using namespace mitk::FiberProcessingTestHelper;
+    auto fib = CreateBundle({Line({0.2, -2.05, 0.2}, {0.2, 2.05, 0.2}, 42), Line({2.1, 0.1, -2}, {2.1, 0.1, 2}, 2)});
+
+    auto filter = itk::TractsToRgbaImageFilter<itk::Image<itk::RGBAPixel<unsigned char>, 3>>::New();
+    filter->SetFiberBundle(fib);
+    filter->SetInputImage(reference);
+    filter->SetUseImageGeometry(true);
+    filter->Update();
+    const auto dense = filter->GetOutput()->GetPixel({{0, 0, 0}});
+    const auto sparse = filter->GetOutput()->GetPixel({{2, 0, 0}});
+    CPPUNIT_ASSERT_EQUAL(255, static_cast<int>(dense[1]));
+    CPPUNIT_ASSERT_EQUAL(255, static_cast<int>(sparse[2]));
+    CPPUNIT_ASSERT_EQUAL(static_cast<int>(dense[3]), static_cast<int>(sparse[3]));
   }
 };
 
