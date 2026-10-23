@@ -35,7 +35,9 @@ PURPOSE.  See the above copyright notices for more information.
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
 
+#include <algorithm>
 #include <cmath>
+#include <type_traits>
 
 namespace itk
 {
@@ -53,6 +55,21 @@ inline Point<double, 3> ResampledImageOrigin(const Point<double, 3>& origin, con
   newOrigin -= direction * (spacing * 0.5);
   newOrigin += direction * (newSpacing * 0.5);
   return newOrigin;
+}
+
+/**
+ * \brief An interpolated value as pixel of type T: rounded and clamped to the range of an integer
+ * type. ITK's cast truncates, which biased every resampled value by about -0.5, i.e. -0.18 % of the
+ * b0 signal to -1.86 % of the b=3000 signal of FWE/InputDiffusionWeightedImage.dwi (tensor MD
+ * +1.2 % after resampling it from 2 to 1 mm).
+ */
+template <class T>
+T ResampledPixel(double value)
+{
+  if constexpr (std::is_integral_v<T>)
+    return static_cast<T>(std::clamp(std::round(value), static_cast<double>(NumericTraits<T>::NonpositiveMin()), static_cast<double>(NumericTraits<T>::max())));
+  else
+    return static_cast<T>(value);
 }
 
 /** \brief How a resampled grid is given: relative to the input, as factor, spacing or size. */

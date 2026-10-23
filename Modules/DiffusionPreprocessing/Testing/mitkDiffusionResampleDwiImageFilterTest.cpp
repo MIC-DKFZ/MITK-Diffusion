@@ -25,6 +25,9 @@ found in the LICENSE file.
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkIOUtil.h>
 
+#include <algorithm>
+#include <cmath>
+
 class mitkDiffusionResampleDwiImageFilterTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionResampleDwiImageFilterTestSuite);
@@ -33,6 +36,7 @@ class mitkDiffusionResampleDwiImageFilterTestSuite : public mitk::TestFixture
   MITK_TEST(Resample_EachSetterAndInterpolation_ResamplesEveryChannelAlike);
   MITK_TEST(Resample_SetterBeforeInputAndUpstreamFilter_RunsPipeline);
   MITK_TEST(ResampledImageGrid_RoundingErrorBelowInteger_KeepsVoxel);
+  MITK_TEST(Resample_Linear_RoundsValues);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -40,13 +44,16 @@ class mitkDiffusionResampleDwiImageFilterTestSuite : public mitk::TestFixture
   using FilterType = itk::ResampleDwiImageFilter<short>;
   using ChannelType = itk::Image<short, 3>;
 
-  /** The filter's grid and interpolators applied to one channel with itk::ResampleImageFilter. */
-  static ChannelType::Pointer ResampleChannel(const DwiType* input, unsigned int channel, const DwiType* output, FilterType::Interpolation interpolation)
+  /**
+   * The filter's grid and interpolators applied to one channel with itk::ResampleImageFilter, in
+   * double; the filter rounds the values into its short output.
+   */
+  static itk::Image<double, 3>::Pointer ResampleChannel(const DwiType* input, unsigned int channel, const DwiType* output, FilterType::Interpolation interpolation)
   {
     auto extractor = itk::VectorIndexSelectionCastImageFilter<DwiType, ChannelType>::New();
     extractor->SetInput(input);
     extractor->SetIndex(channel);
-    auto resampler = itk::ResampleImageFilter<ChannelType, ChannelType>::New();
+    auto resampler = itk::ResampleImageFilter<ChannelType, itk::Image<double, 3>>::New();
     resampler->SetInput(extractor->GetOutput());
     resampler->SetSize(output->GetLargestPossibleRegion().GetSize());
     resampler->SetOutputSpacing(output->GetSpacing());
@@ -79,7 +86,7 @@ class mitkDiffusionResampleDwiImageFilterTestSuite : public mitk::TestFixture
       auto expected = ResampleChannel(input, c, output, interpolation);
       itk::ImageRegionConstIteratorWithIndex<DwiType> it(output, output->GetLargestPossibleRegion());
       for (; !it.IsAtEnd(); ++it)
-        CPPUNIT_ASSERT_EQUAL(expected->GetPixel(it.GetIndex()), it.Get()[c]);
+        CPPUNIT_ASSERT_EQUAL(static_cast<short>(std::clamp(std::round(expected->GetPixel(it.GetIndex())), -32768.0, 32767.0)), it.Get()[c]);
     }
   }
 
@@ -244,6 +251,39 @@ public:
     value.Fill(3);
     itk::ResampledImageGrid(spacing, region, itk::ResampleGridMode::Spacing, value, newSpacing, newRegion);
     CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(7), newRegion.GetSize(0));
+  }
+
+  // The resampled values were truncated, a bias of about -0.5 in every value.
+  void Resample_Linear_RoundsValues()
+  {
+    auto dwi = DwiType::New();
+    dwi->SetRegions(DwiType::RegionType({{0, 0, 0}}, {{2, 1, 1}}));
+    dwi->SetVectorLength(2);
+    dwi->Allocate();
+    DwiType::PixelType pixel(2);
+    pixel[0] = 10;
+    pixel[1] = 7;
+    dwi->SetPixel({{0, 0, 0}}, pixel);
+    pixel[0] = 11;
+    dwi->SetPixel({{1, 0, 0}}, pixel);
+
+    auto filter = FilterType::New();
+    filter->SetInput(dwi);
+    itk::Vector<double, 3> factor;
+    factor.Fill(1);
+    factor[0] = 2;
+    filter->SetSamplingFactor(factor);
+    filter->SetInterpolation(FilterType::Interpolate_Linear);
+    filter->Update();
+
+    // Output voxel x samples the input at (x + 0.5) / 2 - 0.5: 10 (clamped at the border), 10.25,
+    // 10.75 and 11; channel 1 is constant.
+    const short expected[4] = {10, 10, 11, 11};
+    for (unsigned int x = 0; x < 4; ++x)
+    {
+      CPPUNIT_ASSERT_EQUAL(expected[x], filter->GetOutput()->GetPixel({{x, 0, 0}})[0]);
+      CPPUNIT_ASSERT_EQUAL(short(7), filter->GetOutput()->GetPixel({{x, 0, 0}})[1]);
+    }
   }
 
   void Resample_SetterBeforeInputAndUpstreamFilter_RunsPipeline()
