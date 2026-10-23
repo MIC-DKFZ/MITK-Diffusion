@@ -290,7 +290,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
+             <string>Negates the checked world (LPS) components of all gradients. The image data are not changed.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -348,7 +348,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>By default, the image matrix is applied to the image gradients. This button removes this additional rotation.</string>
+             <string>Recomputes the gradients without the rotation of the image matrix. Only DWIs whose gradients include it have one to clear: NRRD files of earlier MITK versions and DICOM. Other DWIs store world gradients.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -367,7 +367,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
+             <string>Reorders the world (LPS) components of all gradients, e.g. &quot;y x z&quot; swaps x and y. The image data are not changed.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -624,7 +624,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Merges selected DWIs of same dimension. If several b-values are present, the resulting image will contain multiple b-shells.</string>
+             <string>Appends the volumes of the DWI chosen next to the button to the selected DWI. Both need the same size, voxel size, origin and direction matrix. If several b-values are present, the resulting image will contain multiple b-shells.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -716,7 +716,7 @@ QGroupBox {
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Merges selected DWIs of same dimension. If several b-values are present, the resulting image will contain multiple b-shells.</string>
+             <string>Mirrors the image along the checked image (voxel) axes; the geometry stays the same. The gradients of a DWI are mirrored along the same axes.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -1138,10 +1138,10 @@ QGroupBox {
              <number>4</number>
             </property>
             <property name="minimum">
-             <double>0.000000000000000</double>
+             <double>0.000100000000000</double>
             </property>
             <property name="maximum">
-             <double>99.989999999999995</double>
+             <double>10000.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -1150,12 +1150,24 @@ QGroupBox {
             <property name="decimals">
              <number>4</number>
             </property>
+            <property name="minimum">
+             <double>0.000100000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10000.000000000000000</double>
+            </property>
            </widget>
           </item>
           <item row="0" column="1">
            <widget class="QDoubleSpinBox" name="m_HeaderSpacingY">
             <property name="decimals">
              <number>4</number>
+            </property>
+            <property name="minimum">
+             <double>0.000100000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10000.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -1312,7 +1324,7 @@ QGroupBox {
           </sizepolicy>
          </property>
          <property name="title">
-          <string>Measurment frame</string>
+          <string>Measurement frame</string>
          </property>
          <layout class="QGridLayout" name="gridLayout">
           <property name="leftMargin">
@@ -1429,6 +1441,19 @@ QGroupBox {
            </spacer>
           </item>
          </layout>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QCheckBox" name="m_RotateGradientsWithImageBox">
+         <property name="toolTip">
+          <string>For DWIs: if checked, a new direction matrix turns the gradients with the image, so they keep their relation to the voxel grid (as FSL bvecs do). If unchecked, the gradients stay fixed in world coordinates.</string>
+         </property>
+         <property name="text">
+          <string>Rotate gradients with the image</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item row="7" column="0">

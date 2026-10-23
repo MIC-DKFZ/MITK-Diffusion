@@ -1,2 +1,3 @@
 MITK_CREATE_MODULE_TESTS()
-
+mitkAddCustomModuleTest(mitkDiffusionImageMappingTest mitkDiffusionImageMappingTest)
+mitkAddCustomModuleTest(mitkDiffusionHeadMotionCorrectionFilterTest mitkDiffusionHeadMotionCorrectionFilterTest)

@@ -32,7 +32,7 @@
   <keyword label="head" id="org.mitk.views.headmotioncorrectionview.Keyword"/>
   <keyword label="align" id="org.mitk.views.simpleregistrationview.Keyword"/>
   <keyword label="align" id="org.mitk.views.headmotioncorrectionview.Keyword"/>
-  <keyword label="register" id="org.mitk.views.simplerigidregistrationview.Keyword"/>
+  <keyword label="register" id="org.mitk.views.simpleregistrationview.Keyword"/>
   <keyword label="register" id="org.mitk.views.headmotioncorrectionview.Keyword"/>
 
   </extension>

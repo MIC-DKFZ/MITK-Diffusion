@@ -1,6 +1,18 @@
 /**
 \page org_mitk_views_denoisingview DWI Denoising
 
-This view provides several methods to denoise diffusion-weighted images. Simply select the image to denoise and press the start button. The default parameters should work relatively well. The NLM method is by far the slowest.
+This view denoises diffusion-weighted images (DWIs). Choose the DWI in <b>Input Image</b>, the
+method in <b>Filter</b>, adjust its parameters and press <b>Start</b>. Each volume of the DWI is
+denoised on its own; gradients and b-values stay as they are. The denoising runs in the
+background, so MITK stays usable meanwhile; the button is disabled until it has finished. The
+result appears below the input, named after it and the method (for example "dwi_NLM").
+
+\li <b>Total-variation</b> (MITK's total variation filter): <b>Lambda</b> weights the smoothing,
+<b>Iterations</b> sets how often it is applied.
+\li <b>Discrete Gaussian</b> (ITK): <b>Variance</b> of the Gaussian kernel in mm².
+\li <b>Non-local means</b> (ITK's patch-based denoising with a Rician noise model): each voxel is
+replaced by a weighted mean of voxels whose neighbourhoods (patches of the given <b>Patch radius</b>)
+look alike. <b>Num. Patches</b> patches are drawn at random within the <b>Sampling Radius</b>;
+<b>Iterations</b> sets how often the filter is applied. By far the slowest of the three methods.
 
 */

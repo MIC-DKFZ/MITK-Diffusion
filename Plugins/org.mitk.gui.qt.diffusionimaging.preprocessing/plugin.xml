@@ -14,4 +14,13 @@
 
   </extension>
 
+  <extension point="org.blueberry.ui.keywords">
+
+  <keyword label="preprocessing" id="org.mitk.views.diffusionpreprocessing.Keyword"/>
+  <keyword label="gradients" id="org.mitk.views.diffusionpreprocessing.Keyword"/>
+  <keyword label="header" id="org.mitk.views.diffusionpreprocessing.Keyword"/>
+  <keyword label="resample" id="org.mitk.views.diffusionpreprocessing.Keyword"/>
+
+  </extension>
+
 </plugin>

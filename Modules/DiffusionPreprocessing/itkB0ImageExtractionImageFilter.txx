@@ -14,113 +14,59 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-/*===================================================================
-
-This file is based heavily on a corresponding ITK filter.
-
-===================================================================*/
-#ifndef __itkB0ImageExtractionImageFilter_txx
-#define __itkB0ImageExtractionImageFilter_txx
+#ifndef itkB0ImageExtractionImageFilter_txx
+#define itkB0ImageExtractionImageFilter_txx
 
 #include "itkB0ImageExtractionImageFilter.h"
 
-#include "itkImageRegionIterator.h"
+#include <itkImageRegionConstIterator.h>
+#include <itkImageRegionIterator.h>
+#include <mitkB0Indices.h>
 
-namespace itk {
+#include <cmath>
 
-  template< class TInputImagePixelType,
-  class TOutputImagePixelType >
-    B0ImageExtractionImageFilter< TInputImagePixelType,
-    TOutputImagePixelType >
-    ::B0ImageExtractionImageFilter()
+namespace itk
+{
+  template <class TInputImagePixelType, class TOutputImagePixelType>
+  B0ImageExtractionImageFilter<TInputImagePixelType, TOutputImagePixelType>::B0ImageExtractionImageFilter()
   {
-    // At least 1 inputs is necessary for a vector image.
-    // For images added one at a time we need at least six
-    this->SetNumberOfRequiredInputs( 1 );
+    this->SetNumberOfRequiredInputs(1);
   }
 
-  template< class TInputImagePixelType,
-  class TOutputImagePixelType >
-    void B0ImageExtractionImageFilter< TInputImagePixelType,
-    TOutputImagePixelType >
-    ::GenerateData()
+  template <class TInputImagePixelType, class TOutputImagePixelType>
+  void B0ImageExtractionImageFilter<TInputImagePixelType, TOutputImagePixelType>::GenerateData()
   {
+    if (m_Directions.IsNull() || m_Directions->Size() != this->GetInput()->GetVectorLength())
+      itkExceptionMacro("The number of gradient directions does not match the number of image volumes.");
+    if (std::isnan(m_ReferenceBValue))
+      itkExceptionMacro("The reference b-value is not set.");
 
-    typename GradientDirectionContainerType::ConstIterator begin = m_Directions->Begin();
-    typename GradientDirectionContainerType::ConstIterator end = m_Directions->End();
+    const std::vector<unsigned int> indices = mitk::GetB0Indices(m_Directions, m_ReferenceBValue);
+    // Without a b0 volume the average would silently be an all-zero image.
+    if (indices.empty())
+      itkExceptionMacro("The image has no b0 volume (no b-value rounds to 0).");
 
-    // Find the index of the b0 image
-    std::vector<int> indices;
-    int index = 0;
-    while(begin!=end)
-    {
-      GradientDirectionType grad = begin->Value();
-
-      if(grad[0] == 0 && grad[1] == 0 && grad[2] == 0)
-      {
-        indices.push_back(index);
-      }
-      ++index;
-      ++begin;
-    }
-
-    typedef itk::Image<float,3> TempImageType;
-    TempImageType::Pointer tmp = TempImageType::New();
-    typename TempImageType::RegionType region = this->GetInput()->GetLargestPossibleRegion();
-
-    tmp->SetSpacing(this->GetInput()->GetSpacing());
-    tmp->SetOrigin(this->GetInput()->GetOrigin());
-    tmp->SetDirection(this->GetInput()->GetDirection());
-    tmp->SetRegions(region);
-    tmp->Allocate();
-
-    itk::ImageRegionIterator<TempImageType> it(tmp.GetPointer(), tmp->GetLargestPossibleRegion() );
-    itk::ImageRegionConstIterator<InputImageType> vectorIt(this->GetInput(), this->GetInput()->GetLargestPossibleRegion() );
-
-    it.GoToBegin();
-    while(!it.IsAtEnd())
-    {
-      it.Set(0);
-      ++it;
-    }
-
-    //Sum all images that have zero diffusion weighting (indices stored in vector index)
-    for(std::vector<int>::iterator indexIt = indices.begin();
-      indexIt != indices.end();
-      indexIt++)
-    {
-      it.GoToBegin();
-      vectorIt.GoToBegin();
-
-      while(!it.IsAtEnd() && !vectorIt.IsAtEnd())
-      {
-        typename InputImageType::PixelType vec = vectorIt.Get();
-        it.Set((1.0 * it.Get()) + (1.0 * vec[*indexIt]) / (1.0 * indices.size()));
-        ++it;
-        ++vectorIt;
-      }
-    }
-
-    typename OutputImageType::Pointer b0Image =
-      static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
-    typename OutputImageType::RegionType outregion = this->GetInput()->GetLargestPossibleRegion();
-    b0Image->SetSpacing(this->GetInput()->GetSpacing());
-    b0Image->SetOrigin(this->GetInput()->GetOrigin());
-    b0Image->SetDirection(this->GetInput()->GetDirection());
-    b0Image->SetRegions(outregion);
+    auto input = this->GetInput();
+    typename OutputImageType::Pointer b0Image = this->GetOutput();
+    b0Image->SetSpacing(input->GetSpacing());
+    b0Image->SetOrigin(input->GetOrigin());
+    b0Image->SetDirection(input->GetDirection());
+    b0Image->SetRegions(input->GetLargestPossibleRegion());
     b0Image->Allocate();
-    itk::ImageRegionIterator<TempImageType> itIn(tmp, tmp->GetLargestPossibleRegion() );
-    itk::ImageRegionIterator<OutputImageType> itOut(b0Image, b0Image->GetLargestPossibleRegion() );
-    itIn.GoToBegin();
-    itOut.GoToBegin();
-    while(!itIn.IsAtEnd())
+
+    // The mean is accumulated in float, b0 volume by b0 volume, and then cast to the output type.
+    const double count = indices.size();
+    ImageRegionConstIterator<InputImageType> inIt(input, input->GetLargestPossibleRegion());
+    ImageRegionIterator<OutputImageType> outIt(b0Image, b0Image->GetLargestPossibleRegion());
+    for (; !inIt.IsAtEnd(); ++inIt, ++outIt)
     {
-      itOut.Set(itIn.Get());
-      ++itIn;
-      ++itOut;
+      const typename InputImageType::PixelType pixel = inIt.Get();
+      float mean = 0;
+      for (auto index : indices)
+        mean = mean + pixel[index] / count;
+      outIt.Set(mean);
     }
   }
-
 }
 
-#endif // __itkB0ImageExtractionImageFilter_txx
+#endif

@@ -5,7 +5,5 @@ project(org_mitk_gui_qt_diffusionimaging_denoising)
 mitk_create_plugin(
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_DENOISING_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkDiffusionPreprocessing MitkImageDenoising
-  PACKAGE_DEPENDS
-    PUBLIC ITK|ITKDenoising
+  MODULE_DEPENDS MitkDiffusionPreprocessing
 )

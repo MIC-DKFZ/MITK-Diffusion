@@ -34,7 +34,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkADCAverageFunctor.h>
 #include <itkBiExpFitFunctor.h>
 #include <itkKurtosisFitFunctor.h>
-#include <itkDwiGradientLengthCorrectionFilter.h>
+#include <mitkDiffusionImageEditing.h>
 #include <mitkIOUtil.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkProperties.h>
@@ -82,16 +82,9 @@ int main(int argc, char* argv[])
     {
       typedef itk::RadialMultishellToSingleshellImageFilter<short, short> FilterType;
 
-      typedef itk::DwiGradientLengthCorrectionFilter  CorrectionFilterType;
-
-      CorrectionFilterType::Pointer roundfilter = CorrectionFilterType::New();
-      roundfilter->SetRoundingValue( 1000 );
-      roundfilter->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue( dwi ));
-      roundfilter->SetReferenceGradientDirectionContainer(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi));
-      roundfilter->Update();
-
-      mitk::DiffusionPropertyHelper::SetReferenceBValue(dwi, roundfilter->GetNewBValue());
-      mitk::DiffusionPropertyHelper::SetGradientContainer(dwi, roundfilter->GetOutputGradientDirectionContainer());
+      const auto rounded = mitk::DiffusionImageEditing::RoundBValues(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi), mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi), 1000);
+      mitk::DiffusionPropertyHelper::SetReferenceBValue(dwi, rounded.referenceBValue);
+      mitk::DiffusionPropertyHelper::SetGradientContainer(dwi, rounded.gradients);
 
       // filter input parameter
       const mitk::DiffusionPropertyHelper::BValueMapType

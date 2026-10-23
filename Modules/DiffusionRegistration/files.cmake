@@ -1,18 +1,11 @@
 set(H_FILES
-  mitkRegistrationWrapper.h
-  mitkPyramidImageRegistrationMethod.h
   mitkDWIHeadMotionCorrectionFilter.h
-  mitkDiffusionImageCorrectionFilter.h
-  mitkPyramidRegistrationMethodHelper.h
-  itkSplitDWImageFilter.h
+  mitkDiffusionImageMapping.h
 )
 
 set(CPP_FILES
-  mitkRegistrationWrapper.cpp
-  mitkPyramidImageRegistrationMethod.cpp
   mitkDWIHeadMotionCorrectionFilter.cpp
-  mitkDiffusionImageCorrectionFilter.cpp
-  itkSplitDWImageFilter.txx
+  mitkDiffusionImageMapping.cpp
 )
 
 set(RESOURCE_FILES

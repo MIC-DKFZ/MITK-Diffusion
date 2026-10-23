@@ -511,6 +511,7 @@ void QmitkTensorReconstructionView::PreviewThreshold(int threshold)
     FilterType::Pointer filterB0 = FilterType::New();
     filterB0->SetInput(itkVectorImagePointer);
     filterB0->SetDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(vols));
+    filterB0->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(vols));
     filterB0->Update();
 
     mitk::Image::Pointer mitkImage = mitk::Image::New();
