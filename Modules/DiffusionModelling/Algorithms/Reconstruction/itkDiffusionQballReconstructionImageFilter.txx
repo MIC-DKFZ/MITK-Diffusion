@@ -784,6 +784,11 @@ namespace itk {
       }
     }
 
+    // Every voxel's signal is divided by the averaged baseline; without one, the integer division
+    // by m_NumberOfBaselineImages killed the process with SIGFPE.
+    if (this->m_NumberOfBaselineImages == 0)
+      itkExceptionMacro("No baseline image detected (no b-zero image)");
+
     this->m_NumberOfGradientDirections = numImages - this->m_NumberOfBaselineImages;
 
     // ensure that the gradient image we received has as many components as
