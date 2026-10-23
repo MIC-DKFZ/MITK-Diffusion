@@ -5,7 +5,7 @@ This view configures how diffusion images, peak images and tractograms are shown
 
 \section QmitkDiffusionImagingVisualizationSettings ODF and Tensor Glyphs
 
-For tensor, ODF and spherical-harmonic images, the visibility of glyphs in the different render windows (T)ransversal, (S)agittal and (C)oronal can be switched here. The maximal number of glyphs to display (\#Glyphs) keeps the system response time during rendering feasible. The other options configure the normalization (Min-Max, Max, None or Global Maximum, the largest value of the whole image; not offered for tensors), the scaling of the glyphs (None, FA/GFA or Principal Curvature), an additional scaling factor, and the colouring by ODF value or by principal direction.
+For tensor, ODF and spherical-harmonic images, the visibility of glyphs in the different render windows (T)ransversal, (S)agittal and (C)oronal can be switched here. The maximal number of glyphs to display (\#Glyphs) keeps the system response time during rendering feasible. The other options configure the normalization (Min-Max, Max or None; not offered for tensors; a scene file with the former "Global Maximum" shows "Max", which draws the same), the scaling of the glyphs (None, FA/GFA or Principal Curvature), an additional scaling factor, and the colouring by ODF value or by principal direction.
 
 A diffusion-weighted image that is loaded while this view is open shows its first b=0 volume instead of volume 0.
 

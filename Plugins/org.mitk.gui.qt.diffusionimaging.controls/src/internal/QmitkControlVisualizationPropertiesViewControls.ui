@@ -344,11 +344,6 @@ QGroupBox {
                    <string>None</string>
                   </property>
                  </item>
-                 <item>
-                  <property name="text">
-                   <string>Global Maximum</string>
-                  </property>
-                 </item>
                 </widget>
                </item>
                <item row="5" column="0">

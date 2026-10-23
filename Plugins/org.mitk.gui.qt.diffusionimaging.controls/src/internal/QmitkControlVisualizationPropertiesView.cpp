@@ -456,9 +456,13 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
       node->GetIntProperty("ShowMaxNumber", val);
       m_Controls->m_ShowMaxNumber->setValue(val);
 
-      // the combo box entries follow the ids of the ODF mapper's enumeration properties
+      // the combo box entries follow the ids of the ODF mapper's enumeration properties; "Global
+      // Maximum", which older scenes may hold, draws as "Max" and is shown as such
       if (auto normalization = dynamic_cast<mitk::EnumerationProperty*>(node->GetProperty("Normalization")))
-        m_Controls->m_NormalizationDropdown->setCurrentIndex(normalization->GetValueAsId());
+      {
+        const auto id = normalization->GetValueAsId();
+        m_Controls->m_NormalizationDropdown->setCurrentIndex(id==mitk::ODFN_GLOBAL_MAX ? static_cast<int>(mitk::ODFN_MAX) : static_cast<int>(id));
+      }
 
       float fval = static_cast<float>(m_Controls->m_ScalingFactor->value());
       node->GetFloatProperty("Scaling",fval);
@@ -750,9 +754,6 @@ void QmitkControlVisualizationPropertiesView::NormalizationDropdownChanged(int n
     break;
   case 2:
     normMeth->SetNormalizationToNone();
-    break;
-  case 3:
-    normMeth->SetNormalizationToGlobalMax();
     break;
   default:
     normMeth->SetNormalizationToMinMax();
