@@ -161,9 +161,10 @@ public:
 
   void grad_regu_Variance(vnl_vector<double> const &x, vnl_vector<double> &dx)
   {
+    // d/dx_k sum_i (x_i - mean)^2 = 2 (x_k - mean): the deviations from the mean sum to zero
     double mean = x.mean();
     vnl_vector<double> tx = x-mean; // difference to mean
-    dx += 10000.0*tx*(2.0-2.0/dim)/dim;
+    dx += 10000.0*m_Lambda*2.0*tx/dim;
   }
 
   void grad_regu_Lasso(vnl_vector<double> const &x, vnl_vector<double> &dx)
@@ -190,7 +191,8 @@ public:
       offset += g;
     }
 
-    dx += 10000.0*tx*(2.0-2.0/dim)/dim;
+    // per group as in grad_regu_Variance
+    dx += 10000.0*m_Lambda*2.0*tx/dim;
   }
 
   void grad_regu_VoxelVariance(vnl_vector<double> const &x, vnl_vector<double> &dx)
