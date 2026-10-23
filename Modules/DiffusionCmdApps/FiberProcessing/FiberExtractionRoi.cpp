@@ -28,11 +28,32 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itksys/SystemTools.hxx>
 #include <itkFiberExtractionFilter.h>
 
+#include <sstream>
+
 #define _USE_MATH_DEFINES
 #include <math.h>
 
 typedef itksys::SystemTools ist;
 typedef itk::Image<float, 3>    ItkFloatImgType;
+
+namespace
+{
+  /** Sends std::cout to a buffer, which hides the readers' and writers' console output, and
+   * restores it when the scope ends, also when an exception leaves the scope, so that the error
+   * message reaches the console. */
+  class CoutSilencer
+  {
+  public:
+    CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
+    ~CoutSilencer() { std::cout.rdbuf(m_Old); }
+    CoutSilencer(const CoutSilencer&) = delete;
+    CoutSilencer& operator=(const CoutSilencer&) = delete;
+
+  private:
+    std::stringstream m_Buffer;
+    std::streambuf* m_Old;
+  };
+}
 
 ItkFloatImgType::Pointer LoadItkImage(const std::string& filename)
 {
@@ -162,17 +183,16 @@ int main(int argc, char* argv[])
     // load fiber bundle
     mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(inFib);
 
-    std::streambuf *old = std::cout.rdbuf(); // <-- save
-    std::stringstream ss;
-    std::cout.rdbuf (ss.rdbuf());       // <-- redirect
     std::vector< ItkFloatImgType::Pointer > roi_images;
     std::vector< std::string > roi_names;
-    for (std::size_t i=0; i<roi_files.size(); ++i)
     {
-      roi_images.push_back( LoadItkImage(roi_files.at(i)) );
-      roi_names.push_back(itksys::SystemTools::GetFilenameWithoutExtension(roi_files.at(i)));
+      CoutSilencer silencer;
+      for (std::size_t i=0; i<roi_files.size(); ++i)
+      {
+        roi_images.push_back( LoadItkImage(roi_files.at(i)) );
+        roi_names.push_back(itksys::SystemTools::GetFilenameWithoutExtension(roi_files.at(i)));
+      }
     }
-    std::cout.rdbuf (old);              // <-- restore
     MITK_INFO << "Loaded " << roi_images.size() << " ROI images.";
 
     std::vector< ItkFloatImgType* > roi_images2;
@@ -258,12 +278,12 @@ int main(int argc, char* argv[])
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (...)

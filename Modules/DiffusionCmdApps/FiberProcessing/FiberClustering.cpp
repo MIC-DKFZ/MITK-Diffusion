@@ -28,7 +28,28 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkClusteringMetricLength.h>
 #include <itksys/SystemTools.hxx>
 
+#include <sstream>
+
 typedef itksys::SystemTools ist;
+
+namespace
+{
+  /** Sends std::cout to a buffer, which hides the readers' and writers' console output, and
+   * restores it when the scope ends, also when an exception leaves the scope, so that the error
+   * message reaches the console. */
+  class CoutSilencer
+  {
+  public:
+    CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
+    ~CoutSilencer() { std::cout.rdbuf(m_Old); }
+    CoutSilencer(const CoutSilencer&) = delete;
+    CoutSilencer& operator=(const CoutSilencer&) = delete;
+
+  private:
+    std::stringstream m_Buffer;
+    std::streambuf* m_Old;
+  };
+}
 
 mitk::FiberBundle::Pointer LoadFib(std::string filename)
 {
@@ -230,9 +251,7 @@ int main(int argc, char* argv[])
     std::vector<mitk::FiberBundle::Pointer> centroids = clusterer->GetOutCentroids();
 
     MITK_INFO << "Saving clusters";
-    std::streambuf *old = std::cout.rdbuf(); // <-- save
-    std::stringstream ss;
-    std::cout.rdbuf (ss.rdbuf());       // <-- redirect
+    CoutSilencer silencer;
 
     if (!only_centroids)
       for (unsigned int i=0; i<tracts.size(); ++i)
@@ -250,18 +269,15 @@ int main(int argc, char* argv[])
       centroid = centroid->AddBundles(centroids);
       mitk::IOUtil::Save(centroid, out_root + ist::GetFilenameWithoutExtension(inFileName) + "_Centroids" + file_ending);
     }
-
-    std::cout.rdbuf (old);              // <-- restore
-
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (...)
