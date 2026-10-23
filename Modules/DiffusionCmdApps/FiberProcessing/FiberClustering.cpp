@@ -27,6 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkClusteringMetricInnerAngles.h>
 #include <mitkClusteringMetricLength.h>
 #include <itksys/SystemTools.hxx>
+#include <mitkExceptionMacro.h>
 
 #include <sstream>
 
@@ -83,7 +84,7 @@ int main(int argc, char* argv[])
   parser.addArgument("output_centroids", "", mitkCommandLineParser::Bool, "Output centroids:", "");
   parser.addArgument("only_centroids", "", mitkCommandLineParser::Bool, "Output only centroids:", "");
   parser.addArgument("merge_centroids", "", mitkCommandLineParser::Bool, "Merge centroids:", "");
-  parser.addArgument("metrics", "", mitkCommandLineParser::StringList, "Metrics:", "EU_MEAN; EU_STD; EU_MAX; ANAT; MAP; LENGTH", std::string("EU_MEAN"));
+  parser.addArgument("metrics", "", mitkCommandLineParser::StringList, "Metrics:", "EU_MEAN; EU_STD; EU_MAX; ANGLES; ANAT; MAP; LENGTH", std::string("EU_MEAN"));
   parser.addArgument("metric_weights", "", mitkCommandLineParser::StringList, "Metric weights:", "add one float weight for each used metric");
   parser.addArgument("input_centroids", "", mitkCommandLineParser::String, "Input centroids:", "", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("scalar_map", "", mitkCommandLineParser::String, "Scalar map:", "", us::Any(), true, false, false, mitkCommandLineParser::Input);
@@ -189,49 +190,54 @@ int main(int argc, char* argv[])
 
     std::vector< mitk::ClusteringMetric* > metrics;
 
+    // Each metric name must create its metric, so that its weight is not given to another one.
     int mc = 0;
     for (auto m : metric_strings)
     {
       float w = boost::lexical_cast<float>(metric_weights.at(mc));
       MITK_INFO << "Metric: " << m << " (w=" << w << ")";
+      mitk::ClusteringMetric* metric = nullptr;
       if (m=="EU_MEAN")
-        metrics.push_back({new mitk::ClusteringMetricEuclideanMean()});
+        metric = new mitk::ClusteringMetricEuclideanMean();
       else if (m=="EU_STD")
-        metrics.push_back({new mitk::ClusteringMetricEuclideanStd()});
+        metric = new mitk::ClusteringMetricEuclideanStd();
       else if (m=="EU_MAX")
-        metrics.push_back({new mitk::ClusteringMetricEuclideanMax()});
+        metric = new mitk::ClusteringMetricEuclideanMax();
       else if (m=="ANGLES")
-        metrics.push_back({new mitk::ClusteringMetricInnerAngles()});
+        metric = new mitk::ClusteringMetricInnerAngles();
       else if (m=="LENGTH")
-        metrics.push_back({new mitk::ClusteringMetricLength()});
-      else if (m=="MAP" && scalar_map!="")
+        metric = new mitk::ClusteringMetricLength();
+      else if (m=="MAP" || m=="ANAT")
       {
-        mitk::Image::Pointer mitk_map = mitk::IOUtil::Load<mitk::Image>(scalar_map);
-        if (mitk_map->GetDimension()==3)
+        const std::string& image_file = m=="MAP" ? scalar_map : parcellation;
+        if (image_file.empty())
+          mitkThrow() << "Metric " << m << " needs --" << (m=="MAP" ? "scalar_map" : "parcellation") << ".";
+        mitk::Image::Pointer mitk_map = mitk::IOUtil::Load<mitk::Image>(image_file);
+        if (mitk_map->GetDimension()!=3)
+          mitkThrow() << "Metric " << m << " needs a 3D image: " << image_file;
+
+        if (m=="MAP")
         {
           FloatImageType::Pointer itk_map = FloatImageType::New();
           mitk::CastToItkImage(mitk_map, itk_map);
-
-          mitk::ClusteringMetricScalarMap* metric = new mitk::ClusteringMetricScalarMap();
-          metric->SetImages({itk_map});
-          metric->SetScale(distances.at(0));
-          metrics.push_back(metric);
+          auto map_metric = new mitk::ClusteringMetricScalarMap();
+          map_metric->SetImages({itk_map});
+          metric = map_metric;
         }
-      }
-      else if (m=="ANAT" && parcellation!="")
-      {
-        mitk::Image::Pointer mitk_map = mitk::IOUtil::Load<mitk::Image>(parcellation);
-        if (mitk_map->GetDimension()==3)
+        else
         {
           ShortImageType::Pointer itk_map = ShortImageType::New();
           mitk::CastToItkImage(mitk_map, itk_map);
-
-          mitk::ClusteringMetricAnatomic* metric = new mitk::ClusteringMetricAnatomic();
-          metric->SetParcellations({itk_map});
-          metrics.push_back(metric);
+          auto anat_metric = new mitk::ClusteringMetricAnatomic();
+          anat_metric->SetParcellations({itk_map});
+          metric = anat_metric;
         }
       }
-      metrics.back()->SetScale(w);
+      else
+        mitkThrow() << "Unknown metric " << m << ".";
+
+      metric->SetScale(w);
+      metrics.push_back(metric);
       mc++;
     }
 
