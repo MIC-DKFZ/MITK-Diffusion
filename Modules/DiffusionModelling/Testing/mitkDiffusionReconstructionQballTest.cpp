@@ -23,6 +23,7 @@ found in the LICENSE file.
 #include <itkOrientationDistributionFunction.h>
 
 #include <cmath>
+#include <string>
 #include <vector>
 
 /** Regression tests of the Q-ball reconstruction filters on small simulated DWIs. */
@@ -32,6 +33,9 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(Numerical_NoBaseline_Throws);
   MITK_TEST(Numerical_SecondUpdate_SameResult);
   MITK_TEST(Analytical_SecondUpdate_SameResult);
+  MITK_TEST(SingleShellFilters_TwoShells_Throw);
+  MITK_TEST(SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint);
+  MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
@@ -88,6 +92,55 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
     }
     dwi.image->FillBuffer(pixel);
     return dwi;
+  }
+
+  /** One b0 volume and 30 directions per b-value, b = ReferenceBValue * |g|^2. */
+  static std::vector<vnl_vector_fixed<double, 3>> Shells(const std::vector<double> &bValues)
+  {
+    std::vector<vnl_vector_fixed<double, 3>> gradients(1, vnl_vector_fixed<double, 3>(0.0));
+    for (double b : bValues)
+      for (const auto &d : Directions(30))
+        gradients.push_back(d * std::sqrt(b / ReferenceBValue));
+    return gradients;
+  }
+
+  template <class TFilter>
+  static typename TFilter::Pointer QballFilter(const Dwi &dwi)
+  {
+    auto filter = TFilter::New();
+    filter->SetBValue(ReferenceBValue);
+    filter->SetGradientImage(dwi.gradients, dwi.image);
+    return filter;
+  }
+
+  static NumericalFilterType::Pointer Numerical(const Dwi &dwi)
+  {
+    auto filter = QballFilter<NumericalFilterType>(dwi);
+    filter->SetNormalizationMethod(NumericalFilterType::QBR_STANDARD);
+    return filter;
+  }
+
+  static AnalyticalFilterType::Pointer Analytical(const Dwi &dwi)
+  {
+    auto filter = QballFilter<AnalyticalFilterType>(dwi);
+    filter->SetNormalizationMethod(AnalyticalFilterType::QBAR_STANDARD);
+    filter->SetLambda(0.006);
+    return filter;
+  }
+
+  /** The description of the exception the filter's Update() throws, empty if none. */
+  template <class TFilter>
+  static std::string UpdateError(TFilter *filter)
+  {
+    try
+    {
+      filter->Update();
+    }
+    catch (const itk::ExceptionObject &e)
+    {
+      return e.GetDescription();
+    }
+    return "";
   }
 
   /** ImageReconstruction/test.dwi: one b0 and 30 directions on the half sphere z >= 0. */
@@ -166,6 +219,48 @@ public:
     reused->Update();
     CheckEqual(fresh->GetOutput(), reused->GetOutput());
     CheckEqual(fresh->GetCoefficientImage().GetPointer(), reused->GetCoefficientImage().GetPointer());
+  }
+
+  // The single-shell filters normalized every gradient and used one b-value, so a second shell was
+  // reconstructed as if it had the reference b-value.
+  void SingleShellFilters_TwoShells_Throw()
+  {
+    auto dwi = Simulate(Shells({500, 1000}));
+    CPPUNIT_ASSERT(UpdateError(Numerical(dwi).GetPointer()).find("2 b-values (500, 1000)") != std::string::npos);
+    CPPUNIT_ASSERT(UpdateError(Analytical(dwi).GetPointer()).find("2 b-values (500, 1000)") != std::string::npos);
+  }
+
+  // b0 volumes stored with b = 5 are a shell of their own under the b-value map's rule; the
+  // analytical filter took every b < 100 for b0, the numerical one only exact zero vectors.
+  void SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint()
+  {
+    auto gradients = Shells({1000});
+    gradients.push_back(vnl_vector_fixed<double, 3>(1.0, 0.0, 0.0) * std::sqrt(5 / ReferenceBValue));
+    auto dwi = Simulate(gradients);
+    CPPUNIT_ASSERT(UpdateError(Numerical(dwi).GetPointer()).find("round the b-values") != std::string::npos);
+    CPPUNIT_ASSERT(UpdateError(Analytical(dwi).GetPointer()).find("round the b-values") != std::string::npos);
+  }
+
+  // A b0 volume stored with a short non-zero vector (b = 0.1) is a b0 volume, as in the b-value
+  // map; the numerical filter took it for a diffusion-weighted volume.
+  void SingleShellFilters_ShortB0Vector_IsB0()
+  {
+    auto exact = Simulate(Shells({1000}));
+    auto gradients = Shells({1000});
+    gradients[0] = vnl_vector_fixed<double, 3>(0.01, 0.0, 0.0);
+    auto shortVector = Simulate(gradients);
+
+    auto numericalExact = Numerical(exact);
+    numericalExact->Update();
+    auto numericalShort = Numerical(shortVector);
+    numericalShort->Update();
+    CheckEqual(numericalExact->GetOutput(), numericalShort->GetOutput());
+
+    auto analyticalExact = Analytical(exact);
+    analyticalExact->Update();
+    auto analyticalShort = Analytical(shortVector);
+    analyticalShort->Update();
+    CheckEqual(analyticalExact->GetOutput(), analyticalShort->GetOutput());
   }
 };
 

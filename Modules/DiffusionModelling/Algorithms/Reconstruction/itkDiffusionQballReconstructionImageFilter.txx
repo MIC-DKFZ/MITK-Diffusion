@@ -23,6 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
 #include "itkPointShell.h"
+#include "mitkSingleShellGradients.h"
 
 namespace itk {
 
@@ -60,13 +61,6 @@ namespace itk {
     NrBasisFunctionCenters>
     ::BeforeThreadedGenerateData()
   {
-    // There need to be at least 6 gradient directions to be able to compute the
-    // tensor basis
-    if( m_NumberOfGradientDirections < 1 )
-    {
-        itkExceptionMacro( << "Your image contains no diffusion gradients!" );
-    }
-
     // Compute reconstruction matrix that is multiplied to the data-vector
     // each voxel in order to reconstruct the ODFs
     this->ComputeReconstructionMatrix();
@@ -204,29 +198,9 @@ namespace itk {
     GradientIteratorType git(gradientImagePointer, outputRegionForThread );
     git.GoToBegin();
 
-    // set of indicies each for the baseline images and gradient images
-    std::vector<unsigned int> baselineind; // contains baseline indicies
-    std::vector<unsigned int> gradientind; // contains gradient indicies
-    for(GradientDirectionContainerType::ConstIterator gdcit = this->m_GradientDirectionContainer->Begin();
-      gdcit != this->m_GradientDirectionContainer->End(); ++gdcit)
-    {
-      if(gdcit.Value().one_norm() <= 0.0)
-      {
-        baselineind.push_back(gdcit.Index());
-      }
-      else
-      {
-        gradientind.push_back(gdcit.Index());
-      }
-    }
-
-    // in case we have a duplicated shell, we also duplicate or indices
-    if( m_DirectionsDuplicated )
-    {
-      int gradIndSize = gradientind.size();
-      for(int i=0; i<gradIndSize; i++)
-        gradientind.push_back(gradientind[i]);
-    }
+    // set of indicies each for the baseline images and gradient images, duplicated with the shell
+    const std::vector<unsigned int> &baselineind = m_BaselineIndices;
+    const std::vector<unsigned int> &gradientind = m_GradientIndices;
 
     // Following loop does the actual reconstruction work in each voxel
     // (Tuch, Q-Ball Reconstruction [1])
@@ -290,15 +264,15 @@ namespace itk {
     NrBasisFunctionCenters>
     ::ComputeReconstructionMatrix()
   {
-    // Derived per execution: the half-sphere duplication below doubles the count, and a second
-    // Update() must not double it again.
+    // Derived per execution: the b-value may be set after the gradients, and the half-sphere
+    // duplication below doubles the count, which a second Update() must not double again. b0
+    // volumes are those whose b-value rounds to 0, as in the b-value map; the model needs one shell.
+    const mitk::SingleShellGradients shell = mitk::GetSingleShellGradients(m_GradientDirectionContainer, m_BValue);
+    m_BaselineIndices = shell.baselineIndices;
+    m_GradientIndices = shell.diffusionWeightedIndices;
+    m_NumberOfBaselineImages = m_BaselineIndices.size();
+    m_NumberOfGradientDirections = m_GradientIndices.size();
     m_DirectionsDuplicated = false;
-    m_NumberOfGradientDirections = m_GradientDirectionContainer->Size() - m_NumberOfBaselineImages;
-
-    if( m_NumberOfGradientDirections < 1 )
-    {
-      itkExceptionMacro( << "Your image contains no diffusion gradients!" );
-    }
 
     {
       // check for duplicate diffusion gradients
@@ -325,20 +299,17 @@ namespace itk {
       vnl_vector<double> centerMass(3);
       centerMass.fill(0.0);
       int count = 0;
-      for(GradientDirectionContainerType::ConstIterator gdcit1 = this->m_GradientDirectionContainer->Begin();
-        gdcit1 != this->m_GradientDirectionContainer->End(); ++gdcit1)
+      for (const auto &direction : shell.directions)
       {
-        if(gdcit1.Value().one_norm() > 0.0)
-        {
-          centerMass += gdcit1.Value().as_vector();
-          count ++;
-        }
+        centerMass += direction.as_vector();
+        count ++;
       }
       centerMass /= count;
       if(centerMass.two_norm() > 0.1)
       {
         m_DirectionsDuplicated = true;
         m_NumberOfGradientDirections *= 2;
+        m_GradientIndices.insert(m_GradientIndices.end(), shell.diffusionWeightedIndices.begin(), shell.diffusionWeightedIndices.end());
       }
     }
 
@@ -353,27 +324,19 @@ namespace itk {
     {
       // Fill matrix Q with gradient directions
       int i = 0;
-      for(GradientDirectionContainerType::ConstIterator gdcit = this->m_GradientDirectionContainer->Begin();
-        gdcit != this->m_GradientDirectionContainer->End(); ++gdcit)
+      for (const auto &direction : shell.directions)
       {
-        if(gdcit.Value().one_norm() > 0.0)
-        {
-          (*Q)(0,i) = gdcit.Value().get(0);
-          (*Q)(1,i) = gdcit.Value().get(1);
-          (*Q)(2,i++) = gdcit.Value().get(2);
-        }
+        (*Q)(0,i) = direction[0];
+        (*Q)(1,i) = direction[1];
+        (*Q)(2,i++) = direction[2];
       }
       if(m_DirectionsDuplicated)
       {
-        for(GradientDirectionContainerType::ConstIterator gdcit = this->m_GradientDirectionContainer->Begin();
-          gdcit != this->m_GradientDirectionContainer->End(); ++gdcit)
+        for (const auto &direction : shell.directions)
         {
-          if(gdcit.Value().one_norm() > 0.0)
-          {
-            (*Q)(0,i) = -gdcit.Value().get(0);
-            (*Q)(1,i) = -gdcit.Value().get(1);
-            (*Q)(2,i++) = -gdcit.Value().get(2);
-          }
+          (*Q)(0,i) = -direction[0];
+          (*Q)(1,i) = -direction[1];
+          (*Q)(2,i++) = -direction[2];
         }
       }
 
@@ -588,6 +551,7 @@ namespace itk {
     ::SetGradientImage(const GradientDirectionContainerType *gradientDirection,
     const GradientImagesType *gradientImage )
   {
+    // The gradients are classified and normalized per execution (ComputeReconstructionMatrix).
     this->m_GradientDirectionContainer = GradientDirectionContainerType::New();
     for(GradientDirectionContainerType::ConstIterator it = gradientDirection->Begin();
       it != gradientDirection->End(); it++)
@@ -595,36 +559,12 @@ namespace itk {
       this->m_GradientDirectionContainer->push_back(it.Value());
     }
 
-    unsigned int numImages = gradientDirection->Size();
-    this->m_NumberOfBaselineImages = 0;
-    for(GradientDirectionContainerType::Iterator it = this->m_GradientDirectionContainer->Begin();
-      it != this->m_GradientDirectionContainer->End(); it++)
-    {
-      if(it.Value().one_norm() <= 0.0)
-      {
-        this->m_NumberOfBaselineImages++;
-      }
-      else // Normalize non-zero gradient directions
-      {
-        it.Value() = it.Value() / it.Value().two_norm();
-      }
-    }
-
-    // Every voxel's signal is divided by the averaged baseline; without one, the integer division
-    // by m_NumberOfBaselineImages killed the process with SIGFPE.
-    if (this->m_NumberOfBaselineImages == 0)
-      itkExceptionMacro("No baseline image detected (no b-zero image)");
-
-    this->m_NumberOfGradientDirections = numImages - this->m_NumberOfBaselineImages;
-
     // ensure that the gradient image we received has as many components as
     // the number of gradient directions
-    if( gradientImage->GetVectorLength() != this->m_NumberOfBaselineImages + m_NumberOfGradientDirections )
+    if( gradientImage->GetVectorLength() != gradientDirection->Size() )
     {
-      itkExceptionMacro( << m_NumberOfGradientDirections << " gradients + " << this->m_NumberOfBaselineImages
-        << "baselines = " << m_NumberOfGradientDirections + this->m_NumberOfBaselineImages
-        << " directions specified but image has " << gradientImage->GetVectorLength()
-        << " components.");
+      itkExceptionMacro( << gradientDirection->Size() << " directions specified but image has "
+        << gradientImage->GetVectorLength() << " components.");
     }
 
     this->ProcessObject::SetNthInput( 0,

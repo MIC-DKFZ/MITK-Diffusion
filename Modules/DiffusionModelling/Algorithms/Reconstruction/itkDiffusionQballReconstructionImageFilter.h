@@ -25,6 +25,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkVectorContainer.h"
 #include "itkVectorImage.h"
 
+#include <vector>
+
 namespace itk{
 /** \class DiffusionQballReconstructionImageFilter
  * \brief This class takes as input one or more reference images (acquired in the
@@ -265,6 +267,11 @@ private:
 
   /** Number of baseline images */
   unsigned int                                      m_NumberOfBaselineImages;
+
+  /** Volumes of the baseline and the diffusion-weighted images, set per execution; the
+   * diffusion-weighted ones twice for a duplicated half sphere */
+  std::vector<unsigned int>                         m_BaselineIndices;
+  std::vector<unsigned int>                         m_GradientIndices;
 
   /** Threshold on the reference image data */
   ReferencePixelType                                m_Threshold;

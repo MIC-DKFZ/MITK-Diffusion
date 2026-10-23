@@ -8,6 +8,8 @@ The q-ball reonstruction view implements a variety of reconstruction methods. Th
 \li <b>ADC-profile only:</b> The ADC-profile reconstructed with spherical harmonic basis functions
 \li <b>Raw signal only:</b> The raw signal reconstructed with spherical harmonic basis functions
 
+These methods model a single shell: the diffusion-weighted volumes of the DWI must all have the same b-value, and volumes whose b-value rounds to 0 are the baseline volumes. For a DWI with several shells, extract one shell first; if the b-values differ only slightly (e.g. 995 and 1000), round them in the preprocessing view.
+
 \imageMacro{qballs1.png,"The q-ball resonstruction view",9.99}
 
 B0 threshold works the same as in tensor reconstruction. The maximum l-level configures the size of the spherical harmonics basis. Larger l-values (e.g. l=8) allow higher levels of detail, lower levels are more stable against noise (e.g. l=4). Lambda is a regularisation parameter. Set it to 0 for no regularisation. lambda = 0.006 has proven to be a stable choice under various settings.

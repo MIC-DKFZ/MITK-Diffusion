@@ -76,6 +76,7 @@ set(H_FILES
 
   # Reconstruction
   Algorithms/Reconstruction/mitkDiffusionReconstruction.h
+  Algorithms/Reconstruction/mitkSingleShellGradients.h
   Algorithms/Reconstruction/itkDiffusionQballReconstructionImageFilter.h
   Algorithms/Reconstruction/mitkTeemDiffusionTensor3DReconstructionImageFilter.h
   Algorithms/Reconstruction/itkAnalyticalDiffusionQballReconstructionImageFilter.h
