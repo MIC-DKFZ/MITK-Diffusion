@@ -15,28 +15,21 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundleVtkReader.h"
-#include <itkMetaDataObject.h>
-#include <vtkPolyData.h>
-#include <vtkDataReader.h>
-#include <vtkPolyDataReader.h>
-#include <vtkMatrix4x4.h>
-#include <vtkPolyLine.h>
-#include <vtkCellArray.h>
-#include <vtkDataArray.h>
-#include <vtkFloatArray.h>
-#include <vtkCellData.h>
-#include <vtkPointData.h>
-#include <itksys/SystemTools.hxx>
-#include <tinyxml2.h>
-#include <vtkCleanPolyData.h>
-#include <mitkCustomMimeType.h>
-#include <vtkXMLPolyDataReader.h>
-#include <vtkXMLDataReader.h>
 #include "mitkFiberBundleMimeTypes.h"
-#include <vtkUnsignedCharArray.h>
-#include <vtkTransformFilter.h>
+
+#include <itksys/SystemTools.hxx>
+#include <mitkFiberBundle.h>
 #include <mitkGeometry3D.h>
 #include <mitkLocaleSwitch.h>
+#include <vtkCellData.h>
+#include <vtkFloatArray.h>
+#include <vtkMatrix4x4.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataReader.h>
+#include <vtkTransformFilter.h>
+#include <vtkUnsignedCharArray.h>
+#include <vtkXMLPolyDataReader.h>
 
 
 mitk::FiberBundleVtkReader::FiberBundleVtkReader()
@@ -46,12 +39,7 @@ mitk::FiberBundleVtkReader::FiberBundleVtkReader()
   defaultOptions["Use RAS space"] = false;
   this->SetDefaultOptions(defaultOptions);
 
-  m_ServiceReg = this->RegisterService();
-}
-
-mitk::FiberBundleVtkReader::FiberBundleVtkReader(const FiberBundleVtkReader &other)
-  :mitk::AbstractFileReader(other)
-{
+  this->RegisterService();
 }
 
 mitk::FiberBundleVtkReader * mitk::FiberBundleVtkReader::Clone() const

@@ -15,22 +15,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundleTckReader.h"
-#include <itkMetaDataObject.h>
-#include <vtkPolyData.h>
-#include <vtkDataReader.h>
-#include <vtkPolyDataReader.h>
-#include <vtkMatrix4x4.h>
-#include <vtkPolyLine.h>
-#include <vtkCellArray.h>
-#include <vtkDataArray.h>
-#include <vtkFloatArray.h>
-#include <vtkCellData.h>
-#include <vtkPointData.h>
-#include <itksys/SystemTools.hxx>
-#include <vtkCleanPolyData.h>
-#include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
+
+#include <itksys/SystemTools.hxx>
 #include <mitkExceptionMacro.h>
+#include <mitkFiberBundle.h>
+#include <vtkCellArray.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyLine.h>
 
 #include <algorithm>
 #include <array>
@@ -44,12 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 mitk::FiberBundleTckReader::FiberBundleTckReader()
   : mitk::AbstractFileReader( mitk::FiberBundleMimeTypes::FIBERBUNDLE_TCK_MIMETYPE_NAME(), "tck Fiber Bundle Reader (MRtrix format)" )
 {
-  m_ServiceReg = this->RegisterService();
-}
-
-mitk::FiberBundleTckReader::FiberBundleTckReader(const FiberBundleTckReader &other)
-  :mitk::AbstractFileReader(other)
-{
+  this->RegisterService();
 }
 
 mitk::FiberBundleTckReader * mitk::FiberBundleTckReader::Clone() const

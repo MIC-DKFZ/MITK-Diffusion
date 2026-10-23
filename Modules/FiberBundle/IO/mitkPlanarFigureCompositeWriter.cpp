@@ -15,12 +15,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkPlanarFigureCompositeWriter.h"
-#include <itksys/SystemTools.hxx>
-#include <mitkAbstractFileWriter.h>
-#include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
+
 #include <boost/property_tree/ptree.hpp>
-#define RAPIDXML_NO_EXCEPTIONS
 #include <boost/property_tree/xml_parser.hpp>
 #include <mitkPlanarFigureComposite.h>
 
@@ -30,13 +27,6 @@ mitk::PlanarFigureCompositeWriter::PlanarFigureCompositeWriter()
     RegisterService();
 }
 
-mitk::PlanarFigureCompositeWriter::PlanarFigureCompositeWriter(const mitk::PlanarFigureCompositeWriter & other)
-    :mitk::AbstractFileWriter(other)
-{}
-
-mitk::PlanarFigureCompositeWriter::~PlanarFigureCompositeWriter()
-{}
-
 mitk::PlanarFigureCompositeWriter * mitk::PlanarFigureCompositeWriter::Clone() const
 {
     return new mitk::PlanarFigureCompositeWriter(*this);
@@ -44,41 +34,17 @@ mitk::PlanarFigureCompositeWriter * mitk::PlanarFigureCompositeWriter::Clone() c
 
 void mitk::PlanarFigureCompositeWriter::Write()
 {
+    mitk::PlanarFigureComposite::ConstPointer input = dynamic_cast<const mitk::PlanarFigureComposite*>(this->GetInput());
+    if (input.IsNull())
+      mitkThrow() << "The planar figure composite writer needs a planar figure composite as input.";
 
-    std::ostream* out;
-    std::ofstream outStream;
+    // A local file also for output streams (the file was written by name and a given stream left
+    // empty); it is copied to the stream when it goes out of scope. No locale switch: the file
+    // holds one integer.
+    LocalFile localFile(this);
 
-    if( this->GetOutputStream() )
-    {
-        out = this->GetOutputStream();
-    }else{
-        outStream.open( this->GetOutputLocation().c_str() );
-        out = &outStream;
-    }
-
-    if ( !out->good() )
-    {
-        mitkThrow() << "Stream not good.";
-    }
-
-    // No locale switch: the file holds one integer, and a switch by hand stayed in force for the
-    // whole process when writing threw.
-    try
-    {
-        std::string filename = this->GetOutputLocation().c_str();
-
-        mitk::PlanarFigureComposite::ConstPointer input = dynamic_cast<const mitk::PlanarFigureComposite*>(this->GetInput());
-        if (input.IsNull())
-          mitkThrow() << "The planar figure composite writer needs a planar figure composite as input.";
-        std::string ext = itksys::SystemTools::GetFilenameLastExtension(this->GetOutputLocation().c_str());
-
-        boost::property_tree::ptree type;
-        type.put("comptype", input->getOperationType());
-        boost::property_tree::xml_writer_settings<std::string> writerSettings(' ', 2);
-        boost::property_tree::xml_parser::write_xml(filename, type, std::locale(), writerSettings);
-    }
-    catch(...)
-    {
-        throw;
-    }
+    boost::property_tree::ptree type;
+    type.put("comptype", input->getOperationType());
+    boost::property_tree::xml_writer_settings<std::string> writerSettings(' ', 2);
+    boost::property_tree::xml_parser::write_xml(localFile.GetFileName(), type, std::locale(), writerSettings);
 }

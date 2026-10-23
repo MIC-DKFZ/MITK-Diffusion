@@ -29,7 +29,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigureCompositeWriter.h>
 
 #include <mitkCoreServices.h>
-#include <mitkDiffusionPropertyHelper.h>
 #include <mitkIPropertyDescriptions.h>
 #include <mitkIPropertyPersistence.h>
 
@@ -82,8 +81,6 @@ namespace mitk
 
       m_PlanarFigureCompositeReader = std::make_unique<PlanarFigureCompositeReader>();
       m_PlanarFigureCompositeWriter = std::make_unique<PlanarFigureCompositeWriter>();
-
-      mitk::DiffusionPropertyHelper::SetupProperties();
 
       m_MapperProviders.push_back(std::make_unique<MapperProviderBase<FiberBundleMapper2D, FiberBundle>>(BaseRenderer::Standard2D));
       m_MapperProviders.push_back(std::make_unique<MapperProviderBase<FiberBundleMapper3D, FiberBundle>>(BaseRenderer::Standard3D));

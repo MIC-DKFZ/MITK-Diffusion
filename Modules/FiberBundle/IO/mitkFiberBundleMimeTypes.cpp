@@ -15,20 +15,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundleMimeTypes.h"
-#include <fstream>
-#include <array>
-#include "mitkIOMimeTypes.h"
-#include <itksys/SystemTools.hxx>
-#include <itkNrrdImageIO.h>
-#include <itkMetaDataDictionary.h>
-#include <itkMetaDataObject.h>
-#include <mitkLog.h>
-#include <dcmtk/dcmtract/trctractographyresults.h>
+
 #include <dcmtk/dcmdata/dcuid.h>
+#include <itksys/SystemTools.hxx>
 #include <mitkDICOMDCMTKTagScanner.h>
-#include <itkGDCMImageIO.h>
-#include <itkNiftiImageIO.h>
-#include <itkBruker2dseqImageIO.h>
+#include <mitkIOMimeTypes.h>
+#include <mitkLog.h>
+
+#include <array>
+#include <fstream>
 
 namespace mitk
 {
@@ -63,12 +58,6 @@ std::string FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE_NAME()
 {
     static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".pfc";
     return name;
-}
-
-std::string FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE_DESCRIPTION()
-{
-    static std::string description = "Planar Figure Composite";
-    return description;
 }
 
 
@@ -205,13 +194,6 @@ std::string FiberBundleMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME()
 {
   static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.dcm";
   return name;
-}
-
-// Descriptions
-std::string FiberBundleMimeTypes::FIBERBUNDLE_MIMETYPE_DESCRIPTION()
-{
-  static std::string description = "Fiberbundles";
-  return description;
 }
 
 }
