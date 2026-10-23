@@ -86,7 +86,6 @@ void QmitkHeadMotionCorrectionView::StartCorrection()
 
   m_ImageNode = node;
   m_Controls->m_RegistrationStartButton->setText("Correction in progress ...");
-  this->UpdateGUI();
 
   // The worker only reads the input; exceptions are passed back as text.
   m_Watcher.setFuture(QtConcurrent::run([inImage]()
@@ -107,6 +106,8 @@ void QmitkHeadMotionCorrectionView::StartCorrection()
     }
     return result;
   }));
+  // Only now isRunning() is true, so the button is disabled.
+  this->UpdateGUI();
 }
 
 void QmitkHeadMotionCorrectionView::OnCorrectionFinished()
