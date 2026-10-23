@@ -37,7 +37,7 @@ using namespace mitk;
 * \brief Command line interface to Fiberfox.
 * Simulate a diffusion-weighted image from a tractogram using the specified parameter file.
 */
-int main(int argc, char* argv[])
+static int RunFiberfox(int argc, char* argv[])
 {
   mitkCommandLineParser parser;
   parser.setTitle("Fiberfox");
@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
   std::string file_extension = "";
   if( itksys::SystemTools::FileIsDirectory( outName ) )
   {
-    while( *(--(outName.cend())) == '/')
+    while( !outName.empty() && outName.back() == '/')
     {
       outName.pop_back();
     }
@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
   else
   {
     // outName is NOT an existing directory, so we need to remove all trailing slashes:
-    while( *(--(outName.cend())) == '/')
+    while( !outName.empty() && outName.back() == '/')
     {
       outName.pop_back();
     }
@@ -284,3 +284,24 @@ int main(int argc, char* argv[])
   return EXIT_SUCCESS;
 }
 
+int main(int argc, char* argv[])
+{
+  // report errors (missing or corrupt parameter files, failed simulations) instead of terminating
+  try
+  {
+    return RunFiberfox(argc, argv);
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+  catch (const std::exception& e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+  catch (...)
+  {
+    std::cerr << "Unknown error." << std::endl;
+  }
+  return EXIT_FAILURE;
+}
