@@ -40,10 +40,28 @@ mitk::FiberfoxParameters::FiberfoxParameters()
 mitk::FiberfoxParameters::FiberfoxParameters(const mitk::FiberfoxParameters& params)
   : m_NoiseModel(nullptr)
 {
+  CopyFrom(params);
+}
+
+mitk::FiberfoxParameters& mitk::FiberfoxParameters::operator=(const mitk::FiberfoxParameters& params)
+{
+  if (this != &params)
+  {
+    DeleteSignalModels();
+    CopyFrom(params);
+  }
+  return *this;
+}
+
+void mitk::FiberfoxParameters::CopyFrom(const mitk::FiberfoxParameters& params)
+{
   m_FiberGen = params.m_FiberGen;
   m_SignalGen = params.m_SignalGen;
   m_Misc = params.m_Misc;
+  m_MissingTags = params.m_MissingTags;
 
+  // a noise model of the same type with the same variance, but its own random generator
+  m_NoiseModel = nullptr;
   if (params.m_NoiseModel!=nullptr)
   {
     if (dynamic_cast<mitk::RicianNoiseModel<>*>(params.m_NoiseModel.get()))
@@ -53,33 +71,20 @@ mitk::FiberfoxParameters::FiberfoxParameters(const mitk::FiberfoxParameters& par
     m_NoiseModel->SetNoiseVariance(params.m_NoiseModel->GetNoiseVariance());
   }
 
-  for (unsigned int i=0; i<params.m_FiberModelList.size()+params.m_NonFiberModelList.size(); i++)
-  {
-    mitk::DiffusionSignalModel<>* outModel = nullptr;
-    mitk::DiffusionSignalModel<>* signalModel = nullptr;
-    if (i<params.m_FiberModelList.size())
-      signalModel = params.m_FiberModelList.at(i);
-    else
-      signalModel = params.m_NonFiberModelList.at(i-params.m_FiberModelList.size());
+  for (auto model : params.m_FiberModelList)
+    m_FiberModelList.push_back(model->Clone());
+  for (auto model : params.m_NonFiberModelList)
+    m_NonFiberModelList.push_back(model->Clone());
+}
 
-    if (dynamic_cast<mitk::StickModel<>*>(signalModel))
-      outModel = new mitk::StickModel<>(dynamic_cast<mitk::StickModel<>*>(signalModel));
-    else  if (dynamic_cast<mitk::TensorModel<>*>(signalModel))
-      outModel = new mitk::TensorModel<>(dynamic_cast<mitk::TensorModel<>*>(signalModel));
-    else  if (dynamic_cast<mitk::RawShModel<>*>(signalModel))
-      outModel = new mitk::RawShModel<>(dynamic_cast<mitk::RawShModel<>*>(signalModel));
-    else  if (dynamic_cast<mitk::BallModel<>*>(signalModel))
-      outModel = new mitk::BallModel<>(dynamic_cast<mitk::BallModel<>*>(signalModel));
-    else if (dynamic_cast<mitk::AstroStickModel<>*>(signalModel))
-      outModel = new mitk::AstroStickModel<>(dynamic_cast<mitk::AstroStickModel<>*>(signalModel));
-    else  if (dynamic_cast<mitk::DotModel<>*>(signalModel))
-      outModel = new mitk::DotModel<>(dynamic_cast<mitk::DotModel<>*>(signalModel));
-
-    if (i<params.m_FiberModelList.size())
-      m_FiberModelList.push_back(outModel);
-    else
-      m_NonFiberModelList.push_back(outModel);
-  }
+void mitk::FiberfoxParameters::DeleteSignalModels()
+{
+  for (auto model : m_FiberModelList)
+    delete model;
+  for (auto model : m_NonFiberModelList)
+    delete model;
+  m_FiberModelList.clear();
+  m_NonFiberModelList.clear();
 }
 
 
@@ -94,15 +99,14 @@ void mitk::FiberfoxParameters::ClearSignalParameters()
   m_Misc = MiscFiberfoxParameters();
   m_SignalGen = SignalGenerationParameters();
 
-  m_FiberModelList.clear();
-  m_NonFiberModelList.clear();
+  DeleteSignalModels();
   m_NoiseModel = nullptr;
   m_MissingTags = "";
 }
 
 mitk::FiberfoxParameters::~FiberfoxParameters()
 {
-
+  DeleteSignalModels();
 }
 
 void mitk::SignalGenerationParameters::GenerateGradientHalfShell()
@@ -658,8 +662,7 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
   boost::property_tree::xml_parser::read_xml( filename, parameterTree );
 
 
-  m_FiberModelList.clear();
-  m_NonFiberModelList.clear();
+  DeleteSignalModels();
   if (m_NoiseModel) { m_NoiseModel = nullptr; }
 
   BOOST_FOREACH( boost::property_tree::ptree::value_type const& v1, parameterTree.get_child("fiberfox") )
@@ -1000,6 +1003,16 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
           { m_NonFiberModelList.push_back(model); }
           // else ?
           signalModel = model;
+        }
+
+        // a compartment whose type is neither "fiber" nor "non-fiber" is in no list
+        if (signalModel!=nullptr
+            && (m_FiberModelList.empty() || m_FiberModelList.back()!=signalModel)
+            && (m_NonFiberModelList.empty() || m_NonFiberModelList.back()!=signalModel))
+        {
+          MITK_WARN << "Ignoring compartment " << signalModel->m_CompartmentId << " of unknown type '" << ReadVal<std::string>(v2,"type","") << "'.";
+          delete signalModel;
+          signalModel = nullptr;
         }
 
         if (signalModel!=nullptr)

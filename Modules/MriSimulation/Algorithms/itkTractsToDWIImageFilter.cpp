@@ -978,7 +978,10 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
 
   if (m_Parameters.m_SignalGen.m_DoDisablePartialVolume)  // no partial volume? remove all but first fiber compartment
     while (m_Parameters.m_FiberModelList.size()>1)
+    {
+      delete m_Parameters.m_FiberModelList.back();
       m_Parameters.m_FiberModelList.pop_back();
+    }
 
   if (!m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition)  // No upsampling of input image needed if no k-space simulation is performed
     m_Parameters.m_SignalGen.m_DoAddGibbsRinging = false;

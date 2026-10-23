@@ -37,11 +37,18 @@ class DiffusionSignalModel
 public:
 
     DiffusionSignalModel()
-        : m_T2(100)
+        : m_CompartmentId(0)
+        , m_T2(100)
         , m_T1(0)
         , m_BValue(1000)
     {}
-    ~DiffusionSignalModel(){}
+    virtual ~DiffusionSignalModel() = default;
+
+    /**
+     * Copy of the model, owned by the caller. FiberfoxParameters owns its models and copies them
+     * with this. The copy draws from its own random generator; the simulation reseeds every model.
+     */
+    virtual DiffusionSignalModel* Clone() const = 0;
 
     typedef itk::Image<double, 3>                   ItkDoubleImgType;
     typedef itk::VariableLengthVector< ScalarType > PixelType;
@@ -97,6 +104,22 @@ public:
     unsigned int                m_CompartmentId;        ///< GUI flag. Which compartment is this model assigned to?
 
 protected:
+
+    DiffusionSignalModel(const DiffusionSignalModel& other)
+        : m_CompartmentId(other.m_CompartmentId)
+        , m_GradientList(other.m_GradientList)
+        , m_T2(other.m_T2)
+        , m_T1(other.m_T1)
+        , m_VolumeFractionImage(other.m_VolumeFractionImage)
+        , m_BValue(other.m_BValue)
+    {
+        if (other.m_RandGen.IsNotNull())
+        {
+            m_RandGen = ItkRandGenType::New();
+            m_RandGen->SetSeed();
+        }
+    }
+    DiffusionSignalModel& operator=(const DiffusionSignalModel&) = delete;
 
     GradientListType            m_GradientList;         ///< Diffusion gradient direction container
     double                      m_T2;                   ///< Tissue specific transversal relaxation time

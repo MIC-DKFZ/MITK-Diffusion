@@ -32,19 +32,9 @@ class BallModel : public DiffusionSignalModel< ScalarType >
 public:
 
   BallModel();
-  template< class OtherType >BallModel(BallModel<OtherType>* model)
-  {
-    this->m_CompartmentId = model->m_CompartmentId;
-    this->m_T1 = model->GetT1();
-    this->m_T2 = model->GetT2();
-    this->m_GradientList = model->GetGradientList();
-    this->m_VolumeFractionImage = model->GetVolumeFractionImage();
-    this->m_RandGen = model->GetRandomGenerator();
+  ~BallModel() override;
 
-    this->m_BValue = model->GetBvalue();
-    this->m_Diffusivity = model->GetDiffusivity();
-  }
-  ~BallModel();
+  DiffusionSignalModel< ScalarType >* Clone() const override { return new BallModel(*this); }
 
   typedef typename DiffusionSignalModel< ScalarType >::PixelType      PixelType;
   typedef typename DiffusionSignalModel< ScalarType >::GradientType   GradientType;

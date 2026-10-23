@@ -34,24 +34,9 @@ class RawShModel : public DiffusionSignalModel< ScalarType >
 public:
 
   RawShModel();
-  template< class OtherType >RawShModel(RawShModel<OtherType>* model)
-  {
-    this->m_CompartmentId = model->m_CompartmentId;
-    this->m_T1 = model->GetT1();
-    this->m_T2 = model->GetT2();
-    this->m_GradientList = model->GetGradientList();
-    this->m_VolumeFractionImage = model->GetVolumeFractionImage();
-    this->m_RandGen = model->GetRandomGenerator();
+  ~RawShModel() override;
 
-    this->m_AdcRange = model->GetAdcRange();
-    this->m_FaRange = model->GetFaRange();
-    this->m_ShCoefficients = model->GetShCoefficients();
-    this->m_B0Signal = model->GetB0Signals();
-    this->m_ShOrder = model->GetShOrder();
-    this->m_ModelIndex = model->GetModelIndex();
-    this->m_MaxNumKernels = model->GetMaxNumKernels();
-  }
-  ~RawShModel();
+  DiffusionSignalModel< ScalarType >* Clone() const override { return new RawShModel(*this); }
 
   typedef itk::Image< double, 3 >                                         ItkDoubleImageType;
   typedef itk::Image< unsigned char, 3 >                                  ItkUcharImageType;

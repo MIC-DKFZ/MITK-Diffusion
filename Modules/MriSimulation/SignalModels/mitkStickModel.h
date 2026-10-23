@@ -32,19 +32,9 @@ class StickModel : public DiffusionSignalModel< ScalarType >
 public:
 
   StickModel();
-  template< class OtherType >StickModel(StickModel<OtherType>* model)
-  {
-    this->m_CompartmentId = model->m_CompartmentId;
-    this->m_T1 = model->GetT1();
-    this->m_T2 = model->GetT2();
-    this->m_GradientList = model->GetGradientList();
-    this->m_VolumeFractionImage = model->GetVolumeFractionImage();
-    this->m_RandGen = model->GetRandomGenerator();
+  ~StickModel() override;
 
-    this->m_BValue = model->GetBvalue();
-    this->m_Diffusivity = model->GetDiffusivity();
-  }
-  ~StickModel();
+  DiffusionSignalModel< ScalarType >* Clone() const override { return new StickModel(*this); }
 
   typedef typename DiffusionSignalModel< ScalarType >::PixelType      PixelType;
   typedef typename DiffusionSignalModel< ScalarType >::GradientType   GradientType;

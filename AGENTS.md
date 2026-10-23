@@ -154,8 +154,6 @@ all 41 diffusion tests pass. The Workbench has not been started. Remove an item 
   is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.
   `DiffusionDebug` leaves the plugin off; `DiffusionRelease`, `Tractography`, `Fiberfox` and
   `IVIM` switch Python on and build it.
-- `FiberfoxParameters` (`Modules/MriSimulation/mitkFiberfoxParameters.h`) deep-copies its signal
-  models on copy construction but shares them on assignment, and never deletes them.
 
 ## Commands
 

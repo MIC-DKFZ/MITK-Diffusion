@@ -303,9 +303,9 @@ namespace mitk
     typedef DiffusionNoiseModel<double>                     NoiseModelType;
 
     FiberfoxParameters();
+    /** Copy and assignment clone the signal models and the noise model. */
     FiberfoxParameters(const FiberfoxParameters &params);
-    /** Member-wise: unlike the copy constructor, it shares the signal models with params. */
-    FiberfoxParameters& operator=(const FiberfoxParameters &params) = default;
+    FiberfoxParameters& operator=(const FiberfoxParameters &params);
     ~FiberfoxParameters();
 
     /** Not templated parameters */
@@ -313,7 +313,7 @@ namespace mitk
     SignalGenerationParameters          m_SignalGen;            ///< Signal generation parameters
     MiscFiberfoxParameters              m_Misc;                 ///< GUI realted and I/O parameters
 
-    /** Templated parameters */
+    /** Templated parameters. The parameters own the models in both lists (created with new) and delete them. */
     DiffusionModelListType              m_FiberModelList;       ///< Intra- and inter-axonal compartments.
     DiffusionModelListType              m_NonFiberModelList;    ///< Extra-axonal compartments.
     std::shared_ptr< NoiseModelType >   m_NoiseModel;           ///< If != nullptr, noise is added to the image.
@@ -334,6 +334,10 @@ namespace mitk
     template< class ParameterType >
     ParameterType ReadVal(boost::property_tree::ptree::value_type const& v, std::string tag, ParameterType defaultValue, bool essential=false);
     std::string                         m_MissingTags;
+
+  private:
+    void DeleteSignalModels();
+    void CopyFrom(const FiberfoxParameters &params);
   };
 }
 

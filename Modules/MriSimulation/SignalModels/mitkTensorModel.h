@@ -33,20 +33,9 @@ class TensorModel : public DiffusionSignalModel< ScalarType >
 public:
 
   TensorModel();
-  template< class OtherType >TensorModel(TensorModel<OtherType>* model)
-  {
-    this->m_CompartmentId = model->m_CompartmentId;
-    this->m_T1 = model->GetT1();
-    this->m_T2 = model->GetT2();
-    this->m_GradientList = model->GetGradientList();
-    this->m_VolumeFractionImage = model->GetVolumeFractionImage();
-    this->m_RandGen = model->GetRandomGenerator();
+  ~TensorModel() override;
 
-    this->m_BValue = model->GetBvalue();
-    this->m_KernelDirection = model->GetKernelDirection();
-    this->m_KernelTensorMatrix = model->GetKernelTensorMatrix();
-  }
-  ~TensorModel();
+  DiffusionSignalModel< ScalarType >* Clone() const override { return new TensorModel(*this); }
 
   typedef typename DiffusionSignalModel< ScalarType >::PixelType      PixelType;
   typedef itk::DiffusionTensor3D< ScalarType >                        ItkTensorType;
