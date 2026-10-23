@@ -22,7 +22,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_matrix.h>
 #include <vnl/vnl_matrix_fixed.h>
 #include <vnl/vnl_inverse.h>
-#include <ciso646>
 #include <vnl/vnl_vector_fixed.hxx>
 #include <vnl/vnl_cross.h>
 #include <mitkLog.h>
@@ -36,21 +35,13 @@ template<class T, unsigned int N>
 vtkPolyData* itk::OrientationDistributionFunction<T,N>::m_BaseMesh = nullptr;
 
 template<class T, unsigned int N>
-double itk::OrientationDistributionFunction<T,N>::m_MaxChordLength = -1.0;
-
-template<class T, unsigned int N>
 std::vector< std::vector<int>* >* itk::OrientationDistributionFunction<T,N>::m_NeighborIdxs = nullptr;
 
 template<class T, unsigned int N>
 std::map< std::pair<double, double>, std::vector< std::vector<int> > > itk::OrientationDistributionFunction<T,N>::m_AngularRangeIdxs;
 
 template<class T, unsigned int N>
-std::vector<int>* itk::OrientationDistributionFunction<T,N>::m_HalfSphereIdxs = nullptr;
-
-template<class T, unsigned int N>
 std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexBaseMesh;
-template<class T, unsigned int N>
-std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexHalfSphereIdxs;
 template<class T, unsigned int N>
 std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexNeighbors;
 template<class T, unsigned int N>
@@ -221,74 +212,6 @@ OrientationDistributionFunction<T, NOdfDirections>
 }
 
 /**
-  * Matrix notation access to elements
-  */
-template<class T, unsigned int NOdfDirections>
-const typename OrientationDistributionFunction<T, NOdfDirections>::ValueType &
-OrientationDistributionFunction<T, NOdfDirections>
-::operator()(unsigned int row, unsigned int col) const
-{
-  unsigned int k;
-
-  if( row < col )
-  {
-    k = row * InternalDimension + col - row * ( row + 1 ) / 2;
-  }
-  else
-  {
-    k = col * InternalDimension + row - col * ( col + 1 ) / 2;
-  }
-
-
-  if( k >= InternalDimension )
-  {
-    k = 0;
-  }
-
-  return (*this)[k];
-}
-
-/**
-  * Matrix notation access to elements
-  */
-template<class T, unsigned int NOdfDirections>
-typename OrientationDistributionFunction<T, NOdfDirections>::ValueType &
-OrientationDistributionFunction<T, NOdfDirections>
-::operator()(unsigned int row, unsigned int col)
-{
-  unsigned int k;
-
-  if( row < col )
-  {
-    k = row * InternalDimension + col - row * ( row + 1 ) / 2;
-  }
-  else
-  {
-    k = col * InternalDimension + row - col * ( col + 1 ) / 2;
-  }
-
-
-  if( k >= InternalDimension )
-  {
-    k = 0;
-  }
-
-  return (*this)[k];
-}
-
-/**
-  * Set the Tensor to an Identity.
-  * Set ones in the diagonal and zeroes every where else.
-  */
-template<class T, unsigned int NOdfDirections>
-void
-OrientationDistributionFunction<T, NOdfDirections>
-::SetIsotropic()
-{
-  this->Fill(NumericTraits< T >::One / NOdfDirections);
-}
-
-/**
   * InitFromTensor()
   */
 template<class T, unsigned int NOdfDirections>
@@ -363,21 +286,9 @@ InitFromEllipsoid( itk::DiffusionTensor3D<T> tensor )
   }
 
   // check magnitude and scale towards 1 to minimize numerical condition kappa:
-#ifdef _MSC_VER
-#if _MSC_VER <= 1700
-  int exponent_a = floor(std::log(a)/std::log(2));
-  int exponent_b = floor(std::log(b)/std::log(2));
-  int exponent_c = floor(std::log(c)/std::log(2));
-#else
   int exponent_a = std::ilogb(a);
   int exponent_b = std::ilogb(b);
   int exponent_c = std::ilogb(c);
-#endif
-#else
-  int exponent_a = std::ilogb(a);
-  int exponent_b = std::ilogb(b);
-  int exponent_c = std::ilogb(c);
-#endif
 
   T min_exponent= fmin(exponent_a, fmin(exponent_b, exponent_c) );
   T max_exponent= fmax(exponent_c, fmax(exponent_b, exponent_a) );
@@ -445,26 +356,6 @@ InitFromEllipsoid( itk::DiffusionTensor3D<T> tensor )
                  << i <<"]= " << (*this)[i];
       (*this)[i] = T(0);
     }
-  }
-}
-
-/**
-  * L2-Normalization
-  */
-template<class T, unsigned int NOdfDirections>
-void
-OrientationDistributionFunction<T, NOdfDirections>
-::L2Normalize()
-{
-  T sum = 0;
-  for( unsigned int i=0; i<InternalDimension; i++)
-  {
-    sum += (*this)[i]*(*this)[i];
-  }
-  sum = std::sqrt(sum);
-  for( unsigned int i=0; i<InternalDimension; i++)
-  {
-    (*this)[i] = (*this)[i] / sum;
   }
 }
 
@@ -559,59 +450,12 @@ OrientationDistributionFunction<T, NOdfDirections>
 template<class T, unsigned int NOdfDirections>
 T
 OrientationDistributionFunction<T, NOdfDirections>
-::GetMinValue() const
-{
-  T min = NumericTraits<T>::max();
-  for( unsigned int i=0; i<InternalDimension; i++)
-  {
-    if((*this)[i] >= min )
-    {
-      min = (*this)[i];
-    }
-  }
-  return min;
-}
-
-template<class T, unsigned int NOdfDirections>
-T
-OrientationDistributionFunction<T, NOdfDirections>
 ::GetMeanValue() const
 {
   T sum = 0;
   for( unsigned int i=0; i<InternalDimension; i++)
     sum += (*this)[i];
   return sum/InternalDimension;
-}
-
-template<class T, unsigned int NOdfDirections>
-double
-OrientationDistributionFunction<T, NOdfDirections>
-::GetMaxChordLength()
-{
-  if(m_MaxChordLength<0.0)
-  {
-    ComputeBaseMesh();
-    double max_dist = -1;
-    vtkPoints* points = m_BaseMesh->GetPoints();
-    for(int i=0; i<NOdfDirections; i++)
-    {
-      double p[3];
-      points->GetPoint(i,p);
-      std::vector<int> neighbors = GetNeighbors(i);
-      for(std::size_t j=0; j<neighbors.size(); j++)
-      {
-        double n[3];
-        points->GetPoint(neighbors[j],n);
-        double d = sqrt(
-                     (p[0]-n[0])*(p[0]-n[0]) +
-            (p[1]-n[1])*(p[1]-n[1]) +
-            (p[2]-n[2])*(p[2]-n[2]));
-        max_dist = d>max_dist ? d : max_dist;
-      }
-    }
-    m_MaxChordLength = max_dist;
-  }
-  return m_MaxChordLength;
 }
 
 template<class T, unsigned int NOdfDirections>
@@ -798,228 +642,11 @@ OrientationDistributionFunction<T, NOdfDirections>
   return *m_NeighborIdxs->at(idx);
 }
 
-/**
-  * Extract the n-th diffusion direction
-  */
-template<class T, unsigned int NOdfDirections>
-int
-OrientationDistributionFunction<T, NOdfDirections>
-::GetNthDiffusionDirection(int n, vnl_vector_fixed<double,3> rndVec) const
-{
-
-  if( n == 0 )
-    return GetPrincipalDiffusionDirectionIndex();
-
-  m_MutexHalfSphereIdxs.lock();
-  if( !m_HalfSphereIdxs )
-  {
-    m_HalfSphereIdxs = new std::vector<int>();
-    for( unsigned int i=0; i<InternalDimension; i++)
-    {
-      if(dot_product(GetDirections().get_column(i),rndVec) > 0.0)
-      {
-        m_HalfSphereIdxs->push_back(i);
-      }
-    }
-  }
-  m_MutexHalfSphereIdxs.unlock();
-
-  // collect indices of directions
-  // that are local maxima
-  std::vector<int> localMaxima;
-  std::vector<int>::iterator it;
-  for( it=m_HalfSphereIdxs->begin();
-       it!=m_HalfSphereIdxs->end();
-       it++)
-  {
-    std::vector<int> nbs = GetNeighbors(*it);
-    std::vector<int>::iterator it2;
-    bool max = true;
-    for(it2 = nbs.begin();
-        it2 != nbs.end();
-        it2++)
-    {
-      if((*this)[*it2] > (*this)[*it])
-      {
-        max = false;
-        break;
-      }
-    }
-    if(max)
-      localMaxima.push_back(*it);
-  }
-
-  // delete n highest local maxima from list
-  // and return remaining highest
-  int maxidx = -1;
-  for( int i=0; i<=n; i++ )
-  {
-    maxidx = -1;
-    T max = NumericTraits<T>::NonpositiveMin();
-    for(it = localMaxima.begin();
-        it != localMaxima.end();
-        it++)
-    {
-      if((*this)[*it]>max)
-      {
-        max = (*this)[*it];
-        maxidx = *it;
-      }
-    }
-    it = find(localMaxima.begin(), localMaxima.end(), maxidx);
-    if(it!=localMaxima.end())
-      localMaxima.erase(it);
-  }
-
-  return maxidx;
-}
-
 template < typename TComponent, unsigned int NOdfDirections >
 vnl_vector_fixed<double,3> itk::OrientationDistributionFunction<TComponent, NOdfDirections>
 ::GetDirection( int i )
 {
   return GetDirections().get_column(i);
-}
-
-/**
-  * Interpolate a position between sampled directions
-  */
-template<class T, unsigned int NOdfDirections>
-T
-OrientationDistributionFunction<T, NOdfDirections>
-::GetInterpolatedComponent(vnl_vector_fixed<double,3> dir, InterpolationMethods method) const
-{
-
-  ComputeBaseMesh();
-  double retval = -1.0;
-
-  switch(method)
-  {
-  case ODF_NEAREST_NEIGHBOR_INTERP:
-  {
-
-    vtkPoints* points = m_BaseMesh->GetPoints();
-    double current_min = NumericTraits<double>::max();
-    int current_min_idx = -1;
-    for(int i=0; i<NOdfDirections; i++)
-    {
-      vnl_vector_fixed<double,3> P(points->GetPoint(i));
-      double dist = (dir-P).two_norm();
-      current_min_idx = dist<current_min ? i : current_min_idx;
-      current_min = dist<current_min ? dist : current_min;
-    }
-    retval = this->GetNthComponent(current_min_idx);
-    break;
-
-  }
-  case ODF_TRILINEAR_BARYCENTRIC_INTERP:
-  {
-
-    double maxChordLength = GetMaxChordLength();
-    vtkCellArray* polys = m_BaseMesh->GetPolys();
-    vtkPoints* points = m_BaseMesh->GetPoints();
-    vtkIdType npts; vtkIdType const *pts;
-    double current_min = NumericTraits<double>::max();
-    polys->InitTraversal();
-    while(polys->GetNextCell(npts,pts))
-    {
-      vnl_vector_fixed<double,3> A(points->GetPoint(pts[0]));
-      vnl_vector_fixed<double,3> B(points->GetPoint(pts[1]));
-      vnl_vector_fixed<double,3> C(points->GetPoint(pts[2]));
-
-      vnl_vector_fixed<double,3> d1;
-      d1.put(0,(dir-A).two_norm());
-      d1.put(1,(dir-B).two_norm());
-      d1.put(2,(dir-C).two_norm());
-      double maxval = d1.max_value();
-      if(maxval>maxChordLength)
-      {
-        continue;
-      }
-
-      // Compute vectors
-      vnl_vector_fixed<double,3> v0 = C - A;
-      vnl_vector_fixed<double,3> v1 = B - A;
-
-      // Project direction to plane ABC
-      vnl_vector_fixed<double,3> v6 = dir;
-      vnl_vector_fixed<double,3> cross = vnl_cross_3d(v0, v1);
-      cross = cross.normalize();
-      vtkPlane::ProjectPoint(v6.data_block(),A.data_block(),cross.data_block(),v6.data_block());
-      v6 = v6-A;
-
-      // Calculate barycentric coords
-      vnl_matrix_fixed<double,3,2> mat;
-      mat.set_column(0, v0);
-      mat.set_column(1, v1);
-      vnl_matrix_inverse<double> inv(mat);
-      vnl_matrix_fixed<double,2,3> inver = inv.pinverse();
-      vnl_vector<double> uv = inv.pinverse()*v6;
-
-      // Check if point is in triangle
-      double eps = 0.01;
-      if( (uv(0) >= 0-eps) && (uv(1) >= 0-eps) && (uv(0) + uv(1) <= 1+eps) )
-      {
-        // check if minimum angle is the max so far
-        if(d1.two_norm() < current_min)
-        {
-          current_min = d1.two_norm();
-          vnl_vector<double> barycentricCoords(3);
-          barycentricCoords[2] = uv[0]<0 ? 0 : (uv[0]>1?1:uv[0]);
-          barycentricCoords[1] = uv[1]<0 ? 0 : (uv[1]>1?1:uv[1]);
-          barycentricCoords[0] = 1-(barycentricCoords[1]+barycentricCoords[2]);
-          retval =  barycentricCoords[0]*this->GetNthComponent(pts[0]) +
-              barycentricCoords[1]*this->GetNthComponent(pts[1]) +
-              barycentricCoords[2]*this->GetNthComponent(pts[2]);
-        }
-      }
-    }
-
-    break;
-  }
-  case ODF_SPHERICAL_GAUSSIAN_BASIS_FUNCTIONS:
-  {
-    double maxChordLength = GetMaxChordLength();
-    double sigma = asin(maxChordLength/2);
-
-    // this is the contribution of each kernel to each sampling point on the
-    // equator
-    vnl_vector<double> contrib;
-    contrib.set_size(NOdfDirections);
-
-    vtkPoints* points = m_BaseMesh->GetPoints();
-    double sum = 0;
-    for(int i=0; i<NOdfDirections; i++)
-    {
-      vnl_vector_fixed<double,3> P(points->GetPoint(i));
-      double stv =  dir[0]*P[0]
-                    + dir[1]*P[1]
-                    + dir[2]*P[2];
-      stv = (stv<-1.0) ? -1.0 : ( (stv>1.0) ? 1.0 : stv);
-      double x = acos(stv);
-      contrib[i] = (1.0/(sigma*sqrt(2.0*itk::Math::pi)))
-                   *exp((-x*x)/(2*sigma*sigma));
-      sum += contrib[i];
-    }
-
-    retval = 0;
-    for(int i=0; i<NOdfDirections; i++)
-    {
-      retval += (contrib[i] / sum)*this->GetNthComponent(i);
-    }
-    break;
-  }
-
-  }
-
-  if(retval==-1)
-  {
-    std::cout << "Interpolation failed" << std::endl;
-    return 0;
-  }
-
-  return retval;
-
 }
 
 /**
@@ -1289,56 +916,6 @@ T itk::OrientationDistributionFunction<T, N>
   double _n = (double) InternalDimension;
   mean /= _n;
   return (T) (-_n / log(_n) * mean);
-}
-
-/**
-  * Pre-multiply the Tensor by a Matrix
-  */
-template<class T, unsigned int NOdfDirections>
-OrientationDistributionFunction<T, NOdfDirections>
-OrientationDistributionFunction<T, NOdfDirections>
-::PreMultiply( const MatrixType & m ) const
-{
-  Self result;
-  typedef typename NumericTraits<T>::AccumulateType  AccumulateType;
-  for(unsigned int r=0; r<NOdfDirections; r++)
-  {
-    for(unsigned int c=0; c<NOdfDirections; c++)
-    {
-      AccumulateType sum = NumericTraits<AccumulateType>::ZeroValue();
-      for(unsigned int t=0; t<NOdfDirections; t++)
-      {
-        sum += m(r,t) * (*this)(t,c);
-      }
-      result(r,c) = static_cast<T>( sum );
-    }
-  }
-  return result;
-}
-
-/**
-  * Post-multiply the Tensor by a Matrix
-  */
-template<class T, unsigned int NOdfDirections>
-OrientationDistributionFunction<T, NOdfDirections>
-OrientationDistributionFunction<T, NOdfDirections>
-::PostMultiply( const MatrixType & m ) const
-{
-  Self result;
-  typedef typename NumericTraits<T>::AccumulateType  AccumulateType;
-  for(unsigned int r=0; r<NOdfDirections; r++)
-  {
-    for(unsigned int c=0; c<NOdfDirections; c++)
-    {
-      AccumulateType sum = NumericTraits<AccumulateType>::ZeroValue();
-      for(unsigned int t=0; t<NOdfDirections; t++)
-      {
-        sum += (*this)(r,t) * m(t,c);
-      }
-      result(r,c) = static_cast<T>( sum );
-    }
-  }
-  return result;
 }
 
 /**

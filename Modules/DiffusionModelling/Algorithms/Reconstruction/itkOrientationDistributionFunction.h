@@ -24,7 +24,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkDiffusionTensor3D.h"
 
 #include "vtkPolyData.h"
-#include "vtkAppendPolyData.h"
 #include "mitkPointShell.h"
 
 // generate by n-fold subdivisions of an icosahedron
@@ -59,12 +58,6 @@ class OrientationDistributionFunction: public
 {
 public:
 
-  enum InterpolationMethods {
-    ODF_NEAREST_NEIGHBOR_INTERP,
-    ODF_TRILINEAR_BARYCENTRIC_INTERP,
-    ODF_SPHERICAL_GAUSSIAN_BASIS_FUNCTIONS
-  };
-
   /** Standard class typedefs. */
   typedef OrientationDistributionFunction  Self;
   typedef FixedArray<TComponent,NOdfDirections> Superclass;
@@ -82,7 +75,6 @@ public:
   typedef typename NumericTraits<ValueType>::RealType AccumulateValueType;
   typedef typename NumericTraits<ValueType>::RealType RealValueType;
 
-  typedef Matrix<TComponent, NOdfDirections, NOdfDirections> MatrixType;
 
   typedef vnl_matrix_fixed<double, 3, NOdfDirections> DirectionsType;
 
@@ -131,30 +123,14 @@ public:
   ComponentType GetNthComponent(int c) const
   { return this->operator[](c); }
 
-  /** Return the value for the Nth component. */
-  ComponentType GetInterpolatedComponent( vnl_vector_fixed<double,3> dir, InterpolationMethods method ) const;
-
   /** Set the Nth component to v. */
   void SetNthComponent(int c, const ComponentType& v)
   {  this->operator[](c) = v; }
-
-  /** Matrix notation, in const and non-const forms. */
-  ValueType & operator()( unsigned int row, unsigned int col );
-  const ValueType & operator()( unsigned int row, unsigned int col ) const;
-
-  /** Set the distribution to isotropic.*/
-  void SetIsotropic();
 
   void InitFromTensor(itk::DiffusionTensor3D<TComponent> tensor);
 
   /** Evaluate diffusion tensor as ellipsoid. */
   void InitFromEllipsoid(itk::DiffusionTensor3D<TComponent> tensor);
-
-  /** Pre-Multiply by a Matrix as ResultingTensor = Matrix * ThisTensor. */
-  Self PreMultiply( const MatrixType & m ) const;
-
-  /** Post-Multiply by a Matrix as ResultingTensor = ThisTensor * Matrix. */
-  Self PostMultiply( const MatrixType & m ) const;
 
   void Normalize();
 
@@ -162,13 +138,11 @@ public:
 
   Self MaxNormalize() const;
 
-  void L2Normalize();
 
   int GetPrincipalDiffusionDirectionIndex() const;
 
   vnl_vector_fixed<double,3> GetPrincipalDiffusionDirection() const;
 
-  int GetNthDiffusionDirection(int n, vnl_vector_fixed<double,3> rndVec) const;
 
   TComponent GetGeneralizedFractionalAnisotropy() const;
 
@@ -182,8 +156,6 @@ public:
 
   ComponentType GetMaxValue() const;
 
-  ComponentType GetMinValue() const;
-
   ComponentType GetMeanValue() const;
 
   TComponent GetPrincipleCurvature(double alphaMinDegree, double alphaMaxDegree, int invert) const;
@@ -194,25 +166,18 @@ public:
 
   static void ComputeBaseMesh();
 
-  static double GetMaxChordLength();
-
   static vnl_vector_fixed<double,3> GetDirection(int i);
 
 private:
 
   static vtkPolyData* m_BaseMesh;
 
-  static double m_MaxChordLength;
-
   static std::vector< std::vector<int>* >* m_NeighborIdxs;
 
   /** Per pair of angles (GetPrincipleCurvature) and direction: the directions in that angular range */
   static std::map< std::pair<double, double>, std::vector< std::vector<int> > > m_AngularRangeIdxs;
 
-  static std::vector<int>* m_HalfSphereIdxs;
-
   static std::mutex m_MutexBaseMesh;
-  static std::mutex m_MutexHalfSphereIdxs;
   static std::mutex m_MutexNeighbors;
   static std::mutex m_MutexAngularRange;
   typename itk::DiffusionTensor3D<TComponent>::EigenValuesArrayType   m_EigenValues;
