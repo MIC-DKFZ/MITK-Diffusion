@@ -59,7 +59,7 @@ int main( int argc, char* argv[] )
   parser.setTitle("Diffusion Kurtosis Fit");
   parser.setCategory("Diffusion Related Measures");
   parser.setContributor("MIC");
-  parser.setDescription("Fitting Kurtosis. The input is smoothed with a Gaussian of variance 1.5 mm^2 before the fit.");
+  parser.setDescription("Fitting Kurtosis. The input is smoothed with a Gaussian of variance 1.5 mm^2 before the fit; K is kept within the K bounds and D within [0, 0.004] mm^2/s.");
   parser.setArgumentPrefix("--","-");
 
   // mandatory arguments

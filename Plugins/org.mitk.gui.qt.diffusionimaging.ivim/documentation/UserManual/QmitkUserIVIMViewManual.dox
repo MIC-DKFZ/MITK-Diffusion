@@ -47,7 +47,7 @@ The plot shows S, the measurements and the fitted curve.
 
 \section QmitkIVIMViewCmdApps Command line tools
 
-MitkDiffusionIvimFit generates the IVIM maps (methods 1 to 4 as fit types 0 to 3, with the b threshold, the fixed D* and a mask as options, signal threshold 0). MitkDiffusionKurtosisFit generates the kurtosis maps with a straight fit, an optional mask, optional fitted S0 and K bounds (default -1000 to 1000); it always smooths with a variance of 1.5 mm².
+MitkDiffusionIvimFit generates the IVIM maps (methods 1 to 4 as fit types 0 to 3, with the b threshold, the fixed D* and a mask as options, signal threshold 0). MitkDiffusionKurtosisFit generates the kurtosis maps with a straight fit, an optional mask, optional fitted S0 and K bounds (default -1000 to 1000), which also keep D within [0, 0.004] mm²/s; it always smooths with a variance of 1.5 mm².
 
 \section QmitkIVIMViewReferences Suggested Readings
 

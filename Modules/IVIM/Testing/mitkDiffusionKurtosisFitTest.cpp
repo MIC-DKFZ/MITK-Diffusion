@@ -36,6 +36,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(MapBounds_AppDefault_RecoversDAndK);
   MITK_TEST(MapBounds_KJustInsideBounds_Recovered);
   MITK_TEST(MapBounds_DAndKOutsideBounds_OnTheBounds);
+  MITK_TEST(FitVoxel_AppBounds_DAtMostPoint004);
   MITK_TEST(Update_KBoundsEqual_Throws);
   MITK_TEST(FitVoxel_KBoundsReversed_Throws);
   MITK_TEST(FitVoxel_SyntheticVoxel_RecoversDAndK);
@@ -235,6 +236,19 @@ public:
     CPPUNIT_ASSERT_EQUAL(0.0, maps.k[0]);
     CPPUNIT_ASSERT_EQUAL(0.004, maps.d[1]);
     CPPUNIT_ASSERT_EQUAL(0.0, maps.k[1]);
+  }
+
+  // MitkDiffusionKurtosisFit always sets the K bounds (default -1000 to 1000), which also keep D
+  // in [0, 0.004] mm^2/s, as its help says.
+  void FitVoxel_AppBounds_DAtMostPoint004()
+  {
+    mitk::kurtosis::FitConfiguration config;
+    config.useKBounds = true;
+    config.kLowerBound = -1000;
+    config.kUpperBound = 1000;
+    const auto values = KurtosisSignal(m_BValues, 10000, 0.005, 0.5);
+    const auto fit = mitk::kurtosis::FitVoxel(vnl_vector<double>(values.data(), values.size()), vnl_vector<double>(m_BValues.data(), m_BValues.size()), config);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.004, fit.d, 1e-8);
   }
 
   void Update_KBoundsEqual_Throws()
