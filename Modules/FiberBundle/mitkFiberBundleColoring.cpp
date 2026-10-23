@@ -24,6 +24,8 @@ found in the LICENSE file.
 #include <vtkNew.h>
 #include <vtkUnsignedCharArray.h>
 
+#include <vector>
+
 // Colour codings of mitk::FiberBundle: one RGBA tuple per point.
 
 namespace
@@ -365,6 +367,11 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const itk::Image<TPixel, 3>* imag
   double min = 999999;
   double max = -999999;
 
+  // The value of each point is sampled once, here, and reused for its colour below.
+  const auto numPointsTotal = static_cast<std::size_t>(m_FiberPolyData->GetNumberOfPoints());
+  std::vector<TPixel> values(numPointsTotal);
+  std::vector<char> sampled(numPointsTotal, 0);
+
   vtkNew<vtkIdList> idBuffer;
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
@@ -377,6 +384,8 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const itk::Image<TPixel, 3>* imag
       double p[3];
       m_FiberPolyData->GetPoint(id, p);
       auto pixelValue = mitk::imv::GetImageValue<TPixel>(mitk::imv::GetItkPoint(p), interpolate, interpolator);
+      values[static_cast<std::size_t>(id)] = pixelValue;
+      sampled[static_cast<std::size_t>(id)] = 1;
 
       if (pixelValue>max)
         max = pixelValue;
@@ -398,11 +407,16 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const itk::Image<TPixel, 3>* imag
 
   for(long i=0; i<m_FiberPolyData->GetNumberOfPoints(); ++i)
   {
-    itk::Point<float, 3> px;
-    px[0] = pointSet->GetPoint(i)[0];
-    px[1] = pointSet->GetPoint(i)[1];
-    px[2] = pointSet->GetPoint(i)[2];
-    auto pixelValue = mitk::imv::GetImageValue<TPixel>(px, interpolate, interpolator);
+    TPixel pixelValue = values[static_cast<std::size_t>(i)];
+    if (!sampled[static_cast<std::size_t>(i)])
+    {
+      // a point on no fiber
+      itk::Point<float, 3> px;
+      px[0] = pointSet->GetPoint(i)[0];
+      px[1] = pointSet->GetPoint(i)[1];
+      px[2] = pointSet->GetPoint(i)[2];
+      pixelValue = mitk::imv::GetImageValue<TPixel>(px, interpolate, interpolator);
+    }
 
     double color[3];
     mitkLookup->GetColor(pixelValue, color);
