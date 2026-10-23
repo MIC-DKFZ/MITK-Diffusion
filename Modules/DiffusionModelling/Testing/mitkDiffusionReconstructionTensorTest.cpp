@@ -20,6 +20,7 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itkDiffusionTensor3DReconstructionImageFilter.h>
+#include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 #include <itkImageRegionConstIterator.h>
 
 #include <cmath>
@@ -34,6 +35,8 @@ class mitkDiffusionReconstructionTensorTestSuite : public mitk::TestFixture
   MITK_TEST(LinearLeastSquares_ShortB0Vector_IsB0);
   MITK_TEST(LinearLeastSquares_SingleShell_SameAsItk);
   MITK_TEST(LinearLeastSquares_InvalidGradients_Throw);
+  MITK_TEST(EigenvalueCorrection_LowBVolumes_AreDiffusionWeighted);
+  MITK_TEST(EigenvalueCorrection_B0AtThreshold_IsFitted);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
@@ -105,6 +108,16 @@ class mitkDiffusionReconstructionTensorTestSuite : public mitk::TestFixture
       dwi->SetPixel({{x, 0, 0}}, pixel);
     }
     return dwi;
+  }
+
+  static TensorImageType::Pointer CorrectEigenvalues(const GradientContainerType *gradients, const DwiType *dwi, double referenceBValue, double b0Threshold)
+  {
+    auto filter = itk::TensorReconstructionWithEigenvalueCorrectionFilter<short, float>::New();
+    filter->SetBValue(referenceBValue);
+    filter->SetGradientImage(gradients, dwi);
+    filter->SetB0Threshold(b0Threshold);
+    filter->Update();
+    return filter->GetOutput();
   }
 
   static void CheckRecovered(const TensorImageType *tensors, double tolerance)
@@ -192,6 +205,25 @@ public:
     for (unsigned int i = 1; i < gradients->Size(); ++i)
       shorter->push_back(gradients->ElementAt(i));
     CPPUNIT_ASSERT_THROW(mitk::ReconstructTensorsLinearLeastSquares(dwi, shorter, 2000, 0), mitk::Exception);
+  }
+
+  // The eigenvalue-corrected filter took every volume with b < 100 for a b0 volume, so volumes at
+  // b = 90 lowered the S0 it divides by and all diffusivities came out too high. A volume is a b0
+  // volume when its b-value rounds to 0, as in the b-value map and the linear least-squares fit.
+  void EigenvalueCorrection_LowBVolumes_AreDiffusionWeighted()
+  {
+    auto gradients = Gradients({90, 1000}, 1000);
+    auto dwi = Simulate(gradients, 1000);
+    CheckRecovered(CorrectEigenvalues(gradients, dwi, 1000, 0), 2e-5);
+  }
+
+  // The filter fitted only voxels whose b0 mean exceeded the threshold, while the view's preview
+  // keeps those that reach it.
+  void EigenvalueCorrection_B0AtThreshold_IsFitted()
+  {
+    auto gradients = Gradients({1000}, 1000);
+    auto dwi = Simulate(gradients, 1000);
+    CheckRecovered(CorrectEigenvalues(gradients, dwi, 1000, 10000), 2e-5);
   }
 };
 
