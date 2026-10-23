@@ -5,6 +5,52 @@
 #include <cstdint>
 #include <cstring>
 
+namespace
+{
+  /** Map from the center-based voxmm coordinates of a TrackVis file (voxmm - voxel_size/2) to
+   *  MITK's LPS world, shared by reader and writer so that MITK reads back what it wrote.
+   *  - Matrix recorded (version 2, vox_to_ras[3][3] != 0) and applied: by the TrackVis definition
+   *    vox_to_ras maps voxel indices to RAS whatever the voxel order, so x and y are negated.
+   *    Exception: MITK's own files with voxel order "LPS", n_count 0 and the default
+   *    image_orientation_patient (written by default from 2019-12 to 2023-01 and since then with
+   *    "Use LPS") store MITK's LPS index-to-world matrix; it is applied as it is.
+   *  - No matrix (version 1 or vox_to_ras[3][3] == 0) or not applied: identity, with the axes
+   *    flipped by voxel order (R, A, I), as MITK always read such files. */
+  vtkSmartPointer<vtkMatrix4x4> VoxmmToLps(const mitk::FiberBundle::TrackVis_header& header, bool useMatrix)
+  {
+    vtkSmartPointer<vtkMatrix4x4> matrix = vtkSmartPointer<vtkMatrix4x4>::New();
+    matrix->Identity();
+
+    const bool hasMatrix = header.version >= 2 && header.vox_to_ras[3][3] != 0;
+    const bool legacyMitkLps = std::strncmp(header.voxel_order, "LPS", 3) == 0 && header.n_count == 0
+        && header.image_orientation_patient[0] == 1 && header.image_orientation_patient[1] == 0
+        && header.image_orientation_patient[2] == 0 && header.image_orientation_patient[3] == 0
+        && header.image_orientation_patient[4] == 1 && header.image_orientation_patient[5] == 0;
+
+    bool negate[3] = {header.voxel_order[0]=='R', header.voxel_order[1]=='A', header.voxel_order[2]=='I'};
+    if (useMatrix && hasMatrix)
+    {
+      for (int i=0; i<4; ++i)
+        for (int j=0; j<4; ++j)
+        {
+          if (j<3)
+            matrix->SetElement(i, j, header.vox_to_ras[i][j]/header.voxel_size[j]);
+          else
+            matrix->SetElement(i, j, header.vox_to_ras[i][j]);
+        }
+      negate[0] = !legacyMitkLps;
+      negate[1] = !legacyMitkLps;
+      negate[2] = false;
+    }
+
+    for (int i=0; i<3; ++i)
+      if (negate[i])
+        for (int j=0; j<4; ++j)
+          matrix->SetElement(i, j, -matrix->GetElement(i, j));
+    return matrix;
+  }
+}
+
 TrackVisFiberReader::TrackVisFiberReader()  { m_Filename = ""; m_FilePointer = nullptr; }
 
 TrackVisFiberReader::~TrackVisFiberReader() { if (m_FilePointer) fclose( m_FilePointer ); }
@@ -69,40 +115,7 @@ short TrackVisFiberReader::write(const mitk::FiberBundle *fib)
   vtkSmartPointer<vtkPolyData> poly = fib->GetFiberPolyData();
   {
     mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
-    vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
-    matrix->Identity();
-    for (int i=0; i<4; ++i)
-      for (int j=0; j<4; ++j)
-      {
-        if (j<3)
-          matrix->SetElement(i, j, m_Header.vox_to_ras[i][j]/m_Header.voxel_size[j]);
-        else
-          matrix->SetElement(i, j, m_Header.vox_to_ras[i][j]);
-      }
-
-    if (m_Header.voxel_order[0]=='R')
-    {
-      matrix->SetElement(0,0,-matrix->GetElement(0,0));
-      matrix->SetElement(0,1,-matrix->GetElement(0,1));
-      matrix->SetElement(0,2,-matrix->GetElement(0,2));
-      matrix->SetElement(0,3,-matrix->GetElement(0,3));
-    }
-    if (m_Header.voxel_order[1]=='A')
-    {
-      matrix->SetElement(1,0,-matrix->GetElement(1,0));
-      matrix->SetElement(1,1,-matrix->GetElement(1,1));
-      matrix->SetElement(1,2,-matrix->GetElement(1,2));
-      matrix->SetElement(1,3,-matrix->GetElement(1,3));
-    }
-    if (m_Header.voxel_order[2]=='I')
-    {
-      matrix->SetElement(2,0,-matrix->GetElement(2,0));
-      matrix->SetElement(2,1,-matrix->GetElement(2,1));
-      matrix->SetElement(2,2,-matrix->GetElement(2,2));
-      matrix->SetElement(2,3,-matrix->GetElement(2,3));
-    }
-
-    geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
+    geometry->SetIndexToWorldTransformByVtkMatrix(VoxmmToLps(m_Header, true));
 
     vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
     transformFilter->SetInputData(poly);
@@ -237,42 +250,7 @@ short TrackVisFiberReader::read( mitk::FiberBundle* fib, bool use_matrix, bool f
   fiberPolyData->SetLines(vtkNewCells);
 
   mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
-  vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
-  matrix->Identity();
-
-  if (use_matrix)
-    for (int i=0; i<4; ++i)
-      for (int j=0; j<4; ++j)
-      {
-        if (j<3)
-          matrix->SetElement(i, j, m_Header.vox_to_ras[i][j]/m_Header.voxel_size[j]);
-        else
-          matrix->SetElement(i, j, m_Header.vox_to_ras[i][j]);
-      }
-
-
-  if (m_Header.voxel_order[0]=='R')
-  {
-    matrix->SetElement(0,0,-matrix->GetElement(0,0));
-    matrix->SetElement(0,1,-matrix->GetElement(0,1));
-    matrix->SetElement(0,2,-matrix->GetElement(0,2));
-    matrix->SetElement(0,3,-matrix->GetElement(0,3));
-  }
-  if (m_Header.voxel_order[1]=='A')
-  {
-    matrix->SetElement(1,0,-matrix->GetElement(1,0));
-    matrix->SetElement(1,1,-matrix->GetElement(1,1));
-    matrix->SetElement(1,2,-matrix->GetElement(1,2));
-    matrix->SetElement(1,3,-matrix->GetElement(1,3));
-  }
-  if (m_Header.voxel_order[2]=='I')
-  {
-    matrix->SetElement(2,0,-matrix->GetElement(2,0));
-    matrix->SetElement(2,1,-matrix->GetElement(2,1));
-    matrix->SetElement(2,2,-matrix->GetElement(2,2));
-    matrix->SetElement(2,3,-matrix->GetElement(2,3));
-  }
-
+  vtkSmartPointer< vtkMatrix4x4 > matrix = VoxmmToLps(m_Header, use_matrix);
 
   if (flip_x)
   {

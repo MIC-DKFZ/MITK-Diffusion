@@ -47,6 +47,10 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TckReader_HeaderWithoutEnd_Throws);
   MITK_TEST(TrkReader_ScalarsAndProperties_AreSkipped);
   MITK_TEST(TrkReader_InvalidFiles_Throw);
+  MITK_TEST(TrkReader_NonRasVoxelOrders_FollowTrackVisDefinition);
+  MITK_TEST(TrkReader_LegacyMitkLpsFile_ReadAsBefore);
+  MITK_TEST(TrkReader_NoMatrixRecorded_UsesVoxelOrder);
+  MITK_TEST(TrkWriter_RoundTrip_KeepsPoints);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -405,6 +409,92 @@ public:
       out.write(reinterpret_cast<const char *>(&numPoints), 4);
     }
     CPPUNIT_ASSERT_THROW_MESSAGE("track without points", mitk::IOUtil::Load(path), std::exception);
+  }
+
+  void TrkReader_NonRasVoxelOrders_FollowTrackVisDefinition()
+  {
+    const std::string path = m_TempDir + "/fibers.trk";
+
+    // FSL/MNI orientation, e.g. dipy saving against an LAS image
+    auto header = MakeTrkHeader("LAS", {{{-2, 0, 0, 30}, {0, 2, 0, -20}, {0, 0, 2, 5}, {0, 0, 0, 1}}});
+    header.n_count = 2;
+    WriteTrk(path, header);
+    AssertTrkFibersSpecMap(mitk::IOUtil::Load<mitk::FiberBundle>(path), header, "LAS");
+
+    header = MakeTrkHeader("LPS", {{{-2, 0, 0, 30}, {0, -2, 0, 40}, {0, 0, 2, 5}, {0, 0, 0, 1}}});
+    header.n_count = 2;
+    WriteTrk(path, header);
+    AssertTrkFibersSpecMap(mitk::IOUtil::Load<mitk::FiberBundle>(path), header, "LPS");
+  }
+
+  void TrkReader_LegacyMitkLpsFile_ReadAsBefore()
+  {
+    // As MITK wrote by default from 2019-12 to 2023-01: voxel order LPS, MITK's LPS
+    // index-to-world matrix as vox_to_ras, n_count 0, default image_orientation_patient
+    auto header = MakeTrkHeader("LPS", RasAffine());
+    header.image_orientation_patient[0] = 1;
+    header.image_orientation_patient[4] = 1;
+    const std::string path = m_TempDir + "/legacy.trk";
+    WriteTrk(path, header);
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(path);
+
+    const auto fibers = TrkFibers();
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(fibers.size()), fib->GetNumFibers());
+    for (unsigned int i = 0; i < fibers.size(); ++i)
+      for (unsigned int j = 0; j < fibers[i].size(); ++j)
+      {
+        const double *p = fib->GetFiberPolyData()->GetCell(i)->GetPoints()->GetPoint(j);
+        for (int r = 0; r < 3; ++r)
+        {
+          double lps = header.vox_to_ras[r][3];
+          for (int c = 0; c < 3; ++c)
+            lps += header.vox_to_ras[r][c] * (fibers[i][j][c] / header.voxel_size[c] - 0.5);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(lps, p[r], 1e-4);
+        }
+      }
+  }
+
+  void TrkReader_NoMatrixRecorded_UsesVoxelOrder()
+  {
+    // vox_to_ras[3][3] == 0 means "not recorded"; points are voxmm, flipped to LPS by voxel order
+    auto header = MakeTrkHeader("RAS", {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}});
+    const std::string path = m_TempDir + "/nomatrix.trk";
+    WriteTrk(path, header);
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(path);
+
+    const auto fibers = TrkFibers();
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(fibers.size()), fib->GetNumFibers());
+    for (unsigned int i = 0; i < fibers.size(); ++i)
+      for (unsigned int j = 0; j < fibers[i].size(); ++j)
+      {
+        const double *p = fib->GetFiberPolyData()->GetCell(i)->GetPoints()->GetPoint(j);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-(fibers[i][j][0] - 1.0), p[0], 1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-(fibers[i][j][1] - 1.0), p[1], 1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(fibers[i][j][2] - 1.0, p[2], 1e-4);
+      }
+  }
+
+  void TrkWriter_RoundTrip_KeepsPoints()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    const std::string path = m_TempDir + "/roundtrip.trk";
+    for (bool useLps : {false, true})
+    {
+      mitk::IFileWriter::Options options;
+      options["Use LPS coordinate system (default is RAS)"] = useLps;
+      options["Print header"] = false;
+      mitk::IOUtil::Save(fib, path, options);
+      CPPUNIT_ASSERT_MESSAGE(useLps ? "LPS" : "RAS", fib->Equals(mitk::IOUtil::Load<mitk::FiberBundle>(path), 0.001));
+    }
+
+    // A bundle carrying the header of a third-party LAS file is written in that convention
+    const std::string lasPath = m_TempDir + "/las.trk";
+    auto header = MakeTrkHeader("LAS", {{{-2, 0, 0, 30}, {0, 2, 0, -20}, {0, 0, 2, 5}, {0, 0, 0, 1}}});
+    header.n_count = 2;
+    WriteTrk(lasPath, header);
+    auto las = mitk::IOUtil::Load<mitk::FiberBundle>(lasPath);
+    mitk::IOUtil::Save(las, path);
+    CPPUNIT_ASSERT_MESSAGE("LAS header", las->Equals(mitk::IOUtil::Load<mitk::FiberBundle>(path), 0.001));
   }
 };
 
