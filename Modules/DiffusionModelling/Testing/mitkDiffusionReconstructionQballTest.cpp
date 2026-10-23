@@ -57,6 +57,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(MultiShell_RotatedScheme_GivesRotatedFunction);
   MITK_TEST(Analytical_CoefficientImages_Snapshot);
   MITK_TEST(MultiShell_CoefficientImage_Snapshot);
+  MITK_TEST(MultiShell_InterpolatedShells_Snapshot);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
@@ -762,6 +763,46 @@ public:
       odfSummary.magnitude[0] += odf.magnitude[j];
     }
     CheckFingerprint("Multi-shell ODF", odfSummary, expectedOdf, 252);
+  }
+
+  // The same for shells with different numbers of directions, which the filter interpolates onto
+  // the union of all directions.
+  void MultiShell_InterpolatedShells_Snapshot()
+  {
+    const std::vector<std::vector<double>> expectedCoefficients = {
+      {2.25675845, 10.1554129, 2.25675845},
+      {0.431367613, 1.93733783, 0.431367613},
+      {-0.729486078, -3.27266716, 0.729486078},
+      {-0.897383243, -4.0704862, 0.897383243},
+      {0.0656713946, 0.278202576, 0.0656713946},
+      {2.68512049, 12.0565351, 2.68512049},
+      {1.65827507, 7.47172467, 1.65827507},
+      {-0.805893295, -3.65550926, 0.805893295},
+      {0.50126335, 2.23288144, 0.50126335},
+      {-0.0247641897, -0.151391121, 0.0264683783},
+      {0.811790198, 3.58050999, 0.811790198},
+      {-0.820736006, -3.67569403, 0.820736006},
+      {1.30723698, 5.9099822, 1.30723698},
+      {-0.773858652, -3.42332403, 0.773858652},
+      {2.15075803, 9.71833119, 2.15075803}};
+    std::vector<vnl_vector_fixed<double, 3>> gradients(1, vnl_vector_fixed<double, 3>(0.0));
+    for (unsigned int shell = 1; shell <= 3; ++shell)
+      for (const auto &d : Directions(20 + 10 * shell))
+        gradients.push_back(d * std::sqrt(shell / 3.0));
+    auto dwi = Simulate(gradients, 3000);
+    unsigned int voxel = 0;
+    for (itk::ImageRegionIterator<DwiType> it(dwi.image, dwi.image->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it, ++voxel)
+    {
+      auto pixel = it.Get();
+      for (unsigned int i = 0; i < pixel.Size(); ++i)
+        pixel[i] = static_cast<short>(pixel[i] * (1 + 0.1 * voxel) + (i % 7) * voxel);
+      it.Set(pixel);
+    }
+    auto filter = MultiShellFilterType::New();
+    filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    filter->SetLambda(0.006);
+    filter->Update();
+    CheckFingerprint("Multi-shell interpolated coefficients", ComputeFingerprint(filter->GetCoefficientImage().GetPointer()), expectedCoefficients, 8);
   }
 
   // Half-sphere schemes were fitted with every row twice, which doubled the data term and so halved
