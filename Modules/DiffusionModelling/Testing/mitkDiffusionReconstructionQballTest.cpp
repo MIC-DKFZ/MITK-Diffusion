@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
@@ -38,6 +39,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint);
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
   MITK_TEST(MultiShell_UnsupportedShells_Throw);
+  MITK_TEST(Standard_ShImageMatchesOdf);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
@@ -283,6 +285,40 @@ public:
     CPPUNIT_ASSERT(MultiShellError({1000}).find("Only three equidistant shells") != std::string::npos);
     CPPUNIT_ASSERT(MultiShellError({1000, 1500, 2000}).find("b = 1000, 1500, 2000") != std::string::npos);
     CPPUNIT_ASSERT_EQUAL(std::string(), MultiShellError({1000, 2000, 3000}));
+  }
+
+  // The coefficient image of the non-CSA methods got the CSA constant 1/(2 sqrt(pi)) added to c0,
+  // so the SH image of "Standard" was the ODF plus an isotropic part the ODF output does not have.
+  void Standard_ShImageMatchesOdf()
+  {
+    auto dwi = LoadHalfSphereDwi();
+    auto filter = AnalyticalFilterType::New();
+    filter->SetBValue(3000);
+    filter->SetGradientImage(dwi.gradients, dwi.image);
+    filter->SetLambda(0.006);
+    filter->SetNormalizationMethod(AnalyticalFilterType::QBAR_STANDARD);
+    filter->Update();
+
+    using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
+    const vnl_matrix<float> basis = mitk::sh::CalcShBasisForDirections(4, OdfType::GetDirections()->as_matrix(), true);
+    itk::ImageRegionConstIterator<AnalyticalFilterType::OutputImageType> itOdf(filter->GetOutput(), dwi.image->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<AnalyticalFilterType::CoefficientImageType> itSh(filter->GetCoefficientImage(), dwi.image->GetLargestPossibleRegion());
+    unsigned int compared = 0;
+    for (; !itOdf.IsAtEnd(); ++itOdf, ++itSh)
+    {
+      const auto odf = itOdf.Get();
+      if (odf.GetNorm() == 0)
+        continue;
+      vnl_vector<float> coefficients(15);
+      for (unsigned int i = 0; i < 15; ++i)
+        coefficients[i] = itSh.Get()[i];
+      const vnl_vector<float> sampled = basis * coefficients;
+      // The ODF output of "Standard" is divided by its sum.
+      for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(odf[i], sampled[i] / sampled.sum(), 1e-6);
+      ++compared;
+    }
+    CPPUNIT_ASSERT(compared > 100);
   }
 };
 

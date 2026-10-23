@@ -348,9 +348,10 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
       }
       else
       {
+        // The constant 1/(4 pi) of the ODF (c0 = 1/(2 sqrt(pi))) belongs to the solid-angle ODF
+        // only; here the SH image holds the same function as the ODF output.
         vnl_vector<TO> coeffs(m_NumberCoefficients);
         coeffs = ( m_CoeffReconstructionMatrix * B );
-        coeffs[0] += 1.0/(2.0*sqrt(itk::Math::pi));
         coeffPixel = coeffs.data_block();
         odf = ( m_ReconstructionMatrix * B ).data_block();
       }
