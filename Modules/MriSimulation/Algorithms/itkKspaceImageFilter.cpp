@@ -137,7 +137,10 @@ namespace itk {
         m_RfImage = nullptr;
     }
 
-    m_Gamma = 42576000*itk::Math::twopi;    // Gyromagnetic ratio in Hz/T
+    // Gyromagnetic ratio in Hz/T: the eddy phase phi enters exp(i 2 pi (k x + phi)) in cycles, like the
+    // field map term (Hz times s), so the field G*r in T times gamma-bar gives Hz. With 2 pi * 42.576
+    // MHz/T (rad/(s T)) the eddy field acted 2 pi times stronger than the documented mT/m.
+    m_Gamma = 42576000;
     if ( m_Parameters->m_SignalGen.m_EddyStrength>0 && m_DiffusionGradientDirection.GetNorm()>0.001)
     {
       m_DiffusionGradientDirection = m_DiffusionGradientDirection *  m_Parameters->m_SignalGen.m_EddyStrength/1000 *  m_Gamma;
