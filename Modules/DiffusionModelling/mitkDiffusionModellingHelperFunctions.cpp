@@ -23,23 +23,63 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkITKImageImport.h>
 #include <mitkImageToItk.h>
 
+#include <vector>
+
 namespace
 {
+  /**
+   * Values of all basis functions up to the given order at one direction, in coefficient order,
+   * equal bit for bit to mitk::sh::Yj of each. The functions of +m and -m share their Legendre and
+   * normalization terms, which are therefore computed once for both.
+   */
+  void BasisValues(int order, float theta, float phi, bool mrtrix, double *values)
+  {
+    const float x = -cos(theta);
+    for (int k = 0; k <= order; k += 2)
+    {
+      double *centre = values + (k * k + k + 2) / 2 - 1; // m = 0
+      for (int a = 0; a <= k; ++a)
+      {
+        if (mrtrix)
+        {
+          const double plm = static_cast<double>(::boost::math::legendre_p<float>(k, a, x));
+          const double mag = sqrt((2.0*k+1.0)/(4.0*itk::Math::pi)*::boost::math::factorial<double>(k-a)/::boost::math::factorial<double>(k+a))*plm;
+          if (a == 0)
+          {
+            centre[0] = mag;
+          }
+          else
+          {
+            centre[a] = mag*static_cast<double>(cos(a*phi));
+            centre[-a] = mag*static_cast<double>(sin(a*phi));
+          }
+        }
+        else if (a == 0)
+        {
+          centre[0] = static_cast<double>(::boost::math::spherical_harmonic_r(static_cast<unsigned int>(k), 0, theta, phi));
+        }
+        else
+        {
+          // Real and imaginary part as spherical_harmonic_r and spherical_harmonic_i give them.
+          const auto y = ::boost::math::spherical_harmonic(static_cast<unsigned int>(k), a, theta, phi);
+          centre[a] = pow(-1.0,a)*sqrt(2.0)*static_cast<double>(y.imag());
+          centre[-a] = sqrt(2.0)*static_cast<double>(y.real());
+        }
+      }
+    }
+  }
+
   /** Basis matrix for directions in spherical coordinates (phi in row 0, theta in row 1). */
   template <typename T>
   vnl_matrix<T> BasisForSphericalDirections(const vnl_matrix<double> &spherical, unsigned int order, bool mrtrix)
   {
     vnl_matrix<T> basis(spherical.cols(), (order + 1) * (order + 2) / 2, 0);
+    std::vector<double> values(basis.cols());
     for (unsigned int i = 0; i < spherical.cols(); ++i)
     {
-      for (int k = 0; k <= static_cast<int>(order); k += 2)
-      {
-        for (int m = -k; m <= k; ++m)
-        {
-          const int j = (k * k + k + 2) / 2 + m - 1;
-          basis(i, j) = mitk::sh::Yj(m, k, spherical(1, i), spherical(0, i), mrtrix);
-        }
-      }
+      BasisValues(order, spherical(1, i), spherical(0, i), mrtrix, values.data());
+      for (unsigned int j = 0; j < basis.cols(); ++j)
+        basis(i, j) = values[j];
     }
     return basis;
   }
@@ -192,15 +232,12 @@ float mitk::sh::GetValue(const vnl_vector<float> &coefficients, const int &sh_or
   if (sh_order < 0 || coefficients.size() < static_cast<unsigned int>((sh_order+1)*(sh_order+2)/2))
     mitkThrow() << coefficients.size() << " coefficients are too few for SH order " << sh_order << ".";
 
+  const unsigned int numCoeffs = (sh_order+1)*(sh_order+2)/2;
+  std::vector<double> values(numCoeffs);
+  BasisValues(sh_order, theta, phi, mrtrix, values.data());
   float val = 0;
-  for(int k=0; k<=sh_order; k+=2)
-  {
-    for(int m=-k; m<=k; m++)
-    {
-      unsigned int j = static_cast<unsigned int>((k*k + k + 2)/2 + m - 1);
-      val += coefficients[j] * mitk::sh::Yj(m, k, theta, phi, mrtrix);
-    }
-  }
+  for (unsigned int j = 0; j < numCoeffs; ++j)
+    val += coefficients[j] * values[j];
 
   return val;
 }
