@@ -606,9 +606,9 @@ void FitFibersToImageFilter::GenerateData()
   }
   std::cout.rdbuf (old);
 
-  // transform back
-  A *= m_MeanSignal/100.0;
-  b *= m_MeanSignal/100.0;
+  // transform back: b was scaled by T/S (mean tract density over mean signal) for the fit
+  A *= m_MeanSignal/m_MeanTractDensity;
+  b *= m_MeanSignal/m_MeanTractDensity;
 
   MITK_INFO << "Generating output images ...";
   if (m_PeakImage.IsNotNull())
