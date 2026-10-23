@@ -480,7 +480,7 @@ void QmitkTensorReconstructionView::DoTensorsToDWI()
         gradientList = MakeGradientList<92>();
 
       }
-      double bVal = m_Controls->m_TensorsToDWIBValueEdit->text().toDouble();
+      double bVal = m_Controls->m_TensorsToDWIBValueEdit->value();
 
       FilterType::Pointer filter = FilterType::New();
       filter->SetInput( itkvol );
@@ -490,9 +490,12 @@ void QmitkTensorReconstructionView::DoTensorsToDWI()
 
       mitk::Image::Pointer image = mitk::GrabItkImageMemory( filter->GetOutput() );
 
-      mitk::DiffusionPropertyHelper::SetGradientContainer(image, gradientList);
-      mitk::DiffusionPropertyHelper::SetReferenceBValue(image, bVal);
-      mitk::DiffusionPropertyHelper::InitializeImage( image );
+      // The DWI is simulated from world-frame tensors, so its gradients are world (LPS) vectors:
+      // identity measurement frame, image rotation not applied (InitializeImage(image) would apply
+      // it, as for gradients of earlier MITK versions).
+      mitk::DiffusionPropertyHelper::MeasurementFrameType identity;
+      identity.set_identity();
+      mitk::DiffusionPropertyHelper::InitializeImage(image, gradientList, bVal, identity, false);
 
       mitk::DataNode::Pointer node=mitk::DataNode::New();
       mitk::DiffusionPropertyHelper::CopyDICOMProperties(vol, image);
