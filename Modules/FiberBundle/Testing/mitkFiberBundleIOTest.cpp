@@ -82,6 +82,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TrkWriter_Header_IsReproducibleAndMatchesData);
   MITK_TEST(Writers_WriteErrors_Throw);
   MITK_TEST(VtkReader_NoFiberPolyData_ThrowsMitkException);
+  MITK_TEST(VtkReader_TruncatedFile_Throws);
   MITK_TEST(VtkReader_ColoursOfUnusedAndReorderedPoints_StayWithTheirPoints);
   MITK_TEST(DicomMimeType_NewDcmFile_FindsWriter);
   MITK_TEST(IOHelper_BrokenFileAndDottedNames_CoutRestored);
@@ -929,6 +930,29 @@ public:
                                    mitk::IOUtil::Save(fib, base + ".FiberBundle.vtk", "/dev/full", options, false), std::exception);
       CPPUNIT_ASSERT_THROW_MESSAGE(".trk, disk full",
                                    mitk::IOUtil::Save(fib, base + ".FiberBundle.trk", "/dev/full", options, false), std::exception);
+    }
+  }
+
+  void VtkReader_TruncatedFile_Throws()
+  {
+    auto fib = LoadWeightedFibers();
+    for (bool binary : {true, false})
+    {
+      const std::string full = m_TempDir + (binary ? "/full_binary.fib" : "/full_ascii.fib");
+      mitk::IFileWriter::Options options;
+      options["Save as binary file"] = binary;
+      mitk::IOUtil::Save(fib, full, options);
+      CPPUNIT_ASSERT_EQUAL(fib->GetNumFibers(), mitk::IOUtil::Load<mitk::FiberBundle>(full)->GetNumFibers());
+
+      // ends in the points, the lines, the weights and the colours
+      const auto size = std::filesystem::file_size(full);
+      for (double fraction : {0.05, 0.6, 0.8, 0.95})
+      {
+        const std::string path = m_TempDir + "/truncated.fib";
+        std::filesystem::copy_file(full, path, std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::resize_file(path, static_cast<std::uintmax_t>(static_cast<double>(size) * fraction));
+        CPPUNIT_ASSERT_THROW_MESSAGE((binary ? "binary, " : "ASCII, ") + std::to_string(fraction), mitk::IOUtil::Load(path), std::exception);
+      }
     }
   }
 

@@ -23,6 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLocaleSwitch.h>
 #include <vtkCellData.h>
 #include <vtkFloatArray.h>
+#include <vtkLogger.h>
 #include <vtkMatrix4x4.h>
 #include <vtkPointData.h>
 #include <vtkPolyData.h>
@@ -30,6 +31,50 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkTransformFilter.h>
 #include <vtkUnsignedCharArray.h>
 #include <vtkXMLPolyDataReader.h>
+
+#include <cstdint>
+#include <string>
+#include <thread>
+
+namespace
+{
+  /** Collects the warnings and errors that VTK logs in the constructing thread while the object
+   *  exists. VTK's legacy reader reports a file that ends inside its data only this way
+   *  ("Error reading binary data!") and returns the points and arrays read so far, or allocated
+   *  but partly filled. */
+  class VtkProblemLog
+  {
+  public:
+    VtkProblemLog()
+      : m_Id("mitk::FiberBundleVtkReader " + std::to_string(reinterpret_cast<std::uintptr_t>(this)))
+      , m_Thread(std::this_thread::get_id())
+    {
+      vtkLogger::AddCallback(m_Id.c_str(), &VtkProblemLog::OnMessage, this, vtkLogger::VERBOSITY_WARNING);
+    }
+
+    ~VtkProblemLog()
+    {
+      vtkLogger::RemoveCallback(m_Id.c_str());
+    }
+
+    VtkProblemLog(const VtkProblemLog&) = delete;
+    VtkProblemLog& operator=(const VtkProblemLog&) = delete;
+
+    const std::string& GetMessages() const { return m_Messages; }
+
+  private:
+    static void OnMessage(void* userData, const vtkLogger::Message& message)
+    {
+      auto self = static_cast<VtkProblemLog*>(userData);
+      if (std::this_thread::get_id() == self->m_Thread && message.verbosity <= vtkLogger::VERBOSITY_WARNING)
+        self->m_Messages += std::string(message.message != nullptr ? message.message : "") + " ";
+    }
+
+    std::string m_Id;
+    std::thread::id m_Thread;
+    std::string m_Messages;
+  };
+}
 
 
 mitk::FiberBundleVtkReader::FiberBundleVtkReader()
@@ -61,11 +106,16 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
 
   MITK_INFO << "Loading tractogram (VTK format): " << itksys::SystemTools::GetFilenameName(filename);
   vtkSmartPointer<vtkPolyData> fiberPolyData;
+  std::string problems;
   vtkSmartPointer<vtkPolyDataReader> legacyReader = vtkSmartPointer<vtkPolyDataReader>::New();
   legacyReader->SetFileName(filename.c_str());
   if (legacyReader->IsFilePolyData())
   {
-    legacyReader->Update();
+    {
+      VtkProblemLog log;
+      legacyReader->Update();
+      problems = log.GetMessages();
+    }
     if (legacyReader->GetErrorCode() != 0)
       mitkThrow() << "Could not read " << filename << " (VTK error code " << legacyReader->GetErrorCode() << ").";
     fiberPolyData = legacyReader->GetOutput();
@@ -76,13 +126,22 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
     if (!xmlReader->CanReadFile(filename.c_str()))
       mitkThrow() << filename << " is no VTK polydata file (legacy .fib/.vtk or XML .vtp).";
     xmlReader->SetFileName(filename.c_str());
-    xmlReader->Update();
+    {
+      VtkProblemLog log;
+      xmlReader->Update();
+      problems = log.GetMessages();
+    }
     if (xmlReader->GetErrorCode() != 0)
       mitkThrow() << "Could not read " << filename << " (VTK error code " << xmlReader->GetErrorCode() << ").";
     fiberPolyData = xmlReader->GetOutput();
   }
   if (fiberPolyData == nullptr)
     mitkThrow() << "Could not read " << filename;
+  if (!problems.empty())
+    mitkThrow() << "Could not read " << filename << " (truncated or corrupt): " << problems;
+  // A legacy ASCII file that ends inside its points gives them without any fiber and no message.
+  if (fiberPolyData->GetNumberOfPoints() > 0 && fiberPolyData->GetNumberOfCells() == 0)
+    mitkThrow() << "Could not read " << filename << " (truncated or corrupt): points without fibers.";
   if (fiberPolyData->GetNumberOfPolys() > 0 || fiberPolyData->GetNumberOfStrips() > 0)
     mitkThrow() << filename << " contains polygons or triangle strips; a fiber bundle consists of lines.";
 
