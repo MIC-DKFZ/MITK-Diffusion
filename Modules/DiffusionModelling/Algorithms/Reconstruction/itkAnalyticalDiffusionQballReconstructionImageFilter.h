@@ -164,8 +164,10 @@ public:
     virtual ReferenceImageType * GetReferenceImage()
     { return ( static_cast< ReferenceImageType *>(this->ProcessObject::GetInput(0)) ); }
 
-    OdfPixelType Normalize(OdfPixelType odf, double b0 );
-    vnl_vector<TOdfPixelType> PreNormalize( vnl_vector<TOdfPixelType> vec, double b0 );
+    /** The ODF as the reconstruction method defines it, from the ODF values of the signal. */
+    void Normalize(OdfPixelType &odf, double b0) const;
+    /** The values the method fits, from the diffusion-weighted signal. */
+    void PreNormalize(vnl_vector<TOdfPixelType> &vec, double b0) const;
 
     /** Threshold on the reference image data. The output ODF will be a null
    * pdf for pixels in the reference image that have a value less than this
@@ -183,6 +185,13 @@ public:
     itkSetMacro( BValue, float)
     itkSetMacro( Lambda, double )
     itkGetMacro( Lambda, double )
+
+    /** Whether the ODFs (the primary output) are computed, true by default. Without them the
+     * output has no buffer, which saves NrOdfDirections values per voxel when only the
+     * coefficient image is used; the filter then executes again on every Update(). */
+    itkSetMacro( ComputeOdf, bool )
+    itkGetConstMacro( ComputeOdf, bool )
+    itkBooleanMacro( ComputeOdf )
 
 #ifdef ITK_USE_CONCEPT_CHECKING
     /** Begin concept checking */
@@ -210,6 +219,7 @@ protected:
     void PrintSelf(std::ostream& os, Indent indent) const override;
 
     void ComputeReconstructionMatrix();
+    void AllocateOutputs() override;
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const
                                OutputImageRegionType &outputRegionForThread) override;
@@ -239,6 +249,7 @@ private:
     typename CoefficientImageType::Pointer            m_CoefficientImage;
     TOdfPixelType                                     m_Delta1;
     TOdfPixelType                                     m_Delta2;
+    bool                                              m_ComputeOdf;
 };
 
 }

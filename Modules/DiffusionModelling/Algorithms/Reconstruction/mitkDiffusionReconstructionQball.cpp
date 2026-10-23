@@ -100,6 +100,7 @@ namespace
     filter->SetThreshold(parameters.b0Threshold);
     filter->SetLambda(parameters.lambda);
     filter->SetNormalizationMethod(normalization);
+    filter->SetComputeOdf(parameters.sampledOdf);
     filter->Update();
 
     mitk::QballResult result;

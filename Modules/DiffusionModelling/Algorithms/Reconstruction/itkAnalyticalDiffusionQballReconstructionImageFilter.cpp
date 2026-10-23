@@ -21,11 +21,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkImageRegionIterator.h>
 #include <itkArray.h>
+#include <vnl/vnl_sse.h>
 #include <vnl/vnl_vector.h>
 #include <mitkDiffusionImageHelperFunctions.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 
 #include <locale>
+#include <optional>
 #include "mitkPointShell.h"
 #include "mitkShRegularization.h"
 #include "mitkSingleShellGradients.h"
@@ -43,7 +45,8 @@ AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDirection
   m_NormalizationMethod(QBAR_STANDARD),
   m_NumberCoefficients(0),
   m_Delta1(0.001),
-  m_Delta2(0.001)
+  m_Delta2(0.001),
+  m_ComputeOdf(true)
 {
   // At least 1 inputs is necessary for a vector image.
   // For images added one at a time we need at least six
@@ -58,8 +61,8 @@ template<
     class TOdfPixelType,
     int ShOrder,
     int NrOdfDirections>
-typename itk::AnalyticalDiffusionQballReconstructionImageFilter< TReferenceImagePixelType,TGradientImagePixelType,TOdfPixelType, ShOrder,NrOdfDirections>::OdfPixelType
-itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, ShOrder, NrOdfDirections>::Normalize( OdfPixelType odf, double b0 )
+void
+itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, ShOrder, NrOdfDirections>::Normalize( OdfPixelType &odf, double b0 ) const
 {
   switch( m_NormalizationMethod )
   {
@@ -73,8 +76,6 @@ itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType,
     }
     if(sum>0)
       odf /= sum;
-
-    return odf;
     break;
   }
   case QBAR_ADC_ONLY:
@@ -83,14 +84,10 @@ itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType,
     {
       odf[i] = ((TOdfPixelType)log((TOdfPixelType)b0)-odf[i])/m_BValue;
     }
-    return odf;
     break;
   }
   case QBAR_RAW_SIGNAL:
-  {
-    return odf;
     break;
-  }
   case QBAR_SOLID_ANGLE:
   {
     for(int i=0; i<NrOdfDirections; i++)
@@ -99,8 +96,6 @@ itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType,
     break;
   }
   }
-
-  return odf;
 }
 
 
@@ -110,7 +105,7 @@ template<
     class TOdfPixelType,
     int ShOrder,
     int NrOdfDirections>
-vnl_vector<TOdfPixelType> itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, ShOrder, NrOdfDirections>::PreNormalize( vnl_vector<TOdfPixelType> vec, double b0 )
+void itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, ShOrder, NrOdfDirections>::PreNormalize( vnl_vector<TOdfPixelType> &vec, double b0 ) const
 {
   switch( m_NormalizationMethod )
   {
@@ -122,7 +117,6 @@ vnl_vector<TOdfPixelType> itk::AnalyticalDiffusionQballReconstructionImageFilter
     {
       vec[i] = vec[i]/b0f;
     }
-    return vec;
     break;
   }
   case QBAR_ADC_ONLY:
@@ -135,14 +129,10 @@ vnl_vector<TOdfPixelType> itk::AnalyticalDiffusionQballReconstructionImageFilter
 
       vec[i] = log(vec[i]);
     }
-    return vec;
     break;
   }
   case QBAR_RAW_SIGNAL:
-  {
-    return vec;
     break;
-  }
   case QBAR_SOLID_ANGLE:
   {
     int n = vec.size();
@@ -162,12 +152,24 @@ vnl_vector<TOdfPixelType> itk::AnalyticalDiffusionQballReconstructionImageFilter
 
       vec[i] = log(-log(vec[i]));
     }
-    return vec;
     break;
   }
   }
+}
 
-  return vec;
+template< class T, class TG, class TO, int ShOrder, int NrOdfDirections>
+void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDirections>::AllocateOutputs()
+{
+  if (m_ComputeOdf)
+  {
+    Superclass::AllocateOutputs();
+    return;
+  }
+  // Without ODFs the primary output gets no buffer (NrOdfDirections values per voxel that nobody
+  // reads, about 4 GB for a whole brain at 1.25 mm).
+  OutputImageType *output = this->GetOutput();
+  output->SetBufferedRegion(OutputImageRegionType());
+  output->Allocate();
 }
 
 template< class T, class TG, class TO, int ShOrder, int NrOdfDirections>
@@ -213,8 +215,10 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
 {
   typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
 
-  ImageRegionIterator< OutputImageType > oit(outputImage, outputRegionForThread);
-  oit.GoToBegin();
+  // The ODF output has a buffer only when the ODFs are computed (AllocateOutputs).
+  std::optional<ImageRegionIterator< OutputImageType >> oit;
+  if (m_ComputeOdf)
+    oit.emplace(outputImage, outputRegionForThread);
 
   ImageRegionIterator< BZeroImageType > oit2(m_BZeroImage, outputRegionForThread);
   oit2.GoToBegin();
@@ -238,9 +242,20 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
   const std::vector<unsigned int> &baselineind = m_BaselineIndices;
   const std::vector<unsigned int> &gradientind = m_GradientIndices;
 
+  // Buffers of this work unit, so that no voxel allocates. The products are those of vnl's
+  // matrix * vector operator, in the same order.
+  vnl_vector<TO> B(m_NumberOfGradientDirections);
+  vnl_vector<TO> coeffs(m_NumberCoefficients);
+  vnl_vector<TO> odfValues(NrOdfDirections);
+  const auto multiply = [](const vnl_matrix<TO> &matrix, const vnl_vector<TO> &vector, vnl_vector<TO> &result) {
+    vnl_sse<TO>::matrix_x_vector(matrix.data_block(), vector.data_block(), result.data_block(), matrix.rows(), matrix.cols());
+  };
+  OdfPixelType odf;
+  typename CoefficientImageType::PixelType coeffPixel;
+
   while( !git.IsAtEnd() )
   {
-    GradientVectorType b = git.Get();
+    const GradientVectorType b = git.Get();
 
     // Average the baseline image pixels, in double so that the mean of several b0 volumes is not
     // truncated (it normalizes the signal, E = S/b0, and is the b0 output)
@@ -251,10 +266,8 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
     }
     b0 /= this->m_NumberOfBaselineImages;
 
-    OdfPixelType odf(0.0);
-
-    typename CoefficientImageType::PixelType coeffPixel(0.0);
-    vnl_vector<TO> B(m_NumberOfGradientDirections);
+    odf.Fill(0.0);
+    coeffPixel.Fill(0.0);
 
     if( (b0 != 0) && (b0 >= m_Threshold) )
     {
@@ -263,31 +276,36 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
         B[i] = static_cast<TO>(b[gradientind[i]]);
       }
 
-      B = PreNormalize(B, b0);
+      PreNormalize(B, b0);
+      multiply(m_CoeffReconstructionMatrix, B, coeffs);
       if(m_NormalizationMethod == QBAR_SOLID_ANGLE)
       {
-        vnl_vector<TO> coeffs(m_NumberCoefficients);
-        coeffs = ( m_CoeffReconstructionMatrix * B );
         coeffs[0] += 1.0/(2.0*sqrt(itk::Math::pi));
-        odf = ( m_SphericalHarmonicBasisMatrix * coeffs ).data_block();
-        coeffPixel = coeffs.data_block();
+        if (m_ComputeOdf)
+        {
+          multiply(m_SphericalHarmonicBasisMatrix, coeffs, odfValues);
+          odf = odfValues.data_block();
+        }
       }
-      else
+      else if (m_ComputeOdf)
       {
         // The constant 1/(4 pi) of the ODF (c0 = 1/(2 sqrt(pi))) belongs to the solid-angle ODF
         // only; here the SH image holds the same function as the ODF output.
-        vnl_vector<TO> coeffs(m_NumberCoefficients);
-        coeffs = ( m_CoeffReconstructionMatrix * B );
-        coeffPixel = coeffs.data_block();
-        odf = ( m_ReconstructionMatrix * B ).data_block();
+        multiply(m_ReconstructionMatrix, B, odfValues);
+        odf = odfValues.data_block();
       }
-      odf = Normalize(odf, b0);
+      coeffPixel = coeffs.data_block();
+      if (m_ComputeOdf)
+        Normalize(odf, b0);
     }
 
-    oit.Set( odf );
+    if (oit)
+    {
+      oit->Set( odf );
+      ++(*oit); // odf image iterator
+    }
     oit2.Set( static_cast<BZeroPixelType>(b0) );
     oit4.Set(coeffPixel);
-    ++oit;  // odf image iterator
     ++oit2; // b0 image iterator
     ++oit4; // coefficient image iterator
     ++git;  // Gradient  image iterator

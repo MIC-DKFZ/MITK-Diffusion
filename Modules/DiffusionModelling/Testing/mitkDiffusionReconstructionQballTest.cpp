@@ -40,6 +40,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(Numerical_NoBaseline_Throws);
   MITK_TEST(Numerical_SecondUpdate_SameResult);
   MITK_TEST(Analytical_SecondUpdate_SameResult);
+  MITK_TEST(Analytical_WithoutOdf_SameCoefficients);
   MITK_TEST(Numerical_NewGradients_SameAsFreshFilter);
   MITK_TEST(SolidAngle_SecondUpdate_SameResult);
   MITK_TEST(SingleShellFilters_DefaultNormalization_IsStandard);
@@ -242,6 +243,32 @@ public:
     reused->Update();
     CheckEqual(fresh->GetOutput(), reused->GetOutput());
     CheckEqual(fresh->GetCoefficientImage().GetPointer(), reused->GetCoefficientImage().GetPointer());
+  }
+
+  // Without ODFs (the coefficient image is the result of the SH methods) the primary output gets no
+  // buffer; coefficients and b0 image are the same as with them.
+  void Analytical_WithoutOdf_SameCoefficients()
+  {
+    auto dwi = LoadHalfSphereDwi();
+    for (auto method : AnalyticalMethods())
+    {
+      std::vector<AnalyticalFilterType::Pointer> filters;
+      for (bool computeOdf : {true, false})
+      {
+        auto filter = AnalyticalFilterType::New();
+        filter->SetBValue(3000);
+        filter->SetGradientImage(dwi.gradients, dwi.image);
+        filter->SetLambda(0.006);
+        filter->SetNormalizationMethod(method);
+        filter->SetComputeOdf(computeOdf);
+        filter->Update();
+        filters.push_back(filter);
+      }
+      CheckEqual(filters[0]->GetCoefficientImage().GetPointer(), filters[1]->GetCoefficientImage().GetPointer());
+      CheckEqual(filters[0]->GetBZeroImage().GetPointer(), filters[1]->GetBZeroImage().GetPointer());
+      CPPUNIT_ASSERT_EQUAL(static_cast<itk::SizeValueType>(363), filters[0]->GetOutput()->GetBufferedRegion().GetNumberOfPixels());
+      CPPUNIT_ASSERT_EQUAL(static_cast<itk::SizeValueType>(0), filters[1]->GetOutput()->GetBufferedRegion().GetNumberOfPixels());
+    }
   }
 
   // The number of equator sampling points was derived from the first input only, so a filter given
