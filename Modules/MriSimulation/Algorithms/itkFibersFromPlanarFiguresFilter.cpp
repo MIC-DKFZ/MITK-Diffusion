@@ -18,6 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define __itkibersFromPlanarFiguresFilter_cpp
 
 #include "itkFibersFromPlanarFiguresFilter.h"
+#include <algorithm>
 
 #include <itkOrientationDistributionFunction.h>
 #include <itkDiffusionOdfGeneralizedFaImageFilter.h>
@@ -122,7 +123,7 @@ void FibersFromPlanarFiguresFilter::GenerateData()
 
       // apply twist
       vnl_matrix_fixed<double, 2, 2> tRot;
-      tRot[0][0] = tDir[0];
+      tRot[0][0] = std::clamp(tDir[0], -1.0, 1.0);  // rounding must not make acos NaN
       tRot[1][1] = tRot[0][0];
       tRot[1][0] = sin(acos(tRot[0][0]));
       tRot[0][1] = -tRot[1][0];
@@ -175,17 +176,16 @@ void FibersFromPlanarFiguresFilter::GenerateData()
 
         eDir = p1-p0; eDir.Normalize();
         mitk::Vector2D tDir2 = p3-p0; tDir2.Normalize();
-        mitk::Vector2D temp; temp.Fill(0);
-        temp.SetVnlVector(tRot.transpose() * tDir2.GetVnlVector());
+        // the twist turns from the previous fiducial's direction, so its sign is that of tDir x tDir2
+        // (tRot holds only the previous increment, which gave the wrong sign for non-monotone twists)
+        const double cross = tDir[0]*tDir2[1] - tDir[1]*tDir2[0];
 
         // apply twist
-        tRot[0][0] = tDir[0]*tDir2[0] + tDir[1]*tDir2[1];
-        if (tRot[0][0]>1.0)
-          tRot[0][0] = 1.0;
+        tRot[0][0] = std::clamp(tDir[0]*tDir2[0] + tDir[1]*tDir2[1], -1.0, 1.0);
         tRot[1][1] = tRot[0][0];
         tRot[1][0] = sin(acos(tRot[0][0]));
         tRot[0][1] = -tRot[1][0];
-        if (temp[1]<0)
+        if (cross<0)
           tRot.inplace_transpose();
         m_2DPoints[j].SetVnlVector(tRot*m_2DPoints[j].GetVnlVector());
         tDir = tDir2;
