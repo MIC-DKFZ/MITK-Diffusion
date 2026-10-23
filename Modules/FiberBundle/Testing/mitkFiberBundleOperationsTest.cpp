@@ -45,6 +45,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(SubsampleFibers_WithoutRandomSeed_IsReproducible);
   MITK_TEST(ResampleToNumPoints_FibersWithoutLength_Terminate);
   MITK_TEST(DerivedBundles_KeepRasFlagAndHeader);
+  MITK_TEST(ApplyCurvatureThreshold_KeepsTwoPointFibersAndNoSinglePoints);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -204,6 +205,10 @@ public:
     fib->RemoveDir(dir, std::cos(5.0 * itk::Math::pi / 180));
     AssertWeightsFollowFibers(source, fib, "RemoveDir");
 
+    fib = source->GetDeepCopy();
+    CPPUNIT_ASSERT(fib->ApplyCurvatureThreshold(5.0f, false));
+    AssertWeightsFollowFibers(source, fib, "ApplyCurvatureThreshold");
+
     auto shortFibers = source->GetDeepCopy();
     shortFibers->RemoveLongFibers(medianLength);
     auto subtracted = source->SubtractBundle(shortFibers);
@@ -298,6 +303,28 @@ public:
     check(source->SubtractBundle(source), "SubtractBundle without remaining fibers");
     check(source->FilterByWeights(1.0f), "FilterByWeights");
     check(source->SubsampleFibers(0.5f, false), "SubsampleFibers");
+  }
+
+  void ApplyCurvatureThreshold_KeepsTwoPointFibersAndNoSinglePoints()
+  {
+    // A two-point fiber, a straight fiber and a zigzag whose every corner is sharper than 5 mm
+    auto fib = MakeBundle({{{0, 0, 10}, {3, 0, 10}},
+                           {{0, 5, 0}, {2, 5, 0}, {4, 5, 0}, {6, 5, 0}, {8, 5, 0}},
+                           {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 2, 0}, {1, 2, 0}, {1, 3, 0}}});
+    CPPUNIT_ASSERT(fib->ApplyCurvatureThreshold(5.0f, false));
+
+    bool twoPointFiber = false;
+    bool straightFiber = false;
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      CPPUNIT_ASSERT_MESSAGE("No fiber with a single point", cell->GetNumberOfPoints() > 1);
+      const double *first = cell->GetPoints()->GetPoint(0);
+      twoPointFiber = twoPointFiber || (first[2] == 10.0 && cell->GetNumberOfPoints() == 2);
+      straightFiber = straightFiber || (first[1] == 5.0 && cell->GetNumberOfPoints() == 5);
+    }
+    CPPUNIT_ASSERT_MESSAGE("The two-point fiber is kept", twoPointFiber);
+    CPPUNIT_ASSERT_MESSAGE("The straight fiber is kept whole", straightFiber);
   }
 };
 

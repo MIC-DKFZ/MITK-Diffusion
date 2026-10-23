@@ -1974,6 +1974,15 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
 
     // calculate curvatures
     vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+    if (numPoints==2)
+    {
+      // no curvature to judge; kept as it is
+      for (int j=0; j<numPoints; j++)
+        container->GetPointIds()->InsertNextId(vtkNewPoints->InsertNextPoint(points->GetPoint(j)));
+      vtkNewCells->InsertNextCell(container);
+      newWeights.push_back(this->GetFiberWeight(static_cast<unsigned int>(i)));
+      continue;
+    }
     for (int j=0; j<numPoints-2; j++)
     {
       double p1[3];
@@ -2011,8 +2020,12 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
       if (r<minRadius)
       {
         j += 2;
-        vtkNewCells->InsertNextCell(container);
-        newWeights.push_back(this->GetFiberWeight(static_cast<unsigned int>(i)));
+        // a single point is no fiber (it would become a vertex cell)
+        if (container->GetNumberOfPoints()>1)
+        {
+          vtkNewCells->InsertNextCell(container);
+          newWeights.push_back(this->GetFiberWeight(static_cast<unsigned int>(i)));
+        }
         container = vtkSmartPointer<vtkPolyLine>::New();
       }
       else if (j==numPoints-3)
