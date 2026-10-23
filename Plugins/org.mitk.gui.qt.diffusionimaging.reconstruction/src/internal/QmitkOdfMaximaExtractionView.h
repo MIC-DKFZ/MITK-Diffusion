@@ -45,6 +45,14 @@ protected:
   void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer> &nodes) override;
 
   Ui::QmitkOdfMaximaExtractionViewControls *m_Controls = nullptr;
+
+private:
+  /** QmitkReconstructionResults::RunInBackground for this view. */
+  template <typename Work, typename Done>
+  void RunInBackground(const char *title, Work work, Done done);
+
+  /** A peak extraction runs in the background. */
+  bool m_Busy = false;
 };
 
 #endif

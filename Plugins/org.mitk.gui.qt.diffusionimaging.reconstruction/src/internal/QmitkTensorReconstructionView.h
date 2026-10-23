@@ -68,6 +68,12 @@ protected:
 
 private:
   void CreateConnections();
+  /** QmitkReconstructionResults::RunInBackground for this view. */
+  template <typename Work, typename Done>
+  void RunInBackground(const char *title, Work work, Done done);
+
+  /** An action runs in the background. */
+  bool m_Busy = false;
 
   /** Mean b0 image of the DWI the threshold preview shows, kept while that DWI is unchanged; each
    * step of the threshold box only thresholds it again. */

@@ -31,6 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <algorithm>
 #include <initializer_list>
 
+using QmitkReconstructionResults::AddResult;
 using QmitkReconstructionResults::ResultNode;
 
 QmitkOdfMaximaExtractionView::~QmitkOdfMaximaExtractionView()
@@ -66,48 +67,62 @@ void QmitkOdfMaximaExtractionView::CreateQtPartControl(QWidget *parent)
   OnImageSelectionChanged();
 }
 
+template <typename Work, typename Done>
+void QmitkOdfMaximaExtractionView::RunInBackground(const char *title, Work work, Done done)
+{
+  QmitkReconstructionResults::RunInBackground(this, m_Busy, [this]() { this->OnImageSelectionChanged(); }, title, std::move(work), std::move(done));
+}
+
 void QmitkOdfMaximaExtractionView::StartPeakExtraction()
 {
-  QmitkReconstructionResults::Run("Peak extraction not possible:", [this]() {
-    auto imageNode = m_Controls->m_ImageBox->GetSelectedNode();
-    if (imageNode.IsNull())
-      return;
-    auto maskNode = m_Controls->m_MaskBox->GetSelectedNode();
-    auto mask = maskNode.IsNotNull() ? dynamic_cast<mitk::Image *>(maskNode->GetData()) : nullptr;
+  auto imageNode = m_Controls->m_ImageBox->GetSelectedNode();
+  if (m_Busy || imageNode.IsNull())
+    return;
+  auto maskNode = m_Controls->m_MaskBox->GetSelectedNode();
+  mitk::Image::ConstPointer mask = maskNode.IsNotNull() ? dynamic_cast<mitk::Image *>(maskNode->GetData()) : nullptr;
+  const bool outputNumberOfPeaks = m_Controls->m_OutputNumDirectionsBox->isChecked();
+  const auto done = [this, imageNode, outputNumberOfPeaks](const char *peaksSuffix, const char *numberSuffix) {
+    return [this, imageNode, outputNumberOfPeaks, peaksSuffix, numberSuffix](const mitk::PeakResult &result) {
+      AddResult(this->GetDataStorage(), ResultNode(result.peaks, imageNode, peaksSuffix), imageNode);
+      if (outputNumberOfPeaks)
+        AddResult(this->GetDataStorage(), ResultNode(result.numberOfPeaks, imageNode, numberSuffix), imageNode);
+    };
+  };
 
-    if (auto tensors = dynamic_cast<mitk::TensorImage *>(imageNode->GetData()))
-    {
-      // The absolute threshold acts as FA threshold; without normalization the vectors are scaled by FA.
-      const auto result = mitk::ExtractTensorPeaks(tensors,
-                                                   m_Controls->m_AbsoluteThresholdBox->value(),
-                                                   m_Controls->m_NormalizationBox->currentIndex() != 0,
-                                                   mask);
-      this->GetDataStorage()->Add(ResultNode(result.peaks, imageNode, "_PrincipalDirection"), imageNode);
-      if (m_Controls->m_OutputNumDirectionsBox->isChecked())
-        this->GetDataStorage()->Add(ResultNode(result.numberOfPeaks, imageNode, "_NumDirections"), imageNode);
-      return;
-    }
+  if (mitk::TensorImage::ConstPointer tensors = dynamic_cast<mitk::TensorImage *>(imageNode->GetData()))
+  {
+    // The absolute threshold acts as FA threshold; without normalization the vectors are scaled by FA.
+    const double faThreshold = m_Controls->m_AbsoluteThresholdBox->value();
+    const bool normalize = m_Controls->m_NormalizationBox->currentIndex() != 0;
+    this->RunInBackground(
+      "Peak extraction not possible:",
+      [tensors, faThreshold, normalize, mask]() { return mitk::ExtractTensorPeaks(tensors, faThreshold, normalize, mask); },
+      done("_PrincipalDirection", "_NumDirections"));
+    return;
+  }
 
-    auto shImage = dynamic_cast<mitk::ShImage *>(imageNode->GetData());
-    if (shImage == nullptr)
-      mitkThrow() << "Select a tensor or an SH image.";
+  mitk::ShImage::ConstPointer shImage = dynamic_cast<mitk::ShImage *>(imageNode->GetData());
+  if (shImage.IsNull())
+  {
+    QmitkReconstructionResults::Run("Peak extraction not possible:", []() { mitkThrow() << "Select a tensor or an SH image."; });
+    return;
+  }
 
-    // The entries of m_NormalizationBox: none, by the largest peak, unit vectors.
-    constexpr mitk::PeakNormalization normalizations[] = {
-      mitk::PeakNormalization::None, mitk::PeakNormalization::MaxVector, mitk::PeakNormalization::SingleVector};
-    mitk::PeakParameters parameters;
-    parameters.maxPeaks = m_Controls->m_MaxNumPeaksBox->value();
-    parameters.relativeThreshold = m_Controls->m_PeakThresholdBox->value();
-    parameters.absoluteThreshold = m_Controls->m_AbsoluteThresholdBox->value();
-    parameters.angularThreshold = m_Controls->m_AngularThreshold->value();
-    parameters.scaleByGfa = m_Controls->m_ScaleByGfaBox->isChecked();
-    parameters.normalization = normalizations[std::clamp(m_Controls->m_NormalizationBox->currentIndex(), 0, 2)];
+  // The entries of m_NormalizationBox: none, by the largest peak, unit vectors.
+  constexpr mitk::PeakNormalization normalizations[] = {
+    mitk::PeakNormalization::None, mitk::PeakNormalization::MaxVector, mitk::PeakNormalization::SingleVector};
+  mitk::PeakParameters parameters;
+  parameters.maxPeaks = m_Controls->m_MaxNumPeaksBox->value();
+  parameters.relativeThreshold = m_Controls->m_PeakThresholdBox->value();
+  parameters.absoluteThreshold = m_Controls->m_AbsoluteThresholdBox->value();
+  parameters.angularThreshold = m_Controls->m_AngularThreshold->value();
+  parameters.scaleByGfa = m_Controls->m_ScaleByGfaBox->isChecked();
+  parameters.normalization = normalizations[std::clamp(m_Controls->m_NormalizationBox->currentIndex(), 0, 2)];
 
-    const auto result = mitk::ExtractPeaks(shImage, parameters, mask);
-    this->GetDataStorage()->Add(ResultNode(result.peaks, imageNode, "_PEAKS"), imageNode);
-    if (m_Controls->m_OutputNumDirectionsBox->isChecked())
-      this->GetDataStorage()->Add(ResultNode(result.numberOfPeaks, imageNode, "_NUM_DIRECTIONS"), imageNode);
-  });
+  this->RunInBackground(
+    "Peak extraction not possible:",
+    [shImage, parameters, mask]() { return mitk::ExtractPeaks(shImage, parameters, mask); },
+    done("_PEAKS", "_NUM_DIRECTIONS"));
 }
 
 void QmitkOdfMaximaExtractionView::OnSelectionChanged(berry::IWorkbenchPart::Pointer, const QList<mitk::DataNode::Pointer> &)
@@ -117,9 +132,11 @@ void QmitkOdfMaximaExtractionView::OnSelectionChanged(berry::IWorkbenchPart::Poi
 
 void QmitkOdfMaximaExtractionView::OnImageSelectionChanged()
 {
-  // The combo box admits tensor and SH images only.
+  // The combo box admits tensor and SH images only. One extraction at a time: the button stays
+  // disabled while one runs in the background.
   auto node = m_Controls->m_ImageBox->GetSelectedNode();
   m_Controls->m_StartPeakExtractionButton->setVisible(node.IsNotNull());
+  m_Controls->m_StartPeakExtractionButton->setEnabled(!m_Busy);
 
   // For tensors only the threshold (on the FA) and the normalization act; the other parameters
   // belong to the ODF maxima.

@@ -29,6 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 const std::string QmitkDiffusionQuantificationView::VIEW_ID = "org.mitk.views.diffusionquantification";
 
+using QmitkReconstructionResults::AddResult;
 using QmitkReconstructionResults::ResultNode;
 using QmitkReconstructionResults::ShowAsIndexMap;
 
@@ -110,16 +111,18 @@ void QmitkDiffusionQuantificationView::UpdateGui()
   const bool odf = dynamic_cast<mitk::OdfImage *>(data) != nullptr || dynamic_cast<mitk::ShImage *>(data) != nullptr;
   const bool tensor = dynamic_cast<mitk::TensorImage *>(data) != nullptr;
   const bool dwi = mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dynamic_cast<mitk::Image *>(data));
+  // One computation at a time: the buttons stay disabled while one runs in the background.
+  const bool idle = !m_Busy;
 
-  m_Controls->m_GFAButton->setEnabled(odf);
-  m_Controls->m_FAButton->setEnabled(tensor);
-  m_Controls->m_RAButton->setEnabled(tensor);
-  m_Controls->m_ADButton->setEnabled(tensor);
-  m_Controls->m_RDButton->setEnabled(tensor);
-  m_Controls->m_MDButton->setEnabled(tensor);
-  m_Controls->m_ClusteringAnisotropy->setEnabled(tensor);
-  m_Controls->m_AdcDwiButton->setEnabled(dwi);
-  m_Controls->m_MdDwiButton->setEnabled(dwi);
+  m_Controls->m_GFAButton->setEnabled(idle && odf);
+  m_Controls->m_FAButton->setEnabled(idle && tensor);
+  m_Controls->m_RAButton->setEnabled(idle && tensor);
+  m_Controls->m_ADButton->setEnabled(idle && tensor);
+  m_Controls->m_RDButton->setEnabled(idle && tensor);
+  m_Controls->m_MDButton->setEnabled(idle && tensor);
+  m_Controls->m_ClusteringAnisotropy->setEnabled(idle && tensor);
+  m_Controls->m_AdcDwiButton->setEnabled(idle && dwi);
+  m_Controls->m_MdDwiButton->setEnabled(idle && dwi);
 }
 
 void QmitkDiffusionQuantificationView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer> &)
@@ -127,58 +130,59 @@ void QmitkDiffusionQuantificationView::OnSelectionChanged(berry::IWorkbenchPart:
   UpdateGui();
 }
 
+template <typename Work>
+void QmitkDiffusionQuantificationView::RunInBackground(Work work, mitk::DataNode::Pointer node, const std::string &suffix, double level, double window)
+{
+  QmitkReconstructionResults::RunInBackground(
+    this, m_Busy, [this]() { this->UpdateGui(); }, "Computation not possible:", std::move(work),
+    [this, node, suffix, level, window](mitk::Image::Pointer image) {
+      auto result = ResultNode(image, node, suffix);
+      ShowAsIndexMap(result, level, window);
+      AddResult(this->GetDataStorage(), result, node);
+      mitk::StatusBar::GetInstance()->DisplayText("Computation complete.");
+      this->RequestRenderWindowUpdate();
+    });
+}
+
 void QmitkDiffusionQuantificationView::ComputeAdc(bool fit)
 {
-  QmitkReconstructionResults::Run("Computation not possible:", [this, fit]() {
-    auto node = m_Controls->m_ImageBox->GetSelectedNode();
-    if (node.IsNull())
-      return;
+  auto node = m_Controls->m_ImageBox->GetSelectedNode();
+  mitk::Image::ConstPointer dwi = node.IsNotNull() ? dynamic_cast<mitk::Image *>(node->GetData()) : nullptr;
+  if (m_Busy || dwi.IsNull())
+    return;
 
-    const double scale = m_Controls->m_ScaleImageValuesBox->value();
-    auto result = ResultNode(mitk::AdcImage(dynamic_cast<mitk::Image *>(node->GetData()), fit, scale), node, fit ? "_ADC" : "_MD");
-    // The window fits diffusivities in mm^2/s; the image holds them times the scale factor.
-    ShowAsIndexMap(result, 0.0015 * scale, 0.003 * scale);
-    this->GetDataStorage()->Add(result, node);
-  });
+  const double scale = m_Controls->m_ScaleImageValuesBox->value();
+  // The window fits diffusivities in mm^2/s; the image holds them times the scale factor.
+  this->RunInBackground([dwi, fit, scale]() { return mitk::AdcImage(dwi, fit, scale); }, node, fit ? "_ADC" : "_MD", 0.0015 * scale, 0.003 * scale);
 }
 
 void QmitkDiffusionQuantificationView::ComputeGfa()
 {
-  QmitkReconstructionResults::Run("Computation not possible:", [this]() {
-    auto node = m_Controls->m_ImageBox->GetSelectedNode();
-    if (node.IsNull())
-      return;
+  auto node = m_Controls->m_ImageBox->GetSelectedNode();
+  mitk::Image::ConstPointer image = node.IsNotNull() ? dynamic_cast<mitk::Image *>(node->GetData()) : nullptr;
+  if (m_Busy || image.IsNull())
+    return;
 
-    mitk::StatusBar::GetInstance()->DisplayText(QString("Computing GFA for %1").arg(QString::fromStdString(node->GetName())).toLatin1());
-    const double scale = m_Controls->m_ScaleImageValuesBox->value();
-    auto result = ResultNode(mitk::GfaImage(dynamic_cast<mitk::Image *>(node->GetData()), scale), node, "_GFA");
-    // The window fits GFA values in [0, 1]; the image holds them times the scale factor.
-    ShowAsIndexMap(result, 0.5 * scale, 1.0 * scale);
-    this->GetDataStorage()->Add(result, node);
-
-    mitk::StatusBar::GetInstance()->DisplayText("Computation complete.");
-    this->RequestRenderWindowUpdate();
-  });
+  mitk::StatusBar::GetInstance()->DisplayText(QString("Computing GFA for %1").arg(QString::fromStdString(node->GetName())).toLatin1());
+  const double scale = m_Controls->m_ScaleImageValuesBox->value();
+  // The window fits GFA values in [0, 1]; the image holds them times the scale factor.
+  this->RunInBackground([image, scale]() { return mitk::GfaImage(image, scale); }, node, "_GFA", 0.5 * scale, 1.0 * scale);
 }
 
 void QmitkDiffusionQuantificationView::ComputeTensorIndex(mitk::TensorIndex index)
 {
-  QmitkReconstructionResults::Run("Computation not possible:", [this, index]() {
-    auto node = m_Controls->m_ImageBox->GetSelectedNode();
-    if (node.IsNull())
-      return;
+  auto node = m_Controls->m_ImageBox->GetSelectedNode();
+  mitk::TensorImage::ConstPointer tensors = node.IsNotNull() ? dynamic_cast<mitk::TensorImage *>(node->GetData()) : nullptr;
+  if (m_Busy || tensors.IsNull())
+    return;
 
-    const auto display = DisplayOf(index);
-    mitk::StatusBar::GetInstance()->DisplayText(QString("Computing %1 for %2").arg(QString(display.name), QString::fromStdString(node->GetName())).toLatin1());
-    const double scale = m_Controls->m_ScaleImageValuesBox->value();
-    auto result = ResultNode(mitk::TensorIndexImage(dynamic_cast<mitk::TensorImage *>(node->GetData()), index, scale),
-                             node,
-                             std::string("_") + display.name);
-    // The windows fit unscaled values; the image holds them times the scale factor.
-    ShowAsIndexMap(result, display.level * scale, display.window * scale);
-    this->GetDataStorage()->Add(result, node);
-
-    mitk::StatusBar::GetInstance()->DisplayText("Computation complete.");
-    this->RequestRenderWindowUpdate();
-  });
+  const auto display = DisplayOf(index);
+  mitk::StatusBar::GetInstance()->DisplayText(QString("Computing %1 for %2").arg(QString(display.name), QString::fromStdString(node->GetName())).toLatin1());
+  const double scale = m_Controls->m_ScaleImageValuesBox->value();
+  // The windows fit unscaled values; the image holds them times the scale factor.
+  this->RunInBackground([tensors, index, scale]() { return mitk::TensorIndexImage(tensors, index, scale); },
+                        node,
+                        std::string("_") + display.name,
+                        display.level * scale,
+                        display.window * scale);
 }

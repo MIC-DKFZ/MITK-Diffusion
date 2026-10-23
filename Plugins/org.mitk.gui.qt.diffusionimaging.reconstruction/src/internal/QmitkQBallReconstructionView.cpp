@@ -31,6 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 const std::string QmitkQBallReconstructionView::VIEW_ID = "org.mitk.views.qballreconstruction";
 
+using QmitkReconstructionResults::AddResult;
 using QmitkReconstructionResults::ResultNode;
 
 namespace
@@ -87,25 +88,36 @@ void QmitkQBallReconstructionView::CreateConnections()
   UpdateGui();
 }
 
+template <typename Work, typename Done>
+void QmitkQBallReconstructionView::RunInBackground(const char *title, Work work, Done done)
+{
+  QmitkReconstructionResults::RunInBackground(this, m_Busy, [this]() { this->UpdateGui(); }, title, std::move(work), std::move(done));
+}
+
 void QmitkQBallReconstructionView::ConvertShImage()
 {
-  QmitkReconstructionResults::Run("Conversion not possible:", [this]() {
-    auto shNode = m_Controls->m_ShImageBox->GetSelectedNode();
-    if (shNode.IsNull())
-      return;
-    auto shImage = dynamic_cast<mitk::Image *>(shNode->GetData());
-    auto odfs = mitk::convert::GetOdfFromShImage(shImage);
-    mitk::DiffusionPropertyHelper::CopyDICOMProperties(shImage, odfs);
-    this->GetDataStorage()->Add(ResultNode(odfs, shNode, "_Odf"), shNode);
-  });
+  auto shNode = m_Controls->m_ShImageBox->GetSelectedNode();
+  mitk::Image::ConstPointer shImage = shNode.IsNotNull() ? dynamic_cast<mitk::Image *>(shNode->GetData()) : nullptr;
+  if (m_Busy || shImage.IsNull())
+    return;
+
+  this->RunInBackground(
+    "Conversion not possible:",
+    [shImage]() {
+      auto odfs = mitk::convert::GetOdfFromShImage(shImage);
+      mitk::DiffusionPropertyHelper::CopyDICOMProperties(shImage, odfs);
+      return odfs;
+    },
+    [this, shNode](mitk::OdfImage::Pointer odfs) { AddResult(this->GetDataStorage(), ResultNode(odfs, shNode, "_Odf"), shNode); });
 }
 
 void QmitkQBallReconstructionView::UpdateGui()
 {
-  m_Controls->m_ButtonStandard->setEnabled(m_Controls->m_ImageBox->GetSelectedNode().IsNotNull());
+  // One action at a time: the buttons stay disabled while one runs in the background.
+  m_Controls->m_ButtonStandard->setEnabled(!m_Busy && m_Controls->m_ImageBox->GetSelectedNode().IsNotNull());
   GenerateShellSelectionUI(m_Controls->m_ImageBox->GetSelectedNode());
 
-  m_Controls->m_ConvertButton->setEnabled(m_Controls->m_ShImageBox->GetSelectedNode().IsNotNull());
+  m_Controls->m_ConvertButton->setEnabled(!m_Busy && m_Controls->m_ShImageBox->GetSelectedNode().IsNotNull());
 }
 
 void QmitkQBallReconstructionView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer> & /*nodes*/)
@@ -158,44 +170,49 @@ void QmitkQBallReconstructionView::MethodChosen(int method)
 
 void QmitkQBallReconstructionView::Reconstruct()
 {
-  QmitkReconstructionResults::Run("Reconstruction not possible:", [this]() {
-    auto dwiNode = m_Controls->m_ImageBox->GetSelectedNode();
-    const int index = m_Controls->m_QBallReconstructionMethodComboBox->currentIndex();
-    if (dwiNode.IsNull() || index < 0 || index >= static_cast<int>(Methods.size()))
-      return;
-    const auto &entry = Methods[index];
+  auto dwiNode = m_Controls->m_ImageBox->GetSelectedNode();
+  mitk::Image::ConstPointer dwi = dwiNode.IsNotNull() ? dynamic_cast<mitk::Image *>(dwiNode->GetData()) : nullptr;
+  const int index = m_Controls->m_QBallReconstructionMethodComboBox->currentIndex();
+  if (m_Busy || dwi.IsNull() || index < 0 || index >= static_cast<int>(Methods.size()))
+    return;
+  const auto &entry = Methods[index];
 
-    mitk::QballParameters parameters;
-    parameters.method = entry.method;
-    parameters.shOrder = m_Controls->m_QBallReconstructionMaxLLevelComboBox->currentText().toUInt();
-    parameters.lambda = m_Controls->m_QBallReconstructionLambdaLineEdit->value();
-    parameters.b0Threshold = static_cast<short>(m_Controls->m_QBallReconstructionThreasholdEdit->value());
-    parameters.sampledOdf = m_Controls->m_OutputOdfImage->isChecked();
-    // The shell selection is read from the DWI now; the check boxes belong to the selected DWI.
-    for (unsigned int i = 0; i < m_ShellCheckBoxes.size(); ++i)
-    {
-      if (m_ShellCheckBoxes[i]->isChecked())
-        parameters.shells.push_back(m_ShellSelectionBValues[i]);
-    }
-    if (entry.method == mitk::QballMethod::MultiShell && parameters.shells.empty())
-      mitkThrow() << "Select three equidistant shells.";
+  mitk::QballParameters parameters;
+  parameters.method = entry.method;
+  parameters.shOrder = m_Controls->m_QBallReconstructionMaxLLevelComboBox->currentText().toUInt();
+  parameters.lambda = m_Controls->m_QBallReconstructionLambdaLineEdit->value();
+  parameters.b0Threshold = static_cast<short>(m_Controls->m_QBallReconstructionThreasholdEdit->value());
+  parameters.sampledOdf = m_Controls->m_OutputOdfImage->isChecked();
+  // The shell selection is read from the DWI now; the check boxes belong to the selected DWI.
+  for (unsigned int i = 0; i < m_ShellCheckBoxes.size(); ++i)
+  {
+    if (m_ShellCheckBoxes[i]->isChecked())
+      parameters.shells.push_back(m_ShellSelectionBValues[i]);
+  }
+  if (entry.method == mitk::QballMethod::MultiShell && parameters.shells.empty())
+  {
+    QmitkReconstructionResults::Run("Reconstruction not possible:", []() { mitkThrow() << "Select three equidistant shells."; });
+    return;
+  }
 
-    const auto result = mitk::ReconstructQball(dynamic_cast<mitk::Image *>(dwiNode->GetData()), parameters);
-
-    const std::string suffix = entry.suffix;
-    if (result.sh.IsNull())
-    {
-      this->GetDataStorage()->Add(ResultNode(result.odf, dwiNode, suffix), dwiNode);
-    }
-    else
-    {
-      auto shNode = ResultNode(result.sh, dwiNode, suffix + "_SH");
-      this->GetDataStorage()->Add(shNode, dwiNode);
-      if (result.odf.IsNotNull())
-        this->GetDataStorage()->Add(ResultNode(result.odf, dwiNode, suffix + "_Sampled"), shNode);
-    }
-    this->RequestRenderWindowUpdate();
-  });
+  const std::string suffix = entry.suffix;
+  this->RunInBackground(
+    "Reconstruction not possible:",
+    [dwi, parameters]() { return mitk::ReconstructQball(dwi, parameters); },
+    [this, dwiNode, suffix](const mitk::QballResult &result) {
+      if (result.sh.IsNull())
+      {
+        AddResult(this->GetDataStorage(), ResultNode(result.odf, dwiNode, suffix), dwiNode);
+      }
+      else
+      {
+        auto shNode = ResultNode(result.sh, dwiNode, suffix + "_SH");
+        AddResult(this->GetDataStorage(), shNode, dwiNode);
+        if (result.odf.IsNotNull())
+          this->GetDataStorage()->Add(ResultNode(result.odf, dwiNode, suffix + "_Sampled"), shNode);
+      }
+      this->RequestRenderWindowUpdate();
+    });
 }
 
 void QmitkQBallReconstructionView::GenerateShellSelectionUI(mitk::DataNode::Pointer node)

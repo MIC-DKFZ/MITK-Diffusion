@@ -55,6 +55,15 @@ private:
   void ComputeGfa();
   void ComputeTensorIndex(mitk::TensorIndex index);
   void ComputeAdc(bool fit);
+  /**
+   * Computes the index image with work in the background (QmitkReconstructionResults::RunInBackground)
+   * and adds it below node as index map with the level window.
+   */
+  template <typename Work>
+  void RunInBackground(Work work, mitk::DataNode::Pointer node, const std::string &suffix, double level, double window);
+
+  /** A computation runs in the background. */
+  bool m_Busy = false;
 };
 
 #endif

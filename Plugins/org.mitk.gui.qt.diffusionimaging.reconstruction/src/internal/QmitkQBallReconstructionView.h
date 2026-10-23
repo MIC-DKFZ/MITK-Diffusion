@@ -58,6 +58,12 @@ protected:
 private:
   void CreateConnections();
   void GenerateShellSelectionUI(mitk::DataNode::Pointer node);
+  /** QmitkReconstructionResults::RunInBackground for this view. */
+  template <typename Work, typename Done>
+  void RunInBackground(const char *title, Work work, Done done);
+
+  /** An action runs in the background. */
+  bool m_Busy = false;
 
   /** Check boxes of the shells of the selected DWI, with their b-values */
   std::vector<QCheckBox *> m_ShellCheckBoxes;

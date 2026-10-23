@@ -32,6 +32,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 const std::string QmitkTensorReconstructionView::VIEW_ID = "org.mitk.views.tensorreconstruction";
 
+using QmitkReconstructionResults::AddResult;
 using QmitkReconstructionResults::ResultNode;
 
 QmitkTensorReconstructionView::~QmitkTensorReconstructionView()
@@ -100,40 +101,50 @@ void QmitkTensorReconstructionView::Deactivated()
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
+template <typename Work, typename Done>
+void QmitkTensorReconstructionView::RunInBackground(const char *title, Work work, Done done)
+{
+  QmitkReconstructionResults::RunInBackground(this, m_Busy, [this]() { this->UpdateGui(); }, title, std::move(work), std::move(done));
+}
+
 void QmitkTensorReconstructionView::Reconstruct()
 {
-  QmitkReconstructionResults::Run("Reconstruction not possible:", [this]() {
-    auto dwiNode = m_Controls->m_DwiBox->GetSelectedNode();
-    if (dwiNode.IsNull())
-      return;
+  auto dwiNode = m_Controls->m_DwiBox->GetSelectedNode();
+  mitk::Image::ConstPointer dwi = dwiNode.IsNotNull() ? dynamic_cast<mitk::Image *>(dwiNode->GetData()) : nullptr;
+  if (m_Busy || dwi.IsNull())
+    return;
 
-    // The combo box lists ITK's linear least squares, then the eigenvalue correction. The corrected
-    // fit always zeroes the tensors whose eigenvalues it could not make positive; the check box
-    // acts on the linear fit only.
-    const bool corrected = m_Controls->m_ReconctructionMethodBox->currentIndex() == 1;
-    const auto fit = corrected ? mitk::TensorFit::EigenvalueCorrection : mitk::TensorFit::LinearLeastSquares;
-    auto tensors = mitk::ReconstructTensors(dynamic_cast<mitk::Image *>(dwiNode->GetData()),
-                                            fit,
-                                            m_Controls->m_TensorReconstructionThreshold->value(),
-                                            corrected || m_Controls->m_CheckNegativeEigenvalues->isChecked());
-
-    this->GetDataStorage()->Add(ResultNode(tensors, dwiNode, corrected ? "_EigenvalueCorrected_DT" : "_LinearLeastSquares_DT"), dwiNode);
-    this->RequestRenderWindowUpdate();
-  });
+  // The combo box lists ITK's linear least squares, then the eigenvalue correction. The corrected
+  // fit always zeroes the tensors whose eigenvalues it could not make positive; the check box
+  // acts on the linear fit only.
+  const bool corrected = m_Controls->m_ReconctructionMethodBox->currentIndex() == 1;
+  const auto fit = corrected ? mitk::TensorFit::EigenvalueCorrection : mitk::TensorFit::LinearLeastSquares;
+  const double threshold = m_Controls->m_TensorReconstructionThreshold->value();
+  const bool zeroNegativeEigenvalues = corrected || m_Controls->m_CheckNegativeEigenvalues->isChecked();
+  this->RunInBackground(
+    "Reconstruction not possible:",
+    [dwi, fit, threshold, zeroNegativeEigenvalues]() { return mitk::ReconstructTensors(dwi, fit, threshold, zeroNegativeEigenvalues); },
+    [this, dwiNode, corrected](mitk::TensorImage::Pointer tensors) {
+      AddResult(this->GetDataStorage(), ResultNode(tensors, dwiNode, corrected ? "_EigenvalueCorrected_DT" : "_LinearLeastSquares_DT"), dwiNode);
+      this->RequestRenderWindowUpdate();
+    });
 }
 
 void QmitkTensorReconstructionView::TensorsToOdf()
 {
-  QmitkReconstructionResults::Run("ODF estimation failed:", [this]() {
-    auto tensorNode = m_Controls->m_OdfBox->GetSelectedNode();
-    auto tensors = tensorNode.IsNotNull() ? dynamic_cast<mitk::TensorImage *>(tensorNode->GetData()) : nullptr;
-    if (tensors == nullptr)
-      return;
+  auto tensorNode = m_Controls->m_OdfBox->GetSelectedNode();
+  mitk::TensorImage::ConstPointer tensors = tensorNode.IsNotNull() ? dynamic_cast<mitk::TensorImage *>(tensorNode->GetData()) : nullptr;
+  if (m_Busy || tensors.IsNull())
+    return;
 
-    auto odfs = mitk::convert::GetOdfFromTensorImage(tensors);
-    mitk::DiffusionPropertyHelper::CopyDICOMProperties(tensors, odfs);
-    this->GetDataStorage()->Add(ResultNode(odfs, tensorNode, "_Odf"), tensorNode);
-  });
+  this->RunInBackground(
+    "ODF estimation failed:",
+    [tensors]() {
+      auto odfs = mitk::convert::GetOdfFromTensorImage(tensors);
+      mitk::DiffusionPropertyHelper::CopyDICOMProperties(tensors, odfs);
+      return odfs;
+    },
+    [this, tensorNode](mitk::OdfImage::Pointer odfs) { AddResult(this->GetDataStorage(), ResultNode(odfs, tensorNode, "_Odf"), tensorNode); });
 }
 
 void QmitkTensorReconstructionView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer> &)
@@ -143,28 +154,31 @@ void QmitkTensorReconstructionView::OnSelectionChanged(berry::IWorkbenchPart::Po
 
 void QmitkTensorReconstructionView::UpdateGui()
 {
-  m_Controls->m_StartReconstruction->setEnabled(m_Controls->m_DwiBox->GetSelectedNode().IsNotNull());
-  m_Controls->m_TensorsToDWIButton->setEnabled(m_Controls->m_DtiBox->GetSelectedNode().IsNotNull());
-  m_Controls->m_TensorsToOdfButton->setEnabled(m_Controls->m_OdfBox->GetSelectedNode().IsNotNull());
+  // One action at a time: the buttons stay disabled while one runs in the background.
+  m_Controls->m_StartReconstruction->setEnabled(!m_Busy && m_Controls->m_DwiBox->GetSelectedNode().IsNotNull());
+  m_Controls->m_TensorsToDWIButton->setEnabled(!m_Busy && m_Controls->m_DtiBox->GetSelectedNode().IsNotNull());
+  m_Controls->m_TensorsToOdfButton->setEnabled(!m_Busy && m_Controls->m_OdfBox->GetSelectedNode().IsNotNull());
 }
 
 void QmitkTensorReconstructionView::TensorsToDwi()
 {
-  QmitkReconstructionResults::Run("DWI estimation failed:", [this]() {
-    auto tensorNode = m_Controls->m_DtiBox->GetSelectedNode();
-    auto tensors = tensorNode.IsNotNull() ? dynamic_cast<mitk::TensorImage *>(tensorNode->GetData()) : nullptr;
-    if (tensors == nullptr)
-      return;
+  auto tensorNode = m_Controls->m_DtiBox->GetSelectedNode();
+  mitk::TensorImage::ConstPointer tensors = tensorNode.IsNotNull() ? dynamic_cast<mitk::TensorImage *>(tensorNode->GetData()) : nullptr;
+  if (m_Busy || tensors.IsNull())
+    return;
 
-    // The combo box lists the sizes of the direction tables.
-    auto dwi = mitk::TensorsToDwi(tensors,
-                                  m_Controls->m_TensorsToDWINumDirsSelect->currentText().toUInt(),
-                                  m_Controls->m_TensorsToDWIBValueEdit->value());
-    auto node = ResultNode(dwi, tensorNode, "_DWI");
-    mitk::ImageVtkMapper2D::SetDefaultProperties(node);
-    this->GetDataStorage()->Add(node, tensorNode);
-    this->RequestRenderWindowUpdate();
-  });
+  // The combo box lists the sizes of the direction tables.
+  const unsigned int numberOfDirections = m_Controls->m_TensorsToDWINumDirsSelect->currentText().toUInt();
+  const double bValue = m_Controls->m_TensorsToDWIBValueEdit->value();
+  this->RunInBackground(
+    "DWI estimation failed:",
+    [tensors, numberOfDirections, bValue]() { return mitk::TensorsToDwi(tensors, numberOfDirections, bValue); },
+    [this, tensorNode](mitk::Image::Pointer dwi) {
+      auto node = ResultNode(dwi, tensorNode, "_DWI");
+      mitk::ImageVtkMapper2D::SetDefaultProperties(node);
+      AddResult(this->GetDataStorage(), node, tensorNode);
+      this->RequestRenderWindowUpdate();
+    });
 }
 
 void QmitkTensorReconstructionView::PreviewThreshold(int threshold)
