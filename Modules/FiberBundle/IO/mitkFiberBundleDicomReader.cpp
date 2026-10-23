@@ -25,9 +25,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkCellArray.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
-#include <vtkPolyLine.h>
 
 #include <memory>
+#include <vector>
 
 #include "dcmtk/ofstd/ofcond.h"
 #include "dcmtk/dcmtract/trctractographyresults.h"
@@ -114,20 +114,18 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Do
     vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
     vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
+    std::vector<vtkIdType> trackIds;
     for (size_t t = 0; t < numTracks; t++)
     {
-      vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
       TrcTrack* track = sets[ts]->getTracks()[t];
       const Float32* vals = nullptr;
       size_t numPoints = track->getTrackData(vals);
 
+      trackIds.resize(numPoints);
       for (size_t v = 0; v < numPoints; ++v)
-      {
-        vtkIdType id = vtkNewPoints->InsertNextPoint(vals[v*3],vals[v*3+1],vals[v*3+2]);
-        container->GetPointIds()->InsertNextId(id);
-      }
+        trackIds[v] = vtkNewPoints->InsertNextPoint(vals[v*3],vals[v*3+1],vals[v*3+2]);
 
-      vtkNewCells->InsertNextCell(container);
+      vtkNewCells->InsertNextCell(static_cast<vtkIdType>(numPoints), trackIds.data());
     }
 
     vtkSmartPointer<vtkPolyData> fiberPolyData = vtkSmartPointer<vtkPolyData>::New();
@@ -185,6 +183,5 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Do
     output_fibs.push_back(fib.GetPointer());
     MITK_INFO << "Fiber bundle read";
   }
-  return output_fibs;
   return output_fibs;
 }

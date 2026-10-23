@@ -117,6 +117,10 @@ mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename,
   const Header header = ReadHeader(in, filename);
   if (printHeader)
     PrintHeader(header, std::cout);
+  const std::streamoff dataStart = in.tellg();
+  in.seekg(0, std::ios::end);
+  const std::streamoff fileEnd = in.tellg();
+  in.seekg(dataStart);
 
   // Each point holds x, y, z and n_scalars values, each track is followed by n_properties
   // values (TrackVis, nibabel, dipy); only the coordinates are imported.
@@ -124,7 +128,7 @@ mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename,
   const std::size_t numProperties = static_cast<std::size_t>(header.n_properties);
   if (valuesPerPoint > 3 || numProperties > 0)
     MITK_INFO << "Skipping " << header.n_scalars << " scalars per point and " << header.n_properties << " properties per track.";
-  std::vector<float> pointValues(valuesPerPoint);
+  std::vector<float> trackValues;
   std::vector<float> properties(numProperties);
 
   vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
@@ -137,12 +141,17 @@ mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename,
     if ( numPoints <= 0 )
       mitkThrow() << "TrackVis file " << filename << ": track " << numFibers << " has " << numPoints << " points.";
 
+    // the whole track in one read; a corrupt point count must not allocate more than the file holds
+    const std::size_t numValues = static_cast<std::size_t>(numPoints)*valuesPerPoint;
+    if (static_cast<std::streamoff>(sizeof(float)*numValues) > fileEnd - static_cast<std::streamoff>(in.tellg()))
+      mitkThrow() << "TrackVis file " << filename << " is truncated in track " << numFibers << ".";
     pointIds.resize(static_cast<std::size_t>(numPoints));
+    trackValues.resize(numValues);
+    if (!in.read(reinterpret_cast<char*>(trackValues.data()), static_cast<std::streamsize>(sizeof(float)*trackValues.size())))
+      mitkThrow() << "TrackVis file " << filename << " is truncated in track " << numFibers << ".";
     for (std::int32_t i=0; i<numPoints; i++)
     {
-      if (!in.read(reinterpret_cast<char*>(pointValues.data()), static_cast<std::streamsize>(sizeof(float)*valuesPerPoint)))
-        mitkThrow() << "TrackVis file " << filename << " is truncated in track " << numFibers << ".";
-
+      const float* pointValues = trackValues.data() + static_cast<std::size_t>(i)*valuesPerPoint;
       // TRK coordinates are corner based, so we have to shift them back to center based coordinates
       float p[3];
       for (int c=0; c<3; ++c)
@@ -169,8 +178,7 @@ mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename,
     if (flips[i])
       NegateRow(matrix, i);
 
-  FiberBundle::Pointer fib = FiberBundle::New();
-  fib->SetFiberPolyData(Transform(polyData, matrix, false));
+  FiberBundle::Pointer fib = FiberBundle::New(Transform(polyData, matrix, false));
   fib->SetTrackVisHeader(header);
   return fib;
 }
