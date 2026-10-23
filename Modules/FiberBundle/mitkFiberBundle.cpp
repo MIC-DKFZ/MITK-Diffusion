@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundle.h"
-#include "mitkFiberPolyDataBuilder.h"
 
 #include <mitkGeometry3D.h>
 #include <vtkCellArray.h>
@@ -24,8 +23,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <algorithm>
 #include <cstring>
-
-using mitk::FiberBundleDetail::CopyMetadata;
 
 mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
   : m_NumFibers(0)
@@ -80,11 +77,7 @@ mitk::FiberBundle::~FiberBundle()
 
 mitk::FiberBundle::Pointer mitk::FiberBundle::GetDeepCopy() const
 {
-  mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(m_FiberPolyData);
-  newFib->SetFiberColors(this->m_FiberColors);
-  newFib->SetFiberWeights(this->m_FiberWeights);
-  CopyMetadata(this, newFib);
-  return newFib;
+  return this->Clone();
 }
 
 void mitk::FiberBundle::SetFiberPolyData(vtkSmartPointer<vtkPolyData> fiberPD)
