@@ -18,6 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 
 mitk::PlanarFigureComposite::PlanarFigureComposite()
+  : m_compOperation(AND)
 {
     mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
     this->SetGeometry(geometry);

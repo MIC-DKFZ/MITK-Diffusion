@@ -36,6 +36,7 @@ mitk::FiberBundleMapper3D::FiberBundleMapper3D()
   : m_TubeRadius(0.0)
   , m_TubeSides(15)
   , m_LineWidth(1)
+  , m_RibbonWidth(0.0)
 {
   m_lut = vtkSmartPointer<vtkLookupTable>::New();
   m_lut->Build();
@@ -114,7 +115,7 @@ void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *rendere
 
   mitk::Vector3D plane_normal = prop->GetNormal();
   mitk::Point3D plane_origin = prop->GetOrigin();
-  bool flip;
+  bool flip = false;
   node->GetBoolProperty("3DClippingPlaneFlip",flip);
 
   if (flip)
