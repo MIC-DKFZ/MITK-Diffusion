@@ -82,6 +82,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(PeakImage_PolydataFollowsPixelChanges);
   MITK_TEST(ShReader_Mrtrix3_ConvertedToMitkBasis);
   MITK_TEST(ShReader_Dipy_ConvertedFromBvecFrame);
+  MITK_TEST(PeakWriter_Nifti_RasWithMarker);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -489,7 +490,7 @@ public:
     for (vtkIdType i = 0; i < points->GetNumberOfPoints(); ++i)
       CPPUNIT_ASSERT(std::isfinite(points->GetPoint(i)[0]) && std::isfinite(points->GetPoint(i)[1]) && std::isfinite(points->GetPoint(i)[2]));
 
-    // Peak files without the MRtrix description, e.g. all MITK-written ones, read unchanged.
+    // Peak files without the MRtrix description, e.g. NIfTI files of earlier MITK versions, read unchanged.
     const std::string mitkFile = GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz");
     CPPUNIT_ASSERT(Values(LoadPeaks(mitkFile, false)) == Values(LoadPeaks(mitkFile, true)));
   }
@@ -1022,6 +1023,45 @@ public:
       directions(2, i) = z;
     }
     return directions;
+  }
+
+  // MITK wrote NIfTI peaks with its LPS vectors and no marker, so MRtrix and the tools that use its
+  // peak files read them mirrored in x and y.
+  void PeakWriter_Nifti_RasWithMarker()
+  {
+    auto peaks = LoadPeaks(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), std::nullopt);
+    const auto lps = Values(peaks);
+    const unsigned int numVoxels = peaks->GetDimension(0) * peaks->GetDimension(1) * peaks->GetDimension(2);
+    unsigned int nonZero = 0;
+    for (const auto value : lps)
+      nonZero += value != 0;
+    CPPUNIT_ASSERT(nonZero > 0);
+
+    for (const std::string extension : {".nii.gz", ".nrrd"})
+    {
+      const std::string path = m_TempDir + "/written_peaks" + extension;
+      mitk::IOUtil::Save(peaks, path);
+      CPPUNIT_ASSERT(Values(peaks) == lps);
+
+      auto reader = itk::ImageFileReader<mitk::PeakImage::ItkPeakImageType>::New();
+      reader->SetFileName(path);
+      reader->Update();
+      const auto *raw = reader->GetOutput()->GetBufferPointer();
+      const bool nifti = extension == ".nii.gz";
+      for (std::size_t i = 0; i < lps.size(); ++i)
+      {
+        const bool isZ = (i / numVoxels) % 3 == 2;
+        CPPUNIT_ASSERT_EQUAL(nifti && !isZ ? -lps[i] : lps[i], raw[i]);
+      }
+      std::string marker;
+      itk::ExposeMetaData<std::string>(reader->GetOutput()->GetMetaDataDictionary(), "ITK_FileNotes", marker);
+      if (nifti)
+        CPPUNIT_ASSERT_EQUAL(std::string("MITK_peak_convention=RAS"), marker);
+
+      // MITK's marker converts back whatever the MRtrix option says.
+      CPPUNIT_ASSERT(Values(LoadPeaks(path, false)) == lps);
+      CPPUNIT_ASSERT(Values(LoadPeaks(path, true)) == lps);
+    }
   }
 };
 
