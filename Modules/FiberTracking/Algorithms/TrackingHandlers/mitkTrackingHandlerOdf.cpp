@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkTrackingHandlerOdf.h"
 #include <itkDiffusionOdfGeneralizedFaImageFilter.h>
 #include <itkImageRegionIterator.h>
-#include <itkPointShell.h>
 #include <omp.h>
 #include <cmath>
 

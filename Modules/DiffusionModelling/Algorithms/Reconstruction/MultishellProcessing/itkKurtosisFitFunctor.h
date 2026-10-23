@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _itk_KurtosisFitFunctor_h_
-#define _itk_KurtosisFitFunctor_h_
+#ifndef itkKurtosisFitFunctor_h
+#define itkKurtosisFitFunctor_h
 
 #include "itkDWIVoxelFunctor.h"
 #include <cmath>
@@ -41,17 +41,13 @@ public:
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
   /** Runtime information support. */
-  itkTypeMacro(KurtosisFitFunctor, DWIVoxelFunctor)
+  itkOverrideGetNameOfClassMacro(KurtosisFitFunctor)
 
   void operator()(vnl_matrix<double> & newSignal,const vnl_matrix<double> & SignalMatrix, const double & S0) override;
 
-  void setTargetBValue(const double & targetBValue){m_TargetBvalue = targetBValue;}
-  void setListOfBValues(const vnl_vector<double> & BValueList){m_BValueList = BValueList;}
+  unsigned int GetNumberOfUnknowns() const override { return 2; } // ADC, AKC
 
 protected:
-  double m_TargetBvalue;
-  vnl_vector<double> m_BValueList;
-
   /**
    * \brief The lestSquaresFunction struct for Non-Linear-Least-Squres fit of Kurtosis
    */
@@ -95,7 +91,9 @@ protected:
       for(int s=0; s<N; s++)
       {
         double approx = S0 * std::exp(- b[s] * D + 1./6. *b[s] * b[s] *D * D * K);
-        fx[s] = std::fabs( measurements[s] - approx );
+        // Signed: the forward-difference Jacobian of |r| is wrong where a residual changes sign,
+        // which stalls Levenberg-Marquardt near exact fits.
+        fx[s] = measurements[s] - approx;
       }
 
     }

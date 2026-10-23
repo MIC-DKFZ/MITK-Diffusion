@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionPropertyHelper.h>
 
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
-#include <itkDiffusionTensor3DReconstructionImageFilter.h>
+#include <mitkDiffusionReconstruction.h>
 #include <itkDiffusionTensor3D.h>
 #include <itkImageFileWriter.h>
 #include <itkNrrdImageIO.h>
@@ -97,12 +97,12 @@ int main(int argc, char* argv[])
       writer->Update();
     }
     else {
-      typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, float > TensorReconstructionImageFilterType;
-      TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
-      filter->SetGradientImage( dynamic_cast<mitk::GradientDirectionsProperty *>(dwi->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
-      filter->SetBValue( mitk::DiffusionPropertyHelper::GetReferenceBValue( dwi ));
-      filter->SetThreshold(threshold);
-      filter->Update();
+      // ITK's DiffusionTensor3DReconstructionImageFilter fits every volume with the reference
+      // b-value, which is wrong for multi-shell DWIs.
+      auto tensors = mitk::ReconstructTensorsLinearLeastSquares(itkVectorImagePointer,
+                                                                mitk::DiffusionPropertyHelper::GetGradientContainer(dwi),
+                                                                mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi),
+                                                                threshold);
 
       // Save tensor image
       itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
 
       mitk::LocaleSwitch localeSwitch("C");
       itk::ImageFileWriter< itk::Image< itk::DiffusionTensor3D< float >, 3 > >::Pointer writer = itk::ImageFileWriter< itk::Image< itk::DiffusionTensor3D< float >, 3 > >::New();
-      writer->SetInput(filter->GetOutput());
+      writer->SetInput(tensors);
       writer->SetFileName(outfilename);
       writer->SetImageIO(io);
       writer->UseCompressionOn();

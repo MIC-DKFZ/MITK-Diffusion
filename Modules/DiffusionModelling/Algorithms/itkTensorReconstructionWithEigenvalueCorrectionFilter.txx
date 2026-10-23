@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImage.h"
 #include "itkImageRegionIterator.h"
 #include <itkImageDuplicator.h>
+#include <mitkBValueMapProperty.h>
 
 namespace itk
 {
@@ -53,22 +54,19 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
   // number of volumes
   int nof = m_GradientDirectionContainer->Size();
 
-  // determine the number of b-zero values
+  // determine the number of b-zero values: volumes whose b-value rounds to 0, as in the b-value map,
+  // the threshold preview of the view and the linear least-squares fit (a volume at b = 50 is
+  // diffusion weighted and has its row in the design matrix)
   int numberb0=0;
   for(int i=0; i<nof; i++)
   {
-    vnl_vector_fixed <double, 3 > vec = m_GradientDirectionContainer->ElementAt(i);
-
-    float bval = vec.magnitude();
-    bval = bval*bval*m_BValue;
-
-    if(bval<100)
+    if (mitk::BValueMapProperty::GetBValue(m_GradientDirectionContainer->ElementAt(i), m_BValue) == 0)
       numberb0++;
   }
 
   // The b0 mean normalizes every voxel, and six tensor elements need six diffusion-weighted volumes.
   if (numberb0 == 0)
-    itkExceptionMacro(<< "No baseline volume (b < 100 s/mm^2) found.");
+    itkExceptionMacro(<< "No baseline volume found (no volume whose b-value rounds to 0).");
   if (nof - numberb0 < 6)
     itkExceptionMacro(<< "At least 6 diffusion-weighted volumes are needed, found " << nof - numberb0 << ".");
 
@@ -84,10 +82,7 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
   {
     vnl_vector_fixed <double, 3 > vec = m_GradientDirectionContainer->ElementAt(i);
 
-    float bval = vec.magnitude();
-    bval = bval*bval*m_BValue;
-
-    if(bval<100)
+    if (mitk::BValueMapProperty::GetBValue(vec, m_BValue) == 0)
     {
       // the diffusion encoding gradient is approximately zero, wo we are dealing with a non-diffusion weighted volume
       m_B0Mask[i]=1;
@@ -207,8 +202,9 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
           }
         }
         mean_b=mean_b/numberb0;
-        // Each iteration writes only its own voxel.
-        mask->SetPixel(ix, mean_b > m_B0Threshold ? 1 : 0);
+        // Each iteration writes only its own voxel. A voxel is kept when its b0 mean reaches the
+        // threshold, as in the view's threshold preview; a zero b0 mean has no attenuation.
+        mask->SetPixel(ix, mean_b > 0 && mean_b >= m_B0Threshold ? 1 : 0);
       }
 
   // Serial on purpose: the voxels are smoothed in place (pixel2 is a view into the image buffer)

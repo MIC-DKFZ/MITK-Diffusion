@@ -61,7 +61,7 @@ namespace
     if (basis == bases.end())
     {
       const unsigned int order = mitk::sh::ShOrder(static_cast<int>(numCoefficients));
-      basis = bases.emplace(key, mitk::sh::CalcShBasisForDirections(order, OdfType::GetDirections()->as_matrix(), mrtrix)).first;
+      basis = bases.emplace(key, mitk::sh::CalcShBasisForDirections(order, OdfType::GetDirections().as_matrix(), mrtrix)).first;
     }
     return basis->second;
   }
