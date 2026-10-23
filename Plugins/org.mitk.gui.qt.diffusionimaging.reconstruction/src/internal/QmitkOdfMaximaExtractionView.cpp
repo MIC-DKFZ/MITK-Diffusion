@@ -104,13 +104,26 @@ void QmitkOdfMaximaExtractionView::SetFocus()
 
 void QmitkOdfMaximaExtractionView::StartPeakExtraction()
 {
-  if (dynamic_cast<TensorImage*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData()) != nullptr)
+  try
   {
-    StartTensorPeakExtraction(dynamic_cast<TensorImage*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData()));
+    if (dynamic_cast<TensorImage*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData()) != nullptr)
+    {
+      StartTensorPeakExtraction(dynamic_cast<TensorImage*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData()));
+    }
+    else
+    {
+      StartMaximaExtraction(dynamic_cast<Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData()));
+    }
   }
-  else
+  catch (const itk::ExceptionObject &ex)
   {
-    StartMaximaExtraction(dynamic_cast<Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData()));
+    MITK_ERROR << ex;
+    QMessageBox::information(nullptr, "Peak extraction not possible:", ex.GetDescription());
+  }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Peak extraction not possible:", e.what());
   }
 }
 

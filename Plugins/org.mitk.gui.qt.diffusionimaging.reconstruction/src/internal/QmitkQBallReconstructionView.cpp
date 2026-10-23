@@ -209,15 +209,28 @@ void QmitkQBallReconstructionView::CreateConnections()
 
 void QmitkQBallReconstructionView::ConvertShImage()
 {
-  if (m_Controls->m_ShImageBox->GetSelectedNode().IsNotNull())
+  try
   {
-    mitk::Image::Pointer mitkImg = dynamic_cast<mitk::Image*>(m_Controls->m_ShImageBox->GetSelectedNode()->GetData());
-    auto img = mitk::convert::GetOdfFromShImage(mitkImg);
-    mitk::DiffusionPropertyHelper::CopyDICOMProperties(mitkImg, img);
-    mitk::DataNode::Pointer node= mitk::DataNode::New();
-    node->SetData( img );
-    node->SetName(m_Controls->m_ShImageBox->GetSelectedNode()->GetName());
-    GetDataStorage()->Add(node, m_Controls->m_ShImageBox->GetSelectedNode());
+    if (m_Controls->m_ShImageBox->GetSelectedNode().IsNotNull())
+    {
+      mitk::Image::Pointer mitkImg = dynamic_cast<mitk::Image*>(m_Controls->m_ShImageBox->GetSelectedNode()->GetData());
+      auto img = mitk::convert::GetOdfFromShImage(mitkImg);
+      mitk::DiffusionPropertyHelper::CopyDICOMProperties(mitkImg, img);
+      mitk::DataNode::Pointer node= mitk::DataNode::New();
+      node->SetData( img );
+      node->SetName(m_Controls->m_ShImageBox->GetSelectedNode()->GetName());
+      GetDataStorage()->Add(node, m_Controls->m_ShImageBox->GetSelectedNode());
+    }
+  }
+  catch (const itk::ExceptionObject &ex)
+  {
+    MITK_ERROR << ex;
+    QMessageBox::information(nullptr, "Conversion not possible:", ex.GetDescription());
+  }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Conversion not possible:", e.what());
   }
 }
 
@@ -434,6 +447,11 @@ void QmitkQBallReconstructionView::NumericalQBallReconstruction(mitk::DataNode::
     QMessageBox::information(nullptr, "Reconstruction not possible:", ex.GetDescription());
     return ;
   }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Reconstruction not possible:", e.what());
+  }
 }
 
 void QmitkQBallReconstructionView::AnalyticalQBallReconstruction( mitk::DataNode::Pointer node, int normalization)
@@ -482,6 +500,11 @@ void QmitkQBallReconstructionView::AnalyticalQBallReconstruction( mitk::DataNode
     MITK_INFO << ex;
     QMessageBox::information(nullptr, "Reconstruction not possible:", ex.GetDescription());
     return;
+  }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Reconstruction not possible:", e.what());
   }
 }
 
@@ -631,6 +654,11 @@ void QmitkQBallReconstructionView::MultiQBallReconstruction(mitk::DataNode::Poin
     MITK_INFO << ex ;
     QMessageBox::information(nullptr, "Reconstruction not possible:", ex.GetDescription());
     return ;
+  }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Reconstruction not possible:", e.what());
   }
 }
 

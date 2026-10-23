@@ -125,12 +125,38 @@ void QmitkDiffusionQuantificationView::OnSelectionChanged(berry::IWorkbenchPart:
 
 void QmitkDiffusionQuantificationView::ADC_DWI()
 {
-  DoAdcCalculation(true);
+  try
+  {
+    DoAdcCalculation(true);
+  }
+  catch (const itk::ExceptionObject &ex)
+  {
+    MITK_ERROR << ex;
+    QMessageBox::information(nullptr, "Computation not possible:", ex.GetDescription());
+  }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Computation not possible:", e.what());
+  }
 }
 
 void QmitkDiffusionQuantificationView::MD_DWI()
 {
-  DoAdcCalculation(false);
+  try
+  {
+    DoAdcCalculation(false);
+  }
+  catch (const itk::ExceptionObject &ex)
+  {
+    MITK_ERROR << ex;
+    QMessageBox::information(nullptr, "Computation not possible:", ex.GetDescription());
+  }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Computation not possible:", e.what());
+  }
 }
 
 void QmitkDiffusionQuantificationView::DoAdcCalculation(bool fit)
@@ -222,12 +248,38 @@ void QmitkDiffusionQuantificationView::MD()
 
 void QmitkDiffusionQuantificationView::OdfQuantify(int method)
 {
-  OdfQuantification(method);
+  try
+  {
+    OdfQuantification(method);
+  }
+  catch (const itk::ExceptionObject &ex)
+  {
+    MITK_ERROR << ex;
+    QMessageBox::information(nullptr, "Computation not possible:", ex.GetDescription());
+  }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Computation not possible:", e.what());
+  }
 }
 
 void QmitkDiffusionQuantificationView::TensorQuantify(int method)
 {
-  TensorQuantification(method);
+  try
+  {
+    TensorQuantification(method);
+  }
+  catch (const itk::ExceptionObject &ex)
+  {
+    MITK_ERROR << ex;
+    QMessageBox::information(nullptr, "Computation not possible:", ex.GetDescription());
+  }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Computation not possible:", e.what());
+  }
 }
 
 void QmitkDiffusionQuantificationView::OdfQuantification(int method)
