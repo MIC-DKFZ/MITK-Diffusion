@@ -48,20 +48,8 @@ namespace
 
 QmitkDicomTractogramTagEditorView::QmitkDicomTractogramTagEditorView()
   : m_Controls(nullptr)
+  , m_TagList(mitk::FiberBundleDicomTags::GetEditableTags())
 {
-  m_TagList = {"DICOM.patient_id",
-               "DICOM.patient_name",
-               "DICOM.study_instance_uid",
-               "DICOM.series_instance_uid",
-               "DICOM.sop_instance_uid",
-               "DICOM.sop_class_uid",
-               "DICOM.frame_of_reference_uid",
-              "DICOM.algo_family_code.value",
-              "DICOM.algo_family_code.meaning",
-              "DICOM.model_code.value",
-              "DICOM.model_code.meaning",
-              "DICOM.anatomy.value",
-              "DICOM.anatomy.meaning"};
 }
 
 // Destructor

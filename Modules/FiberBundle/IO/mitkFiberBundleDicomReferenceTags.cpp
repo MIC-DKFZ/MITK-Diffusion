@@ -17,20 +17,28 @@ found in the LICENSE file.
 #include <array>
 #include <utility>
 
+std::vector<std::string> mitk::FiberBundleDicomTags::GetEditableTags()
+{
+  return {PatientId, PatientName, StudyInstanceUid, SeriesInstanceUid, SopInstanceUid, SopClassUid,
+          FrameOfReferenceUid, AlgorithmFamilyCodeValue, AlgorithmFamilyCodeMeaning, ModelCodeValue,
+          ModelCodeMeaning, AnatomyValue, AnatomyMeaning};
+}
+
 std::vector<std::string> mitk::CopyDicomReferenceTags(const IPropertyProvider* source, FiberBundle* target)
 {
   if (source == nullptr || target == nullptr)
     mitkThrow() << "Copying DICOM reference tags needs a source and a fiber bundle.";
 
   // bundle property (and name used by the diffusion DICOM import), MITK's DICOM tag property
+  using namespace FiberBundleDicomTags;
   const std::array<std::pair<std::string, std::string>, 7> tags = {{
-    {"DICOM.patient_id", "DICOM.0010.0020"},
-    {"DICOM.patient_name", "DICOM.0010.0010"},
-    {"DICOM.study_instance_uid", "DICOM.0020.000D"},
-    {"DICOM.series_instance_uid", "DICOM.0020.000E"},
-    {"DICOM.sop_instance_uid", "DICOM.0008.0018"},
-    {"DICOM.sop_class_uid", "DICOM.0008.0016"},
-    {"DICOM.frame_of_reference_uid", "DICOM.0020.0052"}}};
+    {PatientId, "DICOM.0010.0020"},
+    {PatientName, "DICOM.0010.0010"},
+    {StudyInstanceUid, "DICOM.0020.000D"},
+    {SeriesInstanceUid, "DICOM.0020.000E"},
+    {SopInstanceUid, "DICOM.0008.0018"},
+    {SopClassUid, "DICOM.0008.0016"},
+    {FrameOfReferenceUid, "DICOM.0020.0052"}}};
 
   std::vector<std::string> missing;
   for (const auto& [name, dicomTag] : tags)

@@ -24,6 +24,35 @@ found in the LICENSE file.
 namespace mitk
 {
   /**
+   * Names of the fiber bundle properties that hold DICOM tractography tags: the DICOM reader
+   * sets them, the writer reads them, and the tractogram tag editor edits them.
+   */
+  namespace FiberBundleDicomTags
+  {
+    // the image the tractogram refers to
+    inline constexpr const char* PatientId = "DICOM.patient_id";
+    inline constexpr const char* PatientName = "DICOM.patient_name";
+    inline constexpr const char* StudyInstanceUid = "DICOM.study_instance_uid";
+    inline constexpr const char* SeriesInstanceUid = "DICOM.series_instance_uid";
+    inline constexpr const char* SopInstanceUid = "DICOM.sop_instance_uid";
+    inline constexpr const char* SopClassUid = "DICOM.sop_class_uid";
+    inline constexpr const char* FrameOfReferenceUid = "DICOM.frame_of_reference_uid";
+    // the tracking algorithm and the anatomy
+    inline constexpr const char* AlgorithmFamilyCodeValue = "DICOM.algo_family_code.value";
+    inline constexpr const char* AlgorithmFamilyCodeMeaning = "DICOM.algo_family_code.meaning";
+    inline constexpr const char* ModelCodeValue = "DICOM.model_code.value";
+    inline constexpr const char* ModelCodeMeaning = "DICOM.model_code.meaning";
+    inline constexpr const char* AnatomyValue = "DICOM.anatomy.value";
+    inline constexpr const char* AnatomyMeaning = "DICOM.anatomy.meaning";
+    // the tractogram's own UIDs (read only: the writer generates new ones)
+    inline constexpr const char* TractogramSeriesInstanceUid = "DICOM.tractogram.series_instance_uid";
+    inline constexpr const char* TractogramSopInstanceUid = "DICOM.tractogram.sop_instance_uid";
+
+    /** The tags a user can set for the writer, in display order. */
+    MITKFIBERBUNDLE_EXPORT std::vector<std::string> GetEditableTags();
+  }
+
+  /**
    * \brief Copies the DICOM tags that identify the image a tractogram refers to into the bundle.
    *
    * Patient ID and name, study, series and SOP instance UID, SOP class UID and frame of reference

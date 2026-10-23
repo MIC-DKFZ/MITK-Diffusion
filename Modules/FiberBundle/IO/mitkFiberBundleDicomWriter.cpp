@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkFiberBundleDicomWriter.h"
 #include "mitkFiberBundleMimeTypes.h"
+#include "mitkFiberBundleDicomReferenceTags.h"
 
 #include <mitkFiberBundle.h>
 #include <vtkCell.h>
@@ -46,10 +47,10 @@ void mitk::FiberBundleDicomWriter::Write()
   mitk::PropertyList* p_list = fib->GetPropertyList();
 
   std::string patient_id = "";
-  if (!p_list->GetStringProperty("DICOM.patient_id", patient_id))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::PatientId, patient_id))
     patient_id = "0";
   std::string patient_name = "";
-  if (!p_list->GetStringProperty("DICOM.patient_name", patient_name))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::PatientName, patient_name))
     patient_name = "0";
   // DICOM.series_instance_uid, DICOM.sop_instance_uid and DICOM.sop_class_uid name the image the
   // tractogram refers to (the DWI it was computed from; the tag editor copies them from there,
@@ -58,45 +59,45 @@ void mitk::FiberBundleDicomWriter::Write()
   // that image or with an earlier export of the same bundle.
   char generatedUid[100];
   std::string study_instance_uid = "";
-  if (!p_list->GetStringProperty("DICOM.study_instance_uid", study_instance_uid) || study_instance_uid.empty() || study_instance_uid=="0")
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::StudyInstanceUid, study_instance_uid) || study_instance_uid.empty() || study_instance_uid=="0")
   {
     study_instance_uid = dcmGenerateUniqueIdentifier(generatedUid, SITE_STUDY_UID_ROOT);
     MITK_WARN << "No DICOM study instance UID given; the tractogram starts a new study.";
   }
   std::string series_instance_uid = "";
-  if (!p_list->GetStringProperty("DICOM.series_instance_uid", series_instance_uid))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::SeriesInstanceUid, series_instance_uid))
     series_instance_uid = "0";
   std::string sop_instance_uid = "";
-  if (!p_list->GetStringProperty("DICOM.sop_instance_uid", sop_instance_uid))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::SopInstanceUid, sop_instance_uid))
     sop_instance_uid = "0";
   if (series_instance_uid=="0" || sop_instance_uid=="0")
     MITK_WARN << "No DICOM series or SOP instance UID of the referenced image given; the image reference is a placeholder.";
   std::string sop_class_uid = "";
-  if (!p_list->GetStringProperty("DICOM.sop_class_uid", sop_class_uid) || sop_class_uid.empty() || sop_class_uid=="0")
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::SopClassUid, sop_class_uid) || sop_class_uid.empty() || sop_class_uid=="0")
     sop_class_uid = UID_MRImageStorage;
   std::string frame_of_reference_uid = "";
-  if (!p_list->GetStringProperty("DICOM.frame_of_reference_uid", frame_of_reference_uid) || frame_of_reference_uid.empty() || frame_of_reference_uid=="0")
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::FrameOfReferenceUid, frame_of_reference_uid) || frame_of_reference_uid.empty() || frame_of_reference_uid=="0")
   {
     frame_of_reference_uid = dcmGenerateUniqueIdentifier(generatedUid, SITE_INSTANCE_UID_ROOT);
     MITK_WARN << "No DICOM frame of reference UID given; a new one is generated.";
   }
   std::string algo_code_value = "";
-  if (!p_list->GetStringProperty("DICOM.algo_family_code.value", algo_code_value))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::AlgorithmFamilyCodeValue, algo_code_value))
     algo_code_value = "0";
   std::string algo_code_meaning = "";
-  if (!p_list->GetStringProperty("DICOM.algo_family_code.meaning", algo_code_meaning))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::AlgorithmFamilyCodeMeaning, algo_code_meaning))
     algo_code_meaning = "0";
   std::string model_code_value = "";
-  if (!p_list->GetStringProperty("DICOM.model_code.value", model_code_value))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::ModelCodeValue, model_code_value))
     model_code_value = "0";
   std::string model_code_meaning = "";
-  if (!p_list->GetStringProperty("DICOM.model_code.meaning", model_code_meaning))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::ModelCodeMeaning, model_code_meaning))
     model_code_meaning = "0";
   std::string anatomy_value = "";
-  if (!p_list->GetStringProperty("DICOM.anatomy.value", anatomy_value))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::AnatomyValue, anatomy_value))
     anatomy_value = "0";
   std::string anatomy_meaning = "";
-  if (!p_list->GetStringProperty("DICOM.anatomy.meaning", anatomy_meaning))
+  if (!p_list->GetStringProperty(FiberBundleDicomTags::AnatomyMeaning, anatomy_meaning))
     anatomy_meaning = "0";
 
   mitk::LocaleSwitch localeSwitch("C");

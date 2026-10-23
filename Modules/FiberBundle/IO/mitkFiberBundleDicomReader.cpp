@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkFiberBundleDicomReader.h"
 #include "mitkFiberBundleMimeTypes.h"
+#include "mitkFiberBundleDicomReferenceTags.h"
 
 #include <itksys/SystemTools.hxx>
 #include <mitkFiberBundle.h>
@@ -141,28 +142,28 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Do
     if (!algorithms.empty() && algorithms.front() != nullptr)
       algoCode = &algorithms.front()->getAlgorithmFamilyCode();
     val = "0"; if (algoCode != nullptr) algoCode->getCodeValue(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.algo_family_code.value",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::AlgorithmFamilyCodeValue,val.c_str());
     val = "0"; if (algoCode != nullptr) algoCode->getCodeMeaning(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.algo_family_code.meaning",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::AlgorithmFamilyCodeMeaning,val.c_str());
 
     CodeSequenceMacro modelCode = sets[ts]->getDiffusionModelCode();
     val = "0"; modelCode.getCodeValue(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.model_code.value",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::ModelCodeValue,val.c_str());
     val = "0"; modelCode.getCodeMeaning(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.model_code.meaning",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::ModelCodeMeaning,val.c_str());
 
     CodeWithModifiers anatomy = sets[ts]->getTrackSetAnatomy();
     val = "0"; anatomy.getCodeValue(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.anatomy.value",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::AnatomyValue,val.c_str());
     val = "0"; anatomy.getCodeMeaning(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.anatomy.meaning",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::AnatomyMeaning,val.c_str());
 
     val = "0"; trc->getPatient().getPatientID(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.patient_id",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::PatientId,val.c_str());
     val = "0"; trc->getPatient().getPatientName(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.patient_name",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::PatientName,val.c_str());
     val = "0"; trc->getStudy().getStudyInstanceUID(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.study_instance_uid",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::StudyInstanceUid,val.c_str());
     // DICOM.series_instance_uid, DICOM.sop_instance_uid and DICOM.sop_class_uid name the
     // referenced image, as the writer and the tag editor use them, so that saving the bundle
     // again refers to the same image; the tractogram's own UIDs are kept for display.
@@ -170,16 +171,16 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Do
     if (!references.empty())
     {
       const OFString& referencedInstance = references.front()->m_SOPInstanceUID;
-      fib->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid", FindReferencedSeriesUid(trc.get(), referencedInstance).c_str());
-      fib->GetPropertyList()->SetStringProperty("DICOM.sop_instance_uid", referencedInstance.c_str());
-      fib->GetPropertyList()->SetStringProperty("DICOM.sop_class_uid", references.front()->m_SOPClassUID.c_str());
+      fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::SeriesInstanceUid, FindReferencedSeriesUid(trc.get(), referencedInstance).c_str());
+      fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::SopInstanceUid, referencedInstance.c_str());
+      fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::SopClassUid, references.front()->m_SOPClassUID.c_str());
     }
     val = "0"; trc->getSeries().getSeriesInstanceUID(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.tractogram.series_instance_uid",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::TractogramSeriesInstanceUid,val.c_str());
     val = "0"; trc->getSOPCommon().getSOPInstanceUID(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.tractogram.sop_instance_uid",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::TractogramSopInstanceUid,val.c_str());
     val = "0"; trc->getFrameOfReference().getFrameOfReferenceUID(val);
-    fib->GetPropertyList()->SetStringProperty("DICOM.frame_of_reference_uid",val.c_str());
+    fib->GetPropertyList()->SetStringProperty(FiberBundleDicomTags::FrameOfReferenceUid,val.c_str());
 
     output_fibs.push_back(fib.GetPointer());
     MITK_INFO << "Fiber bundle read";
