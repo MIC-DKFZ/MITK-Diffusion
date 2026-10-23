@@ -186,6 +186,7 @@ public:
     itkSetMacro( Threshold, ReferencePixelType )
     itkGetMacro( Threshold, ReferencePixelType )
 
+    /** Reconstruction method and normalization, QBAR_STANDARD by default */
     itkSetMacro( NormalizationMethod, Normalization)
     itkGetMacro( NormalizationMethod, Normalization )
 

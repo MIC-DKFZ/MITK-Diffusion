@@ -43,6 +43,8 @@ AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDirection
   m_BValue(-1),
   m_Lambda(0.0),
   m_DirectionsDuplicated(false),
+  m_NormalizationMethod(QBAR_STANDARD),
+  m_NumberCoefficients(0),
   m_Delta1(0.001),
   m_Delta2(0.001),
   m_UseMrtrixBasis(false)

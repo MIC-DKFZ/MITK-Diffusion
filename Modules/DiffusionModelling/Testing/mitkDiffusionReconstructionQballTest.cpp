@@ -36,6 +36,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(Numerical_SecondUpdate_SameResult);
   MITK_TEST(Analytical_SecondUpdate_SameResult);
   MITK_TEST(SolidAngle_SecondUpdate_SameResult);
+  MITK_TEST(SingleShellFilters_DefaultNormalization_IsStandard);
   MITK_TEST(SingleShellFilters_TwoShells_Throw);
   MITK_TEST(SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint);
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
@@ -250,6 +251,28 @@ public:
     reused->Update();
     CheckEqual(fresh->GetOutput(), reused->GetOutput());
     CheckEqual(fresh->GetCoefficientImage().GetPointer(), reused->GetCoefficientImage().GetPointer());
+  }
+
+  // Neither single-shell filter initialized its normalization method, so a caller that did not set
+  // one got an undefined method.
+  void SingleShellFilters_DefaultNormalization_IsStandard()
+  {
+    auto dwi = Simulate(Shells({1000}));
+
+    auto numericalDefault = QballFilter<NumericalFilterType>(dwi);
+    CPPUNIT_ASSERT(numericalDefault->GetNormalizationMethod() == NumericalFilterType::QBR_STANDARD);
+    numericalDefault->Update();
+    auto numericalStandard = Numerical(dwi);
+    numericalStandard->Update();
+    CheckEqual(numericalStandard->GetOutput(), numericalDefault->GetOutput());
+
+    auto analyticalDefault = QballFilter<AnalyticalFilterType>(dwi);
+    analyticalDefault->SetLambda(0.006);
+    CPPUNIT_ASSERT(analyticalDefault->GetNormalizationMethod() == AnalyticalFilterType::QBAR_STANDARD);
+    analyticalDefault->Update();
+    auto analyticalStandard = Analytical(dwi);
+    analyticalStandard->Update();
+    CheckEqual(analyticalStandard->GetOutput(), analyticalDefault->GetOutput());
   }
 
   // The single-shell filters normalized every gradient and used one b-value, so a second shell was

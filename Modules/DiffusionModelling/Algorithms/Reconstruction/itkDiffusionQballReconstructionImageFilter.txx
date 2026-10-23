@@ -44,7 +44,8 @@ namespace itk {
     m_NumberOfBaselineImages(1),
     m_Threshold(NumericTraits< ReferencePixelType >::NonpositiveMin()),
     m_BValue(1.0),
-    m_DirectionsDuplicated(false)
+    m_DirectionsDuplicated(false),
+    m_NormalizationMethod(QBR_STANDARD)
   {
     // At least 1 inputs is necessary for a vector image.
     // For images added one at a time we need at least six

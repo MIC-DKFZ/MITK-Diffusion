@@ -206,7 +206,7 @@ public:
   itkSetMacro( Threshold, ReferencePixelType );
   itkGetMacro( Threshold, ReferencePixelType );
 
-  /** Normalization applied to ODFs */
+  /** Normalization applied to ODFs, QBR_STANDARD by default */
   itkSetMacro( NormalizationMethod, Normalization);
   itkGetMacro( NormalizationMethod, Normalization );
 
