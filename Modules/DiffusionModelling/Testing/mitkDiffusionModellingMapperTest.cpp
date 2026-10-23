@@ -177,6 +177,9 @@ public:
       m_RenderingTestHelper.Render();
       CPPUNIT_ASSERT(planes->GetItem(0) == lower && planes->GetItem(1) == upper);
     }
+
+    // The lines are rebuilt when the image was modified, not by rendering.
+    CPPUNIT_ASSERT(actor->GetMapper()->GetInputDataObject(0, 0) == peakImage->GetPolyData().GetPointer());
   }
 
   // MITK's 3D plane mapper takes the colour map's mapper from slot 3 of a "CompositeMapper" node.

@@ -30,7 +30,9 @@ found in the LICENSE file.
 #include <itkVectorImage.h>
 #include <vtkImageData.h>
 #include <vtkPointData.h>
+#include <vtkPolyData.h>
 #include <vtkPoints.h>
+#include <vtkSmartPointer.h>
 #include <vtkUnsignedCharArray.h>
 #include <itksys/SystemTools.hxx>
 #include <vnl/vnl_matrix_fixed.h>
@@ -71,6 +73,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(TensorReader_NiftiLayouts_ElementMapping);
   MITK_TEST(RgbCache_FollowsPixelChanges);
   MITK_TEST(RgbCache_FollowsShConvention);
+  MITK_TEST(PeakImage_PolydataFollowsPixelChanges);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -764,6 +767,36 @@ public:
     auto reference = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
     reference->SetShConvention(mitk::ShImage::FSL);
     CPPUNIT_ASSERT(fsl == Colours(reference));
+  }
+
+  // The peak lines were built once and kept when the peaks changed later; a rebuilt polydata
+  // keeps the custom colour.
+  void PeakImage_PolydataFollowsPixelChanges()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"Peak Image"}, std::vector<std::string>());
+    auto peaks = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &functor);
+    vtkSmartPointer<vtkPolyData> before = peaks->GetPolyData();
+    CPPUNIT_ASSERT(before->GetNumberOfLines() > 1);
+    peaks->SetCustomColor(0, 255, 0);
+    CPPUNIT_ASSERT(before == peaks->GetPolyData());
+
+    {
+      // Only the first peak of the first voxel stays.
+      mitk::ImageWriteAccessor accessor(peaks);
+      auto *values = static_cast<float *>(accessor.GetData());
+      const std::size_t numberOfValues = peaks->GetDimension(0) * peaks->GetDimension(1) * peaks->GetDimension(2) * peaks->GetDimension(3);
+      std::fill(values, values + numberOfValues, 0.0f);
+      values[0] = 1.0f;
+    }
+    peaks->Modified();
+
+    vtkSmartPointer<vtkPolyData> after = peaks->GetPolyData();
+    CPPUNIT_ASSERT(before != after);
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(1), after->GetNumberOfLines());
+    auto colors = dynamic_cast<vtkUnsignedCharArray *>(after->GetPointData()->GetArray("FIBER_COLORS"));
+    CPPUNIT_ASSERT(colors != nullptr);
+    CPPUNIT_ASSERT_EQUAL(0, static_cast<int>(colors->GetTypedComponent(0, 0)));
+    CPPUNIT_ASSERT_EQUAL(255, static_cast<int>(colors->GetTypedComponent(0, 1)));
   }
 };
 

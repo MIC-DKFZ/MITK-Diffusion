@@ -25,18 +25,103 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <algorithm>
 
-mitk::PeakImage::PeakImage() : Image()
+namespace
 {
-  m_PolyData = nullptr;
+  /** Sets the "FIBER_COLORS" array of the peak lines to one colour. */
+  void ColorUniformly(vtkPolyData* polyData, const std::array<float, 3>& rgb)
+  {
+    vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    colors->SetNumberOfComponents(4);
+    colors->SetName("FIBER_COLORS");
+    colors->SetNumberOfTuples(polyData->GetNumberOfPoints());
+    const unsigned char rgba[4] = {static_cast<unsigned char>(rgb[0]), static_cast<unsigned char>(rgb[1]), static_cast<unsigned char>(rgb[2]), 255};
+    for (vtkIdType i = 0; i < polyData->GetNumberOfPoints(); ++i)
+      colors->SetTypedTuple(i, rgba);
+    polyData->GetPointData()->AddArray(colors);
+  }
+
+  /** Sets the "FIBER_COLORS" array of the peak lines to |direction| per channel. */
+  void ColorByDirection(vtkPolyData* polyData)
+  {
+    vtkPoints* extrPoints = polyData->GetPoints();
+    int numOfPoints = 0;
+    if (extrPoints!=nullptr)
+      numOfPoints = static_cast<int>(extrPoints->GetNumberOfPoints());
+
+    //colors and alpha value for each single point, RGBA = 4 components
+    unsigned char rgba[4] = {0,0,0,0};
+    int componentSize = 4;
+
+    vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    colors->ReserveValues(numOfPoints * componentSize);
+    colors->SetNumberOfComponents(componentSize);
+    colors->SetName("FIBER_COLORS");
+
+    int num_peaks = static_cast<int>(polyData->GetNumberOfLines());
+    if (num_peaks < 1)
+      return;
+
+    vtkCellArray* fiberList = polyData->GetLines();
+    fiberList->InitTraversal();
+    for (int fi=0; fi<num_peaks; ++fi)
+    {
+      vtkIdType const* idList; // contains the point id's of the line
+      vtkIdType num_points; // number of points for current line
+      fiberList->GetNextCell(num_points, idList);
+
+      if (num_points == 2)
+      {
+        vnl_vector_fixed< double, 3 > currentPntvtk(extrPoints->GetPoint(idList[0])[0], extrPoints->GetPoint(idList[0])[1],extrPoints->GetPoint(idList[0])[2]);
+        vnl_vector_fixed< double, 3 > nextPntvtk(extrPoints->GetPoint(idList[1])[0], extrPoints->GetPoint(idList[1])[1], extrPoints->GetPoint(idList[1])[2]);
+
+        vnl_vector_fixed< double, 3 > diff1;
+        diff1 = currentPntvtk - nextPntvtk;
+        diff1.normalize();
+
+        rgba[0] = static_cast<unsigned char>(255.0 * std::fabs(diff1[0]));
+        rgba[1] = static_cast<unsigned char>(255.0 * std::fabs(diff1[1]));
+        rgba[2] = static_cast<unsigned char>(255.0 * std::fabs(diff1[2]));
+        rgba[3] = 255;
+        colors->InsertTypedTuple(idList[0], rgba);
+        colors->InsertTypedTuple(idList[1], rgba);
+      }
+      else
+      {
+        MITK_WARN << "Peak with point number!=2 detected!" ;
+        continue;
+      }
+    }
+
+    polyData->GetPointData()->AddArray(colors);
+  }
 }
+
+mitk::PeakImage::PeakImage() = default;
 
 mitk::PeakImage::PeakImage(const PeakImage& other) : Image(other)
+  , m_CustomColor(other.m_CustomColor)
 {
 }
 
-mitk::PeakImage::~PeakImage()
-{
+mitk::PeakImage::~PeakImage() = default;
 
+vtkSmartPointer< vtkPolyData > mitk::PeakImage::GetPolyData() const
+{
+  std::lock_guard<std::mutex> lock(m_PolyDataMutex);
+  // With the geometry's time (BaseData::GetMTime): the lines are in world coordinates.
+  const itk::ModifiedTimeType imageTime = this->GetMTime();
+  if (m_PolyData == nullptr || imageTime > m_PolyDataTime)
+  {
+    this->ConstructPolydata();
+    m_PolyDataTime = imageTime;
+  }
+  return m_PolyData;
+}
+
+void mitk::PeakImage::KeepPolyData()
+{
+  std::lock_guard<std::mutex> lock(m_PolyDataMutex);
+  m_PolyDataTime = this->GetMTime();
 }
 
 void mitk::PeakImage::ConstructPolydata() const
@@ -105,12 +190,16 @@ void mitk::PeakImage::ConstructPolydata() const
         }
       }
 
-  m_PolyData = vtkSmartPointer<vtkPolyData>::New();
-  m_PolyData->SetPoints(m_VtkPoints);
-  m_PolyData->SetLines(m_VtkCellArray);
+  auto polyData = vtkSmartPointer<vtkPolyData>::New();
+  polyData->SetPoints(m_VtkPoints);
+  polyData->SetLines(m_VtkCellArray);
 
   // Built on demand, also from inside rendering, so the image is not marked as modified here.
-  this->ColorPolyDataByOrientation();
+  if (m_CustomColor)
+    ColorUniformly(polyData, *m_CustomColor);
+  else
+    ColorByDirection(polyData);
+  m_PolyData = polyData;
 }
 
 
@@ -126,93 +215,17 @@ mitk::PeakImage::ItkPeakImageType::Pointer mitk::PeakImage::GetItkPeakImage()
 
 void mitk::PeakImage::SetCustomColor(float r, float g, float b)
 {
+  m_CustomColor = std::array<float, 3>{r, g, b};
   // The polydata is built on demand; an image that was never rendered has none yet.
-  vtkPolyData* polyData = this->GetPolyData();
-  vtkPoints* extrPoints = nullptr;
-  extrPoints = polyData->GetPoints();
-  int numOfPoints = 0;
-  if (extrPoints!=nullptr)
-    numOfPoints = static_cast<int>(extrPoints->GetNumberOfPoints());
-
-  int componentSize = 4;
-
-  vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  colors->ReserveValues(numOfPoints * componentSize);
-  colors->SetNumberOfComponents(componentSize);
-  colors->SetName("FIBER_COLORS");
-
-  unsigned char rgba[4] = {0,0,0,0};
-  for(long i=0; i<polyData->GetNumberOfPoints(); ++i)
-  {
-    rgba[0] = static_cast<unsigned char>(r);
-    rgba[1] = static_cast<unsigned char>(g);
-    rgba[2] = static_cast<unsigned char>(b);
-    rgba[3] = 255;
-    colors->InsertTypedTuple(i, rgba);
-  }
-
-  polyData->GetPointData()->AddArray(colors);
+  ColorUniformly(this->GetPolyData(), *m_CustomColor);
   this->Modified();
+  this->KeepPolyData();
 }
 
 void mitk::PeakImage::ColorByOrientation()
 {
-  this->ColorPolyDataByOrientation();
+  m_CustomColor.reset();
+  ColorByDirection(this->GetPolyData());
   this->Modified();
-}
-
-void mitk::PeakImage::ColorPolyDataByOrientation() const
-{
-  vtkPolyData* polyData = this->GetPolyData();
-  vtkPoints* extrPoints = nullptr;
-  extrPoints = polyData->GetPoints();
-  int numOfPoints = 0;
-  if (extrPoints!=nullptr)
-    numOfPoints = static_cast<int>(extrPoints->GetNumberOfPoints());
-
-  //colors and alpha value for each single point, RGBA = 4 components
-  unsigned char rgba[4] = {0,0,0,0};
-  int componentSize = 4;
-
-  vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-  colors->ReserveValues(numOfPoints * componentSize);
-  colors->SetNumberOfComponents(componentSize);
-  colors->SetName("FIBER_COLORS");
-
-  int num_peaks = static_cast<int>(polyData->GetNumberOfLines());
-  if (num_peaks < 1)
-    return;
-
-  vtkCellArray* fiberList = polyData->GetLines();
-  fiberList->InitTraversal();
-  for (int fi=0; fi<num_peaks; ++fi)
-  {
-    vtkIdType const* idList; // contains the point id's of the line
-    vtkIdType num_points; // number of points for current line
-    fiberList->GetNextCell(num_points, idList);
-
-    if (num_points == 2)
-    {
-      vnl_vector_fixed< double, 3 > currentPntvtk(extrPoints->GetPoint(idList[0])[0], extrPoints->GetPoint(idList[0])[1],extrPoints->GetPoint(idList[0])[2]);
-      vnl_vector_fixed< double, 3 > nextPntvtk(extrPoints->GetPoint(idList[1])[0], extrPoints->GetPoint(idList[1])[1], extrPoints->GetPoint(idList[1])[2]);
-
-      vnl_vector_fixed< double, 3 > diff1;
-      diff1 = currentPntvtk - nextPntvtk;
-      diff1.normalize();
-
-      rgba[0] = static_cast<unsigned char>(255.0 * std::fabs(diff1[0]));
-      rgba[1] = static_cast<unsigned char>(255.0 * std::fabs(diff1[1]));
-      rgba[2] = static_cast<unsigned char>(255.0 * std::fabs(diff1[2]));
-      rgba[3] = 255;
-      colors->InsertTypedTuple(idList[0], rgba);
-      colors->InsertTypedTuple(idList[1], rgba);
-    }
-    else
-    {
-      MITK_WARN << "Peak with point number!=2 detected!" ;
-      continue;
-    }
-  }
-
-  polyData->GetPointData()->AddArray(colors);
+  this->KeepPolyData();
 }
