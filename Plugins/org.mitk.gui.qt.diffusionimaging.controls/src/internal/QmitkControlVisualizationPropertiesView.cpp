@@ -64,6 +64,19 @@ const std::string QmitkControlVisualizationPropertiesView::VIEW_ID = "org.mitk.v
 
 using namespace berry;
 
+namespace
+{
+  /** Renderer of the named render window, or nullptr: no editor may be open, and MITK's MxN
+   *  editor need not offer every window name. */
+  mitk::BaseRenderer* GetRendererOf(mitk::IRenderWindowPart* renderWindowPart, const QString& name)
+  {
+    if (renderWindowPart == nullptr)
+      return nullptr;
+    QmitkRenderWindow* renderWindow = renderWindowPart->GetQmitkRenderWindow(name);
+    return renderWindow != nullptr ? renderWindow->GetRenderer() : nullptr;
+  }
+}
+
 QmitkControlVisualizationPropertiesView::QmitkControlVisualizationPropertiesView()
   : QmitkAbstractView(),
     m_Controls(nullptr),
@@ -104,9 +117,9 @@ void QmitkControlVisualizationPropertiesView::RemoveColorObserver()
 
 void QmitkControlVisualizationPropertiesView::SetTs(int currentThickSlicesMode, int num, std::string render_window)
 {
-  if (auto renderWindowPart = this->GetRenderWindowPart(mitk::WorkbenchUtil::IRenderWindowPartStrategy::OPEN))
+  mitk::BaseRenderer::Pointer renderer = GetRendererOf(this->GetRenderWindowPart(mitk::WorkbenchUtil::IRenderWindowPartStrategy::OPEN), QString(render_window.c_str()));
+  if (renderer.IsNotNull() && renderer->GetCurrentWorldPlaneGeometryNode() != nullptr)
   {
-    mitk::BaseRenderer::Pointer renderer = renderWindowPart->GetQmitkRenderWindow(QString(render_window.c_str()))->GetRenderer();
     renderer->GetCurrentWorldPlaneGeometryNode()->SetProperty("reslice.thickslices.num", mitk::IntProperty::New(num));
     if(num>0)
     {
@@ -775,9 +788,12 @@ void QmitkControlVisualizationPropertiesView::Set3DClippingPlane(bool disable, m
     mitk::Point3D planeOrigin; planeOrigin.Fill(0.0);
     if (!disable)
     {
-      mitk::SliceNavigationController* slicer = renderWindow->GetQmitkRenderWindow(QString(plane.c_str()))->GetSliceNavigationController();
-      mitk::PlaneGeometry::ConstPointer planeGeo = slicer->GetCurrentPlaneGeometry();
-      planeOrigin = this->GetRenderWindowPart()->GetSelectedPosition();
+      QmitkRenderWindow* planeWindow = renderWindow->GetQmitkRenderWindow(QString(plane.c_str()));
+      mitk::SliceNavigationController* slicer = planeWindow != nullptr ? planeWindow->GetSliceNavigationController() : nullptr;
+      mitk::PlaneGeometry::ConstPointer planeGeo = slicer != nullptr ? slicer->GetCurrentPlaneGeometry() : nullptr;
+      if (planeGeo.IsNull())
+        return;
+      planeOrigin = renderWindow->GetSelectedPosition();
       planeNormal = planeGeo->GetNormal();
     }
     node->SetProperty( "3DClipping", mitk::ClippingProperty::New( planeOrigin, planeNormal ) );
@@ -816,6 +832,8 @@ void QmitkControlVisualizationPropertiesView::VisibleOdfsON_C()
 
 bool QmitkControlVisualizationPropertiesView::IsPlaneRotated()
 {
+  if (m_NodeUsedForOdfVisualization.IsNull())
+    return false;
   mitk::Image* currentImage = dynamic_cast<mitk::Image* >( m_NodeUsedForOdfVisualization->GetData() );
   if( currentImage == nullptr )
   {
@@ -835,9 +853,10 @@ bool QmitkControlVisualizationPropertiesView::IsPlaneRotated()
   double eps = 0.000001;
   // for all 2D renderwindows of the render window part check alignment
   {
+    mitk::BaseRenderer* renderer = GetRendererOf(renderWindowPart, "axial");
+    if (renderer == nullptr) { return false; }
     mitk::PlaneGeometry::ConstPointer displayPlane
-        = dynamic_cast<const mitk::PlaneGeometry*>
-        ( renderWindowPart->GetQmitkRenderWindow("axial")->GetRenderer()->GetCurrentWorldPlaneGeometry() );
+        = dynamic_cast<const mitk::PlaneGeometry*>( renderer->GetCurrentWorldPlaneGeometry() );
 
     if (displayPlane.IsNull()) { return false; }
 
@@ -853,9 +872,10 @@ bool QmitkControlVisualizationPropertiesView::IsPlaneRotated()
     if (test==3) { return true; }
   }
   {
+    mitk::BaseRenderer* renderer = GetRendererOf(renderWindowPart, "sagittal");
+    if (renderer == nullptr) { return false; }
     mitk::PlaneGeometry::ConstPointer displayPlane
-        = dynamic_cast<const mitk::PlaneGeometry*>
-        ( renderWindowPart->GetQmitkRenderWindow("sagittal")->GetRenderer()->GetCurrentWorldPlaneGeometry() );
+        = dynamic_cast<const mitk::PlaneGeometry*>( renderer->GetCurrentWorldPlaneGeometry() );
 
     if (displayPlane.IsNull()) { return false; }
 
@@ -871,9 +891,10 @@ bool QmitkControlVisualizationPropertiesView::IsPlaneRotated()
     if (test==3) { return true; }
   }
   {
+    mitk::BaseRenderer* renderer = GetRendererOf(renderWindowPart, "coronal");
+    if (renderer == nullptr) { return false; }
     mitk::PlaneGeometry::ConstPointer displayPlane
-        = dynamic_cast<const mitk::PlaneGeometry*>
-        ( renderWindowPart->GetQmitkRenderWindow("coronal")->GetRenderer()->GetCurrentWorldPlaneGeometry() );
+        = dynamic_cast<const mitk::PlaneGeometry*>( renderer->GetCurrentWorldPlaneGeometry() );
 
     if (displayPlane.IsNull()) { return false; }
 
