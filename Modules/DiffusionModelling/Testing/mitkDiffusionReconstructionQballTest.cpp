@@ -44,6 +44,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint);
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
   MITK_TEST(MultiShell_UnsupportedShells_Throw);
+  MITK_TEST(MultiShell_SecondUpdate_SameResult);
   MITK_TEST(Standard_ShImageMatchesOdf);
   CPPUNIT_TEST_SUITE_END();
 
@@ -77,9 +78,9 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
 
   /**
    * A 2x2x2 DWI of a cylindrical tensor along x, S0 = 1000. Each volume's b-value is encoded in the
-   * length of its gradient (b = ReferenceBValue * |g|^2), as in MITK.
+   * length of its gradient (b = referenceBValue * |g|^2), as in MITK.
    */
-  static Dwi Simulate(const std::vector<vnl_vector_fixed<double, 3>> &gradients)
+  static Dwi Simulate(const std::vector<vnl_vector_fixed<double, 3>> &gradients, double referenceBValue = ReferenceBValue)
   {
     Dwi dwi;
     dwi.gradients = GradientContainerType::New();
@@ -98,19 +99,19 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
     {
       const auto &g = gradients[i];
       const double gDg = 1.7e-3 * g[0] * g[0] + 0.3e-3 * (g[1] * g[1] + g[2] * g[2]);
-      pixel[i] = static_cast<short>(std::round(1000 * std::exp(-ReferenceBValue * gDg)));
+      pixel[i] = static_cast<short>(std::round(1000 * std::exp(-referenceBValue * gDg)));
     }
     dwi.image->FillBuffer(pixel);
     return dwi;
   }
 
-  /** One b0 volume and 30 directions per b-value, b = ReferenceBValue * |g|^2. */
-  static std::vector<vnl_vector_fixed<double, 3>> Shells(const std::vector<double> &bValues)
+  /** One b0 volume and the same 30 directions per b-value, b = referenceBValue * |g|^2. */
+  static std::vector<vnl_vector_fixed<double, 3>> Shells(const std::vector<double> &bValues, double referenceBValue = ReferenceBValue)
   {
     std::vector<vnl_vector_fixed<double, 3>> gradients(1, vnl_vector_fixed<double, 3>(0.0));
     for (double b : bValues)
       for (const auto &d : Directions(30))
-        gradients.push_back(d * std::sqrt(b / ReferenceBValue));
+        gradients.push_back(d * std::sqrt(b / referenceBValue));
     return gradients;
   }
 
@@ -391,6 +392,26 @@ public:
     CPPUNIT_ASSERT(MultiShellError({1000}).find("Only three equidistant shells") != std::string::npos);
     CPPUNIT_ASSERT(MultiShellError({1000, 1500, 2000}).find("b = 1000, 1500, 2000") != std::string::npos);
     CPPUNIT_ASSERT_EQUAL(std::string(), MultiShellError({1000, 2000, 3000}));
+  }
+
+  // The first execution normalizes the filter's copy of the gradients in place and every execution
+  // decides anew whether the shells need interpolation; a second Update() must take the same path.
+  void MultiShell_SecondUpdate_SameResult()
+  {
+    auto dwi = Simulate(Shells({1000, 2000, 3000}, 3000), 3000);
+    auto fresh = MultiShellFilterType::New();
+    fresh->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    fresh->SetLambda(0.006);
+    fresh->Update();
+
+    auto reused = MultiShellFilterType::New();
+    reused->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    reused->SetLambda(0.006);
+    reused->Update();
+    reused->Modified();
+    reused->Update();
+    CheckEqual(fresh->GetOutput(), reused->GetOutput());
+    CheckEqual(fresh->GetCoefficientImage().GetPointer(), reused->GetCoefficientImage().GetPointer());
   }
 
   // The coefficient image of the non-CSA methods got the CSA constant 1/(2 sqrt(pi)) added to c0,

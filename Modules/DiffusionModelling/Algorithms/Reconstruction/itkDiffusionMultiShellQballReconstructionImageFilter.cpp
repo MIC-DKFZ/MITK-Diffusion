@@ -574,6 +574,8 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
         return;
       }else
       {
+        // Set here, not in the work units, which would all write it at the same time.
+        m_MaxDirections = size_shell1;
         ComputeReconstructionMatrix(shell1);
       }
     }
@@ -746,10 +748,7 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   IndiciesVector Shell3Indiecies = it->second;
   IndiciesVector BZeroIndicies = m_BValueMap[0];
 
-  if(!m_Interpolation_Flag)
-  {
-    m_MaxDirections = Shell1Indiecies.size();
-  }// else: m_MaxDirection is set in BeforeThreadedGenerateData
+  // m_MaxDirections is set in BeforeThreadedGenerateData, with and without interpolation.
 
   // Nx3 Signal Matrix with E(0) = Shell 1, E(1) = Shell 2, E(2) = Shell 3
   vnl_vector< double > E1(m_MaxDirections);
