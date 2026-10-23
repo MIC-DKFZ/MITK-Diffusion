@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionIndices.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkDiffusionPeaks.h>
 #include <mitkDiffusionPropertyHelper.h>
@@ -25,11 +26,13 @@ found in the LICENSE file.
 
 #include <mitkPointShell.h>
 
+#include <itkAdcImageFilter.h>
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 #include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionIterator.h>
+#include <itkTensorDerivedMeasurementsFilter.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 
 #include <vnl/algo/vnl_svd.h>
@@ -63,6 +66,11 @@ class mitkDiffusionReconstructionTestSuite : public mitk::TestFixture
   MITK_TEST(Peaks_FslConvention_SameAsMrtrix);
   MITK_TEST(Peaks_MaskOfOtherSize_Throws);
   MITK_TEST(TensorPeaks_SameAsFilter);
+  MITK_TEST(TensorIndices_MatchReferences);
+  MITK_TEST(Gfa_MatchesReference);
+  MITK_TEST(Adc_SameAsFilter);
+  MITK_TEST(Indices_Scale);
+  MITK_TEST(Indices_WrongInput_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
@@ -584,6 +592,105 @@ public:
       mitk::CastToItkImage(result.numberOfPeaks, numberOfPeaks);
       CPPUNIT_ASSERT(SameVoxels(filter->GetOutput(), numberOfPeaks.GetPointer()));
     }
+  }
+
+  static mitk::Image::Pointer LoadImage(const std::string &path)
+  {
+    return mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(path));
+  }
+
+  // MITK-Data holds the indices of tensorImage.dti, which no other test uses; the function
+  // reproduces FA, RA, AD and RD. tensorImage_CA.nrrd and tensorImage_MD.nrrd are older than this
+  // repository's history and differ from today's filter (CA: 106 voxels, up to 0.031; MD: 12096
+  // voxels, up to 1.5e-3 at values of about 1e-3, so not the mean eigenvalue), so CA and MD are
+  // compared with the filter.
+  void TensorIndices_MatchReferences()
+  {
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/tensorImage.dti"));
+    const std::vector<std::pair<mitk::TensorIndex, std::string>> cases = {
+      {mitk::TensorIndex::FA, "FA"}, {mitk::TensorIndex::RA, "RA"}, {mitk::TensorIndex::AD, "AD"},
+      {mitk::TensorIndex::RD, "RD"}};
+    for (const auto &[index, name] : cases)
+    {
+      auto reference = LoadImage("DiffusionImaging/tensorImage_" + name + ".nrrd");
+      auto result = mitk::TensorIndexImage(tensors, index, 1.0);
+      CPPUNIT_ASSERT_MESSAGE(name, mitk::Equal(*result, *reference, 1e-5, true));
+    }
+
+    using FilterType = itk::TensorDerivedMeasurementsFilter<float>;
+    for (const auto &[index, measure] : {std::pair{mitk::TensorIndex::CA, FilterType::CA}, std::pair{mitk::TensorIndex::MD, FilterType::MD}})
+    {
+      auto filter = FilterType::New();
+      filter->SetInput(ItkTensors(tensors));
+      filter->SetMeasure(measure);
+      filter->Update();
+      itk::Image<float, 3>::Pointer result;
+      mitk::CastToItkImage(mitk::TensorIndexImage(tensors, index, 1.0), result);
+      CPPUNIT_ASSERT(SameVoxels(filter->GetOutput(), result.GetPointer()));
+    }
+  }
+
+  void Gfa_MatchesReference()
+  {
+    auto odfs = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/qBallImage.qbi"));
+    auto reference = LoadImage("DiffusionImaging/qBallImage_GFA.nrrd");
+    CPPUNIT_ASSERT(mitk::Equal(*mitk::GfaImage(odfs, 1.0), *reference, 1e-5, true));
+  }
+
+  void Adc_SameAsFilter()
+  {
+    DwiType::Pointer itkDwi;
+    mitk::CastToItkImage(m_Dwi, itkDwi);
+    for (bool fit : {false, true})
+    {
+      auto filter = itk::AdcImageFilter<short, double>::New();
+      filter->SetInput(itkDwi);
+      filter->SetGradientDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(m_Dwi));
+      filter->SetB_value(mitk::DiffusionPropertyHelper::GetReferenceBValue(m_Dwi));
+      filter->SetFitSignal(fit);
+      filter->Update();
+
+      itk::Image<double, 3>::Pointer adc;
+      mitk::CastToItkImage(mitk::AdcImage(m_Dwi, fit, 1.0), adc);
+      CPPUNIT_ASSERT(SameVoxels(filter->GetOutput(), adc.GetPointer()));
+    }
+  }
+
+  template <class TPixel>
+  static void CheckScaled(const mitk::Image *unscaled, const mitk::Image *scaled, double factor)
+  {
+    typename itk::Image<TPixel, 3>::Pointer a;
+    typename itk::Image<TPixel, 3>::Pointer b;
+    mitk::CastToItkImage(unscaled, a);
+    mitk::CastToItkImage(scaled, b);
+    itk::ImageRegionConstIterator<itk::Image<TPixel, 3>> itA(a, a->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<itk::Image<TPixel, 3>> itB(b, b->GetLargestPossibleRegion());
+    unsigned int nonZero = 0;
+    for (; !itA.IsAtEnd(); ++itA, ++itB)
+    {
+      CPPUNIT_ASSERT_EQUAL(static_cast<TPixel>(itA.Get() * factor), itB.Get());
+      nonZero += itA.Get() != 0 ? 1 : 0;
+    }
+    CPPUNIT_ASSERT(nonZero > 0);
+  }
+
+  // The view's scale factor multiplies the index (e.g. diffusivities in 10^-3 mm^2/s).
+  void Indices_Scale()
+  {
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    CheckScaled<float>(mitk::TensorIndexImage(tensors, mitk::TensorIndex::MD, 1), mitk::TensorIndexImage(tensors, mitk::TensorIndex::MD, 1000), 1000);
+    auto odfs = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/qBallImage.qbi"));
+    CheckScaled<float>(mitk::GfaImage(odfs, 1), mitk::GfaImage(odfs, 2.5), 2.5);
+    CheckScaled<double>(mitk::AdcImage(m_Dwi, false, 1), mitk::AdcImage(m_Dwi, false, 1000), 1000);
+  }
+
+  void Indices_WrongInput_Throws()
+  {
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    CPPUNIT_ASSERT_THROW(mitk::TensorIndexImage(nullptr, mitk::TensorIndex::FA, 1), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(mitk::GfaImage(tensors, 1), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(mitk::GfaImage(nullptr, 1), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(mitk::AdcImage(tensors, true, 1), mitk::Exception);
   }
 };
 
