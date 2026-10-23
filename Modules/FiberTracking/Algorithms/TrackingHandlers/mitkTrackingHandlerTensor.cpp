@@ -277,17 +277,12 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::ProposeDirection(const itk::Poi
     if (!olddirs.empty())
       oldDir = olddirs.back();
 
-    if (m_Parameters->m_FlipX)
-      oldDir[0] *= -1;
-    if (m_Parameters->m_FlipY)
-      oldDir[1] *= -1;
-    if (m_Parameters->m_FlipZ)
-      oldDir[2] *= -1;
-
-    float old_mag = oldDir.magnitude();
-
+    // same voxel without interpolation: keep the previous direction, still in the tracking frame
     if (!m_Parameters->m_InterpolateTractographyData && oldIndex==index)
       return oldDir;
+
+    FlipDirection(oldDir);  // to the data frame
+    float old_mag = oldDir.magnitude();
 
     output_direction = GetDirection(pos, oldDir, tensor);
     float mag = output_direction.magnitude();

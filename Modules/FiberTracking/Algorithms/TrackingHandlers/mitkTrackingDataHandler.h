@@ -108,6 +108,18 @@ namespace mitk
       m_Parameters->SetMinVoxelSizeMm(minVoxelSize);
     }
 
+    /** Applies the flip options of the parameters. A flip is its own inverse, so the same call maps
+     *  directions from the tracking frame to the data frame and back. */
+    void FlipDirection(vnl_vector_fixed<float, 3> &dir) const
+    {
+      if (m_Parameters->m_FlipX)
+        dir[0] *= -1;
+      if (m_Parameters->m_FlipY)
+        dir[1] *= -1;
+      if (m_Parameters->m_FlipZ)
+        dir[2] *= -1;
+    }
+
     /** Engines of the calling OpenMP thread. */
     ItkRngType *GetThreadRngItk();
     BoostRngType &GetThreadRng();

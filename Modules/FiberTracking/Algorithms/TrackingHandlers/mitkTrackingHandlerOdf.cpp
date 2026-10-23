@@ -284,9 +284,11 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
   // no previous direction
   if (max_odf_val>m_Parameters->m_OdfCutoff && (olddirs.empty() || last_dir.magnitude()<=0.5))
   {
+    // the ODF directions are in the data frame; the flip options map them to the tracking frame
     if (m_Parameters->m_Mode==MODE::DETERMINISTIC)  // return maximum peak
     {
       output_direction = RefinePeak(max_idx_d, probs);
+      FlipDirection(output_direction);
       return output_direction * max_odf_val;
     }
     else if (m_Parameters->m_Mode==MODE::PROBABILISTIC) // sample from complete ODF
@@ -294,6 +296,7 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
       int max_sample_idx = SampleOdf(probs, angles);
       if (max_sample_idx>=0)
         output_direction = m_OdfFloatDirs.get_row(max_sample_idx) * probs[max_sample_idx];
+      FlipDirection(output_direction);
       return output_direction;
     }
   }

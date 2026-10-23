@@ -39,6 +39,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(ProbabilisticPeaks_JitterIsIsotropicStandardDeviation);
   MITK_TEST(DeterministicOdf_FollowsPeakBetweenSamplingDirections);
   MITK_TEST(Interpolation_TracksTheOutermostVoxelLayer);
+  MITK_TEST(Flips_FollowTheFlippedField);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -141,6 +142,78 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
     auto params = MakeParameters();
     params->m_EpConstraints = constraint;
     return Track(params, seeds, target, nullptr, MakeInnerMask())->GetNumberOfLines();
+  }
+
+  using OdfImageType = mitk::TrackingHandlerOdf::ItkOdfImageType;
+  using TensorImageType = mitk::TrackingHandlerTensor::ItkTensorImageType;
+
+  /** 20x20x20 voxels of 1 mm with the single-fibre ODF |d.f|^20 along fibre in every voxel. */
+  static OdfImageType::Pointer MakeOdfField(const vnl_vector_fixed<double, 3> &fibre)
+  {
+    itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE> table;
+    OdfImageType::PixelType odf;
+    for (int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+    {
+      vnl_vector_fixed<double, 3> d = table.GetDirection(i);
+      odf[i] = static_cast<float>(std::pow(std::fabs(dot_product(d, fibre)), 20));
+    }
+    auto odfs = OdfImageType::New();
+    OdfImageType::SizeType size = {{20, 20, 20}};
+    odfs->SetRegions(OdfImageType::RegionType(size));
+    odfs->Allocate();
+    odfs->FillBuffer(odf);
+    return odfs;
+  }
+
+  /** 20x20x20 voxels of 1 mm with a prolate tensor along dir in every voxel. */
+  static TensorImageType::Pointer MakeTensorField(vnl_vector_fixed<double, 3> dir)
+  {
+    dir.normalize();
+    vnl_matrix_fixed<double, 3, 3> d = outer_product(dir, dir) * 0.0014;
+    d(0, 0) += 0.0003;
+    d(1, 1) += 0.0003;
+    d(2, 2) += 0.0003;
+    TensorImageType::PixelType tensor;
+    tensor[0] = d(0, 0);
+    tensor[1] = d(0, 1);
+    tensor[2] = d(0, 2);
+    tensor[3] = d(1, 1);
+    tensor[4] = d(1, 2);
+    tensor[5] = d(2, 2);
+    auto tensors = TensorImageType::New();
+    TensorImageType::SizeType size = {{20, 20, 20}};
+    tensors->SetRegions(TensorImageType::RegionType(size));
+    tensors->Allocate();
+    tensors->FillBuffer(tensor);
+    return tensors;
+  }
+
+  /** Seeds in the voxels (9,9,9) and (10,10,10) of the 20x20x20 fields. */
+  static FloatImgType::Pointer MakeCubeSeeds()
+  {
+    auto seeds = FloatImgType::New();
+    FloatImgType::SizeType size = {{20, 20, 20}};
+    seeds->SetRegions(FloatImgType::RegionType(size));
+    seeds->Allocate();
+    seeds->FillBuffer(0.0f);
+    for (int k = 9; k <= 10; ++k)
+    {
+      FloatImgType::IndexType idx = {{k, k, k}};
+      seeds->SetPixel(idx, 1.0f);
+    }
+    return seeds;
+  }
+
+  static vtkSmartPointer<vtkPolyData> TrackWith(mitk::TrackingDataHandler &handler,
+                                                std::shared_ptr<mitk::StreamlineTractographyParameters> params,
+                                                FloatImgType::Pointer seeds)
+  {
+    auto tracker = itk::StreamlineTrackingFilter::New();
+    tracker->SetTrackingHandler(&handler);
+    tracker->SetSeedImage(seeds);
+    tracker->SetParameters(params);
+    tracker->Update();
+    return tracker->GetFiberPolyData();
   }
 
 public:
@@ -298,32 +371,10 @@ public:
    *  degrees off this fibre; the refined peak must be within one degree. */
   void DeterministicOdf_FollowsPeakBetweenSamplingDirections()
   {
-    using OdfImageType = mitk::TrackingHandlerOdf::ItkOdfImageType;
     vnl_vector_fixed<double, 3> fibre(0.8, 0.5, 0.2);
     fibre.normalize();
-
-    itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE> table;
-    OdfImageType::PixelType odf;
-    for (int i = 0; i < ODF_SAMPLING_SIZE; ++i)
-    {
-      vnl_vector_fixed<double, 3> d = table.GetDirection(i);
-      odf[i] = static_cast<float>(std::pow(std::fabs(dot_product(d, fibre)), 20));
-    }
-    auto odfs = OdfImageType::New();
-    OdfImageType::SizeType size = {{20, 20, 20}};
-    odfs->SetRegions(OdfImageType::RegionType(size));
-    odfs->Allocate();
-    odfs->FillBuffer(odf);
-
-    auto seeds = FloatImgType::New();
-    seeds->SetRegions(FloatImgType::RegionType(size));
-    seeds->Allocate();
-    seeds->FillBuffer(0.0f);
-    for (int k = 9; k <= 10; ++k)
-    {
-      FloatImgType::IndexType idx = {{k, k, k}};
-      seeds->SetPixel(idx, 1.0f);
-    }
+    auto odfs = MakeOdfField(fibre);
+    auto seeds = MakeCubeSeeds();
 
     auto params = MakeParameters();
     params->m_MinTractLengthMm = 5;
@@ -349,7 +400,6 @@ public:
     params->m_MinTractLengthMm = 2;
     CPPUNIT_ASSERT_EQUAL_MESSAGE("peaks", vtkIdType(2), Track(params, seeds, nullptr, MakeStraightPeakField(0, 1, 0))->GetNumberOfLines());
 
-    using TensorImageType = mitk::TrackingHandlerTensor::ItkTensorImageType;
     auto tensors = TensorImageType::New();
     TensorImageType::SizeType size = {{SizeX, SizeYZ, SizeYZ}};
     tensors->SetRegions(TensorImageType::RegionType(size));
@@ -371,6 +421,36 @@ public:
     tracker->SetParameters(params);
     tracker->Update();
     CPPUNIT_ASSERT_EQUAL_MESSAGE("tensors", vtkIdType(2), tracker->GetFiberPolyData()->GetNumberOfLines());
+  }
+
+  /** "Flip X" mirrors the data directions: tracking must follow the mirrored field. The tensor
+   *  handler without interpolation returned the previous direction in the data frame in the same
+   *  voxel, the ODF handler did not flip the first direction at the seed. */
+  void Flips_FollowTheFlippedField()
+  {
+    vnl_vector_fixed<double, 3> fibre(0.8, 0.5, 0.2);
+    fibre.normalize();
+    vnl_vector_fixed<double, 3> flipped(-fibre[0], fibre[1], fibre[2]);
+    auto seeds = MakeCubeSeeds();
+
+    auto params = MakeParameters();
+    params->m_MinTractLengthMm = 5;
+    params->m_FlipX = true;
+    params->m_InterpolateTractographyData = false;
+    mitk::TrackingHandlerTensor tensorHandler;
+    tensorHandler.SetTensorImage(MakeTensorField(fibre).GetPointer());
+    auto fibers = TrackWith(tensorHandler, params, seeds);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("tensor fibers", vtkIdType(2), fibers->GetNumberOfCells());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("tensor, no interpolation", 0.0, MeanSegmentAngleDeg(fibers, flipped), 0.01);
+
+    params = MakeParameters();
+    params->m_MinTractLengthMm = 5;
+    params->m_FlipX = true;
+    mitk::TrackingHandlerOdf odfHandler;
+    odfHandler.SetOdfImage(MakeOdfField(fibre));
+    fibers = TrackWith(odfHandler, params, seeds);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("ODF fibers", vtkIdType(2), fibers->GetNumberOfCells());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("ODF", 0.0, MeanSegmentAngleDeg(fibers, flipped), 1.0);
   }
 };
 
