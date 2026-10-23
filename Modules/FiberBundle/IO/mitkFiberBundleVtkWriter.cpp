@@ -154,6 +154,9 @@ void mitk::FiberBundleVtkWriter::Write()
     else
     {
       vtkSmartPointer<vtkPolyDataWriter> writer = vtkSmartPointer<vtkPolyDataWriter>::New();
+      // VTK 9 writes legacy version 5.1 by default, which VTK 8 based readers (earlier MITK
+      // Diffusion releases, other tools) cannot parse; 4.2 is read by both.
+      writer->SetFileVersion(vtkDataWriter::VTK_LEGACY_READER_VERSION_4_2);
       writer->SetInputData(fibPoly);
       writer->SetFileName(filename.c_str());
       if (us::any_cast<bool>(options["Save as binary file"]))

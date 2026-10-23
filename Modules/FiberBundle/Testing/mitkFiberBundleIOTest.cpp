@@ -274,6 +274,9 @@ public:
 
         auto reloaded = mitk::IOUtil::Load<mitk::FiberBundle>(path);
         CPPUNIT_ASSERT(reloaded->Equals(fib));
+        std::string firstLine;
+        std::getline(std::ifstream(path), firstLine);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("Legacy format readable by VTK 8", std::string("# vtk DataFile Version 4.2"), firstLine);
         for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
         {
           const float expected = saveWeights ? fib->GetFiberWeight(i) : 1.0f;
