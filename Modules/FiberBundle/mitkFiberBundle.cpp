@@ -1600,16 +1600,16 @@ void mitk::FiberBundle::SetFiberWeight(unsigned int fiber, float weight)
 
 void mitk::FiberBundle::SetFiberColors(vtkSmartPointer<vtkUnsignedCharArray> fiberColors)
 {
+  // One RGBA or RGB tuple per point; RGB colours get an opaque alpha.
+  const int components = fiberColors==nullptr ? 0 : fiberColors->GetNumberOfComponents();
+  if (fiberColors==nullptr || (components!=3 && components!=4) || fiberColors->GetNumberOfTuples()<m_FiberPolyData->GetNumberOfPoints())
+    mitkThrow() << "Fiber colors need one RGB or RGBA tuple per point (" << m_FiberPolyData->GetNumberOfPoints() << " points).";
+
   for(long i=0; i<m_FiberPolyData->GetNumberOfPoints(); ++i)
   {
-    unsigned char source[4] = {0,0,0,0};
-    fiberColors->GetTypedTuple(i, source);
-
-    unsigned char target[4] = {0,0,0,0};
-    target[0] = source[0];
-    target[1] = source[1];
-    target[2] = source[2];
-    target[3] = source[3];
+    unsigned char target[4] = {0,0,0,255};
+    for (int c=0; c<components; ++c)
+      target[c] = fiberColors->GetValue(i*components+c);
     m_FiberColors->InsertTypedTuple(i, target);
   }
   m_UpdateTime3D.Modified();

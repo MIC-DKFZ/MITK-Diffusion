@@ -23,6 +23,7 @@ found in the LICENSE file.
 #include <vtkCell.h>
 #include <vtkCellArray.h>
 #include <vtkFloatArray.h>
+#include <vtkUnsignedCharArray.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
@@ -51,6 +52,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(TransformFibers_NoTransform_Throws);
   MITK_TEST(SetFiberPolyData_LeavesOldPolyDataAndPointDataBehind);
   MITK_TEST(SetSingleFiberColor_UsesRgbOrder);
+  MITK_TEST(SetFiberColors_ChecksTheArray);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -381,6 +383,27 @@ public:
         CPPUNIT_ASSERT_EQUAL(i == 1 ? 30.0 : 255.0, colours->GetComponent(id, 2));
       }
     }
+  }
+
+  void SetFiberColors_ChecksTheArray()
+  {
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}}});
+    auto rgb = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    rgb->SetNumberOfComponents(3);
+    for (int i = 0; i < 3; ++i)
+    {
+      const unsigned char value[3] = {10, 20, 30};
+      rgb->InsertNextTypedTuple(value);
+    }
+    fib->SetFiberColors(rgb);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("RGB gets an opaque alpha", 255.0, fib->GetFiberColors()->GetComponent(2, 3));
+    CPPUNIT_ASSERT_EQUAL(20.0, fib->GetFiberColors()->GetComponent(2, 1));
+
+    auto tooShort = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    tooShort->SetNumberOfComponents(4);
+    tooShort->SetNumberOfTuples(2);
+    CPPUNIT_ASSERT_THROW(fib->SetFiberColors(tooShort), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(fib->SetFiberColors(vtkSmartPointer<vtkUnsignedCharArray>()), mitk::Exception);
   }
 };
 
