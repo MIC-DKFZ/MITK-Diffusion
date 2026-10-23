@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output root", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "mask image", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "mask image; without it, the grid covers the tractogram", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("athresh", "", mitkCommandLineParser::Float, "Angular threshold:", "angular threshold in degrees. closer fiber directions are regarded as one direction and clustered together.", 25, true);
   parser.addArgument("peakthresh", "", mitkCommandLineParser::Float, "Peak size threshold:", "peak size threshold relative to largest peak in voxel", 0.2, true);
   parser.addArgument("only_mask_geometry", "", mitkCommandLineParser::Bool, "Only mask geometry:", "don't use content of mask image, only use it's geometry", false);
@@ -132,6 +132,9 @@ int main(int argc, char* argv[])
     case 3:
       fOdfFilter->SetNormalizationMethod(itk::TractsToVectorImageFilter<float>::NormalizationMethods::MAX_VEC_NORM);
       break;
+    default:
+      std::cout << "--normalization must be 1, 2 or 3." << std::endl;
+      return EXIT_FAILURE;
     }
     fOdfFilter->SetSizeThreshold(peakThreshold);
     fOdfFilter->SetMaxNumDirections(maxNumDirs);
