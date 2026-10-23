@@ -169,6 +169,8 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundles(std::vector< mitk::Fibe
   // add current fiber bundle
   vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
 
+  // null entries add nothing
+  fibs.erase(std::remove(fibs.begin(), fibs.end(), nullptr), fibs.end());
   auto num_weights = this->GetNumFibers();
   for (auto fib : fibs)
     num_weights += fib->GetNumFibers();
@@ -1328,6 +1330,8 @@ std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(DataNode *roi,
   mitk::PlanarFigureComposite::Pointer pfc = dynamic_cast<mitk::PlanarFigureComposite*>(roi->GetData());
   if (!pfc.IsNull()) // handle composite
   {
+    if (storage==nullptr)
+      mitkThrow() << "A planar figure composite needs the data storage that holds its children.";
     DataStorage::SetOfObjects::ConstPointer children = storage->GetDerivations(roi);
     if (children->size()==0)
       return result;
@@ -1482,6 +1486,8 @@ std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(DataNode *roi,
         }
       }
     }
+    else
+      MITK_WARN << "Fiber extraction supports planar polygons and circles; " << roi->GetData()->GetNameOfClass() << " extracts nothing.";
     return result;
   }
 

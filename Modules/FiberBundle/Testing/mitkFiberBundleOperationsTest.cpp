@@ -60,6 +60,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(PrintSelf_EmptyBundle_Prints);
   MITK_TEST(GeneratePolyDataByIds_InvalidId_Throws);
   MITK_TEST(ColorFibersByFiberWeights_EqualWeightsAboveOne_OpaqueColours);
+  MITK_TEST(AddBundlesAndCompositeWithoutStorage_NoCrash);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -484,6 +485,18 @@ public:
     auto colours = fib->GetFiberColors();
     for (vtkIdType i = 0; i < colours->GetNumberOfTuples(); ++i)
       CPPUNIT_ASSERT_EQUAL(255.0, colours->GetComponent(i, 3));
+  }
+
+  void AddBundlesAndCompositeWithoutStorage_NoCrash()
+  {
+    auto fib = LoadWeightedFibers();
+    auto other = LoadWeightedFibers();
+    auto joined = fib->AddBundles({nullptr, other, nullptr});
+    CPPUNIT_ASSERT_EQUAL(2 * fib->GetNumFibers(), joined->GetNumFibers());
+
+    auto compositeNode = mitk::DataNode::New();
+    compositeNode->SetData(mitk::PlanarFigureComposite::New());
+    CPPUNIT_ASSERT_THROW(fib->ExtractFiberIdSubset(compositeNode, nullptr), mitk::Exception);
   }
 };
 
