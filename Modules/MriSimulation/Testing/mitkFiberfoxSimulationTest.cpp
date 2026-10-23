@@ -26,6 +26,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(FibersOutsideImage);
   MITK_TEST(NoGradients);
   MITK_TEST(PrototypeNeedsOneShell);
+  MITK_TEST(InversionRecovery);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -128,6 +129,47 @@ public:
       else
         filter->Update();
     }
+  }
+
+  /**
+   * Inversion recovery with TI < TR scales the signal of a T1 by 1 - 2 exp(-TI/T1) + exp(-TR/T1)
+   * relative to 1 - exp(-TR/T1) without inversion. All compartments get the same T1, so the
+   * complex coil images (linear in the signal, no noise in param5) scale by the ratio.
+   */
+  void InversionRecovery()
+  {
+    const double t1 = 832, tr = 4000, ti = 700;
+    std::vector<FilterType::Pointer> filters;
+    for (double inversion : { 0.0, ti })
+    {
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+      parameters.m_SignalGen.m_tRep = tr;
+      parameters.m_SignalGen.m_tInv = inversion;
+      for (auto model : parameters.m_FiberModelList)
+        model->SetT1(t1);
+      for (auto model : parameters.m_NonFiberModelList)
+        model->SetT1(t1);
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetFiberBundle(m_FiberBundle);
+      filter->Update();
+      filters.push_back(filter);
+    }
+    const double expected = (1 - 2 * std::exp(-ti / t1) + std::exp(-tr / t1)) / (1 - std::exp(-tr / t1));
+    auto plain = filters[0]->GetOutputImagesReal()[0];
+    auto inverted = filters[1]->GetOutputImagesReal()[0];
+    const auto n = plain->GetLargestPossibleRegion().GetNumberOfPixels() * plain->GetNumberOfComponentsPerPixel();
+    double maxPlain = 0, maxDeviation = 0;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+      maxPlain = std::max(maxPlain, std::fabs(plain->GetBufferPointer()[i]));
+      maxDeviation = std::max(maxDeviation, std::fabs(inverted->GetBufferPointer()[i] - expected * plain->GetBufferPointer()[i]));
+    }
+    MITK_INFO << "Inversion recovery: largest deviation " << maxDeviation << " of signals up to " << maxPlain;
+    CPPUNIT_ASSERT(maxPlain > 10);
+    CPPUNIT_ASSERT_MESSAGE("signal scaled by the inversion-recovery factor", maxDeviation < 1e-4 * maxPlain);
   }
 };
 

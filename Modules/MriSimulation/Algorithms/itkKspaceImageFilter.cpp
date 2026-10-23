@@ -221,8 +221,17 @@ namespace itk {
         float relaxation = (1.0-std::exp(-m_Parameters->m_SignalGen.m_tRep/m_T1[i]));
 
         // account for inversion pulse and TI
-        if (m_Parameters->m_SignalGen.m_tInv > 0)
-          relaxation *= (1.0-std::exp(std::log(2) - m_Parameters->m_SignalGen.m_tInv/m_T1[i]));
+        const float tInv = m_Parameters->m_SignalGen.m_tInv;
+        if (tInv > 0 && tInv < m_Parameters->m_SignalGen.m_tRep)
+        {
+          // inversion recovery with a 90 degree excitation every TR: 1 - 2 exp(-TI/T1) + exp(-TR/T1)
+          relaxation = 1.0 - 2.0*std::exp(-tInv/m_T1[i]) + std::exp(-m_Parameters->m_SignalGen.m_tRep/m_T1[i]);
+        }
+        else if (tInv > 0)
+        {
+          // TI >= TR has no standard formula; the product kept from earlier versions is an open point
+          relaxation *= (1.0-std::exp(std::log(2) - tInv/m_T1[i]));
+        }
 
         m_T1Relax.push_back(relaxation);
       }
