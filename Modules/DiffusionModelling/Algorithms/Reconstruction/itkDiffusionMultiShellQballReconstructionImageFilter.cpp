@@ -1092,12 +1092,10 @@ bool DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   mapIterator++;
   while(mapIterator != m_BValueMap.end())
   {
-    std::vector<unsigned int>::const_iterator it1 = mapIterator->second.begin();
-    std::vector<unsigned int>::const_iterator it2 = mapIterator->second.begin();
-
-    for(; it1 != mapIterator->second.end(); ++it1)
+    for(auto it1 = mapIterator->second.cbegin(); it1 != mapIterator->second.cend(); ++it1)
     {
-      for(; it2 != mapIterator->second.end(); ++it2)
+      // Every pair of the shell: it2 starts anew for each it1.
+      for(auto it2 = mapIterator->second.cbegin(); it2 != mapIterator->second.cend(); ++it2)
       {
         if(m_GradientDirectionContainer->ElementAt(*it1) == m_GradientDirectionContainer->ElementAt(*it2) && it1 != it2)
         {

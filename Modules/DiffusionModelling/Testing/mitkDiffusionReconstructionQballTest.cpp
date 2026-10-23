@@ -23,6 +23,7 @@ found in the LICENSE file.
 #include <itkDiffusionQballReconstructionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkOrientationDistributionFunction.h>
+#include <itkOutputWindow.h>
 
 #include <cmath>
 #include <string>
@@ -45,6 +46,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
   MITK_TEST(MultiShell_UnsupportedShells_Throw);
   MITK_TEST(MultiShell_SecondUpdate_SameResult);
+  MITK_TEST(MultiShell_DuplicateGradients_Warn);
   MITK_TEST(Standard_ShImageMatchesOdf);
   CPPUNIT_TEST_SUITE_END();
 
@@ -412,6 +414,41 @@ public:
     reused->Update();
     CheckEqual(fresh->GetOutput(), reused->GetOutput());
     CheckEqual(fresh->GetCoefficientImage().GetPointer(), reused->GetCoefficientImage().GetPointer());
+  }
+
+  /** Collects the warnings of ITK filters while it is the output window. */
+  class WarningRecorder : public itk::OutputWindow
+  {
+  public:
+    using Self = WarningRecorder;
+    using Pointer = itk::SmartPointer<Self>;
+    itkNewMacro(Self);
+    void DisplayText(const char *) override {}
+    void DisplayWarningText(const char *text) override { warnings += text; }
+    std::string warnings;
+  };
+
+  // The duplicate-gradient check compared only the first gradient of each shell with the others:
+  // its inner iterator was never reset.
+  void MultiShell_DuplicateGradients_Warn()
+  {
+    // Direction 5 equals direction 4 in every shell, so the shells still have equal directions.
+    auto gradients = Shells({1000, 2000, 3000}, 3000);
+    for (unsigned int shell = 0; shell < 3; ++shell)
+      gradients[1 + 30 * shell + 5] = gradients[1 + 30 * shell + 4];
+    auto dwi = Simulate(gradients, 3000);
+
+    itk::OutputWindow::Pointer previous = itk::OutputWindow::GetInstance();
+    auto recorder = WarningRecorder::New();
+    itk::OutputWindow::SetInstance(recorder);
+    auto filter = MultiShellFilterType::New();
+    filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    filter->SetLambda(0.006);
+    const std::string error = UpdateError(filter.GetPointer());
+    itk::OutputWindow::SetInstance(previous);
+
+    CPPUNIT_ASSERT_EQUAL(std::string(), error);
+    CPPUNIT_ASSERT(recorder->warnings.find("Diffusion Gradients equal each other") != std::string::npos);
   }
 
   // The coefficient image of the non-CSA methods got the CSA constant 1/(2 sqrt(pi)) added to c0,
