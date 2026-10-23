@@ -264,17 +264,13 @@ void QmitkOdfMaximaExtractionView::StartMaximaExtraction(Image *image)
   typedef itk::OdfMaximaExtractionFilter< float, shOrder, ODF_SAMPLING_SIZE > MaximaExtractionFilterType;
   typename MaximaExtractionFilterType::Pointer filter = MaximaExtractionFilterType::New();
 
-  switch (m_Controls->m_ToolkitBox->currentIndex())
-  {
-  case 0:
-    filter->SetToolkit(MaximaExtractionFilterType::MRTRIX);
-    break;
-  case 1:
+  // The SH convention belongs to the image (reader option, or the FSL mark the SH writer stores),
+  // as for the ODF glyphs and the conversion to ODF images.
+  auto shImage = dynamic_cast<mitk::ShImage*>(image);
+  if (shImage != nullptr && shImage->GetShConvention() == mitk::ShImage::SH_CONVENTION::FSL)
     filter->SetToolkit(MaximaExtractionFilterType::FSL);
-    break;
-  default:
+  else
     filter->SetToolkit(MaximaExtractionFilterType::MRTRIX);
-  }
 
   mitk::BaseGeometry::Pointer geometry;
   try{

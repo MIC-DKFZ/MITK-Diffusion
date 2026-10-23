@@ -5,5 +5,7 @@ This view provides the user interface to extract the principal diffusion directi
 
 The output peaks can for example be used for streamline tractography.
 
+The spherical harmonics convention of an SH image (MITK/MRtrix or FSL/Dipy) is a property of the image: it is chosen in the reader options when an SH image of another toolkit is loaded, and the peak extraction uses it.
+
 
 */
