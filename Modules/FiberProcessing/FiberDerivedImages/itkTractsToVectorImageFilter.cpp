@@ -332,22 +332,23 @@ TractsToVectorImageFilter< PixelType >::DirectionContainerType::Pointer TractsTo
     {
       oldMean = currentMean;
       currentMean.fill(0.0);
+      // The peak size is the summed length of the cluster's members in the last iteration, each
+      // direction counted once, not accumulated over the mean-shift iterations.
+      double memberLength = 0;
       for (unsigned int i=0; i<inDirs->size(); i++)
       {
         angle = dot_product(oldMean, inDirs->at(i));
         if (angle>=m_AngularThreshold)
         {
           currentMean += inDirs->at(i);
-          if (meanChanged)
-            length += lengths.at(i);
+          memberLength += lengths.at(i);
           touched[i] = 1;
           meanChanged = true;
         }
         else if (-angle>=m_AngularThreshold)
         {
           currentMean -= inDirs->at(i);
-          if (meanChanged)
-            length += lengths.at(i);
+          memberLength += lengths.at(i);
           touched[i] = 1;
           meanChanged = true;
         }
@@ -355,7 +356,10 @@ TractsToVectorImageFilter< PixelType >::DirectionContainerType::Pointer TractsTo
       if(!meanChanged)
         currentMean = oldMean;
       else
+      {
         currentMean.normalize();
+        length = memberLength;
+      }
     }
 
     // found stable mean

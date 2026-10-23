@@ -25,6 +25,7 @@ class mitkFiberDerivedImagesTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkFiberDerivedImagesTestSuite);
   MITK_TEST(Directions_OriginOfComponentAxisIsZero);
   MITK_TEST(Directions_NoDirectionAllowed_Throws);
+  MITK_TEST(Directions_PeakSizeIsSummedInVoxelLength);
   CPPUNIT_TEST_SUITE_END();
 
   using UcharImageType = itk::Image<unsigned char, 3>;
@@ -75,6 +76,35 @@ public:
     filter->SetMaskImage(CreateMask(1, 1, 3));
     filter->SetMaxNumDirections(0);
     CPPUNIT_ASSERT_THROW(filter->Update(), mitk::Exception);
+  }
+
+  void Directions_PeakSizeIsSummedInVoxelLength()
+  {
+    // Voxel z = 0: fibers at 0 and 40 degrees, one peak at 20 degrees of size 1 + 1/cos(40 deg)
+    // (in-voxel lengths). Voxel z = 2: two parallel fibers, one peak of size 2. With global
+    // maximum normalization the second peak has size 2 / (1 + 1/cos(40 deg)).
+    auto filter = DirectionFilterType::New();
+    filter->SetFiberBundle(CrossingAndParallelFibers());
+    filter->SetMaskImage(CreateMask(1, 1, 3));
+    filter->Update();
+    auto image = filter->GetDirectionImage();
+
+    const double a = 40.0 * itk::Math::pi / 180.0;
+    const double crossingSize = 1.0 + 1.0 / std::cos(a);
+    const auto peak = [&image](int z) {
+      vnl_vector_fixed<double, 3> v;
+      for (int c = 0; c < 3; ++c)
+        v[c] = image->GetPixel({{0, 0, z, c}});
+      return v;
+    };
+    const auto crossing = peak(0);
+    const auto parallel = peak(2);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, crossing.magnitude(), 1e-5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0 / crossingSize, parallel.magnitude(), 1e-4);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(std::cos(a / 2), std::abs(crossing[0]), 1e-4);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sin(a / 2), std::abs(crossing[1]), 1e-4);
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(1), filter->GetNumDirectionsImage()->GetPixel({{0, 0, 0}}));
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(0), filter->GetNumDirectionsImage()->GetPixel({{0, 0, 1}}));
   }
 };
 
