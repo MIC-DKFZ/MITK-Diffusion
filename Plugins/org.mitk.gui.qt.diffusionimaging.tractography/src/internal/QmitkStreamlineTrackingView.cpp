@@ -289,7 +289,7 @@ void QmitkStreamlineTrackingView::ParametersToGui(mitk::StreamlineTractographyPa
 
   m_Controls->m_NumSamplesBox->setValue(params.m_NumSamples);
   m_Controls->m_LoopCheckBox->setValue(params.GetLoopCheckDeg());
-  m_Controls->m_AngularThresholdBox->setValue(params.GetAngularThresholdDeg());
+  m_Controls->m_AngularThresholdBox->setValue(qRound(params.GetAngularThresholdDeg()));
   m_Controls->m_MinTractLengthBox->setValue(params.m_MinTractLengthMm);
   m_Controls->m_MaxTractLengthBox->setValue(params.m_MaxTractLengthMm);
   m_Controls->m_OutputProbMap->setChecked(params.m_OutputProbMap);

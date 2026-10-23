@@ -293,14 +293,14 @@ void mitk::StreamlineTractographyParameters::AutoAdjust()
     m_StepSizeVox = 0.5;
   m_StepSizeMm = m_StepSizeVox*m_MinVoxelSizeMm;
 
+  // m_AngularThresholdDeg keeps the user's value, -1 for "automatic", so that a later change of the
+  // step size or voxel size updates the automatic threshold and parameter files keep "automatic".
   if (m_AngularThresholdDeg<0)
   {
-    if  (m_StepSizeMm/m_MinVoxelSizeMm<=0.966f)  // minimum 15° for automatic estimation
+    if  (m_StepSizeMm/m_MinVoxelSizeMm<=0.966f)  // automatic threshold at most 86.9°
       m_AngularThresholdDot = static_cast<float>(std::cos( 0.5 * itk::Math::pi * static_cast<double>(m_StepSizeMm/m_MinVoxelSizeMm) ));
     else
       m_AngularThresholdDot = static_cast<float>(std::cos( 0.5 * itk::Math::pi * 0.966 ));
-
-    m_AngularThresholdDeg = std::acos(m_AngularThresholdDot)*180.0/itk::Math::pi;
   }
   else
     m_AngularThresholdDot = static_cast<float>(std::cos( static_cast<double>(m_AngularThresholdDeg)*itk::Math::pi/180.0 ));
@@ -318,6 +318,11 @@ float mitk::StreamlineTractographyParameters::GetStepSizeVox() const
 float mitk::StreamlineTractographyParameters::GetAngularThresholdDeg() const
 {
     return m_AngularThresholdDeg;
+}
+
+float mitk::StreamlineTractographyParameters::GetEffectiveAngularThresholdDeg() const
+{
+  return static_cast<float>(std::acos(static_cast<double>(m_AngularThresholdDot))*180.0/itk::Math::pi);
 }
 
 float mitk::StreamlineTractographyParameters::GetSamplingDistanceVox() const

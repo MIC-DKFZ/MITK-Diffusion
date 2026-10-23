@@ -1034,7 +1034,7 @@ QGroupBox {
        <item row="10" column="1">
         <widget class="QSpinBox" name="m_AngularThresholdBox">
          <property name="toolTip">
-          <string>Angular threshold between two steps (in degree). Default: 90° * step_size</string>
+          <string>Angular threshold between two steps (in degree). -1: automatic, 90° * step_size (in voxels), at most 86.9°</string>
          </property>
          <property name="minimum">
           <number>-1</number>

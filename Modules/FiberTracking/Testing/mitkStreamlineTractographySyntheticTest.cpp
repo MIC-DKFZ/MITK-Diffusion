@@ -14,6 +14,8 @@ found in the LICENSE file.
 #include <mitkStreamlineTractographyParameters.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
 #include <mitkFiberBundle.h>
+#include <mitkIOUtil.h>
+#include <cstdio>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <cstring>
@@ -28,6 +30,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkStreamlineTractographySyntheticTestSuite);
   MITK_TEST(Parameters_Defaults);
+  MITK_TEST(Parameters_AutomaticAngularThreshold);
   MITK_TEST(EndpointConstraints_TargetAtEitherEnd);
   MITK_TEST(ProbabilisticPeaks_SameResultAtAnyThreadCount);
   CPPUNIT_TEST_SUITE_END();
@@ -131,6 +134,39 @@ public:
     CPPUNIT_ASSERT_EQUAL(int(EpConstraint::NONE), int(params->m_EpConstraints));
     CPPUNIT_ASSERT(params->m_InterpolateRoiImages);
     params->~StreamlineTractographyParameters();
+  }
+
+  /** "Automatic" (-1) follows the step size, also when the step is set after construction (as the
+   *  command line app does), and survives a save/load round trip. */
+  void Parameters_AutomaticAngularThreshold()
+  {
+    mitk::StreamlineTractographyParameters params;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-1.0, params.GetAngularThresholdDeg(), 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(45.0, params.GetEffectiveAngularThresholdDeg(), 1e-3);
+
+    params.SetStepSizeVox(0.25f);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(22.5, params.GetEffectiveAngularThresholdDeg(), 1e-3);
+    params.SetMinVoxelSizeMm(2.0f);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(22.5, params.GetEffectiveAngularThresholdDeg(), 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, params.GetStepSizeMm(), 1e-6);
+    params.SetStepSizeVox(1.0f);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.966*90.0, params.GetEffectiveAngularThresholdDeg(), 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-1.0, params.GetAngularThresholdDeg(), 1e-6);
+
+    params.SetAngularThresholdDeg(30.0f);
+    params.SetStepSizeVox(0.25f);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(30.0, params.GetEffectiveAngularThresholdDeg(), 1e-3);
+
+    params.SetAngularThresholdDeg(-1.0f);
+    std::ofstream tmpStream;
+    std::string fileName = mitk::IOUtil::CreateTemporaryFile(tmpStream, "streamline_parameters_XXXXXX.stp");
+    tmpStream.close();
+    params.SaveParameters(fileName);
+    mitk::StreamlineTractographyParameters loaded;
+    loaded.LoadParameters(fileName);
+    std::remove(fileName.c_str());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-1.0, loaded.GetAngularThresholdDeg(), 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(22.5, loaded.GetEffectiveAngularThresholdDeg(), 1e-3);
   }
 
   /** Each streamline runs from x = -0.25 to x = 19.25 mm; the target lies at one end, the other, or both. */

@@ -125,9 +125,10 @@ namespace mitk
     float m_Compression = 0.1;
     bool m_OutputProbMap = false;
 
-    float GetAngularThresholdDot() const;
-    float GetAngularThresholdDeg() const;
-    void SetAngularThresholdDeg(float angular_threshold_deg);
+    float GetAngularThresholdDot() const;           ///< cosine of the threshold in effect
+    float GetAngularThresholdDeg() const;           ///< user value; -1 means 90° * step size in voxels, at most 86.9°
+    float GetEffectiveAngularThresholdDeg() const;  ///< threshold in effect, in degrees
+    void SetAngularThresholdDeg(float angular_threshold_deg);  ///< -1 for automatic
 
     float GetLoopCheckDeg() const;
     void SetLoopCheckDeg(float loop_check_deg);
