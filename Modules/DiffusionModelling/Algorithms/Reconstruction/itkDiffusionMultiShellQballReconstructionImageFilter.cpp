@@ -19,6 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 
 #include <limits>
+#include <optional>
 #include <vnl/vnl_sse.h>
 #include <mitkPointShell.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
@@ -38,7 +39,8 @@ DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   m_BZeroImage(nullptr),
   m_CoefficientImage(nullptr),
   m_BValue(1.0),
-  m_Lambda(0.0)
+  m_Lambda(0.0),
+  m_ComputeOdf(true)
 {
   // At least 1 inputs is necessary for a vector image.
   // For images added one at a time we need at least six
@@ -318,6 +320,21 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
 template< class T, class TG, class TO, int L, int NODF>
 void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
+::AllocateOutputs()
+{
+  if (m_ComputeOdf)
+  {
+    Superclass::AllocateOutputs();
+    return;
+  }
+  // Without ODFs the primary output gets no buffer (NODF values per voxel that nobody reads).
+  OdfImageType *output = this->GetOutput();
+  output->SetBufferedRegion(OutputImageRegionType());
+  output->Allocate();
+}
+
+template< class T, class TG, class TO, int L, int NODF>
+void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 ::BeforeThreadedGenerateData()
 {
   // Only the analytical solution for three equidistant shells (Aganj 2010) is implemented. The
@@ -429,8 +446,11 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   typename OdfImageType::Pointer outputImage = static_cast< OdfImageType * >(ProcessObject::GetPrimaryOutput());
   typename GradientImagesType::Pointer gradientImagePointer = static_cast< GradientImagesType * >( ProcessObject::GetInput(0) );
 
-  // Define Image iterators
-  ImageRegionIterator< OdfImageType > odfOutputImageIterator(outputImage, outputRegionForThread);
+  // Define Image iterators; the ODF output has a buffer only when the ODFs are computed
+  // (AllocateOutputs).
+  std::optional<ImageRegionIterator< OdfImageType >> odfOutputImageIterator;
+  if (m_ComputeOdf)
+    odfOutputImageIterator.emplace(outputImage, outputRegionForThread);
   ImageRegionConstIterator< GradientImagesType > gradientInputImageIterator(gradientImagePointer, outputRegionForThread );
   ImageRegionIterator< BZeroImageType > bzeroIterator(m_BZeroImage, outputRegionForThread);
   ImageRegionIterator< CoefficientImageType > coefficientImageIterator(m_CoefficientImage, outputRegionForThread);
@@ -438,7 +458,6 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   // All iterators seht to Begin of the specific OutputRegion
   coefficientImageIterator.GoToBegin();
   bzeroIterator.GoToBegin();
-  odfOutputImageIterator.GoToBegin();
   gradientInputImageIterator.GoToBegin();
 
   // Get Shell Indicies for all non-BZero Gradients
@@ -639,16 +658,22 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
         coeffPixel[i] = static_cast<TO>(coeffs[i]);
 
       // Cast the Signal-Type from double to float for the ODF-Image
-      multiply(m_ODFSphericalHarmonicBasisMatrix, coeffs, odfValues);
-      for(unsigned int i = 0 ; i < odfValues.size(); i++)
-        odf[i] = static_cast<TO>(odfValues[i]);
-      odf *= ((itk::Math::pi*4)/NODF);
+      if (m_ComputeOdf)
+      {
+        multiply(m_ODFSphericalHarmonicBasisMatrix, coeffs, odfValues);
+        for(unsigned int i = 0 ; i < odfValues.size(); i++)
+          odf[i] = static_cast<TO>(odfValues[i]);
+        odf *= ((itk::Math::pi*4)/NODF);
+      }
     }
 
     // set ODF to ODF-Image
     coefficientImageIterator.Set(coeffPixel);
-    odfOutputImageIterator.Set( odf );
-    ++odfOutputImageIterator;
+    if (odfOutputImageIterator)
+    {
+      odfOutputImageIterator->Set( odf );
+      ++(*odfOutputImageIterator);
+    }
     ++coefficientImageIterator;
     ++gradientInputImageIterator;
   }

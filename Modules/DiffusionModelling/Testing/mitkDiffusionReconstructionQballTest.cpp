@@ -51,6 +51,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
   MITK_TEST(MultiShell_UnsupportedShells_Throw);
   MITK_TEST(MultiShell_SecondUpdate_SameResult);
+  MITK_TEST(MultiShell_WithoutOdf_SameCoefficients);
   MITK_TEST(MultiShell_DuplicateGradients_Warn);
   MITK_TEST(Standard_ShImageMatchesOdf);
   MITK_TEST(Analytical_RotatedScheme_GivesRotatedFunction);
@@ -451,6 +452,27 @@ public:
     reused->Update();
     CheckEqual(fresh->GetOutput(), reused->GetOutput());
     CheckEqual(fresh->GetCoefficientImage().GetPointer(), reused->GetCoefficientImage().GetPointer());
+  }
+
+  // As the analytical filter: without ODFs the primary output gets no buffer, and coefficients and
+  // b0 image are the same as with them.
+  void MultiShell_WithoutOdf_SameCoefficients()
+  {
+    auto dwi = Simulate(Shells({1000, 2000, 3000}, 3000), 3000);
+    std::vector<MultiShellFilterType::Pointer> filters;
+    for (bool computeOdf : {true, false})
+    {
+      auto filter = MultiShellFilterType::New();
+      filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+      filter->SetLambda(0.006);
+      filter->SetComputeOdf(computeOdf);
+      filter->Update();
+      filters.push_back(filter);
+    }
+    CheckEqual(filters[0]->GetCoefficientImage().GetPointer(), filters[1]->GetCoefficientImage().GetPointer());
+    CheckEqual(filters[0]->GetBZeroImage().GetPointer(), filters[1]->GetBZeroImage().GetPointer());
+    CPPUNIT_ASSERT_EQUAL(static_cast<itk::SizeValueType>(8), filters[0]->GetOutput()->GetBufferedRegion().GetNumberOfPixels());
+    CPPUNIT_ASSERT_EQUAL(static_cast<itk::SizeValueType>(0), filters[1]->GetOutput()->GetBufferedRegion().GetNumberOfPixels());
   }
 
   /** Collects the warnings of ITK filters while it is the output window. */

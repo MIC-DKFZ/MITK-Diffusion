@@ -138,6 +138,7 @@ namespace
     filter->SetGradientImage(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi), itkDwi, mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi));
     filter->SetThreshold(parameters.b0Threshold);
     filter->SetLambda(parameters.lambda);
+    filter->SetComputeOdf(parameters.sampledOdf);
     filter->Update();
 
     mitk::QballResult result;

@@ -109,10 +109,18 @@ public:
     itkSetMacro( Lambda, double )
     itkGetMacro( Lambda, double )
 
+    /** Whether the ODFs (the primary output) are computed, true by default. Without them the
+     * output has no buffer, which saves NrOdfDirections values per voxel when only the
+     * coefficient image is used; the filter then executes again on every Update(). */
+    itkSetMacro( ComputeOdf, bool )
+    itkGetConstMacro( ComputeOdf, bool )
+    itkBooleanMacro( ComputeOdf )
+
 protected:
     DiffusionMultiShellQballReconstructionImageFilter();
     ~DiffusionMultiShellQballReconstructionImageFilter() override = default;
     void PrintSelf(std::ostream& os, Indent indent) const override;
+    void AllocateOutputs() override;
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
@@ -154,6 +162,8 @@ private:
     BValueMap m_BValueMap;
 
     double m_Lambda;
+
+    bool m_ComputeOdf;
 
     void ComputeReconstructionMatrix(IndiciesVector const & refVector);
     bool CheckDuplicateDiffusionGradients();
