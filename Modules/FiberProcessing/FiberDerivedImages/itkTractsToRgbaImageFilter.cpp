@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <math.h>
 #include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkFiberImageGrid.h>
 
 namespace itk{
 
@@ -47,60 +48,25 @@ void TractsToRgbaImageFilter< OutputImageType >::GenerateData()
   if(&typeid(OutPixelType) != &typeid(itk::RGBAPixel<unsigned char>))
     return;
 
-  // generate upsampled image
-  mitk::BaseGeometry::Pointer geometry = m_FiberBundle->GetGeometry();
   typename OutputImageType::Pointer outImage = this->GetOutput();
 
-  // calculate new image parameters
-  itk::Vector<double,3> newSpacing;
-  mitk::Point3D newOrigin;
-  itk::Matrix<double, 3, 3> newDirection;
-  ImageRegion<3> upsampledRegion;
+  // The same grid as the tract density image, so that the derived images share voxels.
+  mitk::FiberImageGrid grid;
   if (m_UseImageGeometry && !m_InputImage.IsNull())
-  {
-    newSpacing = m_InputImage->GetSpacing()/m_UpsamplingFactor;
-    upsampledRegion = m_InputImage->GetLargestPossibleRegion();
-    newOrigin = m_InputImage->GetOrigin();
-    typename OutputImageType::RegionType::SizeType size = upsampledRegion.GetSize();
-    size[0] *= m_UpsamplingFactor;
-    size[1] *= m_UpsamplingFactor;
-    size[2] *= m_UpsamplingFactor;
-    upsampledRegion.SetSize(size);
-    newDirection = m_InputImage->GetDirection();
-  }
+    grid = mitk::FiberImageGrid::FromReference(m_InputImage, m_UpsamplingFactor);
   else
-  {
-    newSpacing = geometry->GetSpacing()/m_UpsamplingFactor;
-    newOrigin = geometry->GetOrigin();
-    mitk::Geometry3D::BoundsArrayType bounds = geometry->GetBounds();
-    newOrigin[0] += bounds.GetElement(0);
-    newOrigin[1] += bounds.GetElement(2);
-    newOrigin[2] += bounds.GetElement(4);
+    grid = mitk::FiberImageGrid::FromBundle(m_FiberBundle->GetGeometry(), m_UpsamplingFactor);
+  const itk::Vector<double,3> newSpacing = grid.Spacing;
+  typename OutputImageType::RegionType::SizeType upsampledSize = grid.Region.GetSize();
 
-    for (int i=0; i<3; i++)
-      for (int j=0; j<3; j++)
-        newDirection[j][i] = geometry->GetMatrixColumn(i)[j];
-    upsampledRegion.SetSize(0, geometry->GetExtent(0)*m_UpsamplingFactor);
-    upsampledRegion.SetSize(1, geometry->GetExtent(1)*m_UpsamplingFactor);
-    upsampledRegion.SetSize(2, geometry->GetExtent(2)*m_UpsamplingFactor);
-  }
-  typename OutputImageType::RegionType::SizeType upsampledSize = upsampledRegion.GetSize();
-
-  // apply new image parameters
-  outImage->SetSpacing( newSpacing );
-  outImage->SetOrigin( newOrigin );
-  outImage->SetDirection( newDirection );
-  outImage->SetRegions( upsampledRegion );
+  grid.ApplyTo(outImage);
   outImage->Allocate();
   OutPixelType nullp;
   nullp.Fill(0.0);
   outImage->FillBuffer(nullp);
 
   itk::Image< itk::RGBAPixel<double>, 3 >::Pointer double_out = itk::Image< itk::RGBAPixel<double>, 3 >::New();
-  double_out->SetSpacing( newSpacing );
-  double_out->SetOrigin( newOrigin );
-  double_out->SetDirection( newDirection );
-  double_out->SetRegions( upsampledRegion );
+  grid.ApplyTo(double_out);
   double_out->Allocate();
   auto p = itk::RGBAPixel<double>();
   p.Fill(0.0);

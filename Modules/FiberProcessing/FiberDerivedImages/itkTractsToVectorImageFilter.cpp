@@ -14,6 +14,7 @@
 #include <cmath>
 #include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkFiberImageGrid.h>
 
 namespace itk{
 
@@ -74,20 +75,12 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
   }
   else
   {
-    spacing3 = geometry->GetSpacing();
-    origin3 = geometry->GetOrigin();
-    mitk::BaseGeometry::BoundsArrayType bounds = geometry->GetBounds();
-    origin3[0] += bounds.GetElement(0);
-    origin3[1] += bounds.GetElement(2);
-    origin3[2] += bounds.GetElement(4);
-
-    for (int i=0; i<3; i++)
-      for (int j=0; j<3; j++)
-        direction3[j][i] = geometry->GetMatrixColumn(i)[j];
-    imageRegion3.SetSize(0, geometry->GetExtent(0)+1);
-    imageRegion3.SetSize(1, geometry->GetExtent(1)+1);
-    imageRegion3.SetSize(2, geometry->GetExtent(2)+1);
-
+    // The same grid as the tract density image, so that the derived images share voxels.
+    const auto grid = mitk::FiberImageGrid::FromBundle(geometry, 1);
+    spacing3 = grid.Spacing;
+    origin3 = grid.Origin;
+    direction3 = grid.Direction;
+    imageRegion3 = grid.Region;
 
     m_MaskImage = ItkUcharImgType::New();
     m_MaskImage->SetSpacing( spacing3 );

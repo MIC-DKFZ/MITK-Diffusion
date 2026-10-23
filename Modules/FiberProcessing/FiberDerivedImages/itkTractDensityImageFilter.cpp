@@ -27,6 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <boost/timer/progress_display.hpp>
 #include <vtkBox.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkFiberImageGrid.h>
 
 namespace itk{
 
@@ -62,57 +63,23 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::SetMode(const TDI
 template< class OutputImageType, class RefImageType >
 void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
 {
-  // generate upsampled image
-  mitk::BaseGeometry::Pointer geometry = m_FiberBundle->GetGeometry();
   typename OutputImageType::Pointer outImage = this->GetOutput();
 
-  // calculate new image parameters
-  itk::Vector<double,3> newSpacing;
-  mitk::Point3D newOrigin;
-  itk::Matrix<double, 3, 3> newDirection;
-  ImageRegion<3> upsampledRegion;
+  mitk::FiberImageGrid grid;
   if (m_UseImageGeometry && !m_InputImage.IsNull())
   {
     MITK_INFO << "TractDensityImageFilter: using image geometry";
-    newSpacing = m_InputImage->GetSpacing()/m_UpsamplingFactor;
-    upsampledRegion = m_InputImage->GetLargestPossibleRegion();
-    newOrigin = m_InputImage->GetOrigin();
-    typename OutputImageType::RegionType::SizeType size = upsampledRegion.GetSize();
-    size[0] *= m_UpsamplingFactor;
-    size[1] *= m_UpsamplingFactor;
-    size[2] *= m_UpsamplingFactor;
-    upsampledRegion.SetSize(size);
-    newDirection = m_InputImage->GetDirection();
+    grid = mitk::FiberImageGrid::FromReference(m_InputImage, m_UpsamplingFactor);
   }
   else
   {
     MITK_INFO << "TractDensityImageFilter: using fiber bundle geometry";
-    newSpacing = geometry->GetSpacing()/m_UpsamplingFactor;
-    newOrigin = geometry->GetOrigin();
-    mitk::Geometry3D::BoundsArrayType bounds = geometry->GetBounds();
-
-    // we retrieve the origin from a vtk-polydata (corner-based) and hance have to translate it to an image geometry
-    // i.e. center-based
-    newOrigin[0] += bounds.GetElement(0) + 0.5 * newSpacing[0];
-    newOrigin[1] += bounds.GetElement(2) + 0.5 * newSpacing[1];
-    newOrigin[2] += bounds.GetElement(4) + 0.5 * newSpacing[2];
-
-    for (int i=0; i<3; i++)
-      for (int j=0; j<3; j++)
-        newDirection[j][i] = geometry->GetMatrixColumn(i)[j];
-    upsampledRegion.SetSize(0, ceil( geometry->GetExtent(0)*m_UpsamplingFactor ) );
-    upsampledRegion.SetSize(1, ceil( geometry->GetExtent(1)*m_UpsamplingFactor ) );
-    upsampledRegion.SetSize(2, ceil( geometry->GetExtent(2)*m_UpsamplingFactor ) );
+    grid = mitk::FiberImageGrid::FromBundle(m_FiberBundle->GetGeometry(), m_UpsamplingFactor);
   }
-  typename OutputImageType::RegionType::SizeType upsampledSize = upsampledRegion.GetSize();
+  const itk::Vector<double,3> newSpacing = grid.Spacing;
+  typename OutputImageType::RegionType::SizeType upsampledSize = grid.Region.GetSize();
 
-  // apply new image parameters
-  outImage->SetSpacing( newSpacing );
-  outImage->SetOrigin( newOrigin );
-  outImage->SetDirection( newDirection );
-  outImage->SetLargestPossibleRegion( upsampledRegion );
-  outImage->SetBufferedRegion( upsampledRegion );
-  outImage->SetRequestedRegion( upsampledRegion );
+  grid.ApplyTo(outImage);
   outImage->Allocate();
   outImage->FillBuffer(0.0);
 

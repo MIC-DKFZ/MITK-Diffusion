@@ -10,6 +10,9 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <itkTractDensityImageFilter.h>
+#include <itkTractsToFiberEndingsImageFilter.h>
+#include <itkTractsToRgbaImageFilter.h>
 #include <itkTractsToVectorImageFilter.h>
 #include <mitkExceptionMacro.h>
 #include <mitkTestFixture.h>
@@ -27,9 +30,12 @@ class mitkFiberDerivedImagesTestSuite : public mitk::TestFixture
   MITK_TEST(Directions_NoDirectionAllowed_Throws);
   MITK_TEST(Directions_PeakSizeIsSummedInVoxelLength);
   MITK_TEST(Directions_SizeThresholdDiscardsSmallPeaks);
+  MITK_TEST(Grid_DerivedImagesShareBundleGrid);
+  MITK_TEST(Grid_UpsampledReferenceSubdividesVoxels);
   CPPUNIT_TEST_SUITE_END();
 
   using UcharImageType = itk::Image<unsigned char, 3>;
+  using FloatImageType = itk::Image<float, 3>;
   using DirectionFilterType = itk::TractsToVectorImageFilter<float>;
 
   /** Image with 1 mm voxels whose first voxel is centred at the world origin, all voxels 1. */
@@ -126,6 +132,104 @@ public:
       CPPUNIT_ASSERT_EQUAL(expectedPeaks, filter->GetNumDirectionsImage()->GetPixel({{0, 0, 0}}));
       const double secondPeakY = filter->GetDirectionImage()->GetPixel({{0, 0, 0, 4}});
       CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedPeaks == 2 ? 0.1 : 0.0, std::abs(secondPeakY), 1e-5);
+    }
+  }
+
+  template <class TImageA, class TImageB>
+  static void AssertSameGrid(const TImageA* a, const TImageB* b)
+  {
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(a->GetOrigin()[i], b->GetOrigin()[i], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(a->GetSpacing()[i], b->GetSpacing()[i], 1e-9);
+      CPPUNIT_ASSERT_EQUAL(a->GetLargestPossibleRegion().GetSize()[i], b->GetLargestPossibleRegion().GetSize()[i]);
+    }
+  }
+
+  void Grid_DerivedImagesShareBundleGrid()
+  {
+    // Bounding box from (0.1, 0.2, 0.3) to (10.4, 3.3, 2.25) mm; fiber ends on its corners.
+    using namespace mitk::FiberProcessingTestHelper;
+    auto fib = CreateBundle({Line({0.1, 0.2, 0.3}, {10.4, 3.3, 2.15}, 7),
+                             Line({2.0, 0.25, 0.35}, {5.6, 3.0, 1.1}, 3),
+                             Line({9.7, 0.6, 2.25}, {1.0, 2.9, 0.31}, 5)});
+
+    auto density = itk::TractDensityImageFilter<FloatImageType>::New();
+    density->SetFiberBundle(fib);
+    density->SetOutputAbsoluteValues(true);
+    density->Update();
+    auto densityImage = density->GetOutput();
+
+    auto endings = itk::TractsToFiberEndingsImageFilter<FloatImageType>::New();
+    endings->SetFiberBundle(fib);
+    endings->Update();
+    auto endingsImage = endings->GetOutput();
+
+    auto rgba = itk::TractsToRgbaImageFilter<itk::Image<itk::RGBAPixel<unsigned char>, 3>>::New();
+    rgba->SetFiberBundle(fib);
+    rgba->Update();
+
+    auto directions = DirectionFilterType::New();
+    directions->SetFiberBundle(fib);
+    directions->Update();
+
+    AssertSameGrid(densityImage, endingsImage);
+    AssertSameGrid(densityImage, rgba->GetOutput());
+    AssertSameGrid(densityImage, directions->GetNumDirectionsImage().GetPointer());
+
+    // Every endpoint is counted, in a voxel that the fiber passes.
+    double endpointSum = 0;
+    itk::ImageRegionConstIterator<FloatImageType> it(endingsImage, endingsImage->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+    {
+      endpointSum += it.Get();
+      if (it.Get() > 0)
+        CPPUNIT_ASSERT(densityImage->GetPixel(it.GetIndex()) > 0);
+    }
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, endpointSum, 1e-9);
+  }
+
+  void Grid_UpsampledReferenceSubdividesVoxels()
+  {
+    // Reference: 2 x 2 x 2 voxels of 1 mm, centred at 0 and 1, i.e. the volume [-0.5, 1.5]^3.
+    auto reference = FloatImageType::New();
+    FloatImageType::SizeType size = {{2, 2, 2}};
+    reference->SetRegions(FloatImageType::RegionType(size));
+    reference->Allocate();
+
+    // No fiber point lies on a voxel face of either grid: mitk::imv::IntersectImage drops a
+    // segment that starts inside a voxel and ends exactly on its face.
+    using namespace mitk::FiberProcessingTestHelper;
+    auto fib = CreateBundle({Line({-0.4, -0.3, -0.45}, {1.4, 1.35, 1.2}, 4), Line({-0.45, 0.2, 0.7}, {1.45, 0.3, 0.8}, 4)});
+
+    const auto densityOnGrid = [&fib, &reference](float upsampling) {
+      auto filter = itk::TractDensityImageFilter<FloatImageType>::New();
+      filter->SetFiberBundle(fib);
+      filter->SetInputImage(reference);
+      filter->SetUseImageGeometry(true);
+      filter->SetUpsamplingFactor(upsampling);
+      filter->SetOutputAbsoluteValues(true);
+      filter->Update();
+      return FloatImageType::Pointer(filter->GetOutput());
+    };
+    auto coarse = densityOnGrid(1);
+    auto fine = densityOnGrid(2);
+
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(4), fine->GetLargestPossibleRegion().GetSize()[0]);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, fine->GetSpacing()[0], 1e-9);
+    for (unsigned int i = 0; i < 3; ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(-0.25, fine->GetOrigin()[i], 1e-9);
+
+    // Each coarse voxel holds the fiber length of its 2 x 2 x 2 fine voxels.
+    itk::ImageRegionConstIterator<FloatImageType> it(coarse, coarse->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+    {
+      double blockSum = 0;
+      for (int dz = 0; dz < 2; ++dz)
+        for (int dy = 0; dy < 2; ++dy)
+          for (int dx = 0; dx < 2; ++dx)
+            blockSum += fine->GetPixel({{2 * it.GetIndex()[0] + dx, 2 * it.GetIndex()[1] + dy, 2 * it.GetIndex()[2] + dz}});
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(it.Get(), blockSum, 1e-4);
     }
   }
 };

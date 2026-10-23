@@ -3,6 +3,7 @@ set(H_FILES
   FiberDerivedImages/itkTractsToVectorImageFilter.h
   FiberDerivedImages/itkTractsToFiberEndingsImageFilter.h
   FiberDerivedImages/itkTractsToRgbaImageFilter.h
+  FiberDerivedImages/mitkFiberImageGrid.h
 
   FiberModification/itkFiberCurvatureFilter.h
   FiberModification/itkFiberExtractionFilter.h
