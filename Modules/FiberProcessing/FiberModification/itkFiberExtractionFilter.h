@@ -92,7 +92,8 @@ protected:
   FiberExtractionFilter();
   ~FiberExtractionFilter() override;
 
-  mitk::FiberBundle::Pointer CreateFib(std::vector< unsigned int >& ids);
+  mitk::FiberBundle::Pointer CreateFib(const std::vector< unsigned int >& ids);
+  void AddPositives(const std::vector< std::vector< unsigned int > >& positive_ids);
   void ExtractOverlap(mitk::FiberBundle::Pointer fib);
   void ExtractEndpoints(mitk::FiberBundle::Pointer fib);
   void ExtractLabels(mitk::FiberBundle::Pointer fib);

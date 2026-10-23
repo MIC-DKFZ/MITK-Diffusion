@@ -77,13 +77,54 @@ void FiberExtractionFilter< PixelType >::SetRoiImageNames(const std::vector< std
 }
 
 template< class PixelType >
-mitk::FiberBundle::Pointer FiberExtractionFilter< PixelType >::CreateFib(std::vector< unsigned int >& ids)
+mitk::FiberBundle::Pointer FiberExtractionFilter< PixelType >::CreateFib(const std::vector< unsigned int >& ids)
 {
   vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
   vtkSmartPointer<vtkPolyData> pTmp = m_InputFiberBundle->GeneratePolyDataByIds(ids, weights);
   mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
   fib->SetFiberWeights(weights);
   return fib;
+}
+
+template< class PixelType >
+void FiberExtractionFilter< PixelType >::AddPositives(const std::vector< std::vector< unsigned int > >& positive_ids)
+{
+  // One output per ROI, or, without SplitByRoi, one output that holds each positive fiber once,
+  // also if it is positive for several ROIs.
+  std::vector< unsigned int > merged_ids;
+  std::vector< bool > merged(m_InputFiberBundle->GetNumFibers(), false);
+  for (unsigned int i=0; i<positive_ids.size(); ++i)
+  {
+    if (positive_ids.at(i).size()<m_MinFibersPerTract)
+      continue;
+
+    if (m_SplitByRoi)
+    {
+      std::string name;
+      if (i<m_RoiImageNames.size())
+        name = m_RoiImageNames.at(i);
+      else
+        name = "Roi" + boost::lexical_cast<std::string>(i);
+
+      m_Positives.push_back(CreateFib(positive_ids.at(i)));
+      m_PositiveLabels.push_back(name);
+    }
+    else
+    {
+      for (auto id : positive_ids.at(i))
+        if (!merged.at(id))
+        {
+          merged.at(id) = true;
+          merged_ids.push_back(id);
+        }
+    }
+  }
+
+  if (!m_SplitByRoi)
+  {
+    m_Positives.push_back(CreateFib(merged_ids));
+    m_PositiveLabels.push_back("");
+  }
 }
 
 template< class PixelType >
@@ -179,31 +220,7 @@ void FiberExtractionFilter< PixelType >::ExtractOverlap(mitk::FiberBundle::Point
   if (!m_NoNegatives)
     m_Negatives.push_back(CreateFib(negative_ids));
   if (!m_NoPositives)
-  {
-    for (unsigned int i=0; i<positive_ids.size(); ++i)
-    {
-      std::string name;
-      if (i<m_RoiImageNames.size())
-        name = m_RoiImageNames.at(i);
-      else
-        name = "Roi" + boost::lexical_cast<std::string>(i);
-
-      if (positive_ids.at(i).size()>=m_MinFibersPerTract)
-      {
-        m_Positives.push_back(CreateFib(positive_ids.at(i)));
-        m_PositiveLabels.push_back(name);
-      }
-    }
-    if (!m_SplitByRoi)
-    {
-      mitk::FiberBundle::Pointer output = mitk::FiberBundle::New(nullptr);
-      output = output->AddBundles(m_Positives);
-      m_Positives.clear();
-      m_Positives.push_back(output);
-      m_PositiveLabels.clear();
-      m_PositiveLabels.push_back("");
-    }
-  }
+    AddPositives(positive_ids);
 }
 
 template< class PixelType >
@@ -265,30 +282,17 @@ void FiberExtractionFilter< PixelType >::ExtractEndpoints(mitk::FiberBundle::Poi
   if (!m_NoNegatives)
     m_Negatives.push_back(CreateFib(negative_ids));
   if (!m_NoPositives)
-  {
-    for (unsigned int i=0; i<positive_ids.size(); ++i)
-    {
-      std::string name;
-      if (i<m_RoiImageNames.size())
-        name = m_RoiImageNames.at(i);
-      else
-        name = "Roi" + boost::lexical_cast<std::string>(i);
+    AddPositives(positive_ids);
+}
 
-      if (positive_ids.at(i).size()>=m_MinFibersPerTract)
-      {
-        m_Positives.push_back(CreateFib(positive_ids.at(i)));
-        m_PositiveLabels.push_back(name);
-      }
-    }
-    if (!m_SplitByRoi)
-    {
-      mitk::FiberBundle::Pointer output = mitk::FiberBundle::New(nullptr);
-      output = output->AddBundles(m_Positives);
-      m_Positives.clear();
-      m_Positives.push_back(output);
-      m_PositiveLabels.clear();
-      m_PositiveLabels.push_back("");
-    }
+namespace
+{
+  /** Without SplitByRoi, all label maps add to the same keys; a fiber is added to a key once. The
+   * fibers are visited in order, so a repeated fiber is the last one added. */
+  inline void AddId(std::vector< unsigned int >& ids, unsigned int id)
+  {
+    if (ids.empty() || ids.back()!=id)
+      ids.push_back(id);
   }
 }
 
@@ -405,10 +409,7 @@ void FiberExtractionFilter< PixelType >::ExtractLabels(mitk::FiberBundle::Pointe
           if ( (inside==2 && (!m_SkipSelfConnections || label1!=label2)) || (inside==2 && m_OnlySelfConnections && label1==label2) )
           {
             positive = true;
-            if ( positive_ids.count(key)==0 )
-              positive_ids.insert( std::pair< std::string, std::vector< unsigned int > >( key, {i}) );
-            else
-              positive_ids[key].push_back(i);
+            AddId(positive_ids[key], i);
           }
         }
         else
@@ -416,10 +417,7 @@ void FiberExtractionFilter< PixelType >::ExtractLabels(mitk::FiberBundle::Pointe
           if ( (inside>=1 && (!m_SkipSelfConnections || label1!=label2)) || (inside==2 && m_OnlySelfConnections && label1==label2) )
           {
             positive = true;
-            if ( positive_ids.count(key)==0 )
-              positive_ids.insert( std::pair< std::string, std::vector< unsigned int > >( key, {i}) );
-            else
-              positive_ids[key].push_back(i);
+            AddId(positive_ids[key], i);
           }
         }
       }
