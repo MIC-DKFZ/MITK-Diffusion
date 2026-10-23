@@ -2735,7 +2735,7 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
   os << indent << " [" << m_TrackVisHeader.vox_to_ras[2][0] << ", " << m_TrackVisHeader.vox_to_ras[2][1] << ", " << m_TrackVisHeader.vox_to_ras[2][2] << ", " << m_TrackVisHeader.vox_to_ras[2][3] << "]" << std::endl;
   os << indent << " [" << m_TrackVisHeader.vox_to_ras[3][0] << ", " << m_TrackVisHeader.vox_to_ras[3][1] << ", " << m_TrackVisHeader.vox_to_ras[3][2] << ", " << m_TrackVisHeader.vox_to_ras[3][3] << "]]" << std::defaultfloat << std::endl;
 
-  if (m_FiberWeights!=nullptr)
+  if (m_FiberWeights!=nullptr && m_FiberWeights->GetNumberOfValues()>0)
   {
     std::vector< float > weights;
     for (int i=0; i<m_FiberWeights->GetNumberOfValues(); i++)
@@ -2755,9 +2755,9 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
     os << indent << "Max: " << weights.back() << std::endl;
   }
   else
-    os << indent << "\n\nNo fiber weight array found." << std::endl;
+    os << indent << "\n\nNo fiber weights." << std::endl;
 
-  Superclass::PrintSelf(os, 0);
+  Superclass::PrintSelf(os, indent);
 }
 
 mitk::FiberBundle::TrackVis_header mitk::FiberBundle::GetTrackVisHeader()

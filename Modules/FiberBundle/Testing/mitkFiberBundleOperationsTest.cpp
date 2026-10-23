@@ -33,6 +33,7 @@ found in the LICENSE file.
 #include <cmath>
 #include <map>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -56,6 +57,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ColorFibersByOrientation_OnePointFibers_GetColours);
   MITK_TEST(ColorFibersByCurvature_UsesFirstSegment);
   MITK_TEST(ResampleLinear_NoStep_LeavesFibersUnchanged);
+  MITK_TEST(PrintSelf_EmptyBundle_Prints);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -451,6 +453,14 @@ public:
     auto copy = fib->GetDeepCopy();
     fib->ResampleLinear(0.0);
     CPPUNIT_ASSERT(copy->Equals(fib, 0.0));
+  }
+
+  void PrintSelf_EmptyBundle_Prints()
+  {
+    std::ostringstream out;
+    mitk::FiberBundle::New()->Print(out);
+    CPPUNIT_ASSERT(out.str().find("Number of fibers: 0") != std::string::npos);
+    CPPUNIT_ASSERT(out.str().find("No fiber weights") != std::string::npos);
   }
 };
 
