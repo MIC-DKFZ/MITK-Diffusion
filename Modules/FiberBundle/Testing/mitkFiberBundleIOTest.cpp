@@ -53,6 +53,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TrkReader_NoMatrixRecorded_UsesVoxelOrder);
   MITK_TEST(TrkWriter_RoundTrip_KeepsPoints);
   MITK_TEST(TrkWriter_Header_IsReproducibleAndMatchesData);
+  MITK_TEST(Writers_WriteErrors_Throw);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -536,6 +537,29 @@ public:
     auto loaded = mitk::IOUtil::Load<mitk::FiberBundle>(withScalars);
     mitk::IOUtil::Save(loaded, path1, options);
     CPPUNIT_ASSERT(loaded->Equals(mitk::IOUtil::Load<mitk::FiberBundle>(path1), 0.001));
+  }
+
+  void Writers_WriteErrors_Throw()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    const std::string base = mitk::IOMimeTypes::DEFAULT_BASE_NAME();
+    mitk::IFileWriter::Options options;
+    options["Print header"] = false;
+
+    const std::string missingDir = m_TempDir + "/missing/";
+    CPPUNIT_ASSERT_THROW_MESSAGE(".fib, missing directory", mitk::IOUtil::Save(fib, missingDir + "fibers.fib"), std::exception);
+    CPPUNIT_ASSERT_THROW_MESSAGE(".trk, missing directory", mitk::IOUtil::Save(fib, missingDir + "fibers.trk", options), std::exception);
+    CPPUNIT_ASSERT_THROW_MESSAGE(".dcm, missing directory",
+                                 mitk::IOUtil::Save(fib, base + ".FiberBundle.dcm", missingDir + "fibers.dcm"), std::exception);
+
+    // A device on which every write fails (disk full); opening it succeeds.
+    if (std::filesystem::exists("/dev/full"))
+    {
+      CPPUNIT_ASSERT_THROW_MESSAGE(".fib, disk full",
+                                   mitk::IOUtil::Save(fib, base + ".FiberBundle.vtk", "/dev/full", options, false), std::exception);
+      CPPUNIT_ASSERT_THROW_MESSAGE(".trk, disk full",
+                                   mitk::IOUtil::Save(fib, base + ".FiberBundle.trk", "/dev/full", options, false), std::exception);
+    }
   }
 };
 

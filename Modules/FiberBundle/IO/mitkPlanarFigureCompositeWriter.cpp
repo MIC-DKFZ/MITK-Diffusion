@@ -74,6 +74,8 @@ void mitk::PlanarFigureCompositeWriter::Write()
         std::string filename = this->GetOutputLocation().c_str();
 
         mitk::PlanarFigureComposite::ConstPointer input = dynamic_cast<const mitk::PlanarFigureComposite*>(this->GetInput());
+        if (input.IsNull())
+          mitkThrow() << "The planar figure composite writer needs a planar figure composite as input.";
         std::string ext = itksys::SystemTools::GetFilenameLastExtension(this->GetOutputLocation().c_str());
 
         boost::property_tree::ptree type;

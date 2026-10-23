@@ -74,12 +74,9 @@ short TrackVisFiberReader::create(std::string filename , mitk::FiberBundle *fib,
   // write the header to the file
   m_FilePointer = fopen(filename.c_str(),"w+b");
   if (m_FilePointer == nullptr)
-  {
-    printf("[ERROR] Unable to create file '%s'\n",filename.c_str());
-    return 0;
-  }
+    mitkThrow() << "Unable to create TrackVis file " << filename;
   if (fwrite((char*)&m_Header, 1, 1000, m_FilePointer) != 1000)
-    MITK_ERROR << "TrackVis::create : Error occurding during writing fiber.";
+    mitkThrow() << "Could not write the TrackVis header to " << filename;
 
   this->m_Filename = filename;
 
@@ -150,16 +147,8 @@ short TrackVisFiberReader::write(const mitk::FiberBundle *fib)
     }
 
     // write the coordinates to the file
-    if ( fwrite((char*)&numSaved, 1, 4, m_FilePointer) != 4 )
-    {
-      printf( "[ERROR] Problems saving the fiber!\n" );
-      return 1;
-    }
-    if ( fwrite((char*)&(tmp.front()), 1, 4*pos, m_FilePointer) != 4*pos )
-    {
-      printf( "[ERROR] Problems saving the fiber!\n" );
-      return 1;
-    }
+    if ( fwrite((char*)&numSaved, 1, 4, m_FilePointer) != 4 || fwrite((char*)&(tmp.front()), 1, 4*pos, m_FilePointer) != 4*pos )
+      mitkThrow() << "Could not write fiber " << i << " to " << m_Filename;
   }
 
   return 0;
@@ -305,7 +294,7 @@ void TrackVisFiberReader::writeHdr()
 {
   fseek(m_FilePointer, 0, SEEK_SET);
   if (fwrite((char*)&m_Header, 1, 1000, m_FilePointer) != 1000)
-    MITK_ERROR << "[ERROR] Problems saving the fiber!";
+    mitkThrow() << "Could not write the TrackVis header to " << m_Filename;
 }
 
 
@@ -313,8 +302,11 @@ void TrackVisFiberReader::writeHdr()
 // -------------------------------------------------------------
 void TrackVisFiberReader::close()
 {
-  fclose(m_FilePointer);
+  // Buffered write errors (disk full) show up only here.
+  const int result = fclose(m_FilePointer);
   m_FilePointer = nullptr;
+  if (result != 0)
+    mitkThrow() << "Could not finish writing " << m_Filename;
 }
 
 bool TrackVisFiberReader::IsTransformValid()

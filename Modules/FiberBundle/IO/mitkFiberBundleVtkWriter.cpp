@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkFiberBundleMimeTypes.h"
 #include <vtkUnsignedCharArray.h>
 #include <vtkTransformFilter.h>
+#include <mitkLocaleSwitch.h>
 
 mitk::FiberBundleVtkWriter::FiberBundleVtkWriter()
   : mitk::AbstractFileWriter(mitk::FiberBundle::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::FIBERBUNDLE_VTK_MIMETYPE_NAME(), "VTK Fiber Bundle Writer")
@@ -55,35 +56,18 @@ mitk::FiberBundleVtkWriter * mitk::FiberBundleVtkWriter::Clone() const
 
 void mitk::FiberBundleVtkWriter::Write()
 {
-
-  std::ostream* out;
-  std::ofstream outStream;
-
-  if( this->GetOutputStream() )
-  {
-    out = this->GetOutputStream();
-  }else{
-    outStream.open( this->GetOutputLocation().c_str() );
-    out = &outStream;
-  }
-
-  if ( !out->good() )
-  {
-    mitkThrow() << "Stream not good.";
-  }
-
   try
   {
-    const std::string& locale = "C";
-    const std::string& currLocale = setlocale( LC_ALL, nullptr );
-    setlocale(LC_ALL, locale.c_str());
+    // ASCII files write numbers with the decimal point of the current locale
+    mitk::LocaleSwitch localeSwitch("C");
 
-    std::locale I("C");
-    out->imbue(I);
-
-    std::string filename = this->GetOutputLocation().c_str();
+    // A local file also for output streams; it is copied to the stream when it goes out of scope.
+    LocalFile localFile(this);
+    const std::string filename = localFile.GetFileName();
 
     mitk::FiberBundle::ConstPointer input = dynamic_cast<const mitk::FiberBundle*>(this->GetInput());
+    if (input.IsNull())
+      mitkThrow() << "The VTK fiber bundle writer needs a fiber bundle as input.";
     std::string ext = itksys::SystemTools::GetFilenameLastExtension(this->GetOutputLocation().c_str());
     Options options = this->GetOptions();
 
@@ -164,7 +148,8 @@ void mitk::FiberBundleVtkWriter::Write()
         MITK_INFO << "Writing fiber bundle as vtk ascii file";
         writer->SetDataModeToAscii();
       }
-      writer->Write();
+      if (writer->Write() != 1 || writer->GetErrorCode() != 0)
+        mitkThrow() << "Could not write fiber bundle to " << filename << " (VTK error code " << writer->GetErrorCode() << ").";
     }
     else
     {
@@ -181,10 +166,10 @@ void mitk::FiberBundleVtkWriter::Write()
         MITK_INFO << "Writing fiber bundle as vtk ascii file";
         writer->SetFileTypeToASCII();
       }
-      writer->Write();
+      if (writer->Write() != 1 || writer->GetErrorCode() != 0)
+        mitkThrow() << "Could not write fiber bundle to " << filename << " (VTK error code " << writer->GetErrorCode() << ").";
     }
 
-    setlocale(LC_ALL, currLocale.c_str());
     MITK_INFO << "VTK Fiber bundle written to " << filename;
   }
   catch(...)

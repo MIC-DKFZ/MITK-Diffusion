@@ -27,6 +27,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "dcmtk/config/osconfig.h"    /* make sure OS specific configuration is included first */
 #include "dcmtk/dcmtract/trctractographyresults.h"
 #include "dcmtk/dcmdata/dcuid.h"
+#include <mitkLocaleSwitch.h>
+#include <memory>
 
 mitk::FiberBundleDicomWriter::FiberBundleDicomWriter()
   : mitk::AbstractFileWriter(mitk::FiberBundle::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME(), "DICOM Fiber Bundle Writer")
@@ -51,6 +53,8 @@ void mitk::FiberBundleDicomWriter::Write()
   try
   {
     mitk::FiberBundle::ConstPointer fib = dynamic_cast<const mitk::FiberBundle*>(this->GetInput());
+    if (fib.IsNull())
+      mitkThrow() << "The DICOM tractography writer needs a fiber bundle as input.";
     vtkPolyData* poly = fib->GetFiberPolyData();
     mitk::PropertyList* p_list = fib->GetPropertyList();
 
@@ -108,9 +112,7 @@ void mitk::FiberBundleDicomWriter::Write()
     if (!p_list->GetStringProperty("DICOM.anatomy.meaning", anatomy_meaning))
       anatomy_meaning = "0";
 
-    const std::string& locale = "C";
-    const std::string& currLocale = setlocale( LC_ALL, nullptr );
-    setlocale(LC_ALL, locale.c_str());
+    mitk::LocaleSwitch localeSwitch("C");
 
     // Instance Number, Label, Description, Creator's Name
     ContentIdentificationMacro id("1", "TRACTOGRAM", "Tractogram processed with MITK Diffusion", "MIC@DKFZ");
@@ -133,7 +135,10 @@ void mitk::FiberBundleDicomWriter::Write()
     OFString contentTime(time_buffer);
 
     TrcTractographyResults *trc = nullptr;
-    TrcTractographyResults::create(id, contentDate, contentTime, equipment, refs, trc);
+    OFCondition result = TrcTractographyResults::create(id, contentDate, contentTime, equipment, refs, trc);
+    if (result.bad() || trc == nullptr)
+      mitkThrow() << "Could not create the DICOM tractography object: " << result.text();
+    std::unique_ptr<TrcTractographyResults> trcOwner(trc);
     trc->getStudy().setStudyInstanceUID(study_instance_uid.c_str());
 
     trc->getPatient().setPatientID(patient_id.c_str());
@@ -160,14 +165,17 @@ void mitk::FiberBundleDicomWriter::Write()
     algorithmId.setAlgorithmSource("0");
 
     TrcTrackSet *set = nullptr;
-    trc->addTrackSet("TRACTOGRAM", "Tractogram processed with MITK Diffusion", anatomy, diffusionModel, algorithmId, set);
+    result = trc->addTrackSet("TRACTOGRAM", "Tractogram processed with MITK Diffusion", anatomy, diffusionModel, algorithmId, set);
+    if (result.bad() || set == nullptr)
+      mitkThrow() << "Could not create the DICOM track set: " << result.text();
 
     // Create trackset
     Uint16 cieLabColor[3]; // color the whole track with this color; we use some blue
     cieLabColor[0] = 30000; // L
     cieLabColor[1] = 0 ; // a
     cieLabColor[2] = 0 ; // b
-    std::vector< Float32* > tracts;
+    // kept until the file is saved
+    std::vector< std::vector<Float32> > tracts;
 
     for (unsigned int i=0; i<fib->GetNumFibers(); i++)
     {
@@ -175,7 +183,8 @@ void mitk::FiberBundleDicomWriter::Write()
         int numPoints = cell->GetNumberOfPoints();
         vtkPoints* points = cell->GetPoints();
 
-        Float32* pointData = new Float32[numPoints*3];
+        tracts.emplace_back(static_cast<std::size_t>(numPoints)*3);
+        std::vector<Float32>& pointData = tracts.back();
         for(int i=0; i<numPoints ;i++)
         {
             double* p = points->GetPoint(i);
@@ -184,22 +193,19 @@ void mitk::FiberBundleDicomWriter::Write()
             pointData[i*3+1] = p[1];
             pointData[i*3+2] = p[2];
         }
-        tracts.push_back(pointData);
 
         TrcTrack* track = nullptr;
-        set->addTrack(pointData, numPoints, cieLabColor, 1 /* numColors */, track);
+        result = set->addTrack(pointData.data(), numPoints, cieLabColor, 1 /* numColors */, track);
+        if (result.bad())
+          mitkThrow() << "Could not add fiber " << i << " to the DICOM track set: " << result.text();
     }
 
-    // Save file
-    OFCondition result = trc->saveFile(this->GetOutputLocation().c_str());
-    delete trc;
+    // A local file also for output streams; it is copied to the stream when it goes out of scope.
+    LocalFile localFile(this);
+    result = trc->saveFile(localFile.GetFileName().c_str());
     if (result.bad())
       mitkThrow() << "Unable to save tractography as DICOM file: " << result.text();
 
-    for (Float32* tract : tracts)
-      delete [] tract;
-
-    setlocale(LC_ALL, currLocale.c_str());
     MITK_INFO << "DICOM Fiber bundle written to " << this->GetOutputLocation();
   }
   catch(...)

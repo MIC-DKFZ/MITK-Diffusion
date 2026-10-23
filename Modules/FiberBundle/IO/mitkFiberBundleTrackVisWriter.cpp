@@ -53,34 +53,15 @@ mitk::FiberBundleTrackVisWriter * mitk::FiberBundleTrackVisWriter::Clone() const
 void mitk::FiberBundleTrackVisWriter::Write()
 {
 
-  std::ostream* out;
-  std::ofstream outStream;
-
-  if( this->GetOutputStream() )
-  {
-    out = this->GetOutputStream();
-  }else{
-    outStream.open( this->GetOutputLocation().c_str() );
-    out = &outStream;
-  }
-
-  if ( !out->good() )
-  {
-    mitkThrow() << "Stream not good.";
-  }
-
   try
   {
-    const std::string& locale = "C";
-    const std::string& currLocale = setlocale( LC_ALL, nullptr );
-    setlocale(LC_ALL, locale.c_str());
-
-    std::locale I("C");
-    out->imbue(I);
-
-    std::string filename = this->GetOutputLocation().c_str();
+    // A local file also for output streams; it is copied to the stream when it goes out of scope.
+    LocalFile localFile(this);
+    const std::string filename = localFile.GetFileName();
 
     mitk::FiberBundle::ConstPointer input = dynamic_cast<const mitk::FiberBundle*>(this->GetInput());
+    if (input.IsNull())
+      mitkThrow() << "The TrackVis writer needs a fiber bundle as input.";
     std::string ext = itksys::SystemTools::GetFilenameLastExtension(this->GetOutputLocation().c_str());
 
     // default extension is .fib
@@ -99,8 +80,8 @@ void mitk::FiberBundleTrackVisWriter::Write()
     trk.create(filename, const_cast<mitk::FiberBundle*>(input.GetPointer()), print_header, use_lps);
     trk.writeHdr();
     trk.write(input.GetPointer());
+    trk.close();
 
-    setlocale(LC_ALL, currLocale.c_str());
     MITK_INFO << "TrackVis Fiber bundle written to " << filename;
   }
   catch(...)
