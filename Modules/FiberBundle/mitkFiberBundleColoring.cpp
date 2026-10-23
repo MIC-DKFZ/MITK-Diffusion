@@ -14,6 +14,8 @@ found in the LICENSE file.
 
 #include <boost/timer/progress_display.hpp>
 #include <itkLinearInterpolateImageFunction.h>
+#include <mitkDiffusionImageHelperFunctions.h>
+#include <mitkImage.h>
 #include <mitkImageCast.h>
 #include <mitkLookupTable.h>
 #include <vtkCell.h>
@@ -330,37 +332,35 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
   m_UpdateTime2D.Modified();
 }
 
-void mitk::FiberBundle::ColorFibersByScalarMap(mitk::Image::Pointer FAimage, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
+void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::Image* FAimage, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
 {
-  if (FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned char" ||
-           FAimage->GetPixelType().GetComponentTypeAsString()=="char" ||
-           FAimage->GetPixelType().GetComponentTypeAsString()=="long" ||
-           FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned long" ||
-           FAimage->GetPixelType().GetComponentTypeAsString()=="short" ||
-           FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned short" ||
-           FAimage->GetPixelType().GetComponentTypeAsString()=="unsigned int" ||
-           FAimage->GetPixelType().GetComponentTypeAsString()=="int")
+  // Signed integer images are sampled as int, all others as float. (The type names this was once
+  // compared with also listed the unsigned types, but with a space where ITK writes "unsigned_char",
+  // so unsigned images always took the float path; results stay as they were.)
+  const auto componentType = FAimage->GetPixelType().GetComponentType();
+  if (componentType==itk::IOComponentEnum::CHAR || componentType==itk::IOComponentEnum::SHORT ||
+      componentType==itk::IOComponentEnum::INT || componentType==itk::IOComponentEnum::LONG)
   {
-    typedef itk::Image<int, 3> ImageType;
+    using ImageType = itk::Image<int, 3>;
     ImageType::Pointer itkImage = ImageType::New();
     CastToItkImage(FAimage, itkImage);
 
-    ColorFibersByScalarMap<int>(itkImage, opacity, weight_fibers, type, max_cap, interpolate );
+    ColorFibersByScalarMap<int>(itkImage.GetPointer(), opacity, weight_fibers, type, max_cap, interpolate );
   }
   else
   {
-    typedef itk::Image<float, 3> ImageType;
+    using ImageType = itk::Image<float, 3>;
     ImageType::Pointer itkImage = ImageType::New();
     CastToItkImage(FAimage, itkImage);
 
-    ColorFibersByScalarMap<float>(itkImage, opacity, weight_fibers, type, max_cap, interpolate );
+    ColorFibersByScalarMap<float>(itkImage.GetPointer(), opacity, weight_fibers, type, max_cap, interpolate );
   }
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
 }
 
 template <typename TPixel>
-void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
+void mitk::FiberBundle::ColorFibersByScalarMap(const itk::Image<TPixel, 3>* image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
 {
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   m_FiberColors->ReserveValues(m_FiberPolyData->GetNumberOfPoints() * 4);

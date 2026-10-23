@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include "mitkFiberPolyDataBuilder.h"
 
 #include <boost/timer/progress_display.hpp>
+#include <mitkDiffusionImageHelperFunctions.h>
 #include <vtkCell.h>
 #include <vtkUnsignedCharArray.h>
 
@@ -46,9 +47,9 @@ namespace
   }
 }
 
-void mitk::FiberBundle::TransformFibers(itk::ScalableAffineTransform< mitk::ScalarType >::Pointer transform)
+void mitk::FiberBundle::TransformFibers(const itk::ScalableAffineTransform< mitk::ScalarType >* transform)
 {
-  if (transform.IsNull())
+  if (transform==nullptr)
     mitkThrow() << "No transform given to transform the fibers.";
 
   MovePoints(this, [&](double* p)

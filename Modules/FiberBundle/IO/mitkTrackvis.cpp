@@ -1,5 +1,6 @@
 #include <mitkTrackvis.h>
 #include <mitkExceptionMacro.h>
+#include <mitkGeometry3D.h>
 #include <vtkTransformFilter.h>
 
 #include <cstdint>

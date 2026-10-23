@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include "mitkFiberPolyDataBuilder.h"
 
 #include <boost/timer/progress_display.hpp>
+#include <mitkDiffusionImageHelperFunctions.h>
 #include <vtkCell.h>
 
 #include <algorithm>
@@ -23,7 +24,7 @@ found in the LICENSE file.
 
 using mitk::FiberBundleDetail::FiberPolyDataBuilder;
 
-vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GeneratePolyDataByIds(std::vector<unsigned int> fiberIds, vtkSmartPointer<vtkFloatArray> weights)
+vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GeneratePolyDataByIds(const std::vector<unsigned int>& fiberIds, vtkFloatArray* weights) const
 {
   FiberPolyDataBuilder builder;
   for (auto id : fiberIds)
@@ -40,36 +41,43 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GeneratePolyDataByIds(std::vecto
   return builder.GetPolyData();
 }
 
+namespace
+{
+  void AddAllFibers(FiberPolyDataBuilder& builder, const mitk::FiberBundle* fib)
+  {
+    vtkPolyData* polyData = fib->GetFiberPolyData();
+    for (unsigned int i=0; i<polyData->GetNumberOfCells(); ++i)
+      builder.AddFiber(polyData, i, fib->GetFiberWeight(i));
+  }
+}
+
 // merge fiber bundles
-mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundles(std::vector< mitk::FiberBundle::Pointer > fibs)
+mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundles(const std::vector< mitk::FiberBundle::Pointer >& fibs) const
 {
   FiberPolyDataBuilder builder;
-  for (unsigned int i=0; i<m_FiberPolyData->GetNumberOfCells(); ++i)
-    builder.AddFiber(m_FiberPolyData, i, this->GetFiberWeight(i));
-
+  AddAllFibers(builder, this);
   // null entries add nothing
   for (const auto& fib : fibs)
-  {
-    if (fib.IsNull())
-      continue;
-    for (unsigned int i=0; i<fib->GetFiberPolyData()->GetNumberOfCells(); i++)
-      builder.AddFiber(fib->GetFiberPolyData(), i, fib->GetFiberWeight(i));
-  }
+    if (fib.IsNotNull())
+      AddAllFibers(builder, fib);
   return builder.CreateBundle(this);
 }
 
 // merge two fiber bundles
-mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundle(mitk::FiberBundle* fib)
+mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundle(const mitk::FiberBundle* fib) const
 {
   if (fib==nullptr)
     return this->GetDeepCopy();
 
   MITK_INFO << "Adding fibers";
-  return this->AddBundles({fib});
+  FiberPolyDataBuilder builder;
+  AddAllFibers(builder, this);
+  AddAllFibers(builder, fib);
+  return builder.CreateBundle(this);
 }
 
 // Only retain fibers with a weight larger than the specified threshold
-mitk::FiberBundle::Pointer mitk::FiberBundle::FilterByWeights(float weight_thr, bool invert)
+mitk::FiberBundle::Pointer mitk::FiberBundle::FilterByWeights(float weight_thr, bool invert) const
 {
   FiberPolyDataBuilder builder;
   for (unsigned int i=0; i<this->GetNumFibers(); i++)
@@ -82,7 +90,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::FilterByWeights(float weight_thr, 
 }
 
 // Only retain a subsample of the fibers
-mitk::FiberBundle::Pointer mitk::FiberBundle::SubsampleFibers(float factor, bool random_seed)
+mitk::FiberBundle::Pointer mitk::FiberBundle::SubsampleFibers(float factor, bool random_seed) const
 {
   unsigned int new_num_fibs = static_cast<unsigned int>(std::round(this->GetNumFibers()*factor));
   MITK_INFO << "Subsampling fibers with factor " << factor << "(" << new_num_fibs << "/" << this->GetNumFibers() << ")";
@@ -101,7 +109,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubsampleFibers(float factor, bool
 }
 
 // subtract two fiber bundles
-mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* fib)
+mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(const mitk::FiberBundle* fib) const
 {
   if (fib==nullptr)
     return this->GetDeepCopy();
@@ -189,7 +197,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* 
   return builder.CreateBundle(this);
 }
 
-mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgType* mask, bool invert)
+mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(const ItkUcharImgType* mask, bool invert) const
 {
   // The fiber processing view and FiberModification continue with the result, so "no fiber
   // left" is an empty bundle, never nullptr. The pieces of a fiber inside the mask keep its weight.

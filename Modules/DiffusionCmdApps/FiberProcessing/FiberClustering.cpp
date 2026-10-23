@@ -15,6 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <mitkFiberBundle.h>
+#include <mitkImageCast.h>
 #include <mitkCommandLineParser.h>
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>

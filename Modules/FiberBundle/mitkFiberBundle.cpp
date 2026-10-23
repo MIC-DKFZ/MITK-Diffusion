@@ -17,6 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkFiberBundle.h"
 #include "mitkFiberPolyDataBuilder.h"
 
+#include <mitkGeometry3D.h>
 #include <vtkCellArray.h>
 #include <vtkCleanPolyData.h>
 #include <vtkUnsignedCharArray.h>
@@ -77,7 +78,7 @@ mitk::FiberBundle::~FiberBundle()
 
 }
 
-mitk::FiberBundle::Pointer mitk::FiberBundle::GetDeepCopy()
+mitk::FiberBundle::Pointer mitk::FiberBundle::GetDeepCopy() const
 {
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(m_FiberPolyData);
   newFib->SetFiberColors(this->m_FiberColors);
@@ -198,7 +199,9 @@ void mitk::FiberBundle::UpdateFiberGeometry()
   geometry->SetFloatBounds(b);
   this->SetGeometry(geometry);
 
-  GetTrackVisHeader();
+  // The bounding box describes the reference grid until a header is set.
+  if (m_TrackVisHeader.hdr_size==0)
+    this->SetTrackVisHeader(dynamic_cast<const mitk::Geometry3D*>(this->GetGeometry()));
 
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
@@ -250,7 +253,7 @@ unsigned int mitk::FiberBundle::GetNumberOfPoints() const
 }
 
 // reapply selected colorcoding in case PolyData structure has changed
-bool mitk::FiberBundle::Equals(mitk::FiberBundle* fib, double eps)
+bool mitk::FiberBundle::Equals(const mitk::FiberBundle* fib, double eps) const
 {
   if (fib==nullptr)
   {
@@ -314,15 +317,17 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
   os << indent << "Extent z: " << this->GetGeometry()->GetExtentInMM(2) << "mm" << std::endl;
   os << indent << "Diagonal: " << this->GetGeometry()->GetDiagonalLength()  << "mm" << std::endl;
 
+  // the header the TrackVis writer would write
+  const TrackVis_header header = this->GetTrackVisHeader();
   os << "\nReference geometry:" << std::endl;
-  os << indent << "Size: [" << std::defaultfloat << m_TrackVisHeader.dim[0] << " " << m_TrackVisHeader.dim[1] << " " << m_TrackVisHeader.dim[2] << "]" << std::endl;
-  os << indent << "Voxel size: [" << m_TrackVisHeader.voxel_size[0] << " " << m_TrackVisHeader.voxel_size[1] << " " << m_TrackVisHeader.voxel_size[2] << "]" << std::endl;
-  os << indent << "Origin: [" << m_TrackVisHeader.origin[0] << " " << m_TrackVisHeader.origin[1] << " " << m_TrackVisHeader.origin[2] << "]" << std::endl;
+  os << indent << "Size: [" << std::defaultfloat << header.dim[0] << " " << header.dim[1] << " " << header.dim[2] << "]" << std::endl;
+  os << indent << "Voxel size: [" << header.voxel_size[0] << " " << header.voxel_size[1] << " " << header.voxel_size[2] << "]" << std::endl;
+  os << indent << "Origin: [" << header.origin[0] << " " << header.origin[1] << " " << header.origin[2] << "]" << std::endl;
   os << indent << "Matrix: " << std::scientific << std::endl;
-  os << indent << "[[" << m_TrackVisHeader.vox_to_ras[0][0] << ", " << m_TrackVisHeader.vox_to_ras[0][1] << ", " << m_TrackVisHeader.vox_to_ras[0][2] << ", " << m_TrackVisHeader.vox_to_ras[0][3] << "]" << std::endl;
-  os << indent << " [" << m_TrackVisHeader.vox_to_ras[1][0] << ", " << m_TrackVisHeader.vox_to_ras[1][1] << ", " << m_TrackVisHeader.vox_to_ras[1][2] << ", " << m_TrackVisHeader.vox_to_ras[1][3] << "]" << std::endl;
-  os << indent << " [" << m_TrackVisHeader.vox_to_ras[2][0] << ", " << m_TrackVisHeader.vox_to_ras[2][1] << ", " << m_TrackVisHeader.vox_to_ras[2][2] << ", " << m_TrackVisHeader.vox_to_ras[2][3] << "]" << std::endl;
-  os << indent << " [" << m_TrackVisHeader.vox_to_ras[3][0] << ", " << m_TrackVisHeader.vox_to_ras[3][1] << ", " << m_TrackVisHeader.vox_to_ras[3][2] << ", " << m_TrackVisHeader.vox_to_ras[3][3] << "]]" << std::defaultfloat << std::endl;
+  os << indent << "[[" << header.vox_to_ras[0][0] << ", " << header.vox_to_ras[0][1] << ", " << header.vox_to_ras[0][2] << ", " << header.vox_to_ras[0][3] << "]" << std::endl;
+  os << indent << " [" << header.vox_to_ras[1][0] << ", " << header.vox_to_ras[1][1] << ", " << header.vox_to_ras[1][2] << ", " << header.vox_to_ras[1][3] << "]" << std::endl;
+  os << indent << " [" << header.vox_to_ras[2][0] << ", " << header.vox_to_ras[2][1] << ", " << header.vox_to_ras[2][2] << ", " << header.vox_to_ras[2][3] << "]" << std::endl;
+  os << indent << " [" << header.vox_to_ras[3][0] << ", " << header.vox_to_ras[3][1] << ", " << header.vox_to_ras[3][2] << ", " << header.vox_to_ras[3][3] << "]]" << std::defaultfloat << std::endl;
 
   if (m_FiberWeights!=nullptr && m_FiberWeights->GetNumberOfValues()>0)
   {
@@ -349,14 +354,113 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
   Superclass::PrintSelf(os, indent);
 }
 
-mitk::FiberBundle::TrackVis_header mitk::FiberBundle::GetTrackVisHeader()
+namespace
 {
-  if (m_TrackVisHeader.hdr_size==0)
+  /** Header fields that describe the reference grid of the given geometry. */
+  void FillTrackVisHeader(mitk::FiberBundle::TrackVis_header& header, const mitk::BaseGeometry* geometry)
   {
-    mitk::Geometry3D::Pointer geom = dynamic_cast<mitk::Geometry3D*>(this->GetGeometry());
-    SetTrackVisHeader(geom);
+    // vox_to_ras holds the index-to-RAS affine of the reference grid, as the TrackVis format defines
+    // it (MITK's world is LPS: x and y negated). A geometry that is no image grid (the bounding box
+    // of a bundle without reference image) gets a grid whose index 0 lies at the box corner, so that
+    // all points lie inside the declared volume.
+    const vtkMatrix4x4* indexToLps = geometry->GetVtkMatrix();
+    double shift[3] = {0, 0, 0};
+    double dims[3];
+    for (int i=0; i<3; ++i)
+    {
+      dims[i] = geometry->GetExtent(i);
+      if (!geometry->GetImageGeometry())
+      {
+        shift[i] = geometry->GetBounds()[2*i];
+        dims[i] = std::ceil(geometry->GetExtent(i)) + 1;
+      }
+    }
+    double indexToRas[3][4];
+    for (int r=0; r<3; ++r)
+    {
+      const double flip = r<2 ? -1.0 : 1.0;
+      indexToRas[r][3] = indexToLps->GetElement(r, 3);
+      for (int c=0; c<3; ++c)
+      {
+        indexToRas[r][c] = flip * indexToLps->GetElement(r, c);
+        indexToRas[r][3] += indexToLps->GetElement(r, c) * shift[c];
+      }
+      indexToRas[r][3] *= flip;
+    }
+
+    // Voxel axes are reordered and flipped to point to R, A and S (voxel order "RAS"), the one order
+    // that TrackVis readers, MITK's of 2023 to 2026 included, all map the same way.
+    int perm[3] = {0, 1, 2};
+    double sign[3] = {1, 1, 1};
+    bool used[3] = {false, false, false};
+    for (int k=0; k<3; ++k)
+    {
+      int best = -1;
+      for (int j=0; j<3; ++j)
+        if (!used[j] && (best<0 || std::fabs(indexToRas[k][j])>std::fabs(indexToRas[k][best])))
+          best = j;
+      perm[k] = best;
+      used[best] = true;
+      sign[k] = indexToRas[k][best]<0 ? -1.0 : 1.0;
+    }
+
+    for (int r=0; r<3; ++r)
+    {
+      double translation = indexToRas[r][3];
+      for (int k=0; k<3; ++k)
+      {
+        header.vox_to_ras[r][k] = static_cast<float>(sign[k] * indexToRas[r][perm[k]]);
+        if (sign[k]<0)
+          translation += indexToRas[r][perm[k]] * (dims[perm[k]] - 1);
+      }
+      header.vox_to_ras[r][3] = static_cast<float>(translation);
+    }
+    for (int c=0; c<3; ++c)
+      header.vox_to_ras[3][c] = 0;
+    header.vox_to_ras[3][3] = 1;
+
+    for(int k=0; k<3 ;k++)
+    {
+      header.dim[k]            = static_cast<short>(dims[perm[k]]);
+      header.voxel_size[k]     = static_cast<float>(geometry->GetSpacing()[perm[k]]);
+      header.origin[k]         = 0;
+    }
+
+    header.n_scalars = 0;
+    header.n_properties = 0;
+    std::memcpy(header.voxel_order, "RAS", 4);
+    header.image_orientation_patient[0] = 1.0;
+    header.image_orientation_patient[1] = 0.0;
+    header.image_orientation_patient[2] = 0.0;
+    header.image_orientation_patient[3] = 0.0;
+    header.image_orientation_patient[4] = 1.0;
+    header.image_orientation_patient[5] = 0.0;
+    header.pad1[0] = 0;
+    header.pad1[1] = 0;
+    header.pad2[0] = 0;
+    header.pad2[1] = 0;
+    header.invert_x = 0;
+    header.invert_y = 0;
+    header.invert_z = 0;
+    header.swap_xy = 0;
+    header.swap_yz = 0;
+    header.swap_zx = 0;
+    header.n_count = 0;
+    header.version = 2;
+    header.hdr_size = 1000;
+    std::memcpy(header.id_string, "TRACK", 6);
   }
-  return m_TrackVisHeader;
+}
+
+mitk::FiberBundle::TrackVis_header mitk::FiberBundle::GetTrackVisHeader() const
+{
+  if (m_TrackVisHeader.hdr_size!=0)
+    return m_TrackVisHeader;
+  // No header set yet (a bundle constructed without fibers): that of the bounding box.
+  TrackVis_header header = m_TrackVisHeader;
+  if (auto geometry = dynamic_cast<const mitk::Geometry3D*>(this->GetGeometry()))
+    FillTrackVisHeader(header, geometry);
+  return header;
 }
 
 void mitk::FiberBundle::SetTrackVisHeader(const mitk::FiberBundle::TrackVis_header &TrackVisHeader)
@@ -364,102 +468,10 @@ void mitk::FiberBundle::SetTrackVisHeader(const mitk::FiberBundle::TrackVis_head
   m_TrackVisHeader = TrackVisHeader;
 }
 
-void mitk::FiberBundle::SetTrackVisHeader(mitk::BaseGeometry* geometry)
+void mitk::FiberBundle::SetTrackVisHeader(const mitk::BaseGeometry* geometry)
 {
-  if (geometry==nullptr)
-    return;
-
-  // vox_to_ras holds the index-to-RAS affine of the reference grid, as the TrackVis format defines
-  // it (MITK's world is LPS: x and y negated). A geometry that is no image grid (the bounding box
-  // of a bundle without reference image) gets a grid whose index 0 lies at the box corner, so that
-  // all points lie inside the declared volume.
-  vtkMatrix4x4* indexToLps = geometry->GetVtkMatrix();
-  double shift[3] = {0, 0, 0};
-  double dims[3];
-  for (int i=0; i<3; ++i)
-  {
-    dims[i] = geometry->GetExtent(i);
-    if (!geometry->GetImageGeometry())
-    {
-      shift[i] = geometry->GetBounds()[2*i];
-      dims[i] = std::ceil(geometry->GetExtent(i)) + 1;
-    }
-  }
-  double indexToRas[3][4];
-  for (int r=0; r<3; ++r)
-  {
-    const double flip = r<2 ? -1.0 : 1.0;
-    indexToRas[r][3] = indexToLps->GetElement(r, 3);
-    for (int c=0; c<3; ++c)
-    {
-      indexToRas[r][c] = flip * indexToLps->GetElement(r, c);
-      indexToRas[r][3] += indexToLps->GetElement(r, c) * shift[c];
-    }
-    indexToRas[r][3] *= flip;
-  }
-
-  // Voxel axes are reordered and flipped to point to R, A and S (voxel order "RAS"), the one order
-  // that TrackVis readers, MITK's of 2023 to 2026 included, all map the same way.
-  int perm[3] = {0, 1, 2};
-  double sign[3] = {1, 1, 1};
-  bool used[3] = {false, false, false};
-  for (int k=0; k<3; ++k)
-  {
-    int best = -1;
-    for (int j=0; j<3; ++j)
-      if (!used[j] && (best<0 || std::fabs(indexToRas[k][j])>std::fabs(indexToRas[k][best])))
-        best = j;
-    perm[k] = best;
-    used[best] = true;
-    sign[k] = indexToRas[k][best]<0 ? -1.0 : 1.0;
-  }
-
-  for (int r=0; r<3; ++r)
-  {
-    double translation = indexToRas[r][3];
-    for (int k=0; k<3; ++k)
-    {
-      m_TrackVisHeader.vox_to_ras[r][k] = static_cast<float>(sign[k] * indexToRas[r][perm[k]]);
-      if (sign[k]<0)
-        translation += indexToRas[r][perm[k]] * (dims[perm[k]] - 1);
-    }
-    m_TrackVisHeader.vox_to_ras[r][3] = static_cast<float>(translation);
-  }
-  for (int c=0; c<3; ++c)
-    m_TrackVisHeader.vox_to_ras[3][c] = 0;
-  m_TrackVisHeader.vox_to_ras[3][3] = 1;
-
-  for(int k=0; k<3 ;k++)
-  {
-    m_TrackVisHeader.dim[k]            = static_cast<short>(dims[perm[k]]);
-    m_TrackVisHeader.voxel_size[k]     = static_cast<float>(geometry->GetSpacing()[perm[k]]);
-    m_TrackVisHeader.origin[k]         = 0;
-  }
-
-  m_TrackVisHeader.n_scalars = 0;
-  m_TrackVisHeader.n_properties = 0;
-  sprintf(m_TrackVisHeader.voxel_order,"RAS");
-  m_TrackVisHeader.image_orientation_patient[0] = 1.0;
-  m_TrackVisHeader.image_orientation_patient[1] = 0.0;
-  m_TrackVisHeader.image_orientation_patient[2] = 0.0;
-  m_TrackVisHeader.image_orientation_patient[3] = 0.0;
-  m_TrackVisHeader.image_orientation_patient[4] = 1.0;
-  m_TrackVisHeader.image_orientation_patient[5] = 0.0;
-  m_TrackVisHeader.pad1[0] = 0;
-  m_TrackVisHeader.pad1[1] = 0;
-  m_TrackVisHeader.pad2[0] = 0;
-  m_TrackVisHeader.pad2[1] = 0;
-  m_TrackVisHeader.invert_x = 0;
-  m_TrackVisHeader.invert_y = 0;
-  m_TrackVisHeader.invert_z = 0;
-  m_TrackVisHeader.swap_xy = 0;
-  m_TrackVisHeader.swap_yz = 0;
-  m_TrackVisHeader.swap_zx = 0;
-  m_TrackVisHeader.n_count = 0;
-  m_TrackVisHeader.version = 2;
-  m_TrackVisHeader.hdr_size = 1000;
-  std::string id = "TRACK";
-  strcpy(m_TrackVisHeader.id_string, id.c_str());
+  if (geometry!=nullptr)
+    FillTrackVisHeader(m_TrackVisHeader, geometry);
 }
 
 /* ESSENTIAL IMPLEMENTATION OF SUPERCLASS METHODS */

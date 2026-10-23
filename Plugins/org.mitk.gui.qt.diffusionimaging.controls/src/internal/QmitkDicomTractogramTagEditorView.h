@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QmitkAbstractView.h>
 #include "ui_QmitkDicomTractogramTagEditorViewControls.h"
 #include <mitkFiberBundle.h>
+#include <mitkImage.h>
 
 /*!
 \brief View to show and edit the DICOM tags of a tractogram that the DICOM tractography writer stores.

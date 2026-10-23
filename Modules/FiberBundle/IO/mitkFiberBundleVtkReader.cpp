@@ -35,6 +35,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkFiberBundleMimeTypes.h"
 #include <vtkUnsignedCharArray.h>
 #include <vtkTransformFilter.h>
+#include <mitkGeometry3D.h>
 #include <mitkLocaleSwitch.h>
 
 

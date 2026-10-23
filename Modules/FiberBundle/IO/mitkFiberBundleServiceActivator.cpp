@@ -29,6 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigureCompositeWriter.h>
 
 #include <mitkCoreServices.h>
+#include <mitkDiffusionPropertyHelper.h>
 #include <mitkIPropertyDescriptions.h>
 #include <mitkIPropertyPersistence.h>
 

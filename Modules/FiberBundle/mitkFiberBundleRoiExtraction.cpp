@@ -14,6 +14,8 @@ found in the LICENSE file.
 #include "mitkFiberPolyDataBuilder.h"
 
 #include <boost/timer/progress_display.hpp>
+#include <mitkDataStorage.h>
+#include <mitkPlaneGeometry.h>
 #include <mitkPlanarCircle.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkPlanarPolygon.h>
@@ -28,7 +30,7 @@ found in the LICENSE file.
 
 using mitk::FiberBundleDetail::FiberPolyDataBuilder;
 
-mitk::FiberBundle::Pointer mitk::FiberBundle::ExtractFiberSubset(DataNode* roi, DataStorage* storage)
+mitk::FiberBundle::Pointer mitk::FiberBundle::ExtractFiberSubset(const DataNode* roi, const DataStorage* storage) const
 {
   if (roi==nullptr || !(dynamic_cast<PlanarFigure*>(roi->GetData()) || dynamic_cast<PlanarFigureComposite*>(roi->GetData())) )
     mitkThrow() << "Fiber extraction needs a planar figure or a planar figure composite as ROI.";
@@ -39,7 +41,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::ExtractFiberSubset(DataNode* roi, 
   return builder.CreateBundle(this);
 }
 
-std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(DataNode *roi, DataStorage* storage)
+std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(const DataNode* roi, const DataStorage* storage) const
 {
   std::vector<unsigned int> result;
   if (roi==nullptr || roi->GetData()==nullptr)

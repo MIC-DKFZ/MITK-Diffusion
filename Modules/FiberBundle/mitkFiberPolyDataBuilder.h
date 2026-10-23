@@ -29,7 +29,7 @@ namespace mitk::FiberBundleDetail
 {
   /** Bundles derived from another one keep its coordinate convention (the VTK writer saves
    *  RAS bundles back in RAS) and its TrackVis header (reference geometry for .trk files). */
-  void CopyMetadata(FiberBundle* source, FiberBundle* target);
+  void CopyMetadata(const FiberBundle* source, FiberBundle* target);
 
   /**
    * Collects the fibers of a new fiber polydata, each with its weight. Every operation that
@@ -69,7 +69,7 @@ namespace mitk::FiberBundleDetail
     vtkSmartPointer<vtkFloatArray> GetWeights() const;
 
     /** A new bundle of the collected fibers and their weights, with the metadata of source. */
-    FiberBundle::Pointer CreateBundle(FiberBundle* metadataSource) const;
+    FiberBundle::Pointer CreateBundle(const FiberBundle* metadataSource) const;
 
     /** Replaces the fibers and weights of fib by the collected ones. */
     void ReplaceFibersOf(FiberBundle* fib) const;

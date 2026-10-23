@@ -15,7 +15,7 @@ found in the LICENSE file.
 #include <vtkCell.h>
 #include <vtkPolyData.h>
 
-void mitk::FiberBundleDetail::CopyMetadata(FiberBundle* source, FiberBundle* target)
+void mitk::FiberBundleDetail::CopyMetadata(const FiberBundle* source, FiberBundle* target)
 {
   target->SetTrackVisHeader(source->GetTrackVisHeader());
   target->setIsRAS(source->IsRAS());
@@ -79,7 +79,7 @@ vtkSmartPointer<vtkFloatArray> mitk::FiberBundleDetail::FiberPolyDataBuilder::Ge
   return array;
 }
 
-mitk::FiberBundle::Pointer mitk::FiberBundleDetail::FiberPolyDataBuilder::CreateBundle(FiberBundle* metadataSource) const
+mitk::FiberBundle::Pointer mitk::FiberBundleDetail::FiberPolyDataBuilder::CreateBundle(const FiberBundle* metadataSource) const
 {
   FiberBundle::Pointer fib = FiberBundle::New(this->GetPolyData());
   fib->SetFiberWeights(this->GetWeights());
