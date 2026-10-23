@@ -21,6 +21,9 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itksys/SystemTools.hxx>
+#include <vnl/vnl_inverse.h>
+#include <vnl/vnl_matrix_fixed.h>
+#include <vnl/vnl_vector_fixed.h>
 #include <vtkCell.h>
 #include <vtkCellArray.h>
 #include <vtkFloatArray.h>
@@ -69,6 +72,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(DicomMimeType_NewDcmFile_FindsWriter);
   MITK_TEST(IOHelper_BrokenFileAndDottedNames_CoutRestored);
   MITK_TEST(CopyDicomReferenceTags_BothNamingsAndMissingTags);
+  MITK_TEST(TrkWriter_Header_DescribesReferenceGrid);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -712,6 +716,112 @@ public:
     missing = mitk::CopyDicomReferenceTags(mitk::Image::New(), fib);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(7), missing.size());
     CPPUNIT_ASSERT_EQUAL(std::string("TEST0002"), StringProperty(fib, "DICOM.patient_id"));
+  }
+
+  /** Reads a .trk file as the TrackVis format defines it, RAS = vox_to_ras * (voxmm / voxel_size - 0.5);
+   *  inside tells whether all points lie in the declared volume (nibabel's bounding box check). */
+  static std::vector<std::array<double, 3>> ReadTrkAsSpec(const std::string &path, TrkHeader &header, bool &inside)
+  {
+    std::ifstream in(path, std::ios::binary);
+    in.read(reinterpret_cast<char *>(&header), sizeof(header));
+    std::vector<std::array<double, 3>> ras;
+    inside = true;
+    std::int32_t numPoints = 0;
+    while (in.read(reinterpret_cast<char *>(&numPoints), 4))
+    {
+      for (int j = 0; j < numPoints; ++j)
+      {
+        float voxmm[3];
+        in.read(reinterpret_cast<char *>(voxmm), 12);
+        std::array<double, 3> p;
+        for (int r = 0; r < 3; ++r)
+        {
+          p[r] = header.vox_to_ras[r][3];
+          for (int c = 0; c < 3; ++c)
+            p[r] += header.vox_to_ras[r][c] * (voxmm[c] / header.voxel_size[c] - 0.5);
+        }
+        for (int c = 0; c < 3; ++c)
+          inside = inside && voxmm[c] >= 0 && voxmm[c] <= header.dim[c] * header.voxel_size[c];
+        ras.push_back(p);
+      }
+    }
+    return ras;
+  }
+
+  static void AssertSpecPointsMatchBundle(mitk::FiberBundle *fib, const std::vector<std::array<double, 3>> &ras, const std::string &message)
+  {
+    std::size_t k = 0;
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      for (vtkIdType j = 0; j < cell->GetNumberOfPoints(); ++j, ++k)
+      {
+        CPPUNIT_ASSERT_MESSAGE(message, k < ras.size());
+        const double *p = cell->GetPoints()->GetPoint(j);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -p[0], ras[k][0], 1e-3);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -p[1], ras[k][1], 1e-3);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, p[2], ras[k][2], 1e-3);
+      }
+    }
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message, ras.size(), k);
+  }
+
+  void TrkWriter_Header_DescribesReferenceGrid()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    mitk::IFileWriter::Options options;
+    options["Print header"] = false;
+    const std::string path = m_TempDir + "/spec.trk";
+    TrkHeader header;
+    bool inside = false;
+
+    // Without reference image: a grid around the bundle
+    mitk::IOUtil::Save(fib, path, options);
+    AssertSpecPointsMatchBundle(fib, ReadTrkAsSpec(path, header, inside), "no reference");
+    CPPUNIT_ASSERT_MESSAGE("All points inside the declared volume", inside);
+    CPPUNIT_ASSERT_EQUAL(std::string("RAS"), std::string(header.voxel_order, 3));
+
+    // Reference images stored in LPS and in LAS orientation
+    for (const std::string name : {"StreamlineTractography/mask_image.nii.gz", "mean_FA.nii.gz"})
+    {
+      auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/" + name));
+      auto withReference = fib->GetDeepCopy();
+      withReference->SetTrackVisHeader(image->GetGeometry());
+      mitk::IOUtil::Save(withReference, path, options);
+      AssertSpecPointsMatchBundle(fib, ReadTrkAsSpec(path, header, inside), name);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, std::string("RAS"), std::string(header.voxel_order, 3));
+
+      // The header grid is the image grid: every corner voxel of the image is a voxel of the header grid.
+      vnl_matrix_fixed<double, 3, 3> a;
+      vnl_vector_fixed<double, 3> t;
+      for (int r = 0; r < 3; ++r)
+      {
+        t[r] = header.vox_to_ras[r][3];
+        for (int c = 0; c < 3; ++c)
+        {
+          a[r][c] = header.vox_to_ras[r][c];
+          if (r == c)
+            CPPUNIT_ASSERT_MESSAGE(name + ": voxel axes point to R, A, S", a[r][c] > 0);
+        }
+      }
+      const auto inverse = vnl_inverse(a);
+      auto geometry = image->GetGeometry();
+      for (int corner = 0; corner < 8; ++corner)
+      {
+        mitk::Point3D index;
+        for (int c = 0; c < 3; ++c)
+          index[c] = (corner >> c & 1) ? geometry->GetExtent(c) - 1 : 0;
+        mitk::Point3D world;
+        geometry->IndexToWorld(index, world);
+        vnl_vector_fixed<double, 3> ras(-world[0], -world[1], world[2]);
+        const auto headerIndex = inverse * (ras - t);
+        for (int c = 0; c < 3; ++c)
+        {
+          CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(name, std::round(headerIndex[c]), headerIndex[c], 1e-3);
+          CPPUNIT_ASSERT_MESSAGE(name, headerIndex[c] > -0.5 && headerIndex[c] < header.dim[c] - 0.5);
+        }
+      }
+    }
   }
 };
 
