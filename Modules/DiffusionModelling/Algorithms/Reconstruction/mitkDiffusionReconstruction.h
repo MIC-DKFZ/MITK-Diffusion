@@ -36,7 +36,8 @@ namespace mitk
    * gradients and divides every log-attenuation by one b-value, which is right only when every
    * diffusion-weighted volume has the reference b-value. Such DWIs are fitted by ITK's filter; any
    * other DWI (several shells, or one shell below the reference b-value) is fitted with the
-   * b-matrix of each volume, as FSL dtifit and MRtrix dwi2tensor do.
+   * b-matrix of each volume, as FSL dtifit and MRtrix dwi2tensor do. Unlike those, which also fit
+   * ln S0, both fits fix S0 to the mean b0 of the voxel (as ITK's filter does).
    *
    * b0 volumes are those whose b-value rounds to 0 (BValueMapProperty::GetBValue); they are
    * averaged per voxel. Voxels whose mean b0 is 0 or below b0Threshold get the zero tensor. A
@@ -128,8 +129,10 @@ namespace mitk
   /**
    * \brief Q-ball reconstruction of a DWI.
    *
-   * The single-shell methods need one non-zero shell (see GetSingleShellGradients); MultiShell
-   * needs three equidistant shells (b, 2b, 3b) among the selected ones, and uses all b0 volumes.
+   * The single-shell methods need one non-zero shell (see GetSingleShellGradients); AdcProfile
+   * divides by that shell's b-value. MultiShell needs exactly three selected non-zero shells
+   * (QballParameters::shells, or all shells of the DWI) with b-values b, 2b, 3b, and normalizes
+   * each of them by the mean of all b0 volumes.
    *
    * \throw mitk::Exception if dwi is not a DWI, for an unsupported SH order, or for a selected shell
    * the DWI does not have; itk::ExceptionObject from the filters for a DWI the method cannot use

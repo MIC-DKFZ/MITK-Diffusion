@@ -41,11 +41,10 @@ namespace itk{
  * \code
  *       filter->SetGradientImage( directionsContainer, vectorImage );
  * \endcode
- * This is convenient when the DWI images are read in using the
- * <a href="http://wiki.na-mic.org/Wiki/index.php/NAMIC_Wiki:DTI:Nrrd_format">NRRD</a>
- * format. Like the Nrrd format, the reference images are those components of the
- * vectorImage whose gradient direction is (0,0,0). If more than one reference image
- * is present, they are averaged prior to the reconstruction.
+ * The b-value of a component is BValue * |g|^2. The reference images are the components
+ * whose b-value rounds to 0 (BValueMapProperty::GetBValue, as in the b-value map), so
+ * also short non-zero gradient vectors; they are averaged per voxel. All other components
+ * must have one b-value (mitk::GetSingleShellGradients).
  *
  * \par Outputs
  * The output image is an image of vectors that must be understood as ODFs:

@@ -42,11 +42,10 @@ namespace itk{
  *       filter->SetGradientImage( directionsContainer, vectorImage );
  * \endcode
  * Note that this method is used to specify both the reference and gradient images.
- * This is convenient when the DWI images are read in using the
- * <a href="http://wiki.na-mic.org/Wiki/index.php/NAMIC_Wiki:DTI:Nrrd_format">NRRD</a>
- * format. Like the Nrrd format, the reference images are those components of the
- * vectorImage whose gradient direction is (0,0,0). If more than one reference image
- * is present, they are averaged prior to the reconstruction.
+ * The b-value of a component is BValue * |g|^2. The reference images are the components
+ * whose b-value rounds to 0 (BValueMapProperty::GetBValue, as in the b-value map), so
+ * also short non-zero gradient vectors; they are averaged per voxel. All other components
+ * must have one b-value (mitk::GetSingleShellGradients).
  *
  * \par Outputs
  * The output image is an image of vectors that must be understood as ODFs:
@@ -62,25 +61,25 @@ namespace itk{
  * \li Lambda - weight of the Laplace-Beltrami regularization (Descoteaux 2007).
  * The regularization is rotation invariant (mitk::LaplaceBeltramiPenalty) and
  * independent of whether the directions cover one half of the sphere or both.
- * \li OdfDirections - directions of resulting orientation distribution function
- * \li EquatorNrSamplingPoints - number of sampling points on equator when
- * performing Funk Radeon Transform (FRT)
- * \li BasisFunctionCenters - the centers of the basis functions are used for
- * the sRBF (spherical radial basis functions interpolation). If not set, they
- * will be defaulted to equal m_EquatorNrSamplingPoints
+ * \li NormalizationMethod - the reconstruction method, see Normalization.
+ * \li ComputeOdf - whether the ODFs sampled on the NrOdfDirections directions of
+ * mitk::pointshell are computed besides the coefficient image.
  *
  * \par Template parameters
  * The class is templated over
  * \li the pixel type of the reference and gradient images
  * (expected to be scalar data types)
  * \li the internal representation of the ODF pixels (double, float etc).
- * \li the number of OdfDirections
- * \li the number of basis function centers for the sRBF
+ * \li the (even) SH order
+ * \li the number of ODF directions
  *
  * \par References:
- * \li<a href="http://www3.interscience.wiley.com/cgi-bin/fulltext/109800293/PDFSTART">[1]</a>
- * <em>Tuch DS,
- * "Q-ball imaging", Magn Reson Med. 2004 Dec;52(6):1358-72.</em>
+ * \li <em>Tuch DS, "Q-ball imaging", Magn Reson Med. 2004;52(6):1358-72.</em>
+ * \li <em>Descoteaux M, Angelino E, Fitzgibbons S, Deriche R, "Regularized, fast, and robust
+ * analytical Q-ball imaging", Magn Reson Med. 2007;58(3):497-510.</em>
+ * \li <em>Aganj I, Lenglet C, Sapiro G, Yacoub E, Ugurbil K, Harel N, "Reconstruction of the
+ * orientation distribution function in single- and multiple-shell q-ball imaging within constant
+ * solid angle", Magn Reson Med. 2010;64(2):554-66.</em>
  *
  */
 
