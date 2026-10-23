@@ -29,6 +29,7 @@ found in the LICENSE file.
 #include <vtkPolyData.h>
 #include <vtkPropAssembly.h>
 #include <vtkPropCollection.h>
+#include <vtkProperty.h>
 
 #include <cmath>
 #include <set>
@@ -232,9 +233,17 @@ public:
     auto polyData = m_Fibers->GetFiberPolyData();
     const auto arraysBefore = ArrayNames(polyData);
     const auto numPoints = polyData->GetNumberOfPoints();
-    m_Node->SetFloatProperty("shape.tuberadius", 0.5f);
     Render3D();
     Render2D(mitk::AnatomicalPlane::Coronal);
+    const auto updateTime2D = m_Fibers->GetUpdateTime2D();
+    const auto updateTime3D = m_Fibers->GetUpdateTime3D();
+    // changed shape properties are picked up without touching the bundle's update times
+    m_Node->SetFloatProperty("shape.tuberadius", 0.5f);
+    m_Node->SetIntProperty("shape.linewidth", 3);
+    CPPUNIT_ASSERT(Input(Render3D())->GetNumberOfStrips() > 0);
+    CPPUNIT_ASSERT_EQUAL(3.0f, Render2D(mitk::AnatomicalPlane::Coronal)->GetProperty()->GetLineWidth());
+    CPPUNIT_ASSERT(updateTime2D == m_Fibers->GetUpdateTime2D());
+    CPPUNIT_ASSERT(updateTime3D == m_Fibers->GetUpdateTime3D());
     CPPUNIT_ASSERT(polyData.GetPointer() == m_Fibers->GetFiberPolyData().GetPointer());
     CPPUNIT_ASSERT(arraysBefore == ArrayNames(polyData));
     CPPUNIT_ASSERT_EQUAL(numPoints, polyData->GetNumberOfPoints());

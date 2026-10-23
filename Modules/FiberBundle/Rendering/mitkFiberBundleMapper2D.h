@@ -14,29 +14,24 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef FiberBundleMAPPER2D_H_HEADER_INCLUDED
-#define FiberBundleMAPPER2D_H_HEADER_INCLUDED
+#ifndef mitkFiberBundleMapper2D_h
+#define mitkFiberBundleMapper2D_h
 
-#include <mitkCommon.h>
-#include <mitkBaseRenderer.h>
-#include <mitkVtkMapper.h>
-#include <mitkFiberBundle.h>
-#include <vtkSmartPointer.h>
 #include <MitkFiberBundleExports.h>
+#include <mitkFiberBundle.h>
+#include <mitkVtkMapper.h>
 
-#define MITKFIBERBUNDLEMAPPER2D_POLYDATAMAPPER vtkOpenGLPolyDataMapper
+#include <vtkSmartPointer.h>
 
 class vtkActor;
-class mitkBaseRenderer;
-class MITKFIBERBUNDLEMAPPER2D_POLYDATAMAPPER;
-class vtkCutter;
-class vtkPlane;
-class vtkPolyData;
+class vtkOpenGLPolyDataMapper;
 
 namespace mitk {
 
-struct IShaderRepository;
-
+/**
+ * \brief 2D mapper of fiber bundles: the fibers within Fiber2DSliceThickness of the shown plane,
+ * as lines of shape.linewidth with the bundle's colours.
+ */
 class MITKFIBERBUNDLE_EXPORT FiberBundleMapper2D : public VtkMapper
 {
 
@@ -54,34 +49,23 @@ public:
   {
   public:
     vtkSmartPointer<vtkActor> m_Actor;
-    vtkSmartPointer<MITKFIBERBUNDLEMAPPER2D_POLYDATAMAPPER> m_Mapper;
+    vtkSmartPointer<vtkOpenGLPolyDataMapper> m_Mapper;
     itk::TimeStamp m_LastUpdateTime;
+    // line width of the last update; the actor of each render window has its own
+    int m_LineWidth = -1;
     FBXLocalStorage();
-
-    ~FBXLocalStorage() override
-    {
-    }
   };
 
   /** \brief This member holds all three LocalStorages for the three 2D render windows. */
   mitk::LocalStorageHandler<FBXLocalStorage> m_LocalStorageHandler;
 
 protected:
-  FiberBundleMapper2D();
-  ~FiberBundleMapper2D() override;
+  FiberBundleMapper2D() = default;
+  ~FiberBundleMapper2D() override = default;
 
-  /** Does the actual resampling, without rendering. */
   void GenerateDataForRenderer(mitk::BaseRenderer*) override;
-
-  void UpdateShaderParameter(mitk::BaseRenderer*);
-
-private:
-  vtkSmartPointer<vtkLookupTable> m_lut;
-
-  int     m_LineWidth;
 };
 
-
-}//end namespace
+}
 
 #endif

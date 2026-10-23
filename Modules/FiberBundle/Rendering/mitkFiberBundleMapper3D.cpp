@@ -15,43 +15,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundleMapper3D.h"
+
+#include <mitkClippingProperty.h>
 #include <mitkProperties.h>
 
-#include <vtkPropAssembly.h>
-#include <vtkPointData.h>
-#include <vtkProperty.h>
-#include <vtkCellArray.h>
-#include <vtkDepthSortPolyData.h>
-#include <vtkCamera.h>
-#include <vtkTubeFilter.h>
-#include <vtkRibbonFilter.h>
+#include <vtkActor.h>
 #include <vtkLookupTable.h>
-#include <vtkOpenGLHelper.h>
-#include <vtkShaderProgram.h>
-#include <mitkVectorProperty.h>
+#include <vtkOpenGLPolyDataMapper.h>
 #include <vtkPlane.h>
-#include <mitkClippingProperty.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPropAssembly.h>
+#include <vtkProperty.h>
+#include <vtkRibbonFilter.h>
+#include <vtkTubeFilter.h>
+#include <vtkUnsignedCharArray.h>
 
 mitk::FiberBundleMapper3D::FiberBundleMapper3D()
-  : m_TubeRadius(0.0)
-  , m_TubeSides(15)
-  , m_LineWidth(1)
-  , m_RibbonWidth(0.0)
 {
   m_lut = vtkSmartPointer<vtkLookupTable>::New();
   m_lut->Build();
-}
-
-
-mitk::FiberBundleMapper3D::~FiberBundleMapper3D()
-{
-
-}
-
-
-const mitk::FiberBundle* mitk::FiberBundleMapper3D::GetInput()
-{
-  return static_cast<const mitk::FiberBundle * > ( GetDataNode()->GetData() );
 }
 
 
@@ -59,50 +42,41 @@ const mitk::FiberBundle* mitk::FiberBundleMapper3D::GetInput()
  This method is called once the mapper gets new input,
  for UI rotation or changes in colorcoding this method is NOT called
  */
-void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *renderer)
+void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *renderer, const FiberBundle* fiberBundle, const ShapeParameters& shape)
 {
-  m_FiberPolyData->GetPointData()->AddArray(m_FiberBundle->GetFiberColors());
   LocalStorage3D *localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
 
-  if (m_TubeRadius>0.0f)
+  // Rendered from a shallow copy: the colour array added for rendering must not change the
+  // bundle's own polydata, which may be saved or processed meanwhile.
+  vtkSmartPointer<vtkPolyData> fiberPolyData = vtkSmartPointer<vtkPolyData>::New();
+  fiberPolyData->ShallowCopy(fiberBundle->GetFiberPolyData());
+  fiberPolyData->GetPointData()->AddArray(fiberBundle->GetFiberColors());
+
+  if (shape.tubeRadius>0.0f)
   {
     vtkSmartPointer<vtkTubeFilter> tubeFilter = vtkSmartPointer<vtkTubeFilter>::New();
-    tubeFilter->SetInputData(m_FiberPolyData);
-    tubeFilter->SetNumberOfSides(m_TubeSides);
-    tubeFilter->SetRadius(m_TubeRadius);
+    tubeFilter->SetInputData(fiberPolyData);
+    tubeFilter->SetNumberOfSides(shape.tubeSides);
+    tubeFilter->SetRadius(shape.tubeRadius);
     tubeFilter->Update();
-    m_FiberPolyData = tubeFilter->GetOutput();
+    fiberPolyData = tubeFilter->GetOutput();
   }
-  else if (m_RibbonWidth>0.0f)
+  else if (shape.ribbonWidth>0.0f)
   {
     vtkSmartPointer<vtkRibbonFilter> tubeFilter = vtkSmartPointer<vtkRibbonFilter>::New();
-    tubeFilter->SetInputData(m_FiberPolyData);
-    tubeFilter->SetWidth(m_RibbonWidth);
+    tubeFilter->SetInputData(fiberPolyData);
+    tubeFilter->SetWidth(shape.ribbonWidth);
     tubeFilter->Update();
-    m_FiberPolyData = tubeFilter->GetOutput();
+    fiberPolyData = tubeFilter->GetOutput();
   }
 
-//  if (tmpopa<1)
-//  {
-//    vtkSmartPointer<vtkDepthSortPolyData> depthSort = vtkSmartPointer<vtkDepthSortPolyData>::New();
-//    depthSort->SetInputData( m_FiberPolyData );
-//    depthSort->SetCamera( renderer->GetVtkRenderer()->GetActiveCamera() );
-//    depthSort->SetDirectionToBackToFront();
-//    depthSort->Update();
-//    localStorage->m_FiberMapper->SetInputConnection(depthSort->GetOutputPort());
-
-//  }
-//  else
-//  {
-    localStorage->m_FiberMapper->SetInputData(m_FiberPolyData);
-//  }
-
+  localStorage->m_FiberMapper->SetInputData(fiberPolyData);
   localStorage->m_FiberMapper->SelectColorArray("FIBER_COLORS");
   localStorage->m_FiberMapper->ScalarVisibilityOn();
   localStorage->m_FiberMapper->SetScalarModeToUsePointFieldData();
   localStorage->m_FiberActor->SetMapper(localStorage->m_FiberMapper);
   localStorage->m_FiberMapper->SetLookupTable(m_lut);
-  localStorage->m_FiberActor->GetProperty()->SetLineWidth(m_LineWidth);
+  localStorage->m_FiberActor->GetProperty()->SetLineWidth(shape.lineWidth);
   localStorage->m_FiberAssembly->AddPart(localStorage->m_FiberActor);
 
   DataNode* node = this->GetDataNode();
@@ -132,6 +106,7 @@ void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *rendere
   if (plane_normal.GetNorm() > 0.0)
     localStorage->m_FiberMapper->AddClippingPlane(plane);
 
+  localStorage->m_Shape = shape;
   localStorage->m_LastUpdateTime.Modified();
 }
 
@@ -147,44 +122,15 @@ void mitk::FiberBundleMapper3D::GenerateDataForRenderer( mitk::BaseRenderer *ren
   const DataNode* node = this->GetDataNode();
   LocalStorage3D* localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
 
-  m_FiberBundle = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-  // Rendered from a shallow copy: the colour array added for rendering must not change the
-  // bundle's own polydata, which may be saved or processed meanwhile.
-  m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
-  m_FiberPolyData->ShallowCopy(m_FiberBundle->GetFiberPolyData());
+  auto fiberBundle = dynamic_cast<mitk::FiberBundle*>(node->GetData());
+  if (fiberBundle == nullptr)
+    return;
 
-  // did any rendering properties change?
-  float tubeRadius = 0;
-  node->GetFloatProperty("shape.tuberadius", tubeRadius);
-  if (m_TubeRadius!=tubeRadius)
-  {
-    m_TubeRadius = tubeRadius;
-    m_FiberBundle->RequestUpdate3D();
-  }
-
-  int tubeSides = 0;
-  node->GetIntProperty("shape.tubesides", tubeSides);
-  if (m_TubeSides!=tubeSides)
-  {
-    m_TubeSides = tubeSides;
-    m_FiberBundle->RequestUpdate3D();
-  }
-
-  int lineWidth = 0;
-  node->GetIntProperty("shape.linewidth", lineWidth);
-  if (m_LineWidth!=lineWidth)
-  {
-    m_LineWidth = lineWidth;
-    m_FiberBundle->RequestUpdate3D();
-  }
-
-  float ribbonWidth = 0;
-  node->GetFloatProperty("shape.ribbonwidth", ribbonWidth);
-  if (m_RibbonWidth!=ribbonWidth)
-  {
-    m_RibbonWidth = ribbonWidth;
-    m_FiberBundle->RequestUpdate3D();
-  }
+  ShapeParameters shape;
+  node->GetFloatProperty("shape.tuberadius", shape.tubeRadius);
+  node->GetIntProperty("shape.tubesides", shape.tubeSides);
+  node->GetIntProperty("shape.linewidth", shape.lineWidth);
+  node->GetFloatProperty("shape.ribbonwidth", shape.ribbonWidth);
 
   float opacity;
   this->GetDataNode()->GetOpacity(opacity, nullptr);
@@ -206,18 +152,14 @@ void mitk::FiberBundleMapper3D::GenerateDataForRenderer( mitk::BaseRenderer *ren
   property->SetLighting(true);
   property->SetOpacity(opacity);
 
-  if (localStorage->m_LastUpdateTime>=m_FiberBundle->GetUpdateTime3D())
+  // rebuilt for changed fibers and changed shape properties
+  if (localStorage->m_LastUpdateTime>=fiberBundle->GetUpdateTime3D() && localStorage->m_Shape==shape)
     return;
 
   // Calculate time step of the input data for the specified renderer (integer value)
   // this method is implemented in mitkMapper
   this->CalculateTimeStep( renderer );
-  this->InternalGenerateData(renderer);
-}
-
-void mitk::FiberBundleMapper3D::UpdateShaderParameter(mitk::BaseRenderer * )
-{
-  // see new vtkShaderCallback3D
+  this->InternalGenerateData(renderer, fiberBundle, shape);
 }
 
 void mitk::FiberBundleMapper3D::SetDefaultProperties(mitk::DataNode* node, mitk::BaseRenderer* renderer, bool overwrite)
@@ -260,4 +202,3 @@ mitk::FiberBundleMapper3D::LocalStorage3D::LocalStorage3D()
   m_FiberMapper = vtkSmartPointer<vtkOpenGLPolyDataMapper>::New();
   m_FiberAssembly = vtkSmartPointer<vtkPropAssembly>::New();
 }
-
