@@ -13,27 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-/*=========================================================================
-
-Program:   Tensor ToolKit - TTK
-Module:    $URL: svn://scm.gforge.inria.fr/svn/ttk/trunk/Algorithms/itkElectrostaticRepulsionDiffusionGradientReductionFilter.txx $
-Language:  C++
-Date:      $Date: 2010-06-07 13:39:13 +0200 (Mo, 07 Jun 2010) $
-Version:   $Revision: 68 $
-
-Copyright (c) INRIA 2010. All rights reserved.
-See LICENSE.txt for details.
-
-This software is distributed WITHOUT ANY WARRANTY; without even
-the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-PURPOSE.  See the above copyright notices for more information.
-
-=========================================================================*/
-#ifndef _itk_RadialMultishellToSingleshellImageFilter_cpp_
-#define _itk_RadialMultishellToSingleshellImageFilter_cpp_
-#endif
-
-#define _USE_MATH_DEFINES
+#ifndef itkRadialMultishellToSingleshellImageFilter_cpp
+#define itkRadialMultishellToSingleshellImageFilter_cpp
 
 #include "itkRadialMultishellToSingleshellImageFilter.h"
 #include "mitkDiffusionModellingHelperFunctions.h"
@@ -82,7 +63,6 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
   //# BValueMap contains no bZero --> itkException
   if(m_BValueMap.find(0.0) == m_BValueMap.end())
   {
-    MITK_INFO << "No ReferenceSignal (BZeroImages) found!";
     itkExceptionMacro(<< "No ReferenceSignal (BZeroImages) found!");
   }
 
@@ -145,15 +125,9 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
   m_ErrorImage->SetRequestedRegion( this->GetInput()->GetLargestPossibleRegion() );
   m_ErrorImage->Allocate();
 
-  MITK_INFO << "Input:" << std::endl << std::endl
-            << "    GradientDirections: " << m_OriginalGradientDirections->Size() << std::endl
-            << "    Shells: " << (m_BValueMap.size() - 1) << std::endl
-            << "    ReferenceImages: " << m_BValueMap[0.0].size() << std::endl;
-
-  MITK_INFO << "Output:" << std::endl << std::endl
-            << "    OutImageVectorLength: " << outImage->GetVectorLength() << std::endl
-            << "    TargetDirections: " << m_NumberTargetDirections << std::endl
-            << std::endl;
+  itkDebugMacro(<< "Input: " << m_OriginalGradientDirections->Size() << " gradient directions, " << (m_BValueMap.size() - 1)
+                << " shells, " << m_BValueMap[0.0].size() << " reference images; output: vector length "
+                << outImage->GetVectorLength() << ", " << m_NumberTargetDirections << " target directions");
 
 }
 
@@ -271,3 +245,5 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
 }
 
 } // end of namespace
+
+#endif

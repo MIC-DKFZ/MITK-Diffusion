@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _itk_RadialMultishellToSingleshellImageFilterr_h_
-#define _itk_RadialMultishellToSingleshellImageFilterr_h_
+#ifndef itkRadialMultishellToSingleshellImageFilter_h
+#define itkRadialMultishellToSingleshellImageFilter_h
 
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
