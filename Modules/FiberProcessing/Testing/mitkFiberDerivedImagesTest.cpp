@@ -15,12 +15,17 @@ found in the LICENSE file.
 #include <itkTractsToRgbaImageFilter.h>
 #include <itkTractsToVectorImageFilter.h>
 #include <mitkExceptionMacro.h>
+#include <mitkIOUtil.h>
+#include <mitkImageCast.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
 #include "mitkFiberProcessingTestHelper.h"
 
+#include <itkImageRegionConstIterator.h>
+
 #include <cmath>
+#include <map>
 
 /** Images derived from tractograms, on synthetic fibers whose result is known exactly. */
 class mitkFiberDerivedImagesTestSuite : public mitk::TestFixture
@@ -36,6 +41,10 @@ class mitkFiberDerivedImagesTestSuite : public mitk::TestFixture
   MITK_TEST(Directions_SecondUpdateUsesNewBundleGrid);
   MITK_TEST(Directions_NoFiberInMask_EmptyImage);
   MITK_TEST(Rgba_WeightedByLengthNotSegments);
+  MITK_TEST(FiberBundleX_DensitySumsToFiberLength);
+  MITK_TEST(FiberBundleX_BinaryIsSupportOfDensity);
+  MITK_TEST(FiberBundleX_EndpointsTwoPerFiber);
+  MITK_TEST(FiberBundleX_DirectionCountsAsRecorded);
   CPPUNIT_TEST_SUITE_END();
 
   using UcharImageType = itk::Image<unsigned char, 3>;
@@ -313,6 +322,148 @@ public:
     CPPUNIT_ASSERT_EQUAL(255, static_cast<int>(dense[1]));
     CPPUNIT_ASSERT_EQUAL(255, static_cast<int>(sparse[2]));
     CPPUNIT_ASSERT_EQUAL(static_cast<int>(dense[3]), static_cast<int>(sparse[3]));
+  }
+
+  // Safety net on MITK-Data: fiberBundleX.fib (196 fibers, weights 1) and ROIIMAGE.nrrd. The sums
+  // are invariants of the methods, the grid sizes, maxima and counts the results recorded on
+  // 2026-10-23, so that refactoring cannot change them unnoticed.
+
+  mitk::FiberBundle::Pointer LoadFiberBundleX()
+  {
+    return mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/fiberBundleX.fib"));
+  }
+
+  template <class TImage>
+  typename TImage::Pointer LoadRoiImage()
+  {
+    auto image = TImage::New();
+    mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ROIIMAGE.nrrd")), image);
+    return image;
+  }
+
+  template <class TImage>
+  static std::pair<double, double> SumAndMax(const TImage* image)
+  {
+    double sum = 0;
+    double max = 0;
+    for (itk::ImageRegionConstIterator<TImage> it(image, image->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+    {
+      sum += it.Get();
+      max = std::max(max, static_cast<double>(it.Get()));
+    }
+    return {sum, max};
+  }
+
+  void FiberBundleX_DensitySumsToFiberLength()
+  {
+    // The density image holds the fiber length (mm) x weight in each voxel, so it sums to the
+    // weighted length of all fibers, on the bundle grid and on a reference grid that holds them.
+    auto fib = LoadFiberBundleX();
+    double length = 0;
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      length += fib->GetFiberLength(i) * fib->GetFiberWeight(i);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(8063.67, length, 0.01);
+
+    auto onBundle = itk::TractDensityImageFilter<FloatImageType>::New();
+    onBundle->SetFiberBundle(fib);
+    onBundle->SetOutputAbsoluteValues(true);
+    onBundle->Update();
+    const auto size = onBundle->GetOutput()->GetLargestPossibleRegion().GetSize();
+    CPPUNIT_ASSERT(size[0] == 134 && size[1] == 126 && size[2] == 8);
+    const auto [bundleSum, bundleMax] = SumAndMax(onBundle->GetOutput());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(length, bundleSum, 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.6104054, bundleMax, 1e-5);
+
+    auto onReference = itk::TractDensityImageFilter<FloatImageType>::New();
+    onReference->SetFiberBundle(fib);
+    onReference->SetOutputAbsoluteValues(true);
+    onReference->SetInputImage(LoadRoiImage<FloatImageType>());
+    onReference->SetUseImageGeometry(true);
+    onReference->Update();
+    const auto [referenceSum, referenceMax] = SumAndMax(onReference->GetOutput());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(length, referenceSum, 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.4240193, referenceMax, 1e-5);
+  }
+
+  void FiberBundleX_BinaryIsSupportOfDensity()
+  {
+    auto fib = LoadFiberBundleX();
+    auto density = itk::TractDensityImageFilter<FloatImageType>::New();
+    density->SetFiberBundle(fib);
+    density->SetOutputAbsoluteValues(true);
+    density->Update();
+    auto binary = itk::TractDensityImageFilter<UcharImageType>::New();
+    binary->SetFiberBundle(fib);
+    binary->SetMode(TDI_MODE::BINARY);
+    binary->Update();
+
+    unsigned int covered = 0;
+    itk::ImageRegionConstIterator<FloatImageType> d(density->GetOutput(), density->GetOutput()->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<UcharImageType> b(binary->GetOutput(), binary->GetOutput()->GetLargestPossibleRegion());
+    for (; !d.IsAtEnd(); ++d, ++b)
+    {
+      CPPUNIT_ASSERT_EQUAL(d.Get() > 0 ? 1 : 0, static_cast<int>(b.Get()));
+      covered += b.Get();
+    }
+    CPPUNIT_ASSERT_EQUAL(9269u, covered);
+  }
+
+  void FiberBundleX_EndpointsTwoPerFiber()
+  {
+    using EndpointImageType = itk::Image<unsigned int, 3>;
+    auto fib = LoadFiberBundleX();
+    auto onBundle = itk::TractsToFiberEndingsImageFilter<EndpointImageType>::New();
+    onBundle->SetFiberBundle(fib);
+    onBundle->Update();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0 * fib->GetNumFibers(), SumAndMax(onBundle->GetOutput()).first, 0.0);
+
+    auto onReference = itk::TractsToFiberEndingsImageFilter<EndpointImageType>::New();
+    onReference->SetFiberBundle(fib);
+    onReference->SetInputImage(LoadRoiImage<EndpointImageType>());
+    onReference->SetUseImageGeometry(true);
+    onReference->Update();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0 * fib->GetNumFibers(), SumAndMax(onReference->GetOutput()).first, 0.0);
+  }
+
+  void FiberBundleX_DirectionCountsAsRecorded()
+  {
+    // MitkFiberDirectionExtraction with its defaults (25 degrees, peak threshold 0.2, at most 3
+    // peaks, global maximum normalization) on the ROIIMAGE.nrrd grid.
+    auto filter = DirectionFilterType::New();
+    filter->SetFiberBundle(LoadFiberBundleX());
+    filter->SetMaskImage(LoadRoiImage<UcharImageType>());
+    filter->SetOnlyUseMaskGeometry(true);
+    filter->SetAngularThreshold(std::cos(25.0 * itk::Math::pi / 180.0));
+    filter->SetSizeThreshold(0.2);
+    filter->SetMaxNumDirections(3);
+    filter->SetNormalizationMethod(DirectionFilterType::GLOBAL_MAX);
+    filter->Update();
+
+    std::map<int, unsigned int> voxelsWithPeaks;
+    auto numDirections = filter->GetNumDirectionsImage();
+    for (itk::ImageRegionConstIterator<UcharImageType> it(numDirections, numDirections->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+      ++voxelsWithPeaks[it.Get()];
+    CPPUNIT_ASSERT_EQUAL(8619u, voxelsWithPeaks[1]);
+    CPPUNIT_ASSERT_EQUAL(553u, voxelsWithPeaks[2]);
+    CPPUNIT_ASSERT_EQUAL(15u, voxelsWithPeaks[3]);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(4), voxelsWithPeaks.size());
+
+    // With global maximum normalization the largest peak has length 1.
+    auto directions = filter->GetDirectionImage();
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(9), directions->GetLargestPossibleRegion().GetSize()[3]);
+    double largest = 0;
+    for (itk::ImageRegionConstIterator<UcharImageType> it(numDirections, numDirections->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+      for (int peak = 0; peak < it.Get(); ++peak)
+      {
+        double squared = 0;
+        for (int c = 0; c < 3; ++c)
+        {
+          const DirectionFilterType::ItkDirectionImageType::IndexType index = {{it.GetIndex()[0], it.GetIndex()[1], it.GetIndex()[2], 3 * peak + c}};
+          squared += directions->GetPixel(index) * directions->GetPixel(index);
+        }
+        largest = std::max(largest, std::sqrt(squared));
+      }
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, largest, 1e-6);
   }
 };
 

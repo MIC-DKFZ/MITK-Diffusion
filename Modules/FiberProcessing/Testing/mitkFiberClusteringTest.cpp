@@ -17,6 +17,7 @@ found in the LICENSE file.
 #include <mitkClusteringMetricInnerAngles.h>
 #include <mitkClusteringMetricLength.h>
 #include <mitkClusteringMetricScalarMap.h>
+#include <mitkIOUtil.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <mitkExceptionMacro.h>
@@ -47,6 +48,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(Update_TwiceGivesSameOutputs);
   MITK_TEST(Metrics_Definitions);
   MITK_TEST(Outputs_KeepRasFlagAndSetHeaderOnly);
+  MITK_TEST(FiberFitBundles_PartitionAsQuickBundles);
   CPPUNIT_TEST_SUITE_END();
 
   /** Three fibers along x at y = 0, 0.5, 1 mm and, 40 mm away, two at y = 40, 41 mm, with
@@ -423,6 +425,33 @@ public:
           CPPUNIT_ASSERT(HasMetadataOf(clusterer.GetOutUnassigned(), input));
         }
       }
+  }
+
+  void FiberFitBundles_PartitionAsQuickBundles()
+  {
+    // Safety net on MITK-Data: the five FiberFit bundles (2157 fibers) joined and clustered as
+    // MitkFiberClustering does with its defaults (10 mm, EU_MEAN, 12 points, duplicate merging
+    // at half the cluster size). dipy's QuickBundles gives the same partition into 7 clusters.
+    std::vector<mitk::FiberBundle::Pointer> bundles;
+    for (int i = 0; i < 5; ++i)
+      bundles.push_back(mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberFit/Cluster_" + std::to_string(i) + ".fib")));
+    auto fib = mitk::FiberBundle::New()->AddBundles(bundles);
+    CPPUNIT_ASSERT_EQUAL(2157u, fib->GetNumFibers());
+
+    std::vector<float> distances;
+    for (int i = 1; distances.empty() || distances.back() < fib->GetGeometry()->GetDiagonalLength() / 2; ++i)
+      distances.push_back(10.0f * i);
+
+    mitk::TractClusteringFilter clusterer;
+    clusterer.SetTractogram(fib);
+    clusterer.SetDistances(distances);
+    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.Update();
+
+    std::vector<unsigned int> sizes;
+    for (const auto& tract : clusterer.GetOutTractograms())
+      sizes.push_back(tract->GetNumFibers());
+    CPPUNIT_ASSERT(sizes == std::vector<unsigned int>({649, 508, 400, 302, 276, 14, 8}));
   }
 };
 
