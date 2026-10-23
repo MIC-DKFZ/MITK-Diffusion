@@ -8,6 +8,7 @@ set(H_FILES
   FiberModification/itkFiberCurvatureFilter.h
   FiberModification/itkFiberExtractionFilter.h
   FiberModification/mitkFiberWeightsFile.h
+  FiberModification/mitkDerivedFiberBundle.h
 
   FiberQuantification/itkDistanceFromSegmentationImageFilter.h
 

@@ -248,11 +248,8 @@ int main(int argc, char* argv[])
         fib = fib->RemoveFibersOutside(mask, false);
       else if (remove_inside)
         fib = fib->RemoveFibersOutside(mask, true);
-      if (fib.IsNull())
-      {
+      if (fib->GetNumFibers()==0)
         MITK_WARN << "No fiber is left after removing the fiber parts " << (remove_outside ? "outside" : "inside") << " the mask.";
-        fib = mitk::FiberBundle::New();
-      }
     }
 
     // RemoveShortFibers and RemoveLongFibers refuse to remove every fiber and leave the bundle

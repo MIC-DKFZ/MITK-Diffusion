@@ -15,6 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 #include "mitkTractClusteringFilter.h"
 
+#include <mitkDerivedFiberBundle.h>
+
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <algorithm>
@@ -530,12 +532,7 @@ void TractClusteringFilter::AddOutput(const Cluster& c, const vnl_matrix<float>&
 {
   m_OutClusters.push_back(c);
 
-  vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
-  vtkSmartPointer<vtkPolyData> pTmp = m_Tractogram->GeneratePolyDataByIds(c.I, weights);
-  mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
-  fib->SetFiberWeights(weights);
-  fib->SetTrackVisHeader(m_Tractogram->GetTrackVisHeader());
-  m_OutTractograms.push_back(fib);
+  m_OutTractograms.push_back(CreateFiberSubset(m_Tractogram, c.I));
   m_OutFiberIndices.push_back(c.I);
 
   // create centroid
@@ -557,6 +554,7 @@ void TractClusteringFilter::AddOutput(const Cluster& c, const vnl_matrix<float>&
   polyData->SetPoints(vtkNewPoints);
   polyData->SetLines(vtkNewCells);
   mitk::FiberBundle::Pointer centroid = mitk::FiberBundle::New(polyData);
+  CopyFiberBundleMetadata(m_Tractogram, centroid);
   centroid->SetFiberColors(255, 255, 255);
   m_OutCentroids.push_back(centroid);
 }
@@ -640,11 +638,7 @@ void TractClusteringFilter::GenerateData()
 
     if (no_match.n>0)
     {
-      vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
-      vtkSmartPointer<vtkPolyData> pTmp = m_Tractogram->GeneratePolyDataByIds(no_match.I, weights);
-      m_OutUnassigned = mitk::FiberBundle::New(pTmp);
-      m_OutUnassigned->SetFiberWeights(weights);
-      m_OutUnassigned->SetTrackVisHeader(m_Tractogram->GetTrackVisHeader());
+      m_OutUnassigned = CreateFiberSubset(m_Tractogram, no_match.I);
       m_OutUnassigned->SetFiberColors(0, 0, 0);
     }
   }

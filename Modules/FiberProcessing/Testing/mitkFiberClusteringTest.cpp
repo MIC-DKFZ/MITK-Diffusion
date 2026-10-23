@@ -46,6 +46,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(Anatomic_PointOutsideFirstParcellation);
   MITK_TEST(Update_TwiceGivesSameOutputs);
   MITK_TEST(Metrics_Definitions);
+  MITK_TEST(Outputs_KeepRasFlagAndSetHeaderOnly);
   CPPUNIT_TEST_SUITE_END();
 
   /** Three fibers along x at y = 0, 0.5, 1 mm and, 40 mm away, two at y = 40, 41 mm, with
@@ -387,6 +388,41 @@ public:
       for (unsigned int i = 0; i < tracts.at(c)->GetNumFibers(); ++i)
         CPPUNIT_ASSERT_DOUBLES_EQUAL(input->GetFiberWeight(indices.at(c).at(i)), tracts.at(c)->GetFiberWeight(i), 1e-6);
     }
+  }
+
+  void Outputs_KeepRasFlagAndSetHeaderOnly()
+  {
+    // Clusters, centroids and unassigned fibers are bundles derived from the input: they keep its
+    // coordinate convention and a TrackVis header set on it, but not the header the input derives
+    // from its own bounding box, which would not contain a cluster's fibers.
+    using namespace mitk::FiberProcessingTestHelper;
+    auto plain = TwoGroups();
+    plain = plain->AddBundle(CreateBundle({Line({0, 200, 0}, {50, 200, 0}, 20)}));
+    auto withMetadata = plain->GetDeepCopy();
+    SetMetadata(withMetadata);
+    auto centroids = CreateBundle({Line({0, 40.5, 0}, {50, 40.5, 0}, 12), Line({50, 0.5, 0}, {0, 0.5, 0}, 12)});
+
+    for (auto input : {plain, withMetadata})
+      for (auto inCentroids : {mitk::FiberBundle::Pointer(), centroids})
+      {
+        mitk::TractClusteringFilter clusterer;
+        clusterer.SetTractogram(input);
+        clusterer.SetInCentroids(inCentroids);
+        clusterer.SetDistances({10});
+        clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+        clusterer.Update();
+
+        CPPUNIT_ASSERT(!clusterer.GetOutTractograms().empty());
+        for (const auto& tract : clusterer.GetOutTractograms())
+          CPPUNIT_ASSERT(HasMetadataOf(tract, input));
+        for (const auto& centroid : clusterer.GetOutCentroids())
+          CPPUNIT_ASSERT(HasMetadataOf(centroid, input));
+        if (inCentroids.IsNotNull())
+        {
+          CPPUNIT_ASSERT_EQUAL(1u, clusterer.GetOutUnassigned()->GetNumFibers());
+          CPPUNIT_ASSERT(HasMetadataOf(clusterer.GetOutUnassigned(), input));
+        }
+      }
   }
 };
 

@@ -28,6 +28,7 @@ class mitkFiberModificationFilterTestSuite : public mitk::TestFixture
   MITK_TEST(Curvature_SameResultForAnyThreadCount);
   MITK_TEST(Curvature_PiecesKeepFiberWeights);
   MITK_TEST(Curvature_WindowIncludesFirstSegment);
+  MITK_TEST(Curvature_KeepsRasFlagAndSetHeaderOnly);
   CPPUNIT_TEST_SUITE_END();
 
   static mitk::FiberBundle::Pointer Curvature(mitk::FiberBundle::Pointer input, bool removeFibers)
@@ -112,6 +113,21 @@ public:
 
     CPPUNIT_ASSERT_EQUAL(1u, output->GetNumFibers());
     CPPUNIT_ASSERT(output->GetFiberPolyData()->GetCell(0)->GetPoints()->GetPoint(0)[0] > 0.5);
+  }
+
+  void Curvature_KeepsRasFlagAndSetHeaderOnly()
+  {
+    // The pieces keep the coordinate convention of the input and a TrackVis header set on it, not
+    // the header derived from the input's bounding box.
+    auto plain = mitk::FiberProcessingTestHelper::CreateBundle({Hairpin(0), Hairpin(10)});
+    auto withMetadata = plain->GetDeepCopy();
+    mitk::FiberProcessingTestHelper::SetMetadata(withMetadata);
+    for (auto input : {plain, withMetadata})
+    {
+      auto pieces = Curvature(input, false);
+      CPPUNIT_ASSERT_EQUAL(4u, pieces->GetNumFibers());
+      CPPUNIT_ASSERT(mitk::FiberProcessingTestHelper::HasMetadataOf(pieces, input));
+    }
   }
 };
 

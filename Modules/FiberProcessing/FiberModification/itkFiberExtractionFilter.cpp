@@ -19,6 +19,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkFiberExtractionFilter.h"
 
+#include <mitkDerivedFiberBundle.h>
+
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <boost/timer/progress_display.hpp>
@@ -76,11 +78,7 @@ void FiberExtractionFilter< PixelType >::SetRoiImageNames(const std::vector< std
 template< class PixelType >
 mitk::FiberBundle::Pointer FiberExtractionFilter< PixelType >::CreateFib(const std::vector< unsigned int >& ids)
 {
-  vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
-  vtkSmartPointer<vtkPolyData> pTmp = m_InputFiberBundle->GeneratePolyDataByIds(ids, weights);
-  mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
-  fib->SetFiberWeights(weights);
-  return fib;
+  return mitk::CreateFiberSubset(m_InputFiberBundle, ids);
 }
 
 template< class PixelType >
@@ -483,11 +481,6 @@ void FiberExtractionFilter< PixelType >::GenerateData()
     else
       ExtractEndpoints(fib);
   }
-
-  for (auto f : m_Negatives)
-    f->SetTrackVisHeader(fib->GetTrackVisHeader());
-  for (auto f : m_Positives)
-    f->SetTrackVisHeader(fib->GetTrackVisHeader());
 }
 
 }

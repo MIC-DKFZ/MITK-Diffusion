@@ -48,6 +48,31 @@ namespace mitk
       return FiberBundle::New(polyData);
     }
 
+    /** Marks fib as RAS and sets a TrackVis header of its own (77 voxels of 1.25 mm along x), as
+     *  a .trk file or a reference image would. */
+    inline void SetMetadata(FiberBundle* fib)
+    {
+      fib->setIsRAS(true);
+      auto header = fib->GetTrackVisHeader();
+      header.dim[0] = 77;
+      header.voxel_size[0] = 1.25f;
+      fib->SetTrackVisHeader(header);
+    }
+
+    /** Whether derived has the RAS flag of source and, only if source has a header set, that
+     *  header. */
+    inline bool HasMetadataOf(const FiberBundle* derived, const FiberBundle* source)
+    {
+      if (derived->IsRAS() != source->IsRAS() || derived->HasTrackVisHeader() != source->HasTrackVisHeader())
+        return false;
+      if (!source->HasTrackVisHeader())
+        return true;
+      const auto a = derived->GetTrackVisHeader();
+      const auto b = source->GetTrackVisHeader();
+      return a.dim[0] == b.dim[0] && a.dim[1] == b.dim[1] && a.dim[2] == b.dim[2] && a.voxel_size[0] == b.voxel_size[0] &&
+             a.voxel_size[1] == b.voxel_size[1] && a.voxel_size[2] == b.voxel_size[2];
+    }
+
     /** Straight line from a to b with the given number of points. */
     inline Polyline Line(const std::array<double, 3>& a, const std::array<double, 3>& b, unsigned int numPoints)
     {

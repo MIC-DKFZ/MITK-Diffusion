@@ -15,6 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 #include "itkFiberCurvatureFilter.h"
 
+#include <mitkDerivedFiberBundle.h>
+
 #include <vtkDoubleArray.h>
 #include <vtkPointData.h>
 #include <vtkFloatArray.h>
@@ -171,8 +173,7 @@ void FiberCurvatureFilter::GenerateData()
     outputPoly->SetLines(vtkNewCells);
     m_OutputFiberBundle = mitk::FiberBundle::New(outputPoly);
     m_OutputFiberBundle->SetFiberWeights(weights);
-    m_OutputFiberBundle->SetTrackVisHeader(m_InputFiberBundle->GetTrackVisHeader());
-    m_OutputFiberBundle->setIsRAS(m_InputFiberBundle->IsRAS());
+    mitk::CopyFiberBundleMetadata(m_InputFiberBundle, m_OutputFiberBundle);
 }
 
 }

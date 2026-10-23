@@ -26,6 +26,7 @@ class mitkFiberExtractionFilterTestSuite : public mitk::TestFixture
   MITK_TEST(Labels_StartEndLabelsDoNotChangeBothEnds);
   MITK_TEST(Update_TwiceGivesSameOutputs);
   MITK_TEST(Update_EmptyTractogramGivesEmptyOutputs);
+  MITK_TEST(Outputs_KeepRasFlagAndSetHeaderOnly);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::FiberExtractionFilter<float>;
@@ -187,6 +188,31 @@ public:
 
     CPPUNIT_ASSERT_EQUAL(std::size_t(1), filter->GetPositives().size());
     CPPUNIT_ASSERT_EQUAL(2u, filter->GetPositives().at(0)->GetNumFibers());
+  }
+
+  void Outputs_KeepRasFlagAndSetHeaderOnly()
+  {
+    // Positives and negatives keep the coordinate convention of the input and a TrackVis header
+    // set on it, not the header derived from the input's bounding box.
+    auto plain = ThreeFibers();
+    auto withMetadata = plain->GetDeepCopy();
+    mitk::FiberProcessingTestHelper::SetMetadata(withMetadata);
+    auto roi = CreateRoi(1);
+    for (auto input : {plain, withMetadata})
+      for (auto mode : {FilterType::MODE::OVERLAP, FilterType::MODE::ENDPOINTS})
+      {
+        auto filter = FilterType::New();
+        filter->SetInputFiberBundle(input);
+        filter->SetRoiImages({roi});
+        filter->SetOverlapFraction(0.0);
+        filter->SetBothEnds(false);
+        filter->SetMode(mode);
+        filter->Update();
+        CPPUNIT_ASSERT(filter->GetPositives().at(0)->GetNumFibers() > 0);
+        CPPUNIT_ASSERT(filter->GetNegatives().at(0)->GetNumFibers() > 0);
+        CPPUNIT_ASSERT(mitk::FiberProcessingTestHelper::HasMetadataOf(filter->GetPositives().at(0), input));
+        CPPUNIT_ASSERT(mitk::FiberProcessingTestHelper::HasMetadataOf(filter->GetNegatives().at(0), input));
+      }
   }
 };
 
