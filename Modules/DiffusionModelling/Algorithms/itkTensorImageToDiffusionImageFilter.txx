@@ -117,6 +117,41 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
     itMask.GoToBegin();
   }
 
+  // Per gradient, computed once instead of per voxel: whether it is a baseline, its b-value and
+  // the outer product of its normalized direction.
+  const unsigned int numGradients = m_GradientList->Size();
+  std::vector<bool> isBaseline(numGradients);
+  std::vector<double> bValues(numGradients);
+  std::vector<InputPixelType> outerProducts(numGradients);
+  for( unsigned int i=0; i<numGradients; i++)
+  {
+    GradientType g = m_GradientList->at(i);
+
+    // normalize vector so the following computations work
+    const double twonorm = g.two_norm();
+    isBaseline[i] = twonorm < vnl_math::eps;
+    if( isBaseline[i] )
+      continue;
+
+    GradientType gn = g.normalize();
+
+    InputPixelType &S = outerProducts[i];
+    S[0] = gn[0]*gn[0];
+    S[1] = gn[1]*gn[0];
+    S[2] = gn[2]*gn[0];
+    S[3] = gn[1]*gn[1];
+    S[4] = gn[2]*gn[1];
+    S[5] = gn[2]*gn[2];
+
+    // estimate the bvalue from the base value and the norm of the gradient
+    //   - because of this estimation the vector have to be normalized beforehand
+    //     otherwise the modelled signal is wrong ( i.e. not scaled properly )
+    bValues[i] = m_BValue * twonorm * twonorm;
+  }
+
+  OutputPixelType out;
+  out.SetSize(numGradients);
+
   while(!itIn.IsAtEnd())
   {
 
@@ -129,8 +164,6 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 
     BaselinePixelType b0 = itB0.Get();
 
-    OutputPixelType out;
-    out.SetSize(m_GradientList->Size());
     out.Fill(0);
 
     short maskvalue = 1;
@@ -140,31 +173,18 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
       ++itMask;
     }
 
-    std::vector<unsigned int> b0_indices;
     if( b0 > 0)
     {
-      for( unsigned int i=0; i<m_GradientList->Size(); i++)
+      for( unsigned int i=0; i<numGradients; i++)
       {
-        GradientType g = m_GradientList->at(i);
-
-        // normalize vector so the following computations work
-        const double twonorm = g.two_norm();
-        if( twonorm < vnl_math::eps )
+        // The mask applies to the baseline volumes as to the weighted ones.
+        if( isBaseline[i] )
         {
-          b0_indices.push_back(i);
+          out[i] = static_cast<OutputScalarType>( maskvalue * b0 );
           continue;
         }
 
-        GradientType gn = g.normalize();
-
-        InputPixelType S;
-        S[0] = gn[0]*gn[0];
-        S[1] = gn[1]*gn[0];
-        S[2] = gn[2]*gn[0];
-        S[3] = gn[1]*gn[1];
-        S[4] = gn[2]*gn[1];
-        S[5] = gn[2]*gn[2];
-
+        const InputPixelType &S = outerProducts[i];
         const double res =
             T[0]*S[0] +
             2 * T[1]*S[1] +     T[3]*S[3] +
@@ -172,22 +192,9 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 
         // check for corrupted tensor
         if (res>=0)
-        {
-          // estimate the bvalue from the base value and the norm of the gradient
-          //   - because of this estimation the vector have to be normalized beforehand
-          //     otherwise the modelled signal is wrong ( i.e. not scaled properly )
-          const double bval = m_BValue * twonorm * twonorm;
-          out[i] = static_cast<OutputScalarType>( maskvalue * 1.0 * b0 * exp ( -1.0 * bval * res ) );
-        }
+          out[i] = static_cast<OutputScalarType>( maskvalue * 1.0 * b0 * exp ( -1.0 * bValues[i] * res ) );
       }
     }
-
-    // The mask applies to the baseline volumes as to the weighted ones.
-    for(unsigned int idx = 0; idx < b0_indices.size(); idx++ )
-    {
-      out[b0_indices.at(idx)] = static_cast<OutputScalarType>( maskvalue * b0 );
-    }
-
 
     itOut.Set(out);
 
