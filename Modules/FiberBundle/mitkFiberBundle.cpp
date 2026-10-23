@@ -337,13 +337,8 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubsampleFibers(float factor, bool
   std::vector< unsigned int > ids;
   for (unsigned int i=0; i<this->GetNumFibers(); i++)
     ids.push_back(i);
-  if (random_seed)
-    std::srand(static_cast<unsigned int>(std::time(nullptr)));
-  else
-    std::srand(0);
-	
-  std::random_device rd;
-  std::mt19937 g(rd());
+  // Without random_seed the subsample is reproducible (seed 0, as FiberModification documents).
+  std::mt19937 g(random_seed ? std::random_device{}() : 0u);
   std::shuffle(ids.begin(), ids.end(), g);
 
   unsigned int counter = 0;

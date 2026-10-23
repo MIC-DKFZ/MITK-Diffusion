@@ -39,6 +39,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ExtractFiberSubset_RoiIsNoPlanarFigure_Throws);
   MITK_TEST(Weights_RemovingOrSplittingFibers_FollowTheirFibers);
   MITK_TEST(CompressAndSubtract_EightThreads_EqualOneThread);
+  MITK_TEST(SubsampleFibers_WithoutRandomSeed_IsReproducible);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -216,6 +217,14 @@ public:
       AssertIdentical(subtractedSingle, source->SubtractBundle(shortFibers), "SubtractBundle, run " + std::to_string(run));
     }
     omp_set_num_threads(threads);
+  }
+
+  void SubsampleFibers_WithoutRandomSeed_IsReproducible()
+  {
+    auto source = LoadWeightedFibers();
+    auto first = source->SubsampleFibers(0.5f, false);
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(std::round(source->GetNumFibers() * 0.5f)), first->GetNumFibers());
+    AssertIdentical(first, source->SubsampleFibers(0.5f, false), "second subsample");
   }
 };
 
