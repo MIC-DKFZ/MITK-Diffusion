@@ -64,6 +64,7 @@ class mitkFiberfoxParametersTestSuite : public mitk::TestFixture
   MITK_TEST(GradientsFromImage);
   MITK_TEST(MotionVolumes);
   MITK_TEST(GradientsInFile);
+  MITK_TEST(MissingDirection);
   CPPUNIT_TEST_SUITE_END();
 
   /** Parameters whose only models are two counting fiber models and one counting non-fiber model. */
@@ -282,6 +283,30 @@ public:
     for (unsigned int i = 0; i < parameters.m_SignalGen.GetNumVolumes(); ++i)
       for (int c = 0; c < 3; ++c)
         CPPUNIT_ASSERT_DOUBLES_EQUAL(parameters.m_SignalGen.GetGradientDirection(i)[c], loaded.m_SignalGen.GetGradientDirection(i)[c], 1e-9);
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /** A .ffp without basic.direction loads with the identity (it aborted with "No such node"). */
+  void MissingDirection()
+  {
+    std::ifstream in(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"));
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const auto begin = text.find("<direction>");
+    const auto end = text.find("</direction>");
+    CPPUNIT_ASSERT(begin != std::string::npos && end != std::string::npos);
+    text.erase(begin, end + std::string("</direction>").size() - begin);
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_direction_XXXXXX");
+    const std::string file = folder + "/nodirection.ffp";
+    std::ofstream(file) << text;
+
+    mitk::FiberfoxParameters parameters;
+    parameters.m_SignalGen.m_ImageDirection.Fill(0.5);
+    parameters.LoadParameters(file, true);
+    itk::Matrix<double, 3, 3> identity;
+    identity.SetIdentity();
+    CPPUNIT_ASSERT(parameters.m_SignalGen.m_ImageDirection == identity);
+    CPPUNIT_ASSERT(parameters.m_MissingTags.find("basic.direction") != std::string::npos);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), parameters.m_NonFiberModelList.size());
     itksys::SystemTools::RemoveADirectory(folder);
   }
 };

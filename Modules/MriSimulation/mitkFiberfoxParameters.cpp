@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberfoxParameters.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkDiffusionImageHelperFunctions.h>
+#include <mitkLocaleSwitch.h>
 
 mitk::FiberfoxParameters::FiberfoxParameters()
   : m_NoiseModel(nullptr)
@@ -327,23 +328,11 @@ void mitk::FiberfoxParameters::SaveParameters(std::string filename)
 {
   if(filename.empty())
     return;
-  if(".ffp"!=filename.substr(filename.size()-4, 4))
+  if(filename.size()<4 || ".ffp"!=filename.substr(filename.size()-4, 4))
     filename += ".ffp";
 
-  const std::string& locale = "C";
-  const std::string& currLocale = setlocale( LC_ALL, nullptr );
-
-  if ( locale.compare(currLocale)!=0 )
-  {
-    try
-    {
-      setlocale(LC_ALL, locale.c_str());
-    }
-    catch(...)
-    {
-      MITK_INFO << "Could not set locale " << locale;
-    }
-  }
+  // restored also when writing throws
+  mitk::LocaleSwitch localeSwitch("C");
 
   boost::property_tree::ptree parameters;
 
@@ -586,8 +575,6 @@ void mitk::FiberfoxParameters::SaveParameters(std::string filename)
   {
     MITK_INFO << "No mask image saved.";
   }
-
-  setlocale(LC_ALL, currLocale.c_str());
 }
 
 
@@ -663,32 +650,14 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
 {
   itk::Statistics::MersenneTwisterRandomVariateGenerator::Pointer randgen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
   if (fix_seed)
-  {
-    srand(0);
     randgen->SetSeed(0);
-  }
   else
-  {
-    srand(time(0));
     randgen->SetSeed();
-  }
   m_MissingTags = "";
   if(filename.empty()) { return; }
 
-  const std::string& locale = "C";
-  const std::string& currLocale = setlocale( LC_ALL, nullptr );
-
-  if ( locale.compare(currLocale)!=0 )
-  {
-    try
-    {
-      setlocale(LC_ALL, locale.c_str());
-    }
-    catch(...)
-    {
-      MITK_INFO << "Could not set locale " << locale;
-    }
-  }
+  // restored also when reading throws
+  mitk::LocaleSwitch localeSwitch("C");
 
 
   boost::property_tree::ptree parameterTree;
@@ -758,17 +727,30 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
       m_SignalGen.m_ImageOrigin[1] = ReadVal<float>(v1,"basic.origin.y",m_SignalGen.m_ImageOrigin[1]);
       m_SignalGen.m_ImageOrigin[2] = ReadVal<float>(v1,"basic.origin.z",m_SignalGen.m_ImageOrigin[2]);
 
-      int i = 0;
-      int j = 0;
-      for(auto v : v1.second.get_child("basic.direction"))
+      // a file without direction gets the identity (decided by default, D-M8); read as double, as written
+      m_SignalGen.m_ImageDirection.SetIdentity();
+      const auto direction = v1.second.get_child_optional("basic.direction");
+      if (direction)
       {
-        m_SignalGen.m_ImageDirection[i][j] = boost::lexical_cast<float>(v.second.data());
-        ++j;
-        if (j==3)
+        int i = 0;
+        int j = 0;
+        for(auto v : *direction)
         {
-          j = 0;
-          ++i;
+          if (i>2)
+            break;
+          m_SignalGen.m_ImageDirection[i][j] = boost::lexical_cast<double>(v.second.data());
+          ++j;
+          if (j==3)
+          {
+            j = 0;
+            ++i;
+          }
         }
+      }
+      else
+      {
+        MITK_INFO << "Tag 'basic.direction' not found. Using the identity.";
+        m_MissingTags += "\n- basic.direction";
       }
 
       m_SignalGen.m_AcquisitionType = (SignalGenerationParameters::AcquisitionType)ReadVal<int>(v1,"acquisitiontype", m_SignalGen.m_AcquisitionType);
@@ -1103,8 +1085,6 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
   {
     MITK_INFO << "No mask image found.";
   }
-
-  setlocale(LC_ALL, currLocale.c_str());
 }
 
 
