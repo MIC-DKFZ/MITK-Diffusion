@@ -537,8 +537,8 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     m_Parameters.m_SignalGen.m_ImageSpacing = itkVectorImagePointer->GetSpacing();
     m_Parameters.m_SignalGen.m_ImageOrigin = itkVectorImagePointer->GetOrigin();
     m_Parameters.m_SignalGen.m_ImageDirection = itkVectorImagePointer->GetDirection();
-    m_Parameters.SetBvalue(mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi));
-    m_Parameters.SetGradienDirections(mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(dwi));
+    // as FSL bvecs: the view applies the direction matrix before the simulation
+    m_Parameters.SetGradientsFromImage(dwi);
   }
   else if (m_Controls->m_TemplateComboBox->GetSelectedNode().IsNotNull())   // use geometry of selected image
   {

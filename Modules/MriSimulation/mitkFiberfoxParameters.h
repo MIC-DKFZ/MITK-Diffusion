@@ -171,6 +171,12 @@ namespace mitk
     GradientType GetGradientDirection(unsigned int i);
     std::vector< int > GetBvalues();                         ///< Returns a vector with all unique b-values (determined by the gradient magnitudes)
     double GetBvalue();
+    /**
+     * The gradients of .ffp and bvecs files are FSL bvecs of the simulated geometry (voxel frame, x
+     * negated for a direction matrix with positive determinant), like every bvecs file MITK reads.
+     * This turns them into the world (LPS) vectors the simulation uses (and stores as the output's
+     * gradients). Without it, the gradients are taken as world vectors.
+     */
     void ApplyDirectionMatrix();
 
   protected:
@@ -327,6 +333,13 @@ namespace mitk
     void ClearFiberParameters();
     void ClearSignalParameters();
     void ApplyDirectionMatrix();
+    /**
+     * Gradients and reference b-value of a diffusion-weighted image, for a simulation that reproduces
+     * its world gradients; m_SignalGen.m_ImageDirection has to be set to the simulated geometry first.
+     * Stored as FSL bvecs of that geometry (the form of .ffp files, see ApplyDirectionMatrix) or,
+     * with asFslBvecs false, as world vectors for a simulation without ApplyDirectionMatrix.
+     */
+    void SetGradientsFromImage(const mitk::Image* dwi, bool asFslBvecs=true);
 
     void PrintSelf();                           ///< Print parameters to stdout.
     void SaveParameters(std::string filename);  ///< Save image generation parameters to .ffp file.

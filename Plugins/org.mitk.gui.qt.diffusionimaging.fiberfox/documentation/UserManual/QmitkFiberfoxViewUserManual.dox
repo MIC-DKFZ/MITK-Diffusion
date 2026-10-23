@@ -32,7 +32,7 @@ If no fiber bundle but a diffusion-weighted image is selected, the specified art
 <b>Basic Image Settings:</b>
 \li <b>Image Dimensions</b>: Specifies actual image size (number of voxels in each dimension).
 \li <b>Image Spacing</b>: Specifies voxel size in mm. Beware that changing the voxel size also changes the signal strength, e.g. increasing the resolution from <em>2x2x2</em> mm to <em>1x1x1</em> mm decreases the signal obtained for each voxel by a factor 8.
-\li <b>Gradient Directions</b>: Number of gradients directions distributed equally over the half sphere. 10% baseline images are automatically added.
+\li <b>Gradient Directions</b>: Number of gradients directions distributed equally over the half sphere. 10% baseline images are automatically added. Gradient directions loaded from bvals/bvecs files or from a parameter file (.ffp) are FSL bvecs of the simulated image geometry (image axes, x negated for a direction matrix with positive determinant), like every bvecs file MITK reads; the simulated image stores them as world gradients, so its bvecs equal the loaded ones. The gradients of a selected diffusion-weighted image are reproduced exactly.
 \li <b>b-Value</b>: Diffusion weighting in s/mm². If an existing diffusion-weighted image is used to set the basic parameters, the b-value is defined by the gradient direction magnitudes of this image, which also enables the use of multiple b-values.
 
 

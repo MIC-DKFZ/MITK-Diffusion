@@ -13,6 +13,14 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 #include <mitkTestFixture.h>
 #include <mitkFiberfoxParameters.h>
+#include <mitkIOUtil.h>
+#include <mitkITKImageImport.h>
+#include <mitkDiffusionPropertyHelper.h>
+#include <mitkDiffusionImageHelperFunctions.h>
+#include <itkVectorImage.h>
+#include <itkMersenneTwisterRandomVariateGenerator.h>
+#include <itksys/SystemTools.hxx>
+#include <vnl/vnl_rotation_matrix.h>
 
 namespace
 {
@@ -51,6 +59,7 @@ class mitkFiberfoxParametersTestSuite : public mitk::TestFixture
   MITK_TEST(AssignmentClonesModels);
   MITK_TEST(ClearAndLoadDeleteModels);
   MITK_TEST(CopyKeepsLoadedModels);
+  MITK_TEST(GradientsFromImage);
   CPPUNIT_TEST_SUITE_END();
 
   /** Parameters whose only models are two counting fiber models and one counting non-fiber model. */
@@ -144,6 +153,72 @@ public:
     CPPUNIT_ASSERT(astrosticks->GetRandomizeSticks());
     CPPUNIT_ASSERT(astrosticks->GetVolumeFractionImage().IsNotNull());
     CPPUNIT_ASSERT(astrosticks->GetGradientList().size() == parameters.m_SignalGen.GetNumVolumes());
+  }
+
+  /**
+   * Gradient convention (D-M1): .ffp gradients are FSL bvecs of the simulated geometry. The gradients
+   * of a DWI template are stored in that form (equal to the bvecs MITK's NIfTI writer writes for it),
+   * and ApplyDirectionMatrix turns them back into the template's world gradients.
+   */
+  void GradientsFromImage()
+  {
+    auto randGen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+    randGen->SetSeed(7);
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_gradients_XXXXXX");
+
+    for (bool positiveDeterminant : { true, false })
+    {
+      vnl_vector_fixed<double, 3> axis(1, 2, 3);
+      axis.normalize();
+      vnl_matrix_fixed<double, 3, 3> rotation = vnl_rotation_matrix(axis * (30.0 * itk::Math::pi / 180.0));
+      if (!positiveDeterminant)
+        rotation.set_column(0, -rotation.get_column(0));
+      itk::Matrix<double, 3, 3> direction(rotation);
+
+      mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer world = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+      world->InsertElement(0, mitk::DiffusionPropertyHelper::GradientDirectionType(0.0, 0.0, 0.0));
+      for (unsigned int i = 1; i < 13; ++i)
+      {
+        mitk::DiffusionPropertyHelper::GradientDirectionType g(randGen->GetNormalVariate(), randGen->GetNormalVariate(), randGen->GetNormalVariate());
+        g.normalize();
+        world->InsertElement(i, g * (i % 2 ? 1.0 : std::sqrt(0.5)));  // b = 1000 and 500
+      }
+
+      using DwiType = itk::VectorImage<short, 3>;
+      auto itkImage = DwiType::New();
+      DwiType::RegionType region;
+      region.SetSize(0, 2); region.SetSize(1, 2); region.SetSize(2, 2);
+      itkImage->SetRegions(region);
+      itkImage->SetDirection(direction);
+      itkImage->SetVectorLength(world->Size());
+      itkImage->Allocate();
+      DwiType::PixelType pixel(world->Size());
+      pixel.Fill(100);
+      itkImage->FillBuffer(pixel);
+      mitk::Image::Pointer dwi = mitk::GrabItkImageMemory(itkImage.GetPointer());
+      mitk::DiffusionPropertyHelper::SetGradientContainer(dwi, world);
+      mitk::DiffusionPropertyHelper::SetReferenceBValue(dwi, 1000);
+      mitk::DiffusionPropertyHelper::InitializeImage(dwi);
+
+      mitk::IOUtil::Save(dwi, "DWI_NIFTI", folder + "/dwi.nii.gz");
+      double bValue = 0;
+      const auto fslBvecs = mitk::gradients::ReadBvalsBvecs(folder + "/dwi.bvals", folder + "/dwi.bvecs", bValue);
+
+      mitk::FiberfoxParameters parameters;
+      parameters.m_SignalGen.m_ImageDirection = direction;
+      parameters.SetGradientsFromImage(dwi);
+      CPPUNIT_ASSERT_EQUAL(1000.0, parameters.m_SignalGen.GetBvalue());
+      CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(world->Size()), parameters.m_SignalGen.GetNumVolumes());
+      for (unsigned int i = 0; i < world->Size(); ++i)
+        for (int c = 0; c < 3; ++c)
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(fslBvecs->ElementAt(i)[c], parameters.m_SignalGen.GetGradientDirection(i)[c], 1e-5);
+
+      parameters.ApplyDirectionMatrix();
+      for (unsigned int i = 0; i < world->Size(); ++i)
+        for (int c = 0; c < 3; ++c)
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(world->ElementAt(i)[c], parameters.m_SignalGen.GetGradientDirection(i)[c], 1e-12);
+    }
+    itksys::SystemTools::RemoveADirectory(folder);
   }
 };
 

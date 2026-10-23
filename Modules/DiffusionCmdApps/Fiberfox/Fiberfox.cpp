@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
   parser.addArgument("parameters", "p", mitkCommandLineParser::String, "Parameter file:", "fiberfox parameter file (.ffp)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("template", "t", mitkCommandLineParser::String, "Template image:", "use parameters of the template image", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("verbose", "v", mitkCommandLineParser::Bool, "Output additional images:", "output volume fraction images etc.", us::Any());
-  parser.addArgument("dont_apply_direction_matrix", "", mitkCommandLineParser::Bool, "Don't apply direction matrix:", "don't rotate gradients by image direction matrix", us::Any());
+  parser.addArgument("dont_apply_direction_matrix", "", mitkCommandLineParser::Bool, "Don't apply direction matrix:", "the gradients of the parameter file are world vectors, not FSL bvecs of the simulated geometry", us::Any());
   parser.addArgument("fix_seed", "", mitkCommandLineParser::Bool, "Use fix random seed:", "always use same sequence of random numbers", us::Any());
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
@@ -148,8 +148,7 @@ int main(int argc, char* argv[])
         parameters.m_SignalGen.m_ImageSpacing = itkVectorImagePointer->GetSpacing();
         parameters.m_SignalGen.m_ImageOrigin = itkVectorImagePointer->GetOrigin();
         parameters.m_SignalGen.m_ImageDirection = itkVectorImagePointer->GetDirection();
-        parameters.SetBvalue(mitk::DiffusionPropertyHelper::GetReferenceBValue(template_image));
-        parameters.SetGradienDirections(mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(template_image));
+        parameters.SetGradientsFromImage(template_image, apply_direction_matrix);
       }
       else
       {
@@ -174,8 +173,7 @@ int main(int argc, char* argv[])
     parameters.m_SignalGen.m_ImageSpacing = itkVectorImagePointer->GetSpacing();
     parameters.m_SignalGen.m_ImageOrigin = itkVectorImagePointer->GetOrigin();
     parameters.m_SignalGen.m_ImageDirection = itkVectorImagePointer->GetDirection();
-    parameters.SetBvalue(mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg));
-    parameters.SetGradienDirections(mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(diffImg));
+    parameters.SetGradientsFromImage(diffImg, apply_direction_matrix);
 
     tractsToDwiFilter->SetInputImage(itkVectorImagePointer);
   }
@@ -202,10 +200,8 @@ int main(int argc, char* argv[])
 
   if (parameters.m_SignalGen.GetNumWeightedVolumes()>0)
   {
-    if (apply_direction_matrix)
-      mitk::DiffusionPropertyHelper::SetGradientContainer(image, parameters.m_SignalGen.GetItkGradientContainer());
-    else
-      mitk::DiffusionPropertyHelper::SetOriginalGradientContainer(image, parameters.m_SignalGen.GetItkGradientContainer());
+    // the simulated gradients are world vectors, with or without the direction matrix step
+    mitk::DiffusionPropertyHelper::SetGradientContainer(image, parameters.m_SignalGen.GetItkGradientContainer());
     mitk::DiffusionPropertyHelper::SetReferenceBValue(image, parameters.m_SignalGen.GetBvalue());
     mitk::DiffusionPropertyHelper::InitializeImage(image);
 

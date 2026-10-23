@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <string>
 #include <mitkFiberfoxParameters.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkDiffusionImageHelperFunctions.h>
 
 mitk::FiberfoxParameters::FiberfoxParameters()
   : m_NoiseModel(nullptr)
@@ -281,27 +282,45 @@ void mitk::SignalGenerationParameters::SetGradienDirections(mitk::DiffusionPrope
 
 void mitk::SignalGenerationParameters::ApplyDirectionMatrix()
 {
-  auto imageRotationMatrix = m_ImageDirection.GetVnlMatrix();
-  
-  GradientListType rotated_gradients;
+  // world = MF^T bvec with the measurement frame of FSL bvecs (frame axes as rows)
+  const vnl_matrix_fixed<double, 3, 3> toWorld = mitk::gradients::FslBvecsMeasurementFrame(m_ImageDirection).transpose();
+
+  GradientListType world_gradients;
   for(auto g : m_GradientDirections)
   {
-    auto vec = g.GetVnlVector();
-    auto vec2 = vec*imageRotationMatrix.as_matrix();
-
+    const vnl_vector_fixed<double, 3> vec = toWorld*g.GetVnlVector();
     GradientType g2;
-    g2[0] = vec2[0];
-    g2[1] = vec2[1];
-    g2[2] = vec2[2];
-    rotated_gradients.push_back(g2);
+    g2[0] = vec[0];
+    g2[1] = vec[1];
+    g2[2] = vec[2];
+    world_gradients.push_back(g2);
   }
-  m_GradientDirections = rotated_gradients;
+  m_GradientDirections = world_gradients;
 }
 
 void mitk::FiberfoxParameters::ApplyDirectionMatrix()
 {
   m_SignalGen.ApplyDirectionMatrix();
   UpdateSignalModels();
+}
+
+void mitk::FiberfoxParameters::SetGradientsFromImage(const mitk::Image* dwi, bool asFslBvecs)
+{
+  const vnl_matrix_fixed<double, 3, 3> frame = mitk::gradients::FslBvecsMeasurementFrame(m_SignalGen.m_ImageDirection);
+  SignalGenerationParameters::GradientListType gradients;
+  const auto world = mitk::DiffusionPropertyHelper::GetGradientContainer(dwi);
+  for (unsigned int i=0; i<world->Size(); ++i)
+  {
+    const vnl_vector_fixed<double, 3> w = world->ElementAt(i);
+    const vnl_vector_fixed<double, 3> vec = asFslBvecs ? vnl_vector_fixed<double, 3>(frame*w) : w;
+    SignalGenerationParameters::GradientType g;
+    g[0] = vec[0];
+    g[1] = vec[1];
+    g[2] = vec[2];
+    gradients.push_back(g);
+  }
+  m_SignalGen.m_Bvalue = mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi);
+  SetGradienDirections(gradients);
 }
 
 void mitk::FiberfoxParameters::SaveParameters(std::string filename)
