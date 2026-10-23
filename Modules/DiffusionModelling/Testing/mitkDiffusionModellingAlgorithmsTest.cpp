@@ -57,6 +57,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(EigenvalueCorrection_InvalidGradients_Throws);
   MITK_TEST(TensorToL2Norm_FrobeniusNorm);
   MITK_TEST(Adc_NearZeroBValue_CountsAsBaseline);
+  MITK_TEST(Adc_ZeroBaselineValue_LeftOutInBothModes);
   MITK_TEST(PrincipalDirection_MaskOfOtherSize_Throws);
   MITK_TEST(PrincipalDirection_SecondInput_SameAsFreshFilter);
   MITK_TEST(MaximaExtraction_MaskOfOtherSize_Throws);
@@ -262,6 +263,52 @@ public:
   {
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(false), 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(true), 1e-6);
+  }
+
+  // The fit averaged all unweighted values into S0, the mean ADC only the positive ones, so a
+  // zero b0 value gave the two modes different S0 (here 100 and 200).
+  void Adc_ZeroBaselineValue_LeftOutInBothModes()
+  {
+    auto dwi = itk::VectorImage<short, 3>::New();
+    itk::VectorImage<short, 3>::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    dwi->SetRegions(region);
+    dwi->SetVectorLength(3);
+    dwi->Allocate();
+    itk::VariableLengthVector<short> pixel(3);
+    pixel[0] = 0;
+    pixel[1] = 200;
+    pixel[2] = 100;
+    dwi->FillBuffer(pixel);
+    auto gradients = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+    gradients->push_back(mitk::DiffusionPropertyHelper::GradientDirectionType(0.0));
+    gradients->push_back(mitk::DiffusionPropertyHelper::GradientDirectionType(0.0));
+    gradients->push_back(mitk::DiffusionPropertyHelper::GradientDirectionType(1, 0, 0));
+
+    for (bool fitSignal : {false, true})
+    {
+      auto filter = itk::AdcImageFilter<short, double>::New();
+      filter->SetInput(dwi);
+      filter->SetGradientDirections(gradients.GetPointer());
+      filter->SetB_value(1000);
+      filter->SetFitSignal(fitSignal);
+      filter->Update();
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(std::log(2.0) / 1000, filter->GetOutput()->GetPixel({{0, 0, 0}}), 1e-7);
+    }
+
+    // Without a positive baseline value both modes give 0.
+    pixel[1] = 0;
+    dwi->FillBuffer(pixel);
+    for (bool fitSignal : {false, true})
+    {
+      auto filter = itk::AdcImageFilter<short, double>::New();
+      filter->SetInput(dwi);
+      filter->SetGradientDirections(gradients.GetPointer());
+      filter->SetB_value(1000);
+      filter->SetFitSignal(fitSignal);
+      filter->Update();
+      CPPUNIT_ASSERT_EQUAL(0.0, filter->GetOutput()->GetPixel({{0, 0, 0}}));
+    }
   }
 
   using MaskImageType = itk::Image<unsigned char, 3>;
