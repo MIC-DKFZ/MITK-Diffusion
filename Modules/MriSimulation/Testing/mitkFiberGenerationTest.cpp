@@ -20,6 +20,37 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarEllipse.h>
 #include <itkFibersFromPlanarFiguresFilter.h>
 #include <omp.h>
+#include <vtkCell.h>
+#include <vtkPolyData.h>
+
+namespace
+{
+  /** Largest distance of the bundle's first (last) fiber points from the centre of the first (last)
+   *  fiducial, relative to the ellipse: at most 1 when every fiber starts and ends inside them. */
+  double MaxEllipseRadiusOfEnds(mitk::FiberBundle* bundle, mitk::PlanarEllipse* first, mitk::PlanarEllipse* last)
+  {
+    double maxRadius = 0;
+    for (unsigned int i = 0; i < bundle->GetNumFibers(); ++i)
+    {
+      vtkCell* cell = bundle->GetFiberPolyData()->GetCell(i);
+      for (auto end : { std::make_pair(first, 0), std::make_pair(last, static_cast<int>(cell->GetNumberOfPoints()) - 1) })
+      {
+        mitk::Point3D world(cell->GetPoints()->GetPoint(end.second));
+        mitk::Point2D point;
+        end.first->GetPlaneGeometry()->Map(world, point);
+        const mitk::Point2D centre = end.first->GetControlPoint(0);
+        const mitk::Vector2D axis1 = end.first->GetControlPoint(1) - centre;
+        const mitk::Vector2D axis2 = end.first->GetControlPoint(2) - centre;
+        const mitk::Vector2D d = point - centre;
+        const double u = (d * axis1) / axis1.GetSquaredNorm();
+        const double v = (d * axis2) / axis2.GetSquaredNorm();
+        maxRadius = std::max(maxRadius, std::sqrt(u * u + v * v));
+      }
+    }
+    MITK_INFO << "Largest relative ellipse radius of the fiber ends: " << maxRadius;
+    return maxRadius;
+  }
+}
 
 /**Documentation
  *  Test if fiber transfortaiom methods work correctly
@@ -66,6 +97,7 @@ int mitkFiberGenerationTest(int argc, char* argv[])
               mitk::IOUtil::Save(fiberBundles.at(0), out);
             }
             MITK_TEST_CONDITION_REQUIRED(equal,"check uniform bundle")
+            MITK_TEST_CONDITION_REQUIRED(MaxEllipseRadiusOfEnds(fiberBundles.at(0), pf1, pf3) <= 1.0 + 1e-6, "uniform fibers start and end inside the fiducials")
         }
 
         // check gaussian fiber distribution
@@ -84,6 +116,7 @@ int mitkFiberGenerationTest(int argc, char* argv[])
               mitk::IOUtil::Save(fiberBundles.at(0), out);
             }
             MITK_TEST_CONDITION_REQUIRED(equal,"check gaussian bundle")
+            MITK_TEST_CONDITION_REQUIRED(MaxEllipseRadiusOfEnds(fiberBundles.at(0), pf1, pf3) <= 1.0 + 1e-6, "gaussian fibers start and end inside the fiducials")
         }
     }
     catch(...) {

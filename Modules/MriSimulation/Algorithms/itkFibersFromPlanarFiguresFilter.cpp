@@ -83,21 +83,8 @@ void FibersFromPlanarFiguresFilter::SetFixSeed(int FixSeed)
   m_FixSeed = FixSeed;
 }
 
-/*
-void AddGyry()
-{
-mitk::BaseGeometry* geom = pe->GetGeometry();
-mitk::Vector3D translation;
-      pos += bundle_waypoints.at(c-1)->GetPlaneGeometry()->GetNormal() * randGen->GetUniformVariate(m_StepSizeMin, m_StepSizeMax);
-  // translate
-  geom->Translate(translation);
-}
-*/
-
 void FibersFromPlanarFiguresFilter::GenerateData()
 {
-  bool m_Gyrus = true;
-
   // check if enough fiducials are available
   for (unsigned int i=0; i<m_Parameters.m_Fiducials.size(); i++)
     if (m_Parameters.m_Fiducials.at(i).size()<2)
@@ -147,11 +134,6 @@ void FibersFromPlanarFiguresFilter::GenerateData()
       vnl_vector_fixed< double, 2 > newP;
       newP[0] = m_2DPoints.at(j)[0];
       newP[1] = m_2DPoints.at(j)[1];
-      if (m_Gyrus)
-      {
-        newP[0] *= 1.5;
-        newP[1] *= 1.5;
-      }
 
       double alpha = acos(eDir[0]);
       if (eDir[1]>0)
@@ -175,13 +157,6 @@ void FibersFromPlanarFiguresFilter::GenerateData()
       planeGeo->Map(p0, w);
 
       wc = figure->GetWorldControlPoint(0);
-
-      if (m_Gyrus)
-      {
-        mitk::Vector3D d = wc-w;
-        auto l = d.GetNorm();
-        MITK_INFO << l;
-      }
 
       vtkIdType id = m_VtkPoints->InsertNextPoint(w.GetDataPointer());
       container->GetPointIds()->InsertNextId(id);
@@ -218,11 +193,6 @@ void FibersFromPlanarFiguresFilter::GenerateData()
         // apply new ellipse shape
         newP[0] = m_2DPoints.at(j)[0];
         newP[1] = m_2DPoints.at(j)[1];
-        if (m_Gyrus && k==bundle.size()-1)
-        {
-          newP[0] *= 1.5;
-          newP[1] *= 1.5;
-        }
 
         // calculate normal
         mitk::PlaneGeometry* planeGeo = const_cast<mitk::PlaneGeometry*>(figure->GetPlaneGeometry());
