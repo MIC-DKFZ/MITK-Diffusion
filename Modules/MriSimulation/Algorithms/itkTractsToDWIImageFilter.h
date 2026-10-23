@@ -98,6 +98,8 @@ protected:
     TractsToDWIImageFilter();
     ~TractsToDWIImageFilter() override;
     itk::Vector<double, 3> GetItkVector(double point[3]);
+    /** Seed of the random signal models for one fiber segment and compartment. */
+    static int SegmentSeed(int runSeed, int fiber, int segment, int compartment);
     vnl_vector_fixed<double, 3> GetVnlVector(double point[3]);
     vnl_vector_fixed<double, 3> GetVnlVector(Vector< float, 3 >& vector);
     double RoundToNearest(double num);

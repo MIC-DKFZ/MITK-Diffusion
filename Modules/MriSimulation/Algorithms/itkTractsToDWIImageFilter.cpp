@@ -57,6 +57,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <cmath>
 #include <thread>
 #include <atomic>
+#include <cstdint>
+#include <memory>
 
 namespace itk
 {
@@ -1076,6 +1078,12 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
           double value;
         };
         const int chunkSize = 1024;
+
+        // Models that draw random numbers (prototype kernels, randomized astrosticks) are not
+        // thread-safe, and a fiber segment has to get the same draws at any thread count and in every
+        // volume. Each thread therefore calls its own clone, reseeded per segment from the run's seed.
+        std::vector< std::vector< std::unique_ptr< mitk::DiffusionSignalModel<double> > > > threadModels(fiberThreads);
+
         for (int chunkStart=0; chunkStart<numFibers; chunkStart+=chunkSize)
         {
           const int chunkEnd = std::min(numFibers, chunkStart+chunkSize);
@@ -1110,6 +1118,10 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
                 continue;
 
               double seg_volume = fiberWeight*itk::Math::pi*m_mmRadius*m_mmRadius;
+              auto& localModels = threadModels[omp_get_thread_num()];
+              if (localModels.empty())
+                for (auto model : m_Parameters.m_FiberModelList)
+                  localModels.emplace_back(model->UsesRandomNumbers() ? model->Clone() : nullptr);
               for( int j=0; j<numPoints - 1; ++j)
               {
                 if (this->GetAbortGenerateData())
@@ -1146,7 +1158,13 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
                 // generate signal for each fiber compartment
                 for (int k=0; k<numFiberCompartments; ++k)
                 {
-                  double signal_add = m_Parameters.m_FiberModelList[k]->SimulateMeasurement(g, dir)*seg_volume;
+                  mitk::DiffusionSignalModel<double>* model = m_Parameters.m_FiberModelList[k];
+                  if (localModels[k])
+                  {
+                    model = localModels[k].get();
+                    model->SetSeed(SegmentSeed(signalModelSeed, i, j, k));
+                  }
+                  double signal_add = model->SimulateMeasurement(g, dir)*seg_volume;
                   for (std::pair< itk::Index<3>, double > seg : segments)
                   {
                     if (!m_TransformedMaskImage->GetLargestPossibleRegion().IsInside(seg.first) || m_TransformedMaskImage->GetPixel(seg.first)<=0)
@@ -1789,6 +1807,20 @@ SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3
         MITK_ERROR << val;
     }
   }
+}
+
+template< class PixelType >
+int TractsToDWIImageFilter< PixelType >::SegmentSeed(int runSeed, int fiber, int segment, int compartment)
+{
+  // hash combine, then the splitmix64 finalizer, so that neighbouring segments get unrelated seeds
+  std::uint64_t x = static_cast<std::uint32_t>(runSeed);
+  for (std::uint64_t v : { static_cast<std::uint64_t>(fiber), static_cast<std::uint64_t>(segment), static_cast<std::uint64_t>(compartment) })
+    x ^= v + 0x9e3779b97f4a7c15ULL + (x << 6) + (x >> 2);
+  x += 0x9e3779b97f4a7c15ULL;
+  x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+  x ^= x >> 31;
+  return static_cast<int>(x & 0x7fffffffULL);
 }
 
 template< class PixelType >

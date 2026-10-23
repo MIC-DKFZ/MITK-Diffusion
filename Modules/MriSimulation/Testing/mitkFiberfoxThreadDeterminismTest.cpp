@@ -19,6 +19,9 @@ found in the LICENSE file.
 #include <itkImageRegionConstIterator.h>
 #include <omp.h>
 #include <stdexcept>
+#include <functional>
+#include <mitkRawShModel.h>
+#include <mitkAstroStickModel.h>
 
 namespace
 {
@@ -46,6 +49,7 @@ class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
   MITK_TEST(Param1);
   MITK_TEST(Param3);
   MITK_TEST(Param6);
+  MITK_TEST(RandomFiberModels);
   MITK_TEST(ExceptionInFiberLoop);
   CPPUNIT_TEST_SUITE_END();
 
@@ -70,11 +74,15 @@ public:
     m_FiberBundle = nullptr;
   }
 
-  FilterType::Pointer Simulate(const std::string& parameterFile, int threads)
+  using Modifier = std::function<void(mitk::FiberfoxParameters&)>;
+
+  FilterType::Pointer Simulate(const std::string& parameterFile, int threads, const Modifier& modify)
   {
     omp_set_num_threads(threads);
     mitk::FiberfoxParameters parameters;
     parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/" + parameterFile), true);
+    if (modify)
+      modify(parameters);
     auto filter = FilterType::New();
     filter->SetUseConstantRandSeed(true);
     filter->SetParameters(parameters);
@@ -97,12 +105,12 @@ public:
     return differences;
   }
 
-  void CompareAtThreadCounts(const std::string& parameterFile)
+  void CompareAtThreadCounts(const std::string& parameterFile, const Modifier& modify = Modifier())
   {
-    auto reference = Simulate(parameterFile, 1);
+    auto reference = Simulate(parameterFile, 1, modify);
     for (int threads : {2, 3, 8, 8})
     {
-      auto test = Simulate(parameterFile, threads);
+      auto test = Simulate(parameterFile, threads, modify);
       const auto differences = CountDifferences<DwiType>(test->GetOutput(), reference->GetOutput());
       MITK_INFO << parameterFile << ", " << threads << " threads: " << differences << " output values differ from 1 thread";
       CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": output at " + std::to_string(threads) + " threads equals the 1-thread output", 0ul, differences);
@@ -125,6 +133,30 @@ public:
   void Param1() { CompareAtThreadCounts("param1.ffp"); }
   void Param3() { CompareAtThreadCounts("param3.ffp"); }
   void Param6() { CompareAtThreadCounts("param6.ffp"); }
+
+  /** Fiber compartments that draw random numbers: prototype kernels and randomized astrosticks. */
+  void RandomFiberModels()
+  {
+    CompareAtThreadCounts("param5.ffp", [](mitk::FiberfoxParameters& parameters)
+    {
+      auto prototype = new mitk::RawShModel<double>();
+      for (int k = 0; k < 3; ++k)
+      {
+        vnl_vector<double> coefficients(6);
+        for (unsigned int c = 0; c < 6; ++c)
+          coefficients[c] = (c == 0 ? 1.0 : 0.1 * (c + k) * (c % 2 ? 1 : -1));
+        mitk::RawShModel<double>::GradientType direction;
+        direction[0] = 1; direction[1] = k; direction[2] = 0.5;
+        prototype->AddKernel(coefficients, 1.0, direction);
+      }
+      auto astrosticks = new mitk::AstroStickModel<double>();
+      astrosticks->SetRandomizeSticks(true);
+      for (auto model : parameters.m_FiberModelList)
+        delete model;
+      parameters.m_FiberModelList = { prototype, astrosticks };
+      parameters.UpdateSignalModels();
+    });
+  }
 
   /** An exception must not leave an OpenMP region (that terminates the process); it reaches the caller of Update. */
   void ExceptionInFiberLoop()
