@@ -39,6 +39,7 @@ found in the LICENSE file.
 #include <vtkUnsignedCharArray.h>
 #include <itksys/SystemTools.hxx>
 #include <vnl/vnl_matrix_fixed.h>
+#include <vnl/algo/vnl_determinant.h>
 
 #include <cmath>
 #include <cstdint>
@@ -80,6 +81,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(RgbCache_FollowsShConvention);
   MITK_TEST(PeakImage_PolydataFollowsPixelChanges);
   MITK_TEST(ShReader_Mrtrix3_ConvertedToMitkBasis);
+  MITK_TEST(ShReader_Dipy_ConvertedFromBvecFrame);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -948,6 +950,78 @@ public:
     const double amplitudes[4] = {0.20321192, -0.00769596, -0.007680845, 0.023118196};
     for (unsigned int i = 0; i < 4; ++i)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(amplitudes[i], mitk::sh::GetValue(csdCoefficients, 8, vnl_vector_fixed<double, 3>(directions[i]), true), 1e-6);
+  }
+
+  // "FSL/Dipy" read the coefficients in MITK's own FSL definition at world directions, which is
+  // neither dipy's default basis nor the frame of dipy's coefficients (the bvecs it was given):
+  // the first peaks of a dipy CSA fit were 47 degrees off (median).
+  void ShReader_Dipy_ConvertedFromBvecFrame()
+  {
+    // dipy 1.12.1 sf_to_sh(..., sh_order_max=4, basis_type='descoteaux07', legacy=True) of
+    // f(v) = (v.d)^4 on repulsion724, d = (1, 2, 3) / |(1, 2, 3)| in the bvec frame.
+    const std::vector<float> dipyCoefficients = {0.70898154f, -0.168114716f, -0.336229432f, 0.420597999f, -0.672458865f,
+      0.224152955f, -0.00713331864f, 0.0951157676f, -0.113237923f, -0.0686325455f, -0.0614932969f, -0.137265091f,
+      0.150983897f, 0.0172937759f, -0.0244570925f};
+    vnl_vector_fixed<double, 3> d(1, 2, 3);
+    d.normalize();
+
+    // LAS (dcm2niix's layout, negative determinant: bvec frame = voxel axes), identity and an
+    // oblique matrix (positive determinant: x of the voxel frame negated).
+    Matrix3 las;
+    las.set_identity();
+    las(1, 1) = -1;
+    Matrix3 identity;
+    identity.set_identity();
+    const double angle = 0.4;
+    Matrix3 oblique;
+    oblique.set_identity();
+    oblique(0, 0) = std::cos(angle);
+    oblique(0, 1) = -std::sin(angle);
+    oblique(1, 0) = std::sin(angle);
+    oblique(1, 1) = std::cos(angle);
+
+    const vnl_matrix<double> directions = SphereDirections(200);
+    unsigned int index = 0;
+    for (const Matrix3 &direction : {las, identity, oblique})
+    {
+      Matrix3 flip;
+      flip.set_identity();
+      if (vnl_det(direction) > 0)
+        flip(0, 0) = -1;
+      const Matrix3 frame = (direction * flip).transpose(); // v = frame * u
+
+      const auto path = WriteShNifti("dipy" + std::to_string(index++) + ".nii.gz", dipyCoefficients, "", direction);
+      auto image = LoadSh(path, "FSL/Dipy");
+      CPPUNIT_ASSERT_EQUAL(mitk::ShImage::MRTRIX, image->GetShConvention());
+      const vnl_vector<float> coefficients = ShCoefficients(image, 0, 0, 0);
+      for (unsigned int i = 0; i < directions.cols(); ++i)
+      {
+        const vnl_vector_fixed<double, 3> u = directions.get_column(i);
+        const double expected = std::pow(dot_product(frame * u, d), 4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, mitk::sh::GetValue(coefficients, 4, u, true), 1e-5);
+      }
+    }
+
+    // Files that MITK marked with its own FSL definition keep it.
+    auto image = LoadSh(WriteShNifti("marked.nii.gz", dipyCoefficients, "MITK_SH_convention=FSL", identity), "FSL/Dipy");
+    CPPUNIT_ASSERT_EQUAL(mitk::ShImage::FSL, image->GetShConvention());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(dipyCoefficients[1], ShCoefficients(image, 0, 0, 0)[1], 1e-9);
+  }
+
+  /** Unit vectors spread evenly over the sphere (Fibonacci lattice), as columns. */
+  static vnl_matrix<double> SphereDirections(unsigned int count)
+  {
+    vnl_matrix<double> directions(3, count);
+    const double golden = itk::Math::pi * (3.0 - std::sqrt(5.0));
+    for (unsigned int i = 0; i < count; ++i)
+    {
+      const double z = 1.0 - (2.0 * i + 1.0) / count;
+      const double r = std::sqrt(1.0 - z * z);
+      directions(0, i) = r * std::cos(golden * i);
+      directions(1, i) = r * std::sin(golden * i);
+      directions(2, i) = z;
+    }
+    return directions;
   }
 };
 

@@ -28,6 +28,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLocaleSwitch.h>
 #include <itkShCoefficientImageImporter.h>
 
+#include <mitkDiffusionImageHelperFunctions.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
+
+#include <boost/math/special_functions/spherical_harmonic.hpp>
+#include <vnl/algo/vnl_svd.h>
+
 #include <cmath>
 #include <optional>
 
@@ -46,8 +52,59 @@ namespace
   {
     MitkLegacy, // MITK's internal basis (MRtrix 0.2), taken over unchanged
     Mrtrix3,    // MRtrix 3: orthonormal, m != 0 larger by sqrt(2) than MITK's
-    MitkFsl     // MITK's FSL definition (ShImage::FSL), taken over unchanged
+    MitkFsl,    // MITK's FSL definition (ShImage::FSL), taken over unchanged
+    Dipy        // dipy's default basis (descoteaux07, legacy) in the FSL bvec frame
   };
+
+  /**
+   * Matrix that maps coefficients of dipy's default basis to MITK's basis of the same order.
+   * dipy's basis (descoteaux07 with legacy=True, the default of its CSA, CSD and sf_to_sh) is
+   * sqrt(2) Re Y_l^|m| for m < 0, Y_l^0 and sqrt(2) Im Y_l^|m| for m > 0, with the Condon-Shortley
+   * phase, at directions in the frame of the bvecs dipy was given: the FSL frame, i.e. voxel axes
+   * with x negated when the image matrix has a positive determinant. MITK's coefficients are
+   * functions of world (LPS) directions. Both bases span the same space, so sampling dipy's
+   * function on a dense direction set and fitting MITK's basis is exact, also for oblique images.
+   */
+  vnl_matrix<double> DipyToMitkBasis(int order, const itk::Matrix<double, 3, 3> &direction)
+  {
+    // bvec-frame direction v = frame * u for a world direction u (frame axes as rows).
+    const vnl_matrix_fixed<double, 3, 3> frame = mitk::gradients::FslBvecsMeasurementFrame(direction);
+
+    // Fibonacci lattice: unit vectors spread evenly over the sphere, far more than coefficients.
+    const unsigned int count = 1000;
+    vnl_matrix<double> world(3, count);
+    const double golden = itk::Math::pi * (3.0 - std::sqrt(5.0));
+    for (unsigned int i = 0; i < count; ++i)
+    {
+      const double z = 1.0 - (2.0 * i + 1.0) / count;
+      const double r = std::sqrt(1.0 - z * z);
+      world(0, i) = r * std::cos(golden * i);
+      world(1, i) = r * std::sin(golden * i);
+      world(2, i) = z;
+    }
+
+    const unsigned int coefficients = (order + 1) * (order + 2) / 2;
+    vnl_matrix<double> dipy(count, coefficients);
+    for (unsigned int i = 0; i < count; ++i)
+    {
+      const vnl_vector_fixed<double, 3> v = frame * world.get_column(i);
+      const double theta = std::acos(std::max(-1.0, std::min(1.0, v[2])));
+      const double phi = std::atan2(v[1], v[0]);
+      for (int l = 0; l <= order; l += 2)
+        for (int m = -l; m <= l; ++m)
+        {
+          const auto y = boost::math::spherical_harmonic<double>(static_cast<unsigned int>(l), std::abs(m), theta, phi);
+          dipy(i, l * (l + 1) / 2 + m) = m < 0 ? std::sqrt(2.0) * y.real() : (m > 0 ? std::sqrt(2.0) * y.imag() : y.real());
+        }
+    }
+
+    const vnl_matrix<float> mitkBasis = mitk::sh::CalcShBasisForDirections(order, world, true);
+    vnl_matrix<double> mitk(mitkBasis.rows(), mitkBasis.cols());
+    for (unsigned int r = 0; r < mitk.rows(); ++r)
+      for (unsigned int c = 0; c < mitk.cols(); ++c)
+        mitk(r, c) = mitkBasis(r, c);
+    return vnl_svd<double>(mitk).solve(dipy);
+  }
 
   /** Convention marked by ShImageWriter (NRRD key or NIfTI descrip); it overrides the option. */
   std::optional<FileBasis> MitkMarker(const itk::MetaDataDictionary &dictionary)
@@ -121,13 +178,35 @@ namespace mitk
       if (option == MRTRIX3 || (option == AUTO && WrittenByMrtrix3(dictionary)))
         basis = FileBasis::Mrtrix3;
       else if (option == FSL_DIPY)
-        basis = FileBasis::MitkFsl;
+        basis = FileBasis::Dipy;
       else
         basis = FileBasis::MitkLegacy;
     }
 
     if (*basis == FileBasis::MitkFsl)
       shImage->SetShConvention(mitk::ShImage::SH_CONVENTION::FSL);
+
+    if (*basis == FileBasis::Dipy)
+    {
+      itk::Matrix<double, 3, 3> direction;
+      for (unsigned int r = 0; r < 3; ++r)
+        for (unsigned int c = 0; c < 3; ++c)
+          direction[r][c] = img->GetDirection()[r][c];
+      const vnl_matrix<double> toMitk = DipyToMitkBasis(shOrder, direction);
+      auto coefficients = importer->GetCoefficientImage();
+      itk::ImageRegionIterator<typename ImporterType::CoefficientImageType> it(coefficients, coefficients->GetLargestPossibleRegion());
+      for (; !it.IsAtEnd(); ++it)
+      {
+        auto pixel = it.Get();
+        vnl_vector<double> dipy(pixel.Size());
+        for (unsigned int j = 0; j < pixel.Size(); ++j)
+          dipy[j] = pixel[j];
+        const vnl_vector<double> mitk = toMitk * dipy;
+        for (unsigned int j = 0; j < pixel.Size(); ++j)
+          pixel[j] = static_cast<float>(mitk[j]);
+        it.Set(pixel);
+      }
+    }
 
     if (*basis == FileBasis::Mrtrix3)
     {
