@@ -168,7 +168,7 @@ public:
       g[0] = -g[0];
       expected->push_back(g);
     }
-    // Exactly as before the gradient convention fix for axis-aligned images.
+    // For an axis-aligned image the world component of the flipped axis is negated exactly.
     AssertGradientsEqual(expected.GetPointer(), PropHelper::GetGradientContainer(flipped), 0.0);
   }
 

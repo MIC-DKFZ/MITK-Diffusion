@@ -242,7 +242,7 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::FlipAxes(const Image* image, c
 
     // The voxels are mirrored in index space, so a world vector v becomes D F D^-1 v, with the
     // direction matrix D and F = diag(+-1) negating the flipped axes. For an axis-aligned image
-    // this negates the world components of the flipped axes, as before, exactly.
+    // this is exactly the negation of the world components of the flipped axes.
     MatrixType flip;
     flip.set_identity();
     for (unsigned int i = 0; i < 3; ++i)
@@ -256,10 +256,7 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::FlipAxes(const Image* image, c
       newGradients->push_back(mirror * g);
 
     newImage = GrabItkImageMemory(flipper->GetOutput());
-    // DiffusionPropertyHelper::CopyProperties(source, target, true) without a const source: all
-    // properties except the original gradients, which InitializeImage derives again.
-    newImage->SetPropertyList(image->GetPropertyList()->Clone());
-    newImage->GetPropertyList()->RemoveProperty(PropHelper::GetOriginalGradientContainerPropertyName());
+    CopyProperties(image, newImage, false);
     PropHelper::SetGradientContainer(newImage, newGradients);
     PropHelper::InitializeImage(newImage);
   }

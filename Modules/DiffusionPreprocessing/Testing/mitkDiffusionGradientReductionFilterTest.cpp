@@ -92,8 +92,8 @@ public:
 
   void Reduce_DefaultSeed_KnownSelection()
   {
-    // The selection of the random search with seed 0, as computed before the filter was
-    // restructured; a faster cost computation must keep it.
+    // The recorded selection of the random search with seed 0; a faster cost computation must
+    // keep it.
     const FilterType::IndicesVector expected = {0, 2, 5, 7, 10, 13, 15, 17, 20, 23, 24, 25, 26, 27, 28, 29};
     CPPUNIT_ASSERT(Reduce(false) == expected);
   }
