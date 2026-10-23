@@ -217,19 +217,22 @@ void QmitkControlVisualizationPropertiesView::CreateQtPartControl(QWidget *paren
 
 void QmitkControlVisualizationPropertiesView::SetColor()
 {
+  // One dialog for all selected tractograms and peak images (the buttons are in their frames);
+  // each of them is recoloured, not only the node whose colour property is observed.
+  QColor c = QColorDialog::getColor();
+  if (!c.isValid())
+    return;
+
+  float rgb[3];
+  rgb[0] = static_cast<float>(c.redF());
+  rgb[1] = static_cast<float>(c.greenF());
+  rgb[2] = static_cast<float>(c.blueF());
   for (auto node : m_SelectedNodes)
   {
-    QColor c = QColorDialog::getColor();
-    if (c.isValid())
-    {
-      float rgb[3];
-      rgb[0] = static_cast<float>(c.redF());
-      rgb[1] = static_cast<float>(c.greenF());
-      rgb[2] = static_cast<float>(c.blueF());
+    if (node.IsNotNull() && (dynamic_cast<mitk::FiberBundle*>(node->GetData()) || dynamic_cast<mitk::PeakImage*>(node->GetData())))
       node->SetColor(rgb);
-      mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-    }
   }
+  this->SetCustomColor(itk::ModifiedEvent());
 }
 
 void QmitkControlVisualizationPropertiesView::SetFocus()
