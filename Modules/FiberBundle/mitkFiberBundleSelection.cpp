@@ -18,7 +18,11 @@ found in the LICENSE file.
 #include <vtkCell.h>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
 #include <random>
+#include <unordered_map>
 
 // Operations of mitk::FiberBundle that keep, drop, split or combine whole fibers.
 
@@ -118,9 +122,11 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(const mitk::FiberBu
 
   // End points of every fiber; a bundle has no fiber without points (vtkCleanPolyData in
   // UpdateFiberGeometry removes empty cells), so the index is the fiber id.
+  using EndPoints = std::array< itk::Point<float, 3>, 2 >;
   auto endPoints = [](vtkPolyData* polyData, unsigned int numFibers)
   {
-    std::vector< std::vector< itk::Point<float, 3> > > result;
+    std::vector< EndPoints > result;
+    result.reserve(numFibers);
     for (unsigned int i=0; i<numFibers; i++)
     {
       vtkCell* cell = polyData->GetCell(i);
@@ -133,17 +139,66 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(const mitk::FiberBu
   const auto points1 = endPoints(m_FiberPolyData, m_NumFibers);
   const auto points2 = endPoints(fib->GetFiberPolyData(), fib->GetNumFibers());
 
+  // Two fibers match when the mean squared distance of their end points (in the same or the
+  // reverse order) is below 1e-6 mm^2, so the first end point of a matching fiber of fib lies
+  // within 0.0015 mm of an end point of this one in every coordinate. The fibers of fib are
+  // binned by their first end point in cells of 0.01 mm, and each fiber is compared only with
+  // those in the cells around its two end points: the same matches as comparing all pairs, in
+  // linear instead of quadratic time. Non-finite end points never match and are not binned.
+  using Bin = std::array<long long, 3>;
+  struct BinHash
+  {
+    std::size_t operator()(const Bin& bin) const
+    {
+      return std::hash<long long>()(bin[0]) ^ (std::hash<long long>()(bin[1]) * 31) ^ (std::hash<long long>()(bin[2]) * 997);
+    }
+  };
+  auto binOf = [](const itk::Point<float, 3>& p, Bin& bin)
+  {
+    for (int c=0; c<3; ++c)
+    {
+      const double cell = std::floor(static_cast<double>(p[c]) / 0.01);
+      if (!std::isfinite(cell))
+        return false;
+      bin[c] = static_cast<long long>(cell);
+    }
+    return true;
+  };
+  std::unordered_map< Bin, std::vector<unsigned int>, BinHash > fibersByFirstPoint;
+  for (unsigned int j=0; j<points2.size(); j++)
+  {
+    Bin bin;
+    if (binOf(points2[j][0], bin))
+      fibersByFirstPoint[bin].push_back(j);
+  }
+
   // Kept fibers are flagged per index and collected in index order afterwards, so that the
   // result does not depend on the number of threads.
   std::vector< char > keep(points1.size(), 0);
 #pragma omp parallel for
   for (int i=0; i<static_cast<int>(points1.size()); i++)
   {
-    bool match = false;
-    for (unsigned int j=0; j<points2.size(); j++)
+    const EndPoints& v1 = points1[static_cast<std::size_t>(i)];
+    std::vector<unsigned int> candidates;
+    for (const auto& endPoint : v1)
     {
-      auto v1 = points1.at(static_cast<unsigned int>(i));
-      auto v2 = points2.at(j);
+      Bin center;
+      if (!binOf(endPoint, center))
+        continue;
+      for (long long dx=-1; dx<=1; ++dx)
+        for (long long dy=-1; dy<=1; ++dy)
+          for (long long dz=-1; dz<=1; ++dz)
+          {
+            const auto found = fibersByFirstPoint.find({center[0]+dx, center[1]+dy, center[2]+dz});
+            if (found!=fibersByFirstPoint.end())
+              candidates.insert(candidates.end(), found->second.begin(), found->second.end());
+          }
+    }
+
+    bool match = false;
+    for (const unsigned int j : candidates)
+    {
+      const EndPoints& v2 = points2[j];
 
       float dist=0;
       for (unsigned int c=0; c<v1.size(); c++)
