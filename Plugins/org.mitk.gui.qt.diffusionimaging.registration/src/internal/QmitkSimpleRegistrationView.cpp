@@ -155,22 +155,12 @@ void QmitkSimpleRegistrationView::OnRegResultIsAvailable(mitk::MAPRegistrationWr
   mitk::DataNode::Pointer resultNode = mitk::DataNode::New();
   resultNode->SetData(image);
 
-  if (m_MovingImageNode.IsNotNull())
-  {
-    m_MovingImageNode->SetVisibility(false);
-    QString name = m_MovingImageNode->GetName().c_str();
-    if (m_RegistrationType==0)
-      resultNode->SetName((name+"_registered (rigid)").toStdString().c_str());
-    else
-      resultNode->SetName((name+"_registered (affine)").toStdString().c_str());
-  }
+  m_MovingImageNode->SetVisibility(false);
+  QString name = m_MovingImageNode->GetName().c_str();
+  if (m_RegistrationType==0)
+    resultNode->SetName((name+"_registered (rigid)").toStdString().c_str());
   else
-  {
-    if (m_RegistrationType==0)
-      resultNode->SetName("Registered (rigid)");
-    else
-      resultNode->SetName("Registered (affine)");
-  }
+    resultNode->SetName((name+"_registered (affine)").toStdString().c_str());
   GetDataStorage()->Add(resultNode);
 
   mitk::RenderingManager::GetInstance()->InitializeViews( resultNode->GetData()->GetTimeGeometry(),
