@@ -57,6 +57,8 @@ protected:
 
     PlanarFigureComposite(const Self& other);
 
+    mitkCloneMacro(Self)
+
 private:
     OperationType m_compOperation;
 };

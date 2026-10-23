@@ -14,38 +14,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkFiberBundleTckReader_h
-#define __mitkFiberBundleTckReader_h
-
-#include <mitkCommon.h>
-#include <mitkFiberBundle.h>
-#include <vtkSmartPointer.h>
+#ifndef mitkFiberBundleTckReader_h
+#define mitkFiberBundleTckReader_h
 
 #include <mitkAbstractFileReader.h>
 
 namespace mitk
 {
-
-  /** \brief
-  */
-
+  /** \brief Reads MRtrix tractograms (.tck); MRtrix RAS coordinates become MITK LPS. */
   class FiberBundleTckReader : public AbstractFileReader
   {
   public:
 
     FiberBundleTckReader();
-    ~FiberBundleTckReader() override{}
-    FiberBundleTckReader(const FiberBundleTckReader& other);
+    FiberBundleTckReader(const FiberBundleTckReader& other) = default;
     FiberBundleTckReader * Clone() const override;
 
     using mitk::AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
-
-  private:
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
-} //namespace MITK
+}
 
-#endif // __mitkFiberBundleReader_h
+#endif

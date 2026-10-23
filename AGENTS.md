@@ -136,12 +136,17 @@ Facts the layout does not show:
 - The netlib L-BFGS-B code behind `vnl_lbfgsb` keeps its working variables in static storage.
   Threaded code holds `mitk::GetLbfgsbMutex()` (`Modules/DiffusionModelling/Algorithms/mitkLbfgsbMutex.h`)
   while `minimize` runs; the cost function may release it during its evaluation.
+- `ctest -R mitkFiberBundle` runs the `FiberBundle` tests; `mitkFiberBundleMapperTest` renders
+  offscreen (EGL) and is skipped with exit code 77 where no OpenGL context can be created.
+  `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
+  give the same result at any number of OpenMP threads; MITK-Data fiber references depend on
+  exact point positions, so a change there is checked bit for bit against the old output.
 
 ## Porting state
 
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 41 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
+all 44 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,

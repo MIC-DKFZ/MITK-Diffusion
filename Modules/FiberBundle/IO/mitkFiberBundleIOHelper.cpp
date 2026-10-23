@@ -16,7 +16,39 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkFiberBundleIOHelper.h"
 
-std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::string& path, const std::vector<std::string> extensions)
+#include <itkDirectory.h>
+#include <itksys/SystemTools.hxx>
+#include <mitkIOUtil.h>
+
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+
+namespace
+{
+  /** Silences std::cout (progress output of the readers) and restores it also when loading
+   *  throws, so that the callers can still print the error. */
+  class CoutSilencer
+  {
+  public:
+    CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
+    ~CoutSilencer() { this->Restore(); }
+    void Restore()
+    {
+      if (m_Old != nullptr)
+        std::cout.rdbuf(m_Old);
+      m_Old = nullptr;
+    }
+    CoutSilencer(const CoutSilencer&) = delete;
+    CoutSilencer& operator=(const CoutSilencer&) = delete;
+
+  private:
+    std::stringstream m_Buffer;
+    std::streambuf* m_Old;
+  };
+}
+
+std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::string& path, const std::vector<std::string>& extensions)
 {
   std::vector< std::string > file_list;
   itk::Directory::Pointer dir = itk::Directory::New();
@@ -27,8 +59,9 @@ std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::s
     for (int r = 0; r < n; r++)
     {
       const char *filename = dir->GetFile(r);
-      std::string ext = ist::GetFilenameExtension(filename);
-      for (auto e : extensions)
+      // last extension only, so that names with dots (sub-01.CST.trk) are found
+      std::string ext = itksys::SystemTools::GetFilenameLastExtension(filename);
+      for (const auto& e : extensions)
       {
         if (ext==e)
         {
@@ -42,13 +75,11 @@ std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::s
   return file_list;
 }
 
-std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(const std::vector<std::string> files, std::vector<std::string>* filenames)
+std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(const std::vector<std::string>& files, std::vector<std::string>* filenames)
 {
-  std::streambuf *old = std::cout.rdbuf(); // <-- save
-  std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf());       // <-- redirect
+  CoutSilencer silencer;
   std::vector< mitk::FiberBundle::Pointer > out;
-  for (auto f : files)
+  for (auto f : files) // copied: a folder name may get a slash
   {
     if (itksys::SystemTools::FileExists(f, true))
     {
@@ -78,7 +109,7 @@ std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(c
       }
     }
   }
-  std::cout.rdbuf (old);              // <-- restore
+  silencer.Restore();
   MITK_INFO << "Loaded " << out.size() << " tractograms";
   return out;
 }

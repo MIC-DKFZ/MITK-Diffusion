@@ -15,26 +15,29 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef FiberBundleMapper3D_H_HEADER_INCLUDED
-#define FiberBundleMapper3D_H_HEADER_INCLUDED
+#ifndef mitkFiberBundleMapper3D_h
+#define mitkFiberBundleMapper3D_h
 
-#include <mitkVtkMapper.h>
-#include <mitkFiberBundle.h>
-#include <vtkOpenGLPolyDataMapper.h>
-#include <vtkSmartPointer.h>
 #include <MitkFiberBundleExports.h>
+#include <mitkFiberBundle.h>
+#include <mitkVtkMapper.h>
 
-class vtkPropAssembly;
-class vtkPolyDataMapper;
+#include <vtkSmartPointer.h>
+
+#include <array>
+
+class vtkActor;
 class vtkLookupTable;
-class vtkOpenGLActor;
+class vtkOpenGLPolyDataMapper;
+class vtkPropAssembly;
 
 namespace mitk {
 
-//##Documentation
-//## @brief Mapper for FiberBundle
-//## @ingroup Mapper
-
+/**
+ * \brief 3D mapper of fiber bundles: lines, tubes (shape.tuberadius) or ribbons
+ * (shape.ribbonwidth) with the bundle's colours, optionally clipped at the plane of the
+ * 3DClipping property.
+ */
 class MITKFIBERBUNDLE_EXPORT FiberBundleMapper3D : public VtkMapper
 {
 public:
@@ -43,10 +46,19 @@ public:
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
 
-  const FiberBundle* GetInput();
-  vtkProp *GetVtkProp(mitk::BaseRenderer *renderer) override; //looks like depricated.. should be replaced bz GetViewProp()
+  vtkProp *GetVtkProp(mitk::BaseRenderer *renderer) override;
   static void SetDefaultProperties(DataNode* node, BaseRenderer* renderer = nullptr, bool overwrite = false );
   void GenerateDataForRenderer(mitk::BaseRenderer* renderer) override;
+
+  /** The node properties that change the geometry the mapper builds. */
+  struct ShapeParameters
+  {
+    float tubeRadius = 0;
+    int tubeSides = 0;
+    int lineWidth = 0;
+    float ribbonWidth = 0;
+    bool operator==(const ShapeParameters&) const = default;
+  };
 
   class  LocalStorage3D : public mitk::Mapper::BaseLocalStorage
   {
@@ -56,11 +68,12 @@ public:
     vtkSmartPointer<vtkPropAssembly> m_FiberAssembly;
 
     itk::TimeStamp m_LastUpdateTime;
+    // shape of the last update; each render window builds its own
+    ShapeParameters m_Shape;
+    // origin and normal of the clipping plane last applied to m_FiberMapper
+    std::array<double, 6> m_ClippingPlane = {};
+    bool m_ClippingPlaneApplied = false;
     LocalStorage3D();
-
-    ~LocalStorage3D() override
-    {
-    }
   };
 
   /** \brief This member holds all three LocalStorages for the 3D render window(s). */
@@ -70,25 +83,15 @@ public:
 protected:
 
   FiberBundleMapper3D();
-  ~FiberBundleMapper3D() override;
-  void InternalGenerateData(mitk::BaseRenderer *renderer);
-
-  void UpdateShaderParameter(mitk::BaseRenderer*);
+  ~FiberBundleMapper3D() override = default;
+  void InternalGenerateData(mitk::BaseRenderer *renderer, const FiberBundle* fiberBundle, const ShapeParameters& shape);
+  /** Applies the plane of the node's 3DClipping property to the fiber mapper when it changed. */
+  void UpdateClippingPlane(LocalStorage3D* localStorage);
 
 private:
   vtkSmartPointer<vtkLookupTable> m_lut;
-  float   m_TubeRadius;
-  int     m_TubeSides;
-  int     m_LineWidth;
-  float   m_RibbonWidth;
-  vtkSmartPointer<vtkPolyData> m_FiberPolyData;
-  mitk::FiberBundle* m_FiberBundle;
 };
 
-} // end namespace mitk
+}
 
-
-
-
-#endif /* FiberBundleMapper3D_H_HEADER_INCLUDED */
-
+#endif

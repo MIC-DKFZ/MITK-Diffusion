@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
+#include <mitkImage.h>
 #include <mitkSurface.h>
 
 #include <itkCastImageFilter.h>

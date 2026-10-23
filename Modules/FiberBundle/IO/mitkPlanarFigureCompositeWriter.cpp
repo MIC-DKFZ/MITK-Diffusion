@@ -15,27 +15,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkPlanarFigureCompositeWriter.h"
-#include <itksys/SystemTools.hxx>
-#include <mitkAbstractFileWriter.h>
-#include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
+
 #include <boost/property_tree/ptree.hpp>
-#define RAPIDXML_NO_EXCEPTIONS
 #include <boost/property_tree/xml_parser.hpp>
 #include <mitkPlanarFigureComposite.h>
 
 mitk::PlanarFigureCompositeWriter::PlanarFigureCompositeWriter()
-    : mitk::AbstractFileWriter(mitk::PlanarFigureComposite::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE(), "Planar Figure Composite Writer")
+    : mitk::AbstractFileWriter(mitk::PlanarFigureComposite::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE_NAME(), "Planar Figure Composite Writer")
 {
     RegisterService();
 }
-
-mitk::PlanarFigureCompositeWriter::PlanarFigureCompositeWriter(const mitk::PlanarFigureCompositeWriter & other)
-    :mitk::AbstractFileWriter(other)
-{}
-
-mitk::PlanarFigureCompositeWriter::~PlanarFigureCompositeWriter()
-{}
 
 mitk::PlanarFigureCompositeWriter * mitk::PlanarFigureCompositeWriter::Clone() const
 {
@@ -44,47 +34,16 @@ mitk::PlanarFigureCompositeWriter * mitk::PlanarFigureCompositeWriter::Clone() c
 
 void mitk::PlanarFigureCompositeWriter::Write()
 {
+    mitk::PlanarFigureComposite::ConstPointer input = dynamic_cast<const mitk::PlanarFigureComposite*>(this->GetInput());
+    if (input.IsNull())
+      mitkThrow() << "The planar figure composite writer needs a planar figure composite as input.";
 
-    std::ostream* out;
-    std::ofstream outStream;
+    // The XML is written to a file by name, so an output stream gets a local file that is copied
+    // to the stream when it goes out of scope. No locale switch: the file holds one integer.
+    LocalFile localFile(this);
 
-    if( this->GetOutputStream() )
-    {
-        out = this->GetOutputStream();
-    }else{
-        outStream.open( this->GetOutputLocation().c_str() );
-        out = &outStream;
-    }
-
-    if ( !out->good() )
-    {
-        mitkThrow() << "Stream not good.";
-    }
-
-    try
-    {
-        const std::string& locale = "C";
-        const std::string& currLocale = setlocale( LC_ALL, nullptr );
-        setlocale(LC_ALL, locale.c_str());
-
-        std::locale previousLocale(out->getloc());
-        std::locale I("C");
-        out->imbue(I);
-
-        std::string filename = this->GetOutputLocation().c_str();
-
-        mitk::PlanarFigureComposite::ConstPointer input = dynamic_cast<const mitk::PlanarFigureComposite*>(this->GetInput());
-        std::string ext = itksys::SystemTools::GetFilenameLastExtension(this->GetOutputLocation().c_str());
-
-        boost::property_tree::ptree type;
-        type.put("comptype", input->getOperationType());
-        boost::property_tree::xml_writer_settings<std::string> writerSettings(' ', 2);
-        boost::property_tree::xml_parser::write_xml(filename, type, std::locale(), writerSettings);
-
-        setlocale(LC_ALL, currLocale.c_str());
-    }
-    catch(...)
-    {
-        throw;
-    }
+    boost::property_tree::ptree type;
+    type.put("comptype", input->getOperationType());
+    boost::property_tree::xml_writer_settings<std::string> writerSettings(' ', 2);
+    boost::property_tree::xml_parser::write_xml(localFile.GetFileName(), type, std::locale(), writerSettings);
 }
