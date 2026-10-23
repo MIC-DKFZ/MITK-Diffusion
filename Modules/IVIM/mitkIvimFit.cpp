@@ -174,9 +174,9 @@ namespace
     lm.minimize(x);
   }
 
-  /** D* of the second step of the two-step methods: the best of 100 values in [0.001, 0.15), or 0
-      when no candidate has a finite error (D or f not finite). residualBuffer has room for the
-      residuals of all measurements. */
+  /** D* of the second step of the two-step methods: the best of 100 values in [0.001, 0.15),
+      refined between its neighbours within [0, 0.15], or 0 when no candidate has a finite error
+      (D or f not finite). residualBuffer has room for the residuals of all measurements. */
   double SearchDStar(const vnl_vector<double>& bValues,
                      const vnl_vector<double>& measurements,
                      double d,
@@ -204,7 +204,46 @@ namespace
         bestCandidate = i;
       }
     }
-    return bestCandidate < 0 ? 0 : minDStar + bestCandidate * ((maxDStar - minDStar) / numberOfCandidates);
+    if (bestCandidate < 0)
+      return 0;
+
+    // The grid step (0.00149) alone gave errors of up to half a step, 7.5 % at D* = 0.01. A
+    // golden-section search refines the best value between its neighbours.
+    const double step = (maxDStar - minDStar) / numberOfCandidates;
+    const double best = minDStar + bestCandidate * step;
+    const auto error = [&](double dStar) {
+      x[0] = dStar;
+      cost.f(x, fx);
+      return fx.two_norm();
+    };
+    const double ratio = (std::sqrt(5.0) - 1) / 2;
+    double lower = std::max(0.0, best - step);
+    double upper = std::min(maxDStar, best + step);
+    double a = upper - ratio * (upper - lower);
+    double b = lower + ratio * (upper - lower);
+    double errorA = error(a);
+    double errorB = error(b);
+    while (upper - lower > 1e-9)
+    {
+      if (errorA < errorB)
+      {
+        upper = b;
+        b = a;
+        errorB = errorA;
+        a = upper - ratio * (upper - lower);
+        errorA = error(a);
+      }
+      else
+      {
+        lower = a;
+        a = b;
+        errorA = errorB;
+        b = lower + ratio * (upper - lower);
+        errorB = error(b);
+      }
+    }
+    const double refined = (lower + upper) / 2;
+    return error(refined) < minError ? refined : best;
   }
 
   /** The measurements of a fit as S/S0 and their b-values, views of the buffers of a VoxelFitter. */

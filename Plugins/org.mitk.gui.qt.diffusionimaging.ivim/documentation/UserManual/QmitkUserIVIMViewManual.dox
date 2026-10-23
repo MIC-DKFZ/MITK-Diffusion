@@ -20,7 +20,7 @@ The IVIM model is a bi-exponential model of the signal ratio S/S0 with the perfu
 
 \li <b>1. Jointly fit D, f and D*</b>: all three parameters are estimated in one non-linear fit.
 \li <b>2. Fit D &amp; f with fixed D* value</b>: only f and D are estimated; D* is the value of the D* slider.
-\li <b>3. Fit D &amp; f (high b), then fit D*</b>: first f and D of the mono-exponential (1-f) exp(-bD) are fitted to the measurements with b-values above the "Ignore b&lt;" threshold, where the perfusion signal has decayed. Then D* is chosen with f and D fixed: the best of 100 values from 0.001 to 0.15 mm²/s in steps of 0.00149 mm²/s.
+\li <b>3. Fit D &amp; f (high b), then fit D*</b>: first f and D of the mono-exponential (1-f) exp(-bD) are fitted to the measurements with b-values above the "Ignore b&lt;" threshold, where the perfusion signal has decayed. Then D* is chosen with f and D fixed: the best of 100 values from 0.001 to 0.15 mm²/s in steps of 0.00149 mm²/s, refined between its two neighbours (D* stays at most 0.15 mm²/s).
 \li <b>4. Linearly fit D &amp; f (high b), then fit D*</b>: as method 3, but f and D come from the straight line through the points (b, log S/S0) above the threshold.
 
 The non-linear fits of methods 1 to 3 penalize D outside [0, 0.003] mm²/s and D* outside [0, 0.3] mm²/s; the line of method 4 is not bounded.
