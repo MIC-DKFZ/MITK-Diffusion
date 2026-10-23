@@ -139,7 +139,7 @@ void QmitkDiffusionDicomImport::ResetPrefixButtonPushed()
 void QmitkDiffusionDicomImport::Remove()
 {
   int i = m_Controls->listWidget->currentRow();
-  m_Controls->listWidget->takeItem(i);
+  delete m_Controls->listWidget->takeItem(i);
 }
 
 void QmitkDiffusionDicomImport::AverageClicked()
@@ -294,24 +294,9 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
 
   bool has_prefix = true;
 
+  // LoadDiffusionDicomSeries switches to the C locale itself, for the time it parses.
   try
   {
-    const std::string& locale = "C";
-    const std::string& currLocale = setlocale( LC_ALL, nullptr );
-
-    if ( locale.compare(currLocale)!=0 )
-    {
-      try
-      {
-        MITK_INFO << " ** Changing locale from " << setlocale(LC_ALL, nullptr) << " to '" << locale << "'";
-        setlocale(LC_ALL, locale.c_str());
-      }
-      catch(...)
-      {
-        MITK_INFO << "Could not set locale " << locale;
-      }
-    }
-
     int nrFolders = m_Controls->listWidget->count();
 
     if(!nrFolders)
@@ -328,12 +313,13 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
     // Indeterminate: the import has no step to report; the task ends when this function returns.
     mitk::ProgressTask progress("Importing diffusion DICOM");
 
+    // The folder list is cleared only after a successful import, so that a failed one can be
+    // repeated with other options.
     gdcm::Directory::FilenamesType complete_list;
-    while(m_Controls->listWidget->count())
+    for (int folderIndex = 0; folderIndex < nrFolders; ++folderIndex)
     {
       // RETREIVE FOLDERNAME
-      QListWidgetItem * item  = m_Controls->listWidget->takeItem(0);
-      QString folderName = item->text();
+      QString folderName = m_Controls->listWidget->item(folderIndex)->text();
 
 
       if( this->m_Controls->m_DicomLoadRecursiveCheckbox->isChecked() )
@@ -436,20 +422,18 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
 
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 
-    try
-    {
-      MITK_INFO << " ** Changing locale back from " << setlocale(LC_ALL, nullptr) << " to '" << currLocale << "'";
-      setlocale(LC_ALL, currLocale.c_str());
-    }
-    catch(...)
-    {
-      MITK_INFO << "Could not reset locale " << currLocale;
-    }
+    m_Controls->listWidget->clear();
   }
   catch (itk::ExceptionObject &ex)
   {
     Error(QString("%1\n%2\n%3\n%4\n%5\n%6").arg(ex.GetNameOfClass()).arg(ex.GetFile()).arg(ex.GetLine()).arg(ex.GetLocation()).arg(ex.what()).arg(ex.GetDescription()));
     return ;
+  }
+  catch (const std::exception &ex)
+  {
+    // e.g. std::bad_alloc for a series too large for the memory; the slot must not let it escape
+    Error(QString("DICOM import failed: %1").arg(ex.what()));
+    return;
   }
 
   Status(QString("Finished import with memory:"));
