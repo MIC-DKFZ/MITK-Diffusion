@@ -49,6 +49,11 @@ namespace mitk::FiberBundleDetail
     return {ids, static_cast<std::size_t>(numPoints)};
   }
 
+  /** The fibers of polyData as a FiberBundle keeps them (UpdateFiberGeometry): vtkCleanPolyData
+   *  without point merging turns one-point fibers into vertices placed before all lines and drops
+   *  fibers without points; cell data goes along with its cells. */
+  vtkSmartPointer<vtkPolyData> CleanFiberPolyData(vtkPolyData* polyData);
+
   /** Builds the cell lookup of polyData, which FiberPointIds would otherwise build on first use. */
   inline void PrepareParallelReading(vtkPolyData* polyData)
   {
@@ -87,11 +92,15 @@ namespace mitk::FiberBundleDetail
 
     vtkIdType GetNumberOfFibers() const { return m_Lines->GetNumberOfCells(); }
 
-    /** The collected fibers as lines (one cell per fiber). */
-    vtkSmartPointer<vtkPolyData> GetPolyData() const;
+    struct Fibers
+    {
+      vtkSmartPointer<vtkPolyData> polyData;
+      vtkSmartPointer<vtkFloatArray> weights;
+    };
 
-    /** The weights of the collected fibers, in fiber order. */
-    vtkSmartPointer<vtkFloatArray> GetWeights() const;
+    /** The collected fibers and their weights, in the order in which a FiberBundle keeps them
+     *  (CleanFiberPolyData), so that each weight stays with its fiber. */
+    Fibers GetFibers() const;
 
     /** A new bundle of the collected fibers and their weights, with the metadata of source. */
     FiberBundle::Pointer CreateBundle(const FiberBundle* metadataSource) const;
@@ -105,6 +114,8 @@ namespace mitk::FiberBundleDetail
     std::vector<std::array<float, 3>> m_Pending;
     std::vector<vtkIdType> m_PointIds;
     std::vector<float> m_Weights;
+    /** Fibers that CleanFiberPolyData moves or drops: fewer than two points */
+    std::size_t m_NumShortFibers = 0;
     vtkSmartPointer<vtkIdList> m_IdBuffer;
   };
 }

@@ -12,6 +12,8 @@ found in the LICENSE file.
 
 #include "mitkFiberPolyDataBuilder.h"
 
+#include <vtkCellData.h>
+#include <vtkCleanPolyData.h>
 #include <vtkPolyData.h>
 
 void mitk::FiberBundleDetail::CopyMetadata(const FiberBundle* source, FiberBundle* target)
@@ -21,6 +23,15 @@ void mitk::FiberBundleDetail::CopyMetadata(const FiberBundle* source, FiberBundl
   if (source->HasTrackVisHeader())
     target->SetTrackVisHeader(source->GetTrackVisHeader());
   target->setIsRAS(source->IsRAS());
+}
+
+vtkSmartPointer<vtkPolyData> mitk::FiberBundleDetail::CleanFiberPolyData(vtkPolyData* polyData)
+{
+  vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
+  cleaner->SetInputData(polyData);
+  cleaner->PointMergingOff();
+  cleaner->Update();
+  return cleaner->GetOutput();
 }
 
 mitk::FiberBundleDetail::FiberPolyDataBuilder::FiberPolyDataBuilder()
@@ -59,31 +70,40 @@ void mitk::FiberBundleDetail::FiberPolyDataBuilder::EndFiber(float weight)
     m_PointIds[j] = m_Points->InsertNextPoint(m_Pending[j].data());
   m_Lines->InsertNextCell(static_cast<vtkIdType>(m_PointIds.size()), m_PointIds.data());
   m_Weights.push_back(weight);
+  if (m_PointIds.size()<2)
+    ++m_NumShortFibers;
   m_Pending.clear();
 }
 
-vtkSmartPointer<vtkPolyData> mitk::FiberBundleDetail::FiberPolyDataBuilder::GetPolyData() const
+mitk::FiberBundleDetail::FiberPolyDataBuilder::Fibers mitk::FiberBundleDetail::FiberPolyDataBuilder::GetFibers() const
 {
-  vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
-  polyData->SetPoints(m_Points);
-  polyData->SetLines(m_Lines);
-  return polyData;
-}
-
-vtkSmartPointer<vtkFloatArray> mitk::FiberBundleDetail::FiberPolyDataBuilder::GetWeights() const
-{
-  vtkSmartPointer<vtkFloatArray> array = vtkSmartPointer<vtkFloatArray>::New();
-  array->SetName("FIBER_WEIGHTS");
-  array->SetNumberOfValues(static_cast<vtkIdType>(m_Weights.size()));
+  Fibers fibers;
+  fibers.polyData = vtkSmartPointer<vtkPolyData>::New();
+  fibers.polyData->SetPoints(m_Points);
+  fibers.polyData->SetLines(m_Lines);
+  fibers.weights = vtkSmartPointer<vtkFloatArray>::New();
+  fibers.weights->SetName("FIBER_WEIGHTS");
+  fibers.weights->SetNumberOfValues(static_cast<vtkIdType>(m_Weights.size()));
   for (std::size_t i=0; i<m_Weights.size(); ++i)
-    array->SetValue(static_cast<vtkIdType>(i), m_Weights[i]);
-  return array;
+    fibers.weights->SetValue(static_cast<vtkIdType>(i), m_Weights[i]);
+  if (m_NumShortFibers==0)
+    return fibers;
+
+  // The bundle would reorder or drop these fibers; the weights take the same way as cell data.
+  fibers.polyData->GetCellData()->AddArray(fibers.weights);
+  vtkSmartPointer<vtkPolyData> cleaned = CleanFiberPolyData(fibers.polyData);
+  vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
+  weights->DeepCopy(cleaned->GetCellData()->GetArray("FIBER_WEIGHTS"));
+  weights->SetName("FIBER_WEIGHTS");
+  cleaned->GetCellData()->RemoveArray("FIBER_WEIGHTS");
+  return {cleaned, weights};
 }
 
 mitk::FiberBundle::Pointer mitk::FiberBundleDetail::FiberPolyDataBuilder::CreateBundle(const FiberBundle* metadataSource) const
 {
-  FiberBundle::Pointer fib = FiberBundle::New(this->GetPolyData());
-  fib->SetFiberWeights(this->GetWeights());
+  const Fibers fibers = this->GetFibers();
+  FiberBundle::Pointer fib = FiberBundle::New(fibers.polyData);
+  fib->SetFiberWeights(fibers.weights);
   CopyMetadata(metadataSource, fib);
   return fib;
 }
@@ -91,6 +111,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundleDetail::FiberPolyDataBuilder::Create
 void mitk::FiberBundleDetail::FiberPolyDataBuilder::ReplaceFibersOf(FiberBundle* fib) const
 {
   // The weights follow the polydata: SetFiberPolyData sizes the weight array for the new fibers.
-  fib->SetFiberPolyData(this->GetPolyData());
-  fib->SetFiberWeights(this->GetWeights());
+  const Fibers fibers = this->GetFibers();
+  fib->SetFiberPolyData(fibers.polyData);
+  fib->SetFiberWeights(fibers.weights);
 }

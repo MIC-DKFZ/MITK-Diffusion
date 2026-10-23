@@ -86,6 +86,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(TransformFibers_ItkTransform_MovesEveryPoint);
   MITK_TEST(ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat);
   MITK_TEST(TrackVisHeader_JoinedAndMovedBundles_ContainEveryPoint);
+  MITK_TEST(Weights_OnePointFibersChangingPlace_FollowTheirFibers);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -1060,6 +1061,57 @@ public:
     CPPUNIT_ASSERT(joined->HasTrackVisHeader());
     CPPUNIT_ASSERT_EQUAL(77, static_cast<int>(joined->GetTrackVisHeader().dim[0]));
     CPPUNIT_ASSERT_MESSAGE("A derived header is not copied", !a->AddBundle(withReference)->HasTrackVisHeader());
+  }
+
+  /** Every fiber of result has the weight that the fiber starting at the same point has in one of
+   *  the sources. */
+  static void AssertWeightsByFirstPoint(const std::vector<mitk::FiberBundle *> &sources, mitk::FiberBundle *result, const std::string &operation)
+  {
+    std::map<PointKey, float> weights;
+    for (auto source : sources)
+      for (unsigned int i = 0; i < source->GetNumFibers(); ++i)
+        weights[Key(source->GetFiberPolyData()->GetCell(i)->GetPoints()->GetPoint(0))] = source->GetFiberWeight(i);
+    CPPUNIT_ASSERT_MESSAGE(operation, result->GetNumFibers() > 0);
+    for (unsigned int i = 0; i < result->GetNumFibers(); ++i)
+    {
+      auto it = weights.find(Key(result->GetFiberPolyData()->GetCell(i)->GetPoints()->GetPoint(0)));
+      CPPUNIT_ASSERT_MESSAGE(operation + ": fiber comes from a source", it != weights.end());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(operation + ": weight of fiber " + std::to_string(i), it->second, result->GetFiberWeight(i));
+    }
+  }
+
+  void Weights_OnePointFibersChangingPlace_FollowTheirFibers()
+  {
+    // A bundle keeps fibers of one point before all others (vtkCleanPolyData makes them vertices),
+    // so a fiber of one point that an operation puts behind others changes its place.
+    auto a = MakeBundle({{{0, 0, 0}, {0, 1, 0}}, {{1, 0, 0}, {1, 1, 0}}});
+    a->SetFiberWeight(0, 1.0f);
+    a->SetFiberWeight(1, 2.0f);
+    auto b = MakeBundle({{{9, 9, 9}}, {{5, 0, 0}, {5, 1, 0}}});
+    b->SetFiberWeight(0, 3.0f);
+    b->SetFiberWeight(1, 4.0f);
+
+    auto joined = a->AddBundle(b);
+    CPPUNIT_ASSERT_EQUAL(4u, joined->GetNumFibers());
+    AssertWeightsByFirstPoint({a, b}, joined, "AddBundle");
+    AssertWeightsByFirstPoint({a, b}, a->AddBundles({b}), "AddBundles");
+
+    for (unsigned int i = 0; i < joined->GetNumFibers(); ++i)
+      joined->SetFiberWeight(i, 10.0f + i);
+    AssertWeightsByFirstPoint({joined}, joined->SubsampleFibers(1.0f, false), "SubsampleFibers");
+    auto weights = vtkSmartPointer<vtkFloatArray>::New();
+    auto polyData = joined->GeneratePolyDataByIds({3, 2, 1, 0}, weights);
+    auto subset = mitk::FiberBundle::New(polyData);
+    subset->SetFiberWeights(weights);
+    AssertWeightsByFirstPoint({joined}, subset, "GeneratePolyDataByIds");
+
+    // A two-point fiber without length becomes a fiber of one point
+    auto resampled = MakeBundle({{{0, 0, 0}, {0, 3, 0}}, {{7, 7, 7}, {7, 7, 7}}});
+    resampled->SetFiberWeight(0, 5.0f);
+    resampled->SetFiberWeight(1, 6.0f);
+    auto source = resampled->GetDeepCopy();
+    resampled->ResampleLinear(1);
+    AssertWeightsByFirstPoint({source}, resampled, "ResampleLinear");
   }
 };
 

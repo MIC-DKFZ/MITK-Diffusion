@@ -20,7 +20,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkGeometry3D.h>
 #include <vtkCellArray.h>
-#include <vtkCleanPolyData.h>
 #include <vtkNew.h>
 #include <vtkUnsignedCharArray.h>
 
@@ -110,11 +109,7 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GetFiberPolyData() const
 
 void mitk::FiberBundle::UpdateFiberGeometry()
 {
-  vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
-  cleaner->SetInputData(m_FiberPolyData);
-  cleaner->PointMergingOff();
-  cleaner->Update();
-  m_FiberPolyData = cleaner->GetOutput();
+  m_FiberPolyData = FiberBundleDetail::CleanFiberPolyData(m_FiberPolyData);
 
   m_FiberLengths.clear();
   m_MeanFiberLength = 0;

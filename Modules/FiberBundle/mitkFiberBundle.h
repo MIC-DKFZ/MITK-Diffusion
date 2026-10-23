@@ -143,6 +143,8 @@ public:
     // compare fiber bundles
     bool Equals(const FiberBundle* fib, double eps=0.01) const;
 
+    /** The fibers with the given ids, and their weights in weights, both in the order of a bundle
+     *  made of the polydata (fibers of one point first). */
     vtkSmartPointer<vtkPolyData>    GeneratePolyDataByIds(const std::vector<unsigned int>& fiberIds, vtkFloatArray* weights) const;
 
     // Structure to hold metadata of a TrackVis file

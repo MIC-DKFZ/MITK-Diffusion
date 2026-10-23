@@ -38,11 +38,12 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GeneratePolyDataByIds(const std:
     builder.AddFiber(m_FiberPolyData, id, this->GetFiberWeight(id));
   }
 
-  auto newWeights = builder.GetWeights();
-  weights->SetNumberOfValues(newWeights->GetNumberOfValues());
-  for (vtkIdType i=0; i<newWeights->GetNumberOfValues(); ++i)
-    weights->SetValue(i, newWeights->GetValue(i));
-  return builder.GetPolyData();
+  // in the order of a bundle made of the polydata, which may differ from that of fiberIds
+  const auto fibers = builder.GetFibers();
+  weights->SetNumberOfValues(fibers.weights->GetNumberOfValues());
+  for (vtkIdType i=0; i<fibers.weights->GetNumberOfValues(); ++i)
+    weights->SetValue(i, fibers.weights->GetValue(i));
+  return fibers.polyData;
 }
 
 namespace
