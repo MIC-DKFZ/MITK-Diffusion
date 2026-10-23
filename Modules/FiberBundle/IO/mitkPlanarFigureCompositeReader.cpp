@@ -36,8 +36,7 @@ mitk::PlanarFigureCompositeReader * mitk::PlanarFigureCompositeReader::Clone() c
 
 std::vector<itk::SmartPointer<mitk::BaseData> > mitk::PlanarFigureCompositeReader::DoRead()
 {
-    // No locale switch: the file holds one integer, and a switch by hand stayed in force for the
-    // whole process when the XML parser threw.
+    // No locale switch: the file holds one integer, which has no decimal separator.
     const std::string filename = this->GetInputLocation();
 
     boost::property_tree::ptree tree;

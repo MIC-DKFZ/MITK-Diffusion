@@ -38,9 +38,8 @@ void mitk::PlanarFigureCompositeWriter::Write()
     if (input.IsNull())
       mitkThrow() << "The planar figure composite writer needs a planar figure composite as input.";
 
-    // A local file also for output streams (the file was written by name and a given stream left
-    // empty); it is copied to the stream when it goes out of scope. No locale switch: the file
-    // holds one integer.
+    // The XML is written to a file by name, so an output stream gets a local file that is copied
+    // to the stream when it goes out of scope. No locale switch: the file holds one integer.
     LocalFile localFile(this);
 
     boost::property_tree::ptree type;

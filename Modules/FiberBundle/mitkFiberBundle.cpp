@@ -211,7 +211,7 @@ void mitk::FiberBundle::SetFiberWeights(float newWeight)
 
 void mitk::FiberBundle::SetFiberWeights(vtkSmartPointer<vtkFloatArray> weights)
 {
-  // One weight per fiber; a mismatch used to be logged and ignored, leaving the old weights.
+  // One weight per fiber; another count would leave weights of other fibers on some of them.
   if (weights==nullptr || m_NumFibers!=weights->GetNumberOfValues())
     mitkThrow() << "Fiber weights need one value per fiber (" << m_NumFibers << " fibers, "
                 << (weights==nullptr ? 0 : weights->GetNumberOfValues()) << " weights).";
