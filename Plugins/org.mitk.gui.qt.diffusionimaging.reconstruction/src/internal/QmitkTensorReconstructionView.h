@@ -107,7 +107,8 @@ protected:
 
   Ui::QmitkTensorReconstructionViewControls* m_Controls;
 
-  template<int ndirs> itk::VectorContainer<unsigned int, vnl_vector_fixed<double,3> >::Pointer MakeGradientList();
+  /** The table's unit directions followed by one zero vector for the b0 volume. */
+  static itk::VectorContainer<unsigned int, vnl_vector_fixed<double,3> >::Pointer MakeGradientList(unsigned int numberOfDirections);
 
   template<int L>
   void TemplatedAnalyticalTensorReconstruction(mitk::Image* vols,

@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionIterator.h"
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
-#include "itkPointShell.h"
+#include "mitkPointShell.h"
 
 #include <memory>
 #include "mitkSingleShellGradients.h"
@@ -347,14 +347,8 @@ namespace itk {
 
     }
 
-    // DistributePointShell returns a new matrix that the caller owns.
-    std::unique_ptr<vnl_matrix_fixed<double, 3, NOdfDirections>> UOwner(
-      itk::PointShell<NOdfDirections, vnl_matrix_fixed<double, 3, NOdfDirections> >::DistributePointShell());
-    const vnl_matrix_fixed<double, 3, NOdfDirections> &U = *UOwner;
-
-    std::unique_ptr<vnl_matrix_fixed<double, 3, NBasisFunctionCenters>> VOwner(
-      itk::PointShell<NBasisFunctionCenters, vnl_matrix_fixed<double, 3, NBasisFunctionCenters> >::DistributePointShell());
-    const vnl_matrix_fixed<double, 3, NBasisFunctionCenters> &V = *VOwner;
+    const vnl_matrix_fixed<double, 3, NOdfDirections> &U = mitk::pointshell::Directions<NOdfDirections>();
+    const vnl_matrix_fixed<double, 3, NBasisFunctionCenters> &V = mitk::pointshell::Directions<NBasisFunctionCenters>();
 
     // calculate sampling points on the equator perpendicular to z-axis
     vnl_matrix<double> C(3, m_NumberOfEquatorSamplingPoints);

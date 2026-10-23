@@ -36,6 +36,7 @@ set(CPP_FILES
   # Algorithms
   Algorithms/mitkLbfgsbMutex.cpp
   Algorithms/Reconstruction/mitkDiffusionReconstruction.cpp
+  Algorithms/Reconstruction/mitkPointShell.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.cpp
@@ -81,7 +82,7 @@ set(H_FILES
   Algorithms/Reconstruction/itkDiffusionQballReconstructionImageFilter.h
   Algorithms/Reconstruction/itkAnalyticalDiffusionQballReconstructionImageFilter.h
   Algorithms/Reconstruction/itkDiffusionMultiShellQballReconstructionImageFilter.h
-  Algorithms/Reconstruction/itkPointShell.h
+  Algorithms/Reconstruction/mitkPointShell.h
   Algorithms/Reconstruction/itkOrientationDistributionFunction.h
 
   # MultishellProcessing

@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkTimeProbe.h>
 #include <limits>
-#include <itkPointShell.h>
+#include <mitkPointShell.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include "mitkShRegularization.h"
 
@@ -1051,23 +1051,19 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
 
 
   // SH Basis for ODF-reconstruction
-  // DistributePointShell returns a new matrix that the caller owns.
-  std::unique_ptr<vnl_matrix_fixed<double, 3, NOdfDirections>> U(PointShell<NOdfDirections, vnl_matrix_fixed<double, 3, NOdfDirections> >::DistributePointShell());
+  // Spherical coordinates of the ODF directions
+  vnl_matrix<double> U = mitk::pointshell::Directions(NOdfDirections);
   for(int i=0; i<NOdfDirections; i++)
   {
-    double x = (*U)(0,i);
-    double y = (*U)(1,i);
-    double z = (*U)(2,i);
     double cart[3];
-    mitk::gradients::Cart2Sph(x,y,z,cart);
-    (*U)(0,i) = cart[0];
-    (*U)(1,i) = cart[1];
-    (*U)(2,i) = cart[2];
+    mitk::gradients::Cart2Sph(U(0,i),U(1,i),U(2,i),cart);
+    U(0,i) = cart[0];
+    U(1,i) = cart[1];
+    U(2,i) = cart[2];
   }
 
-  MatrixDoublePtr tempPtr (new vnl_matrix<double>( U->as_matrix() ));
   m_ODFSphericalHarmonicBasisMatrix  = std::make_unique<vnl_matrix<double>>(NOdfDirections,NumberOfCoeffs);
-  ComputeSphericalHarmonicsBasis(tempPtr.get(), m_ODFSphericalHarmonicBasisMatrix.get(), LOrder);
+  ComputeSphericalHarmonicsBasis(&U, m_ODFSphericalHarmonicBasisMatrix.get(), LOrder);
 }
 
 template< class T, class TG, class TO, int L, int NOdfDirections>

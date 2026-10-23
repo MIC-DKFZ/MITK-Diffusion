@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "vtkPolyData.h"
 #include "vtkAppendPolyData.h"
+#include "mitkPointShell.h"
 
 // generate by n-fold subdivisions of an icosahedron
 // 1 - 12
@@ -114,10 +115,10 @@ public:
   const Self & operator*=(const RealValueType & scalar );
   const Self & operator/=(const RealValueType & scalar );
 
-  /** Return the number of components. */
-  static DirectionsType* GetDirections()
+  /** The N sampling directions, as the columns of a 3 x N matrix (mitk::pointshell). */
+  static const DirectionsType &GetDirections()
   {
-    return itkGetStaticConstMacro(m_Directions);
+    return mitk::pointshell::Directions<NOdfDirections>();
   }
 
   /** Return the number of components. */
@@ -202,8 +203,6 @@ private:
   static vtkPolyData* m_BaseMesh;
 
   static double m_MaxChordLength;
-
-  static DirectionsType* m_Directions;
 
   static std::vector< std::vector<int>* >* m_NeighborIdxs;
 

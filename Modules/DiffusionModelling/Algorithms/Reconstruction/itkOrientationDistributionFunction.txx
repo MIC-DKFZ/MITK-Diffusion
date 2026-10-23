@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define _itkOrientationDistributionFunction_txx
 
 #include <vnl/algo/vnl_matrix_inverse.h>
-#include <itkPointShell.h>
 #include <itkMatrix.h>
 #include <vnl/vnl_matrix.h>
 #include <vnl/vnl_matrix_fixed.h>
@@ -38,10 +37,6 @@ vtkPolyData* itk::OrientationDistributionFunction<T,N>::m_BaseMesh = nullptr;
 
 template<class T, unsigned int N>
 double itk::OrientationDistributionFunction<T,N>::m_MaxChordLength = -1.0;
-
-template<class T, unsigned int N>
-vnl_matrix_fixed<double, 3, N>* itk::OrientationDistributionFunction<T,N>::m_Directions
-= itk::PointShell<N, vnl_matrix_fixed<double, 3, N> >::DistributePointShell();
 
 template<class T, unsigned int N>
 std::vector< std::vector<int>* >* itk::OrientationDistributionFunction<T,N>::m_NeighborIdxs = nullptr;
@@ -302,6 +297,7 @@ OrientationDistributionFunction<T, NOdfDirections>
 ::InitFromTensor(itk::DiffusionTensor3D<T> tensor)
 {
   m_EigenAnalysisCalculated = false;
+  const DirectionsType &directions = GetDirections();
   for(unsigned int i=0; i<NOdfDirections; i++)
   {
     /*
@@ -313,9 +309,9 @@ OrientationDistributionFunction<T, NOdfDirections>
       *   + g1 * (t1g0+t3g1+t4g2)
       *   + g2 * (t2g0+t4g1+t5g2)
       */
-    T g0 = (*m_Directions)(0,i);
-    T g1 = (*m_Directions)(1,i);
-    T g2 = (*m_Directions)(2,i);
+    T g0 = directions(0,i);
+    T g1 = directions(1,i);
+    T g2 = directions(2,i);
     T t0 = tensor[0];
     T t1 = tensor[1];
     T t2 = tensor[2];
@@ -420,12 +416,13 @@ InitFromEllipsoid( itk::DiffusionTensor3D<T> tensor )
   }
 #endif
 
+  const DirectionsType &directions = GetDirections();
   for( unsigned int i=0; i < NOdfDirections; ++i )
   {
     /// calculate probability p(g)=r as ellipsoids magnitude in direction of g' = B^-1 * g:
     /// (g0*r/evx)² + (g1*r/evy)² + (g2*r/evz)² = 1, |g'|=1.
 
-    vnl_vector_fixed<double, 3> g( (*m_Directions)(0,i), (*m_Directions)(1,i), (*m_Directions)(2,i) );
+    vnl_vector_fixed<double, 3> g( directions(0,i), directions(1,i), directions(2,i) );
     g = eigenBase*g;   // passive change of base system of g.
     g = g.normalize(); // unit vectors necessary.
     (*this)[i] = scaling / sqrt( (g[0]/a)*(g[0]/a) + (g[1]/b)*(g[1]/b) + (g[2]/c)*(g[2]/c) );
@@ -629,9 +626,9 @@ OrientationDistributionFunction<T, NOdfDirections>
 
     vtkPoints* points = vtkPoints::New();
     for(unsigned int j=0; j<NOdfDirections; j++){
-      double x = (*m_Directions)(0,j);
-      double y = (*m_Directions)(1,j);
-      double z = (*m_Directions)(2,j);
+      double x = GetDirections()(0,j);
+      double y = GetDirections()(1,j);
+      double z = GetDirections()(2,j);
       double az = atan2(y,x);
       double elev = atan2(z,sqrt(x*x+y*y));
       double r = sqrt(x*x+y*y+z*z);
@@ -664,9 +661,9 @@ OrientationDistributionFunction<T, NOdfDirections>
 
     vtkPoints* points2 = vtkPoints::New();
     for(unsigned int j=0; j<NOdfDirections; j++){
-      double x = -(*m_Directions)(0,j);
-      double y = -(*m_Directions)(2,j);
-      double z = -(*m_Directions)(1,j);
+      double x = -GetDirections()(0,j);
+      double y = -GetDirections()(2,j);
+      double z = -GetDirections()(1,j);
       double az = atan2(y,x);
       double elev = atan2(z,sqrt(x*x+y*y));
       double r = sqrt(x*x+y*y+z*z);
@@ -699,7 +696,7 @@ OrientationDistributionFunction<T, NOdfDirections>
 
     for (unsigned int p = 0; p < NOdfDirections; p++)
     {
-      points->SetPoint(p,m_Directions->get_column(p).data_block());
+      points->SetPoint(p,GetDirections().get_column(p).data_block());
     }
     polydata->SetPoints( points );
 
@@ -819,7 +816,7 @@ OrientationDistributionFunction<T, NOdfDirections>
     m_HalfSphereIdxs = new std::vector<int>();
     for( unsigned int i=0; i<InternalDimension; i++)
     {
-      if(dot_product(m_Directions->get_column(i),rndVec) > 0.0)
+      if(dot_product(GetDirections().get_column(i),rndVec) > 0.0)
       {
         m_HalfSphereIdxs->push_back(i);
       }
@@ -881,7 +878,7 @@ template < typename TComponent, unsigned int NOdfDirections >
 vnl_vector_fixed<double,3> itk::OrientationDistributionFunction<TComponent, NOdfDirections>
 ::GetDirection( int i )
 {
-  return m_Directions->get_column(i);
+  return GetDirections().get_column(i);
 }
 
 /**

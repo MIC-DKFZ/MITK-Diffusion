@@ -13,13 +13,10 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
-#include <itkMath.h>
-#include <itkPointShell.h>
-#include <vnl/vnl_matrix_fixed.hxx>
+#include <mitkPointShell.h>
 
 #include <algorithm>
 #include <cmath>
-#include <memory>
 #include <vector>
 
 /**
@@ -31,32 +28,9 @@ class mitkDiffusionReconstructionPointShellTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionReconstructionPointShellTestSuite);
   MITK_TEST(Tables_MatchChecksums);
   MITK_TEST(Tables_UnitLengthAndAntipodal);
+  MITK_TEST(Directions_SharedAndFixedSizeEqual);
+  MITK_TEST(Directions_UnsupportedSize_Throws);
   CPPUNIT_TEST_SUITE_END();
-
-  template <int N>
-  static vnl_matrix<double> Table()
-  {
-    std::unique_ptr<vnl_matrix_fixed<double, 3, N>> table(itk::PointShell<N, vnl_matrix_fixed<double, 3, N>>::DistributePointShell());
-    return table->as_matrix();
-  }
-
-  static vnl_matrix<double> Table(unsigned int n)
-  {
-    switch (n)
-    {
-    case 12: return Table<12>();
-    case 42: return Table<42>();
-    case 92: return Table<92>();
-    case 162: return Table<162>();
-    case 252: return Table<252>();
-    case 362: return Table<362>();
-    case 492: return Table<492>();
-    case 642: return Table<642>();
-    case 812: return Table<812>();
-    case 1002: return Table<1002>();
-    default: return vnl_matrix<double>();
-    }
-  }
 
   /** Sum of all values, sum weighted with the position (order sensitive), first and last direction. */
   struct Checksum
@@ -90,7 +64,7 @@ public:
   {
     for (const auto &expected : Checksums())
     {
-      const vnl_matrix<double> table = Table(expected.n);
+      const vnl_matrix<double> &table = mitk::pointshell::Directions(expected.n);
       CPPUNIT_ASSERT_EQUAL(3u, table.rows());
       CPPUNIT_ASSERT_EQUAL(expected.n, table.cols());
       double sum = 0;
@@ -118,7 +92,7 @@ public:
   {
     for (const auto &expected : Checksums())
     {
-      const vnl_matrix<double> table = Table(expected.n);
+      const vnl_matrix<double> &table = mitk::pointshell::Directions(expected.n);
       for (unsigned int i = 0; i < table.cols(); ++i)
       {
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, table.get_column(i).two_norm(), 2e-6);
@@ -128,6 +102,23 @@ public:
         CPPUNIT_ASSERT(nearestAntipode < 2e-6);
       }
     }
+  }
+
+  // Each table is built once: every call returns the same object, and the fixed-size variant has
+  // the same values.
+  void Directions_SharedAndFixedSizeEqual()
+  {
+    CPPUNIT_ASSERT(&mitk::pointshell::Directions(252) == &mitk::pointshell::Directions(252));
+    CPPUNIT_ASSERT(&mitk::pointshell::Directions<252>() == &mitk::pointshell::Directions<252>());
+    CPPUNIT_ASSERT(mitk::pointshell::Directions<42>().as_matrix() == mitk::pointshell::Directions(42));
+    CPPUNIT_ASSERT_EQUAL(Checksums().size(), mitk::pointshell::SupportedSizes().size());
+    for (unsigned int i = 0; i < Checksums().size(); ++i)
+      CPPUNIT_ASSERT_EQUAL(Checksums()[i].n, mitk::pointshell::SupportedSizes()[i]);
+  }
+
+  void Directions_UnsupportedSize_Throws()
+  {
+    CPPUNIT_ASSERT_THROW(mitk::pointshell::Directions(100), mitk::Exception);
   }
 };
 

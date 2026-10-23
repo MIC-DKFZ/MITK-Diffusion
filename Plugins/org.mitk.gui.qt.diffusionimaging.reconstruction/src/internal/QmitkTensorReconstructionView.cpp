@@ -28,7 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "QmitkDataStorageComboBox.h"
 #include <mitkDiffusionReconstruction.h>
 #include "itkTensorImageToDiffusionImageFilter.h"
-#include "itkPointShell.h"
+#include "mitkPointShell.h"
 #include "itkVector.h"
 #include "itkB0ImageExtractionImageFilter.h"
 #include "itkTensorReconstructionWithEigenvalueCorrectionFilter.h"
@@ -399,21 +399,15 @@ void QmitkTensorReconstructionView::UpdateGui()
   m_Controls->m_TensorsToOdfButton->setEnabled(m_Controls->m_OdfBox->GetSelectedNode().IsNotNull());
 }
 
-template<int ndirs>
 itk::VectorContainer<unsigned int, vnl_vector_fixed<double, 3> >::Pointer
-QmitkTensorReconstructionView::MakeGradientList()
+QmitkTensorReconstructionView::MakeGradientList(unsigned int numberOfDirections)
 {
   itk::VectorContainer<unsigned int, vnl_vector_fixed<double,3> >::Pointer retval =
       itk::VectorContainer<unsigned int, vnl_vector_fixed<double,3> >::New();
-  vnl_matrix_fixed<double, 3, ndirs>* U =
-      itk::PointShell<ndirs, vnl_matrix_fixed<double, 3, ndirs> >::DistributePointShell();
+  const vnl_matrix<double> &U = mitk::pointshell::Directions(numberOfDirections);
 
-  for(int i=0; i<ndirs;i++)
-  {
-    vnl_vector_fixed<double,3> v;
-    v[0] = U->get(0,i); v[1] = U->get(1,i); v[2] = U->get(2,i);
-    retval->push_back(v);
-  }
+  for(unsigned int i=0; i<numberOfDirections;i++)
+    retval->push_back(vnl_vector_fixed<double,3>(U(0,i), U(1,i), U(2,i)));
   // Add 0 vector for B0
   vnl_vector_fixed<double,3> v;
   v.fill(0.0);
@@ -442,44 +436,11 @@ void QmitkTensorReconstructionView::DoTensorsToDWI()
       typedef itk::TensorImageToDiffusionImageFilter<
           TTensorPixelType, DiffusionPixelType > FilterType;
 
-      FilterType::GradientListPointerType gradientList;
+      // The combo box lists the table sizes in order; 92 directions if nothing is selected.
+      const auto &sizes = mitk::pointshell::SupportedSizes();
+      const int index = m_Controls->m_TensorsToDWINumDirsSelect->currentIndex();
+      FilterType::GradientListPointerType gradientList = MakeGradientList(index >= 0 && index < static_cast<int>(sizes.size()) ? sizes[index] : 92);
 
-      switch(m_Controls->m_TensorsToDWINumDirsSelect->currentIndex())
-      {
-      case 0:
-        gradientList = MakeGradientList<12>();
-        break;
-      case 1:
-        gradientList = MakeGradientList<42>();
-        break;
-      case 2:
-        gradientList = MakeGradientList<92>();
-        break;
-      case 3:
-        gradientList = MakeGradientList<162>();
-        break;
-      case 4:
-        gradientList = MakeGradientList<252>();
-        break;
-      case 5:
-        gradientList = MakeGradientList<362>();
-        break;
-      case 6:
-        gradientList = MakeGradientList<492>();
-        break;
-      case 7:
-        gradientList = MakeGradientList<642>();
-        break;
-      case 8:
-        gradientList = MakeGradientList<812>();
-        break;
-      case 9:
-        gradientList = MakeGradientList<1002>();
-        break;
-      default:
-        gradientList = MakeGradientList<92>();
-
-      }
       double bVal = m_Controls->m_TensorsToDWIBValueEdit->value();
 
       FilterType::Pointer filter = FilterType::New();

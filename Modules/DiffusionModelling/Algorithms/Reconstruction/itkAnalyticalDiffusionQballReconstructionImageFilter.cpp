@@ -29,7 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <locale>
 #include <fstream>
 #include <memory>
-#include "itkPointShell.h"
+#include "mitkPointShell.h"
 #include "mitkShRegularization.h"
 #include "mitkSingleShellGradients.h"
 
@@ -506,10 +506,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
   }
 
   // needed to calculate the ODF values from the SH coefficients
-  // DistributePointShell returns a new matrix that the caller owns.
-  std::unique_ptr<vnl_matrix_fixed<double, 3, NrOdfDirections>> U(itk::PointShell<NrOdfDirections, vnl_matrix_fixed<double, 3, NrOdfDirections> >::DistributePointShell());
-
-  m_SphericalHarmonicBasisMatrix  = mitk::sh::CalcShBasisForDirections(ShOrder, U->as_matrix(), true);
+  m_SphericalHarmonicBasisMatrix  = mitk::sh::CalcShBasisForDirections(ShOrder, mitk::pointshell::Directions(NrOdfDirections), true);
   m_ReconstructionMatrix = m_SphericalHarmonicBasisMatrix * m_CoeffReconstructionMatrix;
 }
 

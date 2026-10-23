@@ -28,11 +28,11 @@ AstroStickModel< ScalarType >::AstroStickModel()
     this->m_RandGen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
     this->m_RandGen->SetSeed();
 
-    vnl_matrix_fixed<double,3,42>* sticks = itk::PointShell<42, vnl_matrix_fixed<double, 3, 42> >::DistributePointShell();
+    const vnl_matrix<double> &sticks = mitk::pointshell::Directions(m_NumSticks);
     for (unsigned int i=0; i<m_NumSticks; i++)
     {
         GradientType stick;
-        stick[0] = sticks->get(0,i); stick[1] = sticks->get(1,i); stick[2] = sticks->get(2,i);
+        stick[0] = sticks.get(0,i); stick[1] = sticks.get(1,i); stick[2] = sticks.get(2,i);
         stick.Normalize();
         m_Sticks.push_back(stick);
     }

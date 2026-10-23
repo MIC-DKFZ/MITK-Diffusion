@@ -473,7 +473,7 @@ public:
     filter->Update();
 
     using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
-    const vnl_matrix<float> basis = mitk::sh::CalcShBasisForDirections(4, OdfType::GetDirections()->as_matrix(), true);
+    const vnl_matrix<float> basis = mitk::sh::CalcShBasisForDirections(4, OdfType::GetDirections().as_matrix(), true);
     itk::ImageRegionConstIterator<AnalyticalFilterType::OutputImageType> itOdf(filter->GetOutput(), dwi.image->GetLargestPossibleRegion());
     itk::ImageRegionConstIterator<AnalyticalFilterType::CoefficientImageType> itSh(filter->GetCoefficientImage(), dwi.image->GetLargestPossibleRegion());
     unsigned int compared = 0;
