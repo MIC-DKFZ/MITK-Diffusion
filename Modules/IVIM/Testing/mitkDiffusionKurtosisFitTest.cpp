@@ -62,6 +62,7 @@ class mitkDiffusionKurtosisFitTestSuite : public mitk::TestFixture
   MITK_TEST(SingleVoxel_FitVoxel_MatchRecordedValues);
   MITK_TEST(TestMulti_Smoothed_MatchRecordedValues);
   MITK_TEST(TestMulti_SmoothingVarianceZero_SameAsNoSmoothing);
+  MITK_TEST(Smoothing_AlternatingSignals_NotTruncated);
   MITK_TEST(ComputeMaps_TestMultiAppSettings_MatchRecordedValues);
   CPPUNIT_TEST_SUITE_END();
 
@@ -772,8 +773,8 @@ public:
       Parameters center;
     };
     const std::vector<Recorded> recorded = {
-      {false, {0.0009027673453, 0.122532678}, {0.0008759313526, 0.4594837527}},
-      {true, {0.0009027673453, 0.122532678}, {0.0008759313526, 0.4594837527}}};
+      {false, {0.0009018910306, 0.1809233881}, {0.0008731558535, 0.491172703}},
+      {true, {0.0009018910306, 0.1809233881}, {0.0008731558535, 0.491172703}}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 1;
@@ -791,6 +792,37 @@ public:
       AssertClose(r.mean.k, Mean(maps.k));
       AssertClose(r.center.d, maps.d[center]);
       AssertClose(r.center.k, maps.k[center]);
+    }
+  }
+
+  // The smoothed volumes had the input's integer type, so the smoothed signal was truncated: the
+  // mean of alternating signals S and S + 1 became S, a bias of -0.5 in every value.
+  void Smoothing_AlternatingSignals_NotTruncated()
+  {
+    std::vector<double> low = KurtosisSignal(m_BValues, 100, 0.001, 1.0);
+    for (auto& value : low)
+      value = std::round(value);
+    std::vector<double> high = low;
+    for (auto& value : high)
+      value += 1;
+    std::vector<std::vector<double>> signals;
+    for (unsigned int x = 0; x < 11; ++x)
+      signals.push_back(x % 2 == 0 ? low : high);
+
+    auto gradients = MakeGradients(m_BValues, 3000);
+    auto filter = MakeFilter(MakeImage(signals), gradients, 3000);
+    filter->SetSmoothingVariance(1.5);
+    filter->Update();
+    const auto maps = GetMaps(filter);
+
+    vnl_vector<double> mean(low.size());
+    for (unsigned int i = 0; i < mean.size(); ++i)
+      mean[i] = low[i] + 0.5;
+    const auto expected = mitk::kurtosis::FitVoxel(mean, mitk::kurtosis::GetBValues(gradients, 3000), filter->GetFitConfiguration());
+    for (unsigned int x = 3; x < 8; ++x)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected.d, maps.d[x], 1e-3 * expected.d);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected.k, maps.k[x], 1e-3 * expected.k);
     }
   }
 
@@ -824,10 +856,10 @@ public:
     const auto d = Values(maps.d.GetPointer());
     const auto k = Values(maps.k.GetPointer());
     const std::size_t center = 5 + 11 * 5 + 121 * 1;
-    AssertClose(0.0009027673453, Mean(d));
-    AssertClose(0.122532678, Mean(k));
-    AssertClose(0.0008759313526, d[center]);
-    AssertClose(0.4594837527, k[center]);
+    AssertClose(0.0009018910306, Mean(d));
+    AssertClose(0.1809233881, Mean(k));
+    AssertClose(0.0008731558535, d[center]);
+    AssertClose(0.491172703, k[center]);
 
     // The mask restricts the fit, not the smoothing.
     const itk::Index<3> centerIndex = {{5, 5, 1}};

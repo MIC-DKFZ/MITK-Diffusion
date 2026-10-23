@@ -95,7 +95,9 @@ namespace itk
 
     /** Made for each run and only read by the threads. */
     vnl_vector<double> m_BValues;
-    typename InputImageType::ConstPointer m_ProcessedInputImage;
+    /** The smoothed input in double, so that smoothing does not round the signal to the input's
+        integer type; null without smoothing. */
+    VectorImage<double, 3>::ConstPointer m_SmoothedInputImage;
   };
 }
 
