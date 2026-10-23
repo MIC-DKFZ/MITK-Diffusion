@@ -294,14 +294,15 @@ void QmitkControlVisualizationPropertiesView::NodeAdded(const mitk::DataNode *no
   {
     mitk::Image::Pointer dimg = dynamic_cast<mitk::Image*>(notConst->GetData());
 
-    // if there is no b0 image in the dataset, the GetB0Indices() returns a vector of size 0
-    // and hence we cannot set the Property directly to .front()
+    // Show the first b0 volume. MITK's image mapper shows the volume named by
+    // "Image.Displayed Component" (volume 0 without it).
     int displayChannelPropertyValue = 0;
-    mitk::DiffusionPropertyHelper::BValueMapType map = mitk::DiffusionPropertyHelper::GetBValueMap(dimg);
+    const auto& map = mitk::DiffusionPropertyHelper::GetBValueMap(dimg);
+    const auto b0 = map.find(0);
+    if (b0 != map.end() && !b0->second.empty())
+      displayChannelPropertyValue = static_cast<int>(b0->second.front());
 
-    if( map[0].size() > 0) { displayChannelPropertyValue = map[0].front(); }
-
-    notConst->SetIntProperty("DisplayChannel", displayChannelPropertyValue );
+    notConst->SetIntProperty("Image.Displayed Component", displayChannelPropertyValue );
   }
 }
 
