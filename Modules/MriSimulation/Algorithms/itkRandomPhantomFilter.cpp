@@ -298,6 +298,13 @@ void RandomPhantomFilter::SetStartRadiusMin(unsigned int StartRadiusMin)
 
 void RandomPhantomFilter::GenerateData()
 {
+  // a step size of 0 never leaves the volume, a minimum radius of 0 never grows a radius above 5 mm
+  if (m_StepSizeMax==0 || m_StartRadiusMin==0)
+    itkExceptionMacro("The maximum step size and the minimum start radius must be larger than 0.");
+  if (m_StepSizeMin>m_StepSizeMax || m_StartRadiusMin>m_StartRadiusMax || m_CurvynessMin>m_CurvynessMax
+      || m_MinTwist>m_MaxTwist || m_MinStreamlineDensity>m_MaxStreamlineDensity)
+    itkExceptionMacro("Each minimum must not be larger than its maximum.");
+
   randGen = Statistics::MersenneTwisterRandomVariateGenerator::New();
   if (m_FixSeed>=0)
     randGen->SetSeed(m_FixSeed);
