@@ -23,10 +23,13 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <mitkBaseDataSerializer.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 
 #include <mitkITKImageImport.h>
 
+#include <itkImageFileReader.h>
 #include <itkImageFileWriter.h>
+#include <itkMetaDataObject.h>
 #include <itkVectorImage.h>
 #include <vtkImageData.h>
 #include <vtkPointData.h>
@@ -36,6 +39,7 @@ found in the LICENSE file.
 #include <vtkUnsignedCharArray.h>
 #include <itksys/SystemTools.hxx>
 #include <vnl/vnl_matrix_fixed.h>
+#include <vnl/algo/vnl_determinant.h>
 
 #include <cmath>
 #include <cstdint>
@@ -49,6 +53,7 @@ found in the LICENSE file.
 class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionModellingIOTestSuite);
+  MITK_TEST(ShReader_NoOption_ReadsMrtrix3FileConverted);
   MITK_TEST(TensorReader_StandardFrame_RotatedToWorld);
   MITK_TEST(TensorReader_MitkFrameKey_RotatedToWorld);
   MITK_TEST(TensorReader_PermutationFrame_RotatedToWorld);
@@ -75,6 +80,9 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(RgbCache_FollowsPixelChanges);
   MITK_TEST(RgbCache_FollowsShConvention);
   MITK_TEST(PeakImage_PolydataFollowsPixelChanges);
+  MITK_TEST(ShReader_Mrtrix3_ConvertedToMitkBasis);
+  MITK_TEST(ShReader_Dipy_ConvertedFromBvecFrame);
+  MITK_TEST(PeakWriter_Nifti_RasWithMarker);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -339,6 +347,23 @@ public:
     CPPUNIT_ASSERT(std::memcmp(expectedAccess.GetData(), actualAccess.GetData(), size) == 0);
   }
 
+  /**
+   * SH files hold MITK's coefficients in MRtrix 3's basis (m != 0 divided by sqrt(2)), so a saved
+   * and reloaded image agrees to float rounding, not bit for bit.
+   */
+  static void AssertEqualShCoefficients(mitk::Image *expected, mitk::Image *actual)
+  {
+    CPPUNIT_ASSERT_EQUAL(std::string(expected->GetNameOfClass()), std::string(actual->GetNameOfClass()));
+    const auto count = expected->GetPixelType().GetNumberOfComponents() * expected->GetDimension(0) * expected->GetDimension(1) * expected->GetDimension(2);
+    CPPUNIT_ASSERT_EQUAL(count, actual->GetPixelType().GetNumberOfComponents() * actual->GetDimension(0) * actual->GetDimension(1) * actual->GetDimension(2));
+    mitk::ImageReadAccessor expectedAccess(expected);
+    mitk::ImageReadAccessor actualAccess(actual);
+    const auto *expectedValues = static_cast<const float *>(expectedAccess.GetData());
+    const auto *actualValues = static_cast<const float *>(actualAccess.GetData());
+    for (std::size_t i = 0; i < count; ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedValues[i], actualValues[i], 3e-7 * std::fabs(expectedValues[i]));
+  }
+
   // The readers and the SH writer chose their ITK IO by everything after the first dot.
   void ShAndPeakIO_DotsInFileName()
   {
@@ -346,7 +371,7 @@ public:
     auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
     const std::string shPath = m_TempDir + "/sh.v2.shi";
     mitk::IOUtil::Save(shImage, shPath);
-    AssertEqualPixels(shImage, mitk::IOUtil::Load<mitk::ShImage>(shPath, &shFunctor));
+    AssertEqualShCoefficients(shImage, mitk::IOUtil::Load<mitk::ShImage>(shPath, &shFunctor));
 
     mitk::PreferenceListReaderOptionsFunctor peakFunctor({"Peak Image"}, std::vector<std::string>());
     auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &peakFunctor);
@@ -399,7 +424,7 @@ public:
     auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
     const std::string path = m_TempDir + "/sh.nii.gz";
     mitk::IOUtil::Save(shImage, path);
-    AssertEqualPixels(shImage, mitk::IOUtil::Load<mitk::ShImage>(path, &shFunctor));
+    AssertEqualShCoefficients(shImage, mitk::IOUtil::Load<mitk::ShImage>(path, &shFunctor));
   }
 
   // An image read as FSL/Dipy SH was saved without its convention and read back as MRtrix.
@@ -416,7 +441,7 @@ public:
         mitk::IOUtil::Save(shImage, path);
         auto reloaded = mitk::IOUtil::Load<mitk::ShImage>(path, &shFunctor);
         CPPUNIT_ASSERT_EQUAL_MESSAGE(path, convention, reloaded->GetShConvention());
-        AssertEqualPixels(shImage, reloaded);
+        AssertEqualShCoefficients(shImage, reloaded);
       }
     }
   }
@@ -465,7 +490,7 @@ public:
     for (vtkIdType i = 0; i < points->GetNumberOfPoints(); ++i)
       CPPUNIT_ASSERT(std::isfinite(points->GetPoint(i)[0]) && std::isfinite(points->GetPoint(i)[1]) && std::isfinite(points->GetPoint(i)[2]));
 
-    // Peak files without the MRtrix description, e.g. all MITK-written ones, read unchanged.
+    // Peak files without the MRtrix description, e.g. NIfTI files of earlier MITK versions, read unchanged.
     const std::string mitkFile = GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz");
     CPPUNIT_ASSERT(Values(LoadPeaks(mitkFile, false)) == Values(LoadPeaks(mitkFile, true)));
   }
@@ -541,6 +566,11 @@ public:
   void Readers_RecordedContent()
   {
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
+    // The hash pins the file's raw coefficients; ShReader_Mrtrix3_ConvertedToMitkBasis checks
+    // that this MRtrix 3 file is converted by default.
+    mitk::IFileReader::Options legacyOptions;
+    legacyOptions["SH convention"] = std::string("MITK legacy (MRtrix 0.2)");
+    mitk::PreferenceListReaderOptionsFunctor legacyShFunctor({"SH Image"}, legacyOptions);
     mitk::PreferenceListReaderOptionsFunctor peakFunctor({"Peak Image"}, std::vector<std::string>());
     struct Recorded
     {
@@ -560,7 +590,7 @@ public:
        13068465665225140656ull, {0, 0, 0}, {3, 3, 3}},
       {mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor).GetPointer(),
        13341037711982211669ull, {0.615, 1.0005, 0.7045}, {1.23, 2.001, 1.409}},
-      {mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &shFunctor).GetPointer(),
+      {mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &legacyShFunctor).GetPointer(),
        8054354499704950156ull, {0, 0, 0}, {3, 3, 3}},
       {mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &peakFunctor).GetPointer(),
        1038741785062553984ull, {0.615, 1.0005, 0.7045}, {1.23, 2.001, 1.409}},
@@ -667,7 +697,7 @@ public:
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
     auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
     auto shReloaded = mitk::IOUtil::Load<mitk::ShImage>(Serialize(shImage, "sh"), &shFunctor);
-    AssertEqualPixels(shImage, shReloaded);
+    AssertEqualShCoefficients(shImage, shReloaded);
     AssertEqualGeometry(shImage, shReloaded);
 
     auto peakImage = LoadPeaks(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), std::nullopt);
@@ -811,6 +841,227 @@ public:
     CPPUNIT_ASSERT(colors != nullptr);
     CPPUNIT_ASSERT_EQUAL(0, static_cast<int>(colors->GetTypedComponent(0, 0)));
     CPPUNIT_ASSERT_EQUAL(255, static_cast<int>(colors->GetTypedComponent(0, 1)));
+  }
+
+  static mitk::ShImage::Pointer LoadSh(const std::string &path, const std::string &convention = "auto (file marker, else MITK legacy)")
+  {
+    mitk::IFileReader::Options options;
+    options["SH convention"] = convention;
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, options);
+    return mitk::IOUtil::Load<mitk::ShImage>(path, &functor);
+  }
+
+  /** Coefficients of voxel (x, y, z) of an SH image. */
+  static vnl_vector<float> ShCoefficients(mitk::ShImage *image, unsigned int x, unsigned int y, unsigned int z)
+  {
+    const unsigned int count = image->GetPixelType().GetNumberOfComponents();
+    mitk::ImageReadAccessor access(image);
+    const auto *values = static_cast<const float *>(access.GetData());
+    const std::size_t voxel = x + image->GetDimension(0) * (y + static_cast<std::size_t>(image->GetDimension(1)) * z);
+    return vnl_vector<float>(values + voxel * count, count);
+  }
+
+  /** Writes a one-voxel SH file in MRtrix's layout with the given coefficients, NIfTI descrip and direction. */
+  std::string WriteShNifti(const std::string &name, const std::vector<float> &coefficients, const std::string &descrip, const Matrix3 &direction)
+  {
+    using ImageType = mitk::ShImage::ShOnDiskType;
+    auto image = ImageType::New();
+    ImageType::RegionType region;
+    region.SetSize({{1, 1, 1, coefficients.size()}});
+    image->SetRegions(region);
+    ImageType::DirectionType imageDirection;
+    imageDirection.SetIdentity();
+    for (unsigned int r = 0; r < 3; ++r)
+      for (unsigned int c = 0; c < 3; ++c)
+        imageDirection[r][c] = direction(r, c);
+    image->SetDirection(imageDirection);
+    image->Allocate();
+    for (unsigned int j = 0; j < coefficients.size(); ++j)
+      image->SetPixel({{0, 0, 0, j}}, coefficients[j]);
+    if (!descrip.empty())
+      itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "ITK_FileNotes", descrip);
+
+    const std::string path = m_TempDir + "/" + name;
+    auto writer = itk::ImageFileWriter<ImageType>::New();
+    writer->SetInput(image);
+    writer->SetFileName(path);
+    writer->Update();
+    return path;
+  }
+
+  // The option labels were globals initialized after the reader that the library constructs
+  // when it is loaded, so the default "auto" was empty and MRtrix 3 files were not converted.
+  void ShReader_NoOption_ReadsMrtrix3FileConverted()
+  {
+    const std::string path = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz");
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto csd = mitk::IOUtil::Load<mitk::ShImage>(path, &functor);
+    // MRtrix 3.0.8 sh2amp at voxel (30, 30, 1), RAS (-1, 0, 0).
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.20321192, mitk::sh::GetValue(ShCoefficients(csd, 30, 30, 1), 8, vnl_vector_fixed<double, 3>(1, 0, 0), true), 1e-6);
+  }
+
+  // MITK's basis is MRtrix 0.2's; MRtrix 3 (every FOD since 3.0) uses an orthonormal basis whose
+  // functions with m != 0 are sqrt(2) times MITK's. MRtrix 3 files were read as MITK's, which put
+  // 23 % of the ODF maximum into wrong directions, and MITK's files were read wrongly by MRtrix.
+  void ShReader_Mrtrix3_ConvertedToMitkBasis()
+  {
+    const vnl_vector_fixed<double, 3> x(1, 0, 0);
+    Matrix3 identity;
+    identity.set_identity();
+
+    // Only (l = 2, m = 2): MRtrix 3 gives sqrt(15 / (16 pi)) at world (1, 0, 0), i.e. RAS (-1, 0, 0).
+    const double mrtrix3Value = std::sqrt(15.0 / (16.0 * itk::Math::pi));
+    std::vector<float> coefficients(6, 0);
+    coefficients[5] = 1;
+    const auto marked = WriteShNifti("mrtrix3.nii.gz", coefficients, "MRtrix version: 3.0.8", identity);
+    const auto unmarked = WriteShNifti("unmarked.nii.gz", coefficients, "", identity);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value, mitk::sh::GetValue(ShCoefficients(LoadSh(marked), 0, 0, 0), 2, x, true), 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value, mitk::sh::GetValue(ShCoefficients(LoadSh(unmarked, "MRtrix 3"), 0, 0, 0), 2, x, true), 1e-6);
+    // Files without a marker, which includes every SH file of earlier MITK versions, read as before.
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value / std::sqrt(2.0), mitk::sh::GetValue(ShCoefficients(LoadSh(unmarked), 0, 0, 0), 2, x, true), 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value / std::sqrt(2.0), mitk::sh::GetValue(ShCoefficients(LoadSh(marked, "MITK legacy (MRtrix 0.2)"), 0, 0, 0), 2, x, true), 1e-6);
+
+    // MITK writes MRtrix 3's basis with its own marker, which decides over the option.
+    for (const std::string extension : {".nii.gz", ".shi"})
+    {
+      const std::string path = m_TempDir + "/written" + extension;
+      mitk::IOUtil::Save(LoadSh(marked), path);
+      // ITK recognizes a NRRD file by its extension.
+      const std::string rawPath = extension == ".shi" ? path + ".nrrd" : path;
+      if (extension == ".shi")
+        std::filesystem::copy_file(path, rawPath);
+      auto reader = itk::ImageFileReader<mitk::ShImage::ShOnDiskType>::New();
+      reader->SetFileName(rawPath);
+      reader->Update();
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, reader->GetOutput()->GetPixel({{0, 0, 0, 5}}), 1e-7);
+      std::string marker;
+      if (extension == ".shi")
+        itk::ExposeMetaData<std::string>(reader->GetOutput()->GetMetaDataDictionary(), "MITK_SH_convention", marker);
+      else
+        itk::ExposeMetaData<std::string>(reader->GetOutput()->GetMetaDataDictionary(), "ITK_FileNotes", marker);
+      CPPUNIT_ASSERT_EQUAL(std::string(extension == ".shi" ? "MRtrix3" : "MITK_SH_convention=MRtrix3"), marker);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value, mitk::sh::GetValue(ShCoefficients(LoadSh(path, "MITK legacy (MRtrix 0.2)"), 0, 0, 0), 2, x, true), 1e-6);
+    }
+
+    // The MRtrix 3 FOD in MITK-Data, voxel (30, 30, 1): amplitudes of MRtrix 3.0.8 sh2amp at
+    // RAS (-1, 0, 0), (0, -1, 0), (0, 0, 1), (-0.48, 0.6, 0.64), given here as LPS directions.
+    auto csd = LoadSh(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"));
+    const vnl_vector<float> csdCoefficients = ShCoefficients(csd, 30, 30, 1);
+    const double directions[4][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.48, -0.6, 0.64}};
+    const double amplitudes[4] = {0.20321192, -0.00769596, -0.007680845, 0.023118196};
+    for (unsigned int i = 0; i < 4; ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(amplitudes[i], mitk::sh::GetValue(csdCoefficients, 8, vnl_vector_fixed<double, 3>(directions[i]), true), 1e-6);
+  }
+
+  // "FSL/Dipy" read the coefficients in MITK's own FSL definition at world directions, which is
+  // neither dipy's default basis nor the frame of dipy's coefficients (the bvecs it was given):
+  // the first peaks of a dipy CSA fit were 47 degrees off (median).
+  void ShReader_Dipy_ConvertedFromBvecFrame()
+  {
+    // dipy 1.12.1 sf_to_sh(..., sh_order_max=4, basis_type='descoteaux07', legacy=True) of
+    // f(v) = (v.d)^4 on repulsion724, d = (1, 2, 3) / |(1, 2, 3)| in the bvec frame.
+    const std::vector<float> dipyCoefficients = {0.70898154f, -0.168114716f, -0.336229432f, 0.420597999f, -0.672458865f,
+      0.224152955f, -0.00713331864f, 0.0951157676f, -0.113237923f, -0.0686325455f, -0.0614932969f, -0.137265091f,
+      0.150983897f, 0.0172937759f, -0.0244570925f};
+    vnl_vector_fixed<double, 3> d(1, 2, 3);
+    d.normalize();
+
+    // LAS (dcm2niix's layout, negative determinant: bvec frame = voxel axes), identity and an
+    // oblique matrix (positive determinant: x of the voxel frame negated).
+    Matrix3 las;
+    las.set_identity();
+    las(1, 1) = -1;
+    Matrix3 identity;
+    identity.set_identity();
+    const double angle = 0.4;
+    Matrix3 oblique;
+    oblique.set_identity();
+    oblique(0, 0) = std::cos(angle);
+    oblique(0, 1) = -std::sin(angle);
+    oblique(1, 0) = std::sin(angle);
+    oblique(1, 1) = std::cos(angle);
+
+    const vnl_matrix<double> directions = SphereDirections(200);
+    unsigned int index = 0;
+    for (const Matrix3 &direction : {las, identity, oblique})
+    {
+      Matrix3 flip;
+      flip.set_identity();
+      if (vnl_det(direction) > 0)
+        flip(0, 0) = -1;
+      const Matrix3 frame = (direction * flip).transpose(); // v = frame * u
+
+      const auto path = WriteShNifti("dipy" + std::to_string(index++) + ".nii.gz", dipyCoefficients, "", direction);
+      auto image = LoadSh(path, "FSL/Dipy");
+      CPPUNIT_ASSERT_EQUAL(mitk::ShImage::MRTRIX, image->GetShConvention());
+      const vnl_vector<float> coefficients = ShCoefficients(image, 0, 0, 0);
+      for (unsigned int i = 0; i < directions.cols(); ++i)
+      {
+        const vnl_vector_fixed<double, 3> u = directions.get_column(i);
+        const double expected = std::pow(dot_product(frame * u, d), 4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, mitk::sh::GetValue(coefficients, 4, u, true), 1e-5);
+      }
+    }
+
+    // Files that MITK marked with its own FSL definition keep it.
+    auto image = LoadSh(WriteShNifti("marked.nii.gz", dipyCoefficients, "MITK_SH_convention=FSL", identity), "FSL/Dipy");
+    CPPUNIT_ASSERT_EQUAL(mitk::ShImage::FSL, image->GetShConvention());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(dipyCoefficients[1], ShCoefficients(image, 0, 0, 0)[1], 1e-9);
+  }
+
+  /** Unit vectors spread evenly over the sphere (Fibonacci lattice), as columns. */
+  static vnl_matrix<double> SphereDirections(unsigned int count)
+  {
+    vnl_matrix<double> directions(3, count);
+    const double golden = itk::Math::pi * (3.0 - std::sqrt(5.0));
+    for (unsigned int i = 0; i < count; ++i)
+    {
+      const double z = 1.0 - (2.0 * i + 1.0) / count;
+      const double r = std::sqrt(1.0 - z * z);
+      directions(0, i) = r * std::cos(golden * i);
+      directions(1, i) = r * std::sin(golden * i);
+      directions(2, i) = z;
+    }
+    return directions;
+  }
+
+  // MITK wrote NIfTI peaks with its LPS vectors and no marker, so MRtrix and the tools that use its
+  // peak files read them mirrored in x and y.
+  void PeakWriter_Nifti_RasWithMarker()
+  {
+    auto peaks = LoadPeaks(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), std::nullopt);
+    const auto lps = Values(peaks);
+    const unsigned int numVoxels = peaks->GetDimension(0) * peaks->GetDimension(1) * peaks->GetDimension(2);
+    unsigned int nonZero = 0;
+    for (const auto value : lps)
+      nonZero += value != 0;
+    CPPUNIT_ASSERT(nonZero > 0);
+
+    for (const std::string extension : {".nii.gz", ".nrrd"})
+    {
+      const std::string path = m_TempDir + "/written_peaks" + extension;
+      mitk::IOUtil::Save(peaks, path);
+      CPPUNIT_ASSERT(Values(peaks) == lps);
+
+      auto reader = itk::ImageFileReader<mitk::PeakImage::ItkPeakImageType>::New();
+      reader->SetFileName(path);
+      reader->Update();
+      const auto *raw = reader->GetOutput()->GetBufferPointer();
+      const bool nifti = extension == ".nii.gz";
+      for (std::size_t i = 0; i < lps.size(); ++i)
+      {
+        const bool isZ = (i / numVoxels) % 3 == 2;
+        CPPUNIT_ASSERT_EQUAL(nifti && !isZ ? -lps[i] : lps[i], raw[i]);
+      }
+      std::string marker;
+      itk::ExposeMetaData<std::string>(reader->GetOutput()->GetMetaDataDictionary(), "ITK_FileNotes", marker);
+      if (nifti)
+        CPPUNIT_ASSERT_EQUAL(std::string("MITK_peak_convention=RAS"), marker);
+
+      // MITK's marker converts back whatever the MRtrix option says.
+      CPPUNIT_ASSERT(Values(LoadPeaks(path, false)) == lps);
+      CPPUNIT_ASSERT(Values(LoadPeaks(path, true)) == lps);
+    }
   }
 };
 

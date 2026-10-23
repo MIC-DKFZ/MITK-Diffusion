@@ -14,6 +14,8 @@ found in the LICENSE file.
 #include <itkDiscreteGaussianImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionIterator.h>
+
+#include <type_traits>
 #include <itkVectorIndexSelectionCastImageFilter.h>
 
 namespace itk
@@ -59,16 +61,16 @@ namespace itk
     m_BValues = mitk::kurtosis::GetBValues(m_GradientDirections, m_ReferenceBValue);
 
     // A variance of 0 leaves the image as it is.
+    m_SmoothedInputImage = nullptr;
     if (m_SmoothingVariance <= 0)
-    {
-      m_ProcessedInputImage = this->GetInput();
       return;
-    }
 
-    using ScalarImageType = Image<TInputPixelType, 3>;
+    // Smoothed in double: an integer image would truncate the smoothed signal (100 and 101
+    // alternating gave 100), which biased K by -0.02 on test_multi.dwi.
+    using ScalarImageType = Image<double, 3>;
     using GaussianFilterType = DiscreteGaussianImageFilter<ScalarImageType, ScalarImageType>;
     using IndexSelectionType = VectorIndexSelectionCastImageFilter<InputImageType, ScalarImageType>;
-    using ComposeFilterType = ComposeImageFilter<ScalarImageType, InputImageType>;
+    using ComposeFilterType = ComposeImageFilter<ScalarImageType, VectorImage<double, 3>>;
 
     const auto* vectorImage = this->GetInput();
     auto indexSelectionFilter = IndexSelectionType::New();
@@ -86,14 +88,13 @@ namespace itk
       gaussianFilter->Update();
     }
     composer->Update();
-    m_ProcessedInputImage = composer->GetOutput();
+    m_SmoothedInputImage = composer->GetOutput();
   }
 
   template <class TInputPixelType, class TOutputPixelType>
   void DiffusionKurtosisReconstructionImageFilter<TInputPixelType, TOutputPixelType>::DynamicThreadedGenerateData(
     const OutputImageRegionType& outputRegionForThread)
   {
-    ImageRegionConstIterator<InputImageType> inputIt(m_ProcessedInputImage, outputRegionForThread);
     ImageRegionIterator<OutputImageType> dIt(this->GetOutput(0), outputRegionForThread);
     ImageRegionIterator<OutputImageType> kIt(this->GetOutput(1), outputRegionForThread);
 
@@ -103,21 +104,28 @@ namespace itk
 
     mitk::kurtosis::VoxelFitter fitter(m_BValues, m_FitConfiguration);
     vnl_vector<double> signal(m_BValues.size());
-    for (; !inputIt.IsAtEnd(); ++inputIt, ++dIt, ++kIt)
-    {
-      mitk::kurtosis::VoxelFit fit;
-      if (m_ImageMask.IsNull() || maskIt.Get() > 0)
+    auto fitImage = [&](const auto* image) {
+      ImageRegionConstIterator<std::remove_cv_t<std::remove_pointer_t<decltype(image)>>> inputIt(image, outputRegionForThread);
+      for (; !inputIt.IsAtEnd(); ++inputIt, ++dIt, ++kIt)
       {
-        const auto pixel = inputIt.Get();
-        for (unsigned int i = 0; i < signal.size(); ++i)
-          signal[i] = pixel[i];
-        fit = fitter.Fit(signal);
-      }
-      dIt.Set(fit.d);
-      kIt.Set(fit.k);
+        mitk::kurtosis::VoxelFit fit;
+        if (m_ImageMask.IsNull() || maskIt.Get() > 0)
+        {
+          const auto pixel = inputIt.Get();
+          for (unsigned int i = 0; i < signal.size(); ++i)
+            signal[i] = pixel[i];
+          fit = fitter.Fit(signal);
+        }
+        dIt.Set(fit.d);
+        kIt.Set(fit.k);
 
-      if (m_ImageMask.IsNotNull())
-        ++maskIt;
-    }
+        if (m_ImageMask.IsNotNull())
+          ++maskIt;
+      }
+    };
+    if (m_SmoothedInputImage.IsNotNull())
+      fitImage(m_SmoothedInputImage.GetPointer());
+    else
+      fitImage(this->GetInput());
   }
 }

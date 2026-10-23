@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkB0Indices.h>
 
 #include <cmath>
+#include <type_traits>
 
 namespace itk
 {
@@ -54,17 +55,23 @@ namespace itk
     b0Image->SetRegions(input->GetLargestPossibleRegion());
     b0Image->Allocate();
 
-    // The mean is accumulated in float, b0 volume by b0 volume, and then cast to the output type.
+    // The mean is summed in double and rounded for an integer output type; accumulating x/n in
+    // float and truncating made exact integer means one too low (9 b0 volumes of test_multi.dwi)
+    // and biased every b0 image by about -0.5.
     const double count = indices.size();
     ImageRegionConstIterator<InputImageType> inIt(input, input->GetLargestPossibleRegion());
     ImageRegionIterator<OutputImageType> outIt(b0Image, b0Image->GetLargestPossibleRegion());
     for (; !inIt.IsAtEnd(); ++inIt, ++outIt)
     {
       const typename InputImageType::PixelType pixel = inIt.Get();
-      float mean = 0;
+      double sum = 0;
       for (auto index : indices)
-        mean = mean + pixel[index] / count;
-      outIt.Set(mean);
+        sum += pixel[index];
+      const double mean = sum / count;
+      if constexpr (std::is_integral_v<TOutputImagePixelType>)
+        outIt.Set(static_cast<TOutputImagePixelType>(std::round(mean)));
+      else
+        outIt.Set(static_cast<TOutputImagePixelType>(mean));
     }
   }
 }

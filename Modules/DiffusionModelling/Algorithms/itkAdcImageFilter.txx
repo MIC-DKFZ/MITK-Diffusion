@@ -91,7 +91,10 @@ template< class TInPixelType, class TOutPixelType >
 double
 AdcImageFilter< TInPixelType, TOutPixelType>::FitSingleVoxel( const typename InputImageType::PixelType &input)
 {
+  // S0 is the mean of the positive unweighted values, as for the mean ADC without fit; a voxel
+  // without one gets 0 (with S0 = 0 the residuals would not depend on the ADC).
   double S0 = 0;
+  int baselines = 0;
   int nonzero = 0;
   vnl_vector<double> m; m.set_size(m_Nonzero_B_values.size());
   for (unsigned int i=0; i<m_B_values.size(); i++)
@@ -101,15 +104,15 @@ AdcImageFilter< TInPixelType, TOutPixelType>::FitSingleVoxel( const typename Inp
       m[nonzero] = input[i];
       nonzero++;
     }
-    else
+    else if (input[i] > 0)
+    {
       S0 += input[i];
+      ++baselines;
+    }
   }
-  S0 /= (m_B_values.size() - m_Nonzero_B_values.size());
-
-  // With S0 = 0 the model S0*exp(-b*ADC) is 0 for every ADC, so the residuals do not depend on
-  // the ADC and the fit ends at its start value 0. Background voxels skip the fit.
-  if (S0 == 0)
+  if (baselines == 0)
     return 0;
+  S0 /= baselines;
 
   adcLeastSquaresFunction f(m_Nonzero_B_values.size());
   f.set_bvalues(m_Nonzero_B_values);

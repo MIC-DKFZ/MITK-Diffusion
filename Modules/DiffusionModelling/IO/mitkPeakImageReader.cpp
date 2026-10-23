@@ -36,13 +36,16 @@ namespace
 
   /**
    * MRtrix (sh2peaks) writes peak directions in scanner RAS coordinates, MITK uses world LPS
-   * vectors. MRtrix files are recognized by their NIfTI descrip. The NaN that MRtrix writes for
-   * missing peaks is already set to 0 by niftilib.
+   * vectors. MRtrix files are recognized by their NIfTI descrip and converted if convertMrtrix;
+   * PeakImageWriter writes NIfTI peaks in RAS too, marked in the descrip, and those are always
+   * converted. The NaN that MRtrix writes for missing peaks is already set to 0 by niftilib.
    */
-  void ConvertMrtrixPeaks(mitk::PeakImage::ItkPeakImageType* peaks)
+  void ConvertRasPeaks(mitk::PeakImage::ItkPeakImageType* peaks, bool convertMrtrix)
   {
     std::string description;
-    if (!itk::ExposeMetaData<std::string>(peaks->GetMetaDataDictionary(), "ITK_FileNotes", description) || !description.starts_with("MRtrix"))
+    if (!itk::ExposeMetaData<std::string>(peaks->GetMetaDataDictionary(), "ITK_FileNotes", description))
+      return;
+    if (description != "MITK_peak_convention=RAS" && !(convertMrtrix && description.starts_with("MRtrix")))
       return;
 
     itk::ImageRegionIteratorWithIndex<mitk::PeakImage::ItkPeakImageType> it(peaks, peaks->GetLargestPossibleRegion());
@@ -66,8 +69,8 @@ namespace mitk
     : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::PEAK_MIMETYPE_DESCRIPTION() )
   {
     Options defaultOptions;
-    // On by default: only files whose descrip names MRtrix are converted, MITK-written peak files
-    // have none and read as before.
+    // On by default: only files whose descrip names MRtrix are converted; NIfTI peak files of
+    // earlier MITK versions have no descrip and read as before.
     defaultOptions[ConvertMrtrixOption] = true;
     this->SetDefaultOptions(defaultOptions);
 
@@ -97,8 +100,7 @@ namespace mitk
       reader->SetImageIO(io);
     }
     reader->Update();
-    if (us::any_cast<bool>(this->GetOptions()[ConvertMrtrixOption]))
-      ConvertMrtrixPeaks(reader->GetOutput());
+    ConvertRasPeaks(reader->GetOutput(), us::any_cast<bool>(this->GetOptions()[ConvertMrtrixOption]));
 
     // The peak image takes over the buffer of all volumes.
     Image::Pointer resultImage = dynamic_cast<Image*>(PeakImage::New().GetPointer());

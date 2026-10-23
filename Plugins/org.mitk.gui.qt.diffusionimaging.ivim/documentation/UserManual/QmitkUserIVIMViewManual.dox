@@ -16,11 +16,11 @@ The buttons below the plot copy the b-values and measurements of the voxel (for 
 
 \section QmitkIVIMViewIvim IVIM
 
-The IVIM model is a bi-exponential model of the signal ratio S/S0 with the perfusion fraction f, the diffusion coefficient D and the pseudo-diffusion coefficient D*: S/S0 = (1-f) exp(-bD) + f exp(-b(D+D*)). S0 is the mean of the b=0 volumes, the volumes whose b-value rounds to 0 s/mm²; without b=0 volumes the volumes of the lowest b-value serve as S0. The fit methods differ in how they estimate the three parameters:
+The IVIM model is a bi-exponential model of the signal ratio S/S0 with the perfusion fraction f, the diffusion coefficient D and the pseudo-diffusion coefficient D*: S/S0 = (1-f) exp(-bD) + f exp(-b(D+D*)). S0 is the mean of the b=0 volumes, the volumes whose b-value rounds to 0 s/mm². Without b=0 volumes the signal is divided by the mean of the volumes of the lowest b-value b<sub>min</sub>, which follows the same model at b - b<sub>min</sub> with a perfusion fraction f'; the fitted f' is converted to the fraction at b = 0 with the fitted D*: f/(1-f) = f'/(1-f') exp(b<sub>min</sub> D*). Without a D* (methods 3 and 4 when D* is not fitted) f is f', the fraction at b<sub>min</sub>. The fit methods differ in how they estimate the three parameters:
 
 \li <b>1. Jointly fit D, f and D*</b>: all three parameters are estimated in one non-linear fit.
 \li <b>2. Fit D &amp; f with fixed D* value</b>: only f and D are estimated; D* is the value of the D* slider.
-\li <b>3. Fit D &amp; f (high b), then fit D*</b>: first f and D of the mono-exponential (1-f) exp(-bD) are fitted to the measurements with b-values above the "Ignore b&lt;" threshold, where the perfusion signal has decayed. Then D* is chosen with f and D fixed: the best of 100 values from 0.001 to 0.15 mm²/s in steps of 0.00149 mm²/s.
+\li <b>3. Fit D &amp; f (high b), then fit D*</b>: first f and D of the mono-exponential (1-f) exp(-bD) are fitted to the measurements with b-values above the "Ignore b&lt;" threshold, where the perfusion signal has decayed. Then D* is chosen with f and D fixed: the best of 100 values from 0.001 to 0.15 mm²/s in steps of 0.00149 mm²/s, refined between its two neighbours (D* stays at most 0.15 mm²/s).
 \li <b>4. Linearly fit D &amp; f (high b), then fit D*</b>: as method 3, but f and D come from the straight line through the points (b, log S/S0) above the threshold.
 
 The non-linear fits of methods 1 to 3 penalize D outside [0, 0.003] mm²/s and D* outside [0, 0.3] mm²/s; the line of method 4 is not bounded.
@@ -31,11 +31,11 @@ Parameters:
 \li <b>Ignore b&lt; (first fit)</b> (methods 3 and 4): the b-value threshold in s/mm² of the first fit.
 \li <b>Output Maps</b>: the maps of f, D and D* to generate, named "f Fit-n", "D Fit-n" and "D* Fit-n" with the method number n. For methods 3 and 4, D* is searched only when its map is checked; the preview always shows it.
 
-The plot shows S/S0, the measurements of the first fit and, for methods 3 and 4, those of the D* search.
+The plot shows S/S0, the measurements of the first fit and, for methods 3 and 4, those of the D* search. Without b=0 volumes S0 is the b=0 signal of the fitted model.
 
 \section QmitkIVIMViewKurtosis Kurtosis
 
-The kurtosis model describes the signal with the apparent diffusion coefficient D and the kurtosis K: S = S0 exp(-bD + b²D²K/6). S0 is the mean of the b=0 volumes, as for IVIM the volumes whose b-value rounds to 0 s/mm².
+The kurtosis model describes the signal with the apparent diffusion coefficient D and the kurtosis K: S = S0 exp(-bD + b²D²K/6). S0 is the mean of the b=0 volumes, as for IVIM the volumes whose b-value rounds to 0 s/mm². One D and one K are fitted to all diffusion-weighted volumes together, whatever their gradient direction. The straight fit therefore estimates the kurtosis of the direction-averaged signal (the mean signal kurtosis of dipy's MSDKI); the logarithmic fit gives the mean of the directional ADCs and, for evenly spread directions, the mean of the kurtosis tensor (MKT). Neither is the mean kurtosis (MK) of a kurtosis tensor fit, and in anisotropic tissue the two fit types give different K.
 
 \li <b>Select Fit Type</b>: "Straight Fit" fits S, "Logarithmic Fit" fits log S; the logarithmic fit leaves out measurements at or below 0.
 \li <b>Omit b=0 Measurements</b>: S0 is fitted as a third parameter instead of taken from the b=0 volumes. Without b=0 volumes, S0 is always fitted.
@@ -47,7 +47,7 @@ The plot shows S, the measurements and the fitted curve.
 
 \section QmitkIVIMViewCmdApps Command line tools
 
-MitkDiffusionIvimFit generates the IVIM maps (methods 1 to 4 as fit types 0 to 3, with the b threshold, the fixed D* and a mask as options, signal threshold 0). MitkDiffusionKurtosisFit generates the kurtosis maps with a straight fit, an optional mask, optional fitted S0 and K bounds (default -1000 to 1000); it always smooths with a variance of 1.5 mm².
+MitkDiffusionIvimFit generates the IVIM maps (methods 1 to 4 as fit types 0 to 3, with the b threshold, the fixed D* and a mask as options, signal threshold 0). MitkDiffusionKurtosisFit generates the kurtosis maps with a straight fit, an optional mask, optional fitted S0 and K bounds (default -1000 to 1000), which also keep D within [0, 0.004] mm²/s; it always smooths with a variance of 1.5 mm².
 
 \section QmitkIVIMViewReferences Suggested Readings
 

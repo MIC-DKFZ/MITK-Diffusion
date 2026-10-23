@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkShImageWriter.h>
 
 #include <mitkPeakImageReader.h>
+#include <mitkPeakImageWriter.h>
 
 #include "mitkDiffusionIOMimeTypes.h"
 
@@ -88,6 +89,7 @@ namespace mitk
       m_ReadersAndWriters.push_back(std::make_unique<NrrdTensorImageWriter>());
       m_ReadersAndWriters.push_back(std::make_unique<NrrdOdfImageWriter>());
       m_ReadersAndWriters.push_back(std::make_unique<ShImageWriter>());
+      m_ReadersAndWriters.push_back(std::make_unique<PeakImageWriter>());
 
       // MITK's 3D volume mapper declines subclasses of Image, so they register it themselves.
       m_MapperProviders.push_back(std::make_unique<CompositeMapperProvider<OdfImage>>());

@@ -36,6 +36,8 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(Update_ReferenceBValueNotSet_Throws);
   MITK_TEST(Baselines_NoBZero_AllDirectionsOfLowestShell);
   MITK_TEST(Baselines_Mean_NotTruncated);
+  MITK_TEST(Fit_NoBZero_RecoversFractionAtBZero);
+  MITK_TEST(DThenDStar_DStarBetweenGridValues_Refined);
   MITK_TEST(Fit_NoBaselineSignal_Zero);
   MITK_TEST(LinearDThenF_OneShellAboveThreshold_DFromThatShell);
   MITK_TEST(Update_SecondRun_SameMaps);
@@ -198,8 +200,8 @@ public:
     const std::vector<Recorded> recorded = {
       {Method::FitAll, {0.428927243, 0.00050945312, 0.0185983037}, {0.8115640879, 0.0005265806685, 0.01223029941}},
       {Method::DStarFixed, {0.2727053955, 0.0007509511815, 0.05999999866}, {0.7812178731, 0.0006338245585, 0.05999999866}},
-      {Method::DThenDStar, {0.2727041887, 0.0007509544279, 0.02993353789}, {0.7812152505, 0.000633834512, 0.01441000029}},
-      {Method::LinearDThenF, {0.3739915474, 0.0005149761726, 0.02083905281}, {0.7865119576, 0.000659120793, 0.01441000029}}};
+      {Method::DThenDStar, {0.2727041887, 0.0007509544279, 0.03006975278}, {0.7812152505, 0.000633834512, 0.01429907046}},
+      {Method::LinearDThenF, {0.3739915474, 0.0005149761726, 0.0208512924}, {0.7865119576, 0.000659120793, 0.01361831184}}};
 
     auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 5;
@@ -263,6 +265,52 @@ public:
     CPPUNIT_ASSERT_EQUAL(m_BValues.size() - 2, static_cast<std::size_t>(fit.allMeasurements.size()));
     for (unsigned int i = 0; i < fit.allMeasurements.size(); ++i)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(std::round(signal[i + 2]) / 1000.5, fit.allMeasurements[i], 1e-6);
+  }
+
+  // Without b=0 the signal was normalized by the lowest shell but fitted with the model at the
+  // absolute b-values: f 0.084 (FitAll) and 0.073 (D, then D*) instead of 0.1 for b_min = 10; with
+  // b_min = 50 every method gave f = 0.
+  void Fit_NoBZero_RecoversFractionAtBZero()
+  {
+    const std::vector<double> bValues = {10, 20, 40, 80, 110, 140, 170, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+    const Parameters truth = {0.1, 0.001, 0.019};
+    const auto values = IvimSignal(bValues, 1000, truth.f, truth.d, truth.dStar);
+    const vnl_vector<double> signal(values.data(), values.size());
+    const auto protocol = mitk::ivim::MakeProtocol(MakeGradients(bValues, 1000), 1000);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, protocol.baselineBValue, 1e-9);
+
+    const auto all = mitk::ivim::FitVoxel(signal, protocol, MakeParameters(Method::FitAll));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(truth.f, all.f, 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(truth.d, all.d, 0.01 * truth.d);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(truth.dStar, all.dStar, 0.01 * truth.dStar);
+    // The measurements are reported as S/S0 at b, on the model curve.
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(bValues.back(), all.firstFitBValues[all.firstFitBValues.size() - 1], 1e-9);
+    for (unsigned int i = 0; i < all.allMeasurements.size(); ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(values[i + 1] / 1000, all.allMeasurements[i], 1e-3);
+
+    const auto fixed = mitk::ivim::FitVoxel(signal, protocol, MakeParameters(Method::DStarFixed, truth.dStar));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(truth.f, fixed.f, 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(truth.d, fixed.d, 0.01 * truth.d);
+
+    auto parameters = MakeParameters(Method::DThenDStar);
+    parameters.bThreshold = 400;
+    const auto twoStep = mitk::ivim::FitVoxel(signal, protocol, parameters);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(truth.f, twoStep.f, 0.01);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(truth.d, twoStep.d, 0.01 * truth.d);
+  }
+
+  // D* was the best of a grid with step 0.00149: 0.02037 for 0.0207.
+  void DThenDStar_DStarBetweenGridValues_Refined()
+  {
+    const auto protocol = mitk::ivim::MakeProtocol(MakeGradients(m_BValues, 1000), 1000);
+    auto parameters = MakeParameters(Method::DThenDStar);
+    parameters.bThreshold = 400;
+    for (double dStar : {0.0207, 0.1495})
+    {
+      const auto values = IvimSignal(m_BValues, 1000, 0.2, 0.0008, dStar);
+      const auto fit = mitk::ivim::FitVoxel(vnl_vector<double>(values.data(), values.size()), protocol, parameters);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(dStar, fit.dStar, 0.005 * dStar);
+    }
   }
 
   void Fit_NoBaselineSignal_Zero()

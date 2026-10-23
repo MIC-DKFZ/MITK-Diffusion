@@ -28,6 +28,8 @@ found in the LICENSE file.
 #include <itksys/SystemTools.hxx>
 
 #include <format>
+#include <fstream>
+#include <iterator>
 
 /** Reading and writing of DWIs as NRRD and NIfTI, on MITK-Data input and on synthetic files. */
 class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
@@ -386,8 +388,11 @@ public:
     CPPUNIT_ASSERT(itksys::SystemTools::FileExists(m_TempDir + "/roundtrip.bvals"));
     CPPUNIT_ASSERT(itksys::SystemTools::FileExists(m_TempDir + "/roundtrip.bvecs"));
     auto image = mitk::IOUtil::Load<mitk::Image>(path, &functor);
-    // bvals are written as integers, so gradient lengths come back rounded to the b-value.
-    AssertSameDwi(source, image, 1e-6);
+    // The bvals keep b-values that are not integers (999.999 in this file); they were rounded.
+    std::ifstream bvals(m_TempDir + "/roundtrip.bvals");
+    const std::string text((std::istreambuf_iterator<char>(bvals)), std::istreambuf_iterator<char>());
+    CPPUNIT_ASSERT(text.find("999.999 ") != std::string::npos);
+    AssertSameDwi(source, image, 1e-12);
   }
 
   void NiftiReader_Volumes_BecomeVectorComponents()

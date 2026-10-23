@@ -159,8 +159,8 @@ namespace
     result = mitk::GrabItkImageMemory(cropped);
   }
 
-  template <typename TImage>
-  void SetInterpolator(itk::ResampleImageFilter<TImage, TImage>* resampler, mitk::DiffusionImageEditing::Interpolation interpolation)
+  template <typename TImage, typename TOutputImage>
+  void SetInterpolator(itk::ResampleImageFilter<TImage, TOutputImage>* resampler, mitk::DiffusionImageEditing::Interpolation interpolation)
   {
     using mitk::DiffusionImageEditing::Interpolation;
     switch (interpolation)
@@ -201,7 +201,8 @@ namespace
     itk::ImageRegion<3> newRegion;
     itk::ResampledImageGrid(itkImage->GetSpacing(), itkImage->GetLargestPossibleRegion(), grid, value, newSpacing, newRegion);
 
-    auto resampler = itk::ResampleImageFilter<ImageType, ImageType>::New();
+    // Interpolated in double and rounded for integer pixel types, as the DWI channels.
+    auto resampler = itk::ResampleImageFilter<ImageType, itk::Image<double, VImageDimension>>::New();
     resampler->SetInput(itkImage);
     resampler->SetSize(newRegion.GetSize());
     resampler->SetOutputStartIndex(newRegion.GetIndex());
@@ -210,7 +211,17 @@ namespace
     resampler->SetOutputDirection(itkImage->GetDirection());
     SetInterpolator(resampler.GetPointer(), interpolation);
     resampler->Update();
-    result = mitk::GrabItkImageMemory(resampler->GetOutput());
+
+    auto output = ImageType::New();
+    output->CopyInformation(resampler->GetOutput());
+    output->SetRegions(resampler->GetOutput()->GetLargestPossibleRegion());
+    output->Allocate();
+    const double* values = resampler->GetOutput()->GetBufferPointer();
+    TPixel* pixels = output->GetBufferPointer();
+    const auto numberOfPixels = output->GetLargestPossibleRegion().GetNumberOfPixels();
+    for (itk::SizeValueType p = 0; p < numberOfPixels; ++p)
+      pixels[p] = itk::ResampledPixel<TPixel>(values[p]);
+    result = mitk::GrabItkImageMemory(output.GetPointer());
   }
 
   template <typename TPixel, unsigned int VImageDimension>
