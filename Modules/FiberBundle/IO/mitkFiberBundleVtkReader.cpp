@@ -35,6 +35,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkFiberBundleMimeTypes.h"
 #include <vtkUnsignedCharArray.h>
 #include <vtkTransformFilter.h>
+#include <mitkLocaleSwitch.h>
 
 
 mitk::FiberBundleVtkReader::FiberBundleVtkReader()
@@ -60,142 +61,103 @@ mitk::FiberBundleVtkReader * mitk::FiberBundleVtkReader::Clone() const
 
 std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRead()
 {
-
   std::vector<itk::SmartPointer<mitk::BaseData> > result;
 
-  const std::string& locale = "C";
-  const std::string& currLocale = setlocale( LC_ALL, nullptr );
-  setlocale(LC_ALL, locale.c_str());
+  // ASCII files are parsed with the decimal point of the current locale
+  mitk::LocaleSwitch localeSwitch("C");
 
-  std::string filename = this->GetInputLocation();
-
-  std::string ext = itksys::SystemTools::GetFilenameLastExtension(filename);
-  ext = itksys::SystemTools::LowerCase(ext);
-
+  const std::string filename = this->GetInputLocation();
   Options options = this->GetOptions();
-  bool ras = us::any_cast<bool>(options["Use RAS space"]);
+  const bool ras = us::any_cast<bool>(options["Use RAS space"]);
 
-  mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
-  vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
-  matrix->Identity();
+  MITK_INFO << "Loading tractogram (VTK format): " << itksys::SystemTools::GetFilenameName(filename);
+  vtkSmartPointer<vtkPolyData> fiberPolyData;
+  vtkSmartPointer<vtkPolyDataReader> legacyReader = vtkSmartPointer<vtkPolyDataReader>::New();
+  legacyReader->SetFileName(filename.c_str());
+  if (legacyReader->IsFilePolyData())
+  {
+    legacyReader->Update();
+    if (legacyReader->GetErrorCode() != 0)
+      mitkThrow() << "Could not read " << filename << " (VTK error code " << legacyReader->GetErrorCode() << ").";
+    fiberPolyData = legacyReader->GetOutput();
+  }
+  else
+  {
+    vtkSmartPointer<vtkXMLPolyDataReader> xmlReader = vtkSmartPointer<vtkXMLPolyDataReader>::New();
+    if (!xmlReader->CanReadFile(filename.c_str()))
+      mitkThrow() << filename << " is no VTK polydata file (legacy .fib/.vtk or XML .vtp).";
+    xmlReader->SetFileName(filename.c_str());
+    xmlReader->Update();
+    if (xmlReader->GetErrorCode() != 0)
+      mitkThrow() << "Could not read " << filename << " (VTK error code " << xmlReader->GetErrorCode() << ").";
+    fiberPolyData = xmlReader->GetOutput();
+  }
+  if (fiberPolyData == nullptr)
+    mitkThrow() << "Could not read " << filename;
+  if (fiberPolyData->GetNumberOfPolys() > 0 || fiberPolyData->GetNumberOfStrips() > 0)
+    mitkThrow() << filename << " contains polygons or triangle strips; a fiber bundle consists of lines.";
 
   if (ras)
   {
-    matrix->SetElement(0,0,-matrix->GetElement(0,0));
-    matrix->SetElement(0,1,-matrix->GetElement(0,1));
-    matrix->SetElement(0,2,-matrix->GetElement(0,2));
-    matrix->SetElement(0,3,-matrix->GetElement(0,3));
+    vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
+    matrix->Identity();
+    matrix->SetElement(0,0,-1);
+    matrix->SetElement(1,1,-1);
+    mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
+    geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
 
-    matrix->SetElement(1,0,-matrix->GetElement(1,0));
-    matrix->SetElement(1,1,-matrix->GetElement(1,1));
-    matrix->SetElement(1,2,-matrix->GetElement(1,2));
-    matrix->SetElement(1,3,-matrix->GetElement(1,3));
+    vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
+    transformFilter->SetInputData(fiberPolyData);
+    transformFilter->SetTransform(geometry->GetVtkTransform());
+    transformFilter->Update();
+    fiberPolyData = transformFilter->GetPolyDataOutput();
   }
-  geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
 
-  vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
+  FiberBundle::Pointer fiberBundle = FiberBundle::New(fiberPolyData);
+  fiberBundle->setIsRAS(ras);
 
+  // The arrays are taken from the bundle's own polydata: vtkCleanPolyData in the constructor drops
+  // unused points and moves single-point fibers first, and carries the arrays along.
+  vtkPolyData* cleaned = fiberBundle->GetFiberPolyData();
 
-  try
+  vtkFloatArray* fileWeights = vtkFloatArray::SafeDownCast(cleaned->GetCellData()->GetArray("FIBER_WEIGHTS"));
+  if (fileWeights != nullptr)
   {
-    MITK_INFO << "Loading tractogram (VTK format): " << itksys::SystemTools::GetFilenameName(filename);
-    vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
-    reader->SetFileName( this->GetInputLocation().c_str() );
-
-    if (reader->IsFilePolyData())
+    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
+    weights->DeepCopy(fileWeights);
+    for (vtkIdType i=0; i<weights->GetNumberOfValues(); i++)
     {
-      reader->Update();
-
-      if ( reader->GetOutput() != nullptr )
+      if (!(weights->GetValue(i) >= 0.0f)) // negative or NaN
       {
-        vtkSmartPointer<vtkPolyData> fiberPolyData = reader->GetOutput();
-        if (ras)
-        {
-          transformFilter->SetInputData(fiberPolyData);
-          transformFilter->SetTransform(geometry->GetVtkTransform());
-          transformFilter->Update();
-          fiberPolyData = transformFilter->GetPolyDataOutput();
-        }
-        FiberBundle::Pointer fiberBundle = FiberBundle::New(fiberPolyData);
-        fiberBundle->setIsRAS(ras);
-
-        vtkSmartPointer<vtkFloatArray> weights = vtkFloatArray::SafeDownCast(fiberPolyData->GetCellData()->GetArray("FIBER_WEIGHTS"));
-        if (weights!=nullptr)
-        {
-          for (int i=0; i<weights->GetNumberOfValues(); i++)
-          {
-            if (weights->GetValue(i)<0.0)
-            {
-              MITK_ERROR << "Fiber weight<0 detected! Setting value to 0.";
-              weights->SetValue(i,0);
-            }
-          }
-          fiberBundle->SetFiberWeights(weights);
-        }
-
-        vtkSmartPointer<vtkUnsignedCharArray> fiberColors = vtkUnsignedCharArray::SafeDownCast(fiberPolyData->GetPointData()->GetArray("FIBER_COLORS"));
-        if (fiberColors!=nullptr)
-          fiberBundle->SetFiberColors(fiberColors);
-
-        result.push_back(fiberBundle.GetPointer());
-        return result;
+        MITK_ERROR << "Fiber weight<0 or NaN detected! Setting value to 0.";
+        weights->SetValue(i, 0);
       }
     }
-    else
-      MITK_INFO << "File is not VTK format.";
-  }
-  catch(...)
-  {
-    throw;
+    fiberBundle->SetFiberWeights(weights);
   }
 
-  try
+  vtkUnsignedCharArray* fileColors = vtkUnsignedCharArray::SafeDownCast(cleaned->GetPointData()->GetArray("FIBER_COLORS"));
+  if (fileColors != nullptr)
   {
-    MITK_INFO << "Trying to load fiber file as VTP format.";
-    vtkSmartPointer<vtkXMLPolyDataReader> reader = vtkSmartPointer<vtkXMLPolyDataReader>::New();
-    reader->SetFileName( this->GetInputLocation().c_str() );
-
-    if ( reader->CanReadFile(this->GetInputLocation().c_str()) )
+    const int components = fileColors->GetNumberOfComponents();
+    if (fileColors->GetNumberOfTuples() != cleaned->GetNumberOfPoints() || (components != 3 && components != 4))
     {
-      reader->Update();
-
-      if ( reader->GetOutput() != nullptr )
-      {
-        vtkSmartPointer<vtkPolyData> fiberPolyData = reader->GetOutput();
-        if (ras)
-        {
-          transformFilter->SetInputData(fiberPolyData);
-          transformFilter->SetTransform(geometry->GetVtkTransform());
-          transformFilter->Update();
-          fiberPolyData = transformFilter->GetPolyDataOutput();
-        }
-        FiberBundle::Pointer fiberBundle = FiberBundle::New(fiberPolyData);
-        fiberBundle->setIsRAS(ras);
-
-        vtkSmartPointer<vtkFloatArray> weights = vtkFloatArray::SafeDownCast(fiberPolyData->GetCellData()->GetArray("FIBER_WEIGHTS"));
-
-        if (weights!=nullptr)
-        {
-          fiberBundle->SetFiberWeights(weights);
-        }
-
-        vtkSmartPointer<vtkUnsignedCharArray> fiberColors = vtkUnsignedCharArray::SafeDownCast(fiberPolyData->GetPointData()->GetArray("FIBER_COLORS"));
-        if (fiberColors!=nullptr)
-          fiberBundle->SetFiberColors(fiberColors);
-
-        result.push_back(fiberBundle.GetPointer());
-        return result;
-      }
+      MITK_WARN << "Ignoring FIBER_COLORS of " << filename << ": " << fileColors->GetNumberOfTuples() << " tuples of "
+                << components << " components for " << cleaned->GetNumberOfPoints() << " points.";
     }
     else
-      MITK_INFO << "File is not VTP format.";
-  }
-  catch(...)
-  {
-    throw;
+    {
+      // RGB colours get an opaque alpha
+      vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+      colors->SetNumberOfComponents(4);
+      colors->SetNumberOfTuples(fileColors->GetNumberOfTuples());
+      for (vtkIdType i=0; i<fileColors->GetNumberOfTuples(); ++i)
+        for (int c=0; c<4; ++c)
+          colors->SetValue(4*i+c, c<components ? fileColors->GetValue(components*i+c) : 255);
+      fiberBundle->SetFiberColors(colors);
+    }
   }
 
-  throw "Selected file is no vtk readable fiber format (binary or ascii vtk or vtp file).";
-
+  result.push_back(fiberBundle.GetPointer());
   return result;
 }

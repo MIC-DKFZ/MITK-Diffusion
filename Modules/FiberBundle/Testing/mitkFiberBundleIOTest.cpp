@@ -18,6 +18,11 @@ found in the LICENSE file.
 
 #include <itksys/SystemTools.hxx>
 #include <vtkCell.h>
+#include <vtkCellArray.h>
+#include <vtkFloatArray.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataWriter.h>
+#include <vtkUnsignedCharArray.h>
 #include <vtkCellData.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
@@ -54,6 +59,8 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TrkWriter_RoundTrip_KeepsPoints);
   MITK_TEST(TrkWriter_Header_IsReproducibleAndMatchesData);
   MITK_TEST(Writers_WriteErrors_Throw);
+  MITK_TEST(VtkReader_NoFiberPolyData_ThrowsMitkException);
+  MITK_TEST(VtkReader_ColoursOfUnusedAndReorderedPoints_StayWithTheirPoints);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -559,6 +566,82 @@ public:
                                    mitk::IOUtil::Save(fib, base + ".FiberBundle.vtk", "/dev/full", options, false), std::exception);
       CPPUNIT_ASSERT_THROW_MESSAGE(".trk, disk full",
                                    mitk::IOUtil::Save(fib, base + ".FiberBundle.trk", "/dev/full", options, false), std::exception);
+    }
+  }
+
+  void VtkReader_NoFiberPolyData_ThrowsMitkException()
+  {
+    const std::string grid = m_TempDir + "/grid.fib";
+    {
+      std::ofstream out(grid);
+      out << "# vtk DataFile Version 3.0\ngrid\nASCII\nDATASET UNSTRUCTURED_GRID\nPOINTS 1 float\n0 0 0\n"
+             "CELLS 1 2\n1 0\nCELL_TYPES 1\n1\n";
+    }
+    CPPUNIT_ASSERT_THROW_MESSAGE("unstructured grid", mitk::IOUtil::Load(grid), mitk::Exception);
+
+    const std::string surface = m_TempDir + "/surface.fib";
+    {
+      std::ofstream out(surface);
+      out << "# vtk DataFile Version 3.0\nsurface\nASCII\nDATASET POLYDATA\nPOINTS 3 float\n0 0 0 1 0 0 0 1 0\n"
+             "POLYGONS 1 4\n3 0 1 2\n";
+    }
+    CPPUNIT_ASSERT_THROW_MESSAGE("polygons", mitk::IOUtil::Load(surface), mitk::Exception);
+  }
+
+  void VtkReader_ColoursOfUnusedAndReorderedPoints_StayWithTheirPoints()
+  {
+    // Point 0 is unused; fiber 0 uses points 3 and 4, fiber 1 uses points 1 and 2. Every point
+    // has its own RGB colour (3 components, as other tools write them) and each fiber a weight.
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    for (int i = 0; i < 5; ++i)
+      points->InsertNextPoint(i, 2.0 * i, 0.0);
+    auto lines = vtkSmartPointer<vtkCellArray>::New();
+    const vtkIdType fiber0[2] = {3, 4};
+    const vtkIdType fiber1[2] = {1, 2};
+    lines->InsertNextCell(2, fiber0);
+    lines->InsertNextCell(2, fiber1);
+    auto colours = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    colours->SetName("FIBER_COLORS");
+    colours->SetNumberOfComponents(3);
+    for (int i = 0; i < 5; ++i)
+    {
+      const unsigned char rgb[3] = {static_cast<unsigned char>(10 * i), static_cast<unsigned char>(10 * i + 1),
+                                    static_cast<unsigned char>(10 * i + 2)};
+      colours->InsertNextTypedTuple(rgb);
+    }
+    auto weights = vtkSmartPointer<vtkFloatArray>::New();
+    weights->SetName("FIBER_WEIGHTS");
+    weights->InsertNextValue(0.25f);
+    weights->InsertNextValue(0.75f);
+    auto polyData = vtkSmartPointer<vtkPolyData>::New();
+    polyData->SetPoints(points);
+    polyData->SetLines(lines);
+    polyData->GetPointData()->AddArray(colours);
+    polyData->GetCellData()->AddArray(weights);
+
+    const std::string path = m_TempDir + "/reordered.fib";
+    auto writer = vtkSmartPointer<vtkPolyDataWriter>::New();
+    writer->SetInputData(polyData);
+    writer->SetFileName(path.c_str());
+    writer->Write();
+
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(path);
+    CPPUNIT_ASSERT_EQUAL(2u, fib->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL(0.25f, fib->GetFiberWeight(0));
+    CPPUNIT_ASSERT_EQUAL(0.75f, fib->GetFiberWeight(1));
+    auto fibColours = fib->GetFiberColors();
+    for (unsigned int f = 0; f < 2; ++f)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(f);
+      for (vtkIdType j = 0; j < cell->GetNumberOfPoints(); ++j)
+      {
+        const vtkIdType id = cell->GetPointId(j);
+        // the point's original index follows from its x coordinate
+        const int original = static_cast<int>(std::lround(fib->GetFiberPolyData()->GetPoint(id)[0]));
+        for (int c = 0; c < 3; ++c)
+          CPPUNIT_ASSERT_EQUAL(10.0 * original + c, fibColours->GetComponent(id, c));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("RGB colours get an opaque alpha", 255.0, fibColours->GetComponent(id, 3));
+      }
     }
   }
 };
