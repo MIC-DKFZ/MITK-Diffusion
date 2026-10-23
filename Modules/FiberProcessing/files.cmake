@@ -25,6 +25,7 @@ set(H_FILES
 
 set(CPP_FILES
   FiberClustering/mitkTractClusteringFilter.cpp
+  FiberModification/itkFiberCurvatureFilter.cpp
   FiberModification/mitkFiberWeightsFile.cpp
 )
 

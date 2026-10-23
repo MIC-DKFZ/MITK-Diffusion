@@ -19,6 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 // MITK
 #include <mitkPlanarEllipse.h>
 #include <mitkFiberBundle.h>
+#include <MitkFiberProcessingExports.h>
 
 // ITK
 #include <itkProcessObject.h>
@@ -35,7 +36,7 @@ namespace itk{
 /**
 * \brief    */
 
-class FiberCurvatureFilter : public ProcessObject
+class MITKFIBERPROCESSING_EXPORT FiberCurvatureFilter : public ProcessObject
 {
 public:
 
@@ -74,9 +75,5 @@ protected:
     bool    m_UseMedian;
 };
 }
-
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkFiberCurvatureFilter.cpp"
-#endif
 
 #endif
