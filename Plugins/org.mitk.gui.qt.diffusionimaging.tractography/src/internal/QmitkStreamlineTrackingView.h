@@ -136,7 +136,6 @@ private:
   mitk::DataNode::Pointer                 m_InteractivePointSetNode;
 
   std::vector< mitk::DataNode::Pointer >  m_InputImageNodes; ///< input image nodes
-  std::vector< mitk::Image::ConstPointer >     m_AdditionalInputImages;
   bool                                    m_FirstTensorProbRun;
   bool                                    m_FirstInteractiveRun;
 

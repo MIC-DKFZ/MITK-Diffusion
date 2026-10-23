@@ -816,7 +816,6 @@ void QmitkStreamlineTrackingView::OnSelectionChanged( berry::IWorkbenchPart::Poi
 {
   std::vector< mitk::DataNode::Pointer > last_nodes = m_InputImageNodes;
   m_InputImageNodes.clear();
-  m_AdditionalInputImages.clear();
   bool retrack = false;
 
   for( auto node : nodes )
@@ -824,20 +823,14 @@ void QmitkStreamlineTrackingView::OnSelectionChanged( berry::IWorkbenchPart::Poi
 
     if( node.IsNotNull() && dynamic_cast<mitk::Image*>(node->GetData()) )
     {
+      // Raw diffusion-weighted images were the input of the removed machine-learning tracker.
       if( dynamic_cast<mitk::TensorImage*>(node->GetData()) ||
           dynamic_cast<mitk::OdfImage*>(node->GetData()) ||
           dynamic_cast<mitk::ShImage*>(node->GetData()) ||
-          dynamic_cast<mitk::PeakImage*>(node->GetData()) ||
-          mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage( dynamic_cast<mitk::Image *>(node->GetData())))
+          dynamic_cast<mitk::PeakImage*>(node->GetData()) )
       {
         m_InputImageNodes.push_back(node);
         retrack = true;
-      }
-      else
-      {
-        mitk::Image* img = dynamic_cast<mitk::Image*>(node->GetData());
-        if (img!=nullptr && img->GetDimension()==3)
-          m_AdditionalInputImages.push_back(dynamic_cast<mitk::Image*>(node->GetData()));
       }
     }
   }
@@ -971,7 +964,7 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
 
   if (m_InputImageNodes.empty())
   {
-    QMessageBox::information(nullptr, "Information", "Please select an input image in the datamaneger (tensor, ODF, peak or dMRI image)!");
+    QMessageBox::information(nullptr, "Information", "Please select an input image in the datamanager (tensor, ODF, SH or peak image)!");
     return;
   }
   if (m_ThreadIsRunning || !m_Visible)
@@ -1054,7 +1047,7 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
       }
     }
   }
-  else
+  else if (dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData()))
   {
     if (m_TrackingHandler==nullptr)
     {
@@ -1062,6 +1055,12 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
       auto itk_peak_image = dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData())->GetItkPeakImage();
       dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingHandler)->SetPeakImage(itk_peak_image);
     }
+  }
+  else
+  {
+    QMessageBox::information(nullptr, "Information", "The selected input is not supported. Please select a tensor, ODF, SH or peak image.");
+    StartStopTrackingGui(false);
+    return;
   }
 
   if (m_Controls->m_InteractiveBox->isChecked())
