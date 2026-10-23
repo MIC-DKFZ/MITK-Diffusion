@@ -34,6 +34,12 @@ set(CPP_FILES
   IO/mitkPlanarFigureCompositeSerializer.cpp
 
   mitkFiberBundle.cpp
+  mitkFiberBundleColoring.cpp
+  mitkFiberBundleResampling.cpp
+  mitkFiberBundleRoiExtraction.cpp
+  mitkFiberBundleSelection.cpp
+  mitkFiberBundleTransforms.cpp
+  mitkFiberPolyDataBuilder.cpp
 
   IO/mitkFiberBundleServiceActivator.cpp
   IO/mitkFiberBundleMimeTypes.cpp
