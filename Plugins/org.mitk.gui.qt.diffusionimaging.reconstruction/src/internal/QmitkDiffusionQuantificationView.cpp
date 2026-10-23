@@ -205,8 +205,10 @@ void QmitkDiffusionQuantificationView::DoAdcCalculation(bool fit)
     else
       imageNode->SetName((name+"_MD").toStdString().c_str());
 
+    // The window fits diffusivities in mm^2/s; the image holds them times the scale factor.
+    const double scale = m_Controls->m_ScaleImageValuesBox->value();
     mitk::LevelWindow lw;
-    lw.SetLevelWindow(0.0015, 0.003);
+    lw.SetLevelWindow(0.0015 * scale, 0.003 * scale);
     imageNode->SetProperty( "levelwindow", mitk::LevelWindowProperty::New( lw ) );
     GetDataStorage()->Add(imageNode, node);
   }
@@ -427,8 +429,10 @@ void QmitkDiffusionQuantificationView::OdfQuantification(int method)
     lut_prop->SetLookupTable( lut );
     new_node->SetProperty("LookupTable", lut_prop );
 
+    // The window fits GFA values in [0, 1]; the image holds them times the scale factor.
+    const double scale = m_Controls->m_ScaleImageValuesBox->value();
     mitk::LevelWindow lw;
-    lw.SetLevelWindow(0.5, 1.0);
+    lw.SetLevelWindow(0.5 * scale, 1.0 * scale);
     new_node->SetProperty( "levelwindow", mitk::LevelWindowProperty::New( lw ) );
 
     GetDataStorage()->Add(new_node, node);
@@ -530,6 +534,9 @@ void QmitkDiffusionQuantificationView::TensorQuantification(int method)
     }
 
     multi->Update();
+
+    // The windows above fit unscaled values; the image holds them times the scale factor.
+    lw.SetLevelWindow(lw.GetLevel() * multi->GetScale(), lw.GetWindow() * multi->GetScale());
 
     // FA TO DATATREE
     mitk::Image::Pointer image = mitk::Image::New();
