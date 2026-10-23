@@ -819,8 +819,8 @@ bool StreamlineTrackingFilter::IsValidFiber(FiberType* fib)
       if ( mitk::imv::IsInsideMask<float>(fib->front(), m_Parameters->m_InterpolateRoiImages, m_TargetInterpolator)
            && !mitk::imv::IsInsideMask<float>(fib->back(), m_Parameters->m_InterpolateRoiImages, m_TargetInterpolator) )
         return true;
-      if ( !mitk::imv::IsInsideMask<float>(fib->back(), m_Parameters->m_InterpolateRoiImages, m_TargetInterpolator)
-           && mitk::imv::IsInsideMask<float>(fib->front(), m_Parameters->m_InterpolateRoiImages, m_TargetInterpolator) )
+      if ( mitk::imv::IsInsideMask<float>(fib->back(), m_Parameters->m_InterpolateRoiImages, m_TargetInterpolator)
+           && !mitk::imv::IsInsideMask<float>(fib->front(), m_Parameters->m_InterpolateRoiImages, m_TargetInterpolator) )
         return true;
       return false;
     }
