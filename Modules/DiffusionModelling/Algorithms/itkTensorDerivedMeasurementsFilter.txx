@@ -108,9 +108,8 @@ namespace itk {
         }
       case MD:
         {
-          typename TensorType::EigenValuesArrayType evs;
-          tensor.ComputeEigenValues(evs);
-          outputIt.Set((evs[0]+evs[1]+evs[2])/3.0);
+          // The eigenvalues sum to the trace, which needs no eigen decomposition.
+          outputIt.Set(tensor.GetTrace()/3.0);
           break;
         }
       }
