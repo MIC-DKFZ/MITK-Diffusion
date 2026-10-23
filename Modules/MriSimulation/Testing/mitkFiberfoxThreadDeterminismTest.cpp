@@ -18,6 +18,21 @@ found in the LICENSE file.
 #include <itkTractsToDWIImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <omp.h>
+#include <stdexcept>
+
+namespace
+{
+  /** Fiber model that fails, to check that an exception inside the parallel fiber loop reaches the caller. */
+  class ThrowingModel : public mitk::DiffusionSignalModel<double>
+  {
+  public:
+    ThrowingModel() = default;
+    ThrowingModel(const ThrowingModel& other) : mitk::DiffusionSignalModel<double>(other) {}
+    mitk::DiffusionSignalModel<double>* Clone() const override { return new ThrowingModel(*this); }
+    PixelType SimulateMeasurement(GradientType&) override { throw std::runtime_error("model failure"); }
+    double SimulateMeasurement(unsigned int, GradientType&) override { throw std::runtime_error("model failure"); }
+  };
+}
 
 /**
  * A Fiberfox simulation with a constant seed has to give the same result at every OpenMP thread
@@ -31,6 +46,7 @@ class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
   MITK_TEST(Param1);
   MITK_TEST(Param3);
   MITK_TEST(Param6);
+  MITK_TEST(ExceptionInFiberLoop);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -109,6 +125,23 @@ public:
   void Param1() { CompareAtThreadCounts("param1.ffp"); }
   void Param3() { CompareAtThreadCounts("param3.ffp"); }
   void Param6() { CompareAtThreadCounts("param6.ffp"); }
+
+  /** An exception must not leave an OpenMP region (that terminates the process); it reaches the caller of Update. */
+  void ExceptionInFiberLoop()
+  {
+    omp_set_num_threads(8);
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+    for (auto model : parameters.m_FiberModelList)
+      delete model;
+    parameters.m_FiberModelList = { new ThrowingModel() };
+
+    auto filter = FilterType::New();
+    filter->SetUseConstantRandSeed(true);
+    filter->SetParameters(parameters);
+    filter->SetFiberBundle(m_FiberBundle);
+    CPPUNIT_ASSERT_THROW(filter->Update(), std::runtime_error);
+  }
 };
 
 MITK_TEST_SUITE_REGISTRATION(mitkFiberfoxThreadDeterminism)
