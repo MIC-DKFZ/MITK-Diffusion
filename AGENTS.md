@@ -116,6 +116,11 @@ Facts the layout does not show:
   before, with the image rotation applied; DICOM import is unchanged and has no test data.
   `ctest -R 'mitkDiffusion(Property|Image|Dicom)'` runs the `DiffusionImage` tests of readers,
   writers and property helper.
+- `ctest -R mitkFiberBundle` runs the `FiberBundle` tests; `mitkFiberBundleMapperTest` renders
+  offscreen (EGL) and is skipped with exit code 77 where no OpenGL context can be created.
+  `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
+  give the same result at any number of OpenMP threads; MITK-Data fiber references depend on
+  exact point positions, so a change there is checked bit for bit against the old output.
 
 ## Porting state
 
