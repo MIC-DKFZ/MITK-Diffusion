@@ -113,8 +113,14 @@ int main(int argc, char* argv[])
     remove_outside = us::any_cast<bool>(parsedArgs["remove_outside"]);
 
   bool remove_inside = false;
-  if (!remove_outside && parsedArgs.count("remove_inside"))
+  if (parsedArgs.count("remove_inside"))
     remove_inside = us::any_cast<bool>(parsedArgs["remove_inside"]);
+
+  if (remove_inside && remove_outside)
+  {
+    MITK_INFO << "Use either --remove_inside or --remove_outside.";
+    return EXIT_FAILURE;
+  }
 
   typedef itk::Image< unsigned char, 3 > UcharImageType;
   UcharImageType::Pointer mask = nullptr;
@@ -234,6 +240,21 @@ int main(int argc, char* argv[])
       fib = filter->GetOutputFiberBundle();
     }
 
+    // Cutting at the mask comes before the length filter, so that no piece shorter than
+    // --min_length remains. Without any fiber left the result is an empty bundle.
+    if ( mask.IsNotNull() )
+    {
+      if (remove_outside)
+        fib = fib->RemoveFibersOutside(mask, false);
+      else if (remove_inside)
+        fib = fib->RemoveFibersOutside(mask, true);
+      if (fib.IsNull())
+      {
+        MITK_WARN << "No fiber is left after removing the fiber parts " << (remove_outside ? "outside" : "inside") << " the mask.";
+        fib = mitk::FiberBundle::New();
+      }
+    }
+
     if (minFiberLength>0)
       fib->RemoveShortFibers(minFiberLength);
 
@@ -252,13 +273,6 @@ int main(int argc, char* argv[])
     if (compress>0)
       fib->Compress(compress);
 
-    if ( mask.IsNotNull() )
-    {
-      if (remove_outside)
-        fib = fib->RemoveFibersOutside(mask, false);
-      else if (remove_inside)
-        fib = fib->RemoveFibersOutside(mask, true);
-    }
 
     if (axis/100==1)
       fib->MirrorFibers(0);
