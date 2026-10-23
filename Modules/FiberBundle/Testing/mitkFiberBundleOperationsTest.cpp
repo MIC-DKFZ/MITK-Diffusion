@@ -50,6 +50,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ApplyCurvatureThreshold_KeepsTwoPointFibersAndNoSinglePoints);
   MITK_TEST(TransformFibers_NoTransform_Throws);
   MITK_TEST(SetFiberPolyData_LeavesOldPolyDataAndPointDataBehind);
+  MITK_TEST(SetSingleFiberColor_UsesRgbOrder);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -362,6 +363,24 @@ public:
     CPPUNIT_ASSERT_MESSAGE("Point data of the old fibers is not carried over",
                            !fib->GetFiberPolyData()->GetPointData()->HasArray("STALE"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("The old polydata is not changed", oldNumPoints, oldPolyData->GetNumberOfPoints());
+  }
+
+  void SetSingleFiberColor_UsesRgbOrder()
+  {
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}}, {{0, 5, 0}, {1, 5, 0}, {2, 5, 0}}});
+    fib->SetSingleFiberColor(10, 20, 30, 1);
+    auto colours = fib->GetFiberColors();
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      for (vtkIdType j = 0; j < cell->GetNumberOfPoints(); ++j)
+      {
+        const vtkIdType id = cell->GetPointId(j);
+        CPPUNIT_ASSERT_EQUAL(i == 1 ? 10.0 : 255.0, colours->GetComponent(id, 0));
+        CPPUNIT_ASSERT_EQUAL(i == 1 ? 20.0 : 255.0, colours->GetComponent(id, 1));
+        CPPUNIT_ASSERT_EQUAL(i == 1 ? 30.0 : 255.0, colours->GetComponent(id, 2));
+      }
+    }
   }
 };
 

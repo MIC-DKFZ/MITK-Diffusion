@@ -1111,8 +1111,8 @@ void mitk::FiberBundle::SetSingleFiberColor(float r, float g, float b, unsigned 
       for (int j=0; j<numPoints; j++)
       {
           rgba[0] = static_cast<unsigned char>(r);
-          rgba[1] = static_cast<unsigned char>(b);
-          rgba[2] = static_cast<unsigned char>(g);
+          rgba[1] = static_cast<unsigned char>(g);
+          rgba[2] = static_cast<unsigned char>(b);
           rgba[3] = static_cast<unsigned char>(alpha);
 //          m_FiberColors->InsertTypedTuple(j, rgba);
 
