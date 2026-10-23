@@ -74,7 +74,7 @@ namespace mitk
     bool m_EnableInteractive = false;
 
     // ROI constraints
-    EndpointConstraints m_EpConstraints;
+    EndpointConstraints m_EpConstraints = EndpointConstraints::NONE;
     // - mask image
     // - stop image
     // - exclusion image
@@ -117,7 +117,7 @@ namespace mitk
     bool m_FlipY = false;
     bool m_FlipZ = false;
     bool m_InterpolateTractographyData = true;
-    bool m_InterpolateRoiImages;
+    bool m_InterpolateRoiImages = true;
     bool m_ApplyDirectionMatrix = false;
 
     // output and postprocessing

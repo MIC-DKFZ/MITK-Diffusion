@@ -252,6 +252,11 @@ int main(int argc, char* argv[])
       params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::ONE_EP_IN_TARGET;
     else if (us::any_cast<std::string>(parsedArgs["ep_constraint"]) == "NO_EP_IN_TARGET")
       params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::NO_EP_IN_TARGET;
+    else
+    {
+      MITK_ERROR << "Unknown endpoint constraint: " << us::any_cast<std::string>(parsedArgs["ep_constraint"]);
+      return EXIT_FAILURE;
+    }
   }
 
   if (parsedArgs.count("cutoff"))

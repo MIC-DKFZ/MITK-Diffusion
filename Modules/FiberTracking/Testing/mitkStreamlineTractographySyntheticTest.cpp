@@ -15,6 +15,8 @@ found in the LICENSE file.
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
+#include <cstring>
+#include <new>
 #include <omp.h>
 
 /**
@@ -24,6 +26,7 @@ found in the LICENSE file.
 class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkStreamlineTractographySyntheticTestSuite);
+  MITK_TEST(Parameters_Defaults);
   MITK_TEST(EndpointConstraints_TargetAtEitherEnd);
   CPPUNIT_TEST_SUITE_END();
 
@@ -111,6 +114,17 @@ public:
   }
 
   void tearDown() override { m_StraightField = nullptr; }
+
+  /** Constructed on memory that is not zero, so that a member without initializer shows. */
+  void Parameters_Defaults()
+  {
+    alignas(mitk::StreamlineTractographyParameters) unsigned char buffer[sizeof(mitk::StreamlineTractographyParameters)];
+    std::memset(buffer, 0xA5, sizeof(buffer));
+    auto *params = new (buffer) mitk::StreamlineTractographyParameters();
+    CPPUNIT_ASSERT_EQUAL(int(EpConstraint::NONE), int(params->m_EpConstraints));
+    CPPUNIT_ASSERT(params->m_InterpolateRoiImages);
+    params->~StreamlineTractographyParameters();
+  }
 
   /** Each streamline runs from x = -0.25 to x = 19.25 mm; the target lies at one end, the other, or both. */
   void EndpointConstraints_TargetAtEitherEnd()
