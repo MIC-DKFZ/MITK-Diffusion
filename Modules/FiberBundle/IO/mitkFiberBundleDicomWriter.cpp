@@ -143,15 +143,6 @@ void mitk::FiberBundleDicomWriter::Write()
     ref2->readFromItem(item);
     trc->getReferencedInstances().add(ref2);
 
-    // GET STUFF FROM DICOM FILE (disbled since file probably not available)
-//    trc->importHierarchy("/media/neher/Rumpelkammer/Demo/Tumor/KOPF_UNTERSUCHUNG_20170419_164344_842000/T1_FL2D_TRA_5MM_0013/WISSING_MARISKA.MR.KOPF_UNTERSUCHUNG.0013.0022.2017.07.31.14.09.57.918625.254331277.IMA",
-//                         true,
-//                         true,
-//                         true,
-//                         true);
-
-//    trc->getReferencedInstances().addFromFiles({"/media/neher/Rumpelkammer/Demo/Tumor/KOPF_UNTERSUCHUNG_20170419_164344_842000/T1_FL2D_TRA_5MM_0013/WISSING_MARISKA.MR.KOPF_UNTERSUCHUNG.0013.0022.2017.07.31.14.09.57.918625.254331277.IMA"});
-
     // Create track set
     CodeWithModifiers anatomy("");
     anatomy.set(anatomy_value.c_str(), "SRT", anatomy_meaning.c_str());
