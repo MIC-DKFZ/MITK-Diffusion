@@ -30,6 +30,9 @@ namespace mitk
     std::vector<unsigned int> diffusionWeightedIndices;
     /** Unit directions of the diffusion-weighted volumes, in the order of diffusionWeightedIndices. */
     std::vector<vnl_vector_fixed<double, 3>> directions;
+    /** b-value of the diffusion-weighted volumes as the b-value map gives it (one shell, so all share
+     * it); below the reference b-value when e.g. other shells were removed. */
+    double bValue = 0;
   };
 
   /**
@@ -77,6 +80,7 @@ namespace mitk
                                << shells.size() << " b-values (" << bValues.str()
                                << "). Extract one shell, or round the b-values if they differ only by noise.");
     }
+    result.bValue = *shells.begin();
     return result;
   }
 }

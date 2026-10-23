@@ -91,7 +91,9 @@ class AnalyticalDiffusionQballReconstructionImageFilter : public ImageToImageFil
 public:
 
     /** Reconstruction method: Q-ball ODF (Descoteaux 2007, the ODF output divided by its sum),
-     * SH fit of the ADC profile or of the raw signal, solid-angle ODF (Aganj 2010). */
+     * SH fit of the ADC profile or of the raw signal, solid-angle ODF (Aganj 2010). For the ADC
+     * profile the coefficient image holds the fit of ln S, the ODF output the ADC (ln S0 - fit) / b
+     * with the shell's b-value. */
     enum Normalization {
         QBAR_STANDARD,
         QBAR_ADC_ONLY,
@@ -240,8 +242,10 @@ private:
     std::vector<unsigned int>                         m_GradientIndices;
     /** Threshold on the reference image data */
     ReferencePixelType                                m_Threshold;
-    /** LeBihan's b-value for normalizing tensors */
+    /** Reference b-value: a volume's b-value is m_BValue * |g|^2 */
     float                                             m_BValue;
+    /** b-value of the one shell, set per execution; the ADC profile divides by it */
+    double                                            m_ShellBValue;
     typename BZeroImageType::Pointer                  m_BZeroImage;
     double                                            m_Lambda;
     Normalization                                     m_NormalizationMethod;

@@ -5,7 +5,7 @@ The Q-ball reconstruction view computes orientation distribution functions (ODFs
 \li <b>Numerical:</b> the original numerical Q-ball reconstruction (Tuch, "Q-ball imaging", MRM 2004). Its result is an ODF image.
 \li <b>Standard:</b> the Q-ball ODF in spherical harmonics (Descoteaux et al., "Regularized, fast, and robust analytical Q-ball imaging", MRM 2007).
 \li <b>Solid Angle:</b> the ODF with solid-angle consideration (Aganj et al., "Reconstruction of the orientation distribution function in single- and multiple-shell q-ball imaging within constant solid angle", MRM 2010).
-\li <b>ADC-Profile only:</b> the ADC profile in spherical harmonics.
+\li <b>ADC-Profile only:</b> the ADC profile -ln(S/S0)/b in spherical harmonics, with b the b-value of the shell (also when it is below the reference b-value of the DWI, e.g. after other shells were removed). The spherical harmonics image holds the fit of ln(S); the sampled ODF image holds the ADC.
 \li <b>Raw Signal only:</b> the raw signal in spherical harmonics.
 \li <b>Multi-Shell:</b> Aganj's solid-angle reconstruction from three shells with b-values b, 2b and 3b (Aganj et al. 2010). Check boxes for the shells of the selected DWI appear below the parameters; exactly three such shells must be checked.
 

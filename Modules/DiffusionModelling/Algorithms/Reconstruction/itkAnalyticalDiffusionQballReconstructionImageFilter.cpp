@@ -41,6 +41,7 @@ AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDirection
   m_NumberOfBaselineImages(1),
   m_Threshold(NumericTraits< ReferencePixelType >::NonpositiveMin()),
   m_BValue(-1),
+  m_ShellBValue(0),
   m_Lambda(0.0),
   m_NormalizationMethod(QBAR_STANDARD),
   m_NumberCoefficients(0),
@@ -80,9 +81,11 @@ itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType,
   }
   case QBAR_ADC_ONLY:
   {
+    // ADC = -ln(S/S0)/b with the shell's own b-value, which is below the reference b-value when
+    // other shells were removed from the DWI.
     for(int i=0; i<NrOdfDirections; i++)
     {
-      odf[i] = ((TOdfPixelType)log((TOdfPixelType)b0)-odf[i])/m_BValue;
+      odf[i] = ((TOdfPixelType)log((TOdfPixelType)b0)-odf[i])/m_ShellBValue;
     }
     break;
   }
@@ -322,6 +325,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
   m_GradientIndices = shell.diffusionWeightedIndices;
   m_NumberOfBaselineImages = m_BaselineIndices.size();
   m_NumberOfGradientDirections = m_GradientIndices.size();
+  m_ShellBValue = shell.bValue;
 
   m_NumberCoefficients = (ShOrder*ShOrder + ShOrder + 2)/2 + ShOrder;
   if( m_NumberOfGradientDirections < m_NumberCoefficients )

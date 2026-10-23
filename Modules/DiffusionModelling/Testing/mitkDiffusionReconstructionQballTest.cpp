@@ -49,6 +49,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(SingleShellFilters_TwoShells_Throw);
   MITK_TEST(SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint);
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
+  MITK_TEST(AdcProfile_ShellBelowReference_GivesAdc);
   MITK_TEST(MultiShell_UnsupportedShells_Throw);
   MITK_TEST(MultiShell_SecondUpdate_SameResult);
   MITK_TEST(MultiShell_WithoutOdf_SameCoefficients);
@@ -414,6 +415,32 @@ public:
     auto analyticalShort = Analytical(shortVector);
     analyticalShort->Update();
     CheckEqual(analyticalExact->GetOutput(), analyticalShort->GetOutput());
+  }
+
+  // The ADC profile divided by the reference b-value, so a shell of b = 1000 in a DWI whose
+  // reference b-value is 3000 (e.g. after the other shells were removed) gave a third of the ADC.
+  // Without regularization the order-4 fit holds the quadratic form u^T D u of the simulated
+  // tensor; the tolerance covers the rounding of the signal to short (about 1 % of the largest ADC).
+  void AdcProfile_ShellBelowReference_GivesAdc()
+  {
+    using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
+    for (double referenceBValue : {1000.0, 3000.0})
+    {
+      const auto dwi = Simulate(Shells({1000}, referenceBValue), referenceBValue);
+      auto filter = AnalyticalFilterType::New();
+      filter->SetBValue(referenceBValue);
+      filter->SetGradientImage(dwi.gradients, dwi.image);
+      filter->SetLambda(0);
+      filter->SetNormalizationMethod(AnalyticalFilterType::QBAR_ADC_ONLY);
+      filter->Update();
+      const auto adc = filter->GetOutput()->GetPixel({{0, 0, 0}});
+      for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      {
+        const vnl_vector_fixed<double, 3> u = OdfType::GetDirection(i);
+        const double expected = 1.7e-3 * u[0] * u[0] + 0.3e-3 * (u[1] * u[1] + u[2] * u[2]);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, adc[i], 2e-5);
+      }
+    }
   }
 
   static std::string MultiShellError(const std::vector<double> &bValues)
