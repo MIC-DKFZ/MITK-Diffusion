@@ -843,6 +843,10 @@ void TractsToDWIImageFilter< PixelType >::InitializeFiberData()
 {
   m_mmRadius = m_Parameters.m_SignalGen.m_AxonRadius/1000;
 
+  // The weights are normalized below; the simulation works on a copy, so the caller's bundle (the
+  // tractogram shown in the Workbench) keeps its weights.
+  m_FiberBundle = m_FiberBundle->GetDeepCopy();
+
   auto caster = itk::CastImageFilter< itk::Image<unsigned char, 3>, itk::Image<double, 3> >::New();
   caster->SetInput(m_TransformedMaskImage);
   caster->Update();
@@ -870,7 +874,14 @@ void TractsToDWIImageFilter< PixelType >::InitializeFiberData()
   double max_density = density_calculator->GetMaxDensity();
 
   double voxel_volume = m_WorkingSpacing[0]*m_WorkingSpacing[1]*m_WorkingSpacing[2];
-  if (m_mmRadius>0)
+  if (max_density<=0)
+  {
+    // no fiber passes through the image: an automatic radius would be infinite (NaN signal)
+    PrintToLog("\nWarning: no fiber passes through the image. Only the non-fiber compartments contribute signal.", false, true, true);
+    if (m_mmRadius<=0)
+      m_mmRadius = 0;
+  }
+  else if (m_mmRadius>0)
   {
     std::stringstream stream;
     stream << std::fixed << setprecision(2) << itk::Math::pi*m_mmRadius*m_mmRadius*max_density;
@@ -1229,7 +1240,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
 
       // axon radius not manually defined --> set fullest voxel (maxVolume) to full fiber voxel
       double density_correctiony_global = 1.0;
-      if (m_Parameters.m_SignalGen.m_AxonRadius<0.0001)
+      if (m_Parameters.m_SignalGen.m_AxonRadius<0.0001 && maxVolume>0)  // no fiber volume: nothing to correct
         density_correctiony_global = m_VoxelVolume/maxVolume;
 
       // generate non-fiber signal
