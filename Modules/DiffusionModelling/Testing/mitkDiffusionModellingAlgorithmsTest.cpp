@@ -705,10 +705,12 @@ public:
   }
 
   // The MRtrix CSD coefficients (order 8) sampled on the ODF directions give the ODF file that
-  // was made from them.
+  // was made from them. The file was made from the coefficients read in MITK's legacy basis.
   void ShToOdf_MatchesReference()
   {
-    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    mitk::IFileReader::Options options;
+    options["SH convention"] = std::string("MITK legacy (MRtrix 0.2)");
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, options);
     auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &functor);
     CPPUNIT_ASSERT_EQUAL(8u, shImage->ShOrder());
     auto odfs = mitk::convert::GetItkOdfFromShImage(shImage.GetPointer());
@@ -834,7 +836,10 @@ public:
     odfRgb->SetInput(mitk::convert::GetItkOdfFromOdfImage(mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image.qbi")).GetPointer()));
     odfRgb->Update();
 
-    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    // csd_image.qbi was made from the coefficients read in MITK's legacy basis.
+    mitk::IFileReader::Options options;
+    options["SH convention"] = std::string("MITK legacy (MRtrix 0.2)");
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, options);
     auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &functor);
     auto shRgb = itk::ShToRgbImageFilter<itk::Image<itk::Vector<float, 45>, 3>, 8>::New();
     shRgb->SetInput(mitk::convert::GetItkShFromShImage<45>(shImage.GetPointer()));

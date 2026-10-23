@@ -28,6 +28,61 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLocaleSwitch.h>
 #include <itkShCoefficientImageImporter.h>
 
+#include <cmath>
+#include <optional>
+
+namespace
+{
+  // Constant initialization: the reader is constructed while the library is loaded, possibly
+  // before dynamically initialized globals of this file.
+  constexpr const char *CONVENTION_OPTION = "SH convention";
+  constexpr const char *AUTO = "auto (file marker, else MITK legacy)";
+  constexpr const char *MRTRIX3 = "MRtrix 3";
+  constexpr const char *MITK_LEGACY = "MITK legacy (MRtrix 0.2)";
+  constexpr const char *FSL_DIPY = "FSL/Dipy";
+
+  /** How the coefficients in the file are defined. */
+  enum class FileBasis
+  {
+    MitkLegacy, // MITK's internal basis (MRtrix 0.2), taken over unchanged
+    Mrtrix3,    // MRtrix 3: orthonormal, m != 0 larger by sqrt(2) than MITK's
+    MitkFsl     // MITK's FSL definition (ShImage::FSL), taken over unchanged
+  };
+
+  /** Convention marked by ShImageWriter (NRRD key or NIfTI descrip); it overrides the option. */
+  std::optional<FileBasis> MitkMarker(const itk::MetaDataDictionary &dictionary)
+  {
+    std::string value;
+    if (itk::ExposeMetaData<std::string>(dictionary, "MITK_SH_convention", value)
+        || (itk::ExposeMetaData<std::string>(dictionary, "ITK_FileNotes", value) && value.rfind("MITK_SH_convention=", 0) == 0))
+    {
+      value = value.substr(value.find('=') + 1);
+      if (value == "FSL")
+        return FileBasis::MitkFsl;
+      if (value == "MRtrix3")
+        return FileBasis::Mrtrix3;
+    }
+    return std::nullopt;
+  }
+
+  /** MRtrix writes "MRtrix version: <version>" into the NIfTI descrip; version 3 and later use the orthonormal basis. */
+  bool WrittenByMrtrix3(const itk::MetaDataDictionary &dictionary)
+  {
+    const std::string prefix = "MRtrix version: ";
+    std::string notes;
+    if (!itk::ExposeMetaData<std::string>(dictionary, "ITK_FileNotes", notes) || notes.rfind(prefix, 0) != 0)
+      return false;
+    try
+    {
+      return std::stoi(notes.substr(prefix.size())) >= 3;
+    }
+    catch (const std::exception &)
+    {
+      return false;
+    }
+  }
+}
+
 namespace mitk
 {
   ShImageReader::ShImageReader(const ShImageReader& other)
@@ -39,7 +94,8 @@ namespace mitk
     : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION() )
   {
     Options defaultOptions;
-    defaultOptions["Assume MRtrix/MITK style SH convention (else FSL/Dipy)"] = true;
+    defaultOptions[CONVENTION_OPTION] = std::string(AUTO);
+    defaultOptions[std::string(CONVENTION_OPTION) + ".enum"] = std::vector<std::string>{AUTO, MRTRIX3, MITK_LEGACY, FSL_DIPY};
     this->SetDefaultOptions(defaultOptions);
 
     this->RegisterService();
@@ -57,18 +113,38 @@ namespace mitk
 
     mitk::ShImage::Pointer shImage = mitk::ShImage::New();
 
-    Options options = this->GetOptions();
-    bool mrtrix_sh = us::any_cast<bool>(options["Assume MRtrix/MITK style SH convention (else FSL/Dipy)"]);
+    const auto &dictionary = img->GetMetaDataDictionary();
+    auto basis = MitkMarker(dictionary);
+    if (!basis)
+    {
+      const std::string option = us::any_cast<std::string>(this->GetOptions()[CONVENTION_OPTION]);
+      if (option == MRTRIX3 || (option == AUTO && WrittenByMrtrix3(dictionary)))
+        basis = FileBasis::Mrtrix3;
+      else if (option == FSL_DIPY)
+        basis = FileBasis::MitkFsl;
+      else
+        basis = FileBasis::MitkLegacy;
+    }
 
-    // ShImageWriter marks FSL/Dipy coefficients; the mark overrides the option.
-    const auto& dictionary = img->GetMetaDataDictionary();
-    std::string convention;
-    if ((itk::ExposeMetaData<std::string>(dictionary, "MITK_SH_convention", convention) && convention == "FSL")
-        || (itk::ExposeMetaData<std::string>(dictionary, "ITK_FileNotes", convention) && convention == "MITK_SH_convention=FSL"))
-      mrtrix_sh = false;
-
-    if (!mrtrix_sh)
+    if (*basis == FileBasis::MitkFsl)
       shImage->SetShConvention(mitk::ShImage::SH_CONVENTION::FSL);
+
+    if (*basis == FileBasis::Mrtrix3)
+    {
+      // MITK's internal basis is MRtrix 0.2's, whose functions with m != 0 are MRtrix 3's divided
+      // by sqrt(2); m = 0 sits at index l(l+1)/2 of each even order l.
+      auto coefficients = importer->GetCoefficientImage();
+      itk::ImageRegionIterator<typename ImporterType::CoefficientImageType> it(coefficients, coefficients->GetLargestPossibleRegion());
+      for (; !it.IsAtEnd(); ++it)
+      {
+        auto pixel = it.Get();
+        for (int l = 2; l <= shOrder; l += 2)
+          for (int m = -l; m <= l; ++m)
+            if (m != 0)
+              pixel[l * (l + 1) / 2 + m] = static_cast<float>(pixel[l * (l + 1) / 2 + m] * std::sqrt(2.0));
+        it.Set(pixel);
+      }
+    }
 
     // The SH image takes over the buffer of the coefficient image.
     mitk::Image::Pointer resultImage = dynamic_cast<mitk::Image*>(shImage.GetPointer());
