@@ -146,7 +146,8 @@ namespace itk {
     m_Gamma = 42576000;
     if ( m_Parameters->m_SignalGen.m_EddyStrength>0 && m_DiffusionGradientDirection.GetNorm()>0.001)
     {
-      m_DiffusionGradientDirection = m_DiffusionGradientDirection *  m_Parameters->m_SignalGen.m_EddyStrength/1000 *  m_Gamma;
+      // a separate member: scaling m_DiffusionGradientDirection itself scaled it again on every Update()
+      m_EddyFieldGradient = m_DiffusionGradientDirection *  m_Parameters->m_SignalGen.m_EddyStrength/1000 *  m_Gamma;
       m_IsBaseline = false;
     }
     else {
@@ -449,7 +450,7 @@ namespace itk {
         if (  m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline)
         {
           // duration (tRead) already included in "eddyDecay"
-          phi += (m_DiffusionGradientDirection[0]*pos[0]+m_DiffusionGradientDirection[1]*pos[1]+m_DiffusionGradientDirection[2]*pos[2]) * eddyDecay;
+          phi += (m_EddyFieldGradient[0]*pos[0]+m_EddyFieldGradient[1]*pos[1]+m_EddyFieldGradient[2]*pos[2]) * eddyDecay;
         }
 
         // simulate distortions

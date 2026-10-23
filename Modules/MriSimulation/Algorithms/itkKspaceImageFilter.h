@@ -114,6 +114,7 @@ namespace itk{
     std::vector< float >                    m_T1Relax;
     std::vector< InputImagePointerType >    m_CompartmentImages;
     itk::Vector<double,3>                   m_DiffusionGradientDirection;
+    itk::Vector<double,3>                   m_EddyFieldGradient;    ///< eddy-current field gradient times gamma, along the diffusion gradient
     float                                   m_Z;
     int                                     m_Zidx;
     int                                     m_RandSeed;
