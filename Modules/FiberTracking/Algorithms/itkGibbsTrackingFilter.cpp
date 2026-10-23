@@ -97,16 +97,7 @@ GibbsTrackingFilter< ItkOdfImageType >
 {
   MITK_INFO << "GibbsTrackingFilter: estimating particle weight";
 
-  float minSpacing;
-  if(m_OdfImage->GetSpacing()[0]<m_OdfImage->GetSpacing()[1] && m_OdfImage->GetSpacing()[0]<m_OdfImage->GetSpacing()[2])
-    minSpacing = m_OdfImage->GetSpacing()[0];
-  else if (m_OdfImage->GetSpacing()[1] < m_OdfImage->GetSpacing()[2])
-    minSpacing = m_OdfImage->GetSpacing()[1];
-  else
-    minSpacing = m_OdfImage->GetSpacing()[2];
-  float m_ParticleLength = 1.5*minSpacing;
-  float m_ParticleWidth = 0.5*minSpacing;
-
+  // uses the particle length and width of the run (set by the user or defaulted in GenerateData)
   // seed random generators
   Statistics::MersenneTwisterRandomVariateGenerator::Pointer randGen = Statistics::MersenneTwisterRandomVariateGenerator::New();
   if (m_RandomSeed>-1)
