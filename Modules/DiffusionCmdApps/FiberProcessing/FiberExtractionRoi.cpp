@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itksys/SystemTools.hxx>
 #include <itkFiberExtractionFilter.h>
 
+#include <filesystem>
 #include <sstream>
 
 #define _USE_MATH_DEFINES
@@ -236,7 +237,8 @@ int main(int argc, char* argv[])
     std::string ext = itksys::SystemTools::GetFilenameExtension(outFib);
     if (ext.empty())
       ext = ".trk";
-    outFib = itksys::SystemTools::GetFilenamePath(outFib) + '/' + itksys::SystemTools::GetFilenameWithoutExtension(outFib);
+    // A bare file name has an empty parent path; its outputs go to the working directory.
+    outFib = (std::filesystem::path(outFib).parent_path() / itksys::SystemTools::GetFilenameWithoutExtension(outFib)).string();
     if (invert)
       mitk::IOUtil::Save(extractor->GetNegatives().at(0), outFib + ext);
     else
