@@ -13,11 +13,25 @@ found in the LICENSE file.
 #include <itkImageRegionIteratorWithIndex.h>
 #include <mitkFiberBuilder.h>
 #include <mitkGibbsEnergyComputer.h>
+#include <mitkMetropolisHastingsSampler.h>
 #include <mitkParticleGrid.h>
 #include <mitkSphereInterpolator.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <vtkMath.h>
+
+/** Gives the tests access to the connection proposal of the sampler. */
+class TrackProposalSampler : public mitk::MetropolisHastingsSampler
+{
+public:
+  using mitk::MetropolisHastingsSampler::MetropolisHastingsSampler;
+
+  const mitk::Track &ProposeTrackFrom(mitk::Particle *p, int ep)
+  {
+    MakeTrackProposal(mitk::EndPoint(p, ep));
+    return m_ProposalTrack;
+  }
+};
 
 /**
  * Components of the Gibbs (global) tractography on small hand-made inputs, so that the expected
@@ -28,6 +42,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkGlobalTractographyUnitTestSuite);
   MITK_TEST(EvaluateOdf_RotatedImage_SamplesAlongParticle);
   MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
+  MITK_TEST(TrackProposal_LongerThanThousandParticles);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfImageType = GibbsEnergyComputer::ItkOdfImgType;
@@ -137,6 +152,49 @@ public:
         CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, std::sqrt(vtkMath::Distance2BetweenPoints(p0, p1)), 1e-5);
       }
     }
+  }
+
+  /** A connection proposal walks over free particles as long as they continue each other. The
+   *  track had a fixed buffer of 1000 entries that was written without a bound. */
+  void TrackProposal_LongerThanThousandParticles()
+  {
+    const int numParticles = 1500;
+    itk::Matrix<double, 3, 3> identity;
+    identity.SetIdentity();
+    auto mask = FloatImageType::New();
+    FloatImageType::SizeType size = {{numParticles, 2, 2}};
+    mask->SetRegions(FloatImageType::RegionType(size));
+    FloatImageType::SpacingType spacing;
+    spacing.Fill(2.0);
+    mask->SetSpacing(spacing);
+    mask->SetDirection(identity);
+    mask->Allocate();
+    mask->FillBuffer(1.0f);
+    auto odfs = MakeImage<OdfImageType>(identity); // not evaluated by connection proposals
+
+    SphereInterpolator interpolator("");
+    CPPUNIT_ASSERT(interpolator.IsInValidState());
+    const float length = 1.0f;
+    mitk::ParticleGrid grid(mask, length, 16);
+    auto rng = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+    rng->SetSeed(1);
+    GibbsEnergyComputer energy(odfs, mask, &grid, &interpolator, rng);
+    const float curvature = std::cos(itk::Math::pi / 4);
+    energy.SetParameters(0.001f, 0.5f, 10 * length * length, curvature, 0.0f, 0.2f);
+    TrackProposalSampler sampler(&grid, &energy, rng, curvature);
+
+    // a straight row of particles whose endpoints touch
+    for (int k = 0; k < numParticles; ++k)
+    {
+      mitk::Particle *p = grid.NewParticle(vnl_vector_fixed<float, 3>(1.0f + 2.0f * k, 2.0f, 2.0f));
+      CPPUNIT_ASSERT(p != nullptr);
+      p->GetDir() = vnl_vector_fixed<float, 3>(1.0f, 0.0f, 0.0f);
+    }
+
+    const mitk::Track &track = sampler.ProposeTrackFrom(grid.GetParticle(0), +1);
+    CPPUNIT_ASSERT_EQUAL(numParticles, track.m_Length);
+    for (int k = 0; k < numParticles; ++k)
+      CPPUNIT_ASSERT_EQUAL(k, track.track[k].p->ID);
   }
 };
 

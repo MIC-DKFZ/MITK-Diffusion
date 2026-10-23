@@ -96,7 +96,7 @@ public:
 
     Track()
     {
-        track.resize(1000);
+        track.reserve(1000);  // grows if needed: a track can pass any number of free particles
     }
 
     ~Track(){}

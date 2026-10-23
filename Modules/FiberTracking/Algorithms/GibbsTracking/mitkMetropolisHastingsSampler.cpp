@@ -299,7 +299,8 @@ void MetropolisHastingsSampler::RemoveAndSaveTrack(EndPoint P)
     int cnt = 0;
     float energy = 0;
     float AccumProb = 1.0;
-    m_BackupTrack.track[cnt] = Current;
+    m_BackupTrack.track.clear();
+    m_BackupTrack.track.push_back(Current);
     EndPoint Next;
 
     for (;;)
@@ -358,7 +359,7 @@ void MetropolisHastingsSampler::RemoveAndSaveTrack(EndPoint P)
         Current = Next;
         Current.ep *= -1;
         cnt++;
-        m_BackupTrack.track[cnt] = Current;
+        m_BackupTrack.track.push_back(Current);
 
         if (m_RandGen->GetVariate() > m_DelProb)
             break;
@@ -375,7 +376,9 @@ void MetropolisHastingsSampler::MakeTrackProposal(EndPoint P)
     int cnt = 0;
     float energy = 0;
     float AccumProb = 1.0;
-    m_ProposalTrack.track[cnt++] = Current;
+    m_ProposalTrack.track.clear();
+    m_ProposalTrack.track.push_back(Current);
+    cnt++;
     Current.p->label = 1;
 
     for (;;)
@@ -408,7 +411,8 @@ void MetropolisHastingsSampler::MakeTrackProposal(EndPoint P)
         Current.ep *= -1;
 
         Current.p->label = 1;  // put label to avoid loops
-        m_ProposalTrack.track[cnt++] = Current;
+        m_ProposalTrack.track.push_back(Current);
+        cnt++;
     }
 
     m_ProposalTrack.m_Energy = energy;
