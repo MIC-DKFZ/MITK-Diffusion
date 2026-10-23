@@ -21,6 +21,8 @@ found in the LICENSE file.
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <itksys/SystemTools.hxx>
 #include <vnl/vnl_rotation_matrix.h>
+#include <fstream>
+#include <algorithm>
 
 namespace
 {
@@ -60,6 +62,7 @@ class mitkFiberfoxParametersTestSuite : public mitk::TestFixture
   MITK_TEST(ClearAndLoadDeleteModels);
   MITK_TEST(CopyKeepsLoadedModels);
   MITK_TEST(GradientsFromImage);
+  MITK_TEST(MotionVolumes);
   CPPUNIT_TEST_SUITE_END();
 
   /** Parameters whose only models are two counting fiber models and one counting non-fiber model. */
@@ -217,6 +220,44 @@ public:
       for (unsigned int i = 0; i < world->Size(); ++i)
         for (int c = 0; c < 3; ++c)
           CPPUNIT_ASSERT_DOUBLES_EQUAL(world->ElementAt(i)[c], parameters.m_SignalGen.GetGradientDirection(i)[c], 1e-12);
+    }
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /** The motion-volume string of a .ffp file; an unreadable one moves no volume and the rest of the file is read. */
+  void MotionVolumes()
+  {
+    std::ifstream in(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"));
+    const std::string original((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const std::string tag = "<motionvolumes>random</motionvolumes>";
+    CPPUNIT_ASSERT(original.find(tag) != std::string::npos);
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_motion_XXXXXX");
+
+    const std::vector<std::pair<std::string, std::vector<unsigned int>>> cases = {
+      { "2 4", { 2, 4 } },        // moved volumes
+      { "-0 -1", {} },            // all but volumes 0 and 1 (checked below)
+      { "abc", {} },              // unreadable: none
+      { "1 -2", {} },             // both signs: none
+      { "", {} } };
+    for (const auto& c : cases)
+    {
+      std::string text = original;
+      text.replace(text.find(tag), tag.size(), "<motionvolumes>" + c.first + "</motionvolumes>");
+      const std::string file = folder + "/motion.ffp";
+      std::ofstream(file) << text;
+
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(file, true);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE("'" + c.first + "': compartments loaded", std::size_t(2), parameters.m_NonFiberModelList.size());
+      const auto& moved = parameters.m_SignalGen.m_MotionVolumes;
+      CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(parameters.m_SignalGen.GetNumVolumes()), moved.size());
+      for (unsigned int i = 0; i < moved.size(); ++i)
+      {
+        bool expected = std::find(c.second.begin(), c.second.end(), i) != c.second.end();
+        if (c.first == "-0 -1")
+          expected = i > 1;
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("'" + c.first + "': volume " + std::to_string(i), expected, static_cast<bool>(moved[i]));
+      }
     }
     itksys::SystemTools::RemoveADirectory(folder);
   }

@@ -838,62 +838,34 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
         }
         MITK_DEBUG << "mitkFiberfoxParameters.cpp: Case m_Misc.m_MotionVolumesBox == \"random\".";
       }
-      else if ( ! m_Misc.m_MotionVolumesBox.empty() )
-      {
-        std::stringstream stream( m_Misc.m_MotionVolumesBox );
-        std::vector<int> numbers;
-        int nummer = std::numeric_limits<int>::max();
-        while( stream >> nummer )
-        {
-          if( nummer < std::numeric_limits<int>::max() )
-          {
-            numbers.push_back( nummer );
-          }
-        }
-        // If a list of negative numbers is given:
-        if( *(std::min_element( numbers.begin(), numbers.end() )) < 0
-            && *(std::max_element( numbers.begin(), numbers.end() )) <= 0 ) // cave: -0 == +0
-        {
-          for ( size_t i=0; i<m_SignalGen.GetNumVolumes(); ++i )
-          {
-            m_SignalGen.m_MotionVolumes.push_back( true );
-          }
-          // set all true except those given.
-          for (auto number : numbers)
-          {
-            if (-number < static_cast<int>(m_SignalGen.GetNumVolumes()) && -number >= 0 )
-              m_SignalGen.m_MotionVolumes.at(-number) = false;
-          }
-          MITK_DEBUG << "mitkFiberfoxParameters.cpp: Case list of negative numbers.";
-        }
-        // If a list of positive numbers is given:
-        else if( *(std::min_element( numbers.begin(), numbers.end() )) >= 0
-                 && *(std::max_element( numbers.begin(), numbers.end() )) >= 0 )
-        {
-          for ( size_t i=0; i<m_SignalGen.GetNumVolumes(); ++i )
-          {
-            m_SignalGen.m_MotionVolumes.push_back( false );
-          }
-          // set all false except those given.
-          for (auto number : numbers)
-          {
-            if (number < static_cast<int>(m_SignalGen.GetNumVolumes()) && number >= 0)
-              m_SignalGen.m_MotionVolumes.at(number) = true;
-          }
-          MITK_DEBUG << "mitkFiberfoxParameters.cpp: Case list of positive numbers.";
-        }
-        else
-        {
-          MITK_WARN << "mitkFiberfoxParameters.cpp: Inconsistent list of numbers in m_MotionVolumesBox.";
-          break;
-        }
-      }
       else
       {
-        MITK_WARN << "mitkFiberfoxParameters.cpp: Cannot make sense of string in m_MotionVolumesBox.";
-        break;
-      }
+        // A list of volume indices: positive numbers name the moved volumes, negative numbers the
+        // volumes that stay. Anything else (no numbers, both signs) moves no volume, with a warning;
+        // the rest of the file is still read.
+        std::stringstream stream( m_Misc.m_MotionVolumesBox );
+        std::vector<int> numbers;
+        int number = 0;
+        while( stream >> number )
+          numbers.push_back( number );
+        const bool parsed = !numbers.empty();
+        const bool negative = parsed && *std::max_element(numbers.begin(), numbers.end()) <= 0
+            && *std::min_element(numbers.begin(), numbers.end()) < 0;
+        const bool positive = parsed && *std::min_element(numbers.begin(), numbers.end()) >= 0;
 
+        m_SignalGen.m_MotionVolumes.assign(m_SignalGen.GetNumVolumes(), negative);
+        if (negative || positive)
+        {
+          for (auto n : numbers)
+          {
+            const int index = negative ? -n : n;
+            if (index >= 0 && index < static_cast<int>(m_SignalGen.GetNumVolumes()))
+              m_SignalGen.m_MotionVolumes.at(index) = !negative;
+          }
+        }
+        else
+          MITK_WARN << "Cannot read the motion volumes '" << m_Misc.m_MotionVolumesBox << "' (indices of the moved volumes, or negative indices of the volumes that stay). No volume is moved.";
+      }
 
       try
       {
