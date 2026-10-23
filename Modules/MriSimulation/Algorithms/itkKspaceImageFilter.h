@@ -28,7 +28,7 @@ This file is based heavily on a corresponding ITK filter.
 #include <memory>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkFiberfoxParameters.h>
-#include <mitkFiberBundle.h>
+#include <mitkFiberfoxMotion.h>
 #include <mitkAcquisitionType.h>
 
 namespace itk{
@@ -76,11 +76,8 @@ namespace itk{
     itkSetMacro( SpikesPerSlice, unsigned int )     ///< Number of spikes per slice. Corresponding parameter in fiberfox parameter object specifies the number of spikes for the whole image and can thus not be used here.
     itkSetMacro( Z, double )                        ///< Slice position, necessary for eddy current simulation.
     itkSetMacro( RandSeed, int )                  ///< Use constant seed for random generator for reproducible results.
-    itkSetMacro( Translation, VectorType )
-    itkSetMacro( RotationMatrix, MatrixType )
     itkSetMacro( Zidx, int )
     itkSetMacro( StoreTimings, bool )
-    itkSetMacro( FiberBundle, FiberBundle::Pointer )
     itkSetMacro( CoilPosition, VectorType )
     itkGetMacro( KSpaceImage, typename InputImageType::Pointer )    ///< k-space magnitude image
     itkGetMacro( TickImage, typename InputImageType::Pointer )    ///< k-space readout ordering encoded in the voxels
@@ -88,6 +85,7 @@ namespace itk{
     itkGetMacro( SpikeLog, std::string )
 
     void SetParameters( const FiberfoxParameters* param ){ m_Parameters = param; }
+    void SetMotion( const mitk::FiberfoxMotion& motion ){ m_Motion = motion; }  ///< head motion of the volume; moves the frequency map
 
     /** Readout scheme (k-space trajectory and timing) of the acquisition type in the parameters. */
     static std::unique_ptr<AcquisitionType> CreateReadoutScheme(const FiberfoxParameters* parameters);
@@ -120,13 +118,8 @@ namespace itk{
     int                                     m_RandSeed;
     itk::Statistics::MersenneTwisterRandomVariateGenerator::Pointer m_RandGen;
     unsigned int                            m_SpikesPerSlice;
-    FiberBundle::Pointer                    m_FiberBundle;
     float                                   m_Gamma;
-    VectorType                              m_Translation;  ///< used to find correct point in frequency map (head motion)
-    MatrixType                              m_RotationMatrix;
-    float                                   m_TransX;
-    float                                   m_TransY;
-    float                                   m_TransZ;
+    mitk::FiberfoxMotion                    m_Motion;
 
     bool                                    m_IsBaseline;
     std::complex<ScalarType>                 m_Spike;

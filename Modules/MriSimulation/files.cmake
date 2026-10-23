@@ -13,6 +13,7 @@ set(H_FILES
   Algorithms/itkDftImageFilter.h
   Algorithms/itkFieldmapGeneratorFilter.h
   Algorithms/itkRandomPhantomFilter.h
+  Algorithms/mitkFiberfoxMotion.h
 
   SignalModels/mitkDiffusionSignalModel.h
   SignalModels/mitkTensorModel.h

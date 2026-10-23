@@ -11,12 +11,37 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <mitkTestingMacros.h>
+#include <array>
+#include <cmath>
 #include <mitkTestFixture.h>
 #include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
 #include <mitkFiberfoxParameters.h>
 #include <itkTractsToDWIImageFilter.h>
 #include <mitkRawShModel.h>
+#include <mitkFiberfoxMotion.h>
+
+namespace
+{
+  /** The simulation filter with access to the state of the last simulated volume. */
+  class MotionProbeFilter : public itk::TractsToDWIImageFilter<short>
+  {
+  public:
+    using Self = MotionProbeFilter;
+    using Pointer = itk::SmartPointer<Self>;
+    itkFactorylessNewMacro(Self)
+
+    mitk::FiberBundle* GetMovedFibers() const { return m_FiberBundleTransformed; }
+    /** Unmoved position of the centre of a voxel of the moved head, as the filter reads the maps. */
+    itk::Point<float, 3> GetUnmovedVoxelCenter(itk::Index<3> index) { return GetMovedPoint(index, false); }
+    ItkUcharImgType* GetMovedMask() const { return m_TransformedMaskImage; }
+  };
+
+  double Distance(const double* a, const itk::Point<float, 3>& b)
+  {
+    return std::sqrt((a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]) + (a[2]-b[2])*(a[2]-b[2]));
+  }
+}
 
 /** Behaviour of the Fiberfox simulation filter in edge cases (param5: no artifacts, fast). */
 class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
@@ -27,6 +52,8 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(NoGradients);
   MITK_TEST(PrototypeNeedsOneShell);
   MITK_TEST(InversionRecovery);
+  MITK_TEST(MotionTransforms);
+  MITK_TEST(MotionMovesFibersAndMapsTogether);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -170,6 +197,125 @@ public:
     MITK_INFO << "Inversion recovery: largest deviation " << maxDeviation << " of signals up to " << maxPlain;
     CPPUNIT_ASSERT(maxPlain > 10);
     CPPUNIT_ASSERT_MESSAGE("signal scaled by the inversion-recovery factor", maxDeviation < 1e-4 * maxPlain);
+  }
+
+  /** x' = R (x - c) + c + t with R = Rz Ry Rx; the inverse is exact for rotations about all axes. */
+  void MotionTransforms()
+  {
+    mitk::FiberfoxMotion::VectorType rotation, translation;
+    rotation[0] = 10; rotation[1] = -20; rotation[2] = 30;
+    translation[0] = 5; translation[1] = -3; translation[2] = 2;
+    mitk::FiberfoxMotion::PointType center;
+    center[0] = 12; center[1] = -7; center[2] = 30;
+    const mitk::FiberfoxMotion motion(rotation, translation, center);
+    const auto transform = motion.GetTransform();
+
+    const auto moved = motion.Forward(center);
+    for (unsigned int i = 0; i < 3; ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(center[i] + translation[i], moved[i], 1e-12);
+
+    for (const auto& offset : { std::array<double, 3>{ 62, 0, 0 }, std::array<double, 3>{ -10, 40, 25 }, std::array<double, 3>{ 3, -5, -70 } })
+    {
+      mitk::FiberfoxMotion::PointType p;
+      for (unsigned int i = 0; i < 3; ++i)
+        p[i] = center[i] + offset[i];
+      const auto forward = motion.Forward(p);
+      const auto back = motion.Inverse(forward);
+      const auto viaTransform = transform->TransformPoint(p);
+      for (unsigned int i = 0; i < 3; ++i)
+      {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(p[i], back[i], 1e-10);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(viaTransform[i], forward[i], 1e-10);
+      }
+      // rigid: the distance to the centre stays
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(p.EuclideanDistanceTo(center), forward.EuclideanDistanceTo(motion.Forward(center)), 1e-10);
+    }
+
+    // the angles are applied about x first, then y, then z
+    const auto expected = mitk::imv::GetRotationMatrixItk<double>(rotation[0], rotation[1], rotation[2]);
+    for (unsigned int i = 0; i < 3; ++i)
+      for (unsigned int j = 0; j < 3; ++j)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected[i][j], motion.GetMatrix()[i][j], 1e-15);
+
+    CPPUNIT_ASSERT(mitk::FiberfoxMotion().IsIdentity());
+    CPPUNIT_ASSERT(!motion.IsIdentity());
+  }
+
+  /**
+   * With random and with linear motion about all three axes, the fibers of a volume are the unmoved
+   * fibers moved by the motion the filter reports, the last linear volume reaches the full rotation and
+   * translation, and the unmoved position the filter reads the maps from is the exact inverse: it keeps
+   * the distances of a voxel centre to all fiber points.
+   */
+  void MotionMovesFibersAndMapsTogether()
+  {
+    for (bool random : { true, false })
+    {
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+      parameters.m_SignalGen.m_DoAddMotion = true;
+      parameters.m_SignalGen.m_DoRandomizeMotion = random;
+      parameters.m_SignalGen.m_MotionVolumes.clear();  // all volumes but the first
+      parameters.m_SignalGen.m_Rotation[0] = 10;
+      parameters.m_SignalGen.m_Rotation[1] = 10;
+      parameters.m_SignalGen.m_Rotation[2] = 10;
+      parameters.m_SignalGen.m_Translation[0] = 5;
+      parameters.m_SignalGen.m_Translation[1] = -3;
+      parameters.m_SignalGen.m_Translation[2] = 2;
+
+      auto filter = MotionProbeFilter::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetFiberBundle(m_FiberBundle);
+      filter->Update();
+
+      const auto& motion = filter->GetMotion();
+      CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(parameters.m_SignalGen.GetNumVolumes()), motion.size());
+      CPPUNIT_ASSERT(motion.front().IsIdentity());
+      const auto& last = motion.back();
+      if (!random)
+        for (unsigned int i = 0; i < 3; ++i)
+        {
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(parameters.m_SignalGen.m_Rotation[i], last.GetRotation()[i], 1e-12);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(parameters.m_SignalGen.m_Translation[i], last.GetTranslation()[i], 1e-12);
+        }
+      CPPUNIT_ASSERT(!last.IsIdentity());
+
+      vtkPolyData* unmoved = m_FiberBundle->GetFiberPolyData();
+      vtkPolyData* moved = filter->GetMovedFibers()->GetFiberPolyData();
+      CPPUNIT_ASSERT_EQUAL(unmoved->GetNumberOfPoints(), moved->GetNumberOfPoints());
+      double maxFiberError = 0;
+      for (vtkIdType k = 0; k < unmoved->GetNumberOfPoints(); ++k)
+      {
+        itk::Point<double, 3> p;
+        unmoved->GetPoint(k, p.GetDataPointer());
+        const auto expected = last.Forward(p);
+        double q[3];
+        moved->GetPoint(k, q);
+        maxFiberError = std::max(maxFiberError, Distance(q, expected));
+      }
+
+      // voxels of the moved head that contain fiber points; their unmoved centres keep the distances
+      double maxDistanceError = 0;
+      auto mask = filter->GetMovedMask();
+      for (vtkIdType k = 0; k < moved->GetNumberOfPoints(); k += 97)
+      {
+        itk::Point<float, 3> q;
+        for (unsigned int i = 0; i < 3; ++i)
+          q[i] = moved->GetPoint(k)[i];
+        itk::Index<3> index;
+        if (!mask->TransformPhysicalPointToIndex(q, index))
+          continue;
+        itk::Point<float, 3> voxelCenter;
+        mask->TransformIndexToPhysicalPoint(index, voxelCenter);
+        const auto unmovedCenter = filter->GetUnmovedVoxelCenter(index);
+        for (vtkIdType m = 0; m < moved->GetNumberOfPoints(); m += 101)
+          maxDistanceError = std::max(maxDistanceError, std::fabs(Distance(moved->GetPoint(m), voxelCenter) - Distance(unmoved->GetPoint(m), unmovedCenter)));
+      }
+      MITK_INFO << (random ? "Random" : "Linear") << " motion: fibers " << maxFiberError << " mm from the reported motion, distances to the unmoved voxel centre kept within " << maxDistanceError << " mm";
+      CPPUNIT_ASSERT_MESSAGE("fibers moved as reported", maxFiberError < 1e-3);
+      CPPUNIT_ASSERT_MESSAGE("maps read at the exact inverse position", maxDistanceError < 1e-3);
+    }
   }
 };
 

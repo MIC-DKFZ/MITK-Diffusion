@@ -58,9 +58,6 @@ namespace itk {
     m_Spike = std::complex<ScalarType>(0,0);
     m_SpikeTick = std::numeric_limits<long>::max();
     m_SpikeLog = "";
-    m_TransX = -m_Translation[0];
-    m_TransY = -m_Translation[1];
-    m_TransZ = -m_Translation[2];
 
     kxMax = m_Parameters->m_SignalGen.m_CroppedRegion.GetSize(0);
     kyMax = m_Parameters->m_SignalGen.m_CroppedRegion.GetSize(1);
@@ -188,7 +185,7 @@ namespace itk {
     m_MovedFmap = nullptr;
     if (m_Parameters->m_Misc.m_DoAddDistortions && m_Parameters->m_SignalGen.m_FrequencyMap.IsNotNull() && m_Parameters->m_SignalGen.m_DoAddMotion)
     {
-      // we have to account for the head motion since this also moves our frequency map
+      // the frequency map moves with the head: the moved map at x is the map at the unmoved position of x
       itk::LinearInterpolateImageFunction< itk::Image< float, 3 >, float >::Pointer   fmapInterpolator;
       fmapInterpolator = itk::LinearInterpolateImageFunction< itk::Image< float, 3 >, float >::New();
       fmapInterpolator->SetInputImage(m_Parameters->m_SignalGen.m_FrequencyMap);
@@ -210,8 +207,7 @@ namespace itk {
 
         itk::Point<float, 3> point3D;
         m_Parameters->m_SignalGen.m_FrequencyMap->TransformIndexToPhysicalPoint(index, point3D);
-        m_FiberBundle->TransformPoint<float>( point3D, m_RotationMatrix, m_TransX, m_TransY, m_TransZ );
-        it.Set(mitk::imv::GetImageValue<float>(point3D, true, fmapInterpolator));
+        it.Set(mitk::imv::GetImageValue<float>(m_Motion.Inverse(point3D), true, fmapInterpolator));
         ++it;
       }
     }

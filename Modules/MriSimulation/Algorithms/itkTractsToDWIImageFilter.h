@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <mitkPointSet.h>
 #include <itkLinearInterpolateImageFunction.h>
+#include <mitkFiberfoxMotion.h>
 #include <mutex>
 
 namespace itk
@@ -80,6 +81,8 @@ public:
     itkGetMacro( CoilPointset, mitk::PointSet::Pointer )
     itkGetMacro( TickImage, typename Float2DImageType::Pointer )    ///< k-space readout ordering encoded in the voxels
     itkGetMacro( RfImage, typename Float2DImageType::Pointer )    ///< time passed since last RF pulse encoded per voxel
+    const std::vector< mitk::FiberfoxMotion >& GetMotion() const   ///< head motion of each simulated volume (ground truth for motion correction)
+    { return m_Motion; }
 
     void GenerateData() override;
 
@@ -157,9 +160,8 @@ protected:
     std::vector< DoubleDwiType::Pointer >       m_CompartmentImages;
     ItkUcharImgType::Pointer                    m_TransformedMaskImage;     ///< copy of mask image (changes for each motion step)
     ItkUcharImgType::Pointer                    m_UpsampledMaskImage;       ///< helper image for motion simulation
-    std::vector< MatrixType >                   m_RotationsInv;
-    std::vector< MatrixType >                   m_Rotations;                ///<stores the individual rotation of each volume (needed for k-space simulation to obtain correct frequency map position)
-    std::vector< VectorType >                   m_Translations;             ///<stores the individual translation of each volume (needed for k-space simulation to obtain correct frequency map position)
+    std::vector< mitk::FiberfoxMotion >         m_Motion;                   ///< head motion of each volume (fibers, mask, volume fraction and frequency map lookup)
+    mitk::FiberfoxMotion::PointType             m_MotionCenter;             ///< rotation centre of all volumes: centre of the unmoved fiber bundle
     double                                      m_mmRadius;
     double                                      m_SegmentVolume;
     bool                                        m_UseRelativeNonFiberVolumeFractions;
