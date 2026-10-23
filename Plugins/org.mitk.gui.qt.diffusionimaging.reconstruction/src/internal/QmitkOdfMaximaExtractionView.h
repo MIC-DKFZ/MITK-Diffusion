@@ -43,8 +43,6 @@ class QmitkOdfMaximaExtractionView : public QmitkAbstractView
 
 public:
 
-  static const std::string VIEW_ID;
-
   QmitkOdfMaximaExtractionView();
   virtual ~QmitkOdfMaximaExtractionView();
 
@@ -61,7 +59,6 @@ public:
 
   protected slots:
 
-  void ConvertShCoeffs();           ///< convert spherical harmonic coefficients to the according mitk datatype
   void StartPeakExtraction();
   void OnImageSelectionChanged();
 
@@ -76,7 +73,6 @@ protected:
 
   Ui::QmitkOdfMaximaExtractionViewControls* m_Controls;
 
-  template<int shOrder> void TemplatedConvertShCoeffs(mitk::Image* mitkImg);
   template<int shOrder> void StartMaximaExtraction(mitk::Image* image);   ///< ODF maxima extraction using finite differences on the densely sampled sphere
 
 private:

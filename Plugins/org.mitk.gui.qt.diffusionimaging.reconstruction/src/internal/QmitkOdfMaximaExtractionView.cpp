@@ -25,14 +25,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "QmitkOdfMaximaExtractionView.h"
 
 #include <mitkImageCast.h>
-#include <mitkFiberBundle.h>
 #include <mitkImage.h>
 #include <mitkImageToItk.h>
 #include <mitkTensorImage.h>
 #include <itkVectorImage.h>
 #include <itkOdfMaximaExtractionFilter.h>
-#include <itkOdfMaximaExtractionFilter.h>
-#include <itkShCoefficientImageImporter.h>
 #include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateDimension.h>
@@ -47,7 +44,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 // Qt
 #include <QMessageBox>
 
-const std::string QmitkOdfMaximaExtractionView::VIEW_ID = "org.mitk.views.odfmaximaextractionview";
 using namespace mitk;
 
 QmitkOdfMaximaExtractionView::QmitkOdfMaximaExtractionView()
@@ -74,7 +70,6 @@ void QmitkOdfMaximaExtractionView::CreateQtPartControl(QWidget *parent)
     m_Controls->setupUi(parent);
 
     connect((QObject*)m_Controls->m_StartPeakExtractionButton, SIGNAL(clicked()), (QObject*) this, SLOT(StartPeakExtraction()));
-    connect((QObject*)m_Controls->m_ImportShCoeffs, SIGNAL(clicked()), (QObject*) this, SLOT(ConvertShCoeffs()));
 
     m_Controls->m_MaskBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
@@ -95,7 +90,6 @@ void QmitkOdfMaximaExtractionView::CreateQtPartControl(QWidget *parent)
     connect( (QObject*)(m_Controls->m_ImageBox), SIGNAL(OnSelectionChanged(const mitk::DataNode*)), this, SLOT(OnImageSelectionChanged()) );
 
     m_Controls->m_StartPeakExtractionButton->setVisible(false);
-    m_Controls->m_ImportShCoeffs->setVisible(false);
   }
 }
 
@@ -128,87 +122,16 @@ void QmitkOdfMaximaExtractionView::StartPeakExtraction()
   }
 }
 
-template<int shOrder>
-void QmitkOdfMaximaExtractionView::TemplatedConvertShCoeffs(mitk::Image* mitkImg)
-{
-  typedef itk::ShCoefficientImageImporter< float, shOrder > FilterType;
-  typedef mitk::ImageToItk< itk::Image< float, 4 > > CasterType;
-  CasterType::Pointer caster = CasterType::New();
-  caster->SetInput(mitkImg);
-  caster->Update();
-
-  typename FilterType::Pointer filter = FilterType::New();
-  filter->SetInputImage(caster->GetOutput());
-  filter->GenerateData();
-  typename FilterType::CoefficientImageType::Pointer itkCi = filter->GetCoefficientImage();
-
-  {
-    mitk::Image::Pointer img = dynamic_cast<mitk::Image*>(mitk::ShImage::New().GetPointer());
-    img->InitializeByItk(itkCi.GetPointer());
-    img->SetVolume(itkCi->GetBufferPointer());
-    mitk::DiffusionPropertyHelper::CopyDICOMProperties(mitkImg, img);
-
-    DataNode::Pointer node = DataNode::New();
-    node->SetData(img);
-
-    QString name(m_Controls->m_ImageBox->GetSelectedNode()->GetName().c_str());
-    name += "_ShImage_Imported";
-    node->SetName(name.toStdString().c_str());
-
-    GetDataStorage()->Add(node, m_Controls->m_ImageBox->GetSelectedNode());
-  }
-}
-
-void QmitkOdfMaximaExtractionView::ConvertShCoeffs()
-{
-  if (m_Controls->m_ImageBox->GetSelectedNode().IsNull())
-    return;
-
-  Image::Pointer mitkImg = dynamic_cast<Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData());
-  if (mitkImg->GetDimension() != 4 && mitkImg->GetLargestPossibleRegion().GetSize()[3]<6)
-  {
-    MITK_INFO << "wrong image type (need 4 dimensions)";
-    return;
-  }
-
-  int nrCoeffs = mitkImg->GetLargestPossibleRegion().GetSize()[3];
-  switch (nrCoeffs)
-  {
-  case 6:
-    TemplatedConvertShCoeffs<2>(mitkImg);
-    break;
-  case 15:
-    TemplatedConvertShCoeffs<4>(mitkImg);
-    break;
-  case 28:
-    TemplatedConvertShCoeffs<6>(mitkImg);
-    break;
-  case 45:
-    TemplatedConvertShCoeffs<8>(mitkImg);
-    break;
-  case 66:
-    TemplatedConvertShCoeffs<10>(mitkImg);
-    break;
-  case 91:
-    TemplatedConvertShCoeffs<12>(mitkImg);
-    break;
-  default :
-    QMessageBox::warning(nullptr, "Error", "Only spherical harmonics orders 2-12 are supported.", QMessageBox::Ok);
-  }
-}
-
 void QmitkOdfMaximaExtractionView::StartTensorPeakExtraction(mitk::TensorImage* img)
 {
   typedef itk::DiffusionTensorPrincipalDirectionImageFilter< float > MaximaExtractionFilterType;
   MaximaExtractionFilterType::Pointer filter = MaximaExtractionFilterType::New();
   filter->SetUsePolarCoordinates(false);
 
-  mitk::BaseGeometry::Pointer geometry;
   try{
     ItkTensorImage::Pointer itkImage = ItkTensorImage::New();
     CastToItkImage(img, itkImage);
     filter->SetInput(itkImage);
-    geometry = img->GetGeometry();
   }
   catch (itk::ExceptionObject &e)
   {
@@ -273,14 +196,12 @@ void QmitkOdfMaximaExtractionView::StartMaximaExtraction(Image *image)
   else
     filter->SetToolkit(MaximaExtractionFilterType::MRTRIX);
 
-  mitk::BaseGeometry::Pointer geometry;
   try{
     typedef ImageToItk< typename MaximaExtractionFilterType::CoefficientImageType > CasterType;
     typename CasterType::Pointer caster = CasterType::New();
     caster->SetInput(image);
     caster->Update();
     filter->SetInput(caster->GetOutput());
-    geometry = image->GetGeometry();
   }
   catch (itk::ExceptionObject &e)
   {
@@ -382,16 +303,6 @@ void QmitkOdfMaximaExtractionView::OnSelectionChanged(berry::IWorkbenchPart::Poi
 
 void QmitkOdfMaximaExtractionView::OnImageSelectionChanged()
 {
-  m_Controls->m_StartPeakExtractionButton->setVisible(false);
-  m_Controls->m_ImportShCoeffs->setVisible(false);
-
-  mitk::DataNode::Pointer node = m_Controls->m_ImageBox->GetSelectedNode();
-  if (node.IsNull())
-    return;
-
-  Image::Pointer img = dynamic_cast<Image*>(node->GetData());
-  if (img->GetDimension()==4)
-    m_Controls->m_ImportShCoeffs->setVisible(true);
-  else
-    m_Controls->m_StartPeakExtractionButton->setVisible(true);
+  // The combo box admits tensor and SH images only.
+  m_Controls->m_StartPeakExtractionButton->setVisible(m_Controls->m_ImageBox->GetSelectedNode().IsNotNull());
 }
