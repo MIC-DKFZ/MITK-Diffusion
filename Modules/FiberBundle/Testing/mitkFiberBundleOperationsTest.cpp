@@ -21,7 +21,10 @@ found in the LICENSE file.
 #include <itkMath.h>
 #include <omp.h>
 #include <vtkCell.h>
+#include <vtkCellArray.h>
 #include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyLine.h>
 
 #include <array>
 #include <cmath>
@@ -40,6 +43,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(Weights_RemovingOrSplittingFibers_FollowTheirFibers);
   MITK_TEST(CompressAndSubtract_EightThreads_EqualOneThread);
   MITK_TEST(SubsampleFibers_WithoutRandomSeed_IsReproducible);
+  MITK_TEST(ResampleToNumPoints_FibersWithoutLength_Terminate);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -54,6 +58,24 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
     for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
       fib->SetFiberWeight(i, 0.5f + static_cast<float>(i) / fib->GetNumFibers());
     return fib;
+  }
+
+  /** Bundle of the given fibers, built point by point */
+  static mitk::FiberBundle::Pointer MakeBundle(const std::vector<std::vector<std::array<double, 3>>> &fibers)
+  {
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    auto lines = vtkSmartPointer<vtkCellArray>::New();
+    for (const auto &fiber : fibers)
+    {
+      auto line = vtkSmartPointer<vtkPolyLine>::New();
+      for (const auto &p : fiber)
+        line->GetPointIds()->InsertNextId(points->InsertNextPoint(p.data()));
+      lines->InsertNextCell(line);
+    }
+    auto polyData = vtkSmartPointer<vtkPolyData>::New();
+    polyData->SetPoints(points);
+    polyData->SetLines(lines);
+    return mitk::FiberBundle::New(polyData);
   }
 
   using PointKey = std::array<long long, 3>;
@@ -225,6 +247,29 @@ public:
     auto first = source->SubsampleFibers(0.5f, false);
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(std::round(source->GetNumFibers() * 0.5f)), first->GetNumFibers());
     AssertIdentical(first, source->SubsampleFibers(0.5f, false), "second subsample");
+  }
+
+  void ResampleToNumPoints_FibersWithoutLength_Terminate()
+  {
+    auto fib = MakeBundle({{{0, 0, 0}, {2, 0, 0}, {5, 0, 0}, {7, 0, 0}, {10, 0, 0}},
+                           {{5, 5, 5}, {5, 5, 5}, {5, 5, 5}},
+                           {{7, 7, 7}}});
+    CPPUNIT_ASSERT_EQUAL(3u, fib->GetNumFibers());
+    fib->ResampleToNumPoints(4);
+    CPPUNIT_ASSERT_EQUAL(3u, fib->GetNumFibers());
+    bool foundLine = false;
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(4), cell->GetNumberOfPoints());
+      const double *first = cell->GetPoints()->GetPoint(0);
+      if (first[0] == 0.0 && first[1] == 0.0)
+      {
+        foundLine = true;
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, cell->GetPoints()->GetPoint(3)[0], 1e-4);
+      }
+    }
+    CPPUNIT_ASSERT_MESSAGE("The line keeps its end points", foundLine);
   }
 };
 

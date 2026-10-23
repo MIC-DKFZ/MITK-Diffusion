@@ -2362,9 +2362,15 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
 
   MITK_INFO << "Resampling fibers (number of points " << targetPoints << ")";
 
+  // Each pass resamples every fiber whose point count is still off; a handful of passes is
+  // enough, so a fiber that never converges is an error instead of an endless loop.
+  const int maxPasses = 100;
+  int pass = 0;
   bool unequal_fibs = true;
   while (unequal_fibs)
   {
+    if (++pass > maxPasses)
+      mitkThrow() << "Resampling to " << targetPoints << " points did not converge.";
     vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
     vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
@@ -2404,6 +2410,11 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
 
       vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
       vnl_vector_fixed< double, 3 > lastV = vertices.at(0);
+
+      // A fiber without length (one point, or all points equal) has no segments to sample;
+      // its position is repeated so that it gets the requested number of points as well.
+      if (vertices.size()!=targetPoints && seg_len<=0.0000001)
+        vertices.assign(targetPoints, lastV);
 
       {
         vtkIdType id = vtkNewPoints->InsertNextPoint(lastV.data_block());
