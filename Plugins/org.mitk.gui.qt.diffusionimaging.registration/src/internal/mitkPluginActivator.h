@@ -27,13 +27,8 @@ namespace mitk
     Q_INTERFACES(ctkPluginActivator)
 
   public:
-    static ctkPluginContext* GetContext();
-
     void start(ctkPluginContext* context) override;
     void stop(ctkPluginContext* context) override;
-
-  private:
-    static ctkPluginContext* m_Context;
   };
 }
 

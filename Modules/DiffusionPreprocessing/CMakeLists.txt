@@ -4,7 +4,8 @@ if(BUILD_MODULE_DiffusionPreprocessing)
 
 MITK_CREATE_MODULE(
   INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS MitkDiffusionImage
+  DEPENDS MitkDiffusionImage MitkImageDenoising
+  PACKAGE_DEPENDS PRIVATE ITK|ITKDenoising+ITKSmoothing
 )
 
 add_subdirectory(Testing)

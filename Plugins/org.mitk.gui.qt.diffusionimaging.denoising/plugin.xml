@@ -17,7 +17,9 @@
 
   <extension point="org.blueberry.ui.keywords">
 
-
+  <keyword label="denoising" id="org.mitk.views.denoisingview.Keyword"/>
+  <keyword label="noise" id="org.mitk.views.denoisingview.Keyword"/>
+  <keyword label="filter" id="org.mitk.views.denoisingview.Keyword"/>
 
   </extension>
 

@@ -14,121 +14,45 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include "mitkCommandLineParser.h"
-#include <mitkIOUtil.h>
+#include <mitkCommandLineParser.h>
 #include <mitkDiffusionPropertyHelper.h>
-
-#include <mitkImageCaster.h>
-#include <itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h>
-
-
-#include "mitkImage.h"
-#include <iostream>
-#include <usAny.h>
-#include <fstream>
-#include "mitkIOUtil.h"
-
-#include <itkFileTools.h>
-#include <itksys/SystemTools.hxx>
-
-
-//vnl_includes
-#include "vnl/vnl_math.h"
-#include "vnl/vnl_cost_function.h"
-#include "vnl/vnl_least_squares_function.h"
-#include "vnl/algo/vnl_lbfgsb.h"
-#include "vnl/algo/vnl_lbfgs.h"
-
-#include "vnl/algo/vnl_levenberg_marquardt.h"
-
-typedef mitk::DiffusionPropertyHelper DPH;
-
-#include <itkGaussianBlurImageFunction.h>
-#include <itkUnaryFunctorImageFilter.h>
-
-#include <itkImageFileWriter.h>
-
-#include <itkVectorIndexSelectionCastImageFilter.h>
-#include <itkComposeImageFilter.h>
-#include <itkDiscreteGaussianImageFilter.h>
+#include <mitkIOUtil.h>
+#include <mitkIvimFit.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
+#include <usAny.h>
+
+#include <iostream>
+
+using DPH = mitk::DiffusionPropertyHelper;
 
 void IvimMapComputation( mitk::Image::Pointer input,
                          std::string output_prefix ,
                          std::string output_type,
-                         double b_thresh, int type)
+                         std::string maskPath,
+                         double b_thresh, int type, double dstar)
 {
+  mitk::Image::Pointer mask;
+  if (!maskPath.empty())
+    mask = mitk::IOUtil::Load<mitk::Image>(maskPath);
+
   MITK_INFO << "Starting fit";
-  DPH::ImageType::Pointer vectorImage = DPH::ImageType::New();
-  mitk::CastToItkImage( input, vectorImage );
 
-  typedef itk::DiffusionIntravoxelIncoherentMotionReconstructionImageFilter<short, float> IVIMFilterType;
+  // The fit types are the methods in the order of the IVIM view.
+  if (type < 0 || type > 3)
+    type = 2;
+  mitk::ivim::FitParameters parameters;
+  parameters.method = static_cast<mitk::ivim::Method>(type);
+  parameters.bThreshold = b_thresh;
+  parameters.dStar = dstar;
+  parameters.signalThreshold = 0;
+  parameters.fitDStar = true;
 
-  IVIMFilterType::Pointer ivim_filter = IVIMFilterType::New();
-  ivim_filter->SetInput( vectorImage );
-  ivim_filter->SetBValue( DPH::GetReferenceBValue( input.GetPointer() ) );
-  ivim_filter->SetGradientDirections( DPH::GetGradientContainer( input.GetPointer() ) );
+  const auto maps = mitk::ivim::ComputeMaps(input, mask, parameters);
 
-  switch (type)
-  {
-  case 0:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_FIT_ALL);
-    break;
-  case 1:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_DSTAR_FIX);
-    break;
-  case 2:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_D_THEN_DSTAR);
-    break;
-  case 3:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_LINEAR_D_THEN_F);
-    break;
-  default:
-    ivim_filter->SetMethod(IVIMFilterType::IVIM_D_THEN_DSTAR);
-  }
-
-  ivim_filter->SetBThres(b_thresh);
-  ivim_filter->SetS0Thres(0);
-  ivim_filter->SetFitDStar(true);
-  ivim_filter->SetNumberOfWorkUnits(1);
-
-  try
-  {
-    ivim_filter->Update();
-  }
-  catch( const itk::ExceptionObject& e)
-  {
-    mitkThrow() << "IVIM fit failed with an ITK Exception: " << e.what();
-  }
-
-  mitk::Image::Pointer f_image = mitk::Image::New();
-  f_image->InitializeByItk( ivim_filter->GetOutput() );
-  f_image->SetVolume( ivim_filter->GetOutput()->GetBufferPointer() );
-
-  mitk::Image::Pointer d_image = mitk::Image::New();
-  d_image->InitializeByItk( ivim_filter->GetOutput(1) );
-  d_image->SetVolume( ivim_filter->GetOutput(1)->GetBufferPointer() );
-
-  mitk::Image::Pointer dstar_image = mitk::Image::New();
-  dstar_image->InitializeByItk( ivim_filter->GetOutput(1) );
-  dstar_image->SetVolume( ivim_filter->GetOutput(2)->GetBufferPointer() );
-
-  std::string outputf_FileName = output_prefix + "_f_map." + output_type;
-  std::string outputD_FileName = output_prefix + "_D_map." + output_type;
-  std::string outputDstar_FileName = output_prefix + "_Dstar_map." + output_type;
-
-  try
-  {
-    mitk::IOUtil::Save(  dstar_image,  outputDstar_FileName );
-    mitk::IOUtil::Save(  d_image,  outputD_FileName );
-    mitk::IOUtil::Save(  f_image,  outputf_FileName );
-  }
-  catch( const itk::ExceptionObject& e)
-  {
-    mitkThrow() << "Failed to save the KurtosisFit Results due to exception: " << e.what();
-  }
-
+  mitk::IOUtil::Save( maps.dStar, output_prefix + "_Dstar_map." + output_type );
+  mitk::IOUtil::Save( maps.d, output_prefix + "_D_map." + output_type );
+  mitk::IOUtil::Save( maps.f, output_prefix + "_f_map." + output_type );
 }
 
 int main( int argc, char* argv[] )
@@ -144,10 +68,12 @@ int main( int argc, char* argv[] )
 
   // mandatory arguments
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Preifx: ", "Prefix for the output images", us::Any(), false);
-  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ", std::string(".nrrd"));
-  parser.addArgument("b_threshold", "", mitkCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit^", 170.0);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Prefix: ", "Prefix for the output images", us::Any(), false);
+  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. 'nii' or 'nrrd' ", std::string("nrrd"));
+  parser.addArgument("b_threshold", "", mitkCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit", 170.0);
   parser.addArgument("fit_type", "", mitkCommandLineParser::Int, "Fit:", "Jointly fit D, f and D* (0); Fit D&f with fixed D* (1); Fit D&f (high b), then fit D* (2); Linearly fit D&f (high b), then fit D* (3)", 2);
+  parser.addArgument("dstar", "", mitkCommandLineParser::Float, "D*:", "Fixed D* for fit type 1", 0.06);
+  parser.addArgument("mask", "m", mitkCommandLineParser::String, "Masking Image: ", "Fit only where this image is greater than 0, also below 1 (others get 0); it must have the geometry of the input", us::Any(), true, false, false, mitkCommandLineParser::Input);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
 
@@ -158,12 +84,14 @@ int main( int argc, char* argv[] )
   std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string out_prefix = us::any_cast<std::string>(parsedArgs["o"]);
 
-  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-  mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
-
   double b_thresh = 170;
   int fit_type = 2;
+  double dstar = 0.06;
   std::string  out_type = "nrrd";
+  std::string maskPath;
+
+  if (parsedArgs.count("mask"))
+    maskPath = us::any_cast<std::string>(parsedArgs["mask"]);
 
   if (parsedArgs.count("output_type"))
     out_type = us::any_cast<std::string>(parsedArgs["output_type"]);
@@ -174,16 +102,37 @@ int main( int argc, char* argv[] )
   if (parsedArgs.count("fit_type"))
     fit_type = us::any_cast<int>(parsedArgs["fit_type"]);
 
-  if( !DPH::IsDiffusionWeightedImage( inputImage ) )
+  if (parsedArgs.count("dstar"))
+    dstar = us::any_cast<float>(parsedArgs["dstar"]);
+
+  // The file names are <prefix>_<map>.<type>, so "nrrd" and ".nrrd" both work.
+  if (!out_type.empty() && out_type.front() == '.')
+    out_type.erase(0, 1);
+
+  try
   {
-    MITK_ERROR("DiffusionIVIMFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
+    mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
+
+    if( !DPH::IsDiffusionWeightedImage( inputImage ) )
+    {
+      MITK_ERROR("DiffusionIVIMFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
+      return EXIT_FAILURE;
+    }
+
+    IvimMapComputation( inputImage,
+                        out_prefix ,
+                        out_type,
+                        maskPath,
+                        b_thresh,
+                        fit_type,
+                        dstar);
+  }
+  catch (const std::exception& e)
+  {
+    MITK_ERROR << e.what();
     return EXIT_FAILURE;
   }
 
-  IvimMapComputation( inputImage,
-                      out_prefix ,
-                      out_type,
-                      b_thresh,
-                      fit_type);
-
+  return EXIT_SUCCESS;
 }

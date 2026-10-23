@@ -14,93 +14,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include "mitkCommandLineParser.h"
-#include <mitkIOUtil.h>
+#include <mitkCommandLineParser.h>
 #include <mitkDiffusionPropertyHelper.h>
-
-#include <mitkImageCaster.h>
-#include <itkDiffusionKurtosisReconstructionImageFilter.h>
-
-#include "mitkImage.h"
-#include <iostream>
-#include <usAny.h>
-#include <fstream>
-#include "mitkIOUtil.h"
-
-#include <itkFileTools.h>
-#include <itksys/SystemTools.hxx>
-
-
-//vnl_includes
-#include "vnl/vnl_math.h"
-#include "vnl/vnl_cost_function.h"
-#include "vnl/vnl_least_squares_function.h"
-#include "vnl/algo/vnl_lbfgsb.h"
-#include "vnl/algo/vnl_lbfgs.h"
-
-#include "vnl/algo/vnl_levenberg_marquardt.h"
-
-typedef mitk::DiffusionPropertyHelper DPH;
-
-#include <itkGaussianBlurImageFunction.h>
-#include <itkUnaryFunctorImageFilter.h>
-
-#include <itkImageFileWriter.h>
-
-#include <itkVectorIndexSelectionCastImageFilter.h>
-#include <itkComposeImageFilter.h>
-#include <itkDiscreteGaussianImageFilter.h>
+#include <mitkIOUtil.h>
+#include <mitkKurtosisFit.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
+#include <usAny.h>
 
-DPH::ImageType::Pointer GetBlurredVectorImage( DPH::ImageType::Pointer vectorImage, double sigma)
-{
-  typedef itk::DiscreteGaussianImageFilter< itk::Image<DPH::DiffusionPixelType, 3 >, itk::Image<DPH::DiffusionPixelType, 3 > > GaussianFilterType;
+#include <iostream>
 
-  typedef itk::VectorIndexSelectionCastImageFilter< DPH::ImageType, itk::Image<DPH::DiffusionPixelType, 3 > > IndexSelectionType;
-  IndexSelectionType::Pointer indexSelectionFilter = IndexSelectionType::New();
-  indexSelectionFilter->SetInput( vectorImage );
-
-  typedef itk::ComposeImageFilter< itk::Image<DPH::DiffusionPixelType, 3>, DPH::ImageType > ComposeFilterType;
-  ComposeFilterType::Pointer vec_composer = ComposeFilterType::New();
-
-  for( unsigned int i=0; i<vectorImage->GetVectorLength(); ++i)
-  {
-    GaussianFilterType::Pointer gaussian_filter = GaussianFilterType::New();
-
-    indexSelectionFilter->SetIndex( i );
-
-    gaussian_filter->SetInput( indexSelectionFilter->GetOutput() );
-    gaussian_filter->SetVariance( sigma );
-
-    vec_composer->SetInput(i, gaussian_filter->GetOutput() );
-
-    gaussian_filter->Update();
-  }
-
-  try
-  {
-    vec_composer->Update();
-  }
-  catch(const itk::ExceptionObject &e)
-  {
-    mitkThrow() << "[VectorImage.GaussianSmoothing] !! Failed with ITK Exception: " << e.what();
-  }
-
-  DPH::ImageType::Pointer smoothed_vector = vec_composer->GetOutput();
-
-  /*
-  itk::ImageFileWriter< DPH::ImageType >::Pointer writer =
-      itk::ImageFileWriter< DPH::ImageType >::New();
-
-  writer->SetInput( smoothed_vector );
-  writer->SetFileName( "/tmp/itk_smoothed_vector.nrrd");
-  writer->Update();*/
-
-  return smoothed_vector;
-
-
-}
+using DPH = mitk::DiffusionPropertyHelper;
 
 void KurtosisMapComputation( mitk::Image::Pointer input,
                              std::string output_prefix ,
@@ -110,60 +34,21 @@ void KurtosisMapComputation( mitk::Image::Pointer input,
                              double lower,
                              double upper )
 {
-  DPH::ImageType::Pointer vectorImage = DPH::ImageType::New();
-  mitk::CastToItkImage( input, vectorImage );
+  mitk::Image::Pointer mask;
+  if (!maskPath.empty())
+    mask = mitk::IOUtil::Load<mitk::Image>(maskPath);
 
-  typedef itk::DiffusionKurtosisReconstructionImageFilter< short, double > KurtosisFilterType;
-  KurtosisFilterType::Pointer kurtosis_filter = KurtosisFilterType::New();
-  kurtosis_filter->SetInput( GetBlurredVectorImage( vectorImage, 1.5 ) );
-  kurtosis_filter->SetReferenceBValue( DPH::GetReferenceBValue( input.GetPointer() ) );
-  kurtosis_filter->SetGradientDirections( DPH::GetGradientContainer( input.GetPointer() ) );
-//  kurtosis_filter->SetNumberOfThreads(1);
-  kurtosis_filter->SetOmitUnweightedValue(omitBZero);
-  kurtosis_filter->SetBoundariesForKurtosis(-lower,upper);
-//  kurtosis_filter->SetInitialSolution(const vnl_vector<double>& x0 );
+  mitk::kurtosis::FitConfiguration configuration;
+  configuration.omitBZero = omitBZero;
+  configuration.useKBounds = true;
+  configuration.kLowerBound = -lower;
+  configuration.kUpperBound = upper;
 
+  // The app has always smoothed its input with this variance (mm^2) before the fit.
+  const auto maps = mitk::kurtosis::ComputeMaps(input, mask, configuration, 1.5);
 
-  if(maskPath != "")
-  {
-    mitk::Image::Pointer segmentation;
-    segmentation = mitk::IOUtil::Load<mitk::Image>(maskPath);
-    typedef itk::Image< short , 3>            MaskImageType;
-    MaskImageType::Pointer vectorSeg = MaskImageType::New() ;
-    mitk::CastToItkImage( segmentation, vectorSeg );
-    kurtosis_filter->SetImageMask(vectorSeg) ;
-  }
-
-  try
-  {
-    kurtosis_filter->Update();
-  }
-  catch( const itk::ExceptionObject& e)
-  {
-    mitkThrow() << "Kurtosis fit failed with an ITK Exception: " << e.what();
-  }
-
-  mitk::Image::Pointer d_image = mitk::Image::New();
-  d_image->InitializeByItk( kurtosis_filter->GetOutput(0) );
-  d_image->SetVolume( kurtosis_filter->GetOutput(0)->GetBufferPointer() );
-
-  mitk::Image::Pointer k_image = mitk::Image::New();
-  k_image->InitializeByItk( kurtosis_filter->GetOutput(1) );
-  k_image->SetVolume( kurtosis_filter->GetOutput(1)->GetBufferPointer() );
-
-  std::string outputD_FileName = output_prefix + "_ADC_map." + output_type;
-  std::string outputK_FileName = output_prefix + "_AKC_map." + output_type;
-
-  try
-  {
-    mitk::IOUtil::Save(  d_image,  outputD_FileName );
-    mitk::IOUtil::Save(  k_image,  outputK_FileName );
-  }
-  catch( const itk::ExceptionObject& e)
-  {
-    mitkThrow() << "Failed to save the KurtosisFit Results due to exception: " << e.what();
-  }
-
+  mitk::IOUtil::Save( maps.d, output_prefix + "_ADC_map." + output_type );
+  mitk::IOUtil::Save( maps.k, output_prefix + "_AKC_map." + output_type );
 }
 
 int main( int argc, char* argv[] )
@@ -174,25 +59,25 @@ int main( int argc, char* argv[] )
   parser.setTitle("Diffusion Kurtosis Fit");
   parser.setCategory("Diffusion Related Measures");
   parser.setContributor("MIC");
-  parser.setDescription("Fitting Kurtosis");
+  parser.setDescription("Fitting Kurtosis. The input is smoothed with a Gaussian of variance 1.5 mm^2 before the fit.");
   parser.setArgumentPrefix("--","-");
 
   // mandatory arguments
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input: ", "input image (DWI)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Preifx: ", "Prefix for the output images, will append _ADC, _AKC accordingly ", us::Any(), false);
-  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. '.nii' or '.nrrd' ");
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output Prefix: ", "Prefix for the output images, will append _ADC, _AKC accordingly ", us::Any(), false);
+  parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. 'nii' or 'nrrd' (default)");
 
   // optional arguments
   parser.addArgument("mask", "m", mitkCommandLineParser::String, "Masking Image: ", "ROI (segmentation)", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("help", "h", mitkCommandLineParser::Bool, "Help", "Show this help text");
   parser.addArgument("omitbzero", "om", mitkCommandLineParser::Bool, "Omit b0:", "Omit b0 value during fit (default = false)", us::Any());
-  parser.addArgument("lowerkbound", "kl", mitkCommandLineParser::Float, "lower Kbound:", "Set (unsigned) lower boundary for Kurtosis parameter (default = -1000)", us::Any());
+  parser.addArgument("lowerkbound", "kl", mitkCommandLineParser::Float, "lower Kbound:", "Magnitude of the lower boundary for the kurtosis parameter: K >= -value (default = 1000)", us::Any());
   parser.addArgument("upperkbound", "ku", mitkCommandLineParser::Float, "upper Kbound:", "Set upper boundary for Kurtosis parameter (default = 1000)", us::Any());
 
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
 
-  if (parsedArgs.size()==0 || parsedArgs.count("help") || parsedArgs.count("h")){
+  if (parsedArgs.size()==0 || parsedArgs.count("help")){
     std::cout << parser.helpText();
     return EXIT_SUCCESS;
   }
@@ -202,53 +87,65 @@ int main( int argc, char* argv[] )
   std::string out_prefix = us::any_cast<std::string>(parsedArgs["o"]);
   std::string maskPath = "";
 
-  mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-  mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
-
   bool omitBZero = false;
-  double lower = -1000;
+  // The lower bound is given as a magnitude and negated below.
+  double lower = 1000;
   double upper = 1000;
   std::string  out_type = "nrrd";
 
-  if (parsedArgs.count("mask") || parsedArgs.count("m"))
+  if (parsedArgs.count("mask"))
   {
     maskPath = us::any_cast<std::string>(parsedArgs["mask"]);
   }
 
-  if (parsedArgs.count("output_type") || parsedArgs.count("ot"))
+  if (parsedArgs.count("output_type"))
   {
     out_type = us::any_cast<std::string>(parsedArgs["output_type"]);
   }
 
-  if (parsedArgs.count("omitbzero") || parsedArgs.count("om"))
+  if (parsedArgs.count("omitbzero"))
   {
     omitBZero = us::any_cast<bool>(parsedArgs["omitbzero"]);
   }
 
-  if (parsedArgs.count("lowerkbound") || parsedArgs.count("kl"))
+  if (parsedArgs.count("lowerkbound"))
   {
     lower = us::any_cast<float>(parsedArgs["lowerkbound"]);
   }
 
-  if (parsedArgs.count("upperkbound") || parsedArgs.count("ku"))
+  if (parsedArgs.count("upperkbound"))
   {
     upper = us::any_cast<float>(parsedArgs["upperkbound"]);
   }
 
-  if( !DPH::IsDiffusionWeightedImage( inputImage ) )
+  // The file names are <prefix>_<map>.<type>, so "nrrd" and ".nrrd" both work.
+  if (!out_type.empty() && out_type.front() == '.')
+    out_type.erase(0, 1);
+
+  try
   {
-    MITK_ERROR("DiffusionKurtosisFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
+    mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
+
+    if( !DPH::IsDiffusionWeightedImage( inputImage ) )
+    {
+      MITK_ERROR("DiffusionKurtosisFit.Input") << "No valid diffusion-weighted image provided, failed to load " << inFileName << " as DW Image. Aborting...";
+      return EXIT_FAILURE;
+    }
+
+    KurtosisMapComputation( inputImage,
+                            out_prefix ,
+                            out_type,
+                            maskPath,
+                            omitBZero,
+                            lower,
+                            upper);
+  }
+  catch (const std::exception& e)
+  {
+    MITK_ERROR << e.what();
     return EXIT_FAILURE;
   }
 
-
-
-KurtosisMapComputation( inputImage,
-                        out_prefix ,
-                        out_type,
-                        maskPath,
-                        omitBZero,
-                        lower,
-                        upper);
-
+  return EXIT_SUCCESS;
 }

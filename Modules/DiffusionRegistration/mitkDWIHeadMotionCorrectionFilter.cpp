@@ -15,17 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef MITKDWIHEADMOTIONCORRECTIONFILTER_CPP
-#define MITKDWIHEADMOTIONCORRECTIONFILTER_CPP
-
 #include "mitkDWIHeadMotionCorrectionFilter.h"
 
-#include "itkSplitDWImageFilter.h"
-#include "itkB0ImageExtractionToSeparateImageFilter.h"
-
-#include "mitkImageTimeSelector.h"
-
-#include <itkExtractDwiChannelFilter.h>
 // MatchPoint's ITKInitializedMultiResImageRegistrationAlgorithm::doSetProperty() assigns a bool
 // that unwrapMetaProperty() may leave unset; GCC's optimizer reports that in Release builds
 // despite -isystem. MatchPoint is a MITK external, so the warning is silenced for its headers.
@@ -38,122 +29,91 @@ See LICENSE.txt or http://www.mitk.org for details.
 #pragma GCC diagnostic pop
 #endif
 #include <mitkMAPAlgorithmHelper.h>
-#include <mitkMaskedAlgorithmHelper.h>
 #include <mitkImageMappingHelper.h>
 #include <mitkRegistrationHelper.h>
-#include <mitkRegistrationWrapper.h>
-#include <mitkRegistrationWrapperMapper3D.h>
 
 #include <itkComposeImageFilter.h>
+#include <itkImageDuplicator.h>
+#include <mitkDiffusionImageEditing.h>
+#include <mitkDiffusionImageMapping.h>
 #include <mitkDiffusionPropertyHelper.h>
+#include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
-#include <mitkDiffusionImageCorrectionFilter.h>
-#include <mitkImageWriteAccessor.h>
-#include <mitkProperties.h>
-#include <mitkBValueMapProperty.h>
 
 #include <vector>
 
-#include "mitkIOUtil.h"
-#include <itkImage.h>
-
-typedef mitk::DiffusionPropertyHelper DPH;
-typedef itk::ExtractDwiChannelFilter< short > ExtractorType;
-
-mitk::DWIHeadMotionCorrectionFilter::DWIHeadMotionCorrectionFilter()
+namespace
 {
-
+  using DPH = mitk::DiffusionPropertyHelper;
 }
 
-mitk::Image::Pointer mitk::DWIHeadMotionCorrectionFilter::GetCorrectedImage() const
+mitk::Image::Pointer mitk::DWIHeadMotionCorrectionFilter::GetCorrectedImage()
 {
-  return m_CorrectedImage;
+  return this->GetOutput();
 }
-
-void mitk::DWIHeadMotionCorrectionFilter::UpdateOutputInformation()
-  {
-  Superclass::UpdateOutputInformation();
-        }
 
 void mitk::DWIHeadMotionCorrectionFilter::GenerateData()
-  {
-  InputImageType::Pointer input = const_cast<InputImageType*>(this->GetInput(0));
+{
+  const InputImageType* input = this->GetInput(0);
 
   if (!DPH::IsDiffusionWeightedImage(input))
     mitkThrow() << "Input is not a diffusion-weighted image!";
 
-  ITKDiffusionImageType::Pointer itkVectorImagePointer = DPH::GetItkVectorImage(input);
-  int num_gradients = itkVectorImagePointer->GetVectorLength();
+  const unsigned int numberOfVolumes = DPH::GetGradientContainer(input)->Size();
 
-  typedef itk::ComposeImageFilter < ITKDiffusionVolumeType > ComposeFilterType;
-  ComposeFilterType::Pointer composer = ComposeFilterType::New();
+  // The reference is the first volume of the lowest shell.
+  const mitk::BValueMapProperty::BValueMap& bValueMap = DPH::GetBValueMap(input);
+  const unsigned int reference = bValueMap.begin()->second.front();
+  MITK_INFO << "Reference b-value: " << bValueMap.begin()->first << " (volume " << reference << ")";
 
-  // Extract unweighted volumes
-  mitk::BValueMapProperty::BValueMap bval_map = DPH::GetBValueMap(input);
+  mitk::Image::Pointer fixedImage = mitk::DiffusionImageEditing::ExtractVolume(input, reference);
 
-  int first_unweighted_index = bval_map.begin()->second.front();
-  MITK_INFO << "Reference b-value: " << bval_map.begin()->first << " (volume " << first_unweighted_index << ")";
-
-  ExtractorType::Pointer filter = ExtractorType::New();
-  filter->SetInput( itkVectorImagePointer);
-  filter->SetChannelIndex(first_unweighted_index);
-  filter->Update();
-
-  mitk::Image::Pointer fixedImage = mitk::Image::New();
-  fixedImage->InitializeByItk( filter->GetOutput() );
-  fixedImage->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-  composer->SetInput(0, filter->GetOutput());
-
-  mitk::MultiModalAffineDefaultRegistrationAlgorithm< ITKDiffusionVolumeType >::Pointer algo = mitk::MultiModalAffineDefaultRegistrationAlgorithm< ITKDiffusionVolumeType >::New();
-  mitk::MAPAlgorithmHelper helper(algo);
-
-  typedef vnl_matrix_fixed< double, 3, 3> TransformMatrixType;
-  std::vector< TransformMatrixType > estimated_transforms;
-  std::vector< ITKDiffusionVolumeType::Pointer > registered_itk_images;
-  for (int i=0; i<num_gradients; ++i)
+  // The output keeps the volume order of the input, the reference at its own index, because the
+  // gradients are corrected in that order.
+  std::vector<ITKDiffusionVolumeType::Pointer> volumes(numberOfVolumes);
   {
-    if (i==first_unweighted_index)
+    // A copy: an ITK image cast from the fixed image would hold an access to it and block the
+    // registration below.
+    ITKDiffusionVolumeType::Pointer fixedVolume;
+    mitk::CastToItkImage(fixedImage, fixedVolume);
+    auto duplicator = itk::ImageDuplicator<ITKDiffusionVolumeType>::New();
+    duplicator->SetInputImage(fixedVolume);
+    duplicator->Update();
+    volumes[reference] = duplicator->GetOutput();
+  }
+
+  using AlgorithmType = mitk::MultiModalAffineDefaultRegistrationAlgorithm<ITKDiffusionVolumeType>;
+  auto algorithm = AlgorithmType::New();
+  mitk::MAPAlgorithmHelper helper(algorithm);
+
+  // One transform per volume; the reference keeps its gradient.
+  mitk::DiffusionImageMapping::MatrixType identity;
+  identity.set_identity();
+  std::vector<mitk::DiffusionImageMapping::MatrixType> transforms(numberOfVolumes, identity);
+  for (unsigned int i = 0; i < numberOfVolumes; ++i)
+  {
+    if (i == reference)
       continue;
 
     MITK_INFO << "Correcting volume " << i;
-
-    ExtractorType::Pointer filter = ExtractorType::New();
-    filter->SetInput( itkVectorImagePointer);
-    filter->SetChannelIndex(i);
-    filter->Update();
-
-    mitk::Image::Pointer movingImage = mitk::Image::New();
-    movingImage->InitializeByItk( filter->GetOutput() );
-    movingImage->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
+    mitk::Image::Pointer movingImage = mitk::DiffusionImageEditing::ExtractVolume(input, i);
 
     helper.SetData(movingImage, fixedImage);
-    mitk::MAPRegistrationWrapper::Pointer reg = helper.GetMITKRegistrationWrapper();
-    mitk::MITKRegistrationHelper::Affine3DTransformType::Pointer affine = mitk::MITKRegistrationHelper::getAffineMatrix(reg, false);
-    estimated_transforms.push_back(affine->GetMatrix().GetVnlMatrix());
+    mitk::MAPRegistrationWrapper::Pointer registration = helper.GetMITKRegistrationWrapper();
+    auto affine = mitk::MITKRegistrationHelper::getAffineMatrix(registration, false);
+    transforms[i] = affine->GetMatrix().GetVnlMatrix();
 
-    mitk::Image::Pointer registered_mitk_image = mitk::ImageMappingHelper::map(movingImage, reg, false, 0, nullptr, false, 0, mitk::ImageMappingInterpolator::BSpline_3);
-    ITKDiffusionVolumeType::Pointer registered_itk_image = ITKDiffusionVolumeType::New();
-    mitk::CastToItkImage(registered_mitk_image, registered_itk_image);
-    registered_itk_images.push_back(registered_itk_image);
-    }
-
-  int i=1;
-  for (auto image : registered_itk_images)
-  {
-    composer->SetInput(i, image);
-    ++i;
+    mitk::Image::Pointer registered = mitk::ImageMappingHelper::map(movingImage, registration, false, 0, nullptr, false, 0, mitk::ImageMappingInterpolator::BSpline_3);
+    mitk::CastToItkImage(registered, volumes[i]);
   }
+
+  auto composer = itk::ComposeImageFilter<ITKDiffusionVolumeType>::New();
+  for (unsigned int i = 0; i < numberOfVolumes; ++i)
+    composer->SetInput(i, volumes[i]);
   composer->Update();
 
-  m_CorrectedImage = mitk::GrabItkImageMemory( composer->GetOutput() );
-  DPH::CopyProperties(input, m_CorrectedImage, true);
-
-  typedef mitk::DiffusionImageCorrectionFilter CorrectionFilterType;
-  CorrectionFilterType::Pointer corrector = CorrectionFilterType::New();
-  corrector->SetImage( m_CorrectedImage );
-  corrector->CorrectDirections( estimated_transforms );
-
-  DPH::InitializeImage(m_CorrectedImage);
+  OutputImageType::Pointer output = this->GetOutput();
+  mitk::GrabItkImageMemory(composer->GetOutput(), output.GetPointer());
+  output->SetPropertyList(input->GetPropertyList()->Clone());
+  mitk::DiffusionImageMapping::RotateGradients(output, transforms);
 }
-
-#endif // MITKDWIHEADMOTIONCORRECTIONFILTER_CPP

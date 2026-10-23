@@ -29,19 +29,16 @@ the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef _itk_ResampleDwiImageFilter_txx_
-#define _itk_ResampleDwiImageFilter_txx_
-#endif
-
-#define _USE_MATH_DEFINES
+#ifndef itkResampleDwiImageFilter_txx
+#define itkResampleDwiImageFilter_txx
 
 #include "itkResampleDwiImageFilter.h"
-#include <itkImageRegionIterator.h>
-#include <itkImageRegion.h>
-#include <itkResampleImageFilter.h>
+
 #include <itkBSplineInterpolateImageFunction.h>
-#include <itkNearestNeighborInterpolateImageFunction.h>
 #include <itkLinearInterpolateImageFunction.h>
+#include <itkNearestNeighborInterpolateImageFunction.h>
+#include <itkResampleImageFilter.h>
+#include <itkVectorIndexSelectionCastImageFilter.h>
 #include <itkWindowedSincInterpolateImageFunction.h>
 
 namespace itk
@@ -52,7 +49,51 @@ ResampleDwiImageFilter<TScalarType>
 ::ResampleDwiImageFilter()
     : m_Interpolation(Interpolate_Linear)
 {
+    m_GridValue.Fill(1.0);
     this->SetNumberOfRequiredInputs( 1 );
+}
+
+template <class TScalarType>
+void
+ResampleDwiImageFilter<TScalarType>
+::GenerateOutputInformation()
+{
+    Superclass::GenerateOutputInformation();
+
+    auto input = this->GetInput();
+    auto output = this->GetOutput();
+    if (input == nullptr || output == nullptr)
+        return;
+
+    const DoubleVectorType oldSpacing = input->GetSpacing();
+    DoubleVectorType newSpacing;
+    ImageRegion<3> newRegion;
+    ResampledImageGrid(oldSpacing, input->GetLargestPossibleRegion(), m_GridMode, m_GridValue, newSpacing, newRegion);
+
+    output->SetSpacing(newSpacing);
+    output->SetOrigin(ResampledImageOrigin(input->GetOrigin(), input->GetDirection(), oldSpacing, newSpacing));
+    output->SetDirection(input->GetDirection());
+    output->SetLargestPossibleRegion(newRegion);
+    output->SetVectorLength(input->GetVectorLength());
+}
+
+template <class TScalarType>
+void
+ResampleDwiImageFilter<TScalarType>
+::GenerateInputRequestedRegion()
+{
+    Superclass::GenerateInputRequestedRegion();
+    if (auto input = const_cast<DwiImageType*>(this->GetInput()))
+        input->SetRequestedRegionToLargestPossibleRegion();
+}
+
+template <class TScalarType>
+void
+ResampleDwiImageFilter<TScalarType>
+::EnlargeOutputRequestedRegion(DataObject* output)
+{
+    Superclass::EnlargeOutputRequestedRegion(output);
+    output->SetRequestedRegionToLargestPossibleRegion();
 }
 
 template <class TScalarType>
@@ -60,117 +101,53 @@ void
 ResampleDwiImageFilter<TScalarType>
 ::GenerateData()
 {
-//    // initialize output image
-//    itk::Vector< double, 3 > spacing = this->GetInput()->GetSpacing();
-//    spacing[0] /= m_SamplingFactor[0];
-//    spacing[1] /= m_SamplingFactor[1];
-//    spacing[2] /= m_SamplingFactor[2];
-//    ImageRegion<3> region = this->GetInput()->GetLargestPossibleRegion();
-//    region.SetSize(0, region.GetSize(0)*m_SamplingFactor[0]);
-//    region.SetSize(1, region.GetSize(1)*m_SamplingFactor[1]);
-//    region.SetSize(2, region.GetSize(2)*m_SamplingFactor[2]);
-
-    itk::Point<double,3> origin = this->GetInput()->GetOrigin();
-    origin[0] -= this->GetInput()->GetSpacing()[0]/2;
-    origin[1] -= this->GetInput()->GetSpacing()[1]/2;
-    origin[2] -= this->GetInput()->GetSpacing()[2]/2;
-
-    origin[0] += m_NewSpacing[0]/2;
-    origin[1] += m_NewSpacing[1]/2;
-    origin[2] += m_NewSpacing[2]/2;
-
-    typename DwiImageType::Pointer outImage = DwiImageType::New();
-    outImage->SetSpacing( m_NewSpacing );
-    outImage->SetOrigin( origin );
-    outImage->SetDirection( this->GetInput()->GetDirection() );
-    outImage->SetLargestPossibleRegion( m_NewImageRegion );
-    outImage->SetBufferedRegion( m_NewImageRegion );
-    outImage->SetRequestedRegion( m_NewImageRegion );
-    outImage->SetVectorLength( this->GetInput()->GetVectorLength() );
+    auto input = this->GetInput();
+    typename DwiImageType::Pointer outImage = this->GetOutput();
+    outImage->SetBufferedRegion(outImage->GetRequestedRegion());
     outImage->Allocate();
 
-    typename itk::ResampleImageFilter<DwiChannelType, DwiChannelType>::Pointer resampler = itk::ResampleImageFilter<DwiChannelType, DwiChannelType>::New();
-    resampler->SetOutputParametersFromImage(outImage);
+    using ResamplerType = itk::ResampleImageFilter<DwiChannelType, DwiChannelType>;
+    typename ResamplerType::Pointer resampler = ResamplerType::New();
+    resampler->SetSize(outImage->GetLargestPossibleRegion().GetSize());
+    resampler->SetOutputSpacing(outImage->GetSpacing());
+    resampler->SetOutputOrigin(outImage->GetOrigin());
+    resampler->SetOutputDirection(outImage->GetDirection());
+    resampler->SetOutputStartIndex(outImage->GetLargestPossibleRegion().GetIndex());
 
     switch (m_Interpolation)
     {
     case Interpolate_NearestNeighbour:
-    {
-        typename itk::NearestNeighborInterpolateImageFunction<DwiChannelType>::Pointer interp = itk::NearestNeighborInterpolateImageFunction<DwiChannelType>::New();
-        resampler->SetInterpolator(interp);
+        resampler->SetInterpolator(itk::NearestNeighborInterpolateImageFunction<DwiChannelType>::New());
         break;
-    }
-    case Interpolate_Linear:
-    {
-        typename itk::LinearInterpolateImageFunction<DwiChannelType>::Pointer interp = itk::LinearInterpolateImageFunction<DwiChannelType>::New();
-        resampler->SetInterpolator(interp);
-        break;
-    }
     case Interpolate_BSpline:
-    {
-        typename itk::BSplineInterpolateImageFunction<DwiChannelType>::Pointer interp = itk::BSplineInterpolateImageFunction<DwiChannelType>::New();
-        resampler->SetInterpolator(interp);
+        resampler->SetInterpolator(itk::BSplineInterpolateImageFunction<DwiChannelType>::New());
         break;
-    }
     case Interpolate_WindowedSinc:
-    {
-        typename itk::WindowedSincInterpolateImageFunction<DwiChannelType, 3>::Pointer interp = itk::WindowedSincInterpolateImageFunction<DwiChannelType, 3>::New();
-        resampler->SetInterpolator(interp);
+        resampler->SetInterpolator(itk::WindowedSincInterpolateImageFunction<DwiChannelType, 3>::New());
         break;
-    }
+    case Interpolate_Linear:
     default:
-    {
-        typename itk::LinearInterpolateImageFunction<DwiChannelType>::Pointer interp = itk::LinearInterpolateImageFunction<DwiChannelType>::New();
-        resampler->SetInterpolator(interp);
-    }
+        resampler->SetInterpolator(itk::LinearInterpolateImageFunction<DwiChannelType>::New());
     }
 
-    for (unsigned int i=0; i<this->GetInput()->GetVectorLength(); i++)
+    // Each resampled channel is written into its element of the output pixels; the output buffer
+    // holds the vector length elements of each pixel one after the other.
+    auto extractor = itk::VectorIndexSelectionCastImageFilter<DwiImageType, DwiChannelType>::New();
+    extractor->SetInput(input);
+    resampler->SetInput(extractor->GetOutput());
+    const unsigned int vectorLength = input->GetVectorLength();
+    const SizeValueType numberOfPixels = outImage->GetLargestPossibleRegion().GetNumberOfPixels();
+    TScalarType* out = outImage->GetBufferPointer();
+    for (unsigned int i=0; i<vectorLength; i++)
     {
-        typename DwiChannelType::Pointer channel = DwiChannelType::New();
-        channel->SetSpacing( this->GetInput()->GetSpacing() );
-        channel->SetOrigin( this->GetInput()->GetOrigin() );
-        channel->SetDirection( this->GetInput()->GetDirection() );
-        channel->SetLargestPossibleRegion( this->GetInput()->GetLargestPossibleRegion() );
-        channel->SetBufferedRegion( this->GetInput()->GetLargestPossibleRegion() );
-        channel->SetRequestedRegion( this->GetInput()->GetLargestPossibleRegion() );
-        channel->Allocate();
-
-        ImageRegionIterator<DwiChannelType> it(channel, channel->GetLargestPossibleRegion());
-        while(!it.IsAtEnd())
-        {
-            typename DwiImageType::PixelType pix = this->GetInput()->GetPixel(it.GetIndex());
-            it.Set(pix[i]);
-            ++it;
-        }
-
-        resampler->SetInput(channel);
+        extractor->SetIndex(i);
         resampler->Update();
-        channel = resampler->GetOutput();
-
-        ImageRegionIterator<DwiImageType> it2(outImage, outImage->GetLargestPossibleRegion());
-        while(!it2.IsAtEnd())
-        {
-            typename DwiImageType::PixelType pix = it2.Get();
-            pix[i] = channel->GetPixel(it2.GetIndex());
-            it2.Set(pix);
-            ++it2;
-        }
+        const TScalarType* channel = resampler->GetOutput()->GetBufferPointer();
+        for (SizeValueType p=0; p<numberOfPixels; ++p)
+            out[p*vectorLength + i] = channel[p];
     }
-
-    this->SetNthOutput(0, outImage);
-}
-
-template <class TScalarType>
-void
-ResampleDwiImageFilter<TScalarType>
-::UpdateOutputInformation()
-{
-  // Calls to superclass updateoutputinformation
-  //Superclass::UpdateOutputInformation();
-
-  this->GetOutput()->SetSpacing(m_NewSpacing);
-  this->GetOutput()->SetLargestPossibleRegion(m_NewImageRegion);
 }
 
 } // end of namespace
+
+#endif

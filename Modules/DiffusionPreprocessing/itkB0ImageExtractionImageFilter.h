@@ -14,77 +14,74 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkB0ImageExtractionImageFilter_h_
-#define __itkB0ImageExtractionImageFilter_h_
+#ifndef itkB0ImageExtractionImageFilter_h
+#define itkB0ImageExtractionImageFilter_h
 
-#include "itkImageToImageFilter.h"
+#include <itkImageToImageFilter.h>
+#include <itkVectorContainer.h>
+#include <itkVectorImage.h>
 
-namespace itk{
+#include <limits>
+
+namespace itk
+{
   /** \class B0ImageExtractionImageFilter
-  * \brief This class takes as input a T2-weighted image and computes a brainmask.
-  *
-  */
-
-  template< class TInputImagePixelType,
-  class TOutputImagePixelType >
-  class B0ImageExtractionImageFilter :
-    public ImageToImageFilter< VectorImage<TInputImagePixelType, 3>,
-    Image< TOutputImagePixelType, 3 > >
+   * \brief Averages the b0 volumes of a DWI into one 3D image.
+   *
+   * A b0 volume is one whose b-value rounds to 0 (mitk::IsB0), so the reference b-value is needed
+   * along with the gradients. Throws if the image has no b0 volume.
+   */
+  template <class TInputImagePixelType, class TOutputImagePixelType>
+  class B0ImageExtractionImageFilter
+    : public ImageToImageFilter<VectorImage<TInputImagePixelType, 3>, Image<TOutputImagePixelType, 3>>
   {
-
   public:
-
-    typedef B0ImageExtractionImageFilter Self;
-    typedef SmartPointer<Self>                      Pointer;
-    typedef SmartPointer<const Self>                ConstPointer;
-    typedef ImageToImageFilter< VectorImage< TInputImagePixelType, 3 >,
-      Image< TOutputImagePixelType, 3 >  >
-      Superclass;
+    using Self = B0ImageExtractionImageFilter;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
+    using Superclass = ImageToImageFilter<VectorImage<TInputImagePixelType, 3>, Image<TOutputImagePixelType, 3>>;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(B0ImageExtractionImageFilter,
-      ImageToImageFilter);
+    itkTypeMacro(B0ImageExtractionImageFilter, ImageToImageFilter);
 
-    typedef TInputImagePixelType                     InputPixelType;
+    using InputPixelType = TInputImagePixelType;
+    using OutputPixelType = TOutputImagePixelType;
+    using InputImageType = typename Superclass::InputImageType;
+    using OutputImageType = typename Superclass::OutputImageType;
+    using OutputImageRegionType = typename Superclass::OutputImageRegionType;
 
-    typedef TOutputImagePixelType                    OutputPixelType;
-
-    typedef typename Superclass::InputImageType      InputImageType;
-    typedef typename Superclass::OutputImageType     OutputImageType;
-
-    typedef typename Superclass::OutputImageRegionType
-      OutputImageRegionType;
-
-    typedef vnl_vector_fixed< double, 3 >            GradientDirectionType;
-
-    typedef itk::VectorContainer< unsigned int, GradientDirectionType >
-      GradientDirectionContainerType;
+    using GradientDirectionType = vnl_vector_fixed<double, 3>;
+    using GradientDirectionContainerType = itk::VectorContainer<unsigned int, GradientDirectionType>;
 
     GradientDirectionContainerType::ConstPointer GetDirections()
     { return m_Directions; }
-    void SetDirections( GradientDirectionContainerType::ConstPointer directions )
-    { this->m_Directions = directions; }
+    void SetDirections(GradientDirectionContainerType::ConstPointer directions)
+    {
+      this->m_Directions = directions;
+      this->Modified();
+    }
+
+    /** The reference b-value of the gradients; required. */
+    itkSetMacro(ReferenceBValue, double)
+    itkGetConstMacro(ReferenceBValue, double)
 
   protected:
-
     B0ImageExtractionImageFilter();
-    ~B0ImageExtractionImageFilter() override {};
+    ~B0ImageExtractionImageFilter() override = default;
 
     void GenerateData() override;
 
-    GradientDirectionContainerType::ConstPointer   m_Directions;
-
+    GradientDirectionContainerType::ConstPointer m_Directions;
+    double m_ReferenceBValue = std::numeric_limits<double>::quiet_NaN();
   };
-
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
 #include "itkB0ImageExtractionImageFilter.txx"
 #endif
 
-#endif //__itkB0ImageExtractionImageFilter_h_
-
+#endif

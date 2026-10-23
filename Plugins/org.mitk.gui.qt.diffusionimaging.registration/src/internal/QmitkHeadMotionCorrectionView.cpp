@@ -14,113 +14,121 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-//misc
-#define _USE_MATH_DEFINES
-#include <math.h>
-
-// Blueberry
-#include <berryISelectionService.h>
-#include <berryIWorkbenchWindow.h>
-
-// Qmitk
 #include "QmitkHeadMotionCorrectionView.h"
 
-// MITK
-#include <mitkDiffusionPropertyHelper.h>
-#include <mitkNodePredicateDataType.h>
-
-// Qt
-#include <QMessageBox>
-#include <QFileDialog>
-#include <QDir>
-#include <QDirIterator>
-#include <QTimer>
-
 #include <mitkDWIHeadMotionCorrectionFilter.h>
+#include <mitkDiffusionPropertyHelper.h>
+#include <mitkNodePredicateIsDWI.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
+#include <QMessageBox>
+#include <QtConcurrentRun>
 
 const std::string QmitkHeadMotionCorrectionView::VIEW_ID = "org.mitk.views.headmotioncorrectionview";
 
 QmitkHeadMotionCorrectionView::QmitkHeadMotionCorrectionView()
   : QmitkAbstractView()
-  , m_Controls( 0 )
-  , m_DiffusionImage( nullptr )
 {
-
 }
 
-// Destructor
 QmitkHeadMotionCorrectionView::~QmitkHeadMotionCorrectionView()
 {
+  // The worker must not outlive the view it reports to.
+  m_Watcher.waitForFinished();
 }
 
 void QmitkHeadMotionCorrectionView::CreateQtPartControl( QWidget *parent )
 {
-  // build up qt view, unless already done
-  if ( !m_Controls )
-  {
-    // create GUI widgets from the Qt Designer's .ui file
-    m_Controls = new Ui::QmitkHeadMotionCorrectionViewControls;
-    m_Controls->setupUi( parent );
-    connect( m_Controls->m_ImageBox, SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGUI()) );
-    connect( m_Controls->m_RegistrationStartButton, SIGNAL(clicked()), this, SLOT(StartCorrection()) );
-    this->m_Parent = parent;
+  if (m_Controls)
+    return;
 
-    m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
-    mitk::TNodePredicateDataType<mitk::Image>::Pointer isImagePredicate = mitk::TNodePredicateDataType<mitk::Image>::New();
-    m_Controls->m_ImageBox->SetPredicate(isImagePredicate);
-    UpdateGUI();
-  }
-}
+  m_Controls = std::make_unique<Ui::QmitkHeadMotionCorrectionViewControls>();
+  m_Controls->setupUi(parent);
+  connect(m_Controls->m_ImageBox, &QComboBox::currentIndexChanged, this, &QmitkHeadMotionCorrectionView::UpdateGUI);
+  connect(m_Controls->m_RegistrationStartButton, &QAbstractButton::clicked, this, &QmitkHeadMotionCorrectionView::StartCorrection);
+  connect(&m_Watcher, &QFutureWatcher<Result>::finished, this, &QmitkHeadMotionCorrectionView::OnCorrectionFinished);
 
-void QmitkHeadMotionCorrectionView::OnSelectionChanged(berry::IWorkbenchPart::Pointer, const QList<mitk::DataNode::Pointer>& )
-{
-
+  m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
+  m_Controls->m_ImageBox->SetPredicate(mitk::NodePredicateIsDWI::New());
+  this->UpdateGUI();
 }
 
 void QmitkHeadMotionCorrectionView::UpdateGUI()
 {
-  if (m_Controls->m_ImageBox->GetSelectedNode().IsNotNull())
-  {
-    m_Controls->m_RegistrationStartButton->setEnabled(true);
-    m_Controls->m_RegistrationStartButton->setToolTip("Start Registration");
-  }
+  const bool running = m_Watcher.isRunning();
+  const bool selected = m_Controls->m_ImageBox->GetSelectedNode().IsNotNull();
+  m_Controls->m_RegistrationStartButton->setEnabled(!running && selected);
+  if (running)
+    m_Controls->m_RegistrationStartButton->setToolTip("A correction is running.");
   else
-  {
-    m_Controls->m_RegistrationStartButton->setEnabled(false);
-    m_Controls->m_RegistrationStartButton->setToolTip("No Diffusion image selected.");
-  }
+    m_Controls->m_RegistrationStartButton->setToolTip(selected ? "Start Registration" : "No Diffusion image selected.");
 }
 
 void QmitkHeadMotionCorrectionView::SetFocus()
 {
-  UpdateGUI();
+  this->UpdateGUI();
   m_Controls->m_RegistrationStartButton->setFocus();
 }
 
 void QmitkHeadMotionCorrectionView::StartCorrection()
 {
-  mitk::DataNode::Pointer node = m_Controls->m_ImageBox->GetSelectedNode();
-  mitk::Image::Pointer inImage = dynamic_cast<mitk::Image*>(node->GetData());
+  if (m_Watcher.isRunning())
+    return;
 
+  auto node = m_Controls->m_ImageBox->GetSelectedNode();
+  if (node.IsNull())
+    return;
+  mitk::Image::ConstPointer inImage = dynamic_cast<mitk::Image*>(node->GetData());
   if (!mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(inImage))
   {
     QMessageBox::warning(nullptr, "Image not processed", "Input is not a diffusion-weighted image!");
     return;
   }
 
-  mitk::DWIHeadMotionCorrectionFilter::Pointer registerer = mitk::DWIHeadMotionCorrectionFilter::New();
-  registerer->SetInput(inImage);
-  registerer->Update();
-  mitk::Image::Pointer image = registerer->GetCorrectedImage();
-  mitk::DiffusionPropertyHelper::CopyDICOMProperties(inImage, image);
+  m_ImageNode = node;
+  m_Controls->m_RegistrationStartButton->setText("Correction in progress ...");
 
-  mitk::DataNode::Pointer corrected_node = mitk::DataNode::New();
-  corrected_node->SetData( image );
-  QString name(node->GetName().c_str());
-  name += "_Corrected";
-  corrected_node->SetName(name.toStdString());
-  GetDataStorage()->Add(corrected_node, node);
+  // The worker only reads the input; exceptions are passed back as text.
+  m_Watcher.setFuture(QtConcurrent::run([inImage]()
+  {
+    Result result;
+    try
+    {
+      auto registerer = mitk::DWIHeadMotionCorrectionFilter::New();
+      registerer->SetInput(inImage);
+      registerer->Update();
+      result.image = registerer->GetCorrectedImage();
+      result.image->DisconnectPipeline();
+      mitk::DiffusionPropertyHelper::CopyDICOMProperties(inImage, result.image);
+    }
+    catch (const std::exception& e)
+    {
+      result.error = e.what();
+    }
+    return result;
+  }));
+  // Only now isRunning() is true, so the button is disabled.
+  this->UpdateGUI();
+}
+
+void QmitkHeadMotionCorrectionView::OnCorrectionFinished()
+{
+  // Taken, not copied: the watcher's future would otherwise keep the whole image alive until the
+  // next run, even after its node is removed.
+  const Result result = m_Watcher.future().takeResult();
+  m_Controls->m_RegistrationStartButton->setText("Start Head Motion Correction");
+  this->UpdateGUI();
+
+  if (result.image.IsNull())
+  {
+    QMessageBox::warning(nullptr, "Image not processed", QString("Head-motion correction failed: ") + QString::fromStdString(result.error));
+    return;
+  }
+
+  auto correctedNode = mitk::DataNode::New();
+  correctedNode->SetData(result.image);
+  correctedNode->SetName(m_ImageNode->GetName() + "_Corrected");
+  // The input may have been removed while the correction ran.
+  auto dataStorage = this->GetDataStorage();
+  dataStorage->Add(correctedNode, dataStorage->Exists(m_ImageNode) ? m_ImageNode.GetPointer() : nullptr);
+  m_ImageNode = nullptr;
 }
