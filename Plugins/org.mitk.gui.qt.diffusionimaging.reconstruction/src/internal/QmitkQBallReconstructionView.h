@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkILifecycleAwarePart.h>
 
 #include <string>
+#include <vector>
 
 #include "ui_QmitkQBallReconstructionViewControls.h"
 
@@ -33,7 +34,7 @@ typedef short DiffusionPixelType;
 
 struct QbrSelListener;
 
-struct QbrShellSelection;
+class QCheckBox;
 
 /*!
  * \ingroup org_mitk_gui_qt_qballreconstruction_internal
@@ -46,8 +47,6 @@ class QmitkQBallReconstructionView : public QmitkAbstractView, public mitk::ILif
 {
 
   friend struct QbrSelListener;
-
-  friend struct QbrShellSelection;
 
   typedef mitk::DiffusionPropertyHelper::GradientDirectionType            GradientDirectionType;
   typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType  GradientDirectionContainerType;
@@ -122,7 +121,11 @@ protected:
 
 private:
 
-  std::map< const mitk::DataNode *, QbrShellSelection * > m_ShellSelectorMap;
+  /** Check boxes of the shells of the selected DWI, with their b-values */
+  std::vector<QCheckBox*> m_ShellCheckBoxes;
+  std::vector<unsigned int> m_ShellSelectionBValues;
+  /** The node the check boxes were built for; compared, never dereferenced */
+  const mitk::DataNode* m_ShellSelectionNode;
   void GenerateShellSelectionUI(mitk::DataNode::Pointer node);
 };
 

@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkQBallReconstructionView.h"
 
+#include <QCheckBox>
 #include <QMessageBox>
 #include "mitkNodePredicateDataType.h"
 #include "QmitkDataStorageComboBox.h"
@@ -41,120 +42,10 @@ typedef float TTensorPixelType;
 const int QmitkQBallReconstructionView::nrconvkernels = 252;
 
 
-struct QbrShellSelection
-{
-  typedef mitk::DiffusionPropertyHelper::GradientDirectionType            GradientDirectionType;
-  typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType  GradientDirectionContainerType;
-  typedef mitk::DiffusionPropertyHelper::BValueMapType                    BValueMapType;
-  typedef itk::VectorImage< DiffusionPixelType, 3 >                       ITKDiffusionImageType;
-
-  QmitkQBallReconstructionView* m_View;
-  mitk::DataNode * m_Node;
-  std::string m_NodeName;
-
-  std::vector<QCheckBox *> m_CheckBoxes;
-  QLabel * m_Label;
-
-  mitk::Image * m_Image;
-
-  QbrShellSelection(QmitkQBallReconstructionView* view, mitk::DataNode * node)
-    : m_View(view),
-      m_Node(node),
-      m_NodeName(node->GetName())
-  {
-    m_Image = dynamic_cast<mitk::Image * > (node->GetData());
-
-    if(!m_Image)
-    {
-      MITK_ERROR << "QmitkQBallReconstructionView::QbrShellSelection : no image selected";
-      return;
-    }
-    bool isDiffusionImage( mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage( dynamic_cast<mitk::Image *>(m_Node->GetData())) );
-
-    if( !isDiffusionImage )
-    {
-      MITK_ERROR <<
-                    "QmitkQBallReconstructionView::QbrShellSelection : selected image contains no diffusion information";
-      return;
-    }
-
-    GenerateCheckboxes();
-
-  }
-
-  void GenerateCheckboxes()
-  {
-    BValueMapType origMap = mitk::DiffusionPropertyHelper::GetBValueMap(m_Image);
-    BValueMapType::iterator itStart = origMap.begin();
-    itStart++;
-    BValueMapType::iterator itEnd = origMap.end();
-
-    m_Label = new QLabel(m_NodeName.c_str());
-    m_Label->setVisible(true);
-    m_View->m_Controls->m_QBallSelectionBox->layout()->addWidget(m_Label);
-
-    for(BValueMapType::iterator it = itStart ; it!= itEnd; it++)
-    {
-      QCheckBox * box  = new QCheckBox(QString::number(it->first));
-      m_View->m_Controls->m_QBallSelectionBox->layout()->addWidget(box);
-
-      box->setChecked(true);
-      box->setCheckable(true);
-      // box->setVisible(true);
-      m_CheckBoxes.push_back(box);
-    }
-  }
-
-  void SetVisible(bool vis)
-  {
-    foreach(QCheckBox * box, m_CheckBoxes)
-    {
-      box->setVisible(vis);
-    }
-  }
-
-  BValueMapType GetBValueSelctionMap()
-  {
-    BValueMapType inputMap = mitk::DiffusionPropertyHelper::GetBValueMap(m_Image);
-    BValueMapType outputMap;
-
-    unsigned int val = 0;
-
-    if(inputMap.find(0) == inputMap.end()){
-      return outputMap;
-    }else{
-      outputMap[val] = inputMap[val];
-    }
-
-    foreach(QCheckBox * box, m_CheckBoxes)
-    {
-      if(box->isChecked()){
-        val = box->text().toUInt();
-        outputMap[val] = inputMap[val];
-        MITK_INFO << val;
-      }
-    }
-
-    return outputMap;
-  }
-
-  ~QbrShellSelection()
-  {
-    m_View->m_Controls->m_QBallSelectionBox->layout()->removeWidget(m_Label);
-    delete m_Label;
-
-    for(std::vector<QCheckBox *>::iterator it = m_CheckBoxes.begin() ; it!= m_CheckBoxes.end(); it++)
-    {
-      m_View->m_Controls->m_QBallSelectionBox->layout()->removeWidget((*it));
-      delete (*it);
-    }
-    m_CheckBoxes.clear();
-  }
-};
-
 QmitkQBallReconstructionView::QmitkQBallReconstructionView()
   : QmitkAbstractView(),
-    m_Controls(nullptr)
+    m_Controls(nullptr),
+    m_ShellSelectionNode(nullptr)
 {
 }
 
@@ -236,12 +127,8 @@ void QmitkQBallReconstructionView::ConvertShImage()
 
 void QmitkQBallReconstructionView::UpdateGui()
 {
-  m_Controls->m_ButtonStandard->setEnabled(false);
-  if (m_Controls->m_ImageBox->GetSelectedNode().IsNotNull())
-  {
-    m_Controls->m_ButtonStandard->setEnabled(true);
-    GenerateShellSelectionUI(m_Controls->m_ImageBox->GetSelectedNode());
-  }
+  m_Controls->m_ButtonStandard->setEnabled(m_Controls->m_ImageBox->GetSelectedNode().IsNotNull());
+  GenerateShellSelectionUI(m_Controls->m_ImageBox->GetSelectedNode());
 
   m_Controls->m_ConvertButton->setEnabled(m_Controls->m_ShImageBox->GetSelectedNode().IsNotNull());
 }
@@ -676,7 +563,17 @@ void QmitkQBallReconstructionView::TemplatedMultiQBallReconstruction(double lamb
   dataNodePointer->GetStringProperty("name",nodename);
 
   mitk::Image* dwi = dynamic_cast<mitk::Image*>(dataNodePointer->GetData());
-  BValueMapType currSelectionMap = m_ShellSelectorMap[dataNodePointer]->GetBValueSelctionMap();
+
+  // The b0 volumes and the checked shells of the selected DWI, read from the DWI now.
+  const BValueMapType &fullMap = mitk::DiffusionPropertyHelper::GetBValueMap(dwi);
+  BValueMapType currSelectionMap;
+  if (fullMap.count(0) != 0)
+    currSelectionMap[0] = fullMap.at(0);
+  for (unsigned int i = 0; i < m_ShellCheckBoxes.size(); ++i)
+  {
+    if (m_ShellCheckBoxes[i]->isChecked() && fullMap.count(m_ShellSelectionBValues[i]) != 0)
+      currSelectionMap[m_ShellSelectionBValues[i]] = fullMap.at(m_ShellSelectionBValues[i]);
+  }
 
   if(currSelectionMap.size() != 4)// || currSelectionMap.find(0) != currSelectionMap.end())
   {
@@ -709,7 +606,7 @@ void QmitkQBallReconstructionView::TemplatedMultiQBallReconstruction(double lamb
   ITKDiffusionImageType::Pointer itkVectorImagePointer = ITKDiffusionImageType::New();
   mitk::CastToItkImage(dwi, itkVectorImagePointer);
 
-  filter->SetBValueMap(m_ShellSelectorMap[dataNodePointer]->GetBValueSelctionMap());
+  filter->SetBValueMap(currSelectionMap);
   filter->SetGradientImage(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi), itkVectorImagePointer, mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi));
   filter->SetThreshold( static_cast<short>(m_Controls->m_QBallReconstructionThreasholdEdit->value()) );
   filter->SetLambda(lambda);
@@ -744,25 +641,35 @@ void QmitkQBallReconstructionView::TemplatedMultiQBallReconstruction(double lamb
 
 void QmitkQBallReconstructionView::GenerateShellSelectionUI(mitk::DataNode::Pointer node)
 {
-  std::map<const mitk::DataNode * , QbrShellSelection * > tempMap;
+  // One check box per non-zero shell of the selected DWI. Nothing keeps a pointer to the DWI: the
+  // selection is read from the DWI at reconstruction time. The boxes (and their check states) stay
+  // while the same node with the same shells is selected; the node address is only compared.
+  std::vector<unsigned int> bValues;
+  mitk::Image* dwi = node.IsNotNull() ? dynamic_cast<mitk::Image*>(node->GetData()) : nullptr;
+  if (dwi != nullptr && mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi))
+  {
+    for (const auto &shell : mitk::DiffusionPropertyHelper::GetBValueMap(dwi))
+    {
+      if (shell.first != 0)
+        bValues.push_back(shell.first);
+    }
+  }
+  if (node.GetPointer() == m_ShellSelectionNode && bValues == m_ShellSelectionBValues)
+    return;
 
-  if(m_ShellSelectorMap.find(  node.GetPointer() ) != m_ShellSelectorMap.end())
-  {
-    tempMap[node.GetPointer()] = m_ShellSelectorMap[node.GetPointer()];
-    m_ShellSelectorMap.erase(node.GetPointer());
-  }
-  else
-  {
-    tempMap[node.GetPointer()] = new QbrShellSelection(this, node );
-    tempMap[node.GetPointer()]->SetVisible(true);
-  }
+  for (auto box : m_ShellCheckBoxes)
+    delete box;
+  m_ShellCheckBoxes.clear();
+  m_ShellSelectionNode = node.GetPointer();
+  m_ShellSelectionBValues = bValues;
 
-  for(std::map<const mitk::DataNode * , QbrShellSelection * >::iterator it = m_ShellSelectorMap.begin(); it != m_ShellSelectorMap.end();it ++)
+  for (auto bValue : bValues)
   {
-    delete it->second;
+    auto box = new QCheckBox(QString::number(bValue));
+    box->setChecked(true);
+    m_Controls->m_QBallSelectionBox->layout()->addWidget(box);
+    m_ShellCheckBoxes.push_back(box);
   }
-  m_ShellSelectorMap.clear();
-  m_ShellSelectorMap = tempMap;
 }
 
 void QmitkQBallReconstructionView::PreviewThreshold(short threshold)
