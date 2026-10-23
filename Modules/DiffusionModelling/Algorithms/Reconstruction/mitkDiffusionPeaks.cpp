@@ -40,9 +40,9 @@ namespace
   {
     mitk::PeakResult result;
     result.peaks = mitk::PeakImage::New();
-    // Copied: GrabItkImageMemory takes over only the first volume of a 4D image.
-    result.peaks->InitializeByItk(peaks);
-    result.peaks->SetChannel(peaks->GetBufferPointer());
+    // The voxels are taken over, not copied. GrabItkImageMemory would take over only the first
+    // volume of the 4D image; the channel holds all of them.
+    mitk::GrabItkImageMemoryChannel(peaks, nullptr, result.peaks.GetPointer(), false);
     mitk::DiffusionPropertyHelper::CopyDICOMProperties(input, result.peaks);
     result.numberOfPeaks = mitk::GrabItkImageMemory(numberOfPeaks);
     return result;

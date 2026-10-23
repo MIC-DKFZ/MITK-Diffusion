@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkDiffusionReconstruction.h>
+#include <mitkITKImageImport.h>
 #include <mitkImageCast.h>
 #include <mitkImageVtkMapper2D.h>
 #include <mitkNodePredicateDataType.h>
@@ -202,9 +203,7 @@ void QmitkTensorReconstructionView::PreviewThreshold(int threshold)
   filterThreshold->SetOutsideValue(1); // mark cut off values red
   filterThreshold->Update();
 
-  auto mitkImage = mitk::Image::New();
-  mitkImage->InitializeByItk(filterThreshold->GetOutput());
-  mitkImage->SetVolume(filterThreshold->GetOutput()->GetBufferPointer());
+  auto mitkImage = mitk::GrabItkImageMemory(filterThreshold->GetOutput());
 
   mitk::DataNode::Pointer node = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", dwiNode);
   if (node.IsNull())
