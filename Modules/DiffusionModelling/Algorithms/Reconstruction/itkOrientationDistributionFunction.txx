@@ -70,6 +70,7 @@ OrientationDistributionFunction<T, NOdfDirections>
 ::operator= (const Self& r)
 {
   BaseArray::operator=(r);
+  CopyEigenAnalysis(r);
   return *this;
 }
 
@@ -94,6 +95,7 @@ OrientationDistributionFunction<T, NOdfDirections>
 ::operator= (const ComponentArrayType r )
 {
   BaseArray::operator=(r);
+  m_EigenAnalysisCalculated = false;
   return *this;
 }
 

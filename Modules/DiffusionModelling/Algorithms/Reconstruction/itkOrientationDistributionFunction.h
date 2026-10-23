@@ -91,8 +91,9 @@ public:
 
   typedef ComponentType ComponentArrayType[ itkGetStaticConstMacro(InternalDimension) ];
 
-  /** Pass-through constructor for the Array base class. */
-  OrientationDistributionFunction(const Self& r): BaseArray(r) { m_EigenAnalysisCalculated = false; }
+  /** Pass-through constructor for the Array base class. The eigen analysis of InitFromEllipsoid
+   * is copied too, so a copy reports the same principal direction as the original. */
+  OrientationDistributionFunction(const Self& r): BaseArray(r) { CopyEigenAnalysis(r); }
   OrientationDistributionFunction(const ComponentArrayType r): BaseArray(r) { m_EigenAnalysisCalculated = false; }
 
   /** Pass-through assignment operator for the Array base class. */
@@ -216,6 +217,16 @@ private:
   typename itk::DiffusionTensor3D<TComponent>::EigenValuesArrayType   m_EigenValues;
   typename itk::DiffusionTensor3D<TComponent>::EigenVectorsMatrixType m_EigenVectors;
   bool  m_EigenAnalysisCalculated;
+
+  void CopyEigenAnalysis(const Self& r)
+  {
+    m_EigenAnalysisCalculated = r.m_EigenAnalysisCalculated;
+    if (m_EigenAnalysisCalculated)
+    {
+      m_EigenValues = r.m_EigenValues;
+      m_EigenVectors = r.m_EigenVectors;
+    }
+  }
 
 };
 
