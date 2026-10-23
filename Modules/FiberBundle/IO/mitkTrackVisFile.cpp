@@ -11,12 +11,13 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include "mitkTrackVisFile.h"
+#include "mitkFiberPolyDataBuilder.h"
 
 #include <mitkExceptionMacro.h>
 #include <mitkGeometry3D.h>
 
-#include <vtkCell.h>
 #include <vtkCellArray.h>
+#include <vtkLinearTransform.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkTransformFilter.h>
@@ -38,20 +39,25 @@ namespace
       matrix->SetElement(axis, j, -matrix->GetElement(axis, j));
   }
 
-  /** The polydata mapped by the given matrix (as MITK's geometry transform), or by its inverse. */
-  vtkSmartPointer<vtkPolyData> Transform(vtkPolyData* polyData, vtkMatrix4x4* matrix, bool inverse)
+  /** The polydata mapped by the given matrix (as MITK's geometry transform). */
+  vtkSmartPointer<vtkPolyData> Transform(vtkPolyData* polyData, vtkMatrix4x4* matrix)
   {
     mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
     geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
 
     vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
     transformFilter->SetInputData(polyData);
-    if (inverse)
-      transformFilter->SetTransform(geometry->GetVtkTransform()->GetInverse());
-    else
-      transformFilter->SetTransform(geometry->GetVtkTransform());
+    transformFilter->SetTransform(geometry->GetVtkTransform());
     transformFilter->Update();
     return transformFilter->GetPolyDataOutput();
+  }
+
+  /** The inverse of the voxmm-to-LPS map of the header, as the geometry transform computes it. */
+  vtkSmartPointer<vtkAbstractTransform> LpsToVoxmmTransform(const mitk::TrackVisFile::Header& header)
+  {
+    mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
+    geometry->SetIndexToWorldTransformByVtkMatrix(mitk::TrackVisFile::VoxmmToLps(header, true));
+    return geometry->GetVtkTransform()->GetInverse();
   }
 
   mitk::TrackVisFile::Header ReadHeader(std::istream& in, const std::string& filename)
@@ -178,7 +184,7 @@ mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename,
     if (flips[i])
       NegateRow(matrix, i);
 
-  FiberBundle::Pointer fib = FiberBundle::New(Transform(polyData, matrix, false));
+  FiberBundle::Pointer fib = FiberBundle::New(Transform(polyData, matrix));
   fib->SetTrackVisHeader(header);
   return fib;
 }
@@ -202,19 +208,28 @@ void mitk::TrackVisFile::Write(const std::string& filename, const FiberBundle* f
   if (!out.write(reinterpret_cast<const char*>(&header), sizeof(header)))
     mitkThrow() << "Could not write the TrackVis header to " << filename;
 
-  vtkSmartPointer<vtkPolyData> polyData = Transform(fib->GetFiberPolyData(), VoxmmToLps(header, true), true);
+  // Only the points are mapped to voxmm, with the transform that vtkTransformFilter would apply;
+  // the fibers are read from the bundle's own cell array.
+  vtkPolyData* polyData = fib->GetFiberPolyData();
+  vtkSmartPointer<vtkPoints> voxmmPoints = vtkSmartPointer<vtkPoints>::New();
+  if (polyData->GetPoints() != nullptr)
+  {
+    voxmmPoints->SetDataType(polyData->GetPoints()->GetDataType());
+    LpsToVoxmmTransform(header)->TransformPoints(polyData->GetPoints(), voxmmPoints);
+  }
+  vtkSmartPointer<vtkIdList> idBuffer = vtkSmartPointer<vtkIdList>::New();
   std::vector<float> values;
   for (unsigned int i=0; i<fib->GetNumFibers(); i++)
   {
-    vtkCell* cell = polyData->GetCell(i);
-    const std::uint32_t numPoints = static_cast<std::uint32_t>(cell->GetNumberOfPoints());
-    vtkPoints* points = cell->GetPoints();
+    const auto ids = FiberBundleDetail::FiberPointIds(polyData, i, idBuffer);
+    const std::uint32_t numPoints = static_cast<std::uint32_t>(ids.size());
 
     values.resize(3*static_cast<std::size_t>(numPoints));
     std::size_t pos = 0;
     for (std::uint32_t j=0; j<numPoints; j++)
     {
-      double* p = points->GetPoint(j);
+      double p[3];
+      voxmmPoints->GetPoint(ids[j], p);
       // TRK coordinates are corner based, so we have to shift the center based vtk coordinates by half a voxel
       values[pos++] = p[0] + header.voxel_size[0]/2;
       values[pos++] = p[1] + header.voxel_size[1]/2;

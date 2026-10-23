@@ -18,14 +18,16 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkFiberBundleMimeTypes.h"
 #include "mitkFiberBundleDicomReferenceTags.h"
 
+#include "mitkFiberPolyDataBuilder.h"
+
 #include <mitkFiberBundle.h>
-#include <vtkCell.h>
 #include <vtkPolyData.h>
 #include "dcmtk/config/osconfig.h"    /* make sure OS specific configuration is included first */
 #include "dcmtk/dcmtract/trctractographyresults.h"
 #include "dcmtk/dcmdata/dcuid.h"
 #include <mitkLocaleSwitch.h>
 #include <memory>
+#include <vector>
 
 mitk::FiberBundleDicomWriter::FiberBundleDicomWriter()
   : mitk::AbstractFileWriter(mitk::FiberBundle::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME(), "DICOM Fiber Bundle Writer")
@@ -162,20 +164,20 @@ void mitk::FiberBundleDicomWriter::Write()
   cieLabColor[0] = 30000; // L
   cieLabColor[1] = 0 ; // a
   cieLabColor[2] = 0 ; // b
-  // kept until the file is saved
-  std::vector< std::vector<Float32> > tracts;
+  // DCMTK copies the points of each track (putAndInsertFloat32Array), so one buffer serves all.
+  std::vector<Float32> pointData;
+  vtkSmartPointer<vtkIdList> idBuffer = vtkSmartPointer<vtkIdList>::New();
 
   for (unsigned int i=0; i<fib->GetNumFibers(); i++)
   {
-      vtkCell* cell = poly->GetCell(i);
-      int numPoints = cell->GetNumberOfPoints();
-      vtkPoints* points = cell->GetPoints();
+      const auto ids = FiberBundleDetail::FiberPointIds(poly, i, idBuffer);
+      const int numPoints = static_cast<int>(ids.size());
 
-      tracts.emplace_back(static_cast<std::size_t>(numPoints)*3);
-      std::vector<Float32>& pointData = tracts.back();
+      pointData.resize(static_cast<std::size_t>(numPoints)*3);
       for(int i=0; i<numPoints ;i++)
       {
-          double* p = points->GetPoint(i);
+          double p[3];
+          poly->GetPoint(ids[i], p);
 
           pointData[i*3] = p[0];
           pointData[i*3+1] = p[1];
