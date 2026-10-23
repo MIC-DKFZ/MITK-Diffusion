@@ -18,6 +18,8 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
+#include <itkImageRegionIteratorWithIndex.h>
+
 #include "mitkFiberProcessingTestHelper.h"
 
 #include <omp.h>
@@ -36,6 +38,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(InputCentroids_OutputKBelongsToCentroidK);
   MITK_TEST(Metrics_FibersWithFewerThanFourPoints);
   MITK_TEST(Resampling_EqualArcLength);
+  MITK_TEST(ScalarMap_SeveralMapsInParallel);
   CPPUNIT_TEST_SUITE_END();
 
   /** Three fibers along x at y = 0, 0.5, 1 mm and, 40 mm away, two at y = 40, 41 mm, with
@@ -209,6 +212,55 @@ public:
     CPPUNIT_ASSERT_EQUAL(vtkIdType(12), centroid->GetNumberOfPoints());
     for (vtkIdType k = 0; k < 12; ++k)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(100.0 * k / 11, centroid->GetPoint(k)[0], 1e-3);
+  }
+
+  void ScalarMap_SeveralMapsInParallel()
+  {
+    // Two maps (value = x and value = 10 y); distances computed by 8 threads must equal the
+    // sequential ones. A shared interpolator switched between the maps gave other values.
+    using ImageType = itk::Image<float, 3>;
+    std::vector<ImageType::Pointer> maps;
+    for (int m = 0; m < 2; ++m)
+    {
+      auto map = ImageType::New();
+      ImageType::SizeType size = {{20, 20, 3}};
+      map->SetRegions(ImageType::RegionType(size));
+      map->Allocate();
+      itk::ImageRegionIteratorWithIndex<ImageType> it(map, map->GetLargestPossibleRegion());
+      for (; !it.IsAtEnd(); ++it)
+        it.Set(m == 0 ? it.GetIndex()[0] : 10.0f * it.GetIndex()[1]);
+      maps.push_back(map);
+    }
+    mitk::ClusteringMetricScalarMap metric;
+    metric.SetImages(maps);
+
+    std::mt19937 rng(7);
+    std::uniform_real_distribution<float> coordinate(0.0f, 19.0f);
+    const int numPairs = 2000;
+    std::vector<vnl_matrix<float>> s(numPairs, vnl_matrix<float>(3, 12)), t(numPairs, vnl_matrix<float>(3, 12));
+    for (int i = 0; i < numPairs; ++i)
+      for (unsigned int k = 0; k < 12; ++k)
+      {
+        s[i](0, k) = coordinate(rng); s[i](1, k) = coordinate(rng); s[i](2, k) = 1;
+        t[i](0, k) = coordinate(rng); t[i](1, k) = coordinate(rng); t[i](2, k) = 1;
+      }
+
+    std::vector<float> sequential(numPairs), parallel(numPairs);
+    bool flipped = false;
+    for (int i = 0; i < numPairs; ++i)
+      sequential[i] = metric.CalculateDistance(s[i], t[i], flipped);
+
+    const int previousThreads = omp_get_max_threads();
+    omp_set_num_threads(8);
+#pragma omp parallel for
+    for (int i = 0; i < numPairs; ++i)
+    {
+      bool f = false;
+      parallel[i] = metric.CalculateDistance(s[i], t[i], f);
+    }
+    omp_set_num_threads(previousThreads);
+    for (int i = 0; i < numPairs; ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(sequential[i], parallel[i], 1e-3);
   }
 
   void Clusters_KeepInputWeights()

@@ -37,7 +37,6 @@ public:
 
   ClusteringMetricScalarMap()
   {
-    m_Interpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
     this->m_Scale = 30;
   }
   virtual ~ClusteringMetricScalarMap(){}
@@ -105,26 +104,30 @@ public:
 
   vnl_vector<float> GetImageValuesAtPoint(itk::Point<float, 3>& itkP)
   {
-    vnl_vector<float> vals; vals.set_size(m_ScalarMaps.size());
-    int c = 0;
-    for (auto map : m_ScalarMaps)
-    {
-      m_Interpolator->SetInputImage(map);
-      vals[c] = mitk::imv::GetImageValue<float>(itkP, true, m_Interpolator);
-      ++c;
-    }
+    // CalculateDistance runs in the OpenMP loops of the clustering filter, so the interpolators
+    // are only read here; each map has its own, set up in SetImages.
+    vnl_vector<float> vals; vals.set_size(m_Interpolators.size());
+    for (unsigned int c=0; c<m_Interpolators.size(); ++c)
+      vals[c] = mitk::imv::GetImageValue<float>(itkP, true, m_Interpolators[c]);
     return vals;
   }
 
   void SetImages(const std::vector<ItkFloatImgType::Pointer> &Parcellations)
   {
     m_ScalarMaps = Parcellations;
+    m_Interpolators.clear();
+    for (auto map : m_ScalarMaps)
+    {
+      auto interpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
+      interpolator->SetInputImage(map);
+      m_Interpolators.push_back(interpolator);
+    }
   }
 
 protected:
 
   std::vector< ItkFloatImgType::Pointer > m_ScalarMaps;
-  itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::Pointer   m_Interpolator;
+  std::vector< itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::Pointer > m_Interpolators;
 };
 
 }
