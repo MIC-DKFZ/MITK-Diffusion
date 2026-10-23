@@ -1,0 +1,4 @@
+MITK_CREATE_MODULE_TESTS()
+
+mitkAddCustomModuleTest(mitkDiffusionIvimFitTest mitkDiffusionIvimFitTest)
+mitkAddCustomModuleTest(mitkDiffusionKurtosisFitTest mitkDiffusionKurtosisFitTest)

@@ -24,6 +24,11 @@
     <keywordReference id="org.mitk.perspectives.ivim.Keyword"/>
     </perspective>
   
-  </extension>  
-  
+  </extension>
+
+  <extension point="org.blueberry.ui.keywords">
+    <keyword id="org.mitk.views.ivim.Keyword" label="IVIM intravoxel incoherent motion perfusion pseudo-diffusion kurtosis DKI ADC multi b-value fit"/>
+    <keyword id="org.mitk.perspectives.ivim.Keyword" label="IVIM intravoxel incoherent motion perfusion kurtosis DKI"/>
+  </extension>
+
 </plugin>
