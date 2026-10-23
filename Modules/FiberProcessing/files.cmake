@@ -10,8 +10,6 @@ set(H_FILES
   FiberModification/mitkFiberWeightsFile.h
   FiberModification/mitkDerivedFiberBundle.h
 
-  FiberQuantification/itkDistanceFromSegmentationImageFilter.h
-
   # Clustering
   FiberClustering/mitkTractClusteringFilter.h
   FiberClustering/mitkClusteringMetric.h

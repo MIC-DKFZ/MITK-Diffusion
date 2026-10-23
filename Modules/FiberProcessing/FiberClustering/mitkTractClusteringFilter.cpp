@@ -17,11 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkDerivedFiberBundle.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
 #include <algorithm>
-#include <boost/timer/progress_display.hpp>
-#include <vnl/vnl_sparse_matrix.h>
 
 namespace mitk{
 
@@ -370,81 +366,6 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
   return new_clusters;
 }
 
-void TractClusteringFilter::MergeDuplicateClusters(std::vector< TractClusteringFilter::Cluster >& clusters)
-{
-  if (m_MergeDuplicateThreshold<0)
-    m_MergeDuplicateThreshold = m_Distances.at(0)/2;
-  bool found = true;
-
-
-  MITK_INFO << "Merging duplicate clusters with distance threshold " << m_MergeDuplicateThreshold;
-  int start = 0;
-  while (found && m_MergeDuplicateThreshold>mitk::eps)
-  {
-    std::cout << "                                                                                                     \r";
-    std::cout << "Number of clusters: " << clusters.size() << '\r';
-    std::cout.flush();
-
-    found = false;
-    for (int k1=start; k1<(int)clusters.size(); ++k1)
-    {
-      Cluster c1 = clusters.at(k1);
-      vnl_matrix<float> t = c1.h / c1.n;
-
-      std::vector< int > merge_indices;
-      std::vector< bool > flip_indices;
-
-#pragma omp parallel for
-      for (int k2=start+1; k2<(int)clusters.size(); ++k2)
-      {
-        if (k1!=k2)
-        {
-          Cluster c2 = clusters.at(k2);
-          vnl_matrix<float> v = c2.h / c2.n;
-          bool f = false;
-
-          float d = 0;
-          for (auto m : m_Metrics)
-            d += m->CalculateDistance(t, v, f);
-          d /= m_Metrics.size();
-
-#pragma omp critical
-          if (d<m_MergeDuplicateThreshold)
-          {
-            merge_indices.push_back(k2);
-            flip_indices.push_back(f);
-          }
-        }
-      }
-
-      for (unsigned int i=0; i<merge_indices.size(); ++i)
-      {
-        Cluster c2 = clusters.at(merge_indices.at(i));
-        for (int i=0; i<c2.n; ++i)
-        {
-          clusters[k1].I.push_back(c2.I.at(i));
-          clusters[k1].n += 1;
-        }
-        if (!flip_indices.at(i))
-          clusters[k1].h += c2.h;
-        else
-          clusters[k1].h += c2.h.fliplr();
-      }
-
-      std::sort(merge_indices.begin(), merge_indices.end());
-      for (unsigned int i=0; i<merge_indices.size(); ++i)
-      {
-        clusters.erase (clusters.begin()+merge_indices.at(i)-i);
-        found = true;
-      }
-      if (found)
-        break;
-    }
-    ++start;
-  }
-  MITK_INFO << "\nNumber of clusters after merging duplicates: " << clusters.size();
-}
-
 std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClusters(std::vector< unsigned int > f_indices, std::vector<vnl_matrix<float> >& centroids)
 {
   float dist_thres = m_Distances.at(0);
@@ -459,7 +380,6 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
   {
     Cluster c;
     c.h.set_size(T.at(0).rows(), T.at(0).cols()); c.h.fill(0.0);
-    c.f_id = i;
     C.push_back(c);
   }
 

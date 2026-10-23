@@ -40,7 +40,6 @@ TractDensityImageFilter< OutputImageType, RefImageType >::TractDensityImageFilte
   , m_UseImageGeometry(false)
   , m_OutputAbsoluteValues(false)
   , m_MaxDensity(0)
-  , m_NumCoveredVoxels(0)
 {
 }
 
@@ -129,9 +128,6 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
       {
         if (!outImage->GetLargestPossibleRegion().IsInside(segment.first))
           continue;
-        if (outImage->GetPixel(segment.first)==0)
-          m_NumCoveredVoxels++;
-
         switch (m_Mode)
         {
         case BINARY:

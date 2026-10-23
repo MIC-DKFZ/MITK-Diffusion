@@ -63,7 +63,6 @@ public:
   itkSetMacro( InputType, INPUT )           ///< Scalar map or label image
   itkSetMacro( BothEnds, bool )             ///< Both streamline ends need to be inside of the ROI for the streamline to be considered positive
   itkSetMacro( OverlapFraction, float )     ///< Necessary fraction of streamline points inside the ROI for the streamline to be considered positive
-  itkSetMacro( DontResampleFibers, bool )   ///< Don't resample input fibers to ensure coverage
   itkSetMacro( NoNegatives, bool )          ///< Don't create output tractograms from negative streamlines (save the computation)
   itkSetMacro( NoPositives, bool )          ///< Don't create output tractograms from positive streamlines (save the computation)
   itkSetMacro( Interpolate, bool )          ///< Interpolate input ROI image (only relevant for ENDPOINTS mode
@@ -104,7 +103,6 @@ protected:
   std::vector< mitk::FiberBundle::Pointer >   m_Negatives;
   std::vector< ItkInputImgType* >             m_RoiImages;
   std::vector< std::string >                  m_RoiImageNames;
-  bool                                        m_DontResampleFibers;
   MODE                                        m_Mode;
   INPUT                                       m_InputType;
   bool                                        m_BothEnds;

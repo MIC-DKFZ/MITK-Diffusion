@@ -27,7 +27,6 @@ template< class PixelType >
 TractsToVectorImageFilter< PixelType >::TractsToVectorImageFilter():
   m_NormalizationMethod(GLOBAL_MAX),
   m_AngularThreshold(0.7),
-  m_Epsilon(0.999),
   m_MaxNumDirections(3),
   m_SizeThreshold(0.3),
   m_OnlyUseMaskGeometry(false)
@@ -41,16 +40,6 @@ TractsToVectorImageFilter< PixelType >::~TractsToVectorImageFilter()
 {
 }
 
-
-template< class PixelType >
-vnl_vector_fixed<double, 3> TractsToVectorImageFilter< PixelType >::GetVnlVector(double point[])
-{
-  vnl_vector_fixed<double, 3> vnlVector;
-  vnlVector[0] = point[0];
-  vnlVector[1] = point[1];
-  vnlVector[2] = point[2];
-  return vnlVector;
-}
 
 template< class PixelType >
 void TractsToVectorImageFilter< PixelType >::GenerateData()
@@ -94,8 +83,6 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
     mask->FillBuffer(1);
   }
   OutputImageType::RegionType::SizeType outImageSize = imageRegion3.GetSize();
-  m_OutImageSpacing = mask->GetSpacing();
-  m_ClusteredDirectionsContainer = ContainerType::New();
 
   // initialize num directions image
   m_NumDirectionsImage = ItkUcharImgType::New();
@@ -133,7 +120,8 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
   // iterate over all fibers
   vtkSmartPointer<vtkPolyData> fiberPolyData = m_FiberBundle->GetFiberPolyData();
   int numFibers = m_FiberBundle->GetNumFibers();
-  m_DirectionsContainer = ContainerType::New();
+  // per voxel (linear index): the directions of the segments in it and their weighted lengths
+  typename ContainerType::Pointer directionsContainer = ContainerType::New();
 
   VectorContainer< unsigned int, std::vector< double > >::Pointer peakLengths = VectorContainer< unsigned int, std::vector< double > >::New();
 
@@ -183,16 +171,16 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
         // add direction to container
         unsigned int idx = segment.first[0] + outImageSize[0]*(segment.first[1] + outImageSize[1]*segment.first[2]);
         DirectionContainerType::Pointer dirCont;
-        if (m_DirectionsContainer->IndexExists(idx))
+        if (directionsContainer->IndexExists(idx))
         {
           peakLengths->ElementAt(idx).push_back(fiberWeight*segment.second);
 
-          dirCont = m_DirectionsContainer->GetElement(idx);
+          dirCont = directionsContainer->GetElement(idx);
           if (dirCont.IsNull())
           {
             dirCont = DirectionContainerType::New();
             dirCont->push_back(dir);
-            m_DirectionsContainer->InsertElement(idx, dirCont);
+            directionsContainer->InsertElement(idx, dirCont);
           }
           else
             dirCont->push_back(dir);
@@ -201,7 +189,7 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
         {
           dirCont = DirectionContainerType::New();
           dirCont->push_back(dir);
-          m_DirectionsContainer->InsertElement(idx, dirCont);
+          directionsContainer->InsertElement(idx, dirCont);
 
           std::vector< double > lengths; lengths.push_back(fiberWeight*segment.second);
           peakLengths->InsertElement(idx, lengths);
@@ -224,12 +212,12 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
 
     itk::Index<4> idx4; idx4[0] = idx3[0]; idx4[1] = idx3[1]; idx4[2] = idx3[2];
 
-    if (!m_DirectionsContainer->IndexExists(idx_lin))
+    if (!directionsContainer->IndexExists(idx_lin))
     {
       ++dirIt;
       continue;
     }
-    DirectionContainerType::Pointer dirCont = m_DirectionsContainer->GetElement(idx_lin);
+    DirectionContainerType::Pointer dirCont = directionsContainer->GetElement(idx_lin);
     if (dirCont.IsNull() || dirCont->empty())
     {
       ++dirIt;

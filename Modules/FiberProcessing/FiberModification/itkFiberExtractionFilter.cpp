@@ -32,8 +32,7 @@ namespace itk{
 
 template< class PixelType >
 FiberExtractionFilter< PixelType >::FiberExtractionFilter()
-  : m_DontResampleFibers(false)
-  , m_Mode(MODE::OVERLAP)
+  : m_Mode(MODE::OVERLAP)
   , m_InputType(INPUT::SCALAR_MAP)
   , m_BothEnds(true)
   , m_OverlapFraction(0.8)

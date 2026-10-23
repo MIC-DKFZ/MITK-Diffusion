@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define TractClusteringFilter_h
 
 // MITK
-#include <mitkPlanarEllipse.h>
 #include <mitkFiberBundle.h>
 #include "mitkClusteringMetric.h"
 #include <MitkFiberProcessingExports.h>
@@ -43,12 +42,11 @@ public:
 
   struct Cluster
   {
-    Cluster() : n(0), f_id(-1) {}
+    Cluster() : n(0) {}
 
     vnl_matrix<float> h;
     std::vector< unsigned int > I;
     int n;
-    int f_id;
 
     bool operator <(Cluster const& b) const
     {
@@ -114,7 +112,6 @@ protected:
   std::vector< Cluster > ClusterStep(std::vector< unsigned int > f_indices, std::vector< float > distances);
 
   std::vector< TractClusteringFilter::Cluster > MergeDuplicateClusters2(std::vector< TractClusteringFilter::Cluster >& clusters);
-  void MergeDuplicateClusters(std::vector< TractClusteringFilter::Cluster >& clusters);
   std::vector< Cluster > AddToKnownClusters(std::vector< unsigned int > f_indices, std::vector<vnl_matrix<float> > &centroids);
   void AppendCluster(std::vector< Cluster >& a, std::vector< Cluster >&b);
   void AddOutput(const Cluster& c, const vnl_matrix<float>& centroid_points);

@@ -17,7 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define itkFiberCurvatureFilter_h
 
 // MITK
-#include <mitkPlanarEllipse.h>
 #include <mitkFiberBundle.h>
 #include <MitkFiberProcessingExports.h>
 
