@@ -26,7 +26,8 @@ mitk::FiberBundleTrackVisReader::FiberBundleTrackVisReader()
 {
   Options defaultOptions;
   defaultOptions["Apply index to world transform stored in the TRK header"] = true;
-  defaultOptions["Print header"] = true;
+  // Opt-in: the header goes to std::cout, on every load of a .trk file.
+  defaultOptions["Print header"] = false;
   defaultOptions["Flip x"] = false;
   defaultOptions["Flip y"] = false;
   defaultOptions["Flip z"] = false;
