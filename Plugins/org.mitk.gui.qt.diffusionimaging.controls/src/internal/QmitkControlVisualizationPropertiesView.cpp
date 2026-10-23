@@ -16,6 +16,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkControlVisualizationPropertiesView.h"
 
+#include <QSignalBlocker>
+
 #include "mitkNodePredicateDataType.h"
 #include "mitkDataNodeObject.h"
 #include "mitkOdfNormalizationMethodProperty.h"
@@ -328,6 +330,17 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
   // selected must not trigger it.
   this->RemoveColorObserver();
 
+  // Showing a node's values in the controls must not write them into the other selected nodes
+  // through the controls' change signals.
+  const QSignalBlocker blockers[] = {
+    QSignalBlocker(m_Controls->m_Clip0), QSignalBlocker(m_Controls->m_Clip1), QSignalBlocker(m_Controls->m_Clip2),
+    QSignalBlocker(m_Controls->m_Clip3), QSignalBlocker(m_Controls->m_FlipClipBox),
+    QSignalBlocker(m_Controls->m_Enable3dPeaks), QSignalBlocker(m_Controls->m_LineWidth),
+    QSignalBlocker(m_Controls->m_TubeWidth), QSignalBlocker(m_Controls->m_RibbonWidth),
+    QSignalBlocker(m_Controls->m_FiberClippingBox), QSignalBlocker(m_Controls->m_ShowMaxNumber),
+    QSignalBlocker(m_Controls->m_NormalizationDropdown), QSignalBlocker(m_Controls->m_ScalingFactor),
+    QSignalBlocker(m_Controls->m_AdditionalScaling), QSignalBlocker(m_Controls->m_OdfColorBox)};
+
   for (mitk::DataNode::Pointer node: nodes)
   {
     if(node.IsNull())
@@ -369,6 +382,13 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
       default :
         m_Controls->m_Clip0->setChecked(1);
       }
+
+      bool enable3dPeaks = false;
+      node->GetBoolProperty("Enable3DPeaks", enable3dPeaks);
+      m_Controls->m_Enable3dPeaks->setChecked(enable3dPeaks);
+      float lineWidth = static_cast<float>(m_Controls->m_LineWidth->value());
+      node->GetFloatProperty("shape.linewidth", lineWidth);
+      m_Controls->m_LineWidth->setValue(lineWidth);
 
       m_Controls->m_Enable3dPeaks->setVisible(true);
       m_Controls->m_3DClippingBox->setVisible(true);
@@ -413,15 +433,20 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
       else
       { m_Controls->m_Crosshair->setEnabled(true); }
 
-      int width;
-      node->GetIntProperty("shape.linewidth", width);
-      m_Controls->m_LineWidth->setValue(width);
-
-      float radius;
+      // m_LineWidth belongs to the peak controls; fibers have tube and ribbon width
+      float radius = static_cast<float>(m_Controls->m_TubeWidth->value());
       node->GetFloatProperty("shape.tuberadius", radius);
       m_Controls->m_TubeWidth->setValue(radius);
 
-      float range;
+      float ribbonWidth = static_cast<float>(m_Controls->m_RibbonWidth->value());
+      node->GetFloatProperty("shape.ribbonwidth", ribbonWidth);
+      m_Controls->m_RibbonWidth->setValue(ribbonWidth);
+
+      bool flipClipping = false;
+      node->GetBoolProperty("3DClippingPlaneFlip", flipClipping);
+      m_Controls->m_FlipClipBox->setChecked(flipClipping);
+
+      float range = static_cast<float>(m_Controls->m_FiberClippingBox->value());
       node->GetFloatProperty("Fiber2DSliceThickness",range);
       mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
       mitk::BaseGeometry::Pointer geo = fib->GetGeometry();
@@ -462,13 +487,13 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
       }
 
 
-      int val;
+      int val = m_Controls->m_ShowMaxNumber->value();
       node->GetIntProperty("ShowMaxNumber", val);
       m_Controls->m_ShowMaxNumber->setValue(val);
 
       m_Controls->m_NormalizationDropdown->setCurrentIndex(dynamic_cast<mitk::EnumerationProperty*>(node->GetProperty("Normalization"))->GetValueAsId());
 
-      float fval;
+      float fval = static_cast<float>(m_Controls->m_ScalingFactor->value());
       node->GetFloatProperty("Scaling",fval);
       m_Controls->m_ScalingFactor->setValue(fval);
 
@@ -675,9 +700,7 @@ void QmitkControlVisualizationPropertiesView::Toggle3DPeaks()
     if (dynamic_cast<mitk::PeakImage*>(node->GetData())==nullptr)
       continue;
 
-    bool enabled = false;
-    node->GetBoolProperty("Enable3DPeaks", enabled);
-    node->SetBoolProperty( "Enable3DPeaks", !enabled );
+    node->SetBoolProperty( "Enable3DPeaks", m_Controls->m_Enable3dPeaks->isChecked() );
   }
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
@@ -978,7 +1001,7 @@ void QmitkControlVisualizationPropertiesView::Fiber2DfadingEFX()
   {
     if (node && dynamic_cast<mitk::FiberBundle*>(node->GetData()) )
     {
-      bool currentMode;
+      bool currentMode = false;
       node->GetBoolProperty("Fiber2DfadeEFX", currentMode);
       node->SetProperty("Fiber2DfadeEFX", mitk::BoolProperty::New(!currentMode));
       dynamic_cast<mitk::FiberBundle*>(node->GetData())->RequestUpdate2D();
@@ -1257,7 +1280,7 @@ void QmitkControlVisualizationPropertiesView::LineWidthChanged()
     {
       auto newWidth = m_Controls->m_LineWidth->value();
       float currentWidth = 0;
-      node->SetFloatProperty("shape.linewidth", currentWidth);
+      node->GetFloatProperty("shape.linewidth", currentWidth);
       if (currentWidth==newWidth)
         continue;
       node->SetFloatProperty("shape.linewidth", newWidth);
@@ -1277,7 +1300,11 @@ void QmitkControlVisualizationPropertiesView::OnColourisationModeChanged()
 {
   for (auto node : m_SelectedNodes)
   {
-    if( node && m_NodeUsedForOdfVisualization.IsNotNull() )
+    // an ODF mapper property; only glyph images get it
+    if( node && m_NodeUsedForOdfVisualization.IsNotNull()
+        && ( dynamic_cast<mitk::OdfImage*>(node->GetData())
+             || dynamic_cast<mitk::TensorImage*>(node->GetData())
+             || dynamic_cast<mitk::ShImage*>(node->GetData()) ) )
     {
       node->SetProperty( "DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", mitk::BoolProperty::New( m_Controls->m_OdfColorBox->currentIndex() ) );
     }
