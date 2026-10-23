@@ -11,6 +11,7 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <mitkFiberBundle.h>
+#include <mitkIOMimeTypes.h>
 #include <mitkIOUtil.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
@@ -28,6 +29,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkFiberBundleIOTestSuite);
   MITK_TEST(VtkWriter_AllOptionCombinations_LeaveBundleUnchanged);
+  MITK_TEST(DicomWriter_ReferencedImageUids_TractogramGetsOwnUids);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -94,6 +96,53 @@ public:
         }
       }
     }
+  }
+
+  static std::string StringProperty(const mitk::FiberBundle *fib, const std::string &name)
+  {
+    std::string value;
+    fib->GetPropertyList()->GetStringProperty(name.c_str(), value);
+    return value;
+  }
+
+  void DicomWriter_ReferencedImageUids_TractogramGetsOwnUids()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    const std::string mrImageStorage = "1.2.840.10008.5.1.4.1.1.4";
+    fib->GetPropertyList()->SetStringProperty("DICOM.patient_id", "TEST0001");
+    fib->GetPropertyList()->SetStringProperty("DICOM.patient_name", "Test^Tractogram");
+    fib->GetPropertyList()->SetStringProperty("DICOM.study_instance_uid", "1.2.826.0.1.3680043.2.1125.1");
+    fib->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid", "1.2.826.0.1.3680043.2.1125.2");
+    fib->GetPropertyList()->SetStringProperty("DICOM.sop_instance_uid", "1.2.826.0.1.3680043.2.1125.3");
+    fib->GetPropertyList()->SetStringProperty("DICOM.sop_class_uid", mrImageStorage.c_str());
+    fib->GetPropertyList()->SetStringProperty("DICOM.frame_of_reference_uid", "1.2.826.0.1.3680043.2.1125.4");
+
+    // The mime type helper class of the module is not exported; this is its DICOM name.
+    const std::string mimeType = mitk::IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.dcm";
+    const std::string path1 = m_TempDir + "/tractogram1.dcm";
+    mitk::IOUtil::Save(fib, mimeType, path1);
+    auto first = mitk::IOUtil::Load<mitk::FiberBundle>(path1);
+    CPPUNIT_ASSERT(first->Equals(fib, 0.001));
+
+    // The properties name the referenced image, as before saving
+    for (const std::string name : {"DICOM.patient_id", "DICOM.study_instance_uid", "DICOM.series_instance_uid",
+                                   "DICOM.sop_instance_uid", "DICOM.sop_class_uid", "DICOM.frame_of_reference_uid"})
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, StringProperty(fib, name), StringProperty(first, name));
+
+    // The tractogram's own instance is neither the image nor its SOP class
+    const auto ownInstance = StringProperty(first, "DICOM.tractogram.sop_instance_uid");
+    const auto ownSeries = StringProperty(first, "DICOM.tractogram.series_instance_uid");
+    CPPUNIT_ASSERT(!ownInstance.empty() && ownInstance != "0");
+    CPPUNIT_ASSERT(ownInstance != StringProperty(fib, "DICOM.sop_instance_uid"));
+    CPPUNIT_ASSERT(ownInstance != "1.2.840.10008.5.1.4.1.1.66.6");
+    CPPUNIT_ASSERT(ownSeries != StringProperty(fib, "DICOM.series_instance_uid"));
+
+    // Saving the loaded bundle again refers to the same image under a new instance UID
+    const std::string path2 = m_TempDir + "/tractogram2.dcm";
+    mitk::IOUtil::Save(first, mimeType, path2);
+    auto second = mitk::IOUtil::Load<mitk::FiberBundle>(path2);
+    CPPUNIT_ASSERT_EQUAL(StringProperty(fib, "DICOM.sop_instance_uid"), StringProperty(second, "DICOM.sop_instance_uid"));
+    CPPUNIT_ASSERT(StringProperty(second, "DICOM.tractogram.sop_instance_uid") != ownInstance);
   }
 };
 

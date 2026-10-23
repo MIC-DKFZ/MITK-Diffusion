@@ -52,6 +52,43 @@ mitk::FiberBundleDicomReader * mitk::FiberBundleDicomReader::Clone() const
   return new FiberBundleDicomReader(*this);
 }
 
+namespace
+{
+  /** Series instance UID of a referenced instance. The Referenced Instance Sequence of the
+   *  tractography results holds only SOP class and instance UIDs; the series is listed in the
+   *  Common Instance Reference module, in this study or in another one. */
+  std::string FindReferencedSeriesUid(TrcTractographyResults* trc, const OFString& sopInstanceUid)
+  {
+    auto search = [&sopInstanceUid](OFVector<IODSeriesAndInstanceReferenceMacro::ReferencedSeriesItem*>& seriesItems)
+    {
+      for (auto* series : seriesItems)
+      {
+        for (auto* instance : series->getReferencedInstanceItems())
+        {
+          OFString uid;
+          if (instance->getReferencedSOPInstanceUID(uid).good() && uid == sopInstanceUid)
+          {
+            OFString seriesUid;
+            series->getSeriesInstanceUID(seriesUid);
+            return std::string(seriesUid.c_str());
+          }
+        }
+      }
+      return std::string();
+    };
+
+    auto& module = trc->getCommonInstanceReference();
+    std::string seriesUid = search(module.getReferencedSeriesItems());
+    for (auto* study : module.getStudiesContainingOtherReferences())
+    {
+      if (!seriesUid.empty())
+        break;
+      seriesUid = search(study->getReferencedSeriesAndInstanceReferences().getReferencedSeriesItems());
+    }
+    return seriesUid;
+  }
+}
+
 std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::DoRead()
 {
 
@@ -139,12 +176,21 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Do
       fib->GetPropertyList()->SetStringProperty("DICOM.patient_name",val.c_str());
       val = "0"; trc->getStudy().getStudyInstanceUID(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.study_instance_uid",val.c_str());
+      // DICOM.series_instance_uid, DICOM.sop_instance_uid and DICOM.sop_class_uid name the
+      // referenced image, as the writer and the tag editor use them, so that saving the bundle
+      // again refers to the same image; the tractogram's own UIDs are kept for display.
+      const auto& references = trc->getReferencedInstances().get();
+      if (!references.empty())
+      {
+        const OFString& referencedInstance = references.front()->m_SOPInstanceUID;
+        fib->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid", FindReferencedSeriesUid(trc, referencedInstance).c_str());
+        fib->GetPropertyList()->SetStringProperty("DICOM.sop_instance_uid", referencedInstance.c_str());
+        fib->GetPropertyList()->SetStringProperty("DICOM.sop_class_uid", references.front()->m_SOPClassUID.c_str());
+      }
       val = "0"; trc->getSeries().getSeriesInstanceUID(val);
-      fib->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid",val.c_str());
+      fib->GetPropertyList()->SetStringProperty("DICOM.tractogram.series_instance_uid",val.c_str());
       val = "0"; trc->getSOPCommon().getSOPInstanceUID(val);
-      fib->GetPropertyList()->SetStringProperty("DICOM.sop_instance_uid",val.c_str());
-      val = "0"; trc->getSOPCommon().getSOPClassUID(val);
-      fib->GetPropertyList()->SetStringProperty("DICOM.sop_class_uid",val.c_str());
+      fib->GetPropertyList()->SetStringProperty("DICOM.tractogram.sop_instance_uid",val.c_str());
       val = "0"; trc->getFrameOfReference().getFrameOfReferenceUID(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.frame_of_reference_uid",val.c_str());
 
