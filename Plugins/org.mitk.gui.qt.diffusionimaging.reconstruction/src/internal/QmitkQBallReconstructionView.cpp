@@ -309,6 +309,7 @@ void QmitkQBallReconstructionView::MethodChoosen(int method)
   else
     m_Controls->m_ShFrame->setVisible(true);
 
+  // The cases follow the entries of m_QBallReconstructionMethodComboBox, as in ReconstructStandard.
   switch(method)
   {
   case 0:
@@ -323,18 +324,14 @@ void QmitkQBallReconstructionView::MethodChoosen(int method)
     m_Controls->m_OutputOdfImage->setHidden(false);
     break;
   case 3:
-    m_Controls->m_Description->setText("SH solid angle with non-neg. constraint (Goh 2009)");
-    m_Controls->m_OutputOdfImage->setHidden(false);
-    break;
-  case 4:
     m_Controls->m_Description->setText("SH recon. of the plain ADC-profiles");
     m_Controls->m_OutputOdfImage->setHidden(false);
     break;
-  case 5:
+  case 4:
     m_Controls->m_Description->setText("SH recon. of the raw diffusion signal");
     m_Controls->m_OutputOdfImage->setHidden(false);
     break;
-  case 6:
+  case 5:
     m_Controls->m_Description->setText("SH recon. of the multi shell diffusion signal (Aganj 2010)");
     m_Controls->m_QBallSelectionBox->setHidden(false);
     m_Controls->m_OutputOdfImage->setHidden(false);
