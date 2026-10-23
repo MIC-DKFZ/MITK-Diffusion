@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLexicalCast.h>
 #include <itkTractsToVectorImageFilter.h>
 #include <mitkLocaleSwitch.h>
+#include <mitkPeakImage.h>
 
 /*!
 \brief Extract principal fiber directions from a tractogram
@@ -136,20 +137,18 @@ int main(int argc, char* argv[])
     fOdfFilter->SetMaxNumDirections(maxNumDirs);
     fOdfFilter->Update();
 
-    mitk::LocaleSwitch localeSwitch("C");
     {
+      // Saved as mitk::PeakImage, so that NIfTI files follow MITK's peak convention (RAS vectors,
+      // marked in the header) like every other peak image MITK writes.
       itk::TractsToVectorImageFilter<float>::ItkDirectionImageType::Pointer itkImg = fOdfFilter->GetDirectionImage();
-      typedef itk::ImageFileWriter< itk::TractsToVectorImageFilter<float>::ItkDirectionImageType > WriterType;
-      WriterType::Pointer writer = WriterType::New();
-
-      std::string outfilename = outRoot;
-      outfilename.append("_DIRECTIONS");
-      outfilename.append(file_ending);
-
-      writer->SetFileName(outfilename.c_str());
-      writer->SetInput(itkImg);
-      writer->Update();
+      auto peaks = mitk::PeakImage::New();
+      peaks->InitializeByItk(itkImg.GetPointer());
+      // A 4D ITK image becomes one MITK volume per component; SetChannel copies all of them.
+      peaks->SetChannel(itkImg->GetBufferPointer());
+      mitk::IOUtil::Save(peaks, outRoot + "_DIRECTIONS" + file_ending);
     }
+
+    mitk::LocaleSwitch localeSwitch("C");
 
     if (verbose)
     {

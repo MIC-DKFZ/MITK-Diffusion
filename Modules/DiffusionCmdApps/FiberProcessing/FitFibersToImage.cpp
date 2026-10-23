@@ -182,22 +182,19 @@ int main(int argc, char* argv[])
     mitk::LocaleSwitch localeSwitch("C");
     if (save_residuals && mitk_peak_image.IsNotNull())
     {
-      itk::ImageFileWriter< PeakImgType >::Pointer writer = itk::ImageFileWriter< PeakImgType >::New();
-      writer->SetInput(fitter->GetFittedImage());
-      writer->SetFileName(outRoot + "_fitted.nii.gz");
-      writer->Update();
-
-      writer->SetInput(fitter->GetResidualImage());
-      writer->SetFileName(outRoot + "_residual.nii.gz");
-      writer->Update();
-
-      writer->SetInput(fitter->GetOverexplainedImage());
-      writer->SetFileName(outRoot + "_overexplained.nii.gz");
-      writer->Update();
-
-      writer->SetInput(fitter->GetUnderexplainedImage());
-      writer->SetFileName(outRoot + "_underexplained.nii.gz");
-      writer->Update();
+      // Saved as mitk::PeakImage, so that the NIfTI files follow MITK's peak convention (RAS
+      // vectors, marked in the header) like the input peak image.
+      const auto savePeaks = [](PeakImgType* itkPeaks, const std::string& filename) {
+        auto peaks = mitk::PeakImage::New();
+        peaks->InitializeByItk(itkPeaks);
+        // A 4D ITK image becomes one MITK volume per component; SetChannel copies all of them.
+        peaks->SetChannel(itkPeaks->GetBufferPointer());
+        mitk::IOUtil::Save(peaks, filename);
+      };
+      savePeaks(fitter->GetFittedImage(), outRoot + "_fitted.nii.gz");
+      savePeaks(fitter->GetResidualImage(), outRoot + "_residual.nii.gz");
+      savePeaks(fitter->GetOverexplainedImage(), outRoot + "_overexplained.nii.gz");
+      savePeaks(fitter->GetUnderexplainedImage(), outRoot + "_underexplained.nii.gz");
     }
     else if (save_residuals && mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(mitk_image))
     {
