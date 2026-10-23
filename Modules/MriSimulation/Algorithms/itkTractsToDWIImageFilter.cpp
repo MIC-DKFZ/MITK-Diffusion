@@ -58,6 +58,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <thread>
 #include <atomic>
 #include <cstdint>
+#include <algorithm>
+#include <complex>
 #include <memory>
 #include <set>
 #include <mitkBValueMapProperty.h>
@@ -126,7 +128,8 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
   m_KspaceImage->SetRequestedRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
   m_KspaceImage->SetVectorLength( m_Parameters.m_SignalGen.m_NumberOfCoils );
   m_KspaceImage->Allocate();
-  m_KspaceImage->FillBuffer(nullPix);
+  DoubleDwiType::PixelType nullCoilPix; nullCoilPix.SetSize(m_Parameters.m_SignalGen.m_NumberOfCoils); nullCoilPix.Fill(0.0);  // one value per coil
+  m_KspaceImage->FillBuffer(nullCoilPix);
 
   // calculate coil positions
   double a = m_Parameters.m_SignalGen.m_ImageRegion.GetSize(0)*m_Parameters.m_SignalGen.m_ImageSpacing[0];
@@ -139,8 +142,8 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
   itk::Vector<double, 3> pos; pos.Fill(0.0); pos[1] = -diagonal/2;
   itk::Vector<double, 3> center;
   center[0] = a/2-m_Parameters.m_SignalGen.m_ImageSpacing[0]/2;
-  center[1] = b/2-m_Parameters.m_SignalGen.m_ImageSpacing[2]/2;
-  center[2] = c/2-m_Parameters.m_SignalGen.m_ImageSpacing[1]/2;
+  center[1] = b/2-m_Parameters.m_SignalGen.m_ImageSpacing[1]/2;
+  center[2] = c/2-m_Parameters.m_SignalGen.m_ImageSpacing[2]/2;
   for (unsigned int c=0; c<m_Parameters.m_SignalGen.m_NumberOfCoils; c++)
   {
     coilPositions.push_back(pos);
@@ -341,9 +344,8 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
 
               Complex2DImageType::PixelType cPix = newSlice->GetPixel(index2D);
               double magn = sqrt(cPix.real()*cPix.real()+cPix.imag()*cPix.imag());
-              double phase = 0;
-              if (cPix.real()!=0)
-                phase = atan( cPix.imag()/cPix.real() );
+              // in (-pi, pi]; atan(imag/real) lost the quadrant
+              double phase = std::arg(cPix);
 
               component(m_OutputImagesReal.at(c), index3D, g) = cPix.real();
               component(m_OutputImagesImag.at(c), index3D, g) = cPix.imag();
@@ -552,6 +554,7 @@ template< class PixelType >
 void TractsToDWIImageFilter< PixelType >::InitializeData()
 {
   m_Rotations.clear();
+  m_RotationsInv.clear();
   m_Translations.clear();
   m_MotionLog = "";
   m_SpikeLog = "";
@@ -1499,6 +1502,8 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
         signal[i] = floor(signal[i]+0.5);
       else
         signal[i] = ceil(signal[i]-0.5);
+      // clamp: a value outside the range of the output pixel type would wrap around
+      signal[i] = std::clamp<double>(signal[i], itk::NumericTraits<PixelType>::NonpositiveMin(), itk::NumericTraits<PixelType>::max());
     }
     it4.Set(signal);
     ++it4;
