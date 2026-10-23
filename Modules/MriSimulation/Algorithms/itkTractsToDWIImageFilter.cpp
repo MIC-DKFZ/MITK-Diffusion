@@ -989,6 +989,9 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     itkExceptionMacro("No diffusion model for non-fiber compartments defined and input diffusion-weighted"
                       " image is nullptr! At least one non-fiber compartment is necessary to simulate diffusion.");
 
+  if (m_Parameters.m_SignalGen.GetNumVolumes()==0)
+    itkExceptionMacro("No gradient directions defined. A parameter file needs its .bvals/.bvecs files or gradients of its own.");
+
   if (m_Parameters.m_SignalGen.m_DoDisablePartialVolume)  // no partial volume? remove all but first fiber compartment
     while (m_Parameters.m_FiberModelList.size()>1)
     {

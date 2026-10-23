@@ -63,6 +63,7 @@ class mitkFiberfoxParametersTestSuite : public mitk::TestFixture
   MITK_TEST(CopyKeepsLoadedModels);
   MITK_TEST(GradientsFromImage);
   MITK_TEST(MotionVolumes);
+  MITK_TEST(GradientsInFile);
   CPPUNIT_TEST_SUITE_END();
 
   /** Parameters whose only models are two counting fiber models and one counting non-fiber model. */
@@ -259,6 +260,28 @@ public:
         CPPUNIT_ASSERT_EQUAL_MESSAGE("'" + c.first + "': volume " + std::to_string(i), expected, static_cast<bool>(moved[i]));
       }
     }
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /** A saved .ffp keeps its gradients when it is copied without its .bvals/.bvecs files. */
+  void GradientsInFile()
+  {
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_gradients_XXXXXX");
+    const std::string file = folder + "/saved.ffp";
+    parameters.SaveParameters(file);
+    CPPUNIT_ASSERT(itksys::SystemTools::RemoveFile(file + ".bvals"));
+    CPPUNIT_ASSERT(itksys::SystemTools::RemoveFile(file + ".bvecs"));
+
+    mitk::FiberfoxParameters loaded;
+    loaded.LoadParameters(file, true);
+    CPPUNIT_ASSERT_EQUAL(parameters.m_SignalGen.GetBvalue(), loaded.m_SignalGen.GetBvalue());
+    CPPUNIT_ASSERT_EQUAL(parameters.m_SignalGen.GetNumVolumes(), loaded.m_SignalGen.GetNumVolumes());
+    CPPUNIT_ASSERT(parameters.m_SignalGen.GetNumVolumes() > 0);
+    for (unsigned int i = 0; i < parameters.m_SignalGen.GetNumVolumes(); ++i)
+      for (int c = 0; c < 3; ++c)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(parameters.m_SignalGen.GetGradientDirection(i)[c], loaded.m_SignalGen.GetGradientDirection(i)[c], 1e-9);
     itksys::SystemTools::RemoveADirectory(folder);
   }
 };

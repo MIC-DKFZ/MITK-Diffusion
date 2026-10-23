@@ -386,6 +386,16 @@ void mitk::FiberfoxParameters::SaveParameters(std::string filename)
   parameters.put("fiberfox.image.basic.direction.d9", m_SignalGen.m_ImageDirection[2][2]);
 
   mitk::gradients::WriteBvalsBvecs(filename+".bvals", filename+".bvecs", m_SignalGen.GetItkGradientContainer(), m_SignalGen.m_Bvalue);
+  // also in the file itself (the format of earlier versions), so that a .ffp copied without its
+  // .bvals/.bvecs still has gradients; reading prefers the .bvals/.bvecs files
+  parameters.put("fiberfox.image.bvalue", m_SignalGen.m_Bvalue);
+  for (unsigned int i=0; i<m_SignalGen.GetNumVolumes(); ++i)
+  {
+    const auto g = m_SignalGen.GetGradientDirection(i);
+    parameters.put("fiberfox.image.gradients."+boost::lexical_cast<std::string>(i)+".x", g[0]);
+    parameters.put("fiberfox.image.gradients."+boost::lexical_cast<std::string>(i)+".y", g[1]);
+    parameters.put("fiberfox.image.gradients."+boost::lexical_cast<std::string>(i)+".z", g[2]);
+  }
 
   parameters.put("fiberfox.image.acquisitiontype", m_SignalGen.m_AcquisitionType);
   parameters.put("fiberfox.image.coilsensitivityprofile", m_SignalGen.m_CoilSensitivityProfile);
@@ -821,7 +831,8 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
         }
         catch(...)
         {
-          MITK_INFO << "WARNING: Fiberfox parameters without any gradient directions loaded.";
+          MITK_WARN << "Fiberfox parameters without any gradient directions loaded.";
+          m_MissingTags += "\n- gradients";
         }
         m_SignalGen.SetGradienDirections(gradients);
       }

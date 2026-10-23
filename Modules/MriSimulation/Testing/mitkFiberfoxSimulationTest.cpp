@@ -23,6 +23,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkFiberfoxSimulationTestSuite);
   MITK_TEST(InputBundleKeepsWeights);
   MITK_TEST(FibersOutsideImage);
+  MITK_TEST(NoGradients);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -81,6 +82,18 @@ public:
     MITK_INFO << "Signal range without fibers: " << minimum << " to " << maximum;
     CPPUNIT_ASSERT_MESSAGE("no NaN (cast to a negative short)", minimum >= 0);
     CPPUNIT_ASSERT_MESSAGE("non-fiber signal", maximum > 0);
+  }
+
+  /** Without gradient directions the simulation stops with a message (it aborted in itk::VectorImage). */
+  void NoGradients()
+  {
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+    parameters.SetGradienDirections(mitk::SignalGenerationParameters::GradientListType());
+    auto filter = FilterType::New();
+    filter->SetParameters(parameters);
+    filter->SetFiberBundle(m_FiberBundle);
+    CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
   }
 };
 
