@@ -25,6 +25,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkShCoefficientImageExporter.h>
 #include <itksys/SystemTools.hxx>
 #include <itkNrrdImageIO.h>
+#include <itkImageRegionIteratorWithIndex.h>
+
+#include <cmath>
 
 mitk::ShImageWriter::ShImageWriter()
   : AbstractFileWriter(mitk::ShImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::SH_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::SH_MIMETYPE_DESCRIPTION())
@@ -57,15 +60,28 @@ void mitk::ShImageWriter::WriteShImage(InputType::ConstPointer input)
   WriterType::Pointer writer = WriterType::New();
   ShImage::ShOnDiskType::Pointer image = exporter->GetOutputImage();
 
-  // FSL/Dipy coefficients are marked in the file (NRRD key, NIfTI descrip), so that they read back
-  // with their convention; files in MITK's own MRtrix convention stay as before.
-  if (input->GetShConvention() == ShImage::FSL)
+  // The convention is marked in the file (NRRD key, NIfTI descrip), so that the coefficients read
+  // back with it. MITK's own basis (MRtrix 0.2's) is written in MRtrix 3's orthonormal basis, which
+  // MRtrix 3 and other tools expect: m != 0 divided by sqrt(2); m = 0 sits at index l(l+1)/2.
+  std::string convention = "FSL";
+  if (input->GetShConvention() == ShImage::MRTRIX)
   {
-    if (ext==".shi" || ext==".nrrd")
-      itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "MITK_SH_convention", "FSL");
-    else
-      itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "ITK_FileNotes", "MITK_SH_convention=FSL");
+    convention = "MRtrix3";
+    itk::ImageRegionIteratorWithIndex<ShImage::ShOnDiskType> it(image, image->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+    {
+      const int j = static_cast<int>(it.GetIndex()[3]);
+      bool zonal = false;
+      for (int l = 0; l * (l + 1) / 2 <= j; l += 2)
+        zonal = zonal || l * (l + 1) / 2 == j;
+      if (!zonal)
+        it.Set(static_cast<float>(it.Get() / std::sqrt(2.0)));
+    }
   }
+  if (ext==".shi" || ext==".nrrd")
+    itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "MITK_SH_convention", convention);
+  else
+    itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "ITK_FileNotes", "MITK_SH_convention=" + convention);
 
   writer->SetInput( image );
 

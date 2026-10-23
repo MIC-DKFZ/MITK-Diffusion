@@ -20,6 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkImageRegionIterator.h>
 
+#include <cmath>
+
 
 namespace itk {
 
@@ -51,8 +53,13 @@ namespace itk {
         }
       case RA:
         {
-          TPixel diffusionIndex = tensor.GetRelativeAnisotropy();
-          outputIt.Set(diffusionIndex);
+          // Relative anisotropy of Basser & Pierpaoli 1996, std(eigenvalues) / mean(eigenvalues)
+          // = sqrt(3 |D|^2 - tr^2) / tr, from 0 (isotropic) to sqrt(2) (stick). ITK's
+          // GetRelativeAnisotropy() takes the root after dividing by sqrt(3) tr, so its value
+          // depends on the diffusivity unit.
+          const double trace = tensor.GetTrace();
+          const double anisotropy = 3.0 * tensor.GetInnerScalarProduct() - trace * trace;
+          outputIt.Set(trace > 0 && anisotropy > 0 ? std::sqrt(anisotropy) / trace : 0);
           break;
         }
       case AD:

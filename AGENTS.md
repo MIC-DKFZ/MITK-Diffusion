@@ -116,6 +116,14 @@ Facts the layout does not show:
   before, with the image rotation applied; DICOM import is unchanged and has no test data.
   `ctest -R 'mitkDiffusion(Property|Image|Dicom)'` runs the `DiffusionImage` tests of readers,
   writers and property helper.
+- SH and peak files: MITK's SH basis (`mitk::sh`, `mrtrix = true`) is MRtrix 0.2's (functions
+  with m != 0 are MRtrix 3's divided by sqrt(2)) at world (LPS) directions. `ShImageWriter` writes
+  MRtrix 3's orthonormal basis and marks the file `MITK_SH_convention=MRtrix3` (NRRD key, NIfTI
+  descrip); `ShImageReader` converts files so marked or whose descrip starts with
+  `MRtrix version: 3`, and reads unmarked files (all of earlier MITK versions) in the legacy basis.
+  Its option "SH convention" forces one; "FSL/Dipy" converts dipy's default basis (`descoteaux07`,
+  legacy) from the FSL bvec frame. NIfTI peak images are written in RAS with the descrip
+  `MITK_peak_convention=RAS` and read back to LPS; NRRD peaks are LPS.
 - `ctest -R 'mitkDiffusionModelling|PeakShImageReader|ImageReconstruction'` runs the
   `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
   display needed) and is skipped with exit code 77 where no OpenGL context can be created.

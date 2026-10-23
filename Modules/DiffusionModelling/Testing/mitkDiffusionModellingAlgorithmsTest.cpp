@@ -10,6 +10,9 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+// First, so that the build checks that this header compiles on its own.
+#include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
+
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
@@ -37,7 +40,6 @@ found in the LICENSE file.
 #include <itkTensorDerivedMeasurementsFilter.h>
 #include <itkTensorImageToDiffusionImageFilter.h>
 #include <itkTensorImageToOdfImageFilter.h>
-#include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 #include <itkTensorToL2NormImageFilter.h>
 #include <itkTensorToRgbImageFilter.h>
 
@@ -57,6 +59,8 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(EigenvalueCorrection_InvalidGradients_Throws);
   MITK_TEST(TensorToL2Norm_FrobeniusNorm);
   MITK_TEST(Adc_NearZeroBValue_CountsAsBaseline);
+  MITK_TEST(Adc_ZeroBaselineValue_LeftOutInBothModes);
+  MITK_TEST(Adc_MeanAdc_IsMeanOverAcquiredDirections);
   MITK_TEST(PrincipalDirection_MaskOfOtherSize_Throws);
   MITK_TEST(PrincipalDirection_SecondInput_SameAsFreshFilter);
   MITK_TEST(MaximaExtraction_MaskOfOtherSize_Throws);
@@ -68,6 +72,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(Sh_InvalidCoefficientCounts_Throw);
   MITK_TEST(PrincipalDirection_FaThreshold_NoDirection);
   MITK_TEST(TensorMeasures_MatchReferences);
+  MITK_TEST(TensorMeasures_RelativeAnisotropy_UnitIndependent);
   MITK_TEST(Gfa_MatchesReference);
   MITK_TEST(ShToOdf_MatchesReference);
   MITK_TEST(ShBasis_ConventionsAndEvaluationAgree);
@@ -261,6 +266,84 @@ public:
   {
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(false), 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(true), 1e-6);
+  }
+
+  // MitkDiffusionIndices --index md of a DWI is the mean ADC of the acquired directions, which its
+  // help documents: with directions x, x, y, z and the tensor diag(2, 1, 1) 1e-3 mm^2/s it is
+  // 1.5e-3, while the tensor MD is 1.33e-3.
+  void Adc_MeanAdc_IsMeanOverAcquiredDirections()
+  {
+    const double g[5][3] = {{0, 0, 0}, {1, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    const double diagonal[3] = {0.002, 0.001, 0.001};
+    auto dwi = itk::VectorImage<short, 3>::New();
+    itk::VectorImage<short, 3>::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    dwi->SetRegions(region);
+    dwi->SetVectorLength(5);
+    dwi->Allocate();
+    itk::VariableLengthVector<short> pixel(5);
+    auto gradients = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+    for (unsigned int i = 0; i < 5; ++i)
+    {
+      gradients->push_back(mitk::DiffusionPropertyHelper::GradientDirectionType(g[i][0], g[i][1], g[i][2]));
+      const double adc = g[i][0] * diagonal[0] + g[i][1] * diagonal[1] + g[i][2] * diagonal[2];
+      pixel[i] = static_cast<short>(std::round(1000 * std::exp(-1000 * adc)));
+    }
+    dwi->FillBuffer(pixel);
+
+    auto filter = itk::AdcImageFilter<short, double>::New();
+    filter->SetInput(dwi);
+    filter->SetGradientDirections(gradients.GetPointer());
+    filter->SetB_value(1000);
+    filter->SetFitSignal(false);
+    filter->Update();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0015, filter->GetOutput()->GetPixel({{0, 0, 0}}), 1e-5);
+  }
+
+  // The fit averaged all unweighted values into S0, the mean ADC only the positive ones, so a
+  // zero b0 value gave the two modes different S0 (here 100 and 200).
+  void Adc_ZeroBaselineValue_LeftOutInBothModes()
+  {
+    auto dwi = itk::VectorImage<short, 3>::New();
+    itk::VectorImage<short, 3>::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    dwi->SetRegions(region);
+    dwi->SetVectorLength(3);
+    dwi->Allocate();
+    itk::VariableLengthVector<short> pixel(3);
+    pixel[0] = 0;
+    pixel[1] = 200;
+    pixel[2] = 100;
+    dwi->FillBuffer(pixel);
+    auto gradients = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+    gradients->push_back(mitk::DiffusionPropertyHelper::GradientDirectionType(0.0));
+    gradients->push_back(mitk::DiffusionPropertyHelper::GradientDirectionType(0.0));
+    gradients->push_back(mitk::DiffusionPropertyHelper::GradientDirectionType(1, 0, 0));
+
+    for (bool fitSignal : {false, true})
+    {
+      auto filter = itk::AdcImageFilter<short, double>::New();
+      filter->SetInput(dwi);
+      filter->SetGradientDirections(gradients.GetPointer());
+      filter->SetB_value(1000);
+      filter->SetFitSignal(fitSignal);
+      filter->Update();
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(std::log(2.0) / 1000, filter->GetOutput()->GetPixel({{0, 0, 0}}), 1e-7);
+    }
+
+    // Without a positive baseline value both modes give 0.
+    pixel[1] = 0;
+    dwi->FillBuffer(pixel);
+    for (bool fitSignal : {false, true})
+    {
+      auto filter = itk::AdcImageFilter<short, double>::New();
+      filter->SetInput(dwi);
+      filter->SetGradientDirections(gradients.GetPointer());
+      filter->SetB_value(1000);
+      filter->SetFitSignal(fitSignal);
+      filter->Update();
+      CPPUNIT_ASSERT_EQUAL(0.0, filter->GetOutput()->GetPixel({{0, 0, 0}}));
+    }
   }
 
   using MaskImageType = itk::Image<unsigned char, 3>;
@@ -607,15 +690,16 @@ public:
     return maxDifference;
   }
 
-  // FA, RA, AD and RD reproduce the MITK-Data references. The MD reference was made by an older
+  // FA, AD and RD reproduce the MITK-Data references. The MD reference was made by an older
   // version and is not used; MD is checked against the trace, L2 and L3 against the eigenvalues.
+  // The RA reference holds ITK's unit-dependent formula; RA is checked against the eigenvalues.
   void TensorMeasures_MatchReferences()
   {
     using FilterType = itk::TensorDerivedMeasurementsFilter<float>;
     auto tensors = LoadItkTensors("DiffusionImaging/tensorImage.dti");
 
     const std::pair<FilterType::Measure, std::string> references[] = {
-      {FilterType::FA, "FA"}, {FilterType::RA, "RA"}, {FilterType::AD, "AD"}, {FilterType::RD, "RD"}};
+      {FilterType::FA, "FA"}, {FilterType::AD, "AD"}, {FilterType::RD, "RD"}};
     for (const auto &[measure, name] : references)
     {
       auto reference = LoadScalarImage("DiffusionImaging/tensorImage_" + name + ".nrrd");
@@ -626,6 +710,7 @@ public:
     auto md = TensorMeasure(tensors, FilterType::MD);
     auto l2 = TensorMeasure(tensors, FilterType::L2);
     auto l3 = TensorMeasure(tensors, FilterType::L3);
+    auto ra = TensorMeasure(tensors, FilterType::RA);
     itk::ImageRegionConstIterator<mitk::TensorImage::ItkTensorImageType> it(tensors, tensors->GetLargestPossibleRegion());
     unsigned int anisotropic = 0;
     for (; !it.IsAtEnd(); ++it)
@@ -633,6 +718,15 @@ public:
       const auto index = it.GetIndex();
       FilterType::TensorType::EigenValuesArrayType ev;
       it.Get().ComputeEigenValues(ev);
+      // RA = standard deviation / mean of the eigenvalues; the float eigenvalues limit the
+      // accuracy relative to the largest one, also in the mean.
+      const double mean = (static_cast<double>(ev[0]) + ev[1] + ev[2]) / 3.0;
+      if (mean > 1e-6)
+      {
+        const double deviation = std::sqrt(((ev[0] - mean) * (ev[0] - mean) + (ev[1] - mean) * (ev[1] - mean) + (ev[2] - mean) * (ev[2] - mean)) / 3.0);
+        const double largest = std::max({std::fabs(ev[0]), std::fabs(ev[1]), std::fabs(ev[2])});
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(deviation / mean, ra->GetPixel(index), 1e-6 * (1 + deviation / mean) * (1 + largest / mean));
+      }
       // MD comes from the float eigenvalues, so its error scales with the largest eigenvalue.
       const double scale = std::max({std::fabs(ev[0]), std::fabs(ev[1]), std::fabs(ev[2])});
       CPPUNIT_ASSERT_DOUBLES_EQUAL(it.Get().GetTrace() / 3.0, md->GetPixel(index), 1e-5 * scale + 1e-12);
@@ -647,6 +741,40 @@ public:
     CPPUNIT_ASSERT(anisotropic > 0);
   }
 
+  static double RelativeAnisotropy(const itk::DiffusionTensor3D<float> &tensor)
+  {
+    auto image = TensorImageType::New();
+    TensorImageType::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    image->SetRegions(region);
+    image->Allocate();
+    image->FillBuffer(tensor);
+    return TensorMeasure(image, itk::TensorDerivedMeasurementsFilter<float>::RA)->GetPixel({{0, 0, 0}});
+  }
+
+  static itk::DiffusionTensor3D<float> Tensor(double xx, double xy, double xz, double yy, double yz, double zz)
+  {
+    const float elements[6] = {float(xx), float(xy), float(xz), float(yy), float(yz), float(zz)};
+    return itk::DiffusionTensor3D<float>(elements);
+  }
+
+  // RA was ITK's sqrt((3|D|^2 - tr^2) / (sqrt(3) tr)), which depends on the diffusivity unit
+  // (0.0314 in mm^2/s, 0.992 in um^2/ms for the prolate tensor below). Basser & Pierpaoli 1996:
+  // std / mean of the eigenvalues, 0 to sqrt(2).
+  void TensorMeasures_RelativeAnisotropy_UnitIndependent()
+  {
+    // Eigenvalues (1.7, 0.3, 0.3), principal axis (1, 1, 0) / sqrt(2): RA = 0.860818.
+    for (double scale : {1e-3, 1.0, 1e-9})
+    {
+      const auto prolate = Tensor(1.0 * scale, 0.7 * scale, 0, 1.0 * scale, 0, 0.3 * scale);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(0.860818, RelativeAnisotropy(prolate), 1e-5);
+    }
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sqrt(2.0), RelativeAnisotropy(Tensor(1e-3, 0, 0, 0, 0, 0)), 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, RelativeAnisotropy(Tensor(1e-3, 0, 0, 1e-3, 0, 1e-3)), 1e-6);
+    CPPUNIT_ASSERT_EQUAL(0.0, RelativeAnisotropy(Tensor(-1e-3, 0, 0, -1e-3, 0, 0.5e-3)));
+    CPPUNIT_ASSERT_EQUAL(0.0, RelativeAnisotropy(Tensor(0, 0, 0, 0, 0, 0)));
+  }
+
   // GFA of the ODFs in qBallImage.qbi as stored in MITK-Data.
   void Gfa_MatchesReference()
   {
@@ -659,10 +787,12 @@ public:
   }
 
   // The MRtrix CSD coefficients (order 8) sampled on the ODF directions give the ODF file that
-  // was made from them.
+  // was made from them. The file was made from the coefficients read in MITK's legacy basis.
   void ShToOdf_MatchesReference()
   {
-    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    mitk::IFileReader::Options options;
+    options["SH convention"] = std::string("MITK legacy (MRtrix 0.2)");
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, options);
     auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &functor);
     CPPUNIT_ASSERT_EQUAL(8u, shImage->ShOrder());
     auto odfs = mitk::convert::GetItkOdfFromShImage(shImage.GetPointer());
@@ -788,7 +918,10 @@ public:
     odfRgb->SetInput(mitk::convert::GetItkOdfFromOdfImage(mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image.qbi")).GetPointer()));
     odfRgb->Update();
 
-    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    // csd_image.qbi was made from the coefficients read in MITK's legacy basis.
+    mitk::IFileReader::Options options;
+    options["SH convention"] = std::string("MITK legacy (MRtrix 0.2)");
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, options);
     auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &functor);
     auto shRgb = itk::ShToRgbImageFilter<itk::Image<itk::Vector<float, 45>, 3>, 8>::New();
     shRgb->SetInput(mitk::convert::GetItkShFromShImage<45>(shImage.GetPointer()));

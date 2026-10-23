@@ -35,6 +35,10 @@ PURPOSE.  See the above copyright notices for more information.
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
 
+#include <algorithm>
+#include <cmath>
+#include <type_traits>
+
 namespace itk
 {
 
@@ -53,6 +57,21 @@ inline Point<double, 3> ResampledImageOrigin(const Point<double, 3>& origin, con
   return newOrigin;
 }
 
+/**
+ * \brief An interpolated value as pixel of type T: rounded and clamped to the range of an integer
+ * type. ITK's cast truncates, which biased every resampled value by about -0.5, i.e. -0.18 % of the
+ * b0 signal to -1.86 % of the b=3000 signal of FWE/InputDiffusionWeightedImage.dwi (tensor MD
+ * +1.2 % after resampling it from 2 to 1 mm).
+ */
+template <class T>
+T ResampledPixel(double value)
+{
+  if constexpr (std::is_integral_v<T>)
+    return static_cast<T>(std::clamp(std::round(value), static_cast<double>(NumericTraits<T>::NonpositiveMin()), static_cast<double>(NumericTraits<T>::max())));
+  else
+    return static_cast<T>(value);
+}
+
 /** \brief How a resampled grid is given: relative to the input, as factor, spacing or size. */
 enum class ResampleGridMode { SamplingFactor, Spacing, Size };
 
@@ -60,26 +79,30 @@ enum class ResampleGridMode { SamplingFactor, Spacing, Size };
  * \brief Spacing and region of a resampled grid.
  *
  * SamplingFactor: spacing / value, size * value. Spacing: value, size * spacing / value. Size:
- * value, spacing * size / value. The sizes are truncated.
+ * value, spacing * size / value. The sizes are truncated, after adding 1e-6 voxels: a size that is
+ * an integer in exact arithmetic can come out just below it (spacing 1.2 -> 0.4 gives
+ * 2.9999999999999996 per voxel, the spacing of an oblique image 1.9999999999999998), and
+ * truncating it lost a voxel.
  */
 inline void ResampledImageGrid(const Vector<double, 3>& spacing, const ImageRegion<3>& region, ResampleGridMode mode, const Vector<double, 3>& value, Vector<double, 3>& newSpacing, ImageRegion<3>& newRegion)
 {
   newSpacing = spacing;
   newRegion = region;
+  const auto truncated = [](double size) { return static_cast<SizeValueType>(std::floor(size + 1e-6)); };
   switch (mode)
   {
   case ResampleGridMode::SamplingFactor:
     for (unsigned int i = 0; i < 3; ++i)
     {
       newSpacing[i] /= value[i];
-      newRegion.SetSize(i, newRegion.GetSize(i)*value[i]);
+      newRegion.SetSize(i, truncated(newRegion.GetSize(i)*value[i]));
     }
     break;
   case ResampleGridMode::Spacing:
     for (unsigned int i = 0; i < 3; ++i)
     {
       const double sampling = spacing[i]/value[i];
-      newRegion.SetSize(i, newRegion.GetSize(i)*sampling);
+      newRegion.SetSize(i, truncated(newRegion.GetSize(i)*sampling));
     }
     newSpacing = value;
     break;

@@ -22,6 +22,7 @@ set(CPP_FILES
   IO/mitkShImageWriter.cpp
   IO/mitkShImageSerializer.cpp
   IO/mitkPeakImageReader.cpp
+  IO/mitkPeakImageWriter.cpp
   IO/mitkPeakImageSerializer.cpp
 
   # Mapper etc.
@@ -64,6 +65,7 @@ set(H_FILES
   IO/mitkShImageWriter.h
   IO/mitkShImageSerializer.h
   IO/mitkPeakImageReader.h
+  IO/mitkPeakImageWriter.h
   IO/mitkPeakImageSerializer.h
 
   # Rendering
