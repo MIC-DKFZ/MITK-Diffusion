@@ -35,6 +35,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(Numerical_NoBaseline_Throws);
   MITK_TEST(Numerical_SecondUpdate_SameResult);
   MITK_TEST(Analytical_SecondUpdate_SameResult);
+  MITK_TEST(Numerical_NewGradients_SameAsFreshFilter);
   MITK_TEST(SolidAngle_SecondUpdate_SameResult);
   MITK_TEST(SingleShellFilters_DefaultNormalization_IsStandard);
   MITK_TEST(Numerical_Standard_HasUnitNorm);
@@ -228,6 +229,28 @@ public:
     reused->Update();
     CheckEqual(fresh->GetOutput(), reused->GetOutput());
     CheckEqual(fresh->GetCoefficientImage().GetPointer(), reused->GetCoefficientImage().GetPointer());
+  }
+
+  // The number of equator sampling points was derived from the first input only, so a filter given
+  // another gradient set reconstructed it with the sampling of the first.
+  void Numerical_NewGradients_SameAsFreshFilter()
+  {
+    auto first = LoadHalfSphereDwi();
+    auto second = Simulate(Shells({1000}));
+
+    auto fresh = Numerical(second);
+    fresh->Update();
+
+    auto reused = NumericalFilterType::New();
+    reused->SetBValue(3000);
+    reused->SetGradientImage(first.gradients, first.image);
+    reused->SetNormalizationMethod(NumericalFilterType::QBR_STANDARD);
+    reused->Update();
+    reused->SetBValue(ReferenceBValue);
+    reused->SetGradientImage(second.gradients, second.image);
+    // The second image is smaller than the first; ITK keeps the old requested region on Update().
+    reused->UpdateLargestPossibleRegion();
+    CheckEqual(fresh->GetOutput(), reused->GetOutput());
   }
 
   // The solid-angle method set lambda to 0 after its first execution had used the given lambda, so

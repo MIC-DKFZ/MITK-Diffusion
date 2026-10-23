@@ -317,10 +317,10 @@ namespace itk {
       }
     }
 
-    // set default number of equator sampling points if needed
-    if(!this->m_NumberOfEquatorSamplingPoints)
-      this->m_NumberOfEquatorSamplingPoints
-        = (int) ceil((double)sqrt(8*itk::Math::pi*this->m_NumberOfGradientDirections));
+    // number of equator sampling points, derived per execution from this execution's gradient
+    // count (there is no setter; a value kept from an earlier input would not fit a new one)
+    this->m_NumberOfEquatorSamplingPoints
+      = (int) ceil((double)sqrt(8*itk::Math::pi*this->m_NumberOfGradientDirections));
 
     // The matrices of this function are values (they leaked about 27 MB per execution for 64
     // gradients); smart pointers would slow down the loops below in Debug builds.
