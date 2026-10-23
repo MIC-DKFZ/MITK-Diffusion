@@ -1,11 +1,13 @@
 /**
 \page org_mitk_views_controlvisualizationpropertiesview Visualization Control Panel
 
-\section QmitkDiffusionImagingVisualizationSettings ODF Visualization
+This view configures how diffusion images, peak images and tractograms are shown. The controls depend on the data selected in the Data Manager. With several nodes selected, the controls show the values of the last selected node of each kind, and a change applies to all selected nodes of that kind.
 
-In this small view, the visualization of ODFs and diffusion images can be configured. Depending on the selected image in the data storage, different options are shown here. A diffusion-weighted image that is loaded while this view is open shows its first b=0 volume instead of volume 0.
+\section QmitkDiffusionImagingVisualizationSettings ODF and Tensor Glyphs
 
-For tensor or ODF images, the visibility of glyphs in the different render windows (T)ransversal, (S)agittal, and (C)oronal can be configured here. The maximal number of glyphs to display can also be configured here for. This is usefull to keep the system response time during rendering feasible. The other options configure normalization (Min-Max, Max, None or Global Maximum, the largest value of the whole image) and scaling of the glyphs (None, FA/GFA or Principal Curvature).
+For tensor, ODF and spherical-harmonic images, the visibility of glyphs in the different render windows (T)ransversal, (S)agittal and (C)oronal can be switched here. The maximal number of glyphs to display (\#Glyphs) keeps the system response time during rendering feasible. The other options configure the normalization (Min-Max, Max, None or Global Maximum, the largest value of the whole image; not offered for tensors), the scaling of the glyphs (None, FA/GFA or Principal Curvature), an additional scaling factor, and the colouring by ODF value or by principal direction.
+
+A diffusion-weighted image that is loaded while this view is open shows its first b=0 volume instead of volume 0.
 
 This is how a visualization with activated glyphs should look like:
 
@@ -13,10 +15,24 @@ This is how a visualization with activated glyphs should look like:
 
 \imageMacro{Data_Tensors.png,"Tensor image with glyph visibility toggled ON",1}
 
+\section QmitkDiffusionImagingThickSlices Thick Slices
+
+For images, the thick-slice menu sets a maximum, sum or weighted intensity projection over a slab of slices in all three 2D render windows at once. The slider sets the number of slices; the menu shows the state of the axial render window.
+
 \section QmitkDiffusionImagingTractVisualizationSettings Tractogram Visualization
 
-If a tractogram is selected in the data manager, this view enables to visualize the fibers as tubes or thick lines as well as to play with the 2D and 3D clipping of the fiber visualization. The 3D clipping works per tractogram individually, which enables nice visualization of e.g. a CST tract extending upwards out of the bottom half of a whole brain tractogram. The color button opens one color dialog and colors all selected tractograms and peak images with the chosen color.
+If a tractogram is selected in the data manager, this view enables to visualize the fibers as tubes (tube radius) or ribbons (ribbon width) and to clip the fibers in 2D and 3D. In the 2D render windows, a tractogram shows the fibers within the given distance (2D clipping) from the displayed plane. The 3D clipping cuts a tractogram at the current axial, sagittal or coronal plane, optionally on the other side ("Flip Clipping Direction"), and follows the plane when the slice is changed. It works per tractogram individually, which enables nice visualization of e.g. a CST tract extending upwards out of the bottom half of a whole brain tractogram.
+
+The colour button opens one colour dialog and colours all selected tractograms and peak images with the chosen colour; a tractogram whose node colour is changed elsewhere (e.g. in the Data Manager) while it is selected takes the new colour as well. The reset button restores the colouring by fiber orientation.
 
 \imageMacro{tract_visualization.png,"CST tube visualization with sagittal 3D clipping of the whole-brain tractogram.",1}
+
+\section QmitkDiffusionImagingPeakVisualizationSettings Peak Images
+
+For peak images, the view sets the line width, the colour (or the colouring by orientation), the 3D clipping as for tractograms, and whether the peaks are also shown in the 3D render window. "Flip Peaks" mirrors the peak directions of the selected peak images along the chosen axes, e.g. to correct peaks computed in another coordinate convention.
+
+\section QmitkDiffusionImagingPlanarFigures Planar Figures
+
+When a planar figure (e.g. a ROI for fiber extraction) is selected, the 2D render window whose plane is closest to the figure's plane moves to the figure, and the figure becomes editable.
 
 */

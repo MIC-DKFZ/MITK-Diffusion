@@ -268,7 +268,7 @@ p, li { white-space: pre-wrap; }
    <item>
     <widget class="QCommandLinkButton" name="m_DicomLoadStartLoadButton">
      <property name="text">
-      <string>Import DICOM as *.dwi</string>
+      <string>Import DICOM</string>
      </property>
     </widget>
    </item>
