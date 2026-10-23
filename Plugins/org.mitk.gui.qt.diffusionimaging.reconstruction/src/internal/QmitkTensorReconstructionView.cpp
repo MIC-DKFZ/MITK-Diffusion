@@ -96,6 +96,7 @@ void QmitkTensorReconstructionView::Deactivated()
         this->GetDataStorage()->Remove(overlay);
     }
   }
+  m_PreviewB0 = nullptr;
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
@@ -169,35 +170,45 @@ void QmitkTensorReconstructionView::TensorsToDwi()
 void QmitkTensorReconstructionView::PreviewThreshold(int threshold)
 {
   auto dwiNode = m_Controls->m_DwiBox->GetSelectedNode();
-  auto dwi = dwiNode.IsNotNull() ? dynamic_cast<mitk::Image *>(dwiNode->GetData()) : nullptr;
+  const mitk::Image *dwi = dwiNode.IsNotNull() ? dynamic_cast<mitk::Image *>(dwiNode->GetData()) : nullptr;
   if (dwi == nullptr)
     return;
 
-  using FilterType = itk::B0ImageExtractionImageFilter<short, short>;
-  auto filterB0 = FilterType::New();
-  try
+  // The mean b0 image is computed once per DWI (and again when the DWI changes), not on every step
+  // of the threshold box. The DWI is read through a const image, which does not block rendering.
+  if (m_PreviewB0.IsNull() || m_PreviewDwi.Lock().GetPointer() != dwi || m_PreviewDwiTime != dwi->GetMTime())
   {
-    mitk::DiffusionPropertyHelper::ImageType::Pointer itkDwi;
-    mitk::CastToItkImage(dwi, itkDwi);
-    filterB0->SetInput(itkDwi);
-    filterB0->SetDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi));
-    filterB0->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi));
-    filterB0->Update();
-  }
-  catch (const std::exception &e)
-  {
-    // The preview runs on every step of the threshold box, so it reports in the status bar
-    // instead of opening a dialog per key press. A DWI without b0 volume has no preview.
-    if (auto overlay = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", dwiNode))
-      this->GetDataStorage()->Remove(overlay);
-    mitk::StatusBar::GetInstance()->DisplayText((std::string("No threshold preview: ") + e.what()).c_str());
-    mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-    return;
+    m_PreviewB0 = nullptr;
+    using FilterType = itk::B0ImageExtractionImageFilter<short, short>;
+    auto filterB0 = FilterType::New();
+    try
+    {
+      mitk::DiffusionPropertyHelper::ImageType::Pointer itkDwi;
+      mitk::CastToItkImage(dwi, itkDwi);
+      filterB0->SetInput(itkDwi);
+      filterB0->SetDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi));
+      filterB0->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi));
+      filterB0->Update();
+    }
+    catch (const std::exception &e)
+    {
+      // The preview runs on every step of the threshold box, so it reports in the status bar
+      // instead of opening a dialog per key press. A DWI without b0 volume has no preview.
+      if (auto overlay = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", dwiNode))
+        this->GetDataStorage()->Remove(overlay);
+      mitk::StatusBar::GetInstance()->DisplayText((std::string("No threshold preview: ") + e.what()).c_str());
+      mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+      return;
+    }
+    m_PreviewB0 = filterB0->GetOutput();
+    m_PreviewB0->DisconnectPipeline();
+    m_PreviewDwi = dwi;
+    m_PreviewDwiTime = dwi->GetMTime();
   }
 
   using ImageType = itk::Image<short, 3>;
   auto filterThreshold = itk::BinaryThresholdImageFilter<ImageType, ImageType>::New();
-  filterThreshold->SetInput(filterB0->GetOutput());
+  filterThreshold->SetInput(m_PreviewB0);
   filterThreshold->SetLowerThreshold(threshold);
   filterThreshold->SetInsideValue(0);
   filterThreshold->SetOutsideValue(1); // mark cut off values red

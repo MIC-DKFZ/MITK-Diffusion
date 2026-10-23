@@ -19,6 +19,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <QmitkAbstractView.h>
 #include <mitkILifecycleAwarePart.h>
+#include <mitkImage.h>
+#include <mitkWeakPointer.h>
+
+#include <itkImage.h>
 
 #include <string>
 
@@ -42,7 +46,7 @@ public:
   void SetFocus() override;
 
   void Activated() override {}
-  /** Removes the threshold previews. */
+  /** Removes the threshold previews and releases the b0 image they were computed from. */
   void Deactivated() override;
   void Visible() override {}
   void Hidden() override {}
@@ -64,6 +68,12 @@ protected:
 
 private:
   void CreateConnections();
+
+  /** Mean b0 image of the DWI the threshold preview shows, kept while that DWI is unchanged; each
+   * step of the threshold box only thresholds it again. */
+  itk::Image<short, 3>::Pointer m_PreviewB0;
+  mitk::WeakPointer<const mitk::Image> m_PreviewDwi;
+  itk::ModifiedTimeType m_PreviewDwiTime = 0;
 };
 
 #endif
