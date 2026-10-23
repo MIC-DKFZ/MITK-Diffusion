@@ -45,8 +45,8 @@ mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
     this->m_FiberPolyData->SetLines(vtkSmartPointer<vtkCellArray>::New());
   }
 
+  // also colours the fibers by orientation (there are no colours yet)
   this->UpdateFiberGeometry();
-  this->ColorFibersByOrientation();
 }
 
 /** Used by Clone(): an independent copy of fibers, colours, weights, statistics and metadata,
@@ -94,8 +94,9 @@ void mitk::FiberBundle::SetFiberPolyData(vtkSmartPointer<vtkPolyData> fiberPD)
 
   m_NumFibers = static_cast<unsigned int>(m_FiberPolyData->GetNumberOfLines());
 
+  // new fibers are coloured by orientation, which UpdateFiberGeometry does for missing colours
+  m_FiberColors = nullptr;
   UpdateFiberGeometry();
-  ColorFibersByOrientation();
 }
 
 /*
