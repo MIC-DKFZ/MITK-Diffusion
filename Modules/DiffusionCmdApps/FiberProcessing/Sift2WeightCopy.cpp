@@ -32,6 +32,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <itkTractDensityImageFilter.h>
 #include <itkTractsToFiberEndingsImageFilter.h>
+#include <mitkFiberWeightsFile.h>
 
 
 mitk::FiberBundle::Pointer LoadFib(std::string filename)
@@ -73,28 +74,18 @@ int main(int argc, char* argv[])
   {
     mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
 
-    std::ifstream fin;
-    fin.open(weightsFileName);
-    if (!fin.good())
-      return 1; // exit if file not found
-
-    std::vector<float> weights;
-    for (float d; fin >> d; ) { weights.push_back(d); }
-
-    for(std::size_t i = 0; i != weights.size(); i++) {
-      fib->SetFiberWeight(i, weights[i]);
-    }
+    mitk::FiberWeightsFile::Apply(mitk::FiberWeightsFile::Read(weightsFileName), fib);
 
     mitk::IOUtil::Save(fib.GetPointer(), outFileName );
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (...)
