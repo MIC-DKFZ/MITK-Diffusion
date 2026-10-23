@@ -267,17 +267,13 @@ void mitk::SphereInteractor::ExtractFibers()
         // Increment the counter variable
     }
 
-        // Create a new vtkPolyData object and set it to the new fibers
-        m_reducedFibersBundle->GetFiberPolyData()->SetPoints(vNewPoints);
-        m_reducedFibersBundle->GetFiberPolyData()->SetLines(vNewLines);
-//    vNewPolyData->SetPoints(vNewPoints);
-//    vNewPolyData->SetLines(vNewLines);
-
-
-        m_reducedFibersBundle->ColorFibersByOrientation();
+    // Through SetFiberPolyData, so that the bundle's fiber count matches the new fibers and their
+    // weights (SetFiberWeights throws on a size mismatch); it also colours them by orientation.
+    vNewPolyData->SetPoints(vNewPoints);
+    vNewPolyData->SetLines(vNewLines);
+    m_reducedFibersBundle->SetFiberPolyData(vNewPolyData);
 
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
-//    m_reducedFibersBundle->SetFiberPolyData(vNewPolyData);
     m_reducedFibersBundle->SetFiberWeights(weights);
     m_reducedFibersBundle->GetFiberPolyData()->RemoveDeletedCells();
     m_reducedFibersBundle->RequestUpdate();

@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef MITKFiberBundleMimeTypes_H
-#define MITKFiberBundleMimeTypes_H
+#ifndef mitkFiberBundleMimeTypes_h
+#define mitkFiberBundleMimeTypes_h
 
 #include "mitkCustomMimeType.h"
 #include <string>
@@ -32,8 +32,6 @@ public:
 
   static CustomMimeType FIBERBUNDLE_VTK_MIMETYPE();
   static std::string FIBERBUNDLE_VTK_MIMETYPE_NAME();
-
-  static std::string FIBERBUNDLE_MIMETYPE_DESCRIPTION();
 
   // ------------------------------ MRtrix formats ----------------------------------
 
@@ -60,15 +58,11 @@ public:
 
   static CustomMimeType PLANARFIGURECOMPOSITE_MIMETYPE();
   static std::string PLANARFIGURECOMPOSITE_MIMETYPE_NAME();
-  static std::string PLANARFIGURECOMPOSITE_MIMETYPE_DESCRIPTION();
 
-private:
-
-  // purposely not implemented
-  FiberBundleMimeTypes();
-  FiberBundleMimeTypes(const FiberBundleMimeTypes&);
+  FiberBundleMimeTypes() = delete;
+  FiberBundleMimeTypes(const FiberBundleMimeTypes&) = delete;
 };
 
 }
 
-#endif // MITKFiberBundleMimeTypes_H
+#endif

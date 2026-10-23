@@ -10,8 +10,8 @@ set(H_FILES
 
   IO/mitkFiberBundleMimeTypes.h
   IO/mitkFiberBundleIOHelper.h
+  IO/mitkFiberBundleDicomReferenceTags.h
 
-  IO/mitkTrackvis.h
   IO/mitkFiberBundleDicomReader.h
   IO/mitkFiberBundleDicomWriter.h
   IO/mitkFiberBundleTckReader.h
@@ -33,12 +33,19 @@ set(CPP_FILES
   IO/mitkPlanarFigureCompositeSerializer.cpp
 
   mitkFiberBundle.cpp
+  mitkFiberBundleColoring.cpp
+  mitkFiberBundleResampling.cpp
+  mitkFiberBundleRoiExtraction.cpp
+  mitkFiberBundleSelection.cpp
+  mitkFiberBundleTransforms.cpp
+  mitkFiberPolyDataBuilder.cpp
 
   IO/mitkFiberBundleServiceActivator.cpp
   IO/mitkFiberBundleMimeTypes.cpp
   IO/mitkFiberBundleIOHelper.cpp
+  IO/mitkFiberBundleDicomReferenceTags.cpp
 
-  IO/mitkTrackvis.cpp
+  IO/mitkTrackVisFile.cpp
   IO/mitkFiberBundleDicomReader.cpp
   IO/mitkFiberBundleDicomWriter.cpp
   IO/mitkFiberBundleTckReader.cpp

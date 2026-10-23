@@ -56,7 +56,7 @@ std::string mitk::FiberBundleSerializer::Serialize()
 
   try
   {
-    mitk::IOUtil::Save(const_cast<FiberBundle*>(fb),fullname);
+    mitk::IOUtil::Save(fb, fullname);
   }
   catch (std::exception& e)
   {

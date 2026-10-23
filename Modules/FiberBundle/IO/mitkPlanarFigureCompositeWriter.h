@@ -14,34 +14,27 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkPlanarFigureCompositeWriter_h
-#define __mitkPlanarFigureCompositeWriter_h
+#ifndef mitkPlanarFigureCompositeWriter_h
+#define mitkPlanarFigureCompositeWriter_h
 
 #include <mitkAbstractFileWriter.h>
 
 namespace mitk
 {
 
-/**
- * Writes fiber bundles to a file
- * @ingroup Process
- */
+/** \brief Writes the operation (AND, OR, NOT) of a planar figure composite (.pfc). */
 class PlanarFigureCompositeWriter : public mitk::AbstractFileWriter
 {
 public:
 
-
     PlanarFigureCompositeWriter();
-    PlanarFigureCompositeWriter(const PlanarFigureCompositeWriter & other);
+    PlanarFigureCompositeWriter(const PlanarFigureCompositeWriter & other) = default;
     PlanarFigureCompositeWriter * Clone() const override;
-    ~PlanarFigureCompositeWriter() override;
 
     using mitk::AbstractFileWriter::Write;
     void Write() override;
-
 };
 
+}
 
-} // end of namespace mitk
-
-#endif //__mitkFiberBundleWriter_h
+#endif

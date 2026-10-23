@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkDicomTractogramTagEditorView.h"
-#include "QmitkStdMultiWidget.h"
+#include <mitkFiberBundleDicomReferenceTags.h>
 
 // Qt
 #include <QMessageBox>
@@ -34,35 +34,29 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateProperty.h>
 
 const std::string QmitkDicomTractogramTagEditorView::VIEW_ID = "org.mitk.views.dicomtractogramtageditor";
-const std::string id_DataManager = "org.mitk.views.datamanager";
-using namespace berry;
+
+namespace
+{
+  /** Tag names are fixed; only the value column is edited. */
+  QTableWidgetItem* NewTagNameItem(const std::string& tag)
+  {
+    auto item = new QTableWidgetItem(tag.c_str());
+    item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+    return item;
+  }
+}
 
 QmitkDicomTractogramTagEditorView::QmitkDicomTractogramTagEditorView()
   : m_Controls(nullptr)
+  , m_TagList(mitk::FiberBundleDicomTags::GetEditableTags())
 {
-  m_TagList = {"DICOM.patient_id",
-               "DICOM.patient_name",
-               "DICOM.study_instance_uid",
-               "DICOM.series_instance_uid",
-               "DICOM.sop_instance_uid",
-               "DICOM.frame_of_reference_uid",
-              "DICOM.algo_family_code.value",
-              "DICOM.algo_family_code.meaning",
-              "DICOM.model_code.value",
-              "DICOM.model_code.meaning",
-              "DICOM.anatomy.value",
-              "DICOM.anatomy.meaning"};
-  m_ImageTagList = {"DICOM.patient_id",
-               "DICOM.patient_name",
-               "DICOM.study_instance_uid",
-               "DICOM.series_instance_uid",
-               "DICOM.sop_instance_uid",
-               "DICOM.frame_of_reference_uid"};
 }
 
 // Destructor
 QmitkDicomTractogramTagEditorView::~QmitkDicomTractogramTagEditorView()
 {
+  // The widgets belong to the parent; only the Ui struct is this view's.
+  delete m_Controls;
 }
 
 void QmitkDicomTractogramTagEditorView::CreateQtPartControl( QWidget *parent )
@@ -108,16 +102,16 @@ void QmitkDicomTractogramTagEditorView::CopyProperties()
   if (m_Image.IsNull())
     return;
 
-  mitk::PropertyList* source_p_list = m_Image->GetPropertyList();
-  mitk::PropertyList* target_p_list = fib->GetPropertyList();
-
-  for (std::string tag : m_ImageTagList)
-  {
-    std::string val = "0";
-    source_p_list->GetStringProperty(tag.c_str(), val);
-    target_p_list->SetStringProperty(tag.c_str(), val.c_str());
-  }
+  // Tags the image lacks keep their value in the tractogram and are reported.
+  const auto missing = mitk::CopyDicomReferenceTags(m_Image, fib);
   UpdateGui();
+  if (!missing.empty())
+  {
+    QString list;
+    for (const auto& tag : missing)
+      list += QString("\n") + QString::fromStdString(tag);
+    QMessageBox::information(nullptr, "DICOM tags", "The image does not provide these tags; they were not changed:" + list);
+  }
 }
 
 void QmitkDicomTractogramTagEditorView::OnItemChanged(QTableWidgetItem* item)
@@ -155,7 +149,7 @@ void QmitkDicomTractogramTagEditorView::UpdateGui()
     int row = 0;
     for (std::string tag : m_TagList)
     {
-      m_Controls->m_TagTable->setItem(row, 0, new QTableWidgetItem(tag.c_str()));
+      m_Controls->m_TagTable->setItem(row, 0, NewTagNameItem(tag));
       m_Controls->m_TagTable->setItem(row, 1, new QTableWidgetItem("0"));
       ++row;
     }
@@ -171,7 +165,7 @@ void QmitkDicomTractogramTagEditorView::UpdateGui()
   {
     std::string val = "0";
     p_list->GetStringProperty(tag.c_str(), val);
-    m_Controls->m_TagTable->setItem(row, 0, new QTableWidgetItem(tag.c_str()));
+    m_Controls->m_TagTable->setItem(row, 0, NewTagNameItem(tag));
     m_Controls->m_TagTable->setItem(row, 1, new QTableWidgetItem(val.c_str()));
     ++row;
   }
@@ -197,5 +191,5 @@ void QmitkDicomTractogramTagEditorView::OnSelectionChanged( berry::IWorkbenchPar
 
 void QmitkDicomTractogramTagEditorView::SetFocus()
 {
-
+  m_Controls->m_TractogramBox->setFocus();
 }

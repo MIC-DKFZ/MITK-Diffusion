@@ -72,16 +72,8 @@ QGroupBox {
       <item row="0" column="1">
        <widget class="QmitkDataStorageComboBoxWithSelectNone" name="m_TractogramBox">
         <property name="toolTip">
-         <string>Seed points are only placed inside the mask image. If no seed mask is selected, the whole image is seeded.</string>
+         <string>Tractogram whose DICOM tags are shown and edited. The DICOM tractography writer stores these tags.</string>
         </property>
-        <property name="sizeAdjustPolicy">
-         <enum>QComboBox::AdjustToMinimumContentsLength</enum>
-        </property>
-        <item>
-         <property name="text">
-          <string>-</string>
-         </property>
-        </item>
        </widget>
       </item>
      </layout>
@@ -143,7 +135,7 @@ QGroupBox {
    <item row="2" column="0">
     <widget class="QCommandLinkButton" name="m_CopyPropsButton">
      <property name="toolTip">
-      <string>Copies the DICOM properties of the tractogram selected in this view to the one selected in the datamanager.</string>
+      <string>Copies patient, study, series, SOP instance and class and frame of reference UIDs of the image selected in the Data Manager to the tractogram selected in this view. Tags the image lacks are left unchanged.</string>
      </property>
      <property name="text">
       <string>Copy Properties From Image</string>
