@@ -76,7 +76,8 @@ public:
       break;
     }
     const vnl_matrix<double> &sticks = mitk::pointshell::Directions(m_NumSticks);
-    for (int i=0; i<m_NumSticks; i++)
+    m_Sticks.clear();
+    for (unsigned int i=0; i<m_NumSticks; i++)
     {
       GradientType stick;
       stick[0] = sticks.get(0,i); stick[1] = sticks.get(1,i); stick[2] = sticks.get(2,i);

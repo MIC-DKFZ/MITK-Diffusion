@@ -15,6 +15,7 @@ found in the LICENSE file.
 #include <mitkIOUtil.h>
 #include <mitkFiberfoxParameters.h>
 #include <mitkRawShModel.h>
+#include <mitkAstroStickModel.h>
 #include <mitkDiffusionImageHelperFunctions.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
@@ -35,6 +36,7 @@ class mitkFiberfoxSignalModelTestSuite : public mitk::TestFixture
   MITK_TEST(PrototypeDirectionFromCoefficients);
   MITK_TEST(PrototypeSurvivesCopy);
   MITK_TEST(PrototypeSaveLoad);
+  MITK_TEST(AstroSticksVector);
   CPPUNIT_TEST_SUITE_END();
 
   using ModelType = mitk::RawShModel<double>;
@@ -192,6 +194,18 @@ public:
       CPPUNIT_ASSERT_DOUBLES_EQUAL(0.95, model->GetBaselineSignal(1), 1e-12);
     }
     itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /** The vector overload of the astrosticks model equals the per-direction one (it summed into uninitialized memory). */
+  void AstroSticksVector()
+  {
+    mitk::AstroStickModel<double> model;
+    model.SetGradientList(m_Gradients);
+    GradientType f = Direction(1, 0, 0);
+    const auto signal = model.SimulateMeasurement(f);
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(m_Gradients.size()), signal.Size());
+    for (unsigned int g = 0; g < m_Gradients.size(); ++g)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(model.SimulateMeasurement(g, f), signal[g], 1e-12);
   }
 };
 

@@ -93,10 +93,18 @@ typename AstroStickModel< ScalarType >::PixelType AstroStickModel< ScalarType >:
 {
     PixelType signal;
     signal.SetSize(this->m_GradientList.size());
+    signal.Fill(0.0);
     ScalarType b = -this->m_BValue*m_Diffusivity;
 
+    // one stick configuration for all gradient directions of this voxel
+    GradientListType sticks = m_Sticks;
     if (m_RandomizeSticks)
+    {
         m_NumSticks = 30 + this->m_RandGen->GetIntegerVariate()%31;
+        sticks.clear();
+        for (unsigned int j=0; j<m_NumSticks; j++)
+            sticks.push_back(GetRandomDirection());
+    }
 
     for( unsigned int i=0; i<this->m_GradientList.size(); i++)
     {
@@ -105,11 +113,7 @@ typename AstroStickModel< ScalarType >::PixelType AstroStickModel< ScalarType >:
         {
             for (unsigned int j=0; j<m_NumSticks; j++)
             {
-                ScalarType dot = 0;
-                if(m_RandomizeSticks)
-                    dot = GetRandomDirection()*g;
-                else
-                    dot = m_Sticks[j]*g;
+                ScalarType dot = sticks[j]*g;
                 signal[i] += std::exp( (double)(b*dot*dot) ); // skip * bVal becaus bVal is already encoded in the dot product (norm of g encodes b-value relative to baseline b-value m_BValue)
             }
             signal[i] /= m_NumSticks;
