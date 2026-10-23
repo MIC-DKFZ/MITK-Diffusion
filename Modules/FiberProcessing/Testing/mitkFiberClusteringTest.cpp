@@ -35,6 +35,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(InputCentroids_SameResultForAnyThreadCount);
   MITK_TEST(InputCentroids_OutputKBelongsToCentroidK);
   MITK_TEST(Metrics_FibersWithFewerThanFourPoints);
+  MITK_TEST(Resampling_EqualArcLength);
   CPPUNIT_TEST_SUITE_END();
 
   /** Three fibers along x at y = 0, 0.5, 1 mm and, 40 mm away, two at y = 40, 41 mm, with
@@ -184,6 +185,30 @@ public:
     CPPUNIT_ASSERT(!flipped);
     CPPUNIT_ASSERT(std::isfinite(angles.CalculateDistance(s, t, flipped)));
     CPPUNIT_ASSERT(std::isfinite(scalarMap.CalculateDistance(s, t, flipped)));
+  }
+
+  void Resampling_EqualArcLength()
+  {
+    // The same 100 mm line, once with 12 points crowded at its start, once with 50 even points:
+    // after resampling to 12 points at equal arc length both are the same fiber.
+    using namespace mitk::FiberProcessingTestHelper;
+    Polyline crowded;
+    for (int i = 0; i <= 10; ++i)
+      crowded.push_back({static_cast<double>(i), 0, 0});
+    crowded.push_back({100, 0, 0});
+    auto fib = CreateBundle({crowded, Line({0, 0.5, 0}, {100, 0.5, 0}, 50)});
+
+    mitk::TractClusteringFilter clusterer;
+    clusterer.SetTractogram(fib);
+    clusterer.SetDistances({10});
+    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.Update();
+
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), clusterer.GetOutTractograms().size());
+    auto centroid = clusterer.GetOutCentroids().at(0)->GetFiberPolyData();
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(12), centroid->GetNumberOfPoints());
+    for (vtkIdType k = 0; k < 12; ++k)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(100.0 * k / 11, centroid->GetPoint(k)[0], 1e-3);
   }
 
   void Clusters_KeepInputWeights()

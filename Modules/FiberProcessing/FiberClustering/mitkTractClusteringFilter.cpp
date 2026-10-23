@@ -17,6 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <algorithm>
 #include <boost/timer/progress_display.hpp>
 #include <vnl/vnl_sparse_matrix.h>
 
@@ -105,30 +106,54 @@ float TractClusteringFilter::CalcOverlap(vnl_matrix<float>& t)
 
 std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(mitk::FiberBundle::Pointer tractogram)
 {
-  mitk::FiberBundle::Pointer temp_fib = tractogram->GetDeepCopy();
-  if (m_DoResampling)
-    temp_fib->ResampleToNumPoints(m_NumPoints);
-
+  // QuickBundles compares fibers point by point (MDF), so each fiber is resampled to m_NumPoints
+  // points at equal arc length along it, both end points included (as dipy's
+  // set_number_of_points); also fibers that already have m_NumPoints unevenly spaced points.
+  vtkSmartPointer<vtkPolyData> polyData = tractogram->GetFiberPolyData();
   std::vector< vnl_matrix<float> > out_fib;
 
-  for (int i=0; i<temp_fib->GetFiberPolyData()->GetNumberOfCells(); i++)
+  for (int i=0; i<polyData->GetNumberOfCells(); i++)
   {
-    vtkCell* cell = temp_fib->GetFiberPolyData()->GetCell(i);
-    int numPoints = cell->GetNumberOfPoints();
+    vtkCell* cell = polyData->GetCell(i);
+    const int numPoints = cell->GetNumberOfPoints();
     vtkPoints* points = cell->GetPoints();
+
+    std::vector< vnl_vector_fixed< double, 3 > > p(numPoints);
+    for (int j=0; j<numPoints; j++)
+      points->GetPoint(j, p[j].data_block());
 
     vnl_matrix<float> streamline;
     streamline.set_size(3, m_NumPoints);
     streamline.fill(0.0);
 
-    for (int j=0; j<numPoints; j++)
+    if (!m_DoResampling || numPoints<2)
     {
-      double cand[3];
-      points->GetPoint(j, cand);
+      for (unsigned int k=0; k<m_NumPoints && numPoints>0; k++)
+      {
+        // Without resampling the fibers are expected to have m_NumPoints points already.
+        const auto& q = p[std::min<int>(k, numPoints-1)];
+        for (unsigned int d=0; d<3; ++d)
+          streamline(d, k) = q[d];
+      }
+    }
+    else
+    {
+      std::vector< double > arc(numPoints, 0.0);
+      for (int j=1; j<numPoints; j++)
+        arc[j] = arc[j-1] + (p[j]-p[j-1]).magnitude();
 
-      vnl_vector_fixed< float, 3 > candV;
-      candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
-      streamline.set_column(j, candV.as_vector());
+      int seg = 0;
+      for (unsigned int k=0; k<m_NumPoints; k++)
+      {
+        const double target = m_NumPoints>1 ? arc.back()*k/(m_NumPoints-1) : 0.0;
+        while (seg<numPoints-2 && arc[seg+1]<target)
+          ++seg;
+        const double segLength = arc[seg+1]-arc[seg];
+        const double a = segLength>0 ? std::min(1.0, std::max(0.0, (target-arc[seg])/segLength)) : 0.0;
+        const vnl_vector_fixed< double, 3 > q = p[seg] + a*(p[seg+1]-p[seg]);
+        for (unsigned int d=0; d<3; ++d)
+          streamline(d, k) = q[d];
+      }
     }
 
     out_fib.push_back(streamline);
