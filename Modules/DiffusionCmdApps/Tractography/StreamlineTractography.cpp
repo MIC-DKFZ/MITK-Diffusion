@@ -408,7 +408,14 @@ int main(int argc, char* argv[])
     handler = new mitk::TrackingHandlerPeaks();
 
     MITK_INFO << "loading input peak image";
-    mitk::PeakImage::Pointer mitkImage = mitk::IOUtil::Load<mitk::PeakImage>(input_files.at(0));
+    // Without the reader preference, a 4D NIfTI peak file is read as a plain image.
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, std::vector<std::string>());
+    mitk::PeakImage::Pointer mitkImage = mitk::IOUtil::Load<mitk::PeakImage>(input_files.at(0), &functor);
+    if (mitkImage.IsNull())
+    {
+      MITK_ERROR << "Input is not a peak image: " << input_files.at(0);
+      return EXIT_FAILURE;
+    }
     reference_image = mitkImage;
     mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = mitkImage->GetItkPeakImage();
     dynamic_cast<mitk::TrackingHandlerPeaks*>(handler)->SetPeakImage(itkImg);
