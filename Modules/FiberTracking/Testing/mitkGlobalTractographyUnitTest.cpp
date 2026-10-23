@@ -11,11 +11,13 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <itkImageRegionIteratorWithIndex.h>
+#include <mitkFiberBuilder.h>
 #include <mitkGibbsEnergyComputer.h>
 #include <mitkParticleGrid.h>
 #include <mitkSphereInterpolator.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
+#include <vtkMath.h>
 
 /**
  * Components of the Gibbs (global) tractography on small hand-made inputs, so that the expected
@@ -25,6 +27,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkGlobalTractographyUnitTestSuite);
   MITK_TEST(EvaluateOdf_RotatedImage_SamplesAlongParticle);
+  MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfImageType = GibbsEnergyComputer::ItkOdfImgType;
@@ -79,6 +82,61 @@ public:
     // across the row the particle sees the row only at its centre sample
     vnl_vector_fixed<float, 3> across(0.0f, 1.0f, 0.0f);
     CPPUNIT_ASSERT(energy.EvaluateOdf(pos, across) < 0.5);
+  }
+
+  /** Every particle of every chain becomes a fiber point, in chain order, also when the chain is
+   *  first reached in its middle. */
+  void FiberBuilder_AllParticlesOfEveryChain()
+  {
+    itk::Matrix<double, 3, 3> identity;
+    identity.SetIdentity();
+    auto mask = FloatImageType::New();
+    FloatImageType::SizeType size = {{20, 20, 20}};
+    mask->SetRegions(FloatImageType::RegionType(size));
+    mask->SetDirection(identity);
+    mask->Allocate();
+    mask->FillBuffer(1.0f);
+    mitk::ParticleGrid grid(mask, 1.0f, 16);
+
+    auto add = [&grid](float x, float yz) {
+      vnl_vector_fixed<float, 3> pos(x, yz, yz);
+      mitk::Particle *p = grid.NewParticle(pos);
+      p->GetDir() = vnl_vector_fixed<float, 3>(1.0f, 0.0f, 0.0f);
+      return p->ID;
+    };
+    auto connect = [&grid](int a, int b) { grid.CreateConnection(grid.GetParticle(a), +1, grid.GetParticle(b), -1); };
+
+    // chain A, reached at its first particle
+    int a0 = add(2, 5), a1 = add(4, 5), a2 = add(6, 5);
+    connect(a0, a1);
+    connect(a1, a2);
+    // chain B, reached at its middle particle (created first)
+    int b2 = add(6, 10), b0 = add(2, 10), b1 = add(4, 10), b3 = add(8, 10), b4 = add(10, 10);
+    connect(b0, b1);
+    connect(b1, b2);
+    connect(b2, b3);
+    connect(b3, b4);
+    // a single particle
+    add(15, 15);
+
+    mitk::FiberBuilder builder(&grid, mask);
+    auto fibers = builder.iterate(0);
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(3), fibers->GetNumberOfLines());
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(9), fibers->GetNumberOfPoints());
+
+    std::vector<vtkIdType> expectedPoints = {3, 5, 1};
+    for (vtkIdType i = 0; i < fibers->GetNumberOfLines(); ++i)
+    {
+      vtkCell *cell = fibers->GetCell(i);
+      CPPUNIT_ASSERT_EQUAL(expectedPoints[i], cell->GetNumberOfPoints());
+      for (vtkIdType j = 1; j < cell->GetNumberOfPoints(); ++j)
+      {
+        double p0[3], p1[3];
+        cell->GetPoints()->GetPoint(j - 1, p0);
+        cell->GetPoints()->GetPoint(j, p1);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, std::sqrt(vtkMath::Distance2BetweenPoints(p0, p1)), 1e-5);
+      }
+    }
   }
 };
 
