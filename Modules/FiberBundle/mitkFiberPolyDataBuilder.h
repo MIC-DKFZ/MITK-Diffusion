@@ -17,10 +17,13 @@ found in the LICENSE file.
 
 #include <vtkCellArray.h>
 #include <vtkFloatArray.h>
+#include <vtkIdList.h>
 #include <vtkPoints.h>
+#include <vtkPolyData.h>
 #include <vtkSmartPointer.h>
 
 #include <array>
+#include <span>
 #include <vector>
 
 // Internal helpers of the mitk::FiberBundle implementation files (mitkFiberBundle*.cpp).
@@ -30,6 +33,27 @@ namespace mitk::FiberBundleDetail
   /** Bundles derived from another one keep its coordinate convention (the VTK writer saves
    *  RAS bundles back in RAS) and its TrackVis header (reference geometry for .trk files). */
   void CopyMetadata(const FiberBundle* source, FiberBundle* target);
+
+  /**
+   * The point ids of fiber (cell) cellId of polyData, read from its cell array. GetCell copies
+   * the fiber's points into a shared vtkCell, which costs a copy per fiber and forbids parallel
+   * reading; this does neither. Parallel loops pass one buffer per thread and call
+   * PrepareParallelReading before the loop.
+   */
+  inline std::span<const vtkIdType> FiberPointIds(vtkPolyData* polyData, vtkIdType cellId, vtkIdList* buffer)
+  {
+    vtkIdType numPoints = 0;
+    const vtkIdType* ids = nullptr;
+    polyData->GetCellPoints(cellId, numPoints, ids, buffer);
+    return {ids, static_cast<std::size_t>(numPoints)};
+  }
+
+  /** Builds the cell lookup of polyData, which FiberPointIds would otherwise build on first use. */
+  inline void PrepareParallelReading(vtkPolyData* polyData)
+  {
+    if (polyData->NeedToBuildCells())
+      polyData->BuildCells();
+  }
 
   /**
    * Collects the fibers of a new fiber polydata, each with its weight. Every operation that
@@ -80,6 +104,7 @@ namespace mitk::FiberBundleDetail
     std::vector<std::array<float, 3>> m_Pending;
     std::vector<vtkIdType> m_PointIds;
     std::vector<float> m_Weights;
+    vtkSmartPointer<vtkIdList> m_IdBuffer;
   };
 }
 

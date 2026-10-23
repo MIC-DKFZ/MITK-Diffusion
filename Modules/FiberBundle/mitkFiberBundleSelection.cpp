@@ -15,7 +15,7 @@ found in the LICENSE file.
 
 #include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionImageHelperFunctions.h>
-#include <vtkCell.h>
+#include <vtkNew.h>
 
 #include <algorithm>
 #include <array>
@@ -127,12 +127,14 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(const mitk::FiberBu
   {
     std::vector< EndPoints > result;
     result.reserve(numFibers);
+    vtkNew<vtkIdList> idBuffer;
     for (unsigned int i=0; i<numFibers; i++)
     {
-      vtkCell* cell = polyData->GetCell(i);
-      auto numPoints = cell->GetNumberOfPoints();
-      vtkPoints* points = cell->GetPoints();
-      result.push_back( {mitk::imv::GetItkPoint(points->GetPoint(0)), mitk::imv::GetItkPoint(points->GetPoint(numPoints-1))} );
+      const auto ids = mitk::FiberBundleDetail::FiberPointIds(polyData, i, idBuffer);
+      double first[3], last[3];
+      polyData->GetPoint(ids.front(), first);
+      polyData->GetPoint(ids.back(), last);
+      result.push_back( {mitk::imv::GetItkPoint(first), mitk::imv::GetItkPoint(last)} );
     }
     return result;
   };
@@ -260,20 +262,20 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(const ItkUchar
 
   MITK_INFO << "Cutting fibers";
   boost::timer::progress_display disp(m_NumFibers);
+  vtkNew<vtkIdList> idBuffer;
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
     ++disp;
 
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto numPoints = cell->GetNumberOfPoints();
-    vtkPoints* points = cell->GetPoints();
-
-    if (numPoints<=1)
+    const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+    if (ids.size()<=1)
       continue;
 
-    for (int j=0; j<numPoints; j++)
+    for (const vtkIdType id : ids)
     {
-      itk::Point<float, 3> itkP = mitk::imv::GetItkPoint(points->GetPoint(j));
+      double p[3];
+      m_FiberPolyData->GetPoint(id, p);
+      itk::Point<float, 3> itkP = mitk::imv::GetItkPoint(p);
       itk::Index<3> idx;
 
       bool inside = mask->TransformPhysicalPointToIndex(itkP, idx);
@@ -304,20 +306,20 @@ void mitk::FiberBundle::RemoveDir(vnl_vector_fixed<double,3> dir, double thresho
   FiberPolyDataBuilder builder;
 
   boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
+  vtkNew<vtkIdList> idBuffer;
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
     ++disp ;
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto numPoints = cell->GetNumberOfPoints();
-    vtkPoints* points = cell->GetPoints();
+    const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+    const auto numPoints = static_cast<vtkIdType>(ids.size());
 
     bool discard = false;
-    for (int j=0; j<numPoints-1; j++)
+    for (vtkIdType j=0; j<numPoints-1; j++)
     {
       double p1[3];
-      points->GetPoint(j, p1);
+      m_FiberPolyData->GetPoint(ids[j], p1);
       double p2[3];
-      points->GetPoint(j+1, p2);
+      m_FiberPolyData->GetPoint(ids[j+1], p2);
 
       vnl_vector_fixed< double, 3 > v1;
       v1[0] = p2[0]-p1[0];
@@ -350,12 +352,12 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
   FiberPolyDataBuilder builder;
   MITK_INFO << "Applying curvature threshold";
   boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
+  vtkNew<vtkIdList> idBuffer;
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
     ++disp ;
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto numPoints = cell->GetNumberOfPoints();
-    vtkPoints* points = cell->GetPoints();
+    const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+    const auto numPoints = static_cast<vtkIdType>(ids.size());
     const float weight = this->GetFiberWeight(static_cast<unsigned int>(i));
 
     // calculate curvatures
@@ -365,14 +367,14 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
       builder.AddFiber(m_FiberPolyData, i, weight);
       continue;
     }
-    for (int j=0; j<numPoints-2; j++)
+    for (vtkIdType j=0; j<numPoints-2; j++)
     {
       double p1[3];
-      points->GetPoint(j, p1);
+      m_FiberPolyData->GetPoint(ids[j], p1);
       double p2[3];
-      points->GetPoint(j+1, p2);
+      m_FiberPolyData->GetPoint(ids[j+1], p2);
       double p3[3];
-      points->GetPoint(j+2, p3);
+      m_FiberPolyData->GetPoint(ids[j+2], p3);
 
       vnl_vector_fixed< float, 3 > v1, v2, v3;
 

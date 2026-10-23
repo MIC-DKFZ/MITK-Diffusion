@@ -12,7 +12,6 @@ found in the LICENSE file.
 
 #include "mitkFiberPolyDataBuilder.h"
 
-#include <vtkCell.h>
 #include <vtkPolyData.h>
 
 void mitk::FiberBundleDetail::CopyMetadata(const FiberBundle* source, FiberBundle* target)
@@ -24,17 +23,16 @@ void mitk::FiberBundleDetail::CopyMetadata(const FiberBundle* source, FiberBundl
 mitk::FiberBundleDetail::FiberPolyDataBuilder::FiberPolyDataBuilder()
   : m_Points(vtkSmartPointer<vtkPoints>::New())
   , m_Lines(vtkSmartPointer<vtkCellArray>::New())
+  , m_IdBuffer(vtkSmartPointer<vtkIdList>::New())
 {
 }
 
 void mitk::FiberBundleDetail::FiberPolyDataBuilder::AddFiber(vtkPolyData* polyData, vtkIdType cellId, float weight)
 {
-  vtkCell* cell = polyData->GetCell(cellId);
-  vtkPoints* points = cell->GetPoints();
-  for (vtkIdType j=0; j<cell->GetNumberOfPoints(); ++j)
+  for (const vtkIdType id : FiberPointIds(polyData, cellId, m_IdBuffer))
   {
     double p[3];
-    points->GetPoint(j, p);
+    polyData->GetPoint(id, p);
     this->AddPoint(p);
   }
   this->EndFiber(weight);

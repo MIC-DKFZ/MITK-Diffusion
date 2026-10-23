@@ -15,10 +15,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundle.h"
+#include "mitkFiberPolyDataBuilder.h"
 
 #include <mitkGeometry3D.h>
 #include <vtkCellArray.h>
 #include <vtkCleanPolyData.h>
+#include <vtkNew.h>
 #include <vtkUnsignedCharArray.h>
 
 #include <algorithm>
@@ -144,18 +146,18 @@ void mitk::FiberBundle::UpdateFiberGeometry()
   m_FiberPolyData->GetBounds(b);
 
   // calculate statistics
+  vtkNew<vtkIdList> idBuffer;
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto p = cell->GetNumberOfPoints();
-    vtkPoints* points = cell->GetPoints();
+    const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+    auto p = static_cast<vtkIdType>(ids.size());
     float length = 0;
-    for (int j=0; j<p-1; j++)
+    for (vtkIdType j=0; j<p-1; j++)
     {
       double p1[3];
-      points->GetPoint(j, p1);
+      m_FiberPolyData->GetPoint(ids[j], p1);
       double p2[3];
-      points->GetPoint(j+1, p2);
+      m_FiberPolyData->GetPoint(ids[j+1], p2);
 
       double dist = std::sqrt((p1[0]-p2[0])*(p1[0]-p2[0])+(p1[1]-p2[1])*(p1[1]-p2[1])+(p1[2]-p2[2])*(p1[2]-p2[2]));
       length += static_cast<float>(dist);
@@ -236,13 +238,12 @@ void mitk::FiberBundle::SetFiberWeight(unsigned int fiber, float weight)
 
 unsigned int mitk::FiberBundle::GetNumberOfPoints() const
 {
-  unsigned int points = 0;
-  for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
-  {
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    points += cell->GetNumberOfPoints();
-  }
-  return points;
+  // the point ids of all cells (fibers, and vertices for one-point fibers)
+  const vtkIdType points = m_FiberPolyData->GetVerts()->GetNumberOfConnectivityIds()
+      + m_FiberPolyData->GetLines()->GetNumberOfConnectivityIds()
+      + m_FiberPolyData->GetPolys()->GetNumberOfConnectivityIds()
+      + m_FiberPolyData->GetStrips()->GetNumberOfConnectivityIds();
+  return static_cast<unsigned int>(points);
 }
 
 // reapply selected colorcoding in case PolyData structure has changed
@@ -261,15 +262,15 @@ bool mitk::FiberBundle::Equals(const mitk::FiberBundle* fib, double eps) const
     return false;
   }
 
+  vtkPolyData* polyData2 = fib->GetFiberPolyData();
+  vtkNew<vtkIdList> idBuffer;
+  vtkNew<vtkIdList> idBuffer2;
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto numPoints = cell->GetNumberOfPoints();
-    vtkPoints* points = cell->GetPoints();
-
-    vtkCell* cell2 = fib->GetFiberPolyData()->GetCell(i);
-    auto numPoints2 = cell2->GetNumberOfPoints();
-    vtkPoints* points2 = cell2->GetPoints();
+    const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+    const auto ids2 = FiberBundleDetail::FiberPointIds(polyData2, i, idBuffer2);
+    const auto numPoints = ids.size();
+    const auto numPoints2 = ids2.size();
 
     if (numPoints2!=numPoints)
     {
@@ -278,10 +279,12 @@ bool mitk::FiberBundle::Equals(const mitk::FiberBundle* fib, double eps) const
       return false;
     }
 
-    for (int j=0; j<numPoints; j++)
+    for (std::size_t j=0; j<numPoints; j++)
     {
-      double* p1 = points->GetPoint(j);
-      double* p2 = points2->GetPoint(j);
+      double p1[3];
+      m_FiberPolyData->GetPoint(ids[j], p1);
+      double p2[3];
+      polyData2->GetPoint(ids2[j], p2);
       if (fabs(p1[0]-p2[0])>eps || fabs(p1[1]-p2[1])>eps || fabs(p1[2]-p2[2])>eps)
       {
         MITK_INFO << "Unequal points in fiber " << i << " at position " << j << "!";

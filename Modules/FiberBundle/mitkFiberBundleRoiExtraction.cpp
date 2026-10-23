@@ -19,7 +19,7 @@ found in the LICENSE file.
 #include <mitkPlanarCircle.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkPlanarPolygon.h>
-#include <vtkCell.h>
+#include <vtkNew.h>
 #include <vtkPlane.h>
 #include <vtkPolygon.h>
 
@@ -127,20 +127,20 @@ std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(const DataNode
 
       MITK_INFO << "Extracting with polygon";
       boost::timer::progress_display disp(m_NumFibers);
+      vtkNew<vtkIdList> idBuffer;
       for (unsigned int i=0; i<m_NumFibers; i++)
       {
         ++disp ;
-        vtkCell* cell = m_FiberPolyData->GetCell(i);
-        auto numPoints = cell->GetNumberOfPoints();
-        vtkPoints* points = cell->GetPoints();
+        const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+        const auto numPoints = static_cast<vtkIdType>(ids.size());
 
-        for (int j=0; j<numPoints-1; j++)
+        for (vtkIdType j=0; j<numPoints-1; j++)
         {
           // Inputs
           double p1[3] = {0,0,0};
-          points->GetPoint(j, p1);
+          m_FiberPolyData->GetPoint(ids[j], p1);
           double p2[3] = {0,0,0};
-          points->GetPoint(j+1, p2);
+          m_FiberPolyData->GetPoint(ids[j+1], p2);
           double tolerance = 0.001;
 
           // Outputs
@@ -173,20 +173,20 @@ std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(const DataNode
 
       MITK_INFO << "Extracting with circle";
       boost::timer::progress_display disp(m_NumFibers);
+      vtkNew<vtkIdList> idBuffer;
       for (unsigned int i=0; i<m_NumFibers; i++)
       {
         ++disp ;
-        vtkCell* cell = m_FiberPolyData->GetCell(i);
-        auto numPoints = cell->GetNumberOfPoints();
-        vtkPoints* points = cell->GetPoints();
+        const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+        const auto numPoints = static_cast<vtkIdType>(ids.size());
 
-        for (int j=0; j<numPoints-1; j++)
+        for (vtkIdType j=0; j<numPoints-1; j++)
         {
           // Inputs
           double p1[3] = {0,0,0};
-          points->GetPoint(j, p1);
+          m_FiberPolyData->GetPoint(ids[j], p1);
           double p2[3] = {0,0,0};
-          points->GetPoint(j+1, p2);
+          m_FiberPolyData->GetPoint(ids[j+1], p2);
 
           // Outputs
           double t = 0; // Parametric coordinate of intersection (0 (corresponding to p1) to 1 (corresponding to p2))

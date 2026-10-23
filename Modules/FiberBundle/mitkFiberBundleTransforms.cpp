@@ -15,7 +15,7 @@ found in the LICENSE file.
 
 #include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionImageHelperFunctions.h>
-#include <vtkCell.h>
+#include <vtkNew.h>
 #include <vtkUnsignedCharArray.h>
 
 // Geometric transformations of all fibers of mitk::FiberBundle; fiber count and weights stay.
@@ -28,16 +28,15 @@ namespace
   {
     mitk::FiberBundleDetail::FiberPolyDataBuilder builder;
     vtkPolyData* polyData = fib->GetFiberPolyData();
+    vtkNew<vtkIdList> idBuffer;
     for (unsigned int i=0; i<fib->GetNumFibers(); i++)
     {
       if (progress != nullptr)
         ++(*progress);
-      vtkCell* cell = polyData->GetCell(i);
-      vtkPoints* points = cell->GetPoints();
-      for (vtkIdType j=0; j<cell->GetNumberOfPoints(); j++)
+      for (const vtkIdType id : mitk::FiberBundleDetail::FiberPointIds(polyData, i, idBuffer))
       {
         double p[3];
-        points->GetPoint(j, p);
+        polyData->GetPoint(id, p);
         move(p);
         builder.AddPoint(p);
       }

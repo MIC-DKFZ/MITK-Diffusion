@@ -11,6 +11,7 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include "mitkFiberBundle.h"
+#include "mitkFiberPolyDataBuilder.h"
 
 #include <boost/timer/progress_display.hpp>
 #include <itkLinearInterpolateImageFunction.h>
@@ -18,9 +19,9 @@ found in the LICENSE file.
 #include <mitkImage.h>
 #include <mitkImageCast.h>
 #include <mitkLookupTable.h>
-#include <vtkCell.h>
 #include <vtkCellArray.h>
 #include <vtkLookupTable.h>
+#include <vtkNew.h>
 #include <vtkUnsignedCharArray.h>
 
 // Colour codings of mitk::FiberBundle: one RGBA tuple per point.
@@ -62,16 +63,16 @@ void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool weight_fibers, mi
   if (type!=mitk::LookupTable::MULTILABEL)
     mitkLookup->GetVtkLookupTable()->SetTableRange(m_MinFiberLength, m_MaxFiberLength);
 
+  vtkNew<vtkIdList> idBuffer;
   for (unsigned int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto numPoints = cell->GetNumberOfPoints();
+    const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
 
     float l = m_FiberLengths.at(i)/m_MaxFiberLength;
     double color[3];
     mitkLookup->GetColor(m_FiberLengths.at(i), color);
 
-    for (int j=0; j<numPoints; j++)
+    for (const vtkIdType id : ids)
     {
 
       rgba[0] = static_cast<unsigned char>(255.0 * color[0]);
@@ -81,7 +82,7 @@ void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool weight_fibers, mi
         rgba[3] = ClampToByte(255.0f * l);
       else
         rgba[3] = static_cast<unsigned char>(255.0);
-      m_FiberColors->InsertTypedTuple(cell->GetPointId(j), rgba);
+      m_FiberColors->InsertTypedTuple(id, rgba);
     }
 
     if (weight_fibers)
@@ -218,12 +219,12 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
   MITK_INFO << "Coloring fibers by curvature";
   boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
 
+  vtkNew<vtkIdList> idBuffer;
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
     ++disp;
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto numPoints = cell->GetNumberOfPoints();
-    vtkPoints* points = cell->GetPoints();
+    const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+    const auto numPoints = static_cast<int>(ids.size());
     double mean_curv = 0;
 
     // calculate curvatures
@@ -237,9 +238,9 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
       while(dist<window/2 && c>0)
       {
         double p1[3];
-        points->GetPoint(c-1, p1);
+        m_FiberPolyData->GetPoint(ids[c-1], p1);
         double p2[3];
-        points->GetPoint(c, p2);
+        m_FiberPolyData->GetPoint(ids[c], p2);
 
         vnl_vector_fixed< double, 3 > v;
         v[0] = p2[0]-p1[0];
@@ -256,9 +257,9 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
       while(dist<window/2 && c<numPoints-1)
       {
         double p1[3];
-        points->GetPoint(c, p1);
+        m_FiberPolyData->GetPoint(ids[c], p1);
         double p2[3];
-        points->GetPoint(c+1, p2);
+        m_FiberPolyData->GetPoint(ids[c+1], p2);
 
         vnl_vector_fixed< double, 3 > v;
         v[0] = p2[0]-p1[0];
@@ -307,9 +308,7 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
   unsigned int count = 0;
   for (int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto numPoints = cell->GetNumberOfPoints();
-    for (int j=0; j<numPoints; j++)
+    for (const vtkIdType id : FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer))
     {
       double color[3];
       double dev = values.at(count);
@@ -324,7 +323,7 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
       else
         rgba[3] = static_cast<unsigned char>(255.0);
 
-      m_FiberColors->InsertTypedTuple(cell->GetPointId(j), rgba);
+      m_FiberColors->InsertTypedTuple(id, rgba);
       count++;
     }
   }
@@ -366,17 +365,17 @@ void mitk::FiberBundle::ColorFibersByScalarMap(const itk::Image<TPixel, 3>* imag
   double min = 999999;
   double max = -999999;
 
+  vtkNew<vtkIdList> idBuffer;
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto numPoints = cell->GetNumberOfPoints();
-    vtkPoints* points = cell->GetPoints();
+    const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+    const auto numPoints = static_cast<vtkIdType>(ids.size());
     double mean_val = 0;
 
-    for (int j=0; j<numPoints; j++)
+    for (const vtkIdType id : ids)
     {
       double p[3];
-      points->GetPoint(j, p);
+      m_FiberPolyData->GetPoint(id, p);
       auto pixelValue = mitk::imv::GetImageValue<TPixel>(mitk::imv::GetItkPoint(p), interpolate, interpolator);
 
       if (pixelValue>max)
@@ -453,10 +452,10 @@ void mitk::FiberBundle::ColorFibersByFiberWeights(bool opacity, mitk::LookupTabl
   if (type!=mitk::LookupTable::MULTILABEL)
     mitkLookup->GetVtkLookupTable()->SetTableRange(min, max);
 
+  vtkNew<vtkIdList> idBuffer;
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
-    vtkCell* cell = m_FiberPolyData->GetCell(i);
-    auto numPoints = cell->GetNumberOfPoints();
+    const auto numPoints = static_cast<vtkIdType>(FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer).size());
     auto weight = this->GetFiberWeight(i);
 
     double color[3];
@@ -492,10 +491,11 @@ void mitk::FiberBundle::SetSingleFiberColor(float r, float g, float b, unsigned 
   const unsigned char picked[4] = {static_cast<unsigned char>(r), static_cast<unsigned char>(g), static_cast<unsigned char>(b), static_cast<unsigned char>(alpha)};
   const unsigned char other[4] = {255, 255, 255, static_cast<unsigned char>(alpha)};
   unsigned int counter = 0;
+  vtkNew<vtkIdList> idBuffer;
   for (unsigned int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
-    auto numPoints = m_FiberPolyData->GetCell(i)->GetNumberOfPoints();
-    for (int j=0; j<numPoints; j++)
+    const auto numPoints = static_cast<vtkIdType>(FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer).size());
+    for (vtkIdType j=0; j<numPoints; j++)
       m_FiberColors->InsertTypedTuple(counter++, i==cellId ? picked : other);
   }
 
