@@ -30,14 +30,6 @@
     <keywordReference id="org.mitk.views.reconstruction.Keyword"/>
     </view>
 
-    <view id="org.mitk.views.odfdetails"
-    name="ODF Details"
-    category="Quantification"
-    class="QmitkODFDetailsView"
-    icon="resources/OdfDetails.png">
-    <keywordReference id="org.mitk.views.odfdetails.Keyword"/>
-    </view>
-
     <view id="org.mitk.views.odfmaximaextraction"
     name="Peak Extraction"
     category="Signal modeling"
@@ -87,14 +79,6 @@
   <keyword label="index" id="org.mitk.views.diffusionquantification.Keyword"/>
   <keyword label="indices" id="org.mitk.views.diffusionquantification.Keyword"/>
   <keyword label="diffusion" id="org.mitk.views.diffusionquantification.Keyword"/>
-
-  <keyword label="ODF" id="org.mitk.views.odfdetails.Keyword"/>
-  <keyword label="dODF" id="org.mitk.views.odfdetails.Keyword"/>
-  <keyword label="fODF" id="org.mitk.views.odfdetails.Keyword"/>
-  <keyword label="FOD" id="org.mitk.views.odfdetails.Keyword"/>
-  <keyword label="statistics" id="org.mitk.views.odfdetails.Keyword"/>
-  <keyword label="values" id="org.mitk.views.odfdetails.Keyword"/>
-  <keyword label="shape" id="org.mitk.views.odfdetails.Keyword"/>
 
   <keyword label="ODF" id="org.mitk.views.odfmaximaextraction.Keyword"/>
   <keyword label="SH" id="org.mitk.views.odfmaximaextraction.Keyword"/>
