@@ -13,8 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkDiffusionMultiShellQballReconstructionImageFilter_cpp
-#define __itkDiffusionMultiShellQballReconstructionImageFilter_cpp
+#ifndef itkDiffusionMultiShellQballReconstructionImageFilter_cpp
+#define itkDiffusionMultiShellQballReconstructionImageFilter_cpp
 
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 
@@ -29,15 +29,7 @@ template< class T, class TG, class TO, int L, int NODF>
 DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 ::DiffusionMultiShellQballReconstructionImageFilter() :
   m_Interpolation_Flag(false),
-  m_Interpolation_SHT1_inv(nullptr),
-  m_Interpolation_SHT2_inv(nullptr),
-  m_Interpolation_SHT3_inv(nullptr),
-  m_TARGET_SH_shell1(nullptr),
-  m_TARGET_SH_shell2(nullptr),
-  m_TARGET_SH_shell3(nullptr),
   m_MaxDirections(0),
-  m_CoeffReconstructionMatrix(nullptr),
-  m_ODFSphericalHarmonicBasisMatrix(nullptr),
   m_GradientDirectionContainer(nullptr),
   m_NumberOfGradientDirections(0),
   m_NumberOfBaselineImages(0),
@@ -431,41 +423,30 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
         while( ((interp_SHOrder_shell1+1)*(interp_SHOrder_shell1+2)/2) > size_shell1 && interp_SHOrder_shell1 > L )
           interp_SHOrder_shell1 -= 2 ;
 
-        const int number_coeffs_shell1 = (int)(interp_SHOrder_shell1*interp_SHOrder_shell1 + interp_SHOrder_shell1 + 2.0)/2.0 + interp_SHOrder_shell1;
-
         unsigned int interp_SHOrder_shell2 = 12;
         while( ((interp_SHOrder_shell2+1)*(interp_SHOrder_shell2+2)/2) > size_shell2 && interp_SHOrder_shell2 > L )
           interp_SHOrder_shell2 -= 2 ;
-
-        const int number_coeffs_shell2 = (int)(interp_SHOrder_shell2*interp_SHOrder_shell2 + interp_SHOrder_shell2 + 2.0)/2.0 + interp_SHOrder_shell2;
 
         unsigned int interp_SHOrder_shell3 = 12;
         while( ((interp_SHOrder_shell3+1)*(interp_SHOrder_shell3+2)/2) > size_shell3 && interp_SHOrder_shell3 > L )
           interp_SHOrder_shell3 -= 2 ;
 
-        const int number_coeffs_shell3 = (int)(interp_SHOrder_shell3*interp_SHOrder_shell3 + interp_SHOrder_shell3 + 2.0)/2.0 + interp_SHOrder_shell3;
-
         // Create direction container for all directions (no duplicates, different directions from all shells)
-        IndiciesVector  all_directions_container = GetAllDirections();
+        IndiciesVector all_directions_container = mitk::gradients::GetAllUniqueDirections(m_BValueMap, m_GradientDirectionContainer.GetPointer());
         m_MaxDirections = all_directions_container.size();
 
         // Target SH basis per shell on all directions, and the shell's SH fit (pseudo-inverse of its
         // basis on its own directions): Values = target basis * fit * data of the shell.
-        vnl_matrix<double> Q(3, m_MaxDirections);
-        ComputeSphericalFromCartesian(&Q, all_directions_container);
-        const auto shellInterpolation = [&](const IndiciesVector &shell, unsigned int order, int numberOfCoefficients,
-                                            std::unique_ptr<vnl_matrix<double>> &targetBasis, std::unique_ptr<vnl_matrix<double>> &fit) {
-          targetBasis = std::make_unique<vnl_matrix<double>>(m_MaxDirections, numberOfCoefficients);
-          ComputeSphericalHarmonicsBasis(&Q, targetBasis.get(), order);
-          vnl_matrix<double> shellDirections(3, shell.size());
-          ComputeSphericalFromCartesian(&shellDirections, shell);
-          vnl_matrix<double> shellBasis(shell.size(), numberOfCoefficients);
-          ComputeSphericalHarmonicsBasis(&shellDirections, &shellBasis, order);
-          fit = std::make_unique<vnl_matrix<double>>(vnl_matrix_inverse<double>(shellBasis).inverse());
+        const vnl_matrix<double> Q = mitk::gradients::ComputeSphericalFromCartesian(all_directions_container, m_GradientDirectionContainer);
+        const auto shellInterpolation = [&](const IndiciesVector &shell, unsigned int order, vnl_matrix<double> &targetBasis, vnl_matrix<double> &fit) {
+          targetBasis = mitk::sh::ComputeSphericalHarmonicsBasis(Q, order);
+          const vnl_matrix<double> shellBasis = mitk::sh::ComputeSphericalHarmonicsBasis(
+            mitk::gradients::ComputeSphericalFromCartesian(shell, m_GradientDirectionContainer), order);
+          fit = vnl_matrix_inverse<double>(shellBasis).inverse();
         };
-        shellInterpolation(shell1, interp_SHOrder_shell1, number_coeffs_shell1, m_TARGET_SH_shell1, m_Interpolation_SHT1_inv);
-        shellInterpolation(shell2, interp_SHOrder_shell2, number_coeffs_shell2, m_TARGET_SH_shell2, m_Interpolation_SHT2_inv);
-        shellInterpolation(shell3, interp_SHOrder_shell3, number_coeffs_shell3, m_TARGET_SH_shell3, m_Interpolation_SHT3_inv);
+        shellInterpolation(shell1, interp_SHOrder_shell1, m_TARGET_SH_shell1, m_Interpolation_SHT1_inv);
+        shellInterpolation(shell2, interp_SHOrder_shell2, m_TARGET_SH_shell2, m_Interpolation_SHT2_inv);
+        shellInterpolation(shell3, interp_SHOrder_shell3, m_TARGET_SH_shell3, m_Interpolation_SHT3_inv);
 
         ComputeReconstructionMatrix(all_directions_container);
 
@@ -549,9 +530,9 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
   if(m_Interpolation_Flag)
   {
-    tempInterpolationMatrixShell1 = (*m_TARGET_SH_shell1) * (*m_Interpolation_SHT1_inv);
-    tempInterpolationMatrixShell2 = (*m_TARGET_SH_shell2) * (*m_Interpolation_SHT2_inv);
-    tempInterpolationMatrixShell3 = (*m_TARGET_SH_shell3) * (*m_Interpolation_SHT3_inv);
+    tempInterpolationMatrixShell1 = m_TARGET_SH_shell1 * m_Interpolation_SHT1_inv;
+    tempInterpolationMatrixShell2 = m_TARGET_SH_shell2 * m_Interpolation_SHT2_inv;
+    tempInterpolationMatrixShell3 = m_TARGET_SH_shell3 * m_Interpolation_SHT3_inv;
   }
 
   OdfPixelType odf(0.0);
@@ -695,14 +676,14 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
       vnl_vector<double> SignalVector(element_product((LAValues) , (AlphaValues)-(BetaValues)) + (BetaValues));
 
-      vnl_vector<double> coeffs((*m_CoeffReconstructionMatrix) *SignalVector );
+      vnl_vector<double> coeffs(m_CoeffReconstructionMatrix * SignalVector);
 
       // the first coeff is a fix value
       coeffs[0] = 1.0/(2.0*sqrt(itk::Math::pi));
       coeffPixel = element_cast<double, TO>(coeffs).data_block();
 
       // Cast the Signal-Type from double to float for the ODF-Image
-      odf = element_cast<double, TO>( (*m_ODFSphericalHarmonicBasisMatrix) * coeffs ).data_block();
+      odf = element_cast<double, TO>(m_ODFSphericalHarmonicBasisMatrix * coeffs).data_block();
       odf *= ((itk::Math::pi*4)/NODF);
     }
 
@@ -718,43 +699,6 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
 
 
-template< class T, class TG, class TO, int L, int NODF>
-void DiffusionMultiShellQballReconstructionImageFilter<T, TG, TO, L, NODF>::
-ComputeSphericalHarmonicsBasis(vnl_matrix<double> * QBallReference, vnl_matrix<double> *SHBasisOutput, int LOrder , vnl_matrix<double>* LaplaciaBaltramiOutput, vnl_vector<int>* SHOrderAssociation, vnl_matrix<double>* SHEigenvalues)
-{
-  for(unsigned int i=0; i< (*SHBasisOutput).rows(); i++)
-  {
-    for(int k = 0; k <= LOrder; k += 2)
-    {
-      for(int m =- k; m <= k; m++)
-      {
-        int j = ( k * k + k + 2 ) / 2 + m - 1;
-
-        // Compute SHBasisFunctions
-        if(QBallReference){
-          double phi = (*QBallReference)(0,i);
-          double th = (*QBallReference)(1,i);
-          (*SHBasisOutput)(i,j) = mitk::sh::Yj(m,k,th,phi,true);
-        }
-
-        // Laplace-Beltrami penalty, weighted with the norm of MITK's basis functions so that the
-        // regularization is rotation invariant
-        if(LaplaciaBaltramiOutput)
-          (*LaplaciaBaltramiOutput)(j,j) = mitk::LaplaceBeltramiPenalty(k, m);
-
-        // SHEigenvalues with order Accosiation kj
-        if(SHEigenvalues)
-          (*SHEigenvalues)(j,j) = -k* (k+1);
-
-        // Order Association
-        if(SHOrderAssociation)
-          (*SHOrderAssociation)[j] = k;
-
-      }
-    }
-  }
-}
-
 template< class T, class TG, class TO, int L, int NOdfDirections>
 void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
 ::ComputeReconstructionMatrix(IndiciesVector const & refVector)
@@ -769,33 +713,32 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
 
   CheckDuplicateDiffusionGradients();
 
-  const int LOrder = L;
-  int NumberOfCoeffs = (int)(LOrder*LOrder + LOrder + 2.0)/2.0 + LOrder;
-  vnl_matrix<double> SHBasisMatrix(numberOfGradientDirections,NumberOfCoeffs, 0.0);
-  vnl_vector<int> SHOrderAssociation(NumberOfCoeffs, 0);
+  const int NumberOfCoeffs = (L*L + L + 2)/2 + L;
+  const vnl_matrix<double> SHBasisMatrix = mitk::sh::ComputeSphericalHarmonicsBasis(
+    mitk::gradients::ComputeSphericalFromCartesian(refVector, m_GradientDirectionContainer), L);
+
+  // Per coefficient of order k and phase m: the Laplace-Beltrami penalty, weighted with the norm of
+  // MITK's basis functions so that the regularization is rotation invariant; the eigenvalue
+  // -k(k+1) of the Laplace-Beltrami operator; the Funk-Radon transform 2 pi P_k(0).
   vnl_matrix<double> LaplacianBaltrami(NumberOfCoeffs,NumberOfCoeffs, 0.0);
   vnl_matrix<double> FRTMatrix(NumberOfCoeffs,NumberOfCoeffs, 0.0);
   vnl_matrix<double> SHEigenvalues(NumberOfCoeffs,NumberOfCoeffs, 0.0);
-
-  // Convert Cartesian to Spherical Coordinates refVector -> Q
-  vnl_matrix<double> Q(3, numberOfGradientDirections);
-  ComputeSphericalFromCartesian(&Q, refVector);
-
-  // SHBasis-Matrix + LaplacianBaltrami-Matrix + SHOrderAssociationVector
-  ComputeSphericalHarmonicsBasis(&Q, &SHBasisMatrix, LOrder, &LaplacianBaltrami, &SHOrderAssociation, &SHEigenvalues);
-
-  // Compute FunkRadon Transformation Matrix Associated to SHBasis Order lj
-  for(int i=0; i<NumberOfCoeffs; i++)
+  for (int k = 0; k <= L; k += 2)
   {
-    FRTMatrix(i,i) = 2.0 * itk::Math::pi * mitk::sh::legendre0(SHOrderAssociation[i]);
+    for (int m = -k; m <= k; ++m)
+    {
+      const int j = (k * k + k + 2) / 2 + m - 1;
+      LaplacianBaltrami(j, j) = mitk::LaplaceBeltramiPenalty(k, m);
+      SHEigenvalues(j, j) = -k * (k + 1);
+      FRTMatrix(j, j) = 2.0 * itk::Math::pi * mitk::sh::legendre0(k);
+    }
   }
 
   const vnl_matrix<double> inverse = vnl_matrix_inverse<double>(SHBasisMatrix.transpose() * SHBasisMatrix + m_Lambda * LaplacianBaltrami).inverse();
 
   const double factor = (1.0/(16.0*itk::Math::pi*itk::Math::pi));
   const vnl_matrix<double> SignalReonstructionMatrix = inverse * SHBasisMatrix.transpose();
-  m_CoeffReconstructionMatrix = std::make_unique<vnl_matrix<double>>(factor * (FRTMatrix * (SHEigenvalues * SignalReonstructionMatrix)));
-
+  m_CoeffReconstructionMatrix = factor * (FRTMatrix * (SHEigenvalues * SignalReonstructionMatrix));
 
   // SH Basis for ODF-reconstruction
   // Spherical coordinates of the ODF directions
@@ -808,28 +751,8 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
     U(1,i) = cart[1];
     U(2,i) = cart[2];
   }
-
-  m_ODFSphericalHarmonicBasisMatrix  = std::make_unique<vnl_matrix<double>>(NOdfDirections,NumberOfCoeffs);
-  ComputeSphericalHarmonicsBasis(&U, m_ODFSphericalHarmonicBasisMatrix.get(), LOrder);
+  m_ODFSphericalHarmonicBasisMatrix = mitk::sh::ComputeSphericalHarmonicsBasis(U, L);
 }
-
-template< class T, class TG, class TO, int L, int NOdfDirections>
-void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
-::ComputeSphericalFromCartesian(vnl_matrix<double> * Q,  IndiciesVector const & refShell)
-{
-  for(unsigned int i = 0; i < refShell.size(); i++)
-  {
-    double x = m_GradientDirectionContainer->ElementAt(refShell[i]).normalize().get(0);
-    double y = m_GradientDirectionContainer->ElementAt(refShell[i]).normalize().get(1);
-    double z = m_GradientDirectionContainer->ElementAt(refShell[i]).normalize().get(2);
-    double cart[3];
-    mitk::gradients::Cart2Sph(x,y,z,cart);
-    (*Q)(0,i) = cart[0];
-    (*Q)(1,i) = cart[1];
-    (*Q)(2,i) = cart[2];
-  }
-}
-
 
 template< class T, class TG, class TO, int L, int NODF>
 bool DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
@@ -858,89 +781,6 @@ bool DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   return value;
 }
 
-template< class T, class TG, class TO, int L, int NODF>
-std::vector<unsigned int> DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
-::GetAllDirections()
-{
-  IndiciesVector directioncontainer;
-
-  BValueMapIteraotr mapIterator = m_BValueMap.begin();
-  mapIterator++;
-  IndiciesVector shell1 = mapIterator->second;
-  mapIterator++;
-  IndiciesVector shell2 = mapIterator->second;
-  mapIterator++;
-  IndiciesVector shell3 = mapIterator->second;
-
-  while(shell1.size()>0)
-  {
-    unsigned int wntIndex = shell1.back();
-    shell1.pop_back();
-
-    IndiciesVector::iterator containerIt = directioncontainer.begin();
-    bool directionExist = false;
-    while(containerIt != directioncontainer.end())
-    {
-      if (fabs(dot(m_GradientDirectionContainer->ElementAt(*containerIt), m_GradientDirectionContainer->ElementAt(wntIndex)))  > 0.9998)
-      {
-        directionExist = true;
-        break;
-      }
-      containerIt++;
-    }
-    if(!directionExist)
-    {
-      directioncontainer.push_back(wntIndex);
-    }
-  }
-
-  while(shell2.size()>0)
-  {
-    unsigned int wntIndex = shell2.back();
-    shell2.pop_back();
-
-    IndiciesVector::iterator containerIt = directioncontainer.begin();
-    bool directionExist = false;
-    while(containerIt != directioncontainer.end())
-    {
-      if (fabs(dot(m_GradientDirectionContainer->ElementAt(*containerIt), m_GradientDirectionContainer->ElementAt(wntIndex)))  > 0.9998)
-      {
-        directionExist = true;
-        break;
-      }
-      containerIt++;
-    }
-    if(!directionExist)
-    {
-      directioncontainer.push_back(wntIndex);
-    }
-  }
-
-  while(shell3.size()>0)
-  {
-    unsigned int wntIndex = shell3.back();
-    shell3.pop_back();
-
-    IndiciesVector::iterator containerIt = directioncontainer.begin();
-    bool directionExist = false;
-    while(containerIt != directioncontainer.end())
-    {
-      if (fabs(dot(m_GradientDirectionContainer->ElementAt(*containerIt), m_GradientDirectionContainer->ElementAt(wntIndex)))  > 0.9998)
-      {
-        directionExist = true;
-        break;
-      }
-      containerIt++;
-    }
-    if(!directionExist)
-    {
-      directioncontainer.push_back(wntIndex);
-    }
-  }
-
-  return directioncontainer;
-}
-
 // corresponding directions between shells (e.g. dir1_shell1 vs dir1_shell2) differ more than 1 degree.
 template< class T, class TG, class TO, int L, int NODF>
 bool DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
@@ -957,11 +797,11 @@ bool DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   IndiciesVector shell3 = mapIterator->second;
 
   for (unsigned int i=0; i< shell1.size(); i++)
-    if (fabs(dot(m_GradientDirectionContainer->ElementAt(shell1[i]), m_GradientDirectionContainer->ElementAt(shell2[i])))  <= 0.9998) {interp_flag=true; break;}
+    if (AbsoluteCosine(m_GradientDirectionContainer->ElementAt(shell1[i]), m_GradientDirectionContainer->ElementAt(shell2[i])) <= 0.9998) {interp_flag=true; break;}
   for (unsigned int i=0; i< shell1.size(); i++)
-    if (fabs(dot(m_GradientDirectionContainer->ElementAt(shell1[i]), m_GradientDirectionContainer->ElementAt(shell3[i])))  <= 0.9998) {interp_flag=true; break;}
+    if (AbsoluteCosine(m_GradientDirectionContainer->ElementAt(shell1[i]), m_GradientDirectionContainer->ElementAt(shell3[i])) <= 0.9998) {interp_flag=true; break;}
   for (unsigned int i=0; i< shell1.size(); i++)
-    if (fabs(dot(m_GradientDirectionContainer->ElementAt(shell2[i]), m_GradientDirectionContainer->ElementAt(shell3[i])))  <= 0.9998) {interp_flag=true; break;}
+    if (AbsoluteCosine(m_GradientDirectionContainer->ElementAt(shell2[i]), m_GradientDirectionContainer->ElementAt(shell3[i])) <= 0.9998) {interp_flag=true; break;}
   return interp_flag;
 }
 
@@ -1002,4 +842,4 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
 }
 
-#endif // __itkDiffusionMultiShellQballReconstructionImageFilter_cpp
+#endif // itkDiffusionMultiShellQballReconstructionImageFilter_cpp

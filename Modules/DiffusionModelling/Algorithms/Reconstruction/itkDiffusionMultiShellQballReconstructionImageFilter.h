@@ -14,12 +14,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkDiffusionMultiShellQballReconstructionImageFilter_h_
-#define __itkDiffusionMultiShellQballReconstructionImageFilter_h_
+#ifndef itkDiffusionMultiShellQballReconstructionImageFilter_h
+#define itkDiffusionMultiShellQballReconstructionImageFilter_h
 
 #include <itkImageToImageFilter.h>
 
-#include <memory>
+#include <cmath>
 
 namespace itk{
 /** \class DiffusionMultiShellQballReconstructionImageFilter
@@ -72,7 +72,7 @@ public:
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
     /** Runtime information support. */
-    itkTypeMacro(DiffusionMultiShellQballReconstructionImageFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(DiffusionMultiShellQballReconstructionImageFilter)
 
     /** Get reference image */
     virtual typename Superclass::InputImageType * GetInputImage()
@@ -121,17 +121,17 @@ private:
 
     // Interpolation
     bool m_Interpolation_Flag;
-    // Owned here; every execution replaces them (they leaked before).
-    std::unique_ptr<vnl_matrix< double >> m_Interpolation_SHT1_inv;
-    std::unique_ptr<vnl_matrix< double >> m_Interpolation_SHT2_inv;
-    std::unique_ptr<vnl_matrix< double >> m_Interpolation_SHT3_inv;
-    std::unique_ptr<vnl_matrix< double >> m_TARGET_SH_shell1;
-    std::unique_ptr<vnl_matrix< double >> m_TARGET_SH_shell2;
-    std::unique_ptr<vnl_matrix< double >> m_TARGET_SH_shell3;
+    // Rebuilt by every execution.
+    vnl_matrix<double> m_Interpolation_SHT1_inv;
+    vnl_matrix<double> m_Interpolation_SHT2_inv;
+    vnl_matrix<double> m_Interpolation_SHT3_inv;
+    vnl_matrix<double> m_TARGET_SH_shell1;
+    vnl_matrix<double> m_TARGET_SH_shell2;
+    vnl_matrix<double> m_TARGET_SH_shell3;
     unsigned int m_MaxDirections;
 
-    std::unique_ptr<vnl_matrix< double >> m_CoeffReconstructionMatrix;
-    std::unique_ptr<vnl_matrix< double >> m_ODFSphericalHarmonicBasisMatrix;
+    vnl_matrix<double> m_CoeffReconstructionMatrix;
+    vnl_matrix<double> m_ODFSphericalHarmonicBasisMatrix;
 
     /** container to hold gradient directions */
     GradientDirectionContainerType::Pointer m_GradientDirectionContainer;
@@ -158,8 +158,6 @@ private:
     void ComputeReconstructionMatrix(IndiciesVector const & refVector);
     bool CheckDuplicateDiffusionGradients();
     bool CheckForDifferingShellDirections();
-    IndiciesVector GetAllDirections();
-    void ComputeSphericalHarmonicsBasis(vnl_matrix<double>* QBallReference, vnl_matrix<double>* SHBasisOutput, int Lorder , vnl_matrix<double>* LaplaciaBaltramiOutput =0 , vnl_vector<int>* SHOrderAssociation =0 , vnl_matrix<double> * SHEigenvalues =0);
     void S_S0Normalization( vnl_vector<double> & vec, double b0  = 0 );
     void DoubleLogarithm(vnl_vector<double> & vec);
     double CalculateThreashold(const double value, const double delta);
@@ -167,7 +165,6 @@ private:
     void Projection2( vnl_vector<double> & E1, vnl_vector<double> & E2, vnl_vector<double> & E3, double delta = 0.01);
     void Projection3( vnl_vector<double> & A, vnl_vector<double> & alpha, vnl_vector<double> & beta, double delta = 0.01);
     void AnalyticalThreeShellReconstruction(const OutputImageRegionType& outputRegionForThread);
-    void ComputeSphericalFromCartesian(vnl_matrix<double> * Q, const IndiciesVector & refShell);
 
 
     //------------------------- VNL-function ------------------------------------
@@ -183,11 +180,10 @@ private:
       return result;
     }
 
-    template<typename type>
-    double dot (vnl_vector_fixed< type ,3> const& v1, vnl_vector_fixed< type ,3 > const& v2 )
+    /** |cos| of the angle between two gradients; their lengths encode the b-value. */
+    static double AbsoluteCosine(const vnl_vector_fixed<double, 3> &v1, const vnl_vector_fixed<double, 3> &v2)
     {
-      double result = (v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2]) / (v1.two_norm() * v2.two_norm());
-      return result ;
+      return std::fabs((v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2]) / (v1.two_norm() * v2.two_norm()));
     }
 
 
@@ -201,5 +197,5 @@ private:
 #include "itkDiffusionMultiShellQballReconstructionImageFilter.cpp"
 #endif
 
-#endif //__itkDiffusionMultiShellQballReconstructionImageFilter_h_
+#endif //itkDiffusionMultiShellQballReconstructionImageFilter_h
 
