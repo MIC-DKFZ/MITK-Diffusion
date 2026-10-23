@@ -28,6 +28,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "ui_QmitkControlVisualizationPropertiesViewControls.h"
 
 #include "mitkEnumerationProperty.h"
+
+class QActionGroup;
+class QSlider;
 #include <mitkILifecycleAwarePart.h>
 #include <QmitkSliceNavigationListener.h>
 
@@ -109,6 +112,8 @@ protected:
   void SliceRotation(const itk::EventObject&);
   void Set3DClippingPlane(bool disable, mitk::DataNode *node, std::string plane);
   void SetTs(int m_CurrentThickSlicesMode, int num, std::string render_window);
+  void CreateThickSliceMenu();
+  void UpdateThickSliceMenu(const QList<mitk::DataNode::Pointer>& nodes);
 
   Ui::QmitkControlVisualizationPropertiesViewControls* m_Controls;
 
@@ -135,6 +140,8 @@ protected:
   int m_CurrentThickSlicesNum;
   QLabel* m_TSLabel;
   QMenu* m_MyMenu;
+  QSlider* m_TSSlider;
+  QActionGroup* m_ThickSliceModeGroup;
 
   // for planarfigure and bundle handling:
   std::vector< mitk::DataNode::Pointer > m_SelectedNodes;
