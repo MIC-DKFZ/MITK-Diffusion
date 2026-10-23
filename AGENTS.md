@@ -141,6 +141,11 @@ Facts the layout does not show:
   `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
   give the same result at any number of OpenMP threads; MITK-Data fiber references depend on
   exact point positions, so a change there is checked bit for bit against the old output.
+- `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter)Test'`
+  runs the `FiberProcessing` tests. Its filters read const bundles and give the same result at
+  any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
+  set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
+  voxel grid (`mitkFiberImageGrid.h`).
 
 ## Porting state
 
