@@ -474,20 +474,20 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
         vnl_matrix<double> * Q = new vnl_matrix<double>(3, m_MaxDirections);
         ComputeSphericalFromCartesian(Q, all_directions_container);
         // initialize a SH Basis, neede to interpolate from oldDirs -> newDirs
-        m_TARGET_SH_shell1 = new vnl_matrix<double>(m_MaxDirections, number_coeffs_shell1);
-        ComputeSphericalHarmonicsBasis(Q, m_TARGET_SH_shell1, interp_SHOrder_shell1);
+        m_TARGET_SH_shell1 = std::make_unique<vnl_matrix<double>>(m_MaxDirections, number_coeffs_shell1);
+        ComputeSphericalHarmonicsBasis(Q, m_TARGET_SH_shell1.get(), interp_SHOrder_shell1);
         delete Q;
 
         Q = new vnl_matrix<double>(3, m_MaxDirections);
         ComputeSphericalFromCartesian(Q, all_directions_container);
-        m_TARGET_SH_shell2 = new vnl_matrix<double>(m_MaxDirections, number_coeffs_shell2);
-        ComputeSphericalHarmonicsBasis(Q, m_TARGET_SH_shell2, interp_SHOrder_shell2);
+        m_TARGET_SH_shell2 = std::make_unique<vnl_matrix<double>>(m_MaxDirections, number_coeffs_shell2);
+        ComputeSphericalHarmonicsBasis(Q, m_TARGET_SH_shell2.get(), interp_SHOrder_shell2);
         delete Q;
 
         Q = new vnl_matrix<double>(3, m_MaxDirections);
         ComputeSphericalFromCartesian(Q, all_directions_container);
-        m_TARGET_SH_shell3 = new vnl_matrix<double>(m_MaxDirections, number_coeffs_shell3);
-        ComputeSphericalHarmonicsBasis(Q, m_TARGET_SH_shell3, interp_SHOrder_shell3);
+        m_TARGET_SH_shell3 = std::make_unique<vnl_matrix<double>>(m_MaxDirections, number_coeffs_shell3);
+        ComputeSphericalHarmonicsBasis(Q, m_TARGET_SH_shell3.get(), interp_SHOrder_shell3);
         delete Q;
         // end creat target SH-Basis
 
@@ -509,7 +509,7 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
         // Values = m_TARGET_SH_shell1 * Interpolation_SHT1_inv * DataShell1;
         temp = new vnl_matrix_inverse<double>((*tempSHBasis));
-        m_Interpolation_SHT1_inv = new vnl_matrix<double>(temp->inverse());
+        m_Interpolation_SHT1_inv = std::make_unique<vnl_matrix<double>>(temp->inverse());
 
         delete Q;
         delete temp;
@@ -524,7 +524,7 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
         temp = new vnl_matrix_inverse<double>((*tempSHBasis));
 
-        m_Interpolation_SHT2_inv = new vnl_matrix<double>(temp->inverse());
+        m_Interpolation_SHT2_inv = std::make_unique<vnl_matrix<double>>(temp->inverse());
 
         delete Q;
         delete temp;
@@ -539,7 +539,7 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
         temp = new vnl_matrix_inverse<double>((*tempSHBasis));
 
-        m_Interpolation_SHT3_inv = new vnl_matrix<double>(temp->inverse());
+        m_Interpolation_SHT3_inv = std::make_unique<vnl_matrix<double>>(temp->inverse());
 
         delete Q;
         delete temp;
@@ -1042,11 +1042,12 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
 
   const double factor = (1.0/(16.0*itk::Math::pi*itk::Math::pi));
   MatrixDoublePtr SignalReonstructionMatrix (new vnl_matrix<double>((*inverse) * (SHBasisMatrix->transpose())));
-  m_CoeffReconstructionMatrix = new vnl_matrix<double>(( factor * ((*FRTMatrix) * ((*SHEigenvalues) * (*SignalReonstructionMatrix))) ));
+  m_CoeffReconstructionMatrix = std::make_unique<vnl_matrix<double>>(( factor * ((*FRTMatrix) * ((*SHEigenvalues) * (*SignalReonstructionMatrix))) ));
 
 
   // SH Basis for ODF-reconstruction
-  vnl_matrix_fixed<double, 3, NOdfDirections>* U = PointShell<NOdfDirections, vnl_matrix_fixed<double, 3, NOdfDirections> >::DistributePointShell();
+  // DistributePointShell returns a new matrix that the caller owns.
+  std::unique_ptr<vnl_matrix_fixed<double, 3, NOdfDirections>> U(PointShell<NOdfDirections, vnl_matrix_fixed<double, 3, NOdfDirections> >::DistributePointShell());
   for(int i=0; i<NOdfDirections; i++)
   {
     double x = (*U)(0,i);
@@ -1060,8 +1061,8 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
   }
 
   MatrixDoublePtr tempPtr (new vnl_matrix<double>( U->as_matrix() ));
-  m_ODFSphericalHarmonicBasisMatrix  = new vnl_matrix<double>(NOdfDirections,NumberOfCoeffs);
-  ComputeSphericalHarmonicsBasis(tempPtr.get(), m_ODFSphericalHarmonicBasisMatrix, LOrder);
+  m_ODFSphericalHarmonicBasisMatrix  = std::make_unique<vnl_matrix<double>>(NOdfDirections,NumberOfCoeffs);
+  ComputeSphericalHarmonicsBasis(tempPtr.get(), m_ODFSphericalHarmonicBasisMatrix.get(), LOrder);
 }
 
 template< class T, class TG, class TO, int L, int NOdfDirections>

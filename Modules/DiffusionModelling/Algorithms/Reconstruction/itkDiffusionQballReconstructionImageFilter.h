@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkVectorContainer.h"
 #include "itkVectorImage.h"
 
+#include <memory>
 #include <vector>
 
 namespace itk{
@@ -157,7 +158,7 @@ public:
   typedef VectorImage< GradientPixelType, 3 >      GradientImagesType;
 
   /** Holds the ODF reconstruction matrix */
-  typedef vnl_matrix< TOdfPixelType >*
+  typedef std::unique_ptr<vnl_matrix< TOdfPixelType >>
                                                    OdfReconstructionMatrixType;
 
   /** Holds each magnetic field gradient used to acquire one DWImage */

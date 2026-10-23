@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <cstdio>
 #include <locale>
 #include <fstream>
+#include <memory>
 #include "itkPointShell.h"
 #include "mitkSingleShellGradients.h"
 
@@ -503,8 +504,8 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
     P(i,i) = mitk::sh::legendre0(lj[i]);
 
   vnl_matrix<float> B_transpose(B.transpose());
-  vnl_matrix_inverse<float>* pseudoInverse = new vnl_matrix_inverse<float>( B_transpose * B + L*L*m_Lambda );
-  m_CoeffReconstructionMatrix = pseudoInverse->pinverse() * B_transpose;
+  vnl_matrix_inverse<float> pseudoInverse( B_transpose * B + L*L*m_Lambda );
+  m_CoeffReconstructionMatrix = pseudoInverse.pinverse() * B_transpose;
 
   switch(m_NormalizationMethod)
   {
@@ -529,7 +530,8 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
   }
 
   // needed to calculate the ODF values from the SH coefficients
-  vnl_matrix_fixed<double, 3, NrOdfDirections>* U = itk::PointShell<NrOdfDirections, vnl_matrix_fixed<double, 3, NrOdfDirections> >::DistributePointShell();
+  // DistributePointShell returns a new matrix that the caller owns.
+  std::unique_ptr<vnl_matrix_fixed<double, 3, NrOdfDirections>> U(itk::PointShell<NrOdfDirections, vnl_matrix_fixed<double, 3, NrOdfDirections> >::DistributePointShell());
 
   m_SphericalHarmonicBasisMatrix  = mitk::sh::CalcShBasisForDirections(ShOrder, U->as_matrix(), true);
   m_ReconstructionMatrix = m_SphericalHarmonicBasisMatrix * m_CoeffReconstructionMatrix;

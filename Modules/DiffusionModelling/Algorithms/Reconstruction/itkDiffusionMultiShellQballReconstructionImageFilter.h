@@ -19,6 +19,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkImageToImageFilter.h>
 
+#include <memory>
+
 namespace itk{
 /** \class DiffusionMultiShellQballReconstructionImageFilter
     I. Aganj, C. Lenglet, G. Sapiro, E. Yacoub, K. Ugurbil, and N. Harel, “Reconstruction of the orientation distribution function in single and multiple shell q-ball imaging within constant solid angle,” Magnetic Resonance in Medicine, vol. 64, no. 2, pp. 554–566, 2010.
@@ -129,16 +131,17 @@ private:
 
     // Interpolation
     bool m_Interpolation_Flag;
-    vnl_matrix< double > * m_Interpolation_SHT1_inv;
-    vnl_matrix< double > * m_Interpolation_SHT2_inv;
-    vnl_matrix< double > * m_Interpolation_SHT3_inv;
-    vnl_matrix< double > * m_TARGET_SH_shell1;
-    vnl_matrix< double > * m_TARGET_SH_shell2;
-    vnl_matrix< double > * m_TARGET_SH_shell3;
+    // Owned here; every execution replaces them (they leaked before).
+    std::unique_ptr<vnl_matrix< double >> m_Interpolation_SHT1_inv;
+    std::unique_ptr<vnl_matrix< double >> m_Interpolation_SHT2_inv;
+    std::unique_ptr<vnl_matrix< double >> m_Interpolation_SHT3_inv;
+    std::unique_ptr<vnl_matrix< double >> m_TARGET_SH_shell1;
+    std::unique_ptr<vnl_matrix< double >> m_TARGET_SH_shell2;
+    std::unique_ptr<vnl_matrix< double >> m_TARGET_SH_shell3;
     unsigned int m_MaxDirections;
 
-    vnl_matrix< double > * m_CoeffReconstructionMatrix;
-    vnl_matrix< double > * m_ODFSphericalHarmonicBasisMatrix;
+    std::unique_ptr<vnl_matrix< double >> m_CoeffReconstructionMatrix;
+    std::unique_ptr<vnl_matrix< double >> m_ODFSphericalHarmonicBasisMatrix;
 
     /** container to hold gradient directions */
     GradientDirectionContainerType::Pointer m_GradientDirectionContainer;

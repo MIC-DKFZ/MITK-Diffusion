@@ -23,6 +23,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
 #include "itkPointShell.h"
+
+#include <memory>
 #include "mitkSingleShellGradients.h"
 
 namespace itk {
@@ -318,8 +320,9 @@ namespace itk {
       this->m_NumberOfEquatorSamplingPoints
         = (int) ceil((double)sqrt(8*itk::Math::pi*this->m_NumberOfGradientDirections));
 
-    vnl_matrix<double>* Q =
-      new vnl_matrix<double>(3, m_NumberOfGradientDirections);
+    // Every matrix of this function is owned here; they leaked about 27 MB per execution for 64
+    // gradients.
+    auto Q = std::make_unique<vnl_matrix<double>>(3, m_NumberOfGradientDirections);
 
     {
       // Fill matrix Q with gradient directions
@@ -342,15 +345,15 @@ namespace itk {
 
     }
 
-    vnl_matrix_fixed<double, 3, NOdfDirections>* U =
-      itk::PointShell<NOdfDirections, vnl_matrix_fixed<double, 3, NOdfDirections> >::DistributePointShell();
+    // DistributePointShell returns a new matrix that the caller owns.
+    std::unique_ptr<vnl_matrix_fixed<double, 3, NOdfDirections>> U(
+      itk::PointShell<NOdfDirections, vnl_matrix_fixed<double, 3, NOdfDirections> >::DistributePointShell());
 
-    vnl_matrix_fixed<double, 3, NBasisFunctionCenters>* V =
-      itk::PointShell<NBasisFunctionCenters, vnl_matrix_fixed<double, 3, NBasisFunctionCenters> >::DistributePointShell();
+    std::unique_ptr<vnl_matrix_fixed<double, 3, NBasisFunctionCenters>> V(
+      itk::PointShell<NBasisFunctionCenters, vnl_matrix_fixed<double, 3, NBasisFunctionCenters> >::DistributePointShell());
 
     // calculate sampling points on the equator perpendicular to z-axis
-    vnl_matrix<double> *C
-      = new vnl_matrix<double>(3, m_NumberOfEquatorSamplingPoints);
+    auto C = std::make_unique<vnl_matrix<double>>(3, m_NumberOfEquatorSamplingPoints);
     for(unsigned int i=0; i<m_NumberOfEquatorSamplingPoints; i++)
     {
       double theta = i * (2*itk::Math::pi / m_NumberOfEquatorSamplingPoints);
@@ -360,8 +363,7 @@ namespace itk {
     }
 
     // rotate the sampling points to each directions of interest
-    vnl_matrix<double> *S
-      = new vnl_matrix<double>(3,m_NumberOfEquatorSamplingPoints*NOdfDirections);
+    auto S = std::make_unique<vnl_matrix<double>>(3,m_NumberOfEquatorSamplingPoints*NOdfDirections);
 
     {
       vnl_vector_fixed<double,3> z(NumericTraits<double>::Zero);
@@ -371,8 +373,7 @@ namespace itk {
       for(int i=0; i<NOdfDirections; i++)
       {
         vnl_vector_fixed<double,3> ui   = (*U).get_column(i);
-        vnl_matrix<double> *RC
-          = new vnl_matrix<double>(3,m_NumberOfEquatorSamplingPoints);
+        vnl_matrix<double> RC(3,m_NumberOfEquatorSamplingPoints);
 
         if( (z(0)*ui(0)+z(1)*ui(1)+z(2)*ui(2)+1) != 0 )
         {
@@ -382,20 +383,19 @@ namespace itk {
           R.set_column(2, (z+ui)*(z(2)+ui(2)));
           R /= (z(0)*ui(0)+z(1)*ui(1)+z(2)*ui(2)+1);
           R -= eye;
-          (*RC) = R*(*C);
+          RC = R*(*C);
         }
         else
         {
-          RC = C;
+          RC = *C;
         }
-        (*S).set_columns(i*m_NumberOfEquatorSamplingPoints, *RC);
+        (*S).set_columns(i*m_NumberOfEquatorSamplingPoints, RC);
       }
     }
 
     // determine interpolation kernel width first
     // use to determine diffusion measurement contribution to each of the kernels
-    vnl_matrix<double> *H_plus
-      = new vnl_matrix<double>(NBasisFunctionCenters,m_NumberOfGradientDirections);
+    auto H_plus = std::make_unique<vnl_matrix<double>>(NBasisFunctionCenters,m_NumberOfGradientDirections);
 
     double maxSigma = itk::Math::pi/6;
     double bestSigma = maxSigma;
@@ -405,16 +405,14 @@ namespace itk {
       double start = 0.01;
       double minCondition = NumericTraits<double>::max();
 
-      vnl_matrix<double> *H
-        = new vnl_matrix<double>(m_NumberOfGradientDirections,NBasisFunctionCenters,(double)0);
+      auto H = std::make_unique<vnl_matrix<double>>(m_NumberOfGradientDirections,NBasisFunctionCenters,(double)0);
 
       {
 
         int increasing = 0;
         for( double sigma=start; sigma<maxSigma; sigma+=stepsize)
         {
-          vnl_matrix<double> *tmpH
-            = new vnl_matrix<double>(m_NumberOfGradientDirections,NBasisFunctionCenters);
+          auto tmpH = std::make_unique<vnl_matrix<double>>(m_NumberOfGradientDirections,NBasisFunctionCenters);
 
           for(unsigned int r=0; r<m_NumberOfGradientDirections; r++)
           {
@@ -430,14 +428,14 @@ namespace itk {
             }
           }
 
-          vnl_svd<double> *solver;
+          std::unique_ptr<vnl_svd<double>> solver;
           if(m_NumberOfGradientDirections>NBasisFunctionCenters)
           {
-            solver = new vnl_svd<double>(*tmpH);
+            solver = std::make_unique<vnl_svd<double>>(*tmpH);
           }
           else
           {
-            solver = new vnl_svd<double>(tmpH->transpose());
+            solver = std::make_unique<vnl_svd<double>>(tmpH->transpose());
           }
           double condition = solver->sigma_max() / solver->sigma_min();
 
@@ -458,8 +456,7 @@ namespace itk {
       }
 
 
-      vnl_matrix_inverse<double> *pseudoInverse
-        = new vnl_matrix_inverse<double>(*H);
+      auto pseudoInverse = std::make_unique<vnl_matrix_inverse<double>>(*H);
       (*H_plus) = pseudoInverse->pinverse();
 
       std::cout << "choosing sigma = " << bestSigma << std::endl;
@@ -468,8 +465,7 @@ namespace itk {
 
     // this is the contribution of each kernel to each sampling point on the
     // equator
-    vnl_matrix<double> *G
-      = new vnl_matrix<double>(m_NumberOfEquatorSamplingPoints*NOdfDirections,NBasisFunctionCenters);
+    auto G = std::make_unique<vnl_matrix<double>>(m_NumberOfEquatorSamplingPoints*NOdfDirections,NBasisFunctionCenters);
 
     {
       for(unsigned int r=0; r<m_NumberOfEquatorSamplingPoints*NOdfDirections; r++)
@@ -487,8 +483,7 @@ namespace itk {
       }
     }
 
-    vnl_matrix<double> *GH_plus =
-      new vnl_matrix<double>(m_NumberOfEquatorSamplingPoints*NOdfDirections,m_NumberOfGradientDirections);
+    auto GH_plus = std::make_unique<vnl_matrix<double>>(m_NumberOfEquatorSamplingPoints*NOdfDirections,m_NumberOfGradientDirections);
 
     // simple matrix multiplication, manual cause of stack overflow using operator
     for (unsigned i = 0; i < m_NumberOfEquatorSamplingPoints*NOdfDirections; ++i)
@@ -517,8 +512,7 @@ namespace itk {
       GH_plus->set_row(i,r);
     }
 
-    m_ReconstructionMatrix
-      = new vnl_matrix<TOdfPixelType>(NOdfDirections,m_NumberOfGradientDirections,0.0);
+    m_ReconstructionMatrix = std::make_unique<vnl_matrix<TOdfPixelType>>(NOdfDirections,m_NumberOfGradientDirections,0.0);
     for(int i=0; i<NOdfDirections; i++)
     {
       for(unsigned int j=0; j<m_NumberOfGradientDirections; j++)
@@ -588,7 +582,7 @@ namespace itk {
 
     Superclass::PrintSelf(os,indent);
 
-    os << indent << "OdfReconstructionMatrix: " << m_ReconstructionMatrix << std::endl;
+    os << indent << "OdfReconstructionMatrix: " << m_ReconstructionMatrix.get() << std::endl;
     if ( m_GradientDirectionContainer )
     {
       os << indent << "GradientDirectionContainer: "
