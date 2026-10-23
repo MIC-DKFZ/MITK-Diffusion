@@ -27,7 +27,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkImageDataItem.h"
 #include <mitkLocaleSwitch.h>
 #include <itkShCoefficientImageImporter.h>
-#include <mitkImageCast.h>
 
 namespace mitk
 {
@@ -71,9 +70,9 @@ namespace mitk
     if (!mrtrix_sh)
       shImage->SetShConvention(mitk::ShImage::SH_CONVENTION::FSL);
 
+    // The SH image takes over the buffer of the coefficient image.
     mitk::Image::Pointer resultImage = dynamic_cast<mitk::Image*>(shImage.GetPointer());
-    mitk::CastToMitkImage(importer->GetCoefficientImage(), resultImage);
-    resultImage->SetVolume(importer->GetCoefficientImage()->GetBufferPointer());
+    mitk::GrabItkImageMemoryChannel(importer->GetCoefficientImage().GetPointer(), nullptr, resultImage.GetPointer(), false);
     return resultImage;
   }
 

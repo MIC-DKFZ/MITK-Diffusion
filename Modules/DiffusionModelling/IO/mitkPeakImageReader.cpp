@@ -25,7 +25,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkNiftiImageIO.h>
 #include <itkNrrdImageIO.h>
 #include <mitkITKImageImport.h>
-#include <mitkImageCast.h>
 #include <mitkLocaleSwitch.h>
 #include <itkImageRegionIteratorWithIndex.h>
 #include <itkMetaDataObject.h>
@@ -101,9 +100,9 @@ namespace mitk
     if (us::any_cast<bool>(this->GetOptions()[ConvertMrtrixOption]))
       ConvertMrtrixPeaks(reader->GetOutput());
 
+    // The peak image takes over the buffer of all volumes.
     Image::Pointer resultImage = dynamic_cast<Image*>(PeakImage::New().GetPointer());
-    mitk::CastToMitkImage(reader->GetOutput(), resultImage);
-    resultImage->SetVolume(reader->GetOutput()->GetBufferPointer());
+    mitk::GrabItkImageMemoryChannel(reader->GetOutput(), nullptr, resultImage.GetPointer(), false);
 
     StringProperty::Pointer nameProp;
     nameProp = StringProperty::New(itksys::SystemTools::GetFilenameWithoutExtension(GetInputLocation()));
