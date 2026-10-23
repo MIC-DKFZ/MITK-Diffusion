@@ -176,9 +176,12 @@ void mitk::FiberBundleMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *rend
   if (node == nullptr)
     return;
 
-  vtkSmartPointer<vtkPolyData> fiberPolyData = fiberBundle->GetFiberPolyData();
-  if (fiberPolyData == nullptr)
+  if (fiberBundle->GetFiberPolyData() == nullptr)
     return;
+  // Rendered from a shallow copy: the colour array added for rendering must not change the
+  // bundle's own polydata, which may be saved or processed meanwhile.
+  vtkSmartPointer<vtkPolyData> fiberPolyData = vtkSmartPointer<vtkPolyData>::New();
+  fiberPolyData->ShallowCopy(fiberBundle->GetFiberPolyData());
 
   fiberPolyData->GetPointData()->AddArray(fiberBundle->GetFiberColors());
   localStorage->m_Mapper->ScalarVisibilityOn();

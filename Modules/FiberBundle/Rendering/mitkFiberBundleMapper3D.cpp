@@ -147,7 +147,10 @@ void mitk::FiberBundleMapper3D::GenerateDataForRenderer( mitk::BaseRenderer *ren
   LocalStorage3D* localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
 
   m_FiberBundle = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-  m_FiberPolyData = m_FiberBundle->GetFiberPolyData();
+  // Rendered from a shallow copy: the colour array added for rendering must not change the
+  // bundle's own polydata, which may be saved or processed meanwhile.
+  m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
+  m_FiberPolyData->ShallowCopy(m_FiberBundle->GetFiberPolyData());
 
   // did any rendering properties change?
   float tubeRadius = 0;
