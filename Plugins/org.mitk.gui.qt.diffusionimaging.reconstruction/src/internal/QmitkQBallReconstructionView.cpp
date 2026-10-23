@@ -418,7 +418,7 @@ void QmitkQBallReconstructionView::TemplatedAnalyticalQBallReconstruction(mitk::
 
     mitk::DataNode::Pointer node=mitk::DataNode::New();
     node->SetData( image );
-    node->SetName(dataNodePointer->GetName() + nodePostfix + "_Sampeld");
+    node->SetName(dataNodePointer->GetName() + nodePostfix + "_Sampled");
 
     GetDataStorage()->Add(node, coeffsNode);
   }

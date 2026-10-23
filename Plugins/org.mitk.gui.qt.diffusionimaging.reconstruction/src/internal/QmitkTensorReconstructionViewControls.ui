@@ -105,13 +105,13 @@ QGroupBox {
          <item row="0" column="0">
           <widget class="QLabel" name="m_TensorsToDWIBValueLabel">
            <property name="toolTip">
-            <string comment="how fuzzy the confidence boundary should be. By default, confidence boundary is perfectly sharp (float); default: &quot;0&quot;" extracomment="how fuzzy the confidence boundary should be. By default, confidence boundary is perfectly sharp (float); default: &quot;0&quot;">how fuzzy the confidence boundary should be. By default, confidence boundary is perfectly sharp (float); default: &quot;0&quot;</string>
+            <string>b-value of the diffusion-weighted volumes of the generated DWI (s/mm²)</string>
            </property>
            <property name="statusTip">
-            <string comment="how fuzzy the confidence boundary should be. By default, confidence boundary is perfectly sharp (float); default: &quot;0&quot;" extracomment="how fuzzy the confidence boundary should be. By default, confidence boundary is perfectly sharp (float); default: &quot;0&quot;">how fuzzy the confidence boundary should be. By default, confidence boundary is perfectly sharp (float); default: &quot;0&quot;</string>
+            <string>b-value of the diffusion-weighted volumes of the generated DWI (s/mm²)</string>
            </property>
            <property name="whatsThis">
-            <string comment="how fuzzy the confidence boundary should be. By default, confidence boundary is perfectly sharp (float); default: &quot;0&quot;" extracomment="how fuzzy the confidence boundary should be. By default, confidence boundary is perfectly sharp (float); default: &quot;0&quot;">how fuzzy the confidence boundary should be. By default, confidence boundary is perfectly sharp (float); default: &quot;0&quot;</string>
+            <string>b-value of the diffusion-weighted volumes of the generated DWI (s/mm²)</string>
            </property>
            <property name="text">
             <string>B-Value</string>
@@ -363,7 +363,7 @@ QGroupBox {
          <item row="2" column="0">
           <widget class="QCheckBox" name="m_CheckNegativeEigenvalues">
            <property name="toolTip">
-            <string>Only influences WLS reconstruction</string>
+            <string>Leave voxels empty whose tensor has a negative eigenvalue (ITK Linear Least Squares; the corrected method always does)</string>
            </property>
            <property name="text">
             <string>Ignore voxels with negative eigenvalues</string>

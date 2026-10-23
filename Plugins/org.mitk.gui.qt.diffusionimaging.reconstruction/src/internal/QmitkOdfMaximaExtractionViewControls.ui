@@ -53,7 +53,7 @@ QGroupBox {
          <bool>true</bool>
         </property>
         <property name="toolTip">
-         <string>Extract ODF peaks using finite differences on the densely sampled ODF surface.</string>
+         <string>Extract ODF peaks: local maxima on the densely sampled ODF, refined by gradient descent; principal eigenvectors for tensor images.</string>
         </property>
         <property name="text">
          <string>Start Peak Extraction</string>
@@ -196,7 +196,7 @@ QGroupBox {
          <item row="2" column="1">
           <widget class="QComboBox" name="m_NormalizationBox">
            <property name="toolTip">
-            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The vector fields are always coorected for image spacing and using the lagest eigenvalue in case of the tensor peak extraction. This is done for visualizytion purposes. The output direction images are not affected.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Length of the peak vectors. ODF peaks: no normalization keeps the ODF value, MAX normalizes by the largest peak of the voxel, single vector normalization to unit length. Tensor peaks: no normalization scales the principal eigenvector by the FA, the other options give unit vectors.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="currentIndex">
             <number>1</number>
@@ -337,7 +337,7 @@ QGroupBox {
          <item row="5" column="1">
           <widget class="QSpinBox" name="m_AngularThreshold">
            <property name="toolTip">
-            <string>Discard peaks that er closer to a larger peak.</string>
+            <string>Discard peaks that are closer to a larger peak.</string>
            </property>
            <property name="minimum">
             <number>0</number>
