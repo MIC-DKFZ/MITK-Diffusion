@@ -111,23 +111,13 @@ public:
 
 protected:
     DiffusionMultiShellQballReconstructionImageFilter();
-    ~DiffusionMultiShellQballReconstructionImageFilter() { }
-    void PrintSelf(std::ostream& os, Indent indent) const;
-    void BeforeThreadedGenerateData();
-    void AfterThreadedGenerateData();
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
+    ~DiffusionMultiShellQballReconstructionImageFilter() override = default;
+    void PrintSelf(std::ostream& os, Indent indent) const override;
+    void BeforeThreadedGenerateData() override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
 
 private:
-
-    enum ReconstructionType
-    {
-        Mode_Analytical3Shells,
-        Mode_NumericalNShells,
-        Mode_Standard1Shell
-    };
-
-    ReconstructionType m_ReconstructionType;
 
     // Interpolation
     bool m_Interpolation_Flag;
@@ -165,27 +155,18 @@ private:
 
     double m_Lambda;
 
-    bool m_IsHemisphericalArrangementOfGradientDirections;
-
-    bool m_IsArithmeticProgession;
-
     void ComputeReconstructionMatrix(IndiciesVector const & refVector);
-    void ComputeODFSHBasis();
     bool CheckDuplicateDiffusionGradients();
     bool CheckForDifferingShellDirections();
     IndiciesVector GetAllDirections();
     void ComputeSphericalHarmonicsBasis(vnl_matrix<double>* QBallReference, vnl_matrix<double>* SHBasisOutput, int Lorder , vnl_matrix<double>* LaplaciaBaltramiOutput =0 , vnl_vector<int>* SHOrderAssociation =0 , vnl_matrix<double> * SHEigenvalues =0);
-    void Normalize(OdfPixelType & odf );
     void S_S0Normalization( vnl_vector<double> & vec, double b0  = 0 );
     void DoubleLogarithm(vnl_vector<double> & vec);
     double CalculateThreashold(const double value, const double delta);
     void Projection1(vnl_vector<double> & vec, double delta = 0.01);
     void Projection2( vnl_vector<double> & E1, vnl_vector<double> & E2, vnl_vector<double> & E3, double delta = 0.01);
     void Projection3( vnl_vector<double> & A, vnl_vector<double> & alpha, vnl_vector<double> & beta, double delta = 0.01);
-    void StandardOneShellReconstruction(const OutputImageRegionType& outputRegionForThread);
     void AnalyticalThreeShellReconstruction(const OutputImageRegionType& outputRegionForThread);
-    void NumericalNShellReconstruction(const OutputImageRegionType& outputRegionForThread);
-    void GenerateAveragedBZeroImage(const OutputImageRegionType& outputRegionForThread);
     void ComputeSphericalFromCartesian(vnl_matrix<double> * Q, const IndiciesVector & refShell);
 
 

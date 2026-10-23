@@ -18,7 +18,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 
-#include <itkTimeProbe.h>
 #include <limits>
 #include <mitkPointShell.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
@@ -29,7 +28,6 @@ namespace itk {
 template< class T, class TG, class TO, int L, int NODF>
 DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 ::DiffusionMultiShellQballReconstructionImageFilter() :
-  m_ReconstructionType(Mode_Standard1Shell),
   m_Interpolation_Flag(false),
   m_Interpolation_SHT1_inv(nullptr),
   m_Interpolation_SHT2_inv(nullptr),
@@ -47,9 +45,7 @@ DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   m_BZeroImage(nullptr),
   m_CoefficientImage(nullptr),
   m_BValue(1.0),
-  m_Lambda(0.0),
-  m_IsHemisphericalArrangementOfGradientDirections(false),
-  m_IsArithmeticProgession(false)
+  m_Lambda(0.0)
 {
   // At least 1 inputs is necessary for a vector image.
   // For images added one at a time we need at least six
@@ -83,7 +79,6 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
     for( gdcit = m_GradientDirectionContainer->Begin(); gdcit != m_GradientDirectionContainer->End(); ++gdcit)
     {
       double bValueKey = int(((m_BValue * gdcit.Value().two_norm() * gdcit.Value().two_norm())+7.5)/10)*10;
-      MITK_INFO << bValueKey;
       m_BValueMap[bValueKey].push_back(gdcit.Index());
     }
 
@@ -131,17 +126,6 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   m_CoefficientImage->SetBufferedRegion( img->GetLargestPossibleRegion() );
   m_CoefficientImage->Allocate();
 
-}
-
-template<class TReferenceImagePixelType, class TGradientImagePixelType, class TOdfPixelType, int NOrderL, int NrOdfDirections>
-void DiffusionMultiShellQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType,NOrderL, NrOdfDirections>
-::Normalize( OdfPixelType  & out)
-{
-  for(int i=0; i<NrOdfDirections; i++)
-  {
-    out[i] = out[i] < 0 ? 0 : out[i];
-    out[i] *= itk::Math::pi * 4 / NrOdfDirections;
-  }
 }
 
 template<class TReferenceImagePixelType, class TGradientImagePixelType, class TOdfPixelType, int NOrderL, int NrOdfDirections>
@@ -397,13 +381,6 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
 template< class T, class TG, class TO, int L, int NODF>
 void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
-::AfterThreadedGenerateData()
-{
-  MITK_INFO << "Finished reconstruction";
-}
-
-template< class T, class TG, class TO, int L, int NODF>
-void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 ::BeforeThreadedGenerateData()
 {
   // Only the analytical solution for three equidistant shells (Aganj 2010) is implemented. The
@@ -439,16 +416,14 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
       if(size_shell1 != size_shell2 || size_shell2 != size_shell3 || size_shell1 != size_shell3)
       {
         m_Interpolation_Flag = true;
-        MITK_INFO << "Shell interpolation: shells with different numbers of directions";
+        itkDebugMacro(<< "Shell interpolation: shells with different numbers of directions");
       }
       else
       {
         // else if each shell holds same numbers of directions, but the gradient direction differ more than one 1 degree
         m_Interpolation_Flag = CheckForDifferingShellDirections();
-        if(m_Interpolation_Flag) MITK_INFO << "Shell interpolation: gradient direction differ more than one 1 degree";
+        if(m_Interpolation_Flag) itkDebugMacro(<< "Shell interpolation: gradient directions differ by more than 1 degree");
       }
-
-      m_ReconstructionType = Mode_Analytical3Shells;
 
       if(m_Interpolation_Flag)
       {
@@ -474,108 +449,29 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
         IndiciesVector  all_directions_container = GetAllDirections();
         m_MaxDirections = all_directions_container.size();
 
-        // create target SH-Basis
-        // initialize empty target matrix and set the wanted directions
-        vnl_matrix<double> * Q = new vnl_matrix<double>(3, m_MaxDirections);
-        ComputeSphericalFromCartesian(Q, all_directions_container);
-        // initialize a SH Basis, neede to interpolate from oldDirs -> newDirs
-        m_TARGET_SH_shell1 = std::make_unique<vnl_matrix<double>>(m_MaxDirections, number_coeffs_shell1);
-        ComputeSphericalHarmonicsBasis(Q, m_TARGET_SH_shell1.get(), interp_SHOrder_shell1);
-        delete Q;
-
-        Q = new vnl_matrix<double>(3, m_MaxDirections);
-        ComputeSphericalFromCartesian(Q, all_directions_container);
-        m_TARGET_SH_shell2 = std::make_unique<vnl_matrix<double>>(m_MaxDirections, number_coeffs_shell2);
-        ComputeSphericalHarmonicsBasis(Q, m_TARGET_SH_shell2.get(), interp_SHOrder_shell2);
-        delete Q;
-
-        Q = new vnl_matrix<double>(3, m_MaxDirections);
-        ComputeSphericalFromCartesian(Q, all_directions_container);
-        m_TARGET_SH_shell3 = std::make_unique<vnl_matrix<double>>(m_MaxDirections, number_coeffs_shell3);
-        ComputeSphericalHarmonicsBasis(Q, m_TARGET_SH_shell3.get(), interp_SHOrder_shell3);
-        delete Q;
-        // end creat target SH-Basis
-
-
-        // create measured-SHBasis
-        // Shell 1
-        vnl_matrix<double> * tempSHBasis;
-        vnl_matrix_inverse<double> * temp;
-
-        // initialize empty matrix and set the measured directions of shell1
-        Q = new vnl_matrix<double>(3, shell1.size());
-        ComputeSphericalFromCartesian(Q, shell1);
-        // initialize a SH Basis, need to get the coeffs from measuredShell
-        tempSHBasis = new vnl_matrix<double>(shell1.size(), number_coeffs_shell1);
-        ComputeSphericalHarmonicsBasis(Q, tempSHBasis, interp_SHOrder_shell1);
-        // inversion of the SH=Basis
-        // c_s1 = B^-1 * shell1
-        // interp_Values = targetSHBasis * c_s1
-
-        // Values = m_TARGET_SH_shell1 * Interpolation_SHT1_inv * DataShell1;
-        temp = new vnl_matrix_inverse<double>((*tempSHBasis));
-        m_Interpolation_SHT1_inv = std::make_unique<vnl_matrix<double>>(temp->inverse());
-
-        delete Q;
-        delete temp;
-        delete tempSHBasis;
-
-        // Shell 2
-        Q = new vnl_matrix<double>(3, shell2.size());
-        ComputeSphericalFromCartesian(Q, shell2);
-
-        tempSHBasis = new vnl_matrix<double>(shell2.size(), number_coeffs_shell2);
-        ComputeSphericalHarmonicsBasis(Q, tempSHBasis, interp_SHOrder_shell2);
-
-        temp = new vnl_matrix_inverse<double>((*tempSHBasis));
-
-        m_Interpolation_SHT2_inv = std::make_unique<vnl_matrix<double>>(temp->inverse());
-
-        delete Q;
-        delete temp;
-        delete tempSHBasis;
-
-        // Shell 3
-        Q = new vnl_matrix<double>(3, shell3.size());
-        ComputeSphericalFromCartesian(Q, shell3);
-
-        tempSHBasis = new vnl_matrix<double>(shell3.size(), number_coeffs_shell3);
-        ComputeSphericalHarmonicsBasis(Q, tempSHBasis, interp_SHOrder_shell3);
-
-        temp = new vnl_matrix_inverse<double>((*tempSHBasis));
-
-        m_Interpolation_SHT3_inv = std::make_unique<vnl_matrix<double>>(temp->inverse());
-
-        delete Q;
-        delete temp;
-        delete tempSHBasis;
+        // Target SH basis per shell on all directions, and the shell's SH fit (pseudo-inverse of its
+        // basis on its own directions): Values = target basis * fit * data of the shell.
+        vnl_matrix<double> Q(3, m_MaxDirections);
+        ComputeSphericalFromCartesian(&Q, all_directions_container);
+        const auto shellInterpolation = [&](const IndiciesVector &shell, unsigned int order, int numberOfCoefficients,
+                                            std::unique_ptr<vnl_matrix<double>> &targetBasis, std::unique_ptr<vnl_matrix<double>> &fit) {
+          targetBasis = std::make_unique<vnl_matrix<double>>(m_MaxDirections, numberOfCoefficients);
+          ComputeSphericalHarmonicsBasis(&Q, targetBasis.get(), order);
+          vnl_matrix<double> shellDirections(3, shell.size());
+          ComputeSphericalFromCartesian(&shellDirections, shell);
+          vnl_matrix<double> shellBasis(shell.size(), numberOfCoefficients);
+          ComputeSphericalHarmonicsBasis(&shellDirections, &shellBasis, order);
+          fit = std::make_unique<vnl_matrix<double>>(vnl_matrix_inverse<double>(shellBasis).inverse());
+        };
+        shellInterpolation(shell1, interp_SHOrder_shell1, number_coeffs_shell1, m_TARGET_SH_shell1, m_Interpolation_SHT1_inv);
+        shellInterpolation(shell2, interp_SHOrder_shell2, number_coeffs_shell2, m_TARGET_SH_shell2, m_Interpolation_SHT2_inv);
+        shellInterpolation(shell3, interp_SHOrder_shell3, number_coeffs_shell3, m_TARGET_SH_shell3, m_Interpolation_SHT3_inv);
 
         ComputeReconstructionMatrix(all_directions_container);
 
-        MITK_INFO << "Reconstruction information: Multishell Reconstruction filter - Interpolation";
-        MITK_INFO << "Shell 1";
-        MITK_INFO << "  SHOrder: " << interp_SHOrder_shell1;
-        MITK_INFO << "  Number of Coeffs: " << number_coeffs_shell1;
-        MITK_INFO << "  Number of Gradientdirections: " << size_shell1;
-
-
-        MITK_INFO << "Shell 2";
-        MITK_INFO << "  SHOrder: " << interp_SHOrder_shell2;
-        MITK_INFO << "  Number of Coeffs: " << number_coeffs_shell2;
-        MITK_INFO << "  Number of Gradientdirections: " << size_shell2;
-
-
-        MITK_INFO << "Shell 3";
-        MITK_INFO << "  SHOrder: " << interp_SHOrder_shell3;
-        MITK_INFO << "  Number of Coeffs: " << number_coeffs_shell3;
-        MITK_INFO << "  Number of Gradientdirections: " << size_shell3;
-
-
-        MITK_INFO << "Overall";
-        MITK_INFO << "  SHOrder: " << L;
-        MITK_INFO << "  Number of Coeffs: " << (L+1)*(L+2)*0.5;
-        MITK_INFO << "  Number of Gradientdirections: " << m_MaxDirections;
-
+        itkDebugMacro(<< "Shell interpolation, SH orders " << interp_SHOrder_shell1 << ", " << interp_SHOrder_shell2 << ", "
+                      << interp_SHOrder_shell3 << " for " << size_shell1 << ", " << size_shell2 << ", " << size_shell3
+                      << " directions; " << m_MaxDirections << " directions in all");
         return;
       }else
       {
@@ -591,130 +487,10 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 
 template< class T, class TG, class TO, int L, int NODF>
 void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
-::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread /*NumberOfThreads*/)
+::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread)
 {
-
-  itk::TimeProbe clock;
-  clock.Start();
-  switch(m_ReconstructionType)
-  {
-  case Mode_Standard1Shell:
-    StandardOneShellReconstruction(outputRegionForThread);
-    break;
-  case Mode_Analytical3Shells:
-    AnalyticalThreeShellReconstruction(outputRegionForThread);
-    break;
-  case Mode_NumericalNShells:
-    break;
-  }
-  clock.Stop();
-}
-
-
-template< class T, class TG, class TO, int L, int NODF>
-void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
-::StandardOneShellReconstruction(const OutputImageRegionType& outputRegionForThread)
-{
-  // Get output image pointer
-  typename OdfImageType::Pointer outputImage = static_cast< OdfImageType * >(ProcessObject::GetPrimaryOutput());
-  // Get input gradient image pointer
-  typename GradientImagesType::Pointer gradientImagePointer = static_cast< GradientImagesType * >( ProcessObject::GetInput(0) );
-
-  // ImageRegionIterator for the output image
-  ImageRegionIterator< OdfImageType > oit(outputImage, outputRegionForThread);
-  oit.GoToBegin();
-
-  // ImageRegionIterator for the BZero (output) image
-  ImageRegionIterator< BZeroImageType > bzeroIterator(m_BZeroImage, outputRegionForThread);
-  bzeroIterator.GoToBegin();
-
-  //  Const ImageRegionIterator for input gradient image
-  typedef ImageRegionConstIterator< GradientImagesType > GradientIteratorType;
-  GradientIteratorType git(gradientImagePointer, outputRegionForThread );
-  git.GoToBegin();
-
-  BValueMapIteraotr it = m_BValueMap.begin();
-  it++; // skip b0 entry
-  IndiciesVector SignalIndicies = it->second;
-  IndiciesVector BZeroIndicies = m_BValueMap[0];
-
-  unsigned int NumbersOfGradientIndicies = SignalIndicies.size();
-
-  typedef typename GradientImagesType::PixelType         GradientVectorType;
-
-  // iterate overall voxels of the gradient image region
-  while( ! git.IsAtEnd() )
-  {
-    GradientVectorType b = git.Get();
-    // ODF Vector
-    OdfPixelType odf(0.0);
-
-    double b0average = 0;
-    const unsigned int b0size = BZeroIndicies.size();
-    for(unsigned int i = 0; i < b0size ; ++i)
-    {
-      b0average += b[BZeroIndicies[i]];
-    }
-    b0average /= b0size;
-    bzeroIterator.Set(b0average);
-    ++bzeroIterator;
-
-    // Create the Signal Vector
-    vnl_vector<double> SignalVector(NumbersOfGradientIndicies);
-    if( (b0average != 0) && (b0average >= m_Threshold) )
-    {
-
-      for( unsigned int i = 0; i< SignalIndicies.size(); i++ )
-      {
-        SignalVector[i] = static_cast<double>(b[SignalIndicies[i]]);
-      }
-
-      // apply threashold an generate ln(-ln(E)) signal
-      // Replace SignalVector with PreNormalized SignalVector
-      S_S0Normalization(SignalVector, b0average);
-      Projection1(SignalVector);
-
-      DoubleLogarithm(SignalVector);
-
-      // approximate ODF coeffs
-      vnl_vector<double>  coeffs = ( (*m_CoeffReconstructionMatrix) * SignalVector );
-      coeffs[0] = 1.0/(2.0*sqrt(itk::Math::pi));
-
-      odf = element_cast<double, TO>(( (*m_ODFSphericalHarmonicBasisMatrix) * coeffs )).data_block();
-      odf *= (itk::Math::pi*4/NODF);
-    }
-    // set ODF to ODF-Image
-    oit.Set( odf );
-    ++oit;
-    ++git;
-
-  }
-}
-
-//#include "itkLevenbergMarquardtOptimizer.h"
-
-template< class T, class TG, class TO, int L, int NODF>
-void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
-::NumericalNShellReconstruction(const OutputImageRegionType& /*outputRegionForThread*/)
-{
-
-  /* itk::LevenbergMarquardtOptimizer::Pointer optimizer = itk::LevenbergMarquardtOptimizer::New();
-  optimizer->SetUseCostFunctionGradient(false);
-
-  // Scale the translation components of the Transform in the Optimizer
-  itk::LevenbergMarquardtOptimizer::ScalesType scales(transform->GetNumberOfParameters());
-  scales.Fill(0.01);
-  unsigned long numberOfIterations = 80000;
-  double gradientTolerance = 1e-10; // convergence criterion
-  double valueTolerance = 1e-10; // convergence criterion
-  double epsilonFunction = 1e-10; // convergence criterion
-  optimizer->SetScales( scales );
-  optimizer->SetNumberOfIterations( numberOfIterations );
-  optimizer->SetValueTolerance( valueTolerance );
-  optimizer->SetGradientTolerance( gradientTolerance );
-  optimizer->SetEpsilonFunction( epsilonFunction );*/
-
-
+  // BeforeThreadedGenerateData accepts only three equidistant shells.
+  AnalyticalThreeShellReconstruction(outputRegionForThread);
 }
 
 
@@ -751,7 +527,7 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   it++;
   // it = b-value = 3000
   IndiciesVector Shell3Indiecies = it->second;
-  IndiciesVector BZeroIndicies = m_BValueMap[0];
+  const IndiciesVector &BZeroIndicies = m_BValueMap.at(0);
 
   // m_MaxDirections is set in BeforeThreadedGenerateData, with and without interpolation.
 
@@ -838,21 +614,6 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
     {
       // Get the Signal-Value for each Shell at each direction (specified in the ShellIndicies Vector .. this direction corresponse to this shell...)
 
-      /*//fsl fix ---------------------------------------------------
-      for(int i = 0 ; i < Shell1Indiecies.size(); i++)
-        DataShell1[i] = static_cast<double>(b[Shell1Indiecies[i]]);
-      for(int i = 0 ; i < Shell2Indiecies.size(); i++)
-        DataShell2[i] = static_cast<double>(b[Shell2Indiecies[i]]);
-      for(int i = 0 ; i < Shell3Indiecies.size(); i++)
-        DataShell3[i] = static_cast<double>(b[Shell2Indiecies[i]]);
-
-      // Normalize the Signal: Si/S0
-      S_S0Normalization(DataShell1, shell1b0Norm);
-      S_S0Normalization(DataShell2, shell2b0Norm);
-      S_S0Normalization(DataShell3, shell2b0Norm);
-      *///fsl fix -------------------------------------------ende--
-
-      ///correct version
       for(unsigned int i = 0 ; i < Shell1Indiecies.size(); i++)
         DataShell1[i] = static_cast<double>(b[Shell1Indiecies[i]]);
       for(unsigned int i = 0 ; i < Shell2Indiecies.size(); i++)
@@ -915,7 +676,7 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
       for(unsigned int i = 0 ; i < m_MaxDirections; i++)
       {
         const double fac = (PValues[i] * 2 ) / (AlphaValues[i] - BetaValues[i]);
-        lambda = 0.5 + 0.5 * std::sqrt(1 - fac * fac);;
+        lambda = 0.5 + 0.5 * std::sqrt(1 - fac * fac);
         ER1 = std::fabs(lambda * (AlphaValues[i] - BetaValues[i]) + (BetaValues[i] - E1.get(i) ))
             + std::fabs(lambda * (AlphaValues[i] * AlphaValues[i] - BetaValues[i] * BetaValues[i]) + (BetaValues[i] * BetaValues[i] - E2.get(i) ))
             + std::fabs(lambda * (AlphaValues[i] * AlphaValues[i] * AlphaValues[i] - BetaValues[i] * BetaValues[i] * BetaValues[i]) + (BetaValues[i] * BetaValues[i] * BetaValues[i] - E3.get(i) ));
@@ -999,10 +760,6 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
 ::ComputeReconstructionMatrix(IndiciesVector const & refVector)
 {
 
-  typedef std::unique_ptr< vnl_matrix< double> >  MatrixDoublePtr;
-  typedef std::unique_ptr< vnl_vector< int > >    VectorIntPtr;
-  typedef std::unique_ptr< vnl_matrix_inverse< double > >  InverseMatrixDoublePtr;
-
   int numberOfGradientDirections = refVector.size();
 
   if( numberOfGradientDirections <= (((L+1)*(L+2))/2) || numberOfGradientDirections < 6  )
@@ -1014,40 +771,30 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NOdfDirections>
 
   const int LOrder = L;
   int NumberOfCoeffs = (int)(LOrder*LOrder + LOrder + 2.0)/2.0 + LOrder;
-  MatrixDoublePtr SHBasisMatrix(new vnl_matrix<double>(numberOfGradientDirections,NumberOfCoeffs));
-  SHBasisMatrix->fill(0.0);
-  VectorIntPtr SHOrderAssociation(new vnl_vector<int>(NumberOfCoeffs));
-  SHOrderAssociation->fill(0.0);
-  MatrixDoublePtr LaplacianBaltrami(new vnl_matrix<double>(NumberOfCoeffs,NumberOfCoeffs));
-  LaplacianBaltrami->fill(0.0);
-  MatrixDoublePtr FRTMatrix(new vnl_matrix<double>(NumberOfCoeffs,NumberOfCoeffs));
-  FRTMatrix->fill(0.0);
-  MatrixDoublePtr SHEigenvalues(new vnl_matrix<double>(NumberOfCoeffs,NumberOfCoeffs));
-  SHEigenvalues->fill(0.0);
-
-  MatrixDoublePtr Q(new vnl_matrix<double>(3, numberOfGradientDirections));
+  vnl_matrix<double> SHBasisMatrix(numberOfGradientDirections,NumberOfCoeffs, 0.0);
+  vnl_vector<int> SHOrderAssociation(NumberOfCoeffs, 0);
+  vnl_matrix<double> LaplacianBaltrami(NumberOfCoeffs,NumberOfCoeffs, 0.0);
+  vnl_matrix<double> FRTMatrix(NumberOfCoeffs,NumberOfCoeffs, 0.0);
+  vnl_matrix<double> SHEigenvalues(NumberOfCoeffs,NumberOfCoeffs, 0.0);
 
   // Convert Cartesian to Spherical Coordinates refVector -> Q
-  ComputeSphericalFromCartesian(Q.get(), refVector);
+  vnl_matrix<double> Q(3, numberOfGradientDirections);
+  ComputeSphericalFromCartesian(&Q, refVector);
 
   // SHBasis-Matrix + LaplacianBaltrami-Matrix + SHOrderAssociationVector
-  ComputeSphericalHarmonicsBasis(Q.get() ,SHBasisMatrix.get() , LOrder , LaplacianBaltrami.get(), SHOrderAssociation.get(), SHEigenvalues.get());
+  ComputeSphericalHarmonicsBasis(&Q, &SHBasisMatrix, LOrder, &LaplacianBaltrami, &SHOrderAssociation, &SHEigenvalues);
 
   // Compute FunkRadon Transformation Matrix Associated to SHBasis Order lj
   for(int i=0; i<NumberOfCoeffs; i++)
   {
-    (*FRTMatrix)(i,i) = 2.0 * itk::Math::pi * mitk::sh::legendre0((*SHOrderAssociation)[i]);
+    FRTMatrix(i,i) = 2.0 * itk::Math::pi * mitk::sh::legendre0(SHOrderAssociation[i]);
   }
 
-  MatrixDoublePtr temp(new vnl_matrix<double>(((SHBasisMatrix->transpose()) * (*SHBasisMatrix)) + (m_Lambda  * (*LaplacianBaltrami))));
-
-  InverseMatrixDoublePtr pseudo_inv(new vnl_matrix_inverse<double>((*temp)));
-  MatrixDoublePtr inverse(new vnl_matrix<double>(NumberOfCoeffs,NumberOfCoeffs));
-  (*inverse) = pseudo_inv->inverse();
+  const vnl_matrix<double> inverse = vnl_matrix_inverse<double>(SHBasisMatrix.transpose() * SHBasisMatrix + m_Lambda * LaplacianBaltrami).inverse();
 
   const double factor = (1.0/(16.0*itk::Math::pi*itk::Math::pi));
-  MatrixDoublePtr SignalReonstructionMatrix (new vnl_matrix<double>((*inverse) * (SHBasisMatrix->transpose())));
-  m_CoeffReconstructionMatrix = std::make_unique<vnl_matrix<double>>(( factor * ((*FRTMatrix) * ((*SHEigenvalues) * (*SignalReonstructionMatrix))) ));
+  const vnl_matrix<double> SignalReonstructionMatrix = inverse * SHBasisMatrix.transpose();
+  m_CoeffReconstructionMatrix = std::make_unique<vnl_matrix<double>>(factor * (FRTMatrix * (SHEigenvalues * SignalReonstructionMatrix)));
 
 
   // SH Basis for ODF-reconstruction
