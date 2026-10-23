@@ -524,9 +524,6 @@ void TractClusteringFilter::GenerateData()
   }
 
   MITK_INFO << "Clustering finished";
-  int max = clusters.size()-1;
-  if (m_MaxClusters>0 && clusters.size()-1>m_MaxClusters)
-    max = m_MaxClusters;
   m_DiscardedClusters = 0;
   for (int i=clusters.size()-1; i>=0; --i)
   {
@@ -538,8 +535,7 @@ void TractClusteringFilter::GenerateData()
       vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
       vtkSmartPointer<vtkPolyData> pTmp = m_Tractogram->GeneratePolyDataByIds(c.I, weights);
       mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
-      if (max>0)
-        fib->SetFiberWeights((float)i/max);
+      fib->SetFiberWeights(weights);
       m_OutTractograms.push_back(fib);
       m_OutFiberIndices.push_back(c.I);
 
@@ -573,20 +569,23 @@ void TractClusteringFilter::GenerateData()
   }
   MITK_INFO << "Final number of clusters: " << m_OutTractograms.size() << " (discarded " << m_DiscardedClusters << " clusters)";
 
+  // Each cluster gets the JET colour of its rank in the output. The fibers keep the weights of the
+  // input tractogram (e.g. SIFT2 or FitFibersToImage weights) for weighted downstream steps; only
+  // the centroids carry the rank as weight.
+  mitk::LookupTable::Pointer rankColors = mitk::LookupTable::New();
+  rankColors->SetType(mitk::LookupTable::JET);
+  rankColors->GetVtkLookupTable()->SetTableRange(0, 1);
   int w = 0;
   for (auto fib : m_OutTractograms)
   {
+    float rank = 1;
     if (m_OutTractograms.size()>1)
-    {
-      fib->SetFiberWeights((float)w/(m_OutTractograms.size()-1));
-      m_OutCentroids.at(w)->SetFiberWeights((float)w/(m_OutTractograms.size()-1));
-    }
-    else
-    {
-      fib->SetFiberWeights(1);
-      m_OutCentroids.at(w)->SetFiberWeights(1);
-    }
-    fib->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
+      rank = (float)w/(m_OutTractograms.size()-1);
+    m_OutCentroids.at(w)->SetFiberWeights(rank);
+
+    double color[3];
+    rankColors->GetColor(rank, color);
+    fib->SetFiberColors(255.0*color[0], 255.0*color[1], 255.0*color[2]);
     ++w;
   }
 
