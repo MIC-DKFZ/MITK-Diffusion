@@ -115,39 +115,39 @@ void TractsToRgbaImageFilter< OutputImageType >::GenerateData()
         double_out->SetPixel(segment.first, pix);
       }
     }
+  }
 
-    float maxRgb = 0.000000001;
-    float maxInt = 0.000000001;
-    int w = upsampledSize[0];
-    int h = upsampledSize[1];
-    int d = upsampledSize[2];
-    int numPix = w*h*d*4;
+  float maxRgb = 0.000000001;
+  float maxInt = 0.000000001;
+  int w = upsampledSize[0];
+  int h = upsampledSize[1];
+  int d = upsampledSize[2];
+  int numPix = w*h*d*4;
 
-    double* buffer = (double*)double_out->GetBufferPointer();
-    // calc maxima
-    for(int i=0; i<numPix; i++)
+  double* buffer = (double*)double_out->GetBufferPointer();
+  // calc maxima
+  for(int i=0; i<numPix; i++)
+  {
+    if((i-3)%4 != 0)
     {
-      if((i-3)%4 != 0)
-      {
-        if(buffer[i] > maxRgb)
-          maxRgb = buffer[i];
-      }
-      else
-      {
-        if(buffer[i] > maxInt)
-          maxInt = buffer[i];
-      }
+      if(buffer[i] > maxRgb)
+        maxRgb = buffer[i];
     }
-
-    // write output, normalized uchar 0..255
-    unsigned char* outImageBufferPointer = (unsigned char*)outImage->GetBufferPointer();
-    for(int i=0; i<numPix; i++)
+    else
     {
-      if((i-3)%4 != 0)
-        outImageBufferPointer[i] = (unsigned char) (255.0 * buffer[i] / maxRgb);
-      else
-        outImageBufferPointer[i] = (unsigned char) (255.0 * buffer[i] / maxInt);
+      if(buffer[i] > maxInt)
+        maxInt = buffer[i];
     }
+  }
+
+  // write output, normalized uchar 0..255
+  unsigned char* outImageBufferPointer = (unsigned char*)outImage->GetBufferPointer();
+  for(int i=0; i<numPix; i++)
+  {
+    if((i-3)%4 != 0)
+      outImageBufferPointer[i] = (unsigned char) (255.0 * buffer[i] / maxRgb);
+    else
+      outImageBufferPointer[i] = (unsigned char) (255.0 * buffer[i] / maxInt);
   }
 }
 }
