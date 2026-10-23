@@ -27,6 +27,7 @@
     category="Signal modeling"
     icon="resources/tensor.png"
     class="QmitkTensorReconstructionView">
+    <description>Diffusion tensor reconstruction, tensors to ODF and tensors to DWI</description>
     <keywordReference id="org.mitk.views.reconstruction.Keyword"/>
     </view>
 
@@ -35,6 +36,7 @@
     category="Signal modeling"
     class="QmitkOdfMaximaExtractionView"
     icon="resources/odf_peaks.png">
+    <description>Peaks of SH ODF images and principal directions of tensor images</description>
     <keywordReference id="org.mitk.views.odfmaximaextraction.Keyword"/>
     </view>
 
@@ -53,13 +55,8 @@
   <keyword label="ODF" id="org.mitk.views.diffusionquantification.Keyword"/>
   <keyword label="dODF" id="org.mitk.views.diffusionquantification.Keyword"/>
 
-  <keyword label="signal" id="org.mitk.views.reconstruction.Keyword"/>
-  <keyword label="reconstruction" id="org.mitk.views.reconstruction.Keyword"/>
   <keyword label="tensor" id="org.mitk.views.reconstruction.Keyword"/>
-  <keyword label="diffusion" id="org.mitk.views.reconstruction.Keyword"/>
   <keyword label="second order" id="org.mitk.views.reconstruction.Keyword"/>
-  <keyword label="propagator" id="org.mitk.views.reconstruction.Keyword"/>
-  <keyword label="modeling" id="org.mitk.views.reconstruction.Keyword"/>
   <keyword label="DTI" id="org.mitk.views.reconstruction.Keyword"/>
 
   <keyword label="ADC" id="org.mitk.views.diffusionquantification.Keyword"/>
