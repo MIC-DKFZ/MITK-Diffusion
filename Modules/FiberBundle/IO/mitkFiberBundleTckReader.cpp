@@ -31,8 +31,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTrackvis.h>
 #include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
-#include <vtkTransformFilter.h>
-#include <mitkLexicalCast.h>
+#include <mitkExceptionMacro.h>
+
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <cmath>
+#include <cstring>
+#include <fstream>
+#include <sstream>
 
 
 mitk::FiberBundleTckReader::FiberBundleTckReader()
@@ -51,113 +58,149 @@ mitk::FiberBundleTckReader * mitk::FiberBundleTckReader::Clone() const
   return new FiberBundleTckReader(*this);
 }
 
+namespace
+{
+  /** Reads the MRtrix header up to the line "END": offset of the data ("file: . <offset>"),
+   *  "datatype" and "count". Throws when the header is incomplete. */
+  struct TckHeader
+  {
+    std::streamoff offset = -1;
+    std::string datatype = "Float32LE";
+    long long count = -1;
+  };
+
+  TckHeader ReadTckHeader(std::istream& in, const std::string& filename)
+  {
+    TckHeader header;
+    std::string line;
+    bool first = true;
+    bool end = false;
+    while (std::getline(in, line))
+    {
+      if (!line.empty() && line.back()=='\r')
+        line.pop_back();
+      if (first && line!="mrtrix tracks")
+        mitkThrow() << filename << " is no MRtrix tracks file (first line \"" << line << "\").";
+      first = false;
+      if (line=="END")
+      {
+        end = true;
+        break;
+      }
+
+      const auto colon = line.find(':');
+      if (colon==std::string::npos)
+        continue;
+      const std::string key = line.substr(0, colon);
+      std::istringstream value(line.substr(colon+1));
+      if (key=="file")
+      {
+        std::string dot;
+        value >> dot >> header.offset;
+        if (dot!="." || value.fail())
+          mitkThrow() << "Unsupported \"file:\" entry in " << filename << ": \"" << line << "\"";
+      }
+      else if (key=="datatype")
+        value >> header.datatype;
+      else if (key=="count")
+        value >> header.count;
+    }
+    if (!end)
+      mitkThrow() << "MRtrix header of " << filename << " has no END line.";
+    if (header.offset<0)
+      mitkThrow() << "MRtrix header of " << filename << " has no \"file: . <offset>\" entry.";
+    return header;
+  }
+
+  /** One coordinate triple in the file's data type and byte order, converted to double. */
+  template <typename T>
+  bool ReadTriple(std::istream& in, bool swapBytes, double* triple)
+  {
+    for (int c=0; c<3; ++c)
+    {
+      std::array<char, sizeof(T)> bytes;
+      if (!in.read(bytes.data(), bytes.size()))
+        return false;
+      if (swapBytes)
+        std::reverse(bytes.begin(), bytes.end());
+      T value;
+      std::memcpy(&value, bytes.data(), sizeof(T));
+      triple[c] = static_cast<double>(value);
+    }
+    return true;
+  }
+}
+
 std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleTckReader::DoRead()
 {
-
   std::vector<itk::SmartPointer<mitk::BaseData> > result;
-  try
+  const std::string filename = this->GetInputLocation();
+  MITK_INFO << "Loading tractogram (MRtrix format): " << itksys::SystemTools::GetFilenameName(filename);
+
+  // Opened for reading only, so that read-only files and shares load.
+  std::ifstream in(filename, std::ios::binary);
+  if (!in)
+    mitkThrow() << "Could not open " << filename;
+
+  const TckHeader header = ReadTckHeader(in, filename);
+
+  bool isDouble = false;
+  bool isBigEndian = false;
+  if (header.datatype=="Float32LE" || header.datatype=="Float32BE")
+    isDouble = false;
+  else if (header.datatype=="Float64LE" || header.datatype=="Float64BE")
+    isDouble = true;
+  else
+    mitkThrow() << "Unsupported MRtrix data type " << header.datatype << " in " << filename;
+  isBigEndian = header.datatype.compare(header.datatype.size()-2, 2, "BE")==0;
+  const bool swapBytes = isBigEndian != (std::endian::native==std::endian::big);
+
+  in.clear();
+  in.seekg(header.offset);
+  if (!in)
+    mitkThrow() << "Data offset " << header.offset << " lies outside " << filename;
+
+  vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
+  vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
+  vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+
+  // Tracks end with a NaN triple, the file with an Inf triple.
+  bool terminated = false;
+  double p[3];
+  while (isDouble ? ReadTriple<double>(in, swapBytes, p) : ReadTriple<float>(in, swapBytes, p))
   {
-    const std::string& locale = "C";
-    const std::string& currLocale = setlocale( LC_ALL, nullptr );
-    setlocale(LC_ALL, locale.c_str());
-
-    std::string filename = this->GetInputLocation();
-
-    std::string ext = itksys::SystemTools::GetFilenameLastExtension(filename);
-    ext = itksys::SystemTools::LowerCase(ext);
-
-    if (ext==".tck")
+    if (std::isinf(p[0]) || std::isinf(p[1]) || std::isinf(p[2]))
     {
-      MITK_INFO << "Loading tractogram (MRtrix format): " << itksys::SystemTools::GetFilenameName(filename);
-      std::FILE* filePointer = std::fopen(filename.c_str(),"r+b");
-      std::string header = "";
-
-      bool header_end = false;
-      int count = 0;
-      while (!header_end)
-      {
-        char c;
-        count += std::fread(&c, 1, 1, filePointer);
-        header += c;
-        if (header.size() >= 3 && header.compare(header.size() - 3, 3, "END") == 0)
-          header_end = true;
-      }
-      MITK_INFO << "TCK Header:";
-      MITK_INFO << header;
-
-      int header_size = -1;
-      try
-      {
-        std::string delimiter = "file: . ";
-        size_t pos = 0;
-        pos = header.find(delimiter);
-        header.erase(0, pos + delimiter.length());
-        pos = header.find("\n");
-        header_size = boost::lexical_cast<int>(header.substr(0, pos));
-      }
-      catch(...)
-      {
-
-      }
-
-      if (header_size==-1)
-        mitkThrow() << "Could not parse header size from " << filename;
-      std::fseek ( filePointer , header_size , SEEK_SET );
-
-      vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
-      vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
-      vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-
-      float tmp[3];
-      count = 1;
-      int fiber_length = 0;
-      while (std::fread((char*)tmp, 1, 12, filePointer)==12)
-      {
-        if (std::isinf(tmp[0]) || std::isinf(tmp[1]) || std::isinf(tmp[1]))
-          break;
-        else if (std::isnan(tmp[0]) || std::isnan(tmp[1]) || std::isnan(tmp[2]))
-        {
-          count++;
-          fiber_length = 0;
-          vtkNewCells->InsertNextCell(container);
-          container = vtkSmartPointer<vtkPolyLine>::New();
-        }
-        else
-        {
-          fiber_length++;
-          vtkIdType id = vtkNewPoints->InsertNextPoint(tmp);
-          container->GetPointIds()->InsertNextId(id);
-        }
-      }
-
-      vtkSmartPointer<vtkPolyData> fiberPolyData = vtkSmartPointer<vtkPolyData>::New();
-      fiberPolyData->SetPoints(vtkNewPoints);
-      fiberPolyData->SetLines(vtkNewCells);
-
-      // transform polydata from RAS (MRtrix) to LPS (MITK)
-      mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
-      vtkSmartPointer< vtkMatrix4x4 > matrix = vtkSmartPointer< vtkMatrix4x4 >::New();
-      matrix->Identity();
-      matrix->SetElement(0,0,-matrix->GetElement(0,0));
-      matrix->SetElement(1,1,-matrix->GetElement(1,1));
-      geometry->SetIndexToWorldTransformByVtkMatrix(matrix);
-
-      vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
-      transformFilter->SetInputData(fiberPolyData);
-      transformFilter->SetTransform(geometry->GetVtkTransform());
-      transformFilter->Update();
-
-      FiberBundle::Pointer fib = FiberBundle::New(transformFilter->GetPolyDataOutput());
-      result.push_back(fib.GetPointer());
+      terminated = true;
+      break;
     }
+    else if (std::isnan(p[0]) || std::isnan(p[1]) || std::isnan(p[2]))
+    {
+      vtkNewCells->InsertNextCell(container);
+      container = vtkSmartPointer<vtkPolyLine>::New();
+    }
+    else
+    {
+      // RAS (MRtrix) to LPS (MITK)
+      p[0] = -p[0];
+      p[1] = -p[1];
+      vtkIdType id = vtkNewPoints->InsertNextPoint(p);
+      container->GetPointIds()->InsertNextId(id);
+    }
+  }
 
-    setlocale(LC_ALL, currLocale.c_str());
-    MITK_INFO << "Fiber bundle read";
-    return result;
-  }
-  catch(...)
-  {
-    throw;
-  }
+  // MRtrix itself reads truncated files up to the last complete track, so they load with a warning.
+  if (!terminated)
+    MITK_WARN << filename << " ends without the end-of-file marker; " << container->GetNumberOfPoints() << " points of an incomplete track are dropped.";
+  if (header.count>=0 && header.count!=vtkNewCells->GetNumberOfCells())
+    MITK_WARN << filename << " declares " << header.count << " tracks but holds " << vtkNewCells->GetNumberOfCells() << ".";
+
+  vtkSmartPointer<vtkPolyData> fiberPolyData = vtkSmartPointer<vtkPolyData>::New();
+  fiberPolyData->SetPoints(vtkNewPoints);
+  fiberPolyData->SetLines(vtkNewCells);
+
+  FiberBundle::Pointer fib = FiberBundle::New(fiberPolyData);
+  result.push_back(fib.GetPointer());
+  MITK_INFO << "Fiber bundle read";
   return result;
 }

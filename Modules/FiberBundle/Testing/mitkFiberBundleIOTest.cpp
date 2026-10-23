@@ -17,11 +17,22 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itksys/SystemTools.hxx>
+#include <vtkCell.h>
 #include <vtkCellData.h>
 #include <vtkPointData.h>
+#include <vtkPoints.h>
 
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <cmath>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <limits>
 #include <set>
 #include <string>
+#include <vector>
 
 /** Regression tests for the fiber bundle readers and writers. Files are written to a temporary
  *  directory, nothing is added to MITK-Data. */
@@ -30,6 +41,9 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkFiberBundleIOTestSuite);
   MITK_TEST(VtkWriter_AllOptionCombinations_LeaveBundleUnchanged);
   MITK_TEST(DicomWriter_ReferencedImageUids_TractogramGetsOwnUids);
+  MITK_TEST(TckReader_AllFloatTypes_ReadSamePoints);
+  MITK_TEST(TckReader_ReadOnlyOrUnterminatedFile_Loads);
+  MITK_TEST(TckReader_HeaderWithoutEnd_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -56,6 +70,71 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
     for (int i = 0; i < polyData->GetCellData()->GetNumberOfArrays(); ++i)
       names.insert(std::string("cell ") + polyData->GetCellData()->GetArrayName(i));
     return names;
+  }
+
+  using Fiber = std::vector<std::array<double, 3>>;
+
+  /** Two fibers in RAS millimetres, as MRtrix stores them */
+  static std::vector<Fiber> TckFibers()
+  {
+    return {{{1.5, 2.0, 3.0}, {4.0, 5.25, 6.0}, {7.0, 8.0, 9.5}}, {{-1.0, -2.0, -3.0}, {-4.0, -5.0, 10.0}}};
+  }
+
+  template <typename T>
+  static void WriteValue(std::ostream &out, double value, bool bigEndian)
+  {
+    std::array<char, sizeof(T)> bytes;
+    const T typed = static_cast<T>(value);
+    std::memcpy(bytes.data(), &typed, sizeof(T));
+    if (bigEndian != (std::endian::native == std::endian::big))
+      std::reverse(bytes.begin(), bytes.end());
+    out.write(bytes.data(), bytes.size());
+  }
+
+  /** Writes an MRtrix .tck file: header, data at offset 1024, NaN after each track, Inf at the end. */
+  template <typename T>
+  static void WriteTck(const std::string &path,
+                       const std::string &datatype,
+                       const std::string &extraHeader = "",
+                       bool terminator = true)
+  {
+    const bool bigEndian = datatype.substr(datatype.size() - 2) == "BE";
+    const auto fibers = TckFibers();
+    std::string header = "mrtrix tracks\n" + extraHeader + "datatype: " + datatype +
+                         "\ncount: " + std::to_string(fibers.size()) + "\nfile: . 1024\nEND\n";
+    header.resize(1024, '\0');
+    std::ofstream out(path, std::ios::binary);
+    out.write(header.data(), header.size());
+    for (const auto &fiber : fibers)
+    {
+      for (const auto &p : fiber)
+        for (double c : p)
+          WriteValue<T>(out, c, bigEndian);
+      for (int c = 0; c < 3; ++c)
+        WriteValue<T>(out, std::numeric_limits<double>::quiet_NaN(), bigEndian);
+    }
+    if (terminator)
+      for (int c = 0; c < 3; ++c)
+        WriteValue<T>(out, std::numeric_limits<double>::infinity(), bigEndian);
+  }
+
+  /** The bundle holds TckFibers() in LPS (x and y negated). */
+  static void AssertTckFibers(mitk::FiberBundle *fib, const std::string &message)
+  {
+    const auto fibers = TckFibers();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message, static_cast<unsigned int>(fibers.size()), fib->GetNumFibers());
+    for (unsigned int i = 0; i < fibers.size(); ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(message, static_cast<vtkIdType>(fibers[i].size()), cell->GetNumberOfPoints());
+      for (unsigned int j = 0; j < fibers[i].size(); ++j)
+      {
+        const double *p = cell->GetPoints()->GetPoint(j);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -fibers[i][j][0], p[0], 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -fibers[i][j][1], p[1], 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, fibers[i][j][2], p[2], 1e-6);
+      }
+    }
   }
 
 public:
@@ -143,6 +222,52 @@ public:
     auto second = mitk::IOUtil::Load<mitk::FiberBundle>(path2);
     CPPUNIT_ASSERT_EQUAL(StringProperty(fib, "DICOM.sop_instance_uid"), StringProperty(second, "DICOM.sop_instance_uid"));
     CPPUNIT_ASSERT(StringProperty(second, "DICOM.tractogram.sop_instance_uid") != ownInstance);
+  }
+
+  void TckReader_AllFloatTypes_ReadSamePoints()
+  {
+    const std::string path = m_TempDir + "/fibers.tck";
+    WriteTck<float>(path, "Float32LE");
+    AssertTckFibers(mitk::IOUtil::Load<mitk::FiberBundle>(path), "Float32LE");
+    WriteTck<float>(path, "Float32BE");
+    AssertTckFibers(mitk::IOUtil::Load<mitk::FiberBundle>(path), "Float32BE");
+    WriteTck<double>(path, "Float64LE");
+    AssertTckFibers(mitk::IOUtil::Load<mitk::FiberBundle>(path), "Float64LE");
+    WriteTck<double>(path, "Float64BE");
+    AssertTckFibers(mitk::IOUtil::Load<mitk::FiberBundle>(path), "Float64BE");
+
+    // "END" inside a header value does not end the header
+    WriteTck<float>(path, "Float32LE", "command_history: tckgen /data/LEGEND/BACKEND.mif\n");
+    AssertTckFibers(mitk::IOUtil::Load<mitk::FiberBundle>(path), "END in a header value");
+  }
+
+  void TckReader_ReadOnlyOrUnterminatedFile_Loads()
+  {
+    const std::string path = m_TempDir + "/readonly.tck";
+    WriteTck<float>(path, "Float32LE");
+    std::filesystem::permissions(path, std::filesystem::perms::owner_read | std::filesystem::perms::group_read |
+                                         std::filesystem::perms::others_read);
+    AssertTckFibers(mitk::IOUtil::Load<mitk::FiberBundle>(path), "read-only file");
+
+    const std::string unterminated = m_TempDir + "/unterminated.tck";
+    WriteTck<float>(unterminated, "Float32LE", "", false);
+    AssertTckFibers(mitk::IOUtil::Load<mitk::FiberBundle>(unterminated), "file without end marker");
+  }
+
+  void TckReader_HeaderWithoutEnd_Throws()
+  {
+    const std::string path = m_TempDir + "/truncated.tck";
+    {
+      std::ofstream out(path, std::ios::binary);
+      out << "mrtrix tracks\ndatatype: Float32LE\nfile: . 1024\n";
+    }
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load(path), std::exception);
+
+    {
+      std::ofstream out(path, std::ios::binary);
+      out << "mrtrix tracks\ndatatype: Float32LE\nEND\n";
+    }
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load(path), std::exception);
   }
 };
 
