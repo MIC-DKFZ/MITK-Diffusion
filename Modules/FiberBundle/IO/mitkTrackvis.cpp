@@ -1,5 +1,9 @@
 #include <mitkTrackvis.h>
+#include <mitkExceptionMacro.h>
 #include <vtkTransformFilter.h>
+
+#include <cstdint>
+#include <cstring>
 
 TrackVisFiberReader::TrackVisFiberReader()  { m_Filename = ""; m_FilePointer = nullptr; }
 
@@ -39,12 +43,25 @@ short TrackVisFiberReader::open( std::string filename )
 {
   m_FilePointer = std::fopen(filename.c_str(), "rb");
   if (m_FilePointer == nullptr)
-  {
-    printf("[ERROR] Unable to open file '%s'\n",filename.c_str());
-    return 0;
-  }
+    mitkThrow() << "Unable to open TrackVis file " << filename;
   this->m_Filename = filename;
-  return fread((char*)(&m_Header), 1, 1000, m_FilePointer);
+
+  if (fread((char*)(&m_Header), 1, 1000, m_FilePointer) != 1000)
+    mitkThrow() << filename << " is shorter than a TrackVis header (1000 bytes).";
+  if (std::strncmp(m_Header.id_string, "TRACK", 5) != 0)
+    mitkThrow() << filename << " is no TrackVis file (id_string is not \"TRACK\").";
+  if (m_Header.hdr_size != 1000)
+  {
+    // The TrackVis format detects the byte order by hdr_size.
+    std::uint32_t size = static_cast<std::uint32_t>(m_Header.hdr_size);
+    size = ((size >> 24) & 0xffu) | ((size >> 8) & 0xff00u) | ((size << 8) & 0xff0000u) | ((size << 24) & 0xff000000u);
+    if (size == 1000)
+      mitkThrow() << filename << " is a big-endian TrackVis file, which is not supported.";
+    mitkThrow() << filename << " has an invalid TrackVis header size " << m_Header.hdr_size << " (expected 1000).";
+  }
+  if (m_Header.n_scalars < 0 || m_Header.n_properties < 0)
+    mitkThrow() << filename << " has a negative number of scalars or properties in its TrackVis header.";
+  return 1;
 }
 
 short TrackVisFiberReader::write(const mitk::FiberBundle *fib)
@@ -169,36 +186,51 @@ void TrackVisFiberReader::print_header()
 
 short TrackVisFiberReader::read( mitk::FiberBundle* fib, bool use_matrix, bool flip_x, bool flip_y, bool flip_z, bool print_header)
 {
-  int numPoints;
+  int numPoints = 0;
+  int numFibers = 0;
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
   if (print_header)
     this->print_header();
 
-  while (fread((char*)&numPoints, 1, 4, m_FilePointer)==4)
+  // Each point holds x, y, z and n_scalars values, each track is followed by n_properties
+  // values (TrackVis, nibabel, dipy); only the coordinates are imported.
+  const std::size_t valuesPerPoint = 3 + static_cast<std::size_t>(m_Header.n_scalars);
+  const std::size_t numProperties = static_cast<std::size_t>(m_Header.n_properties);
+  if (valuesPerPoint > 3 || numProperties > 0)
+    MITK_INFO << "Skipping " << m_Header.n_scalars << " scalars per point and " << m_Header.n_properties << " properties per track.";
+  std::vector<float> pointValues(valuesPerPoint);
+  std::vector<float> properties(numProperties);
+
+  std::size_t countBytes = 0;
+  while ((countBytes = fread((char*)&numPoints, 1, 4, m_FilePointer))==4)
   {
     if ( numPoints <= 0 )
-    {
-      printf( "[ERROR] Trying to read a fiber with %d points!\n", numPoints );
-      return -1;
-    }
+      mitkThrow() << "TrackVis file " << m_Filename << ": track " << numFibers << " has " << numPoints << " points.";
     vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
 
     float tmp[3];
     for(int i=0; i<numPoints; i++)
     {
-      if (fread((char*)tmp, 1, 12, m_FilePointer) == 0)
-        MITK_ERROR << "TrackVis::read: Error during read.";
+      if (fread(pointValues.data(), sizeof(float), valuesPerPoint, m_FilePointer) != valuesPerPoint)
+        mitkThrow() << "TrackVis file " << m_Filename << " is truncated in track " << numFibers << ".";
 
       // TRK coordinates are corner based, so we have to shift them back to center based coordinates
-      tmp[0] -= m_Header.voxel_size[0]/2;
-      tmp[1] -= m_Header.voxel_size[1]/2;
-      tmp[2] -= m_Header.voxel_size[2]/2;
+      tmp[0] = pointValues[0] - m_Header.voxel_size[0]/2;
+      tmp[1] = pointValues[1] - m_Header.voxel_size[1]/2;
+      tmp[2] = pointValues[2] - m_Header.voxel_size[2]/2;
       vtkIdType id = vtkNewPoints->InsertNextPoint(tmp);
       container->GetPointIds()->InsertNextId(id);
     }
+    if (numProperties > 0 && fread(properties.data(), sizeof(float), numProperties, m_FilePointer) != numProperties)
+      mitkThrow() << "TrackVis file " << m_Filename << " is truncated in track " << numFibers << ".";
     vtkNewCells->InsertNextCell(container);
+    ++numFibers;
   }
+  if (countBytes != 0)
+    mitkThrow() << "TrackVis file " << m_Filename << " is truncated after track " << numFibers << ".";
+  if (m_Header.n_count > 0 && m_Header.n_count != numFibers)
+    MITK_WARN << "TrackVis header of " << m_Filename << " declares " << m_Header.n_count << " tracks, the file holds " << numFibers << ".";
 
   vtkSmartPointer<vtkPolyData> fiberPolyData = vtkSmartPointer<vtkPolyData>::New();
   fiberPolyData->SetPoints(vtkNewPoints);

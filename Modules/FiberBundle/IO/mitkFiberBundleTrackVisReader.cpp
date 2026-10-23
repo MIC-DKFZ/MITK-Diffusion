@@ -63,10 +63,6 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleTrackVisReader:
   std::vector<itk::SmartPointer<mitk::BaseData> > result;
   try
   {
-    const std::string& locale = "C";
-    const std::string& currLocale = setlocale( LC_ALL, nullptr );
-    setlocale(LC_ALL, locale.c_str());
-
     std::string filename = this->GetInputLocation();
     MITK_INFO << "Loading tractogram (TrackVis format): " << itksys::SystemTools::GetFilenameName(filename);
 
@@ -89,7 +85,6 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleTrackVisReader:
       return result;
     }
 
-    setlocale(LC_ALL, currLocale.c_str());
     MITK_INFO << "Fiber bundle read";
   }
   catch(...)

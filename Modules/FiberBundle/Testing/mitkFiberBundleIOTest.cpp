@@ -26,6 +26,7 @@ found in the LICENSE file.
 #include <array>
 #include <bit>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -44,6 +45,8 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TckReader_AllFloatTypes_ReadSamePoints);
   MITK_TEST(TckReader_ReadOnlyOrUnterminatedFile_Loads);
   MITK_TEST(TckReader_HeaderWithoutEnd_Throws);
+  MITK_TEST(TrkReader_ScalarsAndProperties_AreSkipped);
+  MITK_TEST(TrkReader_InvalidFiles_Throw);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -133,6 +136,94 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
         CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -fibers[i][j][0], p[0], 1e-6);
         CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -fibers[i][j][1], p[1], 1e-6);
         CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, fibers[i][j][2], p[2], 1e-6);
+      }
+    }
+  }
+
+  using TrkHeader = mitk::FiberBundle::TrackVis_header;
+  static_assert(sizeof(TrkHeader) == 1000, "TrackVis header layout");
+
+  /** Two tracks in TrackVis voxmm coordinates (corner based) */
+  static std::vector<Fiber> TrkFibers()
+  {
+    return {{{3.0, 4.0, 5.0}, {6.0, 7.0, 8.0}, {9.0, 10.0, 11.5}}, {{1.0, 1.0, 1.0}, {2.0, 3.0, 4.0}}};
+  }
+
+  /** Version 2 header with the given voxel order and vox_to_ras, 2 mm voxels */
+  static TrkHeader MakeTrkHeader(const std::string &voxelOrder, const std::array<std::array<float, 4>, 4> &voxToRas)
+  {
+    TrkHeader header;
+    std::memset(&header, 0, sizeof(header));
+    std::memcpy(header.id_string, "TRACK", 6);
+    for (int i = 0; i < 3; ++i)
+    {
+      header.dim[i] = 20;
+      header.voxel_size[i] = 2.0f;
+    }
+    for (int i = 0; i < 4; ++i)
+      for (int j = 0; j < 4; ++j)
+        header.vox_to_ras[i][j] = voxToRas[i][j];
+    std::memcpy(header.voxel_order, voxelOrder.c_str(), 3);
+    header.version = 2;
+    header.hdr_size = 1000;
+    return header;
+  }
+
+  static std::array<std::array<float, 4>, 4> RasAffine()
+  {
+    return {{{2, 0, 0, -10}, {0, 2, 0, -20}, {0, 0, 2, 5}, {0, 0, 0, 1}}};
+  }
+
+  static void WriteTrk(const std::string &path, TrkHeader header, int numScalars = 0, int numProperties = 0)
+  {
+    header.n_scalars = static_cast<short>(numScalars);
+    header.n_properties = static_cast<short>(numProperties);
+    std::ofstream out(path, std::ios::binary);
+    out.write(reinterpret_cast<const char *>(&header), sizeof(header));
+    for (const auto &fiber : TrkFibers())
+    {
+      const std::int32_t numPoints = static_cast<std::int32_t>(fiber.size());
+      out.write(reinterpret_cast<const char *>(&numPoints), 4);
+      for (const auto &p : fiber)
+      {
+        for (double c : p)
+        {
+          const float value = static_cast<float>(c);
+          out.write(reinterpret_cast<const char *>(&value), 4);
+        }
+        const float scalar = 42.0f;
+        for (int s = 0; s < numScalars; ++s)
+          out.write(reinterpret_cast<const char *>(&scalar), 4);
+      }
+      const float property = -7.0f;
+      for (int s = 0; s < numProperties; ++s)
+        out.write(reinterpret_cast<const char *>(&property), 4);
+    }
+  }
+
+  /** The bundle holds TrkFibers() mapped as the TrackVis format defines it,
+   *  RAS = vox_to_ras * (voxmm / voxel_size - 0.5), converted to LPS. */
+  static void AssertTrkFibersSpecMap(mitk::FiberBundle *fib, const TrkHeader &header, const std::string &message)
+  {
+    const auto fibers = TrkFibers();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message, static_cast<unsigned int>(fibers.size()), fib->GetNumFibers());
+    for (unsigned int i = 0; i < fibers.size(); ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(message, static_cast<vtkIdType>(fibers[i].size()), cell->GetNumberOfPoints());
+      for (unsigned int j = 0; j < fibers[i].size(); ++j)
+      {
+        double ras[3];
+        for (int r = 0; r < 3; ++r)
+        {
+          ras[r] = header.vox_to_ras[r][3];
+          for (int c = 0; c < 3; ++c)
+            ras[r] += header.vox_to_ras[r][c] * (fibers[i][j][c] / header.voxel_size[c] - 0.5);
+        }
+        const double *p = cell->GetPoints()->GetPoint(j);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -ras[0], p[0], 1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -ras[1], p[1], 1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, ras[2], p[2], 1e-4);
       }
     }
   }
@@ -268,6 +359,52 @@ public:
       out << "mrtrix tracks\ndatatype: Float32LE\nEND\n";
     }
     CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load(path), std::exception);
+  }
+
+  void TrkReader_ScalarsAndProperties_AreSkipped()
+  {
+    const auto header = MakeTrkHeader("RAS", RasAffine());
+    const std::string path = m_TempDir + "/fibers.trk";
+    WriteTrk(path, header);
+    AssertTrkFibersSpecMap(mitk::IOUtil::Load<mitk::FiberBundle>(path), header, "coordinates only");
+    WriteTrk(path, header, 2, 1);
+    AssertTrkFibersSpecMap(mitk::IOUtil::Load<mitk::FiberBundle>(path), header, "2 scalars, 1 property");
+  }
+
+  void TrkReader_InvalidFiles_Throw()
+  {
+    const std::string valid = m_TempDir + "/valid.trk";
+    WriteTrk(valid, MakeTrkHeader("RAS", RasAffine()));
+    const auto validSize = std::filesystem::file_size(valid);
+
+    const std::string path = m_TempDir + "/invalid.trk";
+    std::filesystem::copy_file(valid, path);
+    std::filesystem::resize_file(path, 500);
+    CPPUNIT_ASSERT_THROW_MESSAGE("shorter than the header", mitk::IOUtil::Load(path), std::exception);
+
+    std::filesystem::remove(path);
+    std::filesystem::copy_file(valid, path);
+    std::filesystem::resize_file(path, validSize - 6);
+    CPPUNIT_ASSERT_THROW_MESSAGE("truncated in a point", mitk::IOUtil::Load(path), std::exception);
+
+    auto header = MakeTrkHeader("RAS", RasAffine());
+    std::memcpy(header.id_string, "TRICK", 6);
+    WriteTrk(path, header);
+    CPPUNIT_ASSERT_THROW_MESSAGE("wrong id_string", mitk::IOUtil::Load(path), std::exception);
+
+    header = MakeTrkHeader("RAS", RasAffine());
+    header.hdr_size = static_cast<int>(0xE8030000u); // 1000 with swapped bytes
+    WriteTrk(path, header);
+    CPPUNIT_ASSERT_THROW_MESSAGE("big-endian file", mitk::IOUtil::Load(path), std::exception);
+
+    {
+      std::ofstream out(path, std::ios::binary);
+      const auto valid_header = MakeTrkHeader("RAS", RasAffine());
+      out.write(reinterpret_cast<const char *>(&valid_header), sizeof(valid_header));
+      const std::int32_t numPoints = 0;
+      out.write(reinterpret_cast<const char *>(&numPoints), 4);
+    }
+    CPPUNIT_ASSERT_THROW_MESSAGE("track without points", mitk::IOUtil::Load(path), std::exception);
   }
 };
 
