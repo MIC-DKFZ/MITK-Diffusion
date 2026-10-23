@@ -59,7 +59,6 @@ protected:
 
   Ui::QmitkDicomTractogramTagEditorViewControls* m_Controls;
   std::vector< std::string > m_TagList;
-  std::vector< std::string > m_ImageTagList;
   mitk::Image::Pointer m_Image;
 
 protected slots:

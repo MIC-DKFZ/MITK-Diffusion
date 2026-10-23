@@ -22,6 +22,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkDicomTractogramTagEditorView.h"
+#include <mitkFiberBundleDicomReferenceTags.h>
+#include <QMessageBox>
 #include "QmitkStdMultiWidget.h"
 
 // Qt
@@ -45,6 +47,7 @@ QmitkDicomTractogramTagEditorView::QmitkDicomTractogramTagEditorView()
                "DICOM.study_instance_uid",
                "DICOM.series_instance_uid",
                "DICOM.sop_instance_uid",
+               "DICOM.sop_class_uid",
                "DICOM.frame_of_reference_uid",
               "DICOM.algo_family_code.value",
               "DICOM.algo_family_code.meaning",
@@ -52,12 +55,6 @@ QmitkDicomTractogramTagEditorView::QmitkDicomTractogramTagEditorView()
               "DICOM.model_code.meaning",
               "DICOM.anatomy.value",
               "DICOM.anatomy.meaning"};
-  m_ImageTagList = {"DICOM.patient_id",
-               "DICOM.patient_name",
-               "DICOM.study_instance_uid",
-               "DICOM.series_instance_uid",
-               "DICOM.sop_instance_uid",
-               "DICOM.frame_of_reference_uid"};
 }
 
 // Destructor
@@ -108,16 +105,16 @@ void QmitkDicomTractogramTagEditorView::CopyProperties()
   if (m_Image.IsNull())
     return;
 
-  mitk::PropertyList* source_p_list = m_Image->GetPropertyList();
-  mitk::PropertyList* target_p_list = fib->GetPropertyList();
-
-  for (std::string tag : m_ImageTagList)
-  {
-    std::string val = "0";
-    source_p_list->GetStringProperty(tag.c_str(), val);
-    target_p_list->SetStringProperty(tag.c_str(), val.c_str());
-  }
+  // Tags the image lacks keep their value in the tractogram and are reported.
+  const auto missing = mitk::CopyDicomReferenceTags(m_Image, fib);
   UpdateGui();
+  if (!missing.empty())
+  {
+    QString list;
+    for (const auto& tag : missing)
+      list += QString("\n") + QString::fromStdString(tag);
+    QMessageBox::information(nullptr, "DICOM tags", "The image does not provide these tags; they were not changed:" + list);
+  }
 }
 
 void QmitkDicomTractogramTagEditorView::OnItemChanged(QTableWidgetItem* item)

@@ -143,7 +143,7 @@ QGroupBox {
    <item row="2" column="0">
     <widget class="QCommandLinkButton" name="m_CopyPropsButton">
      <property name="toolTip">
-      <string>Copies the DICOM properties of the tractogram selected in this view to the one selected in the datamanager.</string>
+      <string>Copies patient, study, series, SOP instance and class and frame of reference UIDs of the image selected in the Data Manager to the tractogram selected in this view. Tags the image lacks are left unchanged.</string>
      </property>
      <property name="text">
       <string>Copy Properties From Image</string>

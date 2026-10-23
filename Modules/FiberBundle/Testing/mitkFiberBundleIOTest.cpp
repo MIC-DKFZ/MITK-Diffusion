@@ -12,6 +12,9 @@ found in the LICENSE file.
 
 #include <mitkFiberBundle.h>
 #include <mitkFiberBundleIOHelper.h>
+#include <mitkFiberBundleDicomReferenceTags.h>
+#include <mitkImage.h>
+#include <mitkTemporoSpatialStringProperty.h>
 #include <mitkIOMimeTypes.h>
 #include <mitkIOUtil.h>
 #include <mitkTestFixture.h>
@@ -65,6 +68,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(VtkReader_ColoursOfUnusedAndReorderedPoints_StayWithTheirPoints);
   MITK_TEST(DicomMimeType_NewDcmFile_FindsWriter);
   MITK_TEST(IOHelper_BrokenFileAndDottedNames_CoutRestored);
+  MITK_TEST(CopyDicomReferenceTags_BothNamingsAndMissingTags);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -679,6 +683,35 @@ public:
     std::streambuf *coutBuffer = std::cout.rdbuf();
     CPPUNIT_ASSERT_THROW(mitk::FiberBundleIOHelper::load_fibs({m_TempDir + "/plain.fib", broken}), std::exception);
     CPPUNIT_ASSERT_MESSAGE("std::cout is restored after an error", coutBuffer == std::cout.rdbuf());
+  }
+
+  void CopyDicomReferenceTags_BothNamingsAndMissingTags()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+
+    // names of the diffusion DICOM import
+    auto dwi = mitk::Image::New();
+    dwi->GetPropertyList()->SetStringProperty("DICOM.patient_id", "TEST0001");
+    dwi->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid", "1.2.826.0.1.3680043.2.1125.2");
+    auto missing = mitk::CopyDicomReferenceTags(dwi, fib);
+    CPPUNIT_ASSERT_EQUAL(std::string("TEST0001"), StringProperty(fib, "DICOM.patient_id"));
+    CPPUNIT_ASSERT_EQUAL(std::string("1.2.826.0.1.3680043.2.1125.2"), StringProperty(fib, "DICOM.series_instance_uid"));
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(5), missing.size());
+
+    // MITK's DICOM tag properties
+    auto anatomical = mitk::Image::New();
+    anatomical->SetProperty("DICOM.0010.0020", mitk::TemporoSpatialStringProperty::New("TEST0002"));
+    anatomical->SetProperty("DICOM.0008.0016", mitk::TemporoSpatialStringProperty::New("1.2.840.10008.5.1.4.1.1.4"));
+    missing = mitk::CopyDicomReferenceTags(anatomical, fib);
+    CPPUNIT_ASSERT_EQUAL(std::string("TEST0002"), StringProperty(fib, "DICOM.patient_id"));
+    CPPUNIT_ASSERT_EQUAL(std::string("1.2.840.10008.5.1.4.1.1.4"), StringProperty(fib, "DICOM.sop_class_uid"));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("A tag the image lacks stays as it was", std::string("1.2.826.0.1.3680043.2.1125.2"),
+                                 StringProperty(fib, "DICOM.series_instance_uid"));
+
+    // nothing to copy
+    missing = mitk::CopyDicomReferenceTags(mitk::Image::New(), fib);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(7), missing.size());
+    CPPUNIT_ASSERT_EQUAL(std::string("TEST0002"), StringProperty(fib, "DICOM.patient_id"));
   }
 };
 
