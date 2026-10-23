@@ -20,35 +20,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkOdfToRgbImageFilter.h"
 #include <mitkProperties.h>
 
-mitk::OdfImage::OdfImage() : Image()
-{
-  m_RgbImage = nullptr;
-}
+mitk::OdfImage::OdfImage() = default;
 
-mitk::OdfImage::OdfImage(const OdfImage& other) : Image(other)
+mitk::OdfImage::OdfImage(const OdfImage& other) : RgbCachedImage(other)
 {
 }
 
-mitk::OdfImage::~OdfImage()
-{
+mitk::OdfImage::~OdfImage() = default;
 
-}
-
-const vtkImageData* mitk::OdfImage::GetVtkImageData(int t, int n) const
-{
-  if(m_RgbImage.IsNull())
-    ConstructRgbImage();
-  return m_RgbImage->GetVtkImageData(t,n);
-}
-
-vtkImageData*mitk::OdfImage::GetVtkImageData(int t, int n)
-{
-  if(m_RgbImage.IsNull())
-    ConstructRgbImage();
-  return m_RgbImage->GetVtkImageData(t,n);
-}
-
-void mitk::OdfImage::ConstructRgbImage() const
+mitk::Image::Pointer mitk::OdfImage::CreateRgbImage() const
 {
   typedef itk::Image<itk::Vector<float,ODF_SAMPLING_SIZE>,3> ImageType;
   typedef itk::OdfToRgbImageFilter<ImageType> FilterType;
@@ -59,19 +39,8 @@ void mitk::OdfImage::ConstructRgbImage() const
   filter->SetInput(itkvol);
   filter->Update();
 
-  m_RgbImage = mitk::Image::New();
-  m_RgbImage->InitializeByItk( filter->GetOutput() );
-  m_RgbImage->SetVolume( filter->GetOutput()->GetBufferPointer() );
+  mitk::Image::Pointer image = mitk::Image::New();
+  image->InitializeByItk( filter->GetOutput() );
+  image->SetVolume( filter->GetOutput()->GetBufferPointer() );
+  return image;
 }
-
-const vtkImageData* mitk::OdfImage::GetNonRgbVtkImageData(int t, int n) const
-{
-  return Superclass::GetVtkImageData(t,n);
-}
-
-vtkImageData* mitk::OdfImage::GetNonRgbVtkImageData(int t, int n)
-{
-  return Superclass::GetVtkImageData(t,n);
-}
-
-

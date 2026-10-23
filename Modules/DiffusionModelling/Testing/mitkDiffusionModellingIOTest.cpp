@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <mitkImagePixelReadAccessor.h>
 #include <mitkFileReaderSelector.h>
 #include <mitkImageReadAccessor.h>
+#include <mitkImageWriteAccessor.h>
 #include <mitkOdfImage.h>
 #include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
@@ -27,6 +28,7 @@ found in the LICENSE file.
 
 #include <itkImageFileWriter.h>
 #include <itkVectorImage.h>
+#include <vtkImageData.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkUnsignedCharArray.h>
@@ -67,6 +69,8 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(PeakImage_PolydataHasOneLinePerPeak);
   MITK_TEST(Serializers_RoundTrip);
   MITK_TEST(TensorReader_NiftiLayouts_ElementMapping);
+  MITK_TEST(RgbCache_FollowsPixelChanges);
+  MITK_TEST(RgbCache_FollowsShConvention);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -703,6 +707,63 @@ public:
       AssertEqual(ToMatrix(numVolumes == 6 ? fromSix : fromNine),
                   ReadTensor(WriteNiftiAsDti(volumes.GetPointer(), "volumes" + std::to_string(numVolumes))));
     }
+  }
+
+  /** RGBA values of a colour map as shown by MITK's image mappers. */
+  static std::vector<unsigned char> Colours(mitk::Image *image)
+  {
+    vtkImageData *rgb = image->GetVtkImageData();
+    CPPUNIT_ASSERT(rgb != nullptr);
+    CPPUNIT_ASSERT_EQUAL(4, rgb->GetNumberOfScalarComponents());
+    const auto *begin = static_cast<const unsigned char *>(rgb->GetScalarPointer());
+    return std::vector<unsigned char>(begin, begin + 4 * rgb->GetNumberOfPoints());
+  }
+
+  // The colour map was built once and kept when the pixels changed later.
+  void RgbCache_FollowsPixelChanges()
+  {
+    auto image = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    const auto before = Colours(image);
+    CPPUNIT_ASSERT(image->GetVtkImageData() == image->GetVtkImageData());
+
+    {
+      // Every tensor diag(1, 0, 0): FA 1, principal direction x, so opaque red.
+      mitk::ImageWriteAccessor accessor(image);
+      auto *tensors = static_cast<float *>(accessor.GetData());
+      const std::size_t numberOfVoxels = image->GetDimension(0) * image->GetDimension(1) * image->GetDimension(2);
+      for (std::size_t v = 0; v < numberOfVoxels; ++v)
+      {
+        std::fill(tensors + 6 * v, tensors + 6 * v + 6, 0.0f);
+        tensors[6 * v] = 1.0f;
+      }
+    }
+    image->Modified();
+
+    const auto after = Colours(image);
+    CPPUNIT_ASSERT(before != after);
+    for (std::size_t i = 0; i < after.size(); i += 4)
+    {
+      CPPUNIT_ASSERT(after[i] >= 254 && after[i + 3] >= 254);
+      CPPUNIT_ASSERT_EQUAL(0, int(after[i + 1]));
+      CPPUNIT_ASSERT_EQUAL(0, int(after[i + 2]));
+    }
+  }
+
+  // The colours of an SH image depend on its convention.
+  void RgbCache_FollowsShConvention()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto image = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    CPPUNIT_ASSERT_EQUAL(mitk::ShImage::MRTRIX, image->GetShConvention());
+    const auto mrtrix = Colours(image);
+
+    image->SetShConvention(mitk::ShImage::FSL);
+    const auto fsl = Colours(image);
+    CPPUNIT_ASSERT(mrtrix != fsl);
+
+    auto reference = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    reference->SetShConvention(mitk::ShImage::FSL);
+    CPPUNIT_ASSERT(fsl == Colours(reference));
   }
 };
 

@@ -23,6 +23,7 @@ found in the LICENSE file.
 #include <mitkVtkMapper.h>
 
 #include <vtkActor.h>
+#include <vtkImageData.h>
 #include <vtkMapper.h>
 #include <vtkPlane.h>
 #include <vtkPlaneCollection.h>
@@ -30,6 +31,7 @@ found in the LICENSE file.
 #include <vtkPolyData.h>
 #include <vtkPropAssembly.h>
 #include <vtkPropCollection.h>
+#include <vtkSmartPointer.h>
 
 #include <cmath>
 
@@ -44,6 +46,7 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphsSwitchedOff_NoGlyphs);
   MITK_TEST(PeakImage_SlabFollowsPlane);
   MITK_TEST(CompositeMapper_PropAndImageMapperSlot);
+  MITK_TEST(ColourMap_NotRebuiltByRendering);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::RenderingTestHelper m_RenderingTestHelper;
@@ -196,6 +199,28 @@ public:
     parts->InitTraversal();
     CPPUNIT_ASSERT(composite->HasVtkProp(parts->GetNextProp(), renderer));
     CPPUNIT_ASSERT(composite->HasVtkProp(parts->GetNextProp(), renderer));
+  }
+
+  // The tensor image's colour map is rebuilt when the image was modified since it was built;
+  // rendering, slicing and changing the view must not count as a modification.
+  void ColourMap_NotRebuiltByRendering()
+  {
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    m_Node->SetBoolProperty("VisibleOdfs_S", true);
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) != nullptr);
+    auto image = dynamic_cast<mitk::TensorImage *>(m_Node->GetData());
+    // Held, so that a rebuilt colour map cannot get the same address.
+    vtkSmartPointer<vtkImageData> colourMap = image->GetVtkImageData();
+
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+    renderer->GetSliceNavigationController()->GetStepper()->Next();
+    m_RenderingTestHelper.Render();
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Sagittal) != nullptr);
+    m_RenderingTestHelper.Render();
+    CPPUNIT_ASSERT(colourMap == image->GetVtkImageData());
+
+    image->Modified();
+    CPPUNIT_ASSERT(colourMap != image->GetVtkImageData());
   }
 };
 

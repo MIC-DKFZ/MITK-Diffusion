@@ -23,55 +23,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "vtkImageData.h"
 
-mitk::TensorImage::TensorImage() : Image()
-{
-  m_RgbImage = nullptr;
-}
+mitk::TensorImage::TensorImage() = default;
 
-mitk::TensorImage::TensorImage(const TensorImage& other) : Image(other)
+mitk::TensorImage::TensorImage(const TensorImage& other) : RgbCachedImage(other)
 {
 }
 
-mitk::TensorImage::~TensorImage()
+mitk::TensorImage::~TensorImage() = default;
+
+mitk::Image::Pointer mitk::TensorImage::CreateRgbImage() const
 {
+  typedef itk::TensorToRgbImageFilter<ItkTensorImageType> FilterType;
+  FilterType::Pointer filter = FilterType::New();
 
-}
+  ItkTensorImageType::Pointer itkvol = ItkTensorImageType::New();
+  mitk::CastToItkImage(this, itkvol);
+  filter->SetInput(itkvol);
+  filter->Update();
 
-vtkImageData* mitk::TensorImage::GetVtkImageData(int t, int n)
-{
-  if(m_RgbImage.IsNull())
-  {
-    ConstructRgbImage();
-  }
-  return m_RgbImage->GetVtkImageData(t,n);
-}
-
-const vtkImageData*mitk::TensorImage::GetVtkImageData(int t, int n) const
-{
-  if(m_RgbImage.IsNull())
-  {
-    ConstructRgbImage();
-  }
-  return m_RgbImage->GetVtkImageData(t,n);
-}
-
-void mitk::TensorImage::ConstructRgbImage() const
-{
-    typedef itk::TensorToRgbImageFilter<ItkTensorImageType> FilterType;
-    FilterType::Pointer filter = FilterType::New();
-
-    ItkTensorImageType::Pointer itkvol = ItkTensorImageType::New();
-    mitk::CastToItkImage(this, itkvol);
-    filter->SetInput(itkvol);
-    filter->Update();
-
-    mitk::Image::Pointer image = mitk::Image::New();
-    image->InitializeByItk( filter->GetOutput() );
-    image->SetVolume( filter->GetOutput()->GetBufferPointer() );
-    m_RgbImage = image;
-}
-
-vtkImageData* mitk::TensorImage::GetNonRgbVtkImageData(int t, int n)
-{
-  return Superclass::GetVtkImageData(t,n);
+  mitk::Image::Pointer image = mitk::Image::New();
+  image->InitializeByItk( filter->GetOutput() );
+  image->SetVolume( filter->GetOutput()->GetBufferPointer() );
+  return image;
 }

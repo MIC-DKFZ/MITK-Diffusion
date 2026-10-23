@@ -3,6 +3,7 @@ set(CPP_FILES
   mitkDiffusionModellingHelperFunctions.cpp
 
   # DataStructures
+  IO/mitkRgbCachedImage.cpp
   IO/mitkOdfImage.cpp
   IO/mitkShImage.cpp
   IO/mitkTensorImage.cpp
@@ -44,6 +45,7 @@ set(H_FILES
   mitkDiffusionModellingHelperFunctions.h
 
   # DataStructures
+  IO/mitkRgbCachedImage.h
   IO/mitkOdfImage.h
   IO/mitkShImage.h
   IO/mitkTensorImage.h

@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __mitkTensorImage__h
 #define __mitkTensorImage__h
 
-#include "mitkImage.h"
+#include "mitkRgbCachedImage.h"
 #include "itkVectorImage.h"
 
 #include <MitkDiffusionModellingExports.h>
@@ -31,7 +31,7 @@ namespace mitk
   /**
   * \brief this class encapsulates tensor images
   */
-  class MITKDIFFUSIONMODELLING_EXPORT TensorImage : public Image
+  class MITKDIFFUSIONMODELLING_EXPORT TensorImage : public RgbCachedImage
   {
 
   public:
@@ -40,24 +40,17 @@ namespace mitk
     typedef itk::DiffusionTensor3D<ScalarPixelType> PixelType;
     typedef itk::Image<PixelType,3> ItkTensorImageType;
 
-    mitkClassMacro( TensorImage, Image )
+    mitkClassMacro( TensorImage, RgbCachedImage )
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
     mitkCloneMacro(Self)
-
-    virtual vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0);
-
-    vtkImageData* GetVtkImageData(int t = 0, int n = 0) override;
-    const vtkImageData* GetVtkImageData(int t = 0, int n = 0) const override;
-
-    virtual void ConstructRgbImage() const;
 
   protected:
     TensorImage();
     TensorImage(const TensorImage& other);
     ~TensorImage() override;
 
-    mutable mitk::Image::Pointer m_RgbImage;
+    Image::Pointer CreateRgbImage() const override;
 
   };
 
