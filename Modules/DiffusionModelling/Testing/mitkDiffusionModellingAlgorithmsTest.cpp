@@ -68,6 +68,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(Sh_InvalidCoefficientCounts_Throw);
   MITK_TEST(PrincipalDirection_FaThreshold_NoDirection);
   MITK_TEST(TensorMeasures_MatchReferences);
+  MITK_TEST(TensorMeasures_RelativeAnisotropy_UnitIndependent);
   MITK_TEST(Gfa_MatchesReference);
   MITK_TEST(ShToOdf_MatchesReference);
   MITK_TEST(ShBasis_ConventionsAndEvaluationAgree);
@@ -607,15 +608,16 @@ public:
     return maxDifference;
   }
 
-  // FA, RA, AD and RD reproduce the MITK-Data references. The MD reference was made by an older
+  // FA, AD and RD reproduce the MITK-Data references. The MD reference was made by an older
   // version and is not used; MD is checked against the trace, L2 and L3 against the eigenvalues.
+  // The RA reference holds ITK's unit-dependent formula; RA is checked against the eigenvalues.
   void TensorMeasures_MatchReferences()
   {
     using FilterType = itk::TensorDerivedMeasurementsFilter<float>;
     auto tensors = LoadItkTensors("DiffusionImaging/tensorImage.dti");
 
     const std::pair<FilterType::Measure, std::string> references[] = {
-      {FilterType::FA, "FA"}, {FilterType::RA, "RA"}, {FilterType::AD, "AD"}, {FilterType::RD, "RD"}};
+      {FilterType::FA, "FA"}, {FilterType::AD, "AD"}, {FilterType::RD, "RD"}};
     for (const auto &[measure, name] : references)
     {
       auto reference = LoadScalarImage("DiffusionImaging/tensorImage_" + name + ".nrrd");
@@ -626,6 +628,7 @@ public:
     auto md = TensorMeasure(tensors, FilterType::MD);
     auto l2 = TensorMeasure(tensors, FilterType::L2);
     auto l3 = TensorMeasure(tensors, FilterType::L3);
+    auto ra = TensorMeasure(tensors, FilterType::RA);
     itk::ImageRegionConstIterator<mitk::TensorImage::ItkTensorImageType> it(tensors, tensors->GetLargestPossibleRegion());
     unsigned int anisotropic = 0;
     for (; !it.IsAtEnd(); ++it)
@@ -633,6 +636,15 @@ public:
       const auto index = it.GetIndex();
       FilterType::TensorType::EigenValuesArrayType ev;
       it.Get().ComputeEigenValues(ev);
+      // RA = standard deviation / mean of the eigenvalues; the float eigenvalues limit the
+      // accuracy relative to the largest one, also in the mean.
+      const double mean = (static_cast<double>(ev[0]) + ev[1] + ev[2]) / 3.0;
+      if (mean > 1e-6)
+      {
+        const double deviation = std::sqrt(((ev[0] - mean) * (ev[0] - mean) + (ev[1] - mean) * (ev[1] - mean) + (ev[2] - mean) * (ev[2] - mean)) / 3.0);
+        const double largest = std::max({std::fabs(ev[0]), std::fabs(ev[1]), std::fabs(ev[2])});
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(deviation / mean, ra->GetPixel(index), 1e-6 * (1 + deviation / mean) * (1 + largest / mean));
+      }
       // MD comes from the float eigenvalues, so its error scales with the largest eigenvalue.
       const double scale = std::max({std::fabs(ev[0]), std::fabs(ev[1]), std::fabs(ev[2])});
       CPPUNIT_ASSERT_DOUBLES_EQUAL(it.Get().GetTrace() / 3.0, md->GetPixel(index), 1e-5 * scale + 1e-12);
@@ -645,6 +657,40 @@ public:
       }
     }
     CPPUNIT_ASSERT(anisotropic > 0);
+  }
+
+  static double RelativeAnisotropy(const itk::DiffusionTensor3D<float> &tensor)
+  {
+    auto image = TensorImageType::New();
+    TensorImageType::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    image->SetRegions(region);
+    image->Allocate();
+    image->FillBuffer(tensor);
+    return TensorMeasure(image, itk::TensorDerivedMeasurementsFilter<float>::RA)->GetPixel({{0, 0, 0}});
+  }
+
+  static itk::DiffusionTensor3D<float> Tensor(double xx, double xy, double xz, double yy, double yz, double zz)
+  {
+    const float elements[6] = {float(xx), float(xy), float(xz), float(yy), float(yz), float(zz)};
+    return itk::DiffusionTensor3D<float>(elements);
+  }
+
+  // RA was ITK's sqrt((3|D|^2 - tr^2) / (sqrt(3) tr)), which depends on the diffusivity unit
+  // (0.0314 in mm^2/s, 0.992 in um^2/ms for the prolate tensor below). Basser & Pierpaoli 1996:
+  // std / mean of the eigenvalues, 0 to sqrt(2).
+  void TensorMeasures_RelativeAnisotropy_UnitIndependent()
+  {
+    // Eigenvalues (1.7, 0.3, 0.3), principal axis (1, 1, 0) / sqrt(2): RA = 0.860818.
+    for (double scale : {1e-3, 1.0, 1e-9})
+    {
+      const auto prolate = Tensor(1.0 * scale, 0.7 * scale, 0, 1.0 * scale, 0, 0.3 * scale);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(0.860818, RelativeAnisotropy(prolate), 1e-5);
+    }
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sqrt(2.0), RelativeAnisotropy(Tensor(1e-3, 0, 0, 0, 0, 0)), 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, RelativeAnisotropy(Tensor(1e-3, 0, 0, 1e-3, 0, 1e-3)), 1e-6);
+    CPPUNIT_ASSERT_EQUAL(0.0, RelativeAnisotropy(Tensor(-1e-3, 0, 0, -1e-3, 0, 0.5e-3)));
+    CPPUNIT_ASSERT_EQUAL(0.0, RelativeAnisotropy(Tensor(0, 0, 0, 0, 0, 0)));
   }
 
   // GFA of the ODFs in qBallImage.qbi as stored in MITK-Data.
