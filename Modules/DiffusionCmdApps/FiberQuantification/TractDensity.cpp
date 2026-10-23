@@ -69,7 +69,7 @@ typename TImage::Pointer ReferenceGrid(const mitk::Image* reference)
 }
 
 /*!
-\brief Modify input tractogram: fiber resampling, compression, pruning and transformation.
+\brief Tract density image, fiber envelope or fiber endpoints image of a tractogram.
 */
 int main(int argc, char* argv[])
 {

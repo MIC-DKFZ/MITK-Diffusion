@@ -16,7 +16,7 @@ if(BUILD_DiffusionFiberProcessingCmdApps OR MITK_BUILD_ALL_APPS)
     FiberExtraction^^
     FiberExtractionRoi^^
     FiberModification^^
-    FitFibersToImage^^
+    FitFibersToImage^^MitkMriSimulation
     FiberDirectionExtraction^^
     FiberJoin^^
     FiberClustering^^
@@ -35,7 +35,7 @@ if(BUILD_DiffusionFiberProcessingCmdApps OR MITK_BUILD_ALL_APPS)
 
       mitkFunctionCreateCommandLineApp(
         NAME ${appname}
-        DEPENDS MitkDiffusionCmdApps MitkFiberProcessing MitkMriSimulation ${dependencies_list}
+        DEPENDS MitkDiffusionCmdApps MitkFiberProcessing ${dependencies_list}
         PACKAGE_DEPENDS
       )
     endforeach()

@@ -27,8 +27,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageToItk.h>
 #include <mitkStandaloneDataStorage.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
 
 /*!
 \brief Extract fibers from a tractogram using planar figure ROIs

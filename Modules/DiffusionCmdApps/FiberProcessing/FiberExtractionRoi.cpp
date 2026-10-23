@@ -31,10 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <filesystem>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
-
-typedef itksys::SystemTools ist;
 typedef itk::Image<float, 3>    ItkFloatImgType;
 
 ItkFloatImgType::Pointer LoadItkImage(const std::string& filename)

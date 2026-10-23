@@ -25,8 +25,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <mitkFiberBundleIOHelper.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
 
 /*!
 \brief Join multiple tractograms

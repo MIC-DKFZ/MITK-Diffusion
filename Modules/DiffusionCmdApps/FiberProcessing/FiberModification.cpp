@@ -64,8 +64,8 @@ int main(int argc, char* argv[])
   parser.beginGroup("3. Filtering:");
   parser.addArgument("min_length", "", mitkCommandLineParser::Float, "Minimum length:", "Minimum fiber length (in mm)");
   parser.addArgument("max_length", "", mitkCommandLineParser::Float, "Maximum length:", "Maximum fiber length (in mm)");
-  parser.addArgument("max_angle", "", mitkCommandLineParser::Float, "Maximum angle:", "Maximum angular STDEV (in degree) over given distance");
-  parser.addArgument("max_angle_dist", "", mitkCommandLineParser::Float, "Distance:", "Distance in mm", 10);
+  parser.addArgument("max_angle", "", mitkCommandLineParser::Float, "Maximum angle:", "Maximum mean angle (in degree) between the segment directions within --max_angle_dist and their mean direction");
+  parser.addArgument("max_angle_dist", "", mitkCommandLineParser::Float, "Distance:", "Length (mm) of the window along the fiber for --max_angle", 10);
   parser.addArgument("remove", "", mitkCommandLineParser::Bool, "Remove fibers exceeding curvature threshold:", "If false, only the high curvature parts are removed");
   parser.addArgument("subsample", "", mitkCommandLineParser::Float, "Randomly select fraction of streamlines:", "Randomly select the specified fraction of streamlines from the input tractogram");
   parser.addArgument("random_subsample", "", mitkCommandLineParser::Bool, "Randomly seed subsampling:", "Randomly seed subsampling. Else, use seed 0.");
