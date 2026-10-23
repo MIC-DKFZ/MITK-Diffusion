@@ -54,11 +54,12 @@ namespace
 
 mitk::FiberBundle::Pointer LoadFib(std::string filename)
 {
-  std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load(filename);
-  if( fibInfile.empty() )
-    std::cout << "File " << filename << " could not be read!";
-  mitk::BaseData::Pointer baseData = fibInfile.at(0);
-  return dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
+  // IOUtil throws if the file cannot be read; a file without a fiber bundle must not give a null
+  // bundle that the caller dereferences.
+  mitk::FiberBundle::Pointer fib = mitk::IOUtil::Load<mitk::FiberBundle>(filename);
+  if (fib.IsNull())
+    mitkThrow() << filename << " holds no fiber bundle.";
+  return fib;
 }
 
 /*!
