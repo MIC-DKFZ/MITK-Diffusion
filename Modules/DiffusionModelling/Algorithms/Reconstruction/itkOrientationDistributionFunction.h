@@ -14,16 +14,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkOrientationDistributionFunction_h
-#define __itkOrientationDistributionFunction_h
+#ifndef itkOrientationDistributionFunction_h
+#define itkOrientationDistributionFunction_h
 
 #include "itkFixedArray.h"
 #include "itkMatrix.h"
+#include <map>
 #include <mutex>
 #include "itkDiffusionTensor3D.h"
 
 #include "vtkPolyData.h"
-#include "vtkAppendPolyData.h"
+#include <vtkSmartPointer.h>
+#include "mitkPointShell.h"
 
 // generate by n-fold subdivisions of an icosahedron
 // 1 - 12
@@ -57,12 +59,6 @@ class OrientationDistributionFunction: public
 {
 public:
 
-  enum InterpolationMethods {
-    ODF_NEAREST_NEIGHBOR_INTERP,
-    ODF_TRILINEAR_BARYCENTRIC_INTERP,
-    ODF_SPHERICAL_GAUSSIAN_BASIS_FUNCTIONS
-  };
-
   /** Standard class typedefs. */
   typedef OrientationDistributionFunction  Self;
   typedef FixedArray<TComponent,NOdfDirections> Superclass;
@@ -80,7 +76,6 @@ public:
   typedef typename NumericTraits<ValueType>::RealType AccumulateValueType;
   typedef typename NumericTraits<ValueType>::RealType RealValueType;
 
-  typedef Matrix<TComponent, NOdfDirections, NOdfDirections> MatrixType;
 
   typedef vnl_matrix_fixed<double, 3, NOdfDirections> DirectionsType;
 
@@ -91,8 +86,9 @@ public:
 
   typedef ComponentType ComponentArrayType[ itkGetStaticConstMacro(InternalDimension) ];
 
-  /** Pass-through constructor for the Array base class. */
-  OrientationDistributionFunction(const Self& r): BaseArray(r) { m_EigenAnalysisCalculated = false; }
+  /** Pass-through constructor for the Array base class. The eigen analysis of InitFromEllipsoid
+   * is copied too, so a copy reports the same principal direction as the original. */
+  OrientationDistributionFunction(const Self& r): BaseArray(r) { CopyEigenAnalysis(r); }
   OrientationDistributionFunction(const ComponentArrayType r): BaseArray(r) { m_EigenAnalysisCalculated = false; }
 
   /** Pass-through assignment operator for the Array base class. */
@@ -112,10 +108,10 @@ public:
   const Self & operator*=(const RealValueType & scalar );
   const Self & operator/=(const RealValueType & scalar );
 
-  /** Return the number of components. */
-  static DirectionsType* GetDirections()
+  /** The N sampling directions, as the columns of a 3 x N matrix (mitk::pointshell). */
+  static const DirectionsType &GetDirections()
   {
-    return itkGetStaticConstMacro(m_Directions);
+    return mitk::pointshell::Directions<NOdfDirections>();
   }
 
   /** Return the number of components. */
@@ -128,30 +124,14 @@ public:
   ComponentType GetNthComponent(int c) const
   { return this->operator[](c); }
 
-  /** Return the value for the Nth component. */
-  ComponentType GetInterpolatedComponent( vnl_vector_fixed<double,3> dir, InterpolationMethods method ) const;
-
   /** Set the Nth component to v. */
   void SetNthComponent(int c, const ComponentType& v)
   {  this->operator[](c) = v; }
-
-  /** Matrix notation, in const and non-const forms. */
-  ValueType & operator()( unsigned int row, unsigned int col );
-  const ValueType & operator()( unsigned int row, unsigned int col ) const;
-
-  /** Set the distribution to isotropic.*/
-  void SetIsotropic();
 
   void InitFromTensor(itk::DiffusionTensor3D<TComponent> tensor);
 
   /** Evaluate diffusion tensor as ellipsoid. */
   void InitFromEllipsoid(itk::DiffusionTensor3D<TComponent> tensor);
-
-  /** Pre-Multiply by a Matrix as ResultingTensor = Matrix * ThisTensor. */
-  Self PreMultiply( const MatrixType & m ) const;
-
-  /** Post-Multiply by a Matrix as ResultingTensor = ThisTensor * Matrix. */
-  Self PostMultiply( const MatrixType & m ) const;
 
   void Normalize();
 
@@ -159,13 +139,11 @@ public:
 
   Self MaxNormalize() const;
 
-  void L2Normalize();
 
   int GetPrincipalDiffusionDirectionIndex() const;
 
   vnl_vector_fixed<double,3> GetPrincipalDiffusionDirection() const;
 
-  int GetNthDiffusionDirection(int n, vnl_vector_fixed<double,3> rndVec) const;
 
   TComponent GetGeneralizedFractionalAnisotropy() const;
 
@@ -179,43 +157,39 @@ public:
 
   ComponentType GetMaxValue() const;
 
-  ComponentType GetMinValue() const;
-
   ComponentType GetMeanValue() const;
 
   TComponent GetPrincipleCurvature(double alphaMinDegree, double alphaMaxDegree, int invert) const;
 
-  static std::vector<int> GetNeighbors(int idx);
+  /** The directions that share a triangle of the base mesh with direction idx, sorted. */
+  static const std::vector<int> &GetNeighbors(int idx);
 
-  static vtkPolyData* GetBaseMesh(){ComputeBaseMesh(); return m_BaseMesh;}
-
-  static void ComputeBaseMesh();
-
-  static double GetMaxChordLength();
+  /** Triangulation of the sampling directions, shared and not to be changed. */
+  static vtkPolyData *GetBaseMesh();
 
   static vnl_vector_fixed<double,3> GetDirection(int i);
 
 private:
 
-  static vtkPolyData* m_BaseMesh;
+  static vtkSmartPointer<vtkPolyData> BuildBaseMesh();
 
-  static double m_MaxChordLength;
+  /** Per pair of angles (GetPrincipleCurvature) and direction: the directions in that angular range */
+  static std::map< std::pair<double, double>, std::vector< std::vector<int> > > m_AngularRangeIdxs;
 
-  static DirectionsType* m_Directions;
-
-  static std::vector< std::vector<int>* >* m_NeighborIdxs;
-
-  static std::vector< std::vector<int>* >* m_AngularRangeIdxs;
-
-  static std::vector<int>* m_HalfSphereIdxs;
-
-  static std::mutex m_MutexBaseMesh;
-  static std::mutex m_MutexHalfSphereIdxs;
-  static std::mutex m_MutexNeighbors;
   static std::mutex m_MutexAngularRange;
   typename itk::DiffusionTensor3D<TComponent>::EigenValuesArrayType   m_EigenValues;
   typename itk::DiffusionTensor3D<TComponent>::EigenVectorsMatrixType m_EigenVectors;
   bool  m_EigenAnalysisCalculated;
+
+  void CopyEigenAnalysis(const Self& r)
+  {
+    m_EigenAnalysisCalculated = r.m_EigenAnalysisCalculated;
+    if (m_EigenAnalysisCalculated)
+    {
+      m_EigenValues = r.m_EigenValues;
+      m_EigenVectors = r.m_EigenVectors;
+    }
+  }
 
 };
 
@@ -240,4 +214,4 @@ private:
 #endif
 
 
-#endif //__itkOrientationDistributionFunction_h
+#endif //itkOrientationDistributionFunction_h

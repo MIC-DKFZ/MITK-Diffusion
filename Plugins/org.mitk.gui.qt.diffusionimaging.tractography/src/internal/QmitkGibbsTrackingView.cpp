@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Blueberry
 #include <berryISelectionService.h>
+#include <mitkDiffusionPropertyHelper.h>
 #include <berryIWorkbenchWindow.h>
 
 // Qmitk

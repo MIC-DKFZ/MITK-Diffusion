@@ -14,38 +14,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkFiberBundleDicomReader_h
-#define __mitkFiberBundleDicomReader_h
-
-#include <mitkCommon.h>
-#include <mitkFiberBundle.h>
-#include <vtkSmartPointer.h>
+#ifndef mitkFiberBundleDicomReader_h
+#define mitkFiberBundleDicomReader_h
 
 #include <mitkAbstractFileReader.h>
 
 namespace mitk
 {
-
-  /** \brief
-  */
-
+  /** \brief Reads DICOM tractography results (one bundle per track set) with their reference tags. */
   class FiberBundleDicomReader : public AbstractFileReader
   {
   public:
 
     FiberBundleDicomReader();
-    ~FiberBundleDicomReader() override{}
-    FiberBundleDicomReader(const FiberBundleDicomReader& other);
+    FiberBundleDicomReader(const FiberBundleDicomReader& other) = default;
     FiberBundleDicomReader * Clone() const override;
 
     using mitk::AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
-
-  private:
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
-} //namespace MITK
+}
 
-#endif // __mitkFiberBundleReader_h
+#endif

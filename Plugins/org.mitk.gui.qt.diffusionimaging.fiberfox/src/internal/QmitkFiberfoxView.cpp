@@ -1917,8 +1917,7 @@ template<int ndirs>
 std::vector<itk::Vector<double,3> > QmitkFiberfoxView::MakeGradientList()
 {
   std::vector<itk::Vector<double,3> > retval;
-  vnl_matrix_fixed<double, 3, ndirs>* U =
-      itk::PointShell<ndirs, vnl_matrix_fixed<double, 3, ndirs> >::DistributePointShell();
+  const vnl_matrix_fixed<double, 3, ndirs> &U = mitk::pointshell::Directions<ndirs>();
 
 
   // Add 0 vector for B0
@@ -1935,7 +1934,7 @@ std::vector<itk::Vector<double,3> > QmitkFiberfoxView::MakeGradientList()
   for(int i=0; i<ndirs;i++)
   {
     itk::Vector<double,3> v;
-    v[0] = U->get(0,i); v[1] = U->get(1,i); v[2] = U->get(2,i);
+    v[0] = U.get(0,i); v[1] = U.get(1,i); v[2] = U.get(2,i);
     retval.push_back(v);
   }
 

@@ -14,6 +14,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 #include "itkGibbsTrackingFilter.h"
+#include <mitkStringProperty.h>
 
 // MITK
 #include <itkOrientationDistributionFunction.h>

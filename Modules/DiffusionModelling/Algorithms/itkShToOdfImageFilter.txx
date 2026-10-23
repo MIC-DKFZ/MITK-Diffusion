@@ -69,11 +69,11 @@ void ShToOdfImageFilter< PixelType, ShOrder >::DynamicThreadedGenerateData( cons
 template< class PixelType, int ShOrder >
 void ShToOdfImageFilter< PixelType, ShOrder >::CalcShBasis()
 {
-  vnl_matrix_fixed<double, 3, ODF_SAMPLING_SIZE>* U = itk::PointShell<ODF_SAMPLING_SIZE, vnl_matrix_fixed<double, 3, ODF_SAMPLING_SIZE> >::DistributePointShell();
+  const vnl_matrix<double> &U = mitk::pointshell::Directions(ODF_SAMPLING_SIZE);
   if (m_Toolkit==mitk::ShImage::SH_CONVENTION::MRTRIX)
-    m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, U->as_matrix(), true);
+    m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, U, true);
   else
-    m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, U->as_matrix(), false);
+    m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, U, false);
 }
 
 }

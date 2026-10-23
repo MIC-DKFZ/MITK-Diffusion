@@ -19,6 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkClusteringMetric.h>
 #include <itkImage.h>
+#include <mitkDiffusionImageHelperFunctions.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkNumericTraits.h>
 

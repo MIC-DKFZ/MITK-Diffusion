@@ -77,7 +77,7 @@ double OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     if (val>thr*0.9 && gfa*val>m_AbsolutePeakThreshold*0.9)
     {
       flag = true;
-      std::vector< int > neighbours = odf.GetNeighbors(i);
+      const std::vector< int > &neighbours = OdfType::GetNeighbors(i);
       for (unsigned int j=0; j<neighbours.size(); j++)
         if (val<odf.GetElement(neighbours.at(j)))
         {

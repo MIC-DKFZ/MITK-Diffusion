@@ -14,13 +14,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkDiffusionMultiShellQballReconstructionImageFilter_h_
-#define __itkDiffusionMultiShellQballReconstructionImageFilter_h_
+#ifndef itkDiffusionMultiShellQballReconstructionImageFilter_h
+#define itkDiffusionMultiShellQballReconstructionImageFilter_h
 
 #include <itkImageToImageFilter.h>
 
+#include <cmath>
+
 namespace itk{
 /** \class DiffusionMultiShellQballReconstructionImageFilter
+    Constant solid angle ODFs of three equidistant shells (b, 2b, 3b), analytical solution of Aganj
+    et al. 2010. Every shell is normalized by the mean of all b0 volumes (key 0 of the b-value map).
+
     I. Aganj, C. Lenglet, G. Sapiro, E. Yacoub, K. Ugurbil, and N. Harel, “Reconstruction of the orientation distribution function in single and multiple shell q-ball imaging within constant solid angle,” Magnetic Resonance in Medicine, vol. 64, no. 2, pp. 554–566, 2010.
  */
 
@@ -70,7 +75,7 @@ public:
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
     /** Runtime information support. */
-    itkTypeMacro(DiffusionMultiShellQballReconstructionImageFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(DiffusionMultiShellQballReconstructionImageFilter)
 
     /** Get reference image */
     virtual typename Superclass::InputImageType * GetInputImage()
@@ -107,38 +112,37 @@ public:
     itkSetMacro( Lambda, double )
     itkGetMacro( Lambda, double )
 
+    /** Whether the ODFs (the primary output) are computed, true by default. Without them the
+     * output has no buffer, which saves NrOdfDirections values per voxel when only the
+     * coefficient image is used; the filter then executes again on every Update(). */
+    itkSetMacro( ComputeOdf, bool )
+    itkGetConstMacro( ComputeOdf, bool )
+    itkBooleanMacro( ComputeOdf )
+
 protected:
     DiffusionMultiShellQballReconstructionImageFilter();
-    ~DiffusionMultiShellQballReconstructionImageFilter() { }
-    void PrintSelf(std::ostream& os, Indent indent) const;
-    void BeforeThreadedGenerateData();
-    void AfterThreadedGenerateData();
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
+    ~DiffusionMultiShellQballReconstructionImageFilter() override = default;
+    void PrintSelf(std::ostream& os, Indent indent) const override;
+    void AllocateOutputs() override;
+    void BeforeThreadedGenerateData() override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
 
 private:
 
-    enum ReconstructionType
-    {
-        Mode_Analytical3Shells,
-        Mode_NumericalNShells,
-        Mode_Standard1Shell
-    };
-
-    ReconstructionType m_ReconstructionType;
-
     // Interpolation
     bool m_Interpolation_Flag;
-    vnl_matrix< double > * m_Interpolation_SHT1_inv;
-    vnl_matrix< double > * m_Interpolation_SHT2_inv;
-    vnl_matrix< double > * m_Interpolation_SHT3_inv;
-    vnl_matrix< double > * m_TARGET_SH_shell1;
-    vnl_matrix< double > * m_TARGET_SH_shell2;
-    vnl_matrix< double > * m_TARGET_SH_shell3;
+    // Rebuilt by every execution.
+    vnl_matrix<double> m_Interpolation_SHT1_inv;
+    vnl_matrix<double> m_Interpolation_SHT2_inv;
+    vnl_matrix<double> m_Interpolation_SHT3_inv;
+    vnl_matrix<double> m_TARGET_SH_shell1;
+    vnl_matrix<double> m_TARGET_SH_shell2;
+    vnl_matrix<double> m_TARGET_SH_shell3;
     unsigned int m_MaxDirections;
 
-    vnl_matrix< double > * m_CoeffReconstructionMatrix;
-    vnl_matrix< double > * m_ODFSphericalHarmonicBasisMatrix;
+    vnl_matrix<double> m_CoeffReconstructionMatrix;
+    vnl_matrix<double> m_ODFSphericalHarmonicBasisMatrix;
 
     /** container to hold gradient directions */
     GradientDirectionContainerType::Pointer m_GradientDirectionContainer;
@@ -162,48 +166,24 @@ private:
 
     double m_Lambda;
 
-    bool m_IsHemisphericalArrangementOfGradientDirections;
-
-    bool m_IsArithmeticProgession;
+    bool m_ComputeOdf;
 
     void ComputeReconstructionMatrix(IndiciesVector const & refVector);
-    void ComputeODFSHBasis();
     bool CheckDuplicateDiffusionGradients();
     bool CheckForDifferingShellDirections();
-    IndiciesVector GetAllDirections();
-    void ComputeSphericalHarmonicsBasis(vnl_matrix<double>* QBallReference, vnl_matrix<double>* SHBasisOutput, int Lorder , vnl_matrix<double>* LaplaciaBaltramiOutput =0 , vnl_vector<int>* SHOrderAssociation =0 , vnl_matrix<double> * SHEigenvalues =0);
-    void Normalize(OdfPixelType & odf );
     void S_S0Normalization( vnl_vector<double> & vec, double b0  = 0 );
     void DoubleLogarithm(vnl_vector<double> & vec);
     double CalculateThreashold(const double value, const double delta);
     void Projection1(vnl_vector<double> & vec, double delta = 0.01);
     void Projection2( vnl_vector<double> & E1, vnl_vector<double> & E2, vnl_vector<double> & E3, double delta = 0.01);
     void Projection3( vnl_vector<double> & A, vnl_vector<double> & alpha, vnl_vector<double> & beta, double delta = 0.01);
-    void StandardOneShellReconstruction(const OutputImageRegionType& outputRegionForThread);
     void AnalyticalThreeShellReconstruction(const OutputImageRegionType& outputRegionForThread);
-    void NumericalNShellReconstruction(const OutputImageRegionType& outputRegionForThread);
-    void GenerateAveragedBZeroImage(const OutputImageRegionType& outputRegionForThread);
-    void ComputeSphericalFromCartesian(vnl_matrix<double> * Q, const IndiciesVector & refShell);
 
 
-    //------------------------- VNL-function ------------------------------------
-
-    template<typename CurrentValue, typename WntValue>
-    vnl_vector< WntValue> element_cast (vnl_vector< CurrentValue> const& v1)
+    /** |cos| of the angle between two gradients; their lengths encode the b-value. */
+    static double AbsoluteCosine(const vnl_vector_fixed<double, 3> &v1, const vnl_vector_fixed<double, 3> &v2)
     {
-      vnl_vector<WntValue> result(v1.size());
-
-      for(unsigned int i = 0 ; i < v1.size(); i++)
-           result[i] = static_cast< WntValue>(v1[i]);
-
-      return result;
-    }
-
-    template<typename type>
-    double dot (vnl_vector_fixed< type ,3> const& v1, vnl_vector_fixed< type ,3 > const& v2 )
-    {
-      double result = (v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2]) / (v1.two_norm() * v2.two_norm());
-      return result ;
+      return std::fabs((v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2]) / (v1.two_norm() * v2.two_norm()));
     }
 
 
@@ -217,5 +197,5 @@ private:
 #include "itkDiffusionMultiShellQballReconstructionImageFilter.cpp"
 #endif
 
-#endif //__itkDiffusionMultiShellQballReconstructionImageFilter_h_
+#endif //itkDiffusionMultiShellQballReconstructionImageFilter_h
 

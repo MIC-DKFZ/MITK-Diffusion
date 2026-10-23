@@ -14,38 +14,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkFiberBundleVtkReader_h
-#define __mitkFiberBundleVtkReader_h
-
-#include <mitkCommon.h>
-#include <mitkFiberBundle.h>
-#include <vtkSmartPointer.h>
+#ifndef mitkFiberBundleVtkReader_h
+#define mitkFiberBundleVtkReader_h
 
 #include <mitkAbstractFileReader.h>
 
 namespace mitk
 {
-
-  /** \brief
-  */
-
+  /** \brief Reads fiber bundles from VTK polydata files (legacy .fib/.vtk and XML), with their weights and colours. */
   class FiberBundleVtkReader : public AbstractFileReader
   {
   public:
 
     FiberBundleVtkReader();
-    ~FiberBundleVtkReader() override{}
-    FiberBundleVtkReader(const FiberBundleVtkReader& other);
+    FiberBundleVtkReader(const FiberBundleVtkReader& other) = default;
     FiberBundleVtkReader * Clone() const override;
 
     using mitk::AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
-
-  private:
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
-} //namespace MITK
+}
 
-#endif // __mitkFiberBundleReader_h
+#endif

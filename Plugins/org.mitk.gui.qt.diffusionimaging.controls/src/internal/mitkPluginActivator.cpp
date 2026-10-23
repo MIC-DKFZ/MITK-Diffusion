@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 #include "mitkPluginActivator.h"
 
-#include "src/internal/Perspectives/QmitkDiffusionDefaultPerspective.h"
 #include "src/internal/Perspectives/QmitkSegmentationPerspective.h"
 
 #include "src/internal/QmitkDiffusionDicomImportView.h"
@@ -32,14 +31,11 @@ namespace mitk {
 
 void PluginActivator::start(ctkPluginContext* context)
 {
-    BERRY_REGISTER_EXTENSION_CLASS(QmitkDiffusionDefaultPerspective, context)
     BERRY_REGISTER_EXTENSION_CLASS(QmitkSegmentationPerspective, context)
 
-    BERRY_REGISTER_EXTENSION_CLASS(QmitkDiffusionDicomImport, context)
+    BERRY_REGISTER_EXTENSION_CLASS(QmitkDiffusionDicomImportView, context)
     BERRY_REGISTER_EXTENSION_CLASS(QmitkDicomTractogramTagEditorView, context)
     BERRY_REGISTER_EXTENSION_CLASS(QmitkControlVisualizationPropertiesView, context)
-
-            //            Q_UNUSED(context)
 
     QmitkNodeDescriptorManager* manager = QmitkNodeDescriptorManager::GetInstance();
 

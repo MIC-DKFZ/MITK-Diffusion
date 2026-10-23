@@ -14,104 +14,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include "mitkImage.h"
-#include "itkAnalyticalDiffusionQballReconstructionImageFilter.h"
-#include <mitkLexicalCast.h>
 #include "mitkCommandLineParser.h"
-#include <mitkIOUtil.h>
 #include <itksys/SystemTools.hxx>
-#include <mitkDiffusionPropertyHelper.h>
-#include <mitkITKImageImport.h>
-#include <mitkImageCast.h>
-#include <mitkProperties.h>
-#include <mitkIOUtil.h>
-#include <mitkPreferenceListReaderOptionsFunctor.h>
-#include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 #include <mitkDiffusionImageEditing.h>
-
-template<int L>
-void TemplatedMultishellQBallReconstruction(float lambda, mitk::Image::Pointer dwi, bool output_sampled, int threshold, std::string outfilename)
-{
-  typedef itk::DiffusionMultiShellQballReconstructionImageFilter<short,short,float,L,ODF_SAMPLING_SIZE> FilterType;
-  typename FilterType::Pointer filter = FilterType::New();
-
-  auto bMap = mitk::DiffusionPropertyHelper::GetBValueMap(dwi);
-  auto it1 = bMap.rbegin();
-  auto it2 = bMap.rbegin();
-  ++it2;
-
-  // Get average distance
-  int avdistance = 0;
-  for(; it2 != bMap.rend(); ++it1, ++it2)
-    avdistance += static_cast<int>(it1->first - it2->first);
-  avdistance /= bMap.size()-1;
-
-  // Check if all shells are using the same averae distance
-  it1 = bMap.rbegin();
-  it2 = bMap.rbegin();
-  ++it2;
-  for(; it2 != bMap.rend(); ++it1,++it2)
-  {
-    if(avdistance != static_cast<int>(it1->first - it2->first))
-    {
-      mitkThrow() << "Shells are not equidistant.";
-    }
-  }
-
-  auto itkVectorImagePointer = mitk::DiffusionPropertyHelper::GetItkVectorImage(dwi);
-  filter->SetBValueMap(bMap);
-  filter->SetGradientImage(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi), itkVectorImagePointer, mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi));
-  filter->SetThreshold(static_cast<short>(threshold));
-  filter->SetLambda(static_cast<double>(lambda));
-  filter->Update();
-
-  mitk::OdfImage::Pointer image = mitk::OdfImage::New();
-  mitk::Image::Pointer coeffsImage = dynamic_cast<mitk::Image*>(mitk::ShImage::New().GetPointer());
-  image->InitializeByItk( filter->GetOutput() );
-  image->SetVolume( filter->GetOutput()->GetBufferPointer() );
-  coeffsImage->InitializeByItk( filter->GetCoefficientImage().GetPointer() );
-  coeffsImage->SetVolume( filter->GetCoefficientImage()->GetBufferPointer() );
-
-  std::string coeffout = outfilename;
-  coeffout += ".nii.gz";
-  mitk::IOUtil::Save(coeffsImage, "SH_IMAGE", coeffout);
-
-  outfilename += ".odf";
-  if (output_sampled)
-    mitk::IOUtil::Save(image, outfilename);
-}
-
-template<int L>
-void TemplatedCsaQBallReconstruction(float lambda, mitk::Image::Pointer dwi, bool output_sampled, int threshold, std::string outfilename)
-{
-  typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
-  auto itkVectorImagePointer = mitk::DiffusionPropertyHelper::GetItkVectorImage(dwi);
-
-  FilterType::Pointer filter = FilterType::New();
-  filter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi));
-  filter->SetGradientImage( mitk::DiffusionPropertyHelper::GetGradientContainer(dwi), itkVectorImagePointer );
-  filter->SetThreshold(static_cast<short>(threshold));
-  filter->SetLambda(static_cast<double>(lambda));
-//  filter->SetUseMrtrixBasis(mrTrix);
-  filter->SetNormalizationMethod(FilterType::QBAR_SOLID_ANGLE);
-  filter->Update();
-
-  mitk::OdfImage::Pointer image = mitk::OdfImage::New();
-  mitk::Image::Pointer coeffsImage = dynamic_cast<mitk::Image*>(mitk::ShImage::New().GetPointer());
-  image->InitializeByItk( filter->GetOutput() );
-  image->SetVolume( filter->GetOutput()->GetBufferPointer() );
-  coeffsImage->InitializeByItk( filter->GetCoefficientImage().GetPointer() );
-  coeffsImage->SetVolume( filter->GetCoefficientImage()->GetBufferPointer() );
-
-  std::string coeffout = outfilename;
-  coeffout += ".nii.gz";
-  mitk::IOUtil::Save(coeffsImage, "SH_IMAGE", coeffout);
-
-  outfilename += ".odf";
-  if (output_sampled)
-    mitk::IOUtil::Save(image, outfilename);
-}
-
+#include <mitkDiffusionPropertyHelper.h>
+#include <mitkDiffusionReconstruction.h>
+#include <mitkIOUtil.h>
+#include <mitkImage.h>
+#include <mitkPreferenceListReaderOptionsFunctor.h>
 
 /**
  * Perform Q-ball reconstruction using a spherical harmonics basis
@@ -160,13 +70,9 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("lambda"))
     lambda = us::any_cast<float>(parsedArgs["lambda"]);
 
-  bool outCoeffs = false;
-  if (parsedArgs.count("output_coeffs"))
-    outCoeffs = us::any_cast<bool>(parsedArgs["output_coeffs"]);
-
-//  bool mrTrix = false;
-//  if (parsedArgs.count("mrtrix"))
-//    mrTrix = us::any_cast<bool>(parsedArgs["mrtrix"]);
+  bool outputSampled = false;
+  if (parsedArgs.count("output_sampled"))
+    outputSampled = us::any_cast<bool>(parsedArgs["output_sampled"]);
 
   try
   {
@@ -193,65 +99,34 @@ int main(int argc, char* argv[])
     MITK_INFO << "lambda: " << lambda;
     MITK_INFO << "B0 threshold: " << threshold;
     MITK_INFO << "Round bvalues: " << round_bvalues;
-    switch ( shOrder )
-    {
-    case 4:
-    {
-      if(bMap.size()==2)
-        TemplatedCsaQBallReconstruction<4>(lambda, dwi, outCoeffs, threshold, outfilename);
-      else if(bMap.size()==4)
-        TemplatedMultishellQBallReconstruction<4>(lambda, dwi, outCoeffs, threshold, outfilename);
-      break;
-    }
-    case 6:
-    {
-      if(bMap.size()==2)
-        TemplatedCsaQBallReconstruction<6>(lambda, dwi, outCoeffs, threshold, outfilename);
-      else if(bMap.size()==4)
-        TemplatedMultishellQBallReconstruction<6>(lambda, dwi, outCoeffs, threshold, outfilename);
-      break;
-    }
-    case 8:
-    {
-      if(bMap.size()==2)
-        TemplatedCsaQBallReconstruction<8>(lambda, dwi, outCoeffs, threshold, outfilename);
-      else if(bMap.size()==4)
-        TemplatedMultishellQBallReconstruction<8>(lambda, dwi, outCoeffs, threshold, outfilename);
-      break;
-    }
-    case 10:
-    {
-      if(bMap.size()==2)
-        TemplatedCsaQBallReconstruction<10>(lambda, dwi, outCoeffs, threshold, outfilename);
-      else if(bMap.size()==4)
-        TemplatedMultishellQBallReconstruction<10>(lambda, dwi, outCoeffs, threshold, outfilename);
-      break;
-    }
-    case 12:
-    {
-      if(bMap.size()==2)
-        TemplatedCsaQBallReconstruction<12>(lambda, dwi, outCoeffs, threshold, outfilename);
-      else if(bMap.size()==4)
-        TemplatedMultishellQBallReconstruction<12>(lambda, dwi, outCoeffs, threshold, outfilename);
-      break;
-    }
-    default:
-    {
-      mitkThrow() << "SH order not supported";
-    }
-    }
+    // One shell: constant solid angle Q-ball; three shells: its multi-shell form, which checks that
+    // they are b, 2b, 3b.
+    mitk::QballParameters parameters;
+    parameters.method = bMap.size() == 2 ? mitk::QballMethod::SolidAngle : mitk::QballMethod::MultiShell;
+    parameters.shOrder = shOrder;
+    parameters.lambda = lambda;
+    parameters.b0Threshold = static_cast<short>(threshold);
+    parameters.sampledOdf = outputSampled;
+    const auto result = mitk::ReconstructQball(dwi, parameters);
+
+    mitk::IOUtil::Save(result.sh, "SH_IMAGE", outfilename + ".nii.gz");
+    if (result.odf.IsNotNull())
+      mitk::IOUtil::Save(result.odf, outfilename + ".odf");
   }
   catch ( itk::ExceptionObject &err)
   {
     std::cout << "Exception: " << err;
+    return EXIT_FAILURE;
   }
   catch ( std::exception& err)
   {
     std::cout << "Exception: " << err.what();
+    return EXIT_FAILURE;
   }
   catch ( ... )
   {
     std::cout << "Exception!";
+    return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 }

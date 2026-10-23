@@ -21,6 +21,7 @@ found in the LICENSE file.
 #include <mitkDataNode.h>
 #include <mitkGeometry3D.h>
 #include <mitkFiberBundle.h>
+#include <mitkImage.h>
 
 // VTK includes
 #include <vtkCellPicker.h>

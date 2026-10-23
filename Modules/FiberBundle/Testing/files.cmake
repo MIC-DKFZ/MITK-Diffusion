@@ -1,6 +1,10 @@
 SET(MODULE_CUSTOM_TESTS
   mitkFiberBundleReaderWriterTest.cpp
-  mitkFiberMapper3DTest.cpp
+  mitkFiberBundleOperationsTest.cpp
+  mitkFiberBundleIOTest.cpp
 )
 
-
+# Need an OpenGL context; skipped (exit code 77) without one.
+set(MODULE_RENDERING_TESTS
+  mitkFiberBundleMapperTest.cpp
+)

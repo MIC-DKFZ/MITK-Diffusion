@@ -61,7 +61,7 @@ namespace itk
     /** The SH basis is the same for all work units; ITK has allocated the output already. */
     void BeforeThreadedGenerateData() override
     {
-      m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, OdfType::GetDirections()->as_matrix(),
+      m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, OdfType::GetDirections().as_matrix(),
                                                      m_ShConvention == mitk::ShImage::SH_CONVENTION::MRTRIX);
     }
 

@@ -14,38 +14,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkFiberBundleTrackVisReader_h
-#define __mitkFiberBundleTrackVisReader_h
-
-#include <mitkCommon.h>
-#include <mitkFiberBundle.h>
-#include <vtkSmartPointer.h>
+#ifndef mitkFiberBundleTrackVisReader_h
+#define mitkFiberBundleTrackVisReader_h
 
 #include <mitkAbstractFileReader.h>
 
 namespace mitk
 {
-
-  /** \brief
-  */
-
+  /** \brief Reads TrackVis (.trk) tractograms; see mitkTrackVisFile.h for the coordinate map. */
   class FiberBundleTrackVisReader : public AbstractFileReader
   {
   public:
 
     FiberBundleTrackVisReader();
-    ~FiberBundleTrackVisReader() override{}
-    FiberBundleTrackVisReader(const FiberBundleTrackVisReader& other);
+    FiberBundleTrackVisReader(const FiberBundleTrackVisReader& other) = default;
     FiberBundleTrackVisReader * Clone() const override;
 
     using mitk::AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
-
-  private:
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
-} //namespace MITK
+}
 
-#endif // __mitkFiberBundleReader_h
+#endif
