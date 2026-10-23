@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _itkOrientationDistributionFunction_txx
-#define _itkOrientationDistributionFunction_txx
+#ifndef itkOrientationDistributionFunction_txx
+#define itkOrientationDistributionFunction_txx
 
 #include <vnl/algo/vnl_matrix_inverse.h>
 #include <itkMatrix.h>
@@ -25,25 +25,19 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_vector_fixed.hxx>
 #include <vnl/vnl_cross.h>
 #include <mitkLog.h>
+#include <vtkCellArrayIterator.h>
 #include <vtkDelaunay2D.h>
-#include <vtkPlane.h>
+#include <vtkNew.h>
+
+#include <algorithm>
+#include <functional>
 
 namespace itk
 {
 
 template<class T, unsigned int N>
-vtkPolyData* itk::OrientationDistributionFunction<T,N>::m_BaseMesh = nullptr;
-
-template<class T, unsigned int N>
-std::vector< std::vector<int>* >* itk::OrientationDistributionFunction<T,N>::m_NeighborIdxs = nullptr;
-
-template<class T, unsigned int N>
 std::map< std::pair<double, double>, std::vector< std::vector<int> > > itk::OrientationDistributionFunction<T,N>::m_AngularRangeIdxs;
 
-template<class T, unsigned int N>
-std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexBaseMesh;
-template<class T, unsigned int N>
-std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexNeighbors;
 template<class T, unsigned int N>
 std::mutex itk::OrientationDistributionFunction<T,N>::m_MutexAngularRange;
 
@@ -459,94 +453,64 @@ OrientationDistributionFunction<T, NOdfDirections>
 }
 
 template<class T, unsigned int NOdfDirections>
-void
+vtkSmartPointer<vtkPolyData>
 OrientationDistributionFunction<T, NOdfDirections>
-::ComputeBaseMesh()
+::BuildBaseMesh()
 {
-
-  m_MutexBaseMesh.lock();
-  if(m_BaseMesh == nullptr)
-  {
-
-    vtkPoints* points = vtkPoints::New();
-    for(unsigned int j=0; j<NOdfDirections; j++){
-      double x = GetDirections()(0,j);
-      double y = GetDirections()(1,j);
-      double z = GetDirections()(2,j);
-      double az = atan2(y,x);
-      double elev = atan2(z,sqrt(x*x+y*y));
-      double r = sqrt(x*x+y*y+z*z);
-      points->InsertNextPoint(az,elev,r);
+  // Two Delaunay triangulations in azimuth/elevation, of the directions and of the directions
+  // rotated so that the first one's poles and seam lie in the middle; each keeps the triangles
+  // away from its poles and seam.
+  vtkNew<vtkCellArray> polys;
+  const auto triangulate = [&polys](const std::function<vnl_vector_fixed<double, 3>(unsigned int)> &direction) {
+    vtkNew<vtkPoints> points;
+    for (unsigned int j = 0; j < NOdfDirections; j++)
+    {
+      const auto d = direction(j);
+      points->InsertNextPoint(atan2(d[1], d[0]), atan2(d[2], sqrt(d[0] * d[0] + d[1] * d[1])), d.two_norm());
     }
-
-    vtkPolyData* polydata = vtkPolyData::New();
-    polydata->SetPoints( points );
-    vtkDelaunay2D *delaunay = vtkDelaunay2D::New();
-    delaunay->SetInputData( polydata );
+    vtkNew<vtkPolyData> projected;
+    projected->SetPoints(points);
+    vtkNew<vtkDelaunay2D> delaunay;
+    delaunay->SetInputData(projected);
     delaunay->Update();
 
-    vtkCellArray* vtkpolys = delaunay->GetOutput()->GetPolys();
-    vtkCellArray* vtknewpolys = vtkCellArray::New();
-    vtkIdType npts; vtkIdType const *pts;
-    while(vtkpolys->GetNextCell(npts,pts))
+    vtkCellArray *triangles = delaunay->GetOutput()->GetPolys();
+    vtkIdType npts;
+    vtkIdType const *pts;
+    for (triangles->InitTraversal(); triangles->GetNextCell(npts, pts);)
     {
       bool insert = true;
-      for(int i=0; i<npts; i++)
+      for (int i = 0; i < npts; i++)
       {
-        double *tmpPoint = points->GetPoint(pts[i]);
-        double az = tmpPoint[0];
-        double elev = tmpPoint[1];
-        if((std::abs(az)>itk::Math::pi-0.5) || (std::abs(elev)>itk::Math::pi/2-0.5))
+        const double *point = points->GetPoint(pts[i]);
+        if ((std::abs(point[0]) > itk::Math::pi - 0.5) || (std::abs(point[1]) > itk::Math::pi / 2 - 0.5))
           insert = false;
       }
-      if(insert)
-        vtknewpolys->InsertNextCell(npts, pts);
+      if (insert)
+        polys->InsertNextCell(npts, pts);
     }
+  };
+  const auto &directions = GetDirections();
+  triangulate([&directions](unsigned int j) { return vnl_vector_fixed<double, 3>(directions(0, j), directions(1, j), directions(2, j)); });
+  triangulate([&directions](unsigned int j) { return vnl_vector_fixed<double, 3>(-directions(0, j), -directions(2, j), -directions(1, j)); });
 
-    vtkPoints* points2 = vtkPoints::New();
-    for(unsigned int j=0; j<NOdfDirections; j++){
-      double x = -GetDirections()(0,j);
-      double y = -GetDirections()(2,j);
-      double z = -GetDirections()(1,j);
-      double az = atan2(y,x);
-      double elev = atan2(z,sqrt(x*x+y*y));
-      double r = sqrt(x*x+y*y+z*z);
-      points2->InsertNextPoint(az,elev,r);
-    }
+  vtkNew<vtkPoints> points;
+  for (unsigned int p = 0; p < NOdfDirections; p++)
+    points->InsertNextPoint(directions.get_column(p).data_block());
+  auto mesh = vtkSmartPointer<vtkPolyData>::New();
+  mesh->SetPoints(points);
+  mesh->SetPolys(polys);
+  return mesh;
+}
 
-    vtkPolyData* polydata2 = vtkPolyData::New();
-    polydata2->SetPoints( points2 );
-    vtkDelaunay2D *delaunay2 = vtkDelaunay2D::New();
-    delaunay2->SetInputData( polydata2 );
-    delaunay2->Update();
-
-    vtkpolys = delaunay2->GetOutput()->GetPolys();
-    while(vtkpolys->GetNextCell(npts,pts))
-    {
-      bool insert = true;
-      for(int i=0; i<npts; i++)
-      {
-        double *tmpPoint = points2->GetPoint(pts[i]);
-        double az = tmpPoint[0];
-        double elev = tmpPoint[1];
-        if((std::abs(az)>itk::Math::pi-0.5) || (std::abs(elev)>itk::Math::pi/2-0.5))
-          insert = false;
-      }
-      if(insert)
-        vtknewpolys->InsertNextCell(npts, pts);
-    }
-
-    polydata->SetPolys(vtknewpolys);
-
-    for (unsigned int p = 0; p < NOdfDirections; p++)
-    {
-      points->SetPoint(p,GetDirections().get_column(p).data_block());
-    }
-    polydata->SetPoints( points );
-
-    m_BaseMesh = polydata;
-  }
-  m_MutexBaseMesh.unlock();
+template<class T, unsigned int NOdfDirections>
+vtkPolyData *
+OrientationDistributionFunction<T, NOdfDirections>
+::GetBaseMesh()
+{
+  // Built once, on first use from any thread, and never changed.
+  static const vtkSmartPointer<vtkPolyData> mesh = BuildBaseMesh();
+  return mesh;
 }
 
 /**
@@ -595,51 +559,34 @@ vnl_vector_fixed<double,3> OrientationDistributionFunction<T, NOdfDirections>::G
 }
 
 template<class T, unsigned int NOdfDirections>
-std::vector<int>
+const std::vector<int> &
 OrientationDistributionFunction<T, NOdfDirections>
 ::GetNeighbors(int idx)
 {
-  ComputeBaseMesh();
-
-  m_MutexNeighbors.lock();
-  if(m_NeighborIdxs == nullptr)
-  {
-    m_NeighborIdxs = new std::vector< std::vector<int>* >();
-    vtkCellArray* polys = m_BaseMesh->GetPolys();
-
-    for(unsigned int i=0; i<NOdfDirections; i++)
+  // Built once, on first use from any thread, and never changed: for each direction the sorted
+  // indices of the directions it shares a base mesh triangle with.
+  static const std::vector<std::vector<int>> neighbors = []() {
+    std::vector<std::vector<int>> result(NOdfDirections);
+    // An iterator of its own: the traversal position of the shared cell array belongs to its users.
+    auto triangles = vtk::TakeSmartPointer(GetBaseMesh()->GetPolys()->NewIterator());
+    for (triangles->GoToFirstCell(); !triangles->IsDoneWithTraversal(); triangles->GoToNextCell())
     {
-      auto      idxs = new std::vector<int>();
-      polys->InitTraversal();
-      vtkIdType npts; vtkIdType const *pts;
-      while(polys->GetNextCell(npts,pts))
-      {
-        if( pts[0] == i )
-        {
-          idxs->push_back(pts[1]);
-          idxs->push_back(pts[2]);
-        }
-        else if( pts[1] == i )
-        {
-          idxs->push_back(pts[0]);
-          idxs->push_back(pts[2]);
-        }
-        else if( pts[2] == i )
-        {
-          idxs->push_back(pts[0]);
-          idxs->push_back(pts[1]);
-        }
-      }
-      std::sort(idxs->begin(), idxs->end());
-      std::vector< int >::iterator endLocation;
-      endLocation = std::unique( idxs->begin(), idxs->end() );
-      idxs->erase(endLocation, idxs->end());
-      m_NeighborIdxs->push_back(idxs);
+      vtkIdType npts;
+      vtkIdType const *pts;
+      triangles->GetCurrentCell(npts, pts);
+      for (int a = 0; a < 3; ++a)
+        for (int b = 0; b < 3; ++b)
+          if (a != b)
+            result[pts[a]].push_back(pts[b]);
     }
-  }
-  m_MutexNeighbors.unlock();
-
-  return *m_NeighborIdxs->at(idx);
+    for (auto &idxs : result)
+    {
+      std::sort(idxs.begin(), idxs.end());
+      idxs.erase(std::unique(idxs.begin(), idxs.end()), idxs.end());
+    }
+    return result;
+  }();
+  return neighbors.at(idx);
 }
 
 template < typename TComponent, unsigned int NOdfDirections >

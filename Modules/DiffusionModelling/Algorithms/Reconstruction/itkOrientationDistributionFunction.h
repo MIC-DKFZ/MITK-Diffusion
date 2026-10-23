@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkOrientationDistributionFunction_h
-#define __itkOrientationDistributionFunction_h
+#ifndef itkOrientationDistributionFunction_h
+#define itkOrientationDistributionFunction_h
 
 #include "itkFixedArray.h"
 #include "itkMatrix.h"
@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkDiffusionTensor3D.h"
 
 #include "vtkPolyData.h"
+#include <vtkSmartPointer.h>
 #include "mitkPointShell.h"
 
 // generate by n-fold subdivisions of an icosahedron
@@ -160,25 +161,21 @@ public:
 
   TComponent GetPrincipleCurvature(double alphaMinDegree, double alphaMaxDegree, int invert) const;
 
-  static std::vector<int> GetNeighbors(int idx);
+  /** The directions that share a triangle of the base mesh with direction idx, sorted. */
+  static const std::vector<int> &GetNeighbors(int idx);
 
-  static vtkPolyData* GetBaseMesh(){ComputeBaseMesh(); return m_BaseMesh;}
-
-  static void ComputeBaseMesh();
+  /** Triangulation of the sampling directions, shared and not to be changed. */
+  static vtkPolyData *GetBaseMesh();
 
   static vnl_vector_fixed<double,3> GetDirection(int i);
 
 private:
 
-  static vtkPolyData* m_BaseMesh;
-
-  static std::vector< std::vector<int>* >* m_NeighborIdxs;
+  static vtkSmartPointer<vtkPolyData> BuildBaseMesh();
 
   /** Per pair of angles (GetPrincipleCurvature) and direction: the directions in that angular range */
   static std::map< std::pair<double, double>, std::vector< std::vector<int> > > m_AngularRangeIdxs;
 
-  static std::mutex m_MutexBaseMesh;
-  static std::mutex m_MutexNeighbors;
   static std::mutex m_MutexAngularRange;
   typename itk::DiffusionTensor3D<TComponent>::EigenValuesArrayType   m_EigenValues;
   typename itk::DiffusionTensor3D<TComponent>::EigenVectorsMatrixType m_EigenVectors;
@@ -217,4 +214,4 @@ private:
 #endif
 
 
-#endif //__itkOrientationDistributionFunction_h
+#endif //itkOrientationDistributionFunction_h
