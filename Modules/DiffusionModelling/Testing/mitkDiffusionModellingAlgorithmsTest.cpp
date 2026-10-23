@@ -60,6 +60,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(TensorToL2Norm_FrobeniusNorm);
   MITK_TEST(Adc_NearZeroBValue_CountsAsBaseline);
   MITK_TEST(Adc_ZeroBaselineValue_LeftOutInBothModes);
+  MITK_TEST(Adc_MeanAdc_IsMeanOverAcquiredDirections);
   MITK_TEST(PrincipalDirection_MaskOfOtherSize_Throws);
   MITK_TEST(PrincipalDirection_SecondInput_SameAsFreshFilter);
   MITK_TEST(MaximaExtraction_MaskOfOtherSize_Throws);
@@ -265,6 +266,38 @@ public:
   {
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(false), 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(true), 1e-6);
+  }
+
+  // MitkDiffusionIndices --index md of a DWI is the mean ADC of the acquired directions, which its
+  // help documents: with directions x, x, y, z and the tensor diag(2, 1, 1) 1e-3 mm^2/s it is
+  // 1.5e-3, while the tensor MD is 1.33e-3.
+  void Adc_MeanAdc_IsMeanOverAcquiredDirections()
+  {
+    const double g[5][3] = {{0, 0, 0}, {1, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    const double diagonal[3] = {0.002, 0.001, 0.001};
+    auto dwi = itk::VectorImage<short, 3>::New();
+    itk::VectorImage<short, 3>::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    dwi->SetRegions(region);
+    dwi->SetVectorLength(5);
+    dwi->Allocate();
+    itk::VariableLengthVector<short> pixel(5);
+    auto gradients = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+    for (unsigned int i = 0; i < 5; ++i)
+    {
+      gradients->push_back(mitk::DiffusionPropertyHelper::GradientDirectionType(g[i][0], g[i][1], g[i][2]));
+      const double adc = g[i][0] * diagonal[0] + g[i][1] * diagonal[1] + g[i][2] * diagonal[2];
+      pixel[i] = static_cast<short>(std::round(1000 * std::exp(-1000 * adc)));
+    }
+    dwi->FillBuffer(pixel);
+
+    auto filter = itk::AdcImageFilter<short, double>::New();
+    filter->SetInput(dwi);
+    filter->SetGradientDirections(gradients.GetPointer());
+    filter->SetB_value(1000);
+    filter->SetFitSignal(false);
+    filter->Update();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0015, filter->GetOutput()->GetPixel({{0, 0, 0}}), 1e-5);
   }
 
   // The fit averaged all unweighted values into S0, the mean ADC only the positive ones, so a
