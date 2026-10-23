@@ -21,10 +21,12 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <mitkCustomMimeType.h>
+#include <mitkBaseDataSerializer.h>
 #include <usModule.h>
 #include <usModuleContext.h>
 #include <usModuleRegistry.h>
 
+#include <itkObjectFactoryBase.h>
 #include <itksys/SystemTools.hxx>
 #include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcfilefo.h>
@@ -86,6 +88,10 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(PlanarFigureComposite_RoundTripAndBrokenFile_KeepLocale);
   MITK_TEST(PlanarFigureComposite_UnknownOperation_Throws);
   MITK_TEST(MimeTypes_RegisteredOncePerName);
+  MITK_TEST(VtkWriter_BinaryAsciiAndXml_KeepPointsWeightsAndColours);
+  MITK_TEST(VtkReaderWriter_RasOption_RoundTrip);
+  MITK_TEST(PlanarFigureComposite_AllOperations_RoundTrip);
+  MITK_TEST(Serializers_BundleAndComposite_RoundTrip);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -461,6 +467,127 @@ public:
     const std::string base = mitk::IOMimeTypes::DEFAULT_BASE_NAME();
     for (const std::string suffix : {".pfc", ".FiberBundle.vtk", ".FiberBundle.trk", ".FiberBundle.tck", ".FiberBundle.dcm"})
       CPPUNIT_ASSERT_EQUAL_MESSAGE(base + suffix, 1, registrations[base + suffix]);
+  }
+
+  /** Same fibers, weights and colours; eps for coordinates and weights (ASCII files round them) */
+  static void AssertSameBundle(mitk::FiberBundle *expected, mitk::FiberBundle *actual, double eps, const std::string &message)
+  {
+    CPPUNIT_ASSERT_MESSAGE(message, expected->Equals(actual, eps));
+    for (unsigned int i = 0; i < expected->GetNumFibers(); ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, expected->GetFiberWeight(i), actual->GetFiberWeight(i), eps);
+    auto expectedColours = expected->GetFiberColors();
+    auto actualColours = actual->GetFiberColors();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message, expectedColours->GetNumberOfValues(), actualColours->GetNumberOfValues());
+    // colours belong to points; compare them along the fibers
+    for (unsigned int i = 0; i < expected->GetNumFibers(); ++i)
+    {
+      vtkCell *e = expected->GetFiberPolyData()->GetCell(i);
+      vtkCell *a = actual->GetFiberPolyData()->GetCell(i);
+      for (vtkIdType j = 0; j < e->GetNumberOfPoints(); ++j)
+        for (int c = 0; c < 4; ++c)
+          CPPUNIT_ASSERT_EQUAL_MESSAGE(message, expectedColours->GetComponent(e->GetPointId(j), c),
+                                       actualColours->GetComponent(a->GetPointId(j), c));
+    }
+  }
+
+  void VtkWriter_BinaryAsciiAndXml_KeepPointsWeightsAndColours()
+  {
+    auto fib = LoadWeightedFibers();
+    fib->ColorFibersByLength(false, false, mitk::LookupTable::JET);
+    for (bool xml : {false, true})
+    {
+      for (bool binary : {true, false})
+      {
+        const std::string message = std::string(xml ? "XML" : "legacy") + (binary ? " binary" : " ASCII");
+        const std::string path = m_TempDir + "/fibers_" + (xml ? "xml" : "legacy") + (binary ? "_binary" : "_ascii") + ".fib";
+        mitk::IFileWriter::Options options;
+        options["Save as xml file (vtp style)"] = xml;
+        options["Save as binary file"] = binary;
+        mitk::IOUtil::Save(fib, path, options);
+        AssertSameBundle(fib, mitk::IOUtil::Load<mitk::FiberBundle>(path), binary ? 0.0 : 1e-4, message);
+      }
+    }
+  }
+
+  void VtkReaderWriter_RasOption_RoundTrip()
+  {
+    const std::string input = GetTestDataFilePath("DiffusionImaging/FiberProcessing/original.fib");
+    auto lps = mitk::IOUtil::Load<mitk::FiberBundle>(input);
+    mitk::IFileReader::Options rasOption;
+    rasOption["Use RAS space"] = true;
+    mitk::FiberBundle::Pointer ras = dynamic_cast<mitk::FiberBundle *>(mitk::IOUtil::Load(input, rasOption).at(0).GetPointer());
+    CPPUNIT_ASSERT(ras.IsNotNull());
+    CPPUNIT_ASSERT(ras->IsRAS());
+    CPPUNIT_ASSERT(!lps->IsRAS());
+    CPPUNIT_ASSERT_EQUAL(lps->GetNumFibers(), ras->GetNumFibers());
+    for (vtkIdType i = 0; i < lps->GetFiberPolyData()->GetNumberOfPoints(); i += 97)
+    {
+      const double *p = lps->GetFiberPolyData()->GetPoint(i);
+      const double *q = ras->GetFiberPolyData()->GetPoint(i);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(-p[0], q[0], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(-p[1], q[1], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(p[2], q[2], 1e-6);
+    }
+
+    // a RAS bundle is written back in RAS: the file holds the coordinates of the input file
+    const std::string path = m_TempDir + "/ras.fib";
+    mitk::IOUtil::Save(ras, path);
+    CPPUNIT_ASSERT(lps->Equals(mitk::IOUtil::Load<mitk::FiberBundle>(path), 1e-5));
+    mitk::FiberBundle::Pointer rasAgain = dynamic_cast<mitk::FiberBundle *>(mitk::IOUtil::Load(path, rasOption).at(0).GetPointer());
+    CPPUNIT_ASSERT(ras->Equals(rasAgain, 1e-5));
+  }
+
+  void PlanarFigureComposite_AllOperations_RoundTrip()
+  {
+    for (auto operation : {mitk::PlanarFigureComposite::AND, mitk::PlanarFigureComposite::OR, mitk::PlanarFigureComposite::NOT})
+    {
+      auto composite = mitk::PlanarFigureComposite::New();
+      composite->setOperationType(operation);
+      const std::string path = m_TempDir + "/composite" + std::to_string(operation) + ".pfc";
+      mitk::IOUtil::Save(composite, path);
+      CPPUNIT_ASSERT_EQUAL(operation, mitk::IOUtil::Load<mitk::PlanarFigureComposite>(path)->getOperationType());
+    }
+  }
+
+  /** The scene serializer registered under the given name, as mitk::SceneIO creates it */
+  static mitk::BaseDataSerializer::Pointer CreateSerializer(const std::string &name)
+  {
+    for (const auto &object : itk::ObjectFactoryBase::CreateAllInstance(name.c_str()))
+      if (auto *serializer = dynamic_cast<mitk::BaseDataSerializer *>(object.GetPointer()))
+        return serializer;
+    return nullptr;
+  }
+
+  void Serializers_BundleAndComposite_RoundTrip()
+  {
+    auto fib = LoadWeightedFibers();
+    fib->ColorFibersByLength(false, false, mitk::LookupTable::JET);
+    auto serializer = CreateSerializer("FiberBundleSerializer");
+    CPPUNIT_ASSERT(serializer.IsNotNull());
+    serializer->SetData(fib);
+    serializer->SetFilenameHint("bundle");
+    serializer->SetWorkingDirectory(m_TempDir);
+    const std::string fibFile = serializer->Serialize();
+    CPPUNIT_ASSERT(!fibFile.empty());
+    AssertSameBundle(fib, mitk::IOUtil::Load<mitk::FiberBundle>(m_TempDir + "/" + fibFile), 0.0, "FiberBundleSerializer");
+
+    auto composite = mitk::PlanarFigureComposite::New();
+    composite->setOperationType(mitk::PlanarFigureComposite::OR);
+    serializer = CreateSerializer("PlanarFigureCompositeSerializer");
+    CPPUNIT_ASSERT(serializer.IsNotNull());
+    serializer->SetData(composite);
+    serializer->SetFilenameHint("composite");
+    serializer->SetWorkingDirectory(m_TempDir);
+    const std::string pfcFile = serializer->Serialize();
+    CPPUNIT_ASSERT(!pfcFile.empty());
+    CPPUNIT_ASSERT_EQUAL(mitk::PlanarFigureComposite::OR,
+                         mitk::IOUtil::Load<mitk::PlanarFigureComposite>(m_TempDir + "/" + pfcFile)->getOperationType());
+
+    // a serializer given other data writes nothing
+    serializer = CreateSerializer("FiberBundleSerializer");
+    serializer->SetData(composite);
+    serializer->SetWorkingDirectory(m_TempDir);
+    CPPUNIT_ASSERT(serializer->Serialize().empty());
   }
 
   void TckReader_AllFloatTypes_ReadSamePoints()
