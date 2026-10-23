@@ -421,8 +421,9 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* 
     points2.push_back( {start, end} );
   }
 
-  //  int progress = 0;
-  std::vector< int > ids;
+  // Kept fibers are flagged per index and collected in index order afterwards, so that the
+  // result does not depend on the number of threads.
+  std::vector< char > keep(points1.size(), 0);
 #pragma omp parallel for
   for (int i=0; i<static_cast<int>(points1.size()); i++)
   {
@@ -473,10 +474,14 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* 
       }
     }
 
-#pragma omp critical
     if (!match)
-      ids.push_back(i);
+      keep[static_cast<std::size_t>(i)] = 1;
   }
+
+  std::vector< int > ids;
+  for (std::size_t i=0; i<keep.size(); ++i)
+    if (keep[i])
+      ids.push_back(static_cast<int>(i));
 
   std::vector<float> newWeights;
   for( int i : ids )
@@ -2233,17 +2238,19 @@ void mitk::FiberBundle::Compress(float error)
   newFiberWeights->SetName("FIBER_WEIGHTS");
   newFiberWeights->SetNumberOfValues(m_NumFibers);
 
+  const auto numCells = static_cast<std::size_t>(m_FiberPolyData->GetNumberOfCells());
+  std::vector< std::vector< vnl_vector_fixed< double, 3 > > > compressedFibers(numCells);
+  std::vector< unsigned int > removedPerFiber(numCells, 0);
+
 #pragma omp parallel for
   for (int i=0; i<static_cast<int>(m_FiberPolyData->GetNumberOfCells()); i++)
   {
 
     std::vector< vnl_vector_fixed< double, 3 > > vertices;
-    float weight = 1;
 
 #pragma omp critical
     {
       ++disp;
-      weight = m_FiberWeights->GetValue(i);
       vtkCell* cell = m_FiberPolyData->GetCell(i);
       auto numPoints = cell->GetNumberOfPoints();
       vtkPoints* points = cell->GetPoints();
@@ -2263,7 +2270,6 @@ void mitk::FiberBundle::Compress(float error)
     std::vector< int > removedPoints; removedPoints.resize(numPoints, 0);
     removedPoints[0]=-1; removedPoints[numPoints-1]=-1;
 
-    vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
     unsigned int remCounter = 0;
 
     bool pointFound = true;
@@ -2324,23 +2330,23 @@ void mitk::FiberBundle::Compress(float error)
     }
 
     for (unsigned int j=0; j<numPoints; j++)
-    {
       if (removedPoints[j]<=0)
-      {
-#pragma omp critical
-        {
-          vtkIdType id = vtkNewPoints->InsertNextPoint(vertices.at(j).data_block());
-          container->GetPointIds()->InsertNextId(id);
-        }
-      }
-    }
+        compressedFibers[static_cast<std::size_t>(i)].push_back(vertices.at(j));
+    removedPerFiber[static_cast<std::size_t>(i)] = remCounter;
+  }
 
-#pragma omp critical
+  // Assembled in fiber order, so that the result does not depend on the number of threads.
+  for (std::size_t i=0; i<numCells; ++i)
+  {
+    vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+    for (const auto& vertex : compressedFibers[i])
     {
-      newFiberWeights->SetValue(vtkNewCells->GetNumberOfCells(), weight);
-      numRemovedPoints += remCounter;
-      vtkNewCells->InsertNextCell(container);
+      vtkIdType id = vtkNewPoints->InsertNextPoint(vertex.data_block());
+      container->GetPointIds()->InsertNextId(id);
     }
+    newFiberWeights->SetValue(static_cast<vtkIdType>(i), m_FiberWeights->GetValue(static_cast<vtkIdType>(i)));
+    numRemovedPoints += removedPerFiber[i];
+    vtkNewCells->InsertNextCell(container);
   }
 
   if (vtkNewCells->GetNumberOfCells()>0)

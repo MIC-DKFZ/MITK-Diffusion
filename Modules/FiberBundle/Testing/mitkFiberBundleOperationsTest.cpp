@@ -19,6 +19,7 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itkMath.h>
+#include <omp.h>
 #include <vtkCell.h>
 #include <vtkPoints.h>
 
@@ -37,6 +38,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(RemoveFibersOutside_MaskMissesAllFibers_ReturnsEmptyBundle);
   MITK_TEST(ExtractFiberSubset_RoiIsNoPlanarFigure_Throws);
   MITK_TEST(Weights_RemovingOrSplittingFibers_FollowTheirFibers);
+  MITK_TEST(CompressAndSubtract_EightThreads_EqualOneThread);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -183,6 +185,37 @@ public:
     auto subtracted = source->SubtractBundle(shortFibers);
     CPPUNIT_ASSERT(subtracted->GetNumFibers() < source->GetNumFibers());
     AssertWeightsFollowFibers(source, subtracted, "SubtractBundle");
+  }
+
+  /** Same fibers in the same order with the same points and weights */
+  static void AssertIdentical(mitk::FiberBundle *expected, mitk::FiberBundle *actual, const std::string &message)
+  {
+    CPPUNIT_ASSERT_MESSAGE(message, expected->Equals(actual, 0.0));
+    for (unsigned int i = 0; i < expected->GetNumFibers(); ++i)
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(message, expected->GetFiberWeight(i), actual->GetFiberWeight(i));
+  }
+
+  void CompressAndSubtract_EightThreads_EqualOneThread()
+  {
+    auto source = LoadWeightedFibers();
+    auto shortFibers = source->GetDeepCopy();
+    shortFibers->RemoveLongFibers(source->GetMedianFiberLength());
+
+    const int threads = omp_get_max_threads();
+    omp_set_num_threads(1);
+    auto compressedSingle = source->GetDeepCopy();
+    compressedSingle->Compress(0.1f);
+    auto subtractedSingle = source->SubtractBundle(shortFibers);
+
+    omp_set_num_threads(8);
+    for (int run = 0; run < 3; ++run)
+    {
+      auto compressed = source->GetDeepCopy();
+      compressed->Compress(0.1f);
+      AssertIdentical(compressedSingle, compressed, "Compress, run " + std::to_string(run));
+      AssertIdentical(subtractedSingle, source->SubtractBundle(shortFibers), "SubtractBundle, run " + std::to_string(run));
+    }
+    omp_set_num_threads(threads);
   }
 };
 
