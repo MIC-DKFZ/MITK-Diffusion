@@ -34,6 +34,7 @@ set(CPP_FILES
   Rendering/mitkPeakImageMapper3D.cpp
 
   # Algorithms
+  Algorithms/mitkLbfgsbMutex.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.cpp
@@ -99,6 +100,7 @@ set(H_FILES
   Algorithms/itkShToRgbImageFilter.h
   Algorithms/mitkDirectionColor.h
   Algorithms/mitkImageGeometry4D.h
+  Algorithms/mitkLbfgsbMutex.h
   Algorithms/itkDiffusionTensorPrincipalDirectionImageFilter.h
   Algorithms/itkTensorReconstructionWithEigenvalueCorrectionFilter.h
   Algorithms/itkShCoefficientImageImporter.h

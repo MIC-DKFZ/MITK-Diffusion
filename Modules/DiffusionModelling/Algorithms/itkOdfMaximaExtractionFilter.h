@@ -28,6 +28,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/algo/vnl_lbfgsb.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 
+#include <boost/timer/progress_display.hpp>
+
+#include <memory>
+#include <mutex>
+
 namespace itk{
 
 /**
@@ -127,12 +132,14 @@ Image< unsigned char, 3 > >
 
     /** Negative SH value at (theta, phi), minimized to refine a peak direction. mitk::sh::GetValue
       * evaluates in float, which makes the finite-difference gradient noisy; it stays float so
-      * that peak and reconstruction results do not change. */
+      * that peak and reconstruction results do not change.
+      * The minimizer holds lbfgsbLock (mitk::GetLbfgsbMutex()) while it runs; the evaluation
+      * releases it, so the work units evaluate in parallel. */
     class ShCostFunction : public vnl_cost_function
     {
     public:
-      ShCostFunction(const vnl_vector<float> &coefficients, bool mrtrix)
-        : vnl_cost_function(2), m_Coefficients(coefficients), m_Mrtrix(mrtrix)
+      ShCostFunction(const vnl_vector<float> &coefficients, bool mrtrix, std::unique_lock<std::mutex> &lbfgsbLock)
+        : vnl_cost_function(2), m_Coefficients(coefficients), m_Mrtrix(mrtrix), m_LbfgsbLock(lbfgsbLock)
       {
       }
 
@@ -146,9 +153,21 @@ Image< unsigned char, 3 > >
         fdgradf(x, dx);
       }
 
+      void compute(vnl_vector<double> const &x, double *f, vnl_vector<double> *g) override
+      {
+        m_LbfgsbLock.unlock();
+        struct Relock
+        {
+          std::unique_lock<std::mutex> &lock;
+          ~Relock() { lock.lock(); }
+        } relock{m_LbfgsbLock};
+        vnl_cost_function::compute(x, f, g);
+      }
+
     private:
       vnl_vector<float> m_Coefficients;
       bool m_Mrtrix;
+      std::unique_lock<std::mutex> &m_LbfgsbLock;
     };
 
     NormalizationMethods                        m_NormalizationMethod;  ///< normalization method of ODF peaks
@@ -170,6 +189,9 @@ Image< unsigned char, 3 > >
     bool                                        m_ApplyDirectionMatrix;
     bool                                        m_ScaleByGfa;
     int                                         m_Iterations;
+
+    std::unique_ptr<boost::timer::progress_display> m_Progress;  ///< one console progress bar for all work units
+    std::mutex                                  m_ProgressMutex;
 };
 
 }

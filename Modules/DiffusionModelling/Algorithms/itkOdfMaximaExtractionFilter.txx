@@ -24,8 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkOrientationDistributionFunction.h>
 #include <itkContinuousIndex.h>
 #include <mitkImageGeometry4D.h>
-
-#include <boost/timer/progress_display.hpp>
+#include <mitkLbfgsbMutex.h>
 
 namespace itk {
 
@@ -152,7 +151,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   MITK_INFO << "Relative threshold: " << m_RelativePeakThreshold;
   MITK_INFO << "Absolute threshold: " << m_AbsolutePeakThreshold;
   MITK_INFO << "Angular threshold: " << m_AngularThreshold;
-  this->SetNumberOfWorkUnits(1);
+  m_Progress = std::make_unique<boost::timer::progress_display>(this->GetOutput()->GetRequestedRegion().GetNumberOfPixels());
 }
 
 template< class PixelType, int ShOrder, int NrOdfDirections >
@@ -162,6 +161,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   // A mask generated for this input must not be reused for the next one.
   if (m_MaskGenerated)
     m_MaskImage = nullptr;
+  m_Progress.reset();
 }
 
 template< class PixelType, int ShOrder, int NrOdfDirections >
@@ -172,15 +172,21 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 
   ImageRegionConstIterator< CoefficientImageType > cit(ShCoeffImage, outputRegionForThread );
 
-  boost::timer::progress_display disp(outputRegionForThread.GetSize()[0]*outputRegionForThread.GetSize()[1]*outputRegionForThread.GetSize()[2]);
+  auto advance = [this, &cit]()
+  {
+    {
+      std::lock_guard<std::mutex> guard(m_ProgressMutex);
+      ++(*m_Progress);
+    }
+    ++cit;
+  };
   OdfType odf;
   while( !cit.IsAtEnd() )
   {
     typename CoefficientImageType::IndexType idx3 = cit.GetIndex();
     if (m_MaskImage->GetPixel(idx3)==0)
     {
-      ++disp;
-      ++cit;
+      advance();
       continue;
     }
 
@@ -200,8 +206,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     }
     if (max<0.0001)
     {
-      ++disp;
-      ++cit;
+      advance();
       continue;
     }
 
@@ -218,7 +223,9 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       x[0] = spherical[1];  // theta
       x[1] = spherical[0];  // phi
 
-      ShCostFunction cost(coeffs, m_Toolkit==Toolkit::MRTRIX);
+      // The netlib L-BFGS-B code keeps its state in static variables, see mitk::GetLbfgsbMutex().
+      std::unique_lock<std::mutex> lbfgsbLock(mitk::GetLbfgsbMutex(), std::defer_lock);
+      ShCostFunction cost(coeffs, m_Toolkit==Toolkit::MRTRIX, lbfgsbLock);
 
       vnl_lbfgsb minimizer(cost);
       minimizer.set_f_tolerance(1e-6);
@@ -232,7 +239,9 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       minimizer.set_upper_bound(u);
       if (m_Iterations>0)
         minimizer.set_max_function_evals(m_Iterations);
+      lbfgsbLock.lock();
       minimizer.minimize(x);
+      lbfgsbLock.unlock();
 
       float v = -minimizer.get_end_error()*scale;
       candidates[i] = mitk::gradients::Sph2Cart(x[0], x[1], v);
@@ -307,8 +316,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       }
     }
     this->GetOutput()->SetPixel(idx3, num);
-    ++disp;
-    ++cit;
+    advance();
   }
 }
 
