@@ -430,6 +430,11 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
 template< class T, class TG, class TO, int ShOrder, int NrOdfDirections>
 void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDirections>::ComputeReconstructionMatrix()
 {
+  // Derived per execution: the half-sphere duplication below doubles the count, and a second
+  // Update() must not double it again.
+  m_DirectionsDuplicated = false;
+  m_NumberOfGradientDirections = m_GradientDirectionContainer->Size() - m_NumberOfBaselineImages;
+
   m_NumberCoefficients = (ShOrder*ShOrder + ShOrder + 2)/2 + ShOrder;
   if( m_NumberOfGradientDirections < m_NumberCoefficients )
   {

@@ -423,6 +423,10 @@ namespace itk {
     NrBasisFunctionCenters>
     ::ComputeReconstructionMatrix()
   {
+    // Derived per execution: the half-sphere duplication below doubles the count, and a second
+    // Update() must not double it again.
+    m_DirectionsDuplicated = false;
+    m_NumberOfGradientDirections = m_GradientDirectionContainer->Size() - m_NumberOfBaselineImages;
 
     if( m_NumberOfGradientDirections < 1 )
     {
