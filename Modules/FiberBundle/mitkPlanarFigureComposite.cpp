@@ -24,6 +24,12 @@ mitk::PlanarFigureComposite::PlanarFigureComposite()
     this->SetGeometry(geometry);
 }
 
+mitk::PlanarFigureComposite::PlanarFigureComposite(const Self& other)
+  : BaseData(other)
+  , m_compOperation(other.m_compOperation)
+{
+}
+
 mitk::PlanarFigureComposite::~PlanarFigureComposite()
 {
 

@@ -212,7 +212,10 @@ public:
 protected:
 
     FiberBundle( vtkPolyData* fiberPolyData = nullptr );
+    FiberBundle(const FiberBundle& other);
     ~FiberBundle() override;
+
+    mitkCloneMacro(Self)
 
     void                            GenerateFiberIds();
     void                            UpdateFiberGeometry();

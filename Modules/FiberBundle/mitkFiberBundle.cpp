@@ -109,6 +109,30 @@ mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
   this->ColorFibersByOrientation();
 }
 
+/** Used by Clone(): an independent copy of fibers, colours, weights, statistics and metadata,
+ *  without the cleaning and colouring of the polydata constructor. */
+mitk::FiberBundle::FiberBundle(const FiberBundle& other)
+  : BaseData(other)
+  , m_FiberPolyData(vtkSmartPointer<vtkPolyData>::New())
+  , m_NumFibers(other.m_NumFibers)
+  , m_FiberColors(vtkSmartPointer<vtkUnsignedCharArray>::New())
+  , m_FiberWeights(vtkSmartPointer<vtkFloatArray>::New())
+  , m_FiberLengths(other.m_FiberLengths)
+  , m_MinFiberLength(other.m_MinFiberLength)
+  , m_MaxFiberLength(other.m_MaxFiberLength)
+  , m_MeanFiberLength(other.m_MeanFiberLength)
+  , m_MedianFiberLength(other.m_MedianFiberLength)
+  , m_LengthStDev(other.m_LengthStDev)
+  , m_TrackVisHeader(other.m_TrackVisHeader)
+  , m_IsRAS(other.m_IsRAS)
+{
+  m_FiberPolyData->DeepCopy(other.m_FiberPolyData);
+  m_FiberColors->DeepCopy(other.m_FiberColors);
+  m_FiberWeights->DeepCopy(other.m_FiberWeights);
+  this->GenerateFiberIds();
+  this->RequestUpdate();
+}
+
 mitk::FiberBundle::~FiberBundle()
 {
 

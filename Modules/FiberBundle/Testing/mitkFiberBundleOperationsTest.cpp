@@ -61,6 +61,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(GeneratePolyDataByIds_InvalidId_Throws);
   MITK_TEST(ColorFibersByFiberWeights_EqualWeightsAboveOne_OpaqueColours);
   MITK_TEST(AddBundlesAndCompositeWithoutStorage_NoCrash);
+  MITK_TEST(Clone_CopiesFibersAndMetadataIndependently);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -497,6 +498,52 @@ public:
     auto compositeNode = mitk::DataNode::New();
     compositeNode->SetData(mitk::PlanarFigureComposite::New());
     CPPUNIT_ASSERT_THROW(fib->ExtractFiberIdSubset(compositeNode, nullptr), mitk::Exception);
+  }
+
+  void Clone_CopiesFibersAndMetadataIndependently()
+  {
+    auto fib = LoadWeightedFibers();
+    fib->SetSingleFiberColor(10, 20, 30, 1);
+    fib->setIsRAS(true);
+    auto header = fib->GetTrackVisHeader();
+    header.dim[0] = 77;
+    fib->SetTrackVisHeader(header);
+
+    mitk::FiberBundle::Pointer clone = fib->Clone();
+    CPPUNIT_ASSERT(clone.GetPointer() != fib.GetPointer());
+    CPPUNIT_ASSERT(clone->GetFiberPolyData().GetPointer() != fib->GetFiberPolyData().GetPointer());
+    CPPUNIT_ASSERT(fib->Equals(clone, 0.0));
+    CPPUNIT_ASSERT_EQUAL(fib->GetNumberOfPoints(), clone->GetNumberOfPoints());
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      CPPUNIT_ASSERT_EQUAL(fib->GetFiberWeight(i), clone->GetFiberWeight(i));
+      CPPUNIT_ASSERT_EQUAL(fib->GetFiberLength(i), clone->GetFiberLength(i));
+    }
+    CPPUNIT_ASSERT_EQUAL(fib->GetFiberColors()->GetNumberOfTuples(), clone->GetFiberColors()->GetNumberOfTuples());
+    for (vtkIdType i = 0; i < fib->GetFiberColors()->GetNumberOfValues(); ++i)
+      CPPUNIT_ASSERT_EQUAL(fib->GetFiberColors()->GetValue(i), clone->GetFiberColors()->GetValue(i));
+    CPPUNIT_ASSERT_EQUAL(fib->GetMeanFiberLength(), clone->GetMeanFiberLength());
+    CPPUNIT_ASSERT(clone->IsRAS());
+    CPPUNIT_ASSERT_EQUAL(77, static_cast<int>(clone->GetTrackVisHeader().dim[0]));
+
+    // Changing the arrays of the clone in place leaves the original as it was
+    const double x = fib->GetFiberPolyData()->GetPoint(0)[0];
+    const float weight = fib->GetFiberWeight(0);
+    const unsigned char red = fib->GetFiberColors()->GetValue(0);
+    const double moved[3] = {x + 5, 0, 0};
+    clone->GetFiberPolyData()->GetPoints()->SetPoint(0, moved);
+    clone->SetFiberWeight(0, weight + 1);
+    clone->GetFiberColors()->SetValue(0, static_cast<unsigned char>(red + 1));
+    CPPUNIT_ASSERT_EQUAL(x, fib->GetFiberPolyData()->GetPoint(0)[0]);
+    CPPUNIT_ASSERT_EQUAL(weight, fib->GetFiberWeight(0));
+    CPPUNIT_ASSERT_EQUAL(red, fib->GetFiberColors()->GetValue(0));
+    // The clone stays usable for operations that use the fiber ids
+    auto weights = vtkSmartPointer<vtkFloatArray>::New();
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(2), clone->GeneratePolyDataByIds({0, 1}, weights)->GetNumberOfLines());
+
+    auto composite = mitk::PlanarFigureComposite::New();
+    composite->setOperationType(mitk::PlanarFigureComposite::NOT);
+    CPPUNIT_ASSERT_EQUAL(mitk::PlanarFigureComposite::NOT, composite->Clone()->getOperationType());
   }
 };
 
