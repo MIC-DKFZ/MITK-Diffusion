@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
     {
       MITK_INFO << "Writing statistics of bunlde " << fib_names.at(c);
       statistics_file << "File: " << fib_names.at(c) << std::endl;
-      tract->PrintSelf(statistics_file, 2);
+      tract->PrintStatistics(statistics_file, 2);
       statistics_file << "-------------------------------------------------------------------------\n\n" << std::endl;
       ++c;
     }

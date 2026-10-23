@@ -64,6 +64,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ColorFibersByCurvature_UsesFirstSegment);
   MITK_TEST(ResampleLinear_NoStep_LeavesFibersUnchanged);
   MITK_TEST(PrintSelf_EmptyBundle_Prints);
+  MITK_TEST(PrintStatistics_WithoutObjectAddresses);
   MITK_TEST(GeneratePolyDataByIds_InvalidId_Throws);
   MITK_TEST(ColorFibersByFiberWeights_EqualWeightsAboveOne_OpaqueColours);
   MITK_TEST(AddBundlesAndCompositeWithoutStorage_NoCrash);
@@ -490,6 +491,22 @@ public:
     mitk::FiberBundle::New()->Print(out);
     CPPUNIT_ASSERT(out.str().find("Number of fibers: 0") != std::string::npos);
     CPPUNIT_ASSERT(out.str().find("No fiber weights") != std::string::npos);
+  }
+
+  void PrintStatistics_WithoutObjectAddresses()
+  {
+    // MitkPrintFiberStatistics writes these statistics to a file, which must be the same on
+    // every run: no object addresses as in the BaseData part of PrintSelf.
+    auto fib = LoadWeightedFibers();
+    std::ostringstream statistics;
+    fib->PrintStatistics(statistics, 2);
+    CPPUNIT_ASSERT(statistics.str().find("Number of fibers: 71") != std::string::npos);
+    CPPUNIT_ASSERT(statistics.str().find("Fiber weight statistics") != std::string::npos);
+    CPPUNIT_ASSERT(statistics.str().find("0x") == std::string::npos);
+
+    std::ostringstream all;
+    fib->Print(all);
+    CPPUNIT_ASSERT(all.str().find("Geometry3D (0x") != std::string::npos);
   }
 
   void GeneratePolyDataByIds_InvalidId_Throws()
