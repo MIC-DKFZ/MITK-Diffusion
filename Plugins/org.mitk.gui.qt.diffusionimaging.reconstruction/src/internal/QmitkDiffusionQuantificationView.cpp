@@ -435,7 +435,7 @@ void QmitkDiffusionQuantificationView::OdfQuantification(int method)
     mitk::StatusBar::GetInstance()->DisplayText("Computation complete.");
   }
 
-  this->GetRenderWindowPart()->RequestUpdate();
+  this->RequestRenderWindowUpdate();
 
 }
 
@@ -550,6 +550,6 @@ void QmitkDiffusionQuantificationView::TensorQuantification(int method)
     mitk::StatusBar::GetInstance()->DisplayText("Computation complete.");
   }
 
-  this->GetRenderWindowPart()->RequestUpdate();
+  this->RequestRenderWindowUpdate();
 
 }

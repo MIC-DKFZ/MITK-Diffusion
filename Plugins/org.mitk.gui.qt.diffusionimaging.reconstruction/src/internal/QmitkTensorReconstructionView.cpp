@@ -240,7 +240,7 @@ void QmitkTensorReconstructionView::TensorReconstructionWithCorr()
       GetDataStorage()->Add(node, m_Controls->m_DwiBox->GetSelectedNode());
     }
 
-    this->GetRenderWindowPart()->RequestUpdate();
+    this->RequestRenderWindowUpdate();
   }
   catch (itk::ExceptionObject &ex)
   {
@@ -320,7 +320,7 @@ void QmitkTensorReconstructionView::ItkTensorReconstruction()
       GetDataStorage()->Add(node, m_Controls->m_DwiBox->GetSelectedNode());
     }
 
-    this->GetRenderWindowPart()->RequestUpdate();
+    this->RequestRenderWindowUpdate();
   }
   catch (itk::ExceptionObject &ex)
   {
@@ -500,7 +500,7 @@ void QmitkTensorReconstructionView::DoTensorsToDWI()
       node->SetName(nodename+"_DWI");
       GetDataStorage()->Add(node, m_Controls->m_DtiBox->GetSelectedNode());
     }
-    this->GetRenderWindowPart()->RequestUpdate();
+    this->RequestRenderWindowUpdate();
   }
   catch (itk::ExceptionObject &ex)
   {

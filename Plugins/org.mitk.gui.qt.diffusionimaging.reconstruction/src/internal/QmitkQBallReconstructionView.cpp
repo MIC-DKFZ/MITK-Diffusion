@@ -329,7 +329,7 @@ void QmitkQBallReconstructionView::NumericalQBallReconstruction(mitk::DataNode::
 
     GetDataStorage()->Add(new_node, node);
 
-    this->GetRenderWindowPart()->RequestUpdate();
+    this->RequestRenderWindowUpdate();
   }
   catch (itk::ExceptionObject &ex)
   {
@@ -383,7 +383,7 @@ void QmitkQBallReconstructionView::AnalyticalQBallReconstruction( mitk::DataNode
     }
     }
 
-    this->GetRenderWindowPart()->RequestUpdate();
+    this->RequestRenderWindowUpdate();
   }
   catch (itk::ExceptionObject &ex)
   {
