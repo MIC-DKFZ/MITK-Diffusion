@@ -59,6 +59,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ResampleLinear_NoStep_LeavesFibersUnchanged);
   MITK_TEST(PrintSelf_EmptyBundle_Prints);
   MITK_TEST(GeneratePolyDataByIds_InvalidId_Throws);
+  MITK_TEST(ColorFibersByFiberWeights_EqualWeightsAboveOne_OpaqueColours);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -472,6 +473,17 @@ public:
     CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(2), polyData->GetNumberOfLines());
     CPPUNIT_ASSERT_EQUAL(fib->GetFiberWeight(2), weights->GetValue(1));
     CPPUNIT_ASSERT_THROW(fib->GeneratePolyDataByIds({0, fib->GetNumFibers()}, weights), mitk::Exception);
+  }
+
+  void ColorFibersByFiberWeights_EqualWeightsAboveOne_OpaqueColours()
+  {
+    // equal weights force the colour range to [0, 1]; weight/max is then 3
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}}, {{0, 2, 0}, {1, 2, 0}}});
+    fib->SetFiberWeights(3.0f);
+    fib->ColorFibersByFiberWeights(true, mitk::LookupTable::JET);
+    auto colours = fib->GetFiberColors();
+    for (vtkIdType i = 0; i < colours->GetNumberOfTuples(); ++i)
+      CPPUNIT_ASSERT_EQUAL(255.0, colours->GetComponent(i, 3));
   }
 };
 

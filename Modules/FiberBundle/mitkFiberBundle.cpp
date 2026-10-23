@@ -65,6 +65,17 @@ namespace
     return array;
   }
 
+  /** Opacity in 0..255; values outside (scalar maps beyond 1, NaN from a zero maximum) would be
+   *  undefined when cast to unsigned char. */
+  unsigned char ClampToByte(double value)
+  {
+    if (!(value > 0.0))
+      return 0;
+    if (value >= 255.0)
+      return 255;
+    return static_cast<unsigned char>(value);
+  }
+
   /** Bundles derived from another one keep its coordinate convention (the VTK writer saves
    *  RAS bundles back in RAS) and its TrackVis header (reference geometry for .trk files). */
   void CopyMetadata(mitk::FiberBundle* source, mitk::FiberBundle* target)
@@ -594,7 +605,7 @@ void mitk::FiberBundle::ColorFibersByLength(bool opacity, bool weight_fibers, mi
       rgba[1] = static_cast<unsigned char>(255.0 * color[1]);
       rgba[2] = static_cast<unsigned char>(255.0 * color[2]);
       if (opacity)
-        rgba[3] = static_cast<unsigned char>(255.0f * l);
+        rgba[3] = ClampToByte(255.0f * l);
       else
         rgba[3] = static_cast<unsigned char>(255.0);
       m_FiberColors->InsertTypedTuple(cell->GetPointId(j), rgba);
@@ -893,7 +904,7 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
       rgba[2] = static_cast<unsigned char>(255.0 * color[2]);
 
       if (opacity)
-        rgba[3] = static_cast<unsigned char>(255.0f * dev/max);
+        rgba[3] = ClampToByte(255.0f * dev/max);
       else
         rgba[3] = static_cast<unsigned char>(255.0);
 
@@ -1020,7 +1031,7 @@ void mitk::FiberBundle::ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::P
     rgba[1] = static_cast<unsigned char>(255.0 * color[1]);
     rgba[2] = static_cast<unsigned char>(255.0 * color[2]);
     if (opacity)
-      rgba[3] = static_cast<unsigned char>(255.0 * pixelValue);
+      rgba[3] = ClampToByte(255.0 * pixelValue);
     else
       rgba[3] = static_cast<unsigned char>(255.0);
     m_FiberColors->InsertTypedTuple(i, rgba);
@@ -1076,7 +1087,7 @@ void mitk::FiberBundle::ColorFibersByFiberWeights(bool opacity, mitk::LookupTabl
       rgba[1] = static_cast<unsigned char>(255.0 * color[1]);
       rgba[2] = static_cast<unsigned char>(255.0 * color[2]);
       if (opacity)
-        rgba[3] = static_cast<unsigned char>(255.0f * weight/max);
+        rgba[3] = ClampToByte(255.0f * weight/max);
       else
         rgba[3] = static_cast<unsigned char>(255.0);
 
