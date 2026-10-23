@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkNrrdTensorImageReader_h
-#define __mitkNrrdTensorImageReader_h
+#ifndef mitkNrrdTensorImageReader_h
+#define mitkNrrdTensorImageReader_h
 
 #include "mitkCommon.h"
 #include "itkVectorContainer.h"
@@ -56,4 +56,4 @@ namespace mitk
 
 } //namespace MITK
 
-#endif // __mitkNrrdTensorImageReader_h
+#endif

@@ -15,8 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef __mitkOdfImage__h
-#define __mitkOdfImage__h
+#ifndef mitkOdfImage_h
+#define mitkOdfImage_h
 
 #include "mitkRgbCachedImage.h"
 
@@ -54,4 +54,4 @@ namespace mitk
 
 } // namespace mitk
 
-#endif /* __mitkOdfImage__h */
+#endif

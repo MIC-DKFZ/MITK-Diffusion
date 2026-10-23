@@ -15,8 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef __mitkTensorImage__h
-#define __mitkTensorImage__h
+#ifndef mitkTensorImage_h
+#define mitkTensorImage_h
 
 #include "mitkRgbCachedImage.h"
 #include "itkVectorImage.h"
@@ -56,4 +56,4 @@ namespace mitk
 
 } // namespace mitk
 
-#endif /* __mitkTensorImage__h */
+#endif

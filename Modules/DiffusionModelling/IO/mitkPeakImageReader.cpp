@@ -75,9 +75,7 @@ namespace mitk
     this->RegisterService();
   }
 
-  PeakImageReader::~PeakImageReader()
-  {
-  }
+  PeakImageReader::~PeakImageReader() = default;
 
   std::vector<itk::SmartPointer<BaseData> > PeakImageReader::DoRead()
   {

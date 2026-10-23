@@ -193,9 +193,7 @@ namespace mitk
     this->RegisterService();
   }
 
-  NrrdTensorImageReader::~NrrdTensorImageReader()
-  {
-  }
+  NrrdTensorImageReader::~NrrdTensorImageReader() = default;
 
   std::vector<itk::SmartPointer<BaseData> > NrrdTensorImageReader::DoRead()
   {

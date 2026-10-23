@@ -15,8 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef __mitkPeakImage__h
-#define __mitkPeakImage__h
+#ifndef mitkPeakImage_h
+#define mitkPeakImage_h
 
 #include "mitkImage.h"
 #include <vtkPolyData.h>
@@ -80,4 +80,4 @@ namespace mitk
 
 } // namespace mitk
 
-#endif /* __mitkPeakImage__h */
+#endif

@@ -37,8 +37,7 @@ mitk::ShImageWriter::ShImageWriter(const mitk::ShImageWriter& other)
 {
 }
 
-mitk::ShImageWriter::~ShImageWriter()
-{}
+mitk::ShImageWriter::~ShImageWriter() = default;
 
 template <int shOrder>
 void mitk::ShImageWriter::WriteShImage(InputType::ConstPointer input)

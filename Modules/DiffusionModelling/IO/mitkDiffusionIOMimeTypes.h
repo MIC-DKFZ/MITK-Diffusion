@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef MITKDiffusionIOMimeTypes_H
-#define MITKDiffusionIOMimeTypes_H
+#ifndef mitkDiffusionIOMimeTypes_h
+#define mitkDiffusionIOMimeTypes_h
 
 #include "mitkCustomMimeType.h"
 #include <string>
@@ -69,4 +69,4 @@ public:
 
 }
 
-#endif // MITKDiffusionIOMimeTypes_H
+#endif

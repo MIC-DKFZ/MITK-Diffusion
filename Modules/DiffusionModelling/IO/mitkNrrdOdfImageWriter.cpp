@@ -36,8 +36,7 @@ mitk::NrrdOdfImageWriter::NrrdOdfImageWriter(const mitk::NrrdOdfImageWriter& oth
 {
 }
 
-mitk::NrrdOdfImageWriter::~NrrdOdfImageWriter()
-{}
+mitk::NrrdOdfImageWriter::~NrrdOdfImageWriter() = default;
 
 
 void mitk::NrrdOdfImageWriter::Write()

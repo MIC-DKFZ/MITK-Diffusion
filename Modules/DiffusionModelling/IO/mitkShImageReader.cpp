@@ -46,9 +46,7 @@ namespace mitk
     this->RegisterService();
   }
 
-  ShImageReader::~ShImageReader()
-  {
-  }
+  ShImageReader::~ShImageReader() = default;
 
   template <int shOrder>
   mitk::Image::Pointer ShImageReader::ConvertShImage(ShImage::ShOnDiskType::Pointer img)

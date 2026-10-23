@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _MITK_NRRDDTI_WRITER__H_
-#define _MITK_NRRDDTI_WRITER__H_
+#ifndef mitkNrrdTensorImageWriter_h
+#define mitkNrrdTensorImageWriter_h
 
 #include <mitkAbstractFileWriter.h>
 #include <mitkTensorImage.h>
@@ -50,4 +50,4 @@ protected:
 
 } // end of namespace mitk
 
-#endif //_MITK_NRRDDTI_WRITER__H_
+#endif

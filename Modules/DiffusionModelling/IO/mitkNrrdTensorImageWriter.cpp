@@ -37,8 +37,7 @@ mitk::NrrdTensorImageWriter::NrrdTensorImageWriter(const mitk::NrrdTensorImageWr
 }
 
 
-mitk::NrrdTensorImageWriter::~NrrdTensorImageWriter()
-{}
+mitk::NrrdTensorImageWriter::~NrrdTensorImageWriter() = default;
 
 
 void mitk::NrrdTensorImageWriter::Write()

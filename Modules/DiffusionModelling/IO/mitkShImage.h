@@ -15,8 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef __mitkShImage__h
-#define __mitkShImage__h
+#ifndef mitkShImage_h
+#define mitkShImage_h
 
 #include "mitkRgbCachedImage.h"
 
@@ -69,4 +69,4 @@ namespace mitk
 
 } // namespace mitk
 
-#endif /* __mitkShImage__h */
+#endif

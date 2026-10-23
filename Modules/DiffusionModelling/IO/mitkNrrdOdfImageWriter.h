@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _MITK_NRRDODF_WRITER__H_
-#define _MITK_NRRDODF_WRITER__H_
+#ifndef mitkNrrdOdfImageWriter_h
+#define mitkNrrdOdfImageWriter_h
 
 #include <mitkAbstractFileWriter.h>
 #include <mitkOdfImage.h>
@@ -50,4 +50,4 @@ namespace mitk
 
 } // end of namespace mitk
 
-#endif //_MITK_NRRDODF_WRITER__H_
+#endif

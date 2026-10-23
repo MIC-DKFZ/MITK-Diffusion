@@ -30,9 +30,7 @@ mitk::PeakImageSerializer::PeakImageSerializer()
 }
 
 
-mitk::PeakImageSerializer::~PeakImageSerializer()
-{
-}
+mitk::PeakImageSerializer::~PeakImageSerializer() = default;
 
 
 std::string mitk::PeakImageSerializer::Serialize()

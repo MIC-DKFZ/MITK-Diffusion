@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _MITK_SH_WRITER__H_
-#define _MITK_SH_WRITER__H_
+#ifndef mitkShImageWriter_h
+#define mitkShImageWriter_h
 
 #include <mitkAbstractFileWriter.h>
 #include <mitkShImage.h>

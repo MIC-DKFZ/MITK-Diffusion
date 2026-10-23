@@ -39,9 +39,7 @@ namespace mitk
     this->RegisterService();
   }
 
-  NrrdOdfImageReader::~NrrdOdfImageReader()
-  {
-  }
+  NrrdOdfImageReader::~NrrdOdfImageReader() = default;
 
   std::vector<itk::SmartPointer<BaseData> > NrrdOdfImageReader::DoRead()
   {
