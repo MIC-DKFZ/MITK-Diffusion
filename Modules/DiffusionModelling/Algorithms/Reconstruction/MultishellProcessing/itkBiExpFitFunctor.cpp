@@ -52,8 +52,6 @@ void itk::BiExpFitFunctor::operator()(vnl_matrix<double> & newSignal,const vnl_m
 
     newSignal.put(i, 0, S0 * (lambda * std::exp(-m_TargetBvalue * ADC_slow) + (1-lambda)* std::exp(-m_TargetBvalue * ADC_fast)));
     newSignal.put(i, 1, minimizer.get_end_error()); // RMS Error
-
-    //OUTPUT FOR EVALUATION
   }
 
 }

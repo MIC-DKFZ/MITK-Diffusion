@@ -254,8 +254,8 @@ namespace itk {
     this->m_NumberOfEquatorSamplingPoints
       = (int) ceil((double)sqrt(8*itk::Math::pi*this->m_NumberOfGradientDirections));
 
-    // The matrices of this function are values (they leaked about 27 MB per execution for 64
-    // gradients); smart pointers would slow down the loops below in Debug builds.
+    // The matrices of this function are local values, freed on return (about 27 MB for 64
+    // gradients); smart pointers to them would slow down the loops below in Debug builds.
     vnl_matrix<double> Q(3, m_NumberOfGradientDirections);
 
     {
@@ -363,9 +363,9 @@ namespace itk {
     // Per ODF direction: its equator sampling points (the equator rotated to the direction), the
     // contribution G of each kernel to each point, and G * H_plus with negative weights set to 0 and
     // each row normalized to sum 1 (an addition to the original Tuch algorithm), summed over the
-    // points. One direction at a time: G and G * H_plus of all directions together had
-    // m * NOdfDirections rows (25 MB for 30 half-sphere gradients). The products are row by row the
-    // same, so the matrix is too.
+    // points. One direction at a time, so that G and G * H_plus never hold the m * NOdfDirections
+    // rows of all directions (25 MB for 30 half-sphere gradients); row by row the products are those
+    // of the full matrices.
     m_ReconstructionMatrix = vnl_matrix<TOdfPixelType>(NOdfDirections,m_NumberOfGradientDirections,0.0);
     {
       vnl_vector_fixed<double,3> z(0.0);

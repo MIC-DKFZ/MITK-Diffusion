@@ -35,7 +35,6 @@ void itk::ADCAverageFunctor::operator()(vnl_matrix<double> & newSignal, const vn
     double averageADC = ADCMatrix.get_row(i).mean();
     newSignal.put(i,0, S0 * std::exp(-m_TargetBvalue * averageADC) ); // S = S0*exp(-b*D)
 
-    //OUTPUT FOR EVALUATION
     // Root Mean Squares Error
     double error = 0;
     for(unsigned int j = 0 ; j < SignalMatrix.cols(); ++j)

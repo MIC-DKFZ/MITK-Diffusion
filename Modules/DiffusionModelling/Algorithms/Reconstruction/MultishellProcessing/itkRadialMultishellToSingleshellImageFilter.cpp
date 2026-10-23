@@ -74,7 +74,7 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
   m_NumberTargetDirections = m_TargetDirectionsIndicies.size();
   m_TargetGradientDirections = mitk::gradients::CreateNormalizedUniqueGradientDirectionContainer(m_BValueMap,m_OriginalGradientDirections);
 
-  // Rebuilt per execution; a second Update() appended to the matrices of the first.
+  // Rebuilt per execution, so that a second Update() does not append to the matrices of the first.
   m_ShellInterpolationMatrixVector.clear();
   m_ShellInterpolationMatrixVector.reserve(m_BValueMap.size()-1);
 
@@ -225,7 +225,7 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
 
     // A non-positive interpolated signal makes the functors' logarithms NaN, and converting NaN or
     // an out-of-range value to the integer output is undefined: such values give 0, the others are
-    // clamped and truncated as before.
+    // clamped and truncated (not rounded: the references test_multi_*.dwi hold truncated values).
     for(unsigned int i = 1 ; i < out.Size(); i ++)
     {
       const double value = SignalVector.get(i-1);

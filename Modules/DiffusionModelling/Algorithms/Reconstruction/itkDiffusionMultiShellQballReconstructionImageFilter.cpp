@@ -337,8 +337,8 @@ template< class T, class TG, class TO, int L, int NODF>
 void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
 ::BeforeThreadedGenerateData()
 {
-  // Only the analytical solution for three equidistant shells (Aganj 2010) is implemented. The
-  // other modes wrote nothing (or no coefficients), so their outputs kept uninitialized memory.
+  // Only the analytical solution for three equidistant shells (Aganj 2010) is implemented; with any
+  // other selection the outputs would stay unwritten.
   if (m_BValueMap.size() != 4)
     itkExceptionMacro(<< "Only three equidistant shells are supported, the selection has " << m_BValueMap.size() - 1 << ".");
 

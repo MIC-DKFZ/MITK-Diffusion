@@ -183,7 +183,8 @@ void QmitkQBallReconstructionView::Reconstruct()
   parameters.lambda = m_Controls->m_QBallReconstructionLambdaLineEdit->value();
   parameters.b0Threshold = static_cast<short>(m_Controls->m_QBallReconstructionThreasholdEdit->value());
   parameters.sampledOdf = m_Controls->m_OutputOdfImage->isChecked();
-  // The shell selection is read from the DWI now; the check boxes belong to the selected DWI.
+  // The b-values of the checked boxes, built for the selected DWI; ReconstructQball rejects a
+  // b-value the DWI does not have.
   for (unsigned int i = 0; i < m_ShellCheckBoxes.size(); ++i)
   {
     if (m_ShellCheckBoxes[i]->isChecked())
@@ -217,9 +218,9 @@ void QmitkQBallReconstructionView::Reconstruct()
 
 void QmitkQBallReconstructionView::GenerateShellSelectionUI(mitk::DataNode::Pointer node)
 {
-  // One check box per non-zero shell of the selected DWI. Nothing keeps a pointer to the DWI: the
-  // selection is read from the DWI at reconstruction time. The boxes (and their check states) stay
-  // while the same node with the same shells is selected; the node address is only compared.
+  // One check box per non-zero shell of the selected DWI. Only the b-values are kept, never the
+  // DWI. The boxes (and their check states) stay while the same node with the same shells is
+  // selected; the node address is only compared.
   std::vector<unsigned int> bValues;
   auto dwi = node.IsNotNull() ? dynamic_cast<mitk::Image *>(node->GetData()) : nullptr;
   if (dwi != nullptr && mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi))

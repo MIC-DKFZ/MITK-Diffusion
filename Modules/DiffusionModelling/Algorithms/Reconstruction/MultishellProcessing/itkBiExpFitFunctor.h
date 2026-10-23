@@ -94,7 +94,7 @@ protected:
       {
         double approx = lambda * std::exp(-b[s] * ADC_slow) + (1-lambda) * std::exp(-b[s] * ADC_fast);
         // Signed: the forward-difference Jacobian of |r| is wrong where a residual changes sign,
-        // which stalled Levenberg-Marquardt near exact fits.
+        // which stalls Levenberg-Marquardt near exact fits.
         fx[s] = measurements[s] - approx*S0;
       }
 

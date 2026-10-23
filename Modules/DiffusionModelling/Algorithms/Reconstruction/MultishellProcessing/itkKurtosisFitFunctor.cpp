@@ -49,7 +49,5 @@ void itk::KurtosisFitFunctor::operator()(vnl_matrix<double> & newSignal, const v
 
     newSignal.put(i, 0, S0 * std::exp(-m_TargetBvalue * ADC + 1./6. * m_TargetBvalue* m_TargetBvalue * ADC * ADC * AKC));
     newSignal.put(i, 1, minimizer.get_end_error()); // RMS Error
-
-    //OUTPUT FOR EVALUATION
   }
 }

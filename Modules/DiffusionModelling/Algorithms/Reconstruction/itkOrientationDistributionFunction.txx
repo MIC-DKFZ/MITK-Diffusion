@@ -64,7 +64,8 @@ OrientationDistributionFunction<T, NOdfDirections>&
 OrientationDistributionFunction<T, NOdfDirections>
 ::operator= (const ComponentType & r)
 {
-  // BaseArray::operator=(&r) read N values from the address of the one scalar.
+  // Fill, not BaseArray::operator=(&r), which would read N values from the address of the one
+  // scalar.
   this->Fill(r);
   m_EigenAnalysisCalculated = false;
   return *this;
