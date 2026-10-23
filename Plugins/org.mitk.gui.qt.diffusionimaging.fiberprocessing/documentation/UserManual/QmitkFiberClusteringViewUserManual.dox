@@ -6,7 +6,7 @@ Cluster fibers using an extended version of the QuickBundles method (see [1,2]).
 \section SecInput Input Data
 
 - Tractogram: Input streamlines to be clustered.
-- Input Centroids: Optionally input a set of streamlines around which the streamlines of the input tractograms are clustered. No new clusters are created in this case. Each input streamline is assigned to the neares centroid.
+- Input Centroids: Optionally input a set of streamlines around which the streamlines of the input tractograms are clustered. No new clusters are created in this case. Each input streamline is assigned to the nearest centroid within the cluster size. Cluster_k belongs to the k-th input centroid and is empty if no streamline was assigned to it; streamlines farther from every centroid form "Cluster_unassigned". Merging of duplicate clusters and the maximum number of clusters are not used in this case.
 
 \section SecParams Parameters
 

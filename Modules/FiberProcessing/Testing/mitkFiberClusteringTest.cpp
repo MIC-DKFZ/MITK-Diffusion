@@ -29,6 +29,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(Clusters_KeepInputWeights);
   MITK_TEST(Clusters_SameResultForAnyThreadCount);
   MITK_TEST(InputCentroids_SameResultForAnyThreadCount);
+  MITK_TEST(InputCentroids_OutputKBelongsToCentroidK);
   CPPUNIT_TEST_SUITE_END();
 
   /** Three fibers along x at y = 0, 0.5, 1 mm and, 40 mm away, two at y = 40, 41 mm, with
@@ -122,6 +123,33 @@ public:
     const auto single = Cluster(fib, centroids, 1);
     for (int run = 0; run < 3; ++run)
       AssertEqualResults(single, Cluster(fib, centroids, 8));
+  }
+
+  void InputCentroids_OutputKBelongsToCentroidK()
+  {
+    // Centroid 0 lies on the group at y = 40, centroid 1 far from every fiber, centroid 2 on the
+    // group at y = 0; a sixth fiber at y = 200 is far from all of them.
+    using namespace mitk::FiberProcessingTestHelper;
+    auto fib = TwoGroups();
+    fib = fib->AddBundle(CreateBundle({Line({0, 200, 0}, {50, 200, 0}, 20)}));
+    auto centroids = CreateBundle({Line({0, 40.5, 0}, {50, 40.5, 0}, 12), Line({0, -100, 0}, {50, -100, 0}, 12), Line({50, 0.5, 0}, {0, 0.5, 0}, 12)});
+
+    mitk::TractClusteringFilter clusterer;
+    clusterer.SetTractogram(fib);
+    clusterer.SetInCentroids(centroids);
+    clusterer.SetDistances({10});
+    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.Update();
+
+    const auto indices = clusterer.GetOutFiberIndices();
+    CPPUNIT_ASSERT_EQUAL(std::size_t(3), clusterer.GetOutTractograms().size());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(3), clusterer.GetOutCentroids().size());
+    CPPUNIT_ASSERT(indices.at(0) == std::vector<unsigned int>({2, 4}));
+    CPPUNIT_ASSERT(indices.at(1).empty());
+    CPPUNIT_ASSERT_EQUAL(0u, clusterer.GetOutTractograms().at(1)->GetNumFibers());
+    CPPUNIT_ASSERT(indices.at(2) == std::vector<unsigned int>({0, 1, 3}));
+    CPPUNIT_ASSERT_EQUAL(1u, clusterer.GetOutUnassigned()->GetNumFibers());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-100.0, clusterer.GetOutCentroids().at(1)->GetFiberPolyData()->GetPoint(0)[1], 1e-4);
   }
 
   void Clusters_KeepInputWeights()

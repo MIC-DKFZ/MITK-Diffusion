@@ -254,8 +254,12 @@ int main(int argc, char* argv[])
     CoutSilencer silencer;
 
     if (!only_centroids)
+    {
       for (unsigned int i=0; i<tracts.size(); ++i)
         mitk::IOUtil::Save(tracts.at(i), out_root + "Cluster_" + boost::lexical_cast<std::string>(i) + file_ending);
+      if (clusterer->GetOutUnassigned()->GetNumFibers()>0)
+        mitk::IOUtil::Save(clusterer->GetOutUnassigned(), out_root + "Cluster_unassigned" + file_ending);
+    }
 
 
     if (output_centroids && !merge_centroids)

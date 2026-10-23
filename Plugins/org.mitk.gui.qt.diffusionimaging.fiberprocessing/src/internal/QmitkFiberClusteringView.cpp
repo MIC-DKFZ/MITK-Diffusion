@@ -226,6 +226,14 @@ void QmitkFiberClusteringView::StartClustering()
     ++c;
   }
 
+  if (clusterer->GetOutUnassigned()->GetNumFibers()>0)
+  {
+    mitk::DataNode::Pointer new_node = mitk::DataNode::New();
+    new_node->SetData(clusterer->GetOutUnassigned());
+    new_node->SetName("Cluster_unassigned");
+    this->GetDataStorage()->Add(new_node, m_Controls->m_InCentroidsBox->GetSelectedNode());
+  }
+
   if (m_Controls->m_CentroidsBox->isChecked() && m_Controls->m_MergeCentroidsBox->isChecked())
   {
     mitk::DataNode::Pointer new_node2 = mitk::DataNode::New();

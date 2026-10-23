@@ -73,6 +73,13 @@ public:
   std::vector<Cluster> GetOutClusters() const;
   std::vector<std::vector<unsigned int> > GetOutFiberIndices() const;
 
+  /**
+  * Fibers farther than the cluster size from every input centroid (empty without input
+  * centroids). With input centroids, output cluster and centroid k belong to input centroid k
+  * (empty if no fiber was assigned to it), and MaxClusters and the duplicate merging are not used.
+  */
+  mitk::FiberBundle::Pointer GetOutUnassigned() const;
+
   void SetMetrics(const std::vector<mitk::ClusteringMetric *> &Metrics);
 
   void SetTractogram(const mitk::FiberBundle::Pointer &Tractogram);
@@ -107,6 +114,7 @@ protected:
   void MergeDuplicateClusters(std::vector< TractClusteringFilter::Cluster >& clusters);
   std::vector< Cluster > AddToKnownClusters(std::vector< unsigned int > f_indices, std::vector<vnl_matrix<float> > &centroids);
   void AppendCluster(std::vector< Cluster >& a, std::vector< Cluster >&b);
+  void AddOutput(const Cluster& c, const vnl_matrix<float>& centroid_points);
 
   unsigned int                                m_NumPoints;
   std::vector< float >                        m_Distances;
@@ -114,6 +122,7 @@ protected:
   mitk::FiberBundle::Pointer                  m_InCentroids;
   std::vector< mitk::FiberBundle::Pointer >   m_OutTractograms;
   std::vector< mitk::FiberBundle::Pointer >   m_OutCentroids;
+  mitk::FiberBundle::Pointer                  m_OutUnassigned;
   std::vector<vnl_matrix<float> >             T;
   unsigned int                                m_MinClusterSize;
   unsigned int                                m_MaxClusters;
