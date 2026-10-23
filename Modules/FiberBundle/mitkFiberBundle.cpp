@@ -529,13 +529,13 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* 
  */
 void mitk::FiberBundle::SetFiberPolyData(vtkSmartPointer<vtkPolyData> fiberPD, bool updateGeometry)
 {
-  if (fiberPD == nullptr)
-    this->m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
-  else
-  {
-    m_FiberPolyData->CopyStructure(fiberPD);
-//    m_FiberPolyData->DeepCopy(fiberPD);
-  }
+  // A new object instead of the old one changed in place: the old one may be in use elsewhere
+  // (mappers, callers holding GetFiberPolyData()), and its point data, sized for the old points,
+  // must not be carried over to the new ones.
+  vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
+  if (fiberPD != nullptr)
+    polyData->CopyStructure(fiberPD);
+  this->m_FiberPolyData = polyData;
 
   m_NumFibers = static_cast<unsigned int>(m_FiberPolyData->GetNumberOfLines());
 

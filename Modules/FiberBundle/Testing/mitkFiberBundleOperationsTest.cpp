@@ -22,6 +22,8 @@ found in the LICENSE file.
 #include <omp.h>
 #include <vtkCell.h>
 #include <vtkCellArray.h>
+#include <vtkFloatArray.h>
+#include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyLine.h>
@@ -47,6 +49,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(DerivedBundles_KeepRasFlagAndHeader);
   MITK_TEST(ApplyCurvatureThreshold_KeepsTwoPointFibersAndNoSinglePoints);
   MITK_TEST(TransformFibers_NoTransform_Throws);
+  MITK_TEST(SetFiberPolyData_LeavesOldPolyDataAndPointDataBehind);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -340,6 +343,25 @@ public:
     const double x = fib->GetFiberPolyData()->GetPoint(0)[0];
     fib->TransformFibers(transform);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(x + 5.0, fib->GetFiberPolyData()->GetPoint(0)[0], 1e-4);
+  }
+
+  void SetFiberPolyData_LeavesOldPolyDataAndPointDataBehind()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    auto oldPolyData = fib->GetFiberPolyData();
+    const auto oldNumPoints = oldPolyData->GetNumberOfPoints();
+    auto stale = vtkSmartPointer<vtkFloatArray>::New();
+    stale->SetName("STALE");
+    stale->SetNumberOfValues(oldNumPoints);
+    oldPolyData->GetPointData()->AddArray(stale);
+
+    auto other = LoadFibers("fiberBundleX.fib");
+    fib->SetFiberPolyData(other->GetFiberPolyData());
+
+    CPPUNIT_ASSERT(fib->Equals(other));
+    CPPUNIT_ASSERT_MESSAGE("Point data of the old fibers is not carried over",
+                           !fib->GetFiberPolyData()->GetPointData()->HasArray("STALE"));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("The old polydata is not changed", oldNumPoints, oldPolyData->GetNumberOfPoints());
   }
 };
 
