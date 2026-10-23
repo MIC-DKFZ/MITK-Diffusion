@@ -58,6 +58,9 @@ public:
 
   TractClusteringFilter();
   ~TractClusteringFilter();
+  // The filter owns (and deletes) its metrics.
+  TractClusteringFilter(const TractClusteringFilter&) = delete;
+  TractClusteringFilter& operator=(const TractClusteringFilter&) = delete;
 
   typedef itk::Image< float, 3 >                              FloatImageType;
   typedef itk::Image< unsigned char, 3 >                      UcharImageType;

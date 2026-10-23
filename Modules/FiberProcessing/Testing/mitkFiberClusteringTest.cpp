@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <mitkClusteringMetricScalarMap.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
+#include <mitkExceptionMacro.h>
 
 #include <itkImageRegionIteratorWithIndex.h>
 
@@ -41,6 +42,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(Resampling_EqualArcLength);
   MITK_TEST(ScalarMap_SeveralMapsInParallel);
   MITK_TEST(Anatomic_PointOutsideFirstParcellation);
+  MITK_TEST(Update_TwiceGivesSameOutputs);
   CPPUNIT_TEST_SUITE_END();
 
   /** Three fibers along x at y = 0, 0.5, 1 mm and, 40 mm away, two at y = 40, 41 mm, with
@@ -296,6 +298,22 @@ public:
     float distance = 0;
     CPPUNIT_ASSERT_NO_THROW(distance = metric.CalculateDistance(s, t, flipped));
     CPPUNIT_ASSERT(distance < 9999);
+  }
+
+  void Update_TwiceGivesSameOutputs()
+  {
+    mitk::TractClusteringFilter clusterer;
+    clusterer.SetTractogram(TwoGroups());
+    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    CPPUNIT_ASSERT_THROW(clusterer.Update(), mitk::Exception);
+
+    clusterer.SetDistances({10});
+    clusterer.Update();
+    const auto first = clusterer.GetOutFiberIndices();
+    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.Update();
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), clusterer.GetOutTractograms().size());
+    CPPUNIT_ASSERT(first == clusterer.GetOutFiberIndices());
   }
 
   void Clusters_KeepInputWeights()

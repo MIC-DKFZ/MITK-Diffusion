@@ -55,6 +55,10 @@ mitk::FiberBundle::Pointer TractClusteringFilter::GetOutUnassigned() const
 
 void TractClusteringFilter::SetMetrics(const std::vector<mitk::ClusteringMetric *> &Metrics)
 {
+  // The filter owns its metrics; metrics set before and not passed again are deleted here.
+  for (auto m : m_Metrics)
+    if (std::find(Metrics.begin(), Metrics.end(), m)==Metrics.end())
+      delete m;
   m_Metrics = Metrics;
 }
 
@@ -298,12 +302,14 @@ void TractClusteringFilter::SetTractogram(const mitk::FiberBundle::Pointer &Trac
 
 std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplicateClusters2(std::vector< TractClusteringFilter::Cluster >& clusters)
 {
-  if (m_MergeDuplicateThreshold<0)
-    m_MergeDuplicateThreshold = m_Distances.at(0)/2;
-  else if (m_MergeDuplicateThreshold==0)
+  // A negative setting means half the cluster size of this run; the setting itself stays.
+  float mergeThreshold = m_MergeDuplicateThreshold;
+  if (mergeThreshold<0)
+    mergeThreshold = m_Distances.at(0)/2;
+  else if (mergeThreshold==0)
     return clusters;
 
-  MITK_INFO << "Merging duplicate clusters with distance threshold " << m_MergeDuplicateThreshold;
+  MITK_INFO << "Merging duplicate clusters with distance threshold " << mergeThreshold;
 
   std::vector< TractClusteringFilter::Cluster > new_clusters;
   for (Cluster c1 : clusters)
@@ -333,7 +339,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
     bool flip = false;
     for (int k2=0; k2<(int)new_clusters.size(); ++k2)
     {
-      if (distances[k2]<min_d && distances[k2]<m_MergeDuplicateThreshold)
+      if (distances[k2]<min_d && distances[k2]<mergeThreshold)
       {
         min_d = distances[k2];
         min_idx = k2;
@@ -528,6 +534,7 @@ void TractClusteringFilter::AddOutput(const Cluster& c, const vnl_matrix<float>&
   vtkSmartPointer<vtkPolyData> pTmp = m_Tractogram->GeneratePolyDataByIds(c.I, weights);
   mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
   fib->SetFiberWeights(weights);
+  fib->SetTrackVisHeader(m_Tractogram->GetTrackVisHeader());
   m_OutTractograms.push_back(fib);
   m_OutFiberIndices.push_back(c.I);
 
@@ -559,6 +566,7 @@ void TractClusteringFilter::GenerateData()
   m_OutTractograms.clear();
   m_OutCentroids.clear();
   m_OutClusters.clear();
+  m_OutFiberIndices.clear();
   m_OutUnassigned = mitk::FiberBundle::New();
 
   if (m_Metrics.empty())
@@ -566,6 +574,8 @@ void TractClusteringFilter::GenerateData()
     mitkThrow() << "No metric selected!";
     return;
   }
+  if (m_Distances.empty())
+    mitkThrow() << "No cluster distance set!";
 
   T = ResampleFibers(m_Tractogram);
   if (T.empty())
@@ -634,6 +644,7 @@ void TractClusteringFilter::GenerateData()
       vtkSmartPointer<vtkPolyData> pTmp = m_Tractogram->GeneratePolyDataByIds(no_match.I, weights);
       m_OutUnassigned = mitk::FiberBundle::New(pTmp);
       m_OutUnassigned->SetFiberWeights(weights);
+      m_OutUnassigned->SetTrackVisHeader(m_Tractogram->GetTrackVisHeader());
       m_OutUnassigned->SetFiberColors(0, 0, 0);
     }
   }
