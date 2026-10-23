@@ -127,9 +127,9 @@ namespace
 
   /** The axes the voxel order names; an empty voxel order is TrackVis's default "LPS", as for
    *  nibabel. None for an order that does not name each axis once. */
-  std::optional<AxisCodes> VoxelOrderAxisCodes(const mitk::TrackVisFile::Header& header)
+  std::optional<AxisCodes> VoxelOrderAxisCodes(const char* voxelOrder)
   {
-    std::string order(header.voxel_order, std::find(header.voxel_order, header.voxel_order + 3, '\0'));
+    std::string order(voxelOrder, std::find(voxelOrder, voxelOrder + 3, '\0'));
     if (order.empty())
       order = "LPS";
     if (order.size()!=3)
@@ -168,7 +168,7 @@ namespace
    *  name the same axes in the same directions, or when one of them names no axes. */
   vtkSmartPointer<vtkMatrix4x4> VoxelOrderToMatrixAxes(const mitk::TrackVisFile::Header& header)
   {
-    const auto start = VoxelOrderAxisCodes(header);
+    const auto start = VoxelOrderAxisCodes(header.voxel_order);
     const auto end = MatrixAxisCodes(header);
     if (!start || !end || *start == *end)
       return nullptr;
@@ -193,6 +193,33 @@ namespace
         matrix->SetElement(i, 3, header.dim[i] - 1);
     }
     return matrix;
+  }
+
+  /** Whether nibabel, readers that use only the matrix, and MITK (VoxmmToLps) all read the header
+   *  the same way: a matrix is recorded, the voxel order names its axes, and MITK does not read it
+   *  as one of its LPS files. */
+  bool IsConsistent(const mitk::TrackVisFile::Header& header)
+  {
+    if (!HasMatrix(header) || IsLegacyMitkHeader(header, "LPS"))
+      return false;
+    const auto orderCodes = VoxelOrderAxisCodes(header.voxel_order);
+    const auto matrixCodes = MatrixAxisCodes(header);
+    return orderCodes && matrixCodes && *orderCodes == *matrixCodes;
+  }
+
+  /** Sets the grid of the header from its index-to-LPS map (x and y negated for RAS). */
+  void SetGridFromLps(mitk::TrackVisFile::Header& header, const vtkMatrix4x4* indexToLps, const char* voxelOrder)
+  {
+    double indexToRas[3][4];
+    for (int r=0; r<3; ++r)
+    {
+      const double flip = r<2 ? -1.0 : 1.0;
+      for (int c=0; c<4; ++c)
+        indexToRas[r][c] = flip*indexToLps->GetElement(r, c);
+    }
+    const double dims[3] = {static_cast<double>(header.dim[0]), static_cast<double>(header.dim[1]), static_cast<double>(header.dim[2])};
+    const double spacing[3] = {header.voxel_size[0], header.voxel_size[1], header.voxel_size[2]};
+    mitk::TrackVisFile::SetGrid(header, indexToRas, dims, spacing, voxelOrder);
   }
 
   /** The inverse of the voxmm-to-LPS map of the header, as the geometry transform computes it. */
@@ -261,6 +288,54 @@ vtkSmartPointer<vtkMatrix4x4> mitk::TrackVisFile::VoxmmToLps(const Header& heade
     if (negate[i])
       NegateRow(matrix, i);
   return matrix;
+}
+
+void mitk::TrackVisFile::SetGrid(Header& header, const double indexToRas[3][4], const double dims[3], const double spacing[3], const char* voxelOrder)
+{
+  double linear[3][3];
+  for (int r=0; r<3; ++r)
+    for (int c=0; c<3; ++c)
+      linear[r][c] = indexToRas[r][c];
+  const auto gridCodes = MatrixAxisCodes(linear);
+  const auto targetCodes = VoxelOrderAxisCodes(voxelOrder);
+  if (!gridCodes || !targetCodes)
+    mitkThrow() << "The reference grid has no three independent axes; no TrackVis header can describe it.";
+
+  // New voxel axis k is the grid axis on the world axis of voxel order letter k, negated (and
+  // counted from the other end) where it points the other way.
+  int perm[3] = {0, 1, 2};
+  double sign[3] = {1, 1, 1};
+  for (int k=0; k<3; ++k)
+    for (int j=0; j<3; ++j)
+      if ((*gridCodes)[j].first == (*targetCodes)[k].first)
+      {
+        perm[k] = j;
+        sign[k] = (*gridCodes)[j].second == (*targetCodes)[k].second ? 1.0 : -1.0;
+      }
+
+  for (int r=0; r<3; ++r)
+  {
+    double translation = indexToRas[r][3];
+    for (int k=0; k<3; ++k)
+    {
+      header.vox_to_ras[r][k] = static_cast<float>(sign[k] * indexToRas[r][perm[k]]);
+      if (sign[k]<0)
+        translation += indexToRas[r][perm[k]] * (dims[perm[k]] - 1);
+    }
+    header.vox_to_ras[r][3] = static_cast<float>(translation);
+  }
+  for (int c=0; c<3; ++c)
+    header.vox_to_ras[3][c] = 0;
+  header.vox_to_ras[3][3] = 1;
+
+  for (int k=0; k<3; ++k)
+  {
+    header.dim[k] = static_cast<short>(dims[perm[k]]);
+    header.voxel_size[k] = static_cast<float>(spacing[perm[k]]);
+    header.origin[k] = 0;
+  }
+  std::memcpy(header.voxel_order, voxelOrder, 3);
+  header.voxel_order[3] = 0;
 }
 
 mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename, bool useMatrix, bool flipX, bool flipY, bool flipZ, bool printHeader)
@@ -333,15 +408,35 @@ mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename,
       NegateRow(matrix, i);
 
   FiberBundle::Pointer fib = FiberBundle::New(Transform(polyData, matrix));
-  fib->SetTrackVisHeader(header);
+  // MITK's own files of 2019 to 2026 store the LPS index-to-world matrix of their reference grid
+  // (those with voxel order "RAS" are read with another map, VoxmmToLps); the bundle keeps that
+  // grid as the TrackVis format defines it, so that a saved copy describes the reference image.
+  Header kept = header;
+  if (useMatrix && HasMatrix(header) && (IsLegacyMitkHeader(header, "LPS") || IsLegacyMitkHeader(header, "RAS")))
+  {
+    vtkSmartPointer<vtkMatrix4x4> indexToLps = vtkSmartPointer<vtkMatrix4x4>::New();
+    for (int r=0; r<4; ++r)
+      for (int c=0; c<4; ++c)
+        indexToLps->SetElement(r, c, header.vox_to_ras[r][c]);
+    SetGridFromLps(kept, indexToLps, "RAS");
+  }
+  fib->SetTrackVisHeader(kept);
   return fib;
 }
 
 void mitk::TrackVisFile::Write(const std::string& filename, const FiberBundle* fib, bool useLps, bool printHeader)
 {
   Header header = fib->GetTrackVisHeader();
-  if (useLps)
-    std::memcpy(header.voxel_order, "LPS", 4);
+  // A header that the readers would read in different ways (see IsConsistent) is written as the
+  // grid MITK reads it with, with a voxel order that names the axes of its matrix.
+  if (!IsConsistent(header) || (useLps && std::strncmp(header.voxel_order, "LPS", 3)!=0))
+  {
+    vtkSmartPointer<vtkMatrix4x4> indexToLps = VoxmmToLps(header, true);
+    for (int r=0; r<4; ++r)
+      for (int c=0; c<3; ++c)
+        indexToLps->SetElement(r, c, indexToLps->GetElement(r, c)*header.voxel_size[c]);
+    SetGridFromLps(header, indexToLps, useLps ? "LPS" : "RAS");
+  }
   // Only coordinates are written, and readers such as nibabel read exactly n_count tracks; a
   // header copied from a loaded file would otherwise keep its counts.
   header.n_scalars = 0;

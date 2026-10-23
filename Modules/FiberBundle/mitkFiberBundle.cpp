@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkFiberBundle.h"
 #include "mitkFiberPolyDataBuilder.h"
+#include "mitkTrackVisFile.h"
 
 #include <mitkGeometry3D.h>
 #include <vtkCellArray.h>
@@ -383,45 +384,11 @@ namespace
 
     // Voxel axes are reordered and flipped to point to R, A and S (voxel order "RAS"), the one order
     // that TrackVis readers, MITK's of 2023 to 2026 included, all map the same way.
-    int perm[3] = {0, 1, 2};
-    double sign[3] = {1, 1, 1};
-    bool used[3] = {false, false, false};
-    for (int k=0; k<3; ++k)
-    {
-      int best = -1;
-      for (int j=0; j<3; ++j)
-        if (!used[j] && (best<0 || std::fabs(indexToRas[k][j])>std::fabs(indexToRas[k][best])))
-          best = j;
-      perm[k] = best;
-      used[best] = true;
-      sign[k] = indexToRas[k][best]<0 ? -1.0 : 1.0;
-    }
-
-    for (int r=0; r<3; ++r)
-    {
-      double translation = indexToRas[r][3];
-      for (int k=0; k<3; ++k)
-      {
-        header.vox_to_ras[r][k] = static_cast<float>(sign[k] * indexToRas[r][perm[k]]);
-        if (sign[k]<0)
-          translation += indexToRas[r][perm[k]] * (dims[perm[k]] - 1);
-      }
-      header.vox_to_ras[r][3] = static_cast<float>(translation);
-    }
-    for (int c=0; c<3; ++c)
-      header.vox_to_ras[3][c] = 0;
-    header.vox_to_ras[3][3] = 1;
-
-    for(int k=0; k<3 ;k++)
-    {
-      header.dim[k]            = static_cast<short>(dims[perm[k]]);
-      header.voxel_size[k]     = static_cast<float>(geometry->GetSpacing()[perm[k]]);
-      header.origin[k]         = 0;
-    }
+    const double spacing[3] = {geometry->GetSpacing()[0], geometry->GetSpacing()[1], geometry->GetSpacing()[2]};
+    mitk::TrackVisFile::SetGrid(header, indexToRas, dims, spacing, "RAS");
 
     header.n_scalars = 0;
     header.n_properties = 0;
-    std::memcpy(header.voxel_order, "RAS", 4);
     header.image_orientation_patient[0] = 1.0;
     header.image_orientation_patient[1] = 0.0;
     header.image_orientation_patient[2] = 0.0;

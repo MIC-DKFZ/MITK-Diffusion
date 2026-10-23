@@ -87,6 +87,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(IOHelper_BrokenFileAndDottedNames_CoutRestored);
   MITK_TEST(CopyDicomReferenceTags_BothNamingsAndMissingTags);
   MITK_TEST(TrkWriter_Header_DescribesReferenceGrid);
+  MITK_TEST(TrkWriter_LpsOptionAndOldMitkFiles_WriteConsistentHeaders);
   MITK_TEST(DicomReader_NoAlgorithmIdentification_LoadsAndKeepsLocale);
   MITK_TEST(PlanarFigureComposite_RoundTripAndBrokenFile_KeepLocale);
   MITK_TEST(PlanarFigureComposite_UnknownOperation_Throws);
@@ -1096,6 +1097,134 @@ public:
       }
     }
     CPPUNIT_ASSERT_EQUAL_MESSAGE(message, ras.size(), k);
+  }
+
+  /** The voxmm-to-LPS map with which MITK read and wrote .trk files from 2019 to 2026: vox_to_ras
+   *  divided by the voxel size, rows negated by the voxel order letters R, A and I. */
+  static vnl_matrix_fixed<double, 4, 4> Mitk2023Map(const TrkHeader &header)
+  {
+    vnl_matrix_fixed<double, 4, 4> map;
+    for (int i = 0; i < 4; ++i)
+      for (int j = 0; j < 4; ++j)
+        map[i][j] = j < 3 ? header.vox_to_ras[i][j] / header.voxel_size[j] : header.vox_to_ras[i][j];
+    const bool negate[3] = {header.voxel_order[0] == 'R', header.voxel_order[1] == 'A', header.voxel_order[2] == 'I'};
+    for (int i = 0; i < 3; ++i)
+      if (negate[i])
+        for (int j = 0; j < 4; ++j)
+          map[i][j] = -map[i][j];
+    return map;
+  }
+
+  /** Writes the bundle as MITK did from 2019 to 2026 against the reference geometry: vox_to_ras its
+   *  LPS index-to-world matrix, n_count 0, default image_orientation_patient. */
+  static void WriteTrkAsMitk2023(const std::string &path, mitk::FiberBundle *fib, const mitk::BaseGeometry *geometry, const std::string &voxelOrder)
+  {
+    TrkHeader header;
+    std::memset(&header, 0, sizeof(header));
+    std::memcpy(header.id_string, "TRACK", 6);
+    const vtkMatrix4x4 *matrix = geometry->GetVtkMatrix();
+    for (int i = 0; i < 3; ++i)
+    {
+      header.dim[i] = static_cast<short>(geometry->GetExtent(i));
+      header.voxel_size[i] = static_cast<float>(geometry->GetSpacing()[i]);
+      header.origin[i] = static_cast<float>(geometry->GetOrigin()[i]);
+    }
+    for (int i = 0; i < 4; ++i)
+      for (int j = 0; j < 4; ++j)
+        header.vox_to_ras[i][j] = static_cast<float>(matrix->GetElement(i, j));
+    std::memcpy(header.voxel_order, voxelOrder.c_str(), 3);
+    header.image_orientation_patient[0] = 1;
+    header.image_orientation_patient[4] = 1;
+    header.version = 2;
+    header.hdr_size = 1000;
+
+    const auto map = Mitk2023Map(header);
+    const auto inverse = vnl_inverse(map.extract(3, 3));
+    std::ofstream out(path, std::ios::binary);
+    out.write(reinterpret_cast<const char *>(&header), sizeof(header));
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+      const std::int32_t numPoints = static_cast<std::int32_t>(cell->GetNumberOfPoints());
+      out.write(reinterpret_cast<const char *>(&numPoints), 4);
+      for (vtkIdType j = 0; j < numPoints; ++j)
+      {
+        const double *p = cell->GetPoints()->GetPoint(j);
+        const vnl_vector_fixed<double, 3> lps(p[0] - map[0][3], p[1] - map[1][3], p[2] - map[2][3]);
+        const auto voxmm = inverse * lps;
+        for (int c = 0; c < 3; ++c)
+        {
+          const float value = static_cast<float>(voxmm[c] + header.voxel_size[c] / 2);
+          out.write(reinterpret_cast<const char *>(&value), 4);
+        }
+      }
+    }
+  }
+
+  /** Reads a .trk file as MITK did from 2019 to 2026 (Mitk2023Map), as RAS points. */
+  static std::vector<std::array<double, 3>> ReadTrkAsMitk2023(const std::string &path)
+  {
+    std::ifstream in(path, std::ios::binary);
+    TrkHeader header;
+    in.read(reinterpret_cast<char *>(&header), sizeof(header));
+    const auto map = Mitk2023Map(header);
+    std::vector<std::array<double, 3>> ras;
+    std::int32_t numPoints = 0;
+    while (in.read(reinterpret_cast<char *>(&numPoints), 4))
+      for (int j = 0; j < numPoints; ++j)
+      {
+        float voxmm[3];
+        in.read(reinterpret_cast<char *>(voxmm), 12);
+        std::array<double, 3> p;
+        for (int r = 0; r < 3; ++r)
+        {
+          p[r] = map[r][3];
+          for (int c = 0; c < 3; ++c)
+            p[r] += map[r][c] * (voxmm[c] - header.voxel_size[c] / 2);
+        }
+        ras.push_back({-p[0], -p[1], p[2]});
+      }
+    return ras;
+  }
+
+  void TrkWriter_LpsOptionAndOldMitkFiles_WriteConsistentHeaders()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/mask_image.nii.gz"));
+    mitk::IFileWriter::Options ras;
+    ras["Print header"] = false;
+    mitk::IFileWriter::Options lps = ras;
+    lps["Use LPS coordinate system (default is RAS)"] = true;
+    const std::string path = m_TempDir + "/written.trk";
+    TrkHeader header;
+    bool inside = false;
+
+    // "Use LPS" writes a grid whose voxel axes point to L, P and S
+    mitk::IOUtil::Save(fib, path, lps);
+    AssertSpecPointsMatchBundle(fib, ReadTrkAsSpec(path, header, inside), "Use LPS");
+    CPPUNIT_ASSERT_MESSAGE("Use LPS: inside the declared volume", inside);
+    CPPUNIT_ASSERT_EQUAL(std::string("LPS"), std::string(header.voxel_order, 3));
+    CPPUNIT_ASSERT(header.vox_to_ras[0][0] < 0 && header.vox_to_ras[1][1] < 0 && header.vox_to_ras[2][2] > 0);
+
+    // Files that MITK wrote from 2019 to 2026 against the image, by default ("RAS") and with "Use LPS"
+    for (const std::string order : {"RAS", "LPS"})
+    {
+      const std::string old = m_TempDir + "/mitk2023_" + order + ".trk";
+      WriteTrkAsMitk2023(old, fib, image->GetGeometry(), order);
+      auto loaded = mitk::IOUtil::Load<mitk::FiberBundle>(old);
+      CPPUNIT_ASSERT_MESSAGE(order, fib->Equals(loaded, 1e-3));
+
+      // Saved again: nibabel and MITK 2023 to 2026 read the points, which lie in the image grid
+      mitk::IOUtil::Save(loaded, path, ras);
+      AssertSpecPointsMatchBundle(fib, ReadTrkAsSpec(path, header, inside), order + " saved again");
+      CPPUNIT_ASSERT_MESSAGE(order + " saved again: inside the image grid", inside);
+      CPPUNIT_ASSERT_EQUAL(std::string("RAS"), std::string(header.voxel_order, 3));
+      AssertSpecPointsMatchBundle(fib, ReadTrkAsMitk2023(path), order + " saved again, read as MITK 2023 to 2026");
+
+      mitk::IOUtil::Save(loaded, path, lps);
+      AssertSpecPointsMatchBundle(fib, ReadTrkAsSpec(path, header, inside), order + " saved again with Use LPS");
+      CPPUNIT_ASSERT_MESSAGE(order + " saved again with Use LPS: inside the image grid", inside);
+    }
   }
 
   void TrkWriter_Header_DescribesReferenceGrid()
