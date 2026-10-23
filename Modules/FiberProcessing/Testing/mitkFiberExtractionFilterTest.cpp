@@ -11,6 +11,7 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <itkFiberExtractionFilter.h>
+#include <mitkExceptionMacro.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -27,6 +28,9 @@ class mitkFiberExtractionFilterTestSuite : public mitk::TestFixture
   MITK_TEST(Update_TwiceGivesSameOutputs);
   MITK_TEST(Update_EmptyTractogramGivesEmptyOutputs);
   MITK_TEST(Outputs_KeepRasFlagAndSetHeaderOnly);
+  MITK_TEST(Overlap_FractionOfLengthInRoi);
+  MITK_TEST(Labels_SplitLabels);
+  MITK_TEST(Labels_PairedStartAndEndLabels);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::FiberExtractionFilter<float>;
@@ -213,6 +217,62 @@ public:
         CPPUNIT_ASSERT(mitk::FiberProcessingTestHelper::HasMetadataOf(filter->GetPositives().at(0), input));
         CPPUNIT_ASSERT(mitk::FiberProcessingTestHelper::HasMetadataOf(filter->GetNegatives().at(0), input));
       }
+  }
+
+  void Overlap_FractionOfLengthInRoi()
+  {
+    // In-ROI fractions of the fiber lengths: fiber 0 3.5/11.66 = 0.30, fiber 1 1.3/6.8 = 0.19,
+    // fiber 2 0.
+    auto roi = CreateRoi(1);
+    const auto positives = [&roi](float fraction) {
+      auto filter = FilterType::New();
+      filter->SetInputFiberBundle(ThreeFibers());
+      filter->SetRoiImages({roi});
+      filter->SetOverlapFraction(fraction);
+      filter->Update();
+      return filter->GetPositives().at(0)->GetNumFibers();
+    };
+    CPPUNIT_ASSERT_EQUAL(2u, positives(0.15f));
+    CPPUNIT_ASSERT_EQUAL(1u, positives(0.25f));
+    CPPUNIT_ASSERT_EQUAL(0u, positives(0.35f));
+  }
+
+  void Labels_SplitLabels()
+  {
+    // All labels (0 excluded), both ends: fiber 0 connects 3-3, fiber 1 3-4; fibers 2 and 3 have
+    // an end in label 0.
+    auto labels = CreateLabels();
+    auto filter = LabelFilter(LabelFibers(), labels);
+    filter->SetSplitLabels(true);
+    filter->Update();
+    CPPUNIT_ASSERT(filter->GetPositiveLabels() == std::vector<std::string>({"3-3", "3-4"}));
+    CPPUNIT_ASSERT_EQUAL(1u, filter->GetPositives().at(0)->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL(1u, filter->GetPositives().at(1)->GetNumFibers());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(8.0, filter->GetPositives().at(1)->GetFiberPolyData()->GetPoint(4)[0], 1e-5);
+    CPPUNIT_ASSERT_EQUAL(2u, filter->GetNegatives().at(0)->GetNumFibers());
+  }
+
+  void Labels_PairedStartAndEndLabels()
+  {
+    auto labels = CreateLabels();
+    const auto positives = [&labels](const std::vector<unsigned short>& start, const std::vector<unsigned short>& end) {
+      auto filter = LabelFilter(LabelFibers(), labels);
+      filter->SetPairedStartEndLabels(true);
+      filter->SetStartLabels(start);
+      filter->SetEndLabels(end);
+      filter->Update();
+      return filter->GetPositives().at(0)->GetNumFibers();
+    };
+    // A pair matches in either fiber direction.
+    CPPUNIT_ASSERT_EQUAL(1u, positives({4}, {3}));
+    CPPUNIT_ASSERT_EQUAL(1u, positives({3}, {3}));
+    CPPUNIT_ASSERT_EQUAL(2u, positives({3, 3}, {3, 4}));
+
+    auto filter = LabelFilter(LabelFibers(), labels);
+    filter->SetPairedStartEndLabels(true);
+    filter->SetStartLabels({3, 4});
+    filter->SetEndLabels({3});
+    CPPUNIT_ASSERT_THROW(filter->Update(), mitk::Exception);
   }
 };
 
