@@ -82,7 +82,9 @@ OrientationDistributionFunction<T, NOdfDirections>&
 OrientationDistributionFunction<T, NOdfDirections>
 ::operator= (const ComponentType & r)
 {
-  BaseArray::operator=(&r);
+  // BaseArray::operator=(&r) read N values from the address of the one scalar.
+  this->Fill(r);
+  m_EigenAnalysisCalculated = false;
   return *this;
 }
 
@@ -505,6 +507,9 @@ OrientationDistributionFunction<T, NOdfDirections>
     min = (*this)[i] < min ? (*this)[i] : min;
   }
   Self retval;
+  // A constant ODF (e.g. all zero) has no range; it stays zero instead of becoming NaN.
+  if (!(max > min))
+    return retval;
   for( unsigned int i=0; i<InternalDimension; i++)
   {
     retval[i] = ((*this)[i] - min) / (max - min);
@@ -526,6 +531,9 @@ OrientationDistributionFunction<T, NOdfDirections>
     max = (*this)[i] > max ? (*this)[i] : max;
   }
   Self retval;
+  // A zero ODF stays zero instead of becoming NaN.
+  if (max == 0)
+    return retval;
   for( unsigned int i=0; i<InternalDimension; i++)
   {
     retval[i] = (*this)[i] / max;

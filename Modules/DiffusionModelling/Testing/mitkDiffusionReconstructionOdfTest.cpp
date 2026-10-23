@@ -26,6 +26,8 @@ class mitkDiffusionReconstructionOdfTestSuite : public mitk::TestFixture
   MITK_TEST(PrincipalDirection_MaximumAtIndexZero);
   MITK_TEST(EllipsoidDirection_SurvivesCopies);
   MITK_TEST(PrincipleCurvature_DependsOnAngles);
+  MITK_TEST(Normalizations_ConstantOdf_StayFinite);
+  MITK_TEST(AssignScalar_FillsAll);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
@@ -118,6 +120,30 @@ public:
     CPPUNIT_ASSERT_EQUAL(0.0f, odf.GetPrincipleCurvature(89.9, 89.95, 0));
     const OdfType zero;
     CPPUNIT_ASSERT_EQUAL(0.0f, zero.GetPrincipleCurvature(0, 30, 0));
+  }
+
+  // The glyphs min-max or max normalize every ODF; a zero or constant ODF became NaN.
+  void Normalizations_ConstantOdf_StayFinite()
+  {
+    const OdfType zero;
+    OdfType constant;
+    constant.Fill(0.5f);
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+    {
+      CPPUNIT_ASSERT_EQUAL(0.0f, zero.MinMaxNormalize()[i]);
+      CPPUNIT_ASSERT_EQUAL(0.0f, zero.MaxNormalize()[i]);
+      CPPUNIT_ASSERT_EQUAL(0.0f, constant.MinMaxNormalize()[i]);
+      CPPUNIT_ASSERT_EQUAL(1.0f, constant.MaxNormalize()[i]);
+    }
+  }
+
+  // Assigning a scalar copied N values starting at the address of that one scalar.
+  void AssignScalar_FillsAll()
+  {
+    OdfType odf;
+    odf = 0.25f;
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      CPPUNIT_ASSERT_EQUAL(0.25f, odf[i]);
   }
 };
 
