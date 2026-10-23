@@ -50,6 +50,12 @@ public:
      */
     virtual DiffusionSignalModel* Clone() const = 0;
 
+    /**
+     * True if SimulateMeasurement draws from the model's random generator. The simulation calls such
+     * models from the parallel fiber loop through per-thread clones, reseeded per fiber segment.
+     */
+    virtual bool UsesRandomNumbers() const { return false; }
+
     typedef itk::Image<double, 3>                   ItkDoubleImgType;
     typedef itk::VariableLengthVector< ScalarType > PixelType;
     typedef itk::Vector<double,3>                   GradientType;

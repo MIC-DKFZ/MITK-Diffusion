@@ -33,6 +33,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <itkImageFileWriter.h>
 #include <limits>
+#include <boost/lexical_cast.hpp>
 
 namespace itk {
 

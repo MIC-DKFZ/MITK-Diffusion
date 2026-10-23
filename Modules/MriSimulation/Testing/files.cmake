@@ -5,4 +5,5 @@ SET(MODULE_CUSTOM_TESTS
   mitkFiberFitTest.cpp
   mitkFiberfoxThreadDeterminismTest.cpp
   mitkFiberfoxParametersTest.cpp
+  mitkFiberfoxSignalModelTest.cpp
 )

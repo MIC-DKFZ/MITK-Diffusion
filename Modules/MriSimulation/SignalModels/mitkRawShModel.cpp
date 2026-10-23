@@ -13,26 +13,21 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#include <vnl/vnl_cross.h>
-#include <vnl/vnl_quaternion.h>
 #include <mitkRawShModel.h>
-#include <boost/math/special_functions.hpp>
-#include <itkOrientationDistributionFunction.h>
-#include <mitkFiberfoxParameters.h>
 #include <itkDiffusionTensor3DReconstructionImageFilter.h>
 #include <itkAdcImageFilter.h>
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <mitkDiffusionPropertyHelper.h>
+#include <mitkDiffusionImageHelperFunctions.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkImageCast.h>
 #include <mitkProperties.h>
-
-using namespace mitk;
-using namespace boost::math;
+#include <vnl/vnl_quaternion.h>
+#include <vnl/algo/vnl_symmetric_eigensystem.h>
 
 template< class ScalarType >
-RawShModel< ScalarType >::RawShModel()
+mitk::RawShModel< ScalarType >::RawShModel()
   : m_ShOrder(0)
-  , m_ModelIndex(-1)
   , m_MaxNumKernels(1000)
 {
   this->m_RandGen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
@@ -44,13 +39,13 @@ RawShModel< ScalarType >::RawShModel()
 }
 
 template< class ScalarType >
-RawShModel< ScalarType >::~RawShModel()
+mitk::RawShModel< ScalarType >::~RawShModel()
 {
 
 }
 
 template< class ScalarType >
-void RawShModel< ScalarType >::Clear()
+void mitk::RawShModel< ScalarType >::Clear()
 {
   m_ShCoefficients.clear();
   m_PrototypeMaxDirection.clear();
@@ -58,19 +53,23 @@ void RawShModel< ScalarType >::Clear()
 }
 
 template< class ScalarType >
-void RawShModel< ScalarType >::RandomModel()
-{
-  m_ModelIndex = this->m_RandGen->GetIntegerVariate(m_B0Signal.size()-1);
-}
-
-template< class ScalarType >
-unsigned int RawShModel< ScalarType >::GetNumberOfKernels()
+unsigned int mitk::RawShModel< ScalarType >::GetNumberOfKernels() const
 {
   return m_B0Signal.size();
 }
 
 template< class ScalarType >
-bool RawShModel< ScalarType >::SampleKernels(Image::Pointer diffImg, ItkUcharImageType::Pointer maskImage, TensorImageType::Pointer tensorImage, QballFilterType::CoefficientImageType::Pointer itkFeatureImage, ItkDoubleImageType::Pointer adcImage)
+unsigned int mitk::RawShModel< ScalarType >::DrawKernel()
+{
+  if (m_B0Signal.empty())
+    mitkThrow() << "Prototype signal model without kernels.";
+  if (m_B0Signal.size()==1)
+    return 0;
+  return this->m_RandGen->GetIntegerVariate(m_B0Signal.size()-1);
+}
+
+template< class ScalarType >
+bool mitk::RawShModel< ScalarType >::SampleKernels(Image::Pointer diffImg, ItkUcharImageType::Pointer maskImage, TensorImageType::Pointer tensorImage, QballFilterType::CoefficientImageType::Pointer itkFeatureImage, ItkDoubleImageType::Pointer adcImage)
 {
   if (diffImg.IsNull())
     return false;
@@ -176,17 +175,14 @@ bool RawShModel< ScalarType >::SampleKernels(Image::Pointer diffImg, ItkUcharIma
 
     if ( this->GetMaxNumKernels()>this->GetNumberOfKernels() && FA>m_FaRange.first && FA<m_FaRange.second && ADC>m_AdcRange.first && ADC<m_AdcRange.second)
     {
-      if (this->SetShCoefficients( coeffs.as_vector(), (double)itkVectorImagePointer->GetPixel(it.GetIndex())[b0Index]/max ))
-      {
-        tensor.ComputeEigenAnalysis(eigenvalues, eigenvectors);
-        itk::Vector<double,3> dir;
-        dir[0] = eigenvectors(2, 0);
-        dir[1] = eigenvectors(2, 1);
-        dir[2] = eigenvectors(2, 2);
-        m_PrototypeMaxDirection.push_back(dir);
-        count++;
-        MITK_INFO << "KERNEL: " << it.GetIndex() << " (" << count << ")";
-      }
+      tensor.ComputeEigenAnalysis(eigenvalues, eigenvectors);
+      GradientType dir;
+      dir[0] = eigenvectors(2, 0);
+      dir[1] = eigenvectors(2, 1);
+      dir[2] = eigenvectors(2, 2);
+      this->AddKernel(coeffs.as_vector(), (double)itkVectorImagePointer->GetPixel(it.GetIndex())[b0Index]/max, dir);
+      count++;
+      MITK_INFO << "KERNEL: " << it.GetIndex() << " (" << count << ")";
     }
     ++it;
   }
@@ -196,199 +192,107 @@ bool RawShModel< ScalarType >::SampleKernels(Image::Pointer diffImg, ItkUcharIma
   return false;
 }
 
-// convert cartesian to spherical coordinates
 template< class ScalarType >
-vnl_matrix<double> RawShModel<ScalarType>::Cart2Sph(GradientListType &gradients )
+double mitk::RawShModel< ScalarType >::EvaluateKernel(const vnl_vector< double >& coefficients, unsigned int order, const GradientType& direction)
 {
-  vnl_matrix<double> sphCoords;
-  sphCoords.set_size(gradients.size(), 2);
-  sphCoords.fill(0.0);
-
-  for (unsigned int i=0; i<gradients.size(); i++)
-  {
-    GradientType g = gradients[i];
-    if( g.GetNorm() > 0.0001 )
-    {
-      gradients[i].Normalize();
-      sphCoords(i,0) = acos(gradients[i][2]); // theta
-      sphCoords(i,1) = atan2(gradients[i][1], gradients[i][0]); // phi
-    }
-  }
-
-  return sphCoords;
+  // the analytical Q-ball filter fits the kernels with this basis and these spherical coordinates
+  double spherical[3];
+  mitk::gradients::Cart2Sph(direction[0], direction[1], direction[2], spherical);
+  vnl_matrix<double> sphericalMatrix(3, 1);
+  for (unsigned int r=0; r<3; ++r)
+    sphericalMatrix(r, 0) = spherical[r];
+  const vnl_matrix<double> basis = mitk::sh::ComputeSphericalHarmonicsBasis(sphericalMatrix, order);
+  double value = 0;
+  for (unsigned int j=0; j<basis.cols(); ++j)
+    value += coefficients[j]*basis(0, j);
+  return value;
 }
 
 template< class ScalarType >
-vnl_matrix<double> RawShModel< ScalarType >::SetFiberDirection(GradientType& fiberDirection)
+void mitk::RawShModel< ScalarType >::AddKernel(const vnl_vector< double >& shCoefficients, double b0, const GradientType& direction)
 {
-  RandomModel();
-  GradientType axis = itk::CrossProduct(fiberDirection, m_PrototypeMaxDirection.at(m_ModelIndex));
-  axis.Normalize();
-
-  vnl_quaternion<double> rotation(axis.GetVnlVector(), acos(dot_product(fiberDirection.GetVnlVector(), m_PrototypeMaxDirection.at(m_ModelIndex).GetVnlVector())));
-  rotation.normalize();
-
-  GradientListType gradients;
-  for (unsigned int i=0; i<this->m_GradientList.size(); i++)
-  {
-    GradientType dir = this->m_GradientList.at(i);
-    if( dir.GetNorm() > 0.0001 )
-    {
-      dir.Normalize();
-      vnl_vector_fixed< double, 3 > vnlDir = rotation.rotate(dir.GetVnlVector());
-      dir[0] = vnlDir[0]; dir[1] = vnlDir[1]; dir[2] = vnlDir[2];
-      dir.Normalize();
-    }
-    gradients.push_back(dir);
-  }
-
-  return Cart2Sph( gradients );
-}
-
-template< class ScalarType >
-bool RawShModel< ScalarType >::SetShCoefficients(vnl_vector< double > shCoefficients, double b0 )
-{
-  m_ShOrder = 2;
-  while ( (m_ShOrder*m_ShOrder + m_ShOrder + 2)/2 + m_ShOrder <= shCoefficients.size() )
-    m_ShOrder += 2;
-  m_ShOrder -= 2;
-
-  m_ModelIndex = m_B0Signal.size();
+  const unsigned int order = mitk::sh::ShOrder(shCoefficients.size());
+  if (!m_ShCoefficients.empty() && order!=m_ShOrder)
+    mitkThrow() << "Prototype kernels of SH order " << order << " and " << m_ShOrder << " cannot be mixed.";
+  if (direction.GetNorm()<0.0001)
+    mitkThrow() << "Prototype kernel without direction.";
+  m_ShOrder = order;
   m_B0Signal.push_back(b0);
   m_ShCoefficients.push_back(shCoefficients);
-
-  //    itk::OrientationDistributionFunction<double, 10000> odf;
-  //    GradientListType gradients;
-  //    for (unsigned int i=0; i<odf.GetNumberOfComponents(); i++)
-  //    {
-  //        GradientType dir; dir[0]=odf.GetDirection(i)[0]; dir[1]=odf.GetDirection(i)[1]; dir[2]=odf.GetDirection(i)[2];
-  //        dir.Normalize();
-  //        gradients.push_back(dir);
-  //    }
-  //    Cart2Sph( this->m_GradientList );
-  //    PixelType signal = SimulateMeasurement();
-
-  //    int minDirIdx = 0;
-  //    double min = itk::NumericTraits<double>::max();
-  //    for (unsigned int i=0; i<signal.GetSize(); i++)
-  //    {
-  //        if (signal[i]>b0 || signal[i]<0)
-  //        {
-  //            MITK_INFO << "Corrupted signal value detected. Kernel rejected.";
-  //            m_B0Signal.pop_back();
-  //            m_ShCoefficients.pop_back();
-  //            return false;
-  //        }
-  //        if (signal[i]<min)
-  //        {
-  //            min = signal[i];
-  //            minDirIdx = i;
-  //        }
-  //    }
-  //    GradientType maxDir = this->m_GradientList.at(minDirIdx);
-  //    maxDir.Normalize();
-  //    m_PrototypeMaxDirection.push_back(maxDir);
-
-  Cart2Sph( this->m_GradientList );
-  m_ModelIndex = -1;
-
-  return true;
+  GradientType normalized = direction;
+  normalized.Normalize();
+  m_PrototypeMaxDirection.push_back(normalized);
 }
 
 template< class ScalarType >
-ScalarType RawShModel< ScalarType >::SimulateMeasurement(unsigned int dir, GradientType& fiberDirection)
+void mitk::RawShModel< ScalarType >::AddKernel(const vnl_vector< double >& shCoefficients, double b0)
 {
-  ScalarType signal = 0;
-
-  if (m_ModelIndex==-1)
-    RandomModel();
-
-  vnl_matrix<double> sphCoords = this->SetFiberDirection(fiberDirection);
-
-  if (dir>=this->m_GradientList.size())
-    return signal;
-
-  int j, m; double mag, plm;
-
-  if (this->m_GradientList[dir].GetNorm()>0.001)
+  // The order-2 part of the expansion is a quadratic form u^T Q u on the unit sphere; six values
+  // give Q. The principal diffusion direction is where the signal is lowest: the eigenvector of the
+  // smallest eigenvalue.
+  const unsigned int order = std::min(2u, mitk::sh::ShOrder(shCoefficients.size()));
+  auto f = [&](double x, double y, double z)
   {
-    j=0;
-    for (int l=0; l<=static_cast<int>(m_ShOrder); l=l+2)
-      for (m=-l; m<=l; m++)
-      {
-        plm = legendre_p<double>(l,abs(m),cos(sphCoords(dir,0)));
-        mag = sqrt((double)(2*l+1)/(4.0*itk::Math::pi)*factorial<double>(l-abs(m))/factorial<double>(l+abs(m)))*plm;
-        double basis;
-
-        if (m<0)
-          basis = sqrt(2.0)*mag*cos(fabs((double)m)*sphCoords(dir,1));
-        else if (m==0)
-          basis = mag;
-        else
-          basis = pow(-1.0, m)*sqrt(2.0)*mag*sin(m*sphCoords(dir,1));
-
-        signal += m_ShCoefficients.at(m_ModelIndex)[j]*basis;
-        j++;
-      }
-  }
-  else
-    signal = m_B0Signal.at(m_ModelIndex);
-
-  m_ModelIndex = -1;
-
-  return signal;
+    GradientType u; u[0] = x; u[1] = y; u[2] = z;
+    u.Normalize();
+    return EvaluateKernel(shCoefficients, order, u);
+  };
+  vnl_matrix<double> Q(3, 3);
+  Q(0,0) = f(1,0,0); Q(1,1) = f(0,1,0); Q(2,2) = f(0,0,1);
+  Q(0,1) = Q(1,0) = f(1,1,0) - (Q(0,0)+Q(1,1))/2;
+  Q(0,2) = Q(2,0) = f(1,0,1) - (Q(0,0)+Q(2,2))/2;
+  Q(1,2) = Q(2,1) = f(0,1,1) - (Q(1,1)+Q(2,2))/2;
+  const vnl_symmetric_eigensystem<double> eigen(Q);
+  GradientType direction;
+  direction[0] = eigen.V(0, 0); direction[1] = eigen.V(1, 0); direction[2] = eigen.V(2, 0);
+  AddKernel(shCoefficients, b0, direction);
 }
 
 template< class ScalarType >
-typename RawShModel< ScalarType >::PixelType RawShModel< ScalarType >::SimulateMeasurement(GradientType& fiberDirection)
+double mitk::RawShModel< ScalarType >::KernelSignal(unsigned int kernel, const GradientType& gradient, const GradientType& fiberDirection) const
 {
-  if (m_ModelIndex==-1)
-    RandomModel();
+  if (gradient.GetNorm()<=0.001)
+    return m_B0Signal.at(kernel);
 
+  // The rotation R maps the fiber direction onto the prototype direction p, so the signal of the
+  // turned kernel for gradient g is the kernel's signal for R g. The signal is antipodally
+  // symmetric: the fiber is flipped towards p, which keeps the angle at most 90 degrees.
+  const GradientType& p = m_PrototypeMaxDirection.at(kernel);
+  GradientType f = fiberDirection;
+  f.Normalize();
+  if (f*p < 0)
+    f *= -1;
+  GradientType g = gradient;
+  g.Normalize();
+
+  GradientType axis = itk::CrossProduct(f, p);
+  const double sinAngle = axis.GetNorm();
+  if (sinAngle>1e-12)
+  {
+    axis /= sinAngle;
+    const double angle = std::atan2(sinAngle, std::min(1.0, f*p));
+    vnl_quaternion<double> rotation(axis.GetVnlVector(), angle);
+    const vnl_vector_fixed<double, 3> rotated = rotation.rotate(g.GetVnlVector());
+    g[0] = rotated[0]; g[1] = rotated[1]; g[2] = rotated[2];
+  }
+  return EvaluateKernel(m_ShCoefficients.at(kernel), m_ShOrder, g);
+}
+
+template< class ScalarType >
+ScalarType mitk::RawShModel< ScalarType >::SimulateMeasurement(unsigned int dir, GradientType& fiberDirection)
+{
+  if (dir>=this->m_GradientList.size())
+    return 0;
+  return KernelSignal(DrawKernel(), this->m_GradientList[dir], fiberDirection);
+}
+
+template< class ScalarType >
+typename mitk::RawShModel< ScalarType >::PixelType mitk::RawShModel< ScalarType >::SimulateMeasurement(GradientType& fiberDirection)
+{
+  const unsigned int kernel = DrawKernel();
   PixelType signal;
   signal.SetSize(this->m_GradientList.size());
-
-  int M = this->m_GradientList.size();
-  int j, m; double mag, plm;
-
-  vnl_matrix< double > shBasis;
-  shBasis.set_size(M, m_ShCoefficients.at(m_ModelIndex).size());
-  shBasis.fill(0.0);
-
-  vnl_matrix<double> sphCoords = this->SetFiberDirection(fiberDirection);
-
-  for (int p=0; p<M; p++)
-  {
-    if (this->m_GradientList[p].GetNorm()>0.001)
-    {
-      j=0;
-      for (int l=0; l<=static_cast<int>(m_ShOrder); l=l+2)
-        for (m=-l; m<=l; m++)
-        {
-          plm = legendre_p<double>(l,abs(m),cos(sphCoords(p,0)));
-          mag = sqrt((double)(2*l+1)/(4.0*itk::Math::pi)*factorial<double>(l-abs(m))/factorial<double>(l+abs(m)))*plm;
-
-          if (m<0)
-            shBasis(p,j) = sqrt(2.0)*mag*cos(fabs((double)m)*sphCoords(p,1));
-          else if (m==0)
-            shBasis(p,j) = mag;
-          else
-            shBasis(p,j) = pow(-1.0, m)*sqrt(2.0)*mag*sin(m*sphCoords(p,1));
-
-          j++;
-        }
-
-
-      double val = 0;
-      for (unsigned int cidx=0; cidx<m_ShCoefficients.at(m_ModelIndex).size(); cidx++)
-        val += m_ShCoefficients.at(m_ModelIndex)[cidx]*shBasis(p,cidx);
-      signal[p] = val;
-    }
-    else
-      signal[p] = m_B0Signal.at(m_ModelIndex);
-  }
-
-  m_ModelIndex = -1;
-
+  for (unsigned int p=0; p<this->m_GradientList.size(); p++)
+    signal[p] = KernelSignal(kernel, this->m_GradientList[p], fiberDirection);
   return signal;
 }

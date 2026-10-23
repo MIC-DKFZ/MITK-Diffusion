@@ -47,6 +47,7 @@ public:
 
   void SetRandomizeSticks(bool randomize=true){ m_RandomizeSticks=randomize; } ///< Random stick configuration in each voxel
   bool GetRandomizeSticks() { return m_RandomizeSticks; }
+  bool UsesRandomNumbers() const override { return m_RandomizeSticks; }
 
   void SetDiffusivity(double diffusivity) { m_Diffusivity = diffusivity; } ///< Scalar diffusion constant
   double GetDiffusivity() { return m_Diffusivity; }

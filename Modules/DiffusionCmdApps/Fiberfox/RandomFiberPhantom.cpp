@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <mitkDiffusionDataIOHelper.h>
 #include <itkRandomPhantomFilter.h>
+#include <boost/lexical_cast.hpp>
 
 int main(int argc, char* argv[])
 {

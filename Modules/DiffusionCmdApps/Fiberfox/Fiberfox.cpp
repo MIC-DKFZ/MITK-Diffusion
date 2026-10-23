@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
 #include <mitkFiberfoxParameters.h>
+#include <boost/lexical_cast.hpp>
 #include "mitkCommandLineParser.h"
 
 #include <itkTractsToDWIImageFilter.h>
@@ -28,6 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkFiberfoxParameters.h>
+#include <boost/lexical_cast.hpp>
 
 using namespace mitk;
 

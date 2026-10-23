@@ -483,6 +483,10 @@ void mitk::FiberfoxParameters::SaveParameters(std::string filename)
         for (unsigned int k=0; k<coeffs.size(); k++)
           parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".coeffs."+boost::lexical_cast<std::string>(k), coeffs[k]);
         parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".B0", model->GetBaselineSignal(j));
+        const auto direction = model->GetPrototypeDirection(j);
+        parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".dir.x", direction[0]);
+        parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".dir.y", direction[1]);
+        parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".dir.z", direction[2]);
       }
     }
     else  if (dynamic_cast<mitk::BallModel<>*>(signalModel))
@@ -994,7 +998,19 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
             {
               coeffs[k] = ReadVal<double>(v2,"kernels."+boost::lexical_cast<std::string>(j)+".coeffs."+boost::lexical_cast<std::string>(k),0,true);
             }
-            model->SetShCoefficients( coeffs, ReadVal<double>(v2,"kernels."+boost::lexical_cast<std::string>(j)+".B0",0,true) );
+            const double b0 = ReadVal<double>(v2,"kernels."+boost::lexical_cast<std::string>(j)+".B0",0,true);
+            // files of earlier MITK versions store no direction; the model derives it from the coefficients
+            const auto direction = v2.second.get_child_optional("kernels."+boost::lexical_cast<std::string>(j)+".dir");
+            if (direction)
+            {
+              mitk::RawShModel<>::GradientType dir;
+              dir[0] = direction->get<double>("x");
+              dir[1] = direction->get<double>("y");
+              dir[2] = direction->get<double>("z");
+              model->AddKernel(coeffs, b0, dir);
+            }
+            else
+              model->AddKernel(coeffs, b0);
           }
 
           if (ReadVal<std::string>(v2,"type","",true)=="fiber")
