@@ -16,13 +16,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_cross.h>
 #include <vnl/vnl_quaternion.h>
 #include <mitkChiSquareNoiseModel.h>
+#include <random>
 
 using namespace mitk;
 
 template< class ScalarType >
 ChiSquareNoiseModel< ScalarType >::ChiSquareNoiseModel()
 {
-    m_RandGen.seed();
+    SetSeed(-1);
 }
 
 template< class ScalarType >
@@ -34,10 +35,11 @@ ChiSquareNoiseModel< ScalarType >::~ChiSquareNoiseModel()
 template< class ScalarType >
 void ChiSquareNoiseModel< ScalarType >::SetSeed(int seed)
 {
+    // a negative seed means a random one, as in RicianNoiseModel (seed() without argument is a fixed default)
     if (seed>=0)
         m_RandGen.seed(seed);
     else
-        m_RandGen.seed();
+        m_RandGen.seed(std::random_device()());
 }
 
 template< class ScalarType >

@@ -1427,7 +1427,11 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
   if (signalScale>1)
     PrintToLog("Scaling signal", false);
   if (m_Parameters.m_NoiseModel)
-    PrintToLog("Adding noise: " + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_NoiseVariance), false);
+  {
+    PrintToLog("Adding noise: " + boost::lexical_cast<std::string>(m_Parameters.m_NoiseModel->GetNoiseVariance()), false);
+    // the noise model has its own generator; seeded from the run's generator, a constant seed makes it reproducible too
+    m_Parameters.m_NoiseModel->SetSeed(static_cast<int>(m_RandGen->GetIntegerVariate() & 0x7fffffff));
+  }
   ImageRegionIterator<OutputImageType> it4 (m_OutputImage, m_OutputImage->GetLargestPossibleRegion());
   DoubleDwiType::PixelType signal; signal.SetSize(m_Parameters.m_SignalGen.GetNumVolumes());
   boost::timer::progress_display disp2(m_OutputImage->GetLargestPossibleRegion().GetNumberOfPixels());

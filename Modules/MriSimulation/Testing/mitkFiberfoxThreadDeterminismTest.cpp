@@ -50,6 +50,7 @@ class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
   MITK_TEST(Param3);
   MITK_TEST(Param6);
   MITK_TEST(RandomFiberModels);
+  MITK_TEST(NoiseModelsFollowSeed);
   MITK_TEST(ExceptionInFiberLoop);
   CPPUNIT_TEST_SUITE_END();
 
@@ -76,7 +77,7 @@ public:
 
   using Modifier = std::function<void(mitk::FiberfoxParameters&)>;
 
-  FilterType::Pointer Simulate(const std::string& parameterFile, int threads, const Modifier& modify)
+  FilterType::Pointer Simulate(const std::string& parameterFile, int threads, const Modifier& modify, bool constantSeed = true)
   {
     omp_set_num_threads(threads);
     mitk::FiberfoxParameters parameters;
@@ -84,7 +85,7 @@ public:
     if (modify)
       modify(parameters);
     auto filter = FilterType::New();
-    filter->SetUseConstantRandSeed(true);
+    filter->SetUseConstantRandSeed(constantSeed);
     filter->SetParameters(parameters);
     filter->SetFiberBundle(m_FiberBundle);
     filter->Update();
@@ -156,6 +157,29 @@ public:
       parameters.m_FiberModelList = { prototype, astrosticks };
       parameters.UpdateSignalModels();
     });
+  }
+
+  /** Rician and chi-square noise: equal with a constant seed, different without. */
+  void NoiseModelsFollowSeed()
+  {
+    for (bool rician : { true, false })
+    {
+      const Modifier addNoise = [rician](mitk::FiberfoxParameters& parameters)
+      {
+        if (rician)
+          parameters.m_NoiseModel = std::make_shared< mitk::RicianNoiseModel<double> >();
+        else
+          parameters.m_NoiseModel = std::make_shared< mitk::ChiSquareNoiseModel<double> >();
+        parameters.m_NoiseModel->SetNoiseVariance(50);
+      };
+      const std::string name = rician ? "Rician" : "chi-square";
+      auto first = Simulate("param5.ffp", 8, addNoise);
+      auto second = Simulate("param5.ffp", 8, addNoise);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name + " noise with a constant seed is reproducible", 0ul, CountDifferences<DwiType>(first->GetOutput(), second->GetOutput()));
+      first = Simulate("param5.ffp", 8, addNoise, false);
+      second = Simulate("param5.ffp", 8, addNoise, false);
+      CPPUNIT_ASSERT_MESSAGE(name + " noise without a constant seed differs between runs", CountDifferences<DwiType>(first->GetOutput(), second->GetOutput()) > 0);
+    }
   }
 
   /** An exception must not leave an OpenMP region (that terminates the process); it reaches the caller of Update. */
