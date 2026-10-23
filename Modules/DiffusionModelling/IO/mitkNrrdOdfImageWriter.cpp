@@ -19,7 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkMetaDataObject.h"
 #include "itkNrrdImageIO.h"
 #include "itkImageFileWriter.h"
-#include "mitkImageCast.h"
+#include "mitkImageToItk.h"
 #include "mitkIOMimeTypes.h"
 #include "mitkDiffusionIOMimeTypes.h"
 #include <mitkLocaleSwitch.h>
@@ -52,14 +52,16 @@ void mitk::NrrdOdfImageWriter::Write()
     itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
     io->UseCompressionOn();
 
+    // The file layout is a VectorImage; it is written straight from the ODF buffer, without a copy.
     typedef itk::VectorImage<float, 3> VecImgType;
-
-    typedef itk::Image<itk::Vector<float,ODF_SAMPLING_SIZE>,3> ImageType;
     typedef itk::ImageFileWriter<VecImgType> WriterType;
     WriterType::Pointer nrrdWriter = WriterType::New();
 
-    ImageType::Pointer outimage = ImageType::New();
-    CastToItkImage(input, outimage);
+    typedef mitk::ImageToItk<InputType::ItkOdfImageType> CasterType;
+    CasterType::Pointer caster = CasterType::New();
+    caster->SetInput(input);
+    caster->Update();
+    InputType::ItkOdfImageType::Pointer outimage = caster->GetOutput();
 
     VecImgType::Pointer vecImg = VecImgType::New();
     vecImg->SetSpacing( outimage->GetSpacing() );   // Set the image spacing
@@ -68,23 +70,8 @@ void mitk::NrrdOdfImageWriter::Write()
     vecImg->SetLargestPossibleRegion( outimage->GetLargestPossibleRegion());
     vecImg->SetBufferedRegion( outimage->GetLargestPossibleRegion() );
     vecImg->SetVectorLength(ODF_SAMPLING_SIZE);
-    vecImg->Allocate();
-
-    itk::ImageRegionIterator<VecImgType> ot (vecImg, vecImg->GetLargestPossibleRegion() );
-    ot.GoToBegin();
-
-    itk::ImageRegionIterator<ImageType> it (outimage, outimage->GetLargestPossibleRegion() );
-
-    typedef ImageType::PixelType VecPixType;
-    typedef VecImgType::PixelType VarVecType;
-
-    for (it.GoToBegin(); !it.IsAtEnd(); ++it)
-    {
-      VecPixType vec = it.Get();
-      VarVecType varVec(vec.GetVnlVector().data_block(), ODF_SAMPLING_SIZE);
-      ot.Set(varVec);
-      ++ot;
-    }
+    vecImg->GetPixelContainer()->SetImportPointer(outimage->GetBufferPointer()->GetDataPointer(),
+                                                  outimage->GetLargestPossibleRegion().GetNumberOfPixels() * ODF_SAMPLING_SIZE, false);
 
     nrrdWriter->SetInput( vecImg );
     nrrdWriter->SetImageIO(io);

@@ -19,11 +19,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkDiffusionIOMimeTypes.h"
 
 #include "itkImageFileReader.h"
-#include "itkImageRegionIterator.h"
 #include "itkMetaDataObject.h"
 #include "itkNrrdImageIO.h"
 #include "mitkITKImageImport.h"
-#include "mitkImageDataItem.h"
 #include <mitkLocaleSwitch.h>
 
 namespace mitk
@@ -56,47 +54,20 @@ namespace mitk
       {
         mitk::LocaleSwitch localeSwitch("C");
 
-        typedef itk::VectorImage<float,3> ImageType;
+        // Each voxel is read as a fixed vector of ODF_SAMPLING_SIZE values, straight into the
+        // buffer that the result image takes over.
         itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-        typedef itk::ImageFileReader<ImageType> FileReaderType;
+        typedef itk::ImageFileReader<OutputType::ItkOdfImageType> FileReaderType;
         FileReaderType::Pointer reader = FileReaderType::New();
         reader->SetImageIO(io);
         reader->SetFileName(location);
+        reader->UpdateOutputInformation();
+        if (io->GetNumberOfComponents() != ODF_SAMPLING_SIZE)
+          mitkThrow() << "The ODF image has " << io->GetNumberOfComponents() << " values per voxel instead of " << ODF_SAMPLING_SIZE << ".";
         reader->Update();
-        ImageType::Pointer img = reader->GetOutput();
-
-        // Each voxel is copied as a fixed vector of ODF_SAMPLING_SIZE values.
-        if (img->GetNumberOfComponentsPerPixel() != ODF_SAMPLING_SIZE)
-          mitkThrow() << "The ODF image has " << img->GetNumberOfComponentsPerPixel() << " values per voxel instead of " << ODF_SAMPLING_SIZE << ".";
-
-        typedef itk::Image<itk::Vector<float,ODF_SAMPLING_SIZE>,3> VecImgType;
-        VecImgType::Pointer vecImg = VecImgType::New();
-        vecImg->SetSpacing( img->GetSpacing() );   // Set the image spacing
-        vecImg->SetOrigin( img->GetOrigin() );     // Set the image origin
-        vecImg->SetDirection( img->GetDirection() );  // Set the image direction
-        vecImg->SetLargestPossibleRegion( img->GetLargestPossibleRegion());
-        vecImg->SetBufferedRegion( img->GetLargestPossibleRegion() );
-        vecImg->Allocate();
-
-        itk::ImageRegionIterator<VecImgType> ot (vecImg, vecImg->GetLargestPossibleRegion() );
-        ot.GoToBegin();
-
-        itk::ImageRegionIterator<ImageType> it (img, img->GetLargestPossibleRegion() );
-
-        typedef ImageType::PixelType  VarPixType;
-        typedef VecImgType::PixelType FixPixType;
-
-        for (it.GoToBegin(); !it.IsAtEnd(); ++it)
-        {
-          VarPixType vec = it.Get();
-          FixPixType fixVec(vec.GetDataPointer());
-          ot.Set(fixVec);
-          ++ot;
-        }
 
         OutputType::Pointer resultImage = OutputType::New();
-        resultImage->InitializeByItk( vecImg.GetPointer() );
-        resultImage->SetVolume( vecImg->GetBufferPointer() );
+        mitk::GrabItkImageMemoryChannel(reader->GetOutput(), nullptr, resultImage.GetPointer(), false);
         result.push_back( resultImage.GetPointer() );
 
       }
