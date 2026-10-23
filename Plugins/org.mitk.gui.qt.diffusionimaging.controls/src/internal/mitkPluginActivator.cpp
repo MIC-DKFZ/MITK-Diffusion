@@ -35,7 +35,7 @@ void PluginActivator::start(ctkPluginContext* context)
     BERRY_REGISTER_EXTENSION_CLASS(QmitkDiffusionDefaultPerspective, context)
     BERRY_REGISTER_EXTENSION_CLASS(QmitkSegmentationPerspective, context)
 
-    BERRY_REGISTER_EXTENSION_CLASS(QmitkDiffusionDicomImport, context)
+    BERRY_REGISTER_EXTENSION_CLASS(QmitkDiffusionDicomImportView, context)
     BERRY_REGISTER_EXTENSION_CLASS(QmitkDicomTractogramTagEditorView, context)
     BERRY_REGISTER_EXTENSION_CLASS(QmitkControlVisualizationPropertiesView, context)
 

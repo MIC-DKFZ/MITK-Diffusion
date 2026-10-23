@@ -34,7 +34,7 @@
     <view id="org.mitk.views.diffusiondicomimport"
     name="DICOM Import"
     category="Data"
-    class="QmitkDiffusionDicomImport"
+    class="QmitkDiffusionDicomImportView"
     icon="resources/dwiimport.png">
     <description>Diffusion DICOM data import</description>
     <keywordReference id="org.mitk.views.diffusiondicomimport.Keyword"/>

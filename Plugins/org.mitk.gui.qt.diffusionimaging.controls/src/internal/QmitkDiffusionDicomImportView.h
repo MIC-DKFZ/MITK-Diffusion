@@ -14,17 +14,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef QmitkDiffusionDicomImportView_H__INCLUDED
-#define QmitkDiffusionDicomImportView_H__INCLUDED
+#ifndef QmitkDiffusionDicomImportView_h
+#define QmitkDiffusionDicomImportView_h
 
 #include <QmitkAbstractView.h>
 #include "ui_QmitkDiffusionDicomImportViewControls.h"
 
-
-/*!
-\brief QmitkDiffusionDicomImport
-*/
-class QmitkDiffusionDicomImport : public QmitkAbstractView
+/**
+ * \brief Imports diffusion-weighted DICOM series from one or more folders (optionally their
+ * subfolders), with mosaic splitting and averaging of duplicate gradients.
+ */
+class QmitkDiffusionDicomImportView : public QmitkAbstractView
 {
   Q_OBJECT
 
@@ -32,39 +32,11 @@ public:
 
   static const std::string VIEW_ID;
 
-  /*!
-  \  Convenient typedefs
-  */
-  typedef mitk::DataStorage::SetOfObjects  ConstVector;
-  typedef ConstVector::ConstPointer        ConstVectorPointer;
-  typedef ConstVector::ConstIterator       ConstVectorIterator;
+  QmitkDiffusionDicomImportView();
+  ~QmitkDiffusionDicomImportView() override;
 
-  /*!
-  \brief default constructor
-  */
-  QmitkDiffusionDicomImport(QObject *parent=0, const char *name=0);
-
-  /*!
-  \brief default destructor
-  */
-  virtual ~QmitkDiffusionDicomImport();
-
-  /*!
-  \brief method for creating the widget containing the application   controls, like sliders, buttons etc.
-  */
-  virtual void CreateQtPartControl(QWidget *parent) override;
-
-  /*!
-  \brief method for creating the connections of main and control widget
-  */
-  virtual void CreateConnections();
-
-  ///
-  /// Sets the focus to an internal widget.
-  ///
-  virtual void SetFocus() override;
-
-  void SetDwiNodeProperties(mitk::DataNode::Pointer node, std::string name);
+  void CreateQtPartControl(QWidget *parent) override;
+  void SetFocus() override;
 
 protected slots:
 
@@ -79,27 +51,14 @@ protected slots:
 
 protected:
 
-  void Status(QString status);
-  void Status(std::string status);
-  void Status(const char* status);
-  void Error(QString status);
-  void Error(std::string status);
-  void Error(const char* status);
+  /** Shows the message in the status bar and logs it. */
+  void Status(const QString& status);
+  void Error(const QString& status);
 
-  void PrintMemoryUsage();
-  std::string FormatMemorySize( size_t size );
-  std::string FormatPercentage( double val );
-  std::string GetMemoryDescription( size_t processSize, float percentage );
-
-  /*!
-  * controls containing sliders for scrolling through the slices
-  */
   Ui::QmitkDiffusionDicomImportControls *m_Controls;
 
   QWidget *m_Parent;
 
 };
 
-#endif // !defined(QmitkDiffusionDicomImport_H__INCLUDED)
-
-
+#endif
