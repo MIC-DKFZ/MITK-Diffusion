@@ -26,6 +26,7 @@ class mitkFiberDerivedImagesTestSuite : public mitk::TestFixture
   MITK_TEST(Directions_OriginOfComponentAxisIsZero);
   MITK_TEST(Directions_NoDirectionAllowed_Throws);
   MITK_TEST(Directions_PeakSizeIsSummedInVoxelLength);
+  MITK_TEST(Directions_SizeThresholdDiscardsSmallPeaks);
   CPPUNIT_TEST_SUITE_END();
 
   using UcharImageType = itk::Image<unsigned char, 3>;
@@ -105,6 +106,27 @@ public:
     CPPUNIT_ASSERT_DOUBLES_EQUAL(std::sin(a / 2), std::abs(crossing[1]), 1e-4);
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(1), filter->GetNumDirectionsImage()->GetPixel({{0, 0, 0}}));
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(0), filter->GetNumDirectionsImage()->GetPixel({{0, 0, 1}}));
+  }
+
+  void Directions_SizeThresholdDiscardsSmallPeaks()
+  {
+    // One voxel crossed by a fiber along x (weight 1) and one along y (weight 0.1): peaks of size
+    // 1 and 0.1.
+    using namespace mitk::FiberProcessingTestHelper;
+    auto fib = CreateBundle({Line({-2, 0, 0}, {2, 0, 0}, 2), Line({0, -2, 0}, {0, 2, 0}, 2)});
+    fib->SetFiberWeight(1, 0.1f);
+
+    for (const auto& [threshold, expectedPeaks] : {std::pair<float, unsigned char>(0.3f, 1), std::pair<float, unsigned char>(0.05f, 2)})
+    {
+      auto filter = DirectionFilterType::New();
+      filter->SetFiberBundle(fib);
+      filter->SetMaskImage(CreateMask(1, 1, 1));
+      filter->SetSizeThreshold(threshold);
+      filter->Update();
+      CPPUNIT_ASSERT_EQUAL(expectedPeaks, filter->GetNumDirectionsImage()->GetPixel({{0, 0, 0}}));
+      const double secondPeakY = filter->GetDirectionImage()->GetPixel({{0, 0, 0, 4}});
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedPeaks == 2 ? 0.1 : 0.0, std::abs(secondPeakY), 1e-5);
+    }
   }
 };
 

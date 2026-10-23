@@ -243,9 +243,12 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
     DirectionContainerType::Pointer directions = FastClustering(dirCont, peakLengths->GetElement(idx_lin));
     std::sort( directions->begin(), directions->end(), CompareVectorLengths );
 
-    unsigned int numDir = directions->size();
-    if (numDir>m_MaxNumDirections)
-      numDir = m_MaxNumDirections;
+    // The directions are sorted by size; peaks smaller than SizeThreshold x the largest peak of the
+    // voxel are discarded.
+    const double largestPeak = directions->empty() ? 0.0 : directions->at(0).magnitude();
+    unsigned int numDir = 0;
+    while (numDir<directions->size() && numDir<m_MaxNumDirections && directions->at(numDir).magnitude()>=m_SizeThreshold*largestPeak)
+      ++numDir;
 
     float voxel_max_mag = 0;
     for (unsigned int i=0; i<numDir; i++)
