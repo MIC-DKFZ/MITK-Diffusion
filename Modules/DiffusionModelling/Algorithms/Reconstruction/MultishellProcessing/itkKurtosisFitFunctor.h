@@ -95,7 +95,9 @@ protected:
       for(int s=0; s<N; s++)
       {
         double approx = S0 * std::exp(- b[s] * D + 1./6. *b[s] * b[s] *D * D * K);
-        fx[s] = std::fabs( measurements[s] - approx );
+        // Signed: the forward-difference Jacobian of |r| is wrong where a residual changes sign,
+        // which stalled Levenberg-Marquardt near exact fits.
+        fx[s] = measurements[s] - approx;
       }
 
     }

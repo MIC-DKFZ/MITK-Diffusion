@@ -182,7 +182,8 @@ public:
     auto functor = itk::BiExpFitFunctor::New();
     functor->setListOfBValues(m_BValues);
     functor->setTargetBValue(m_BValues.mean());
-    Check(functor, "test_multi_BiExp.dwi");
+    // _v2: the fit's signed residuals (A-L16) changed one value of test_multi_BiExp.dwi by 4.
+    Check(functor, "test_multi_BiExp_v2.dwi");
   }
 
   // log(S/S0) with S0 = 0 is NaN, and converting NaN to the short output is undefined.
