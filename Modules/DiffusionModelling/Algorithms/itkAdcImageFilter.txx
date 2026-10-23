@@ -106,6 +106,11 @@ AdcImageFilter< TInPixelType, TOutPixelType>::FitSingleVoxel( const typename Inp
   }
   S0 /= (m_B_values.size() - m_Nonzero_B_values.size());
 
+  // With S0 = 0 the model S0*exp(-b*ADC) is 0 for every ADC, so the residuals do not depend on
+  // the ADC and the fit ends at its start value 0. Background voxels skip the fit.
+  if (S0 == 0)
+    return 0;
+
   adcLeastSquaresFunction f(m_Nonzero_B_values.size());
   f.set_bvalues(m_Nonzero_B_values);
   f.set_S0(S0);
