@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkDiffusionQballReconstructionImageFilter_h_
-#define __itkDiffusionQballReconstructionImageFilter_h_
+#ifndef itkDiffusionQballReconstructionImageFilter_h
+#define itkDiffusionQballReconstructionImageFilter_h
 
 #include "itkImageToImageFilter.h"
 //#include "vnl/vnl_matrix.h"
@@ -119,8 +119,7 @@ public:
   itkCloneMacro(Self)
 
   /** Runtime information support. */
-  itkTypeMacro(DiffusionQballReconstructionImageFilter,
-                                                   ImageToImageFilter);
+  itkOverrideGetNameOfClassMacro(DiffusionQballReconstructionImageFilter);
 
   typedef TReferenceImagePixelType                 ReferencePixelType;
 
@@ -161,8 +160,8 @@ public:
   typedef VectorContainer< unsigned int,
           GradientDirectionType >                  GradientDirectionContainerType;
 
-  itkStaticConstMacro(NOdfDirections,int,NrOdfDirections);
-  itkStaticConstMacro(NBasisFunctionCenters,int,NrBasisFunctionCenters);
+  static constexpr int NOdfDirections = NrOdfDirections;
+  static constexpr int NBasisFunctionCenters = NrBasisFunctionCenters;
 
   /** Another set method to add a gradient directions and its corresponding
    * image. The image here is a VectorImage. The user is expected to pass the
@@ -281,5 +280,5 @@ private:
 #include "itkDiffusionQballReconstructionImageFilter.txx"
 #endif
 
-#endif //__itkDiffusionQballReconstructionImageFilter_h_
+#endif //itkDiffusionQballReconstructionImageFilter_h
 

@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _itk_DWIVoxelFunctor_h_
-#define _itk_DWIVoxelFunctor_h_
+#ifndef itkDWIVoxelFunctor_h
+#define itkDWIVoxelFunctor_h
 
 #include <MitkDiffusionModellingExports.h>
 #include "vnl/vnl_vector.h"
@@ -43,7 +43,7 @@ public:
   typedef itk::Object                                  Superclass;
 
   /** Runtime information support. */
-  itkTypeMacro(DWIVoxelFunctor, Object)
+  itkOverrideGetNameOfClassMacro(DWIVoxelFunctor)
   /** Method for creation through the object factory. */
   //itkFactorylessNewMacro(Self)
   //itkCloneMacro(Self)

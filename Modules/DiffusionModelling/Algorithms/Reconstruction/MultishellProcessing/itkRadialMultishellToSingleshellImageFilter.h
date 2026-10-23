@@ -43,7 +43,7 @@ namespace itk
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(RadialMultishellToSingleshellImageFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(RadialMultishellToSingleshellImageFilter)
 
     typedef TInputScalarType                         InputScalarType;
     typedef itk::VectorImage<InputScalarType,3>      InputImageType;

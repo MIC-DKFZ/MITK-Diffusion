@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkAnalyticalDiffusionQballReconstructionImageFilter_h_
-#define __itkAnalyticalDiffusionQballReconstructionImageFilter_h_
+#ifndef itkAnalyticalDiffusionQballReconstructionImageFilter_h
+#define itkAnalyticalDiffusionQballReconstructionImageFilter_h
 
 #include "itkImageToImageFilter.h"
 #include "vnl/vnl_vector_fixed.h"
@@ -110,7 +110,7 @@ public:
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(AnalyticalDiffusionQballReconstructionImageFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(AnalyticalDiffusionQballReconstructionImageFilter)
 
     typedef TReferenceImagePixelType                 ReferencePixelType;
 
@@ -247,5 +247,5 @@ private:
 #include "itkAnalyticalDiffusionQballReconstructionImageFilter.cpp"
 #endif
 
-#endif //__itkAnalyticalDiffusionQballReconstructionImageFilter_h_
+#endif //itkAnalyticalDiffusionQballReconstructionImageFilter_h
 

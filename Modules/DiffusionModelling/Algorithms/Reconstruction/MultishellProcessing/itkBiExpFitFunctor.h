@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _itk_BiExpFitFunctor_h_
-#define _itk_BiExpFitFunctor_h_
+#ifndef itkBiExpFitFunctor_h
+#define itkBiExpFitFunctor_h
 
 #include "itkDWIVoxelFunctor.h"
 #include <cmath>
@@ -41,7 +41,7 @@ public:
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
   /** Runtime information support. */
-  itkTypeMacro(BiExpFitFunctor, DWIVoxelFunctor)
+  itkOverrideGetNameOfClassMacro(BiExpFitFunctor)
 
   void operator()(vnl_matrix<double> & newSignal,const vnl_matrix<double> & SignalMatrix, const double & S0) override;
 

@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _itk_ADCAverageFunctor_h_
-#define _itk_ADCAverageFunctor_h_
+#ifndef itkADCAverageFunctor_h
+#define itkADCAverageFunctor_h
 
 #include "itkDWIVoxelFunctor.h"
 #include <cmath>
@@ -38,7 +38,7 @@ public:
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
   /** Runtime information support. */
-  itkTypeMacro(ADCAverageFunctor, DWIVoxelFunctor)
+  itkOverrideGetNameOfClassMacro(ADCAverageFunctor)
 
   void operator()(vnl_matrix<double> & newSignal, const vnl_matrix<double> & SignalMatrix, const double & S0) override;
 

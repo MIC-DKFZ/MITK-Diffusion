@@ -13,8 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkAnalyticalDiffusionQballReconstructionImageFilter_cpp
-#define __itkAnalyticalDiffusionQballReconstructionImageFilter_cpp
+#ifndef itkAnalyticalDiffusionQballReconstructionImageFilter_cpp
+#define itkAnalyticalDiffusionQballReconstructionImageFilter_cpp
 
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
@@ -461,4 +461,4 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
 
 }
 
-#endif // __itkAnalyticalDiffusionQballReconstructionImageFilter_cpp
+#endif // itkAnalyticalDiffusionQballReconstructionImageFilter_cpp

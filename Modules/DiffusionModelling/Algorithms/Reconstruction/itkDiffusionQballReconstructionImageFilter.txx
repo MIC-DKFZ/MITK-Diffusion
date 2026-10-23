@@ -13,8 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkDiffusionQballReconstructionImageFilter_txx
-#define __itkDiffusionQballReconstructionImageFilter_txx
+#ifndef itkDiffusionQballReconstructionImageFilter_txx
+#define itkDiffusionQballReconstructionImageFilter_txx
 
 #include "itkDiffusionQballReconstructionImageFilter.h"
 #include "itkImageRegionConstIterator.h"
@@ -299,16 +299,16 @@ namespace itk {
       double theta = i * (2*itk::Math::pi / m_NumberOfEquatorSamplingPoints);
       C(0,i) = cos(theta);
       C(1,i) = sin(theta);
-      C(2,i) = NumericTraits<double>::Zero;
+      C(2,i) = 0.0;
     }
 
     // rotate the sampling points to each directions of interest
     vnl_matrix<double> S(3,m_NumberOfEquatorSamplingPoints*NOdfDirections);
 
     {
-      vnl_vector_fixed<double,3> z(NumericTraits<double>::Zero);
+      vnl_vector_fixed<double,3> z(0.0);
       z.put(2,NumericTraits<double>::One);
-      vnl_matrix_fixed<double,3,3> eye(NumericTraits<double>::Zero);
+      vnl_matrix_fixed<double,3,3> eye(0.0);
       eye.fill_diagonal(NumericTraits<double>::One);
       for(int i=0; i<NOdfDirections; i++)
       {
@@ -530,4 +530,4 @@ namespace itk {
 
 }
 
-#endif // __itkDiffusionQballReconstructionImageFilter_txx
+#endif // itkDiffusionQballReconstructionImageFilter_txx
