@@ -164,16 +164,6 @@ public:
     virtual ReferenceImageType * GetReferenceImage()
     { return ( static_cast< ReferenceImageType *>(this->ProcessObject::GetInput(0)) ); }
 
-    /** Return the gradient direction. idx is 0 based */
-    virtual GradientDirectionType GetGradientDirection( unsigned int idx) const
-    {
-        if( idx >= m_NumberOfGradientDirections )
-            itkExceptionMacro( << "Gradient direction " << idx << "does not exist" );
-        return m_GradientDirectionContainer->ElementAt( idx+1 );
-    }
-
-    static void tofile2(vnl_matrix<float> *A, std::string fname);
-
     OdfPixelType Normalize(OdfPixelType odf, double b0 );
     vnl_vector<TOdfPixelType> PreNormalize( vnl_vector<TOdfPixelType> vec, double b0 );
 
@@ -187,16 +177,12 @@ public:
     itkSetMacro( NormalizationMethod, Normalization)
     itkGetMacro( NormalizationMethod, Normalization )
 
-    typedef Image<float, 3> FloatImageType;
     itkGetMacro( BZeroImage, typename BZeroImageType::Pointer)
-    itkGetMacro( ODFSumImage, typename FloatImageType::Pointer)
     itkGetMacro( CoefficientImage, typename CoefficientImageType::Pointer)
 
     itkSetMacro( BValue, float)
     itkSetMacro( Lambda, double )
     itkGetMacro( Lambda, double )
-
-    itkSetMacro( UseMrtrixBasis, bool )
 
 #ifdef ITK_USE_CONCEPT_CHECKING
     /** Begin concept checking */
@@ -250,11 +236,9 @@ private:
     double                                            m_Lambda;
     Normalization                                     m_NormalizationMethod;
     unsigned int                                      m_NumberCoefficients;
-    FloatImageType::Pointer                           m_ODFSumImage;
     typename CoefficientImageType::Pointer            m_CoefficientImage;
     TOdfPixelType                                     m_Delta1;
     TOdfPixelType                                     m_Delta2;
-    bool                                              m_UseMrtrixBasis;
 };
 
 }
