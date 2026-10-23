@@ -91,11 +91,15 @@ namespace
 
 QmitkDiffusionDicomImport::QmitkDiffusionDicomImport(QObject* /*parent*/, const char* /*name*/)
   : m_Controls(nullptr)
+  , m_Parent(nullptr)
 {
 }
 
 QmitkDiffusionDicomImport::~QmitkDiffusionDicomImport()
-{}
+{
+  // The widgets belong to the parent; only the Ui struct is this view's.
+  delete m_Controls;
+}
 
 void QmitkDiffusionDicomImport::CreateQtPartControl(QWidget *parent)
 {

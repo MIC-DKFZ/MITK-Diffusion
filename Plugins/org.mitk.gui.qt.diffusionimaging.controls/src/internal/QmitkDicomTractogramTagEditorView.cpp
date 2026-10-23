@@ -60,6 +60,8 @@ QmitkDicomTractogramTagEditorView::QmitkDicomTractogramTagEditorView()
 // Destructor
 QmitkDicomTractogramTagEditorView::~QmitkDicomTractogramTagEditorView()
 {
+  // The widgets belong to the parent; only the Ui struct is this view's.
+  delete m_Controls;
 }
 
 void QmitkDicomTractogramTagEditorView::CreateQtPartControl( QWidget *parent )

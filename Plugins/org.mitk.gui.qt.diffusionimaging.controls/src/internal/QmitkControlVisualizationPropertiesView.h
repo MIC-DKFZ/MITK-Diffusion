@@ -122,15 +122,6 @@ protected:
 
   mitk::DataNode::Pointer m_NodeUsedForOdfVisualization;
 
-  QIcon* m_IconTexOFF;
-  QIcon* m_IconTexON;
-  QIcon* m_IconGlyOFF_T;
-  QIcon* m_IconGlyON_T;
-  QIcon* m_IconGlyOFF_C;
-  QIcon* m_IconGlyON_C;
-  QIcon* m_IconGlyOFF_S;
-  QIcon* m_IconGlyON_S;
-
   bool m_TexIsOn;
   bool m_GlyIsOn_T;
   bool m_GlyIsOn_C;

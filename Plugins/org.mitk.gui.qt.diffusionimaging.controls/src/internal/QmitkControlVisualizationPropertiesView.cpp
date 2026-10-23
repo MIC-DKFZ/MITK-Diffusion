@@ -81,14 +81,6 @@ QmitkControlVisualizationPropertiesView::QmitkControlVisualizationPropertiesView
   : QmitkAbstractView(),
     m_Controls(nullptr),
     m_CurrentSelection(nullptr),
-    m_IconTexOFF(new QIcon(":/QmitkDiffusionImaging/texIntOFFIcon.png")),
-    m_IconTexON(new QIcon(":/QmitkDiffusionImaging/texIntONIcon.png")),
-    m_IconGlyOFF_T(new QIcon(":/QmitkDiffusionImaging/glyphsoff_T.png")),
-    m_IconGlyON_T(new QIcon(":/QmitkDiffusionImaging/glyphson_T.png")),
-    m_IconGlyOFF_C(new QIcon(":/QmitkDiffusionImaging/glyphsoff_C.png")),
-    m_IconGlyON_C(new QIcon(":/QmitkDiffusionImaging/glyphson_C.png")),
-    m_IconGlyOFF_S(new QIcon(":/QmitkDiffusionImaging/glyphsoff_S.png")),
-    m_IconGlyON_S(new QIcon(":/QmitkDiffusionImaging/glyphson_S.png")),
     m_GlyIsOn_T(false),
     m_GlyIsOn_C(false),
     m_GlyIsOn_S(false),
@@ -109,6 +101,8 @@ QmitkControlVisualizationPropertiesView::~QmitkControlVisualizationPropertiesVie
 {
   // The observer calls back into this view; the node may outlive it.
   this->RemoveColorObserver();
+  // The widgets belong to the parent; only the Ui struct is this view's.
+  delete m_Controls;
 }
 
 void QmitkControlVisualizationPropertiesView::RemoveColorObserver()
@@ -260,8 +254,11 @@ void QmitkControlVisualizationPropertiesView::SliceRotation(const itk::EventObje
 }
 
 
-void QmitkControlVisualizationPropertiesView::NodeRemoved(const mitk::DataNode* /*node*/)
+void QmitkControlVisualizationPropertiesView::NodeRemoved(const mitk::DataNode* node)
 {
+  // Otherwise the removed ODF node and its image stay in memory until another one is selected.
+  if (node == m_NodeUsedForOdfVisualization.GetPointer())
+    m_NodeUsedForOdfVisualization = nullptr;
 }
 
 
