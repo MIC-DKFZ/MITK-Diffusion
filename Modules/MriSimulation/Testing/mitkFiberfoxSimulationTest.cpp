@@ -16,6 +16,7 @@ found in the LICENSE file.
 #include <mitkFiberBundle.h>
 #include <mitkFiberfoxParameters.h>
 #include <itkTractsToDWIImageFilter.h>
+#include <mitkRawShModel.h>
 
 /** Behaviour of the Fiberfox simulation filter in edge cases (param5: no artifacts, fast). */
 class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
@@ -24,6 +25,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(InputBundleKeepsWeights);
   MITK_TEST(FibersOutsideImage);
   MITK_TEST(NoGradients);
+  MITK_TEST(PrototypeNeedsOneShell);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -94,6 +96,38 @@ public:
     filter->SetParameters(parameters);
     filter->SetFiberBundle(m_FiberBundle);
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  /** Prototype kernels come from one shell: a multi-shell simulation with them stops with a message. */
+  void PrototypeNeedsOneShell()
+  {
+    for (bool multiShell : { false, true })
+    {
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+      auto prototype = new mitk::RawShModel<double>();
+      vnl_vector<double> coefficients(6, 0.0);
+      coefficients[0] = 1;
+      mitk::RawShModel<double>::GradientType direction;
+      direction[0] = 1; direction[1] = 0; direction[2] = 0;
+      prototype->AddKernel(coefficients, 1.0, direction);
+      delete parameters.m_FiberModelList[0];
+      parameters.m_FiberModelList[0] = prototype;
+
+      auto gradients = parameters.m_SignalGen.GetGradientDirections();
+      if (multiShell)
+        gradients.back() *= std::sqrt(2.0);
+      parameters.SetGradienDirections(gradients);
+
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetFiberBundle(m_FiberBundle);
+      if (multiShell)
+        CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+      else
+        filter->Update();
+    }
   }
 };
 

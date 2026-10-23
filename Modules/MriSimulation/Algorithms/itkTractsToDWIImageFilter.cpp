@@ -59,6 +59,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <set>
+#include <mitkBValueMapProperty.h>
 
 namespace itk
 {
@@ -992,6 +994,13 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
   if (m_Parameters.m_SignalGen.GetNumVolumes()==0)
     itkExceptionMacro("No gradient directions defined. A parameter file needs its .bvals/.bvecs files or gradients of its own.");
 
+  // The prototype (raw-SH) kernels are sampled from one shell and evaluated for the gradient
+  // direction only; with several shells every shell would get the same attenuation.
+  for (auto model : m_Parameters.m_FiberModelList)
+    CheckPrototypeShells(model);
+  for (auto model : m_Parameters.m_NonFiberModelList)
+    CheckPrototypeShells(model);
+
   if (m_Parameters.m_SignalGen.m_DoDisablePartialVolume)  // no partial volume? remove all but first fiber compartment
     while (m_Parameters.m_FiberModelList.size()>1)
     {
@@ -1825,6 +1834,23 @@ SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3
         MITK_ERROR << val;
     }
   }
+}
+
+template< class PixelType >
+void TractsToDWIImageFilter< PixelType >::CheckPrototypeShells(mitk::DiffusionSignalModel<double>* model)
+{
+  if (dynamic_cast<mitk::RawShModel<double>*>(model)==nullptr)
+    return;
+  const auto gradients = m_Parameters.m_SignalGen.GetItkGradientContainer();
+  std::set<double> shells;
+  for (unsigned int i=0; i<gradients->Size(); ++i)
+  {
+    const double b = mitk::BValueMapProperty::GetBValue(gradients->ElementAt(i), m_Parameters.m_SignalGen.GetBvalue());
+    if (b!=0)
+      shells.insert(b);
+  }
+  if (shells.size()>1)
+    itkExceptionMacro("The prototype signal model has kernels of one shell, but the gradients have " << shells.size() << " non-zero b-values. Use one shell or another signal model.");
 }
 
 template< class PixelType >
