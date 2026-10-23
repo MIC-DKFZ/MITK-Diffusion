@@ -27,11 +27,10 @@ float GibbsEnergyComputer::EvaluateOdf(vnl_vector_fixed<float, 3>& pos, vnl_vect
     float result = 0;                       // average of sampled ODF values
     int xint, yint, zint;                   // voxel containing samplePos
 
-    // rotate particle direction according to image rotation
-    dir = m_RotationMatrix*dir;
-
-    // get interpolation for rotated direction
-    m_SphereInterpolator->getInterpolation(dir);
+    // Particles live in the image-axis frame (spacing-scaled index, no rotation), the ODF directions
+    // are world vectors: the lookup uses the rotated direction, the sample positions the particle's own.
+    vnl_vector_fixed<float, 3> worldDir = m_RotationMatrix*dir;
+    m_SphereInterpolator->getInterpolation(worldDir);
 
     // sample ODF values along particle direction
     for (int i=-sampleSteps; i <= sampleSteps;i++)
