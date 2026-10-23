@@ -121,7 +121,12 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
   vtkPolyData* cleaned = fiberBundle->GetFiberPolyData();
 
   vtkFloatArray* fileWeights = vtkFloatArray::SafeDownCast(cleaned->GetCellData()->GetArray("FIBER_WEIGHTS"));
-  if (fileWeights != nullptr)
+  if (fileWeights != nullptr && fileWeights->GetNumberOfValues() != static_cast<vtkIdType>(fiberBundle->GetNumFibers()))
+  {
+    MITK_WARN << "Ignoring FIBER_WEIGHTS of " << filename << ": " << fileWeights->GetNumberOfValues() << " values for "
+              << fiberBundle->GetNumFibers() << " fibers.";
+  }
+  else if (fileWeights != nullptr)
   {
     vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
     weights->DeepCopy(fileWeights);

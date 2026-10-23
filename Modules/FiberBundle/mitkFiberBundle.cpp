@@ -1614,6 +1614,9 @@ void mitk::FiberBundle::UpdateFiberGeometry()
 
 float mitk::FiberBundle::GetFiberWeight(unsigned int fiber) const
 {
+  // vtkFloatArray does not check the index
+  if (fiber >= static_cast<unsigned int>(m_FiberWeights->GetNumberOfValues()))
+    mitkThrow() << "Fiber index " << fiber << " out of range (" << m_FiberWeights->GetNumberOfValues() << " weights).";
   return m_FiberWeights->GetValue(fiber);
 }
 
@@ -1625,11 +1628,10 @@ void mitk::FiberBundle::SetFiberWeights(float newWeight)
 
 void mitk::FiberBundle::SetFiberWeights(vtkSmartPointer<vtkFloatArray> weights)
 {
-  if (m_NumFibers!=weights->GetNumberOfValues())
-  {
-    MITK_INFO << "Weights array not equal to number of fibers! " << weights->GetNumberOfValues() << " vs " << m_NumFibers;
-    return;
-  }
+  // One weight per fiber; a mismatch used to be logged and ignored, leaving the old weights.
+  if (weights==nullptr || m_NumFibers!=weights->GetNumberOfValues())
+    mitkThrow() << "Fiber weights need one value per fiber (" << m_NumFibers << " fibers, "
+                << (weights==nullptr ? 0 : weights->GetNumberOfValues()) << " weights).";
 
   for (int i=0; i<weights->GetNumberOfValues(); i++)
     m_FiberWeights->SetValue(i, weights->GetValue(i));
@@ -1639,6 +1641,8 @@ void mitk::FiberBundle::SetFiberWeights(vtkSmartPointer<vtkFloatArray> weights)
 
 void mitk::FiberBundle::SetFiberWeight(unsigned int fiber, float weight)
 {
+  if (fiber >= static_cast<unsigned int>(m_FiberWeights->GetNumberOfValues()))
+    mitkThrow() << "Fiber index " << fiber << " out of range (" << m_FiberWeights->GetNumberOfValues() << " weights).";
   m_FiberWeights->SetValue(fiber, weight);
 }
 

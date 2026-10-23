@@ -62,6 +62,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ColorFibersByFiberWeights_EqualWeightsAboveOne_OpaqueColours);
   MITK_TEST(AddBundlesAndCompositeWithoutStorage_NoCrash);
   MITK_TEST(Clone_CopiesFibersAndMetadataIndependently);
+  MITK_TEST(FiberWeights_WrongSizeOrIndex_Throw);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -544,6 +545,29 @@ public:
     auto composite = mitk::PlanarFigureComposite::New();
     composite->setOperationType(mitk::PlanarFigureComposite::NOT);
     CPPUNIT_ASSERT_EQUAL(mitk::PlanarFigureComposite::NOT, composite->Clone()->getOperationType());
+  }
+
+  void FiberWeights_WrongSizeOrIndex_Throw()
+  {
+    auto fib = LoadWeightedFibers();
+    const unsigned int numFibers = fib->GetNumFibers();
+    const float lastWeight = fib->GetFiberWeight(numFibers - 1);
+
+    auto tooShort = vtkSmartPointer<vtkFloatArray>::New();
+    tooShort->SetNumberOfValues(numFibers - 1);
+    tooShort->FillValue(2.0f);
+    CPPUNIT_ASSERT_THROW(fib->SetFiberWeights(tooShort), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(fib->SetFiberWeights(vtkSmartPointer<vtkFloatArray>()), mitk::Exception);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("A rejected array leaves the weights", lastWeight, fib->GetFiberWeight(numFibers - 1));
+
+    CPPUNIT_ASSERT_THROW(fib->GetFiberWeight(numFibers), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(fib->SetFiberWeight(numFibers, 1.0f), mitk::Exception);
+
+    auto matching = vtkSmartPointer<vtkFloatArray>::New();
+    matching->SetNumberOfValues(numFibers);
+    matching->FillValue(2.0f);
+    fib->SetFiberWeights(matching);
+    CPPUNIT_ASSERT_EQUAL(2.0f, fib->GetFiberWeight(numFibers - 1));
   }
 };
 
