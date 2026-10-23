@@ -55,6 +55,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(SetFiberColors_ChecksTheArray);
   MITK_TEST(ColorFibersByOrientation_OnePointFibers_GetColours);
   MITK_TEST(ColorFibersByCurvature_UsesFirstSegment);
+  MITK_TEST(ResampleLinear_NoStep_LeavesFibersUnchanged);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -442,6 +443,14 @@ public:
     const vtkIdType straight = cell->GetPointId(6);
     CPPUNIT_ASSERT_MESSAGE("The corner point sees the bend",
                            colours->GetComponent(corner, 0) != colours->GetComponent(straight, 0));
+  }
+
+  void ResampleLinear_NoStep_LeavesFibersUnchanged()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    auto copy = fib->GetDeepCopy();
+    fib->ResampleLinear(0.0);
+    CPPUNIT_ASSERT(copy->Equals(fib, 0.0));
   }
 };
 

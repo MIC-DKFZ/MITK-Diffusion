@@ -2540,6 +2540,10 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
 
 void mitk::FiberBundle::ResampleLinear(double pointDistance)
 {
+  // A step of 0 never advances along the fiber (endless loop), as in ResampleSpline.
+  if (pointDistance<=0)
+    return;
+
   vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
   vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
 
