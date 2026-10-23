@@ -183,6 +183,16 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
 
   bool output_timing = m_Parameters.m_Misc.m_OutputAdditionalImages;
 
+  // All slices read the echo time, so it is raised to the readout's minimum once, before the
+  // parallel loop, instead of by each k-space filter.
+  const float minimumEchoTime = KspaceImageFilter< Float2DImageType::PixelType >::CreateReadoutScheme(&m_Parameters)->GetMinimumEchoTime();
+  if ( m_Parameters.m_SignalGen.m_tEcho < minimumEchoTime )
+  {
+    m_Parameters.m_SignalGen.m_tEcho = minimumEchoTime;
+    MITK_WARN << "Echo time is too short! Time not sufficient to read slice. Automatically adjusted to " << m_Parameters.m_SignalGen.m_tEcho << " ms";
+    m_Parameters.m_Misc.m_AfterSimulationMessage += "Echo time was chosen too short! Time not sufficient to read slice. Internally adjusted to " + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_tEcho) + " ms\n";
+  }
+
   PrintToLog("0%   10   20   30   40   50   60   70   80   90   100%", false, true, false);
   PrintToLog("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, false);
   unsigned long lastTick = 0;

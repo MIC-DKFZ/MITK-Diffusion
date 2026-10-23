@@ -175,22 +175,7 @@ namespace itk {
       }
     }
 
-    switch (m_Parameters->m_SignalGen.m_AcquisitionType)
-    {
-      case SignalGenerationParameters::SingleShotEpi:
-        m_ReadoutScheme = new mitk::SingleShotEpi(m_Parameters);
-      break;
-      case SignalGenerationParameters::ConventionalSpinEcho:
-        m_ReadoutScheme = new mitk::ConventionalSpinEcho(m_Parameters);
-      break;
-      case SignalGenerationParameters::FastSpinEcho:
-        m_ReadoutScheme = new mitk::FastSpinEcho(m_Parameters);
-      break;
-      default:
-        m_ReadoutScheme = new mitk::SingleShotEpi(m_Parameters);
-    }
-
-    m_ReadoutScheme->AdjustEchoTime();
+    m_ReadoutScheme = CreateReadoutScheme(m_Parameters);
 
     m_MovedFmap = nullptr;
     if (m_Parameters->m_Misc.m_DoAddDistortions && m_Parameters->m_SignalGen.m_FrequencyMap.IsNotNull() && m_Parameters->m_SignalGen.m_DoAddMotion)
@@ -237,6 +222,21 @@ namespace itk {
 
         m_T1Relax.push_back(relaxation);
       }
+  }
+
+  template< class ScalarType >
+  std::unique_ptr<AcquisitionType> KspaceImageFilter< ScalarType >::CreateReadoutScheme(const FiberfoxParameters* parameters)
+  {
+    switch (parameters->m_SignalGen.m_AcquisitionType)
+    {
+      case SignalGenerationParameters::ConventionalSpinEcho:
+        return std::make_unique<mitk::ConventionalSpinEcho>(parameters);
+      case SignalGenerationParameters::FastSpinEcho:
+        return std::make_unique<mitk::FastSpinEcho>(parameters);
+      case SignalGenerationParameters::SingleShotEpi:
+      default:
+        return std::make_unique<mitk::SingleShotEpi>(parameters);
+    }
   }
 
   template< class ScalarType >
@@ -531,7 +531,7 @@ namespace itk {
       outputImage->SetPixel(spikeIdx, m_Spike);
       m_SpikeLog += "[" + boost::lexical_cast<std::string>(spikeIdx[0]) + "," + boost::lexical_cast<std::string>(spikeIdx[1]) + "," + boost::lexical_cast<std::string>(m_Zidx) + "] Magnitude: " + boost::lexical_cast<std::string>(m_Spike.real()) + "+" + boost::lexical_cast<std::string>(m_Spike.imag()) + "i\n";
     }
-    delete m_ReadoutScheme;
+    m_ReadoutScheme.reset();
   }
 }
 #endif

@@ -25,6 +25,7 @@ This file is based heavily on a corresponding ITK filter.
 #include <itkImageSource.h>
 #include <vector>
 #include <mutex>
+#include <memory>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkFiberfoxParameters.h>
 #include <mitkFiberBundle.h>
@@ -86,7 +87,10 @@ namespace itk{
     itkGetMacro( RfImage, typename InputImageType::Pointer )    ///< time passed since last RF pulse encoded per voxel
     itkGetMacro( SpikeLog, std::string )
 
-    void SetParameters( FiberfoxParameters* param ){ m_Parameters = param; }
+    void SetParameters( const FiberfoxParameters* param ){ m_Parameters = param; }
+
+    /** Readout scheme (k-space trajectory and timing) of the acquisition type in the parameters. */
+    static std::unique_ptr<AcquisitionType> CreateReadoutScheme(const FiberfoxParameters* parameters);
 
     void SetCompartmentImages( std::vector< InputImagePointerType > cImgs ) { m_CompartmentImages=cImgs; }  ///< One signal image per compartment.
     void SetT2( std::vector< float > t2Vector ) { m_T2=t2Vector; } ///< One T2 relaxation constant per compartment image.
@@ -104,7 +108,7 @@ namespace itk{
     void AfterThreadedGenerateData() override;
 
     VectorType                              m_CoilPosition;
-    FiberfoxParameters*                     m_Parameters;
+    const FiberfoxParameters*               m_Parameters;
     std::vector< float >                    m_T2;
     std::vector< float >                    m_T1;
     std::vector< float >                    m_T1Relax;
@@ -134,7 +138,7 @@ namespace itk{
     typename InputImageType::Pointer        m_KSpaceImage;
     typename InputImageType::Pointer        m_TickImage;
     typename InputImageType::Pointer        m_RfImage;
-    AcquisitionType*                        m_ReadoutScheme;
+    std::unique_ptr<AcquisitionType>        m_ReadoutScheme;
 
     typename itk::Image< ScalarType, 2 >::Pointer m_MovedFmap;
     int                                     ringing_lines_x;
