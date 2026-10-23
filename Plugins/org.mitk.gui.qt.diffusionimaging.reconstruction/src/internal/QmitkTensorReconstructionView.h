@@ -31,8 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 typedef short DiffusionPixelType;
 
-struct TrSelListener;
-
 /*!
  * \ingroup org_mitk_gui_qt_tensorreconstruction_internal
  *
@@ -42,8 +40,6 @@ struct TrSelListener;
  */
 class QmitkTensorReconstructionView : public QmitkAbstractView, public mitk::ILifecycleAwarePart
 {
-
-  friend struct TrSelListener;
 
   // this is needed for all Qt objects that should have a MOC object (everything that derives from QObject)
   Q_OBJECT
@@ -82,8 +78,6 @@ class QmitkTensorReconstructionView : public QmitkAbstractView, public mitk::ILi
   /// \brief Called when the view becomes hidden
   virtual void Hidden() override;
 
-  static const int nrconvkernels;
-
 protected slots:
 
   void UpdateGui();
@@ -109,10 +103,6 @@ protected:
 
   /** The table's unit directions followed by one zero vector for the b0 volume. */
   static itk::VectorContainer<unsigned int, vnl_vector_fixed<double,3> >::Pointer MakeGradientList(unsigned int numberOfDirections);
-
-  template<int L>
-  void TemplatedAnalyticalTensorReconstruction(mitk::Image* vols,
-    float lambda, std::string nodename, std::vector<mitk::DataNode::Pointer>* nodes, int normalization);
 };
 
 

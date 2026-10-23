@@ -126,25 +126,15 @@ void QmitkTensorReconstructionView::Deactivated()
 
   // Get all current nodes
 
+  // Remove the threshold previews of all DWIs.
   mitk::DataStorage::SetOfObjects::ConstPointer objects =  this->GetDataStorage()->GetAll();
-  mitk::DataStorage::SetOfObjects::const_iterator itemiter( objects->begin() );
-  mitk::DataStorage::SetOfObjects::const_iterator itemiterend( objects->end() );
-  while ( itemiter != itemiterend ) // for all items
+  for (const mitk::DataNode::Pointer &node : *objects)
   {
-    mitk::DataNode::Pointer node = *itemiter;
-    if (node.IsNull())
-      continue;
-
-    // only look at interesting types
     if( mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dynamic_cast<mitk::Image*>(node->GetData())))
     {
-      if (this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", *itemiter))
-      {
-        node = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", *itemiter);
-        this->GetDataStorage()->Remove(node);
-      }
+      if (auto overlay = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", node))
+        this->GetDataStorage()->Remove(overlay);
     }
-    itemiter++;
   }
 
 
