@@ -2,6 +2,8 @@
 
 #include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkLbfgsbMutex.h>
+#include <mutex>
 
 namespace itk{
 
@@ -513,6 +515,8 @@ void FitFibersToImageFilter::GenerateData()
   minimizer.set_trace(m_Verbose);
 
   minimizer.set_max_function_evals(m_MaxIterations);
+  // the netlib L-BFGS-B code keeps its working variables in static storage (see AGENTS.md)
+  std::unique_lock<std::mutex> lbfgsbLock(mitk::GetLbfgsbMutex());
   minimizer.minimize(m_Weights);
 
   std::vector< double > weights;
@@ -529,6 +533,7 @@ void FitFibersToImageFilter::GenerateData()
     minimizer.minimize(m_Weights);
     weights.clear();
   }
+  lbfgsbLock.unlock();
 
   for (auto w : m_Weights)
     weights.push_back(w);

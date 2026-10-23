@@ -8,6 +8,7 @@
 #include <vnl/algo/vnl_lbfgsb.h>
 #include <vnl/vnl_sparse_matrix.h>
 #include <vnl/vnl_sparse_matrix_linear_system.h>
+#include <memory>
 #include <itkImageDuplicator.h>
 #include <itkTimeProbe.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
@@ -29,7 +30,7 @@ public:
     NONE
   };
 
-  vnl_sparse_matrix_linear_system< double >* S;
+  std::unique_ptr< vnl_sparse_matrix_linear_system< double > > S;
   vnl_sparse_matrix< double > m_A;
   vnl_sparse_matrix< double > m_A_Ones; // matrix indicating active weights with 1
   vnl_vector< double > m_b;
@@ -42,7 +43,7 @@ public:
 
   void SetProblem(vnl_sparse_matrix< double >& A, vnl_vector<double>& b, double lambda, REGU regu)
   {
-    S = new vnl_sparse_matrix_linear_system<double>(A, b);
+    S = std::make_unique< vnl_sparse_matrix_linear_system<double> >(A, b);
     m_A = A;
     m_b = b;
     m_Lambda = lambda;
