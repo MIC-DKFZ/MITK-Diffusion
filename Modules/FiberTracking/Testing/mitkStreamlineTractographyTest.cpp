@@ -321,7 +321,7 @@ public:
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
 
-    CheckFibResult("Test_Odf1.fib", outFib);
+    CheckFibResult("Test_Odf1_v2.fib", outFib);  // regenerated when deterministic ODF peaks were refined between the sampling directions
 
     delete handler;
   }
@@ -341,7 +341,7 @@ public:
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
 
-    CheckFibResult("Test_Odf2.fib", outFib);
+    CheckFibResult("Test_Odf2_v2.fib", outFib);  // regenerated when deterministic ODF peaks were refined between the sampling directions
 
     delete handler;
   }
@@ -363,7 +363,7 @@ public:
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
 
-    CheckFibResult("Test_Odf3.fib", outFib);
+    CheckFibResult("Test_Odf3_v2.fib", outFib);  // regenerated when deterministic ODF peaks were refined between the sampling directions
 
     delete handler;
   }
@@ -384,7 +384,7 @@ public:
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
 
-    CheckFibResult("Test_Odf4.fib", outFib);
+    CheckFibResult("Test_Odf4_v2.fib", outFib);  // regenerated when deterministic ODF peaks were refined between the sampling directions
 
     delete handler;
   }

@@ -12,7 +12,9 @@ found in the LICENSE file.
 
 #include <itkStreamlineTrackingFilter.h>
 #include <mitkStreamlineTractographyParameters.h>
+#include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
+#include <itkOrientationDistributionFunction.h>
 #include <mitkFiberBundle.h>
 #include <mitkIOUtil.h>
 #include <cstdio>
@@ -34,6 +36,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(EndpointConstraints_TargetAtEitherEnd);
   MITK_TEST(ProbabilisticPeaks_SameResultAtAnyThreadCount);
   MITK_TEST(ProbabilisticPeaks_JitterIsIsotropicStandardDeviation);
+  MITK_TEST(DeterministicOdf_FollowsPeakBetweenSamplingDirections);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -264,6 +267,53 @@ public:
       CPPUNIT_ASSERT(fibers->GetNumberOfCells() > 200);
       CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, MeanSegmentAngleDeg(fibers, dir), 0.6);
     }
+  }
+
+  /** Deterministic ODF tracking on a straight single-fibre ODF field |d.f|^20 whose peak lies
+   *  between the sampling directions. The step direction was the best sampling direction, 5.5
+   *  degrees off this fibre; the refined peak must be within one degree. */
+  void DeterministicOdf_FollowsPeakBetweenSamplingDirections()
+  {
+    using OdfImageType = mitk::TrackingHandlerOdf::ItkOdfImageType;
+    vnl_vector_fixed<double, 3> fibre(0.8, 0.5, 0.2);
+    fibre.normalize();
+
+    itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE> table;
+    OdfImageType::PixelType odf;
+    for (int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+    {
+      vnl_vector_fixed<double, 3> d = table.GetDirection(i);
+      odf[i] = static_cast<float>(std::pow(std::fabs(dot_product(d, fibre)), 20));
+    }
+    auto odfs = OdfImageType::New();
+    OdfImageType::SizeType size = {{20, 20, 20}};
+    odfs->SetRegions(OdfImageType::RegionType(size));
+    odfs->Allocate();
+    odfs->FillBuffer(odf);
+
+    auto seeds = FloatImgType::New();
+    seeds->SetRegions(FloatImgType::RegionType(size));
+    seeds->Allocate();
+    seeds->FillBuffer(0.0f);
+    for (int k = 9; k <= 10; ++k)
+    {
+      FloatImgType::IndexType idx = {{k, k, k}};
+      seeds->SetPixel(idx, 1.0f);
+    }
+
+    auto params = MakeParameters();
+    params->m_MinTractLengthMm = 5;
+    mitk::TrackingHandlerOdf handler;
+    handler.SetOdfImage(odfs);
+    auto tracker = itk::StreamlineTrackingFilter::New();
+    tracker->SetTrackingHandler(&handler);
+    tracker->SetSeedImage(seeds);
+    tracker->SetParameters(params);
+    tracker->Update();
+    auto fibers = tracker->GetFiberPolyData();
+
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(2), fibers->GetNumberOfCells());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, MeanSegmentAngleDeg(fibers, fibre), 1.0);
   }
 };
 

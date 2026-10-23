@@ -63,6 +63,19 @@ protected:
 
   int SampleOdf(vnl_vector< float >& probs, vnl_vector< float >& angles);
 
+  /** Peak direction near the hemisphere sampling direction idx (same orientation as that direction):
+   *  climbs to the local maximum of the sampled values and fits a quadratic to their logarithm in
+   *  the tangent plane of the neighbouring directions, so that deterministic tracking is not
+   *  limited to the sampling directions. */
+  vnl_vector_fixed<float,3> RefinePeak(int idx, const vnl_vector< float >& values) const;
+
+  struct OdfNeighbor
+  {
+    int index;    ///< hemisphere index
+    float sign;   ///< +1 or -1: orientation of the hemisphere direction relative to the centre
+  };
+  std::vector< std::vector< OdfNeighbor > > m_OdfNeighbors;  ///< hemisphere directions within 25 degrees
+
   ItkFloatImgType::Pointer        m_GfaImage;     ///< GFA image used to determine streamline termination.
   ItkOdfImageType::Pointer        m_OdfImage;     ///< Input odf image.
   ItkOdfImageType::Pointer        m_WorkingOdfImage;     ///< Modified odf image.
