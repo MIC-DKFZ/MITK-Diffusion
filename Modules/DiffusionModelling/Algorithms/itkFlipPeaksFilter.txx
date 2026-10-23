@@ -13,28 +13,11 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkFlipPeaksFilter_cpp
-#define __itkFlipPeaksFilter_cpp
+#ifndef itkFlipPeaksFilter_txx
+#define itkFlipPeaksFilter_txx
 
 #include "itkFlipPeaksFilter.h"
-#include <itkImageRegionConstIterator.h>
-#include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkImageRegionIterator.h>
-#include <vnl/vnl_vector.h>
-#include <itkOrientationDistributionFunction.h>
-#include <itkContinuousIndex.h>
-
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkCellArray.h>
-#include <vtkPoints.h>
-#include <vtkPolyLine.h>
-
-#include <boost/math/special_functions.hpp>
-#include <boost/timer/progress_display.hpp>
-
-
-using namespace boost::math;
 
 namespace itk {
 
@@ -42,32 +25,8 @@ template< class PixelType >
 FlipPeaksFilter< PixelType>::FlipPeaksFilter()
 {
   this->SetNumberOfRequiredInputs(1);
-
-  
 }
 
-
-template< class PixelType >
-void FlipPeaksFilter< PixelType>
-::BeforeThreadedGenerateData()
-{
-  typename InputImageType::Pointer input = static_cast< InputImageType* >( this->ProcessObject::GetInput(0) );
-
-//  typename OutputImageType::Pointer output = OutputImageType::New();
-//  output->SetSpacing( input->GetSpacing() );
-//  output->SetOrigin( input->GetOrigin() );
-//  output->SetDirection( input->GetDirection() );
-//  output->SetRegions( input->GetLargestPossibleRegion() );
-//  output->Allocate();
-//  output->FillBuffer(0.0);
-}
-
-template< class PixelType >
-void FlipPeaksFilter< PixelType>
-::AfterThreadedGenerateData()
-{
-
-}
 
 template< class PixelType >
 void FlipPeaksFilter< PixelType>
@@ -98,4 +57,4 @@ void FlipPeaksFilter< PixelType>
 
 }
 
-#endif // __itkFlipPeaksFilter_cpp
+#endif // itkFlipPeaksFilter_txx

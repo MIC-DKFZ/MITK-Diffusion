@@ -14,17 +14,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include <mitkNodePredicateDataType.h>
-#include <mitkRenderingTestHelper.h>
-#include <mitkSmartPointerProperty.h>
-#include <mitkTestingMacros.h>
-#include <vtkSmartPointer.h>
-#include "mitkTestingMacros.h"
-#include <itksys/SystemTools.hxx>
-#include <mitkTestingConfig.h>
 #include <mitkIOUtil.h>
 #include <mitkTestFixture.h>
-#include <vtkTesting.h>
+#include <mitkTestingMacros.h>
 #include <mitkPeakImage.h>
 #include <mitkShImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>

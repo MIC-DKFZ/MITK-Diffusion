@@ -54,32 +54,29 @@ public:
   typedef itk::DiffusionTensor3D<TPixel>          TensorType;
   typedef itk::Image< TensorType, 3 >             TensorImageType;
   typedef itk::Image< TPixel, 3 >                 OutputImageType;
+  typedef typename OutputImageType::RegionType    OutputImageRegionType;
 
   typedef TensorDerivedMeasurementsFilter         Self;
   typedef SmartPointer<Self>                      Pointer;
   typedef SmartPointer<const Self>                ConstPointer;
-  typedef ImageToImageFilter< TensorType,
-                              OutputImageType >
-                                                  SuperClass;
 
    /** Method for creation through the object factory. */
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
 
   /** Runtime information support. */
-  itkTypeMacro(TensorDerivedMeasurementsFilter, ImageToImageFilter);
+  itkOverrideGetNameOfClassMacro(TensorDerivedMeasurementsFilter);
 
   itkSetMacro(Measure, Measure);
 
 
 protected:
   TensorDerivedMeasurementsFilter();
-  ~TensorDerivedMeasurementsFilter() {};
-  //void PrintSelf(std::ostream& os, Indent indent) const;
+  ~TensorDerivedMeasurementsFilter() override = default;
 
   Measure m_Measure;
 
-  void GenerateData() override;
+  void DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread) override;
 
 }; // end class
 

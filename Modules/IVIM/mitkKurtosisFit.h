@@ -20,7 +20,12 @@ found in the LICENSE file.
 #include <vnl/vnl_vector.h>
 
 /** The diffusion kurtosis model S = S0 exp(-b D + b^2 D^2 K / 6) and its voxel-wise fit, shared by
-    the map filter, the IVIM view and MitkDiffusionKurtosisFit. */
+    the map filter, the IVIM view and MitkDiffusionKurtosisFit. One D and one K are fitted to all
+    diffusion-weighted volumes together, whatever their direction. The straight fit then estimates
+    the kurtosis of the direction-averaged signal (dipy's mean signal kurtosis, MSDKI); the
+    logarithmic fit gives the mean of the directional ADCs and, for evenly spread directions, the
+    mean of the kurtosis tensor (MKT). Neither is the mean kurtosis MK of a kurtosis tensor fit, and
+    in anisotropic tissue the two scales give different K. */
 namespace mitk::kurtosis
 {
   enum class FitScale

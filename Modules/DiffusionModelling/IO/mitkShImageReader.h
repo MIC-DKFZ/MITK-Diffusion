@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkNrrdShImageReader_h
-#define __mitkNrrdShImageReader_h
+#ifndef mitkShImageReader_h
+#define mitkShImageReader_h
 
 #include "mitkCommon.h"
 #include "itkVectorContainer.h"
@@ -29,9 +29,24 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
 
-  /** \brief
-  */
-
+  /**
+   * Reads SH coefficient images in MRtrix's layout: a 4D float image (NIfTI, or NRRD as .shi) with
+   * one volume per coefficient, orders 2 to 12. The image holds coefficients in MITK's basis
+   * (mitk::sh, mrtrix = true: MRtrix 0.2's) or, for files marked FSL, in MITK's FSL definition.
+   * A convention marked by ShImageWriter ("MITK_SH_convention" NRRD key or NIfTI descrip) decides;
+   * otherwise the option "SH convention": "auto" reads files whose descrip says
+   * "MRtrix version: 3..." (every MRtrix FOD since 3.0) in MRtrix 3's orthonormal basis and all
+   * others, which includes files of earlier MITK versions, in MITK's legacy basis. MRtrix 3
+   * coefficients are converted on reading (m != 0 times sqrt(2)). "FSL/Dipy" reads coefficients
+   * of dipy's default basis (descoteaux07, legacy), given in the frame of FSL bvecs, and converts
+   * them into MITK's basis at world directions.
+   *
+   * SH images in vector layout (a 3D image with one vector of coefficients per voxel, as MITK's
+   * generic image writer and older MITK versions wrote them) are not read as SH images; MITK's
+   * image reader reads them as plain multi-component images. The two such files in MITK-Data
+   * (qBallImage_SHCoeffs.nrrd, StreamlineTractography/qball_image_sh.nii.gz) hold coefficients in
+   * the FSL/Dipy basis, not MITK's, so reading them with MITK's default would give wrong ODFs.
+   */
   class ShImageReader : public mitk::AbstractFileReader
   {
   public:
@@ -54,10 +69,8 @@ namespace mitk
 
     template <int sh_order>
     mitk::Image::Pointer ConvertShImage(ShImage::ShOnDiskType::Pointer img);
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
 } //namespace MITK
 
-#endif // __mitkNrrdShImageReader_h
+#endif

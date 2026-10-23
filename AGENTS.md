@@ -116,6 +116,20 @@ Facts the layout does not show:
   before, with the image rotation applied; DICOM import is unchanged and has no test data.
   `ctest -R 'mitkDiffusion(Property|Image|Dicom)'` runs the `DiffusionImage` tests of readers,
   writers and property helper.
+- SH and peak files: MITK's SH basis (`mitk::sh`, `mrtrix = true`) is MRtrix 0.2's (functions
+  with m != 0 are MRtrix 3's divided by sqrt(2)) at world (LPS) directions. `ShImageWriter` writes
+  MRtrix 3's orthonormal basis and marks the file `MITK_SH_convention=MRtrix3` (NRRD key, NIfTI
+  descrip); `ShImageReader` converts files so marked or whose descrip starts with
+  `MRtrix version: 3`, and reads unmarked files (all of earlier MITK versions) in the legacy basis.
+  Its option "SH convention" forces one; "FSL/Dipy" converts dipy's default basis (`descoteaux07`,
+  legacy) from the FSL bvec frame. NIfTI peak images are written in RAS with the descrip
+  `MITK_peak_convention=RAS` and read back to LPS; NRRD peaks are LPS.
+- `ctest -R 'mitkDiffusionModelling|PeakShImageReader|ImageReconstruction'` runs the
+  `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
+  display needed) and is skipped with exit code 77 where no OpenGL context can be created.
+- The netlib L-BFGS-B code behind `vnl_lbfgsb` keeps its working variables in static storage.
+  Threaded code holds `mitk::GetLbfgsbMutex()` (`Modules/DiffusionModelling/Algorithms/mitkLbfgsbMutex.h`)
+  while `minimize` runs; the cost function may release it during its evaluation.
 - `ctest -R mitkFiberBundle` runs the `FiberBundle` tests; `mitkFiberBundleMapperTest` renders
   offscreen (EGL) and is skipped with exit code 77 where no OpenGL context can be created.
   `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
@@ -126,7 +140,7 @@ Facts the layout does not show:
 
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 31 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
+all 35 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,

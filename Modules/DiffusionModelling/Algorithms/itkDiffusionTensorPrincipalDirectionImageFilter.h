@@ -29,7 +29,7 @@ This file is based heavily on a corresponding ITK filter.
 #include <itkVectorContainer.h>
 #include <itkVectorImage.h>
 #include <itkDiffusionTensor3D.h>
-#include <mitkFiberBundle.h>
+#include <mitkPoint.h>
 
 namespace itk{
 /** \brief Extracts principal eigenvectors of the input tensors
@@ -52,7 +52,7 @@ public:
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(DiffusionTensorPrincipalDirectionImageFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(DiffusionTensorPrincipalDirectionImageFilter)
 
     typedef TTensorPixelType                            TensorComponentType;
     typedef typename Superclass::InputImageType         InputImageType;
@@ -62,7 +62,6 @@ public:
     typedef vnl_vector_fixed< double, 3 >               DirectionType;
     typedef Image< float, 4 >                           PeakImageType;
 
-    void SetImage( const InputImageType *image );
 
     // input
     itkSetMacro( MaskImage, ItkUcharImgType::Pointer)
@@ -75,17 +74,24 @@ public:
 
     protected:
         DiffusionTensorPrincipalDirectionImageFilter();
-    ~DiffusionTensorPrincipalDirectionImageFilter() {}
-    void PrintSelf(std::ostream& os, Indent indent) const;
+    ~DiffusionTensorPrincipalDirectionImageFilter() override = default;
 
-    void BeforeThreadedGenerateData();
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread );
-    void AfterThreadedGenerateData();
+    /** The peak image always covers the whole input, so the primary output does too, also when
+      * the filter is updated again with an input of another size. */
+    void EnlargeOutputRequestedRegion(DataObject *output) override
+    {
+      output->SetRequestedRegionToLargestPossibleRegion();
+    }
+
+    void BeforeThreadedGenerateData() override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread ) override;
+    void AfterThreadedGenerateData() override;
 
 private:
 
     bool                                m_NormalizeVectors;     ///< Normalizes the output vector to length 1
     ItkUcharImgType::Pointer            m_MaskImage;            ///< Extraction is only performed inside of the binary mask
+    bool                                m_MaskGenerated = false; ///< m_MaskImage was generated for the current update only
     PeakImageType::Pointer              m_PeakImage;
     bool                                m_UsePolarCoordinates;
     float                               m_FaThreshold;

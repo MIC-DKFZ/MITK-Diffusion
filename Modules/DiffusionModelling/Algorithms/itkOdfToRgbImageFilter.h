@@ -14,135 +14,55 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkOdfToRgbImageFilter_h
-#define __itkOdfToRgbImageFilter_h
+#ifndef itkOdfToRgbImageFilter_h
+#define itkOdfToRgbImageFilter_h
 
-#include "itkUnaryFunctorImageFilter.h"
-#include "itkOrientationDistributionFunction.h"
-#include "itkRGBAPixel.h"
-#include "itkImageRegionConstIterator.h"
-#include "itkImageRegionIterator.h"
+#include <itkImageRegionConstIterator.h>
+#include <itkImageRegionIterator.h>
+#include <itkImageToImageFilter.h>
+#include <itkOrientationDistributionFunction.h>
+#include <itkRGBAPixel.h>
+#include <mitkDirectionColor.h>
+#include <mitkOdfImage.h>
 
 namespace itk
 {
-
-  #define __IMG_DAT_ITEM__CEIL_ZERO_ONE__(val) (val) =       \
-  ( (val) < 0 ) ? ( 0 ) : ( ( (val)>1 ) ? ( 1 ) : ( (val) ) );
-
-
-/** \class OdfToRgbImageFilter
-*
-*/
-template <typename TInputImage,
-typename TOutputImage=itk::Image<itk::RGBAPixel<unsigned char>,3> >
-                      class OdfToRgbImageFilter :
-                      public ImageToImageFilter<TInputImage,TOutputImage>
-                      {
-                      public:
-  /** Standard class typedefs. */
-  typedef OdfToRgbImageFilter  Self;
-  typedef ImageToImageFilter<TInputImage,TOutputImage>
-      Superclass;
-  typedef SmartPointer<Self>                     Pointer;
-  typedef SmartPointer<const Self>               ConstPointer;
-
-  typedef typename Superclass::InputImageType    InputImageType;
-  typedef typename Superclass::OutputImageType    OutputImageType;
-  typedef typename OutputImageType::PixelType     OutputPixelType;
-  typedef typename TInputImage::PixelType         InputPixelType;
-  typedef typename InputPixelType::ValueType      InputValueType;
-
-  /** Run-time type information (and related methods).   */
-  itkTypeMacro( OdfToRgbImageFilter, ImageToImageFilter )
-
-  /** Method for creation through the object factory. */
-  itkFactorylessNewMacro(Self)
-  itkCloneMacro(Self)
-
-  /** Print internal ivars */
-  void PrintSelf(std::ostream& os, Indent indent) const override
-  { this->Superclass::PrintSelf( os, indent ); }
-
-#ifdef ITK_USE_CONCEPT_CHECKING
-  /** Begin concept checking */
-  itkConceptMacro(InputHasNumericTraitsCheck,
-                  (Concept::HasNumericTraits<InputValueType>));
-  /** End concept checking */
-#endif
-
-protected:
-  OdfToRgbImageFilter(){}
-  ~OdfToRgbImageFilter() override{}
-
-  void GenerateData() override
+  /**
+   * \brief Colour map of an ODF image: the principal direction of each ODF weighted by its GFA,
+   *        with the GFA as alpha (see mitk::DirectionColor).
+   */
+  template <typename TInputImage, typename TOutputImage = itk::Image<itk::RGBAPixel<unsigned char>, 3>>
+  class OdfToRgbImageFilter : public ImageToImageFilter<TInputImage, TOutputImage>
   {
+  public:
+    ITK_DISALLOW_COPY_AND_MOVE(OdfToRgbImageFilter);
 
-    typename InputImageType::Pointer OdfImage = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
+    using Self = OdfToRgbImageFilter;
+    using Superclass = ImageToImageFilter<TInputImage, TOutputImage>;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
 
-    typename OutputImageType::Pointer outputImage =
-        static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
+    using InputImageType = typename Superclass::InputImageType;
+    using OutputImageType = typename Superclass::OutputImageType;
+    using OutputImageRegionType = typename OutputImageType::RegionType;
 
-    typename InputImageType::RegionType region = OdfImage->GetLargestPossibleRegion();
+    itkOverrideGetNameOfClassMacro(OdfToRgbImageFilter);
+    itkFactorylessNewMacro(Self);
+    itkCloneMacro(Self);
 
-    outputImage->SetSpacing( OdfImage->GetSpacing() );   // Set the image spacing
-    outputImage->SetOrigin( OdfImage->GetOrigin() );     // Set the image origin
-    outputImage->SetDirection( OdfImage->GetDirection() );  // Set the image direction
-    outputImage->SetRegions( OdfImage->GetLargestPossibleRegion());
-    outputImage->Allocate();
+  protected:
+    OdfToRgbImageFilter() { this->DynamicMultiThreadingOn(); }
+    ~OdfToRgbImageFilter() override = default;
 
-    typedef ImageRegionConstIterator< InputImageType > OdfImageIteratorType;
-    OdfImageIteratorType OdfIt(OdfImage, OdfImage->GetLargestPossibleRegion());
-
-    typedef ImageRegionIterator< OutputImageType > OutputImageIteratorType;
-    OutputImageIteratorType outputIt(outputImage, outputImage->GetLargestPossibleRegion());
-
-    OdfIt.GoToBegin();
-    outputIt.GoToBegin();
-
-    while(!OdfIt.IsAtEnd() && !outputIt.IsAtEnd()){
-
-      InputPixelType x = OdfIt.Get();
-      typedef itk::OrientationDistributionFunction<float,ODF_SAMPLING_SIZE> OdfType;
-      OdfType odf(x.GetDataPointer());
-
-      vnl_vector_fixed<double,3> dir;
-      int pd = odf.GetPrincipalDiffusionDirectionIndex();
-      if (pd==-1)
-        dir.fill(0);
-      else
-        dir = OdfType::GetDirection(pd);
-
-      const float fa = odf.GetGeneralizedFractionalAnisotropy();
-      float r = fabs(dir[0]) * fa;
-      float g = fabs(dir[1]) * fa;
-      float b = fabs(dir[2]) * fa;
-//      float a = (fa-(m_OpacLevel-m_OpacWindow/2.0f))/m_OpacWindow;
-      float a = fa;
-
-      __IMG_DAT_ITEM__CEIL_ZERO_ONE__(r);
-      __IMG_DAT_ITEM__CEIL_ZERO_ONE__(g);
-      __IMG_DAT_ITEM__CEIL_ZERO_ONE__(b);
-      __IMG_DAT_ITEM__CEIL_ZERO_ONE__(a);
-
-      OutputPixelType out;
-      out.SetRed(   r * 255.0f);
-      out.SetGreen( g * 255.0f);
-      out.SetBlue(  b * 255.0f);
-      out.SetAlpha( a * 255.0f);
-
-      outputIt.Set(out);
-
-      ++OdfIt;
-      ++outputIt;
+    void DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread) override
+    {
+      using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
+      ImageRegionConstIterator<InputImageType> it(this->GetInput(), outputRegionForThread);
+      ImageRegionIterator<OutputImageType> oit(this->GetOutput(), outputRegionForThread);
+      for (; !it.IsAtEnd(); ++it, ++oit)
+        oit.Set(mitk::OdfColor(OdfType(it.Get().GetDataPointer())));
     }
-
-  }
-
-private:
-  OdfToRgbImageFilter(const Self&); //purposely not implemented
-  void operator=(const Self&); //purposely not implemented
-};
-
-} // end namespace itk
+  };
+}
 
 #endif

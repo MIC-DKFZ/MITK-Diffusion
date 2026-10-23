@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
 /**
-  \brief Serializes mitk::Surface for mitk::SceneIO
+  \brief Serializes mitk::ShImage for mitk::SceneIO
 */
 class ShImageSerializer : public BaseDataSerializer
 {
@@ -32,8 +32,8 @@ class ShImageSerializer : public BaseDataSerializer
     itkCloneMacro(Self)
     std::string Serialize() override;
   protected:
-    ShImageSerializer();
-    ~ShImageSerializer() override;
+    ShImageSerializer() = default;
+    ~ShImageSerializer() override = default;
 };
 } // namespace
 #endif

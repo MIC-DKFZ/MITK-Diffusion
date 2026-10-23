@@ -442,16 +442,18 @@ int main(int argc, char* argv[])
     else
     {
       std::vector<std::string> include = {"SH Image", "ODF Image"};
-      std::vector<std::string> exclude = {};
-      mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor(include, exclude);
+      // The SH reader converts dipy's coefficients, which are given in the bvec frame, into MITK's
+      // basis; files without a convention marker are read as MRtrix 3 or MITK files otherwise.
+      mitk::IFileReader::Options options;
+      if (type == "ODF-DIPY/FSL")
+        options["SH convention"] = std::string("FSL/Dipy");
+      mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor(include, options);
       auto input = mitk::IOUtil::Load(input_files.at(0), &functor)[0];
       reference_image = dynamic_cast<mitk::Image*>(input.GetPointer());
       if (dynamic_cast<mitk::ShImage*>(input.GetPointer()))
       {
         MITK_INFO << "Converting SH to ODF image";
         mitk::ShImage::Pointer mitkShImage = dynamic_cast<mitk::ShImage*>(input.GetPointer());
-        if (type == "ODF-DIPY/FSL")
-          mitkShImage->SetShConvention(mitk::ShImage::SH_CONVENTION::FSL);
         mitk::Image::Pointer mitkImg = dynamic_cast<mitk::Image*>(mitkShImage.GetPointer());
         itkImg = mitk::convert::GetItkOdfFromShImage(mitkImg);
       }

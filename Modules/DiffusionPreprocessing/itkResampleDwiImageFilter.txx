@@ -106,7 +106,8 @@ ResampleDwiImageFilter<TScalarType>
     outImage->SetBufferedRegion(outImage->GetRequestedRegion());
     outImage->Allocate();
 
-    using ResamplerType = itk::ResampleImageFilter<DwiChannelType, DwiChannelType>;
+    // Interpolated in double and converted by ResampledPixel, which rounds for integer pixel types.
+    using ResamplerType = itk::ResampleImageFilter<DwiChannelType, itk::Image<double, 3>>;
     typename ResamplerType::Pointer resampler = ResamplerType::New();
     resampler->SetSize(outImage->GetLargestPossibleRegion().GetSize());
     resampler->SetOutputSpacing(outImage->GetSpacing());
@@ -142,9 +143,9 @@ ResampleDwiImageFilter<TScalarType>
     {
         extractor->SetIndex(i);
         resampler->Update();
-        const TScalarType* channel = resampler->GetOutput()->GetBufferPointer();
+        const double* channel = resampler->GetOutput()->GetBufferPointer();
         for (SizeValueType p=0; p<numberOfPixels; ++p)
-            out[p*vectorLength + i] = channel[p];
+            out[p*vectorLength + i] = ResampledPixel<TScalarType>(channel[p]);
     }
 }
 

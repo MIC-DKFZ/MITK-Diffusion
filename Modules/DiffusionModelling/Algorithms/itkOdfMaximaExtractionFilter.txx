@@ -13,8 +13,8 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkOdfMaximaExtractionFilter_cpp
-#define __itkOdfMaximaExtractionFilter_cpp
+#ifndef itkOdfMaximaExtractionFilter_txx
+#define itkOdfMaximaExtractionFilter_txx
 
 #include "itkOdfMaximaExtractionFilter.h"
 #include <itkImageRegionConstIterator.h>
@@ -23,17 +23,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_vector.h>
 #include <itkOrientationDistributionFunction.h>
 #include <itkContinuousIndex.h>
-
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkCellArray.h>
-#include <vtkPoints.h>
-#include <vtkPolyLine.h>
-
-#include <boost/math/special_functions.hpp>
-#include <boost/timer/progress_display.hpp>
-
-using namespace boost::math;
+#include <mitkImageGeometry4D.h>
+#include <mitkLbfgsbMutex.h>
 
 namespace itk {
 
@@ -111,53 +102,21 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 {
   typename CoefficientImageType::Pointer ShCoeffImage = static_cast< CoefficientImageType* >( this->ProcessObject::GetInput(0) );
   itk::Vector<double,3> spacing = ShCoeffImage->GetSpacing();
-  double minSpacing = spacing[0];
-  if (spacing[1]<minSpacing)
-    minSpacing = spacing[1];
-  if (spacing[2]<minSpacing)
-    minSpacing = spacing[2];
-
   mitk::Point3D origin = ShCoeffImage->GetOrigin();
   itk::Matrix<double, 3, 3> direction = ShCoeffImage->GetDirection();
   ImageRegion<3> imageRegion = ShCoeffImage->GetLargestPossibleRegion();
 
-  if (m_MaskImage.IsNotNull())
-  {
-    origin = m_MaskImage->GetOrigin();
-    direction = m_MaskImage->GetDirection();
-    imageRegion = m_MaskImage->GetLargestPossibleRegion();
-  }
-
-  itk::Vector<double, 3> spacing3 = ShCoeffImage->GetSpacing();
-  itk::Point<float, 3> origin3 = ShCoeffImage->GetOrigin();
-  itk::Matrix<double, 3, 3> direction3 = ShCoeffImage->GetDirection();
-  itk::ImageRegion<3> imageRegion3 = ShCoeffImage->GetLargestPossibleRegion();
-
-  itk::Vector<double, 4> spacing4;
-  itk::Point<float, 4> origin4;
-  itk::Matrix<double, 4, 4> direction4;
-  itk::ImageRegion<4> imageRegion4;
-
-  spacing4[0] = spacing3[0]; spacing4[1] = spacing3[1]; spacing4[2] = spacing3[2]; spacing4[3] = 1;
-  origin4[0] = origin3[0]; origin4[1] = origin3[1]; origin4[2] = origin3[2]; origin4[3] = 0;
-  for (int r=0; r<3; r++)
-    for (int c=0; c<3; c++)
-      direction4[r][c] = direction3[r][c];
-  direction4[3][3] = 1;
-  imageRegion4.SetSize(0, imageRegion3.GetSize()[0]);
-  imageRegion4.SetSize(1, imageRegion3.GetSize()[1]);
-  imageRegion4.SetSize(2, imageRegion3.GetSize()[2]);
-  imageRegion4.SetSize(3, m_MaxNumPeaks*3);
+  // The mask is read with the input's voxel indices.
+  if (m_MaskImage.IsNotNull() && (m_MaskImage->GetLargestPossibleRegion() != imageRegion || !m_MaskImage->IsSameImageGeometryAs(ShCoeffImage)))
+    itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the SH image.");
 
   m_PeakImage = PeakImageType::New();
-  m_PeakImage->SetSpacing( spacing4 );
-  m_PeakImage->SetOrigin( origin4 );
-  m_PeakImage->SetDirection( direction4 );
-  m_PeakImage->SetRegions( imageRegion4 );
+  mitk::CopyGeometryTo4D(ShCoeffImage, m_PeakImage, m_MaxNumPeaks*3);
   m_PeakImage->Allocate();
   m_PeakImage->FillBuffer(0.0);
 
-  if (m_MaskImage.IsNull())
+  m_MaskGenerated = m_MaskImage.IsNull();
+  if (m_MaskGenerated)
   {
     m_MaskImage = ItkUcharImgType::New();
     m_MaskImage->SetSpacing( spacing );
@@ -167,13 +126,8 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     m_MaskImage->Allocate();
     m_MaskImage->FillBuffer(1);
   }
-  m_NumDirectionsImage = ItkUcharImgType::New();
-  m_NumDirectionsImage->SetSpacing( spacing );
-  m_NumDirectionsImage->SetOrigin( origin );
-  m_NumDirectionsImage->SetDirection( direction );
-  m_NumDirectionsImage->SetRegions( imageRegion );
-  m_NumDirectionsImage->Allocate();
-  m_NumDirectionsImage->FillBuffer(0);
+  // Masked voxels and voxels with an ODF maximum near 0 are skipped and keep 0 directions.
+  this->GetOutput()->FillBuffer(0);
 
   // calculate SH basis
   OdfType odf;
@@ -187,7 +141,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   }
 
   if (m_Toolkit==Toolkit::MRTRIX)
-    m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, dir_matrix);
+    m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, dir_matrix, true);
   else
     m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, dir_matrix, false);
 
@@ -197,14 +151,17 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   MITK_INFO << "Relative threshold: " << m_RelativePeakThreshold;
   MITK_INFO << "Absolute threshold: " << m_AbsolutePeakThreshold;
   MITK_INFO << "Angular threshold: " << m_AngularThreshold;
-  this->SetNumberOfWorkUnits(1);
+  m_Progress = std::make_unique<boost::timer::progress_display>(this->GetOutput()->GetRequestedRegion().GetNumberOfPixels());
 }
 
 template< class PixelType, int ShOrder, int NrOdfDirections >
 void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 ::AfterThreadedGenerateData()
 {
-
+  // A mask generated for this input must not be reused for the next one.
+  if (m_MaskGenerated)
+    m_MaskImage = nullptr;
+  m_Progress.reset();
 }
 
 template< class PixelType, int ShOrder, int NrOdfDirections >
@@ -215,15 +172,21 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 
   ImageRegionConstIterator< CoefficientImageType > cit(ShCoeffImage, outputRegionForThread );
 
-  boost::timer::progress_display disp(outputRegionForThread.GetSize()[0]*outputRegionForThread.GetSize()[1]*outputRegionForThread.GetSize()[2]);
+  auto advance = [this, &cit]()
+  {
+    {
+      std::lock_guard<std::mutex> guard(m_ProgressMutex);
+      ++(*m_Progress);
+    }
+    ++cit;
+  };
   OdfType odf;
   while( !cit.IsAtEnd() )
   {
     typename CoefficientImageType::IndexType idx3 = cit.GetIndex();
     if (m_MaskImage->GetPixel(idx3)==0)
     {
-      ++disp;
-      ++cit;
+      advance();
       continue;
     }
 
@@ -243,8 +206,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     }
     if (max<0.0001)
     {
-      ++disp;
-      ++cit;
+      advance();
       continue;
     }
 
@@ -261,11 +223,9 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       x[0] = spherical[1];  // theta
       x[1] = spherical[0];  // phi
 
-      VnlCostFunction cost;
-      if (m_Toolkit==Toolkit::MRTRIX)
-        cost.SetProblem(coeffs, ShOrder, true, max);
-      else
-        cost.SetProblem(coeffs, ShOrder, false, max);
+      // The netlib L-BFGS-B code keeps its state in static variables, see mitk::GetLbfgsbMutex().
+      std::unique_lock<std::mutex> lbfgsbLock(mitk::GetLbfgsbMutex(), std::defer_lock);
+      ShCostFunction cost(coeffs, m_Toolkit==Toolkit::MRTRIX, lbfgsbLock);
 
       vnl_lbfgsb minimizer(cost);
       minimizer.set_f_tolerance(1e-6);
@@ -279,7 +239,9 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       minimizer.set_upper_bound(u);
       if (m_Iterations>0)
         minimizer.set_max_function_evals(m_Iterations);
+      lbfgsbLock.lock();
       minimizer.minimize(x);
+      lbfgsbLock.unlock();
 
       float v = -minimizer.get_end_error()*scale;
       candidates[i] = mitk::gradients::Sph2Cart(x[0], x[1], v);
@@ -304,6 +266,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
           DirectionType v2 = candidates.at(j);
           double val2 = v2.magnitude();
           double angle = fabs(dot_product(v1,v2)/(val*val2));
+          // Of two peaks of exactly equal length both are kept, e.g. antipodal duplicates.
           if (angle>m_AngularThreshold && val<val2)
           {
             flag = false;
@@ -352,13 +315,11 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
         m_PeakImage->SetPixel(idx4, dir[j]);
       }
     }
-    m_NumDirectionsImage->SetPixel(idx3, num);
-    ++disp;
-    ++cit;
+    this->GetOutput()->SetPixel(idx3, num);
+    advance();
   }
-  MITK_INFO << "One thread finished extraction";
 }
 
 }
 
-#endif // __itkOdfMaximaExtractionFilter_cpp
+#endif // itkOdfMaximaExtractionFilter_txx

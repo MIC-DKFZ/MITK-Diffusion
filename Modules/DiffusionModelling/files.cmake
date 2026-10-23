@@ -3,6 +3,7 @@ set(CPP_FILES
   mitkDiffusionModellingHelperFunctions.cpp
 
   # DataStructures
+  IO/mitkRgbCachedImage.cpp
   IO/mitkOdfImage.cpp
   IO/mitkShImage.cpp
   IO/mitkTensorImage.cpp
@@ -20,22 +21,21 @@ set(CPP_FILES
   IO/mitkShImageReader.cpp
   IO/mitkShImageWriter.cpp
   IO/mitkShImageSerializer.cpp
-  IO/mitkPeakImageReader.h
-  IO/mitkPeakImageSerializer.h
+  IO/mitkPeakImageReader.cpp
+  IO/mitkPeakImageWriter.cpp
+  IO/mitkPeakImageSerializer.cpp
 
   # Mapper etc.
-  Rendering/vtkMaskedProgrammableGlyphFilter.cpp
-  Rendering/mitkVectorImageVtkGlyphMapper3D.cpp
-  Rendering/vtkOdfSource.cxx
-  Rendering/vtkThickPlane.cxx
   Rendering/mitkOdfNormalizationMethodProperty.cpp
   Rendering/mitkOdfScaleByProperty.cpp
   Rendering/mitkCompositeMapper.cpp
+  Rendering/mitkOdfGlyphGenerator.cpp
+  Rendering/mitkOdfVtkMapper2D.cpp
   Rendering/mitkPeakImageMapper2D.cpp
   Rendering/mitkPeakImageMapper3D.cpp
 
   # Algorithms
-  
+  Algorithms/mitkLbfgsbMutex.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.cpp
@@ -47,6 +47,7 @@ set(H_FILES
   mitkDiffusionModellingHelperFunctions.h
 
   # DataStructures
+  IO/mitkRgbCachedImage.h
   IO/mitkOdfImage.h
   IO/mitkShImage.h
   IO/mitkTensorImage.h
@@ -63,10 +64,12 @@ set(H_FILES
   IO/mitkShImageReader.h
   IO/mitkShImageWriter.h
   IO/mitkShImageSerializer.h
-  IO/mitkPeakImageReader.cpp
-  IO/mitkPeakImageSerializer.cpp
+  IO/mitkPeakImageReader.h
+  IO/mitkPeakImageWriter.h
+  IO/mitkPeakImageSerializer.h
 
   # Rendering
+  Rendering/mitkOdfGlyphGenerator.h
   Rendering/mitkOdfVtkMapper2D.h
   Rendering/mitkCompositeMapper.h
   Rendering/mitkPeakImageMapper2D.h
@@ -93,8 +96,13 @@ set(H_FILES
   Algorithms/itkTensorDerivedMeasurementsFilter.h
   Algorithms/itkTensorImageToDiffusionImageFilter.h
   Algorithms/itkTensorToL2NormImageFilter.h
-  Algorithms/itkGaussianInterpolateImageFunction.h
-  
+  Algorithms/itkTensorImageToOdfImageFilter.h
+  Algorithms/itkTensorToRgbImageFilter.h
+  Algorithms/itkOdfToRgbImageFilter.h
+  Algorithms/itkShToRgbImageFilter.h
+  Algorithms/mitkDirectionColor.h
+  Algorithms/mitkImageGeometry4D.h
+  Algorithms/mitkLbfgsbMutex.h
   Algorithms/itkDiffusionTensorPrincipalDirectionImageFilter.h
   Algorithms/itkTensorReconstructionWithEigenvalueCorrectionFilter.h
   Algorithms/itkShCoefficientImageImporter.h

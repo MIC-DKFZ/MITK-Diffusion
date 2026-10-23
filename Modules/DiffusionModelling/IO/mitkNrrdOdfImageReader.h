@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkNrrdOdfImageReader_h
-#define __mitkNrrdOdfImageReader_h
+#ifndef mitkNrrdOdfImageReader_h
+#define mitkNrrdOdfImageReader_h
 
 #include "mitkCommon.h"
 #include "itkVectorContainer.h"
@@ -45,16 +45,10 @@ namespace mitk
     using AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
 
-  protected:
-
-
-  private:
   private:
     NrrdOdfImageReader* Clone() const override;
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
 } //namespace MITK
 
-#endif // __mitkNrrdOdfImageReader_h
+#endif

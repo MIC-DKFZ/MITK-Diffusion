@@ -20,6 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkImageRegionIterator.h>
 
+#include <cmath>
+
 
 namespace itk {
 
@@ -29,30 +31,13 @@ namespace itk {
   }
 
   template <class TPixel>
-      void TensorDerivedMeasurementsFilter<TPixel>::GenerateData()
+      void TensorDerivedMeasurementsFilter<TPixel>::DynamicThreadedGenerateData(const OutputImageRegionType &outputRegionForThread)
   {
-    typename TensorImageType::Pointer tensorImage = static_cast< TensorImageType * >( this->ProcessObject::GetInput(0) );
     typedef ImageRegionConstIterator< TensorImageType > TensorImageIteratorType;
     typedef ImageRegionIterator< OutputImageType > OutputImageIteratorType;
 
-
-    typename OutputImageType::Pointer outputImage =
-        static_cast< OutputImageType * >(this->ProcessObject::GetPrimaryOutput());
-
-    typename TensorImageType::RegionType region = tensorImage->GetLargestPossibleRegion();
-
-
-    outputImage->SetSpacing( tensorImage->GetSpacing() );   // Set the image spacing
-    outputImage->SetOrigin( tensorImage->GetOrigin() );     // Set the image origin
-    outputImage->SetDirection( tensorImage->GetDirection() );  // Set the image direction
-    outputImage->SetRegions( tensorImage->GetLargestPossibleRegion());
-    outputImage->Allocate();
-
-    TensorImageIteratorType tensorIt(tensorImage, tensorImage->GetLargestPossibleRegion());
-    OutputImageIteratorType outputIt(outputImage, outputImage->GetLargestPossibleRegion());
-
-    tensorIt.GoToBegin();
-    outputIt.GoToBegin();
+    TensorImageIteratorType tensorIt(this->GetInput(), outputRegionForThread);
+    OutputImageIteratorType outputIt(this->GetOutput(), outputRegionForThread);
 
     while(!tensorIt.IsAtEnd() && !outputIt.IsAtEnd()){
 
@@ -68,8 +53,13 @@ namespace itk {
         }
       case RA:
         {
-          TPixel diffusionIndex = tensor.GetRelativeAnisotropy();
-          outputIt.Set(diffusionIndex);
+          // Relative anisotropy of Basser & Pierpaoli 1996, std(eigenvalues) / mean(eigenvalues)
+          // = sqrt(3 |D|^2 - tr^2) / tr, from 0 (isotropic) to sqrt(2) (stick). ITK's
+          // GetRelativeAnisotropy() takes the root after dividing by sqrt(3) tr, so its value
+          // depends on the diffusivity unit.
+          const double trace = tensor.GetTrace();
+          const double anisotropy = 3.0 * tensor.GetInnerScalarProduct() - trace * trace;
+          outputIt.Set(trace > 0 && anisotropy > 0 ? std::sqrt(anisotropy) / trace : 0);
           break;
         }
       case AD:
@@ -125,9 +115,8 @@ namespace itk {
         }
       case MD:
         {
-          typename TensorType::EigenValuesArrayType evs;
-          tensor.ComputeEigenValues(evs);
-          outputIt.Set((evs[0]+evs[1]+evs[2])/3.0);
+          // The eigenvalues sum to the trace, which needs no eigen decomposition.
+          outputIt.Set(tensor.GetTrace()/3.0);
           break;
         }
       }
@@ -135,8 +124,6 @@ namespace itk {
       ++tensorIt;
       ++outputIt;
     }
-
-
   }
 
 

@@ -22,7 +22,7 @@ namespace itk
 {
 
   template <class TInputImage, class TOutputImage>
-    class ITK_EXPORT TensorToL2NormImageFilter
+    class TensorToL2NormImageFilter
     : public ImageToImageFilter<TInputImage, TOutputImage>
   {
 
@@ -34,7 +34,7 @@ namespace itk
     typedef SmartPointer<Self> Pointer;
     typedef SmartPointer<const Self> ConstPointer;
 
-    itkTypeMacro (TensorToL2NormImageFilter, ImageToImageFilter);
+    itkOverrideGetNameOfClassMacro(TensorToL2NormImageFilter);
 
     itkStaticConstMacro (ImageDimension, unsigned int,
                          TOutputImage::ImageDimension);
@@ -52,7 +52,7 @@ namespace itk
     TensorToL2NormImageFilter(){
       
     };
-    ~TensorToL2NormImageFilter(){};
+    ~TensorToL2NormImageFilter() override = default;
 
     void PrintSelf (std::ostream& os, Indent indent) const override
     {
@@ -64,8 +64,7 @@ namespace itk
 
 
   private:
-    TensorToL2NormImageFilter (const Self&);
-    void operator=(const Self&);
+    ITK_DISALLOW_COPY_AND_MOVE(TensorToL2NormImageFilter);
 
     };
 

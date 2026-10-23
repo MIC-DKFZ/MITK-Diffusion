@@ -35,14 +35,13 @@ public:
     typedef ProcessObject                           Superclass;
     typedef itk::Image< float, 4 >                  InputImageType;
     typedef Image< Vector< PixelType, (ShOrder*ShOrder + ShOrder + 2)/2 + ShOrder >, 3 > CoefficientImageType;
-    typedef Image< Vector< PixelType, ODF_SAMPLING_SIZE >, 3 > OdfImageType;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(ShCoefficientImageImporter, ProcessObject)
+    itkOverrideGetNameOfClassMacro(ShCoefficientImageImporter)
 
     // input
     itkSetMacro( InputImage, InputImageType::Pointer) ///< sh coefficient image in FSL file format
@@ -54,7 +53,7 @@ public:
 
 protected:
     ShCoefficientImageImporter();
-    ~ShCoefficientImageImporter() override{}
+    ~ShCoefficientImageImporter() override = default;
 
     InputImageType::Pointer                   m_InputImage;
     typename CoefficientImageType::Pointer    m_CoefficientImage; ///< mitk style image containing the SH coefficients
@@ -66,7 +65,7 @@ private:
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkShCoefficientImageImporter.cpp"
+#include "itkShCoefficientImageImporter.txx"
 #endif
 
 #endif //__itkShCoefficientImageImporter_h_

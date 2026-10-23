@@ -26,7 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 
 mitk::NrrdTensorImageWriter::NrrdTensorImageWriter()
-  : AbstractFileWriter(mitk::TensorImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::DTI_MIMETYPE() ), mitk::DiffusionIOMimeTypes::DTI_MIMETYPE_DESCRIPTION() )
+  : AbstractFileWriter(mitk::TensorImage::GetStaticNameOfClass(), CustomMimeType( mitk::DiffusionIOMimeTypes::DTI_MIMETYPE_NAME() ), mitk::DiffusionIOMimeTypes::DTI_MIMETYPE_DESCRIPTION() )
 {
   RegisterService();
 }
@@ -37,23 +37,16 @@ mitk::NrrdTensorImageWriter::NrrdTensorImageWriter(const mitk::NrrdTensorImageWr
 }
 
 
-mitk::NrrdTensorImageWriter::~NrrdTensorImageWriter()
-{}
+mitk::NrrdTensorImageWriter::~NrrdTensorImageWriter() = default;
 
 
 void mitk::NrrdTensorImageWriter::Write()
 {
   InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
   if (input.IsNull() )
-  {
-    MITK_ERROR <<"Sorry, input to NrrdTensorImageWriter is nullptr!";
-    return;
-  }
+    mitkThrow() << "Sorry, input to NrrdTensorImageWriter is nullptr!";
   if ( this->GetOutputLocation().empty() )
-  {
-    MITK_ERROR << "Sorry, filename has not been set!" ;
-    return ;
-  }
+    mitkThrow() << "Sorry, filename has not been set!";
   mitk::LocaleSwitch localeSwitch("C");
 
   itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
@@ -70,14 +63,7 @@ void mitk::NrrdTensorImageWriter::Write()
   nrrdWriter->SetFileName(this->GetOutputLocation().c_str());
   nrrdWriter->UseCompressionOn();
 
-  try
-  {
-    nrrdWriter->Update();
-  }
-  catch (const itk::ExceptionObject& e)
-  {
-    std::cout << e.GetDescription() << std::endl;
-  }
+  nrrdWriter->Update();
 }
 
 mitk::NrrdTensorImageWriter* mitk::NrrdTensorImageWriter::Clone() const
@@ -85,15 +71,3 @@ mitk::NrrdTensorImageWriter* mitk::NrrdTensorImageWriter::Clone() const
   return new NrrdTensorImageWriter(*this);
 }
 
-mitk::IFileWriter::ConfidenceLevel mitk::NrrdTensorImageWriter::GetConfidenceLevel() const
-{
-  InputType::ConstPointer input = dynamic_cast<const InputType*>(this->GetInput());
-  if (input.IsNull() )
-  {
-    return Unsupported;
-  }
-  else
-  {
-    return Supported;
-  }
-}

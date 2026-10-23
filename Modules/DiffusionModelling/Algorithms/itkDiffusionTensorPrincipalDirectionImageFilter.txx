@@ -17,9 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkDiffusionTensorPrincipalDirectionImageFilter_txx
 #define __itkDiffusionTensorPrincipalDirectionImageFilter_txx
 
-#include <time.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "itkDiffusionTensorPrincipalDirectionImageFilter.h"
 #include "itkImageRegionConstIterator.h"
@@ -27,13 +24,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionIterator.h"
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
-#include <boost/timer/progress_display.hpp>
+#include <mitkImageGeometry4D.h>
 
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkCellArray.h>
-#include <vtkPoints.h>
-#include <vtkPolyLine.h>
 
 namespace itk {
 
@@ -57,7 +49,12 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::BeforeThre
   itk::Matrix<double, 3, 3> direction3 = inputImagePointer->GetDirection();
   ImageRegion<3> imageRegion3 = inputImagePointer->GetLargestPossibleRegion();
 
-  if (m_MaskImage.IsNull())
+  // The mask is read with the input's voxel indices.
+  if (m_MaskImage.IsNotNull() && (m_MaskImage->GetLargestPossibleRegion() != imageRegion3 || !m_MaskImage->IsSameImageGeometryAs(inputImagePointer)))
+    itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the tensor image.");
+
+  m_MaskGenerated = m_MaskImage.IsNull();
+  if (m_MaskGenerated)
   {
     m_MaskImage = ItkUcharImgType::New();
     m_MaskImage->SetSpacing( spacing3 );
@@ -68,37 +65,11 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::BeforeThre
     m_MaskImage->FillBuffer(1);
   }
 
-  typename OutputImageType::Pointer outputImage = OutputImageType::New();
-  outputImage->SetSpacing( spacing3 );
-  outputImage->SetOrigin( origin3 );
-  outputImage->SetDirection( direction3 );
-  outputImage->SetRegions( imageRegion3 );
-  outputImage->Allocate();
-  outputImage->FillBuffer(0);
-  this->SetNthOutput(0, outputImage);
-
-
-  itk::Vector<double, 4> spacing4;
-  itk::Point<float, 4> origin4;
-  itk::Matrix<double, 4, 4> direction4;
-  itk::ImageRegion<4> imageRegion4;
-
-  spacing4[0] = spacing3[0]; spacing4[1] = spacing3[1]; spacing4[2] = spacing3[2]; spacing4[3] = 1;
-  origin4[0] = origin3[0]; origin4[1] = origin3[1]; origin4[2] = origin3[2]; origin3[3] = 0;
-  for (int r=0; r<3; r++)
-    for (int c=0; c<3; c++)
-      direction4[r][c] = direction3[r][c];
-  direction4[3][3] = 1;
-  imageRegion4.SetSize(0, imageRegion3.GetSize()[0]);
-  imageRegion4.SetSize(1, imageRegion3.GetSize()[1]);
-  imageRegion4.SetSize(2, imageRegion3.GetSize()[2]);
-  imageRegion4.SetSize(3, 3);
+  // The number of directions is written only for voxels inside the mask with a non-zero tensor.
+  this->GetOutput()->FillBuffer(0);
 
   m_PeakImage = PeakImageType::New();
-  m_PeakImage->SetSpacing( spacing4 );
-  m_PeakImage->SetOrigin( origin4 );
-  m_PeakImage->SetDirection( direction4 );
-  m_PeakImage->SetRegions( imageRegion4 );
+  mitk::CopyGeometryTo4D(inputImagePointer, m_PeakImage, 3);
   m_PeakImage->Allocate();
   m_PeakImage->FillBuffer(0.0);
 }
@@ -107,7 +78,9 @@ template< class TTensorPixelType>
 void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
 ::AfterThreadedGenerateData()
 {
-
+  // A mask generated for this input must not be reused for the next one.
+  if (m_MaskGenerated)
+    m_MaskImage = nullptr;
 }
 
 template< class TTensorPixelType>
@@ -161,6 +134,8 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
         vec.fill(0.0);
       else
       {
+        numDirectionsIterator.Set( 1 );
+
         if (!m_NormalizeVectors)
           vec *= fa;
 
@@ -171,11 +146,6 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
             out[0] = sqrt( vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2] );
             out[1] = atan2( vec[1], vec[0] );
             out[2] = 0.5*itk::Math::pi - atan( vec[2] / sqrt( vec[0] * vec[0] + vec[1] * vec[1] ) );
-
-            if(out[1]>itk::Math::pi)
-            {
-              out[1] = out[1] - itk::Math::pi;
-            }
           }
           else
           {
@@ -196,22 +166,13 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
       m_PeakImage->SetPixel(peakIndex, out[1]);
       peakIndex[3] = 2;
       m_PeakImage->SetPixel(peakIndex, out[2]);
-
-      numDirectionsIterator.Set( 1 );
     }
 
     ++numDirectionsIterator;
     ++tensorIterator;
   }
-
-  std::cout << "One Thread finished extraction" << std::endl;
 }
 
-template< class TTensorPixelType>
-void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
-::PrintSelf(std::ostream& , Indent ) const
-{
-}
 
 }
 #endif

@@ -51,17 +51,17 @@ public:
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(ShToOdfImageFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(ShToOdfImageFilter)
 
     itkSetMacro( Toolkit, mitk::ShImage::SH_CONVENTION)  ///< define SH coefficient convention (depends on toolkit)
     itkGetMacro( Toolkit, mitk::ShImage::SH_CONVENTION)  ///< SH coefficient convention (depends on toolkit)
 
-    void BeforeThreadedGenerateData();
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
+    void BeforeThreadedGenerateData() override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
 protected:
     ShToOdfImageFilter();
-    ~ShToOdfImageFilter(){}
+    ~ShToOdfImageFilter() override = default;
 
     void CalcShBasis();
 
@@ -75,7 +75,7 @@ private:
 }
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkShToOdfImageFilter.cpp"
+#include "itkShToOdfImageFilter.txx"
 #endif
 
 #endif //__itkShToOdfImageFilter_h_

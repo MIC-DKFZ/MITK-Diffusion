@@ -31,7 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 =========================================================================*/
 #ifndef _itk_TensorToL2NormImageFilter_txx_
 #define _itk_TensorToL2NormImageFilter_txx_
-#endif
 
 #include "itkTensorToL2NormImageFilter.h"
 #include <itkImageRegionIterator.h>
@@ -61,9 +60,8 @@ void TensorToL2NormImageFilter<TInputImage, TOutputImage>::DynamicThreadedGenera
 
     if ( !(T[0]==0 && T[1]==0 && T[2]==0 && T[3]==0 && T[4]==0 && T[5]==0) )
     {
-      double sum = T[0]*T[0] + T[3]*T[3] + T[5]*T[5]
-          + T[1]*T[2]*2.0 + T[2]*T[4]*2.0 + T[1]*T[4]*2.0;
-      out = static_cast<OutputPixelType>( std::sqrt( sum ));
+      // Frobenius norm of the symmetric tensor: each off-diagonal element counts twice.
+      out = static_cast<OutputPixelType>( std::sqrt( T.GetInnerScalarProduct() ));
     }
 
     itOut.Set (out);
@@ -76,3 +74,5 @@ void TensorToL2NormImageFilter<TInputImage, TOutputImage>::DynamicThreadedGenera
 
 
 } // end of namespace
+
+#endif

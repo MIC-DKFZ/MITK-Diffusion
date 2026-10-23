@@ -22,7 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk
 {
 /**
-  \brief Serializes mitk::Surface for mitk::SceneIO
+  \brief Serializes mitk::TensorImage for mitk::SceneIO
 */
 class TensorImageSerializer : public BaseDataSerializer
 {
@@ -32,8 +32,8 @@ class TensorImageSerializer : public BaseDataSerializer
     itkCloneMacro(Self)
     std::string Serialize() override;
   protected:
-    TensorImageSerializer();
-    ~TensorImageSerializer() override;
+    TensorImageSerializer() = default;
+    ~TensorImageSerializer() override = default;
 };
 } // namespace
 #endif

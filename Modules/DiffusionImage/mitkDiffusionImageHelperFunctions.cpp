@@ -20,6 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkBox.h>
 #include <itksys/SystemTools.hxx>
 #include <charconv>
+#include <cmath>
+#include <format>
 #include <fstream>
 #include <limits>
 #include <sstream>
@@ -226,10 +228,16 @@ mitk::DiffusionPropertyHelper::MeasurementFrameType mitk::gradients::FslBvecsMea
 
 void mitk::gradients::WriteBvalsBvecs(std::string bvals_file, std::string bvecs_file, GradientDirectionContainerType::ConstPointer gradients, double reference_bval)
 {
+  // The bvecs are normalized, so the b-value is all that is left of the gradient length: it is
+  // written as b_ref |g|^2, rounded to 1e-6 s/mm^2 and in its shortest form ("1000", "999.999",
+  // "162.5"), not as the integer key of the b-value map, which changed b-values by up to 0.5.
   std::ofstream myfile;
   myfile.open (bvals_file.c_str());
   for(unsigned int i=0; i<gradients->Size(); i++)
-    myfile << mitk::BValueMapProperty::GetBValue(gradients->ElementAt(i), reference_bval) << " ";
+  {
+    const double b = reference_bval * gradients->ElementAt(i).squared_magnitude();
+    myfile << std::format("{}", std::round(b * 1e6) / 1e6) << " ";
+  }
   myfile.close();
 
   std::ofstream myfile2;

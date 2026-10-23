@@ -15,10 +15,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef __mitkShImage__h
-#define __mitkShImage__h
+#ifndef mitkShImage_h
+#define mitkShImage_h
 
-#include "mitkImage.h"
+#include "mitkRgbCachedImage.h"
 
 #include <MitkDiffusionModellingExports.h>
 
@@ -28,7 +28,7 @@ namespace mitk
   /**
   * \brief this class encapsulates spherical harmonics coefficients
   */
-  class MITKDIFFUSIONMODELLING_EXPORT ShImage : public Image
+  class MITKDIFFUSIONMODELLING_EXPORT ShImage : public RgbCachedImage
   {
 
   public:
@@ -40,39 +40,33 @@ namespace mitk
 
     typedef itk::Image<float,4 >  ShOnDiskType; // we store the sh images in MRtrix 4D float format and convert on load to 3D multi-component images
 
-    mitkClassMacro( ShImage, Image )
+    mitkClassMacro( ShImage, RgbCachedImage )
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
+    mitkCloneMacro(Self)
 
-    virtual const vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0) const;
-    virtual vtkImageData* GetNonRgbVtkImageData(int t = 0, int n = 0);
-
-    const vtkImageData* GetVtkImageData(int t = 0, int n = 0) const override;
-    vtkImageData* GetVtkImageData(int t = 0, int n = 0) override;
-
-    virtual void ConstructRgbImage() const;
-
-    unsigned int ShOrder();
-    unsigned int NumCoefficients();
+    /** SH order of the coefficients; throws if their number belongs to no even order. */
+    unsigned int ShOrder() const;
+    unsigned int NumCoefficients() const;
 
     SH_CONVENTION GetShConvention() const;
     void SetShConvention(SH_CONVENTION ShConvention);
 
   protected:
     ShImage();
+    ShImage(const ShImage& other);
     ~ShImage() override;
 
+    Image::Pointer CreateRgbImage() const override;
+
     template<int num_components>
-    void Construct() const;
+    Image::Pointer Construct() const;
 
     void  PrintSelf(std::ostream &os, itk::Indent indent) const override;
 
-    mutable mitk::Image::Pointer m_RgbImage;
-    unsigned int m_ShOrder;
-    unsigned int m_NumCoefficients;
     SH_CONVENTION m_ShConvention;  // use mrtrix style SH convention
   };
 
 } // namespace mitk
 
-#endif /* __mitkShImage__h */
+#endif

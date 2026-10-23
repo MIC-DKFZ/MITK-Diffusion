@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _MITK_NRRDDTI_WRITER__H_
-#define _MITK_NRRDDTI_WRITER__H_
+#ifndef mitkNrrdTensorImageWriter_h
+#define mitkNrrdTensorImageWriter_h
 
 #include <mitkAbstractFileWriter.h>
 #include <mitkTensorImage.h>
@@ -25,7 +25,7 @@ namespace mitk
 {
 
 /**
- * Writes diffusion volumes to a file
+ * Writes tensor images to NRRD files (.dti)
  * @ingroup Process
  */
 class NrrdTensorImageWriter : public mitk::AbstractFileWriter
@@ -40,7 +40,6 @@ public:
     using AbstractFileWriter::Write;
     void Write() override;
 
-    ConfidenceLevel GetConfidenceLevel() const override;
 
 protected:
 
@@ -51,4 +50,4 @@ protected:
 
 } // end of namespace mitk
 
-#endif //_MITK_NRRDDTI_WRITER__H_
+#endif
