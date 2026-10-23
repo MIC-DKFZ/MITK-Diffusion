@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
 
   parser.beginGroup("1. Mandatory arguments:");
   parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input:", "input image (multiple possible for 'DetTensor' algorithm)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output fiberbundle/probability map", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram (.fib, .vtk, .trk) or probability map (.nii, .nii.gz, .nrrd)", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("type", "", mitkCommandLineParser::String, "Type:", "which tracker to use (Peaks; Tensor; ODF; ODF-DIPY/FSL; RF)", us::Any(), false);
   parser.addArgument("probabilistic", "", mitkCommandLineParser::Bool, "Probabilistic:", "Probabilistic tractography", us::Any(false));
   parser.endGroup();
@@ -125,7 +125,8 @@ int main(int argc, char* argv[])
   parser.addArgument("flip_z", "", mitkCommandLineParser::Bool, "Flip Z:", "multiply z-coordinate of direction proposal by -1");
   parser.addArgument("no_data_interpolation", "", mitkCommandLineParser::Bool, "Don't interpolate input data:", "don't interpolate input image values");
   parser.addArgument("no_mask_interpolation", "", mitkCommandLineParser::Bool, "Don't interpolate masks:", "don't interpolate mask image values");
-  parser.addArgument("compress", "", mitkCommandLineParser::Bool, "Compress:", "compress output fibers (lossy)");
+  parser.addArgument("compress", "", mitkCommandLineParser::Bool, "Compress:", "compress output fibers (lossy, on by default)");
+  parser.addArgument("no_compress", "", mitkCommandLineParser::Bool, "Don't compress:", "write the output fibers without (lossy) compression");
   parser.addArgument("fix_seed", "", mitkCommandLineParser::Bool, "Fix Random Seed:", "always use the same random numbers");
   parser.addArgument("parameter_file", "", mitkCommandLineParser::String, "Parameter File:", "load parameters from json file (svae using MITK Diffusion GUI). the parameters loaded form this file are overwritten by the manually set parameters.", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.endGroup();
@@ -203,6 +204,8 @@ int main(int argc, char* argv[])
 
   if (parsedArgs.count("compress"))
     params->m_CompressFibers = us::any_cast<bool>(parsedArgs["compress"]);
+  if (parsedArgs.count("no_compress"))
+    params->m_CompressFibers = !us::any_cast<bool>(parsedArgs["no_compress"]);
 
   if (parsedArgs.count("min_tract_length"))
     params->m_MinTractLengthMm = us::any_cast<float>(parsedArgs["min_tract_length"]);
@@ -296,10 +299,15 @@ int main(int argc, char* argv[])
     params->m_MaxNumFibers = us::any_cast<int>(parsedArgs["max_tracts"]);
 
 
-  std::string ext = itksys::SystemTools::GetFilenameExtension(outFile);
-  if (ext != ".fib" && ext != ".trk")
+  // Only the last extension counts, so that names may contain dots; .nii.gz is the one double extension.
+  std::string ext = itksys::SystemTools::LowerCase(itksys::SystemTools::GetFilenameLastExtension(outFile));
+  if (ext == ".gz" && itksys::SystemTools::LowerCase(itksys::SystemTools::GetFilenameWithoutLastExtension(outFile)).ends_with(".nii"))
+    ext = ".nii.gz";
+  const bool fiberOutput = ext == ".fib" || ext == ".vtk" || ext == ".trk";  // the FiberBundle writers
+  const bool imageOutput = ext == ".nii" || ext == ".nii.gz" || ext == ".nrrd";
+  if (!fiberOutput && !imageOutput)
   {
-    MITK_INFO << "Output file format not supported. Use one of .fib, .trk, .nii, .nii.gz, .nrrd";
+    MITK_ERROR << "Output file format not supported. Use one of .fib, .vtk, .trk (tractogram) or .nii, .nii.gz, .nrrd (probability map).";
     return EXIT_FAILURE;
   }
 
@@ -514,12 +522,11 @@ int main(int argc, char* argv[])
   tracker->SetTargetRegions(target);
   tracker->SetExclusionRegions(exclusion);
   tracker->SetTrackingHandler(handler);
-  if (ext != ".fib" && ext != ".trk")
-    params->m_OutputProbMap = true;
+  params->m_OutputProbMap = imageOutput;
   tracker->SetParameters(params);
   tracker->Update();
 
-  if (ext == ".fib" || ext == ".trk")
+  if (fiberOutput)
   {
 
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
@@ -548,9 +555,6 @@ int main(int argc, char* argv[])
     mitk::Image::Pointer img = mitk::Image::New();
     img->InitializeByItk(outImg.GetPointer());
     img->SetVolume(outImg->GetBufferPointer());
-
-    if (ext != ".nii" && ext != ".nii.gz" && ext != ".nrrd")
-      outFile += ".nii.gz";
 
     mitk::IOUtil::Save(img, outFile);
   }
