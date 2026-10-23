@@ -194,7 +194,7 @@ public:
   /** Normalization performed on the reconstructed ODF according
   * to method set in m_NormalizationMethod
   */
-  OdfPixelType Normalize(OdfPixelType odf, typename NumericTraits<ReferencePixelType>::AccumulateType b0 );
+  OdfPixelType Normalize(OdfPixelType odf, double b0 );
 
   /** Normalization performed on diffusion signal vector according
   * to method set in m_NormalizationMethod

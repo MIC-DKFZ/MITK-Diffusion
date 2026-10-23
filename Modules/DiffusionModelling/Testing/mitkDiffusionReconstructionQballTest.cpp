@@ -38,6 +38,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(SolidAngle_SecondUpdate_SameResult);
   MITK_TEST(SingleShellFilters_DefaultNormalization_IsStandard);
   MITK_TEST(Numerical_Standard_HasUnitNorm);
+  MITK_TEST(SingleShellFilters_B0Mean_NotTruncated);
   MITK_TEST(SingleShellFilters_TwoShells_Throw);
   MITK_TEST(SingleShellFilters_NearZeroBValue_ThrowWithRoundingHint);
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
@@ -285,6 +286,27 @@ public:
     itk::ImageRegionConstIterator<NumericalFilterType::OutputImageType> it(filter->GetOutput(), filter->GetOutput()->GetLargestPossibleRegion());
     for (; !it.IsAtEnd(); ++it)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, it.Get().GetNorm(), 1e-5);
+  }
+
+  // The mean of several b0 volumes was an integer division, so b0 = 1000 and 1001 gave 1000.
+  void SingleShellFilters_B0Mean_NotTruncated()
+  {
+    auto gradients = Shells({1000});
+    gradients.insert(gradients.begin(), vnl_vector_fixed<double, 3>(0.0));
+    auto dwi = Simulate(gradients);
+    itk::VariableLengthVector<short> pixel(gradients.size());
+    for (unsigned int i = 0; i < gradients.size(); ++i)
+      pixel[i] = dwi.image->GetPixel({{0, 0, 0}})[i];
+    pixel[0] = 1001;
+    dwi.image->FillBuffer(pixel);
+
+    auto numerical = Numerical(dwi);
+    numerical->Update();
+    CPPUNIT_ASSERT_EQUAL(1000.5f, numerical->GetBZeroImage()->GetPixel({{1, 1, 1}}));
+
+    auto analytical = Analytical(dwi);
+    analytical->Update();
+    CPPUNIT_ASSERT_EQUAL(1000.5f, analytical->GetBZeroImage()->GetPixel({{1, 1, 1}}));
   }
 
   // The single-shell filters normalized every gradient and used one b-value, so a second shell was

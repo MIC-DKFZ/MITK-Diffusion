@@ -177,8 +177,8 @@ public:
 
     static void tofile2(vnl_matrix<float> *A, std::string fname);
 
-    OdfPixelType Normalize(OdfPixelType odf, typename NumericTraits<ReferencePixelType>::AccumulateType b0 );
-    vnl_vector<TOdfPixelType> PreNormalize( vnl_vector<TOdfPixelType> vec, typename NumericTraits<ReferencePixelType>::AccumulateType b0  );
+    OdfPixelType Normalize(OdfPixelType odf, double b0 );
+    vnl_vector<TOdfPixelType> PreNormalize( vnl_vector<TOdfPixelType> vec, double b0 );
 
     /** Threshold on the reference image data. The output ODF will be a null
    * pdf for pixels in the reference image that have a value less than this

@@ -63,7 +63,7 @@ template<
     int ShOrder,
     int NrOdfDirections>
 typename itk::AnalyticalDiffusionQballReconstructionImageFilter< TReferenceImagePixelType,TGradientImagePixelType,TOdfPixelType, ShOrder,NrOdfDirections>::OdfPixelType
-itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, ShOrder, NrOdfDirections>::Normalize( OdfPixelType odf, typename NumericTraits<ReferencePixelType>::AccumulateType b0 )
+itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, ShOrder, NrOdfDirections>::Normalize( OdfPixelType odf, double b0 )
 {
   switch( m_NormalizationMethod )
   {
@@ -138,7 +138,7 @@ template<
     class TOdfPixelType,
     int ShOrder,
     int NrOdfDirections>
-vnl_vector<TOdfPixelType> itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, ShOrder, NrOdfDirections>::PreNormalize( vnl_vector<TOdfPixelType> vec, typename NumericTraits<ReferencePixelType>::AccumulateType b0 )
+vnl_vector<TOdfPixelType> itk::AnalyticalDiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, ShOrder, NrOdfDirections>::PreNormalize( vnl_vector<TOdfPixelType> vec, double b0 )
 {
   switch( m_NormalizationMethod )
   {
@@ -305,9 +305,9 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
   {
     GradientVectorType b = git.Get();
 
-    typename NumericTraits<ReferencePixelType>::AccumulateType b0 = NumericTraits<ReferencePixelType>::Zero;
-
-    // Average the baseline image pixels
+    // Average the baseline image pixels, in double so that the mean of several b0 volumes is not
+    // truncated (it normalizes the signal, E = S/b0, and is the b0 output)
+    double b0 = 0;
     for(unsigned int i = 0; i < baselineind.size(); ++i)
     {
       b0 += b[baselineind[i]];
@@ -359,7 +359,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
     }
 
     oit.Set( odf );
-    oit2.Set( b0 );
+    oit2.Set( static_cast<BZeroPixelType>(b0) );
     float sum = 0;
     for (unsigned int k=0; k<odf.Size(); k++)
       sum += (float) odf[k];

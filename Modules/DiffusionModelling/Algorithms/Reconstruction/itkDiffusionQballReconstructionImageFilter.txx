@@ -88,7 +88,7 @@ namespace itk {
     int NrOdfDirections,
     int NrBasisFunctionCenters>
     typename itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::OdfPixelType
-    itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::Normalize( OdfPixelType odf, typename NumericTraits<ReferencePixelType>::AccumulateType b0 )
+    itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::Normalize( OdfPixelType odf, double b0 )
   {
     switch( m_NormalizationMethod )
     {
@@ -212,8 +212,9 @@ namespace itk {
       // current vector of diffusion measurements
       GradientVectorType b = git.Get();
 
-      // average of current b-zero reference values
-      typename NumericTraits<ReferencePixelType>::AccumulateType b0 = NumericTraits<ReferencePixelType>::Zero;
+      // average of current b-zero reference values, in double so that the mean of several b0
+      // volumes is not truncated (it normalizes the signal and is the b0 output)
+      double b0 = 0;
       for(unsigned int i = 0; i < baselineind.size(); ++i)
       {
         b0 += b[baselineind[i]];
@@ -249,7 +250,7 @@ namespace itk {
       // set and increment output iterators
       oit.Set( odf );
       ++oit;
-      oit2.Set( b0 );
+      oit2.Set( static_cast<BZeroPixelType>(b0) );
       ++oit2;
       ++git; // Gradient  image iterator
     }
