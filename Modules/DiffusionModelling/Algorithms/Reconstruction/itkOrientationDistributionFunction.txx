@@ -438,11 +438,13 @@ InitFromEllipsoid( itk::DiffusionTensor3D<T> tensor )
       assert( (*this)[i] <= (scaling*max_ev + eps*kappa*6.0) ); // biggest eigenvalue.
     }
 #endif
-    if ( (*this)[i] < T(0) || (*this)[i] > T(1) || std::isnan((*this)[i]) ) // P∈[0;1] sanity check.
-    { // C: NaN != NaN, C++11: isnan((*this)[i]).
+    // The radius lies between the smallest and the largest eigenvalue, which exceed 1 for tensors
+    // not given in mm^2/s; only negative and NaN radii are invalid.
+    if ( (*this)[i] < T(0) || std::isnan((*this)[i]) )
+    {
       MITK_DEBUG << "OrientationDistributionFunction<" << typeid(T).name() << ", " << NOdfDirections
                  << ">::InitFromEllipsoid(" << typeid(tensor).name()
-                 << ") encountered a probability value out of range [0;1] and set it to zero: (*this)["
+                 << ") encountered a negative or NaN radius and set it to zero: (*this)["
                  << i <<"]= " << (*this)[i];
       (*this)[i] = T(0);
     }

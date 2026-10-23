@@ -28,6 +28,7 @@ class mitkDiffusionReconstructionOdfTestSuite : public mitk::TestFixture
   MITK_TEST(PrincipleCurvature_DependsOnAngles);
   MITK_TEST(Normalizations_ConstantOdf_StayFinite);
   MITK_TEST(AssignScalar_FillsAll);
+  MITK_TEST(Ellipsoid_EigenvaluesAboveOne_KeepRadii);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
@@ -144,6 +145,18 @@ public:
     odf = 0.25f;
     for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
       CPPUNIT_ASSERT_EQUAL(0.25f, odf[i]);
+  }
+
+  // Every radius above 1 was set to zero, so tensors not given in mm^2/s gave empty glyphs.
+  void Ellipsoid_EigenvaluesAboveOne_KeepRadii()
+  {
+    OdfType small;
+    small.InitFromEllipsoid(Tensor(1, 0.3, 0.1));
+    OdfType large;
+    large.InitFromEllipsoid(Tensor(1, 0.3, 0.1, 1000));
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1000 * small[i], large[i], 1e-3 * large[i]);
+    CPPUNIT_ASSERT(large.GetMaxValue() > 1);
   }
 };
 
