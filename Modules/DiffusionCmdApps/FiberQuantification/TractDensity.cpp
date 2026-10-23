@@ -45,6 +45,38 @@ mitk::FiberBundle::Pointer LoadFib(std::string filename)
   return fib;
 }
 
+/**
+ * Empty image with the 3D grid of the reference image (as mitk::ImageToItk derives it). The
+ * filters only need the grid; casting the whole reference failed for other pixel types, e.g.
+ * the gradient vectors of a diffusion-weighted image.
+ */
+template <class TImage>
+typename TImage::Pointer ReferenceGrid(const mitk::Image* reference)
+{
+  const mitk::BaseGeometry* geometry = reference->GetGeometry();
+  const auto& matrix = geometry->GetIndexToWorldTransform()->GetMatrix();
+  typename TImage::SpacingType spacing;
+  typename TImage::PointType origin;
+  typename TImage::DirectionType direction;
+  typename TImage::SizeType size;
+  for (unsigned int i=0; i<3; ++i)
+  {
+    spacing[i] = geometry->GetSpacing()[i];
+    origin[i] = geometry->GetOrigin()[i];
+    size[i] = reference->GetDimension(i);
+  }
+  for (unsigned int i=0; i<3; ++i)
+    for (unsigned int j=0; j<3; ++j)
+      direction[i][j] = matrix[i][j] / spacing[j];
+
+  auto image = TImage::New();
+  image->SetSpacing(spacing);
+  image->SetOrigin(origin);
+  image->SetDirection(direction);
+  image->SetRegions(size);
+  return image;
+}
+
 /*!
 \brief Modify input tractogram: fiber resampling, compression, pruning and transformation.
 */
@@ -116,11 +148,8 @@ int main(int argc, char* argv[])
 
       if (ref_img.IsNotNull())
       {
-        OutImageType::Pointer itkImage = OutImageType::New();
-        CastToItkImage(ref_img, itkImage);
-        generator->SetInputImage(itkImage);
+        generator->SetInputImage(ReferenceGrid<OutImageType>(ref_img));
         generator->SetUseImageGeometry(true);
-
       }
       generator->Update();
 
@@ -146,11 +175,8 @@ int main(int argc, char* argv[])
 
       if (ref_img.IsNotNull())
       {
-        OutImageType::Pointer itkImage = OutImageType::New();
-        CastToItkImage(ref_img, itkImage);
-        generator->SetInputImage(itkImage);
+        generator->SetInputImage(ReferenceGrid<OutImageType>(ref_img));
         generator->SetUseImageGeometry(true);
-
       }
       generator->Update();
 
@@ -176,11 +202,8 @@ int main(int argc, char* argv[])
 
       if (ref_img.IsNotNull())
       {
-        OutImageType::Pointer itkImage = OutImageType::New();
-        CastToItkImage(ref_img, itkImage);
-        generator->SetInputImage(itkImage);
+        generator->SetInputImage(ReferenceGrid<OutImageType>(ref_img));
         generator->SetUseImageGeometry(true);
-
       }
       generator->Update();
 
