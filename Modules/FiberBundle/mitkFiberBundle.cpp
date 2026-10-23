@@ -63,6 +63,14 @@ namespace
       array->SetValue(static_cast<vtkIdType>(i), weights[i]);
     return array;
   }
+
+  /** Bundles derived from another one keep its coordinate convention (the VTK writer saves
+   *  RAS bundles back in RAS) and its TrackVis header (reference geometry for .trk files). */
+  void CopyMetadata(mitk::FiberBundle* source, mitk::FiberBundle* target)
+  {
+    target->SetTrackVisHeader(source->GetTrackVisHeader());
+    target->setIsRAS(source->IsRAS());
+  }
 }
 
 mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
@@ -97,7 +105,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::GetDeepCopy()
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(m_FiberPolyData);
   newFib->SetFiberColors(this->m_FiberColors);
   newFib->SetFiberWeights(this->m_FiberWeights);
-  newFib->SetTrackVisHeader(this->GetTrackVisHeader());
+  CopyMetadata(this, newFib);
   return newFib;
 }
 
@@ -206,6 +214,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundles(std::vector< mitk::Fibe
   // initialize fiber bundle
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(vNewPolyData);
   newFib->SetFiberWeights(weights);
+  CopyMetadata(this, newFib);
   return newFib;
 }
 
@@ -274,6 +283,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundle(mitk::FiberBundle* fib)
   // initialize fiber bundle
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(vNewPolyData);
   newFib->SetFiberWeights(weights);
+  CopyMetadata(this, newFib);
   return newFib;
 }
 
@@ -316,7 +326,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::FilterByWeights(float weight_thr, 
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(vNewPolyData);
   for (unsigned int i=0; i<weights.size(); ++i)
     newFib->SetFiberWeight(i, weights.at(i));
-  newFib->SetTrackVisHeader(this->GetTrackVisHeader());
+  CopyMetadata(this, newFib);
   return newFib;
 }
 
@@ -369,7 +379,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubsampleFibers(float factor, bool
   // initialize fiber bundle
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(vNewPolyData);
   newFib->SetFiberWeights(weights);
-  newFib->SetTrackVisHeader(this->GetTrackVisHeader());
+  CopyMetadata(this, newFib);
   return newFib;
 }
 
@@ -498,7 +508,11 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* 
     newWeights.push_back(this->GetFiberWeight(static_cast<unsigned int>(i)));
   }
   if(vNewLines->GetNumberOfCells()==0)
-    return mitk::FiberBundle::New();
+  {
+    mitk::FiberBundle::Pointer emptyFib = mitk::FiberBundle::New();
+    CopyMetadata(this, emptyFib);
+    return emptyFib;
+  }
   // initialize PolyData
   vNewPolyData->SetPoints(vNewPoints);
   vNewPolyData->SetLines(vNewLines);
@@ -506,6 +520,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(mitk::FiberBundle* 
   // initialize fiber bundle
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(vNewPolyData);
   newFib->SetFiberWeights(ToWeightArray(newWeights));
+  CopyMetadata(this, newFib);
   return newFib;
 }
 
@@ -1234,7 +1249,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgTyp
   if (vtkNewCells->GetNumberOfCells()<=0)
   {
     mitk::FiberBundle::Pointer emptyFib = mitk::FiberBundle::New();
-    emptyFib->SetTrackVisHeader(this->GetTrackVisHeader());
+    CopyMetadata(this, emptyFib);
     return emptyFib;
   }
 
@@ -1262,7 +1277,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(ItkUcharImgTyp
   mitk::FiberBundle::Pointer newFib = mitk::FiberBundle::New(newPolyData);
   newFib->SetFiberWeights(newFiberWeights);
 //  newFib->Compress(0.1);
-  newFib->SetTrackVisHeader(this->GetTrackVisHeader());
+  CopyMetadata(this, newFib);
   return newFib;
 }
 
@@ -1274,12 +1289,16 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::ExtractFiberSubset(DataNode* roi, 
   std::vector<unsigned int> tmp = ExtractFiberIdSubset(roi, storage);
 
   if (tmp.size()<=0)
-    return mitk::FiberBundle::New();
+  {
+    mitk::FiberBundle::Pointer emptyFib = mitk::FiberBundle::New();
+    CopyMetadata(this, emptyFib);
+    return emptyFib;
+  }
   vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
   vtkSmartPointer<vtkPolyData> pTmp = GeneratePolyDataByIds(tmp, weights);
   mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
   fib->SetFiberWeights(weights);
-  fib->SetTrackVisHeader(this->GetTrackVisHeader());
+  CopyMetadata(this, fib);
   return fib;
 }
 

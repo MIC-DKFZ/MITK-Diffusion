@@ -44,6 +44,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(CompressAndSubtract_EightThreads_EqualOneThread);
   MITK_TEST(SubsampleFibers_WithoutRandomSeed_IsReproducible);
   MITK_TEST(ResampleToNumPoints_FibersWithoutLength_Terminate);
+  MITK_TEST(DerivedBundles_KeepRasFlagAndHeader);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -270,6 +271,33 @@ public:
       }
     }
     CPPUNIT_ASSERT_MESSAGE("The line keeps its end points", foundLine);
+  }
+
+  void DerivedBundles_KeepRasFlagAndHeader()
+  {
+    auto source = LoadWeightedFibers();
+    source->setIsRAS(true);
+    auto header = source->GetTrackVisHeader();
+    header.dim[0] = 77;
+    header.voxel_size[0] = 1.25f;
+    source->SetTrackVisHeader(header);
+    auto other = LoadWeightedFibers();
+    auto shortFibers = source->GetDeepCopy();
+    shortFibers->RemoveLongFibers(source->GetMedianFiberLength());
+
+    auto check = [](mitk::FiberBundle *fib, const std::string &operation)
+    {
+      CPPUNIT_ASSERT_MESSAGE(operation + " keeps the RAS flag", fib->IsRAS());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(operation, 77, static_cast<int>(fib->GetTrackVisHeader().dim[0]));
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(operation, 1.25f, fib->GetTrackVisHeader().voxel_size[0]);
+    };
+    check(source->GetDeepCopy(), "GetDeepCopy");
+    check(source->AddBundle(other), "AddBundle");
+    check(source->AddBundles({other}), "AddBundles");
+    check(source->SubtractBundle(shortFibers), "SubtractBundle");
+    check(source->SubtractBundle(source), "SubtractBundle without remaining fibers");
+    check(source->FilterByWeights(1.0f), "FilterByWeights");
+    check(source->SubsampleFibers(0.5f, false), "SubsampleFibers");
   }
 };
 
