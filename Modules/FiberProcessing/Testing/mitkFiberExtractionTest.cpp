@@ -22,7 +22,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <mitkStandaloneDataStorage.h>
 #include <vtkDebugLeaks.h>
-#include <omp.h>
 #include <itkFiberExtractionFilter.h>
 
 /**Documentation
@@ -38,7 +37,6 @@ int mitkFiberExtractionTest(int argc, char* argv[])
   MITK_INFO << "argc: " << argc;
   MITK_TEST_CONDITION_REQUIRED(argc==13,"check for input data");
 
-  omp_set_num_threads(1);
   try{
     mitk::FiberBundle::Pointer groundTruthFibs = mitk::IOUtil::Load<mitk::FiberBundle>(argv[1]);
     mitk::FiberBundle::Pointer testFibs = mitk::IOUtil::Load<mitk::FiberBundle>(argv[2]);
