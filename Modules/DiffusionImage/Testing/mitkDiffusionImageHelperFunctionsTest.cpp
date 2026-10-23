@@ -30,6 +30,7 @@ class mitkDiffusionImageHelperFunctionsTestSuite : public mitk::TestFixture
   MITK_TEST(ReadBvalsBvecs_WrongShape_Throws);
   MITK_TEST(ReadBvalsBvecs_InvalidEntry_Throws);
   MITK_TEST(WriteBvalsBvecs_ReadBack_SameGradients);
+  MITK_TEST(WriteBvalsBvecs_NonIntegerBValues_Kept);
   MITK_TEST(UniqueDirections_ShellsWithSameDirections_CountedOnce);
   MITK_TEST(FslBvecsMeasurementFrame_Determinant_FlipsXOnlyIfPositive);
   MITK_TEST(IntersectImage_Segment_LengthPerVoxel);
@@ -131,6 +132,22 @@ public:
     CPPUNIT_ASSERT_EQUAL(gradients->Size(), read->Size());
     for (unsigned int i = 0; i < gradients->Size(); ++i)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, (gradients->ElementAt(i) - read->ElementAt(i)).two_norm(), 1e-15);
+  }
+
+  // bvals held the integer key of the b-value map: b_ref 650 and gradient (0.5, 0, 0) gave 163.
+  void WriteBvalsBvecs_NonIntegerBValues_Kept()
+  {
+    auto gradients = ContainerType::New();
+    gradients->push_back(Vec(0, 0, 0));
+    gradients->push_back(Vec(0.5, 0, 0));
+    gradients->push_back(Vec(1, 0, 0));
+    gradients->push_back(Vec(0, std::sqrt(999.999 / 650), 0));
+    mitk::gradients::WriteBvalsBvecs(m_TempDir + "/test.bvals", m_TempDir + "/test.bvecs", gradients.GetPointer(), 650);
+
+    std::ifstream bvals(m_TempDir + "/test.bvals");
+    std::string text;
+    std::getline(bvals, text);
+    CPPUNIT_ASSERT_EQUAL(std::string("0 162.5 650 999.999 "), text);
   }
 
   void UniqueDirections_ShellsWithSameDirections_CountedOnce()
