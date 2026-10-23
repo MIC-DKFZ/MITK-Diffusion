@@ -25,6 +25,8 @@ found in the LICENSE file.
 #include <itkOrientationDistributionFunction.h>
 #include <itkOutputWindow.h>
 
+#include <vnl/vnl_rotation_matrix.h>
+
 #include <cmath>
 #include <string>
 #include <vector>
@@ -48,6 +50,9 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(MultiShell_SecondUpdate_SameResult);
   MITK_TEST(MultiShell_DuplicateGradients_Warn);
   MITK_TEST(Standard_ShImageMatchesOdf);
+  MITK_TEST(Analytical_RotatedScheme_GivesRotatedFunction);
+  MITK_TEST(Analytical_HalfSphereScheme_SameAsMirrored);
+  MITK_TEST(MultiShell_RotatedScheme_GivesRotatedFunction);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
@@ -483,6 +488,116 @@ public:
       ++compared;
     }
     CPPUNIT_ASSERT(compared > 100);
+  }
+
+  static const std::vector<AnalyticalFilterType::Normalization> &AnalyticalMethods()
+  {
+    static const std::vector<AnalyticalFilterType::Normalization> methods = {AnalyticalFilterType::QBAR_STANDARD,
+      AnalyticalFilterType::QBAR_SOLID_ANGLE, AnalyticalFilterType::QBAR_ADC_ONLY, AnalyticalFilterType::QBAR_RAW_SIGNAL};
+    return methods;
+  }
+
+  /** The SH coefficients of voxel (0,0,0) of the analytical filter with lambda 0.006. */
+  static vnl_vector<float> AnalyticalCoefficients(const Dwi &dwi, AnalyticalFilterType::Normalization method)
+  {
+    auto filter = Analytical(dwi);
+    filter->SetNormalizationMethod(method);
+    filter->Update();
+    const auto pixel = filter->GetCoefficientImage()->GetPixel({{0, 0, 0}});
+    vnl_vector<float> coefficients(pixel.Size());
+    for (unsigned int i = 0; i < pixel.Size(); ++i)
+      coefficients[i] = pixel[i];
+    return coefficients;
+  }
+
+  /** Largest difference of the SH functions a and b at the directions, relative to the largest |a|. */
+  static double RelativeDifference(const vnl_vector<float> &a, const vnl_vector<float> &b,
+                                   const vnl_matrix_fixed<double, 3, 3> &rotationOfB)
+  {
+    using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
+    double maxDifference = 0;
+    double maxValue = 0;
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+    {
+      const vnl_vector_fixed<double, 3> u = OdfType::GetDirection(i);
+      const double valueA = mitk::sh::GetValue(a, 4, u, true);
+      const double valueB = mitk::sh::GetValue(b, 4, rotationOfB * u, true);
+      maxDifference = std::max(maxDifference, std::fabs(valueA - valueB));
+      maxValue = std::max(maxValue, std::fabs(valueA));
+    }
+    return maxDifference / maxValue;
+  }
+
+  // The Laplace-Beltrami regularization weighted MITK's SH functions with m != 0, whose norm is
+  // 1/sqrt(2), only half: the fitted function depended on the fibre orientation relative to the z
+  // axis. A rotated gradient table with the same signal must give the rotated function.
+  void Analytical_RotatedScheme_GivesRotatedFunction()
+  {
+    const vnl_matrix_fixed<double, 3, 3> rotation = vnl_rotation_matrix(vnl_vector_fixed<double, 3>(0.3, -0.5, 0.6));
+    const auto dwi = Simulate(Shells({1000}));
+    Dwi rotated;
+    rotated.image = dwi.image;
+    rotated.gradients = GradientContainerType::New();
+    for (const auto &g : *dwi.gradients)
+      rotated.gradients->push_back(rotation * g);
+
+    for (auto method : AnalyticalMethods())
+    {
+      const double difference = RelativeDifference(AnalyticalCoefficients(dwi, method), AnalyticalCoefficients(rotated, method), rotation);
+      MITK_INFO << "Method " << method << ": relative difference " << difference;
+      CPPUNIT_ASSERT(difference < 1e-5);
+    }
+  }
+
+  // The multi-shell filter fits with the same Laplace-Beltrami regularization.
+  void MultiShell_RotatedScheme_GivesRotatedFunction()
+  {
+    const vnl_matrix_fixed<double, 3, 3> rotation = vnl_rotation_matrix(vnl_vector_fixed<double, 3>(0.3, -0.5, 0.6));
+    const auto dwi = Simulate(Shells({1000, 2000, 3000}, 3000), 3000);
+    Dwi rotated;
+    rotated.image = dwi.image;
+    rotated.gradients = GradientContainerType::New();
+    for (const auto &g : *dwi.gradients)
+      rotated.gradients->push_back(rotation * g);
+
+    auto coefficients = [](const Dwi &input) {
+      auto filter = MultiShellFilterType::New();
+      filter->SetGradientImage(input.gradients, input.image, 3000);
+      filter->SetLambda(0.006);
+      filter->Update();
+      const auto pixel = filter->GetCoefficientImage()->GetPixel({{0, 0, 0}});
+      vnl_vector<float> result(pixel.Size());
+      for (unsigned int i = 0; i < pixel.Size(); ++i)
+        result[i] = pixel[i];
+      return result;
+    };
+    const double difference = RelativeDifference(coefficients(dwi), coefficients(rotated), rotation);
+    MITK_INFO << "Multi-shell: relative difference " << difference;
+    CPPUNIT_ASSERT(difference < 1e-5);
+  }
+
+  // Half-sphere schemes were fitted with every row twice, which doubled the data term and so halved
+  // the effective lambda. Mirroring directions (g -> -g, the same measurement) must not change the
+  // result.
+  void Analytical_HalfSphereScheme_SameAsMirrored()
+  {
+    auto gradients = Shells({1000});
+    for (unsigned int i = 0; i < Directions(30, true).size(); ++i)
+      gradients[1 + i] = Directions(30, true)[i];
+    const auto halfSphere = Simulate(gradients);
+    Dwi mirrored;
+    mirrored.image = halfSphere.image;
+    mirrored.gradients = GradientContainerType::New();
+    for (unsigned int i = 0; i < gradients.size(); ++i)
+      mirrored.gradients->push_back(i % 2 == 0 ? gradients[i] : -gradients[i]);
+
+    const vnl_matrix_fixed<double, 3, 3> identity(vnl_matrix_fixed<double, 3, 3>().set_identity());
+    for (auto method : AnalyticalMethods())
+    {
+      const double difference = RelativeDifference(AnalyticalCoefficients(halfSphere, method), AnalyticalCoefficients(mirrored, method), identity);
+      MITK_INFO << "Method " << method << ": relative difference " << difference;
+      CPPUNIT_ASSERT(difference < 1e-5);
+    }
   }
 };
 

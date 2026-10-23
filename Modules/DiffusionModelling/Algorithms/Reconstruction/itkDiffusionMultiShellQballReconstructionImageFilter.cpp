@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <limits>
 #include <itkPointShell.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include "mitkShRegularization.h"
 
 namespace itk {
 
@@ -975,9 +976,10 @@ ComputeSphericalHarmonicsBasis(vnl_matrix<double> * QBallReference, vnl_matrix<d
           (*SHBasisOutput)(i,j) = mitk::sh::Yj(m,k,th,phi,true);
         }
 
-        // Laplacian Baltrami Order Association
+        // Laplace-Beltrami penalty, weighted with the norm of MITK's basis functions so that the
+        // regularization is rotation invariant
         if(LaplaciaBaltramiOutput)
-          (*LaplaciaBaltramiOutput)(j,j) = k*k*(k + 1)*(k+1);
+          (*LaplaciaBaltramiOutput)(j,j) = mitk::LaplaceBeltramiPenalty(k, m);
 
         // SHEigenvalues with order Accosiation kj
         if(SHEigenvalues)

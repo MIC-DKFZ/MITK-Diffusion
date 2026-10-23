@@ -59,10 +59,9 @@ namespace itk{
  * be a null pdf for pixels in the reference image that have a value less
  * than this.
  * \li BValue - See the documentation of SetBValue().
- * \li At least 6 gradient images must be specified for the filter to be able
- * to run. If the input gradient directions g_i are majorly sampled on one half
- * of the sqhere, then each input image I_i will be duplicated and assign -g_i
- * in order to guarantee stability of the algorithm.
+ * \li Lambda - weight of the Laplace-Beltrami regularization (Descoteaux 2007).
+ * The regularization is rotation invariant (mitk::LaplaceBeltramiPenalty) and
+ * independent of whether the directions cover one half of the sphere or both.
  * \li OdfDirections - directions of resulting orientation distribution function
  * \li EquatorNrSamplingPoints - number of sampling points on equator when
  * performing Funk Radeon Transform (FRT)
@@ -242,8 +241,7 @@ private:
     unsigned int                                      m_NumberOfGradientDirections;
     /** Number of baseline images */
     unsigned int                                      m_NumberOfBaselineImages;
-    /** Volumes of the baseline and the diffusion-weighted images, set per execution; the
-     * diffusion-weighted ones twice for a duplicated half sphere */
+    /** Volumes of the baseline and the diffusion-weighted images, set per execution */
     std::vector<unsigned int>                         m_BaselineIndices;
     std::vector<unsigned int>                         m_GradientIndices;
     /** Threshold on the reference image data */
@@ -252,7 +250,6 @@ private:
     float                                             m_BValue;
     typename BZeroImageType::Pointer                  m_BZeroImage;
     double                                            m_Lambda;
-    bool                                              m_DirectionsDuplicated;
     Normalization                                     m_NormalizationMethod;
     unsigned int                                      m_NumberCoefficients;
     FloatImageType::Pointer                           m_ODFSumImage;

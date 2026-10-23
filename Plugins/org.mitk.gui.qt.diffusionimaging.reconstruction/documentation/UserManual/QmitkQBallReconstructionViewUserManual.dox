@@ -13,7 +13,7 @@ All methods but Multi-Shell model a single shell: the diffusion-weighted volumes
 
 \imageMacro{qballs1.png,"The q-ball resonstruction view",9.99}
 
-B0 threshold works the same as in tensor reconstruction. The maximum l-level configures the size of the spherical harmonics basis. Larger l-values (e.g. l=8) allow higher levels of detail, lower levels are more stable against noise (e.g. l=4). Lambda is a regularisation parameter. Set it to 0 for no regularisation. lambda = 0.006 has proven to be a stable choice under various settings.
+B0 threshold works the same as in tensor reconstruction. The maximum l-level configures the size of the spherical harmonics basis. Larger l-values (e.g. l=8) allow higher levels of detail, lower levels are more stable against noise (e.g. l=4). Lambda is a regularisation parameter. Set it to 0 for no regularisation. lambda = 0.006 has proven to be a stable choice under various settings. It weights the Laplace-Beltrami regularisation of Descoteaux et al. (2007), which does not depend on the orientation of the fibres or on whether the gradient directions cover half of the sphere or all of it; lambda has the same meaning as the smoothing parameter of dipy's QballModel and CsaOdfModel.
 
 \imageMacro{qballs2.png,"Advanced q-ball reconstruction settings",8.00}
 

@@ -30,6 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <fstream>
 #include <memory>
 #include "itkPointShell.h"
+#include "mitkShRegularization.h"
 #include "mitkSingleShellGradients.h"
 
 namespace itk {
@@ -42,7 +43,6 @@ AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDirection
   m_Threshold(NumericTraits< ReferencePixelType >::NonpositiveMin()),
   m_BValue(-1),
   m_Lambda(0.0),
-  m_DirectionsDuplicated(false),
   m_NormalizationMethod(QBAR_STANDARD),
   m_NumberCoefficients(0),
   m_Delta1(0.001),
@@ -405,15 +405,13 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
 template< class T, class TG, class TO, int ShOrder, int NrOdfDirections>
 void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDirections>::ComputeReconstructionMatrix()
 {
-  // Derived per execution: the half-sphere duplication below doubles the count, which a second
-  // Update() must not double again. b0 volumes are those whose b-value rounds to 0, as in the
-  // b-value map; the model needs one shell.
+  // Derived per execution. b0 volumes are those whose b-value rounds to 0, as in the b-value map;
+  // the model needs one shell.
   const mitk::SingleShellGradients shell = mitk::GetSingleShellGradients(m_GradientDirectionContainer, m_BValue);
   m_BaselineIndices = shell.baselineIndices;
   m_GradientIndices = shell.diffusionWeightedIndices;
   m_NumberOfBaselineImages = m_BaselineIndices.size();
   m_NumberOfGradientDirections = m_GradientIndices.size();
-  m_DirectionsDuplicated = false;
 
   m_NumberCoefficients = (ShOrder*ShOrder + ShOrder + 2)/2 + ShOrder;
   if( m_NumberOfGradientDirections < m_NumberCoefficients )
@@ -441,47 +439,25 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
       if (warning)
         break;
     }
-
-    // handle acquisition schemes where only half of the spherical
-    // shell is sampled by the gradient directions. In this case,
-    // each gradient direction is duplicated in negative direction.
-    vnl_vector<double> centerMass(3);
-    centerMass.fill(0.0);
-    int count = 0;
-    for (const auto &direction : shell.directions)
-    {
-      centerMass += direction.as_vector();
-      count ++;
-    }
-    centerMass /= count;
-    if(centerMass.two_norm() > 0.1)
-    {
-      m_DirectionsDuplicated = true;
-      m_NumberOfGradientDirections *= 2;
-      m_GradientIndices.insert(m_GradientIndices.end(), shell.diffusionWeightedIndices.begin(), shell.diffusionWeightedIndices.end());
-    }
   }
 
-  // Create 3xM matrix Q that contains the gradient vectors in polar coordinates
+  // Create 3xM matrix Q that contains the gradient vectors in polar coordinates. Half-sphere
+  // schemes need no mirrored copies: the even SH basis is antipodally symmetric, and a copy would
+  // only double the data term and so halve the effective lambda.
   vnl_matrix<float> Q(3, m_NumberOfGradientDirections);
+  for (unsigned int i = 0; i < m_NumberOfGradientDirections; ++i)
   {
-    // The even SH basis is antipodally symmetric, so a duplicated direction needs no sign change.
-    unsigned int i = 0;
-    for (unsigned int copy = 0; copy < (m_DirectionsDuplicated ? 2u : 1u); ++copy)
-    {
-      for (const auto &direction : shell.directions)
-      {
-        double cart[3];
-        mitk::gradients::Cart2Sph(direction[0], direction[1], direction[2], cart);
-        Q(0,i) = cart[0];
-        Q(1,i) = cart[1];
-        Q(2,i++) = cart[2];
-      }
-    }
+    const auto &direction = shell.directions[i];
+    double cart[3];
+    mitk::gradients::Cart2Sph(direction[0], direction[1], direction[2], cart);
+    Q(0,i) = cart[0];
+    Q(1,i) = cart[1];
+    Q(2,i) = cart[2];
   }
 
   // Calcualte SH basis B
   vnl_matrix<float> L(m_NumberCoefficients,m_NumberCoefficients, 0);
+  vnl_matrix<float> penalty(m_NumberCoefficients,m_NumberCoefficients, 0);
   vnl_vector<int> lj(m_NumberCoefficients);
   vnl_matrix<float> B(m_NumberOfGradientDirections,m_NumberCoefficients);
   for(unsigned int i=0; i<m_NumberOfGradientDirections; i++)
@@ -492,6 +468,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
       {
         int j = (k*k + k + 2)/2 + m - 1;
         L(j,j) = -k*(k+1);
+        penalty(j,j) = mitk::LaplaceBeltramiPenalty(k, m);
         lj[j] = k;
         B(i,j) = mitk::sh::Yj(m, k, Q(1,i), Q(0,i), true);
       }
@@ -503,7 +480,7 @@ void AnalyticalDiffusionQballReconstructionImageFilter<T,TG,TO,ShOrder,NrOdfDire
     P(i,i) = mitk::sh::legendre0(lj[i]);
 
   vnl_matrix<float> B_transpose(B.transpose());
-  vnl_matrix_inverse<float> pseudoInverse( B_transpose * B + L*L*m_Lambda );
+  vnl_matrix_inverse<float> pseudoInverse( B_transpose * B + penalty*m_Lambda );
   m_CoeffReconstructionMatrix = pseudoInverse.pinverse() * B_transpose;
 
   switch(m_NormalizationMethod)
