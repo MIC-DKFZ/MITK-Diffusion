@@ -48,6 +48,7 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   MITK_TEST(Mapper3D_LinesWithOneColourPerPoint);
   MITK_TEST(Mapper3D_TubesAndRibbonsGiveSurfaces);
   MITK_TEST(Mapper3D_ClippingPlaneFromProperty);
+  MITK_TEST(Mapper3D_ClippingPlaneChange_AppliedWithoutRebuild);
   MITK_TEST(Mapper2D_SlabAroundThePlane);
   MITK_TEST(Rendering_LeavesTheBundleUnchanged);
   CPPUNIT_TEST_SUITE_END();
@@ -192,6 +193,41 @@ public:
     actor = Render3D();
     actor->GetMapper()->GetClippingPlanes()->GetItem(0)->GetNormal(planeNormal);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-1.0, planeNormal[2], 1e-9);
+  }
+
+  // The controls view moves the plane with every slice step and only requests a render: the
+  // plane must be applied without a rebuild of the tubes.
+  void Mapper3D_ClippingPlaneChange_AppliedWithoutRebuild()
+  {
+    m_Node->SetFloatProperty("shape.tuberadius", 0.5f);
+    vtkPolyData *tubes = Input(Render3D());
+    CPPUNIT_ASSERT(tubes->GetNumberOfStrips() + tubes->GetNumberOfPolys() > 0);
+    const auto updateTime3D = m_Fibers->GetUpdateTime3D();
+
+    for (double z : {1.0, 2.0})
+    {
+      mitk::Point3D origin;
+      origin.Fill(z);
+      mitk::Vector3D normal;
+      normal.Fill(0.0);
+      normal[2] = 1.0;
+      m_Node->SetProperty("3DClipping", mitk::ClippingProperty::New(origin, normal));
+      vtkActor *actor = Render3D();
+      CPPUNIT_ASSERT_EQUAL(1, actor->GetMapper()->GetNumberOfClippingPlanes());
+      double planeOrigin[3];
+      actor->GetMapper()->GetClippingPlanes()->GetItem(0)->GetOrigin(planeOrigin);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(z, planeOrigin[2], 1e-9);
+      CPPUNIT_ASSERT_MESSAGE("tubes not rebuilt", Input(actor) == tubes);
+    }
+
+    // a zero normal removes the plane
+    mitk::Point3D origin;
+    origin.Fill(0.0);
+    mitk::Vector3D normal;
+    normal.Fill(0.0);
+    m_Node->SetProperty("3DClipping", mitk::ClippingProperty::New(origin, normal));
+    CPPUNIT_ASSERT_EQUAL(0, Render3D()->GetMapper()->GetNumberOfClippingPlanes());
+    CPPUNIT_ASSERT(updateTime3D == m_Fibers->GetUpdateTime3D());
   }
 
   // The 2D mapper shows the fibers within Fiber2DSliceThickness of the plane: two clipping

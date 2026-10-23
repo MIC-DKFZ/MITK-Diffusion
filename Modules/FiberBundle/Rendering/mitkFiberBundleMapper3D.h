@@ -24,6 +24,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <vtkSmartPointer.h>
 
+#include <array>
+
 class vtkActor;
 class vtkLookupTable;
 class vtkOpenGLPolyDataMapper;
@@ -68,6 +70,9 @@ public:
     itk::TimeStamp m_LastUpdateTime;
     // shape of the last update; each render window builds its own
     ShapeParameters m_Shape;
+    // origin and normal of the clipping plane last applied to m_FiberMapper
+    std::array<double, 6> m_ClippingPlane = {};
+    bool m_ClippingPlaneApplied = false;
     LocalStorage3D();
   };
 
@@ -80,6 +85,8 @@ protected:
   FiberBundleMapper3D();
   ~FiberBundleMapper3D() override = default;
   void InternalGenerateData(mitk::BaseRenderer *renderer, const FiberBundle* fiberBundle, const ShapeParameters& shape);
+  /** Applies the plane of the node's 3DClipping property to the fiber mapper when it changed. */
+  void UpdateClippingPlane(LocalStorage3D* localStorage);
 
 private:
   vtkSmartPointer<vtkLookupTable> m_lut;

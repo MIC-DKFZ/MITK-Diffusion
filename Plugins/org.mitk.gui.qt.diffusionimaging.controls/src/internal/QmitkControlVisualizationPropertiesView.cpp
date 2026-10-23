@@ -677,11 +677,9 @@ void QmitkControlVisualizationPropertiesView::Set3DClippingPlane(mitk::DataNode*
       planeOrigin = renderWindow->GetSelectedPosition();
       planeNormal = planeGeo->GetNormal();
     }
+    // The mappers read the plane at every render (the fiber mapper without rebuilding its tubes);
+    // the callers request the render.
     node->SetProperty( "3DClipping", mitk::ClippingProperty::New( planeOrigin, planeNormal ) );
-    if (auto fib = dynamic_cast<mitk::FiberBundle*>(node->GetData()))
-      fib->RequestUpdate();
-    else
-      mitk::RenderingManager::GetInstance()->RequestUpdateAll();
   }
 }
 

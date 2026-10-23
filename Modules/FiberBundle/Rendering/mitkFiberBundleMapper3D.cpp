@@ -79,6 +79,12 @@ void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *rendere
   localStorage->m_FiberActor->GetProperty()->SetLineWidth(shape.lineWidth);
   localStorage->m_FiberAssembly->AddPart(localStorage->m_FiberActor);
 
+  localStorage->m_Shape = shape;
+  localStorage->m_LastUpdateTime.Modified();
+}
+
+void mitk::FiberBundleMapper3D::UpdateClippingPlane(LocalStorage3D* localStorage)
+{
   DataNode* node = this->GetDataNode();
   mitk::ClippingProperty* prop = dynamic_cast<mitk::ClippingProperty*>(node->GetProperty("3DClipping"));
   if (prop==nullptr)
@@ -95,19 +101,20 @@ void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *rendere
   if (flip)
     plane_normal *= -1;
 
+  const std::array<double, 6> clippingPlane = {plane_origin[0], plane_origin[1], plane_origin[2], plane_normal[0], plane_normal[1], plane_normal[2]};
+  if (localStorage->m_ClippingPlaneApplied && localStorage->m_ClippingPlane==clippingPlane)
+    return;
+
   vtkSmartPointer<vtkPlane> plane = vtkSmartPointer<vtkPlane>::New();
-  double vp[3], vnormal[3];
-  vp[0] = plane_origin[0]; vp[1] = plane_origin[1]; vp[2] = plane_origin[2];
-  vnormal[0] = plane_normal[0]; vnormal[1] = plane_normal[1]; vnormal[2] = plane_normal[2];
-  plane->SetOrigin(vp);
-  plane->SetNormal(vnormal);
+  plane->SetOrigin(clippingPlane[0], clippingPlane[1], clippingPlane[2]);
+  plane->SetNormal(clippingPlane[3], clippingPlane[4], clippingPlane[5]);
 
   localStorage->m_FiberMapper->RemoveAllClippingPlanes();
   if (plane_normal.GetNorm() > 0.0)
     localStorage->m_FiberMapper->AddClippingPlane(plane);
 
-  localStorage->m_Shape = shape;
-  localStorage->m_LastUpdateTime.Modified();
+  localStorage->m_ClippingPlane = clippingPlane;
+  localStorage->m_ClippingPlaneApplied = true;
 }
 
 
@@ -153,13 +160,17 @@ void mitk::FiberBundleMapper3D::GenerateDataForRenderer( mitk::BaseRenderer *ren
   property->SetOpacity(opacity);
 
   // rebuilt for changed fibers and changed shape properties
-  if (localStorage->m_LastUpdateTime>=fiberBundle->GetUpdateTime3D() && localStorage->m_Shape==shape)
-    return;
+  if (localStorage->m_LastUpdateTime<fiberBundle->GetUpdateTime3D() || !(localStorage->m_Shape==shape))
+  {
+    // Calculate time step of the input data for the specified renderer (integer value)
+    // this method is implemented in mitkMapper
+    this->CalculateTimeStep( renderer );
+    this->InternalGenerateData(renderer, fiberBundle, shape);
+  }
 
-  // Calculate time step of the input data for the specified renderer (integer value)
-  // this method is implemented in mitkMapper
-  this->CalculateTimeStep( renderer );
-  this->InternalGenerateData(renderer, fiberBundle, shape);
+  // The clipping plane follows the slice position (the controls view moves it with every slice
+  // step); it is a setting of the VTK mapper and needs no rebuild of the lines, tubes or ribbons.
+  this->UpdateClippingPlane(localStorage);
 }
 
 void mitk::FiberBundleMapper3D::SetDefaultProperties(mitk::DataNode* node, mitk::BaseRenderer* renderer, bool overwrite)
