@@ -26,27 +26,17 @@ found in the LICENSE file.
 
 // Extraction of the fibers that pass planar figure ROIs and their AND/OR/NOT composites.
 
-using mitk::FiberBundleDetail::CopyMetadata;
+using mitk::FiberBundleDetail::FiberPolyDataBuilder;
 
 mitk::FiberBundle::Pointer mitk::FiberBundle::ExtractFiberSubset(DataNode* roi, DataStorage* storage)
 {
   if (roi==nullptr || !(dynamic_cast<PlanarFigure*>(roi->GetData()) || dynamic_cast<PlanarFigureComposite*>(roi->GetData())) )
     mitkThrow() << "Fiber extraction needs a planar figure or a planar figure composite as ROI.";
 
-  std::vector<unsigned int> tmp = ExtractFiberIdSubset(roi, storage);
-
-  if (tmp.size()<=0)
-  {
-    mitk::FiberBundle::Pointer emptyFib = mitk::FiberBundle::New();
-    CopyMetadata(this, emptyFib);
-    return emptyFib;
-  }
-  vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
-  vtkSmartPointer<vtkPolyData> pTmp = GeneratePolyDataByIds(tmp, weights);
-  mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
-  fib->SetFiberWeights(weights);
-  CopyMetadata(this, fib);
-  return fib;
+  FiberPolyDataBuilder builder;
+  for (auto id : ExtractFiberIdSubset(roi, storage))
+    builder.AddFiber(m_FiberPolyData, id, this->GetFiberWeight(id));
+  return builder.CreateBundle(this);
 }
 
 std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(DataNode *roi, DataStorage* storage)

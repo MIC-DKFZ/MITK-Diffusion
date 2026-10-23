@@ -11,35 +11,31 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include "mitkFiberBundle.h"
+#include "mitkFiberPolyDataBuilder.h"
 
 #include <boost/timer/progress_display.hpp>
 #include <vtkCell.h>
-#include <vtkCellArray.h>
 #include <vtkKochanekSpline.h>
 #include <vtkParametricFunctionSource.h>
 #include <vtkParametricSpline.h>
-#include <vtkPolyLine.h>
+
+#include <array>
 
 // Resampling, smoothing and compression of the fibers of mitk::FiberBundle; fiber count and
 // weights stay.
+
+using mitk::FiberBundleDetail::FiberPolyDataBuilder;
 
 void mitk::FiberBundle::ResampleSpline(float pointDistance, double tension, double continuity, double bias )
 {
   if (pointDistance<=0)
     return;
 
-  vtkSmartPointer<vtkPoints> vtkSmoothPoints = vtkSmartPointer<vtkPoints>::New(); //in smoothpoints the interpolated points representing a fiber are stored.
-
-  //in vtkcells all polylines are stored, actually all id's of them are stored
-  vtkSmartPointer<vtkCellArray> vtkSmoothCells = vtkSmartPointer<vtkCellArray>::New(); //cellcontainer for smoothed lines
-
   MITK_INFO << "Smoothing fibers";
-  vtkSmartPointer<vtkFloatArray> newFiberWeights = vtkSmartPointer<vtkFloatArray>::New();
-  newFiberWeights->SetName("FIBER_WEIGHTS");
-  newFiberWeights->SetNumberOfValues(m_NumFibers);
 
-  std::vector< vtkSmartPointer<vtkPolyLine> > resampled_streamlines;
-  resampled_streamlines.resize(m_NumFibers);
+  // Each fiber is sampled on its own and the fibers are assembled in fiber order afterwards,
+  // so that the result does not depend on the number of threads.
+  std::vector< std::vector< std::array<double, 3> > > resampled_streamlines(m_NumFibers);
 
   boost::timer::progress_display disp(m_NumFibers);
 #pragma omp parallel for
@@ -80,32 +76,21 @@ void mitk::FiberBundle::ResampleSpline(float pointDistance, double tension, doub
     functionSource->SetWResolution(sampling);
     functionSource->Update();
 
-    vtkPolyData* outputFunction = functionSource->GetOutput();
-    vtkPoints* tmpSmoothPnts = outputFunction->GetPoints(); //smoothPoints of current fiber
-
-    vtkSmartPointer<vtkPolyLine> smoothLine = vtkSmartPointer<vtkPolyLine>::New();
-
-#pragma omp critical
-    {
-      for (int j=0; j<tmpSmoothPnts->GetNumberOfPoints(); j++)
-      {
-        vtkIdType id = vtkSmoothPoints->InsertNextPoint(tmpSmoothPnts->GetPoint(j));
-        smoothLine->GetPointIds()->InsertNextId(id);
-      }
-
-      resampled_streamlines[static_cast<unsigned long>(i)] = smoothLine;
-    }
+    vtkPoints* tmpSmoothPnts = functionSource->GetOutput()->GetPoints(); //smoothPoints of current fiber
+    auto& smoothLine = resampled_streamlines[static_cast<std::size_t>(i)];
+    smoothLine.resize(static_cast<std::size_t>(tmpSmoothPnts->GetNumberOfPoints()));
+    for (vtkIdType j=0; j<tmpSmoothPnts->GetNumberOfPoints(); j++)
+      tmpSmoothPnts->GetPoint(j, smoothLine[static_cast<std::size_t>(j)].data());
   }
 
-  for (auto container : resampled_streamlines)
+  FiberPolyDataBuilder builder;
+  for (unsigned int i=0; i<m_NumFibers; i++)
   {
-    vtkSmoothCells->InsertNextCell(container);
+    for (const auto& point : resampled_streamlines[i])
+      builder.AddPoint(point.data());
+    builder.EndFiber(this->GetFiberWeight(i));
   }
-
-  m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
-  m_FiberPolyData->SetPoints(vtkSmoothPoints);
-  m_FiberPolyData->SetLines(vtkSmoothCells);
-  this->SetFiberPolyData(m_FiberPolyData, true);
+  builder.ReplaceFibersOf(this);
 }
 
 void mitk::FiberBundle::ResampleSpline(float pointDistance)
@@ -115,15 +100,9 @@ void mitk::FiberBundle::ResampleSpline(float pointDistance)
 
 void mitk::FiberBundle::Compress(float error)
 {
-  vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
-  vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
-
   MITK_INFO << "Compressing fibers with max. error " << error << "mm";
   unsigned int numRemovedPoints = 0;
   boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
-  vtkSmartPointer<vtkFloatArray> newFiberWeights = vtkSmartPointer<vtkFloatArray>::New();
-  newFiberWeights->SetName("FIBER_WEIGHTS");
-  newFiberWeights->SetNumberOfValues(m_NumFibers);
 
   const auto numCells = static_cast<std::size_t>(m_FiberPolyData->GetNumberOfCells());
   std::vector< std::vector< vnl_vector_fixed< double, 3 > > > compressedFibers(numCells);
@@ -223,27 +202,19 @@ void mitk::FiberBundle::Compress(float error)
   }
 
   // Assembled in fiber order, so that the result does not depend on the number of threads.
+  FiberPolyDataBuilder builder;
   for (std::size_t i=0; i<numCells; ++i)
   {
-    vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
     for (const auto& vertex : compressedFibers[i])
-    {
-      vtkIdType id = vtkNewPoints->InsertNextPoint(vertex.data_block());
-      container->GetPointIds()->InsertNextId(id);
-    }
-    newFiberWeights->SetValue(static_cast<vtkIdType>(i), m_FiberWeights->GetValue(static_cast<vtkIdType>(i)));
+      builder.AddPoint(vertex.data_block());
+    builder.EndFiber(m_FiberWeights->GetValue(static_cast<vtkIdType>(i)));
     numRemovedPoints += removedPerFiber[i];
-    vtkNewCells->InsertNextCell(container);
   }
 
-  if (vtkNewCells->GetNumberOfCells()>0)
+  if (builder.GetNumberOfFibers()>0)
   {
     MITK_INFO << "Removed points: " << numRemovedPoints;
-    SetFiberWeights(newFiberWeights);
-    m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
-    m_FiberPolyData->SetPoints(vtkNewPoints);
-    m_FiberPolyData->SetLines(vtkNewCells);
-    this->SetFiberPolyData(m_FiberPolyData, true);
+    builder.ReplaceFibersOf(this);
   }
 }
 
@@ -263,12 +234,7 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
   {
     if (++pass > maxPasses)
       mitkThrow() << "Resampling to " << targetPoints << " points did not converge.";
-    vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
-    vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
-
-    vtkSmartPointer<vtkFloatArray> newFiberWeights = vtkSmartPointer<vtkFloatArray>::New();
-    newFiberWeights->SetName("FIBER_WEIGHTS");
-    newFiberWeights->SetNumberOfValues(m_NumFibers);
+    FiberPolyDataBuilder builder;
 
     unequal_fibs = false;
     MITK_INFO << "Start";
@@ -300,7 +266,6 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
         }
       }
 
-      vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
       vnl_vector_fixed< double, 3 > lastV = vertices.at(0);
 
       // A fiber without length (one point, or all points equal) has no segments to sample;
@@ -308,10 +273,7 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
       if (vertices.size()!=targetPoints && seg_len<=0.0000001)
         vertices.assign(targetPoints, lastV);
 
-      {
-        vtkIdType id = vtkNewPoints->InsertNextPoint(lastV.data_block());
-        container->GetPointIds()->InsertNextId(id);
-      }
+      builder.AddPoint(lastV.data_block());
       for (unsigned int j=1; j<vertices.size(); j++)
       {
         vnl_vector_fixed< double, 3 > vec = vertices.at(j) - lastV;
@@ -348,42 +310,24 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
             j--;
           }
 
-//#pragma omp critical
-          {
-            vtkIdType id = vtkNewPoints->InsertNextPoint(newV.data_block());
-            container->GetPointIds()->InsertNextId(id);
-          }
+          builder.AddPoint(newV.data_block());
           lastV = newV;
         }
         else if ( (j==vertices.size()-1 && new_dist>0.0001) || seg_len<=0.0000001)
         {
-//#pragma omp critical
-          {
-            vtkIdType id = vtkNewPoints->InsertNextPoint(vertices.at(j).data_block());
-            container->GetPointIds()->InsertNextId(id);
-          }
+          builder.AddPoint(vertices.at(j).data_block());
         }
       }
 
-//#pragma omp critical
-      {
-        newFiberWeights->SetValue(vtkNewCells->GetNumberOfCells(), weight);
-        vtkNewCells->InsertNextCell(container);
-        if (container->GetNumberOfPoints()!=targetPoints)
-          unequal_fibs = true;
-      }
+      if (builder.GetNumberOfPendingPoints()!=targetPoints)
+        unequal_fibs = true;
+      builder.EndFiber(weight);
     }
 //    });
 //    MITK_INFO << "Done";
 
-    if (vtkNewCells->GetNumberOfCells()>0)
-    {
-      SetFiberWeights(newFiberWeights);
-      m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
-      m_FiberPolyData->SetPoints(vtkNewPoints);
-      m_FiberPolyData->SetLines(vtkNewCells);
-      this->SetFiberPolyData(m_FiberPolyData, true);
-    }
+    if (builder.GetNumberOfFibers()>0)
+      builder.ReplaceFibersOf(this);
   }
 }
 
@@ -393,17 +337,12 @@ void mitk::FiberBundle::ResampleLinear(double pointDistance)
   if (pointDistance<=0)
     return;
 
-  vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
-  vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
-
   MITK_INFO << "Resampling fibers (linear)";
   boost::timer::progress_display disp(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
-  vtkSmartPointer<vtkFloatArray> newFiberWeights = vtkSmartPointer<vtkFloatArray>::New();
-  newFiberWeights->SetName("FIBER_WEIGHTS");
-  newFiberWeights->SetNumberOfValues(m_NumFibers);
 
-  std::vector< vtkSmartPointer<vtkPolyLine> > resampled_streamlines;
-  resampled_streamlines.resize(static_cast<unsigned long>(m_FiberPolyData->GetNumberOfCells()));
+  // Each fiber is resampled on its own and the fibers are assembled in fiber order afterwards,
+  // so that the result does not depend on the number of threads.
+  std::vector< std::vector< vnl_vector_fixed< double, 3 > > > resampled_streamlines(static_cast<std::size_t>(m_FiberPolyData->GetNumberOfCells()));
 
 #pragma omp parallel for
   for (int i=0; i<static_cast<int>(m_FiberPolyData->GetNumberOfCells()); i++)
@@ -428,14 +367,9 @@ void mitk::FiberBundle::ResampleLinear(double pointDistance)
       }
     }
 
-    vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+    auto& container = resampled_streamlines[static_cast<std::size_t>(i)];
     vnl_vector_fixed< double, 3 > lastV = vertices.at(0);
-
-#pragma omp critical
-    {
-      vtkIdType id = vtkNewPoints->InsertNextPoint(lastV.data_block());
-      container->GetPointIds()->InsertNextId(id);
-    }
+    container.push_back(lastV);
     for (unsigned int j=1; j<vertices.size(); j++)
     {
       vnl_vector_fixed< double, 3 > vec = vertices.at(j) - lastV;
@@ -472,39 +406,24 @@ void mitk::FiberBundle::ResampleLinear(double pointDistance)
           j--;
         }
 
-#pragma omp critical
-        {
-          vtkIdType id = vtkNewPoints->InsertNextPoint(newV.data_block());
-          container->GetPointIds()->InsertNextId(id);
-        }
+        container.push_back(newV);
         lastV = newV;
       }
       else if (j==vertices.size()-1 && new_dist>0.0001)
       {
-#pragma omp critical
-        {
-          vtkIdType id = vtkNewPoints->InsertNextPoint(vertices.at(j).data_block());
-          container->GetPointIds()->InsertNextId(id);
-        }
+        container.push_back(vertices.at(j));
       }
     }
-
-#pragma omp critical
-    {
-      resampled_streamlines[static_cast<unsigned int>(i)] = container;
-    }
   }
 
-  for (auto container : resampled_streamlines)
+  FiberPolyDataBuilder builder;
+  for (std::size_t i=0; i<resampled_streamlines.size(); ++i)
   {
-    vtkNewCells->InsertNextCell(container);
+    for (const auto& point : resampled_streamlines[i])
+      builder.AddPoint(point.data_block());
+    builder.EndFiber(this->GetFiberWeight(static_cast<unsigned int>(i)));
   }
 
-  if (vtkNewCells->GetNumberOfCells()>0)
-  {
-    m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
-    m_FiberPolyData->SetPoints(vtkNewPoints);
-    m_FiberPolyData->SetLines(vtkNewCells);
-    this->SetFiberPolyData(m_FiberPolyData, true);
-  }
+  if (builder.GetNumberOfFibers()>0)
+    builder.ReplaceFibersOf(this);
 }
