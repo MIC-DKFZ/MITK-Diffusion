@@ -427,6 +427,9 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
   }
   m_ImageNode = m_Controls->m_InputImageBox->GetSelectedNode();
 
+  // Both are reset: the input of an earlier run must not take precedence over the current one.
+  m_OdfImage = nullptr;
+  m_TensorImage = nullptr;
   if (dynamic_cast<mitk::OdfImage*>(m_ImageNode->GetData()))
     m_OdfImage = dynamic_cast<mitk::OdfImage*>(m_ImageNode->GetData());
   else if (dynamic_cast<mitk::TensorImage*>(m_ImageNode->GetData()))
