@@ -334,27 +334,14 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
 
 void mitk::FiberBundle::ColorFibersByScalarMap(const mitk::Image* FAimage, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate)
 {
-  // Signed integer images are sampled as int, all others as float. (The type names this was once
-  // compared with also listed the unsigned types, but with a space where ITK writes "unsigned_char",
-  // so unsigned images always took the float path; results stay as they were.)
-  const auto componentType = FAimage->GetPixelType().GetComponentType();
-  if (componentType==itk::IOComponentEnum::CHAR || componentType==itk::IOComponentEnum::SHORT ||
-      componentType==itk::IOComponentEnum::INT || componentType==itk::IOComponentEnum::LONG)
-  {
-    using ImageType = itk::Image<int, 3>;
-    ImageType::Pointer itkImage = ImageType::New();
-    CastToItkImage(FAimage, itkImage);
+  // Every pixel type is sampled as float: an integer interpolator would truncate interpolated
+  // values (a point halfway across a 0/1 mask edge would count as 0). Integer labels below 2^24
+  // are exact in float.
+  using ImageType = itk::Image<float, 3>;
+  ImageType::Pointer itkImage = ImageType::New();
+  CastToItkImage(FAimage, itkImage);
 
-    ColorFibersByScalarMap<int>(itkImage.GetPointer(), opacity, weight_fibers, type, max_cap, interpolate );
-  }
-  else
-  {
-    using ImageType = itk::Image<float, 3>;
-    ImageType::Pointer itkImage = ImageType::New();
-    CastToItkImage(FAimage, itkImage);
-
-    ColorFibersByScalarMap<float>(itkImage.GetPointer(), opacity, weight_fibers, type, max_cap, interpolate );
-  }
+  ColorFibersByScalarMap<float>(itkImage.GetPointer(), opacity, weight_fibers, type, max_cap, interpolate );
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
 }

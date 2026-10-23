@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <mitkFiberBundle.h>
 #include <mitkImage.h>
 #include <mitkIOUtil.h>
+#include <mitkITKImageImport.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkStandaloneDataStorage.h>
 #include <mitkTestFixture.h>
@@ -80,6 +81,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ColorFibersByOrientation_ThreePointFiber_SegmentDirections);
   MITK_TEST(ColorFibersByScalarMap_Mask_ColoursAndWeightsFromTheMask);
   MITK_TEST(TransformFibers_ItkTransform_MovesEveryPoint);
+  MITK_TEST(ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -927,6 +929,42 @@ public:
       inside = inside || fib->GetFiberWeight(i) > 0.0f;
     }
     CPPUNIT_ASSERT(inside);
+  }
+
+  /** A 4x1x1 image with the values 0, 1, 1, 0 along x (voxel i at x = i) */
+  template <typename TPixel>
+  static mitk::Image::Pointer EdgeImage()
+  {
+    using ImageType = itk::Image<TPixel, 3>;
+    typename ImageType::RegionType region;
+    region.SetSize({4, 1, 1});
+    auto image = ImageType::New();
+    image->SetRegions(region);
+    image->Allocate();
+    image->FillBuffer(0);
+    image->SetPixel({1, 0, 0}, 1);
+    image->SetPixel({2, 0, 0}, 1);
+    return mitk::GrabItkImageMemory(image.GetPointer());
+  }
+
+  // C-L16: interpolated values of signed integer images were truncated to int, so a point
+  // halfway across a mask edge counted as 0.
+  void ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat()
+  {
+    auto fromShort = MakeBundle({{{0.5, 0, 0}, {1.0, 0, 0}, {1.5, 0, 0}}});
+    auto fromFloat = fromShort->GetDeepCopy();
+    fromShort->ColorFibersByScalarMap(EdgeImage<short>(), true, true, mitk::LookupTable::JET, 1.0, true);
+    fromFloat->ColorFibersByScalarMap(EdgeImage<float>(), true, true, mitk::LookupTable::JET, 1.0, true);
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL((0.5 + 1.0 + 1.0) / 3, fromFloat->GetFiberWeight(0), 1e-6);
+    CPPUNIT_ASSERT_EQUAL(fromFloat->GetFiberWeight(0), fromShort->GetFiberWeight(0));
+    auto expected = fromFloat->GetFiberColors();
+    auto actual = fromShort->GetFiberColors();
+    CPPUNIT_ASSERT_EQUAL(expected->GetNumberOfValues(), actual->GetNumberOfValues());
+    for (vtkIdType i = 0; i < expected->GetNumberOfValues(); ++i)
+      CPPUNIT_ASSERT_EQUAL(static_cast<int>(expected->GetValue(i)), static_cast<int>(actual->GetValue(i)));
+    // the half-way point is half opaque
+    CPPUNIT_ASSERT_EQUAL(127, static_cast<int>(actual->GetComponent(0, 3)));
   }
 
   void TransformFibers_ItkTransform_MovesEveryPoint()
