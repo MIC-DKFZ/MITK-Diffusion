@@ -189,6 +189,15 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
 
   boost::timer::progress_display disp(static_cast<unsigned long>(num_gradient_volumes)*compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2));
 
+  // The volumes are simulated in parallel, and every voxel vector holds one component per volume
+  // (per coil for the k-space image). GetPixel/SetPixel of an itk::VectorImage copy the whole voxel
+  // vector, so a write-back that way overwrites the components other threads store at the same time
+  // (lost updates, seen as zeros in the output). Each thread therefore writes only its own component.
+  auto component = [](DoubleDwiType* image, const DoubleDwiType::IndexType& index, unsigned int k) -> double&
+  {
+    return image->GetBufferPointer()[image->ComputeOffset(index)*image->GetNumberOfComponentsPerPixel() + k];
+  };
+
 #pragma omp parallel for num_threads(out_threads)
   for (int g=0; g<num_gradient_volumes; g++)
   {
@@ -317,41 +326,23 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
             if (cPix.real()!=0)
               phase = atan( cPix.imag()/cPix.real() );
 
-            DoubleDwiType::PixelType real_pix = m_OutputImagesReal.at(c)->GetPixel(index3D);
-            real_pix[g] = cPix.real();
-            m_OutputImagesReal.at(c)->SetPixel(index3D, real_pix);
-
-            DoubleDwiType::PixelType imag_pix = m_OutputImagesImag.at(c)->GetPixel(index3D);
-            imag_pix[g] = cPix.imag();
-            m_OutputImagesImag.at(c)->SetPixel(index3D, imag_pix);
-
-            DoubleDwiType::PixelType dwiPix = magnitudeDwiImage->GetPixel(index3D);
-            DoubleDwiType::PixelType phasePix = m_PhaseImage->GetPixel(index3D);
+            component(m_OutputImagesReal.at(c), index3D, g) = cPix.real();
+            component(m_OutputImagesImag.at(c), index3D, g) = cPix.imag();
 
             if (m_Parameters.m_SignalGen.m_NumberOfCoils>1)
             {
-              dwiPix[g] += magn*magn;
-              phasePix[g] += phase*phase;
+              component(magnitudeDwiImage, index3D, g) += magn*magn;
+              component(m_PhaseImage, index3D, g) += phase*phase;
             }
             else
             {
-              dwiPix[g] = magn;
-              phasePix[g] = phase;
+              component(magnitudeDwiImage, index3D, g) = magn;
+              component(m_PhaseImage, index3D, g) = phase;
             }
 
-            //#pragma omp critical
-            {
-              magnitudeDwiImage->SetPixel(index3D, dwiPix);
-              m_PhaseImage->SetPixel(index3D, phasePix);
-
-              // k-space image
-              if (g==0)
-              {
-                DoubleDwiType::PixelType kspacePix = m_KspaceImage->GetPixel(index3D);
-                kspacePix[c] = idft->GetKSpaceImage()->GetPixel(index2D);
-                m_KspaceImage->SetPixel(index3D, kspacePix);
-              }
-            }
+            // k-space image
+            if (g==0)
+              component(m_KspaceImage, index3D, c) = idft->GetKSpaceImage()->GetPixel(index2D);
           }
       }
 
@@ -361,17 +352,10 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
           for (int x=0; x<static_cast<int>(magnitudeDwiImage->GetLargestPossibleRegion().GetSize(0)); x++)
           {
             DoubleDwiType::IndexType index3D; index3D[0]=x; index3D[1]=y; index3D[2]=z;
-            DoubleDwiType::PixelType magPix = magnitudeDwiImage->GetPixel(index3D);
-            magPix[g] = sqrt(magPix[g]/m_Parameters.m_SignalGen.m_NumberOfCoils);
-
-            DoubleDwiType::PixelType phasePix = m_PhaseImage->GetPixel(index3D);
-            phasePix[g] = sqrt(phasePix[g]/m_Parameters.m_SignalGen.m_NumberOfCoils);
-
-            //#pragma omp critical
-            {
-              magnitudeDwiImage->SetPixel(index3D, magPix);
-              m_PhaseImage->SetPixel(index3D, phasePix);
-            }
+            double& magnitude = component(magnitudeDwiImage, index3D, g);
+            magnitude = sqrt(magnitude/m_Parameters.m_SignalGen.m_NumberOfCoils);
+            double& phase = component(m_PhaseImage, index3D, g);
+            phase = sqrt(phase/m_Parameters.m_SignalGen.m_NumberOfCoils);
           }
       }
 
