@@ -57,8 +57,6 @@ const std::string QmitkDiffusionDicomImport::VIEW_ID = "org.mitk.views.diffusion
 
 QmitkDiffusionDicomImport::QmitkDiffusionDicomImport(QObject* /*parent*/, const char* /*name*/)
   : m_Controls(nullptr)
-  , m_OutputFolderName("")
-  , m_OutputFolderNameSet(false)
 {
 }
 
@@ -78,7 +76,6 @@ void QmitkDiffusionDicomImport::CreateQtPartControl(QWidget *parent)
     m_Controls->m_DicomLoadAverageDuplicatesCheckbox->setChecked(false);
 
     m_Controls->m_DicomLoadRecursiveCheckbox->setVisible(true);
-    m_Controls->m_OverrideOptionCheckbox->setVisible(false);
     m_Controls->m_SubdirPrefixLineEdit->setVisible(false);
     m_Controls->m_SetPrefixButton->setVisible(false);
     m_Controls->m_ResetPrefixButton->setVisible(false);
@@ -98,8 +95,6 @@ void QmitkDiffusionDicomImport::CreateConnections()
     //connect( m_Controls->m_DicomLoadStartLoadButton, SIGNAL(clicked()), this, SLOT(DicomLoadStartLoad()) );
     connect( m_Controls->m_DicomLoadStartLoadButton, SIGNAL(clicked()), this, SLOT(NewDicomLoadStartLoad()) );
     connect( m_Controls->m_DicomLoadAverageDuplicatesCheckbox, SIGNAL(clicked()), this, SLOT(AverageClicked()) );
-    connect( m_Controls->m_OutputSetButton, SIGNAL(clicked()), this, SLOT(OutputSet()) );
-    connect( m_Controls->m_OutputClearButton, SIGNAL(clicked()), this, SLOT(OutputClear()) );
     connect( m_Controls->m_Remove, SIGNAL(clicked()), this, SLOT(Remove()) );
     connect( m_Controls->m_SetPrefixButton, SIGNAL(clicked()), this, SLOT(SetPrefixButtonPushed()));
     connect( m_Controls->m_ResetPrefixButton, SIGNAL(clicked()), this, SLOT(ResetPrefixButtonPushed()));
@@ -145,34 +140,6 @@ void QmitkDiffusionDicomImport::Remove()
 {
   int i = m_Controls->listWidget->currentRow();
   m_Controls->listWidget->takeItem(i);
-}
-
-void QmitkDiffusionDicomImport::OutputSet()
-{
-  // SELECT FOLDER DIALOG
-  QFileDialog* w = new QFileDialog( m_Parent, QString("Select folders containing DWI data") );
-  w->setFileMode( QFileDialog::Directory );
-
-  // RETRIEVE SELECTION
-  if ( w->exec() != QDialog::Accepted )
-    return;
-
-  m_OutputFolderName = w->selectedFiles()[0];
-  m_OutputFolderNameSet = true;
-  m_Controls->m_OutputLabel->setText(m_OutputFolderName);
-
-  // show file override option checkbox
-  m_Controls->m_OverrideOptionCheckbox->setVisible(true);
-}
-
-void QmitkDiffusionDicomImport::OutputClear()
-{
-  m_OutputFolderName = "";
-  m_OutputFolderNameSet = false;
-  m_Controls->m_OutputLabel->setText("... optional out-folder ...");
-
-  // hide file override option checkbox - no output specified
-  m_Controls->m_OverrideOptionCheckbox->setVisible(false);
 }
 
 void QmitkDiffusionDicomImport::AverageClicked()
@@ -324,7 +291,6 @@ std::string QmitkDiffusionDicomImport::GetMemoryDescription( size_t processSize,
 void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
 {
   itk::TimeProbesCollectorBase clock;
-  bool imageSuccessfullySaved = true;
 
   bool has_prefix = true;
 
@@ -439,6 +405,14 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
       const auto images = mitk::DiffusionDICOMFileReader::LoadDiffusionDicomSeries( complete_list, this->m_Controls->m_SplitMosaicCheckBox->isChecked(), true );
       for( const auto& loaded_image : images )
       {
+        // "Merge duplicate gradients": volumes whose gradients differ by less than the given
+        // precision are averaged, as in the preprocessing view.
+        if (m_Controls->m_DicomLoadAverageDuplicatesCheckbox->isChecked())
+        {
+          mitk::DiffusionPropertyHelper::AverageRedundantGradients(loaded_image, m_Controls->m_Blur->value());
+          mitk::DiffusionPropertyHelper::InitializeImage(loaded_image);
+        }
+
         node = mitk::DataNode::New();
         node->SetData( loaded_image );
         node->SetName( loaded_image->GetProperty("name")->GetValueAsString() );
@@ -450,7 +424,7 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
     Status("Timing information");
     clock.Report();
 
-    if(!m_OutputFolderNameSet && node.IsNotNull())
+    if(node.IsNotNull())
     {
       mitk::BaseData::Pointer basedata = node->GetData();
       if (basedata.IsNotNull())
@@ -478,8 +452,6 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
     return ;
   }
 
-  if (!imageSuccessfullySaved)
-    QMessageBox::warning(nullptr,"WARNING","One or more files could not be saved! The according files where moved to the datastorage.");
   Status(QString("Finished import with memory:"));
 
   PrintMemoryUsage();

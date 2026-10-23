@@ -72,8 +72,6 @@ protected slots:
   void DicomLoadDeleteFolderNames();
   void NewDicomLoadStartLoad() ;
   void AverageClicked();
-  void OutputSet();
-  void OutputClear();
   void Remove();
   void RecursiveSettingsChanged();
   void SetPrefixButtonPushed();
@@ -100,8 +98,6 @@ protected:
 
   QWidget *m_Parent;
 
-  QString m_OutputFolderName;
-  bool m_OutputFolderNameSet;
 
   std::string m_Prefix;
 
