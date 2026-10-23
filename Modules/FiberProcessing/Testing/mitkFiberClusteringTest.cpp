@@ -11,6 +11,7 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <mitkTractClusteringFilter.h>
+#include <mitkClusteringMetricAnatomic.h>
 #include <mitkClusteringMetricEuclideanMean.h>
 #include <mitkClusteringMetricInnerAngles.h>
 #include <mitkClusteringMetricLength.h>
@@ -39,6 +40,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(Metrics_FibersWithFewerThanFourPoints);
   MITK_TEST(Resampling_EqualArcLength);
   MITK_TEST(ScalarMap_SeveralMapsInParallel);
+  MITK_TEST(Anatomic_PointOutsideFirstParcellation);
   CPPUNIT_TEST_SUITE_END();
 
   /** Three fibers along x at y = 0, 0.5, 1 mm and, 40 mm away, two at y = 40, 41 mm, with
@@ -261,6 +263,39 @@ public:
     omp_set_num_threads(previousThreads);
     for (int i = 0; i < numPairs; ++i)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(sequential[i], parallel[i], 1e-3);
+  }
+
+  void Anatomic_PointOutsideFirstParcellation()
+  {
+    // Parcellation A (labels 1, 2) covers [0, 2) mm, parcellation B (labels 5, 6, 7) starts at
+    // 10 mm. Fibers inside B only must be looked up in B's labels, not in A's.
+    using ImageType = itk::Image<short, 3>;
+    const auto createParcellation = [](double origin, unsigned int size, short firstLabel, short numLabels) {
+      auto parc = ImageType::New();
+      ImageType::SizeType imageSize = {{size, size, size}};
+      parc->SetRegions(ImageType::RegionType(imageSize));
+      parc->SetOrigin(itk::Point<double, 3>(origin));
+      parc->Allocate();
+      itk::ImageRegionIteratorWithIndex<ImageType> it(parc, parc->GetLargestPossibleRegion());
+      for (; !it.IsAtEnd(); ++it)
+        it.Set(firstLabel + it.GetIndex()[0] % numLabels);
+      return parc;
+    };
+
+    mitk::ClusteringMetricAnatomic metric;
+    metric.SetParcellations({createParcellation(0, 2, 1, 2), createParcellation(10, 6, 5, 3)});
+
+    vnl_matrix<float> s(3, 12);
+    vnl_matrix<float> t(3, 12);
+    for (unsigned int k = 0; k < 12; ++k)
+    {
+      s.set_column(k, vnl_vector_fixed<float, 3>(10.5f + 0.3f * k, 12, 12).as_vector());
+      t.set_column(k, vnl_vector_fixed<float, 3>(10.5f + 0.3f * k, 12.2f, 12).as_vector());
+    }
+    bool flipped = true;
+    float distance = 0;
+    CPPUNIT_ASSERT_NO_THROW(distance = metric.CalculateDistance(s, t, flipped));
+    CPPUNIT_ASSERT(distance < 9999);
   }
 
   void Clusters_KeepInputWeights()

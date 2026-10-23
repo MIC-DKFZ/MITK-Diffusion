@@ -121,9 +121,11 @@ public:
 
   void GetHistogramAtPoint(itk::Point<float, 3>& itkP, vnl_matrix<float>& hist)
   {
-    int parc_idx = 0;
-    for (auto parc : m_Parcellations)
+    // The label map belongs to the parcellation at the same index, also after a point outside a
+    // parcellation was skipped.
+    for (unsigned int parc_idx=0; parc_idx<m_Parcellations.size(); ++parc_idx)
     {
+      const ItkShortImgType::Pointer& parc = m_Parcellations.at(parc_idx);
       int dir_idx=0;
       itk::Index<3> tmp_idx;
       itk::Index<3> idx;
@@ -160,7 +162,6 @@ public:
               }
             }
           }
-      ++parc_idx;
     }
   }
 
@@ -168,6 +169,7 @@ public:
   {
     m_Parcellations = Parcellations;
     m_NumLabels = 0;
+    m_LabelMaps.clear();
 
     for (auto parc : m_Parcellations)
     {
