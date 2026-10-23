@@ -23,11 +23,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkProcessObject.h>
 #include <itkLinearInterpolateImageFunction.h>
 
+#include <string>
+#include <vector>
+
 namespace itk{
 
 /**
-* \brief Extract streamlines from tractograms using ROI images */
-
+* \brief Extracts streamlines from a tractogram with ROI images. OVERLAP mode: a fiber is positive for
+* the ROI that holds the largest fraction of its length (at least OverlapFraction) in voxels at or
+* above Threshold; it ignores Interpolate and label maps. ENDPOINTS mode: a fiber is positive if
+* both (BothEnds) or one of its end points lie in the ROI (SCALAR_MAP, value at or above Threshold)
+* or in one of the labels (LABEL_MAP). Each Update replaces the outputs.
+*/
 template< class PixelType >
 class FiberExtractionFilter : public ProcessObject
 {
@@ -39,16 +46,17 @@ public:
   };
 
   enum class INPUT {
-    SCALAR_MAP,  ///< In this case, positive means roi image vlaue > threshold
-    LABEL_MAP    ///< In this case, positive means roi image value in labels vector
+    /** positive means ROI image value >= threshold */
+    SCALAR_MAP,
+    /** positive means ROI image value in the labels */
+    LABEL_MAP
   };
 
-  typedef FiberExtractionFilter Self;
-  typedef ProcessObject                   Superclass;
-  typedef SmartPointer< Self >            Pointer;
-  typedef SmartPointer< const Self >      ConstPointer;
-  typedef itk::Image< PixelType , 3>      ItkInputImgType;
-
+  using Self = FiberExtractionFilter;
+  using Superclass = ProcessObject;
+  using Pointer = SmartPointer< Self >;
+  using ConstPointer = SmartPointer< const Self >;
+  using ItkInputImgType = itk::Image< PixelType , 3>;
 
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
@@ -78,35 +86,51 @@ public:
       this->Modified();
     }
   }
-  itkSetMacro( BothEnds, bool )             ///< Both streamline ends need to be inside of the ROI for the streamline to be considered positive
-  itkSetMacro( OverlapFraction, float )     ///< Necessary fraction of streamline points inside the ROI for the streamline to be considered positive
-  itkSetMacro( NoNegatives, bool )          ///< Don't create output tractograms from negative streamlines (save the computation)
-  itkSetMacro( NoPositives, bool )          ///< Don't create output tractograms from positive streamlines (save the computation)
-  itkSetMacro( Interpolate, bool )          ///< Interpolate input ROI image (only relevant for ENDPOINTS mode
-  itkSetMacro( Threshold, float )           ///< Threshold on input ROI image value to determine positives/negatives
-  itkSetMacro( SkipSelfConnections, bool )  ///< Ignore streamlines between two identical labels
-  itkSetMacro( OnlySelfConnections, bool )  ///< Only keep streamlines between two identical labels
-  itkSetMacro( SplitLabels, bool )          ///< Output a separate tractogram for each label-->label tract
-  itkSetMacro( SplitByRoi, bool )           ///< Output a separate tractogram for each ROI image
-  itkSetMacro( MinFibersPerTract, unsigned int )  ///< Discard positives with less fibers
+  /** Both streamline ends need to be inside the ROI for the streamline to be positive. */
+  itkSetMacro( BothEnds, bool )
+  /** Fraction of the streamline length inside the ROI needed for the streamline to be positive */
+  itkSetMacro( OverlapFraction, float )
+  /** No output tractogram of the negative streamlines */
+  itkSetMacro( NoNegatives, bool )
+  /** No output tractograms of the positive streamlines */
+  itkSetMacro( NoPositives, bool )
+  /** Interpolate the ROI image (ENDPOINTS mode only) */
+  itkSetMacro( Interpolate, bool )
+  /** Threshold on the ROI image value for positives (SCALAR_MAP) */
+  itkSetMacro( Threshold, float )
+  /** Ignore streamlines between two identical labels. */
+  itkSetMacro( SkipSelfConnections, bool )
+  /** Only keep streamlines between two identical labels. */
+  itkSetMacro( OnlySelfConnections, bool )
+  /** A separate tractogram for each label-to-label tract */
+  itkSetMacro( SplitLabels, bool )
+  /** A separate tractogram for each ROI image */
+  itkSetMacro( SplitByRoi, bool )
+  /** Positive tracts with fewer fibers are discarded. */
+  itkSetMacro( MinFibersPerTract, unsigned int )
+  /** Start and end labels are pairs: label i of the start labels belongs to label i of the end labels. */
   itkSetMacro( PairedStartEndLabels, bool )
 
+  /** The filter keeps raw pointers: the images must live until Update has run. */
   void SetRoiImages(const std::vector< ItkInputImgType* > &rois);
   void SetRoiImageNames(const std::vector< std::string > roi_names);
   void SetLabels(const std::vector<unsigned short> &Labels);
   void SetStartLabels(const std::vector<unsigned short> &Labels);
   void SetEndLabels(const std::vector<unsigned short> &Labels);
 
-  std::vector<mitk::FiberBundle::Pointer> GetPositives() const; ///< Get positive tracts (filtered by the input ROIs)
-  std::vector<mitk::FiberBundle::Pointer> GetNegatives() const; ///< Get negative tracts (not filtered by the ROIs)
-  std::vector< std::string > GetPositiveLabels() const;  ///< In case of label extraction, this vector contains the labels corresponding to the positive tracts
+  /** Positive tracts (selected by the ROIs) */
+  std::vector<mitk::FiberBundle::Pointer> GetPositives() const;
+  /** Negative tracts (not selected by any ROI) */
+  std::vector<mitk::FiberBundle::Pointer> GetNegatives() const;
+  /** For label extraction and split ROIs, the name of each positive tract */
+  std::vector< std::string > GetPositiveLabels() const;
 
 protected:
 
   void GenerateData() override;
 
   FiberExtractionFilter();
-  ~FiberExtractionFilter() override;
+  ~FiberExtractionFilter() override = default;
 
   mitk::FiberBundle::Pointer CreateFib(const std::vector< unsigned int >& ids);
   void AddPositives(const std::vector< std::vector< unsigned int > >& positive_ids);

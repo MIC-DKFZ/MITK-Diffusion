@@ -22,14 +22,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <MitkFiberProcessingExports.h>
 
 // ITK
-#include <itkProcessObject.h>
+#include <itkImage.h>
 
-// VTK
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkCellArray.h>
-#include <vtkPoints.h>
-#include <vtkPolyLine.h>
+#include <vnl/vnl_matrix.h>
 
 #include <memory>
 #include <vector>
@@ -37,8 +32,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace mitk{
 
 /**
-* \brief    */
-
+* \brief QuickBundles-like fiber clustering (Garyfallidis et al. 2012): fibers resampled to NumPoints
+* points at equal arc length are assigned to the nearest cluster centroid by the mean of the metric
+* distances, coarse to fine over the given distances; clusters closer than the merge threshold are
+* merged. With input centroids, each fiber is assigned to the nearest input centroid instead.
+* Outputs keep the input's fiber weights; results do not depend on the number of threads.
+*/
 class MITKFIBERPROCESSING_EXPORT TractClusteringFilter
 {
 public:
@@ -59,14 +58,16 @@ public:
 
   TractClusteringFilter();
 
-  typedef itk::Image< float, 3 >                              FloatImageType;
-  typedef itk::Image< unsigned char, 3 >                      UcharImageType;
+  using FloatImageType = itk::Image< float, 3 >;
+  using UcharImageType = itk::Image< unsigned char, 3 >;
 
   void Update(){
     this->GenerateData();
   }
 
-  void SetDistances(const std::vector<float> &Distances); ///< Set clustering distances that are traversed recoursively. The distances have to be sorted in an ascending manner. The actual cluster size is determined by the smallest entry in the distance-list (index 0).
+  /** Cluster distances, traversed from the largest to the smallest (sorted ascending); the
+   *  smallest is the cluster size. */
+  void SetDistances(const std::vector<float> &Distances);
 
   std::vector<mitk::FiberBundle::Pointer> GetOutTractograms() const;
   std::vector<mitk::FiberBundle::Pointer> GetOutCentroids() const;

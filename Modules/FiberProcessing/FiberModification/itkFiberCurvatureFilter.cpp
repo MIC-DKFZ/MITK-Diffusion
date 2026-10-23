@@ -17,9 +17,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkDerivedFiberBundle.h>
 
-#include <vtkDoubleArray.h>
-#include <vtkPointData.h>
+#include <vtkCellArray.h>
 #include <vtkFloatArray.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyLine.h>
+#include <vtkSmartPointer.h>
 #include <boost/timer/progress_display.hpp>
 
 namespace itk{
@@ -29,11 +32,6 @@ FiberCurvatureFilter::FiberCurvatureFilter()
     , m_Distance(10.0)
     , m_RemoveFibers(false)
     , m_UseMedian(false)
-{
-
-}
-
-FiberCurvatureFilter::~FiberCurvatureFilter()
 {
 
 }

@@ -37,11 +37,6 @@ namespace itk{
   }
 
   template< class OutputImageType >
-  TractsToFiberEndingsImageFilter< OutputImageType >::~TractsToFiberEndingsImageFilter()
-  {
-  }
-
-  template< class OutputImageType >
   void TractsToFiberEndingsImageFilter< OutputImageType >::GenerateData()
   {
     typename OutputImageType::Pointer outImage = this->GetOutput();
@@ -62,7 +57,7 @@ namespace itk{
     int d = upsampledSize[2];
 
     // set/initialize output
-    OutPixelType* outImageBufferPointer = (OutPixelType*)outImage->GetBufferPointer();
+    OutPixelType* outImageBufferPointer = outImage->GetBufferPointer();
     for (int i=0; i<w*h*d; i++)
       outImageBufferPointer[i] = 0;
 

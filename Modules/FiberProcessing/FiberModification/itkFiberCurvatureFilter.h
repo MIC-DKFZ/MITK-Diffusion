@@ -23,26 +23,23 @@ See LICENSE.txt or http://www.mitk.org for details.
 // ITK
 #include <itkProcessObject.h>
 
-// VTK
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkCellArray.h>
-#include <vtkPoints.h>
-#include <vtkPolyLine.h>
-
 namespace itk{
 
 /**
-* \brief    */
-
+* \brief Removes the strongly curved parts of fibers. At each point, the mean angle between the
+* segment directions within +-Distance/2 mm along the fiber and their mean direction is the
+* deviation; points whose deviation reaches AngularDeviation are removed and the fiber is split
+* there (or, with RemoveFibers, the whole fiber is removed). Pieces keep their fiber's weight;
+* single points are dropped.
+*/
 class MITKFIBERPROCESSING_EXPORT FiberCurvatureFilter : public ProcessObject
 {
 public:
 
-    typedef FiberCurvatureFilter Self;
-    typedef ProcessObject                                       Superclass;
-    typedef SmartPointer< Self >                                Pointer;
-    typedef SmartPointer< const Self >                          ConstPointer;
+    using Self = FiberCurvatureFilter;
+    using Superclass = ProcessObject;
+    using Pointer = SmartPointer< Self >;
+    using ConstPointer = SmartPointer< const Self >;
 
     itkFactorylessNewMacro(Self)
     itkCloneMacro(Self)
@@ -52,9 +49,14 @@ public:
         this->GenerateData();
     }
 
+    /** Length of the window along the fiber in mm */
     itkSetMacro( Distance, double )
+    /** Threshold of the mean angle in degrees */
     itkSetMacro( AngularDeviation, double )
+    /** Remove whole fibers instead of the curved parts */
     itkSetMacro( RemoveFibers, bool )
+    /** The reference direction is the mean of the two segments next to the point instead of the
+     *  mean of all segments in the window (not a median, despite the name). */
     itkSetMacro( UseMedian, bool )
     itkSetConstObjectMacro( InputFiberBundle, mitk::FiberBundle )
     itkGetMacro( OutputFiberBundle, mitk::FiberBundle::Pointer )
@@ -64,7 +66,7 @@ protected:
     void GenerateData() override;
 
     FiberCurvatureFilter();
-    ~FiberCurvatureFilter() override;
+    ~FiberCurvatureFilter() override = default;
 
     mitk::FiberBundle::ConstPointer m_InputFiberBundle;
     mitk::FiberBundle::Pointer m_OutputFiberBundle;

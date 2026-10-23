@@ -2,7 +2,7 @@
 
 The Medical Imaging Interaction Toolkit (MITK)
 
-Coindex[1]right (c) German Cancer Research Center,
+Copyright (c) German Cancer Research Center.
 
 All rights reserved.
 
@@ -40,11 +40,6 @@ TractDensityImageFilter< OutputImageType, RefImageType >::TractDensityImageFilte
   , m_UseImageGeometry(false)
   , m_OutputAbsoluteValues(false)
   , m_MaxDensity(0)
-{
-}
-
-template< class OutputImageType, class RefImageType >
-TractDensityImageFilter< OutputImageType, RefImageType >::~TractDensityImageFilter()
 {
 }
 
@@ -88,7 +83,7 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
   int d = upsampledSize[2];
 
   // set/initialize output
-  OutPixelType* outImageBufferPointer = (OutPixelType*)outImage->GetBufferPointer();
+  OutPixelType* outImageBufferPointer = outImage->GetBufferPointer();
 
   MITK_INFO << "TractDensityImageFilter: starting image generation";
   vtkSmartPointer<vtkPolyData> fiberPolyData = m_FiberBundle->GetFiberPolyData();

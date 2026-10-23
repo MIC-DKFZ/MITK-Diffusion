@@ -38,16 +38,8 @@ TractsToRgbaImageFilter< OutputImageType >::TractsToRgbaImageFilter()
 }
 
 template< class OutputImageType >
-TractsToRgbaImageFilter< OutputImageType >::~TractsToRgbaImageFilter()
-{
-}
-
-template< class OutputImageType >
 void TractsToRgbaImageFilter< OutputImageType >::GenerateData()
 {
-  if(&typeid(OutPixelType) != &typeid(itk::RGBAPixel<unsigned char>))
-    return;
-
   typename OutputImageType::Pointer outImage = this->GetOutput();
 
   // The same grid as the tract density image, so that the derived images share voxels.

@@ -13,59 +13,63 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkTractsToRgbaImageFilter_h__
-#define __itkTractsToRgbaImageFilter_h__
+#ifndef itkTractsToRgbaImageFilter_h
+#define itkTractsToRgbaImageFilter_h
 
 #include <itkImageSource.h>
 #include <itkImage.h>
-#include <itkVectorContainer.h>
 #include <itkRGBAPixel.h>
 #include <mitkFiberBundle.h>
+
+#include <type_traits>
 
 namespace itk{
 
 /**
-* \brief Generates RGBA image from the input fibers where color values are set according to the local fiber directions.   */
-
+* \brief Direction-encoded tract density image: per voxel, the absolute segment directions (RGB) and
+* the fiber length (alpha), weighted by in-voxel length and fiber weight and scaled to 0-255.
+*/
 template< class OutputImageType >
 class TractsToRgbaImageFilter : public ImageSource< OutputImageType >
 {
 
 public:
-  typedef TractsToRgbaImageFilter Self;
-  typedef ProcessObject Superclass;
-  typedef SmartPointer< Self > Pointer;
-  typedef SmartPointer< const Self > ConstPointer;
+  using Self = TractsToRgbaImageFilter;
+  using Superclass = ImageSource< OutputImageType >;
+  using Pointer = SmartPointer< Self >;
+  using ConstPointer = SmartPointer< const Self >;
 
-  typedef typename OutputImageType::PixelType OutPixelType;
-  typedef itk::Image<unsigned char, 3> InputImageType;
+  using OutPixelType = typename OutputImageType::PixelType;
+  using InputImageType = itk::Image<unsigned char, 3>;
+
+  static_assert(std::is_same_v<OutPixelType, itk::RGBAPixel<unsigned char>>, "The output pixel type must be itk::RGBAPixel<unsigned char>.");
 
   itkFactorylessNewMacro(Self)
   itkCloneMacro(Self)
   itkTypeMacro( TractsToRgbaImageFilter, ImageSource )
 
-  /** Upsampling factor **/
+  /** Each voxel of the reference image or the bundle grid is divided into factor^3 voxels. */
   itkSetMacro( UpsamplingFactor, float)
   itkGetMacro( UpsamplingFactor, float)
 
   itkSetConstObjectMacro( FiberBundle, mitk::FiberBundle )
+  /** Reference image; only its grid is used. */
   itkSetMacro( InputImage, typename InputImageType::Pointer)
 
-  /** Use input image geometry to initialize output image **/
+  /** Use the grid of the input image instead of the bundle's bounding box. */
   itkSetMacro( UseImageGeometry, bool)
   itkGetMacro( UseImageGeometry, bool)
 
-
-  void GenerateData();
+  void GenerateData() override;
 
 protected:
 
   TractsToRgbaImageFilter();
-  virtual ~TractsToRgbaImageFilter();
+  ~TractsToRgbaImageFilter() override = default;
 
-  mitk::FiberBundle::ConstPointer        m_FiberBundle;      ///< input fiber bundle
-  float                             m_UpsamplingFactor; ///< use higher resolution for ouput image
-  bool                              m_UseImageGeometry; ///< output image is given other geometry than fiberbundle (input image geometry)
+  mitk::FiberBundle::ConstPointer   m_FiberBundle;
+  float                             m_UpsamplingFactor;
+  bool                              m_UseImageGeometry;
   typename InputImageType::Pointer  m_InputImage;
 };
 
@@ -75,4 +79,4 @@ protected:
 #include "itkTractsToRgbaImageFilter.cpp"
 #endif
 
-#endif // __itkTractsToRgbaImageFilter_h__
+#endif

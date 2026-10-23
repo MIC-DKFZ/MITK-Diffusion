@@ -14,18 +14,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkFiberExtractionFilter_cpp
-#define __itkFiberExtractionFilter_cpp
+#ifndef itkFiberExtractionFilter_cpp
+#define itkFiberExtractionFilter_cpp
 
 #include "itkFiberExtractionFilter.h"
 
 #include <mitkDerivedFiberBundle.h>
 
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionModellingHelperFunctions.h>
-#include <boost/lexical_cast.hpp>
+#include <string>
 
 namespace itk{
 
@@ -49,12 +48,6 @@ FiberExtractionFilter< PixelType >::FiberExtractionFilter()
   , m_PairedStartEndLabels(false)
 {
   m_Interpolator = itk::LinearInterpolateImageFunction< itk::Image< PixelType, 3 >, float >::New();
-}
-
-template< class PixelType >
-FiberExtractionFilter< PixelType >::~FiberExtractionFilter()
-{
-
 }
 
 template< class PixelType >
@@ -98,7 +91,7 @@ void FiberExtractionFilter< PixelType >::AddPositives(const std::vector< std::ve
       if (i<m_RoiImageNames.size())
         name = m_RoiImageNames.at(i);
       else
-        name = "Roi" + boost::lexical_cast<std::string>(i);
+        name = "Roi" + std::to_string(i);
 
       m_Positives.push_back(CreateFib(positive_ids.at(i)));
       m_PositiveLabels.push_back(name);
@@ -388,9 +381,9 @@ void FiberExtractionFilter< PixelType >::ExtractLabels(const mitk::FiberBundle* 
         if (m_SplitLabels)
         {
           if (label1<label2)
-            key = boost::lexical_cast<std::string>(label1) + "-" + boost::lexical_cast<std::string>(label2);
+            key = std::to_string(label1) + "-" + std::to_string(label2);
           else
-            key = boost::lexical_cast<std::string>(label2) + "-" + boost::lexical_cast<std::string>(label1);
+            key = std::to_string(label2) + "-" + std::to_string(label1);
         }
 
         if (m_SplitByRoi)
@@ -398,7 +391,7 @@ void FiberExtractionFilter< PixelType >::ExtractLabels(const mitk::FiberBundle* 
           if (m<m_RoiImageNames.size())
             key = m_RoiImageNames.at(m) + "_" + key;
           else
-            key = "Roi" + boost::lexical_cast<std::string>(m) + "_" + key;
+            key = "Roi" + std::to_string(m) + "_" + key;
         }
 
         // SkipSelfConnections drops fibers between two equal labels, OnlySelfConnections keeps
@@ -484,7 +477,7 @@ void FiberExtractionFilter< PixelType >::GenerateData()
 
 }
 
-#endif // __itkFiberExtractionFilter_cpp
+#endif
 
 
 

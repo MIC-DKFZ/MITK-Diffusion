@@ -17,6 +17,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkDerivedFiberBundle.h>
 
+#include <vtkCell.h>
+#include <vtkCellArray.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyLine.h>
+#include <vtkSmartPointer.h>
+
 #include <algorithm>
 
 namespace mitk{
