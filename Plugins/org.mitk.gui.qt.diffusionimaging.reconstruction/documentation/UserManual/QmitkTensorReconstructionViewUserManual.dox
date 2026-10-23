@@ -7,7 +7,7 @@ The tensor view reconstructs diffusion tensors from a diffusion-weighted image (
 
 Volumes whose b-value rounds to 0 are the baseline volumes; their mean is the non-diffusion weighted signal of a voxel. Voxels whose mean baseline signal is below the "B0 Threshold" are not reconstructed; while the threshold is changed, the excluded voxels are shown as an overlay on the DWI.
 
-The reconstruction runs in the background: the application stays usable, and the buttons of the view are disabled until the result appears as a new node below the DWI (depending on the image size and method, after a few seconds to minutes). The same holds for the images generated from tensors below.
+The reconstruction runs in the background: the application stays usable, and the buttons of the view are disabled until the result appears as a new node below the DWI (depending on the image size and method, after a few seconds to minutes). The same holds for the images generated from tensors below. A running computation cannot be stopped: closing the view lets it run to its end and drops its result, and quitting the application waits until it has ended.
 
 \imageMacro{tensor4.png,"Tensor image after reconstruction",16.00}
 

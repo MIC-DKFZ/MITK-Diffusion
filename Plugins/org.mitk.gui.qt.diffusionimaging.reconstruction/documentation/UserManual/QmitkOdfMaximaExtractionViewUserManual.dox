@@ -11,7 +11,7 @@ For SH images, peaks below the relative threshold (a fraction of the largest pea
 
 An optional mask restricts the extraction to its non-zero voxels; it must have the geometry of the input image.
 
-The extraction runs in the background: the application stays usable, and the start button is disabled until the peak image appears as a new node below the input image.
+The extraction runs in the background: the application stays usable, and the start button is disabled until the peak image appears as a new node below the input image. A running computation cannot be stopped: closing the view lets it run to its end and drops its result, and quitting the application waits until it has ended.
 
 
 */
