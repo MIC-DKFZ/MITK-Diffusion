@@ -53,6 +53,44 @@ namespace mitk
     double referenceBValue,
     double b0Threshold);
 
+  /** \brief Tensor fits of ReconstructTensors. */
+  enum class TensorFit
+  {
+    LinearLeastSquares,  ///< ReconstructTensorsLinearLeastSquares
+    EigenvalueCorrection ///< itk::TensorReconstructionWithEigenvalueCorrectionFilter
+  };
+
+  /**
+   * \brief Diffusion tensors of a DWI.
+   *
+   * \param b0Threshold voxels whose mean b0 is below get the zero tensor.
+   * \param zeroNegativeEigenvalues tensors with a negative eigenvalue are set to zero. The
+   * eigenvalue correction can leave such tensors where it does not succeed.
+   * \throw mitk::Exception if dwi is not a DWI, and the exceptions of the fit.
+   */
+  MITKDIFFUSIONMODELLING_EXPORT TensorImage::Pointer ReconstructTensors(const Image *dwi,
+                                                                        TensorFit fit,
+                                                                        double b0Threshold,
+                                                                        bool zeroNegativeEigenvalues);
+
+  /**
+   * \brief Gradients of a simulated single-shell DWI: the numberOfDirections unit vectors of
+   * mitk::pointshell::Directions, followed by one zero vector for a b0 volume.
+   * \throw mitk::Exception for a number of directions without a table.
+   */
+  MITKDIFFUSIONMODELLING_EXPORT DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer PointShellGradients(
+    unsigned int numberOfDirections);
+
+  /**
+   * \brief The DWI that the tensors give for PointShellGradients(numberOfDirections) at the given
+   * b-value (itk::TensorImageToDiffusionImageFilter). The tensors are world tensors, so the
+   * gradients are world (LPS) vectors: identity measurement frame, image rotation not applied.
+   * \throw mitk::Exception without tensor image or for a number of directions without a table.
+   */
+  MITKDIFFUSIONMODELLING_EXPORT Image::Pointer TensorsToDwi(const TensorImage *tensors,
+                                                            unsigned int numberOfDirections,
+                                                            double bValue);
+
   /** \brief Q-ball reconstruction methods of ReconstructQball. */
   enum class QballMethod
   {

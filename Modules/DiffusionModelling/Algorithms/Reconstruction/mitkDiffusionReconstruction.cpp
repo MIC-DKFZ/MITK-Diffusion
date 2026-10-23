@@ -14,8 +14,13 @@ found in the LICENSE file.
 
 #include <mitkBValueMapProperty.h>
 #include <mitkExceptionMacro.h>
+#include <mitkITKImageImport.h>
+#include <mitkImageCast.h>
+#include <mitkPointShell.h>
 
 #include <itkDiffusionTensor3DReconstructionImageFilter.h>
+#include <itkTensorImageToDiffusionImageFilter.h>
+#include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionIterator.h>
 #include <itkMultiThreaderBase.h>
@@ -167,4 +172,88 @@ mitk::TensorImage::ItkTensorImageType::Pointer mitk::ReconstructTensorsLinearLea
   if (allAtReferenceBValue)
     return FitWithItk(dwi, gradients, isB0, referenceBValue, b0Threshold);
   return FitWithBMatrix(dwi, gradients, isB0, referenceBValue, b0Threshold);
+}
+
+mitk::TensorImage::Pointer mitk::ReconstructTensors(const Image *dwi,
+                                                    TensorFit fit,
+                                                    double b0Threshold,
+                                                    bool zeroNegativeEigenvalues)
+{
+  if (!DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi))
+    mitkThrow() << "The input is not a diffusion-weighted image.";
+
+  DwiType::Pointer itkDwi;
+  CastToItkImage(dwi, itkDwi);
+  const auto gradients = DiffusionPropertyHelper::GetGradientContainer(dwi);
+  const double referenceBValue = DiffusionPropertyHelper::GetReferenceBValue(dwi);
+
+  TensorImageType::Pointer tensors;
+  if (fit == TensorFit::EigenvalueCorrection)
+  {
+    // The filter works on a copy of the DWI, which it smooths where it corrects eigenvalues.
+    auto filter = itk::TensorReconstructionWithEigenvalueCorrectionFilter<short, float>::New();
+    filter->SetBValue(referenceBValue);
+    filter->SetGradientImage(gradients, itkDwi);
+    filter->SetB0Threshold(b0Threshold);
+    filter->Update();
+    tensors = filter->GetOutput();
+  }
+  else
+  {
+    tensors = ReconstructTensorsLinearLeastSquares(itkDwi, gradients, referenceBValue, b0Threshold);
+  }
+
+  if (zeroNegativeEigenvalues)
+  {
+    unsigned int negatives = 0;
+    for (itk::ImageRegionIterator<TensorImageType> it(tensors, tensors->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+    {
+      TensorImageType::PixelType::EigenValuesArrayType eigenvalues;
+      it.Get().ComputeEigenValues(eigenvalues);
+      if (std::any_of(eigenvalues.Begin(), eigenvalues.End(), [](double value) { return value < 0.0; }))
+      {
+        it.Set(TensorImageType::PixelType(0.0));
+        ++negatives;
+      }
+    }
+    MITK_INFO << negatives << " tensors with negative eigenvalues set to zero";
+  }
+
+  auto image = TensorImage::New();
+  GrabItkImageMemory(tensors.GetPointer(), image.GetPointer());
+  DiffusionPropertyHelper::CopyDICOMProperties(dwi, image);
+  return image;
+}
+
+mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer mitk::PointShellGradients(
+  unsigned int numberOfDirections)
+{
+  const auto &directions = pointshell::Directions(numberOfDirections);
+  auto gradients = GradientContainerType::New();
+  for (unsigned int i = 0; i < numberOfDirections; ++i)
+    gradients->push_back(GradientContainerType::Element(directions(0, i), directions(1, i), directions(2, i)));
+  gradients->push_back(GradientContainerType::Element(0.0));
+  return gradients;
+}
+
+mitk::Image::Pointer mitk::TensorsToDwi(const TensorImage *tensors, unsigned int numberOfDirections, double bValue)
+{
+  if (tensors == nullptr)
+    mitkThrow() << "No tensor image.";
+  auto gradients = PointShellGradients(numberOfDirections);
+
+  TensorImageType::Pointer itkTensors;
+  CastToItkImage(tensors, itkTensors);
+  auto filter = itk::TensorImageToDiffusionImageFilter<float, short>::New();
+  filter->SetInput(itkTensors);
+  filter->SetBValue(bValue);
+  filter->SetGradientList(gradients.GetPointer());
+  filter->Update();
+
+  auto image = GrabItkImageMemory(filter->GetOutput());
+  DiffusionPropertyHelper::MeasurementFrameType identity;
+  identity.set_identity();
+  DiffusionPropertyHelper::InitializeImage(image, gradients.GetPointer(), bValue, identity, false);
+  DiffusionPropertyHelper::CopyDICOMProperties(tensors, image);
+  return image;
 }

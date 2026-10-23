@@ -20,9 +20,12 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
+#include <mitkPointShell.h>
+
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
+#include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 
 #include <cmath>
 #include <string>
@@ -42,11 +45,18 @@ class mitkDiffusionReconstructionTestSuite : public mitk::TestFixture
   MITK_TEST(Qball_SingleShellMethods_RejectMultiShell);
   MITK_TEST(Qball_MultiShell_SameAsFilter);
   MITK_TEST(Qball_MultiShell_ShellSelection);
+  MITK_TEST(Tensors_LinearLeastSquares_MatchesReference);
+  MITK_TEST(Tensors_EigenvalueCorrection_SameAsFilter);
+  MITK_TEST(Tensors_ZeroNegativeEigenvalues);
+  MITK_TEST(Tensors_NoDwi_Throws);
+  MITK_TEST(PointShellGradients_TableAndB0);
+  MITK_TEST(TensorsToDwi_WorldGradients);
   CPPUNIT_TEST_SUITE_END();
 
   using GradientContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
   using DwiType = mitk::DiffusionPropertyHelper::ImageType;
   using Direction = vnl_vector_fixed<double, 3>;
+  using TensorImageType = mitk::TensorImage::ItkTensorImageType;
 
   mitk::Image::Pointer m_Dwi;
 
@@ -257,6 +267,126 @@ public:
     const auto result = mitk::ReconstructQball(dwi, parameters);
     CPPUNIT_ASSERT(result.sh.IsNotNull());
     CPPUNIT_ASSERT(result.odf.IsNotNull());
+  }
+
+  // The view's linear least-squares tensors of a single-shell DWI give the reference of
+  // mitkImageReconstructionTest.
+  void Tensors_LinearLeastSquares_MatchesReference()
+  {
+    auto tensors = mitk::ReconstructTensors(m_Dwi, mitk::TensorFit::LinearLeastSquares, 0, false);
+    auto reference = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    CPPUNIT_ASSERT(mitk::Equal(*tensors, *reference, 1e-4, true));
+  }
+
+  static mitk::Image::Pointer LoadDwi(const std::string &path)
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"Diffusion Weighted Images"}, std::vector<std::string>());
+    return mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(path), &functor);
+  }
+
+  static TensorImageType::Pointer ItkTensors(const mitk::TensorImage *image)
+  {
+    TensorImageType::Pointer tensors;
+    mitk::CastToItkImage(image, tensors);
+    return tensors;
+  }
+
+  static bool HasNegativeEigenvalue(const TensorImageType::PixelType &tensor)
+  {
+    TensorImageType::PixelType::EigenValuesArrayType eigenvalues;
+    tensor.ComputeEigenValues(eigenvalues);
+    return eigenvalues[0] < 0 || eigenvalues[1] < 0 || eigenvalues[2] < 0;
+  }
+
+  // diffusionImage.hdwi has voxels whose eigenvalues the correction cannot make positive (see
+  // mitkDiffusionModellingAlgorithmsTest); without zeroing, the function gives the filter's tensors.
+  void Tensors_EigenvalueCorrection_SameAsFilter()
+  {
+    auto dwi = LoadDwi("DiffusionImaging/diffusionImage.hdwi");
+    DwiType::Pointer itkDwi;
+    mitk::CastToItkImage(dwi, itkDwi);
+    auto filter = itk::TensorReconstructionWithEigenvalueCorrectionFilter<short, float>::New();
+    filter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi));
+    filter->SetGradientImage(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi), itkDwi);
+    filter->SetB0Threshold(0);
+    filter->Update();
+
+    auto tensors = mitk::ReconstructTensors(dwi, mitk::TensorFit::EigenvalueCorrection, 0, false);
+    CPPUNIT_ASSERT(SameVoxels(filter->GetOutput(), ItkTensors(tensors).GetPointer()));
+  }
+
+  // Zeroing sets exactly the tensors with a negative eigenvalue to zero, for both fits.
+  void Tensors_ZeroNegativeEigenvalues()
+  {
+    auto dwi = LoadDwi("DiffusionImaging/diffusionImage.hdwi");
+    for (auto fit : {mitk::TensorFit::LinearLeastSquares, mitk::TensorFit::EigenvalueCorrection})
+    {
+      auto raw = ItkTensors(mitk::ReconstructTensors(dwi, fit, 0, false));
+      auto zeroed = ItkTensors(mitk::ReconstructTensors(dwi, fit, 0, true));
+      unsigned int negatives = 0;
+      itk::ImageRegionConstIterator<TensorImageType> itRaw(raw, raw->GetLargestPossibleRegion());
+      itk::ImageRegionConstIterator<TensorImageType> itZeroed(zeroed, zeroed->GetLargestPossibleRegion());
+      for (; !itRaw.IsAtEnd(); ++itRaw, ++itZeroed)
+      {
+        if (HasNegativeEigenvalue(itRaw.Get()))
+        {
+          ++negatives;
+          CPPUNIT_ASSERT(itZeroed.Get() == TensorImageType::PixelType(0.0));
+        }
+        else
+        {
+          CPPUNIT_ASSERT(itZeroed.Get() == itRaw.Get());
+        }
+      }
+      // The linear fit of this DWI has tensors with negative eigenvalues, so the zeroing is tested.
+      if (fit == mitk::TensorFit::LinearLeastSquares)
+        CPPUNIT_ASSERT(negatives > 0);
+    }
+  }
+
+  void Tensors_NoDwi_Throws()
+  {
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    CPPUNIT_ASSERT_THROW(mitk::ReconstructTensors(tensors, mitk::TensorFit::LinearLeastSquares, 0, false), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(mitk::ReconstructTensors(nullptr, mitk::TensorFit::EigenvalueCorrection, 0, false), mitk::Exception);
+  }
+
+  void PointShellGradients_TableAndB0()
+  {
+    for (unsigned int n : {12u, 92u, 252u})
+    {
+      const auto gradients = mitk::PointShellGradients(n);
+      const auto &table = mitk::pointshell::Directions(n);
+      CPPUNIT_ASSERT_EQUAL(n + 1, static_cast<unsigned int>(gradients->Size()));
+      for (unsigned int i = 0; i < n; ++i)
+        CPPUNIT_ASSERT(gradients->ElementAt(i) == Direction(table(0, i), table(1, i), table(2, i)));
+      CPPUNIT_ASSERT(gradients->ElementAt(n) == Direction(0.0));
+    }
+    CPPUNIT_ASSERT_THROW(mitk::PointShellGradients(100), mitk::Exception);
+  }
+
+  // The simulated DWI carries world gradients: identity frame, image rotation off, the modified
+  // gradients equal to the table.
+  void TensorsToDwi_WorldGradients()
+  {
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto dwi = mitk::TensorsToDwi(tensors, 92, 1000);
+
+    CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi));
+    CPPUNIT_ASSERT_EQUAL(93u, static_cast<unsigned int>(dwi->GetPixelType().GetNumberOfComponents()));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1000.0, mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi), 0.0);
+    // The flag behind DiffusionPropertyHelper::SetApplyMatrixToGradients.
+    bool applyRotation = true;
+    CPPUNIT_ASSERT(dwi->GetPropertyList()->GetBoolProperty("DWMRI.ApplyMatrixToGradients", applyRotation));
+    CPPUNIT_ASSERT(!applyRotation);
+    CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::GetMeasurementFrame(dwi).is_identity());
+
+    const auto expected = mitk::PointShellGradients(92);
+    const auto gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(dwi);
+    for (unsigned int i = 0; i < expected->Size(); ++i)
+      CPPUNIT_ASSERT((gradients->ElementAt(i) - expected->ElementAt(i)).two_norm() < 1e-12);
+
+    CPPUNIT_ASSERT_THROW(mitk::TensorsToDwi(nullptr, 92, 1000), mitk::Exception);
   }
 };
 
