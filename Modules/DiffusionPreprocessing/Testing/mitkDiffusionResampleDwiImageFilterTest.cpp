@@ -32,6 +32,7 @@ class mitkDiffusionResampleDwiImageFilterTestSuite : public mitk::TestFixture
   MITK_TEST(Resample_FlippedAxis_KeepsCorner);
   MITK_TEST(Resample_EachSetterAndInterpolation_ResamplesEveryChannelAlike);
   MITK_TEST(Resample_SetterBeforeInputAndUpstreamFilter_RunsPipeline);
+  MITK_TEST(ResampledImageGrid_RoundingErrorBelowInteger_KeepsVoxel);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -208,6 +209,41 @@ public:
       CPPUNIT_ASSERT_DOUBLES_EQUAL(22.0 / 20, filter->GetOutput()->GetSpacing()[1], 1e-12);
       CheckChannels(m_Dwi, filter->GetOutput(), interpolation);
     }
+  }
+
+  // Sizes that are integers in exact arithmetic came out just below them and were truncated: an
+  // oblique 2 mm image (spacing read as 1.9999999999999998) resampled to 1 mm had 21 instead of 22
+  // voxels along x, 1.2 mm -> 0.4 mm gave 32 instead of 33.
+  void ResampledImageGrid_RoundingErrorBelowInteger_KeepsVoxel()
+  {
+    itk::ImageRegion<3> region;
+    region.SetSize({{11, 11, 11}});
+    itk::Vector<double, 3> spacing;
+    spacing.Fill(1.2);
+    itk::Vector<double, 3> value;
+    value.Fill(0.4);
+    itk::Vector<double, 3> newSpacing;
+    itk::ImageRegion<3> newRegion;
+    itk::ResampledImageGrid(spacing, region, itk::ResampleGridMode::Spacing, value, newSpacing, newRegion);
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(33), newRegion.GetSize(0));
+
+    spacing.Fill(2);
+    spacing[0] = 1.9999999999999998;
+    value.Fill(1);
+    itk::ResampledImageGrid(spacing, region, itk::ResampleGridMode::Spacing, value, newSpacing, newRegion);
+    for (unsigned int i = 0; i < 3; ++i)
+      CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(22), newRegion.GetSize(i));
+
+    spacing.Fill(1.2);
+    value.Fill(3);
+    itk::ResampledImageGrid(spacing, region, itk::ResampleGridMode::SamplingFactor, value, newSpacing, newRegion);
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(33), newRegion.GetSize(0));
+
+    // Sizes that are not integers are still truncated: 11 * 2 / 3 = 7.33.
+    spacing.Fill(2);
+    value.Fill(3);
+    itk::ResampledImageGrid(spacing, region, itk::ResampleGridMode::Spacing, value, newSpacing, newRegion);
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(7), newRegion.GetSize(0));
   }
 
   void Resample_SetterBeforeInputAndUpstreamFilter_RunsPipeline()

@@ -35,6 +35,8 @@ PURPOSE.  See the above copyright notices for more information.
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
 
+#include <cmath>
+
 namespace itk
 {
 
@@ -60,26 +62,30 @@ enum class ResampleGridMode { SamplingFactor, Spacing, Size };
  * \brief Spacing and region of a resampled grid.
  *
  * SamplingFactor: spacing / value, size * value. Spacing: value, size * spacing / value. Size:
- * value, spacing * size / value. The sizes are truncated.
+ * value, spacing * size / value. The sizes are truncated, after adding 1e-6 voxels: a size that is
+ * an integer in exact arithmetic can come out just below it (spacing 1.2 -> 0.4 gives
+ * 2.9999999999999996 per voxel, the spacing of an oblique image 1.9999999999999998), and
+ * truncating it lost a voxel.
  */
 inline void ResampledImageGrid(const Vector<double, 3>& spacing, const ImageRegion<3>& region, ResampleGridMode mode, const Vector<double, 3>& value, Vector<double, 3>& newSpacing, ImageRegion<3>& newRegion)
 {
   newSpacing = spacing;
   newRegion = region;
+  const auto truncated = [](double size) { return static_cast<SizeValueType>(std::floor(size + 1e-6)); };
   switch (mode)
   {
   case ResampleGridMode::SamplingFactor:
     for (unsigned int i = 0; i < 3; ++i)
     {
       newSpacing[i] /= value[i];
-      newRegion.SetSize(i, newRegion.GetSize(i)*value[i]);
+      newRegion.SetSize(i, truncated(newRegion.GetSize(i)*value[i]));
     }
     break;
   case ResampleGridMode::Spacing:
     for (unsigned int i = 0; i < 3; ++i)
     {
       const double sampling = spacing[i]/value[i];
-      newRegion.SetSize(i, newRegion.GetSize(i)*sampling);
+      newRegion.SetSize(i, truncated(newRegion.GetSize(i)*sampling));
     }
     newSpacing = value;
     break;
