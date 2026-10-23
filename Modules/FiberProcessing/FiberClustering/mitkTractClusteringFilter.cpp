@@ -115,6 +115,7 @@ std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(mitk::Fibe
   // QuickBundles compares fibers point by point (MDF), so each fiber is resampled to m_NumPoints
   // points at equal arc length along it, both end points included (as dipy's
   // set_number_of_points); also fibers that already have m_NumPoints unevenly spaced points.
+  // FiberBundle::ResampleToNumPoints does neither: it steps by chord length and keeps such fibers.
   vtkSmartPointer<vtkPolyData> polyData = tractogram->GetFiberPolyData();
   std::vector< vnl_matrix<float> > out_fib;
 
