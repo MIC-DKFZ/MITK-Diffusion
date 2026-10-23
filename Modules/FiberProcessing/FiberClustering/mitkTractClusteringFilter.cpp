@@ -25,6 +25,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkSmartPointer.h>
 
 #include <algorithm>
+#include <iterator>
+#include <utility>
 
 namespace mitk{
 
@@ -82,7 +84,7 @@ void TractClusteringFilter::SetDistances(const std::vector<float> &Distances)
   m_Distances = Distances;
 }
 
-float TractClusteringFilter::CalcOverlap(vnl_matrix<float>& t)
+float TractClusteringFilter::CalcOverlap(const vnl_matrix<float>& t) const
 {
   float overlap = 0;
   if (m_FilterMask.IsNotNull())
@@ -167,11 +169,14 @@ std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(const mitk
   return out_fib;
 }
 
-std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep(std::vector< unsigned int > f_indices, std::vector<float> distances)
+std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep(const std::vector< unsigned int >& f_indices, std::vector<float> distances)
 {
   float dist_thres = distances.back();
   distances.pop_back();
   std::vector< Cluster > C;
+  // The centroid (mean) of each cluster, computed when a fiber joins the cluster instead of in
+  // every comparison with it.
+  std::vector< vnl_matrix<float> > means;
 
   int N = f_indices.size();
 
@@ -180,12 +185,13 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
   c1.h = T[f_indices.at(0)];
   c1.n = 1;
   C.push_back(c1);
+  means.push_back(c1.h / c1.n);
   if (f_indices.size()==1)
     return C;
 
   for (int i=1; i<N; ++i)
   {
-    vnl_matrix<float> t = T.at(f_indices.at(i));
+    const vnl_matrix<float>& t = T.at(f_indices.at(i));
 
     int min_cluster_index = -1;
     float min_cluster_distance = 99999;
@@ -193,7 +199,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
 
     for (unsigned int k=0; k<C.size(); ++k)
     {
-      vnl_matrix<float> v = C.at(k).h / C.at(k).n;
+      const vnl_matrix<float>& v = means[k];
       bool f = false;
       float d = 0;
       for (const auto& m : m_Metrics)
@@ -210,12 +216,14 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
 
     if (min_cluster_index>=0 && min_cluster_distance<dist_thres)
     {
-      C[min_cluster_index].I.push_back(f_indices.at(i));
+      Cluster& c = C[min_cluster_index];
+      c.I.push_back(f_indices.at(i));
       if (!flip)
-        C[min_cluster_index].h += t;
+        c.h += t;
       else
-        C[min_cluster_index].h += t.fliplr();
-      C[min_cluster_index].n += 1;
+        c.h += vnl_matrix<float>(t).fliplr();  // fliplr() flips in place
+      c.n += 1;
+      means[min_cluster_index] = c.h / c.n;
     }
     else
     {
@@ -223,7 +231,8 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
       c.I.push_back(f_indices.at(i));
       c.h = t;
       c.n = 1;
-      C.push_back(c);
+      means.push_back(c.h / c.n);
+      C.push_back(std::move(c));
     }
   }
 
@@ -238,17 +247,11 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
 
     std::vector< Cluster > outC;
     for (auto& tempC : subClusters)
-      AppendCluster(outC, tempC);
+      outC.insert(outC.end(), std::make_move_iterator(tempC.begin()), std::make_move_iterator(tempC.end()));
     return outC;
   }
   else
     return C;
-}
-
-void TractClusteringFilter::AppendCluster(std::vector< Cluster >& a, std::vector< Cluster >&b)
-{
-  for (auto c : b)
-    a.push_back(c);
 }
 
 unsigned int TractClusteringFilter::GetDiscardedClusters() const
@@ -308,12 +311,14 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
   if (mergeThreshold<0)
     mergeThreshold = m_Distances.at(0)/2;
   else if (mergeThreshold==0)
-    return clusters;
+    return std::move(clusters);
 
   MITK_INFO << "Merging duplicate clusters with distance threshold " << mergeThreshold;
 
   std::vector< TractClusteringFilter::Cluster > new_clusters;
-  for (Cluster c1 : clusters)
+  // The centroids of new_clusters, computed when a cluster is added or merged into.
+  std::vector< vnl_matrix<float> > means;
+  for (Cluster& c1 : clusters)
   {
     vnl_matrix<float> t = c1.h / c1.n;
 
@@ -324,8 +329,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
 #pragma omp parallel for
     for (int k2=0; k2<(int)new_clusters.size(); ++k2)
     {
-      const Cluster& c2 = new_clusters.at(k2);
-      vnl_matrix<float> v = c2.h / c2.n;
+      const vnl_matrix<float>& v = means[k2];
 
       bool f = false;
       float d = 0;
@@ -349,18 +353,23 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
     }
 
     if (min_idx<0)
-      new_clusters.push_back(c1);
+    {
+      means.push_back(std::move(t));
+      new_clusters.push_back(std::move(c1));
+    }
     else
     {
+      Cluster& c2 = new_clusters[min_idx];
       for (int i=0; i<c1.n; ++i)
       {
-        new_clusters[min_idx].I.push_back(c1.I.at(i));
-        new_clusters[min_idx].n += 1;
+        c2.I.push_back(c1.I.at(i));
+        c2.n += 1;
       }
       if (!flip)
-        new_clusters[min_idx].h += c1.h;
+        c2.h += c1.h;
       else
-        new_clusters[min_idx].h += c1.h.fliplr();
+        c2.h += c1.h.fliplr();
+      means[min_idx] = c2.h / c2.n;
     }
   }
 
@@ -368,7 +377,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
   return new_clusters;
 }
 
-std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClusters(std::vector< unsigned int > f_indices, std::vector<vnl_matrix<float> >& centroids)
+std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClusters(const std::vector< unsigned int >& f_indices, const std::vector<vnl_matrix<float> >& centroids)
 {
   float dist_thres = m_Distances.at(0);
   int N = f_indices.size();
@@ -392,7 +401,7 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
 #pragma omp parallel for
   for (int i=0; i<N; ++i)
   {
-    vnl_matrix<float> t = T.at(f_indices.at(i));
+    const vnl_matrix<float>& t = T.at(f_indices.at(i));
 
     int min_cluster_index = -1;
     float min_cluster_distance = 99999;
@@ -401,7 +410,7 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
     if (CalcOverlap(t)>=m_OverlapThreshold)
     {
       int c_idx = 0;
-      for (vnl_matrix<float> centroid : centroids)
+      for (const vnl_matrix<float>& centroid : centroids)
       {
         bool f = false;
         float d = 0;
@@ -431,12 +440,12 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
     const int k = assignedCluster[i];
     if (k>=0)
     {
-      vnl_matrix<float> t = T.at(f_indices.at(i));  // fliplr() flips in place
+      const vnl_matrix<float>& t = T.at(f_indices.at(i));
       C[k].I.push_back(f_indices.at(i));
       if (!assignedFlip[i])
         C[k].h += t;
       else
-        C[k].h += t.fliplr();
+        C[k].h += vnl_matrix<float>(t).fliplr();  // fliplr() flips in place
       C[k].n += 1;
     }
     else

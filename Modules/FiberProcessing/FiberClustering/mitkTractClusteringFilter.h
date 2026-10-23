@@ -109,13 +109,13 @@ protected:
 
   void GenerateData();
   std::vector< vnl_matrix<float> > ResampleFibers(const FiberBundle* tractogram);
-  float CalcOverlap(vnl_matrix<float>& t);
+  float CalcOverlap(const vnl_matrix<float>& t) const;
 
-  std::vector< Cluster > ClusterStep(std::vector< unsigned int > f_indices, std::vector< float > distances);
+  std::vector< Cluster > ClusterStep(const std::vector< unsigned int >& f_indices, std::vector< float > distances);
 
+  /** The clusters are moved into the result. */
   std::vector< TractClusteringFilter::Cluster > MergeDuplicateClusters2(std::vector< TractClusteringFilter::Cluster >& clusters);
-  std::vector< Cluster > AddToKnownClusters(std::vector< unsigned int > f_indices, std::vector<vnl_matrix<float> > &centroids);
-  void AppendCluster(std::vector< Cluster >& a, std::vector< Cluster >&b);
+  std::vector< Cluster > AddToKnownClusters(const std::vector< unsigned int >& f_indices, const std::vector<vnl_matrix<float> > &centroids);
   void AddOutput(const Cluster& c, const vnl_matrix<float>& centroid_points);
 
   unsigned int                                m_NumPoints;
