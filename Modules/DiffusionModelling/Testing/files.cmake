@@ -3,6 +3,7 @@ set(MODULE_TESTS
   mitkDiffusionModellingIOTest.cpp
   mitkDiffusionModellingRenderingTest.cpp
   mitkDiffusionReconstructionQballTest.cpp
+  mitkDiffusionReconstructionTensorTest.cpp
 )
 
 # Need an OpenGL context; skipped (exit code 77) without one.

@@ -35,6 +35,7 @@ set(CPP_FILES
 
   # Algorithms
   Algorithms/mitkLbfgsbMutex.cpp
+  Algorithms/Reconstruction/mitkDiffusionReconstruction.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCAverageFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkADCFitFunctor.cpp
   Algorithms/Reconstruction/MultishellProcessing/itkKurtosisFitFunctor.cpp
@@ -74,6 +75,7 @@ set(H_FILES
   Rendering/mitkPeakImageMapper3D.h
 
   # Reconstruction
+  Algorithms/Reconstruction/mitkDiffusionReconstruction.h
   Algorithms/Reconstruction/itkDiffusionQballReconstructionImageFilter.h
   Algorithms/Reconstruction/mitkTeemDiffusionTensor3DReconstructionImageFilter.h
   Algorithms/Reconstruction/itkAnalyticalDiffusionQballReconstructionImageFilter.h

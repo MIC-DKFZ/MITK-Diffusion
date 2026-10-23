@@ -26,7 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkNodePredicateDataType.h"
 #include "QmitkDataStorageComboBox.h"
-#include "itkDiffusionTensor3DReconstructionImageFilter.h"
+#include <mitkDiffusionReconstruction.h>
 #include "itkTensorImageToDiffusionImageFilter.h"
 #include "itkPointShell.h"
 #include "itkVector.h"
@@ -259,30 +259,20 @@ void QmitkTensorReconstructionView::ItkTensorReconstruction()
       std::string nodename = m_Controls->m_DwiBox->GetSelectedNode()->GetName();
 
 
-      typedef itk::DiffusionTensor3DReconstructionImageFilter<DiffusionPixelType, DiffusionPixelType, TTensorPixelType > TensorReconstructionImageFilterType;
-      TensorReconstructionImageFilterType::Pointer tensorReconstructionFilter = TensorReconstructionImageFilterType::New();
-
-      GradientDirectionContainerType::Pointer gradientContainerCopy = GradientDirectionContainerType::New();
-      for(GradientDirectionContainerType::ConstIterator it = mitk::DiffusionPropertyHelper::GetGradientContainer(vols)->Begin();
-          it != mitk::DiffusionPropertyHelper::GetGradientContainer(vols)->End(); it++)
-      {
-        gradientContainerCopy->push_back(it.Value());
-      }
-
       ITKDiffusionImageType::Pointer itkVectorImagePointer = ITKDiffusionImageType::New();
       mitk::CastToItkImage(vols, itkVectorImagePointer);
 
-      tensorReconstructionFilter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(vols));
-      tensorReconstructionFilter->SetGradientImage( gradientContainerCopy, itkVectorImagePointer );
-      tensorReconstructionFilter->SetThreshold( m_Controls->m_TensorReconstructionThreshold->value() );
-      tensorReconstructionFilter->Update();
+      // Not ITK's filter directly: it fits every volume with the reference b-value, which is wrong
+      // for multi-shell DWIs.
+      typedef mitk::TensorImage::ItkTensorImageType TensorImageType;
+      TensorImageType::Pointer tensorImage = mitk::ReconstructTensorsLinearLeastSquares(
+        itkVectorImagePointer,
+        mitk::DiffusionPropertyHelper::GetGradientContainer(vols),
+        mitk::DiffusionPropertyHelper::GetReferenceBValue(vols),
+        m_Controls->m_TensorReconstructionThreshold->value());
 
       // TENSORS TO DATATREE
       mitk::TensorImage::Pointer image = mitk::TensorImage::New();
-
-      typedef mitk::TensorImage::ItkTensorImageType TensorImageType;
-      TensorImageType::Pointer tensorImage;
-      tensorImage = tensorReconstructionFilter->GetOutput();
 
       // Check the tensor for negative eigenvalues
       if(m_Controls->m_CheckNegativeEigenvalues->isChecked())
@@ -316,7 +306,7 @@ void QmitkTensorReconstructionView::ItkTensorReconstruction()
 
       tensorImage->SetDirection( itkVectorImagePointer->GetDirection() );
       image->InitializeByItk( tensorImage.GetPointer() );
-      image->SetVolume( tensorReconstructionFilter->GetOutput()->GetBufferPointer() );
+      image->SetVolume( tensorImage->GetBufferPointer() );
       mitk::DataNode::Pointer node=mitk::DataNode::New();
       mitk::DiffusionPropertyHelper::CopyDICOMProperties(vols, image);
       node->SetData( image );
