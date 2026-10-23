@@ -36,7 +36,7 @@ class MITKFIBERBUNDLE_EXPORT FiberBundleIOHelper
 {
 public:
 
-  static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string > extensions={".fib", ".trk"});
+  static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string > extensions={".fib", ".trk", ".tck"});
 
   static std::vector< mitk::FiberBundle::Pointer > load_fibs(const std::vector<std::string> files, std::vector<std::string>* filenames=nullptr);
 };

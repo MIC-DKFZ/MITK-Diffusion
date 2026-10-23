@@ -11,6 +11,7 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkIOMimeTypes.h>
 #include <mitkIOUtil.h>
 #include <mitkTestFixture.h>
@@ -35,6 +36,7 @@ found in the LICENSE file.
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <limits>
 #include <set>
@@ -62,6 +64,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(VtkReader_NoFiberPolyData_ThrowsMitkException);
   MITK_TEST(VtkReader_ColoursOfUnusedAndReorderedPoints_StayWithTheirPoints);
   MITK_TEST(DicomMimeType_NewDcmFile_FindsWriter);
+  MITK_TEST(IOHelper_BrokenFileAndDottedNames_CoutRestored);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -660,6 +663,22 @@ public:
     const std::string shortFile = m_TempDir + "/short.dcm";
     std::ofstream(shortFile) << "DICM";
     CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load<mitk::FiberBundle>(shortFile), std::exception);
+  }
+
+  void IOHelper_BrokenFileAndDottedNames_CoutRestored()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    mitk::IOUtil::Save(fib, m_TempDir + "/sub-01.CST.fib");
+    mitk::IOUtil::Save(fib, m_TempDir + "/plain.fib");
+
+    const auto files = mitk::FiberBundleIOHelper::get_file_list(m_TempDir);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("Names with several dots are listed", static_cast<std::size_t>(2), files.size());
+
+    const std::string broken = m_TempDir + "/broken.trk";
+    std::ofstream(broken) << "no tractogram";
+    std::streambuf *coutBuffer = std::cout.rdbuf();
+    CPPUNIT_ASSERT_THROW(mitk::FiberBundleIOHelper::load_fibs({m_TempDir + "/plain.fib", broken}), std::exception);
+    CPPUNIT_ASSERT_MESSAGE("std::cout is restored after an error", coutBuffer == std::cout.rdbuf());
   }
 };
 

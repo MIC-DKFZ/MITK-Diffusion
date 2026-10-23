@@ -16,6 +16,30 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkFiberBundleIOHelper.h"
 
+namespace
+{
+  /** Silences std::cout (progress output of the readers) and restores it also when loading
+   *  throws, so that the callers can still print the error. */
+  class CoutSilencer
+  {
+  public:
+    CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
+    ~CoutSilencer() { this->Restore(); }
+    void Restore()
+    {
+      if (m_Old != nullptr)
+        std::cout.rdbuf(m_Old);
+      m_Old = nullptr;
+    }
+    CoutSilencer(const CoutSilencer&) = delete;
+    CoutSilencer& operator=(const CoutSilencer&) = delete;
+
+  private:
+    std::stringstream m_Buffer;
+    std::streambuf* m_Old;
+  };
+}
+
 std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::string& path, const std::vector<std::string> extensions)
 {
   std::vector< std::string > file_list;
@@ -27,7 +51,8 @@ std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::s
     for (int r = 0; r < n; r++)
     {
       const char *filename = dir->GetFile(r);
-      std::string ext = ist::GetFilenameExtension(filename);
+      // last extension only, so that names with dots (sub-01.CST.trk) are found
+      std::string ext = ist::GetFilenameLastExtension(filename);
       for (auto e : extensions)
       {
         if (ext==e)
@@ -44,9 +69,7 @@ std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::s
 
 std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(const std::vector<std::string> files, std::vector<std::string>* filenames)
 {
-  std::streambuf *old = std::cout.rdbuf(); // <-- save
-  std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf());       // <-- redirect
+  CoutSilencer silencer;
   std::vector< mitk::FiberBundle::Pointer > out;
   for (auto f : files)
   {
@@ -78,7 +101,7 @@ std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(c
       }
     }
   }
-  std::cout.rdbuf (old);              // <-- restore
+  silencer.Restore();
   MITK_INFO << "Loaded " << out.size() << " tractograms";
   return out;
 }
