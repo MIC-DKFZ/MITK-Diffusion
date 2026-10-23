@@ -220,8 +220,12 @@ namespace mitk
       }
       else
       {
-        // Other files are tried as NIfTI (FSL element order, no frame), through a copy with a NIfTI
-        // extension, which niftilib needs.
+        // Other files are tried as NIfTI, through a copy with a NIfTI extension, which niftilib
+        // needs; they reach this reader only when renamed to .dti. Six volumes or components are
+        // taken in FSL dtifit's order (xx, xy, xz, yy, yz, zz), in the voxel frame as stored: FSL's
+        // flip of the voxel frame (applied to bvecs, see DiffusionImage's NIfTI reader) and the
+        // image rotation are not applied. MRtrix's dwi2tensor order (D11, D22, D33, D12, D13, D23,
+        // RAS) is not recognized and would be read in the wrong order.
         const TemporaryNiftiCopy niftiCopy(location);
         tensors = ReadTensors<itk::NiftiImageIO>(niftiCopy.GetPath(), dictionary);
       }
