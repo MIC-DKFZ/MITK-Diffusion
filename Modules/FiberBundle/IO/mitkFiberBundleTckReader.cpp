@@ -28,7 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPointData.h>
 #include <itksys/SystemTools.hxx>
 #include <vtkCleanPolyData.h>
-#include <mitkTrackvis.h>
 #include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
 #include <mitkExceptionMacro.h>

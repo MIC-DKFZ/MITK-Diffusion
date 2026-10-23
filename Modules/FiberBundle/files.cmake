@@ -12,7 +12,6 @@ set(H_FILES
   IO/mitkFiberBundleIOHelper.h
   IO/mitkFiberBundleDicomReferenceTags.h
 
-  IO/mitkTrackvis.h
   IO/mitkFiberBundleDicomReader.h
   IO/mitkFiberBundleDicomWriter.h
   IO/mitkFiberBundleTckReader.h
@@ -46,7 +45,7 @@ set(CPP_FILES
   IO/mitkFiberBundleIOHelper.cpp
   IO/mitkFiberBundleDicomReferenceTags.cpp
 
-  IO/mitkTrackvis.cpp
+  IO/mitkTrackVisFile.cpp
   IO/mitkFiberBundleDicomReader.cpp
   IO/mitkFiberBundleDicomWriter.cpp
   IO/mitkFiberBundleTckReader.cpp

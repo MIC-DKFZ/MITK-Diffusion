@@ -15,20 +15,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundleTrackVisWriter.h"
-#include <vtkSmartPointer.h>
-#include <vtkCleanPolyData.h>
-#include <itksys/SystemTools.hxx>
-#include <mitkTrackvis.h>
-#include <itkSize.h>
-#include <vtkFloatArray.h>
-#include <vtkCellData.h>
-#include <vtkPointData.h>
-#include <mitkAbstractFileWriter.h>
-#include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
+#include "mitkTrackVisFile.h"
+
+#include <mitkFiberBundle.h>
 
 mitk::FiberBundleTrackVisWriter::FiberBundleTrackVisWriter()
-  : mitk::AbstractFileWriter(mitk::FiberBundle::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::FIBERBUNDLE_TRK_MIMETYPE_NAME(), "TrackVis Fiber Bundle Reader")
+  : mitk::AbstractFileWriter(mitk::FiberBundle::GetStaticNameOfClass(), mitk::FiberBundleMimeTypes::FIBERBUNDLE_TRK_MIMETYPE_NAME(), "TrackVis Fiber Bundle Writer")
 {
   Options defaultOptions;
   defaultOptions["Print header"] = false;
@@ -38,13 +31,6 @@ mitk::FiberBundleTrackVisWriter::FiberBundleTrackVisWriter()
   RegisterService();
 }
 
-mitk::FiberBundleTrackVisWriter::FiberBundleTrackVisWriter(const mitk::FiberBundleTrackVisWriter & other)
-  :mitk::AbstractFileWriter(other)
-{}
-
-mitk::FiberBundleTrackVisWriter::~FiberBundleTrackVisWriter()
-{}
-
 mitk::FiberBundleTrackVisWriter * mitk::FiberBundleTrackVisWriter::Clone() const
 {
   return new mitk::FiberBundleTrackVisWriter(*this);
@@ -52,40 +38,19 @@ mitk::FiberBundleTrackVisWriter * mitk::FiberBundleTrackVisWriter::Clone() const
 
 void mitk::FiberBundleTrackVisWriter::Write()
 {
+  // A local file also for output streams; it is copied to the stream when it goes out of scope.
+  LocalFile localFile(this);
+  const std::string filename = localFile.GetFileName();
 
-  try
-  {
-    // A local file also for output streams; it is copied to the stream when it goes out of scope.
-    LocalFile localFile(this);
-    const std::string filename = localFile.GetFileName();
+  mitk::FiberBundle::ConstPointer input = dynamic_cast<const mitk::FiberBundle*>(this->GetInput());
+  if (input.IsNull())
+    mitkThrow() << "The TrackVis writer needs a fiber bundle as input.";
 
-    mitk::FiberBundle::ConstPointer input = dynamic_cast<const mitk::FiberBundle*>(this->GetInput());
-    if (input.IsNull())
-      mitkThrow() << "The TrackVis writer needs a fiber bundle as input.";
-    std::string ext = itksys::SystemTools::GetFilenameLastExtension(this->GetOutputLocation().c_str());
+  Options options = this->GetOptions();
+  const bool print_header = us::any_cast<bool>(options["Print header"]);
+  const bool use_lps = us::any_cast<bool>(options["Use LPS coordinate system (default is RAS)"]);
 
-    // default extension is .fib
-    if(ext == "")
-    {
-      ext = ".trk";
-      this->SetOutputLocation(this->GetOutputLocation() + ext);
-    }
-
-    Options options = this->GetOptions();
-    bool print_header = us::any_cast<bool>(options["Print header"]);
-    bool use_lps = us::any_cast<bool>(options["Use LPS coordinate system (default is RAS)"]);
-
-    MITK_INFO << "Writing fiber bundle as TRK";
-    TrackVisFiberReader trk;
-    trk.create(filename, const_cast<mitk::FiberBundle*>(input.GetPointer()), print_header, use_lps);
-    trk.writeHdr();
-    trk.write(input.GetPointer());
-    trk.close();
-
-    MITK_INFO << "TrackVis Fiber bundle written to " << filename;
-  }
-  catch(...)
-  {
-    throw;
-  }
+  MITK_INFO << "Writing fiber bundle as TRK";
+  TrackVisFile::Write(filename, input, use_lps, print_header);
+  MITK_INFO << "TrackVis Fiber bundle written to " << filename;
 }

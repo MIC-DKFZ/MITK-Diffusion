@@ -15,22 +15,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundleTrackVisReader.h"
-#include <itkMetaDataObject.h>
-#include <vtkPolyData.h>
-#include <vtkDataReader.h>
-#include <vtkPolyDataReader.h>
-#include <vtkMatrix4x4.h>
-#include <vtkPolyLine.h>
-#include <vtkCellArray.h>
-#include <vtkDataArray.h>
-#include <vtkFloatArray.h>
-#include <vtkCellData.h>
-#include <vtkPointData.h>
-#include <itksys/SystemTools.hxx>
-#include <vtkCleanPolyData.h>
-#include "mitkTrackvis.h"
-#include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
+#include "mitkTrackVisFile.h"
+
+#include <itksys/SystemTools.hxx>
 
 
 mitk::FiberBundleTrackVisReader::FiberBundleTrackVisReader()
@@ -44,12 +32,7 @@ mitk::FiberBundleTrackVisReader::FiberBundleTrackVisReader()
   defaultOptions["Flip z"] = false;
   this->SetDefaultOptions(defaultOptions);
 
-  m_ServiceReg = this->RegisterService();
-}
-
-mitk::FiberBundleTrackVisReader::FiberBundleTrackVisReader(const FiberBundleTrackVisReader &other)
-  :mitk::AbstractFileReader(other)
-{
+  this->RegisterService();
 }
 
 mitk::FiberBundleTrackVisReader * mitk::FiberBundleTrackVisReader::Clone() const
@@ -59,37 +42,17 @@ mitk::FiberBundleTrackVisReader * mitk::FiberBundleTrackVisReader::Clone() const
 
 std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleTrackVisReader::DoRead()
 {
+  const std::string filename = this->GetInputLocation();
+  MITK_INFO << "Loading tractogram (TrackVis format): " << itksys::SystemTools::GetFilenameName(filename);
+
+  Options options = this->GetOptions();
+  const bool apply_matrix = us::any_cast<bool>(options["Apply index to world transform stored in the TRK header"]);
+  const bool flip_x = us::any_cast<bool>(options["Flip x"]);
+  const bool flip_y = us::any_cast<bool>(options["Flip y"]);
+  const bool flip_z = us::any_cast<bool>(options["Flip z"]);
+  const bool print_header = us::any_cast<bool>(options["Print header"]);
 
   std::vector<itk::SmartPointer<mitk::BaseData> > result;
-  try
-  {
-    std::string filename = this->GetInputLocation();
-    MITK_INFO << "Loading tractogram (TrackVis format): " << itksys::SystemTools::GetFilenameName(filename);
-
-    std::string ext = itksys::SystemTools::GetFilenameLastExtension(filename);
-    ext = itksys::SystemTools::LowerCase(ext);
-
-    if (ext==".trk")
-    {
-      Options options = this->GetOptions();
-      bool apply_matrix = us::any_cast<bool>(options["Apply index to world transform stored in the TRK header"]);
-      bool flip_x = us::any_cast<bool>(options["Flip x"]);
-      bool flip_y = us::any_cast<bool>(options["Flip y"]);
-      bool flip_z = us::any_cast<bool>(options["Flip z"]);
-      bool print_header = us::any_cast<bool>(options["Print header"]);
-      FiberBundle::Pointer mitk_fib = FiberBundle::New();
-      TrackVisFiberReader reader;
-      reader.open(this->GetInputLocation().c_str());
-      reader.read(mitk_fib.GetPointer(), apply_matrix, flip_x, flip_y, flip_z, print_header);
-      result.push_back(mitk_fib.GetPointer());
-      return result;
-    }
-
-    MITK_INFO << "Fiber bundle read";
-  }
-  catch(...)
-  {
-    throw;
-  }
+  result.push_back(TrackVisFile::Read(filename, apply_matrix, flip_x, flip_y, flip_z, print_header).GetPointer());
   return result;
 }
