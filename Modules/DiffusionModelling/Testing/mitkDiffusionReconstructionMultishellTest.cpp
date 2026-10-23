@@ -37,6 +37,9 @@ class mitkDiffusionReconstructionMultishellTestSuite : public mitk::TestFixture
   MITK_TEST(AdcAverage_MatchesReference);
   MITK_TEST(KurtosisFit_MatchesReference);
   MITK_TEST(BiExpFit_MatchesReference);
+  MITK_TEST(ZeroBaseline_GivesZeroVoxel);
+  MITK_TEST(SecondUpdate_SameResult);
+  MITK_TEST(InvalidInput_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -105,6 +108,7 @@ public:
 
   void tearDown() override
   {
+    m_Functors.clear();
     m_Dwi = nullptr;
     m_Gradients = nullptr;
   }
@@ -140,6 +144,23 @@ public:
     }
   }
 
+  FilterType::Pointer AdcFilter(DwiType *dwi)
+  {
+    auto functor = itk::ADCAverageFunctor::New();
+    functor->setListOfBValues(m_BValues);
+    functor->setTargetBValue(m_BValues.mean());
+    auto filter = FilterType::New();
+    filter->SetInput(dwi);
+    filter->SetOriginalGradientDirections(m_Gradients.GetPointer());
+    filter->SetOriginalBValueMap(m_BValueMap);
+    filter->SetOriginalBValue(m_ReferenceBValue);
+    filter->SetFunctor(functor);
+    m_Functors.push_back(functor.GetPointer());
+    return filter;
+  }
+
+  std::vector<itk::DWIVoxelFunctor::Pointer> m_Functors;
+
   void AdcAverage_MatchesReference()
   {
     auto functor = itk::ADCAverageFunctor::New();
@@ -162,6 +183,60 @@ public:
     functor->setListOfBValues(m_BValues);
     functor->setTargetBValue(m_BValues.mean());
     Check(functor, "test_multi_BiExp.dwi");
+  }
+
+  // log(S/S0) with S0 = 0 is NaN, and converting NaN to the short output is undefined.
+  void ZeroBaseline_GivesZeroVoxel()
+  {
+    auto dwi = DwiType::New();
+    dwi->SetRegions(m_Dwi->GetLargestPossibleRegion());
+    dwi->SetVectorLength(m_Dwi->GetNumberOfComponentsPerPixel());
+    dwi->Allocate();
+    itk::ImageRegionConstIterator<DwiType> in(m_Dwi, m_Dwi->GetLargestPossibleRegion());
+    itk::ImageRegionIterator<DwiType> out(dwi, m_Dwi->GetLargestPossibleRegion());
+    for (; !in.IsAtEnd(); ++in, ++out)
+      out.Set(in.Get());
+    auto pixel = dwi->GetPixel({{5, 5, 1}});
+    for (auto i : m_BValueMap.at(0))
+      pixel[i] = 0;
+    dwi->SetPixel({{5, 5, 1}}, pixel);
+
+    auto filter = AdcFilter(dwi);
+    filter->Update();
+    const auto result = filter->GetOutput()->GetPixel({{5, 5, 1}});
+    for (unsigned int i = 0; i < result.Size(); ++i)
+      CPPUNIT_ASSERT_EQUAL(short(0), result[i]);
+  }
+
+  // The interpolation matrices of every execution were appended to those of the first one.
+  void SecondUpdate_SameResult()
+  {
+    auto fresh = AdcFilter(m_Dwi);
+    fresh->Update();
+    auto reused = AdcFilter(m_Dwi);
+    reused->Update();
+    reused->Modified();
+    reused->Update();
+    itk::ImageRegionConstIterator<DwiType> itFresh(fresh->GetOutput(), m_Dwi->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<DwiType> itReused(reused->GetOutput(), m_Dwi->GetLargestPossibleRegion());
+    for (; !itFresh.IsAtEnd(); ++itFresh, ++itReused)
+      CPPUNIT_ASSERT(itFresh.Get() == itReused.Get());
+  }
+
+  // Without a functor the filter dereferenced a null pointer; gradients that do not match the
+  // volumes were read out of bounds.
+  void InvalidInput_Throws()
+  {
+    auto noFunctor = AdcFilter(m_Dwi);
+    noFunctor->SetFunctor(nullptr);
+    CPPUNIT_ASSERT_THROW(noFunctor->Update(), itk::ExceptionObject);
+
+    auto shorter = PropHelper::GradientDirectionsContainerType::New();
+    for (unsigned int i = 1; i < m_Gradients->Size(); ++i)
+      shorter->push_back(m_Gradients->ElementAt(i));
+    auto wrongGradients = AdcFilter(m_Dwi);
+    wrongGradients->SetOriginalGradientDirections(shorter.GetPointer());
+    CPPUNIT_ASSERT_THROW(wrongGradients->Update(), itk::ExceptionObject);
   }
 };
 

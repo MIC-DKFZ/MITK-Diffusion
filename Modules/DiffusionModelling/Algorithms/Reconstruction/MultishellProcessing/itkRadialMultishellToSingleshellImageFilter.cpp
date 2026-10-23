@@ -38,6 +38,12 @@ PURPOSE.  See the above copyright notices for more information.
 #include "itkRadialMultishellToSingleshellImageFilter.h"
 #include "mitkDiffusionModellingHelperFunctions.h"
 
+#include <itkImageRegionIterator.h>
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
 
 namespace itk
 {
@@ -55,6 +61,11 @@ template <class TInputScalarType, class TOutputScalarType>
 void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
 ::BeforeThreadedGenerateData()
 {
+  if (m_Functor == nullptr)
+    itkExceptionMacro(<< "No voxel functor set.");
+  if (m_OriginalGradientDirections.IsNull() || m_OriginalGradientDirections->Size() != this->GetInput()->GetNumberOfComponentsPerPixel())
+    itkExceptionMacro(<< "The gradient directions do not match the volumes of the input image.");
+
   // test whether BvalueMap contains all necessary information
   if(m_BValueMap.size() == 0)
   {
@@ -81,6 +92,8 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
   m_NumberTargetDirections = m_TargetDirectionsIndicies.size();
   m_TargetGradientDirections = mitk::gradients::CreateNormalizedUniqueGradientDirectionContainer(m_BValueMap,m_OriginalGradientDirections);
 
+  // Rebuilt per execution; a second Update() appended to the matrices of the first.
+  m_ShellInterpolationMatrixVector.clear();
   m_ShellInterpolationMatrixVector.reserve(m_BValueMap.size()-1);
 
   // for each shell
@@ -166,7 +179,7 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
   eit.GoToBegin();
 
   // calculate target bZero-Value [b0_t]
-  const IndicesVector IndicesS0 = m_BValueMap[0.0];
+  const IndicesVector IndicesS0 = m_BValueMap.at(0);
   double AverageS0 = 0.0;
 
   unsigned int numberOfShells = m_BValueMap.size()-1;
@@ -192,6 +205,18 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
     }
     AverageS0 /= (double)IndicesS0.size();
     out = oit.Get();
+
+    // Without a positive baseline there is no attenuation to model; the voxel stays 0.
+    if (!(AverageS0 > 0))
+    {
+      out.Fill(0);
+      oit.Set(out);
+      eit.Set(0);
+      ++eit;
+      ++oit;
+      ++iit;
+      continue;
+    }
     out.SetElement(0,AverageS0);
 
     shellIterator = m_BValueMap.begin();
@@ -222,8 +247,19 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
     (*m_Functor)(NewSignalMatrix, /*const &*/SignalMatrix,/*const &*/ AverageS0);
     SignalVector = NewSignalMatrix.get_column(0);
 
+    // A non-positive interpolated signal makes the functors' logarithms NaN, and converting NaN or
+    // an out-of-range value to the integer output is undefined: such values give 0, the others are
+    // clamped and truncated as before.
     for(unsigned int i = 1 ; i < out.Size(); i ++)
-      out.SetElement(i,SignalVector.get(i-1));
+    {
+      const double value = SignalVector.get(i-1);
+      if (!std::isfinite(value))
+        out.SetElement(i, 0);
+      else
+        out.SetElement(i, static_cast<OutputScalarType>(std::clamp(value,
+          static_cast<double>(std::numeric_limits<OutputScalarType>::lowest()),
+          static_cast<double>(std::numeric_limits<OutputScalarType>::max()))));
+    }
 
     eit.Set(NewSignalMatrix.get_column(1).mean());
 
