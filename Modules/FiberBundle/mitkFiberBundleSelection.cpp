@@ -53,6 +53,19 @@ namespace
     for (unsigned int i=0; i<polyData->GetNumberOfCells(); ++i)
       builder.AddFiber(polyData, i, fib->GetFiberWeight(i));
   }
+
+  /** The bundle whose metadata a join keeps: the first one with fibers. Joins are commonly
+   *  written as FiberBundle::New()->AddBundles(list), whose empty first bundle has neither a
+   *  reference geometry nor the coordinate convention of the joined fibers. */
+  const mitk::FiberBundle* MetadataSourceOfJoin(const mitk::FiberBundle* first, const std::vector<const mitk::FiberBundle*>& others)
+  {
+    if (first->GetNumFibers()>0)
+      return first;
+    for (auto fib : others)
+      if (fib!=nullptr && fib->GetNumFibers()>0)
+        return fib;
+    return first;
+  }
 }
 
 // merge fiber bundles
@@ -60,11 +73,15 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundles(const std::vector< mitk
 {
   FiberPolyDataBuilder builder;
   AddAllFibers(builder, this);
+  std::vector<const FiberBundle*> others;
   // null entries add nothing
   for (const auto& fib : fibs)
     if (fib.IsNotNull())
+    {
       AddAllFibers(builder, fib);
-  return builder.CreateBundle(this);
+      others.push_back(fib);
+    }
+  return builder.CreateBundle(MetadataSourceOfJoin(this, others));
 }
 
 // merge two fiber bundles
@@ -77,7 +94,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundle(const mitk::FiberBundle*
   FiberPolyDataBuilder builder;
   AddAllFibers(builder, this);
   AddAllFibers(builder, fib);
-  return builder.CreateBundle(this);
+  return builder.CreateBundle(MetadataSourceOfJoin(this, {fib}));
 }
 
 // Only retain fibers with a weight larger than the specified threshold

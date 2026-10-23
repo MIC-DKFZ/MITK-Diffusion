@@ -16,7 +16,10 @@ found in the LICENSE file.
 
 void mitk::FiberBundleDetail::CopyMetadata(const FiberBundle* source, FiberBundle* target)
 {
-  target->SetTrackVisHeader(source->GetTrackVisHeader());
+  // A header derived from the source's bounding box is not copied: the target derives its own,
+  // which contains the target's fibers.
+  if (source->HasTrackVisHeader())
+    target->SetTrackVisHeader(source->GetTrackVisHeader());
   target->setIsRAS(source->IsRAS());
 }
 

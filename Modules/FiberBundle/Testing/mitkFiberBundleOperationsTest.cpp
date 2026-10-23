@@ -20,6 +20,9 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itkMath.h>
+#include <vnl/vnl_inverse.h>
+#include <vnl/vnl_matrix_fixed.h>
+#include <vnl/vnl_vector_fixed.h>
 #include <omp.h>
 #include <vtkCell.h>
 #include <vtkCellArray.h>
@@ -82,6 +85,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ColorFibersByScalarMap_Mask_ColoursAndWeightsFromTheMask);
   MITK_TEST(TransformFibers_ItkTransform_MovesEveryPoint);
   MITK_TEST(ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat);
+  MITK_TEST(TrackVisHeader_JoinedAndMovedBundles_ContainEveryPoint);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -998,6 +1002,64 @@ public:
       }
       CPPUNIT_ASSERT_EQUAL(source->GetFiberWeight(i), fib->GetFiberWeight(i));
     }
+  }
+
+  /** Every point lies in the volume the TrackVis header declares: its corner-based voxel
+   *  coordinate (vox_to_ras^-1 * RAS + 0.5) is within [0, dim], as dipy's bounding box check asks. */
+  static void AssertHeaderContainsAllPoints(mitk::FiberBundle *fib, const std::string &message)
+  {
+    const auto header = fib->GetTrackVisHeader();
+    vnl_matrix_fixed<double, 3, 3> a;
+    vnl_vector_fixed<double, 3> t;
+    for (int r = 0; r < 3; ++r)
+    {
+      t[r] = header.vox_to_ras[r][3];
+      for (int c = 0; c < 3; ++c)
+        a[r][c] = header.vox_to_ras[r][c];
+    }
+    const auto inverse = vnl_inverse(a);
+    auto points = fib->GetFiberPolyData()->GetPoints();
+    CPPUNIT_ASSERT_MESSAGE(message, points->GetNumberOfPoints() > 0);
+    for (vtkIdType i = 0; i < points->GetNumberOfPoints(); ++i)
+    {
+      const double *p = points->GetPoint(i);
+      const vnl_vector_fixed<double, 3> ras(-p[0], -p[1], p[2]);
+      const auto index = inverse * (ras - t);
+      for (int c = 0; c < 3; ++c)
+        CPPUNIT_ASSERT_MESSAGE(message + ": point " + std::to_string(i),
+                               index[c] + 0.5 >= -1e-3 && index[c] + 0.5 <= header.dim[c] + 1e-3);
+    }
+  }
+
+  void TrackVisHeader_JoinedAndMovedBundles_ContainEveryPoint()
+  {
+    auto a = LoadFibers("FiberProcessing/original.fib");
+    auto b = LoadFibers("fiberBundleX.fib");
+    CPPUNIT_ASSERT_MESSAGE("A .fib file sets no header", !a->HasTrackVisHeader());
+
+    // The joins of FiberJoin, FitFibersToImage and FiberClustering, and joins in the views
+    AssertHeaderContainsAllPoints(mitk::FiberBundle::New()->AddBundles({a, b}), "New()->AddBundles");
+    AssertHeaderContainsAllPoints(a->AddBundle(b), "AddBundle");
+    AssertHeaderContainsAllPoints(b->AddBundles({a}), "AddBundles");
+
+    auto moved = a->GetDeepCopy();
+    moved->TranslateFibers(100, 0, 0);
+    AssertHeaderContainsAllPoints(moved, "TranslateFibers");
+    moved->RotateAroundAxis(0, 0, 90);
+    AssertHeaderContainsAllPoints(moved, "RotateAroundAxis");
+
+    // The first bundle with fibers gives the join its coordinate convention and a set header
+    auto withReference = a->GetDeepCopy();
+    withReference->setIsRAS(true);
+    auto header = withReference->GetTrackVisHeader();
+    header.dim[0] = 77;
+    withReference->SetTrackVisHeader(header);
+    CPPUNIT_ASSERT(withReference->HasTrackVisHeader());
+    auto joined = mitk::FiberBundle::New()->AddBundles({nullptr, withReference, b});
+    CPPUNIT_ASSERT_MESSAGE("RAS flag of the first bundle with fibers", joined->IsRAS());
+    CPPUNIT_ASSERT(joined->HasTrackVisHeader());
+    CPPUNIT_ASSERT_EQUAL(77, static_cast<int>(joined->GetTrackVisHeader().dim[0]));
+    CPPUNIT_ASSERT_MESSAGE("A derived header is not copied", !a->AddBundle(withReference)->HasTrackVisHeader());
   }
 };
 

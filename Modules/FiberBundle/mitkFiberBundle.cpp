@@ -31,7 +31,7 @@ mitk::FiberBundle::FiberBundle( vtkPolyData* fiberPolyData )
   , m_IsRAS(false)
 {
   // Zeroed, because the TrackVis writer writes all 1000 bytes (unset fields would leak heap
-  // contents into the file); hdr_size 0 marks "not set yet" for GetTrackVisHeader.
+  // contents into the file); hdr_size 0 marks "no header set" (HasTrackVisHeader).
   std::memset(&m_TrackVisHeader, 0, sizeof(m_TrackVisHeader));
   m_FiberWeights = vtkSmartPointer<vtkFloatArray>::New();
   m_FiberWeights->SetName("FIBER_WEIGHTS");
@@ -194,10 +194,6 @@ void mitk::FiberBundle::UpdateFiberGeometry()
   mitk::Geometry3D::Pointer geometry = mitk::Geometry3D::New();
   geometry->SetFloatBounds(b);
   this->SetGeometry(geometry);
-
-  // The bounding box describes the reference grid until a header is set.
-  if (m_TrackVisHeader.hdr_size==0)
-    this->SetTrackVisHeader(dynamic_cast<const mitk::Geometry3D*>(this->GetGeometry()));
 
   m_UpdateTime3D.Modified();
   m_UpdateTime2D.Modified();
@@ -451,13 +447,19 @@ namespace
 
 mitk::FiberBundle::TrackVis_header mitk::FiberBundle::GetTrackVisHeader() const
 {
-  if (m_TrackVisHeader.hdr_size!=0)
+  if (this->HasTrackVisHeader())
     return m_TrackVisHeader;
-  // No header set yet (a bundle constructed without fibers): that of the bounding box.
+  // Derived from the current bounding box on every call, so that it contains all fibers also after
+  // they were joined, moved or transformed.
   TrackVis_header header = m_TrackVisHeader;
   if (auto geometry = dynamic_cast<const mitk::Geometry3D*>(this->GetGeometry()))
     FillTrackVisHeader(header, geometry);
   return header;
+}
+
+bool mitk::FiberBundle::HasTrackVisHeader() const
+{
+  return m_TrackVisHeader.hdr_size!=0;
 }
 
 void mitk::FiberBundle::SetTrackVisHeader(const mitk::FiberBundle::TrackVis_header &TrackVisHeader)

@@ -173,9 +173,12 @@ public:
         int                 hdr_size;
     };
 
-    /** The header set, read from a .trk file or set from a reference geometry; until there is
-     *  one, a header describing the bundle's bounding box. */
+    /** The header set, read from a .trk file or set from a reference geometry; while there is
+     *  none, a header describing the bundle's current bounding box. */
     TrackVis_header GetTrackVisHeader() const;
+    /** Whether a header was set (read from a .trk file, set from a reference geometry or copied
+     *  from a bundle that had one), as opposed to the one derived from the bounding box. */
+    bool HasTrackVisHeader() const;
     void SetTrackVisHeader(const TrackVis_header &TrackVisHeader);
     void SetTrackVisHeader(const BaseGeometry *geometry);
 

@@ -31,7 +31,8 @@ found in the LICENSE file.
 namespace mitk::FiberBundleDetail
 {
   /** Bundles derived from another one keep its coordinate convention (the VTK writer saves
-   *  RAS bundles back in RAS) and its TrackVis header (reference geometry for .trk files). */
+   *  RAS bundles back in RAS) and the TrackVis header set on it (reference geometry for .trk
+   *  files). */
   void CopyMetadata(const FiberBundle* source, FiberBundle* target);
 
   /**
