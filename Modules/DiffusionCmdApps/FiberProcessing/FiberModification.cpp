@@ -186,15 +186,15 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("rotate_z"))
     rotateZ = us::any_cast<float>(parsedArgs["rotate_z"]);
 
-  float scaleX = 0;
+  float scaleX = 1;
   if (parsedArgs.count("scale_x"))
     scaleX = us::any_cast<float>(parsedArgs["scale_x"]);
 
-  float scaleY = 0;
+  float scaleY = 1;
   if (parsedArgs.count("scale_y"))
     scaleY = us::any_cast<float>(parsedArgs["scale_y"]);
 
-  float scaleZ = 0;
+  float scaleZ = 1;
   if (parsedArgs.count("scale_z"))
     scaleZ = us::any_cast<float>(parsedArgs["scale_z"]);
 
@@ -268,14 +268,13 @@ int main(int argc, char* argv[])
       fib->MirrorFibers(2);
 
 
-    if (rotateX > 0 || rotateY > 0 || rotateZ > 0){
-      std::cout << "Rotate " << rotateX << " " << rotateY << " " << rotateZ;
+    // A transformation runs whenever one of its options is given, whatever the sign; the
+    // components not given are neutral (angle and offset 0, scale factor 1).
+    if (parsedArgs.count("rotate_x") || parsedArgs.count("rotate_y") || parsedArgs.count("rotate_z"))
       fib->RotateAroundAxis(rotateX, rotateY, rotateZ);
-    }
-    if (translateX > 0 || translateY > 0 || translateZ > 0){
+    if (parsedArgs.count("translate_x") || parsedArgs.count("translate_y") || parsedArgs.count("translate_z"))
       fib->TranslateFibers(translateX, translateY, translateZ);
-    }
-    if (scaleX > 0 || scaleY > 0 || scaleZ > 0)
+    if (parsedArgs.count("scale_x") || parsedArgs.count("scale_y") || parsedArgs.count("scale_z"))
       fib->ScaleFibers(scaleX, scaleY, scaleZ);
 
     mitk::IOUtil::Save(fib.GetPointer(), outFileName );
