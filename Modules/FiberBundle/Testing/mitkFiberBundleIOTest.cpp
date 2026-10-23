@@ -79,6 +79,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TrkWriter_Header_DescribesReferenceGrid);
   MITK_TEST(DicomReader_NoAlgorithmIdentification_LoadsAndKeepsLocale);
   MITK_TEST(PlanarFigureComposite_RoundTripAndBrokenFile_KeepLocale);
+  MITK_TEST(PlanarFigureComposite_UnknownOperation_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -418,6 +419,17 @@ public:
     CPPUNIT_ASSERT(brokenThrew);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("Locale after writing", expected, afterWriting);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("Locale after a failed read", expected, afterBroken);
+  }
+
+  void PlanarFigureComposite_UnknownOperation_Throws()
+  {
+    const std::string path = m_TempDir + "/unknown.pfc";
+    std::ofstream(path) << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<comptype>7</comptype>\n";
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load(path), mitk::Exception);
+
+    std::ofstream(path) << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<comptype>1</comptype>\n";
+    CPPUNIT_ASSERT_EQUAL(mitk::PlanarFigureComposite::OR,
+                         mitk::IOUtil::Load<mitk::PlanarFigureComposite>(path)->getOperationType());
   }
 
   void TckReader_AllFloatTypes_ReadSamePoints()

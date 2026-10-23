@@ -78,10 +78,10 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::PlanarFigureCompositeReade
             MITK_INFO << "loading NOT composition";
             break;
         default:
-            MITK_ERROR << filename << " contains no valid composition type!";
+            // A composite with a default operation would silently extract other fibers.
+            mitkThrow() << filename << " contains no valid composition type (" << comptype << ").";
         }
 
-        std::vector<itk::SmartPointer<mitk::BaseData> > result;
         result.push_back(pfc.GetPointer());
 
         return result;
