@@ -175,12 +175,7 @@ public:
   /** Normalization performed on the reconstructed ODF according
   * to method set in m_NormalizationMethod
   */
-  OdfPixelType Normalize(OdfPixelType odf, double b0 );
-
-  /** Normalization performed on diffusion signal vector according
-  * to method set in m_NormalizationMethod
-  */
-  vnl_vector<TOdfPixelType> PreNormalize( vnl_vector<TOdfPixelType> vec );
+  void Normalize(OdfPixelType &odf) const;
 
   /** Threshold on the reference image data. The output ODF will be a null
    * pdf for pixels in the reference image that have a value less than this

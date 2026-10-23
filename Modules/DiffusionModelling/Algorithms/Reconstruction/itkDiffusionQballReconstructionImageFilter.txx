@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionConstIteratorWithIndex.h"
 #include "itkImageRegionIterator.h"
 #include "itkArray.h"
+#include "vnl/vnl_sse.h"
 #include "vnl/vnl_vector.h"
 #include "mitkPointShell.h"
 
@@ -87,8 +88,8 @@ namespace itk {
   class TOdfPixelType,
     int NrOdfDirections,
     int NrBasisFunctionCenters>
-    typename itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::OdfPixelType
-    itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::Normalize( OdfPixelType odf, double /*b0*/ )
+    void
+    itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::Normalize( OdfPixelType &odf ) const
   {
     switch( m_NormalizationMethod )
     {
@@ -96,23 +97,9 @@ namespace itk {
     case QBR_STANDARD:
       {
         odf.Normalize();
-        return odf;
+        break;
       }
     }
-
-    return odf;
-  }
-
-
-  template< class TReferenceImagePixelType,
-  class TGradientImagePixelType,
-  class TOdfPixelType,
-    int NrOdfDirections,
-    int NrBasisFunctionCenters >
-    vnl_vector<TOdfPixelType> itk::DiffusionQballReconstructionImageFilter<TReferenceImagePixelType, TGradientImagePixelType, TOdfPixelType, NrOdfDirections, NrBasisFunctionCenters>::PreNormalize( vnl_vector<TOdfPixelType> vec )
-  {
-    // standard: no normalization before reconstruction
-    return vec;
   }
 
   template< class TReferenceImagePixelType,
@@ -132,7 +119,10 @@ namespace itk {
     oit.GoToBegin();
     ImageRegionIterator< BZeroImageType > oit2(m_BZeroImage, outputRegionForThread);
     oit2.GoToBegin();
+    // Buffers of this work unit, so that no voxel allocates.
     vnl_vector<TOdfPixelType> B(m_NumberOfGradientDirections);
+    vnl_vector<TOdfPixelType> odfValues(NOdfDirections);
+    OdfPixelType odf;
 
     // init input iterator
     typedef ImageRegionConstIterator< GradientImagesType > GradientIteratorType;
@@ -165,7 +155,7 @@ namespace itk {
       b0 /= this->m_NumberOfBaselineImages;
 
       // init resulting ODF
-      OdfPixelType odf(0.0);
+      odf.Fill(0.0);
 
       // threshold on reference value to suppress noisy regions
       if( (b0 != 0) && (b0 >= m_Threshold) )
@@ -175,14 +165,14 @@ namespace itk {
           B[i] = static_cast<TOdfPixelType>(b[gradientind[i]]);
         }
 
-        // pre-normalization according to m_NormalizationMethod
-        B = PreNormalize(B);
-
-        // actual reconstruction
-        odf = ( m_ReconstructionMatrix * B ).data_block();
+        // actual reconstruction (the standard method normalizes no signal before); the product of
+        // vnl's matrix * vector operator, without its temporary
+        vnl_sse<TOdfPixelType>::matrix_x_vector(m_ReconstructionMatrix.data_block(), B.data_block(), odfValues.data_block(),
+                                                m_ReconstructionMatrix.rows(), m_ReconstructionMatrix.cols());
+        odf = odfValues.data_block();
 
         // post-normalization according to m_NormalizationMethod
-        odf = Normalize(odf, b0);
+        Normalize(odf);
 
       }
 
@@ -302,37 +292,6 @@ namespace itk {
       C(2,i) = 0.0;
     }
 
-    // rotate the sampling points to each directions of interest
-    vnl_matrix<double> S(3,m_NumberOfEquatorSamplingPoints*NOdfDirections);
-
-    {
-      vnl_vector_fixed<double,3> z(0.0);
-      z.put(2,NumericTraits<double>::One);
-      vnl_matrix_fixed<double,3,3> eye(0.0);
-      eye.fill_diagonal(NumericTraits<double>::One);
-      for(int i=0; i<NOdfDirections; i++)
-      {
-        vnl_vector_fixed<double,3> ui   = U.get_column(i);
-        vnl_matrix<double> RC(3,m_NumberOfEquatorSamplingPoints);
-
-        if( (z(0)*ui(0)+z(1)*ui(1)+z(2)*ui(2)+1) != 0 )
-        {
-          vnl_matrix_fixed<double,3,3> R;
-          R.set_column(0, (z+ui)*(z(0)+ui(0)));
-          R.set_column(1, (z+ui)*(z(1)+ui(1)));
-          R.set_column(2, (z+ui)*(z(2)+ui(2)));
-          R /= (z(0)*ui(0)+z(1)*ui(1)+z(2)*ui(2)+1);
-          R -= eye;
-          RC = R*C;
-        }
-        else
-        {
-          RC = C;
-        }
-        S.set_columns(i*m_NumberOfEquatorSamplingPoints, RC);
-      }
-    }
-
     // determine interpolation kernel width first
     // use to determine diffusion measurement contribution to each of the kernels
     vnl_matrix<double> H_plus(NBasisFunctionCenters,m_NumberOfGradientDirections);
@@ -401,51 +360,76 @@ namespace itk {
 
     }
 
-    // this is the contribution of each kernel to each sampling point on the
-    // equator
-    vnl_matrix<double> G(m_NumberOfEquatorSamplingPoints*NOdfDirections,NBasisFunctionCenters);
-
-    {
-      for(unsigned int r=0; r<m_NumberOfEquatorSamplingPoints*NOdfDirections; r++)
-      {
-        for(int c=0; c<NBasisFunctionCenters; c++)
-        {
-          double stv =  S(0,r)*V(0,c)
-            + S(1,r)*V(1,c)
-            + S(2,r)*V(2,c);
-          stv = (stv<-1.0) ? -1.0 : ( (stv>1.0) ? 1.0 : stv);
-          double x = acos(stv);
-          G(r,c) = (1.0/(bestSigma*sqrt(2.0*itk::Math::pi)))
-            *exp((-x*x)/(2*bestSigma*bestSigma));
-        }
-      }
-    }
-
-    vnl_matrix<double> GH_plus = G * H_plus;
-
-    typename vnl_matrix<double>::iterator it3;
-    for( it3 = GH_plus.begin(); it3 != GH_plus.end(); it3++)
-    {
-      if(*it3<0.0)
-        *it3 = 0;
-    }
-
-    // this is an addition to the original tuch algorithm
-    for(unsigned int i=0; i<NOdfDirections*m_NumberOfEquatorSamplingPoints; i++)
-    {
-      vnl_vector< double > r = GH_plus.get_row(i);
-      r /= r.sum();
-      GH_plus.set_row(i,r);
-    }
-
+    // Per ODF direction: its equator sampling points (the equator rotated to the direction), the
+    // contribution G of each kernel to each point, and G * H_plus with negative weights set to 0 and
+    // each row normalized to sum 1 (an addition to the original Tuch algorithm), summed over the
+    // points. One direction at a time: G and G * H_plus of all directions together had
+    // m * NOdfDirections rows (25 MB for 30 half-sphere gradients). The products are row by row the
+    // same, so the matrix is too.
     m_ReconstructionMatrix = vnl_matrix<TOdfPixelType>(NOdfDirections,m_NumberOfGradientDirections,0.0);
-    for(int i=0; i<NOdfDirections; i++)
     {
-      for(unsigned int j=0; j<m_NumberOfGradientDirections; j++)
+      vnl_vector_fixed<double,3> z(0.0);
+      z.put(2,NumericTraits<double>::One);
+      vnl_matrix_fixed<double,3,3> eye(0.0);
+      eye.fill_diagonal(NumericTraits<double>::One);
+      vnl_matrix<double> RC(3,m_NumberOfEquatorSamplingPoints);
+      vnl_matrix<double> G(m_NumberOfEquatorSamplingPoints,NBasisFunctionCenters);
+      for(int i=0; i<NOdfDirections; i++)
       {
+        // rotate the sampling points to the direction of interest
+        vnl_vector_fixed<double,3> ui   = U.get_column(i);
+        if( (z(0)*ui(0)+z(1)*ui(1)+z(2)*ui(2)+1) != 0 )
+        {
+          vnl_matrix_fixed<double,3,3> R;
+          R.set_column(0, (z+ui)*(z(0)+ui(0)));
+          R.set_column(1, (z+ui)*(z(1)+ui(1)));
+          R.set_column(2, (z+ui)*(z(2)+ui(2)));
+          R /= (z(0)*ui(0)+z(1)*ui(1)+z(2)*ui(2)+1);
+          R -= eye;
+          RC = R*C;
+        }
+        else
+        {
+          RC = C;
+        }
+
+        // the contribution of each kernel to each sampling point on the equator
         for(unsigned int k=0; k<m_NumberOfEquatorSamplingPoints; k++)
         {
-          m_ReconstructionMatrix(i,j) += (TOdfPixelType)GH_plus(m_NumberOfEquatorSamplingPoints*i+k,j);
+          for(int c=0; c<NBasisFunctionCenters; c++)
+          {
+            double stv =  RC(0,k)*V(0,c)
+              + RC(1,k)*V(1,c)
+              + RC(2,k)*V(2,c);
+            stv = (stv<-1.0) ? -1.0 : ( (stv>1.0) ? 1.0 : stv);
+            double x = acos(stv);
+            G(k,c) = (1.0/(bestSigma*sqrt(2.0*itk::Math::pi)))
+              *exp((-x*x)/(2*bestSigma*bestSigma));
+          }
+        }
+
+        vnl_matrix<double> GH_plus = G * H_plus;
+
+        typename vnl_matrix<double>::iterator it3;
+        for( it3 = GH_plus.begin(); it3 != GH_plus.end(); it3++)
+        {
+          if(*it3<0.0)
+            *it3 = 0;
+        }
+
+        for(unsigned int k=0; k<m_NumberOfEquatorSamplingPoints; k++)
+        {
+          vnl_vector< double > r = GH_plus.get_row(k);
+          r /= r.sum();
+          GH_plus.set_row(k,r);
+        }
+
+        for(unsigned int j=0; j<m_NumberOfGradientDirections; j++)
+        {
+          for(unsigned int k=0; k<m_NumberOfEquatorSamplingPoints; k++)
+          {
+            m_ReconstructionMatrix(i,j) += (TOdfPixelType)GH_plus(k,j);
+          }
         }
       }
     }
