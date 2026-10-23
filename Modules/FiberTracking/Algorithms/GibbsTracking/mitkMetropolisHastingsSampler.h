@@ -25,7 +25,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // ITK
 #include <itkImage.h>
-#include <itkTimeProbe.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 
 // MISC
@@ -50,7 +49,6 @@ public:
     void MakeProposal();    ///< make proposal for birth/death/shift/connection of particles
     int GetNumAcceptedProposals();
     void SetProbabilities(float birth, float death, float shift, float optShift, float connect);    ///< update the probabilities of the single proposals
-    void PrintProposalTimes();  ///< print the state of the proposal time probes
 
 protected:
 
@@ -94,13 +92,6 @@ protected:
     ParticleGrid*   m_ParticleGrid;         ///< storest all particles
     EnergyComputer* m_EnergyComputer;       ///< computes internal and external energy of particles
     unsigned int    m_AcceptedProposals;    ///< counts accepted proposals
-
-    /** Time probes for the single proposals */
-    itk::TimeProbe  m_BirthTime;
-    itk::TimeProbe  m_DeathTime;
-    itk::TimeProbe  m_ShiftTime;
-    itk::TimeProbe  m_OptShiftTime;
-    itk::TimeProbe  m_ConnectionTime;
 };
 
 }

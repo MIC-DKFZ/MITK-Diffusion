@@ -69,18 +69,6 @@ void MetropolisHastingsSampler::SetProbabilities(float birth, float death, float
     std::cout << "Connection: " << m_ConnectionProb << std::endl;
 }
 
-// print proposal times
-void MetropolisHastingsSampler::PrintProposalTimes()
-{
-    double sum = m_BirthTime.GetTotal()+m_DeathTime.GetTotal()+m_ShiftTime.GetTotal()+m_OptShiftTime.GetTotal()+m_ConnectionTime.GetTotal();
-    std::cout << "Proposal time probes (toal%/mean)" << std::endl;
-    std::cout << "Birth: " << 100*m_BirthTime.GetTotal()/sum << "/" << m_BirthTime.GetMean()*1000 << std::endl;
-    std::cout << "Death: " << 100*m_DeathTime.GetTotal()/sum << "/" << m_DeathTime.GetMean()*1000 << std::endl;
-    std::cout << "Shift: " << 100*m_ShiftTime.GetTotal()/sum << "/" << m_ShiftTime.GetMean()*1000 << std::endl;
-    std::cout << "Optimal shift: " << 100*m_OptShiftTime.GetTotal()/sum << " - " << m_OptShiftTime.GetMean()*1000 << std::endl;
-    std::cout << "Connection: " << 100*m_ConnectionTime.GetTotal()/sum << "/" << m_ConnectionTime.GetMean()*1000 << std::endl;
-}
-
 // update temperature of simulated annealing process
 void MetropolisHastingsSampler::SetTemperature(float val)
 {
@@ -115,7 +103,6 @@ void MetropolisHastingsSampler::MakeProposal()
     // Birth Proposal
     if (randnum < m_BirthProb)
     {
-        m_BirthTime.Start();
         vnl_vector_fixed<float, 3> R;
         m_EnergyComputer->DrawRandomPosition(R);
         vnl_vector_fixed<float, 3> N = GetRandomDirection();
@@ -139,12 +126,10 @@ void MetropolisHastingsSampler::MakeProposal()
                 m_AcceptedProposals++;
             }
         }
-        m_BirthTime.Stop();
     }
     // Death Proposal
     else if (randnum < m_BirthProb+m_DeathProb)
     {
-        m_DeathTime.Start();
         if (m_ParticleGrid->m_NumParticles > 0)
         {
             int pnum = m_RandGen->GetIntegerVariate()%m_ParticleGrid->m_NumParticles;
@@ -163,14 +148,12 @@ void MetropolisHastingsSampler::MakeProposal()
                 }
             }
         }
-        m_DeathTime.Stop();
     }
     // Shift Proposal
     else  if (randnum < m_BirthProb+m_DeathProb+m_ShiftProb)
     {
         if (m_ParticleGrid->m_NumParticles > 0)
         {
-            m_ShiftTime.Start();
             int pnum = m_RandGen->GetIntegerVariate()%m_ParticleGrid->m_NumParticles;
             Particle *p =  m_ParticleGrid->GetParticle(pnum);
             Particle prop_p = *p;
@@ -198,7 +181,6 @@ void MetropolisHastingsSampler::MakeProposal()
                 }
                 m_AcceptedProposals++;
             }
-            m_ShiftTime.Stop();
         }
     }
     // Optimal Shift Proposal
@@ -206,7 +188,6 @@ void MetropolisHastingsSampler::MakeProposal()
     {
         if (m_ParticleGrid->m_NumParticles > 0)
         {
-            m_OptShiftTime.Start();
             int pnum = m_RandGen->GetIntegerVariate()%m_ParticleGrid->m_NumParticles;
             Particle *p =  m_ParticleGrid->GetParticle(pnum);
 
@@ -265,7 +246,6 @@ void MetropolisHastingsSampler::MakeProposal()
                     m_AcceptedProposals++;
                 }
             }
-            m_OptShiftTime.Stop();
         }
     }
     // Connection Proposal
@@ -273,7 +253,6 @@ void MetropolisHastingsSampler::MakeProposal()
     {
         if (m_ParticleGrid->m_NumParticles > 0)
         {
-            m_ConnectionTime.Start();
             int pnum = m_RandGen->GetIntegerVariate()%m_ParticleGrid->m_NumParticles;
             Particle *p = m_ParticleGrid->GetParticle(pnum);
 
@@ -302,7 +281,6 @@ void MetropolisHastingsSampler::MakeProposal()
             }
             else
                 ImplementTrack(m_BackupTrack);
-            m_ConnectionTime.Stop();
         }
     }
 }
