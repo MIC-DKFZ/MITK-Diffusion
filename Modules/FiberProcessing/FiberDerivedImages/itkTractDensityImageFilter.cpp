@@ -23,6 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkCell.h>
 
 // misc
+#include <algorithm>
 #include <cmath>
 #include <boost/timer/progress_display.hpp>
 #include <vtkBox.h>
@@ -104,6 +105,10 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
 
     float weight = m_FiberBundle->GetFiberWeight(i);
 
+    // A streamline counts once per voxel it visits (Calamante's track density), however many of
+    // its segments pass the voxel.
+    std::vector< itk::OffsetValueType > visitedVoxels;
+
     // fill output image
     for( int j=0; j<numPoints-1; j++)
     {
@@ -136,7 +141,7 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
         }
         case VISITATION_COUNT:
         {
-          outImage->SetPixel(segment.first, outImage->GetPixel(segment.first) + 1);
+          visitedVoxels.push_back(outImage->ComputeOffset(segment.first));
           break;
         }
         case DENSITY:
@@ -151,6 +156,11 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
         }
       }
     }
+
+    std::sort(visitedVoxels.begin(), visitedVoxels.end());
+    visitedVoxels.erase(std::unique(visitedVoxels.begin(), visitedVoxels.end()), visitedVoxels.end());
+    for (auto offset : visitedVoxels)
+      outImageBufferPointer[offset] += 1;
   }
 
   m_MaxDensity = 0;

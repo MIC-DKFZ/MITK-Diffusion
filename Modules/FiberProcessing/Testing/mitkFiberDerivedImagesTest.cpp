@@ -32,6 +32,7 @@ class mitkFiberDerivedImagesTestSuite : public mitk::TestFixture
   MITK_TEST(Directions_SizeThresholdDiscardsSmallPeaks);
   MITK_TEST(Grid_DerivedImagesShareBundleGrid);
   MITK_TEST(Grid_UpsampledReferenceSubdividesVoxels);
+  MITK_TEST(Density_VisitationCountsEachFiberOncePerVoxel);
   CPPUNIT_TEST_SUITE_END();
 
   using UcharImageType = itk::Image<unsigned char, 3>;
@@ -231,6 +232,29 @@ public:
             blockSum += fine->GetPixel({{2 * it.GetIndex()[0] + dx, 2 * it.GetIndex()[1] + dy, 2 * it.GetIndex()[2] + dz}});
       CPPUNIT_ASSERT_DOUBLES_EQUAL(it.Get(), blockSum, 1e-4);
     }
+  }
+
+  void Density_VisitationCountsEachFiberOncePerVoxel()
+  {
+    // Five voxels in a row; a densely sampled fiber (about ten points per voxel) and a sparse one
+    // pass all of them.
+    auto reference = FloatImageType::New();
+    FloatImageType::SizeType size = {{5, 1, 1}};
+    reference->SetRegions(FloatImageType::RegionType(size));
+    reference->Allocate();
+
+    using namespace mitk::FiberProcessingTestHelper;
+    auto fib = CreateBundle({Line({-0.4, 0.1, 0.1}, {4.4, 0.1, 0.1}, 48), Line({-0.4, -0.1, -0.1}, {4.4, -0.1, -0.1}, 9)});
+
+    auto filter = itk::TractDensityImageFilter<FloatImageType>::New();
+    filter->SetFiberBundle(fib);
+    filter->SetInputImage(reference);
+    filter->SetUseImageGeometry(true);
+    filter->SetMode(VISITATION_COUNT);
+    filter->SetOutputAbsoluteValues(true);
+    filter->Update();
+    for (int x = 0; x < 5; ++x)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, filter->GetOutput()->GetPixel({{x, 0, 0}}), 1e-9);
   }
 };
 
