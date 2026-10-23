@@ -37,10 +37,7 @@ namespace itk {
 
 StreamlineTrackingFilter
 ::StreamlineTrackingFilter()
-  : m_PauseTracking(false)
-  , m_AbortTracking(false)
-  , m_BuildFibersFinished(false)
-  , m_BuildFibersReady(0)
+  : m_AbortTracking(false)
   , m_FiberPolyData(nullptr)
   , m_Points(nullptr)
   , m_Cells(nullptr)
@@ -51,7 +48,6 @@ StreamlineTrackingFilter
   , m_ExclusionRegions(nullptr)
   , m_OutputProbabilityMap(nullptr)
   , m_Verbose(true)
-  , m_DemoMode(false)
   , m_CurrentTracts(0)
   , m_Progress(0)
   , m_StopTracking(false)
@@ -196,16 +192,8 @@ void StreamlineTrackingFilter::BeforeTracking()
   if (m_SeedPoints.empty())
     GetSeedPointsFromSeedImage();
 
-  m_BuildFibersReady = 0;
-  m_BuildFibersFinished = false;
   m_Tractogram.clear();
-  m_SamplingPointset = mitk::PointSet::New();
-  m_AlternativePointset = mitk::PointSet::New();
-  m_StopVotePointset = mitk::PointSet::New();
   m_StartTime = std::chrono::system_clock::now();
-
-  if (m_DemoMode)
-    omp_set_num_threads(1);
 
   if (m_Parameters->m_Mode==mitk::TrackingDataHandler::MODE::DETERMINISTIC)
     std::cout << "StreamlineTracking - Mode: deterministic" << std::endl;
@@ -254,13 +242,7 @@ void StreamlineTrackingFilter::BeforeTracking()
   if (m_TrackingPriorHandler!=nullptr)
     std::cout << "StreamlineTracking - Using directional prior for tractography (w=" << m_Parameters->m_Weight << ")" << std::endl;
 
-  if (m_DemoMode)
-  {
-    std::cout << "StreamlineTracking - Running in demo mode";
-    std::cout << "StreamlineTracking - Starting streamline tracking using 1 thread" << std::endl;
-  }
-  else
-    std::cout << "StreamlineTracking - Starting streamline tracking using " << omp_get_max_threads() << " threads" << std::endl;
+  std::cout << "StreamlineTracking - Starting streamline tracking using " << omp_get_max_threads() << " threads" << std::endl;
 }
 
 void StreamlineTrackingFilter::CalculateNewPosition(itk::Point<float, 3>& pos, vnl_vector_fixed<float, 3>& dir)
@@ -312,12 +294,6 @@ std::vector< vnl_vector_fixed<float,3> > StreamlineTrackingFilter::CreateDirecti
 
 vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::Point<float, 3> &pos, std::deque<vnl_vector_fixed<float, 3> >& olddirs, itk::Index<3> &oldIndex)
 {
-  if (m_DemoMode)
-  {
-    m_SamplingPointset->Clear();
-    m_AlternativePointset->Clear();
-    m_StopVotePointset->Clear();
-  }
   vnl_vector_fixed<float,3> direction; direction.fill(0);
 
   if (mitk::imv::IsInsideMask<float>(pos, m_Parameters->m_InterpolateRoiImages, m_MaskInterpolator) && !mitk::imv::IsInsideMask<float>(pos, m_Parameters->m_InterpolateRoiImages, m_StopInterpolator))
@@ -332,7 +308,6 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
     vnl_vector_fixed<float,3> olddir = olddirs.back();
     std::vector< vnl_vector_fixed<float,3> > probeVecs = CreateDirections(m_Parameters->m_NumSamples);
     itk::Point<double, 3> sample_pos;
-    unsigned int alternatives = 1;
     for (unsigned int i=0; i<probeVecs.size(); i++)
     {
       vnl_vector_fixed<float,3> d;
@@ -369,16 +344,11 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
       if (tempDir.magnitude()>static_cast<float>(mitk::eps))
       {
         direction += tempDir;
-
-        if(m_DemoMode)
-          m_SamplingPointset->InsertPoint(i, sample_pos);
       }
       else if (m_Parameters->m_AvoidStop && olddir.magnitude()>0.5f) // out of white matter
       {
         if (is_stop_voter)
           stop_votes++;
-        if (m_DemoMode)
-          m_StopVotePointset->InsertPoint(i, sample_pos);
 
         float dot = dot_product(d, olddir);
         if (dot >= 0.0f) // in front of plane defined by pos and olddir
@@ -390,7 +360,6 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
         sample_pos[0] = pos[0] + d[0];
         sample_pos[1] = pos[1] + d[1];
         sample_pos[2] = pos[2] + d[2];
-        alternatives++;
         vnl_vector_fixed<float,3> tempDir; tempDir.fill(0.0);
         if (mitk::imv::IsInsideMask<float>(sample_pos, m_Parameters->m_InterpolateRoiImages, m_MaskInterpolator))
           tempDir = m_TrackingHandler->ProposeDirection(sample_pos, olddirs, oldIndex); // sample neighborhood
@@ -399,21 +368,10 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
         {
           direction += d * m_Parameters->m_DeflectionMod;         // go into the direction of the white matter
           direction += tempDir;  // go into the direction of the white matter direction at this location
-
-          if(m_DemoMode)
-            m_AlternativePointset->InsertPoint(alternatives, sample_pos);
-        }
-        else
-        {
-          if (m_DemoMode)
-            m_StopVotePointset->InsertPoint(i, sample_pos);
         }
       }
       else
       {
-        if (m_DemoMode)
-          m_StopVotePointset->InsertPoint(i, sample_pos);
-
         if (is_stop_voter)
           stop_votes++;
       }
@@ -492,20 +450,6 @@ float StreamlineTrackingFilter::FollowStreamline(itk::Point<float, 3> pos, vnl_v
     if (tractLength>m_Parameters->m_MaxTractLengthMm)
       return tractLength;
 
-    if (m_DemoMode && !m_Parameters->m_OutputProbMap) // CHECK: warum sind die samplingpunkte der streamline in der visualisierung immer einen schritt voras?
-    {
-#pragma omp critical
-      {
-        m_BuildFibersReady++;
-        m_Tractogram.push_back(*fib);
-        BuildFibers(true);
-        m_Stop = true;
-
-        while (m_Stop){
-        }
-      }
-    }
-
     last_dirs.push_back(dir);
     if (last_dirs.size()>m_Parameters->m_NumPreviousDirections)
       last_dirs.pop_front();
@@ -518,8 +462,6 @@ float StreamlineTrackingFilter::FollowStreamline(itk::Point<float, 3> pos, vnl_v
       dpos[2] += dir[2]*m_Parameters->GetStepSizeMm()*0.5;
       dir = GetNewDirection(dpos, last_dirs, oldIndex);
     }
-
-    while (m_PauseTracking){}
 
     if (dir.magnitude()<0.0001f)
       return tractLength;
@@ -858,11 +800,8 @@ void StreamlineTrackingFilter::FiberToProbmap(FiberType* fib)
   }
 }
 
-void StreamlineTrackingFilter::BuildFibers(bool check)
+void StreamlineTrackingFilter::BuildFibers()
 {
-  if (m_BuildFibersReady<omp_get_num_threads() && check)
-    return;
-
   m_FiberPolyData = vtkSmartPointer<vtkPolyData>::New();
   vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
   vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
@@ -879,14 +818,8 @@ void StreamlineTrackingFilter::BuildFibers(bool check)
     vNewLines->InsertNextCell(container);
   }
 
-  if (check)
-    for (int i=0; i<m_BuildFibersReady; i++)
-      m_Tractogram.pop_back();
-  m_BuildFibersReady = 0;
-
   m_FiberPolyData->SetPoints(vNewPoints);
   m_FiberPolyData->SetLines(vNewLines);
-  m_BuildFibersFinished = true;
 }
 
 void StreamlineTrackingFilter::AfterTracking()
@@ -897,7 +830,7 @@ void StreamlineTrackingFilter::AfterTracking()
   {
     MITK_INFO << "Reconstructed " << m_Tractogram.size() << " fibers.";
     MITK_INFO << "Generating polydata ";
-    BuildFibers(false);
+    BuildFibers();
   }
   else
   {

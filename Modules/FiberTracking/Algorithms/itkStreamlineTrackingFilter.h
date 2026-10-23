@@ -31,6 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkPointSet.h>
+#include <atomic>
 #include <chrono>
 #include <TrackingHandlers/mitkTrackingDataHandler.h>
 #include <MitkFiberTrackingExports.h>
@@ -72,14 +73,7 @@ public:
   typedef std::deque< itk::Point<float> > FiberType;
   typedef std::vector< FiberType > BundleType;
 
-  volatile bool    m_PauseTracking;
-  bool    m_AbortTracking;
-  bool    m_BuildFibersFinished;
-  int     m_BuildFibersReady;
-  volatile bool m_Stop;
-  mitk::PointSet::Pointer             m_SamplingPointset;
-  mitk::PointSet::Pointer             m_StopVotePointset;
-  mitk::PointSet::Pointer             m_AlternativePointset;
+  std::atomic<bool> m_AbortTracking;
 
   void SetDicomProperties(mitk::FiberBundle::Pointer fib);
 
@@ -92,9 +86,10 @@ public:
 
   itkSetMacro( StoppingRegions, ItkFloatImgType::Pointer) ///< Streamlines entering a stopping region will stop immediately
   itkSetMacro( TargetRegions, ItkFloatImgType::Pointer)    ///< Only streamline starting and ending in this mask are retained
-  itkSetMacro( DemoMode, bool )
   itkSetMacro( Verbose, bool )                        ///< If true, output tracking progress (might be slower)
-  itkSetMacro( StopTracking, bool )
+
+  /** Called from the GUI thread while the tracking threads run, hence no itkSetMacro (Modified() is not thread-safe). */
+  void SetStopTracking(bool stop) { m_StopTracking = stop; }
 
   ///< Use manually defined points in physical space as seed points instead of seed image
   void SetSeedPoints( const std::vector< itk::Point<float> >& sP) {
@@ -150,13 +145,12 @@ protected:
   ItkDoubleImgType::Pointer           m_OutputProbabilityMap;
 
   bool                                m_Verbose;
-  bool                                m_DemoMode;
   std::vector< itk::Point<float> >    m_SeedPoints;
   unsigned int                        m_CurrentTracts;
   unsigned int                        m_Progress;
-  bool                                m_StopTracking;
+  std::atomic<bool>                   m_StopTracking;
 
-  void BuildFibers(bool check);
+  void BuildFibers();
   float CheckCurvature(DirectionContainer *fib, bool front);
 
   mitk::TrackingDataHandler*          m_TrackingHandler;
