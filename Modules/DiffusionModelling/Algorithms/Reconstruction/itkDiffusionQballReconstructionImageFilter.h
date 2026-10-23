@@ -158,7 +158,7 @@ public:
   typedef VectorImage< GradientPixelType, 3 >      GradientImagesType;
 
   /** Holds the ODF reconstruction matrix */
-  typedef std::unique_ptr<vnl_matrix< TOdfPixelType >>
+  typedef vnl_matrix< TOdfPixelType >
                                                    OdfReconstructionMatrixType;
 
   /** Holds each magnetic field gradient used to acquire one DWImage */
