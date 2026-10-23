@@ -71,7 +71,6 @@ protected slots:
   void OnThickSlicesModeSelected( QAction* action );
   void OnTSNumChanged(int num);
   void ResetColoring();
-  void PlanarFigureFocus();
   void Fiber2DfadingEFX();
   void FiberSlicingThickness2D();
   void LineWidthChanged();
@@ -104,6 +103,7 @@ protected:
   virtual void NodeAdded(const mitk::DataNode *node) override;
   void SetCustomColor(const itk::EventObject& /*e*/);
   void RemoveColorObserver();
+  void PlanarFigureFocus(mitk::DataNode* node);
   bool IsPlaneRotated();
 
   void SliceRotation(const itk::EventObject&);

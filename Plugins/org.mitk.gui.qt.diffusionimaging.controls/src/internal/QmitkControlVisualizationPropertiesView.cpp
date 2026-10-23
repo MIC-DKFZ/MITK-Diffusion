@@ -341,6 +341,8 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
     QSignalBlocker(m_Controls->m_NormalizationDropdown), QSignalBlocker(m_Controls->m_ScalingFactor),
     QSignalBlocker(m_Controls->m_AdditionalScaling), QSignalBlocker(m_Controls->m_OdfColorBox)};
 
+  // As in MITK's measurement view, the last selected planar figure gets the focus.
+  mitk::DataNode::Pointer lastPlanarFigure;
   for (mitk::DataNode::Pointer node: nodes)
   {
     if(node.IsNull())
@@ -511,7 +513,7 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
     }
     else if(dynamic_cast<mitk::PlanarFigure*>(nodeData))
     {
-      PlanarFigureFocus();
+      lastPlanarFigure = node;
     }
     else if( dynamic_cast<mitk::Image*>(nodeData) )
     {
@@ -521,6 +523,9 @@ void QmitkControlVisualizationPropertiesView::OnSelectionChanged(berry::IWorkben
 
     m_SelectedNodes.push_back(node);
   }
+
+  if (lastPlanarFigure.IsNotNull())
+    this->PlanarFigureFocus(lastPlanarFigure);
 
   if( nodes.empty() ) { return; }
 
@@ -1078,134 +1083,64 @@ void QmitkControlVisualizationPropertiesView::ResetColoring()
 }
 
 
-void QmitkControlVisualizationPropertiesView::PlanarFigureFocus()
+void QmitkControlVisualizationPropertiesView::PlanarFigureFocus(mitk::DataNode* node)
 {
-  for (auto node : m_SelectedNodes)
+  mitk::PlanarFigure* _PlanarFigure = dynamic_cast<mitk::PlanarFigure*> (node->GetData());
+  auto renderWindowPart = this->GetRenderWindowPart(mitk::WorkbenchUtil::IRenderWindowPartStrategy::OPEN);
+
+  if (_PlanarFigure && _PlanarFigure->GetPlaneGeometry() && renderWindowPart)
   {
-    if(node)
+    // An editor may not offer all three 2D windows (MxN layouts).
+    QmitkRenderWindow* axialRenderWindow = renderWindowPart->GetQmitkRenderWindow("axial");
+    QmitkRenderWindow* sagittalRenderWindow = renderWindowPart->GetQmitkRenderWindow("sagittal");
+    QmitkRenderWindow* coronalRenderWindow = renderWindowPart->GetQmitkRenderWindow("coronal");
+
+    if (axialRenderWindow && sagittalRenderWindow && coronalRenderWindow)
     {
-      mitk::PlanarFigure* _PlanarFigure = 0;
-      _PlanarFigure = dynamic_cast<mitk::PlanarFigure*> (node->GetData());
+      QmitkRenderWindow* selectedRenderWindow = nullptr;
+      const mitk::PlaneGeometry* _PlaneGeometry = _PlanarFigure->GetPlaneGeometry();
 
-      if (_PlanarFigure && _PlanarFigure->GetPlaneGeometry())
-      {
+      mitk::VnlVector normal = _PlaneGeometry->GetNormalVnl();
+      mitk::VnlVector normal1 = axialRenderWindow->GetRenderer()->GetCurrentWorldPlaneGeometry()->GetNormalVnl();
+      mitk::VnlVector normal2 = sagittalRenderWindow->GetRenderer()->GetCurrentWorldPlaneGeometry()->GetNormalVnl();
+      mitk::VnlVector normal3 = coronalRenderWindow->GetRenderer()->GetCurrentWorldPlaneGeometry()->GetNormalVnl();
 
-        QmitkRenderWindow* selectedRenderWindow = 0;
-        bool PlanarFigureInitializedWindow = false;
+      normal[0]  = fabs(normal[0]);  normal[1]  = fabs(normal[1]);  normal[2]  = fabs(normal[2]);
+      normal1[0] = fabs(normal1[0]); normal1[1] = fabs(normal1[1]); normal1[2] = fabs(normal1[2]);
+      normal2[0] = fabs(normal2[0]); normal2[1] = fabs(normal2[1]); normal2[2] = fabs(normal2[2]);
+      normal3[0] = fabs(normal3[0]); normal3[1] = fabs(normal3[1]); normal3[2] = fabs(normal3[2]);
 
-        auto renderWindowPart = this->GetRenderWindowPart(mitk::WorkbenchUtil::IRenderWindowPartStrategy::OPEN);
+      double ang1 = angle(normal, normal1);
+      double ang2 = angle(normal, normal2);
+      double ang3 = angle(normal, normal3);
 
-        QmitkRenderWindow* axialRenderWindow =
-            renderWindowPart->GetQmitkRenderWindow("axial");
+      if(ang1 < ang2 && ang1 < ang3)
+        selectedRenderWindow = axialRenderWindow;
+      else if(ang2 < ang3)
+        selectedRenderWindow = sagittalRenderWindow;
+      else
+        selectedRenderWindow = coronalRenderWindow;
 
-        if (node->GetBoolProperty("PlanarFigureInitializedWindow",
-                                            PlanarFigureInitializedWindow, axialRenderWindow->GetRenderer()))
-        {
-          selectedRenderWindow = axialRenderWindow;
-        }
-
-        QmitkRenderWindow* sagittalRenderWindow =
-            renderWindowPart->GetQmitkRenderWindow("sagittal");
-
-        if (!selectedRenderWindow && node->GetBoolProperty(
-              "PlanarFigureInitializedWindow", PlanarFigureInitializedWindow,
-              sagittalRenderWindow->GetRenderer()))
-        {
-          selectedRenderWindow = sagittalRenderWindow;
-        }
-
-        QmitkRenderWindow* coronalRenderWindow =
-            renderWindowPart->GetQmitkRenderWindow("coronal");
-
-        if (!selectedRenderWindow && node->GetBoolProperty(
-              "PlanarFigureInitializedWindow", PlanarFigureInitializedWindow,
-              coronalRenderWindow->GetRenderer()))
-        {
-          selectedRenderWindow = coronalRenderWindow;
-        }
-
-        QmitkRenderWindow* _3DRenderWindow =
-            renderWindowPart->GetQmitkRenderWindow("3d");
-
-        if (!selectedRenderWindow && node->GetBoolProperty(
-              "PlanarFigureInitializedWindow", PlanarFigureInitializedWindow,
-              _3DRenderWindow->GetRenderer()))
-        {
-          selectedRenderWindow = _3DRenderWindow;
-        }
-
-        const mitk::PlaneGeometry* _PlaneGeometry = _PlanarFigure->GetPlaneGeometry();
-
-        mitk::VnlVector normal = _PlaneGeometry->GetNormalVnl();
-
-        mitk::PlaneGeometry::ConstPointer worldGeometry1 =
-            axialRenderWindow->GetRenderer()->GetCurrentWorldPlaneGeometry();
-        mitk::PlaneGeometry::ConstPointer _Plane1 =
-            dynamic_cast<const mitk::PlaneGeometry*>( worldGeometry1.GetPointer() );
-        mitk::VnlVector normal1 = _Plane1->GetNormalVnl();
-
-        mitk::PlaneGeometry::ConstPointer worldGeometry2 =
-            sagittalRenderWindow->GetRenderer()->GetCurrentWorldPlaneGeometry();
-        mitk::PlaneGeometry::ConstPointer _Plane2 =
-            dynamic_cast<const mitk::PlaneGeometry*>( worldGeometry2.GetPointer() );
-        mitk::VnlVector normal2 = _Plane2->GetNormalVnl();
-
-        mitk::PlaneGeometry::ConstPointer worldGeometry3 =
-            coronalRenderWindow->GetRenderer()->GetCurrentWorldPlaneGeometry();
-        mitk::PlaneGeometry::ConstPointer _Plane3 =
-            dynamic_cast<const mitk::PlaneGeometry*>( worldGeometry3.GetPointer() );
-        mitk::VnlVector normal3 = _Plane3->GetNormalVnl();
-
-        normal[0]  = fabs(normal[0]);  normal[1]  = fabs(normal[1]);  normal[2]  = fabs(normal[2]);
-        normal1[0] = fabs(normal1[0]); normal1[1] = fabs(normal1[1]); normal1[2] = fabs(normal1[2]);
-        normal2[0] = fabs(normal2[0]); normal2[1] = fabs(normal2[1]); normal2[2] = fabs(normal2[2]);
-        normal3[0] = fabs(normal3[0]); normal3[1] = fabs(normal3[1]); normal3[2] = fabs(normal3[2]);
-
-        double ang1 = angle(normal, normal1);
-        double ang2 = angle(normal, normal2);
-        double ang3 = angle(normal, normal3);
-
-        if(ang1 < ang2 && ang1 < ang3)
-        {
-          selectedRenderWindow = axialRenderWindow;
-        }
-        else
-        {
-          if(ang2 < ang3)
-          {
-            selectedRenderWindow = sagittalRenderWindow;
-          }
-          else
-          {
-            selectedRenderWindow = coronalRenderWindow;
-          }
-        }
-
-        // make node visible
-        if (selectedRenderWindow)
-        {
-          const mitk::Point3D& centerP = _PlaneGeometry->GetOrigin();
-          selectedRenderWindow->GetSliceNavigationController()->ReorientSlices(
-                centerP, _PlaneGeometry->GetNormal());
-        }
-      }
-
-      // set interactor for new node (if not already set)
-      mitk::PlanarFigureInteractor::Pointer figureInteractor
-          = dynamic_cast<mitk::PlanarFigureInteractor*>(node->GetDataInteractor().GetPointer());
-
-      if(figureInteractor.IsNull())
-      {
-        figureInteractor = mitk::PlanarFigureInteractor::New();
-        us::Module* planarFigureModule = us::ModuleRegistry::GetModule( "MitkPlanarFigure" );
-        figureInteractor->LoadStateMachine("PlanarFigureInteraction.xml", planarFigureModule );
-        figureInteractor->SetEventConfig( "PlanarFigureConfig.xml", planarFigureModule );
-        figureInteractor->SetDataNode( node );
-      }
-
-      node->SetProperty("planarfigure.iseditable",mitk::BoolProperty::New(true));
+      // make node visible
+      const mitk::Point3D& centerP = _PlaneGeometry->GetOrigin();
+      selectedRenderWindow->GetSliceNavigationController()->ReorientSlices(centerP, _PlaneGeometry->GetNormal());
     }
   }
+
+  // set interactor for new node (if not already set)
+  mitk::PlanarFigureInteractor::Pointer figureInteractor
+      = dynamic_cast<mitk::PlanarFigureInteractor*>(node->GetDataInteractor().GetPointer());
+
+  if(figureInteractor.IsNull())
+  {
+    figureInteractor = mitk::PlanarFigureInteractor::New();
+    us::Module* planarFigureModule = us::ModuleRegistry::GetModule( "MitkPlanarFigure" );
+    figureInteractor->LoadStateMachine("PlanarFigureInteraction.xml", planarFigureModule );
+    figureInteractor->SetEventConfig( "PlanarFigureConfig.xml", planarFigureModule );
+    figureInteractor->SetDataNode( node );
+  }
+
+  node->SetProperty("planarfigure.iseditable",mitk::BoolProperty::New(true));
 }
 
 
