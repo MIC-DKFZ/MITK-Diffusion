@@ -22,6 +22,10 @@ class mitkFiberExtractionFilterTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkFiberExtractionFilterTestSuite);
   MITK_TEST(Endpoints_SeveralRois_EachFiberOnce);
   MITK_TEST(Labels_SeveralLabelMaps_EachFiberOnce);
+  MITK_TEST(Labels_SelfConnections);
+  MITK_TEST(Labels_StartEndLabelsDoNotChangeBothEnds);
+  MITK_TEST(Update_TwiceGivesSameOutputs);
+  MITK_TEST(Update_EmptyTractogramGivesEmptyOutputs);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::FiberExtractionFilter<float>;
@@ -50,7 +54,104 @@ class mitkFiberExtractionFilterTestSuite : public mitk::TestFixture
                          Line({5, 8, 0}, {9, 8, 0}, 5)});
   }
 
+  /** 10 x 10 x 1 voxels: label 3 for x < 3, label 4 for x >= 6, 0 between. */
+  static ImageType::Pointer CreateLabels()
+  {
+    auto image = CreateRoi(3);
+    for (int x = 6; x < 10; ++x)
+      for (int y = 0; y < 10; ++y)
+        image->SetPixel({{x, y, 0}}, 4);
+    return image;
+  }
+
+  /** Fiber 0 connects label 3 with itself, fiber 1 labels 3 and 4, fiber 2 label 3 and 0,
+   * fiber 3 lies in label 0. */
+  static mitk::FiberBundle::Pointer LabelFibers()
+  {
+    using namespace mitk::FiberProcessingTestHelper;
+    return CreateBundle({{{1, 1, 0}, {4.4, 5, 0}, {1, 8, 0}},
+                         Line({1, 2, 0}, {8, 2, 0}, 5),
+                         Line({1, 7, 0}, {4.4, 7, 0}, 3),
+                         Line({4, 9, 0}, {5, 9, 0}, 2)});
+  }
+
+  static FilterType::Pointer LabelFilter(mitk::FiberBundle::Pointer fib, ImageType* labels)
+  {
+    auto filter = FilterType::New();
+    filter->SetInputFiberBundle(fib);
+    filter->SetRoiImages({labels});
+    filter->SetMode(FilterType::MODE::ENDPOINTS);
+    filter->SetInputType(FilterType::INPUT::LABEL_MAP);
+    return filter;
+  }
+
 public:
+  void Labels_SelfConnections()
+  {
+    auto fib = LabelFibers();
+    auto labels = CreateLabels();
+
+    auto all = LabelFilter(fib, labels);
+    all->Update();
+    CPPUNIT_ASSERT_EQUAL(2u, all->GetPositives().at(0)->GetNumFibers());
+
+    auto onlySelf = LabelFilter(fib, labels);
+    onlySelf->SetOnlySelfConnections(true);
+    onlySelf->Update();
+    CPPUNIT_ASSERT_EQUAL(1u, onlySelf->GetPositives().at(0)->GetNumFibers());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.4, onlySelf->GetPositives().at(0)->GetFiberPolyData()->GetPoint(1)[0], 1e-5);
+
+    auto skipSelf = LabelFilter(fib, labels);
+    skipSelf->SetSkipSelfConnections(true);
+    skipSelf->Update();
+    CPPUNIT_ASSERT_EQUAL(1u, skipSelf->GetPositives().at(0)->GetNumFibers());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(8.0, skipSelf->GetPositives().at(0)->GetFiberPolyData()->GetPoint(4)[0], 1e-5);
+  }
+
+  void Labels_StartEndLabelsDoNotChangeBothEnds()
+  {
+    auto labels = CreateLabels();  // the filter keeps raw pointers to its ROI images
+    auto filter = LabelFilter(LabelFibers(), labels);
+    filter->SetBothEnds(false);
+    filter->SetStartLabels({3});
+    filter->SetEndLabels({4});
+    filter->Update();
+    CPPUNIT_ASSERT_EQUAL(1u, filter->GetPositives().at(0)->GetNumFibers());
+
+    // Without start and end labels, one end in label 3 suffices again: fibers 0, 1 and 2.
+    filter->SetStartLabels({});
+    filter->SetEndLabels({});
+    filter->SetLabels({3});
+    filter->Update();
+    CPPUNIT_ASSERT_EQUAL(3u, filter->GetPositives().at(0)->GetNumFibers());
+  }
+
+  void Update_TwiceGivesSameOutputs()
+  {
+    auto filter = FilterType::New();
+    filter->SetInputFiberBundle(ThreeFibers());
+    auto roi = CreateRoi(1);
+    filter->SetRoiImages({roi});
+    filter->SetOverlapFraction(0.0);
+    filter->Update();
+    filter->Update();
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), filter->GetPositives().size());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), filter->GetNegatives().size());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), filter->GetPositiveLabels().size());
+  }
+
+  void Update_EmptyTractogramGivesEmptyOutputs()
+  {
+    auto filter = FilterType::New();
+    filter->SetInputFiberBundle(mitk::FiberBundle::New());
+    auto roi = CreateRoi(1);
+    filter->SetRoiImages({roi});
+    filter->SetMode(FilterType::MODE::ENDPOINTS);
+    filter->Update();
+    CPPUNIT_ASSERT_EQUAL(0u, filter->GetPositives().at(0)->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL(0u, filter->GetNegatives().at(0)->GetNumFibers());
+  }
+
   void Endpoints_SeveralRois_EachFiberOnce()
   {
     auto fib = ThreeFibers();
