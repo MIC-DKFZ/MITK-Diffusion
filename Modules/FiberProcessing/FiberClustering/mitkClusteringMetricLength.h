@@ -14,10 +14,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _ClusteringMetricLength
-#define _ClusteringMetricLength
+#ifndef mitkClusteringMetricLength_h
+#define mitkClusteringMetricLength_h
 
 #include <mitkClusteringMetric.h>
+
+#include <cmath>
 
 namespace mitk
 {
@@ -30,10 +32,7 @@ class ClusteringMetricLength : public ClusteringMetric
 
 public:
 
-  ClusteringMetricLength(){}
-  virtual ~ClusteringMetricLength(){}
-
-  float CalculateDistance(vnl_matrix<float>& s, vnl_matrix<float>& t, bool &flipped)
+  float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
     float l1 = 0;
     float l2 = 0;
@@ -64,8 +63,6 @@ public:
     flipped = false;
     return m_Scale * std::fabs(l1-l2);
   }
-
-protected:
 
 };
 

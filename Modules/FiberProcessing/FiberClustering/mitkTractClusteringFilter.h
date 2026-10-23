@@ -31,6 +31,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPoints.h>
 #include <vtkPolyLine.h>
 
+#include <memory>
+#include <vector>
+
 namespace mitk{
 
 /**
@@ -55,10 +58,6 @@ public:
   };
 
   TractClusteringFilter();
-  ~TractClusteringFilter();
-  // The filter owns (and deletes) its metrics.
-  TractClusteringFilter(const TractClusteringFilter&) = delete;
-  TractClusteringFilter& operator=(const TractClusteringFilter&) = delete;
 
   typedef itk::Image< float, 3 >                              FloatImageType;
   typedef itk::Image< unsigned char, 3 >                      UcharImageType;
@@ -81,7 +80,9 @@ public:
   */
   mitk::FiberBundle::Pointer GetOutUnassigned() const;
 
-  void SetMetrics(const std::vector<mitk::ClusteringMetric *> &Metrics);
+  /** Adds a metric. The distance of two fibers is the mean of the distances of all metrics. */
+  void AddMetric(std::unique_ptr<mitk::ClusteringMetric> metric);
+  void ClearMetrics();
 
   void SetTractogram(const mitk::FiberBundle* Tractogram);
 
@@ -132,7 +133,7 @@ protected:
   bool                                        m_DoResampling;
   UcharImageType::Pointer                     m_FilterMask;
   float                                       m_OverlapThreshold;
-  std::vector< mitk::ClusteringMetric* >      m_Metrics;
+  std::vector< std::unique_ptr<mitk::ClusteringMetric> > m_Metrics;
   std::vector< std::vector< unsigned int > >          m_OutFiberIndices;
 };
 }

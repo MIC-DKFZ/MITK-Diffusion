@@ -14,11 +14,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _ClusteringMetricScalarMap
-#define _ClusteringMetricScalarMap
+#ifndef mitkClusteringMetricScalarMap_h
+#define mitkClusteringMetricScalarMap_h
 
 #include <mitkClusteringMetric.h>
 #include <itkImage.h>
+#include <itkLinearInterpolateImageFunction.h>
 #include <mitkDiffusionImageHelperFunctions.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkNumericTraits.h>
@@ -34,15 +35,14 @@ class ClusteringMetricScalarMap : public ClusteringMetric
 
 public:
 
-  typedef itk::Image<float, 3>  ItkFloatImgType;
+  using ItkFloatImgType = itk::Image<float, 3>;
 
   ClusteringMetricScalarMap()
   {
     this->m_Scale = 30;
   }
-  virtual ~ClusteringMetricScalarMap(){}
 
-  float CalculateDistance(vnl_matrix<float>& s, vnl_matrix<float>& t, bool &flipped)
+  float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
     float d_direct = 0;
     float d_flipped = 0;
@@ -103,7 +103,7 @@ public:
     return m_Scale*map_distance;
   }
 
-  vnl_vector<float> GetImageValuesAtPoint(itk::Point<float, 3>& itkP)
+  vnl_vector<float> GetImageValuesAtPoint(const itk::Point<float, 3>& itkP) const
   {
     // CalculateDistance runs in the OpenMP loops of the clustering filter, so the interpolators
     // are only read here; each map has its own, set up in SetImages.

@@ -35,12 +35,6 @@ TractClusteringFilter::TractClusteringFilter()
 
 }
 
-TractClusteringFilter::~TractClusteringFilter()
-{
-  for (auto m : m_Metrics)
-    delete m;
-}
-
 std::vector<std::vector<unsigned int> > TractClusteringFilter::GetOutFiberIndices() const
 {
   return m_OutFiberIndices;
@@ -51,13 +45,14 @@ mitk::FiberBundle::Pointer TractClusteringFilter::GetOutUnassigned() const
   return m_OutUnassigned;
 }
 
-void TractClusteringFilter::SetMetrics(const std::vector<mitk::ClusteringMetric *> &Metrics)
+void TractClusteringFilter::AddMetric(std::unique_ptr<mitk::ClusteringMetric> metric)
 {
-  // The filter owns its metrics; metrics set before and not passed again are deleted here.
-  for (auto m : m_Metrics)
-    if (std::find(Metrics.begin(), Metrics.end(), m)==Metrics.end())
-      delete m;
-  m_Metrics = Metrics;
+  m_Metrics.push_back(std::move(metric));
+}
+
+void TractClusteringFilter::ClearMetrics()
+{
+  m_Metrics.clear();
 }
 
 std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::GetOutClusters() const
@@ -194,7 +189,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
       vnl_matrix<float> v = C.at(k).h / C.at(k).n;
       bool f = false;
       float d = 0;
-      for (auto m : m_Metrics)
+      for (const auto& m : m_Metrics)
         d += m->CalculateDistance(t, v, f);
       d /= m_Metrics.size();
 
@@ -327,7 +322,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
 
       bool f = false;
       float d = 0;
-      for (auto m : m_Metrics)
+      for (const auto& m : m_Metrics)
         d += m->CalculateDistance(t, v, f);
       distances[k2] = d / m_Metrics.size();
       flips[k2] = f;
@@ -403,7 +398,7 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
       {
         bool f = false;
         float d = 0;
-        for (auto m : m_Metrics)
+        for (const auto& m : m_Metrics)
           d += m->CalculateDistance(t, centroid, f);
         d /= m_Metrics.size();
 

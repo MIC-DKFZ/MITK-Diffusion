@@ -14,13 +14,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _ClusteringMetricAnatomic
-#define _ClusteringMetricAnatomic
+#ifndef mitkClusteringMetricAnatomic_h
+#define mitkClusteringMetricAnatomic_h
 
 #include <mitkClusteringMetric.h>
 #include <itkImage.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkNumericTraits.h>
+
+#include <map>
 
 namespace mitk
 {
@@ -33,14 +35,13 @@ class ClusteringMetricAnatomic : public ClusteringMetric
 
 public:
 
-  typedef itk::Image<short, 3>  ItkShortImgType;
+  using ItkShortImgType = itk::Image<short, 3>;
 
   ClusteringMetricAnatomic()
     : m_Radius(1)
   {}
-  virtual ~ClusteringMetricAnatomic(){}
 
-  float CalculateDistance(vnl_matrix<float>& s, vnl_matrix<float>& t, bool &flipped)
+  float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
     vnl_matrix<float> hist1; hist1.set_size( (2*m_Radius+1)*(2*m_Radius+1)*(2*m_Radius+1), m_NumLabels ); hist1.fill(0);
     vnl_matrix<float> hist2; hist2.set_size( (2*m_Radius+1)*(2*m_Radius+1)*(2*m_Radius+1), m_NumLabels ); hist2.fill(0);
@@ -69,17 +70,7 @@ public:
       d_flipped += (s.get_column(i)-t.get_column(s.cols()-i-1)).magnitude();
     }
 
-//    float eudist = 0;
-    if (d_direct>d_flipped)
-    {
-      flipped = true;
-//      eudist = d_flipped/s.cols();
-    }
-    else
-    {
-      flipped = false;
-//      eudist = d_direct/s.cols();
-    }
+    flipped = d_direct>d_flipped;
 
     float label_intersection = 0;
     for (unsigned int c=0; c<hist1.cols(); ++c)
@@ -119,7 +110,7 @@ public:
       return 9999;
   }
 
-  void GetHistogramAtPoint(itk::Point<float, 3>& itkP, vnl_matrix<float>& hist)
+  void GetHistogramAtPoint(const itk::Point<float, 3>& itkP, vnl_matrix<float>& hist) const
   {
     // The label map belongs to the parcellation at the same index, also after a point outside a
     // parcellation was skipped.

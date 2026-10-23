@@ -168,25 +168,23 @@ int main(int argc, char* argv[])
       clusterer->SetInCentroids(in_centroids);
     }
 
-    std::vector< mitk::ClusteringMetric* > metrics;
-
     // Each metric name must create its metric, so that its weight is not given to another one.
     int mc = 0;
     for (auto m : metric_strings)
     {
       float w = boost::lexical_cast<float>(metric_weights.at(mc));
       MITK_INFO << "Metric: " << m << " (w=" << w << ")";
-      mitk::ClusteringMetric* metric = nullptr;
+      std::unique_ptr<mitk::ClusteringMetric> metric;
       if (m=="EU_MEAN")
-        metric = new mitk::ClusteringMetricEuclideanMean();
+        metric = std::make_unique<mitk::ClusteringMetricEuclideanMean>();
       else if (m=="EU_STD")
-        metric = new mitk::ClusteringMetricEuclideanStd();
+        metric = std::make_unique<mitk::ClusteringMetricEuclideanStd>();
       else if (m=="EU_MAX")
-        metric = new mitk::ClusteringMetricEuclideanMax();
+        metric = std::make_unique<mitk::ClusteringMetricEuclideanMax>();
       else if (m=="ANGLES")
-        metric = new mitk::ClusteringMetricInnerAngles();
+        metric = std::make_unique<mitk::ClusteringMetricInnerAngles>();
       else if (m=="LENGTH")
-        metric = new mitk::ClusteringMetricLength();
+        metric = std::make_unique<mitk::ClusteringMetricLength>();
       else if (m=="MAP" || m=="ANAT")
       {
         const std::string& image_file = m=="MAP" ? scalar_map : parcellation;
@@ -200,34 +198,33 @@ int main(int argc, char* argv[])
         {
           FloatImageType::Pointer itk_map = FloatImageType::New();
           mitk::CastToItkImage(mitk_map, itk_map);
-          auto map_metric = new mitk::ClusteringMetricScalarMap();
+          auto map_metric = std::make_unique<mitk::ClusteringMetricScalarMap>();
           map_metric->SetImages({itk_map});
-          metric = map_metric;
+          metric = std::move(map_metric);
         }
         else
         {
           ShortImageType::Pointer itk_map = ShortImageType::New();
           mitk::CastToItkImage(mitk_map, itk_map);
-          auto anat_metric = new mitk::ClusteringMetricAnatomic();
+          auto anat_metric = std::make_unique<mitk::ClusteringMetricAnatomic>();
           anat_metric->SetParcellations({itk_map});
-          metric = anat_metric;
+          metric = std::move(anat_metric);
         }
       }
       else
         mitkThrow() << "Unknown metric " << m << ".";
 
       metric->SetScale(w);
-      metrics.push_back(metric);
+      clusterer->AddMetric(std::move(metric));
       mc++;
     }
 
-    if (metrics.empty())
+    if (mc==0)
     {
       MITK_INFO << "No metric selected!";
       return EXIT_FAILURE;
     }
 
-    clusterer->SetMetrics(metrics);
     clusterer->SetMergeDuplicateThreshold(merge_clusters);
     clusterer->SetNumPoints(fiber_points);
     clusterer->SetMaxClusters(max_clusters);

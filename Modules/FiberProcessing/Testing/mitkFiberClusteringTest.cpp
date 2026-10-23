@@ -31,6 +31,7 @@ found in the LICENSE file.
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <memory>
 #include <random>
 
 /** Fiber clustering on synthetic bundles whose partition is known. */
@@ -111,7 +112,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
     if (inCentroids.IsNotNull())
       clusterer.SetInCentroids(inCentroids);
     clusterer.SetDistances(distances);
-    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.AddMetric(std::make_unique<mitk::ClusteringMetricEuclideanMean>());
     clusterer.Update();
     omp_set_num_threads(previousThreads);
     return {clusterer.GetOutFiberIndices(), clusterer.GetOutCentroids()};
@@ -157,7 +158,7 @@ public:
     clusterer.SetTractogram(fib);
     clusterer.SetInCentroids(centroids);
     clusterer.SetDistances({10});
-    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.AddMetric(std::make_unique<mitk::ClusteringMetricEuclideanMean>());
     clusterer.Update();
 
     const auto indices = clusterer.GetOutFiberIndices();
@@ -214,7 +215,7 @@ public:
     mitk::TractClusteringFilter clusterer;
     clusterer.SetTractogram(fib);
     clusterer.SetDistances({10});
-    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.AddMetric(std::make_unique<mitk::ClusteringMetricEuclideanMean>());
     clusterer.Update();
 
     CPPUNIT_ASSERT_EQUAL(std::size_t(1), clusterer.GetOutTractograms().size());
@@ -310,13 +311,14 @@ public:
   {
     mitk::TractClusteringFilter clusterer;
     clusterer.SetTractogram(TwoGroups());
-    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.AddMetric(std::make_unique<mitk::ClusteringMetricEuclideanMean>());
     CPPUNIT_ASSERT_THROW(clusterer.Update(), mitk::Exception);
 
     clusterer.SetDistances({10});
     clusterer.Update();
     const auto first = clusterer.GetOutFiberIndices();
-    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.ClearMetrics();
+    clusterer.AddMetric(std::make_unique<mitk::ClusteringMetricEuclideanMean>());
     clusterer.Update();
     CPPUNIT_ASSERT_EQUAL(std::size_t(2), clusterer.GetOutTractograms().size());
     CPPUNIT_ASSERT(first == clusterer.GetOutFiberIndices());
@@ -376,7 +378,7 @@ public:
     mitk::TractClusteringFilter clusterer;
     clusterer.SetTractogram(input);
     clusterer.SetDistances({10});
-    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.AddMetric(std::make_unique<mitk::ClusteringMetricEuclideanMean>());
     clusterer.Update();
 
     const auto tracts = clusterer.GetOutTractograms();
@@ -411,7 +413,7 @@ public:
         clusterer.SetTractogram(input);
         clusterer.SetInCentroids(inCentroids);
         clusterer.SetDistances({10});
-        clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+        clusterer.AddMetric(std::make_unique<mitk::ClusteringMetricEuclideanMean>());
         clusterer.Update();
 
         CPPUNIT_ASSERT(!clusterer.GetOutTractograms().empty());
@@ -445,7 +447,7 @@ public:
     mitk::TractClusteringFilter clusterer;
     clusterer.SetTractogram(fib);
     clusterer.SetDistances(distances);
-    clusterer.SetMetrics({new mitk::ClusteringMetricEuclideanMean()});
+    clusterer.AddMetric(std::make_unique<mitk::ClusteringMetricEuclideanMean>());
     clusterer.Update();
 
     std::vector<unsigned int> sizes;

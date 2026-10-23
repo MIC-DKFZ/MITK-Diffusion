@@ -14,10 +14,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _ClusteringMetricEuStd
-#define _ClusteringMetricEuStd
+#ifndef mitkClusteringMetricEuclideanStd_h
+#define mitkClusteringMetricEuclideanStd_h
 
 #include <mitkClusteringMetric.h>
+
+#include <cmath>
 
 namespace mitk
 {
@@ -30,10 +32,7 @@ class ClusteringMetricEuclideanStd : public ClusteringMetric
 
 public:
 
-  ClusteringMetricEuclideanStd(){}
-  virtual ~ClusteringMetricEuclideanStd(){}
-
-  float CalculateDistance(vnl_matrix<float>& s, vnl_matrix<float>& t, bool &flipped)
+  float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
     float d_direct = 0;
     float d_flipped = 0;
@@ -69,8 +68,6 @@ public:
     flipped = false;
     return m_Scale*d/2;
   }
-
-protected:
 
 };
 

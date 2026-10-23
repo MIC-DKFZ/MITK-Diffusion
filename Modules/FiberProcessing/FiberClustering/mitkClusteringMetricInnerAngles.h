@@ -14,10 +14,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _ClusteringMetricInnerAngles
-#define _ClusteringMetricInnerAngles
+#ifndef mitkClusteringMetricInnerAngles_h
+#define mitkClusteringMetricInnerAngles_h
 
 #include <mitkClusteringMetric.h>
+
+#include <itkMath.h>
+
+#include <algorithm>
+#include <cmath>
 
 namespace mitk
 {
@@ -30,10 +35,7 @@ class ClusteringMetricInnerAngles : public ClusteringMetric
 
 public:
 
-  ClusteringMetricInnerAngles(){}
-  virtual ~ClusteringMetricInnerAngles(){}
-
-  float CalculateDistance(vnl_matrix<float>& s, vnl_matrix<float>& t, bool &flipped)
+  float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
     int p1 = 0;
     int p2 = s.cols()/4;
@@ -118,8 +120,6 @@ public:
     float d3 = std::fabs(a3_s-a3_t);
     return m_Scale * std::max( d1, std::max(d2,d3) );
   }
-
-protected:
 
 };
 
