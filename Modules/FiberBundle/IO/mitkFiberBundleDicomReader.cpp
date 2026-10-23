@@ -31,6 +31,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkCustomMimeType.h>
 #include "mitkFiberBundleMimeTypes.h"
 #include <mitkLexicalCast.h>
+#include <mitkLocaleSwitch.h>
+
+#include <memory>
 
 #include "dcmtk/ofstd/ofcond.h"
 #include "dcmtk/dcmtract/trctractographyresults.h"
@@ -95,29 +98,22 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Do
   std::vector<itk::SmartPointer<mitk::BaseData> > output_fibs;
   try
   {
-    const std::string& locale = "C";
-    const std::string& currLocale = setlocale( LC_ALL, nullptr );
-    setlocale(LC_ALL, locale.c_str());
+    // Restored on every exit, also when DCMTK or the code below throws.
+    mitk::LocaleSwitch localeSwitch("C");
 
     std::string filename = this->GetInputLocation();
 
 
     OFCondition result;
-    TrcTractographyResults *trc = nullptr;
-    result = TrcTractographyResults::loadFile(filename.c_str(), trc);
+    TrcTractographyResults *loaded = nullptr;
+    result = TrcTractographyResults::loadFile(filename.c_str(), loaded);
+    // loadFile allocates the object before reading it, so it is owned also when reading failed.
+    std::unique_ptr<TrcTractographyResults> trc(loaded);
     if (result.bad())
       mitkThrow() << "Unable to load tractography dicom file: " << result.text();
 
-    OFString val = "-";
-    trc->getPatient().getPatientName(val);
-    MITK_INFO << "Patient Name: " <<  val; val = "-";
-    trc->getStudy().getStudyInstanceUID(val);
-    MITK_INFO << "Study       : " << val; val = "-";
-    trc->getSeries().getSeriesInstanceUID(val);
-    MITK_INFO << "Series      : " << val; val = "-";
-    trc->getSOPCommon().getSOPInstanceUID(val);
-    MITK_INFO << "Instance    : " << val; val = "-";
-    MITK_INFO << "-------------------------------------------------------------------------";
+    // Patient name and UIDs are not logged: the log file must not identify the patient.
+    OFString val;
     size_t numTrackSets = trc->getNumberOfTrackSets();
     OFVector<TrcTrackSet*>& sets = trc->getTrackSets();
     for (size_t ts = 0; ts < numTrackSets; ts++)
@@ -152,10 +148,15 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Do
       fiberPolyData->SetLines(vtkNewCells);
       FiberBundle::Pointer fib = FiberBundle::New(fiberPolyData);
 
-      CodeSequenceMacro algoCode = sets[ts]->getTrackingAlgorithmIdentification().at(0)->getAlgorithmFamilyCode();
-      val = "0"; algoCode.getCodeValue(val);
+      // Type 1 in the standard, but DCMTK reads a file without it (with a warning); the
+      // properties then keep the placeholder "0", as for the other missing codes.
+      const auto& algorithms = sets[ts]->getTrackingAlgorithmIdentification();
+      CodeSequenceMacro* algoCode = nullptr;
+      if (!algorithms.empty() && algorithms.front() != nullptr)
+        algoCode = &algorithms.front()->getAlgorithmFamilyCode();
+      val = "0"; if (algoCode != nullptr) algoCode->getCodeValue(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.algo_family_code.value",val.c_str());
-      val = "0"; algoCode.getCodeMeaning(val);
+      val = "0"; if (algoCode != nullptr) algoCode->getCodeMeaning(val);
       fib->GetPropertyList()->SetStringProperty("DICOM.algo_family_code.meaning",val.c_str());
 
       CodeSequenceMacro modelCode = sets[ts]->getDiffusionModelCode();
@@ -183,7 +184,7 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Do
       if (!references.empty())
       {
         const OFString& referencedInstance = references.front()->m_SOPInstanceUID;
-        fib->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid", FindReferencedSeriesUid(trc, referencedInstance).c_str());
+        fib->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid", FindReferencedSeriesUid(trc.get(), referencedInstance).c_str());
         fib->GetPropertyList()->SetStringProperty("DICOM.sop_instance_uid", referencedInstance.c_str());
         fib->GetPropertyList()->SetStringProperty("DICOM.sop_class_uid", references.front()->m_SOPClassUID.c_str());
       }
@@ -197,9 +198,6 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleDicomReader::Do
       output_fibs.push_back(fib.GetPointer());
       MITK_INFO << "Fiber bundle read";
     }
-    delete trc;
-
-    setlocale(LC_ALL, currLocale.c_str());
     return output_fibs;
   }
   catch(...)

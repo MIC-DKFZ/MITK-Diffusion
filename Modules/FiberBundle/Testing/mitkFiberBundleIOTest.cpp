@@ -21,6 +21,8 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itksys/SystemTools.hxx>
+#include <dcmtk/dcmdata/dcdeftag.h>
+#include <dcmtk/dcmdata/dcfilefo.h>
 #include <vnl/vnl_inverse.h>
 #include <vnl/vnl_matrix_fixed.h>
 #include <vnl/vnl_vector_fixed.h>
@@ -39,6 +41,7 @@ found in the LICENSE file.
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <clocale>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -73,6 +76,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(IOHelper_BrokenFileAndDottedNames_CoutRestored);
   MITK_TEST(CopyDicomReferenceTags_BothNamingsAndMissingTags);
   MITK_TEST(TrkWriter_Header_DescribesReferenceGrid);
+  MITK_TEST(DicomReader_NoAlgorithmIdentification_LoadsAndKeepsLocale);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -343,6 +347,43 @@ public:
     auto second = mitk::IOUtil::Load<mitk::FiberBundle>(path2);
     CPPUNIT_ASSERT_EQUAL(StringProperty(fib, "DICOM.sop_instance_uid"), StringProperty(second, "DICOM.sop_instance_uid"));
     CPPUNIT_ASSERT(StringProperty(second, "DICOM.tractogram.sop_instance_uid") != ownInstance);
+  }
+
+  void DicomReader_NoAlgorithmIdentification_LoadsAndKeepsLocale()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    const std::string mimeType = mitk::IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.dcm";
+    const std::string path = m_TempDir + "/tractogram.dcm";
+    mitk::IOUtil::Save(fib, mimeType, path);
+
+    // The Tracking Algorithm Identification Sequence is type 1, but DCMTK reads a file without it.
+    DcmFileFormat file;
+    CPPUNIT_ASSERT(file.loadFile(path.c_str()).good());
+    DcmItem *trackSet = nullptr;
+    CPPUNIT_ASSERT(file.getDataset()->findAndGetSequenceItem(DCM_TrackSetSequence, trackSet, 0).good());
+    CPPUNIT_ASSERT(trackSet->findAndDeleteElement(DCM_TrackingAlgorithmIdentificationSequence).good());
+    const std::string stripped = m_TempDir + "/no_algorithm.dcm";
+    CPPUNIT_ASSERT(file.saveFile(stripped.c_str(), EXS_LittleEndianExplicit).good());
+
+    // A locale other than "C" must survive the reader, whether it succeeds or not.
+    const std::string before = std::setlocale(LC_ALL, nullptr);
+    const char *testLocale = std::setlocale(LC_ALL, "C.UTF-8");
+    const std::string expected = testLocale != nullptr ? testLocale : before;
+    mitk::FiberBundle::Pointer loaded;
+    try
+    {
+      loaded = mitk::IOUtil::Load<mitk::FiberBundle>(stripped);
+    }
+    catch (...)
+    {
+    }
+    const std::string after = std::setlocale(LC_ALL, nullptr);
+    std::setlocale(LC_ALL, before.c_str());
+
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("Locale restored", expected, after);
+    CPPUNIT_ASSERT_MESSAGE("File without algorithm identification loads", loaded.IsNotNull());
+    CPPUNIT_ASSERT(loaded->Equals(fib, 0.001));
+    CPPUNIT_ASSERT_EQUAL(std::string("0"), StringProperty(loaded, "DICOM.algo_family_code.value"));
   }
 
   void TckReader_AllFloatTypes_ReadSamePoints()
