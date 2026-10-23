@@ -15,6 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkTrackingHandlerPeaks.h"
+#include <algorithm>
+#include <cmath>
 
 namespace mitk
 {
@@ -184,67 +186,39 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::GetDirection(itk::Point<float, 3
 
   if (interpolate)
   {
-    float frac_x = cIdx[0] - idx3[0];
-    float frac_y = cIdx[1] - idx3[1];
-    float frac_z = cIdx[2] - idx3[2];
-    if (frac_x<0)
+    // Trilinear interpolation with the corner indices clamped to the image, as ITK's interpolators
+    // do for the FA/GFA, ODF and mask images, so that the outermost half voxel is tracked too.
+    itk::Index<3> lo, hi;
+    float frac[3];
+    for (int d=0; d<3; ++d)
     {
-      idx3[0] -= 1;
-      frac_x += 1;
+      auto size = static_cast<itk::IndexValueType>(m_DummyImage->GetLargestPossibleRegion().GetSize(d));
+      auto base = static_cast<itk::IndexValueType>(std::floor(cIdx[d]));
+      frac[d] = 1 - (cIdx[d] - base);   // weight of the lower corner
+      lo[d] = std::clamp<itk::IndexValueType>(base, 0, size-1);
+      hi[d] = std::clamp<itk::IndexValueType>(base+1, 0, size-1);
     }
-    if (frac_y<0)
-    {
-      idx3[1] -= 1;
-      frac_y += 1;
-    }
-    if (frac_z<0)
-    {
-      idx3[2] -= 1;
-      frac_z += 1;
-    }
-    frac_x = 1-frac_x;
-    frac_y = 1-frac_y;
-    frac_z = 1-frac_z;
+    const float frac_x = frac[0], frac_y = frac[1], frac_z = frac[2];
+    auto corner = [&lo, &hi](bool x, bool y, bool z) { itk::Index<3> c = {{x ? hi[0] : lo[0], y ? hi[1] : lo[1], z ? hi[2] : lo[2]}}; return c; };
 
-    // int coordinates inside image?
-    if (idx3[0] >= 0 && idx3[0] < static_cast<itk::IndexValueType>(m_DummyImage->GetLargestPossibleRegion().GetSize(0) - 1) &&
-        idx3[1] >= 0 && idx3[1] < static_cast<itk::IndexValueType>(m_DummyImage->GetLargestPossibleRegion().GetSize(1) - 1) &&
-        idx3[2] >= 0 && idx3[2] < static_cast<itk::IndexValueType>(m_DummyImage->GetLargestPossibleRegion().GetSize(2) - 1))
-    {
-      // trilinear interpolation
-      vnl_vector_fixed<float, 8> interpWeights;
-      interpWeights[0] = (  frac_x)*(  frac_y)*(  frac_z);
-      interpWeights[1] = (1-frac_x)*(  frac_y)*(  frac_z);
-      interpWeights[2] = (  frac_x)*(1-frac_y)*(  frac_z);
-      interpWeights[3] = (  frac_x)*(  frac_y)*(1-frac_z);
-      interpWeights[4] = (1-frac_x)*(1-frac_y)*(  frac_z);
-      interpWeights[5] = (  frac_x)*(1-frac_y)*(1-frac_z);
-      interpWeights[6] = (1-frac_x)*(  frac_y)*(1-frac_z);
-      interpWeights[7] = (1-frac_x)*(1-frac_y)*(1-frac_z);
+    vnl_vector_fixed<float, 8> interpWeights;
+    interpWeights[0] = (  frac_x)*(  frac_y)*(  frac_z);
+    interpWeights[1] = (1-frac_x)*(  frac_y)*(  frac_z);
+    interpWeights[2] = (  frac_x)*(1-frac_y)*(  frac_z);
+    interpWeights[3] = (  frac_x)*(  frac_y)*(1-frac_z);
+    interpWeights[4] = (1-frac_x)*(1-frac_y)*(  frac_z);
+    interpWeights[5] = (  frac_x)*(1-frac_y)*(1-frac_z);
+    interpWeights[6] = (1-frac_x)*(  frac_y)*(1-frac_z);
+    interpWeights[7] = (1-frac_x)*(1-frac_y)*(1-frac_z);
 
-      dir = GetMatchingDirection(idx3, oldDir) * interpWeights[0];
-
-      itk::Index<3> tmpIdx = idx3; tmpIdx[0]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir) * interpWeights[1];
-
-      tmpIdx = idx3; tmpIdx[1]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir) * interpWeights[2];
-
-      tmpIdx = idx3; tmpIdx[2]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir) * interpWeights[3];
-
-      tmpIdx = idx3; tmpIdx[0]++; tmpIdx[1]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir) * interpWeights[4];
-
-      tmpIdx = idx3; tmpIdx[1]++; tmpIdx[2]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir) * interpWeights[5];
-
-      tmpIdx = idx3; tmpIdx[2]++; tmpIdx[0]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir) * interpWeights[6];
-
-      tmpIdx = idx3; tmpIdx[0]++; tmpIdx[1]++; tmpIdx[2]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir) * interpWeights[7];
-    }
+    dir = GetMatchingDirection(corner(false, false, false), oldDir) * interpWeights[0];
+    dir +=  GetMatchingDirection(corner(true, false, false), oldDir) * interpWeights[1];
+    dir +=  GetMatchingDirection(corner(false, true, false), oldDir) * interpWeights[2];
+    dir +=  GetMatchingDirection(corner(false, false, true), oldDir) * interpWeights[3];
+    dir +=  GetMatchingDirection(corner(true, true, false), oldDir) * interpWeights[4];
+    dir +=  GetMatchingDirection(corner(false, true, true), oldDir) * interpWeights[5];
+    dir +=  GetMatchingDirection(corner(true, false, true), oldDir) * interpWeights[6];
+    dir +=  GetMatchingDirection(corner(true, true, true), oldDir) * interpWeights[7];
   }
   else
     dir = GetMatchingDirection(idx3, oldDir);

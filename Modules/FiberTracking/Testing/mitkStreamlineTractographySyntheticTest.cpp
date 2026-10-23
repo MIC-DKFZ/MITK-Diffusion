@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <mitkStreamlineTractographyParameters.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
+#include <Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h>
 #include <itkOrientationDistributionFunction.h>
 #include <mitkFiberBundle.h>
 #include <mitkIOUtil.h>
@@ -37,6 +38,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(ProbabilisticPeaks_SameResultAtAnyThreadCount);
   MITK_TEST(ProbabilisticPeaks_JitterIsIsotropicStandardDeviation);
   MITK_TEST(DeterministicOdf_FollowsPeakBetweenSamplingDirections);
+  MITK_TEST(Interpolation_TracksTheOutermostVoxelLayer);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -100,7 +102,8 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   vtkSmartPointer<vtkPolyData> Track(std::shared_ptr<mitk::StreamlineTractographyParameters> params,
                                      FloatImgType::Pointer seeds,
                                      FloatImgType::Pointer target,
-                                     PeakImgType::Pointer field = nullptr)
+                                     PeakImgType::Pointer field = nullptr,
+                                     FloatImgType::Pointer mask = nullptr)
   {
     mitk::TrackingHandlerPeaks handler;
     handler.SetPeakImage(field.IsNotNull() ? field : m_StraightField);
@@ -108,16 +111,36 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
     tracker->SetTrackingHandler(&handler);
     tracker->SetSeedImage(seeds);
     tracker->SetTargetRegions(target);
+    tracker->SetMaskImage(mask);
     tracker->SetParameters(params);
     tracker->Update();
     return tracker->GetFiberPolyData();
+  }
+
+  /** Tracking mask without the first and last voxel plane along x, so that streamlines end inside
+   *  the image (a streamline ends at its first point outside the mask). */
+  static FloatImgType::Pointer MakeInnerMask()
+  {
+    auto image = FloatImgType::New();
+    FloatImgType::SizeType size = {{SizeX, SizeYZ, SizeYZ}};
+    image->SetRegions(FloatImgType::RegionType(size));
+    image->Allocate();
+    image->FillBuffer(1.0f);
+    for (int y = 0; y < SizeYZ; ++y)
+      for (int z = 0; z < SizeYZ; ++z)
+        for (int x : {0, SizeX - 1})
+        {
+          FloatImgType::IndexType idx = {{x, y, z}};
+          image->SetPixel(idx, 0.0f);
+        }
+    return image;
   }
 
   vtkIdType CountFibers(EpConstraint constraint, FloatImgType::Pointer seeds, FloatImgType::Pointer target)
   {
     auto params = MakeParameters();
     params->m_EpConstraints = constraint;
-    return Track(params, seeds, target)->GetNumberOfLines();
+    return Track(params, seeds, target, nullptr, MakeInnerMask())->GetNumberOfLines();
   }
 
 public:
@@ -173,7 +196,8 @@ public:
     CPPUNIT_ASSERT_DOUBLES_EQUAL(22.5, loaded.GetEffectiveAngularThresholdDeg(), 1e-3);
   }
 
-  /** Each streamline runs from x = -0.25 to x = 19.25 mm; the target lies at one end, the other, or both. */
+  /** Each streamline runs from x = 0.25 to x = 18.75 mm (first points outside the inner mask); the
+   *  target lies at one end, the other, or both. */
   void EndpointConstraints_TargetAtEitherEnd()
   {
     auto seeds = MakeLineRoi({{8, 10, 1.0f}});
@@ -197,7 +221,7 @@ public:
     auto oneLabel = MakeLineRoi({{0, 3, 1.0f}, {15, 19, 1.0f}});
     CPPUNIT_ASSERT_EQUAL_MESSAGE("LABELDIFF, same label", vtkIdType(0), CountFibers(EpConstraint::EPS_IN_TARGET_LABELDIFF, seeds, oneLabel));
 
-    auto endSeeds = MakeLineRoi({{0, 3, 1.0f}});
+    auto endSeeds = MakeLineRoi({{0, 4, 1.0f}});  // voxel 0 lies outside the mask: four seeds, front ends in voxel 0
     auto farTarget = MakeLineRoi({{15, 19, 1.0f}});
     CPPUNIT_ASSERT_EQUAL_MESSAGE("EPS_IN_SEED_AND_TARGET", vtkIdType(4), CountFibers(EpConstraint::EPS_IN_SEED_AND_TARGET, endSeeds, farTarget));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("EPS_IN_SEED_AND_TARGET, seed in the middle", vtkIdType(0), CountFibers(EpConstraint::EPS_IN_SEED_AND_TARGET, seeds, farTarget));
@@ -314,6 +338,39 @@ public:
 
     CPPUNIT_ASSERT_EQUAL(vtkIdType(2), fibers->GetNumberOfCells());
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, MeanSegmentAngleDeg(fibers, fibre), 1.0);
+  }
+
+  /** Seeds in the first and last voxel layer along x of a field along y: the interpolation of
+   *  peaks and tensors needed all eight neighbours and gave no direction there. */
+  void Interpolation_TracksTheOutermostVoxelLayer()
+  {
+    auto seeds = MakeLineRoi({{0, 0, 1.0f}, {SizeX - 1, SizeX - 1, 1.0f}});
+    auto params = MakeParameters();
+    params->m_MinTractLengthMm = 2;
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("peaks", vtkIdType(2), Track(params, seeds, nullptr, MakeStraightPeakField(0, 1, 0))->GetNumberOfLines());
+
+    using TensorImageType = mitk::TrackingHandlerTensor::ItkTensorImageType;
+    auto tensors = TensorImageType::New();
+    TensorImageType::SizeType size = {{SizeX, SizeYZ, SizeYZ}};
+    tensors->SetRegions(TensorImageType::RegionType(size));
+    tensors->Allocate();
+    TensorImageType::PixelType tensor;
+    tensor.Fill(0.0f);
+    tensor[0] = 0.0003f; // xx
+    tensor[3] = 0.0017f; // yy
+    tensor[5] = 0.0003f; // zz
+    tensors->FillBuffer(tensor);
+
+    params = MakeParameters();
+    params->m_MinTractLengthMm = 2;
+    mitk::TrackingHandlerTensor handler;
+    handler.SetTensorImage(tensors.GetPointer());
+    auto tracker = itk::StreamlineTrackingFilter::New();
+    tracker->SetTrackingHandler(&handler);
+    tracker->SetSeedImage(seeds);
+    tracker->SetParameters(params);
+    tracker->Update();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("tensors", vtkIdType(2), tracker->GetFiberPolyData()->GetNumberOfLines());
   }
 };
 
