@@ -44,6 +44,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkAppendPolyData.h>
 #include <random>
 #include <algorithm>
+#include <iterator>
 
 
 const char* mitk::FiberBundle::FIBER_ID_ARRAY = "Fiber_IDs";
@@ -1275,14 +1276,12 @@ std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(DataNode *roi,
     {
       MITK_INFO << "AND";
       result = this->ExtractFiberIdSubset(children->ElementAt(0), storage);
-      std::vector<unsigned int>::iterator it;
       for (unsigned int i=1; i<children->Size(); ++i)
       {
         std::vector<unsigned int> inRoi = this->ExtractFiberIdSubset(children->ElementAt(i), storage);
 
-        std::vector<unsigned int> rest(std::min(result.size(),inRoi.size()));
-        it = std::set_intersection(result.begin(), result.end(), inRoi.begin(), inRoi.end(), rest.begin() );
-        rest.resize( static_cast<unsigned int>(it - rest.begin()) );
+        std::vector<unsigned int> rest;
+        std::set_intersection(result.begin(), result.end(), inRoi.begin(), inRoi.end(), std::back_inserter(rest));
         result = rest;
       }
       break;
@@ -1311,14 +1310,14 @@ std::vector<unsigned int> mitk::FiberBundle::ExtractFiberIdSubset(DataNode *roi,
       for(unsigned int i=0; i<this->GetNumFibers(); i++)
         result.push_back(i);
 
-      std::vector<unsigned int>::iterator it;
+      // The children may overlap and result shrinks with every child, so the size of the
+      // difference is unknown in advance.
       for (unsigned int i=0; i<children->Size(); ++i)
       {
         std::vector<unsigned int> inRoi = ExtractFiberIdSubset(children->ElementAt(i), storage);
 
-        std::vector<unsigned int> rest(result.size()-inRoi.size());
-        it = std::set_difference(result.begin(), result.end(), inRoi.begin(), inRoi.end(), rest.begin() );
-        rest.resize( static_cast<unsigned int>(it - rest.begin()) );
+        std::vector<unsigned int> rest;
+        std::set_difference(result.begin(), result.end(), inRoi.begin(), inRoi.end(), std::back_inserter(rest));
         result = rest;
       }
       break;
