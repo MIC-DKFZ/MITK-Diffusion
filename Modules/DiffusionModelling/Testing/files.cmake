@@ -2,6 +2,7 @@ set(MODULE_TESTS
   mitkDiffusionModellingAlgorithmsTest.cpp
   mitkDiffusionModellingIOTest.cpp
   mitkDiffusionModellingRenderingTest.cpp
+  mitkDiffusionReconstructionOdfTest.cpp
   mitkDiffusionReconstructionQballTest.cpp
   mitkDiffusionReconstructionTensorTest.cpp
 )

@@ -734,7 +734,7 @@ vnl_vector_fixed<double,3> OrientationDistributionFunction<T, NOdfDirections>::G
   else
   {
     int idx = GetPrincipalDiffusionDirectionIndex();
-    if (idx>0 && idx<(int)NOdfDirections)
+    if (idx>=0 && idx<(int)NOdfDirections)
       return OrientationDistributionFunction<T, NOdfDirections>::GetDirection(idx);
     vnl_vector_fixed<double,3> vec; vec.fill(0);
     return vec;
