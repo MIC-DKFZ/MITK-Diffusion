@@ -33,6 +33,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(Parameters_AutomaticAngularThreshold);
   MITK_TEST(EndpointConstraints_TargetAtEitherEnd);
   MITK_TEST(ProbabilisticPeaks_SameResultAtAnyThreadCount);
+  MITK_TEST(ProbabilisticPeaks_JitterIsIsotropicStandardDeviation);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -219,6 +220,50 @@ public:
 
     CPPUNIT_ASSERT(single->GetNumFibers() > 400);
     CPPUNIT_ASSERT_MESSAGE("1 and 4 threads give the same tractogram", single->Equals(multi));
+  }
+
+  /** Mean angle between the streamline segments and the field direction. */
+  static double MeanSegmentAngleDeg(vtkPolyData *fibers, vnl_vector_fixed<double, 3> dir)
+  {
+    dir.normalize();
+    double sum = 0;
+    int count = 0;
+    for (vtkIdType i = 0; i < fibers->GetNumberOfCells(); ++i)
+    {
+      vtkCell *cell = fibers->GetCell(i);
+      for (vtkIdType j = 1; j < cell->GetNumberOfPoints(); ++j)
+      {
+        double p0[3], p1[3];
+        cell->GetPoints()->GetPoint(j - 1, p0);
+        cell->GetPoints()->GetPoint(j, p1);
+        vnl_vector_fixed<double, 3> seg(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
+        seg.normalize();
+        sum += std::acos(std::min(1.0, std::fabs(dot_product(seg, dir)))) * 180.0 / itk::Math::pi;
+        ++count;
+      }
+    }
+    return count > 0 ? sum / count : 0;
+  }
+
+  /** The jitter is the standard deviation of the noise on each component of the unit peak
+   *  direction: the mean deviation is about sqrt(pi/2) * jitter for any peak orientation
+   *  (it was a variance scaled by the component, so an axis-aligned peak was never perturbed). */
+  void ProbabilisticPeaks_JitterIsIsotropicStandardDeviation()
+  {
+    auto seeds = MakeLineRoi({{2, 17, 1.0f}});
+    const double expected = std::sqrt(itk::Math::pi / 2) * 0.1 * 180.0 / itk::Math::pi; // 7.18 degrees
+    for (auto dir : {vnl_vector_fixed<double, 3>(1, 0, 0), vnl_vector_fixed<double, 3>(0.8, 0.5, 0.3)})
+    {
+      auto field = MakeStraightPeakField(dir[0], dir[1], dir[2]);
+      auto params = MakeParameters();
+      params->m_Mode = mitk::StreamlineTractographyParameters::MODE::PROBABILISTIC;
+      params->m_SeedsPerVoxel = 20;
+      params->m_MinTractLengthMm = 2;
+      params->m_PeakJitter = 0.1f;
+      auto fibers = Track(params, seeds, nullptr, field);
+      CPPUNIT_ASSERT(fibers->GetNumberOfCells() > 200);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, MeanSegmentAngleDeg(fibers, dir), 0.6);
+    }
   }
 };
 

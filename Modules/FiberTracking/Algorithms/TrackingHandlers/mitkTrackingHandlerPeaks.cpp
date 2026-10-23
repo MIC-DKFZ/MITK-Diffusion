@@ -276,11 +276,14 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::ProposeDirection(const itk::Poin
   {
     if (m_Parameters->m_Mode == MODE::PROBABILISTIC)
     {
+      // Each component of the unit peak direction gets normal noise with standard deviation
+      // m_PeakJitter (ITK's GetNormalVariate takes the variance), so that the spread depends
+      // neither on the peak's orientation nor on its length.
+      output_direction.normalize();
       auto rng = GetThreadRngItk();
-      output_direction[0] += rng->GetNormalVariate(0, fabs(output_direction[0])*m_Parameters->m_PeakJitter);
-      output_direction[1] += rng->GetNormalVariate(0, fabs(output_direction[1])*m_Parameters->m_PeakJitter);
-      output_direction[2] += rng->GetNormalVariate(0, fabs(output_direction[2])*m_Parameters->m_PeakJitter);
-      mag = output_direction.magnitude();
+      double variance = static_cast<double>(m_Parameters->m_PeakJitter)*m_Parameters->m_PeakJitter;
+      for (int c=0; c<3; ++c)
+        output_direction[c] += rng->GetNormalVariate(0, variance);
     }
 
     output_direction.normalize();
