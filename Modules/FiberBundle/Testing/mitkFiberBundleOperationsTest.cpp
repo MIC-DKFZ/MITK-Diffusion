@@ -54,6 +54,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(SetSingleFiberColor_UsesRgbOrder);
   MITK_TEST(SetFiberColors_ChecksTheArray);
   MITK_TEST(ColorFibersByOrientation_OnePointFibers_GetColours);
+  MITK_TEST(ColorFibersByCurvature_UsesFirstSegment);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -427,6 +428,20 @@ public:
     CPPUNIT_ASSERT(found);
     // a copy can take the colours over
     CPPUNIT_ASSERT(fib->GetDeepCopy().IsNotNull());
+  }
+
+  void ColorFibersByCurvature_UsesFirstSegment()
+  {
+    // A right angle at the second point: its backward window holds the first segment, so its
+    // curvature colour differs from that of a point on the straight part.
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {1, 2, 0}, {1, 3, 0}, {1, 4, 0}, {1, 5, 0}, {1, 6, 0}}});
+    fib->ColorFibersByCurvature(false, false, mitk::LookupTable::GRAYSCALE);
+    auto colours = fib->GetFiberColors();
+    vtkCell *cell = fib->GetFiberPolyData()->GetCell(0);
+    const vtkIdType corner = cell->GetPointId(1);
+    const vtkIdType straight = cell->GetPointId(6);
+    CPPUNIT_ASSERT_MESSAGE("The corner point sees the bend",
+                           colours->GetComponent(corner, 0) != colours->GetComponent(straight, 0));
   }
 };
 

@@ -808,7 +808,8 @@ void mitk::FiberBundle::ColorFibersByCurvature(bool opacity, bool weight_fibers,
       int c = j;
       std::vector< vnl_vector_fixed< double, 3 > > vectors;
       vnl_vector_fixed< double, 3 > meanV; meanV.fill(0.0);
-      while(dist<window/2 && c>1)
+      // backwards down to the fiber's first segment (points c-1 and c)
+      while(dist<window/2 && c>0)
       {
         double p1[3];
         points->GetPoint(c-1, p1);
