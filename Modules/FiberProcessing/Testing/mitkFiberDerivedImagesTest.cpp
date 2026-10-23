@@ -262,7 +262,7 @@ public:
     filter->SetFiberBundle(fib);
     filter->SetInputImage(reference);
     filter->SetUseImageGeometry(true);
-    filter->SetMode(VISITATION_COUNT);
+    filter->SetMode(itk::TDI_MODE::VISITATION_COUNT);
     filter->SetOutputAbsoluteValues(true);
     filter->Update();
     for (int x = 0; x < 5; ++x)
@@ -394,7 +394,7 @@ public:
     density->Update();
     auto binary = itk::TractDensityImageFilter<UcharImageType>::New();
     binary->SetFiberBundle(fib);
-    binary->SetMode(TDI_MODE::BINARY);
+    binary->SetMode(itk::TDI_MODE::BINARY);
     binary->Update();
 
     unsigned int covered = 0;
@@ -436,7 +436,7 @@ public:
     filter->SetAngularThreshold(std::cos(25.0 * itk::Math::pi / 180.0));
     filter->SetSizeThreshold(0.2);
     filter->SetMaxNumDirections(3);
-    filter->SetNormalizationMethod(DirectionFilterType::GLOBAL_MAX);
+    filter->SetNormalizationMethod(DirectionFilterType::NormalizationMethods::GLOBAL_MAX);
     filter->Update();
 
     std::map<int, unsigned int> voxelsWithPeaks;

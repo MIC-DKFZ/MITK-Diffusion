@@ -36,7 +36,7 @@ template< class OutputImageType, class RefImageType >
 TractDensityImageFilter< OutputImageType, RefImageType >::TractDensityImageFilter()
   : m_UpsamplingFactor(1)
   , m_InvertImage(false)
-  , m_Mode(DENSITY)
+  , m_Mode(TDI_MODE::DENSITY)
   , m_UseImageGeometry(false)
   , m_OutputAbsoluteValues(false)
   , m_MaxDensity(0)
@@ -130,17 +130,17 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
           continue;
         switch (m_Mode)
         {
-        case BINARY:
+        case TDI_MODE::BINARY:
         {
           outImage->SetPixel(segment.first, 1);
           break;
         }
-        case VISITATION_COUNT:
+        case TDI_MODE::VISITATION_COUNT:
         {
           visitedVoxels.push_back(outImage->ComputeOffset(segment.first));
           break;
         }
-        case DENSITY:
+        case TDI_MODE::DENSITY:
         {
           outImage->SetPixel(segment.first, outImage->GetPixel(segment.first)+segment.second * weight);
           break;
@@ -163,7 +163,7 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
   for (int i=0; i<w*h*d; i++)
     if (m_MaxDensity < outImageBufferPointer[i])
       m_MaxDensity = outImageBufferPointer[i];
-  if (!m_OutputAbsoluteValues && m_Mode!=BINARY)
+  if (!m_OutputAbsoluteValues && m_Mode!=TDI_MODE::BINARY)
   {
     MITK_INFO << "TractDensityImageFilter: max-normalizing output image";
     if (m_MaxDensity>0)

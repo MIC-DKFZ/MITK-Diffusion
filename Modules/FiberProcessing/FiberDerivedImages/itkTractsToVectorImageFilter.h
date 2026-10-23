@@ -26,7 +26,7 @@ class TractsToVectorImageFilter : public ImageSource< Image< PixelType, 4 > >
 
 public:
 
-  enum NormalizationMethods {
+  enum class NormalizationMethods {
       GLOBAL_MAX,         ///< global maximum normalization
       SINGLE_VEC_NORM,    ///< normalize the single peaks to length 1
       MAX_VEC_NORM        ///< normalize all peaks according to their length in comparison to the largest peak in the voxel (0-1)
@@ -56,7 +56,16 @@ public:
   itkGetMacro( SizeThreshold, float)
   itkSetMacro( AngularThreshold, float)                               ///< cluster directions that are closer together than the specified threshold
   itkGetMacro( AngularThreshold, float)                               ///< cluster directions that are closer together than the specified threshold
-  itkSetMacro( NormalizationMethod, NormalizationMethods)             ///< normalization method of peaks
+  /** Normalization method of the peaks. Written out because itkSetMacro streams the value,
+   *  which an enum class does not support. */
+  void SetNormalizationMethod(NormalizationMethods method)
+  {
+    if (m_NormalizationMethod != method)
+    {
+      m_NormalizationMethod = method;
+      this->Modified();
+    }
+  }
   itkSetMacro( MaxNumDirections, unsigned long)                       ///< If more directions are extracted, only the largest are kept.
   itkGetMacro( MaxNumDirections, unsigned long)                       ///< If more directions are extracted, only the largest are kept.
   itkSetMacro( MaskImage, ItkUcharImgType::Pointer)                   ///< only process voxels inside mask

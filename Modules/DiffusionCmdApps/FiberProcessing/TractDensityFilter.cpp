@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
 
     itk::TractDensityImageFilter< ItkFloatImgType >::Pointer generator = itk::TractDensityImageFilter< ItkFloatImgType >::New();
     generator->SetFiberBundle(inputTractogram);
-    generator->SetMode(TDI_MODE::DENSITY);
+    generator->SetMode(itk::TDI_MODE::DENSITY);
     generator->SetOutputAbsoluteValues(false);
     generator->Update();
 

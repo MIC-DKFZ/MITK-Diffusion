@@ -25,7 +25,7 @@ static inline bool CompareVectorLengths(const vnl_vector_fixed< double, 3 >& v1,
 
 template< class PixelType >
 TractsToVectorImageFilter< PixelType >::TractsToVectorImageFilter():
-  m_NormalizationMethod(GLOBAL_MAX),
+  m_NormalizationMethod(NormalizationMethods::GLOBAL_MAX),
   m_AngularThreshold(0.7),
   m_MaxNumDirections(3),
   m_SizeThreshold(0.3),
@@ -253,9 +253,9 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
       count++;
 
       float mag = dir.magnitude();
-      if (m_NormalizationMethod==MAX_VEC_NORM && voxel_max_mag>mitk::eps)
+      if (m_NormalizationMethod==NormalizationMethods::MAX_VEC_NORM && voxel_max_mag>mitk::eps)
         dir /= voxel_max_mag;
-      else if (m_NormalizationMethod==SINGLE_VEC_NORM && mag>mitk::eps)
+      else if (m_NormalizationMethod==NormalizationMethods::SINGLE_VEC_NORM && mag>mitk::eps)
         dir.normalize();
 
       for (unsigned int j = 0; j<3; j++)
@@ -268,7 +268,7 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
     ++dirIt;
   }
 
-  if (m_NormalizationMethod==GLOBAL_MAX && max_dir_mag>0)
+  if (m_NormalizationMethod==NormalizationMethods::GLOBAL_MAX && max_dir_mag>0)
   {
     itk::ImageRegionIterator<ItkDirectionImageType> dirImgIt(m_DirectionImage, m_DirectionImage->GetLargestPossibleRegion());
     while(!dirImgIt.IsAtEnd())

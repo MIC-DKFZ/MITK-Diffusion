@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
 
       itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
       generator->SetFiberBundle(fib);
-      generator->SetMode(TDI_MODE::BINARY);
+      generator->SetMode(itk::TDI_MODE::BINARY);
       generator->SetOutputAbsoluteValues(!normalize);
       generator->SetUpsamplingFactor(upsampling);
 
@@ -187,7 +187,7 @@ int main(int argc, char* argv[])
 
       itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
       generator->SetFiberBundle(fib);
-      generator->SetMode(TDI_MODE::DENSITY);
+      generator->SetMode(itk::TDI_MODE::DENSITY);
       generator->SetOutputAbsoluteValues(!normalize);
       generator->SetUpsamplingFactor(upsampling);
 

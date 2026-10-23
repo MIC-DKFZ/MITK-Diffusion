@@ -22,13 +22,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkRGBAPixel.h>
 #include <mitkFiberBundle.h>
 
-enum TDI_MODE : int {
+namespace itk{
+
+/** What a tract density image holds per voxel. */
+enum class TDI_MODE : int {
+  /** 1 where a fiber passes, else 0 */
   BINARY,
+  /** number of fibers that pass the voxel, each counted once */
   VISITATION_COUNT,
+  /** fiber length (mm) in the voxel times the fiber weight, summed over the fibers */
   DENSITY
 };
-
-namespace itk{
 
 /**
 * \brief Generates tract density images from input fiberbundles (Calamante 2010).   */

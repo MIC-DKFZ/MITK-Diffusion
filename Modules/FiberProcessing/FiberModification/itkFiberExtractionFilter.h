@@ -33,12 +33,12 @@ class FiberExtractionFilter : public ProcessObject
 {
 public:
 
-  enum MODE {
+  enum class MODE {
     OVERLAP,
     ENDPOINTS
   };
 
-  enum INPUT {
+  enum class INPUT {
     SCALAR_MAP,  ///< In this case, positive means roi image vlaue > threshold
     LABEL_MAP    ///< In this case, positive means roi image value in labels vector
   };
@@ -59,8 +59,25 @@ public:
   }
 
   itkSetMacro( InputFiberBundle, mitk::FiberBundle::Pointer )
-  itkSetMacro( Mode, MODE )                 ///< Overlap or endpoints
-  itkSetMacro( InputType, INPUT )           ///< Scalar map or label image
+  /** Overlap or endpoints. The setters are written out because itkSetMacro streams the value,
+   *  which an enum class does not support. */
+  void SetMode(MODE mode)
+  {
+    if (m_Mode != mode)
+    {
+      m_Mode = mode;
+      this->Modified();
+    }
+  }
+  /** Scalar map or label image */
+  void SetInputType(INPUT inputType)
+  {
+    if (m_InputType != inputType)
+    {
+      m_InputType = inputType;
+      this->Modified();
+    }
+  }
   itkSetMacro( BothEnds, bool )             ///< Both streamline ends need to be inside of the ROI for the streamline to be considered positive
   itkSetMacro( OverlapFraction, float )     ///< Necessary fraction of streamline points inside the ROI for the streamline to be considered positive
   itkSetMacro( NoNegatives, bool )          ///< Don't create output tractograms from negative streamlines (save the computation)
