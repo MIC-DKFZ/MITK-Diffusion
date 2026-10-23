@@ -79,8 +79,11 @@ namespace itk {
     ringing_lines_x = static_cast<int>(ceil(kxMax/2 * ringing_factor));
     ringing_lines_y = static_cast<int>(ceil(kyMax/2 * ringing_factor));
 
-    // Adjust noise variance since it is the intended variance in physical space and not in k-space:
-    float noiseVar = m_Parameters->m_SignalGen.m_PartialFourier*m_Parameters->m_SignalGen.m_NoiseVariance/(kyMax*kxMax);
+    // Adjust noise variance since it is the intended variance in physical space and not in k-space.
+    // It is the per-component image variance of a fully sampled acquisition: with partial Fourier the
+    // conjugate filling already keeps the total noise power (moving it from the imaginary to the real
+    // part), so the variance is not scaled with the acquired fraction.
+    float noiseVar = m_Parameters->m_SignalGen.m_NoiseVariance/(kyMax*kxMax);
 
     m_RandGen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
     if (m_RandSeed>=0)  // always generate the same random numbers?
