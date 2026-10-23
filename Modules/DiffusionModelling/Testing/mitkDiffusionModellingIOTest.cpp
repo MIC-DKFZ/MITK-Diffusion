@@ -61,6 +61,7 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(PeakImage_SetCustomColorWithoutPolydata);
   MITK_TEST(ShAndPeakIO_DotsInFileName);
   MITK_TEST(MimeTypes_ShAndPeakReadersOnlyForMatchingFiles);
+  MITK_TEST(MimeTypes_ReplacedFile_CheckedAgain);
   MITK_TEST(ShWriter_NewNiftiFile_ReadsBackAsSh);
   MITK_TEST(ShIO_ConventionSurvivesSaving);
   MITK_TEST(PeakReader_MrtrixPeaks_ConvertedToLps);
@@ -376,6 +377,19 @@ public:
     const auto shDescriptions = ReaderDescriptions(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"));
     CPPUNIT_ASSERT(shDescriptions.count("SH Image") == 1);
     CPPUNIT_ASSERT(shDescriptions.count("Peak Image") == 1);
+  }
+
+  // The SH and peak mime types share the header of the last file checked; a file replaced under
+  // the same name is read again.
+  void MimeTypes_ReplacedFile_CheckedAgain()
+  {
+    const std::string path = m_TempDir + "/replaced.nii.gz";
+    std::filesystem::copy_file(GetTestDataFilePath("DiffusionImaging/mean_FA.nii.gz"), path);
+    CPPUNIT_ASSERT(ReaderDescriptions(path).count("SH Image") == 0);
+    std::filesystem::copy_file(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), path, std::filesystem::copy_options::overwrite_existing);
+    const auto descriptions = ReaderDescriptions(path);
+    CPPUNIT_ASSERT(descriptions.count("SH Image") == 1);
+    CPPUNIT_ASSERT(descriptions.count("Peak Image") == 1);
   }
 
   // Writers are chosen through the mime type of the output path, which does not exist yet.

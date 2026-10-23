@@ -23,6 +23,82 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLog.h>
 #include <itkNiftiImageIO.h>
 
+#include <cstdint>
+#include <filesystem>
+#include <mutex>
+
+namespace
+{
+  /** What the SH and the peak mime type need from the header of a NRRD or NIfTI file. */
+  struct Scalar4DHeader
+  {
+    bool scalar4D = false;   ///< scalar pixels in four dimensions
+    unsigned int volumes = 0; ///< size of the fourth dimension
+  };
+
+  Scalar4DHeader ProbeScalar4D(itk::ImageIOBase *io, const std::string &path)
+  {
+    Scalar4DHeader header;
+    try
+    {
+      if (io->CanReadFile(path.c_str()))
+      {
+        io->SetFileName(path.c_str());
+        io->ReadImageInformation();
+        if (io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions() == 4)
+        {
+          header.scalar4D = true;
+          header.volumes = io->GetDimensions(3);
+        }
+      }
+    }
+    catch (...)
+    {
+    }
+    return header;
+  }
+
+  /**
+   * Both mime types check the header of every .nrrd, .nii and .nii.gz file that is opened. The
+   * header is read once for both: the result for the last file is kept as long as its
+   * modification time and size stay the same.
+   */
+  Scalar4DHeader ReadScalar4DHeader(const std::string &path)
+  {
+    static std::mutex mutex;
+    static std::string lastPath;
+    static std::filesystem::file_time_type lastTime;
+    static std::uintmax_t lastSize = 0;
+    static Scalar4DHeader lastHeader;
+
+    std::error_code timeError, sizeError;
+    const auto time = std::filesystem::last_write_time(path, timeError);
+    const auto size = std::filesystem::file_size(path, sizeError);
+    const bool cacheable = !timeError && !sizeError;
+    if (cacheable)
+    {
+      std::lock_guard<std::mutex> lock(mutex);
+      if (path == lastPath && time == lastTime && size == lastSize)
+        return lastHeader;
+    }
+
+    // A file that NRRD cannot read as a scalar 4D image is still tried with NIfTI.
+    Scalar4DHeader header = ProbeScalar4D(itk::NrrdImageIO::New(), path);
+    if (!header.scalar4D)
+      header = ProbeScalar4D(itk::NiftiImageIO::New(), path);
+
+    if (cacheable)
+    {
+      std::lock_guard<std::mutex> lock(mutex);
+      lastPath = path;
+      lastTime = time;
+      lastSize = size;
+      lastHeader = header;
+    }
+    return header;
+  }
+}
+
 namespace mitk
 {
 
@@ -66,85 +142,21 @@ bool DiffusionIOMimeTypes::SHImageMimeType::AppliesTo(const std::string &path) c
   if (ext==".shi")
     return true;
 
+  const auto header = ReadScalar4DHeader(path);
+  if (!header.scalar4D)
+    return false;
+  switch (header.volumes)
   {
-    try
-    {
-      itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-      if (io->CanReadFile(path.c_str()))
-      {
-        io->SetFileName(path.c_str());
-        io->ReadImageInformation();
-        if (io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions() == 4)
-        {
-          switch (io->GetDimensions(3))
-          {
-          case 6:
-            return true;
-            break;
-          case 15:
-            return true;
-            break;
-          case 28:
-            return true;
-            break;
-          case 45:
-            return true;
-            break;
-          case 66:
-            return true;
-            break;
-          case 91:
-            return true;
-            break;
-          default:
-            return false;
-          }
-        }
-      }
-    }
-    catch(...)
-    {}
+  case 6:
+  case 15:
+  case 28:
+  case 45:
+  case 66:
+  case 91:
+    return true;
+  default:
+    return false;
   }
-
-  try
-  {
-    itk::NiftiImageIO::Pointer io = itk::NiftiImageIO::New();
-    if ( io->CanReadFile( path.c_str() ) )
-    {
-      io->SetFileName( path.c_str() );
-      io->ReadImageInformation();
-      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4)
-      {
-        switch (io->GetDimensions(3))
-        {
-        case 6:
-          return true;
-          break;
-        case 15:
-          return true;
-          break;
-        case 28:
-          return true;
-          break;
-        case 45:
-          return true;
-          break;
-        case 66:
-          return true;
-          break;
-        case 91:
-          return true;
-          break;
-        default :
-          return false;
-        }
-      }
-    }
-  }
-  catch(...)
-  {}
-
-  return false;
 }
 
 DiffusionIOMimeTypes::SHImageMimeType* DiffusionIOMimeTypes::SHImageMimeType::Clone() const
@@ -204,35 +216,8 @@ bool DiffusionIOMimeTypes::PeakImageMimeType::AppliesTo(const std::string &path)
   if (ext==".peak")
     return true;
 
-  try
-  {
-    itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
-    if ( io->CanReadFile( path.c_str() ) )
-    {
-      io->SetFileName( path.c_str() );
-      io->ReadImageInformation();
-      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
-        return true;
-    }
-  }
-  catch(...)
-  {}
-
-  try
-  {
-    itk::NiftiImageIO::Pointer io = itk::NiftiImageIO::New();
-    if ( io->CanReadFile( path.c_str() ) )
-    {
-      io->SetFileName( path.c_str() );
-      io->ReadImageInformation();
-      if ( io->GetPixelType() == itk::CommonEnums::IOPixel::SCALAR && io->GetNumberOfDimensions()==4 && io->GetDimensions(3)%3==0)
-        return true;
-    }
-  }
-  catch(...)
-  {}
-
-  return false;
+  const auto header = ReadScalar4DHeader(path);
+  return header.scalar4D && header.volumes % 3 == 0;
 }
 
 DiffusionIOMimeTypes::PeakImageMimeType* DiffusionIOMimeTypes::PeakImageMimeType::Clone() const
