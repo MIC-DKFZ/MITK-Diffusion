@@ -101,7 +101,6 @@ protected slots:
 protected:
 
   void ItkTensorReconstruction();
-  void TeemTensorReconstruction();
   void TensorReconstructionWithCorr();
 
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
