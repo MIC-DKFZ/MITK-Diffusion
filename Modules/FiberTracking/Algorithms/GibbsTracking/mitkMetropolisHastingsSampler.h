@@ -57,6 +57,7 @@ protected:
     void RemoveAndSaveTrack(EndPoint P);
     void MakeTrackProposal(EndPoint P);
     void ComputeEndPointProposalDistribution(EndPoint P);
+    bool ComputeOptimalShift(Particle* p, Particle& prop_p);  ///< proposal of the optimal shift of p
 
     /** generate random vectors */
     void DistortVector(float sigma, vnl_vector_fixed<float, 3>& vec);

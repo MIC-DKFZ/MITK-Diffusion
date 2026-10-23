@@ -31,6 +31,8 @@ public:
     MakeTrackProposal(mitk::EndPoint(p, ep));
     return m_ProposalTrack;
   }
+
+  using mitk::MetropolisHastingsSampler::ComputeOptimalShift;
 };
 
 /**
@@ -43,6 +45,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(EvaluateOdf_RotatedImage_SamplesAlongParticle);
   MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
+  MITK_TEST(OptimalShift_OneNeighbour_FacesIt);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfImageType = GibbsEnergyComputer::ItkOdfImgType;
@@ -195,6 +198,45 @@ public:
     CPPUNIT_ASSERT_EQUAL(numParticles, track.m_Length);
     for (int k = 0; k < numParticles; ++k)
       CPPUNIT_ASSERT_EQUAL(k, track.track[k].p->ID);
+  }
+
+  /** With one connected neighbour, the optimal shift places the particle so that its connected end
+   *  touches the neighbour's end. The direction ignored which end of the neighbour it was, so half
+   *  of these proposals had an impossible connection (energy -FLT_MAX) and were always rejected. */
+  void OptimalShift_OneNeighbour_FacesIt()
+  {
+    itk::Matrix<double, 3, 3> identity;
+    identity.SetIdentity();
+    auto mask = MakeImage<FloatImageType>(identity);
+    mask->FillBuffer(1.0f);
+    auto odfs = MakeImage<OdfImageType>(identity);
+    SphereInterpolator interpolator("");
+    CPPUNIT_ASSERT(interpolator.IsInValidState());
+    const float length = 0.5f;
+    auto rng = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+    const float curvature = std::cos(itk::Math::pi / 4);
+
+    for (int pEnd : {+1, -1})
+      for (int neighbourEnd : {+1, -1})
+      {
+        mitk::ParticleGrid grid(mask, length, 16);
+        GibbsEnergyComputer energy(odfs, mask, &grid, &interpolator, rng);
+        energy.SetParameters(0.001f, 0.5f, 10 * length * length, curvature, 0.0f, 0.2f);
+        TrackProposalSampler sampler(&grid, &energy, rng, curvature);
+
+        mitk::Particle *neighbour = grid.NewParticle(vnl_vector_fixed<float, 3>(3.5f, 3.5f, 3.5f));
+        neighbour->GetDir() = vnl_vector_fixed<float, 3>(1.0f, 0.0f, 0.0f);
+        mitk::Particle *p = grid.NewParticle(vnl_vector_fixed<float, 3>(2.0f, 4.0f, 3.5f));
+        p->GetDir() = vnl_vector_fixed<float, 3>(0.0f, 1.0f, 0.0f);
+        grid.CreateConnection(p, pEnd, neighbour, neighbourEnd);
+
+        mitk::Particle proposal = *p;
+        CPPUNIT_ASSERT(sampler.ComputeOptimalShift(p, proposal));
+        vnl_vector_fixed<float, 3> pTip = proposal.GetPos() + proposal.GetDir() * (length * pEnd);
+        vnl_vector_fixed<float, 3> neighbourTip = neighbour->GetPos() + neighbour->GetDir() * (length * neighbourEnd);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, (pTip - neighbourTip).magnitude(), 1e-5);
+        CPPUNIT_ASSERT(energy.ComputeInternalEnergyConnection(&proposal, pEnd, neighbour, neighbourEnd) > 0);
+      }
   }
 };
 

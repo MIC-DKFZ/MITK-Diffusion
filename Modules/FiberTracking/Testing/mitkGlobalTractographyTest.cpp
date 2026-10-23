@@ -117,8 +117,9 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
 
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(tracker->GetFiberBundle());
 
-    // Regenerated when FiberBuilder kept the first particle of every fiber, not only of the first one.
-    CheckFibResult("gibbsTractogram_v2.fib", outFib);
+    // Regenerated when FiberBuilder kept the first particle of every fiber (v2) and when the optimal
+    // shift with one neighbour faced that neighbour (v3).
+    CheckFibResult("gibbsTractogram_v3.fib", outFib);
   }
 
 };

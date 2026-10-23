@@ -191,37 +191,8 @@ void MetropolisHastingsSampler::MakeProposal()
             int pnum = m_RandGen->GetIntegerVariate()%m_ParticleGrid->m_NumParticles;
             Particle *p =  m_ParticleGrid->GetParticle(pnum);
 
-            bool no_proposal = false;
             Particle prop_p = *p;
-            if (p->pID != -1 && p->mID != -1)
-            {
-                Particle *plus = m_ParticleGrid->GetParticle(p->pID);
-                int ep_plus = (plus->pID == p->ID)? 1 : -1;
-                Particle *minus = m_ParticleGrid->GetParticle(p->mID);
-                int ep_minus = (minus->pID == p->ID)? 1 : -1;
-                prop_p.GetPos() = (plus->GetPos() + plus->GetDir() * (m_ParticleLength * ep_plus)  + minus->GetPos() + minus->GetDir() * (m_ParticleLength * ep_minus));
-                prop_p.GetPos() *= 0.5;
-                prop_p.GetDir() = plus->GetPos() - minus->GetPos();
-                prop_p.GetDir().normalize();
-            }
-            else if (p->pID != -1)
-            {
-                Particle *plus = m_ParticleGrid->GetParticle(p->pID);
-                int ep_plus = (plus->pID == p->ID)? 1 : -1;
-                prop_p.GetPos() = plus->GetPos() + plus->GetDir() * (m_ParticleLength * ep_plus * 2);
-                prop_p.GetDir() = plus->GetDir();
-            }
-            else if (p->mID != -1)
-            {
-                Particle *minus = m_ParticleGrid->GetParticle(p->mID);
-                int ep_minus = (minus->pID == p->ID)? 1 : -1;
-                prop_p.GetPos() = minus->GetPos() + minus->GetDir() * (m_ParticleLength * ep_minus * 2);
-                prop_p.GetDir() = minus->GetDir();
-            }
-            else
-                no_proposal = true;
-
-            if (!no_proposal)
+            if (ComputeOptimalShift(p, prop_p))
             {
                 float cos = dot_product(prop_p.GetDir(), p->GetDir());
                 float p_rev = exp(-((prop_p.GetPos()-p->GetPos()).squared_magnitude() + (1-cos*cos))*m_Gamma)/m_Z;
@@ -283,6 +254,41 @@ void MetropolisHastingsSampler::MakeProposal()
                 ImplementTrack(m_BackupTrack);
         }
     }
+}
+
+// position and direction of p implied by its connected neighbours; false if p is not connected
+bool MetropolisHastingsSampler::ComputeOptimalShift(Particle* p, Particle& prop_p)
+{
+    if (p->pID != -1 && p->mID != -1)
+    {
+        Particle *plus = m_ParticleGrid->GetParticle(p->pID);
+        int ep_plus = (plus->pID == p->ID)? 1 : -1;
+        Particle *minus = m_ParticleGrid->GetParticle(p->mID);
+        int ep_minus = (minus->pID == p->ID)? 1 : -1;
+        prop_p.GetPos() = (plus->GetPos() + plus->GetDir() * (m_ParticleLength * ep_plus)  + minus->GetPos() + minus->GetDir() * (m_ParticleLength * ep_minus));
+        prop_p.GetPos() *= 0.5;
+        prop_p.GetDir() = plus->GetPos() - minus->GetPos();
+        prop_p.GetDir().normalize();
+    }
+    else if (p->pID != -1)
+    {
+        // p's + end faces the neighbour's ep_plus end, so p points away from it: -ep_plus * its direction
+        Particle *plus = m_ParticleGrid->GetParticle(p->pID);
+        int ep_plus = (plus->pID == p->ID)? 1 : -1;
+        prop_p.GetPos() = plus->GetPos() + plus->GetDir() * (m_ParticleLength * ep_plus * 2);
+        prop_p.GetDir() = plus->GetDir() * static_cast<float>(-ep_plus);
+    }
+    else if (p->mID != -1)
+    {
+        // p's - end faces the neighbour's ep_minus end: p points along ep_minus * its direction
+        Particle *minus = m_ParticleGrid->GetParticle(p->mID);
+        int ep_minus = (minus->pID == p->ID)? 1 : -1;
+        prop_p.GetPos() = minus->GetPos() + minus->GetDir() * (m_ParticleLength * ep_minus * 2);
+        prop_p.GetDir() = minus->GetDir() * static_cast<float>(ep_minus);
+    }
+    else
+        return false;
+    return true;
 }
 
 // establish connections between particles stored in input Track
