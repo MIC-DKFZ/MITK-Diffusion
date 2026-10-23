@@ -134,8 +134,9 @@ void FiberExtractionFilter< PixelType >::ExtractOverlap(mitk::FiberBundle::Point
     {
       auto roi = m_RoiImages.at(m);
       m_Interpolator->SetInputImage(roi);
-      PixelType inside = 0;
-      PixelType outside = 0;
+      // In-voxel lengths in mm; an integer ROI pixel type must not truncate them.
+      double inside = 0;
+      double outside = 0;
       for (int j=0; j<numPoints-1; j++)
       {
         itk::Point<float, 3> startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
@@ -162,7 +163,7 @@ void FiberExtractionFilter< PixelType >::ExtractOverlap(mitk::FiberBundle::Point
         }
       }
 
-      float overlap = (float)inside/(inside+outside);
+      float overlap = inside/(inside+outside);
       if (overlap > best_ol && overlap >= m_OverlapFraction)
       {
         best_ol_idx = m;
