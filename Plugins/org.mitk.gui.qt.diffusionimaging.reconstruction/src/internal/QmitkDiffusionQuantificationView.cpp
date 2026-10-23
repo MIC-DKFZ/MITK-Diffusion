@@ -216,7 +216,20 @@ void QmitkDiffusionQuantificationView::DoAdcCalculation(bool fit)
 
 void QmitkDiffusionQuantificationView::GFA()
 {
-  OdfQuantify(0);
+  try
+  {
+    OdfQuantification();
+  }
+  catch (const itk::ExceptionObject &ex)
+  {
+    MITK_ERROR << ex;
+    QMessageBox::information(nullptr, "Computation not possible:", ex.GetDescription());
+  }
+  catch (const std::exception &e)
+  {
+    MITK_ERROR << e.what();
+    QMessageBox::information(nullptr, "Computation not possible:", e.what());
+  }
 }
 
 void QmitkDiffusionQuantificationView::FA()
@@ -249,24 +262,6 @@ void QmitkDiffusionQuantificationView::MD()
   TensorQuantify(5);
 }
 
-void QmitkDiffusionQuantificationView::OdfQuantify(int method)
-{
-  try
-  {
-    OdfQuantification(method);
-  }
-  catch (const itk::ExceptionObject &ex)
-  {
-    MITK_ERROR << ex;
-    QMessageBox::information(nullptr, "Computation not possible:", ex.GetDescription());
-  }
-  catch (const std::exception &e)
-  {
-    MITK_ERROR << e.what();
-    QMessageBox::information(nullptr, "Computation not possible:", e.what());
-  }
-}
-
 void QmitkDiffusionQuantificationView::TensorQuantify(int method)
 {
   try
@@ -285,7 +280,7 @@ void QmitkDiffusionQuantificationView::TensorQuantify(int method)
   }
 }
 
-void QmitkDiffusionQuantificationView::OdfQuantification(int method)
+void QmitkDiffusionQuantificationView::OdfQuantification()
 {
   QString status;
 
@@ -310,88 +305,9 @@ void QmitkDiffusionQuantificationView::OdfQuantification(int method)
     GfaFilterType::Pointer gfaFilter = GfaFilterType::New();
     gfaFilter->SetInput(itkvol);
 
-    std::string newname;
-    newname.append(nodename);
-    switch(method)
-    {
-    case 0:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_STANDARD);
-      newname.append("GFA");
-      break;
-    }
-    case 1:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_QUANTILES_HIGH_LOW);
-      newname.append("01");
-      break;
-    }
-    case 2:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_QUANTILE_HIGH);
-      newname.append("02");
-      break;
-    }
-    case 3:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_MAX_ODF_VALUE);
-      newname.append("03");
-      break;
-    }
-    case 4:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_DECONVOLUTION_COEFFS);
-      newname.append("04");
-      break;
-    }
-    case 5:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_MIN_MAX_NORMALIZED_STANDARD);
-      newname.append("05");
-      break;
-    }
-    case 6:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_NORMALIZED_ENTROPY);
-      newname.append("06");
-      break;
-    }
-    case 7:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_NEMATIC_ORDER_PARAMETER);
-      newname.append("07");
-      break;
-    }
-    case 8:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_QUANTILES_LOW_HIGH);
-      newname.append("08");
-      break;
-    }
-    case 9:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_QUANTILE_LOW);
-      newname.append("09");
-      break;
-    }
-    case 10:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_MIN_ODF_VALUE);
-      newname.append("10");
-      break;
-    }
-    case 11:
-    {
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_STD_BY_MAX);
-      newname.append("11");
-      break;
-    }
-    default:
-    {
-      newname.append("0");
-      gfaFilter->SetComputationMethod(GfaFilterType::GFA_STANDARD);
-    }
-    }
+    // The filter's other GFA variants are not offered (several are not defined as published).
+    gfaFilter->SetComputationMethod(GfaFilterType::GFA_STANDARD);
+    std::string newname = nodename + "GFA";
     gfaFilter->Update();
 
     typedef itk::Image<TOdfPixelType, 3> ImgType;

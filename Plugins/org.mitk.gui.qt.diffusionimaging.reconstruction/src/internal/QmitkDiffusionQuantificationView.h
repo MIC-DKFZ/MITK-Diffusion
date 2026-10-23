@@ -32,8 +32,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 class QmitkDiffusionQuantificationView : public QmitkAbstractView
 {
 
-  friend struct DqSelListener;
-
   // this is needed for all Qt objects that should have a MOC object (everything that derives from QObject)
   Q_OBJECT
 
@@ -62,8 +60,7 @@ protected slots:
   void ADC_DWI();
   void MD_DWI();
 
-  void OdfQuantify(int method);
-  void OdfQuantification(int method) ;
+  void OdfQuantification();
 
   void TensorQuantify(int method);
   void TensorQuantification(int method) ;
@@ -78,7 +75,6 @@ protected:
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
 
   Ui::QmitkDiffusionQuantificationViewControls* m_Controls;
-  static const float m_ScaleDAIValues;
 };
 
 
