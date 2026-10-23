@@ -19,6 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkFixedArray.h"
 #include "itkMatrix.h"
+#include <map>
 #include <mutex>
 #include "itkDiffusionTensor3D.h"
 
@@ -206,7 +207,8 @@ private:
 
   static std::vector< std::vector<int>* >* m_NeighborIdxs;
 
-  static std::vector< std::vector<int>* >* m_AngularRangeIdxs;
+  /** Per pair of angles (GetPrincipleCurvature) and direction: the directions in that angular range */
+  static std::map< std::pair<double, double>, std::vector< std::vector<int> > > m_AngularRangeIdxs;
 
   static std::vector<int>* m_HalfSphereIdxs;
 

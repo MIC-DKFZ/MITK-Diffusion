@@ -15,7 +15,9 @@ found in the LICENSE file.
 
 #include <itkOrientationDistributionFunction.h>
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
 
 /** Regression tests of itk::OrientationDistributionFunction. */
 class mitkDiffusionReconstructionOdfTestSuite : public mitk::TestFixture
@@ -23,6 +25,7 @@ class mitkDiffusionReconstructionOdfTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionReconstructionOdfTestSuite);
   MITK_TEST(PrincipalDirection_MaximumAtIndexZero);
   MITK_TEST(EllipsoidDirection_SurvivesCopies);
+  MITK_TEST(PrincipleCurvature_DependsOnAngles);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
@@ -81,6 +84,40 @@ public:
     plain[5] = 1;
     assigned = plain;
     CheckDirection(OdfType::GetDirection(5), assigned.GetPrincipalDiffusionDirection());
+  }
+
+  /** GetPrincipleCurvature computed directly: maximum against the minimum of its angular range. */
+  static double ExpectedCurvature(const OdfType &odf, double alphaMin, double alphaMax)
+  {
+    const int pIdx = odf.GetPrincipalDiffusionDirectionIndex();
+    const auto pDir = OdfType::GetDirection(pIdx);
+    double median = std::numeric_limits<double>::max();
+    for (unsigned int j = 0; j < ODF_SAMPLING_SIZE; ++j)
+    {
+      const double angle = 180 / itk::Math::pi * std::acos(dot_product(pDir, OdfType::GetDirection(j)));
+      if (angle < alphaMax && angle > alphaMin)
+        median = std::min(median, static_cast<double>(odf[j]));
+    }
+    const double mode = odf[pIdx];
+    return mode > median ? mode / median - 1 : median / mode - 1;
+  }
+
+  // The angular ranges of the first call were kept for every later pair of angles, so changing
+  // the glyph properties or the GFA filter's parameters had no effect; an empty range indexed an
+  // empty vector and a zero ODF gave NaN.
+  void PrincipleCurvature_DependsOnAngles()
+  {
+    OdfType odf;
+    odf.InitFromTensor(Tensor(1, 0.3, 0.1));
+    const float first = odf.GetPrincipleCurvature(0, 30, 0);
+    const float second = odf.GetPrincipleCurvature(0, 60, 0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(ExpectedCurvature(odf, 0, 30), first, 1e-4 * first);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(ExpectedCurvature(odf, 0, 60), second, 1e-4 * second);
+    CPPUNIT_ASSERT(second > first * 1.01);
+
+    CPPUNIT_ASSERT_EQUAL(0.0f, odf.GetPrincipleCurvature(89.9, 89.95, 0));
+    const OdfType zero;
+    CPPUNIT_ASSERT_EQUAL(0.0f, zero.GetPrincipleCurvature(0, 30, 0));
   }
 };
 

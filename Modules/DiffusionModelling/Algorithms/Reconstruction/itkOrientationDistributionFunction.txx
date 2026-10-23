@@ -47,7 +47,7 @@ template<class T, unsigned int N>
 std::vector< std::vector<int>* >* itk::OrientationDistributionFunction<T,N>::m_NeighborIdxs = nullptr;
 
 template<class T, unsigned int N>
-std::vector< std::vector<int>* >* itk::OrientationDistributionFunction<T,N>::m_AngularRangeIdxs = nullptr;
+std::map< std::pair<double, double>, std::vector< std::vector<int> > > itk::OrientationDistributionFunction<T,N>::m_AngularRangeIdxs;
 
 template<class T, unsigned int N>
 std::vector<int>* itk::OrientationDistributionFunction<T,N>::m_HalfSphereIdxs = nullptr;
@@ -1153,29 +1153,32 @@ template < typename T, unsigned int N >
 T itk::OrientationDistributionFunction<T, N>
 ::GetPrincipleCurvature(double alphaMinDegree, double alphaMaxDegree, int invert) const
 {
-  // following loop only performed once
-  // (computing indices of each angular range)
-  m_MutexAngularRange.lock();
-  if(m_AngularRangeIdxs == nullptr)
+  // The angular ranges depend on the two angles (node properties of the glyphs, parameters of the
+  // GFA filter), so they are computed once per pair of angles. std::map keeps the references valid
+  // when other pairs are added.
+  const std::vector< std::vector<int> > *angularRanges = nullptr;
   {
-    m_AngularRangeIdxs = new std::vector< std::vector<int>* >();
-    for(unsigned int i=0; i<N; i++)
+    std::lock_guard<std::mutex> lock(m_MutexAngularRange);
+    auto &ranges = m_AngularRangeIdxs[std::make_pair(alphaMinDegree, alphaMaxDegree)];
+    if (ranges.empty())
     {
-      vnl_vector_fixed<double,3> pDir = GetDirection(i);
-      auto      idxs = new std::vector<int>();
-      for(unsigned int j=0; j<N; j++)
+      ranges.resize(N);
+      for(unsigned int i=0; i<N; i++)
       {
-        vnl_vector_fixed<double,3> cDir = GetDirection(j);
-        double angle = ( 180 / itk::Math::pi ) * acos( dot_product(pDir, cDir) );
-        if( (angle < alphaMaxDegree) && (angle > alphaMinDegree) )
+        vnl_vector_fixed<double,3> pDir = GetDirection(i);
+        for(unsigned int j=0; j<N; j++)
         {
-          idxs->push_back(j);
+          vnl_vector_fixed<double,3> cDir = GetDirection(j);
+          double angle = ( 180 / itk::Math::pi ) * acos( dot_product(pDir, cDir) );
+          if( (angle < alphaMaxDegree) && (angle > alphaMinDegree) )
+          {
+            ranges[i].push_back(j);
+          }
         }
       }
-      m_AngularRangeIdxs->push_back(idxs);
     }
+    angularRanges = &ranges;
   }
-  m_MutexAngularRange.unlock();
 
   // find the maximum (or minimum) direction (remember index and value)
   T mode;
@@ -1227,10 +1230,13 @@ T itk::OrientationDistributionFunction<T, N>
 
   // collect all values in angular range of mode
   std::vector<T> odfValuesInAngularRange;
-  int numInRange = m_AngularRangeIdxs->at(pIdx)->size();
+  int numInRange = angularRanges->at(pIdx).size();
+  // An empty angular range or an ODF without a positive mode or median has no curvature.
+  if (numInRange == 0)
+    return 0;
   for(int i=0; i<numInRange; i++)
   {
-    odfValuesInAngularRange.push_back((*this)[(*m_AngularRangeIdxs->at(pIdx))[i] ]);
+    odfValuesInAngularRange.push_back((*this)[angularRanges->at(pIdx)[i] ]);
   }
 
   // sort them by value
@@ -1240,6 +1246,8 @@ T itk::OrientationDistributionFunction<T, N>
   T median = odfValuesInAngularRange[floor(quantile*(double)numInRange+0.5)];
 
   // compute and return final value
+  if (!(mode > 0) || !(median > 0))
+    return 0;
   if(mode > median)
   {
     return mode/median - 1.0;
