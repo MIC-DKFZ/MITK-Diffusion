@@ -14,40 +14,37 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#include <mitkTestingMacros.h>
-#include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
+#include <mitkIOUtil.h>
+#include <mitkTestFixture.h>
+#include <mitkTestingMacros.h>
 
-/**Documentation
- *  Test if fiber transfortaiom methods work correctly
- */
-int mitkFiberTransformationTest(int argc, char* argv[])
+/** A chain of FiberBundle transformations on fiberBundleX.fib against the MITK-Data reference. */
+class mitkFiberTransformationTestSuite : public mitk::TestFixture
 {
-    MITK_TEST_BEGIN("mitkFiberTransformationTest");
+  CPPUNIT_TEST_SUITE(mitkFiberTransformationTestSuite);
+  MITK_TEST(TransformationChain_EqualsReference);
+  CPPUNIT_TEST_SUITE_END();
 
-    MITK_TEST_CONDITION_REQUIRED(argc==3,"check for input data")
+public:
+  void TransformationChain_EqualsReference()
+  {
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/fiberBundleX.fib"));
+    auto reference = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/fiberBundleX_transformed.fib"));
 
-            try{
-        mitk::FiberBundle::Pointer groundTruthFibs = mitk::IOUtil::Load<mitk::FiberBundle>(argv[1]);
-        mitk::FiberBundle::Pointer transformedFibs = mitk::IOUtil::Load<mitk::FiberBundle>(argv[2]);
+    fib->RotateAroundAxis(90, 45, 10);
+    fib->TranslateFibers(2, 3, 5);
+    fib->ScaleFibers(1, 0.1, 1.3);
+    fib->RemoveLongFibers(150);
+    fib->RemoveShortFibers(20);
+    fib->ResampleSpline(1.0);
+    fib->ApplyCurvatureThreshold(3.0, true);
+    fib->MirrorFibers(0);
+    fib->MirrorFibers(1);
+    fib->MirrorFibers(2);
 
-        groundTruthFibs->RotateAroundAxis(90, 45, 10);
-        groundTruthFibs->TranslateFibers(2, 3, 5);
-        groundTruthFibs->ScaleFibers(1, 0.1, 1.3);
-        groundTruthFibs->RemoveLongFibers(150);
-        groundTruthFibs->RemoveShortFibers(20);
-        groundTruthFibs->ResampleSpline(1.0);
-        groundTruthFibs->ApplyCurvatureThreshold(3.0, true);
-        groundTruthFibs->MirrorFibers(0);
-        groundTruthFibs->MirrorFibers(1);
-        groundTruthFibs->MirrorFibers(2);
+    CPPUNIT_ASSERT_MESSAGE("Transformed bundle equals the reference", fib->Equals(reference));
+  }
+};
 
-        MITK_TEST_CONDITION_REQUIRED(groundTruthFibs->Equals(transformedFibs),"check transformation")
-    }
-    catch(...) {
-        return EXIT_FAILURE;
-    }
-
-    // always end with this!
-    MITK_TEST_END();
-}
+MITK_TEST_SUITE_REGISTRATION(mitkFiberTransformation)
