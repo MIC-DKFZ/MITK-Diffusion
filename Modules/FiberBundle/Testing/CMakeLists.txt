@@ -4,6 +4,3 @@ MITK_CREATE_MODULE_TESTS(PACKAGE_DEPENDS PRIVATE DCMTK|dcmdata+ofstd)
 mitkAddCustomModuleTest(mitkFiberBundleReaderWriterTest mitkFiberBundleReaderWriterTest)
 mitkAddCustomModuleTest(mitkFiberBundleOperationsTest mitkFiberBundleOperationsTest)
 mitkAddCustomModuleTest(mitkFiberBundleIOTest mitkFiberBundleIOTest)
-
-# does not work reliably
-# mitkAddCustomModuleTest(mitkFiberMapper3DTest mitkFiberMapper3DTest)
