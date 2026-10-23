@@ -30,6 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <TrackingHandlers/mitkTrackingHandlerPeaks.h>
 #include <TrackingHandlers/mitkTrackingHandlerTensor.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <cstdint>
 #include <random>
 
 namespace itk {
@@ -50,6 +51,7 @@ StreamlineTrackingFilter
   , m_Verbose(true)
   , m_CurrentTracts(0)
   , m_Progress(0)
+  , m_NumSeeds(0)
   , m_StopTracking(false)
   , m_TrackingPriorHandler(nullptr)
 {
@@ -58,13 +60,15 @@ StreamlineTrackingFilter
 
 std::string StreamlineTrackingFilter::GetStatusText()
 {
-  std::string status = "Seedpoints processed: " + boost::lexical_cast<std::string>(m_Progress) + "/" + boost::lexical_cast<std::string>(m_SeedPoints.size());
-  if (m_SeedPoints.size()>0)
-    status += " (" + boost::lexical_cast<std::string>(100*m_Progress/m_SeedPoints.size()) + "%)";
+  unsigned int progress = m_Progress;
+  unsigned int num_seeds = m_NumSeeds;
+  std::string status = "Seedpoints processed: " + std::to_string(progress) + "/" + std::to_string(num_seeds);
+  if (num_seeds>0)
+    status += " (" + std::to_string(100*static_cast<unsigned long long>(progress)/num_seeds) + "%)";
   if (m_Parameters->m_MaxNumFibers>0)
-    status += "\nFibers accepted: " + boost::lexical_cast<std::string>(m_CurrentTracts) + "/" + boost::lexical_cast<std::string>(m_Parameters->m_MaxNumFibers);
+    status += "\nFibers accepted: " + std::to_string(m_CurrentTracts.load()) + "/" + std::to_string(m_Parameters->m_MaxNumFibers);
   else
-    status += "\nFibers accepted: " + boost::lexical_cast<std::string>(m_CurrentTracts);
+    status += "\nFibers accepted: " + std::to_string(m_CurrentTracts.load());
 
   return status;
 }
@@ -314,11 +318,11 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
       bool is_stop_voter = false;
       if (!m_Parameters->m_FixRandomSeed && m_Parameters->m_RandomSampling)
       {
-        d[0] = static_cast<float>(m_TrackingHandler->GetRandDouble(-0.5, 0.5));
-        d[1] = static_cast<float>(m_TrackingHandler->GetRandDouble(-0.5, 0.5));
-        d[2] = static_cast<float>(m_TrackingHandler->GetRandDouble(-0.5, 0.5));
+        d[0] = static_cast<float>(m_TrackingHandler->GetThreadRandDouble(-0.5, 0.5));
+        d[1] = static_cast<float>(m_TrackingHandler->GetThreadRandDouble(-0.5, 0.5));
+        d[2] = static_cast<float>(m_TrackingHandler->GetThreadRandDouble(-0.5, 0.5));
         d.normalize();
-        d *= static_cast<float>(m_TrackingHandler->GetRandDouble(0, static_cast<double>(m_Parameters->GetSamplingDistanceMm())));
+        d *= static_cast<float>(m_TrackingHandler->GetThreadRandDouble(0, static_cast<double>(m_Parameters->GetSamplingDistanceMm())));
       }
       else
       {
@@ -581,6 +585,19 @@ void StreamlineTrackingFilter::GetSeedPointsFromSeedImage()
     mitkThrow() << "No valid seed point in seed image! Is your seed image registered with the image you are tracking on?";
 }
 
+namespace
+{
+  /** Seed of the random engines for one seed point: a SplitMix64 hash of the run's base seed and
+   *  the seed point's index, so that neighbouring indices get unrelated streams. */
+  std::uint32_t SeedPointRandomSeed(std::uint32_t base_seed, std::uint32_t seed_index)
+  {
+    std::uint64_t z = (static_cast<std::uint64_t>(base_seed) << 32 | seed_index) + 0x9E3779B97F4A7C15ull;
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+    return static_cast<std::uint32_t>(z ^ (z >> 31));
+  }
+}
+
 void StreamlineTrackingFilter::GenerateData()
 {
   this->BeforeTracking();
@@ -593,42 +610,44 @@ void StreamlineTrackingFilter::GenerateData()
 
   m_CurrentTracts = 0;
   int num_seeds = static_cast<int>(m_SeedPoints.size());
+  m_NumSeeds = static_cast<unsigned int>(num_seeds);
   itk::Index<3> zeroIndex; zeroIndex.Fill(0);
   m_Progress = 0;
-  int i = 0;
   int print_interval = num_seeds/100;
-  if (print_interval<100)
-    m_Verbose=false;
+  bool verbose = m_Verbose && print_interval>=100;
 
   unsigned int trials_per_seed = 1;
   if(m_Parameters->m_Mode==mitk::TrackingDataHandler::MODE::PROBABILISTIC)
     trials_per_seed = m_Parameters->m_TrialsPerSeed;
 
-#pragma omp parallel
-  while (i<num_seeds && !m_StopTracking)
-  {
-    int temp_i = 0;
-#pragma omp critical
-    {
-      temp_i = i;
-      i++;
-    }
+  // Every seed point gets its own random streams and its own result slot, and the slots are
+  // joined in seed order: the tractogram is the same for any number of threads.
+  std::uint32_t base_seed = 0;
+  if (!m_Parameters->m_FixRandomSeed)
+    base_seed = std::random_device()();
+  m_TrackingHandler->InitThreadRandomEngines(omp_get_max_threads());
+  if (m_TrackingPriorHandler!=nullptr)
+    m_TrackingPriorHandler->InitThreadRandomEngines(omp_get_max_threads());
 
-    if (temp_i>=num_seeds || m_StopTracking)
-      continue;
-    else if (m_Verbose && i%print_interval==0)
-#pragma omp critical
-    {
-      m_Progress += static_cast<unsigned int>(print_interval);
-      std::cout << "                                                                                                     \r";
-      if (m_Parameters->m_MaxNumFibers>0)
-        std::cout << "Tried: " << m_Progress << "/" << num_seeds << " | Accepted: " << m_CurrentTracts << "/" << m_Parameters->m_MaxNumFibers << '\r';
-      else
-        std::cout << "Tried: " << m_Progress << "/" << num_seeds << " | Accepted: " << m_CurrentTracts << '\r';
-      std::cout.flush();
-    }
+  std::vector< FiberType > seed_fibers(static_cast<std::size_t>(num_seeds));
+  std::vector< unsigned char > seed_success(static_cast<std::size_t>(num_seeds), 0);
+  std::atomic<int> next_seed(0);
+
+  // Seeds are handed out in increasing order. When the maximum number of fibers is reached, all
+  // seeds handed out so far are finished, so the first m_MaxNumFibers fibers in seed order are
+  // the same as in a single-threaded run.
+#pragma omp parallel
+  while (!m_StopTracking)
+  {
+    int temp_i = next_seed++;
+    if (temp_i>=num_seeds)
+      break;
 
     const itk::Point<float> worldPos = m_SeedPoints.at(static_cast<unsigned int>(temp_i));
+    std::uint32_t seed = SeedPointRandomSeed(base_seed, static_cast<std::uint32_t>(temp_i));
+    m_TrackingHandler->SeedThreadRandomEngines(seed);
+    if (m_TrackingPriorHandler!=nullptr)
+      m_TrackingPriorHandler->SeedThreadRandomEngines(~seed);
 
     for (unsigned int trials=0; trials<trials_per_seed; ++trials)
     {
@@ -659,30 +678,14 @@ void StreamlineTrackingFilter::GenerateData()
 
         counter = fib.size();
 
-        if (tractLength>=m_Parameters->m_MinTractLengthMm && counter>=2 && !exclude)
+        if (tractLength>=m_Parameters->m_MinTractLengthMm && counter>=2 && !exclude && IsValidFiber(&fib))
         {
-#pragma omp critical
-          if ( IsValidFiber(&fib) )
-          {
-            if (!m_StopTracking)
-            {
-              if (!m_Parameters->m_OutputProbMap)
-                m_Tractogram.push_back(fib);
-              else
-                FiberToProbmap(&fib);
-              m_CurrentTracts++;
-              success = true;
-            }
-            if (m_Parameters->m_MaxNumFibers > 0 && m_CurrentTracts>=static_cast<unsigned int>(m_Parameters->m_MaxNumFibers))
-            {
-              if (!m_StopTracking)
-              {
-                std::cout << "                                                                                                     \r";
-                MITK_INFO << "Reconstructed maximum number of tracts (" << m_CurrentTracts << "). Stopping tractography.";
-              }
-              m_StopTracking = true;
-            }
-          }
+          seed_fibers[static_cast<std::size_t>(temp_i)] = std::move(fib);
+          seed_success[static_cast<std::size_t>(temp_i)] = 1;
+          success = true;
+          unsigned int accepted = ++m_CurrentTracts;
+          if (m_Parameters->m_MaxNumFibers > 0 && accepted>=static_cast<unsigned int>(m_Parameters->m_MaxNumFibers))
+            m_StopTracking = true;
         }
       }
 
@@ -691,7 +694,35 @@ void StreamlineTrackingFilter::GenerateData()
 
     }// trials per seed
 
+    unsigned int tried = ++m_Progress;
+    if (verbose && tried%static_cast<unsigned int>(print_interval)==0)
+#pragma omp critical
+    {
+      std::cout << "                                                                                                     \r";
+      if (m_Parameters->m_MaxNumFibers>0)
+        std::cout << "Tried: " << tried << "/" << num_seeds << " | Accepted: " << m_CurrentTracts.load() << "/" << m_Parameters->m_MaxNumFibers << '\r';
+      else
+        std::cout << "Tried: " << tried << "/" << num_seeds << " | Accepted: " << m_CurrentTracts.load() << '\r';
+      std::cout.flush();
+    }
   }// seed points
+
+  unsigned int kept = 0;
+  for (std::size_t s=0; s<seed_fibers.size(); ++s)
+  {
+    if (seed_success[s]==0)
+      continue;
+    if (m_Parameters->m_MaxNumFibers > 0 && kept>=static_cast<unsigned int>(m_Parameters->m_MaxNumFibers))
+      break;
+    if (!m_Parameters->m_OutputProbMap)
+      m_Tractogram.push_back(std::move(seed_fibers[s]));
+    else
+      FiberToProbmap(&seed_fibers[s]);
+    ++kept;
+  }
+  m_CurrentTracts = kept;
+  if (m_Parameters->m_MaxNumFibers > 0 && kept>=static_cast<unsigned int>(m_Parameters->m_MaxNumFibers))
+    MITK_INFO << "Reconstructed maximum number of tracts (" << kept << "). Stopped tractography.";
 
   this->AfterTracking();
 }

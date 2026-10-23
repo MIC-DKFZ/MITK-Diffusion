@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <itkStreamlineTrackingFilter.h>
 #include <mitkStreamlineTractographyParameters.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
+#include <mitkFiberBundle.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <cstring>
@@ -28,6 +29,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkStreamlineTractographySyntheticTestSuite);
   MITK_TEST(Parameters_Defaults);
   MITK_TEST(EndpointConstraints_TargetAtEitherEnd);
+  MITK_TEST(ProbabilisticPeaks_SameResultAtAnyThreadCount);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -39,8 +41,8 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
 
   PeakImgType::Pointer m_StraightField;
 
-  /** One peak along +x in every voxel of a 20x5x5 image with 1 mm voxels. */
-  static PeakImgType::Pointer MakeStraightPeakField()
+  /** The same peak (default +x) in every voxel of a 20x5x5 image with 1 mm voxels. */
+  static PeakImgType::Pointer MakeStraightPeakField(float dx = 1.0f, float dy = 0.0f, float dz = 0.0f)
   {
     auto image = PeakImgType::New();
     PeakImgType::SizeType size = {{SizeX, SizeYZ, SizeYZ, 3}};
@@ -52,7 +54,11 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
         for (int z = 0; z < SizeYZ; ++z)
         {
           PeakImgType::IndexType idx = {{x, y, z, 0}};
-          image->SetPixel(idx, 1.0f);
+          image->SetPixel(idx, dx);
+          idx[3] = 1;
+          image->SetPixel(idx, dy);
+          idx[3] = 2;
+          image->SetPixel(idx, dz);
         }
     return image;
   }
@@ -86,10 +92,11 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
 
   vtkSmartPointer<vtkPolyData> Track(std::shared_ptr<mitk::StreamlineTractographyParameters> params,
                                      FloatImgType::Pointer seeds,
-                                     FloatImgType::Pointer target)
+                                     FloatImgType::Pointer target,
+                                     PeakImgType::Pointer field = nullptr)
   {
     mitk::TrackingHandlerPeaks handler;
-    handler.SetPeakImage(m_StraightField);
+    handler.SetPeakImage(field.IsNotNull() ? field : m_StraightField);
     auto tracker = itk::StreamlineTrackingFilter::New();
     tracker->SetTrackingHandler(&handler);
     tracker->SetSeedImage(seeds);
@@ -154,6 +161,28 @@ public:
     auto farTarget = MakeLineRoi({{15, 19, 1.0f}});
     CPPUNIT_ASSERT_EQUAL_MESSAGE("EPS_IN_SEED_AND_TARGET", vtkIdType(4), CountFibers(EpConstraint::EPS_IN_SEED_AND_TARGET, endSeeds, farTarget));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("EPS_IN_SEED_AND_TARGET, seed in the middle", vtkIdType(0), CountFibers(EpConstraint::EPS_IN_SEED_AND_TARGET, seeds, farTarget));
+  }
+
+  /** Probabilistic peak tracking draws random numbers in every step. With one shared engine it
+   *  crashed at more than one thread and depended on the thread scheduling. */
+  void ProbabilisticPeaks_SameResultAtAnyThreadCount()
+  {
+    auto field = MakeStraightPeakField(0.8f, 0.5f, 0.3f);
+    auto seeds = MakeLineRoi({{2, 17, 1.0f}});
+    auto params = MakeParameters();
+    params->m_Mode = mitk::StreamlineTractographyParameters::MODE::PROBABILISTIC;
+    params->m_SeedsPerVoxel = 50;
+    params->m_MinTractLengthMm = 2;
+    params->m_PeakJitter = 0.1f;
+
+    omp_set_num_threads(1);
+    auto single = mitk::FiberBundle::New(Track(params, seeds, nullptr, field));
+    omp_set_num_threads(4);
+    auto multi = mitk::FiberBundle::New(Track(params, seeds, nullptr, field));
+    omp_set_num_threads(1);
+
+    CPPUNIT_ASSERT(single->GetNumFibers() > 400);
+    CPPUNIT_ASSERT_MESSAGE("1 and 4 threads give the same tractogram", single->Equals(multi));
   }
 };
 

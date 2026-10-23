@@ -146,8 +146,9 @@ protected:
 
   bool                                m_Verbose;
   std::vector< itk::Point<float> >    m_SeedPoints;
-  unsigned int                        m_CurrentTracts;
-  unsigned int                        m_Progress;
+  std::atomic<unsigned int>           m_CurrentTracts;  ///< read by GetStatusText from the GUI thread
+  std::atomic<unsigned int>           m_Progress;       ///< seed points processed, read by GetStatusText
+  std::atomic<unsigned int>           m_NumSeeds;
   std::atomic<bool>                   m_StopTracking;
 
   void BuildFibers();

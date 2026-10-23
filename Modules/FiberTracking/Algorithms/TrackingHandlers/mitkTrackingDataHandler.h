@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <boost/random/discrete_distribution.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/variate_generator.hpp>
+#include <cstdint>
 #include <deque>
 #include <itkImage.h>
 #include <itkLinearInterpolateImageFunction.h>
@@ -68,20 +69,26 @@ namespace mitk
       m_Parameters = parameters;
 
       if (m_Parameters->m_FixRandomSeed)
-      {
-        m_Rng.seed(0);
-        std::srand(0);
         m_RngItk->SetSeed(0);
-      }
       else
-      {
-        m_Rng.seed();
         m_RngItk->SetSeed();
-        std::srand(std::time(nullptr));
-      }
     }
 
+    /** Uniform random number from the handler's own engine, which is seeded in SetParameters.
+     *  For set-up work outside the tracking threads (seed point jitter); not thread-safe. */
     double GetRandDouble(const double &a, const double &b) { return m_RngItk->GetUniformVariate(a, b); }
+
+    /** Creates one random engine per tracking thread. The tracker calls it before the
+     *  parallel region with the number of OpenMP threads it will use. */
+    void InitThreadRandomEngines(int numThreads);
+
+    /** Seeds the random engines of the calling OpenMP thread. The tracker calls it at each seed
+     *  point with a value derived from the seed point's index, so that a streamline depends only
+     *  on its seed point and not on the number of threads or their scheduling. */
+    void SeedThreadRandomEngines(std::uint32_t seed);
+
+    /** Uniform random number from the calling thread's engine (see SeedThreadRandomEngines). */
+    double GetThreadRandDouble(double a, double b) { return GetThreadRngItk()->GetUniformVariate(a, b); }
 
   protected:
     void CalculateMinVoxelSize()
@@ -101,8 +108,13 @@ namespace mitk
       m_Parameters->SetMinVoxelSizeMm(minVoxelSize);
     }
 
-    BoostRngType m_Rng;
+    /** Engines of the calling OpenMP thread. */
+    ItkRngType *GetThreadRngItk();
+    BoostRngType &GetThreadRng();
+
     ItkRngType::Pointer m_RngItk;
+    std::vector<ItkRngType::Pointer> m_ThreadRngItk;
+    std::vector<BoostRngType> m_ThreadRng;
     bool m_NeedsDataInit;
     std::shared_ptr<mitk::StreamlineTractographyParameters> m_Parameters;
 

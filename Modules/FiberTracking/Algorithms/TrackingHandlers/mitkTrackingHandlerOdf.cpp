@@ -110,11 +110,8 @@ int TrackingHandlerOdf::SampleOdf(vnl_vector< float >& probs, vnl_vector< float 
   for (int i=0; i<m_NumProbSamples; i++)  // we sample m_NumProbSamples times and retain the sample with maximum probabilty
   {
     trials++;
-#pragma omp critical
-    {
-      boost::random::variate_generator<boost::random::mt19937&, boost::random::discrete_distribution<int,float>> sampler(m_Rng, dist);
-      sampled_idx = sampler();
-    }
+    boost::random::variate_generator<boost::random::mt19937&, boost::random::discrete_distribution<int,float>> sampler(GetThreadRng(), dist);
+    sampled_idx = sampler();
     if (probs[sampled_idx]>max_prob && probs[sampled_idx]>m_Parameters->m_OdfCutoff && fabs(angles[sampled_idx])>=m_Parameters->GetAngularThresholdDot())
     {
       max_prob = probs[sampled_idx];

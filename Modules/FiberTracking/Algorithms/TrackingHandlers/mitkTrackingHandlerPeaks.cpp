@@ -89,9 +89,7 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::GetMatchingDirection(itk::Index<
       // try m_NumDirs times to get a non-zero random direction
       for (int j=0; j<m_NumDirs; j++)
       {
-        int i = 0;
-#pragma omp critical
-        i = m_RngItk->GetIntegerVariate(m_NumDirs-1);
+        int i = static_cast<int>(GetThreadRngItk()->GetIntegerVariate(m_NumDirs-1));
         out_dir = GetDirection(idx3, i);
 
         if (out_dir.magnitude()>mitk::eps)
@@ -278,9 +276,10 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::ProposeDirection(const itk::Poin
   {
     if (m_Parameters->m_Mode == MODE::PROBABILISTIC)
     {
-      output_direction[0] += this->m_RngItk->GetNormalVariate(0, fabs(output_direction[0])*m_Parameters->m_PeakJitter);
-      output_direction[1] += this->m_RngItk->GetNormalVariate(0, fabs(output_direction[1])*m_Parameters->m_PeakJitter);
-      output_direction[2] += this->m_RngItk->GetNormalVariate(0, fabs(output_direction[2])*m_Parameters->m_PeakJitter);
+      auto rng = GetThreadRngItk();
+      output_direction[0] += rng->GetNormalVariate(0, fabs(output_direction[0])*m_Parameters->m_PeakJitter);
+      output_direction[1] += rng->GetNormalVariate(0, fabs(output_direction[1])*m_Parameters->m_PeakJitter);
+      output_direction[2] += rng->GetNormalVariate(0, fabs(output_direction[2])*m_Parameters->m_PeakJitter);
       mag = output_direction.magnitude();
     }
 
