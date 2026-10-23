@@ -319,7 +319,7 @@ class FitFibersToImageFilter : public ImageSource< mitk::PeakImage::ItkPeakImage
 public:
 
   typedef FitFibersToImageFilter Self;
-  typedef ProcessObject Superclass;
+  typedef ImageSource< mitk::PeakImage::ItkPeakImageType > Superclass;
   typedef SmartPointer< Self > Pointer;
   typedef SmartPointer< const Self > ConstPointer;
 
