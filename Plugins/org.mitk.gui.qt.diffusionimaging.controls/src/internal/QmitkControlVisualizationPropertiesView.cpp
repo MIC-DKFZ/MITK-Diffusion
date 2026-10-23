@@ -23,8 +23,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkFiberBundle.h>
 #include <mitkImage.h>
-#include <mitkImageCast.h>
 #include <mitkImageToItk.h>
+#include <mitkImageWriteAccessor.h>
 #include <mitkOdfImage.h>
 #include <mitkOdfNormalizationMethodProperty.h>
 #include <mitkOdfScaleByProperty.h>
@@ -47,6 +47,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QWidgetAction>
+
+#include <cstring>
 
 const std::string QmitkControlVisualizationPropertiesView::VIEW_ID = "org.mitk.views.controlvisualizationpropertiesview";
 
@@ -589,31 +591,46 @@ void QmitkControlVisualizationPropertiesView::FlipPeaks()
 
   for (auto node : m_SelectedNodes)
   {
-    if (dynamic_cast<mitk::PeakImage*>(node->GetData())==nullptr)
+    auto peaks = dynamic_cast<mitk::PeakImage*>(node->GetData());
+    if (peaks==nullptr)
       continue;
 
-    std::string name = node->GetName();
+    // The flipped peaks are written back into the node's image: one copy of the buffer instead
+    // of two into a new image, and the image keeps its properties.
+    mitk::PeakImage::ItkPeakImageType::Pointer flipped;
+    {
+      // The caster reads the image's buffer in place; its read access must end with this scope,
+      // before the buffer is written.
+      using CasterType = mitk::ImageToItk< mitk::PeakImage::ItkPeakImageType >;
+      CasterType::Pointer caster = CasterType::New();
+      caster->SetInput(static_cast<const mitk::Image*>(peaks));
+      caster->Update();
 
-    mitk::Image::Pointer image = dynamic_cast<mitk::PeakImage*>(node->GetData());
+      itk::FlipPeaksFilter< float >::Pointer flipper = itk::FlipPeaksFilter< float >::New();
+      flipper->SetInput(caster->GetOutput());
+      flipper->SetFlipX(m_Controls->m_FlipPeaksX->isChecked());
+      flipper->SetFlipY(m_Controls->m_FlipPeaksY->isChecked());
+      flipper->SetFlipZ(m_Controls->m_FlipPeaksZ->isChecked());
+      flipper->Update();
+      flipped = flipper->GetOutput();
+      flipped->DisconnectPipeline();
+    }
 
-    typedef mitk::ImageToItk< mitk::PeakImage::ItkPeakImageType > CasterType;
-    CasterType::Pointer caster = CasterType::New();
-    caster->SetInput(image);
-    caster->Update();
-    mitk::PeakImage::ItkPeakImageType::Pointer itkImg = caster->GetOutput();
-
-    itk::FlipPeaksFilter< float >::Pointer flipper = itk::FlipPeaksFilter< float >::New();
-    flipper->SetInput(itkImg);
-    flipper->SetFlipX(m_Controls->m_FlipPeaksX->isChecked());
-    flipper->SetFlipY(m_Controls->m_FlipPeaksY->isChecked());
-    flipper->SetFlipZ(m_Controls->m_FlipPeaksZ->isChecked());
-    flipper->Update();
-
-    mitk::Image::Pointer resultImage = dynamic_cast<mitk::Image*>(mitk::PeakImage::New().GetPointer());
-    mitk::CastToMitkImage(flipper->GetOutput(), resultImage);
-    resultImage->SetVolume(flipper->GetOutput()->GetBufferPointer());
-    node->SetData(resultImage);
-    node->SetName(name);
+    std::size_t numValues = 1;
+    for (unsigned int d=0; d<peaks->GetDimension(); ++d)
+      numValues *= peaks->GetDimension(d);
+    if (flipped->GetPixelContainer()->Size()!=numValues)
+    {
+      MITK_ERROR << "Flipped peaks of " << node->GetName() << " do not match the image size; image left unchanged.";
+      continue;
+    }
+    {
+      mitk::ImageWriteAccessor access(peaks);
+      std::memcpy(access.GetData(), flipped->GetBufferPointer(), numValues*sizeof(mitk::PeakImage::PixelType));
+    }
+    peaks->Modified();
+    // the peak lines the mappers draw are built from the buffer
+    peaks->ConstructPolydata();
   }
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
