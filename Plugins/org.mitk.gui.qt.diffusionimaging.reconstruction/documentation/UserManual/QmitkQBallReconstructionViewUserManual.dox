@@ -17,7 +17,7 @@ Parameters:
 \li <b>Lambda:</b> the weight of the regularisation; 0 switches it off. lambda = 0.006 has proven to be a stable choice under various settings. It weights the Laplace-Beltrami regularisation of Descoteaux et al. (2007), which does not depend on the orientation of the fibres or on whether the gradient directions cover half of the sphere or all of it; lambda has the same meaning as the smoothing parameter of dipy's QballModel and CsaOdfModel.
 \li <b>Output Sampled ODF Image:</b> besides the spherical harmonics image, also add the ODF sampled on 252 directions.
 
-"Convert SH to sampled ODF image" samples a selected spherical harmonics image on the 252 directions.
+"Convert SH to sampled ODF image" samples a selected spherical harmonics image on the 252 directions; the result is named after the SH image with "_Odf".
 
 Standard Q-balls feature a relatively low GFA and thus appear rather dark; adjust the level window.
 

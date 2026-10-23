@@ -14,71 +14,47 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _QMITKDIFFUSIONQUANTIFICATIONVIEW_H_INCLUDED
-#define _QMITKDIFFUSIONQUANTIFICATIONVIEW_H_INCLUDED
+#ifndef QmitkDiffusionQuantificationView_h
+#define QmitkDiffusionQuantificationView_h
 
 #include <QmitkAbstractView.h>
+
+#include <mitkDiffusionIndices.h>
+
 #include <string>
-#include <itkVectorImage.h>
 
 #include "ui_QmitkDiffusionQuantificationViewControls.h"
-/*!
- * \ingroup org_mitk_gui_qt_diffusionquantification_internal
- *
- * \brief QmitkDiffusionQuantificationView
- *
- * Document your class here.
+
+/**
+ * \brief Scalar indices of tensor images (FA, RA, AD, RD, CA, MD), ODF and SH images (GFA) and
+ * DWIs (ADC, MD).
  */
 class QmitkDiffusionQuantificationView : public QmitkAbstractView
 {
-
-  // this is needed for all Qt objects that should have a MOC object (everything that derives from QObject)
   Q_OBJECT
 
-  public:
-
+public:
   static const std::string VIEW_ID;
 
-  QmitkDiffusionQuantificationView();
-  virtual ~QmitkDiffusionQuantificationView();
+  QmitkDiffusionQuantificationView() = default;
+  ~QmitkDiffusionQuantificationView() override;
 
-  typedef itk::VectorImage< short, 3 >                                    ItkDwiType;
-
-  virtual void CreateQtPartControl(QWidget *parent) override;
-  virtual void SetFocus() override;
+  void CreateQtPartControl(QWidget *parent) override;
+  void SetFocus() override;
 
 protected slots:
-
-  void GFA();
-  void FA();
-  void RA();
-  void AD();
-  void RD();
-  void ClusterAnisotropy();
-  void MD();
-
-  void ADC_DWI();
-  void MD_DWI();
-
-  void OdfQuantification();
-
-  void TensorQuantify(int method);
-  void TensorQuantification(int method) ;
 
   void UpdateGui();
 
 protected:
+  void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer> &nodes) override;
 
-  void DoAdcCalculation(bool fit);
+  Ui::QmitkDiffusionQuantificationViewControls *m_Controls = nullptr;
 
-  /// \brief called by QmitkAbstractView when DataManager's selection has changed
-  virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
-
-  Ui::QmitkDiffusionQuantificationViewControls* m_Controls;
+private:
+  void ComputeGfa();
+  void ComputeTensorIndex(mitk::TensorIndex index);
+  void ComputeAdc(bool fit);
 };
 
-
-
-
-#endif // _QMITKDIFFUSIONQUANTIFICATIONVIEW_H_INCLUDED
-
+#endif
