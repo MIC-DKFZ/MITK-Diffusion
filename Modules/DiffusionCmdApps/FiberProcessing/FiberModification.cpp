@@ -255,11 +255,19 @@ int main(int argc, char* argv[])
       }
     }
 
-    if (minFiberLength>0)
-      fib->RemoveShortFibers(minFiberLength);
+    // RemoveShortFibers and RemoveLongFibers refuse to remove every fiber and leave the bundle
+    // unchanged; here that means an empty result.
+    if (minFiberLength>0 && !fib->RemoveShortFibers(minFiberLength))
+    {
+      MITK_WARN << "Every fiber is shorter than " << minFiberLength << " mm.";
+      fib = mitk::FiberBundle::New();
+    }
 
-    if (maxFiberLength>0)
-      fib->RemoveLongFibers(maxFiberLength);
+    if (maxFiberLength>0 && fib->GetNumFibers()>0 && !fib->RemoveLongFibers(maxFiberLength))
+    {
+      MITK_WARN << "Every fiber is longer than " << maxFiberLength << " mm.";
+      fib = mitk::FiberBundle::New();
+    }
 
     if (spline_resampling>0)
       fib->ResampleSpline(spline_resampling);
