@@ -191,6 +191,10 @@ protected:
   mitk::DataNode::Pointer GenerateFiberEndingsImage(mitk::FiberBundle::Pointer fib);
   mitk::DataNode::Pointer GenerateFiberEndingsPointSet(mitk::FiberBundle::Pointer fib);
 
+  /** Fills an empty bundle or planar figure selection with the topmost top-level node of that
+   *  kind, other than excluded. */
+  void SelectTopmostIfEmpty(const mitk::DataNode* excluded);
+
   void NodeAdded( const mitk::DataNode* node ) override;
   void NodeRemoved(const mitk::DataNode* node) override;
   void RemoveObservers();

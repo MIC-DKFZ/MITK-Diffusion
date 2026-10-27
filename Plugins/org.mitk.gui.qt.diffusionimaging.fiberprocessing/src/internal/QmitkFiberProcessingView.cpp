@@ -486,13 +486,17 @@ void QmitkFiberProcessingView::RemoveWithMask(bool removeInside)
 
 void QmitkFiberProcessingView::ExtractWithMask(bool onlyEnds, bool invert, bool labelmap)
 {
-  if (m_RoiImageNode.IsNull())
+  // Adding the results to the data storage may change the selection (NodeAdded), so the loop
+  // works on copies.
+  const mitk::DataNode::Pointer roiNode = m_RoiImageNode;
+  const auto bundleNodes = m_SelectedFB;
+  if (roiNode.IsNull())
     return;
 
-  mitk::Image::Pointer mitkMask = dynamic_cast<mitk::Image*>(m_RoiImageNode->GetData());
-  for (auto node : m_SelectedFB)
+  mitk::Image::Pointer mitkMask = dynamic_cast<mitk::Image*>(roiNode->GetData());
+  const std::string roi_name = roiNode->GetName();
+  for (auto node : bundleNodes)
   {
-    std::string roi_name = m_RoiImageNode->GetName();
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
     mitk::CastToItkImage(mitkMask, mask);
@@ -1204,25 +1208,35 @@ void QmitkFiberProcessingView::UpdateGui()
 
 void QmitkFiberProcessingView::NodeRemoved(const mitk::DataNode* node )
 {
-  for (auto fnode: m_SelectedFB)
-    if (node == fnode)
-    {
-      m_SelectedFB.clear();
-      break;
-    }
+  // Only the removed node leaves the selection. The data storage calls this before the node
+  // leaves it, so the topmost fallback must skip the node.
+  RemoveObservers();
+  auto isRemoved = [node](const mitk::DataNode::Pointer& selected) { return selected.GetPointer() == node; };
+  std::erase_if(m_SelectedFB, isRemoved);
+  std::erase_if(m_SelectedPF, isRemoved);
+  std::erase_if(m_SelectedSurfaces, [node](const mitk::Surface::Pointer& surface) { return surface.GetPointer() == node->GetData(); });
+  if (m_RoiImageNode.GetPointer() == node)
+    m_RoiImageNode = nullptr;
+  if (m_SelectedImage.IsNotNull() && m_SelectedImage.GetPointer() == node->GetData())
+    m_SelectedImage = nullptr;
+  if (m_InteractiveNode.GetPointer() == node)
+    m_InteractiveNode = nullptr;
 
-  berry::IWorkbenchPart::Pointer nullPart;
-  QList<mitk::DataNode::Pointer> nodes;
-  OnSelectionChanged(nullPart, nodes);
+  SelectTopmostIfEmpty(node);
+  AddObservers();
+  UpdateGui();
 }
 
 void QmitkFiberProcessingView::NodeAdded(const mitk::DataNode* )
 {
+  // A node added anywhere (a result of this view, a loaded file) keeps the selection, also the
+  // bundles a slot of this view is looping over; it only fills an empty selection.
   if (!m_Controls->m_InteractiveBox->isChecked())
   {
-    berry::IWorkbenchPart::Pointer nullPart;
-    QList<mitk::DataNode::Pointer> nodes;
-    OnSelectionChanged(nullPart, nodes);
+    RemoveObservers();
+    SelectTopmostIfEmpty(nullptr);
+    AddObservers();
+    UpdateGui();
   }
 }
 
@@ -1292,54 +1306,55 @@ void QmitkFiberProcessingView::OnSelectionChanged(berry::IWorkbenchPart::Pointer
   if (m_SelectedFB.empty() && m_Controls->m_InteractiveBox->isChecked())
     m_SelectedFB = lastSelectedFB;
 
-  // if no fibers or surfaces are selected, select topmost
-  if (m_SelectedFB.empty() && m_SelectedSurfaces.empty())
-  {
-    int maxLayer = 0;
-    itk::VectorContainer<unsigned int, mitk::DataNode::Pointer>::ConstPointer nodes = this->GetDataStorage()->GetAll();
-    for (unsigned int i=0; i<nodes->Size(); i++)
-      if (dynamic_cast<mitk::FiberBundle*>(nodes->at(i)->GetData()))
-      {
-        mitk::DataStorage::SetOfObjects::ConstPointer sources = GetDataStorage()->GetSources(nodes->at(i));
-        if (sources->Size()>0)
-          continue;
-
-        int layer = 0;
-        nodes->at(i)->GetPropertyValue("layer", layer);
-        if (layer>=maxLayer)
-        {
-          maxLayer = layer;
-          m_SelectedFB.clear();
-          m_SelectedFB.push_back(nodes->at(i));
-        }
-      }
-  }
-
-  // if no plar figure is selected, select topmost
-  if (m_SelectedPF.empty())
-  {
-    int maxLayer = 0;
-    itk::VectorContainer<unsigned int, mitk::DataNode::Pointer>::ConstPointer nodes = this->GetDataStorage()->GetAll();
-    for (unsigned int i=0; i<nodes->Size(); i++)
-      if (dynamic_cast<mitk::PlanarPolygon*>(nodes->at(i)->GetData()) || dynamic_cast<mitk::PlanarFigureComposite*>(nodes->at(i)->GetData()) || dynamic_cast<mitk::PlanarCircle*>(nodes->at(i)->GetData()))
-      {
-        mitk::DataStorage::SetOfObjects::ConstPointer sources = GetDataStorage()->GetSources(nodes->at(i));
-        if (sources->Size()>0)
-          continue;
-
-        int layer = 0;
-        nodes->at(i)->GetPropertyValue("layer", layer);
-        if (layer>=maxLayer)
-        {
-          maxLayer = layer;
-          m_SelectedPF.clear();
-          m_SelectedPF.push_back(nodes->at(i));
-        }
-      }
-  }
+  SelectTopmostIfEmpty(nullptr);
 
   AddObservers();
   UpdateGui();
+}
+
+void QmitkFiberProcessingView::SelectTopmostIfEmpty(const mitk::DataNode* excluded)
+{
+  auto isPlanarFigure = [](const mitk::DataNode* node) {
+    return dynamic_cast<mitk::PlanarPolygon*>(node->GetData()) || dynamic_cast<mitk::PlanarFigureComposite*>(node->GetData()) || dynamic_cast<mitk::PlanarCircle*>(node->GetData());
+  };
+
+  // the top-level node of the given kind with the highest layer
+  auto topmost = [this, excluded](auto isKind) {
+    mitk::DataNode::Pointer result;
+    int maxLayer = 0;
+    auto nodes = this->GetDataStorage()->GetAll();
+    for (unsigned int i=0; i<nodes->Size(); i++)
+    {
+      mitk::DataNode::Pointer node = nodes->at(i);
+      if (node.GetPointer()==excluded || !isKind(node.GetPointer()) || this->GetDataStorage()->GetSources(node)->Size()>0)
+        continue;
+
+      int layer = 0;
+      node->GetPropertyValue("layer", layer);
+      if (layer>=maxLayer)
+      {
+        maxLayer = layer;
+        result = node;
+      }
+    }
+    return result;
+  };
+
+  // if no fibers or surfaces are selected, select topmost
+  if (m_SelectedFB.empty() && m_SelectedSurfaces.empty())
+  {
+    auto node = topmost([](const mitk::DataNode* n) { return dynamic_cast<mitk::FiberBundle*>(n->GetData())!=nullptr; });
+    if (node.IsNotNull())
+      m_SelectedFB.push_back(node);
+  }
+
+  // if no planar figure is selected, select topmost
+  if (m_SelectedPF.empty())
+  {
+    auto node = topmost(isPlanarFigure);
+    if (node.IsNotNull())
+      m_SelectedPF.push_back(node);
+  }
 }
 
 void QmitkFiberProcessingView::OnDrawPolygon()
@@ -1562,14 +1577,16 @@ void QmitkFiberProcessingView::CopyBundles()
     return;
   }
 
-  for (auto node : m_SelectedFB)
+  // adding the copies may change the selection (NodeAdded), so the loop works on a copy
+  const auto bundleNodes = m_SelectedFB;
+  for (auto node : bundleNodes)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
     mitk::FiberBundle::Pointer newFib = fib->GetDeepCopy();
 
     node->SetVisibility(false);
     QString name("");
-    name += QString(m_SelectedFB.at(0)->GetName().c_str());
+    name += QString(node->GetName().c_str());
     name += "_copy";
 
     mitk::DataNode::Pointer fbNode = mitk::DataNode::New();
