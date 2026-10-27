@@ -163,21 +163,14 @@ void QmitkGibbsTrackingView::AfterThread()
   }
   UpdateTrackingStatus();
 
+  // Automatic values stay automatic (slider 0) for the next run, possibly on other data; the
+  // estimate is only shown.
   if(m_Controls->m_ParticleWeightSlider->value()==0)
-  {
-    m_Controls->m_ParticleWeightLabel->setText(QString::number(m_GlobalTracker->GetParticleWeight()));
-    m_Controls->m_ParticleWeightSlider->setValue(m_GlobalTracker->GetParticleWeight()*10000);
-  }
+    m_Controls->m_ParticleWeightLabel->setText("auto (" + QString::number(m_GlobalTracker->GetParticleWeight()) + ")");
   if(m_Controls->m_ParticleWidthSlider->value()==0)
-  {
-    m_Controls->m_ParticleWidthLabel->setText(QString::number(m_GlobalTracker->GetParticleWidth()));
-    m_Controls->m_ParticleWidthSlider->setValue(m_GlobalTracker->GetParticleWidth()*10);
-  }
+    m_Controls->m_ParticleWidthLabel->setText("auto (" + QString::number(m_GlobalTracker->GetParticleWidth()) + " mm)");
   if(m_Controls->m_ParticleLengthSlider->value()==0)
-  {
-    m_Controls->m_ParticleLengthLabel->setText(QString::number(m_GlobalTracker->GetParticleLength()));
-    m_Controls->m_ParticleLengthSlider->setValue(m_GlobalTracker->GetParticleLength()*10);
-  }
+    m_Controls->m_ParticleLengthLabel->setText("auto (" + QString::number(m_GlobalTracker->GetParticleLength()) + " mm)");
 
   GenerateFiberBundle();
   m_FiberBundleNode = 0;
@@ -603,47 +596,26 @@ void QmitkGibbsTrackingView::LoadTrackingParameters()
     }
   }
 
-  QString iterations(pElem->Attribute("iterations"));
-  m_Controls->m_IterationsBox->setText(iterations);
+  m_Controls->m_IterationsBox->setText(pElem->Attribute("iterations"));
 
-  QString particleLength(pElem->Attribute("particle_length"));
-  float pLength = particleLength.toFloat();
-  QString particleWidth(pElem->Attribute("particle_width"));
-  float pWidth = particleWidth.toFloat();
+  // Rounded to the sliders' steps (truncation turned 0.29 into 0.28); the labels are then set from
+  // the sliders, so they show the values that are used, also when a slider clamps.
+  auto toSlider = [pElem](const char* name, float scale) { return qRound(QString(pElem->Attribute(name)).toFloat()*scale); };
+  m_Controls->m_ParticleLengthSlider->setValue(toSlider("particle_length", 10));
+  m_Controls->m_ParticleWidthSlider->setValue(toSlider("particle_width", 10));
+  m_Controls->m_ParticleWeightSlider->setValue(toSlider("particle_weight", 10000));
+  m_Controls->m_StartTempSlider->setValue(toSlider("temp_start", 100));
+  m_Controls->m_EndTempSlider->setValue(toSlider("temp_end", 10000));
+  m_Controls->m_InExBalanceSlider->setValue(toSlider("inexbalance", 10));
+  m_Controls->m_FiberLengthSlider->setValue(toSlider("fiber_length", 1));
+  m_Controls->m_CurvatureThresholdSlider->setValue(toSlider("curvature_threshold", 1));
 
-  if (pLength==0)
-    m_Controls->m_ParticleLengthLabel->setText("auto");
-  else
-    m_Controls->m_ParticleLengthLabel->setText(particleLength+" mm");
-  if (pWidth==0)
-    m_Controls->m_ParticleWidthLabel->setText("auto");
-  else
-    m_Controls->m_ParticleWidthLabel->setText(particleWidth+" mm");
-
-  m_Controls->m_ParticleWidthSlider->setValue(pWidth*10);
-  m_Controls->m_ParticleLengthSlider->setValue(pLength*10);
-
-  QString partWeight(pElem->Attribute("particle_weight"));
-  m_Controls->m_ParticleWeightSlider->setValue(partWeight.toFloat()*10000);
-  m_Controls->m_ParticleWeightLabel->setText(partWeight);
-
-  QString startTemp(pElem->Attribute("temp_start"));
-  m_Controls->m_StartTempSlider->setValue(startTemp.toFloat()*100);
-  m_Controls->m_StartTempLabel->setText(startTemp);
-
-  QString endTemp(pElem->Attribute("temp_end"));
-  m_Controls->m_EndTempSlider->setValue(endTemp.toFloat()*10000);
-  m_Controls->m_EndTempLabel->setText(endTemp);
-
-  QString inExBalance(pElem->Attribute("inexbalance"));
-  m_Controls->m_InExBalanceSlider->setValue(inExBalance.toFloat()*10);
-  m_Controls->m_InExBalanceLabel->setText(inExBalance);
-
-  QString fiberLength(pElem->Attribute("fiber_length"));
-  m_Controls->m_FiberLengthSlider->setValue(fiberLength.toInt());
-  m_Controls->m_FiberLengthLabel->setText(fiberLength+"mm");
-
-  QString curvThres(pElem->Attribute("curvature_threshold"));
-  m_Controls->m_CurvatureThresholdSlider->setValue(curvThres.toInt());
-  m_Controls->m_CurvatureThresholdLabel->setText(curvThres+"°");
+  SetParticleLength(m_Controls->m_ParticleLengthSlider->value());
+  SetParticleWidth(m_Controls->m_ParticleWidthSlider->value());
+  SetParticleWeight(m_Controls->m_ParticleWeightSlider->value());
+  SetStartTemp(m_Controls->m_StartTempSlider->value());
+  SetEndTemp(m_Controls->m_EndTempSlider->value());
+  SetInExBalance(m_Controls->m_InExBalanceSlider->value());
+  SetFiberLength(m_Controls->m_FiberLengthSlider->value());
+  SetCurvatureThreshold(m_Controls->m_CurvatureThresholdSlider->value());
 }

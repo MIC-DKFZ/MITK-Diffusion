@@ -23,7 +23,7 @@ Optional Input:
 \li Weighting between the internal (affinity of the model to long and straigt fibers) and external energy (affinity of the model towards the data). (usually no change needed).
 \li Minimum fiber length constraint (in mm). Shorter fibers are discarded after the tracking.
 
-The automatic selection of parameters for the particle length/width and weight are determined directly from the input image using information about the image spacing and GFA.
+The automatic selection of parameters for the particle length/width and weight are determined directly from the input image using information about the image spacing and GFA. After a run, the values used are shown next to "auto"; the parameters stay automatic for the next run.
 
 \section QmitkGibbsTrackingUserManualTrackingSurveillance Surveilance of the tracking process
 
