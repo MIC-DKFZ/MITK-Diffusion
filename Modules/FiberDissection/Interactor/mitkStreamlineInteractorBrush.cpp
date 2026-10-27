@@ -68,21 +68,21 @@ void mitk::StreamlineInteractorBrush::SetNegativeNode(DataNode *node)
 {
 
     m_NegStreamlineNode = node;
-    m_NegStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
+    m_NegStreamline = node != nullptr ? dynamic_cast<mitk::FiberBundle *>(node->GetData()) : nullptr;
 }
 
 void mitk::StreamlineInteractorBrush::SetToLabelNode(DataNode *node)
 {
     m_manStreamlineNode = node;
     DataInteractor::SetDataNode(m_manStreamlineNode);
-    m_manStreamline = dynamic_cast<mitk::FiberBundle *>(node->GetData());
+    m_manStreamline = node != nullptr ? dynamic_cast<mitk::FiberBundle *>(node->GetData()) : nullptr;
 
 }
 
 void mitk::StreamlineInteractorBrush::SetPositiveNode(DataNode *node)
 {
     m_PosStreamlineNode = node;
-    m_PosStreamline= dynamic_cast<mitk::FiberBundle *>(node->GetData());
+    m_PosStreamline = node != nullptr ? dynamic_cast<mitk::FiberBundle *>(node->GetData()) : nullptr;
 }
 
 void mitk::StreamlineInteractorBrush::LabelfromPrediction(bool predlabeling)
@@ -96,7 +96,7 @@ bool mitk::StreamlineInteractorBrush::CheckSelection(const InteractionEvent *int
     /* Save Colorvector here*/
 
     const auto *positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
-    if (positionEvent != nullptr)
+    if (positionEvent != nullptr && GetDataNode() != nullptr)
     {
         if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
         {
@@ -180,6 +180,8 @@ bool mitk::StreamlineInteractorBrush::CheckSelection(const InteractionEvent *int
 void mitk::StreamlineInteractorBrush::SelectStreamline(StateMachineAction *, InteractionEvent *interactionEvent)
 {
     auto *positionEvent = dynamic_cast<InteractionPositionEvent *>(interactionEvent);
+    if (positionEvent == nullptr || GetDataNode() == nullptr || m_manStreamline.IsNull())
+      return;
 
     if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
     {
