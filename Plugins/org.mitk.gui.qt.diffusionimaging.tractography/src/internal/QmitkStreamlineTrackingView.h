@@ -30,6 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
+#include <memory>
 #include <random>
 #include <mitkPointSet.h>
 #include <mitkPointSetShapeProperty.h>
@@ -139,14 +140,14 @@ private:
   bool                                    m_FirstTensorProbRun;
   bool                                    m_FirstInteractiveRun;
 
-  mitk::TrackingDataHandler*              m_TrackingHandler;
+  std::unique_ptr<mitk::TrackingDataHandler> m_TrackingHandler;  ///< m_Tracker borrows it
   bool                                    m_ThreadIsRunning;
   QTimer*                                 m_TrackingTimer;
   bool                                    m_DeleteTrackingHandler;
   QmitkSliceNavigationListener            m_SliceChangeListener;
   bool                                    m_Visible;
   mitk::DataNode::Pointer                 m_LastPrior;
-  mitk::TrackingDataHandler*              m_TrackingPriorHandler;
+  std::unique_ptr<mitk::TrackingDataHandler> m_TrackingPriorHandler;  ///< m_Tracker borrows it
   std::map< QString, std::string >        m_LastTractoParams;
   QString                                 m_ParameterFile;
 };

@@ -809,13 +809,13 @@ void QmitkStreamlineTrackingView::DeleteTrackingHandler()
 {
   if (!m_ThreadIsRunning && m_TrackingHandler != nullptr)
   {
-    if (m_TrackingPriorHandler != nullptr)
+    if (m_Tracker.IsNotNull())  // keeps no pointer to the handlers released here
     {
-      delete m_TrackingPriorHandler;
-      m_TrackingPriorHandler = nullptr;
+      m_Tracker->SetTrackingHandler(nullptr);
+      m_Tracker->SetTrackingPriorHandler(nullptr);
     }
-    delete m_TrackingHandler;
-    m_TrackingHandler = nullptr;
+    m_TrackingPriorHandler.reset();
+    m_TrackingHandler.reset();
     m_DeleteTrackingHandler = false;
     m_LastPrior = nullptr;
   }
@@ -1020,38 +1020,38 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     {
       if (m_TrackingHandler==nullptr)
       {
-        m_TrackingHandler = new mitk::TrackingHandlerOdf();
+        m_TrackingHandler = std::make_unique<mitk::TrackingHandlerOdf>();
         typedef itk::TensorImageToOdfImageFilter< float, float > FilterType;
         FilterType::Pointer filter = FilterType::New();
         filter->SetInput( mitk::convert::GetItkTensorFromTensorImage(dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())) );
         filter->Update();
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetOdfImage(filter->GetOutput());
+        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetOdfImage(filter->GetOutput());
 
         if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
         {
           ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
           mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
 
-          dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetGfaImage(itkImg);
+          dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetGfaImage(itkImg);
         }
       }
 
-      dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetIsOdfFromTensor(true);
+      dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetIsOdfFromTensor(true);
     }
     else
     {
       if (m_TrackingHandler==nullptr)
       {
-        m_TrackingHandler = new mitk::TrackingHandlerTensor();
+        m_TrackingHandler = std::make_unique<mitk::TrackingHandlerTensor>();
         for (unsigned int i=0; i<m_InputImageNodes.size(); ++i)
-          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler)->AddTensorImage(mitk::convert::GetItkTensorFromTensorImage(dynamic_cast<mitk::Image*>(m_InputImageNodes.at(i)->GetData())).GetPointer());
+          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler.get())->AddTensorImage(mitk::convert::GetItkTensorFromTensorImage(dynamic_cast<mitk::Image*>(m_InputImageNodes.at(i)->GetData())).GetPointer());
 
         if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
         {
           ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
           mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
 
-          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler)->SetFaImage(itkImg);
+          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler.get())->SetFaImage(itkImg);
         }
       }
     }
@@ -1061,18 +1061,18 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
   {
     if (m_TrackingHandler==nullptr)
     {
-      m_TrackingHandler = new mitk::TrackingHandlerOdf();
+      m_TrackingHandler = std::make_unique<mitk::TrackingHandlerOdf>();
 
       if (dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData()))
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetOdfImage(mitk::convert::GetItkOdfFromShImage(dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData())));
+        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetOdfImage(mitk::convert::GetItkOdfFromShImage(dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData())));
       else
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetOdfImage(mitk::convert::GetItkOdfFromOdfImage(dynamic_cast<mitk::OdfImage*>(m_InputImageNodes.at(0)->GetData())));
+        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetOdfImage(mitk::convert::GetItkOdfFromOdfImage(dynamic_cast<mitk::OdfImage*>(m_InputImageNodes.at(0)->GetData())));
 
       if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
       {
         ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
         mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetGfaImage(itkImg);
+        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetGfaImage(itkImg);
       }
     }
   }
@@ -1080,9 +1080,9 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
   {
     if (m_TrackingHandler==nullptr)
     {
-      m_TrackingHandler = new mitk::TrackingHandlerPeaks();
+      m_TrackingHandler = std::make_unique<mitk::TrackingHandlerPeaks>();
       auto itk_peak_image = dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData())->GetItkPeakImage();
-      dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingHandler)->SetPeakImage(itk_peak_image);
+      dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingHandler.get())->SetPeakImage(itk_peak_image);
     }
   }
   else
@@ -1138,8 +1138,9 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
       caster->SetCopyMemFlag(true);
       caster->Update();
       mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = caster->GetOutput();
-      m_TrackingPriorHandler = new mitk::TrackingHandlerPeaks();
-      dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingPriorHandler)->SetPeakImage(itkImg);
+      auto priorHandler = std::make_unique<mitk::TrackingHandlerPeaks>();
+      priorHandler->SetPeakImage(itkImg);
+      m_TrackingPriorHandler = std::move(priorHandler);  // releases the copy of the previous prior
       m_LastPrior = m_Controls->m_PriorImageSelectionWidget->GetSelectedNode();
     }
 
@@ -1151,7 +1152,7 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     prior_params->m_Cutoff = 0.0;
     m_TrackingPriorHandler->SetParameters(prior_params);
 
-    m_Tracker->SetTrackingPriorHandler(m_TrackingPriorHandler);
+    m_Tracker->SetTrackingPriorHandler(m_TrackingPriorHandler.get());
   }
   else if (m_Controls->m_PriorImageSelectionWidget->GetSelectedNode().IsNull())
     m_Tracker->SetTrackingPriorHandler(nullptr);
@@ -1207,7 +1208,7 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
 //  }
 
   m_Tracker->SetParameters(params);
-  m_Tracker->SetTrackingHandler(m_TrackingHandler);
+  m_Tracker->SetTrackingHandler(m_TrackingHandler.get());
   m_Tracker->SetVerbose(!m_Controls->m_InteractiveBox->isChecked());
   }
   catch (const std::exception &e)
