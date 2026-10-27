@@ -118,7 +118,10 @@ int main(int argc, char* argv[])
     else
       mitk::IOUtil::Save(registered_image, o);
 
-    std::string path = ist::GetFilenamePath(o) + "/";
+    // Next to the output; for an output without folder, in the working directory.
+    std::string path = ist::GetFilenamePath(o);
+    if (!path.empty())
+      path += "/";
     std::vector< std::string > file_names;
     auto coreg_images = mitk::DiffusionDataIOHelper::load_mitk_images(coreg, &file_names);
     for (unsigned int i=0; i<coreg_images.size(); ++i)
