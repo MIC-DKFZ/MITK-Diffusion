@@ -975,9 +975,6 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
 
   m_Tracker = TrackerType::New();
 
-  if (params->m_EpConstraints == itk::StreamlineTrackingFilter::EndpointConstraints::NONE)
-      m_Tracker->SetTargetRegions(nullptr);
-
   if( dynamic_cast<mitk::TensorImage*>(m_InputImageNodes.at(0)->GetData()) )
   {
     if (m_Controls->m_ModeBox->currentIndex()==1)
@@ -1088,7 +1085,10 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     m_Tracker->SetStoppingRegions(mask);
   }
 
-  if (m_Controls->m_TargetImageSelectionWidget->GetSelectedNode().IsNotNull())
+  // With "No Constraints" the target widget is disabled but keeps its selection; the filter would
+  // turn a target into an endpoint constraint.
+  if (params->m_EpConstraints != itk::StreamlineTrackingFilter::EndpointConstraints::NONE
+      && m_Controls->m_TargetImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
     mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_TargetImageSelectionWidget->GetSelectedNode()->GetData()), mask);
