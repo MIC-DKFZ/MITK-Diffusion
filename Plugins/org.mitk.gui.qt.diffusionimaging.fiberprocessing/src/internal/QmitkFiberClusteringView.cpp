@@ -114,6 +114,11 @@ void QmitkFiberClusteringView::StartClustering()
   float clusterSize = m_Controls->m_ClusterSizeBox->value();
 
   mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
+  if (fib->GetNumFibers()==0)
+  {
+    QMessageBox::information(nullptr, "Fiber Clustering", "The tractogram contains no fibers.");
+    return;
+  }
 
   float max_d = 0;
   int i=1;
@@ -201,9 +206,19 @@ void QmitkFiberClusteringView::StartClustering()
   clusterer->SetNumPoints(m_Controls->m_FiberPointsBox->value());
   clusterer->SetMaxClusters(m_Controls->m_MaxClustersBox->value());
   clusterer->SetMinClusterSize(m_Controls->m_MinFibersBox->value());
-  clusterer->Update();
+  try
+  {
+    clusterer->Update();
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Fiber Clustering", e.what());
+    return;
+  }
   std::vector<mitk::FiberBundle::Pointer> tracts = clusterer->GetOutTractograms();
   std::vector<mitk::FiberBundle::Pointer> centroids = clusterer->GetOutCentroids();
+  if (tracts.empty())
+    QMessageBox::information(nullptr, "Fiber Clustering", QString("No cluster with at least %1 fibers.").arg(m_Controls->m_MinFibersBox->value()));
 
   unsigned int c = 0;
   for (auto f : tracts)
@@ -235,7 +250,7 @@ void QmitkFiberClusteringView::StartClustering()
     this->GetDataStorage()->Add(new_node, m_Controls->m_InCentroidsBox->GetSelectedNode());
   }
 
-  if (m_Controls->m_CentroidsBox->isChecked() && m_Controls->m_MergeCentroidsBox->isChecked())
+  if (m_Controls->m_CentroidsBox->isChecked() && m_Controls->m_MergeCentroidsBox->isChecked() && !centroids.empty())
   {
     mitk::DataNode::Pointer new_node2 = mitk::DataNode::New();
     auto centroid_bundle = centroids.at(0);
