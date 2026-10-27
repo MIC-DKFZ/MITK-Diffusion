@@ -48,7 +48,7 @@ QmitkFiberFitView::QmitkFiberFitView()
 // Destructor
 QmitkFiberFitView::~QmitkFiberFitView()
 {
-
+  delete m_Controls;
 }
 
 void QmitkFiberFitView::CreateQtPartControl( QWidget *parent )

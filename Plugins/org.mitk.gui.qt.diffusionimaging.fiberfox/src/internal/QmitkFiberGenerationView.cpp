@@ -87,6 +87,7 @@ QmitkFiberGenerationView::~QmitkFiberGenerationView()
   // the fiducials stay in the data storage after the view is closed
   for (auto& entry : m_DataNodeToPlanarFigureData)
     RemoveObservers(entry.second);
+  delete m_Controls;
 }
 
 void QmitkFiberGenerationView::RemoveObservers(QmitkPlanarFigureData& data)
@@ -254,6 +255,8 @@ void QmitkFiberGenerationView::SaveParameters()
         tr("Save Parameters"),
         m_ParameterFile,
         tr("Fiberfox Parameters (*.ffp)") );
+  if (filename.isEmpty())
+    return;
 
   SaveParameters(filename);
 }

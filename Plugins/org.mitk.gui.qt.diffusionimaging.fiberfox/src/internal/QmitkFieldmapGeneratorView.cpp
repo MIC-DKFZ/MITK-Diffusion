@@ -39,7 +39,7 @@ QmitkFieldmapGeneratorView::QmitkFieldmapGeneratorView()
 
 QmitkFieldmapGeneratorView::~QmitkFieldmapGeneratorView()
 {
-
+  delete m_Controls;
 }
 
 void QmitkFieldmapGeneratorView::CreateQtPartControl( QWidget *parent )
@@ -56,7 +56,7 @@ void QmitkFieldmapGeneratorView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_SelectedImageBox->SetPredicate(isMitkImage);
 
     m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
-    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
+    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()), Qt::UniqueConnection);
 
     connect((QObject*) m_Controls->m_GenerateFieldmap, SIGNAL(clicked()), (QObject*) this, SLOT(GenerateFieldmap()));
     connect((QObject*) m_Controls->m_PlaceFieldSource, SIGNAL(clicked()), (QObject*) this, SLOT(PlaceFieldSource()));
@@ -222,7 +222,8 @@ void QmitkFieldmapGeneratorView::Hidden()
 void QmitkFieldmapGeneratorView::Activated()
 {
   m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
-  connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
+  // every activation would add another connection otherwise
+  connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()), Qt::UniqueConnection);
 }
 
 void QmitkFieldmapGeneratorView::Deactivated()
@@ -231,9 +232,6 @@ void QmitkFieldmapGeneratorView::Deactivated()
 
 void QmitkFieldmapGeneratorView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& nodes)
 {
-  if (m_Controls->m_SelectedImageBox->GetSelectedNode().IsNotNull())
-    m_Controls->m_SelectedImageBox->GetSelectedNode()->RemoveObserver( m_PropertyObserverTag );
-
   m_Controls->m_InputData->setTitle("Please Select Reference Image");
   m_SelectedSource = nullptr;
 
