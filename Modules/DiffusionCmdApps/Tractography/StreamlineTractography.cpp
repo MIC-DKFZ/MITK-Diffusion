@@ -17,14 +17,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkBaseData.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
-#include <metaCommand.h>
 #include <mitkCommandLineParser.h>
 #include <mitkLog.h>
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <iostream>
-#include <fstream>
-#include <itksys/SystemTools.hxx>
+#include <memory>
 #include <itksys/SystemTools.hxx>
 
 #include <mitkFiberBundle.h>
@@ -37,16 +35,37 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkStreamlineTractographyParameters.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
+namespace
+{
+int Run(int argc, char* argv[]);
+}
 
-const int numOdfSamples = 200;
-typedef itk::Image< itk::Vector< float, numOdfSamples > , 3 > SampledShImageType;
-
-/*!
-\brief
-*/
 int main(int argc, char* argv[])
+{
+  // Reader and filter errors (unreadable input, a seed image outside the mask, a missing target
+  // image for an endpoint constraint) end the run with a message instead of an abort.
+  try
+  {
+    return Run(argc, argv);
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    MITK_ERROR << e.GetDescription();
+  }
+  catch (const std::exception& e)
+  {
+    MITK_ERROR << e.what();
+  }
+  catch (...)
+  {
+    MITK_ERROR << "Unknown error.";
+  }
+  return EXIT_FAILURE;
+}
+
+namespace
+{
+int Run(int argc, char* argv[])
 {
   mitkCommandLineParser parser;
 
@@ -61,7 +80,7 @@ int main(int argc, char* argv[])
   parser.beginGroup("1. Mandatory arguments:");
   parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input:", "input image (multiple possible for 'DetTensor' algorithm)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram (.fib, .vtk, .trk) or probability map (.nii, .nii.gz, .nrrd)", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("type", "", mitkCommandLineParser::String, "Type:", "which tracker to use (Peaks; Tensor; ODF; ODF-DIPY/FSL; RF)", us::Any(), false);
+  parser.addArgument("type", "", mitkCommandLineParser::String, "Type:", "which tracker to use (Peaks; Tensor; ODF; ODF-DIPY/FSL)", us::Any(), false);
   parser.addArgument("probabilistic", "", mitkCommandLineParser::Bool, "Probabilistic:", "Probabilistic tractography", us::Any(false));
   parser.endGroup();
 
@@ -83,7 +102,7 @@ int main(int argc, char* argv[])
   parser.beginGroup("4. Streamline integration parameters:");
   parser.addArgument("sharpen_odfs", "", mitkCommandLineParser::Int, "Sharpen ODFs:", "if you are using dODF images as input, it is advisable to sharpen the ODFs (power of X). this is not necessary for CSD fODFs, since they are narurally much sharper.");
   parser.addArgument("cutoff", "", mitkCommandLineParser::Float, "Cutoff:", "set the FA, GFA or Peak amplitude cutoff for terminating tracks", 0.1);
-  parser.addArgument("odf_cutoff", "", mitkCommandLineParser::Float, "ODF Cutoff:", "threshold on the ODF magnitude. this is useful in case of CSD fODF tractography.", 0.0);
+  parser.addArgument("odf_cutoff", "", mitkCommandLineParser::Float, "ODF Cutoff:", "threshold on the ODF magnitude. this is useful in case of CSD fODF tractography.", 0.00025);
   parser.addArgument("step_size", "", mitkCommandLineParser::Float, "Step size:", "step size (in voxels)", 0.5);
   parser.addArgument("min_tract_length", "", mitkCommandLineParser::Float, "Min. tract length:", "minimum fiber length (in mm)", 20);
   parser.addArgument("max_tract_length", "", mitkCommandLineParser::Float, "Max. tract length:", "maximum fiber length (in mm)", 400);
@@ -116,7 +135,7 @@ int main(int argc, char* argv[])
   parser.endGroup();
 
   parser.beginGroup("8. Additional input:");
-  parser.addArgument("additional_images", "", mitkCommandLineParser::StringList, "Additional images:", "specify a list of float images that hold additional information (FA, GFA, additional features for RF tractography)", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("additional_images", "", mitkCommandLineParser::StringList, "Additional images:", "FA (Tensor) or GFA (ODF) image used for the cutoff instead of the one computed from the input; only the first image is used", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.endGroup();
 
   parser.beginGroup("9. Misc:");
@@ -371,12 +390,10 @@ int main(int argc, char* argv[])
     addImages.at(0).push_back(itkimg);
   }
 
-  //    //////////////////////////////////////////////////////////////////
-  //      omp_set_num_threads(1);
-
   typedef itk::StreamlineTrackingFilter TrackerType;
   TrackerType::Pointer tracker = TrackerType::New();
 
+  std::unique_ptr<mitk::TrackingDataHandler> priorhandler;
   if (!prior_image.empty())
   {
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, std::vector<std::string>());
@@ -384,11 +401,11 @@ int main(int argc, char* argv[])
 
     if (priorImage.IsNull())
     {
-      MITK_INFO << "Only peak images are supported as prior at the moment!";
+      MITK_ERROR << "Only peak images are supported as prior.";
       return EXIT_FAILURE;
     }
 
-    mitk::TrackingDataHandler* priorhandler = new mitk::TrackingHandlerPeaks();
+    auto peakPrior = std::make_unique<mitk::TrackingHandlerPeaks>();
 
     typedef mitk::ImageToItk< mitk::TrackingHandlerPeaks::PeakImgType > CasterType;
     CasterType::Pointer caster = CasterType::New();
@@ -401,16 +418,18 @@ int main(int argc, char* argv[])
     prior_params->m_FlipY = params->m_PriorFlipY;
     prior_params->m_FlipZ = params->m_PriorFlipZ;
     prior_params->m_Cutoff = 0.0;
-    dynamic_cast<mitk::TrackingHandlerPeaks*>(priorhandler)->SetPeakImage(itkImg);
-    priorhandler->SetParameters(prior_params);
-    tracker->SetTrackingPriorHandler(priorhandler);
+    peakPrior->SetPeakImage(itkImg);
+    peakPrior->SetParameters(prior_params);
+    priorhandler = std::move(peakPrior);
+    tracker->SetTrackingPriorHandler(priorhandler.get());
   }
 
-  mitk::TrackingDataHandler* handler;
+  // the tracker only borrows the handlers
+  std::unique_ptr<mitk::TrackingDataHandler> handler;
   mitk::Image::Pointer reference_image;
   if (type == "Peaks")
   {
-    handler = new mitk::TrackingHandlerPeaks();
+    auto peakHandler = std::make_unique<mitk::TrackingHandlerPeaks>();
 
     MITK_INFO << "loading input peak image";
     // Without the reader preference, a 4D NIfTI peak file is read as a plain image.
@@ -423,11 +442,12 @@ int main(int argc, char* argv[])
     }
     reference_image = mitkImage;
     mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = mitkImage->GetItkPeakImage();
-    dynamic_cast<mitk::TrackingHandlerPeaks*>(handler)->SetPeakImage(itkImg);
+    peakHandler->SetPeakImage(itkImg);
+    handler = std::move(peakHandler);
   }
   else if (type == "Tensor" && params->m_Mode == mitk::StreamlineTractographyParameters::MODE::DETERMINISTIC)
   {
-    handler = new mitk::TrackingHandlerTensor();
+    auto tensorHandler = std::make_unique<mitk::TrackingHandlerTensor>();
 
     MITK_INFO << "loading input tensor images";
     std::vector< mitk::Image::Pointer > input_images;
@@ -436,15 +456,16 @@ int main(int argc, char* argv[])
       mitk::Image::Pointer mitkImage = mitk::IOUtil::Load<mitk::Image>(input_files.at(i));
       reference_image = mitkImage;
       mitk::TensorImage::ItkTensorImageType::Pointer itkImg = mitk::convert::GetItkTensorFromTensorImage(mitkImage);
-      dynamic_cast<mitk::TrackingHandlerTensor*>(handler)->AddTensorImage(itkImg.GetPointer());
+      tensorHandler->AddTensorImage(itkImg.GetPointer());
     }
 
     if (addImages.at(0).size()>0)
-      dynamic_cast<mitk::TrackingHandlerTensor*>(handler)->SetFaImage(addImages.at(0).at(0));
+      tensorHandler->SetFaImage(addImages.at(0).at(0));
+    handler = std::move(tensorHandler);
   }
   else if (type == "ODF" || type == "ODF-DIPY/FSL" || (type == "Tensor" && params->m_Mode == mitk::StreamlineTractographyParameters::MODE::PROBABILISTIC))
   {
-    handler = new mitk::TrackingHandlerOdf();
+    auto odfHandler = std::make_unique<mitk::TrackingHandlerOdf>();
 
     mitk::OdfImage::ItkOdfImageType::Pointer itkImg = nullptr;
 
@@ -454,7 +475,7 @@ int main(int argc, char* argv[])
       auto input = mitk::IOUtil::Load<mitk::Image>(input_files.at(0));
       reference_image = input;
       itkImg = mitk::convert::GetItkOdfFromTensorImage(input);
-      dynamic_cast<mitk::TrackingHandlerOdf*>(handler)->SetIsOdfFromTensor(true);
+      odfHandler->SetIsOdfFromTensor(true);
     }
     else
     {
@@ -480,17 +501,21 @@ int main(int argc, char* argv[])
         itkImg = mitk::convert::GetItkOdfFromOdfImage(mitkImg);
       }
       else
-        mitkThrow() << "";
+      {
+        MITK_ERROR << "Input is neither an SH nor an ODF image: " << input_files.at(0);
+        return EXIT_FAILURE;
+      }
     }
 
-    dynamic_cast<mitk::TrackingHandlerOdf*>(handler)->SetOdfImage(itkImg);
+    odfHandler->SetOdfImage(itkImg);
 
     if (addImages.at(0).size()>0)
-      dynamic_cast<mitk::TrackingHandlerOdf*>(handler)->SetGfaImage(addImages.at(0).at(0));
+      odfHandler->SetGfaImage(addImages.at(0).at(0));
+    handler = std::move(odfHandler);
   }
   else
   {
-    MITK_INFO << "Unknown tractography algorithm (" + type+"). Known types are Peaks, DetTensor, ProbTensor, DetODF, ProbODF, DetRF, ProbRF.";
+    MITK_ERROR << "Unknown tractography algorithm (" + type+"). Known types are Peaks, Tensor, ODF and ODF-DIPY/FSL.";
     return EXIT_FAILURE;
   }
 
@@ -518,7 +543,7 @@ int main(int argc, char* argv[])
   tracker->SetStoppingRegions(stop);
   tracker->SetTargetRegions(target);
   tracker->SetExclusionRegions(exclusion);
-  tracker->SetTrackingHandler(handler);
+  tracker->SetTrackingHandler(handler.get());
   params->m_OutputProbMap = imageOutput;
   tracker->SetParameters(params);
   tracker->Update();
@@ -556,7 +581,6 @@ int main(int argc, char* argv[])
     mitk::IOUtil::Save(img, outFile);
   }
 
-  delete handler;
-
   return EXIT_SUCCESS;
+}
 }
