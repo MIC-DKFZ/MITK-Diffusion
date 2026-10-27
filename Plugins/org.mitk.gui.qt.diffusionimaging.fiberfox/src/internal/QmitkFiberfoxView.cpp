@@ -765,67 +765,45 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
 
     if ( m_Parameters.m_Misc.m_MotionVolumesBox == "random" )
     {
-      for ( size_t i=0; i < m_Parameters.m_SignalGen.GetNumVolumes(); ++i )
-      {
-        m_Parameters.m_SignalGen.m_MotionVolumes.push_back( bool( rand()%2 ) );
-      }
-      MITK_DEBUG << "QmitkFiberfoxView.cpp: Case m_Misc.m_MotionVolumesBox == \"random\".";
+      // as FiberfoxParameters::LoadParameters: volume 0 stays, every other volume moves with probability 1/2
+      auto randgen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+      randgen->SetSeed();
+      m_Parameters.m_SignalGen.m_MotionVolumes.push_back(false);
+      for ( size_t i=1; i < m_Parameters.m_SignalGen.GetNumVolumes(); ++i )
+        m_Parameters.m_SignalGen.m_MotionVolumes.push_back( bool( randgen->GetIntegerVariate()%2 ) );
     }
 
     else if ( ! m_Parameters.m_Misc.m_MotionVolumesBox.empty() )
     {
+      // The parser of FiberfoxParameters::LoadParameters (deferred: one shared function): positive
+      // numbers name the moved volumes, negative numbers the volumes that stay. Anything else (no
+      // numbers, both signs) moves no volume, with a warning.
       std::stringstream stream( m_Parameters.m_Misc.m_MotionVolumesBox );
       std::vector<int> numbers;
-      int number = std::numeric_limits<int>::max();
+      int number = 0;
       while( stream >> number )
+        numbers.push_back( number );
+      const bool parsed = !numbers.empty();
+      const bool negative = parsed && *std::max_element(numbers.begin(), numbers.end()) <= 0
+          && *std::min_element(numbers.begin(), numbers.end()) < 0;
+      const bool positive = parsed && *std::min_element(numbers.begin(), numbers.end()) >= 0;
+
+      m_Parameters.m_SignalGen.m_MotionVolumes.assign(m_Parameters.m_SignalGen.GetNumVolumes(), negative);
+      if (negative || positive)
       {
-        if( number < std::numeric_limits<int>::max() )
+        for (auto n : numbers)
         {
-          numbers.push_back( number );
+          const int index = negative ? -n : n;
+          if (index >= 0 && index < static_cast<int>(m_Parameters.m_SignalGen.GetNumVolumes()))
+            m_Parameters.m_SignalGen.m_MotionVolumes.at(index) = !negative;
         }
       }
-
-      // If a list of negative numbers is given:
-      if(    *(std::min_element( numbers.begin(), numbers.end() )) < 0
-             && *(std::max_element( numbers.begin(), numbers.end() )) <= 0 ) // cave: -0 == +0
-      {
-        for ( size_t i=0; i < m_Parameters.m_SignalGen.GetNumVolumes(); ++i )
-        {
-          m_Parameters.m_SignalGen.m_MotionVolumes.push_back( true );
-        }
-        // set all true except those given.
-        for( auto iter = std::begin( numbers ); iter != std::end( numbers ); ++iter  )
-        {
-          if ( -(*iter) < (int)m_Parameters.m_SignalGen.GetNumVolumes() && -(*iter) >= 0 )
-          {
-            m_Parameters.m_SignalGen.m_MotionVolumes.at( -(*iter) ) = false;
-          }
-        }
-        MITK_DEBUG << "QmitkFiberfoxView.cpp: Case list of negative numbers.";
-      }
-
-      // If a list of positive numbers is given:
-      else if(    *(std::min_element( numbers.begin(), numbers.end() )) >= 0
-                  && *(std::max_element( numbers.begin(), numbers.end() )) >= 0 )
-      {
-        for ( size_t i=0; i < m_Parameters.m_SignalGen.GetNumVolumes(); ++i )
-        {
-          m_Parameters.m_SignalGen.m_MotionVolumes.push_back( false );
-        }
-        // set all false except those given.
-        for( auto iter = std::begin( numbers ); iter != std::end( numbers ); ++iter )
-        {
-          if ( *iter < (int)m_Parameters.m_SignalGen.GetNumVolumes() && *iter >= 0 )
-          {
-            m_Parameters.m_SignalGen.m_MotionVolumes.at( *iter ) = true;
-          }
-        }
-        MITK_DEBUG << "QmitkFiberfoxView.cpp: Case list of positive numbers.";
-      }
-
       else
       {
-        MITK_ERROR << "QmitkFiberfoxView.cpp: Inconsistent list of numbers in m_MotionVolumesBox.";
+        MITK_WARN << "Cannot read the motion volumes '" << m_Parameters.m_Misc.m_MotionVolumesBox << "'. No volume is moved.";
+        QMessageBox::warning(nullptr, "Motion volumes", "Cannot read the motion volumes \""
+                             + m_Controls->m_MotionVolumesBox->text()
+                             + "\": give \"random\", the indices of the moved volumes, or the negative indices of the volumes that stay. No volume is moved.");
       }
     }
 
