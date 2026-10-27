@@ -434,6 +434,10 @@ float StreamlineTrackingFilter::FollowStreamline(itk::Point<float, 3> pos, vnl_v
     if (m_AbortTracking)
       return tractLength;
 
+    // the step moved by |dir| steps: the first one from the seed is half a step, and the handlers
+    // scale the direction with the interpolated magnitude
+    const float stepLength = dir.magnitude()*m_Parameters->GetStepSizeMm();
+
     // if yes, add new point to streamline
     dir.normalize();
     if (front)
@@ -446,7 +450,7 @@ float StreamlineTrackingFilter::FollowStreamline(itk::Point<float, 3> pos, vnl_v
       fib->push_back(pos);
       container->push_back(dir);
     }
-    tractLength +=  m_Parameters->GetStepSizeMm();
+    tractLength += stepLength;
 
     if (m_Parameters->GetLoopCheckDeg()>=0 && CheckCurvature(container, front)>m_Parameters->GetLoopCheckDeg())
       return tractLength;

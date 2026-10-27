@@ -42,6 +42,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(Flips_FollowTheFlippedField);
   MITK_TEST(TensorFaImage_OnAnotherGrid);
   MITK_TEST(Tend_NextToZeroTensors);
+  MITK_TEST(MinTractLength_IsThePolylineLength);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -523,6 +524,25 @@ public:
 
     CPPUNIT_ASSERT_EQUAL(1u, fibers->GetNumFibers());
     CPPUNIT_ASSERT_MESSAGE("streamline runs along the zero-tensor plane", fibers->GetFiberLength(0) > 15);
+  }
+
+  /** The first step on each side of the seed is half a step; it was counted as a full step, so
+   *  fibers up to one step shorter than the minimum length were kept. */
+  void MinTractLength_IsThePolylineLength()
+  {
+    auto seeds = MakeLineRoi({{9, 9, 1.0f}});
+    auto params = MakeParameters();
+    params->m_MinTractLengthMm = 1;
+    auto fibers = mitk::FiberBundle::New(Track(params, seeds, nullptr, nullptr, MakeInnerMask()));
+    CPPUNIT_ASSERT_EQUAL(1u, fibers->GetNumFibers());
+    const float length = fibers->GetFiberLength(0);
+
+    params = MakeParameters();
+    params->m_MinTractLengthMm = length - 0.01f;
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(1), Track(params, seeds, nullptr, nullptr, MakeInnerMask())->GetNumberOfLines());
+    params = MakeParameters();
+    params->m_MinTractLengthMm = length + 0.25f*params->GetStepSizeMm();
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(0), Track(params, seeds, nullptr, nullptr, MakeInnerMask())->GetNumberOfLines());
   }
 };
 
