@@ -114,7 +114,7 @@ protected:
 
   bool IsValidFiber(FiberType* fib);  ///< Check endpoints
   void FiberToProbmap(FiberType* fib);
-  void GetSeedPointsFromSeedImage();
+  void GetSeedPointsFromSeedImage(const ItkFloatImgType* seedImage);
   void CalculateNewPosition(itk::Point<float, 3>& pos, vnl_vector_fixed<float,3>& dir);    ///< Calculate next integration step.
   float FollowStreamline(itk::Point<float, 3> start_pos, vnl_vector_fixed<float,3> dir, FiberType* fib, DirectionContainer* container, float tractLength, bool front, bool& exclude);       ///< Start streamline in one direction.
   vnl_vector_fixed<float,3> GetNewDirection(const itk::Point<float, 3>& pos, std::deque< vnl_vector_fixed<float,3> >& olddirs, itk::Index<3>& oldIndex); ///< Determine new direction by sample voting at the current position taking the last progression direction into account.
@@ -159,6 +159,8 @@ protected:
   itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::Pointer   m_ExclusionInterpolator;
   bool                                                                     m_SeedImageSet;
   bool                                                                     m_TargetImageSet;
+  EndpointConstraints                                                      m_EpConstraints;  ///< parameters' constraint, or the automatic one for a set target image
+  std::vector< vnl_vector_fixed<float,3> >                                 m_ProbeVectors;   ///< neighbourhood sampling directions
 
   std::shared_ptr< mitk::StreamlineTractographyParameters > m_Parameters;
 

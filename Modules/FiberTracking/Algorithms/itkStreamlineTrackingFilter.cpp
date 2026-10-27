@@ -99,93 +99,77 @@ void StreamlineTrackingFilter::BeforeTracking()
     m_OutputProbabilityMap->FillBuffer(0);
   }
 
-  m_MaskInterpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
-  m_StopInterpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
-  m_SeedInterpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
-  m_TargetInterpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
-  m_ExclusionInterpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
-
-  if (m_StoppingRegions.IsNull())
+  // The ROI images the caller set stay untouched, so that the filter can run again with other
+  // inputs. Without a stop or target image the interpolator stays null and IsInsideMask is false;
+  // only the mask (whose border ends the streamlines) and, for seeding, the seed image get a
+  // default image on the tracking grid.
+  auto newInterpolator = [](const ItkFloatImgType* image)
   {
-    m_StoppingRegions = ItkFloatImgType::New();
-    m_StoppingRegions->SetSpacing( imageSpacing );
-    m_StoppingRegions->SetOrigin( m_TrackingHandler->GetOrigin() );
-    m_StoppingRegions->SetDirection( m_TrackingHandler->GetDirection() );
-    m_StoppingRegions->SetRegions( m_TrackingHandler->GetLargestPossibleRegion() );
-    m_StoppingRegions->Allocate();
-    m_StoppingRegions->FillBuffer(0);
-  }
-  else
-    std::cout << "StreamlineTracking - Using stopping region image" << std::endl;
-  m_StopInterpolator->SetInputImage(m_StoppingRegions);
+    auto interpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
+    interpolator->SetInputImage(image);
+    return interpolator;
+  };
+  auto defaultImage = [this, &imageSpacing]()
+  {
+    ItkFloatImgType::Pointer image = ItkFloatImgType::New();
+    image->SetSpacing( imageSpacing );
+    image->SetOrigin( m_TrackingHandler->GetOrigin() );
+    image->SetDirection( m_TrackingHandler->GetDirection() );
+    image->SetRegions( m_TrackingHandler->GetLargestPossibleRegion() );
+    image->Allocate();
+    image->FillBuffer(1);
+    return image;
+  };
 
+  m_StopInterpolator = nullptr;
+  if (m_StoppingRegions.IsNotNull())
+  {
+    std::cout << "StreamlineTracking - Using stopping region image" << std::endl;
+    m_StopInterpolator = newInterpolator(m_StoppingRegions);
+  }
+
+  m_ExclusionInterpolator = nullptr;
   if (m_ExclusionRegions.IsNotNull())
   {
     std::cout << "StreamlineTracking - Using exclusion region image" << std::endl;
-    m_ExclusionInterpolator->SetInputImage(m_ExclusionRegions);
+    m_ExclusionInterpolator = newInterpolator(m_ExclusionRegions);
   }
 
-  if (m_TargetRegions.IsNull())
+  m_TargetImageSet = m_TargetRegions.IsNotNull();
+  m_TargetInterpolator = nullptr;
+  if (m_TargetImageSet)
   {
-    m_TargetImageSet = false;
-    m_TargetRegions = ItkFloatImgType::New();
-    m_TargetRegions->SetSpacing( imageSpacing );
-    m_TargetRegions->SetOrigin( m_TrackingHandler->GetOrigin() );
-    m_TargetRegions->SetDirection( m_TrackingHandler->GetDirection() );
-    m_TargetRegions->SetRegions( m_TrackingHandler->GetLargestPossibleRegion() );
-    m_TargetRegions->Allocate();
-    m_TargetRegions->FillBuffer(1);
-  }
-  else
-  {
-    m_TargetImageSet = true;
-    m_TargetInterpolator->SetInputImage(m_TargetRegions);
+    m_TargetInterpolator = newInterpolator(m_TargetRegions);
     std::cout << "StreamlineTracking - Using target region image" << std::endl;
   }
 
-  if (m_SeedImage.IsNull())
+  m_SeedImageSet = m_SeedImage.IsNotNull();
+  m_SeedInterpolator = nullptr;
+  if (m_SeedImageSet)
   {
-    m_SeedImageSet = false;
-    m_SeedImage = ItkFloatImgType::New();
-    m_SeedImage->SetSpacing( imageSpacing );
-    m_SeedImage->SetOrigin( m_TrackingHandler->GetOrigin() );
-    m_SeedImage->SetDirection( m_TrackingHandler->GetDirection() );
-    m_SeedImage->SetRegions( m_TrackingHandler->GetLargestPossibleRegion() );
-    m_SeedImage->Allocate();
-    m_SeedImage->FillBuffer(1);
-  }
-  else
-  {
-    m_SeedImageSet = true;
+    m_SeedInterpolator = newInterpolator(m_SeedImage);
     std::cout << "StreamlineTracking - Using seed image" << std::endl;
   }
-  m_SeedInterpolator->SetInputImage(m_SeedImage);
 
-  if (m_MaskImage.IsNull())
+  if (m_MaskImage.IsNotNull())
   {
-    // initialize mask image
-    m_MaskImage = ItkFloatImgType::New();
-    m_MaskImage->SetSpacing( imageSpacing );
-    m_MaskImage->SetOrigin( m_TrackingHandler->GetOrigin() );
-    m_MaskImage->SetDirection( m_TrackingHandler->GetDirection() );
-    m_MaskImage->SetRegions( m_TrackingHandler->GetLargestPossibleRegion() );
-    m_MaskImage->Allocate();
-    m_MaskImage->FillBuffer(1);
+    std::cout << "StreamlineTracking - Using mask image" << std::endl;
+    m_MaskInterpolator = newInterpolator(m_MaskImage);
   }
   else
-    std::cout << "StreamlineTracking - Using mask image" << std::endl;
-  m_MaskInterpolator->SetInputImage(m_MaskImage);
+    m_MaskInterpolator = newInterpolator(defaultImage());
 
-  // Autosettings for endpoint constraints
-  if (m_Parameters->m_EpConstraints==EndpointConstraints::NONE && m_TargetImageSet && m_SeedImageSet)
+  // Autosettings for endpoint constraints; kept in the filter, the caller's parameters stay as set
+  m_EpConstraints = m_Parameters->m_EpConstraints;
+  if (m_EpConstraints==EndpointConstraints::NONE && m_TargetImageSet && m_SeedImageSet)
   {
     MITK_INFO << "No endpoint constraint chosen but seed and target image set --> setting constraint to EPS_IN_SEED_AND_TARGET";
-    m_Parameters->m_EpConstraints = EndpointConstraints::EPS_IN_SEED_AND_TARGET;
+    m_EpConstraints = EndpointConstraints::EPS_IN_SEED_AND_TARGET;
   }
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::NONE && m_TargetImageSet)
+  else if (m_EpConstraints==EndpointConstraints::NONE && m_TargetImageSet)
   {
     MITK_INFO << "No endpoint constraint chosen but target image set --> setting constraint to EPS_IN_TARGET";
-    m_Parameters->m_EpConstraints = EndpointConstraints::EPS_IN_TARGET;
+    m_EpConstraints = EndpointConstraints::EPS_IN_TARGET;
   }
 
   // Check if endpoint constraints are valid
@@ -194,7 +178,10 @@ void StreamlineTrackingFilter::BeforeTracking()
   IsValidFiber(&test_fib);
 
   if (m_SeedPoints.empty())
-    GetSeedPointsFromSeedImage();
+    GetSeedPointsFromSeedImage(m_SeedImageSet ? m_SeedImage.GetPointer() : defaultImage().GetPointer());
+
+  // the neighbourhood sampling directions are the same at every step
+  m_ProbeVectors = CreateDirections(m_Parameters->m_NumSamples);
 
   m_Tractogram.clear();
   m_StartTime = std::chrono::system_clock::now();
@@ -209,19 +196,19 @@ void StreamlineTrackingFilter::BeforeTracking()
   else
     std::cout << "StreamlineTracking - Mode: ???" << std::endl;
 
-  if (m_Parameters->m_EpConstraints==EndpointConstraints::NONE)
+  if (m_EpConstraints==EndpointConstraints::NONE)
     std::cout << "StreamlineTracking - Endpoint constraint: NONE" << std::endl;
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::EPS_IN_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::EPS_IN_TARGET)
     std::cout << "StreamlineTracking - Endpoint constraint: EPS_IN_TARGET" << std::endl;
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::EPS_IN_TARGET_LABELDIFF)
+  else if (m_EpConstraints==EndpointConstraints::EPS_IN_TARGET_LABELDIFF)
     std::cout << "StreamlineTracking - Endpoint constraint: EPS_IN_TARGET_LABELDIFF" << std::endl;
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::EPS_IN_SEED_AND_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::EPS_IN_SEED_AND_TARGET)
     std::cout << "StreamlineTracking - Endpoint constraint: EPS_IN_SEED_AND_TARGET" << std::endl;
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::MIN_ONE_EP_IN_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::MIN_ONE_EP_IN_TARGET)
     std::cout << "StreamlineTracking - Endpoint constraint: MIN_ONE_EP_IN_TARGET" << std::endl;
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::ONE_EP_IN_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::ONE_EP_IN_TARGET)
     std::cout << "StreamlineTracking - Endpoint constraint: ONE_EP_IN_TARGET" << std::endl;
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::NO_EP_IN_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::NO_EP_IN_TARGET)
     std::cout << "StreamlineTracking - Endpoint constraint: NO_EP_IN_TARGET" << std::endl;
 
   std::cout << "StreamlineTracking - Angular threshold: " << m_Parameters->GetEffectiveAngularThresholdDeg() << "°" << (m_Parameters->GetAngularThresholdDeg()<0 ? " (automatic)" : "") << std::endl;
@@ -309,11 +296,10 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
   if (!olddirs.empty())
   {
     vnl_vector_fixed<float,3> olddir = olddirs.back();
-    std::vector< vnl_vector_fixed<float,3> > probeVecs = CreateDirections(m_Parameters->m_NumSamples);
     itk::Point<double, 3> sample_pos;
-    for (unsigned int i=0; i<probeVecs.size(); i++)
+    for (unsigned int i=0; i<m_ProbeVectors.size(); i++)
     {
-      vnl_vector_fixed<float,3> d = probeVecs.at(i);
+      vnl_vector_fixed<float,3> d = m_ProbeVectors[i];
       bool is_stop_voter = false;
       float dot = dot_product(d, olddir);
       if (m_Parameters->m_StopVotes && dot>0.7f)
@@ -535,13 +521,13 @@ void StreamlineTrackingFilter::SetTrackingPriorHandler(mitk::TrackingDataHandler
   m_TrackingPriorHandler = TrackingPriorHandler;
 }
 
-void StreamlineTrackingFilter::GetSeedPointsFromSeedImage()
+void StreamlineTrackingFilter::GetSeedPointsFromSeedImage(const ItkFloatImgType* seedImage)
 {
   MITK_INFO << "StreamlineTracking - Calculating seed points.";
   m_SeedPoints.clear();
 
   typedef ImageRegionConstIterator< ItkFloatImgType >     MaskIteratorType;
-  MaskIteratorType    sit(m_SeedImage, m_SeedImage->GetLargestPossibleRegion());
+  MaskIteratorType    sit(seedImage, seedImage->GetLargestPossibleRegion());
   sit.GoToBegin();
 
   while (!sit.IsAtEnd())
@@ -554,7 +540,7 @@ void StreamlineTrackingFilter::GetSeedPointsFromSeedImage()
       start[1] = index[1];
       start[2] = index[2];
       itk::Point<float> worldPos;
-      m_SeedImage->TransformContinuousIndexToPhysicalPoint(start, worldPos);
+      seedImage->TransformContinuousIndexToPhysicalPoint(start, worldPos);
 
       if ( mitk::imv::IsInsideMask<float>(worldPos, m_Parameters->m_InterpolateRoiImages, m_MaskInterpolator) )
       {
@@ -566,7 +552,7 @@ void StreamlineTrackingFilter::GetSeedPointsFromSeedImage()
           start[2] = index[2] + static_cast<float>(m_TrackingHandler->GetRandDouble(-0.5, 0.5));
 
           itk::Point<float> worldPos;
-          m_SeedImage->TransformContinuousIndexToPhysicalPoint(start, worldPos);
+          seedImage->TransformContinuousIndexToPhysicalPoint(start, worldPos);
           m_SeedPoints.push_back(worldPos);
         }
       }
@@ -723,11 +709,11 @@ void StreamlineTrackingFilter::GenerateData()
 
 bool StreamlineTrackingFilter::IsValidFiber(FiberType* fib)
 {
-  if (m_Parameters->m_EpConstraints==EndpointConstraints::NONE)
+  if (m_EpConstraints==EndpointConstraints::NONE)
   {
     return true;
   }
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::EPS_IN_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::EPS_IN_TARGET)
   {
     if (m_TargetImageSet)
     {
@@ -739,7 +725,7 @@ bool StreamlineTrackingFilter::IsValidFiber(FiberType* fib)
     else
       mitkThrow() << "No target image set but endpoint constraint EPS_IN_TARGET chosen!";
   }
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::EPS_IN_TARGET_LABELDIFF)
+  else if (m_EpConstraints==EndpointConstraints::EPS_IN_TARGET_LABELDIFF)
   {
     if (m_TargetImageSet)
     {
@@ -752,7 +738,7 @@ bool StreamlineTrackingFilter::IsValidFiber(FiberType* fib)
     else
       mitkThrow() << "No target image set but endpoint constraint EPS_IN_TARGET_LABELDIFF chosen!";
   }
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::EPS_IN_SEED_AND_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::EPS_IN_SEED_AND_TARGET)
   {
     if (m_TargetImageSet && m_SeedImageSet)
     {
@@ -767,7 +753,7 @@ bool StreamlineTrackingFilter::IsValidFiber(FiberType* fib)
     else
       mitkThrow() << "No target or seed image set but endpoint constraint EPS_IN_SEED_AND_TARGET chosen!";
   }
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::MIN_ONE_EP_IN_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::MIN_ONE_EP_IN_TARGET)
   {
     if (m_TargetImageSet)
     {
@@ -779,7 +765,7 @@ bool StreamlineTrackingFilter::IsValidFiber(FiberType* fib)
     else
       mitkThrow() << "No target image set but endpoint constraint MIN_ONE_EP_IN_TARGET chosen!";
   }
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::ONE_EP_IN_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::ONE_EP_IN_TARGET)
   {
     if (m_TargetImageSet)
     {
@@ -794,7 +780,7 @@ bool StreamlineTrackingFilter::IsValidFiber(FiberType* fib)
     else
       mitkThrow() << "No target image set but endpoint constraint ONE_EP_IN_TARGET chosen!";
   }
-  else if (m_Parameters->m_EpConstraints==EndpointConstraints::NO_EP_IN_TARGET)
+  else if (m_EpConstraints==EndpointConstraints::NO_EP_IN_TARGET)
   {
     if (m_TargetImageSet)
     {

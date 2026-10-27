@@ -35,6 +35,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(Parameters_Defaults);
   MITK_TEST(Parameters_AutomaticAngularThreshold);
   MITK_TEST(EndpointConstraints_TargetAtEitherEnd);
+  MITK_TEST(Filter_RunsAgainWithoutTarget);
   MITK_TEST(ProbabilisticPeaks_SameResultAtAnyThreadCount);
   MITK_TEST(ProbabilisticPeaks_JitterIsIsotropicStandardDeviation);
   MITK_TEST(DeterministicOdf_FollowsPeakBetweenSamplingDirections);
@@ -278,6 +279,28 @@ public:
 
   /** Each streamline runs from x = 0.25 to x = 18.75 mm (first points outside the inner mask); the
    *  target lies at one end, the other, or both. */
+  /** The automatic endpoint constraint of a run with a target image stays in the filter: the
+   *  caller's parameters keep NONE, and the next run without a target image is unconstrained. */
+  void Filter_RunsAgainWithoutTarget()
+  {
+    auto params = MakeParameters();
+    mitk::TrackingHandlerPeaks handler;
+    handler.SetPeakImage(m_StraightField);
+    auto tracker = itk::StreamlineTrackingFilter::New();
+    tracker->SetTrackingHandler(&handler);
+    tracker->SetSeedImage(MakeLineRoi({{8, 10, 1.0f}}));
+    tracker->SetTargetRegions(MakeLineRoi({{9, 9, 1.0f}}));  // contains no streamline end
+    tracker->SetMaskImage(MakeInnerMask());
+    tracker->SetParameters(params);
+    tracker->Update();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("automatic EPS_IN_SEED_AND_TARGET", vtkIdType(0), tracker->GetFiberPolyData()->GetNumberOfLines());
+    CPPUNIT_ASSERT_EQUAL(int(EpConstraint::NONE), int(params->m_EpConstraints));
+
+    tracker->SetTargetRegions(nullptr);
+    tracker->Update();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("second run without target", vtkIdType(3), tracker->GetFiberPolyData()->GetNumberOfLines());
+  }
+
   void EndpointConstraints_TargetAtEitherEnd()
   {
     auto seeds = MakeLineRoi({{8, 10, 1.0f}});
