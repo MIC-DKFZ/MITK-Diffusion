@@ -316,7 +316,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateFiberEndingsPointS
       pointSet->InsertPoint(count, itkPoint);
       count++;
     }
-    if (numPoints>2)
+    if (numPoints>1)
     {
       double* point = points->GetPoint(numPoints-1);
       itk::Point<double,3> itkPoint = mitk::imv::GetItkPoint(point);
