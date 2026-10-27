@@ -58,6 +58,7 @@ int main(int argc, char* argv[])
   parser.addArgument("akc", "K", mitkCommandLineParser::Bool, "Kurtosis fit:", "Kurtosis Fit", us::Any(), true);
   parser.addArgument("biexp", "B", mitkCommandLineParser::Bool, "BiExp fit:", "BiExp fit", us::Any(), true);
   parser.addArgument("targetbvalue", "b", mitkCommandLineParser::String, "b Value:", "target bValue (mean, min, max)", us::Any(), false);
+  parser.addArgument("round_bvalues", "", mitkCommandLineParser::Int, "Round b-values:", "round the b-values to multiples of this value; the shells are the rounded b-values", 1000, true);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -70,6 +71,9 @@ int main(int argc, char* argv[])
   bool applyAKC = parsedArgs.count("akc") && us::any_cast<bool>(parsedArgs["akc"]);
   bool applyBiExp = parsedArgs.count("biexp") && us::any_cast<bool>(parsedArgs["biexp"]);
   std::string targetType = us::any_cast<std::string>(parsedArgs["targetbvalue"]);
+  int roundingValue = 1000;
+  if (parsedArgs.count("round_bvalues"))
+    roundingValue = us::any_cast<int>(parsedArgs["round_bvalues"]);
 
   if (!applyADC && !applyAKC && !applyBiExp)
   {
@@ -93,9 +97,8 @@ int main(int argc, char* argv[])
     {
       typedef itk::RadialMultishellToSingleshellImageFilter<short, short> FilterType;
 
-      const auto rounded = mitk::DiffusionImageEditing::RoundBValues(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi), mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi), 1000);
-      mitk::DiffusionPropertyHelper::SetReferenceBValue(dwi, rounded.referenceBValue);
-      mitk::DiffusionPropertyHelper::SetGradientContainer(dwi, rounded.gradients);
+      // The image overload also rebuilds the b-value map, which defines the shells below.
+      dwi = mitk::DiffusionImageEditing::RoundBValues(dwi, roundingValue);
 
       // filter input parameter
       const mitk::DiffusionPropertyHelper::BValueMapType
