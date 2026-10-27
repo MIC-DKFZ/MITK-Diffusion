@@ -141,12 +141,17 @@ Facts the layout does not show:
   `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
   give the same result at any number of OpenMP threads; MITK-Data fiber references depend on
   exact point positions, so a change there is checked bit for bit against the old output.
+- `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter)Test'`
+  runs the `FiberProcessing` tests. Its filters read const bundles and give the same result at
+  any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
+  set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
+  voxel grid (`mitkFiberImageGrid.h`).
 
 ## Porting state
 
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 44 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
+all 49 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,

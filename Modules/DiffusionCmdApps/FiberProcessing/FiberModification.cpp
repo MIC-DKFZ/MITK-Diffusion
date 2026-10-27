@@ -25,22 +25,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>
+#include <mitkExceptionMacro.h>
 #include <itkFiberCurvatureFilter.h>
 #include <mitkDiffusionDataIOHelper.h>
 #include <itkImage.h>
 
-
-mitk::FiberBundle::Pointer LoadFib(std::string filename)
-{
-  std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load(filename);
-  if( fibInfile.empty() )
-    std::cout << "File " << filename << " could not be read!";
-  mitk::BaseData::Pointer baseData = fibInfile.at(0);
-  return dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
-}
 
 /*!
 \brief Modify input tractogram: fiber resampling, compression, pruning and transformation.
@@ -64,15 +57,15 @@ int main(int argc, char* argv[])
   parser.beginGroup("2. Resampling:");
   parser.addArgument("spline_resampling", "", mitkCommandLineParser::Float, "Spline resampling:", "Resample fiber using splines with the given point distance (in mm)");
   parser.addArgument("linear_resampling", "", mitkCommandLineParser::Float, "Linear resampling:", "Resample fiber linearly with the given point distance (in mm)");
-  parser.addArgument("num_resampling", "", mitkCommandLineParser::Int, "Num. fiber points resampling:", "Resample all fibers to the given number of points");
+  parser.addArgument("num_resampling", "", mitkCommandLineParser::Int, "Num. fiber points resampling:", "Resample all fibers to the given number of points, at equal chord distance (not arc length); fibers that already have this number of points are kept as they are");
   parser.addArgument("compress", "", mitkCommandLineParser::Float, "Compress:", "Compress fiber using the given error threshold (in mm)");
   parser.endGroup();
 
   parser.beginGroup("3. Filtering:");
   parser.addArgument("min_length", "", mitkCommandLineParser::Float, "Minimum length:", "Minimum fiber length (in mm)");
   parser.addArgument("max_length", "", mitkCommandLineParser::Float, "Maximum length:", "Maximum fiber length (in mm)");
-  parser.addArgument("max_angle", "", mitkCommandLineParser::Float, "Maximum angle:", "Maximum angular STDEV (in degree) over given distance");
-  parser.addArgument("max_angle_dist", "", mitkCommandLineParser::Float, "Distance:", "Distance in mm", 10);
+  parser.addArgument("max_angle", "", mitkCommandLineParser::Float, "Maximum angle:", "Maximum mean angle (in degree) between the segment directions within --max_angle_dist and their mean direction");
+  parser.addArgument("max_angle_dist", "", mitkCommandLineParser::Float, "Distance:", "Length (mm) of the window along the fiber for --max_angle", 10);
   parser.addArgument("remove", "", mitkCommandLineParser::Bool, "Remove fibers exceeding curvature threshold:", "If false, only the high curvature parts are removed");
   parser.addArgument("subsample", "", mitkCommandLineParser::Float, "Randomly select fraction of streamlines:", "Randomly select the specified fraction of streamlines from the input tractogram");
   parser.addArgument("random_subsample", "", mitkCommandLineParser::Bool, "Randomly seed subsampling:", "Randomly seed subsampling. Else, use seed 0.");
@@ -111,8 +104,14 @@ int main(int argc, char* argv[])
     remove_outside = us::any_cast<bool>(parsedArgs["remove_outside"]);
 
   bool remove_inside = false;
-  if (!remove_outside && parsedArgs.count("remove_inside"))
+  if (parsedArgs.count("remove_inside"))
     remove_inside = us::any_cast<bool>(parsedArgs["remove_inside"]);
+
+  if (remove_inside && remove_outside)
+  {
+    MITK_INFO << "Use either --remove_inside or --remove_outside.";
+    return EXIT_FAILURE;
+  }
 
   typedef itk::Image< unsigned char, 3 > UcharImageType;
   UcharImageType::Pointer mask = nullptr;
@@ -186,15 +185,15 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("rotate_z"))
     rotateZ = us::any_cast<float>(parsedArgs["rotate_z"]);
 
-  float scaleX = 0;
+  float scaleX = 1;
   if (parsedArgs.count("scale_x"))
     scaleX = us::any_cast<float>(parsedArgs["scale_x"]);
 
-  float scaleY = 0;
+  float scaleY = 1;
   if (parsedArgs.count("scale_y"))
     scaleY = us::any_cast<float>(parsedArgs["scale_y"]);
 
-  float scaleZ = 0;
+  float scaleZ = 1;
   if (parsedArgs.count("scale_z"))
     scaleZ = us::any_cast<float>(parsedArgs["scale_z"]);
 
@@ -216,7 +215,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
+    mitk::FiberBundle::Pointer fib = mitk::FiberBundleIOHelper::load_fib(inFileName);
 
     if (subsample>0)
       fib = fib->SubsampleFibers(subsample, random_subsample);
@@ -232,11 +231,34 @@ int main(int argc, char* argv[])
       fib = filter->GetOutputFiberBundle();
     }
 
-    if (minFiberLength>0)
-      fib->RemoveShortFibers(minFiberLength);
+    // Cutting at the mask comes before the length filter, so that no piece shorter than
+    // --min_length remains, and before resampling and compression: the cut keeps the fiber
+    // points inside the mask, so on compressed or coarsely resampled fibers it would lose the
+    // in-mask parts between distant points, and --num_resampling gives each output piece its
+    // number of points. Without any fiber left the result is an empty bundle.
+    if ( mask.IsNotNull() )
+    {
+      if (remove_outside)
+        fib = fib->RemoveFibersOutside(mask, false);
+      else if (remove_inside)
+        fib = fib->RemoveFibersOutside(mask, true);
+      if (fib->GetNumFibers()==0)
+        MITK_WARN << "No fiber is left after removing the fiber parts " << (remove_outside ? "outside" : "inside") << " the mask.";
+    }
 
-    if (maxFiberLength>0)
-      fib->RemoveLongFibers(maxFiberLength);
+    // RemoveShortFibers and RemoveLongFibers refuse to remove every fiber and leave the bundle
+    // unchanged; here that means an empty result.
+    if (minFiberLength>0 && !fib->RemoveShortFibers(minFiberLength))
+    {
+      MITK_WARN << "Every fiber is shorter than " << minFiberLength << " mm.";
+      fib = mitk::FiberBundle::New();
+    }
+
+    if (maxFiberLength>0 && fib->GetNumFibers()>0 && !fib->RemoveLongFibers(maxFiberLength))
+    {
+      MITK_WARN << "Every fiber is longer than " << maxFiberLength << " mm.";
+      fib = mitk::FiberBundle::New();
+    }
 
     if (spline_resampling>0)
       fib->ResampleSpline(spline_resampling);
@@ -250,13 +272,6 @@ int main(int argc, char* argv[])
     if (compress>0)
       fib->Compress(compress);
 
-    if ( mask.IsNotNull() )
-    {
-      if (remove_outside)
-        fib = fib->RemoveFibersOutside(mask, false);
-      else if (remove_inside)
-        fib = fib->RemoveFibersOutside(mask, true);
-    }
 
     if (axis/100==1)
       fib->MirrorFibers(0);
@@ -268,14 +283,13 @@ int main(int argc, char* argv[])
       fib->MirrorFibers(2);
 
 
-    if (rotateX > 0 || rotateY > 0 || rotateZ > 0){
-      std::cout << "Rotate " << rotateX << " " << rotateY << " " << rotateZ;
+    // A transformation runs whenever one of its options is given, whatever the sign; the
+    // components not given are neutral (angle and offset 0, scale factor 1).
+    if (parsedArgs.count("rotate_x") || parsedArgs.count("rotate_y") || parsedArgs.count("rotate_z"))
       fib->RotateAroundAxis(rotateX, rotateY, rotateZ);
-    }
-    if (translateX > 0 || translateY > 0 || translateZ > 0){
+    if (parsedArgs.count("translate_x") || parsedArgs.count("translate_y") || parsedArgs.count("translate_z"))
       fib->TranslateFibers(translateX, translateY, translateZ);
-    }
-    if (scaleX > 0 || scaleY > 0 || scaleZ > 0)
+    if (parsedArgs.count("scale_x") || parsedArgs.count("scale_y") || parsedArgs.count("scale_z"))
       fib->ScaleFibers(scaleX, scaleY, scaleZ);
 
     mitk::IOUtil::Save(fib.GetPointer(), outFileName );

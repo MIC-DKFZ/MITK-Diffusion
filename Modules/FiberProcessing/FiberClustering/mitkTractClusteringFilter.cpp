@@ -15,16 +15,25 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 #include "mitkTractClusteringFilter.h"
 
-#define _USE_MATH_DEFINES
-#include <math.h>
-#include <boost/timer/progress_display.hpp>
-#include <vnl/vnl_sparse_matrix.h>
+#include <mitkDerivedFiberBundle.h>
+
+#include <vtkCell.h>
+#include <vtkCellArray.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyLine.h>
+#include <vtkSmartPointer.h>
+
+#include <algorithm>
+#include <iterator>
+#include <utility>
 
 namespace mitk{
 
 TractClusteringFilter::TractClusteringFilter()
   : m_NumPoints(12)
   , m_InCentroids(nullptr)
+  , m_OutUnassigned(mitk::FiberBundle::New())
   , m_MinClusterSize(1)
   , m_MaxClusters(0)
   , m_MergeDuplicateThreshold(-1)
@@ -35,20 +44,24 @@ TractClusteringFilter::TractClusteringFilter()
 
 }
 
-TractClusteringFilter::~TractClusteringFilter()
-{
-  for (auto m : m_Metrics)
-    delete m;
-}
-
 std::vector<std::vector<unsigned int> > TractClusteringFilter::GetOutFiberIndices() const
 {
   return m_OutFiberIndices;
 }
 
-void TractClusteringFilter::SetMetrics(const std::vector<mitk::ClusteringMetric *> &Metrics)
+mitk::FiberBundle::Pointer TractClusteringFilter::GetOutUnassigned() const
 {
-  m_Metrics = Metrics;
+  return m_OutUnassigned;
+}
+
+void TractClusteringFilter::AddMetric(std::unique_ptr<mitk::ClusteringMetric> metric)
+{
+  m_Metrics.push_back(std::move(metric));
+}
+
+void TractClusteringFilter::ClearMetrics()
+{
+  m_Metrics.clear();
 }
 
 std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::GetOutClusters() const
@@ -71,7 +84,7 @@ void TractClusteringFilter::SetDistances(const std::vector<float> &Distances)
   m_Distances = Distances;
 }
 
-float TractClusteringFilter::CalcOverlap(vnl_matrix<float>& t)
+float TractClusteringFilter::CalcOverlap(const vnl_matrix<float>& t) const
 {
   float overlap = 0;
   if (m_FilterMask.IsNotNull())
@@ -97,32 +110,57 @@ float TractClusteringFilter::CalcOverlap(vnl_matrix<float>& t)
   return overlap;
 }
 
-std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(mitk::FiberBundle::Pointer tractogram)
+std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(const mitk::FiberBundle* tractogram)
 {
-  mitk::FiberBundle::Pointer temp_fib = tractogram->GetDeepCopy();
-  if (m_DoResampling)
-    temp_fib->ResampleToNumPoints(m_NumPoints);
-
+  // QuickBundles compares fibers point by point (MDF), so each fiber is resampled to m_NumPoints
+  // points at equal arc length along it, both end points included (as dipy's
+  // set_number_of_points); also fibers that already have m_NumPoints unevenly spaced points.
+  // FiberBundle::ResampleToNumPoints does neither: it steps by chord length and keeps such fibers.
+  vtkSmartPointer<vtkPolyData> polyData = tractogram->GetFiberPolyData();
   std::vector< vnl_matrix<float> > out_fib;
 
-  for (int i=0; i<temp_fib->GetFiberPolyData()->GetNumberOfCells(); i++)
+  for (int i=0; i<polyData->GetNumberOfCells(); i++)
   {
-    vtkCell* cell = temp_fib->GetFiberPolyData()->GetCell(i);
-    int numPoints = cell->GetNumberOfPoints();
+    vtkCell* cell = polyData->GetCell(i);
+    const int numPoints = cell->GetNumberOfPoints();
     vtkPoints* points = cell->GetPoints();
+
+    std::vector< vnl_vector_fixed< double, 3 > > p(numPoints);
+    for (int j=0; j<numPoints; j++)
+      points->GetPoint(j, p[j].data_block());
 
     vnl_matrix<float> streamline;
     streamline.set_size(3, m_NumPoints);
     streamline.fill(0.0);
 
-    for (int j=0; j<numPoints; j++)
+    if (!m_DoResampling || numPoints<2)
     {
-      double cand[3];
-      points->GetPoint(j, cand);
+      for (unsigned int k=0; k<m_NumPoints && numPoints>0; k++)
+      {
+        // Without resampling the fibers are expected to have m_NumPoints points already.
+        const auto& q = p[std::min<int>(k, numPoints-1)];
+        for (unsigned int d=0; d<3; ++d)
+          streamline(d, k) = q[d];
+      }
+    }
+    else
+    {
+      std::vector< double > arc(numPoints, 0.0);
+      for (int j=1; j<numPoints; j++)
+        arc[j] = arc[j-1] + (p[j]-p[j-1]).magnitude();
 
-      vnl_vector_fixed< float, 3 > candV;
-      candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
-      streamline.set_column(j, candV.as_vector());
+      int seg = 0;
+      for (unsigned int k=0; k<m_NumPoints; k++)
+      {
+        const double target = m_NumPoints>1 ? arc.back()*k/(m_NumPoints-1) : 0.0;
+        while (seg<numPoints-2 && arc[seg+1]<target)
+          ++seg;
+        const double segLength = arc[seg+1]-arc[seg];
+        const double a = segLength>0 ? std::min(1.0, std::max(0.0, (target-arc[seg])/segLength)) : 0.0;
+        const vnl_vector_fixed< double, 3 > q = p[seg] + a*(p[seg+1]-p[seg]);
+        for (unsigned int d=0; d<3; ++d)
+          streamline(d, k) = q[d];
+      }
     }
 
     out_fib.push_back(streamline);
@@ -131,11 +169,14 @@ std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(mitk::Fibe
   return out_fib;
 }
 
-std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep(std::vector< unsigned int > f_indices, std::vector<float> distances)
+std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep(const std::vector< unsigned int >& f_indices, std::vector<float> distances)
 {
   float dist_thres = distances.back();
   distances.pop_back();
   std::vector< Cluster > C;
+  // The centroid (mean) of each cluster, computed when a fiber joins the cluster instead of in
+  // every comparison with it.
+  std::vector< vnl_matrix<float> > means;
 
   int N = f_indices.size();
 
@@ -144,12 +185,13 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
   c1.h = T[f_indices.at(0)];
   c1.n = 1;
   C.push_back(c1);
+  means.push_back(c1.h / c1.n);
   if (f_indices.size()==1)
     return C;
 
   for (int i=1; i<N; ++i)
   {
-    vnl_matrix<float> t = T.at(f_indices.at(i));
+    const vnl_matrix<float>& t = T.at(f_indices.at(i));
 
     int min_cluster_index = -1;
     float min_cluster_distance = 99999;
@@ -157,10 +199,10 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
 
     for (unsigned int k=0; k<C.size(); ++k)
     {
-      vnl_matrix<float> v = C.at(k).h / C.at(k).n;
+      const vnl_matrix<float>& v = means[k];
       bool f = false;
       float d = 0;
-      for (auto m : m_Metrics)
+      for (const auto& m : m_Metrics)
         d += m->CalculateDistance(t, v, f);
       d /= m_Metrics.size();
 
@@ -174,12 +216,14 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
 
     if (min_cluster_index>=0 && min_cluster_distance<dist_thres)
     {
-      C[min_cluster_index].I.push_back(f_indices.at(i));
+      Cluster& c = C[min_cluster_index];
+      c.I.push_back(f_indices.at(i));
       if (!flip)
-        C[min_cluster_index].h += t;
+        c.h += t;
       else
-        C[min_cluster_index].h += t.fliplr();
-      C[min_cluster_index].n += 1;
+        c.h += vnl_matrix<float>(t).fliplr();  // fliplr() flips in place
+      c.n += 1;
+      means[min_cluster_index] = c.h / c.n;
     }
     else
     {
@@ -187,31 +231,27 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
       c.I.push_back(f_indices.at(i));
       c.h = t;
       c.n = 1;
-      C.push_back(c);
+      means.push_back(c.h / c.n);
+      C.push_back(std::move(c));
     }
   }
 
   if (!distances.empty())
   {
-    std::vector< Cluster > outC;
+    // The sub-clusters are collected per cluster and concatenated in cluster order, so that the
+    // result does not depend on the number of threads.
+    std::vector< std::vector< Cluster > > subClusters(C.size());
 #pragma omp parallel for
     for (int c=0; c<(int)C.size(); c++)
-    {
+      subClusters[c] = ClusterStep(C.at(c).I, distances);
 
-      std::vector< Cluster > tempC = ClusterStep(C.at(c).I, distances);
-#pragma omp critical
-      AppendCluster(outC, tempC);
-    }
+    std::vector< Cluster > outC;
+    for (auto& tempC : subClusters)
+      outC.insert(outC.end(), std::make_move_iterator(tempC.begin()), std::make_move_iterator(tempC.end()));
     return outC;
   }
   else
     return C;
-}
-
-void TractClusteringFilter::AppendCluster(std::vector< Cluster >& a, std::vector< Cluster >&b)
-{
-  for (auto c : b)
-    a.push_back(c);
 }
 
 unsigned int TractClusteringFilter::GetDiscardedClusters() const
@@ -254,68 +294,82 @@ void TractClusteringFilter::SetMergeDuplicateThreshold(float MergeDuplicateThres
   m_MergeDuplicateThreshold = MergeDuplicateThreshold;
 }
 
-void TractClusteringFilter::SetInCentroids(const mitk::FiberBundle::Pointer &InCentroids)
+void TractClusteringFilter::SetInCentroids(const mitk::FiberBundle* InCentroids)
 {
   m_InCentroids = InCentroids;
 }
 
-void TractClusteringFilter::SetTractogram(const mitk::FiberBundle::Pointer &Tractogram)
+void TractClusteringFilter::SetTractogram(const mitk::FiberBundle* Tractogram)
 {
   m_Tractogram = Tractogram;
 }
 
 std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplicateClusters2(std::vector< TractClusteringFilter::Cluster >& clusters)
 {
-  if (m_MergeDuplicateThreshold<0)
-    m_MergeDuplicateThreshold = m_Distances.at(0)/2;
-  else if (m_MergeDuplicateThreshold==0)
-    return clusters;
+  // A negative setting means half the cluster size of this run; the setting itself stays.
+  float mergeThreshold = m_MergeDuplicateThreshold;
+  if (mergeThreshold<0)
+    mergeThreshold = m_Distances.at(0)/2;
+  else if (mergeThreshold==0)
+    return std::move(clusters);
 
-  MITK_INFO << "Merging duplicate clusters with distance threshold " << m_MergeDuplicateThreshold;
+  MITK_INFO << "Merging duplicate clusters with distance threshold " << mergeThreshold;
 
   std::vector< TractClusteringFilter::Cluster > new_clusters;
-  for (Cluster c1 : clusters)
+  // The centroids of new_clusters, computed when a cluster is added or merged into.
+  std::vector< vnl_matrix<float> > means;
+  for (Cluster& c1 : clusters)
   {
     vnl_matrix<float> t = c1.h / c1.n;
+
+    // Distances in parallel, the nearest cluster afterwards in cluster order: with equal
+    // distances the first cluster wins whatever the number of threads.
+    std::vector< float > distances(new_clusters.size());
+    std::vector< char > flips(new_clusters.size(), 0);
+#pragma omp parallel for
+    for (int k2=0; k2<(int)new_clusters.size(); ++k2)
+    {
+      const vnl_matrix<float>& v = means[k2];
+
+      bool f = false;
+      float d = 0;
+      for (const auto& m : m_Metrics)
+        d += m->CalculateDistance(t, v, f);
+      distances[k2] = d / m_Metrics.size();
+      flips[k2] = f;
+    }
 
     int min_idx = -1;
     float min_d = 99999;
     bool flip = false;
-
-#pragma omp parallel for
     for (int k2=0; k2<(int)new_clusters.size(); ++k2)
     {
-      Cluster c2 = new_clusters.at(k2);
-      vnl_matrix<float> v = c2.h / c2.n;
-
-      bool f = false;
-      float d = 0;
-      for (auto m : m_Metrics)
-        d += m->CalculateDistance(t, v, f);
-      d /= m_Metrics.size();
-
-#pragma omp critical
-      if (d<min_d && d<m_MergeDuplicateThreshold)
+      if (distances[k2]<min_d && distances[k2]<mergeThreshold)
       {
-        min_d = d;
+        min_d = distances[k2];
         min_idx = k2;
-        flip = f;
+        flip = flips[k2];
       }
     }
 
     if (min_idx<0)
-      new_clusters.push_back(c1);
+    {
+      means.push_back(std::move(t));
+      new_clusters.push_back(std::move(c1));
+    }
     else
     {
+      Cluster& c2 = new_clusters[min_idx];
       for (int i=0; i<c1.n; ++i)
       {
-        new_clusters[min_idx].I.push_back(c1.I.at(i));
-        new_clusters[min_idx].n += 1;
+        c2.I.push_back(c1.I.at(i));
+        c2.n += 1;
       }
       if (!flip)
-        new_clusters[min_idx].h += c1.h;
+        c2.h += c1.h;
       else
-        new_clusters[min_idx].h += c1.h.fliplr();
+        c2.h += c1.h.fliplr();
+      means[min_idx] = c2.h / c2.n;
     }
   }
 
@@ -323,82 +377,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
   return new_clusters;
 }
 
-void TractClusteringFilter::MergeDuplicateClusters(std::vector< TractClusteringFilter::Cluster >& clusters)
-{
-  if (m_MergeDuplicateThreshold<0)
-    m_MergeDuplicateThreshold = m_Distances.at(0)/2;
-  bool found = true;
-
-
-  MITK_INFO << "Merging duplicate clusters with distance threshold " << m_MergeDuplicateThreshold;
-  int start = 0;
-  while (found && m_MergeDuplicateThreshold>mitk::eps)
-  {
-    std::cout << "                                                                                                     \r";
-    std::cout << "Number of clusters: " << clusters.size() << '\r';
-    std::cout.flush();
-
-    found = false;
-    for (int k1=start; k1<(int)clusters.size(); ++k1)
-    {
-      Cluster c1 = clusters.at(k1);
-      vnl_matrix<float> t = c1.h / c1.n;
-
-      std::vector< int > merge_indices;
-      std::vector< bool > flip_indices;
-
-#pragma omp parallel for
-      for (int k2=start+1; k2<(int)clusters.size(); ++k2)
-      {
-        if (k1!=k2)
-        {
-          Cluster c2 = clusters.at(k2);
-          vnl_matrix<float> v = c2.h / c2.n;
-          bool f = false;
-
-          float d = 0;
-          for (auto m : m_Metrics)
-            d += m->CalculateDistance(t, v, f);
-          d /= m_Metrics.size();
-
-#pragma omp critical
-          if (d<m_MergeDuplicateThreshold)
-          {
-            merge_indices.push_back(k2);
-            flip_indices.push_back(f);
-          }
-        }
-      }
-
-      for (unsigned int i=0; i<merge_indices.size(); ++i)
-      {
-        Cluster c2 = clusters.at(merge_indices.at(i));
-        for (int i=0; i<c2.n; ++i)
-        {
-          clusters[k1].I.push_back(c2.I.at(i));
-          clusters[k1].n += 1;
-        }
-        if (!flip_indices.at(i))
-          clusters[k1].h += c2.h;
-        else
-          clusters[k1].h += c2.h.fliplr();
-      }
-
-      std::sort(merge_indices.begin(), merge_indices.end());
-      for (unsigned int i=0; i<merge_indices.size(); ++i)
-      {
-        clusters.erase (clusters.begin()+merge_indices.at(i)-i);
-        found = true;
-      }
-      if (found)
-        break;
-    }
-    ++start;
-  }
-  MITK_INFO << "\nNumber of clusters after merging duplicates: " << clusters.size();
-}
-
-std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClusters(std::vector< unsigned int > f_indices, std::vector<vnl_matrix<float> >& centroids)
+std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClusters(const std::vector< unsigned int >& f_indices, const std::vector<vnl_matrix<float> >& centroids)
 {
   float dist_thres = m_Distances.at(0);
   int N = f_indices.size();
@@ -412,14 +391,17 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
   {
     Cluster c;
     c.h.set_size(T.at(0).rows(), T.at(0).cols()); c.h.fill(0.0);
-    c.f_id = i;
     C.push_back(c);
   }
 
+  // The nearest centroid of each fiber in parallel; the clusters are filled afterwards in fiber
+  // order, so that their fiber order and centroid sums do not depend on the number of threads.
+  std::vector< int > assignedCluster(N, -1);
+  std::vector< char > assignedFlip(N, 0);
 #pragma omp parallel for
   for (int i=0; i<N; ++i)
   {
-    vnl_matrix<float> t = T.at(f_indices.at(i));
+    const vnl_matrix<float>& t = T.at(f_indices.at(i));
 
     int min_cluster_index = -1;
     float min_cluster_distance = 99999;
@@ -428,11 +410,11 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
     if (CalcOverlap(t)>=m_OverlapThreshold)
     {
       int c_idx = 0;
-      for (vnl_matrix<float> centroid : centroids)
+      for (const vnl_matrix<float>& centroid : centroids)
       {
         bool f = false;
         float d = 0;
-        for (auto m : m_Metrics)
+        for (const auto& m : m_Metrics)
           d += m->CalculateDistance(t, centroid, f);
         d /= m_Metrics.size();
 
@@ -448,23 +430,28 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
 
     if (min_cluster_index>=0 && min_cluster_distance<dist_thres)
     {
-#pragma omp critical
-      {
-        C[min_cluster_index].I.push_back(f_indices.at(i));
-        if (!flip)
-          C[min_cluster_index].h += t;
-        else
-          C[min_cluster_index].h += t.fliplr();
-        C[min_cluster_index].n += 1;
-      }
+      assignedCluster[i] = min_cluster_index;
+      assignedFlip[i] = flip;
+    }
+  }
+
+  for (int i=0; i<N; ++i)
+  {
+    const int k = assignedCluster[i];
+    if (k>=0)
+    {
+      const vnl_matrix<float>& t = T.at(f_indices.at(i));
+      C[k].I.push_back(f_indices.at(i));
+      if (!assignedFlip[i])
+        C[k].h += t;
+      else
+        C[k].h += vnl_matrix<float>(t).fliplr();  // fliplr() flips in place
+      C[k].n += 1;
     }
     else
     {
-#pragma omp critical
-      {
-        no_fit.I.push_back(f_indices.at(i));
-        no_fit.n++;
-      }
+      no_fit.I.push_back(f_indices.at(i));
+      no_fit.n++;
     }
   }
   C.push_back(no_fit);
@@ -473,17 +460,52 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
 
 
 
+void TractClusteringFilter::AddOutput(const Cluster& c, const vnl_matrix<float>& centroid_points)
+{
+  m_OutClusters.push_back(c);
+
+  m_OutTractograms.push_back(CreateFiberSubset(m_Tractogram, c.I));
+  m_OutFiberIndices.push_back(c.I);
+
+  // create centroid
+  vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
+  vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
+  vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
+  vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
+  for (unsigned int j=0; j<centroid_points.cols(); j++)
+  {
+    double p[3];
+    p[0] = centroid_points.get(0,j);
+    p[1] = centroid_points.get(1,j);
+    p[2] = centroid_points.get(2,j);
+
+    vtkIdType id = vtkNewPoints->InsertNextPoint(p);
+    container->GetPointIds()->InsertNextId(id);
+  }
+  vtkNewCells->InsertNextCell(container);
+  polyData->SetPoints(vtkNewPoints);
+  polyData->SetLines(vtkNewCells);
+  mitk::FiberBundle::Pointer centroid = mitk::FiberBundle::New(polyData);
+  CopyFiberBundleMetadata(m_Tractogram, centroid);
+  centroid->SetFiberColors(255, 255, 255);
+  m_OutCentroids.push_back(centroid);
+}
+
 void TractClusteringFilter::GenerateData()
 {
   m_OutTractograms.clear();
   m_OutCentroids.clear();
   m_OutClusters.clear();
+  m_OutFiberIndices.clear();
+  m_OutUnassigned = mitk::FiberBundle::New();
 
   if (m_Metrics.empty())
   {
     mitkThrow() << "No metric selected!";
     return;
   }
+  if (m_Distances.empty())
+    mitkThrow() << "No cluster distance set!";
 
   T = ResampleFibers(m_Tractogram);
   if (T.empty())
@@ -497,15 +519,24 @@ void TractClusteringFilter::GenerateData()
     f_indices.push_back(i);
   //  std::random_shuffle(f_indices.begin(), f_indices.end());
 
-  Cluster no_match;
-  std::vector< Cluster > clusters;
+  m_DiscardedClusters = 0;
   if (m_InCentroids.IsNull())
   {
     MITK_INFO << "Clustering fibers";
-    clusters = ClusterStep(f_indices, m_Distances);
+    std::vector< Cluster > clusters = ClusterStep(f_indices, m_Distances);
     MITK_INFO << "Number of clusters: " << clusters.size();
     clusters = MergeDuplicateClusters2(clusters);
     std::sort(clusters.begin(),clusters.end());
+    MITK_INFO << "Clustering finished";
+
+    for (int i=clusters.size()-1; i>=0; --i)
+    {
+      const Cluster& c = clusters.at(i);
+      if ( c.n>=(int)m_MinClusterSize && !(m_MaxClusters>0 && clusters.size()-i>m_MaxClusters) )
+        AddOutput(c, c.h / c.n);
+      else
+        m_DiscardedClusters++;
+    }
   }
   else
   {
@@ -516,88 +547,53 @@ void TractClusteringFilter::GenerateData()
       return;
     }
     MITK_INFO << "Clustering with input centroids";
-    clusters = AddToKnownClusters(f_indices, centroids);
-    no_match = clusters.back();
+    std::vector< Cluster > clusters = AddToKnownClusters(f_indices, centroids);
+    Cluster no_match = clusters.back();
     clusters.pop_back();
-    MITK_INFO << "Number of clusters: " << clusters.size();
-    clusters = MergeDuplicateClusters2(clusters);
-  }
+    MITK_INFO << "Clustering finished";
 
-  MITK_INFO << "Clustering finished";
-  int max = clusters.size()-1;
-  if (m_MaxClusters>0 && clusters.size()-1>m_MaxClusters)
-    max = m_MaxClusters;
-  m_DiscardedClusters = 0;
-  for (int i=clusters.size()-1; i>=0; --i)
-  {
-    Cluster c = clusters.at(i);
-    if ( c.n>=(int)m_MinClusterSize && !(m_MaxClusters>0 && clusters.size()-i>m_MaxClusters) )
+    // Output k belongs to input centroid k, so clusters are neither merged nor sorted. A centroid
+    // without fibers (or with fewer than the minimum cluster size) gives an empty cluster, whose
+    // centroid is the input centroid.
+    for (unsigned int k=0; k<clusters.size(); ++k)
     {
-      m_OutClusters.push_back(c);
-
-      vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
-      vtkSmartPointer<vtkPolyData> pTmp = m_Tractogram->GeneratePolyDataByIds(c.I, weights);
-      mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
-      if (max>0)
-        fib->SetFiberWeights((float)i/max);
-      m_OutTractograms.push_back(fib);
-      m_OutFiberIndices.push_back(c.I);
-
-      // create centroid
-      vtkSmartPointer<vtkPoints> vtkNewPoints = vtkSmartPointer<vtkPoints>::New();
-      vtkSmartPointer<vtkCellArray> vtkNewCells = vtkSmartPointer<vtkCellArray>::New();
-      vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
-      vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-      vnl_matrix<float> centroid_points = c.h / c.n;
-      for (unsigned int j=0; j<centroid_points.cols(); j++)
+      const Cluster& c = clusters.at(k);
+      if (c.n>0 && c.n>=(int)m_MinClusterSize)
+        AddOutput(c, c.h / c.n);
+      else
       {
-        double p[3];
-        p[0] = centroid_points.get(0,j);
-        p[1] = centroid_points.get(1,j);
-        p[2] = centroid_points.get(2,j);
-
-        vtkIdType id = vtkNewPoints->InsertNextPoint(p);
-        container->GetPointIds()->InsertNextId(id);
+        if (c.n>0)
+          m_DiscardedClusters++;
+        AddOutput(Cluster(), centroids.at(k));
       }
-      vtkNewCells->InsertNextCell(container);
-      polyData->SetPoints(vtkNewPoints);
-      polyData->SetLines(vtkNewCells);
-      mitk::FiberBundle::Pointer centroid = mitk::FiberBundle::New(polyData);
-      centroid->SetFiberColors(255, 255, 255);
-      m_OutCentroids.push_back(centroid);
     }
-    else
+
+    if (no_match.n>0)
     {
-      m_DiscardedClusters++;
+      m_OutUnassigned = CreateFiberSubset(m_Tractogram, no_match.I);
+      m_OutUnassigned->SetFiberColors(0, 0, 0);
     }
   }
   MITK_INFO << "Final number of clusters: " << m_OutTractograms.size() << " (discarded " << m_DiscardedClusters << " clusters)";
 
+  // Each cluster gets the JET colour of its rank in the output. The fibers keep the weights of the
+  // input tractogram (e.g. SIFT2 or FitFibersToImage weights) for weighted downstream steps; only
+  // the centroids carry the rank as weight.
+  mitk::LookupTable::Pointer rankColors = mitk::LookupTable::New();
+  rankColors->SetType(mitk::LookupTable::JET);
+  rankColors->GetVtkLookupTable()->SetTableRange(0, 1);
   int w = 0;
   for (auto fib : m_OutTractograms)
   {
+    float rank = 1;
     if (m_OutTractograms.size()>1)
-    {
-      fib->SetFiberWeights((float)w/(m_OutTractograms.size()-1));
-      m_OutCentroids.at(w)->SetFiberWeights((float)w/(m_OutTractograms.size()-1));
-    }
-    else
-    {
-      fib->SetFiberWeights(1);
-      m_OutCentroids.at(w)->SetFiberWeights(1);
-    }
-    fib->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
-    ++w;
-  }
+      rank = (float)w/(m_OutTractograms.size()-1);
+    m_OutCentroids.at(w)->SetFiberWeights(rank);
 
-  if (no_match.n>0)
-  {
-    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
-    vtkSmartPointer<vtkPolyData> pTmp = m_Tractogram->GeneratePolyDataByIds(no_match.I, weights);
-    mitk::FiberBundle::Pointer fib = mitk::FiberBundle::New(pTmp);
-    fib->SetFiberColors(0, 0, 0);
-    m_OutFiberIndices.push_back(no_match.I);
-    m_OutTractograms.push_back(fib);
+    double color[3];
+    rankColors->GetColor(rank, color);
+    fib->SetFiberColors(255.0*color[0], 255.0*color[1], 255.0*color[2]);
+    ++w;
   }
 }
 

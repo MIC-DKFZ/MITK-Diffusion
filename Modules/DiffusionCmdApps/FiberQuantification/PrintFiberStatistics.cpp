@@ -25,20 +25,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <mitkFiberBundleIOHelper.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
-
-mitk::FiberBundle::Pointer LoadFib(std::string filename)
-{
-  std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load(filename);
-  if( fibInfile.empty() )
-    std::cout << "File " << filename << " could not be read!";
-  mitk::BaseData::Pointer baseData = fibInfile.at(0);
-  return dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
-}
 
 /*!
-\brief Join multiple tractograms
+\brief Write fiber count, length, extent and weight statistics of tractograms to a text file.
 */
 int main(int argc, char* argv[])
 {
@@ -74,7 +63,7 @@ int main(int argc, char* argv[])
     {
       MITK_INFO << "Writing statistics of bunlde " << fib_names.at(c);
       statistics_file << "File: " << fib_names.at(c) << std::endl;
-      tract->PrintSelf(statistics_file, 2);
+      tract->PrintStatistics(statistics_file, 2);
       statistics_file << "-------------------------------------------------------------------------\n\n" << std::endl;
       ++c;
     }

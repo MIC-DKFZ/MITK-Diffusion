@@ -22,12 +22,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigure.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <mitkStandaloneDataStorage.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
 
 /*!
 \brief Extract fibers from a tractogram using planar figure ROIs
@@ -66,10 +65,22 @@ int main(int argc, char* argv[])
       pf2_path = us::any_cast<std::string>(parsedArgs["planfirgure2"]);
   }
 
+  // An unknown operation, or AND/OR without a second figure, would extract with an empty node.
+  if (!operation.empty() && operation!="NOT" && operation!="AND" && operation!="OR")
+  {
+    std::cout << "Unknown operation " << operation << "; use AND, OR or NOT." << std::endl;
+    return EXIT_FAILURE;
+  }
+  if ((operation=="AND" || operation=="OR") && pf2_path.empty())
+  {
+    std::cout << "Operation " << operation << " needs a second planar figure (--planfirgure2)." << std::endl;
+    return EXIT_FAILURE;
+  }
+
   try
   {
     // load fiber bundle
-    mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(inFib);
+    mitk::FiberBundle::Pointer inputTractogram = mitk::FiberBundleIOHelper::load_fib(inFib);
     mitk::FiberBundle::Pointer result;
 
     mitk::StandaloneDataStorage::Pointer storage = mitk::StandaloneDataStorage::New();

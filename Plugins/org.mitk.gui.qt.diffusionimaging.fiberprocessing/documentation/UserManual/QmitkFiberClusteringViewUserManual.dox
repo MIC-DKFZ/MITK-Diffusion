@@ -6,16 +6,18 @@ Cluster fibers using an extended version of the QuickBundles method (see [1,2]).
 \section SecInput Input Data
 
 - Tractogram: Input streamlines to be clustered.
-- Input Centroids: Optionally input a set of streamlines around which the streamlines of the input tractograms are clustered. No new clusters are created in this case. Each input streamline is assigned to the neares centroid.
+- Input Centroids: Optionally input a set of streamlines around which the streamlines of the input tractograms are clustered. No new clusters are created in this case. Each input streamline is assigned to the nearest centroid within the cluster size. Cluster_k belongs to the k-th input centroid and is empty if no streamline was assigned to it; streamlines farther from every centroid form "Cluster_unassigned". Merging of duplicate clusters and the maximum number of clusters are not used in this case.
 
 \section SecParams Parameters
 
 - Cluster Size: Metric distance threshold for a streamline to be assigned to a cluster (cluster size).
-- Fiber Points: Resample the input streamlines to the given number of points. For scalar map and anatomical metrics this value should be much larger than for streamline shape-based metrics.
+- Fiber Points: Resample the input streamlines to the given number of points, equally spaced along each streamline (as in QuickBundles). For scalar map and anatomical metrics this value should be much larger than for streamline shape-based metrics.
 - Min. Fibers per Cluster: Clusters with a smaller number of streamlines are discarded.
 - Max. Clusters: Only the N largest clusters are retained.
 - Merge Duplicate Clusters: Merge clusters based on the distance of their respective centroids using the given metric threshold. No merging is performed for a metric threshold of 0.
 - Output Centroids: Output the final cluster centroids.
+
+The streamlines of each cluster keep their weights from the input tractogram (e.g. SIFT2 weights). Each cluster gets one colour, by its rank in the output.
 
 \section SecMetrics Metrics
 

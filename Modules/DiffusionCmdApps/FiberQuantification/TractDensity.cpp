@@ -27,24 +27,49 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>
+#include <mitkExceptionMacro.h>
 #include <itkTractDensityImageFilter.h>
 #include <itkTractsToFiberEndingsImageFilter.h>
 
 
-mitk::FiberBundle::Pointer LoadFib(std::string filename)
+/**
+ * Empty image with the 3D grid of the reference image (as mitk::ImageToItk derives it). The
+ * filters only need the grid; casting the whole reference failed for other pixel types, e.g.
+ * the gradient vectors of a diffusion-weighted image.
+ */
+template <class TImage>
+typename TImage::Pointer ReferenceGrid(const mitk::Image* reference)
 {
-  std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load(filename);
-  if( fibInfile.empty() )
-    std::cout << "File " << filename << " could not be read!";
-  mitk::BaseData::Pointer baseData = fibInfile.at(0);
-  return dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
+  const mitk::BaseGeometry* geometry = reference->GetGeometry();
+  const auto& matrix = geometry->GetIndexToWorldTransform()->GetMatrix();
+  typename TImage::SpacingType spacing;
+  typename TImage::PointType origin;
+  typename TImage::DirectionType direction;
+  typename TImage::SizeType size;
+  for (unsigned int i=0; i<3; ++i)
+  {
+    spacing[i] = geometry->GetSpacing()[i];
+    origin[i] = geometry->GetOrigin()[i];
+    size[i] = reference->GetDimension(i);
+  }
+  for (unsigned int i=0; i<3; ++i)
+    for (unsigned int j=0; j<3; ++j)
+      direction[i][j] = matrix[i][j] / spacing[j];
+
+  auto image = TImage::New();
+  image->SetSpacing(spacing);
+  image->SetOrigin(origin);
+  image->SetDirection(direction);
+  image->SetRegions(size);
+  return image;
 }
 
 /*!
-\brief Modify input tractogram: fiber resampling, compression, pruning and transformation.
+\brief Tract density image, fiber envelope or fiber endpoints image of a tractogram.
 */
 int main(int argc, char* argv[])
 {
@@ -96,7 +121,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
+    mitk::FiberBundle::Pointer fib = mitk::FiberBundleIOHelper::load_fib(inFileName);
 
     mitk::Image::Pointer ref_img;
     if (!reference_image.empty())
@@ -114,11 +139,8 @@ int main(int argc, char* argv[])
 
       if (ref_img.IsNotNull())
       {
-        OutImageType::Pointer itkImage = OutImageType::New();
-        CastToItkImage(ref_img, itkImage);
-        generator->SetInputImage(itkImage);
+        generator->SetInputImage(ReferenceGrid<OutImageType>(ref_img));
         generator->SetUseImageGeometry(true);
-
       }
       generator->Update();
 
@@ -138,17 +160,14 @@ int main(int argc, char* argv[])
 
       itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
       generator->SetFiberBundle(fib);
-      generator->SetMode(TDI_MODE::BINARY);
+      generator->SetMode(itk::TDI_MODE::BINARY);
       generator->SetOutputAbsoluteValues(!normalize);
       generator->SetUpsamplingFactor(upsampling);
 
       if (ref_img.IsNotNull())
       {
-        OutImageType::Pointer itkImage = OutImageType::New();
-        CastToItkImage(ref_img, itkImage);
-        generator->SetInputImage(itkImage);
+        generator->SetInputImage(ReferenceGrid<OutImageType>(ref_img));
         generator->SetUseImageGeometry(true);
-
       }
       generator->Update();
 
@@ -168,17 +187,14 @@ int main(int argc, char* argv[])
 
       itk::TractDensityImageFilter< OutImageType >::Pointer generator = itk::TractDensityImageFilter< OutImageType >::New();
       generator->SetFiberBundle(fib);
-      generator->SetMode(TDI_MODE::DENSITY);
+      generator->SetMode(itk::TDI_MODE::DENSITY);
       generator->SetOutputAbsoluteValues(!normalize);
       generator->SetUpsamplingFactor(upsampling);
 
       if (ref_img.IsNotNull())
       {
-        OutImageType::Pointer itkImage = OutImageType::New();
-        CastToItkImage(ref_img, itkImage);
-        generator->SetInputImage(itkImage);
+        generator->SetInputImage(ReferenceGrid<OutImageType>(ref_img));
         generator->SetUseImageGeometry(true);
-
       }
       generator->Update();
 

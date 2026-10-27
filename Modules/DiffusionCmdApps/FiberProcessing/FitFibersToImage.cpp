@@ -121,6 +121,8 @@ int main(int argc, char* argv[])
     auto input_tracts = mitk::FiberBundleIOHelper::load_fibs(fib_files, &fib_names);
 
     itk::FitFibersToImageFilter::Pointer fitter = itk::FitFibersToImageFilter::New();
+    // The filter does not own its signal model; it must live as long as the filter is used.
+    std::unique_ptr< mitk::TensorModel<> > model;
 
     mitk::BaseData::Pointer inputData = mitk::IOUtil::Load(input_image_name, &functor)[0].GetPointer();
     mitk::Image::Pointer mitk_image = dynamic_cast<mitk::Image*>(inputData.GetPointer());
@@ -137,13 +139,13 @@ int main(int argc, char* argv[])
     else if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(mitk_image))
     {
       fitter->SetDiffImage(mitk::DiffusionPropertyHelper::GetItkVectorImage(mitk_image));
-      mitk::TensorModel<>* model = new mitk::TensorModel<>();
+      model = std::make_unique< mitk::TensorModel<> >();
       model->SetBvalue(1000);
       model->SetDiffusivity1(0.0010);
       model->SetDiffusivity2(0.00015);
       model->SetDiffusivity3(0.00015);
       model->SetGradientList(mitk::DiffusionPropertyHelper::GetGradientContainer(mitk_image));
-      fitter->SetSignalModel(model);
+      fitter->SetSignalModel(model.get());
     }
     else if (mitk_image->GetDimension()==3)
     {
@@ -178,28 +180,30 @@ int main(int argc, char* argv[])
       fitter->SetRegularization(VnlCostFunction::REGU::GROUP_VARIANCE);
     else if (regu=="NONE")
       fitter->SetRegularization(VnlCostFunction::REGU::NONE);
+    else
+    {
+      std::cout << "Unknown regularization " << regu << "." << std::endl;
+      return EXIT_FAILURE;
+    }
 
     fitter->Update();
 
     mitk::LocaleSwitch localeSwitch("C");
     if (save_residuals && mitk_peak_image.IsNotNull())
     {
-      itk::ImageFileWriter< PeakImgType >::Pointer writer = itk::ImageFileWriter< PeakImgType >::New();
-      writer->SetInput(fitter->GetFittedImage());
-      writer->SetFileName(outRoot + "_fitted.nii.gz");
-      writer->Update();
-
-      writer->SetInput(fitter->GetResidualImage());
-      writer->SetFileName(outRoot + "_residual.nii.gz");
-      writer->Update();
-
-      writer->SetInput(fitter->GetOverexplainedImage());
-      writer->SetFileName(outRoot + "_overexplained.nii.gz");
-      writer->Update();
-
-      writer->SetInput(fitter->GetUnderexplainedImage());
-      writer->SetFileName(outRoot + "_underexplained.nii.gz");
-      writer->Update();
+      // Saved as mitk::PeakImage, so that the NIfTI files follow MITK's peak convention (RAS
+      // vectors, marked in the header) like the input peak image.
+      const auto savePeaks = [](PeakImgType* itkPeaks, const std::string& filename) {
+        auto peaks = mitk::PeakImage::New();
+        peaks->InitializeByItk(itkPeaks);
+        // A 4D ITK image becomes one MITK volume per component; SetChannel copies all of them.
+        peaks->SetChannel(itkPeaks->GetBufferPointer());
+        mitk::IOUtil::Save(peaks, filename);
+      };
+      savePeaks(fitter->GetFittedImage(), outRoot + "_fitted.nii.gz");
+      savePeaks(fitter->GetResidualImage(), outRoot + "_residual.nii.gz");
+      savePeaks(fitter->GetOverexplainedImage(), outRoot + "_overexplained.nii.gz");
+      savePeaks(fitter->GetUnderexplainedImage(), outRoot + "_underexplained.nii.gz");
     }
     else if (save_residuals && mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(mitk_image))
     {
@@ -267,12 +271,13 @@ int main(int argc, char* argv[])
           fib->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
           mitk::IOUtil::Save(fib, outRoot + name + "_fitted.fib");
 
+          // One weight per fiber of the saved bundle, as for the joined output.
           if (save_weights)
           {
             std::ofstream logfile;
             logfile.open (outRoot + name + "_weights.txt");
-            for (unsigned int f=0; f<output_tracts.at(bundle)->GetNumFibers(); ++f)
-              logfile << output_tracts.at(bundle)->GetFiberWeight(f) << "\n";
+            for (unsigned int f=0; f<fib->GetNumFibers(); ++f)
+              logfile << fib->GetFiberWeight(f) << "\n";
             logfile.close();
           }
         }
