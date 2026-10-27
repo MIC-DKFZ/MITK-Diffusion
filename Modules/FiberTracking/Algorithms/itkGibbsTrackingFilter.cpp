@@ -360,8 +360,6 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   MITK_INFO << "GibbsTrackingFilter: preparation of the data took " << m << "m and " << s << "s";
   MITK_INFO << "GibbsTrackingFilter: " << m_NumAcceptedFibers << " fibers accepted";
 
-
-  SaveParameters();
 }
 
 template< class ItkOdfImageType >
@@ -445,53 +443,6 @@ void GibbsTrackingFilter< ItkOdfImageType >::LoadParameters()
   m_MinFiberLength = read("fiber_length", float());
   m_CurvatureThreshold = cos(read("curvature_threshold", float())*itk::Math::pi/180);
   MITK_INFO << "GibbsTrackingFilter: parameter file loaded successfully";
-}
-
-// save current tracking paramters to xml file (.gtp)
-template< class ItkOdfImageType >
-bool GibbsTrackingFilter< ItkOdfImageType >::SaveParameters()
-{
-  try
-  {
-    if( m_SaveParameterFile.length()==0 )
-    {
-      MITK_INFO << "GibbsTrackingFilter: no filename specified to save parameters";
-      return true;
-    }
-
-    MITK_INFO << "GibbsTrackingFilter: saving parameter file " << m_SaveParameterFile;
-	
-    tinyxml2::XMLDocument documentXML;
-    //TiXmlDeclaration* declXML = new TiXmlDeclaration( "1.0", "", "" );
-    //documentXML.LinkEndChild( declXML );
-	
-	tinyxml2::XMLNode * mainXML = documentXML.NewElement("global_tracking_parameter_file");
-	documentXML.InsertFirstChild(mainXML);
-
-    auto paramXML = documentXML.NewElement("parameter_set");
-    paramXML->SetAttribute("iterations", m_Iterations);
-    paramXML->SetAttribute("particle_length", m_ParticleLength);
-    paramXML->SetAttribute("particle_width", m_ParticleWidth);
-    paramXML->SetAttribute("particle_weight", m_ParticleWeight);
-    paramXML->SetAttribute("temp_start", m_StartTemperature);
-    paramXML->SetAttribute("temp_end", m_EndTemperature);
-    paramXML->SetAttribute("inexbalance", m_InexBalance);
-    paramXML->SetAttribute("fiber_length", m_MinFiberLength);
-    paramXML->SetAttribute("curvature_threshold", m_CurvatureThreshold);
-    mainXML->InsertEndChild(paramXML);
-
-    if(!boost::algorithm::ends_with(m_SaveParameterFile, ".gtp"))
-      m_SaveParameterFile.append(".gtp");
-    documentXML.SaveFile( m_SaveParameterFile.c_str() );
-
-    MITK_INFO << "GibbsTrackingFilter: parameter file saved successfully";
-    return true;
-  }
-  catch(...)
-  {
-    MITK_INFO << "GibbsTrackingFilter: could not save parameter file";
-    return false;
-  }
 }
 
 template< class ItkOdfImageType >

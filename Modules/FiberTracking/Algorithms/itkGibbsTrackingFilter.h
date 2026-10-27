@@ -75,7 +75,6 @@ public:
     itkSetMacro( DuplicateImage, bool )             ///< Work on copy of input image.
     itkSetMacro( RandomSeed, int )                  ///< Seed for random generator.
     itkSetMacro( LoadParameterFile, std::string )   ///< Parameter file.
-    itkSetMacro( SaveParameterFile, std::string )
     itkSetMacro( LutPath, std::string )             ///< Path to lookuptables. Default is binary directory.
 
     /** Set flag to prematurely abort tracking. Safe to call from another thread while Update() runs. */
@@ -118,7 +117,6 @@ protected:
     void EstimateParticleWeight();
     void PrepareMaskImage();
     void LoadParameters(); ///< throws mitk::Exception for a missing or incomplete file
-    bool SaveParameters();
 
     // Input Images
     typename ItkOdfImageType::Pointer m_OdfImage;
@@ -148,7 +146,6 @@ protected:
     std::atomic<int> m_NumConnections;      ///< current number of connections between particles in grid
     int             m_RandomSeed;           ///< seed value for random generator (-1 for standard seeding)
     std::string     m_LoadParameterFile;    ///< filename of parameter file (reader)
-    std::string     m_SaveParameterFile;    ///< filename of parameter file (writer)
     std::string     m_LutPath;              ///< path to lookuptables used by the sphere interpolator
     bool            m_IsInValidState;       ///< Whether the filter is in a valid state, false if error occured
 
