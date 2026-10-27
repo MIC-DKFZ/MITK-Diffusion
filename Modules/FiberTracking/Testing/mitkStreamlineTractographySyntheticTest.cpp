@@ -44,6 +44,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(Tend_NextToZeroTensors);
   MITK_TEST(MinTractLength_IsThePolylineLength);
   MITK_TEST(SeedInFirstVoxel_WithoutInterpolation);
+  MITK_TEST(NoPreviousDirections_Tracks);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -569,6 +570,14 @@ public:
     mitk::TrackingHandlerTensor tensorHandler;
     tensorHandler.SetTensorImage(MakeTensorField(vnl_vector_fixed<double, 3>(1, 0, 0)).GetPointer());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("tensor", vtkIdType(1), TrackWith(tensorHandler, params, seeds)->GetNumberOfLines());
+  }
+
+  /** 0 previous directions used to underflow an unsigned loop bound (4e9 zero vectors per step). */
+  void NoPreviousDirections_Tracks()
+  {
+    auto params = MakeParameters();
+    params->m_NumPreviousDirections = 0;
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(1), Track(params, MakeLineRoi({{9, 9, 1.0f}}), nullptr)->GetNumberOfLines());
   }
 };
 

@@ -414,7 +414,8 @@ float StreamlineTrackingFilter::FollowStreamline(itk::Point<float, 3> pos, vnl_v
 {
   vnl_vector_fixed<float,3> zero_dir; zero_dir.fill(0.0);
   std::deque< vnl_vector_fixed<float,3> > last_dirs;
-  for (unsigned int i=0; i<m_Parameters->m_NumPreviousDirections-1; i++)
+  // i+1 < n, not i < n-1: n is unsigned, and n = 0 would underflow to 4e9 directions
+  for (unsigned int i=0; i+1<m_Parameters->m_NumPreviousDirections; i++)
     last_dirs.push_back(zero_dir);
 
   for (int step=0; step< 5000; step++)
