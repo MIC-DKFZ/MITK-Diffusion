@@ -534,6 +534,50 @@ void QmitkFiberfoxView::OnBvalsBvecsCheck(int )
   UpdateGui();
 }
 
+namespace
+{
+  std::vector<double> PrototypeSettings(QmitkPrototypeSignalParametersWidget* widget)
+  {
+    return {widget->GetNumberOfSamples(), widget->GetMinFa(), widget->GetMaxFa(), widget->GetMinAdc(), widget->GetMaxAdc()};
+  }
+}
+
+QmitkPrototypeSignalParametersWidget* QmitkFiberfoxView::GetPrototypeWidget(int compartmentId)
+{
+  switch (compartmentId)
+  {
+  case 1:
+    return m_Controls->m_PrototypeWidget1;
+  case 3:
+    return m_Controls->m_PrototypeWidget3;
+  case 4:
+    return m_Controls->m_PrototypeWidget4;
+  default:
+    return nullptr;   // compartment 2 offers no prototype model
+  }
+}
+
+mitk::RawShModel<>* QmitkFiberfoxView::NewPrototypeModel(QmitkPrototypeSignalParametersWidget* widget, int compartmentId)
+{
+  mitk::RawShModel<>* model = nullptr;
+  auto loaded = m_LoadedPrototypes.find(compartmentId);
+  if (loaded!=m_LoadedPrototypes.end() && loaded->second.m_WidgetSettings==PrototypeSettings(widget))
+  {
+    // the kernels of a loaded .ffp, as long as widget and gradient settings are those of the file
+    model = static_cast< mitk::RawShModel<>* >(loaded->second.m_Model->Clone());
+  }
+  else
+  {
+    model = new mitk::RawShModel<>();
+    model->SetMaxNumKernels(widget->GetNumberOfSamples());
+    model->SetFaRange(widget->GetMinFa(), widget->GetMaxFa());
+    model->SetAdcRange(widget->GetMinAdc(), widget->GetMaxAdc());
+  }
+  model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
+  model->m_CompartmentId = compartmentId;
+  return model;
+}
+
 void QmitkFiberfoxView::SetGradientsFromGui()
 {
   if (m_Controls->m_UseBvalsBvecsBox->isChecked())
@@ -559,6 +603,7 @@ void QmitkFiberfoxView::SetGradientsFromGui()
 void QmitkFiberfoxView::OnGradientSettingsChanged()
 {
   m_LoadedGradients.clear();
+  m_LoadedPrototypes.clear();   // their kernels belong to the file's shell
 }
 
 void QmitkFiberfoxView::UpdateParametersFromGui()
@@ -970,13 +1015,8 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     }
     case 3:
     {
-      mitk::RawShModel<mitk::ScalarType>* model = new mitk::RawShModel<mitk::ScalarType>();
+      mitk::RawShModel<mitk::ScalarType>* model = NewPrototypeModel(m_Controls->m_PrototypeWidget1, 1);
       m_Parameters.m_SignalGen.m_DoSimulateRelaxation = false;
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetMaxNumKernels(m_Controls->m_PrototypeWidget1->GetNumberOfSamples());
-      model->SetFaRange(m_Controls->m_PrototypeWidget1->GetMinFa(), m_Controls->m_PrototypeWidget1->GetMaxFa());
-      model->SetAdcRange(m_Controls->m_PrototypeWidget1->GetMinAdc(), m_Controls->m_PrototypeWidget1->GetMaxAdc());
-      model->m_CompartmentId = 1;
       m_Parameters.m_FiberModelList.push_back(model);
       m_Parameters.m_Misc.m_SignalModelString += "Prototype";
       m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.Description", mitk::StringProperty::New("Intra-axonal compartment") );
@@ -1121,13 +1161,8 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     }
     case 3:
     {
-      mitk::RawShModel<mitk::ScalarType>* model = new mitk::RawShModel<mitk::ScalarType>();
+      mitk::RawShModel<mitk::ScalarType>* model = NewPrototypeModel(m_Controls->m_PrototypeWidget3, 3);
       m_Parameters.m_SignalGen.m_DoSimulateRelaxation = false;
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetMaxNumKernels(m_Controls->m_PrototypeWidget3->GetNumberOfSamples());
-      model->SetFaRange(m_Controls->m_PrototypeWidget3->GetMinFa(), m_Controls->m_PrototypeWidget3->GetMaxFa());
-      model->SetAdcRange(m_Controls->m_PrototypeWidget3->GetMinAdc(), m_Controls->m_PrototypeWidget3->GetMaxAdc());
-      model->m_CompartmentId = 3;
       m_Parameters.m_NonFiberModelList.push_back(model);
       m_Parameters.m_Misc.m_SignalModelString += "Prototype";
       m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.Description", mitk::StringProperty::New("Extra-axonal compartment 1") );
@@ -1200,13 +1235,8 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     }
     case 4:
     {
-      mitk::RawShModel<mitk::ScalarType>* model = new mitk::RawShModel<mitk::ScalarType>();
+      mitk::RawShModel<mitk::ScalarType>* model = NewPrototypeModel(m_Controls->m_PrototypeWidget4, 4);
       m_Parameters.m_SignalGen.m_DoSimulateRelaxation = false;
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetMaxNumKernels(m_Controls->m_PrototypeWidget4->GetNumberOfSamples());
-      model->SetFaRange(m_Controls->m_PrototypeWidget4->GetMinFa(), m_Controls->m_PrototypeWidget4->GetMaxFa());
-      model->SetAdcRange(m_Controls->m_PrototypeWidget4->GetMinAdc(), m_Controls->m_PrototypeWidget4->GetMaxAdc());
-      model->m_CompartmentId = 4;
       m_Parameters.m_NonFiberModelList.push_back(model);
       m_Parameters.m_Misc.m_SignalModelString += "Prototype";
       m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.Description", mitk::StringProperty::New("Extra-axonal compartment 2") );
@@ -1645,6 +1675,22 @@ void QmitkFiberfoxView::LoadParameters()
     }
   }
 
+  // Prototype kernels of the file are reused by NewPrototypeModel while the widgets keep the settings
+  // just set (read back, i.e. as the spin boxes round them).
+  m_LoadedPrototypes.clear();
+  for (auto list : {&m_Parameters.m_FiberModelList, &m_Parameters.m_NonFiberModelList})
+    for (auto signalModel : *list)
+    {
+      auto model = dynamic_cast< mitk::RawShModel<>* >(signalModel);
+      QmitkPrototypeSignalParametersWidget* widget = model!=nullptr ? GetPrototypeWidget(model->m_CompartmentId) : nullptr;
+      if (widget!=nullptr && model->GetNumberOfKernels()>0)
+      {
+        LoadedPrototype& loaded = m_LoadedPrototypes[model->m_CompartmentId];
+        loaded.m_Model.reset(model->Clone());
+        loaded.m_WidgetSettings = PrototypeSettings(widget);
+      }
+    }
+
   if ( m_Parameters.m_SignalGen.m_MaskImage )
   {
     mitk::Image::Pointer image = mitk::Image::New();
@@ -2053,9 +2099,7 @@ void QmitkFiberfoxView::SimulateImageFromFibers(mitk::DataNode* fiberNode)
       return;
     }
   }
-  else if ( m_Controls->m_Compartment1Box->currentIndex()==3
-            || m_Controls->m_Compartment3Box->currentIndex()==3
-            || m_Controls->m_Compartment4Box->currentIndex()==4 )
+  else if ( !GetPrototypeModelsWithoutKernels().empty() )
   {
     QMessageBox::information( nullptr, "Simulation cancelled",
                               "Prototype signal but no diffusion-weighted image selected to sample signal from.");

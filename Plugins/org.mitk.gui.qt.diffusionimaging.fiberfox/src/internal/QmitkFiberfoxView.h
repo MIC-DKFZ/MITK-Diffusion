@@ -155,6 +155,10 @@ protected:
 
     void SaveParameters(QString filename);
 
+    /** The widget of a compartment's prototype model, nullptr for compartment 2 (none). */
+    QmitkPrototypeSignalParametersWidget* GetPrototypeWidget(int compartmentId);
+    /** A prototype model of the widget's settings, with the loaded kernels if they still apply. */
+    mitk::RawShModel<>* NewPrototypeModel(QmitkPrototypeSignalParametersWidget* widget, int compartmentId);
     /** Prototype signal models of m_Parameters that have no kernels yet. */
     std::vector< mitk::RawShModel<>* > GetPrototypeModelsWithoutKernels();
     /** Samples the kernels of the given models from the DWI; false if a model got no valid kernel. */
@@ -181,6 +185,13 @@ protected:
     mitk::FiberfoxParameters  m_Parameters;
     mitk::SignalGenerationParameters::GradientListType  m_LoadedGradients;  ///< of a .ffp without .bvals/.bvecs files
     double                    m_LoadedBvalue = 0;
+    /** Prototype model with kernels from a loaded .ffp and the widget settings it was loaded with. */
+    struct LoadedPrototype
+    {
+      std::unique_ptr< mitk::DiffusionSignalModel<> > m_Model;
+      std::vector<double>       m_WidgetSettings;
+    };
+    std::map< int, LoadedPrototype > m_LoadedPrototypes;   ///< by compartment id
     /** m_Parameters of the last started simulation before ApplyDirectionMatrix (gradients as FSL
      * bvecs), saved as .ffp next to the simulated image */
     mitk::FiberfoxParameters  m_SimulatedParameters;
