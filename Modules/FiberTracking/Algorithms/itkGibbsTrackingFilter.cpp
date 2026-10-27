@@ -231,13 +231,15 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   if(m_ParticleWidth == 0)
     m_ParticleWidth = 0.5*minSpacing;
 
+  // angles above 90 degrees are not supported; clamped before the weight estimation, so that it
+  // estimates the weight for the threshold of the run
+  if (m_CurvatureThreshold < mitk::eps)
+    m_CurvatureThreshold = 0;
+
   if(m_ParticleWeight == 0)
     EstimateParticleWeight();
 
   float alpha = log(m_EndTemperature/m_StartTemperature);
-
-  if (m_CurvatureThreshold < mitk::eps)
-    m_CurvatureThreshold = 0;
 
   // seed random generators
   Statistics::MersenneTwisterRandomVariateGenerator::Pointer randGen = Statistics::MersenneTwisterRandomVariateGenerator::New();
