@@ -186,7 +186,7 @@ void mitk::SphereInteractor::EndCreationStart(mitk::StateMachineAction*, mitk::I
 {
 
   this->GetDataNode()->SetBoolProperty(DATANODE_PROPERTY_CREATED, true);
-   if (this->GetDataNode()->GetName() == m_startDataNode->GetName()) {
+   if (this->GetDataNode() == m_startDataNode) {
      DataInteractor::SetDataNode(m_endDataNode);
    }
   else {
