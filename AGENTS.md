@@ -56,7 +56,7 @@ mitk-diffusion code too. Read the matching rule before touching CMake, a module 
 | Path | What it is |
 | --- | --- |
 | `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters; in `Algorithms/Reconstruction/` the functions the reconstruction views and apps call (`mitkDiffusionReconstruction.h`: tensors, Q-ball, tensors to DWI; `mitkDiffusionPeaks.h`; `mitkDiffusionIndices.h`) and the ODF direction tables (`mitkPointShell.h`). `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk and DICOM tractography IO. `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`. |
-| `mitk-diffusion/Modules/DiffusionCmdApps/` | Command line tools, one subfolder per group, each group switched by a `BUILD_Diffusion*CmdApps` option; an app is a name in its group's list in that `CMakeLists.txt`. |
+| `mitk-diffusion/Modules/DiffusionCmdApps/` | Command line tools, one subfolder per group, each group switched by a `BUILD_Diffusion*CmdApps` option. A group's `CMakeLists.txt` is one call of `mitk_diffusion_create_cmdapps` (defined in `Modules/DiffusionCmdApps/CMakeLists.txt`) with the option, the modules of the group and its apps, `<App>` or `<App>:<module>,...` for modules only that app links. The apps link with `--no-as-needed`: a diffusion module registers its readers and writers when it is loaded, and an app that only loads and saves files uses none of its symbols. |
 | `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. |
 | `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI). Each starts with `set_always.txt`, which resets every variable a configuration changes (external packages; every diffusion module, cmd-app group and plugin off), and then switches on what it contains; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
 | `mitk-diffusion/CMakeExternals/`, `CMake/PackageDepends/` | OpenCV, which MITK no longer provides, added to the superbuild by the extension. |
@@ -83,11 +83,13 @@ it applies the configuration, so the first configure after a switch can fail; th
 **Wiring for a new module, cmd-app group or plugin.** Module: its folder, an
 `option(BUILD_MODULE_<Name>)` guard in its `CMakeLists.txt`, an entry in `ModuleList.cmake` after
 its dependencies, an `OFF` line in `set_always.txt` and an `ON` line in each configuration that
-should contain it. Cmd-app group: its subfolder with an `option(BUILD_Diffusion<Group>CmdApps)`,
-an `add_subdirectory` in `Modules/DiffusionCmdApps/CMakeLists.txt`, and the same `OFF` and `ON`
-lines. Plugin: the same via `PluginList.cmake` and `MITK_BUILD_<plugin>`. A forgotten line
-silently leaves it unbuilt. A plugin whose modules are off fails the configure, but a module or
-cmd app with a missing dependency is only listed as disabled in the configure's feature summary.
+should contain it. Cmd-app group: its subfolder whose `CMakeLists.txt` calls
+`mitk_diffusion_create_cmdapps(OPTION BUILD_Diffusion<Group>CmdApps ...)`, an `add_subdirectory`
+in `Modules/DiffusionCmdApps/CMakeLists.txt`, and the same `OFF` and `ON` lines; a new app is
+one more name in its group's `APPS` list. Plugin: the same via `PluginList.cmake` and
+`MITK_BUILD_<plugin>`. A forgotten line silently leaves it unbuilt. A plugin whose modules are
+off fails the configure, but a module or cmd app with a missing dependency is only listed as
+disabled in the configure's feature summary.
 
 Facts the layout does not show:
 

@@ -1,6 +1,7 @@
 include(${CMAKE_CURRENT_LIST_DIR}/DiffusionDebug.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/set_release.txt)
-# The Misc command line apps link MitkTestingHelper, which MITK builds only with testing on.
+# The command line app FiberScreenshot links MitkTestingHelper, which MITK builds only with
+# testing on.
 set(BUILD_TESTING ON CACHE BOOL "Build the MITK tests" FORCE)
 
 # Release builds support Python, which MITK's segmentation plugin needs to compile.
