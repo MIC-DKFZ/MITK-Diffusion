@@ -450,13 +450,20 @@ void QmitkFiberProcessingView::ApplyCurvatureThreshold()
 
 void QmitkFiberProcessingView::RemoveDir()
 {
+  vnl_vector_fixed<double,3> dir;
+  dir[0] = m_Controls->m_ExtractDirX->value();
+  dir[1] = m_Controls->m_ExtractDirY->value();
+  dir[2] = m_Controls->m_ExtractDirZ->value();
+  // a zero vector would be normalized to zero: no fiber would ever match
+  if (dir.magnitude()==0)
+  {
+    QMessageBox::information(nullptr, "Remove fibers in direction", "Enter a direction other than (0, 0, 0).");
+    return;
+  }
+
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    vnl_vector_fixed<double,3> dir;
-    dir[0] = m_Controls->m_ExtractDirX->value();
-    dir[1] = m_Controls->m_ExtractDirY->value();
-    dir[2] = m_Controls->m_ExtractDirZ->value();
     fib->RemoveDir(dir,cos((float)m_Controls->m_ExtractAngle->value()*itk::Math::pi/180));
   }
   RenderingManager::GetInstance()->RequestUpdateAll();
