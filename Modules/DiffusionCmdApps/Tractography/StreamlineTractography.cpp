@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
   parser.addArgument("min_tract_length", "", mitkCommandLineParser::Float, "Min. tract length:", "minimum fiber length (in mm)", 20);
   parser.addArgument("max_tract_length", "", mitkCommandLineParser::Float, "Max. tract length:", "maximum fiber length (in mm)", 400);
   parser.addArgument("angular_threshold", "", mitkCommandLineParser::Float, "Angular threshold:", "angular threshold between two successive steps, (default: 90° * step_size, at most 86.9°)");
-  parser.addArgument("loop_check", "", mitkCommandLineParser::Float, "Check for loops:", "threshold on angular stdev over the last 4 voxel lengths");
+  parser.addArgument("loop_check", "", mitkCommandLineParser::Float, "Check for loops:", "threshold on the mean angular deviation (degrees) from the mean direction over the last 4 voxel lengths (at least 8 steps)");
   parser.addArgument("peak_jitter", "", mitkCommandLineParser::Float, "Peak jitter:", "important for probabilistic peak tractography and peak prior. each component of the unit peak direction gets normally distributed noise with peak_jitter as standard deviation (0.1: mean deviation about 7 degrees).", 0.01);
   parser.addArgument("first_order", "", mitkCommandLineParser::Bool, "First order integration:", "use first order integration. default is second order to avoids streamlineovershoot", false);
   parser.endGroup();

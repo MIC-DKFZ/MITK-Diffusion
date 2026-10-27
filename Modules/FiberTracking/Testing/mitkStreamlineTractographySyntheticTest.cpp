@@ -46,6 +46,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(SeedInFirstVoxel_WithoutInterpolation);
   MITK_TEST(NoPreviousDirections_Tracks);
   MITK_TEST(PeakImage_IncompletePeaks_Throws);
+  MITK_TEST(ProbabilityMap_CountsFirstVoxel);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -590,6 +591,33 @@ public:
     image->Allocate();
     image->FillBuffer(1.0f);
     CPPUNIT_ASSERT_THROW(Track(MakeParameters(), MakeLineRoi({{9, 9, 1.0f}}), nullptr, image), mitk::Exception);
+  }
+
+  /** The visited-voxel bookkeeping of the probability map started at voxel (0,0,0), so a streamline
+   *  starting there did not count it. */
+  void ProbabilityMap_CountsFirstVoxel()
+  {
+    auto seeds = FloatImgType::New();
+    FloatImgType::SizeType size = {{SizeX, SizeYZ, SizeYZ}};
+    seeds->SetRegions(FloatImgType::RegionType(size));
+    seeds->Allocate();
+    seeds->FillBuffer(0.0f);
+    FloatImgType::IndexType first = {{0, 0, 0}};
+    seeds->SetPixel(first, 1.0f);
+
+    auto params = MakeParameters();
+    params->m_OutputProbMap = true;
+    mitk::TrackingHandlerPeaks handler;
+    handler.SetPeakImage(m_StraightField);
+    auto tracker = itk::StreamlineTrackingFilter::New();
+    tracker->SetTrackingHandler(&handler);
+    tracker->SetSeedImage(seeds);
+    tracker->SetParameters(params);
+    tracker->Update();
+    auto map = tracker->GetOutputProbabilityMap();
+    itk::Index<3> second = {{1, 0, 0}};
+    CPPUNIT_ASSERT_MESSAGE("the streamline passes voxel (1,0,0)", map->GetPixel(second) > 0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(map->GetPixel(second), map->GetPixel(first), 1e-12);
   }
 };
 

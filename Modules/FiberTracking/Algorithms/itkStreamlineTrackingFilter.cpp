@@ -493,7 +493,7 @@ float StreamlineTrackingFilter::CheckCurvature(DirectionContainer* fib, bool fro
   if (front)
   {
     int c = 0;
-    while(dist<m_Distance && c<static_cast<int>(fib->size())-1)
+    while(dist<m_Distance && c<static_cast<int>(fib->size()))
     {
       dist += m_Parameters->GetStepSizeMm();
       vnl_vector_fixed< float, 3 > v = fib->at(static_cast<unsigned int>(c));
@@ -825,7 +825,7 @@ bool StreamlineTrackingFilter::IsValidFiber(FiberType* fib)
 
 void StreamlineTrackingFilter::FiberToProbmap(FiberType* fib)
 {
-  ItkDoubleImgType::IndexType last_idx; last_idx.Fill(0);
+  ItkDoubleImgType::IndexType last_idx; last_idx.Fill(-1);  // not a voxel, so that voxel (0,0,0) counts too
   for (auto p : *fib)
   {
     ItkDoubleImgType::IndexType idx;
