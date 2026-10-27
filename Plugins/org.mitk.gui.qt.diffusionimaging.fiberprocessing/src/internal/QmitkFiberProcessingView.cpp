@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "QmitkFiberProcessingView.h"
 
 #include <QMessageBox>
+#include <functional>
 
 #include <mitkNodePredicateProperty.h>
 #include <mitkImageCast.h>
@@ -601,6 +602,29 @@ void QmitkFiberProcessingView::GenerateRoiImage()
 {
   if (m_SelectedPF.empty())
     return;
+
+  // WritePfToImage paints every figure of a composite, so the ROI image is the union of the
+  // figures; an AND or NOT composite would silently differ from the fiber extraction with it.
+  std::function<bool(const mitk::DataNode*)> hasAndOrNot = [this, &hasAndOrNot](const mitk::DataNode* node) {
+    auto composite = dynamic_cast<mitk::PlanarFigureComposite*>(node->GetData());
+    if (composite==nullptr)
+      return false;
+    if (composite->getOperationType()!=mitk::PlanarFigureComposite::OR)
+      return true;
+    auto children = this->GetDataStorage()->GetDerivations(node);
+    for (unsigned int i=0; i<children->Size(); i++)
+      if (hasAndOrNot(children->at(i)))
+        return true;
+    return false;
+  };
+  for (const auto& node : m_SelectedPF)
+  {
+    if (hasAndOrNot(node))
+    {
+      QMessageBox::information(nullptr, "Generate ROI Image", "The ROI image is the union of the selected planar figures. AND and NOT composites cannot be converted; select the figures or an OR composite.");
+      return;
+    }
+  }
 
   mitk::BaseGeometry::Pointer geometry;
   if (!m_SelectedFB.empty())
