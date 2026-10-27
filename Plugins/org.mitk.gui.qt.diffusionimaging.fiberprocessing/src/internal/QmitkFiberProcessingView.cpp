@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QMessageBox>
 #include <functional>
 
+#include <mitkNodePredicateFunction.h>
 #include <mitkNodePredicateProperty.h>
 #include <mitkImageCast.h>
 #include <mitkPointSet.h>
@@ -106,16 +107,14 @@ void QmitkFiberProcessingView::CreateQtPartControl( QWidget *parent )
     connect(m_Controls->m_ModificationMethodBox, SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()));
     connect(m_Controls->m_ExtractionBoxMask, SIGNAL(currentIndexChanged(int)), this, SLOT(OnMaskExtractionChanged()));
 
+    // FiberBundle::ColorFibersByScalarMap reads a 3D scalar image; DWIs, tensor, ODF, peak and
+    // RGB images have several components or four dimensions.
     m_Controls->m_ColorMapBox->SetDataStorage(this->GetDataStorage());
-    mitk::TNodePredicateDataType<mitk::Image>::Pointer isMitkImage = mitk::TNodePredicateDataType<mitk::Image>::New();
-    mitk::NodePredicateDataType::Pointer isDwi = mitk::NodePredicateDataType::New("DiffusionImage");
-    mitk::NodePredicateDataType::Pointer isDti = mitk::NodePredicateDataType::New("TensorImage");
-    mitk::NodePredicateDataType::Pointer isOdf = mitk::NodePredicateDataType::New("OdfImage");
-    mitk::NodePredicateOr::Pointer isDiffusionImage = mitk::NodePredicateOr::New(isDwi, isDti);
-    isDiffusionImage = mitk::NodePredicateOr::New(isDiffusionImage, isOdf);
-    mitk::NodePredicateNot::Pointer noDiffusionImage = mitk::NodePredicateNot::New(isDiffusionImage);
-    mitk::NodePredicateAnd::Pointer finalPredicate = mitk::NodePredicateAnd::New(isMitkImage, noDiffusionImage);
-    m_Controls->m_ColorMapBox->SetPredicate(finalPredicate);
+    auto isScalarMap = mitk::NodePredicateFunction::New([](const mitk::DataNode* node) {
+      auto image = dynamic_cast<const mitk::Image*>(node->GetData());
+      return image!=nullptr && image->GetDimension()==3 && image->GetPixelType().GetNumberOfComponents()==1;
+    });
+    m_Controls->m_ColorMapBox->SetPredicate(isScalarMap);
   }
 
   UpdateGui();
