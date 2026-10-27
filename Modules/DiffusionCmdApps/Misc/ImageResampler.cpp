@@ -21,19 +21,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImage.h>
 #include <mitkImageCast.h>
 #include <mitkITKImageImport.h>
-#include <mitkImageTimeSelector.h>
 #include <mitkDiffusionPropertyHelper.h>
-#include <mitkProperties.h>
 
 // ITK
-#include <itksys/SystemTools.hxx>
-#include <itkDirectory.h>
 #include "itkLinearInterpolateImageFunction.h"
 #include "itkWindowedSincInterpolateImageFunction.h"
 #include "itkNearestNeighborInterpolateImageFunction.h"
 #include "itkIdentityTransform.h"
 #include "itkResampleImageFilter.h"
-#include "itkResampleDwiImageFilter.h"
+#include <mitkDiffusionImageEditing.h>
 
 typedef itk::Image<double, 3> InputImageType;
 typedef itk::Image<unsigned char, 3> BinaryImageType;
@@ -130,179 +126,6 @@ static std::vector<std::string> split(const std::string &s, char delim)
 }
 
 
-static mitk::Image::Pointer ResampleBySpacing(mitk::Image *input, float *spacing, bool useLinInt = true, bool useNN = false)
-{
-  if (!useNN)
-  {
-    InputImageType::Pointer itkImage = InputImageType::New();
-    CastToItkImage(input,itkImage);
-
-    /**
-   * 1) Resampling
-   *
-   */
-    // Identity transform.
-    // We don't want any transform on our image except rescaling which is not
-    // specified by a transform but by the input/output spacing as we will see
-    // later.
-    // So no transform will be specified.
-    typedef itk::IdentityTransform<double, 3> T_Transform;
-
-    // The resampler type itself.
-    typedef itk::ResampleImageFilter<InputImageType, InputImageType>  T_ResampleFilter;
-
-    // Prepare the resampler.
-    // Instantiate the transform and specify it should be the id transform.
-    T_Transform::Pointer _pTransform = T_Transform::New();
-    _pTransform->SetIdentity();
-
-    // Instantiate the resampler. Wire in the transform and the interpolator.
-    T_ResampleFilter::Pointer _pResizeFilter = T_ResampleFilter::New();
-
-    // Specify the input.
-    _pResizeFilter->SetInput(itkImage);
-
-    _pResizeFilter->SetTransform(_pTransform);
-
-    // Set the output origin.
-    _pResizeFilter->SetOutputOrigin(itkImage->GetOrigin());
-
-    // Compute the size of the output.
-    // The size (# of pixels) in the output is recomputed using
-    // the ratio of the input and output sizes.
-    InputImageType::SpacingType inputSpacing = itkImage->GetSpacing();
-    InputImageType::SpacingType outputSpacing;
-    const InputImageType::RegionType& inputSize = itkImage->GetLargestPossibleRegion();
-
-    InputImageType::SizeType outputSize;
-    typedef InputImageType::SizeType::SizeValueType SizeValueType;
-
-    // Set the output spacing.
-    outputSpacing[0] = spacing[0];
-    outputSpacing[1] = spacing[1];
-    outputSpacing[2] = spacing[2];
-
-    outputSize[0] = static_cast<SizeValueType>(inputSize.GetSize()[0] * inputSpacing[0] / outputSpacing[0] + .5);
-    outputSize[1] = static_cast<SizeValueType>(inputSize.GetSize()[1] * inputSpacing[1] / outputSpacing[1] + .5);
-    outputSize[2] = static_cast<SizeValueType>(inputSize.GetSize()[2] * inputSpacing[2] / outputSpacing[2] + .5);
-
-    _pResizeFilter->SetOutputSpacing(outputSpacing);
-    _pResizeFilter->SetSize(outputSize);
-
-    typedef itk::LinearInterpolateImageFunction< InputImageType > LinearInterpolatorType;
-    LinearInterpolatorType::Pointer lin_interpolator = LinearInterpolatorType::New();
-
-
-    typedef itk::WindowedSincInterpolateImageFunction< InputImageType, 4> WindowedSincInterpolatorType;
-    WindowedSincInterpolatorType::Pointer sinc_interpolator = WindowedSincInterpolatorType::New();
-
-    if (useLinInt)
-      _pResizeFilter->SetInterpolator(lin_interpolator);
-    else
-      _pResizeFilter->SetInterpolator(sinc_interpolator);
-
-    _pResizeFilter->Update();
-
-    mitk::Image::Pointer image = mitk::Image::New();
-    image->InitializeByItk(_pResizeFilter->GetOutput());
-    mitk::GrabItkImageMemory( _pResizeFilter->GetOutput(), image);
-    return image;
-  }
-
-  BinaryImageType::Pointer itkImage = BinaryImageType::New();
-  CastToItkImage(input,itkImage);
-
-  /**
- * 1) Resampling
- *
- */
-  // Identity transform.
-  // We don't want any transform on our image except rescaling which is not
-  // specified by a transform but by the input/output spacing as we will see
-  // later.
-  // So no transform will be specified.
-  typedef itk::IdentityTransform<double, 3> T_Transform;
-
-  // The resampler type itself.
-  typedef itk::ResampleImageFilter<BinaryImageType, BinaryImageType>  T_ResampleFilter;
-
-  // Prepare the resampler.
-  // Instantiate the transform and specify it should be the id transform.
-  T_Transform::Pointer _pTransform = T_Transform::New();
-  _pTransform->SetIdentity();
-
-  // Instantiate the resampler. Wire in the transform and the interpolator.
-  T_ResampleFilter::Pointer _pResizeFilter = T_ResampleFilter::New();
-
-  // Specify the input.
-  _pResizeFilter->SetInput(itkImage);
-
-  _pResizeFilter->SetTransform(_pTransform);
-
-  // Set the output origin.
-  _pResizeFilter->SetOutputOrigin(itkImage->GetOrigin());
-
-  // Compute the size of the output.
-  // The size (# of pixels) in the output is recomputed using
-  // the ratio of the input and output sizes.
-  BinaryImageType::SpacingType inputSpacing = itkImage->GetSpacing();
-  BinaryImageType::SpacingType outputSpacing;
-  const BinaryImageType::RegionType& inputSize = itkImage->GetLargestPossibleRegion();
-
-  BinaryImageType::SizeType outputSize;
-  typedef BinaryImageType::SizeType::SizeValueType SizeValueType;
-
-  // Set the output spacing.
-  outputSpacing[0] = spacing[0];
-  outputSpacing[1] = spacing[1];
-  outputSpacing[2] = spacing[2];
-
-  outputSize[0] = static_cast<SizeValueType>(inputSize.GetSize()[0] * inputSpacing[0] / outputSpacing[0] + .5);
-  outputSize[1] = static_cast<SizeValueType>(inputSize.GetSize()[1] * inputSpacing[1] / outputSpacing[1] + .5);
-  outputSize[2] = static_cast<SizeValueType>(inputSize.GetSize()[2] * inputSpacing[2] / outputSpacing[2] + .5);
-
-  _pResizeFilter->SetOutputSpacing(outputSpacing);
-  _pResizeFilter->SetSize(outputSize);
-
-  typedef itk::NearestNeighborInterpolateImageFunction< BinaryImageType> NearestNeighborInterpolateImageType;
-  NearestNeighborInterpolateImageType::Pointer nn_interpolator = NearestNeighborInterpolateImageType::New();
-    _pResizeFilter->SetInterpolator(nn_interpolator);
-
-  _pResizeFilter->Update();
-
-  mitk::Image::Pointer image = mitk::Image::New();
-  image->InitializeByItk(_pResizeFilter->GetOutput());
-  mitk::GrabItkImageMemory( _pResizeFilter->GetOutput(), image);
-  return image;
-}
-
-static mitk::Image::Pointer ResampleDWIbySpacing(mitk::Image::Pointer input, float* spacing)
-{
-  itk::Vector<double, 3> spacingVector;
-  spacingVector[0] = spacing[0];
-  spacingVector[1] = spacing[1];
-  spacingVector[2] = spacing[2];
-
-  typedef itk::ResampleDwiImageFilter<short> ResampleFilterType;
-
-  mitk::DiffusionPropertyHelper::ImageType::Pointer itkVectorImagePointer = mitk::DiffusionPropertyHelper::ImageType::New();
-  mitk::CastToItkImage(input, itkVectorImagePointer);
-
-  ResampleFilterType::Pointer resampler = ResampleFilterType::New();
-  resampler->SetInput( itkVectorImagePointer );
-  resampler->SetInterpolation(ResampleFilterType::Interpolate_Linear);
-  resampler->SetNewSpacing(spacingVector);
-  resampler->Update();
-
-  mitk::Image::Pointer output = mitk::GrabItkImageMemory( resampler->GetOutput() );
-
-  mitk::DiffusionPropertyHelper::SetGradientContainer(output, mitk::DiffusionPropertyHelper::GetGradientContainer(input));
-  mitk::DiffusionPropertyHelper::SetReferenceBValue(output, mitk::DiffusionPropertyHelper::GetReferenceBValue(input));
-  mitk::DiffusionPropertyHelper::InitializeImage( output );
-
-  return output;
-}
-
 int main( int argc, char* argv[] )
 {
   mitkCommandLineParser parser;
@@ -397,33 +220,28 @@ int main( int argc, char* argv[] )
     if (!useSpacing)
       refImage = mitk::IOUtil::Load<mitk::Image>(refImageFile);
 
-    mitk::Image::Pointer inputDWI = mitk::IOUtil::Load<mitk::Image>(inputFile);
-    if ( mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(inputDWI.GetPointer()))
-    {
-      mitk::Image::Pointer outputImage;
-
-      if (useSpacing)
-        outputImage = ResampleDWIbySpacing(inputDWI, spacing);
-      else
-      {
-        MITK_WARN << "Not supported yet, to resample a DWI please set a new spacing.";
-        return EXIT_FAILURE;
-      }
-
-      mitk::IOUtil::Save(outputImage, outputFile.c_str());
-
-      return EXIT_SUCCESS;
-    }
     mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inputFile);
-
-
     mitk::Image::Pointer resultImage;
 
     if (useSpacing)
-      resultImage = ResampleBySpacing(inputImage,spacing,useLinearInterpol,useNN);
+    {
+      // Keeps pixel type, direction matrix and the outer corner of the image; DWIs volume by volume.
+      using mitk::DiffusionImageEditing::Interpolation;
+      const auto interpolation = useNN ? Interpolation::NearestNeighbour
+                                       : (useLinearInterpol ? Interpolation::Linear : Interpolation::WindowedSinc);
+      mitk::Vector3D newSpacing;
+      newSpacing[0] = spacing[0];
+      newSpacing[1] = spacing[1];
+      newSpacing[2] = spacing[2];
+      resultImage = mitk::DiffusionImageEditing::Resample(inputImage, mitk::DiffusionImageEditing::ResampleGrid::Spacing, newSpacing, interpolation);
+    }
+    else if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(inputImage))
+    {
+      MITK_ERROR << "Not supported yet, to resample a DWI please set a new spacing.";
+      return EXIT_FAILURE;
+    }
     else
       resultImage = TransformToReference(refImage,inputImage,!useLinearInterpol,useNN);
-
 
     mitk::IOUtil::Save(resultImage, outputFile);
   }
