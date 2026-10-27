@@ -630,7 +630,7 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   m_Parameters.m_Misc.m_OutputAdditionalImages = m_Controls->m_VolumeFractionsBox->isChecked();
 
   std::string outputPath = m_Controls->m_SavePathEdit->text().toStdString();
-  // "-" or an emptied box: no automatic save (an empty path became "/", the root folder)
+  // "-" or an emptied box: no automatic save (an empty path plus "/" would be the root folder)
   if (!outputPath.empty() && outputPath.compare("-")!=0)
   {
     m_Parameters.m_Misc.m_OutputPath = outputPath;
