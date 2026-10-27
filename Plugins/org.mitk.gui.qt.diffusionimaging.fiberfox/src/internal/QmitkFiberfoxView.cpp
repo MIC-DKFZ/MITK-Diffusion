@@ -810,7 +810,8 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   m_Parameters.m_SignalGen.m_Rotation[1] = m_Controls->m_MaxRotationBoxY->value();
   m_Parameters.m_SignalGen.m_Rotation[2] = m_Controls->m_MaxRotationBoxZ->value();
   m_Parameters.m_SignalGen.m_MotionVolumes.clear();
-  m_Parameters.m_Misc.m_MotionVolumesBox = m_Controls->m_MotionVolumesBox->text().toStdString();
+  // trimmed: spaces alone count as blank, " random" as random
+  m_Parameters.m_Misc.m_MotionVolumesBox = m_Controls->m_MotionVolumesBox->text().trimmed().toStdString();
 
   if ( m_Controls->m_AddMotion->isChecked())
   {
