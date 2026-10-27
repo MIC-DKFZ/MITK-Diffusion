@@ -32,7 +32,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkMAPAlgorithmHelper.h>
 #include <mitkRegistrationHelper.h>
-#include <mitkImageMappingHelper.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkDiffusionImageEditing.h>
@@ -44,8 +43,9 @@ typedef mitk::DiffusionPropertyHelper DPH;
 
 mitk::Image::Pointer apply_transform(mitk::Image::Pointer moving, mitk::Image::Pointer fixed_single, mitk::MAPRegistrationWrapper::Pointer reg, bool resample)
 {
+  // DiffusionImageMapping turns the world gradients of a DWI with the image.
   if (!resample)
-    return mitk::ImageMappingHelper::refineGeometry(moving, reg, true);
+    return mitk::DiffusionImageMapping::RefineGeometry(moving, reg);
   return mitk::DiffusionImageMapping::MapImage(moving, reg, fixed_single->GetGeometry(), mitk::ImageMappingInterpolator::BSpline_3);
 }
 
@@ -109,8 +109,6 @@ int main(int argc, char* argv[])
     mitk::Image::Pointer registered_image = apply_transform(moving, fixed_single, reg, resample);
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(registered_image))
     {
-      mitk::DiffusionPropertyHelper::InitializeImage( registered_image );
-
       std::string file_extension = itksys::SystemTools::GetFilenameExtension(o);
       if (file_extension==".nii" || file_extension==".nii.gz")
         mitk::IOUtil::Save(registered_image, "DWI_NIFTI", o);
@@ -131,8 +129,6 @@ int main(int argc, char* argv[])
       registered_image = apply_transform(coreg_images.at(i), fixed_single, reg, resample);
       if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(registered_image))
       {
-        mitk::DiffusionPropertyHelper::InitializeImage( registered_image );
-
         if (ext==".nii" || ext==".nii.gz")
           mitk::IOUtil::Save(registered_image, "DWI_NIFTI", out_name);
         else
