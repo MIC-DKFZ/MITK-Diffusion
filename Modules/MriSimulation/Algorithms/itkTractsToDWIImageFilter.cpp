@@ -323,7 +323,6 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
           Complex2DImageType::Pointer newSlice;
           auto dft = itk::DftImageFilter< Float2DImageType::PixelType >::New();
           dft->SetInput(fSlice);
-          dft->SetParameters(m_Parameters);
           dft->SetNumberOfWorkUnits(in_threads);
           dft->Update();
           newSlice = dft->GetOutput();
