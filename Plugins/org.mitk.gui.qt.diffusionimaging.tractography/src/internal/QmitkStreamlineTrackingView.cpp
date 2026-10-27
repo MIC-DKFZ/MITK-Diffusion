@@ -1135,6 +1135,9 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     prior_params->m_FlipX = m_Controls->m_PriorFlipXBox->isChecked();
     prior_params->m_FlipY = m_Controls->m_PriorFlipYBox->isChecked();
     prior_params->m_FlipZ = m_Controls->m_PriorFlipZBox->isChecked();
+    // as in MitkStreamlineTractography: the data cutoff (FA/GFA/peak length) does not apply to the
+    // prior, which would otherwise stop streamlines with "Restrict to Prior"
+    prior_params->m_Cutoff = 0.0;
     m_TrackingPriorHandler->SetParameters(prior_params);
 
     m_Tracker->SetTrackingPriorHandler(m_TrackingPriorHandler);
