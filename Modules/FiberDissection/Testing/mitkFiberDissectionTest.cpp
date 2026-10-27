@@ -175,6 +175,7 @@ class mitkFiberDissectionTestSuite : public mitk::TestFixture
   MITK_TEST(MoveFiber_KeepsFiberCountAndWeights);
   MITK_TEST(MoveFiber_LabelBundlesTrainAndPredict);
   MITK_TEST(SphereRoi_KeepsFibersOfBothOrientations);
+  MITK_TEST(SphereRoi_IsASphere);
   CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -277,6 +278,18 @@ public:
     for (const auto &p : kept)
       startX.insert(p[0]);
     CPPUNIT_ASSERT(startX.count(0) == 1 && startX.count(40) == 1);
+  }
+
+  /** A ROI of radius 5 keeps an end point 4.9 mm from its centre and rejects one in the corner of
+   *  its bounding box, 6.4 mm from the centre. */
+  void SphereRoi_IsASphere()
+  {
+    auto bundle = Bundle({Line({4.9, 0, 0}, {40, 0, 0}),
+                          Line({4.5, 4.5, 0}, {40, 0, 0})});
+    const auto kept = SelectBySphereRois(bundle, SphereRoi({0, 0, 0}, 5), SphereRoi({40, 0, 0}, 5));
+
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), kept.size());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, kept[0][1], 1e-6);
   }
 };
 

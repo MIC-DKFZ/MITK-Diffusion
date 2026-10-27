@@ -221,8 +221,22 @@ void mitk::SphereInteractor::ExtractFibers()
     vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
     vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
 
-    mitk::Surface::Pointer startSurfaceData = dynamic_cast<mitk::Surface*>(m_startDataNode->GetData());
-    mitk::Surface::Pointer endSurfaceData = dynamic_cast<mitk::Surface*>(m_endDataNode->GetData());
+    // The ROIs are spheres around the origin of their surface geometry with the radius of their
+    // size property; the geometry itself is the bounding box of the sphere, a cube.
+    auto sphereTest = [](const mitk::DataNode* node) {
+      const mitk::Point3D center = node->GetData()->GetGeometry()->GetOrigin();
+      float radius = -1;
+      node->GetFloatProperty(DATANODE_PROPERTY_SIZE, radius);
+      return [center, radius](const double* point) {
+        mitk::Point3D p;
+        p[0] = point[0];
+        p[1] = point[1];
+        p[2] = point[2];
+        return radius >= 0 && center.EuclideanDistanceTo(p) <= radius;
+      };
+    };
+    const auto inStart = sphereTest(m_startDataNode);
+    const auto inEnd = sphereTest(m_endDataNode);
 
     unsigned int counter = 0;
     for (int i = 0; i < polyData->GetNumberOfCells(); i++)
@@ -241,8 +255,8 @@ void mitk::SphereInteractor::ExtractFibers()
         points->GetPoint(numPoints - 1, endPoint);
 
         // Streamlines have no orientation: either end may lie in the start ROI.
-        const bool startToEnd = startSurfaceData->GetGeometry()->IsInside(startPoint) && endSurfaceData->GetGeometry()->IsInside(endPoint);
-        const bool endToStart = startSurfaceData->GetGeometry()->IsInside(endPoint) && endSurfaceData->GetGeometry()->IsInside(startPoint);
+        const bool startToEnd = inStart(startPoint) && inEnd(endPoint);
+        const bool endToStart = inStart(endPoint) && inEnd(startPoint);
         if (startToEnd || endToStart)
         {
             // Create a new vtkPolyLine container to store the new fiber
