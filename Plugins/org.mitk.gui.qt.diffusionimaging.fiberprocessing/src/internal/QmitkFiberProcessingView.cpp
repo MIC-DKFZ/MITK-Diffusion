@@ -622,11 +622,12 @@ void QmitkFiberProcessingView::GenerateRoiImage()
   newOrigin[1] += bounds.GetElement(2);
   newOrigin[2] += bounds.GetElement(4);
 
+  // Column i of the geometry matrix is direction i scaled by the original spacing along i.
   itk::Matrix<double, 3, 3> direction;
   itk::ImageRegion<3> imageRegion;
   for (int i=0; i<3; i++)
     for (int j=0; j<3; j++)
-      direction[j][i] = geometry->GetMatrixColumn(i)[j]/spacing[j];
+      direction[j][i] = geometry->GetMatrixColumn(i)[j]/geometry->GetSpacing()[i];
   imageRegion.SetSize(0, geometry->GetExtent(0)*m_UpsamplingFactor);
   imageRegion.SetSize(1, geometry->GetExtent(1)*m_UpsamplingFactor);
   imageRegion.SetSize(2, geometry->GetExtent(2)*m_UpsamplingFactor);
