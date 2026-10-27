@@ -127,7 +127,6 @@ void QmitkFiberfoxView::BeforeThread()
   m_Controls->m_AbortSimulationButton->setVisible(true);
   m_Controls->m_GenerateImageButton->setVisible(false);
   m_Controls->m_SimulationStatusText->setVisible(true);
-  m_ThreadIsRunning = true;
 }
 
 void QmitkFiberfoxView::AfterThread()
@@ -318,8 +317,10 @@ void QmitkFiberfoxView::UpdateSimulationStatus()
 {
   QString statusText = QString(m_TractsToDwiFilter->GetStatusText().c_str());
 
+  // rewritten only when the log changed, so that the user can scroll back during a run
   if (QString::compare(m_SimulationStatusText,statusText)!=0)
   {
+    m_SimulationStatusText = statusText;
     m_Controls->m_SimulationStatusText->clear();
     m_Controls->m_SimulationStatusText->setText(statusText);
     QScrollBar *vScrollBar = m_Controls->m_SimulationStatusText->verticalScrollBar();
@@ -341,6 +342,7 @@ QmitkFiberfoxView::~QmitkFiberfoxView()
     while (!m_Thread.wait(100));
   }
   delete m_SimulationTimer;
+  delete m_Controls;
 }
 
 void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
@@ -613,10 +615,12 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   m_Parameters.m_Misc.m_OutputAdditionalImages = m_Controls->m_VolumeFractionsBox->isChecked();
 
   std::string outputPath = m_Controls->m_SavePathEdit->text().toStdString();
-  if (outputPath.compare("-")!=0)
+  // "-" or an emptied box: no automatic save (an empty path became "/", the root folder)
+  if (!outputPath.empty() && outputPath.compare("-")!=0)
   {
     m_Parameters.m_Misc.m_OutputPath = outputPath;
-    m_Parameters.m_Misc.m_OutputPath += "/";
+    if (outputPath.back()!='/')
+      m_Parameters.m_Misc.m_OutputPath += "/";
   }
   else {
     m_Parameters.m_Misc.m_OutputPath = "";
@@ -1254,15 +1258,16 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     }
   }
 
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.SignalScale", mitk::IntProperty::New(m_Parameters.m_SignalGen.m_SignalScale));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.FiberRadius", mitk::IntProperty::New(m_Parameters.m_SignalGen.m_AxonRadius));
+  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.SignalScale", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_SignalScale));
+  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.FiberRadius", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_AxonRadius));
   m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Tinhom", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_tInhom));
   m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.echoTrainLength", mitk::IntProperty::New(m_Parameters.m_SignalGen.m_EchoTrainLength));
   m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Tline", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_tLine));
   m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.TE", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_tEcho));
   m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.b-value", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.GetBvalue()));
   m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.NoPartialVolume", mitk::BoolProperty::New(m_Parameters.m_SignalGen.m_DoDisablePartialVolume));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Relaxation", mitk::BoolProperty::New(m_Parameters.m_SignalGen.m_DoSimulateRelaxation));
+  // a prototype model switches relaxation off after the relaxation block set the property
+  m_Parameters.m_Misc.m_ResultNode->SetProperty("Fiberfox.Relaxation", mitk::BoolProperty::New(m_Parameters.m_SignalGen.m_DoSimulateRelaxation));
   m_Parameters.m_Misc.m_ResultNode->AddProperty("binary", mitk::BoolProperty::New(false));
 }
 
@@ -1984,6 +1989,11 @@ std::vector<itk::Vector<double,3> > QmitkFiberfoxView::MakeGradientList()
 
 void QmitkFiberfoxView::GenerateImage()
 {
+  // set before the thread starts and cleared in AfterThread: a second click before the queued
+  // BeforeThread hides the button must not replace the running filter
+  if (m_ThreadIsRunning)
+    return;
+
   // bvals/bvecs files and other inputs are read here; a bad one stops with its message
   try
   {
@@ -2069,6 +2079,7 @@ void QmitkFiberfoxView::SimulateForExistingDwi(mitk::DataNode* imageNode)
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetInputImage(itkVectorImagePointer);
+  m_ThreadIsRunning = true;
   m_Thread.start(QThread::LowestPriority);
 }
 
@@ -2110,6 +2121,7 @@ void QmitkFiberfoxView::SimulateImageFromFibers(mitk::DataNode* fiberNode)
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetFiberBundle(fiberBundle);
+  m_ThreadIsRunning = true;
   m_Thread.start(QThread::LowestPriority);
 }
 
