@@ -238,7 +238,6 @@ void StreamlineTrackingFilter::BeforeTracking()
 
   std::cout << "StreamlineTracking - Num. neighborhood samples: " << m_Parameters->m_NumSamples << std::endl;
   std::cout << "StreamlineTracking - Max. sampling distance: " << m_Parameters->GetSamplingDistanceMm() << "mm (" << m_Parameters->GetSamplingDistanceMm()/m_Parameters->GetMinVoxelSizeMm() << "*vox)" << std::endl;
-  std::cout << "StreamlineTracking - Deflection modifier: " << m_Parameters->m_DeflectionMod << std::endl;
 
   std::cout << "StreamlineTracking - Use stop votes: " << m_Parameters->m_StopVotes << std::endl;
   std::cout << "StreamlineTracking - Only frontal samples: " << m_Parameters->m_OnlyForwardSamples << std::endl;
@@ -314,29 +313,17 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
     itk::Point<double, 3> sample_pos;
     for (unsigned int i=0; i<probeVecs.size(); i++)
     {
-      vnl_vector_fixed<float,3> d;
+      vnl_vector_fixed<float,3> d = probeVecs.at(i);
       bool is_stop_voter = false;
-      if (!m_Parameters->m_FixRandomSeed && m_Parameters->m_RandomSampling)
+      float dot = dot_product(d, olddir);
+      if (m_Parameters->m_StopVotes && dot>0.7f)
       {
-        d[0] = static_cast<float>(m_TrackingHandler->GetThreadRandDouble(-0.5, 0.5));
-        d[1] = static_cast<float>(m_TrackingHandler->GetThreadRandDouble(-0.5, 0.5));
-        d[2] = static_cast<float>(m_TrackingHandler->GetThreadRandDouble(-0.5, 0.5));
-        d.normalize();
-        d *= static_cast<float>(m_TrackingHandler->GetThreadRandDouble(0, static_cast<double>(m_Parameters->GetSamplingDistanceMm())));
+        is_stop_voter = true;
+        possible_stop_votes++;
       }
-      else
-      {
-        d = probeVecs.at(i);
-        float dot = dot_product(d, olddir);
-        if (m_Parameters->m_StopVotes && dot>0.7f)
-        {
-          is_stop_voter = true;
-          possible_stop_votes++;
-        }
-        else if (m_Parameters->m_OnlyForwardSamples && dot<0)
-          continue;
-        d *= m_Parameters->GetSamplingDistanceMm();
-      }
+      else if (m_Parameters->m_OnlyForwardSamples && dot<0)
+        continue;
+      d *= m_Parameters->GetSamplingDistanceMm();
 
       sample_pos[0] = pos[0] + d[0];
       sample_pos[1] = pos[1] + d[1];
@@ -349,7 +336,7 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
       {
         direction += tempDir;
       }
-      else if (m_Parameters->m_AvoidStop && olddir.magnitude()>0.5f) // out of white matter
+      else if (olddir.magnitude()>0.5f) // out of white matter
       {
         if (is_stop_voter)
           stop_votes++;
@@ -370,7 +357,7 @@ vnl_vector_fixed<float,3> StreamlineTrackingFilter::GetNewDirection(const itk::P
 
         if (tempDir.magnitude()>static_cast<float>(mitk::eps))  // are we back in the white matter?
         {
-          direction += d * m_Parameters->m_DeflectionMod;         // go into the direction of the white matter
+          direction += d;         // go into the direction of the white matter
           direction += tempDir;  // go into the direction of the white matter direction at this location
         }
       }

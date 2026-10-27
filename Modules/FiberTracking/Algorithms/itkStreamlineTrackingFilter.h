@@ -14,35 +14,28 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkMLBSTrackingFilter_h_
-#define __itkMLBSTrackingFilter_h_
+#ifndef itkStreamlineTrackingFilter_h
+#define itkStreamlineTrackingFilter_h
 
-#include <itkImageToImageFilter.h>
-#include <itkVectorContainer.h>
-#include <itkVectorImage.h>
+#include <itkProcessObject.h>
+#include <itkLinearInterpolateImageFunction.h>
 #include <vtkSmartPointer.h>
 #include <vtkPolyData.h>
 #include <vtkCellArray.h>
 #include <vtkPoints.h>
 #include <vtkPolyLine.h>
-#include <vtkCleanPolyData.h>
-#include <itkOrientationDistributionFunction.h>
-#include <itkMersenneTwisterRandomVariateGenerator.h>
-#include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
-#include <mitkDiffusionPropertyHelper.h>
-#include <mitkPointSet.h>
 #include <atomic>
 #include <chrono>
+#include <deque>
 #include <TrackingHandlers/mitkTrackingDataHandler.h>
 #include <MitkFiberTrackingExports.h>
 #include <mitkFiberBundle.h>
-#include <mitkPeakImage.h>
 #include <mitkStreamlineTractographyParameters.h>
 
 namespace itk{
 
 /**
-* \brief Performs streamline tracking on the input image. Depending on the tracking handler this can be a tensor, peak or machine learning based tracking. */
+* \brief Performs streamline tracking on the input image. Depending on the tracking handler this can be a tensor, ODF or peak based tracking. */
 
 class MITKFIBERTRACKING_EXPORT StreamlineTrackingFilter : public ProcessObject
 {
@@ -59,7 +52,7 @@ public:
   itkCloneMacro(Self)
 
   /** Runtime information support. */
-  itkTypeMacro(StreamlineTrackingFilter, ImageToImageFilter)
+  itkTypeMacro(StreamlineTrackingFilter, ProcessObject)
 
   typedef itk::Image<unsigned char, 3>                ItkUcharImgType;
   typedef itk::Image<unsigned int, 3>                 ItkUintImgType;
@@ -173,15 +166,9 @@ protected:
   // Directional priors
   mitk::TrackingDataHandler*                  m_TrackingPriorHandler;
 
-private:
-
 };
 
 }
 
-//#ifndef ITK_MANUAL_INSTANTIATION
-//#include "itkMLBSTrackingFilter.cpp"
-//#endif
-
-#endif //__itkMLBSTrackingFilter_h_
+#endif
 

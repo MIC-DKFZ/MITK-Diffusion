@@ -42,6 +42,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateProperty.h>
 #include <mitkNodePredicateDimension.h>
 #include <mitkOdfImage.h>
+#include <mitkPeakImage.h>
 #include <mitkShImage.h>
 #include <mitkSliceNavigationController.h>
 
@@ -337,12 +338,6 @@ void QmitkStreamlineTrackingView::ParametersToGui(mitk::StreamlineTractographyPa
 std::shared_ptr<mitk::StreamlineTractographyParameters> QmitkStreamlineTrackingView::GetParametersFromGui()
 {
   std::shared_ptr<mitk::StreamlineTractographyParameters> params = std::make_shared<mitk::StreamlineTractographyParameters>();
-
-  // NOT IN GUI
-//  unsigned int m_NumPreviousDirections = 1;
-//  bool m_AvoidStop = true;
-//  bool m_RandomSampling = false;
-//  float m_DeflectionMod = 1.0;
 
   // NOT IN GUI BUT AUTOMATICALLY SET
   if (!m_InputImageNodes.empty())

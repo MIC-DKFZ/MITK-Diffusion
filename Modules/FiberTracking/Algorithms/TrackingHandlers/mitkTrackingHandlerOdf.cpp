@@ -376,10 +376,5 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
   return output_direction;
 }
 
-void TrackingHandlerOdf::SetNumProbSamples(int NumProbSamples)
-{
-  m_NumProbSamples = NumProbSamples;
-}
-
 }
 

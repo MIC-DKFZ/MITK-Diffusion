@@ -54,7 +54,6 @@ public:
   ItkUcharImgType::RegionType GetLargestPossibleRegion() override{ return m_OdfImage->GetLargestPossibleRegion(); }
 
   int OdfPower() const;
-  void SetNumProbSamples(int NumProbSamples);
 
   bool GetIsOdfFromTensor() const;
   void SetIsOdfFromTensor(bool OdfFromTensor);
@@ -78,10 +77,9 @@ protected:
 
   ItkFloatImgType::Pointer        m_GfaImage;     ///< GFA image used to determine streamline termination.
   ItkOdfImageType::Pointer        m_OdfImage;     ///< Input odf image.
-  ItkOdfImageType::Pointer        m_WorkingOdfImage;     ///< Modified odf image.
   std::vector< int >              m_OdfHemisphereIndices;
   vnl_matrix< float >             m_OdfFloatDirs;
-  int                             m_NumProbSamples;
+  int                             m_NumProbSamples;     ///< samples drawn per step, the most probable one is kept
   bool                            m_OdfFromTensor;
 
   itk::LinearInterpolateImageFunction< itk::Image< float, 3 >, float >::Pointer   m_GfaInterpolator;

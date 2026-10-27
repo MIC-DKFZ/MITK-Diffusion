@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itksys/SystemTools.hxx>
 
 #include <mitkFiberBundle.h>
+#include <mitkPeakImage.h>
 #include <itkStreamlineTrackingFilter.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingDataHandler.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>

@@ -108,9 +108,6 @@ namespace mitk
     unsigned int m_NumSamples = 0;
     bool m_OnlyForwardSamples = false;
     bool m_StopVotes = false;
-    bool m_AvoidStop = true;
-    bool m_RandomSampling = false;
-    float m_DeflectionMod = 1.0;
 
     // data handling
     bool m_FlipX = false;

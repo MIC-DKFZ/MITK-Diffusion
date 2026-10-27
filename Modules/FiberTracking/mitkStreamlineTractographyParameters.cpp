@@ -16,8 +16,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <boost/foreach.hpp>
 #include <mitkLexicalCast.h>
-#include <itkImageFileWriter.h>
-#include <itkImageFileReader.h>
 #include <mitkLog.h>
 #include <algorithm>
 #include <string>
@@ -105,17 +103,6 @@ void mitk::StreamlineTractographyParameters::SaveParameters(std::string filename
   parameters.put("output.prob_map", m_OutputProbMap);
 
   boost::property_tree::json_parser::write_json(filename, parameters, std::locale(), true);
-
-//  try{
-//    itk::ImageFileWriter<ItkFloatImgType>::Pointer writer = itk::ImageFileWriter<ItkFloatImgType>::New();
-//    writer->SetFileName(filename+"_FMAP.nii.gz");
-//    writer->SetInput(m_SignalGen.m_FrequencyMap);
-//    writer->Update();
-//  }
-//  catch(...)
-//  {
-//    MITK_INFO << "No frequency map saved.";
-//  }
 
   setlocale(LC_ALL, currLocale.c_str());
 }
@@ -253,25 +240,6 @@ void mitk::StreamlineTractographyParameters::LoadParameters(std::string filename
       m_OutputProbMap = ReadVal<bool>(v1,"prob_map", m_OutputProbMap);
     }
   }
-
-//  try
-//  {
-//    itk::ImageFileReader<ItkFloatImgType>::Pointer reader = itk::ImageFileReader<ItkFloatImgType>::New();
-//    reader->SetFileName(filename+"_FMAP.nrrd");
-//    if ( itksys::SystemTools::FileExists(filename+"_FMAP.nii.gz") )
-//      reader->SetFileName(filename+"_FMAP.nii.gz");
-//    else if ( itksys::SystemTools::FileExists(filename+"_FMAP.nii") )
-//      reader->SetFileName(filename+"_FMAP.nii");
-//    else
-//      reader->SetFileName(filename+"_FMAP.nrrd");
-//    reader->Update();
-//    m_SignalGen.m_FrequencyMap = reader->GetOutput();
-//    MITK_INFO << "Frequency map loaded.";
-//  }
-//  catch(...)
-//  {
-//    MITK_INFO << "No frequency map found.";
-//  }
 
   setlocale(LC_ALL, currLocale.c_str());
 }
