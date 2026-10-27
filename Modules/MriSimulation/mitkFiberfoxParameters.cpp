@@ -24,6 +24,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <string>
 #include <mitkFiberfoxParameters.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkDiffusionImageHelperFunctions.h>
+#include <mitkLocaleSwitch.h>
 
 mitk::FiberfoxParameters::FiberfoxParameters()
   : m_NoiseModel(nullptr)
@@ -40,10 +42,28 @@ mitk::FiberfoxParameters::FiberfoxParameters()
 mitk::FiberfoxParameters::FiberfoxParameters(const mitk::FiberfoxParameters& params)
   : m_NoiseModel(nullptr)
 {
+  CopyFrom(params);
+}
+
+mitk::FiberfoxParameters& mitk::FiberfoxParameters::operator=(const mitk::FiberfoxParameters& params)
+{
+  if (this != &params)
+  {
+    DeleteSignalModels();
+    CopyFrom(params);
+  }
+  return *this;
+}
+
+void mitk::FiberfoxParameters::CopyFrom(const mitk::FiberfoxParameters& params)
+{
   m_FiberGen = params.m_FiberGen;
   m_SignalGen = params.m_SignalGen;
   m_Misc = params.m_Misc;
+  m_MissingTags = params.m_MissingTags;
 
+  // a noise model of the same type with the same variance, but its own random generator
+  m_NoiseModel = nullptr;
   if (params.m_NoiseModel!=nullptr)
   {
     if (dynamic_cast<mitk::RicianNoiseModel<>*>(params.m_NoiseModel.get()))
@@ -53,33 +73,20 @@ mitk::FiberfoxParameters::FiberfoxParameters(const mitk::FiberfoxParameters& par
     m_NoiseModel->SetNoiseVariance(params.m_NoiseModel->GetNoiseVariance());
   }
 
-  for (unsigned int i=0; i<params.m_FiberModelList.size()+params.m_NonFiberModelList.size(); i++)
-  {
-    mitk::DiffusionSignalModel<>* outModel = nullptr;
-    mitk::DiffusionSignalModel<>* signalModel = nullptr;
-    if (i<params.m_FiberModelList.size())
-      signalModel = params.m_FiberModelList.at(i);
-    else
-      signalModel = params.m_NonFiberModelList.at(i-params.m_FiberModelList.size());
+  for (auto model : params.m_FiberModelList)
+    m_FiberModelList.push_back(model->Clone());
+  for (auto model : params.m_NonFiberModelList)
+    m_NonFiberModelList.push_back(model->Clone());
+}
 
-    if (dynamic_cast<mitk::StickModel<>*>(signalModel))
-      outModel = new mitk::StickModel<>(dynamic_cast<mitk::StickModel<>*>(signalModel));
-    else  if (dynamic_cast<mitk::TensorModel<>*>(signalModel))
-      outModel = new mitk::TensorModel<>(dynamic_cast<mitk::TensorModel<>*>(signalModel));
-    else  if (dynamic_cast<mitk::RawShModel<>*>(signalModel))
-      outModel = new mitk::RawShModel<>(dynamic_cast<mitk::RawShModel<>*>(signalModel));
-    else  if (dynamic_cast<mitk::BallModel<>*>(signalModel))
-      outModel = new mitk::BallModel<>(dynamic_cast<mitk::BallModel<>*>(signalModel));
-    else if (dynamic_cast<mitk::AstroStickModel<>*>(signalModel))
-      outModel = new mitk::AstroStickModel<>(dynamic_cast<mitk::AstroStickModel<>*>(signalModel));
-    else  if (dynamic_cast<mitk::DotModel<>*>(signalModel))
-      outModel = new mitk::DotModel<>(dynamic_cast<mitk::DotModel<>*>(signalModel));
-
-    if (i<params.m_FiberModelList.size())
-      m_FiberModelList.push_back(outModel);
-    else
-      m_NonFiberModelList.push_back(outModel);
-  }
+void mitk::FiberfoxParameters::DeleteSignalModels()
+{
+  for (auto model : m_FiberModelList)
+    delete model;
+  for (auto model : m_NonFiberModelList)
+    delete model;
+  m_FiberModelList.clear();
+  m_NonFiberModelList.clear();
 }
 
 
@@ -94,15 +101,14 @@ void mitk::FiberfoxParameters::ClearSignalParameters()
   m_Misc = MiscFiberfoxParameters();
   m_SignalGen = SignalGenerationParameters();
 
-  m_FiberModelList.clear();
-  m_NonFiberModelList.clear();
+  DeleteSignalModels();
   m_NoiseModel = nullptr;
   m_MissingTags = "";
 }
 
 mitk::FiberfoxParameters::~FiberfoxParameters()
 {
-
+  DeleteSignalModels();
 }
 
 void mitk::SignalGenerationParameters::GenerateGradientHalfShell()
@@ -277,21 +283,20 @@ void mitk::SignalGenerationParameters::SetGradienDirections(mitk::DiffusionPrope
 
 void mitk::SignalGenerationParameters::ApplyDirectionMatrix()
 {
-  auto imageRotationMatrix = m_ImageDirection.GetVnlMatrix();
-  
-  GradientListType rotated_gradients;
+  // world = MF^T bvec with the measurement frame of FSL bvecs (frame axes as rows)
+  const vnl_matrix_fixed<double, 3, 3> toWorld = mitk::gradients::FslBvecsMeasurementFrame(m_ImageDirection).transpose();
+
+  GradientListType world_gradients;
   for(auto g : m_GradientDirections)
   {
-    auto vec = g.GetVnlVector();
-    auto vec2 = vec*imageRotationMatrix.as_matrix();
-
+    const vnl_vector_fixed<double, 3> vec = toWorld*g.GetVnlVector();
     GradientType g2;
-    g2[0] = vec2[0];
-    g2[1] = vec2[1];
-    g2[2] = vec2[2];
-    rotated_gradients.push_back(g2);
+    g2[0] = vec[0];
+    g2[1] = vec[1];
+    g2[2] = vec[2];
+    world_gradients.push_back(g2);
   }
-  m_GradientDirections = rotated_gradients;
+  m_GradientDirections = world_gradients;
 }
 
 void mitk::FiberfoxParameters::ApplyDirectionMatrix()
@@ -300,27 +305,34 @@ void mitk::FiberfoxParameters::ApplyDirectionMatrix()
   UpdateSignalModels();
 }
 
+void mitk::FiberfoxParameters::SetGradientsFromImage(const mitk::Image* dwi, bool asFslBvecs)
+{
+  const vnl_matrix_fixed<double, 3, 3> frame = mitk::gradients::FslBvecsMeasurementFrame(m_SignalGen.m_ImageDirection);
+  SignalGenerationParameters::GradientListType gradients;
+  const auto world = mitk::DiffusionPropertyHelper::GetGradientContainer(dwi);
+  for (unsigned int i=0; i<world->Size(); ++i)
+  {
+    const vnl_vector_fixed<double, 3> w = world->ElementAt(i);
+    const vnl_vector_fixed<double, 3> vec = asFslBvecs ? vnl_vector_fixed<double, 3>(frame*w) : w;
+    SignalGenerationParameters::GradientType g;
+    g[0] = vec[0];
+    g[1] = vec[1];
+    g[2] = vec[2];
+    gradients.push_back(g);
+  }
+  m_SignalGen.m_Bvalue = mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi);
+  SetGradienDirections(gradients);
+}
+
 void mitk::FiberfoxParameters::SaveParameters(std::string filename)
 {
   if(filename.empty())
     return;
-  if(".ffp"!=filename.substr(filename.size()-4, 4))
+  if(filename.size()<4 || ".ffp"!=filename.substr(filename.size()-4, 4))
     filename += ".ffp";
 
-  const std::string& locale = "C";
-  const std::string& currLocale = setlocale( LC_ALL, nullptr );
-
-  if ( locale.compare(currLocale)!=0 )
-  {
-    try
-    {
-      setlocale(LC_ALL, locale.c_str());
-    }
-    catch(...)
-    {
-      MITK_INFO << "Could not set locale " << locale;
-    }
-  }
+  // restored also when writing throws
+  mitk::LocaleSwitch localeSwitch("C");
 
   boost::property_tree::ptree parameters;
 
@@ -363,6 +375,16 @@ void mitk::FiberfoxParameters::SaveParameters(std::string filename)
   parameters.put("fiberfox.image.basic.direction.d9", m_SignalGen.m_ImageDirection[2][2]);
 
   mitk::gradients::WriteBvalsBvecs(filename+".bvals", filename+".bvecs", m_SignalGen.GetItkGradientContainer(), m_SignalGen.m_Bvalue);
+  // also in the file itself (the format of earlier versions), so that a .ffp copied without its
+  // .bvals/.bvecs still has gradients; reading prefers the .bvals/.bvecs files
+  parameters.put("fiberfox.image.bvalue", m_SignalGen.m_Bvalue);
+  for (unsigned int i=0; i<m_SignalGen.GetNumVolumes(); ++i)
+  {
+    const auto g = m_SignalGen.GetGradientDirection(i);
+    parameters.put("fiberfox.image.gradients."+boost::lexical_cast<std::string>(i)+".x", g[0]);
+    parameters.put("fiberfox.image.gradients."+boost::lexical_cast<std::string>(i)+".y", g[1]);
+    parameters.put("fiberfox.image.gradients."+boost::lexical_cast<std::string>(i)+".z", g[2]);
+  }
 
   parameters.put("fiberfox.image.acquisitiontype", m_SignalGen.m_AcquisitionType);
   parameters.put("fiberfox.image.coilsensitivityprofile", m_SignalGen.m_CoilSensitivityProfile);
@@ -479,6 +501,10 @@ void mitk::FiberfoxParameters::SaveParameters(std::string filename)
         for (unsigned int k=0; k<coeffs.size(); k++)
           parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".coeffs."+boost::lexical_cast<std::string>(k), coeffs[k]);
         parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".B0", model->GetBaselineSignal(j));
+        const auto direction = model->GetPrototypeDirection(j);
+        parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".dir.x", direction[0]);
+        parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".dir.y", direction[1]);
+        parameters.put("fiberfox.image.compartments.c"+boost::lexical_cast<std::string>(i)+".kernels."+boost::lexical_cast<std::string>(j)+".dir.z", direction[2]);
       }
     }
     else  if (dynamic_cast<mitk::BallModel<>*>(signalModel))
@@ -549,8 +575,6 @@ void mitk::FiberfoxParameters::SaveParameters(std::string filename)
   {
     MITK_INFO << "No mask image saved.";
   }
-
-  setlocale(LC_ALL, currLocale.c_str());
 }
 
 
@@ -626,40 +650,21 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
 {
   itk::Statistics::MersenneTwisterRandomVariateGenerator::Pointer randgen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
   if (fix_seed)
-  {
-    srand(0);
     randgen->SetSeed(0);
-  }
   else
-  {
-    srand(time(0));
     randgen->SetSeed();
-  }
   m_MissingTags = "";
   if(filename.empty()) { return; }
 
-  const std::string& locale = "C";
-  const std::string& currLocale = setlocale( LC_ALL, nullptr );
-
-  if ( locale.compare(currLocale)!=0 )
-  {
-    try
-    {
-      setlocale(LC_ALL, locale.c_str());
-    }
-    catch(...)
-    {
-      MITK_INFO << "Could not set locale " << locale;
-    }
-  }
+  // restored also when reading throws
+  mitk::LocaleSwitch localeSwitch("C");
 
 
   boost::property_tree::ptree parameterTree;
   boost::property_tree::xml_parser::read_xml( filename, parameterTree );
 
 
-  m_FiberModelList.clear();
-  m_NonFiberModelList.clear();
+  DeleteSignalModels();
   if (m_NoiseModel) { m_NoiseModel = nullptr; }
 
   BOOST_FOREACH( boost::property_tree::ptree::value_type const& v1, parameterTree.get_child("fiberfox") )
@@ -722,17 +727,30 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
       m_SignalGen.m_ImageOrigin[1] = ReadVal<float>(v1,"basic.origin.y",m_SignalGen.m_ImageOrigin[1]);
       m_SignalGen.m_ImageOrigin[2] = ReadVal<float>(v1,"basic.origin.z",m_SignalGen.m_ImageOrigin[2]);
 
-      int i = 0;
-      int j = 0;
-      for(auto v : v1.second.get_child("basic.direction"))
+      // a file without direction gets the identity (decided by default, D-M8); read as double, as written
+      m_SignalGen.m_ImageDirection.SetIdentity();
+      const auto direction = v1.second.get_child_optional("basic.direction");
+      if (direction)
       {
-        m_SignalGen.m_ImageDirection[i][j] = boost::lexical_cast<float>(v.second.data());
-        ++j;
-        if (j==3)
+        int i = 0;
+        int j = 0;
+        for(auto v : *direction)
         {
-          j = 0;
-          ++i;
+          if (i>2)
+            break;
+          m_SignalGen.m_ImageDirection[i][j] = boost::lexical_cast<double>(v.second.data());
+          ++j;
+          if (j==3)
+          {
+            j = 0;
+            ++i;
+          }
         }
+      }
+      else
+      {
+        MITK_INFO << "Tag 'basic.direction' not found. Using the identity.";
+        m_MissingTags += "\n- basic.direction";
       }
 
       m_SignalGen.m_AcquisitionType = (SignalGenerationParameters::AcquisitionType)ReadVal<int>(v1,"acquisitiontype", m_SignalGen.m_AcquisitionType);
@@ -795,7 +813,8 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
         }
         catch(...)
         {
-          MITK_INFO << "WARNING: Fiberfox parameters without any gradient directions loaded.";
+          MITK_WARN << "Fiberfox parameters without any gradient directions loaded.";
+          m_MissingTags += "\n- gradients";
         }
         m_SignalGen.SetGradienDirections(gradients);
       }
@@ -812,62 +831,34 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
         }
         MITK_DEBUG << "mitkFiberfoxParameters.cpp: Case m_Misc.m_MotionVolumesBox == \"random\".";
       }
-      else if ( ! m_Misc.m_MotionVolumesBox.empty() )
-      {
-        std::stringstream stream( m_Misc.m_MotionVolumesBox );
-        std::vector<int> numbers;
-        int nummer = std::numeric_limits<int>::max();
-        while( stream >> nummer )
-        {
-          if( nummer < std::numeric_limits<int>::max() )
-          {
-            numbers.push_back( nummer );
-          }
-        }
-        // If a list of negative numbers is given:
-        if( *(std::min_element( numbers.begin(), numbers.end() )) < 0
-            && *(std::max_element( numbers.begin(), numbers.end() )) <= 0 ) // cave: -0 == +0
-        {
-          for ( size_t i=0; i<m_SignalGen.GetNumVolumes(); ++i )
-          {
-            m_SignalGen.m_MotionVolumes.push_back( true );
-          }
-          // set all true except those given.
-          for (auto number : numbers)
-          {
-            if (-number < static_cast<int>(m_SignalGen.GetNumVolumes()) && -number >= 0 )
-              m_SignalGen.m_MotionVolumes.at(-number) = false;
-          }
-          MITK_DEBUG << "mitkFiberfoxParameters.cpp: Case list of negative numbers.";
-        }
-        // If a list of positive numbers is given:
-        else if( *(std::min_element( numbers.begin(), numbers.end() )) >= 0
-                 && *(std::max_element( numbers.begin(), numbers.end() )) >= 0 )
-        {
-          for ( size_t i=0; i<m_SignalGen.GetNumVolumes(); ++i )
-          {
-            m_SignalGen.m_MotionVolumes.push_back( false );
-          }
-          // set all false except those given.
-          for (auto number : numbers)
-          {
-            if (number < static_cast<int>(m_SignalGen.GetNumVolumes()) && number >= 0)
-              m_SignalGen.m_MotionVolumes.at(number) = true;
-          }
-          MITK_DEBUG << "mitkFiberfoxParameters.cpp: Case list of positive numbers.";
-        }
-        else
-        {
-          MITK_WARN << "mitkFiberfoxParameters.cpp: Inconsistent list of numbers in m_MotionVolumesBox.";
-          break;
-        }
-      }
       else
       {
-        MITK_WARN << "mitkFiberfoxParameters.cpp: Cannot make sense of string in m_MotionVolumesBox.";
-        break;
-      }
+        // A list of volume indices: positive numbers name the moved volumes, negative numbers the
+        // volumes that stay. Anything else (no numbers, both signs) moves no volume, with a warning;
+        // the rest of the file is still read.
+        std::stringstream stream( m_Misc.m_MotionVolumesBox );
+        std::vector<int> numbers;
+        int number = 0;
+        while( stream >> number )
+          numbers.push_back( number );
+        const bool parsed = !numbers.empty();
+        const bool negative = parsed && *std::max_element(numbers.begin(), numbers.end()) <= 0
+            && *std::min_element(numbers.begin(), numbers.end()) < 0;
+        const bool positive = parsed && *std::min_element(numbers.begin(), numbers.end()) >= 0;
 
+        m_SignalGen.m_MotionVolumes.assign(m_SignalGen.GetNumVolumes(), negative);
+        if (negative || positive)
+        {
+          for (auto n : numbers)
+          {
+            const int index = negative ? -n : n;
+            if (index >= 0 && index < static_cast<int>(m_SignalGen.GetNumVolumes()))
+              m_SignalGen.m_MotionVolumes.at(index) = !negative;
+          }
+        }
+        else
+          MITK_WARN << "Cannot read the motion volumes '" << m_Misc.m_MotionVolumesBox << "' (indices of the moved volumes, or negative indices of the volumes that stay). No volume is moved.";
+      }
 
       try
       {
@@ -991,7 +982,19 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
             {
               coeffs[k] = ReadVal<double>(v2,"kernels."+boost::lexical_cast<std::string>(j)+".coeffs."+boost::lexical_cast<std::string>(k),0,true);
             }
-            model->SetShCoefficients( coeffs, ReadVal<double>(v2,"kernels."+boost::lexical_cast<std::string>(j)+".B0",0,true) );
+            const double b0 = ReadVal<double>(v2,"kernels."+boost::lexical_cast<std::string>(j)+".B0",0,true);
+            // files of earlier MITK versions store no direction; the model derives it from the coefficients
+            const auto direction = v2.second.get_child_optional("kernels."+boost::lexical_cast<std::string>(j)+".dir");
+            if (direction)
+            {
+              mitk::RawShModel<>::GradientType dir;
+              dir[0] = direction->get<double>("x");
+              dir[1] = direction->get<double>("y");
+              dir[2] = direction->get<double>("z");
+              model->AddKernel(coeffs, b0, dir);
+            }
+            else
+              model->AddKernel(coeffs, b0);
           }
 
           if (ReadVal<std::string>(v2,"type","",true)=="fiber")
@@ -1000,6 +1003,16 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
           { m_NonFiberModelList.push_back(model); }
           // else ?
           signalModel = model;
+        }
+
+        // a compartment whose type is neither "fiber" nor "non-fiber" is in no list
+        if (signalModel!=nullptr
+            && (m_FiberModelList.empty() || m_FiberModelList.back()!=signalModel)
+            && (m_NonFiberModelList.empty() || m_NonFiberModelList.back()!=signalModel))
+        {
+          MITK_WARN << "Ignoring compartment " << signalModel->m_CompartmentId << " of unknown type '" << ReadVal<std::string>(v2,"type","") << "'.";
+          delete signalModel;
+          signalModel = nullptr;
         }
 
         if (signalModel!=nullptr)
@@ -1072,8 +1085,6 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
   {
     MITK_INFO << "No mask image found.";
   }
-
-  setlocale(LC_ALL, currLocale.c_str());
 }
 
 

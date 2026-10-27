@@ -26,6 +26,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <mitkPointSet.h>
 #include <itkLinearInterpolateImageFunction.h>
+#include <mitkFiberfoxMotion.h>
+#include <mutex>
 
 namespace itk
 {
@@ -66,19 +68,21 @@ public:
     itkSetMacro( FiberBundle, FiberBundleType )             ///< Input fiber bundle
     itkSetMacro( InputImage, typename OutputImageType::Pointer )     ///< Input diffusion-weighted image. If no fiber bundle is set, then the acquisition is simulated for this image without a new diffusion simulation.
     itkSetMacro( UseConstantRandSeed, bool )                ///< Seed for random generator.
-    void SetParameters( FiberfoxParameters param )  ///< Simulation parameters.
+    void SetParameters( mitk::FiberfoxParameters param )  ///< Simulation parameters.
     { m_Parameters = param; }
 
     /** Output */
-    FiberfoxParameters GetParameters(){ return m_Parameters; }
+    mitk::FiberfoxParameters GetParameters(){ return m_Parameters; }
     std::vector< ItkDoubleImgType::Pointer > GetVolumeFractions() ///< one double image for each compartment containing the corresponding volume fraction per voxel
     { return m_VolumeFractions; }
-    itkGetMacro( StatusText, std::string )
+    std::string GetStatusText() const;   ///< log of the running simulation; safe to call from another thread
     itkGetMacro( PhaseImage, DoubleDwiType::Pointer )
     itkGetMacro( KspaceImage, DoubleDwiType::Pointer )
     itkGetMacro( CoilPointset, mitk::PointSet::Pointer )
     itkGetMacro( TickImage, typename Float2DImageType::Pointer )    ///< k-space readout ordering encoded in the voxels
     itkGetMacro( RfImage, typename Float2DImageType::Pointer )    ///< time passed since last RF pulse encoded per voxel
+    const std::vector< mitk::FiberfoxMotion >& GetMotion() const   ///< head motion of each simulated volume (ground truth for motion correction)
+    { return m_Motion; }
 
     void GenerateData() override;
 
@@ -97,15 +101,35 @@ protected:
     TractsToDWIImageFilter();
     ~TractsToDWIImageFilter() override;
     itk::Vector<double, 3> GetItkVector(double point[3]);
+    /** Seed of the random signal models for one fiber segment and compartment. */
+    static int SegmentSeed(int runSeed, int fiber, int segment, int compartment);
+    /** Throws if the model is a prototype (raw-SH) model and the gradients have more than one shell. */
+    void CheckPrototypeShells(mitk::DiffusionSignalModel<double>* model);
     vnl_vector_fixed<double, 3> GetVnlVector(double point[3]);
     vnl_vector_fixed<double, 3> GetVnlVector(Vector< float, 3 >& vector);
     double RoundToNearest(double num);
     std::string GetTime();
     bool PrepareLogFile();  /** Prepares the log file and returns true if successful or false if failed. */
     void PrintToLog(std::string m, bool addTime=true, bool linebreak=true, bool stdOut=true);
+    /** Progress bar of 50 stars in the log, the status text and on stdout, for total steps. */
+    void StartProgress(unsigned long total);
+    /** One step of the progress bar; called from the parallel loops. */
+    void AdvanceProgress();
 
     /** Transform generated image compartment by compartment, channel by channel and slice by slice using DFT and add k-space artifacts/effects. */
     DoubleDwiType::Pointer SimulateKspaceAcquisition(std::vector< DoubleDwiType::Pointer >& images);
+
+    /**
+     * Adds the signal of every fiber segment in volume g to the fiber compartment images and the
+     * segment volumes (mm³) to intraAxonalVolume; returns its largest voxel value.
+     */
+    double SimulateFiberSignal(unsigned int g, int signalModelSeed, int fiberThreads, ItkDoubleImgType* intraAxonalVolume);
+
+    /**
+     * In every voxel of the moved mask, scales the fiber compartments of volume g to their volume
+     * fractions and fills the rest of the voxel with the non-fiber compartments.
+     */
+    void SimulateNonFiberSignal(unsigned int g, const ItkDoubleImgType* intraAxonalVolume, double maxVolume);
 
     /** Generate signal of non-fiber compartments. */
     void SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3>& volume_fraction_point, double intraAxonalVolume, int g);
@@ -133,6 +157,11 @@ protected:
     std::vector < typename DoubleDwiType::Pointer > m_OutputImagesImag;
     std::vector< ItkDoubleImgType::Pointer >    m_VolumeFractions;
     std::string                                 m_StatusText;
+    mutable std::mutex                          m_LogMutex;   ///< guards m_StatusText, m_Logfile, m_TimeProbe and the log output
+    std::mutex                                  m_ProgressMutex;
+    unsigned long                               m_ProgressTotal = 1;
+    unsigned long                               m_ProgressCount = 0;
+    unsigned long                               m_ProgressStars = 0;  ///< stars printed so far
 
     // MISC
     itk::TimeProbe                              m_TimeProbe;
@@ -151,9 +180,8 @@ protected:
     std::vector< DoubleDwiType::Pointer >       m_CompartmentImages;
     ItkUcharImgType::Pointer                    m_TransformedMaskImage;     ///< copy of mask image (changes for each motion step)
     ItkUcharImgType::Pointer                    m_UpsampledMaskImage;       ///< helper image for motion simulation
-    std::vector< MatrixType >                   m_RotationsInv;
-    std::vector< MatrixType >                   m_Rotations;                ///<stores the individual rotation of each volume (needed for k-space simulation to obtain correct frequency map position)
-    std::vector< VectorType >                   m_Translations;             ///<stores the individual translation of each volume (needed for k-space simulation to obtain correct frequency map position)
+    std::vector< mitk::FiberfoxMotion >         m_Motion;                   ///< head motion of each volume (fibers, mask, volume fraction and frequency map lookup)
+    mitk::FiberfoxMotion::PointType             m_MotionCenter;             ///< rotation centre of all volumes: centre of the unmoved fiber bundle
     double                                      m_mmRadius;
     double                                      m_SegmentVolume;
     bool                                        m_UseRelativeNonFiberVolumeFractions;

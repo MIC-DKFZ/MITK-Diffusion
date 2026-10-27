@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <mitkDiffusionDataIOHelper.h>
 #include <itkRandomPhantomFilter.h>
+#include <boost/lexical_cast.hpp>
 
 int main(int argc, char* argv[])
 {
@@ -31,20 +32,20 @@ int main(int argc, char* argv[])
   parser.setDescription("Create Random Fiber Configurations");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("num_bundles", "", mitkCommandLineParser::Int, "", "", 50);
-  parser.addArgument("min_density", "", mitkCommandLineParser::Int, "", "", 50);
-  parser.addArgument("max_density", "", mitkCommandLineParser::Int, "", "", 200);
-  parser.addArgument("size_x", "", mitkCommandLineParser::Int, "", "", 250);
-  parser.addArgument("size_y", "", mitkCommandLineParser::Int, "", "", 250);
-  parser.addArgument("size_z", "", mitkCommandLineParser::Int, "", "", 250);
-  parser.addArgument("min_stepsize", "", mitkCommandLineParser::Int, "", "", 15);
-  parser.addArgument("max_stepsize", "", mitkCommandLineParser::Int, "", "", 30);
-  parser.addArgument("min_curve", "", mitkCommandLineParser::Int, "", "", 5);
-  parser.addArgument("max_curve", "", mitkCommandLineParser::Int, "", "", 45);
-  parser.addArgument("min_radius", "", mitkCommandLineParser::Int, "", "", 5);
-  parser.addArgument("max_radius", "", mitkCommandLineParser::Int, "", "", 25);
-  parser.addArgument("min_twist", "", mitkCommandLineParser::Int, "", "", 15);
-  parser.addArgument("max_twist", "", mitkCommandLineParser::Int, "", "", 30);
+  parser.addArgument("num_bundles", "", mitkCommandLineParser::Int, "Bundles:", "number of fiber bundles", 50);
+  parser.addArgument("min_density", "", mitkCommandLineParser::Int, "Minimum density:", "minimum number of fibers per cm^2 of cross-section", 50);
+  parser.addArgument("max_density", "", mitkCommandLineParser::Int, "Maximum density:", "maximum number of fibers per cm^2 of cross-section", 200);
+  parser.addArgument("size_x", "", mitkCommandLineParser::Int, "Size x:", "volume size in x (mm)", 250);
+  parser.addArgument("size_y", "", mitkCommandLineParser::Int, "Size y:", "volume size in y (mm)", 250);
+  parser.addArgument("size_z", "", mitkCommandLineParser::Int, "Size z:", "volume size in z (mm)", 250);
+  parser.addArgument("min_stepsize", "", mitkCommandLineParser::Int, "Minimum step size:", "minimum distance between fiducials (mm)", 15);
+  parser.addArgument("max_stepsize", "", mitkCommandLineParser::Int, "Maximum step size:", "maximum distance between fiducials (mm), larger than 0", 30);
+  parser.addArgument("min_curve", "", mitkCommandLineParser::Int, "Minimum curvyness:", "minimum rotation between fiducials (degree)", 5);
+  parser.addArgument("max_curve", "", mitkCommandLineParser::Int, "Maximum curvyness:", "maximum rotation between fiducials (degree)", 45);
+  parser.addArgument("min_radius", "", mitkCommandLineParser::Int, "Minimum radius:", "minimum start radius of the bundles (mm), larger than 0", 5);
+  parser.addArgument("max_radius", "", mitkCommandLineParser::Int, "Maximum radius:", "maximum start radius of the bundles (mm)", 25);
+  parser.addArgument("min_twist", "", mitkCommandLineParser::Int, "Minimum twist:", "minimum twist between fiducials (degree)", 15);
+  parser.addArgument("max_twist", "", mitkCommandLineParser::Int, "Maximum twist:", "maximum twist between fiducials (degree)", 30);
   parser.addArgument("compress", "", mitkCommandLineParser::Float, "Compress:", "compress fiber using the given error threshold (in mm)", 0.1);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output folder:", "output folder", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("fix_seed", "", mitkCommandLineParser::Int, "Fix random seed:", "if >= 0, produce same random values on each run using this seed.", -1);
@@ -54,6 +55,9 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
 
   std::string out_folder = us::any_cast<std::string>(parsedArgs["o"]);
+  // the bundles are written into the folder, not next to it
+  if (!out_folder.empty() && out_folder.back()!='/')
+    out_folder += '/';
 
   float compress=0.1;
   if (parsedArgs.count("compress"))
@@ -142,7 +146,6 @@ int main(int argc, char* argv[])
     filter->Update();
     auto fibs = filter->GetFiberBundles();
 
-    std::vector< mitk::DataNode::Pointer > fiber_nodes;
     int c = 1;
     for (auto fib : fibs)
     {

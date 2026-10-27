@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_quaternion.h>
 #include <mitkStickModel.h>
 
-using namespace mitk;
+namespace mitk {
 
 template< class ScalarType >
 StickModel< ScalarType >::StickModel()
@@ -71,4 +71,6 @@ typename StickModel< ScalarType >::PixelType StickModel< ScalarType >::SimulateM
   }
 
   return signal;
+}
+
 }

@@ -24,9 +24,11 @@ This file is based heavily on a corresponding ITK filter.
 
 #include <itkImageSource.h>
 #include <vector>
+#include <mutex>
+#include <memory>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkFiberfoxParameters.h>
-#include <mitkFiberBundle.h>
+#include <mitkFiberfoxMotion.h>
 #include <mitkAcquisitionType.h>
 
 namespace itk{
@@ -74,18 +76,29 @@ namespace itk{
     itkSetMacro( SpikesPerSlice, unsigned int )     ///< Number of spikes per slice. Corresponding parameter in fiberfox parameter object specifies the number of spikes for the whole image and can thus not be used here.
     itkSetMacro( Z, double )                        ///< Slice position, necessary for eddy current simulation.
     itkSetMacro( RandSeed, int )                  ///< Use constant seed for random generator for reproducible results.
-    itkSetMacro( Translation, VectorType )
-    itkSetMacro( RotationMatrix, MatrixType )
     itkSetMacro( Zidx, int )
     itkSetMacro( StoreTimings, bool )
-    itkSetMacro( FiberBundle, FiberBundle::Pointer )
     itkSetMacro( CoilPosition, VectorType )
     itkGetMacro( KSpaceImage, typename InputImageType::Pointer )    ///< k-space magnitude image
     itkGetMacro( TickImage, typename InputImageType::Pointer )    ///< k-space readout ordering encoded in the voxels
     itkGetMacro( RfImage, typename InputImageType::Pointer )    ///< time passed since last RF pulse encoded per voxel
     itkGetMacro( SpikeLog, std::string )
 
-    void SetParameters( FiberfoxParameters* param ){ m_Parameters = param; }
+    void SetParameters( const mitk::FiberfoxParameters* param ){ m_Parameters = param; }
+    void SetMotion( const mitk::FiberfoxMotion& motion ){ m_Motion = motion; }  ///< head motion of the volume; moves the frequency map
+
+    /** Readout scheme (k-space trajectory and timing) of the acquisition type in the parameters. */
+    static std::unique_ptr<mitk::AcquisitionType> CreateReadoutScheme(const mitk::FiberfoxParameters* parameters);
+
+    /**
+     * Whether partial Fourier leaves the phase-encoding line with k-space index ky (0 to numLines-1)
+     * unacquired. The partial Fourier factor is the fraction of the numLines lines that is acquired:
+     * round(partialFourier*numLines) lines, at least up to the k-space centre. They are the lines read
+     * first: the highest indices in normal and the lowest in reversed phase direction. With an even
+     * number of lines, line 0 (the highest frequency, without a conjugate partner) is always acquired
+     * and counted, so both directions acquire the same number of lines, mirrored about the centre.
+     */
+    static bool IsSkippedLine(int ky, int numLines, double partialFourier, bool reversePhase);
 
     void SetCompartmentImages( std::vector< InputImagePointerType > cImgs ) { m_CompartmentImages=cImgs; }  ///< One signal image per compartment.
     void SetT2( std::vector< float > t2Vector ) { m_T2=t2Vector; } ///< One T2 relaxation constant per compartment image.
@@ -96,34 +109,32 @@ namespace itk{
     KspaceImageFilter();
     ~KspaceImageFilter() override {}
 
-    float CoilSensitivity(VectorType& pos);
+    float CoilSensitivity(VectorType& pos) const;
 
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
     void AfterThreadedGenerateData() override;
 
     VectorType                              m_CoilPosition;
-    FiberfoxParameters*                     m_Parameters;
+    const mitk::FiberfoxParameters*               m_Parameters;
     std::vector< float >                    m_T2;
     std::vector< float >                    m_T1;
     std::vector< float >                    m_T1Relax;
     std::vector< InputImagePointerType >    m_CompartmentImages;
     itk::Vector<double,3>                   m_DiffusionGradientDirection;
+    itk::Vector<double,3>                   m_EddyFieldGradient;    ///< eddy-current field gradient times gamma, along the diffusion gradient
     float                                   m_Z;
     int                                     m_Zidx;
     int                                     m_RandSeed;
     itk::Statistics::MersenneTwisterRandomVariateGenerator::Pointer m_RandGen;
     unsigned int                            m_SpikesPerSlice;
-    FiberBundle::Pointer                    m_FiberBundle;
     float                                   m_Gamma;
-    VectorType                              m_Translation;  ///< used to find correct point in frequency map (head motion)
-    MatrixType                              m_RotationMatrix;
-    float                                   m_TransX;
-    float                                   m_TransY;
-    float                                   m_TransZ;
+    mitk::FiberfoxMotion                    m_Motion;
 
     bool                                    m_IsBaseline;
     std::complex<ScalarType>                 m_Spike;
+    long                                    m_SpikeTick;    ///< readout position of m_Spike, decides between equal maxima
+    std::mutex                              m_SpikeMutex;
     MatrixType                              m_Transform;
     std::string                             m_SpikeLog;
 
@@ -131,7 +142,7 @@ namespace itk{
     typename InputImageType::Pointer        m_KSpaceImage;
     typename InputImageType::Pointer        m_TickImage;
     typename InputImageType::Pointer        m_RfImage;
-    AcquisitionType*                        m_ReadoutScheme;
+    std::unique_ptr<mitk::AcquisitionType>        m_ReadoutScheme;
 
     typename itk::Image< ScalarType, 2 >::Pointer m_MovedFmap;
     int                                     ringing_lines_x;

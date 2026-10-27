@@ -74,8 +74,6 @@ void FieldmapGeneratorFilter< OutputImageType >::DynamicThreadedGenerateData( co
     oit.Set(value);
     ++oit;
   }
-
-  MITK_INFO << "One thread finished processing";
 }
 
 }

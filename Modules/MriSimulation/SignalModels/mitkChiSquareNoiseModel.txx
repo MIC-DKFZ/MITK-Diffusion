@@ -15,39 +15,38 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 #include <vnl/vnl_cross.h>
 #include <vnl/vnl_quaternion.h>
-#include <mitkRicianNoiseModel.h>
+#include <mitkChiSquareNoiseModel.h>
+#include <random>
 
-using namespace mitk;
+namespace mitk {
 
 template< class ScalarType >
-RicianNoiseModel< ScalarType >::RicianNoiseModel()
+ChiSquareNoiseModel< ScalarType >::ChiSquareNoiseModel()
 {
-    m_RandGen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
-    m_RandGen->SetSeed();
-    this->m_NoiseVariance = 0;
+    SetSeed(-1);
 }
 
 template< class ScalarType >
-RicianNoiseModel< ScalarType >::~RicianNoiseModel()
+ChiSquareNoiseModel< ScalarType >::~ChiSquareNoiseModel()
 {
 
 }
 
 template< class ScalarType >
-void RicianNoiseModel< ScalarType >::SetSeed(int seed)
+void ChiSquareNoiseModel< ScalarType >::SetSeed(int seed)
 {
+    // a negative seed means a random one, as in RicianNoiseModel (seed() without argument is a fixed default)
     if (seed>=0)
-        m_RandGen->SetSeed(seed);
+        m_RandGen.seed(seed);
     else
-        m_RandGen->SetSeed();
+        m_RandGen.seed(std::random_device()());
 }
 
 template< class ScalarType >
-void RicianNoiseModel< ScalarType >::AddNoise(PixelType& pixel)
+void ChiSquareNoiseModel< ScalarType >::AddNoise(PixelType& pixel)
 {
     for( unsigned int i=0; i<pixel.Size(); i++)
-    {
-        double signal = pixel[i];
-        pixel[i] = sqrt(pow(signal + m_RandGen->GetNormalVariate(0.0, this->m_NoiseVariance), 2) +  pow(m_RandGen->GetNormalVariate(0.0, this->m_NoiseVariance),2));
-    }
+        pixel[i] += (ScalarType)(m_Distribution(m_RandGen)-m_Distribution.n());
+}
+
 }

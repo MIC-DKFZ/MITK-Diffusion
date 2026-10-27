@@ -31,7 +31,7 @@ public:
 
   unsigned int linesWithSameTime;
   float half_read_time;
-  FastSpinEcho(FiberfoxParameters* parameters)
+  FastSpinEcho(const FiberfoxParameters* parameters)
     : AcquisitionType(parameters)
   {
     linesWithSameTime = static_cast<unsigned int>(std::ceil(static_cast<float>(kyMax)/m_Parameters->m_SignalGen.m_EchoTrainLength));
@@ -76,14 +76,9 @@ public:
     return out_idx;
   }
 
-  void AdjustEchoTime() override
+  float GetMinimumEchoTime() const override
   {
-    if ( m_Parameters->m_SignalGen.m_tEcho < m_Parameters->m_SignalGen.m_EchoTrainLength*m_Parameters->m_SignalGen.m_tLine )
-    {
-      m_Parameters->m_SignalGen.m_tEcho = m_Parameters->m_SignalGen.m_EchoTrainLength*m_Parameters->m_SignalGen.m_tLine;
-      MITK_WARN << "Echo time is too short! Time not sufficient to read slice. Automatically adjusted to " << m_Parameters->m_SignalGen.m_tEcho << " ms";
-      m_Parameters->m_Misc.m_AfterSimulationMessage += "Echo time was chosen too short! Time not sufficient to read slice. Internally adjusted to " + boost::lexical_cast<std::string>(m_Parameters->m_SignalGen.m_tEcho) + " ms\n";
-    }
+    return m_Parameters->m_SignalGen.m_EchoTrainLength*m_Parameters->m_SignalGen.m_tLine;
   }
 
 protected:

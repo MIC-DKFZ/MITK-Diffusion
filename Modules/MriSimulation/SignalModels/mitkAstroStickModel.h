@@ -33,22 +33,9 @@ class AstroStickModel : public DiffusionSignalModel< ScalarType >
 public:
 
   AstroStickModel();
-  template< class OtherType >AstroStickModel(AstroStickModel<OtherType>* model)
-  {
-    this->m_CompartmentId = model->m_CompartmentId;
-    this->m_T1 = model->GetT1();
-    this->m_T2 = model->GetT2();
-    this->m_GradientList = model->GetGradientList();
-    this->m_VolumeFractionImage = model->GetVolumeFractionImage();
-    this->m_RandGen = model->GetRandomGenerator();
+  ~AstroStickModel() override;
 
-    this->m_BValue = model->GetBvalue();
-    this->m_Diffusivity = model->GetDiffusivity();
-    this->m_Sticks = model->GetSticks();
-    this->m_NumSticks = model->GetNumSticks();
-    this->m_RandomizeSticks = model->GetRandomizeSticks();
-  }
-  ~AstroStickModel();
+  DiffusionSignalModel< ScalarType >* Clone() const override { return new AstroStickModel(*this); }
 
   typedef typename DiffusionSignalModel< ScalarType >::PixelType          PixelType;
   typedef typename DiffusionSignalModel< ScalarType >::GradientType       GradientType;
@@ -60,6 +47,7 @@ public:
 
   void SetRandomizeSticks(bool randomize=true){ m_RandomizeSticks=randomize; } ///< Random stick configuration in each voxel
   bool GetRandomizeSticks() { return m_RandomizeSticks; }
+  bool UsesRandomNumbers() const override { return m_RandomizeSticks; }
 
   void SetDiffusivity(double diffusivity) { m_Diffusivity = diffusivity; } ///< Scalar diffusion constant
   double GetDiffusivity() { return m_Diffusivity; }
@@ -88,7 +76,8 @@ public:
       break;
     }
     const vnl_matrix<double> &sticks = mitk::pointshell::Directions(m_NumSticks);
-    for (int i=0; i<m_NumSticks; i++)
+    m_Sticks.clear();
+    for (unsigned int i=0; i<m_NumSticks; i++)
     {
       GradientType stick;
       stick[0] = sticks.get(0,i); stick[1] = sticks.get(1,i); stick[2] = sticks.get(2,i);
@@ -110,7 +99,7 @@ protected:
 
 }
 
-#include "mitkAstroStickModel.cpp"
+#include "mitkAstroStickModel.txx"
 
 #endif
 

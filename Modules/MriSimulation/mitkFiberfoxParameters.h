@@ -171,6 +171,12 @@ namespace mitk
     GradientType GetGradientDirection(unsigned int i);
     std::vector< int > GetBvalues();                         ///< Returns a vector with all unique b-values (determined by the gradient magnitudes)
     double GetBvalue();
+    /**
+     * The gradients of .ffp and bvecs files are FSL bvecs of the simulated geometry (voxel frame, x
+     * negated for a direction matrix with positive determinant), like every bvecs file MITK reads.
+     * This turns them into the world (LPS) vectors the simulation uses (and stores as the output's
+     * gradients). Without it, the gradients are taken as world vectors.
+     */
     void ApplyDirectionMatrix();
 
   protected:
@@ -303,9 +309,9 @@ namespace mitk
     typedef DiffusionNoiseModel<double>                     NoiseModelType;
 
     FiberfoxParameters();
+    /** Copy and assignment clone the signal models and the noise model. */
     FiberfoxParameters(const FiberfoxParameters &params);
-    /** Member-wise: unlike the copy constructor, it shares the signal models with params. */
-    FiberfoxParameters& operator=(const FiberfoxParameters &params) = default;
+    FiberfoxParameters& operator=(const FiberfoxParameters &params);
     ~FiberfoxParameters();
 
     /** Not templated parameters */
@@ -313,7 +319,7 @@ namespace mitk
     SignalGenerationParameters          m_SignalGen;            ///< Signal generation parameters
     MiscFiberfoxParameters              m_Misc;                 ///< GUI realted and I/O parameters
 
-    /** Templated parameters */
+    /** Templated parameters. The parameters own the models in both lists (created with new) and delete them. */
     DiffusionModelListType              m_FiberModelList;       ///< Intra- and inter-axonal compartments.
     DiffusionModelListType              m_NonFiberModelList;    ///< Extra-axonal compartments.
     std::shared_ptr< NoiseModelType >   m_NoiseModel;           ///< If != nullptr, noise is added to the image.
@@ -327,6 +333,13 @@ namespace mitk
     void ClearFiberParameters();
     void ClearSignalParameters();
     void ApplyDirectionMatrix();
+    /**
+     * Gradients and reference b-value of a diffusion-weighted image, for a simulation that reproduces
+     * its world gradients; m_SignalGen.m_ImageDirection has to be set to the simulated geometry first.
+     * Stored as FSL bvecs of that geometry (the form of .ffp files, see ApplyDirectionMatrix) or,
+     * with asFslBvecs false, as world vectors for a simulation without ApplyDirectionMatrix.
+     */
+    void SetGradientsFromImage(const mitk::Image* dwi, bool asFslBvecs=true);
 
     void PrintSelf();                           ///< Print parameters to stdout.
     void SaveParameters(std::string filename);  ///< Save image generation parameters to .ffp file.
@@ -334,6 +347,10 @@ namespace mitk
     template< class ParameterType >
     ParameterType ReadVal(boost::property_tree::ptree::value_type const& v, std::string tag, ParameterType defaultValue, bool essential=false);
     std::string                         m_MissingTags;
+
+  private:
+    void DeleteSignalModels();
+    void CopyFrom(const FiberfoxParameters &params);
   };
 }
 
