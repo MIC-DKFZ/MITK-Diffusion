@@ -18,35 +18,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkDirectory.h>
 #include <itksys/SystemTools.hxx>
+#include <mitkExceptionMacro.h>
 #include <mitkIOUtil.h>
 
 #include <algorithm>
-#include <iostream>
-#include <sstream>
-
-namespace
-{
-  /** Silences std::cout (progress output of the readers) and restores it also when loading
-   *  throws, so that the callers can still print the error. */
-  class CoutSilencer
-  {
-  public:
-    CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
-    ~CoutSilencer() { this->Restore(); }
-    void Restore()
-    {
-      if (m_Old != nullptr)
-        std::cout.rdbuf(m_Old);
-      m_Old = nullptr;
-    }
-    CoutSilencer(const CoutSilencer&) = delete;
-    CoutSilencer& operator=(const CoutSilencer&) = delete;
-
-  private:
-    std::stringstream m_Buffer;
-    std::streambuf* m_Old;
-  };
-}
 
 std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::string& path, const std::vector<std::string>& extensions)
 {
@@ -112,4 +87,13 @@ std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(c
   silencer.Restore();
   MITK_INFO << "Loaded " << out.size() << " tractograms";
   return out;
+}
+
+mitk::FiberBundle::Pointer mitk::FiberBundleIOHelper::load_fib(const std::string& file)
+{
+  // IOUtil throws if the file cannot be read and gives a null pointer for other data.
+  mitk::FiberBundle::Pointer fib = mitk::IOUtil::Load<mitk::FiberBundle>(file);
+  if (fib.IsNull())
+    mitkThrow() << file << " holds no fiber bundle.";
+  return fib;
 }

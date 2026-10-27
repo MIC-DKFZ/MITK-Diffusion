@@ -864,7 +864,7 @@ void TractsToDWIImageFilter< PixelType >::InitializeFiberData()
   auto density_calculator = itk::TractDensityImageFilter< itk::Image<double, 3> >::New();
   density_calculator->SetFiberBundle(m_FiberBundle);
   density_calculator->SetInputImage(caster->GetOutput());
-  density_calculator->SetMode(TDI_MODE::DENSITY);
+  density_calculator->SetMode(itk::TDI_MODE::DENSITY);
   density_calculator->SetUseImageGeometry(true);
   density_calculator->SetOutputAbsoluteValues(true);
   density_calculator->Update();

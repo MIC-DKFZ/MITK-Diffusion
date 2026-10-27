@@ -184,6 +184,9 @@ public:
     void SetTrackVisHeader(const TrackVis_header &TrackVisHeader);
     void SetTrackVisHeader(const BaseGeometry *geometry);
 
+    /** Fiber count, length, extent and weight statistics and the TrackVis reference grid, as
+     *  PrintSelf prints them before the BaseData part (geometry objects and properties). */
+    void PrintStatistics(std::ostream &os, itk::Indent indent) const;
     void PrintSelf(std::ostream &os, itk::Indent indent) const override;
 
     void setIsRAS(bool newIsRAS);

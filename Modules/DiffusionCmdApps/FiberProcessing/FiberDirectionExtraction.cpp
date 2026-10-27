@@ -22,9 +22,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <usAny.h>
 #include <itkImageFileWriter.h>
 #include <mitkIOUtil.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkLexicalCast.h>
 #include <itkTractsToVectorImageFilter.h>
 #include <mitkLocaleSwitch.h>
+#include <mitkPeakImage.h>
 
 /*!
 \brief Extract principal fiber directions from a tractogram
@@ -41,7 +43,7 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output root", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "mask image", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "mask image; without it, the grid covers the tractogram", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("athresh", "", mitkCommandLineParser::Float, "Angular threshold:", "angular threshold in degrees. closer fiber directions are regarded as one direction and clustered together.", 25, true);
   parser.addArgument("peakthresh", "", mitkCommandLineParser::Float, "Peak size threshold:", "peak size threshold relative to largest peak in voxel", 0.2, true);
   parser.addArgument("only_mask_geometry", "", mitkCommandLineParser::Bool, "Only mask geometry:", "don't use content of mask image, only use it's geometry", false);
@@ -82,6 +84,11 @@ int main(int argc, char* argv[])
   int maxNumDirs = 3;
   if (parsedArgs.count("numdirs"))
     maxNumDirs = us::any_cast<int>(parsedArgs["numdirs"]);
+  if (maxNumDirs < 1)
+  {
+    std::cout << "--numdirs must be at least 1." << std::endl;
+    return EXIT_FAILURE;
+  }
 
   int normalization = 1;
   if (parsedArgs.count("normalization"))
@@ -97,7 +104,7 @@ int main(int argc, char* argv[])
     typedef itk::Image<unsigned char, 3>                                    ItkUcharImgType;
 
     // load fiber bundle
-    mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(fibFile);
+    mitk::FiberBundle::Pointer inputTractogram = mitk::FiberBundleIOHelper::load_fib(fibFile);
 
     // load/create mask image
     ItkUcharImgType::Pointer itkMaskImage = nullptr;
@@ -126,25 +133,26 @@ int main(int argc, char* argv[])
     case 3:
       fOdfFilter->SetNormalizationMethod(itk::TractsToVectorImageFilter<float>::NormalizationMethods::MAX_VEC_NORM);
       break;
+    default:
+      std::cout << "--normalization must be 1, 2 or 3." << std::endl;
+      return EXIT_FAILURE;
     }
     fOdfFilter->SetSizeThreshold(peakThreshold);
     fOdfFilter->SetMaxNumDirections(maxNumDirs);
     fOdfFilter->Update();
 
-    mitk::LocaleSwitch localeSwitch("C");
     {
+      // Saved as mitk::PeakImage, so that NIfTI files follow MITK's peak convention (RAS vectors,
+      // marked in the header) like every other peak image MITK writes.
       itk::TractsToVectorImageFilter<float>::ItkDirectionImageType::Pointer itkImg = fOdfFilter->GetDirectionImage();
-      typedef itk::ImageFileWriter< itk::TractsToVectorImageFilter<float>::ItkDirectionImageType > WriterType;
-      WriterType::Pointer writer = WriterType::New();
-
-      std::string outfilename = outRoot;
-      outfilename.append("_DIRECTIONS");
-      outfilename.append(file_ending);
-
-      writer->SetFileName(outfilename.c_str());
-      writer->SetInput(itkImg);
-      writer->Update();
+      auto peaks = mitk::PeakImage::New();
+      peaks->InitializeByItk(itkImg.GetPointer());
+      // A 4D ITK image becomes one MITK volume per component; SetChannel copies all of them.
+      peaks->SetChannel(itkImg->GetBufferPointer());
+      mitk::IOUtil::Save(peaks, outRoot + "_DIRECTIONS" + file_ending);
     }
+
+    mitk::LocaleSwitch localeSwitch("C");
 
     if (verbose)
     {
@@ -164,12 +172,12 @@ int main(int argc, char* argv[])
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (...)
