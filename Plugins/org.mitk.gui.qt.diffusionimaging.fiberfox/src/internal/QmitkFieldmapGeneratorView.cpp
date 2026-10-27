@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImage.h>
 #include <mitkSliceNavigationController.h>
 #include <QmitkRenderWindow.h>
+#include <QMessageBox>
 
 const std::string QmitkFieldmapGeneratorView::VIEW_ID = "org.mitk.views.fieldmapgenerator";
 
@@ -189,7 +190,15 @@ void QmitkFieldmapGeneratorView::GenerateFieldmap()
   filter->SetImageRegion(imageRegion);
   filter->SetGradient(gradient);
   filter->SetOffset(offset);
-  filter->Update();
+  try
+  {
+    filter->Update();
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    QMessageBox::warning(nullptr, "Fieldmap not generated", e.GetDescription());
+    return;
+  }
 
   mitk::DataNode::Pointer resultNode = mitk::DataNode::New();
   mitk::Image::Pointer image = mitk::Image::New();

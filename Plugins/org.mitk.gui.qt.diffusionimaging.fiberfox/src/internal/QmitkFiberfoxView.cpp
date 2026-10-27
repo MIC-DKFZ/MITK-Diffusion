@@ -1330,8 +1330,21 @@ void QmitkFiberfoxView::SaveParameters()
         tr("Save Parameters"),
         m_ParameterFile,
         tr("Fiberfox Parameters (*.ffp)") );
+  if (filename.isEmpty())
+    return;
 
-  SaveParameters(filename);
+  try
+  {
+    SaveParameters(filename);
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    QMessageBox::warning(nullptr, "Parameter file not saved", e.GetDescription());
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Parameter file not saved", e.what());
+  }
 }
 
 void QmitkFiberfoxView::LoadParameters()
@@ -1340,8 +1353,16 @@ void QmitkFiberfoxView::LoadParameters()
   if(filename.isEmpty() || filename.isNull())
     return;
 
+  try
+  {
+    m_Parameters.LoadParameters(filename.toStdString());
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Parameters not loaded", QString("Cannot read ") + filename + ":\n" + e.what());
+    return;
+  }
   m_ParameterFile = filename;
-  m_Parameters.LoadParameters(filename.toStdString());
 
   if (m_Parameters.m_MissingTags.size()>0)
   {
@@ -1910,6 +1931,23 @@ std::vector<itk::Vector<double,3> > QmitkFiberfoxView::MakeGradientList()
 }
 
 void QmitkFiberfoxView::GenerateImage()
+{
+  // bvals/bvecs files and other inputs are read here; a bad one stops with its message
+  try
+  {
+    StartSimulation();
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    QMessageBox::warning(nullptr, "No image generated", e.GetDescription());
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "No image generated", e.what());
+  }
+}
+
+void QmitkFiberfoxView::StartSimulation()
 {
   if (m_Controls->m_FiberBundleComboBox->GetSelectedNode().IsNull() && !mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage( m_Controls->m_TemplateComboBox->GetSelectedNode()))
   {

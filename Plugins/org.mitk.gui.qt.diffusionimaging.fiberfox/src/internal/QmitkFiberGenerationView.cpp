@@ -142,6 +142,22 @@ void QmitkFiberGenerationView::CreateQtPartControl( QWidget *parent )
 
 void QmitkFiberGenerationView::RandomPhantom()
 {
+  // the filter throws for a minimum above its maximum
+  const std::vector< std::pair<QString, std::pair<double, double>> > ranges = {
+    {"Streamline density", {m_Controls->m_MinDensityBox->value(), m_Controls->m_MaxDensityBox->value()}},
+    {"Step size", {m_Controls->m_StepSizeMinBox->value(), m_Controls->m_StepSizeMaxBox->value()}},
+    {"Curviness", {m_Controls->m_CurvyMinBox->value(), m_Controls->m_CurvyMaxBox->value()}},
+    {"Start radius", {m_Controls->m_SizeMinBox->value(), m_Controls->m_SizeMaxBox->value()}},
+    {"Twist", {m_Controls->m_MinTwistBox->value(), m_Controls->m_MaxTwistBox->value()}}};
+  for (const auto& range : ranges)
+  {
+    if (range.second.first > range.second.second)
+    {
+      QMessageBox::information(nullptr, "No phantom generated", range.first + ": the minimum is larger than the maximum.");
+      return;
+    }
+  }
+
   itk::RandomPhantomFilter::Pointer filter = itk::RandomPhantomFilter::New();
   filter->SetNumTracts(m_Controls->m_NumBundlesBox->value());
   filter->SetMinStreamlineDensity(m_Controls->m_MinDensityBox->value());
@@ -159,7 +175,15 @@ void QmitkFiberGenerationView::RandomPhantom()
   filter->SetStartRadiusMax(m_Controls->m_SizeMaxBox->value());
   filter->SetMinTwist(m_Controls->m_MinTwistBox->value());
   filter->SetMaxTwist(m_Controls->m_MaxTwistBox->value());
-  filter->Update();
+  try
+  {
+    filter->Update();
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    QMessageBox::warning(nullptr, "No phantom generated", e.GetDescription());
+    return;
+  }
   auto fibs = filter->GetFiberBundles();
 
   std::vector< mitk::DataNode::Pointer > fiber_nodes;
@@ -240,8 +264,16 @@ void QmitkFiberGenerationView::LoadParameters()
   if(filename.isEmpty() || filename.isNull())
     return;
 
+  try
+  {
+    m_Parameters.LoadParameters(filename.toStdString());
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Parameters not loaded", QString("Cannot read ") + filename + ":\n" + e.what());
+    return;
+  }
   m_ParameterFile = filename;
-  m_Parameters.LoadParameters(filename.toStdString());
 
   if (m_Parameters.m_MissingTags.size()>0)
   {

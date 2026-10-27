@@ -142,6 +142,7 @@ protected:
 
     Ui::QmitkFiberfoxViewControls* m_Controls;
 
+    void StartSimulation();     ///< GenerateImage without its exception handling
     void SimulateForExistingDwi(mitk::DataNode* imageNode);     ///< add artifacts to existing diffusion weighted image
     void SimulateImageFromFibers(mitk::DataNode* fiberNode);    ///< simulate new diffusion weighted image
     void UpdateParametersFromGui();  ///< update fiberfox paramater object

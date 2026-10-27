@@ -33,6 +33,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateDimension.h>
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateOr.h>
+#include <QMessageBox>
 
 const std::string QmitkFiberFitView::VIEW_ID = "org.mitk.views.fiberfit";
 using namespace mitk;
@@ -153,7 +154,15 @@ void QmitkFiberFitView::StartFit()
   fitter->SetGradientTolerance(1e-5);
   fitter->SetLambda(m_Controls->m_ReguBox->value());
   fitter->SetFilterOutliers(m_Controls->m_OutliersBox->isChecked());
-  fitter->Update();
+  try
+  {
+    fitter->Update();
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Fit failed", e.what());
+    return;
+  }
 
   mitk::FiberBundle::Pointer output_tracts = fitter->GetTractograms().at(0);
   output_tracts->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);
