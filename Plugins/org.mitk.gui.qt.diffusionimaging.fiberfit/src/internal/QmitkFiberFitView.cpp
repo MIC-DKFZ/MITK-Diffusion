@@ -99,6 +99,8 @@ void QmitkFiberFitView::StartFit()
   mitk::FiberBundle::Pointer input_tracts = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_TractBox->GetSelectedNode()->GetData())->GetDeepCopy();
 
   mitk::DataNode::Pointer node = m_Controls->m_ImageBox->GetSelectedNode();
+  // the fitter keeps a raw pointer to the signal model; declared first, the model outlives it
+  mitk::TensorModel<> model;
   itk::FitFibersToImageFilter::Pointer fitter = itk::FitFibersToImageFilter::New();
 
   mitk::Image::Pointer mitk_image = dynamic_cast<mitk::Image*>(node->GetData());
@@ -117,13 +119,13 @@ void QmitkFiberFitView::StartFit()
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(mitk_image))
     {
       fitter->SetDiffImage(mitk::DiffusionPropertyHelper::GetItkVectorImage(mitk_image));
-      mitk::TensorModel<>* model = new mitk::TensorModel<>();
-      model->SetBvalue(1000);
-      model->SetDiffusivity1(0.0010);
-      model->SetDiffusivity2(0.00015);
-      model->SetDiffusivity3(0.00015);
-      model->SetGradientList(mitk::DiffusionPropertyHelper::GetGradientContainer(mitk_image));
-      fitter->SetSignalModel(model);
+      // the gradient norms encode sqrt(b/b_ref), so the model needs the image's reference b-value
+      model.SetBvalue(mitk::DiffusionPropertyHelper::GetReferenceBValue(mitk_image));
+      model.SetDiffusivity1(0.0010);
+      model.SetDiffusivity2(0.00015);
+      model.SetDiffusivity3(0.00015);
+      model.SetGradientList(mitk::DiffusionPropertyHelper::GetGradientContainer(mitk_image));
+      fitter->SetSignalModel(&model);
     }
     else
     {
