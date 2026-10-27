@@ -199,6 +199,11 @@ int main(int argc, char* argv[])
         mitk::IOUtil::Save(outImage, (std::string(outName) + "_BiExp.dwi").c_str());
       }
     }
+    else
+    {
+      std::cout << inName << " is no diffusion-weighted image." << std::endl;
+      return EXIT_FAILURE;
+    }
   }
   catch (const itk::ExceptionObject& e)
   {

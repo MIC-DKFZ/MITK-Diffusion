@@ -50,8 +50,12 @@ int main(int argc, char* argv[])
     mitk::ShImage::Pointer source = mitk::IOUtil::Load<mitk::ShImage>(imageName, &functor);
     mitk::Image::Pointer mitkImage = dynamic_cast<mitk::Image*>(source.GetPointer());
     mitk::OdfImage::Pointer out_image = mitk::convert::GetOdfFromShImage(mitkImage);
-    if (out_image.IsNotNull())
-      mitk::IOUtil::Save(out_image, outImage);
+    if (out_image.IsNull())
+    {
+      std::cout << "Could not convert " << imageName << " to an ODF image." << std::endl;
+      return EXIT_FAILURE;
+    }
+    mitk::IOUtil::Save(out_image, outImage);
   }
   catch (const itk::ExceptionObject& e)
   {

@@ -173,7 +173,10 @@ int main(int argc, char* argv[])
       fileWriter->Update();
     }
     else
-      std::cout << "Diffusion index " << index << " not supported for supplied file type.";
+    {
+      std::cout << "Diffusion index " << index << " not supported for supplied file type." << std::endl;
+      return EXIT_FAILURE;
+    }
   }
   catch (const itk::ExceptionObject& e)
   {
