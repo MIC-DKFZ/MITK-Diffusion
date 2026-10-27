@@ -600,8 +600,9 @@ void StreamlineTrackingFilter::GenerateData()
   if(m_Parameters->m_Mode==mitk::TrackingDataHandler::MODE::PROBABILISTIC)
     trials_per_seed = m_Parameters->m_TrialsPerSeed;
 
-  // Every seed point gets its own random streams and its own result slot, and the slots are
-  // joined in seed order: the tractogram is the same for any number of threads.
+  // Every seed point gets its own random streams, each thread keeps its accepted fibers with their
+  // seed index, and the fibers are joined in seed order: the tractogram is the same for any number
+  // of threads.
   std::uint32_t base_seed = 0;
   if (!m_Parameters->m_FixRandomSeed)
     base_seed = std::random_device()();
@@ -609,8 +610,9 @@ void StreamlineTrackingFilter::GenerateData()
   if (m_TrackingPriorHandler!=nullptr)
     m_TrackingPriorHandler->InitThreadRandomEngines(omp_get_max_threads());
 
-  std::vector< FiberType > seed_fibers(static_cast<std::size_t>(num_seeds));
-  std::vector< unsigned char > seed_success(static_cast<std::size_t>(num_seeds), 0);
+  // Only accepted fibers are stored, no slot per seed point: an empty FiberType (std::deque)
+  // allocates about 670 bytes in libstdc++, gigabytes for whole-brain seeding.
+  std::vector< std::vector< std::pair<int, FiberType> > > thread_fibers(static_cast<std::size_t>(omp_get_max_threads()));
   std::atomic<int> next_seed(0);
 
   // Seeds are handed out in increasing order. When the maximum number of fibers is reached, all
@@ -660,8 +662,7 @@ void StreamlineTrackingFilter::GenerateData()
 
         if (tractLength>=m_Parameters->m_MinTractLengthMm && counter>=2 && !exclude && IsValidFiber(&fib))
         {
-          seed_fibers[static_cast<std::size_t>(temp_i)] = std::move(fib);
-          seed_success[static_cast<std::size_t>(temp_i)] = 1;
+          thread_fibers[static_cast<std::size_t>(omp_get_thread_num())].emplace_back(temp_i, std::move(fib));
           success = true;
           unsigned int accepted = ++m_CurrentTracts;
           if (m_Parameters->m_MaxNumFibers > 0 && accepted>=static_cast<unsigned int>(m_Parameters->m_MaxNumFibers))
@@ -687,17 +688,23 @@ void StreamlineTrackingFilter::GenerateData()
     }
   }// seed points
 
+  // a seed point gives at most one fiber, so sorting by seed index gives a unique order; the
+  // pointers keep the fibers in place
+  std::vector< std::pair<int, FiberType*> > found;
+  for (auto& fibers : thread_fibers)
+    for (auto& [seed_index, fib] : fibers)
+      found.emplace_back(seed_index, &fib);
+  std::sort(found.begin(), found.end());
+
   unsigned int kept = 0;
-  for (std::size_t s=0; s<seed_fibers.size(); ++s)
+  for (const auto& entry : found)
   {
-    if (seed_success[s]==0)
-      continue;
     if (m_Parameters->m_MaxNumFibers > 0 && kept>=static_cast<unsigned int>(m_Parameters->m_MaxNumFibers))
       break;
     if (!m_Parameters->m_OutputProbMap)
-      m_Tractogram.push_back(std::move(seed_fibers[s]));
+      m_Tractogram.push_back(std::move(*entry.second));
     else
-      FiberToProbmap(&seed_fibers[s]);
+      FiberToProbmap(entry.second);
     ++kept;
   }
   m_CurrentTracts = kept;
