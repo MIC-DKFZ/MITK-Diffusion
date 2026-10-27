@@ -155,7 +155,7 @@ void QmitkGibbsTrackingView::AfterThread()
 
   UpdateGUI();
 
-  // After an exception the filter may not have finished; GetFiberBundle would then wait forever.
+  // After an exception there is no result to show.
   if (!m_TrackingError.empty())
   {
     MITK_ERROR << "Gibbs tracking failed: " << m_TrackingError;
@@ -480,8 +480,9 @@ void QmitkGibbsTrackingView::GenerateFiberBundle()
   if (m_Controls->m_VisualizeOnceButton->isChecked())
     m_Controls->m_VisualizeOnceButton->setChecked(false);
 
+  // nullptr while the filter still prepares the data (no fibers built yet)
   vtkSmartPointer<vtkPolyData> fiberBundle = m_GlobalTracker->GetFiberBundle();
-  if ( m_GlobalTracker->GetNumAcceptedFibers()==0 )
+  if (fiberBundle == nullptr || fiberBundle->GetNumberOfLines() == 0)
     return;
   m_FiberBundle = mitk::FiberBundle::New(fiberBundle);
   m_FiberBundle->SetTrackVisHeader(dynamic_cast<mitk::Image*>(m_ImageNode->GetData())->GetGeometry());

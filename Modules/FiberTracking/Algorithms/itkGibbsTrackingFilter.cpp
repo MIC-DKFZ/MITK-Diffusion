@@ -66,7 +66,8 @@ GibbsTrackingFilter< ItkOdfImageType >::GibbsTrackingFilter():
   m_RandomSeed(-1),
   m_LoadParameterFile(""),
   m_LutPath(""),
-  m_IsInValidState(true)
+  m_IsInValidState(true),
+  m_SamplingRunning(false)
 {
 
 }
@@ -81,12 +82,12 @@ GibbsTrackingFilter< ItkOdfImageType >::~GibbsTrackingFilter()
 template< class ItkOdfImageType >
 typename GibbsTrackingFilter< ItkOdfImageType >::FiberPolyDataType GibbsTrackingFilter< ItkOdfImageType >::GetFiberBundle()
 {
-  if (!m_AbortTracking)
+  std::unique_lock<std::mutex> lock(m_FiberMutex);
+  if (m_SamplingRunning)
   {
     m_BuildFibers = true;
-    while (m_BuildFibers){}
+    m_FibersBuilt.wait(lock, [this] { return !m_BuildFibers || !m_SamplingRunning; });
   }
-
   return m_FiberPolyData;
 }
 
@@ -111,8 +112,6 @@ GibbsTrackingFilter< ItkOdfImageType >
   if( !interpolator->IsInValidState() )
   {
     m_IsInValidState = false;
-    m_AbortTracking = true;
-    m_BuildFibers = false;
     mitkThrow() << "Unable to load lookup tables.";
   }
   ParticleGrid* particleGrid = new ParticleGrid(m_MaskImage, m_ParticleLength, m_ParticleGridCellCapacity);
@@ -231,8 +230,6 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   if( !interpolator->IsInValidState() )
   {
     m_IsInValidState = false;
-    m_AbortTracking = true;
-    m_BuildFibers = false;
     mitkThrow() << "Unable to load lookup tables.";
   }
   // initialize the actual tracking components (ParticleGrid, Metropolis Hastings Sampler and Energy Computer)
@@ -249,8 +246,6 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   {
     MITK_ERROR  << "Particle grid allocation failed. Not enough memory? Try to increase the particle length.";
     m_IsInValidState = false;
-    m_AbortTracking = true;
-    m_BuildFibers = false;
     return;
   }
 
@@ -267,48 +262,64 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   MITK_INFO << "Random seed: " << m_RandomSeed;
   MITK_INFO << "----------------------------------------";
 
+  // FiberBuilder only reads the grid (its labels are reset afterwards), so fibers built on request
+  // of GetFiberBundle do not change the result of the run.
+  auto buildFibers = [&]()
+  {
+    FiberBuilder fiberBuilder(particleGrid, m_MaskImage);
+    FiberPolyDataType fibers = fiberBuilder.iterate(m_MinFiberLength);
+    std::lock_guard<std::mutex> lock(m_FiberMutex);
+    m_FiberPolyData = fibers;
+    m_NumAcceptedFibers = fibers->GetNumberOfLines();
+    m_BuildFibers = false;
+    m_FibersBuilt.notify_all();
+  };
+
   // main loop
   preClock.Stop();
   TimeProbe clock; clock.Start();
   m_NumAcceptedFibers = 0;
   m_CurrentIteration = 0;
-  bool just_built_fibers = false;
-  boost::timer::progress_display disp(m_Iterations);
-  if (!m_AbortTracking)
-    while (m_CurrentIteration<m_Iterations)
+  {
     {
-      just_built_fibers = false;
+      std::lock_guard<std::mutex> lock(m_FiberMutex);
+      m_SamplingRunning = true;
+    }
+    // GetFiberBundle waits only while the loop below can serve its request; this ends that on
+    // every way out of the block.
+    struct SamplingEnd
+    {
+      GibbsTrackingFilter *filter;
+      ~SamplingEnd()
+      {
+        std::lock_guard<std::mutex> lock(filter->m_FiberMutex);
+        filter->m_SamplingRunning = false;
+        filter->m_BuildFibers = false;
+        filter->m_FibersBuilt.notify_all();
+      }
+    } samplingEnd{this};
+
+    double iteration = 0;
+    boost::timer::progress_display disp(m_Iterations);
+    while (iteration<m_Iterations && !m_AbortTracking)
+    {
       ++disp;
-      m_CurrentIteration++;
-      if (m_AbortTracking)
-        break;
+      ++iteration;
+      m_CurrentIteration.store(iteration, std::memory_order_relaxed);
 
       // update temperatur for simulated annealing process
-      float temperature = m_StartTemperature * exp(alpha*m_CurrentIteration/m_Iterations);
+      float temperature = m_StartTemperature * exp(alpha*iteration/m_Iterations);
       sampler->SetTemperature(temperature);
       sampler->MakeProposal();
 
-      m_ProposalAcceptance = (float)sampler->GetNumAcceptedProposals()/m_CurrentIteration;
-      m_NumParticles = particleGrid->m_NumParticles;
-      m_NumConnections = particleGrid->m_NumConnections;
+      m_ProposalAcceptance.store((float)sampler->GetNumAcceptedProposals()/iteration, std::memory_order_relaxed);
+      m_NumParticles.store(particleGrid->m_NumParticles, std::memory_order_relaxed);
+      m_NumConnections.store(particleGrid->m_NumConnections, std::memory_order_relaxed);
 
-      if (m_AbortTracking)
-        break;
-
-      if (m_BuildFibers)
-      {
-        FiberBuilder fiberBuilder(particleGrid, m_MaskImage);
-        m_FiberPolyData = fiberBuilder.iterate(m_MinFiberLength);
-        m_NumAcceptedFibers = m_FiberPolyData->GetNumberOfLines();
-        m_BuildFibers = false;
-        just_built_fibers = true;
-      }
+      if (m_BuildFibers.load(std::memory_order_relaxed))
+        buildFibers();
     }
-  if (!just_built_fibers)
-  {
-    FiberBuilder fiberBuilder(particleGrid, m_MaskImage);
-    m_FiberPolyData = fiberBuilder.iterate(m_MinFiberLength);
-    m_NumAcceptedFibers = m_FiberPolyData->GetNumberOfLines();
+    buildFibers();
   }
   clock.Stop();
 
@@ -316,8 +327,6 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   delete encomp;
   delete interpolator;
   delete particleGrid;
-  m_AbortTracking = true;
-  m_BuildFibers = false;
 
   int h = clock.GetTotal()/3600;
   int m = ((int)clock.GetTotal()%3600)/60;
