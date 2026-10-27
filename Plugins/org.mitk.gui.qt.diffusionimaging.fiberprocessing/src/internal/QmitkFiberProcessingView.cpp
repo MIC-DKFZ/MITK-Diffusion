@@ -228,7 +228,7 @@ void QmitkFiberProcessingView::WeightFibers()
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
     fib->SetFiberWeights(weight);
   }
-
+  RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
 void QmitkFiberProcessingView::Remove()
@@ -321,13 +321,19 @@ void QmitkFiberProcessingView::PruneBundle()
 {
   int minLength = this->m_Controls->m_PruneFibersMinBox->value();
   int maxLength = this->m_Controls->m_PruneFibersMaxBox->value();
+  if (minLength>maxLength)
+  {
+    QMessageBox::information(nullptr, "No output generated:", "The minimum length is larger than the maximum length.");
+    return;
+  }
   for (auto node : m_SelectedFB)
   {
-    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    if (!fib->RemoveShortFibers(minLength))
+    // on a copy: when the second step would leave no fibers, the bundle stays as it was
+    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData())->GetDeepCopy();
+    if (!fib->RemoveShortFibers(minLength) || !fib->RemoveLongFibers(maxLength))
       QMessageBox::information(nullptr, "No output generated:", "The resulting fiber bundle contains no fibers.");
-    else if (!fib->RemoveLongFibers(maxLength))
-      QMessageBox::information(nullptr, "No output generated:", "The resulting fiber bundle contains no fibers.");
+    else
+      node->SetData(fib);
   }
   RenderingManager::GetInstance()->RequestUpdateAll();
 }
@@ -422,8 +428,8 @@ void QmitkFiberProcessingView::ApplyDensityThreshold()
 
 void QmitkFiberProcessingView::ApplyCurvatureThreshold()
 {
-  int angle = this->m_Controls->m_CurvSpinBox->value();
-  int dist = this->m_Controls->m_CurvDistanceSpinBox->value();
+  double angle = this->m_Controls->m_CurvSpinBox->value();
+  double dist = this->m_Controls->m_CurvDistanceSpinBox->value();
   std::vector< DataNode::Pointer > nodes = m_SelectedFB;
   for (auto node : nodes)
   {
@@ -1436,8 +1442,12 @@ void QmitkFiberProcessingView::AddFigureToDataStorage(mitk::PlanarFigure* figure
 
 void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
 {
-  if ( m_SelectedFB.empty() || m_SelectedPF.empty() ){
-    QMessageBox::information( nullptr, "Warning", "No fibe bundle selected!");
+  if ( m_SelectedFB.empty() ){
+    QMessageBox::information( nullptr, "Warning", "No fiber bundle selected!");
+    return;
+  }
+  if ( m_SelectedPF.empty() ){
+    QMessageBox::information( nullptr, "Warning", "No planar figure selected!");
     return;
   }
 
@@ -1464,7 +1474,8 @@ void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
           m_InteractiveNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(currentThickness));
           GetDataStorage()->Add(m_InteractiveNode);
         }
-        float op = 5.0/sqrt(fib->GetNumFibers());
+        // fainter for larger bundles, opaque below 25 fibers (and for an empty bundle)
+        float op = fib->GetNumFibers()>25 ? 5.0/sqrt(fib->GetNumFibers()) : 1.0;
         float currentOp = 0;
         fiberBundles.at(i)->GetFloatProperty("opacity", currentOp);
 
@@ -1496,8 +1507,11 @@ void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
       }
     }
   }
-  catch(const std::out_of_range& )
+  catch(const std::exception& e)
   {
+    // an unplaced figure has no control points: PlanarFigure throws itk::ExceptionObject,
+    // the extraction mitk::Exception or std::out_of_range
+    MITK_ERROR << e.what();
     QMessageBox::warning( nullptr, "Fiber extraction failed", "Did you only create the planar figure, using the circle or polygon button, but forgot to actually place it in the image afterwards? \nAfter creating a planar figure, simply left-click at the desired position in the image or on the tractogram to place it.");
   }
 }
@@ -1922,6 +1936,7 @@ void QmitkFiberProcessingView::MirrorFibers()
     }
     poly->SetPoints(vtkNewPoints);
     surf->CalculateBoundingBox();
+    surf->Modified();
   }
 
   if (auto renderWindowPart = this->GetRenderWindowPart())
