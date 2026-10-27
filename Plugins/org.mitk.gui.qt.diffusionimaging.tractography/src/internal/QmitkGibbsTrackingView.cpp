@@ -160,6 +160,9 @@ void QmitkGibbsTrackingView::AfterThread()
   {
     QMessageBox::critical( nullptr, "Gibbs Tracking", "An internal error occured. Tracking aborted.\n Please check the log for details." );
     m_FiberBundleNode = nullptr;
+    m_GlobalTracker = nullptr;
+    m_ItkOdfImage = nullptr;
+    m_ItkTensorImage = nullptr;
     return;
   }
   UpdateTrackingStatus();
@@ -338,7 +341,8 @@ void QmitkGibbsTrackingView::UpdateTrackingStatus()
   m_Controls->m_TrackingTimeLabel->setText( QString::number(hours)+QString("h ")+QString::number(minutes)+QString("m ")+QString::number(seconds)+QString("s") );
   m_Controls->m_NumConnectionsLabel->setText( QString::number(m_GlobalTracker->GetNumConnections()) );
   m_Controls->m_NumParticlesLabel->setText( QString::number(m_GlobalTracker->GetNumParticles()) );
-  m_Controls->m_CurrentStepLabel->setText( QString::number(100*m_GlobalTracker->GetCurrentIteration()/m_GlobalTracker->GetIterations())+"%" );
+  if (m_GlobalTracker->GetIterations() > 0)
+    m_Controls->m_CurrentStepLabel->setText( QString::number(100*m_GlobalTracker->GetCurrentIteration()/m_GlobalTracker->GetIterations())+"%" );
   m_Controls->m_AcceptedFibersLabel->setText( QString::number(m_GlobalTracker->GetNumAcceptedFibers()) );
 }
 
@@ -422,6 +426,15 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
   if (m_OdfImage.IsNull() && m_TensorImage.IsNull())
     return;
 
+  // the line edit has no validator; invalid text would give an empty run
+  bool iterationsOk = false;
+  const double iterations = m_Controls->m_IterationsBox->text().toDouble(&iterationsOk);
+  if (!iterationsOk || iterations < 1)
+  {
+    QMessageBox::information(nullptr, "Gibbs Tracking", "The number of iterations must be a positive number.");
+    return;
+  }
+
   // cast odf to itk
   m_TrackingNode = m_ImageNode;
   m_ItkTensorImage = nullptr;
@@ -466,7 +479,7 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
   m_GlobalTracker->SetMaskImage(m_MaskImage);
   m_GlobalTracker->SetStartTemperature((float)m_Controls->m_StartTempSlider->value()/100);
   m_GlobalTracker->SetEndTemperature((float)m_Controls->m_EndTempSlider->value()/10000);
-  m_GlobalTracker->SetIterations(m_Controls->m_IterationsBox->text().toDouble());
+  m_GlobalTracker->SetIterations(iterations);
   m_GlobalTracker->SetParticleWeight((float)m_Controls->m_ParticleWeightSlider->value()/10000);
   m_GlobalTracker->SetParticleWidth((float)(m_Controls->m_ParticleWidthSlider->value())/10);
   m_GlobalTracker->SetParticleLength((float)(m_Controls->m_ParticleLengthSlider->value())/10);
@@ -495,7 +508,11 @@ void QmitkGibbsTrackingView::GenerateFiberBundle()
   // nullptr while the filter still prepares the data (no fibers built yet)
   vtkSmartPointer<vtkPolyData> fiberBundle = m_GlobalTracker->GetFiberBundle();
   if (fiberBundle == nullptr || fiberBundle->GetNumberOfLines() == 0)
+  {
+    if (!m_ThreadIsRunning)
+      QMessageBox::information(nullptr, "Gibbs Tracking", "No fiber was accepted, so no tractogram was added or saved. More iterations, a lower particle weight or a shorter minimum fiber length may help.");
     return;
+  }
   m_FiberBundle = mitk::FiberBundle::New(fiberBundle);
   m_FiberBundle->SetTrackVisHeader(dynamic_cast<mitk::Image*>(m_ImageNode->GetData())->GetGeometry());
   mitk::DiffusionPropertyHelper::CopyDICOMProperties(m_ImageNode->GetData(), m_FiberBundle);
@@ -576,7 +593,8 @@ void QmitkGibbsTrackingView::SaveTrackingParameters()
     return;
   if(!filename.endsWith(".gtp"))
     filename += ".gtp";
-  documentXML.SaveFile( filename.toStdString().c_str() );
+  if (documentXML.SaveFile( filename.toStdString().c_str() ) != tinyxml2::XML_SUCCESS)
+    QMessageBox::warning(nullptr, "Gibbs Tracking", "Could not save the parameters to\n" + filename);
 }
 
 // load current tracking paramters from xml file (.gtp)
