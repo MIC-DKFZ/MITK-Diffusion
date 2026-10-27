@@ -49,6 +49,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(EvaluateOdf_ThinImage_SamplesAlongParticle);
   MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
   MITK_TEST(Neighbours_ThinImage_EachOnce);
+  MITK_TEST(SphereInterpolator_TruncatedLookupTables_Invalid);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
   MITK_TEST(OptimalShift_OneNeighbour_FacesIt);
   MITK_TEST(Filter_EmptyMask_Throws);
@@ -189,6 +190,30 @@ public:
     while (grid.GetNextNeighbor() != nullptr)
       ++count;
     CPPUNIT_ASSERT_EQUAL(2, count);
+  }
+
+  /** The lookup tables were read without a size check (a truncated file was read out of bounds) and
+   *  with the last value appended twice. */
+  void SphereInterpolator_TruncatedLookupTables_Invalid()
+  {
+    SphereInterpolator complete("");
+    CPPUNIT_ASSERT(complete.IsInValidState());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(3 * 6 * 301 * 301), complete.barycoords.size());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(3 * 6 * 301 * 301), complete.indices.size());
+
+    const std::string dir = mitk::IOUtil::CreateTemporaryDirectory() + "/";
+    for (const char *name : {"FiberTrackingLUTBaryCoords.bin", "FiberTrackingLUTIndices.bin"})
+    {
+      std::ofstream file(dir + name, std::ios::binary);
+      const float values[100] = {};
+      file.write(reinterpret_cast<const char *>(values), sizeof(values));
+    }
+    SphereInterpolator truncated(dir);
+    CPPUNIT_ASSERT(!truncated.IsInValidState());
+    CPPUNIT_ASSERT_EQUAL(301, truncated.size);
+    for (const char *name : {"FiberTrackingLUTBaryCoords.bin", "FiberTrackingLUTIndices.bin"})
+      std::remove((dir + name).c_str());
+    std::remove(dir.c_str());
   }
 
   /** Every particle of every chain becomes a fiber point, in chain order, also when the chain is
