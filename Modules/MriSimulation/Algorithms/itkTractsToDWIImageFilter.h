@@ -119,6 +119,18 @@ protected:
     /** Transform generated image compartment by compartment, channel by channel and slice by slice using DFT and add k-space artifacts/effects. */
     DoubleDwiType::Pointer SimulateKspaceAcquisition(std::vector< DoubleDwiType::Pointer >& images);
 
+    /**
+     * Adds the signal of every fiber segment in volume g to the fiber compartment images and the
+     * segment volumes (mm³) to intraAxonalVolume; returns its largest voxel value.
+     */
+    double SimulateFiberSignal(unsigned int g, int signalModelSeed, int fiberThreads, ItkDoubleImgType* intraAxonalVolume);
+
+    /**
+     * In every voxel of the moved mask, scales the fiber compartments of volume g to their volume
+     * fractions and fills the rest of the voxel with the non-fiber compartments.
+     */
+    void SimulateNonFiberSignal(unsigned int g, const ItkDoubleImgType* intraAxonalVolume, double maxVolume);
+
     /** Generate signal of non-fiber compartments. */
     void SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3>& volume_fraction_point, double intraAxonalVolume, int g);
 

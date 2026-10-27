@@ -953,6 +953,285 @@ bool TractsToDWIImageFilter< PixelType >::PrepareLogFile()
 
 
 template< class PixelType >
+double TractsToDWIImageFilter< PixelType >::SimulateFiberSignal(unsigned int g, int signalModelSeed, int fiberThreads, ItkDoubleImgType* intraAxonalVolumeImage)
+{
+  const int numFiberCompartments = m_Parameters.m_FiberModelList.size();
+  const int numFibers = m_FiberBundle->GetNumFibers();
+  const unsigned int image_size_x = m_WorkingImageRegion.GetSize(0);
+  const unsigned int region_size_y = m_WorkingImageRegion.GetSize(1);
+  const unsigned int num_gradients = m_Parameters.m_SignalGen.GetNumVolumes();
+  double* intraAxBuffer = intraAxonalVolumeImage->GetBufferPointer();
+  double maxVolume = 0;
+
+  vtkPolyData* fiberPolyData = m_FiberBundleTransformed->GetFiberPolyData();
+  // generate fiber signal (if there are any fiber models present)
+  if (!m_Parameters.m_FiberModelList.empty())
+  {
+    std::vector< double* > buffers;
+    for (unsigned int i=0; i<m_CompartmentImages.size(); ++i)
+      buffers.push_back(m_CompartmentImages.at(i)->GetBufferPointer());
+    // The fibers are simulated in parallel, but their contributions are added to the images in
+    // fiber order afterwards: a floating-point sum depends on the order of its summands, and the
+    // result has to be the same at every thread count. Chunks bound the memory this needs.
+    struct Contribution
+    {
+      int compartment;    ///< -1: intra-axonal volume image
+      std::size_t index;
+      double value;
+    };
+    const int chunkSize = 1024;
+
+    // Models that draw random numbers (prototype kernels, randomized astrosticks) are not
+    // thread-safe, and a fiber segment has to get the same draws at any thread count and in every
+    // volume. Each thread therefore calls its own clone, reseeded per segment from the run's seed.
+    std::vector< std::vector< std::unique_ptr< mitk::DiffusionSignalModel<double> > > > threadModels(fiberThreads);
+
+    for (int chunkStart=0; chunkStart<numFibers; chunkStart+=chunkSize)
+    {
+      const int chunkEnd = std::min(numFibers, chunkStart+chunkSize);
+      std::vector< std::vector< Contribution > > contributions(chunkEnd-chunkStart);
+      std::atomic<bool> loopFailed(false);
+      std::exception_ptr loopException;
+#pragma omp parallel for num_threads(fiberThreads) schedule(dynamic)
+      for( int i=chunkStart; i<chunkEnd; ++i )
+      {
+        if (this->GetAbortGenerateData() || loopFailed)
+          continue;
+
+        try
+        {
+          auto& fiberContributions = contributions[i-chunkStart];
+          float fiberWeight = m_FiberBundleTransformed->GetFiberWeight(i);
+          if (fiberWeight == 0)
+            continue;
+
+          int numPoints = -1;
+          std::vector< itk::Vector<double, 3> > points_copy;
+#pragma omp critical
+          {
+            vtkCell* cell = fiberPolyData->GetCell(i);
+            numPoints = cell->GetNumberOfPoints();
+            vtkPoints* points = cell->GetPoints();
+            for (int j=0; j<numPoints; j++)
+              points_copy.push_back(GetItkVector(points->GetPoint(j)));
+          }
+
+          if (numPoints<2)
+            continue;
+
+          double seg_volume = fiberWeight*itk::Math::pi*m_mmRadius*m_mmRadius;
+          auto& localModels = threadModels[omp_get_thread_num()];
+          if (localModels.empty())
+            for (auto model : m_Parameters.m_FiberModelList)
+              localModels.emplace_back(model->UsesRandomNumbers() ? model->Clone() : nullptr);
+          for( int j=0; j<numPoints - 1; ++j)
+          {
+            if (this->GetAbortGenerateData())
+            {
+              j=numPoints;
+              continue;
+            }
+
+            itk::Vector<double> v = points_copy.at(j);
+
+            itk::Vector<double, 3> dir = points_copy.at(j+1)-v;
+            if ( dir.GetSquaredNorm()<0.0001 || dir[0]!=dir[0] || dir[1]!=dir[1] || dir[2]!=dir[2] )
+              continue;
+            dir.Normalize();
+
+            auto tmp = points_copy.at(j);
+            itk::Point<float, 3> startVertex;
+            startVertex[0] = tmp[0]; startVertex[1] = tmp[1]; startVertex[2] = tmp[2];
+            itk::Index<3> startIndex;
+            itk::ContinuousIndex<float, 3> startIndexCont;
+            (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
+            (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+
+            tmp = points_copy.at(j+1);
+            itk::Point<float, 3> endVertex;
+            endVertex[0] = tmp[0]; endVertex[1] = tmp[1]; endVertex[2] = tmp[2];
+            itk::Index<3> endIndex;
+            itk::ContinuousIndex<float, 3> endIndexCont;
+            (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
+            (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+
+            std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(m_WorkingSpacing, startIndex, endIndex, startIndexCont, endIndexCont);
+
+            // generate signal for each fiber compartment
+            for (int k=0; k<numFiberCompartments; ++k)
+            {
+              mitk::DiffusionSignalModel<double>* model = m_Parameters.m_FiberModelList[k];
+              if (localModels[k])
+              {
+                model = localModels[k].get();
+                model->SetSeed(SegmentSeed(signalModelSeed, i, j, k));
+              }
+              double signal_add = model->SimulateMeasurement(g, dir)*seg_volume;
+              for (std::pair< itk::Index<3>, double > seg : segments)
+              {
+                if (!m_TransformedMaskImage->GetLargestPossibleRegion().IsInside(seg.first) || m_TransformedMaskImage->GetPixel(seg.first)<=0)
+                  continue;
+
+                double seg_signal = seg.second*signal_add;
+
+                unsigned int linear_index = g + num_gradients*seg.first[0] + num_gradients*image_size_x*seg.first[1] + num_gradients*image_size_x*region_size_y*seg.first[2];
+
+                // update dMRI volume
+                fiberContributions.push_back({k, linear_index, seg_signal});
+
+                // update fiber volume image
+                if (k==0)
+                {
+                  linear_index = seg.first[0] + image_size_x*seg.first[1] + image_size_x*region_size_y*seg.first[2];
+                  fiberContributions.push_back({-1, linear_index, seg.second*seg_volume});
+                }
+              }
+
+            }
+          }
+
+          AdvanceProgress();
+        }
+        catch (...)
+        {
+          // an exception must not leave the OpenMP region (std::terminate); the first one is rethrown after the loop
+#pragma omp critical (FiberfoxFiberException)
+          if (!loopException)
+            loopException = std::current_exception();
+          loopFailed = true;
+        }
+      }
+
+      if (loopException)
+        std::rethrow_exception(loopException);
+
+      // add the contributions in fiber order, as one thread would
+      for (const auto& fiberContributions : contributions)
+        for (const auto& c : fiberContributions)
+        {
+          if (c.compartment<0)
+          {
+            intraAxBuffer[c.index] += c.value;
+            if (intraAxBuffer[c.index]>maxVolume)
+              maxVolume = intraAxBuffer[c.index];
+          }
+          else
+            buffers[c.compartment][c.index] += c.value;
+        }
+    }
+  }
+  return maxVolume;
+}
+
+template< class PixelType >
+void TractsToDWIImageFilter< PixelType >::SimulateNonFiberSignal(unsigned int g, const ItkDoubleImgType* intraAxonalVolumeImage, double maxVolume)
+{
+  const int numFiberCompartments = m_Parameters.m_FiberModelList.size();
+
+  // axon radius not manually defined --> set fullest voxel (maxVolume) to full fiber voxel
+  double density_correctiony_global = 1.0;
+  if (m_Parameters.m_SignalGen.m_AxonRadius<0.0001 && maxVolume>0)  // no fiber volume: nothing to correct
+    density_correctiony_global = m_VoxelVolume/maxVolume;
+
+  // generate non-fiber signal
+  ImageRegionIterator<ItkUcharImgType> it3(m_TransformedMaskImage, m_TransformedMaskImage->GetLargestPossibleRegion());
+  while(!it3.IsAtEnd())
+  {
+    if (it3.Get()>0)
+    {
+      DoubleDwiType::IndexType index = it3.GetIndex();
+      double iAxVolume = intraAxonalVolumeImage->GetPixel(index);
+
+      // get non-transformed point (remove headmotion tranformation)
+      // this point lives in the volume fraction image space
+      itk::Point<float, 3> volume_fraction_point;
+      if ( m_Parameters.m_SignalGen.m_DoAddMotion )
+        volume_fraction_point = GetMovedPoint(index, false);
+      else
+        m_TransformedMaskImage->TransformIndexToPhysicalPoint(index, volume_fraction_point);
+
+      if (m_Parameters.m_SignalGen.m_DoDisablePartialVolume)
+      {
+        if (iAxVolume>0.0001) // scale fiber compartment to voxel
+        {
+          DoubleDwiType::PixelType pix = m_CompartmentImages.at(0)->GetPixel(index);
+          pix[g] *= m_VoxelVolume/iAxVolume;
+          m_CompartmentImages.at(0)->SetPixel(index, pix);
+
+          if (g==0)
+            m_VolumeFractions.at(0)->SetPixel(index, 1);
+        }
+        else
+        {
+          DoubleDwiType::PixelType pix = m_CompartmentImages.at(0)->GetPixel(index);
+          pix[g] = 0;
+          m_CompartmentImages.at(0)->SetPixel(index, pix);
+          SimulateExtraAxonalSignal(index, volume_fraction_point, 0, g);
+        }
+      }
+      else
+      {
+        // manually defined axon radius and voxel overflow --> rescale to voxel volume
+        if ( m_Parameters.m_SignalGen.m_AxonRadius>=0.0001 && iAxVolume>m_VoxelVolume )
+        {
+          for (int i=0; i<numFiberCompartments; ++i)
+          {
+            DoubleDwiType::PixelType pix = m_CompartmentImages.at(i)->GetPixel(index);
+            pix[g] *= m_VoxelVolume/iAxVolume;
+            m_CompartmentImages.at(i)->SetPixel(index, pix);
+          }
+          iAxVolume = m_VoxelVolume;
+        }
+
+        // if volume fraction image is set use it, otherwise use global scaling factor
+        double density_correction_voxel = density_correctiony_global;
+        if ( m_Parameters.m_FiberModelList[0]->GetVolumeFractionImage()!=nullptr && iAxVolume>0.0001 )
+        {
+          m_DoubleInterpolator->SetInputImage(m_Parameters.m_FiberModelList[0]->GetVolumeFractionImage());
+          double volume_fraction = mitk::imv::GetImageValue<double>(volume_fraction_point, true, m_DoubleInterpolator);
+          if (volume_fraction<0)
+            mitkThrow() << "Volume fraction image (index 1) contains negative values (intra-axonal compartment)!";
+          density_correction_voxel = m_VoxelVolume*volume_fraction/iAxVolume; // remove iAxVolume sclaing and scale to volume_fraction
+        }
+        else if (m_Parameters.m_FiberModelList[0]->GetVolumeFractionImage()!=nullptr)
+          density_correction_voxel = 0.0;
+
+        // adjust intra-axonal compartment volume by density correction factor
+        DoubleDwiType::PixelType pix = m_CompartmentImages.at(0)->GetPixel(index);
+        pix[g] *= density_correction_voxel;
+        m_CompartmentImages.at(0)->SetPixel(index, pix);
+
+        // normalize remaining fiber volume fractions (they are rescaled in SimulateExtraAxonalSignal)
+        if (iAxVolume>0.0001)
+        {
+          for (int i=1; i<numFiberCompartments; i++)
+          {
+            DoubleDwiType::PixelType pix = m_CompartmentImages.at(i)->GetPixel(index);
+            pix[g] /= iAxVolume;
+            m_CompartmentImages.at(i)->SetPixel(index, pix);
+          }
+        }
+        else
+        {
+          for (int i=1; i<numFiberCompartments; i++)
+          {
+            DoubleDwiType::PixelType pix = m_CompartmentImages.at(i)->GetPixel(index);
+            pix[g] = 0;
+            m_CompartmentImages.at(i)->SetPixel(index, pix);
+          }
+        }
+
+        iAxVolume = density_correction_voxel*iAxVolume; // new intra-axonal volume = old intra-axonal volume * correction factor
+
+        // simulate other compartments
+        SimulateExtraAxonalSignal(index, volume_fraction_point, iAxVolume, g);
+      }
+    }
+    ++it3;
+  }
+}
+
+template< class PixelType >
 void TractsToDWIImageFilter< PixelType >::GenerateData()
 {
   PrintToLog("\n**********************************************", false);
@@ -1008,7 +1287,6 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     int numFiberCompartments = m_Parameters.m_FiberModelList.size();
     int numNonFiberCompartments = m_Parameters.m_NonFiberModelList.size();
 
-    double maxVolume = 0;
     int signalModelSeed = m_RandGen->GetIntegerVariate();
 
     PrintToLog("\n", false, false);
@@ -1024,8 +1302,6 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     PrintToLog("\n", false, false, true);
     PrintToLog("\n", false, false, true);
 
-    unsigned int image_size_x = m_WorkingImageRegion.GetSize(0);
-    unsigned int region_size_y = m_WorkingImageRegion.GetSize(1);
     unsigned int num_gradients = m_Parameters.m_SignalGen.GetNumVolumes();
     int numFibers = m_FiberBundle->GetNumFibers();
 
@@ -1048,7 +1324,10 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
       for (std::size_t i=0; i<m_Parameters.m_NonFiberModelList.size(); i++)
         m_Parameters.m_NonFiberModelList.at(i)->SetSeed(signalModelSeed);
 
-      // storing voxel-wise intra-axonal volume in mm³
+      if (this->GetAbortGenerateData())
+        continue;
+
+      // voxel-wise intra-axonal volume in mm³
       auto intraAxonalVolumeImage = ItkDoubleImgType::New();
       intraAxonalVolumeImage->SetSpacing( m_WorkingSpacing );
       intraAxonalVolumeImage->SetOrigin( m_WorkingOrigin );
@@ -1058,271 +1337,9 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
       intraAxonalVolumeImage->SetRequestedRegion( m_WorkingImageRegion );
       intraAxonalVolumeImage->Allocate();
       intraAxonalVolumeImage->FillBuffer(0);
-      maxVolume = 0;
-      double* intraAxBuffer = intraAxonalVolumeImage->GetBufferPointer();
 
-      if (this->GetAbortGenerateData())
-        continue;
-
-      vtkPolyData* fiberPolyData = m_FiberBundleTransformed->GetFiberPolyData();
-      // generate fiber signal (if there are any fiber models present)
-      if (!m_Parameters.m_FiberModelList.empty())
-      {
-        std::vector< double* > buffers;
-        for (unsigned int i=0; i<m_CompartmentImages.size(); ++i)
-          buffers.push_back(m_CompartmentImages.at(i)->GetBufferPointer());
-        // The fibers are simulated in parallel, but their contributions are added to the images in
-        // fiber order afterwards: a floating-point sum depends on the order of its summands, and the
-        // result has to be the same at every thread count. Chunks bound the memory this needs.
-        struct Contribution
-        {
-          int compartment;    ///< -1: intra-axonal volume image
-          std::size_t index;
-          double value;
-        };
-        const int chunkSize = 1024;
-
-        // Models that draw random numbers (prototype kernels, randomized astrosticks) are not
-        // thread-safe, and a fiber segment has to get the same draws at any thread count and in every
-        // volume. Each thread therefore calls its own clone, reseeded per segment from the run's seed.
-        std::vector< std::vector< std::unique_ptr< mitk::DiffusionSignalModel<double> > > > threadModels(fiberThreads);
-
-        for (int chunkStart=0; chunkStart<numFibers; chunkStart+=chunkSize)
-        {
-          const int chunkEnd = std::min(numFibers, chunkStart+chunkSize);
-          std::vector< std::vector< Contribution > > contributions(chunkEnd-chunkStart);
-          std::atomic<bool> loopFailed(false);
-          std::exception_ptr loopException;
-#pragma omp parallel for num_threads(fiberThreads) schedule(dynamic)
-          for( int i=chunkStart; i<chunkEnd; ++i )
-          {
-            if (this->GetAbortGenerateData() || loopFailed)
-              continue;
-
-            try
-            {
-              auto& fiberContributions = contributions[i-chunkStart];
-              float fiberWeight = m_FiberBundleTransformed->GetFiberWeight(i);
-              if (fiberWeight == 0)
-                continue;
-
-              int numPoints = -1;
-              std::vector< itk::Vector<double, 3> > points_copy;
-#pragma omp critical
-              {
-                vtkCell* cell = fiberPolyData->GetCell(i);
-                numPoints = cell->GetNumberOfPoints();
-                vtkPoints* points = cell->GetPoints();
-                for (int j=0; j<numPoints; j++)
-                  points_copy.push_back(GetItkVector(points->GetPoint(j)));
-              }
-
-              if (numPoints<2)
-                continue;
-
-              double seg_volume = fiberWeight*itk::Math::pi*m_mmRadius*m_mmRadius;
-              auto& localModels = threadModels[omp_get_thread_num()];
-              if (localModels.empty())
-                for (auto model : m_Parameters.m_FiberModelList)
-                  localModels.emplace_back(model->UsesRandomNumbers() ? model->Clone() : nullptr);
-              for( int j=0; j<numPoints - 1; ++j)
-              {
-                if (this->GetAbortGenerateData())
-                {
-                  j=numPoints;
-                  continue;
-                }
-
-                itk::Vector<double> v = points_copy.at(j);
-
-                itk::Vector<double, 3> dir = points_copy.at(j+1)-v;
-                if ( dir.GetSquaredNorm()<0.0001 || dir[0]!=dir[0] || dir[1]!=dir[1] || dir[2]!=dir[2] )
-                  continue;
-                dir.Normalize();
-
-                auto tmp = points_copy.at(j);
-                itk::Point<float, 3> startVertex;
-                startVertex[0] = tmp[0]; startVertex[1] = tmp[1]; startVertex[2] = tmp[2];
-                itk::Index<3> startIndex;
-                itk::ContinuousIndex<float, 3> startIndexCont;
-                (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-                (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
-
-                tmp = points_copy.at(j+1);
-                itk::Point<float, 3> endVertex;
-                endVertex[0] = tmp[0]; endVertex[1] = tmp[1]; endVertex[2] = tmp[2];
-                itk::Index<3> endIndex;
-                itk::ContinuousIndex<float, 3> endIndexCont;
-                (void)m_TransformedMaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-                (void)m_TransformedMaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
-
-                std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(m_WorkingSpacing, startIndex, endIndex, startIndexCont, endIndexCont);
-
-                // generate signal for each fiber compartment
-                for (int k=0; k<numFiberCompartments; ++k)
-                {
-                  mitk::DiffusionSignalModel<double>* model = m_Parameters.m_FiberModelList[k];
-                  if (localModels[k])
-                  {
-                    model = localModels[k].get();
-                    model->SetSeed(SegmentSeed(signalModelSeed, i, j, k));
-                  }
-                  double signal_add = model->SimulateMeasurement(g, dir)*seg_volume;
-                  for (std::pair< itk::Index<3>, double > seg : segments)
-                  {
-                    if (!m_TransformedMaskImage->GetLargestPossibleRegion().IsInside(seg.first) || m_TransformedMaskImage->GetPixel(seg.first)<=0)
-                      continue;
-
-                    double seg_signal = seg.second*signal_add;
-
-                    unsigned int linear_index = g + num_gradients*seg.first[0] + num_gradients*image_size_x*seg.first[1] + num_gradients*image_size_x*region_size_y*seg.first[2];
-
-                    // update dMRI volume
-                    fiberContributions.push_back({k, linear_index, seg_signal});
-
-                    // update fiber volume image
-                    if (k==0)
-                    {
-                      linear_index = seg.first[0] + image_size_x*seg.first[1] + image_size_x*region_size_y*seg.first[2];
-                      fiberContributions.push_back({-1, linear_index, seg.second*seg_volume});
-                    }
-                  }
-
-                }
-              }
-
-              AdvanceProgress();
-            }
-            catch (...)
-            {
-              // an exception must not leave the OpenMP region (std::terminate); the first one is rethrown after the loop
-#pragma omp critical (FiberfoxFiberException)
-              if (!loopException)
-                loopException = std::current_exception();
-              loopFailed = true;
-            }
-          }
-
-          if (loopException)
-            std::rethrow_exception(loopException);
-
-          // add the contributions in fiber order, as one thread would
-          for (const auto& fiberContributions : contributions)
-            for (const auto& c : fiberContributions)
-            {
-              if (c.compartment<0)
-              {
-                intraAxBuffer[c.index] += c.value;
-                if (intraAxBuffer[c.index]>maxVolume)
-                  maxVolume = intraAxBuffer[c.index];
-              }
-              else
-                buffers[c.compartment][c.index] += c.value;
-            }
-        }
-      }
-
-      // axon radius not manually defined --> set fullest voxel (maxVolume) to full fiber voxel
-      double density_correctiony_global = 1.0;
-      if (m_Parameters.m_SignalGen.m_AxonRadius<0.0001 && maxVolume>0)  // no fiber volume: nothing to correct
-        density_correctiony_global = m_VoxelVolume/maxVolume;
-
-      // generate non-fiber signal
-      ImageRegionIterator<ItkUcharImgType> it3(m_TransformedMaskImage, m_TransformedMaskImage->GetLargestPossibleRegion());
-      while(!it3.IsAtEnd())
-      {
-        if (it3.Get()>0)
-        {
-          DoubleDwiType::IndexType index = it3.GetIndex();
-          double iAxVolume = intraAxonalVolumeImage->GetPixel(index);
-
-          // get non-transformed point (remove headmotion tranformation)
-          // this point lives in the volume fraction image space
-          itk::Point<float, 3> volume_fraction_point;
-          if ( m_Parameters.m_SignalGen.m_DoAddMotion )
-            volume_fraction_point = GetMovedPoint(index, false);
-          else
-            m_TransformedMaskImage->TransformIndexToPhysicalPoint(index, volume_fraction_point);
-
-          if (m_Parameters.m_SignalGen.m_DoDisablePartialVolume)
-          {
-            if (iAxVolume>0.0001) // scale fiber compartment to voxel
-            {
-              DoubleDwiType::PixelType pix = m_CompartmentImages.at(0)->GetPixel(index);
-              pix[g] *= m_VoxelVolume/iAxVolume;
-              m_CompartmentImages.at(0)->SetPixel(index, pix);
-
-              if (g==0)
-                m_VolumeFractions.at(0)->SetPixel(index, 1);
-            }
-            else
-            {
-              DoubleDwiType::PixelType pix = m_CompartmentImages.at(0)->GetPixel(index);
-              pix[g] = 0;
-              m_CompartmentImages.at(0)->SetPixel(index, pix);
-              SimulateExtraAxonalSignal(index, volume_fraction_point, 0, g);
-            }
-          }
-          else
-          {
-            // manually defined axon radius and voxel overflow --> rescale to voxel volume
-            if ( m_Parameters.m_SignalGen.m_AxonRadius>=0.0001 && iAxVolume>m_VoxelVolume )
-            {
-              for (int i=0; i<numFiberCompartments; ++i)
-              {
-                DoubleDwiType::PixelType pix = m_CompartmentImages.at(i)->GetPixel(index);
-                pix[g] *= m_VoxelVolume/iAxVolume;
-                m_CompartmentImages.at(i)->SetPixel(index, pix);
-              }
-              iAxVolume = m_VoxelVolume;
-            }
-
-            // if volume fraction image is set use it, otherwise use global scaling factor
-            double density_correction_voxel = density_correctiony_global;
-            if ( m_Parameters.m_FiberModelList[0]->GetVolumeFractionImage()!=nullptr && iAxVolume>0.0001 )
-            {
-              m_DoubleInterpolator->SetInputImage(m_Parameters.m_FiberModelList[0]->GetVolumeFractionImage());
-              double volume_fraction = mitk::imv::GetImageValue<double>(volume_fraction_point, true, m_DoubleInterpolator);
-              if (volume_fraction<0)
-                mitkThrow() << "Volume fraction image (index 1) contains negative values (intra-axonal compartment)!";
-              density_correction_voxel = m_VoxelVolume*volume_fraction/iAxVolume; // remove iAxVolume sclaing and scale to volume_fraction
-            }
-            else if (m_Parameters.m_FiberModelList[0]->GetVolumeFractionImage()!=nullptr)
-              density_correction_voxel = 0.0;
-
-            // adjust intra-axonal compartment volume by density correction factor
-            DoubleDwiType::PixelType pix = m_CompartmentImages.at(0)->GetPixel(index);
-            pix[g] *= density_correction_voxel;
-            m_CompartmentImages.at(0)->SetPixel(index, pix);
-
-            // normalize remaining fiber volume fractions (they are rescaled in SimulateExtraAxonalSignal)
-            if (iAxVolume>0.0001)
-            {
-              for (int i=1; i<numFiberCompartments; i++)
-              {
-                DoubleDwiType::PixelType pix = m_CompartmentImages.at(i)->GetPixel(index);
-                pix[g] /= iAxVolume;
-                m_CompartmentImages.at(i)->SetPixel(index, pix);
-              }
-            }
-            else
-            {
-              for (int i=1; i<numFiberCompartments; i++)
-              {
-                DoubleDwiType::PixelType pix = m_CompartmentImages.at(i)->GetPixel(index);
-                pix[g] = 0;
-                m_CompartmentImages.at(i)->SetPixel(index, pix);
-              }
-            }
-
-            iAxVolume = density_correction_voxel*iAxVolume; // new intra-axonal volume = old intra-axonal volume * correction factor
-
-            // simulate other compartments
-            SimulateExtraAxonalSignal(index, volume_fraction_point, iAxVolume, g);
-          }
-        }
-        ++it3;
-      }
+      const double maxVolume = SimulateFiberSignal(g, signalModelSeed, fiberThreads, intraAxonalVolumeImage);
+      SimulateNonFiberSignal(g, intraAxonalVolumeImage, maxVolume);
     }
 
     PrintToLog("\n", false);
