@@ -48,7 +48,6 @@ int main(int argc, char* argv[])
 
   bool originOnly = false;
 
-  // Show a help message
   if ( parsedArgs.count("alignCentroid") || parsedArgs.count("a"))
   {
     originOnly = true;

@@ -37,7 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 
 /*!
-\brief Modify input tractogram: fiber resampling, compression, pruning and transformation.
+\brief Renders tractograms in 3D and writes a PNG screenshot.
 */
 int main(int argc, char* argv[])
 {
@@ -52,7 +52,6 @@ int main(int argc, char* argv[])
   parser.beginGroup("1. Mandatory arguments:");
   parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input:", "input tractograms", us::Any(), false);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "Output png", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("resample", "", mitkCommandLineParser::Float, "", "");
   parser.endGroup();
 
   parser.addArgument("rotate_x", "", mitkCommandLineParser::Float, "Rotate x-axis:", "Rotate around x-axis (in deg)");

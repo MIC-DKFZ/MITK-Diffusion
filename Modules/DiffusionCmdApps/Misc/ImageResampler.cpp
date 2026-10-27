@@ -134,13 +134,13 @@ int main( int argc, char* argv[] )
   parser.setTitle("Image Resampler");
   parser.setCategory("Preprocessing Tools");
   parser.setContributor("MIC");
-  parser.setDescription("Resample an image to eigther a specific spacing or to a reference image.");
+  parser.setDescription("Resample an image to either a specific spacing or to a reference image.");
 
   // Add command line argument names
   parser.addArgument("help", "h",mitkCommandLineParser::Bool, "Show this help text");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "Input file",us::Any(),false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "Output file",us::Any(),false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("spacing", "s", mitkCommandLineParser::String, "Spacing:", "Resample provide x,y,z spacing in mm (e.g. -r 1,1,3), is not applied to tensor data",us::Any());
+  parser.addArgument("spacing", "s", mitkCommandLineParser::String, "Spacing:", "new x,y,z spacing in mm (e.g. -s 1,1,3), for scalar images and DWIs",us::Any());
   parser.addArgument("reference", "r", mitkCommandLineParser::String, "Reference:", "Resample using supplied reference image. Also cuts image to same dimensions",us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("win-sinc", "w", mitkCommandLineParser::Bool, "Windowed-sinc interpolation:", "Use windowed-sinc interpolation (3) instead of linear interpolation ",us::Any());
   parser.addArgument("nearest-neigh", "n", mitkCommandLineParser::Bool, "Nearest Neighbor:", "Use Nearest Neighbor interpolation instead of linear interpolation ",us::Any());
@@ -209,7 +209,7 @@ int main( int argc, char* argv[] )
 
   if (refImageFile =="" && useSpacing == false)
   {
-    MITK_ERROR << "No information how to resample is supplied. Use eigther --spacing or --reference !";
+    MITK_ERROR << "No information how to resample is supplied. Use either --spacing or --reference !";
     return EXIT_FAILURE;
   }
 

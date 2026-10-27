@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
 
   parser.setTitle("Multishell Methods");
   parser.setCategory("Preprocessing Tools");
-  parser.setDescription("");
+  parser.setDescription("Maps a multi-shell DWI to a single shell at the target b-value with an ADC average, a kurtosis fit or a bi-exponential fit; writes <output>_ADC.dwi, _AKC.dwi, _BiExp.dwi.");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");

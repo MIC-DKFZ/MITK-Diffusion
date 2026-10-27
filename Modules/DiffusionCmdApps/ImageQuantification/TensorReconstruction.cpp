@@ -31,7 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
 /**
- * Convert files from one ending to the other
+ * Fits a diffusion tensor per voxel to a DWI.
  */
 int main(int argc, char* argv[])
 {
@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
 
   parser.setCategory("Signal Modelling");
   parser.setTitle("Tensor Reconstruction");
-  parser.setDescription("");
+  parser.setDescription("Fits a diffusion tensor per voxel to a DWI (linear least squares on the log signal, every volume with its own b-value; with --correct_negative_eigenv ITK's fit with eigenvalue correction) and writes it as .dti.");
   parser.setContributor("MIC");
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
