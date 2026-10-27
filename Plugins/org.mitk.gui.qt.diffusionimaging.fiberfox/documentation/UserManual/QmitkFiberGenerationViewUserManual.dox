@@ -34,7 +34,7 @@ Fiber strands are defined simply by placing markers in a 3D image volume. The fi
 
 <b>Fiducial Options:</b>
 \li <b>Use Constant Fiducial Radius</b>: If checked, all fiducials are treated as circles with the same radius. The first fiducial of the bundle defines the radius of all other fiducials.
-\li <b>Generate Fibers</b>: Generates the fibers of every selected bundle that has at least two fiducials.
+\li <b>Generate Fibers</b>: Generates the fibers of every selected bundle that has at least two fiducials; a selected bundle with only one fiducial is emptied.
 \li <b>Align with grid</b>: Click to shift the selected fiducial center points to the next voxel center.
 
 <b>Operations:</b>
