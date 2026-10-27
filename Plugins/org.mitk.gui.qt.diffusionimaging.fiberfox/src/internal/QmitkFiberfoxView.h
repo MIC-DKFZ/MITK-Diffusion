@@ -135,7 +135,7 @@ protected slots:
     void OnTemplateSelected(int value);
     void OnBvalsBvecsCheck(int value);
     void OnTlineChanged();
-    void OnGradientSettingsChanged();   ///< the loaded gradients give way to generated ones
+    void OnGradientSettingsChanged();   ///< loaded gradients and prototypes give way to the changed settings
 
 protected:
 
@@ -190,6 +190,7 @@ protected:
     {
       std::unique_ptr< mitk::DiffusionSignalModel<> > m_Model;
       std::vector<double>       m_WidgetSettings;
+      std::vector<int>          m_Shells;   ///< non-zero b-values of the file's gradients
     };
     std::map< int, LoadedPrototype > m_LoadedPrototypes;   ///< by compartment id
     /** m_Parameters of the last started simulation before ApplyDirectionMatrix (gradients as FSL

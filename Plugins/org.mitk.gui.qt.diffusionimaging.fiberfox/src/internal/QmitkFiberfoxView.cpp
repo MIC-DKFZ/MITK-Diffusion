@@ -485,6 +485,8 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     connect((QObject*) m_Controls->m_SizeX, SIGNAL( valueChanged(int)), (QObject*) this, SLOT(OnTlineChanged()));
     connect((QObject*) m_Controls->m_NumGradientsBox, SIGNAL( valueChanged(int)), (QObject*) this, SLOT(OnGradientSettingsChanged()));
     connect((QObject*) m_Controls->m_BvalueBox, SIGNAL( valueChanged(int)), (QObject*) this, SLOT(OnGradientSettingsChanged()));
+    connect((QObject*) m_Controls->m_LoadBvalsEdit, SIGNAL( textChanged(QString)), (QObject*) this, SLOT(OnGradientSettingsChanged()));
+    connect((QObject*) m_Controls->m_LoadBvecsEdit, SIGNAL( textChanged(QString)), (QObject*) this, SLOT(OnGradientSettingsChanged()));
   }
   OnTlineChanged();
   UpdateGui();
@@ -533,6 +535,7 @@ void QmitkFiberfoxView::OnFibSelected(int )
 
 void QmitkFiberfoxView::OnBvalsBvecsCheck(int )
 {
+  OnGradientSettingsChanged();
   UpdateGui();
 }
 
@@ -541,6 +544,15 @@ namespace
   std::vector<double> PrototypeSettings(QmitkPrototypeSignalParametersWidget* widget)
   {
     return {widget->GetNumberOfSamples(), widget->GetMinFa(), widget->GetMaxFa(), widget->GetMinAdc(), widget->GetMaxAdc()};
+  }
+
+  /** The non-zero b-values of the gradients, sorted. */
+  std::vector<int> Shells(mitk::SignalGenerationParameters& signalGen)
+  {
+    std::vector<int> shells = signalGen.GetBvalues();
+    shells.erase(std::remove(shells.begin(), shells.end(), 0), shells.end());
+    std::sort(shells.begin(), shells.end());
+    return shells;
   }
 }
 
@@ -563,9 +575,12 @@ mitk::RawShModel<>* QmitkFiberfoxView::NewPrototypeModel(QmitkPrototypeSignalPar
 {
   mitk::RawShModel<>* model = nullptr;
   auto loaded = m_LoadedPrototypes.find(compartmentId);
-  if (loaded!=m_LoadedPrototypes.end() && loaded->second.m_WidgetSettings==PrototypeSettings(widget))
+  // The kernels of a loaded .ffp, as long as the widget shows the file's settings and the simulated
+  // b-values (from boxes, a template DWI or bvals/bvecs files) are the file's: kernels hold the
+  // signal of their shell, they are evaluated for the gradient direction only.
+  if (loaded!=m_LoadedPrototypes.end() && loaded->second.m_WidgetSettings==PrototypeSettings(widget)
+      && loaded->second.m_Shells==Shells(m_Parameters.m_SignalGen))
   {
-    // the kernels of a loaded .ffp, as long as widget and gradient settings are those of the file
     model = static_cast< mitk::RawShModel<>* >(loaded->second.m_Model->Clone());
   }
   else
@@ -1693,6 +1708,7 @@ void QmitkFiberfoxView::LoadParameters()
         LoadedPrototype& loaded = m_LoadedPrototypes[model->m_CompartmentId];
         loaded.m_Model.reset(model->Clone());
         loaded.m_WidgetSettings = PrototypeSettings(widget);
+        loaded.m_Shells = Shells(m_Parameters.m_SignalGen);
       }
     }
 
