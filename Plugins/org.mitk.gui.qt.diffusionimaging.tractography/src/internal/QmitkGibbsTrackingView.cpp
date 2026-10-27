@@ -38,6 +38,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateOr.h>
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateProperty.h>
+#include <mitkNodePredicateFunction.h>
 
 // ITK
 #include <itkGibbsTrackingFilter.h>
@@ -228,10 +229,13 @@ void QmitkGibbsTrackingView::CreateQtPartControl( QWidget *parent )
 
     m_Controls->m_MaskImageBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_MaskImageBox->SetZeroEntryText("--");
-    mitk::TNodePredicateDataType<mitk::Image>::Pointer isImagePredicate = mitk::TNodePredicateDataType<mitk::Image>::New();
-    mitk::NodePredicateProperty::Pointer isBinaryPredicate = mitk::NodePredicateProperty::New("binary", mitk::BoolProperty::New(true));
-    mitk::NodePredicateDimension::Pointer is3D = mitk::NodePredicateDimension::New(3);
-    m_Controls->m_MaskImageBox->SetPredicate( mitk::NodePredicateAnd::New(isBinaryPredicate, mitk::NodePredicateAnd::New(isImagePredicate, is3D)) );
+    // any 3D scalar image: the mask values weight the particle density (e.g. a white-matter
+    // probability map), voxels above 0.5 are seeded
+    auto isScalar3dImage = mitk::NodePredicateFunction::New([](const mitk::DataNode *node) {
+      auto image = dynamic_cast<const mitk::Image*>(node->GetData());
+      return image != nullptr && image->GetDimension() == 3 && image->GetPixelType().GetNumberOfComponents() == 1;
+    });
+    m_Controls->m_MaskImageBox->SetPredicate(isScalar3dImage);
 
     connect( (QObject*)(m_Controls->m_MaskImageBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGUI()));
     connect( (QObject*)(m_Controls->m_InputImageBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGUI()));
@@ -435,8 +439,7 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
     mitk::CastToItkImage(m_TensorImage, m_ItkTensorImage);
   }
 
-  // mask image found?
-  // catch exceptions thrown by the itkAccess macros
+  // a mask that cannot be used must not silently be replaced by the whole image
   try{
     if(m_Controls->m_MaskImageBox->GetSelectedNode().IsNotNull())
     {
@@ -445,7 +448,15 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
         mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_MaskImageNode->GetData()), m_MaskImage);
     }
   }
-  catch(...){};
+  catch (const std::exception &e)
+  {
+    QMessageBox::warning(nullptr, "Gibbs Tracking", QString("The mask image cannot be used:\n") + e.what());
+    m_ItkOdfImage = nullptr;
+    m_ItkTensorImage = nullptr;
+    m_MaskImage = nullptr;
+    m_TrackingNode = nullptr;
+    return;
+  }
 
   // The filter is configured here, in the GUI thread: the worker thread must not read widgets, and
   // the view must not see a half-assigned m_GlobalTracker.
