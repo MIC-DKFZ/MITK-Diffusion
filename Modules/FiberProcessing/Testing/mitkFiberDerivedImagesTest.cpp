@@ -37,6 +37,7 @@ class mitkFiberDerivedImagesTestSuite : public mitk::TestFixture
   MITK_TEST(Directions_SizeThresholdDiscardsSmallPeaks);
   MITK_TEST(Grid_DerivedImagesShareBundleGrid);
   MITK_TEST(Grid_UpsampledReferenceSubdividesVoxels);
+  MITK_TEST(Grid_PlanarBundleWithIntegerExtentKeepsEveryPoint);
   MITK_TEST(Density_VisitationCountsEachFiberOncePerVoxel);
   MITK_TEST(Directions_SecondUpdateUsesNewBundleGrid);
   MITK_TEST(Directions_NoFiberInMask_EmptyImage);
@@ -244,6 +245,56 @@ public:
             blockSum += fine->GetPixel({{2 * it.GetIndex()[0] + dx, 2 * it.GetIndex()[1] + dy, 2 * it.GetIndex()[2] + dz}});
       CPPUNIT_ASSERT_DOUBLES_EQUAL(it.Get(), blockSum, 1e-4);
     }
+  }
+
+  void Grid_PlanarBundleWithIntegerExtentKeepsEveryPoint()
+  {
+    // Three straight fibers in the plane z = 0 from x = 0 to x = 4: no extent in z (a planar
+    // tractogram, e.g. tracked on a single slice) and an integer extent in x, so that the end
+    // points at x = 4 lie on the upper bound of the bounding box (continuous index
+    // 4 x upsampling - 0.5, which ITK rounds up). The bundle grid needs one voxel in z and
+    // 4 x upsampling + 1 voxels in x to hold every point.
+    using namespace mitk::FiberProcessingTestHelper;
+    auto fib = CreateBundle({Line({0, 0.2, 0}, {4, 0.2, 0}, 2), Line({0, 1.3, 0}, {4, 1.3, 0}, 2), Line({0, 2.1, 0}, {4, 2.1, 0}, 2)});
+
+    for (const auto& [upsampling, sizeY] : {std::pair<float, itk::SizeValueType>(1, 2), std::pair<float, itk::SizeValueType>(2, 4)})
+    {
+      auto density = itk::TractDensityImageFilter<FloatImageType>::New();
+      density->SetFiberBundle(fib);
+      density->SetUpsamplingFactor(upsampling);
+      density->SetOutputAbsoluteValues(true);
+      density->Update();
+      const auto size = density->GetOutput()->GetLargestPossibleRegion().GetSize();
+      CPPUNIT_ASSERT_EQUAL(static_cast<itk::SizeValueType>(4 * upsampling + 1), size[0]);
+      CPPUNIT_ASSERT_EQUAL(sizeY, size[1]);
+      CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(1), size[2]);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(12.0, SumAndMax(density->GetOutput()).first, 1e-4);
+
+      auto endings = itk::TractsToFiberEndingsImageFilter<FloatImageType>::New();
+      endings->SetFiberBundle(fib);
+      endings->SetUpsamplingFactor(upsampling);
+      endings->Update();
+      AssertSameGrid(density->GetOutput(), endings->GetOutput());
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(6.0, SumAndMax(endings->GetOutput()).first, 0.0);
+    }
+
+    // Without a mask the directions use the same grid (no upsampling). Voxel row y = 0 holds the
+    // first fiber, row y = 1 the other two: one peak along x of size 1 mm and 2 mm.
+    auto directions = DirectionFilterType::New();
+    directions->SetFiberBundle(fib);
+    directions->Update();
+    auto numDirections = directions->GetNumDirectionsImage();
+    const auto size = numDirections->GetLargestPossibleRegion().GetSize();
+    CPPUNIT_ASSERT(size[0] == 5 && size[1] == 2 && size[2] == 1);
+    auto directionImage = directions->GetDirectionImage();
+    for (int y = 0; y < 2; ++y)
+      for (int x = 0; x < 4; ++x)
+      {
+        CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(1), numDirections->GetPixel({{x, y, 0}}));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(y == 0 ? 0.5 : 1.0, std::abs(directionImage->GetPixel({{x, y, 0, 0}})), 1e-5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, directionImage->GetPixel({{x, y, 0, 1}}), 1e-5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, directionImage->GetPixel({{x, y, 0, 2}}), 1e-5);
+      }
   }
 
   void Density_VisitationCountsEachFiberOncePerVoxel()

@@ -59,7 +59,7 @@ namespace mitk
     /**
      * Grid on the bounding box of a tractogram (its geometry): voxels of the geometry's spacing
      * divided by the upsampling factor, the first voxel starting at the minimum corner of the box,
-     * ceil(extent x upsampling) voxels per axis.
+     * floor(extent x upsampling) + 1 voxels per axis.
      */
     static FiberImageGrid FromBundle(const BaseGeometry* geometry, double upsampling)
     {
@@ -73,7 +73,10 @@ namespace mitk
         grid.Origin[i] += bounds[2 * i] + 0.5 * grid.Spacing[i];
         for (unsigned int j = 0; j < 3; ++j)
           grid.Direction[j][i] = geometry->GetMatrixColumn(i)[j];
-        grid.Region.SetSize(i, std::ceil(geometry->GetExtent(i) * upsampling));
+        // A point on the upper bound has continuous index extent x upsampling - 0.5, which ITK
+        // rounds up. floor + 1 keeps it inside for an integer extent and gives an axis without
+        // extent (a planar tractogram) one voxel; for any other extent it equals ceil.
+        grid.Region.SetSize(i, static_cast<itk::SizeValueType>(std::floor(geometry->GetExtent(i) * upsampling)) + 1);
       }
       return grid;
     }
