@@ -27,21 +27,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>
+#include <mitkExceptionMacro.h>
 #include <itkTractDensityImageFilter.h>
 #include <itkTractsToFiberEndingsImageFilter.h>
+#include <mitkFiberWeightsFile.h>
 
-
-mitk::FiberBundle::Pointer LoadFib(std::string filename)
-{
-  std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load(filename);
-  if( fibInfile.empty() )
-    std::cout << "File " << filename << " could not be read!";
-  mitk::BaseData::Pointer baseData = fibInfile.at(0);
-  return dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
-}
 
 /*!
 \brief Import Sift2 Fiber Weights txt file.
@@ -71,30 +65,20 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
+    mitk::FiberBundle::Pointer fib = mitk::FiberBundleIOHelper::load_fib(inFileName);
 
-    std::ifstream fin;
-    fin.open(weightsFileName);
-    if (!fin.good())
-      return 1; // exit if file not found
-
-    std::vector<float> weights;
-    for (float d; fin >> d; ) { weights.push_back(d); }
-
-    for(std::size_t i = 0; i != weights.size(); i++) {
-      fib->SetFiberWeight(i, weights[i]);
-    }
+    mitk::FiberWeightsFile::Apply(mitk::FiberWeightsFile::Read(weightsFileName), fib);
 
     mitk::IOUtil::Save(fib.GetPointer(), outFileName );
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (...)

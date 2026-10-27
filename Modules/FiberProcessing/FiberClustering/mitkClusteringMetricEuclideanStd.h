@@ -14,10 +14,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _ClusteringMetricEuStd
-#define _ClusteringMetricEuStd
+#ifndef mitkClusteringMetricEuclideanStd_h
+#define mitkClusteringMetricEuclideanStd_h
 
 #include <mitkClusteringMetric.h>
+
+#include <cmath>
 
 namespace mitk
 {
@@ -30,10 +32,7 @@ class ClusteringMetricEuclideanStd : public ClusteringMetric
 
 public:
 
-  ClusteringMetricEuclideanStd(){}
-  virtual ~ClusteringMetricEuclideanStd(){}
-
-  float CalculateDistance(vnl_matrix<float>& s, vnl_matrix<float>& t, bool &flipped)
+  float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
     float d_direct = 0;
     float d_flipped = 0;
@@ -50,11 +49,13 @@ public:
       d_flipped += dists_f[i];
     }
 
+    // Mean of the point distances plus their standard deviation, halved. The norm of the
+    // deviations from the mean is sqrt(N) times the standard deviation.
     if (d_direct>d_flipped)
     {
       float d = d_flipped/s.cols();
       dists_f -= d;
-      d += dists_f.magnitude();
+      d += dists_f.magnitude()/std::sqrt(static_cast<float>(s.cols()));
 
       flipped = true;
       return m_Scale*d/2;
@@ -62,13 +63,11 @@ public:
 
     float d = d_direct/s.cols();
     dists_d -= d;
-    d += dists_d.magnitude();
+    d += dists_d.magnitude()/std::sqrt(static_cast<float>(s.cols()));
 
     flipped = false;
     return m_Scale*d/2;
   }
-
-protected:
 
 };
 

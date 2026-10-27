@@ -213,15 +213,15 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
       DataNode::Pointer newNode = nullptr;
       switch(generationMethod){
       case 0:
-        newNode = GenerateTractDensityImage(fib, TDI_MODE::DENSITY, true, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, true, node->GetName());
         name += "_TDI";
         break;
       case 1:
-        newNode = GenerateTractDensityImage(fib, TDI_MODE::DENSITY, false, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, false, node->GetName());
         name += "_TDI";
         break;
       case 2:
-        newNode = GenerateTractDensityImage(fib, TDI_MODE::BINARY, false, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::BINARY, false, node->GetName());
         name += "_envelope";
         break;
       case 3:
@@ -244,7 +244,7 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
         name += "_skeleton";
         break;
       case 8:
-        newNode = GenerateTractDensityImage(fib, TDI_MODE::VISITATION_COUNT, true, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::VISITATION_COUNT, true, node->GetName());
         name += "_visitations";
         break;
       case 9:
@@ -391,7 +391,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateBinarySkeleton(mit
 
   itk::TractDensityImageFilter< UcharImageType >::Pointer envelope_generator = itk::TractDensityImageFilter< UcharImageType >::New();
   envelope_generator->SetFiberBundle(fib);
-  envelope_generator->SetMode(TDI_MODE::BINARY);
+  envelope_generator->SetMode(itk::TDI_MODE::BINARY);
   envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
@@ -424,7 +424,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateDistanceMap(mitk::
 
   itk::TractDensityImageFilter< UcharImageType >::Pointer envelope_generator = itk::TractDensityImageFilter< UcharImageType >::New();
   envelope_generator->SetFiberBundle(fib);
-  envelope_generator->SetMode(TDI_MODE::BINARY);
+  envelope_generator->SetMode(itk::TDI_MODE::BINARY);
   envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
@@ -454,10 +454,10 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateDistanceMap(mitk::
 }
 
 // generate tract density image from fiber bundle
-mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, TDI_MODE mode, bool absolute, std::string name)
+mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, itk::TDI_MODE mode, bool absolute, std::string name)
 {
   mitk::DataNode::Pointer node = mitk::DataNode::New();
-  if (mode==TDI_MODE::BINARY)
+  if (mode==itk::TDI_MODE::BINARY)
   {
     typedef unsigned char OutPixType;
     typedef itk::Image<OutPixType, 3> OutImageType;

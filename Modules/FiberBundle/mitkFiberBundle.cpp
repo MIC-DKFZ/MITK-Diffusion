@@ -291,7 +291,7 @@ bool mitk::FiberBundle::Equals(const mitk::FiberBundle* fib, double eps) const
   return true;
 }
 
-void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
+void mitk::FiberBundle::PrintStatistics(std::ostream &os, itk::Indent indent) const
 {
   os << indent << "Number of fibers: " << this->GetNumFibers() << std::endl;
   os << indent << "Min. fiber length: " << this->GetMinFiberLength() << std::endl;
@@ -339,7 +339,11 @@ void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
   }
   else
     os << indent << "\n\nNo fiber weights." << std::endl;
+}
 
+void mitk::FiberBundle::PrintSelf(std::ostream &os, itk::Indent indent) const
+{
+  this->PrintStatistics(os, indent);
   Superclass::PrintSelf(os, indent);
 }
 

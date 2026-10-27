@@ -20,20 +20,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <mitkLexicalCast.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <itksys/SystemTools.hxx>
 #include <itkFiberExtractionFilter.h>
 #include <itkTractDensityImageFilter.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
 
-typedef itksys::SystemTools ist;
 typedef itk::Image<float, 3>    ItkFloatImgType;
 
 /*!
-\brief Extract fibers from a tractogram using binary image ROIs
+\brief Remove outlier fibers: keep the fibers that run mostly through voxels of high tract density.
 */
 int main(int argc, char* argv[])
 {
@@ -42,14 +40,15 @@ int main(int argc, char* argv[])
   parser.setTitle("Filter Outliers by Tract Density");
   parser.setCategory("Fiber Tracking and Processing Methods");
   parser.setContributor("MIC");
+  parser.setDescription("Remove outlier fibers: keep the fibers with at least the given fraction of their length in voxels whose max-normalized tract density reaches the threshold.");
 
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.dcm)", us::Any(), false);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram", us::Any(), false);
 
-  parser.addArgument("threshold", "", mitkCommandLineParser::Float, "Threshold:", "positive means ROI image value threshold", 0.05);
-  parser.addArgument("overlap", "", mitkCommandLineParser::Float, "Overlap:", "positive means ROI image value threshold", 0.5);
-  parser.addArgument("min_fibers", "", mitkCommandLineParser::Int, "Min. num. fibers:", "discard positive tracts with less fibers", 0);
+  parser.addArgument("threshold", "", mitkCommandLineParser::Float, "Threshold:", "minimum max-normalized tract density (0-1) of the voxels that count", 0.05);
+  parser.addArgument("overlap", "", mitkCommandLineParser::Float, "Overlap:", "minimum fraction of the fiber length in such voxels", 0.5);
+  parser.addArgument("min_fibers", "", mitkCommandLineParser::Int, "Min. num. fibers:", "write no output if fewer fibers are kept", 0);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -72,11 +71,11 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(inFib);
+    mitk::FiberBundle::Pointer inputTractogram = mitk::FiberBundleIOHelper::load_fib(inFib);
 
     itk::TractDensityImageFilter< ItkFloatImgType >::Pointer generator = itk::TractDensityImageFilter< ItkFloatImgType >::New();
     generator->SetFiberBundle(inputTractogram);
-    generator->SetMode(TDI_MODE::DENSITY);
+    generator->SetMode(itk::TDI_MODE::DENSITY);
     generator->SetOutputAbsoluteValues(false);
     generator->Update();
 

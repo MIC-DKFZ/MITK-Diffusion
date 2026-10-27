@@ -25,25 +25,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkBaseData.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include "mitkCommandLineParser.h"
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>
+#include <mitkExceptionMacro.h>
 #include <itkFiberCurvatureFilter.h>
 #include <mitkDiffusionDataIOHelper.h>
 #include <mitkImage.h>
 
 
-mitk::FiberBundle::Pointer LoadFib(std::string filename)
-{
-  std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load(filename);
-  if( fibInfile.empty() )
-    std::cout << "File " << filename << " could not be read!";
-  mitk::BaseData::Pointer baseData = fibInfile.at(0);
-  return dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
-}
-
 /*!
-\brief Modify input tractogram: fiber resampling, compression, pruning and transformation.
+\brief Colour a tractogram by the values of a scalar map along its fibers.
 */
 int main(int argc, char* argv[])
 {
@@ -51,7 +44,7 @@ int main(int argc, char* argv[])
 
   parser.setTitle("Fiber Coloring");
   parser.setCategory("Fiber Tracking and Processing Methods");
-  parser.setDescription("Color tractogram.");
+  parser.setDescription("Colour a tractogram by the values of a scalar map along its fibers.");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
@@ -59,14 +52,14 @@ int main(int argc, char* argv[])
   parser.beginGroup("1. Mandatory arguments:");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "Input fiber bundle (.fib, .trk, .tck)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "Output fiber bundle (.fib)", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("resample", "", mitkCommandLineParser::Float, "", "");
+  parser.addArgument("resample", "", mitkCommandLineParser::Float, "Resample:", "Resample the fibers with splines at this point distance (mm) before colouring");
   parser.endGroup();
 
   parser.beginGroup("2. Color by scalar map:");
-  parser.addArgument("scalar_map", "", mitkCommandLineParser::String, "", "", us::Any(), true, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("lookup", "", mitkCommandLineParser::String, "", "JET, MAGMA, INFERNO, VIRIDIS, PLASMA, MULTILABEL", us::Any(), true, false, false);
-  parser.addArgument("interpolate", "", mitkCommandLineParser::Bool, "", "");
-  parser.addArgument("normalize", "", mitkCommandLineParser::Bool, "", "");
+  parser.addArgument("scalar_map", "", mitkCommandLineParser::String, "Scalar map:", "Image whose values at the fiber points give the colours", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("lookup", "", mitkCommandLineParser::String, "Lookup table:", "JET (default), MAGMA, INFERNO, VIRIDIS, PLASMA or MULTILABEL; any other value means MULTILABEL, without interpolation", us::Any(), true, false, false);
+  parser.addArgument("interpolate", "", mitkCommandLineParser::Bool, "Interpolate:", "Interpolate the scalar map at the fiber points");
+  parser.addArgument("normalize", "", mitkCommandLineParser::Bool, "Fixed range:", "Map the values with the lookup table's fixed range instead of the range of the sampled values");
   parser.endGroup();
 
 
@@ -96,7 +89,7 @@ int main(int argc, char* argv[])
 
   try
   {
-    mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
+    mitk::FiberBundle::Pointer fib = mitk::FiberBundleIOHelper::load_fib(inFileName);
 
     if (resample>0)
       fib->ResampleSpline(resample);

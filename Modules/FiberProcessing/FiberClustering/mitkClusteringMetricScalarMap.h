@@ -14,11 +14,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _ClusteringMetricScalarMap
-#define _ClusteringMetricScalarMap
+#ifndef mitkClusteringMetricScalarMap_h
+#define mitkClusteringMetricScalarMap_h
 
 #include <mitkClusteringMetric.h>
 #include <itkImage.h>
+#include <itkLinearInterpolateImageFunction.h>
 #include <mitkDiffusionImageHelperFunctions.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkNumericTraits.h>
@@ -34,16 +35,14 @@ class ClusteringMetricScalarMap : public ClusteringMetric
 
 public:
 
-  typedef itk::Image<float, 3>  ItkFloatImgType;
+  using ItkFloatImgType = itk::Image<float, 3>;
 
   ClusteringMetricScalarMap()
   {
-    m_Interpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
     this->m_Scale = 30;
   }
-  virtual ~ClusteringMetricScalarMap(){}
 
-  float CalculateDistance(vnl_matrix<float>& s, vnl_matrix<float>& t, bool &flipped)
+  float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
     float d_direct = 0;
     float d_flipped = 0;
@@ -52,7 +51,8 @@ public:
     vnl_vector<float> dists_d; dists_d.set_size(s.cols());
     vnl_vector<float> dists_f; dists_f.set_size(s.cols());
 
-    int inc = s.cols()/4;
+    // Every fourth point; fibers with fewer than four points use every point.
+    const unsigned int inc = s.cols()>=4 ? s.cols()/4 : 1;
     for (unsigned int i=0; i<s.cols(); i += inc)
     {
       d_direct += (s.get_column(i)-t.get_column(i)).magnitude();
@@ -103,28 +103,32 @@ public:
     return m_Scale*map_distance;
   }
 
-  vnl_vector<float> GetImageValuesAtPoint(itk::Point<float, 3>& itkP)
+  vnl_vector<float> GetImageValuesAtPoint(const itk::Point<float, 3>& itkP) const
   {
-    vnl_vector<float> vals; vals.set_size(m_ScalarMaps.size());
-    int c = 0;
-    for (auto map : m_ScalarMaps)
-    {
-      m_Interpolator->SetInputImage(map);
-      vals[c] = mitk::imv::GetImageValue<float>(itkP, true, m_Interpolator);
-      ++c;
-    }
+    // CalculateDistance runs in the OpenMP loops of the clustering filter, so the interpolators
+    // are only read here; each map has its own, set up in SetImages.
+    vnl_vector<float> vals; vals.set_size(m_Interpolators.size());
+    for (unsigned int c=0; c<m_Interpolators.size(); ++c)
+      vals[c] = mitk::imv::GetImageValue<float>(itkP, true, m_Interpolators[c]);
     return vals;
   }
 
   void SetImages(const std::vector<ItkFloatImgType::Pointer> &Parcellations)
   {
     m_ScalarMaps = Parcellations;
+    m_Interpolators.clear();
+    for (auto map : m_ScalarMaps)
+    {
+      auto interpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
+      interpolator->SetInputImage(map);
+      m_Interpolators.push_back(interpolator);
+    }
   }
 
 protected:
 
   std::vector< ItkFloatImgType::Pointer > m_ScalarMaps;
-  itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::Pointer   m_Interpolator;
+  std::vector< itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::Pointer > m_Interpolators;
 };
 
 }

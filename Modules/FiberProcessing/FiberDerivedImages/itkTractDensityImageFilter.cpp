@@ -2,7 +2,7 @@
 
 The Medical Imaging Interaction Toolkit (MITK)
 
-Coindex[1]right (c) German Cancer Research Center,
+Copyright (c) German Cancer Research Center.
 
 All rights reserved.
 
@@ -23,10 +23,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkCell.h>
 
 // misc
+#include <algorithm>
 #include <cmath>
 #include <boost/timer/progress_display.hpp>
 #include <vtkBox.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkFiberImageGrid.h>
 
 namespace itk{
 
@@ -34,16 +36,10 @@ template< class OutputImageType, class RefImageType >
 TractDensityImageFilter< OutputImageType, RefImageType >::TractDensityImageFilter()
   : m_UpsamplingFactor(1)
   , m_InvertImage(false)
-  , m_Mode(DENSITY)
+  , m_Mode(TDI_MODE::DENSITY)
   , m_UseImageGeometry(false)
   , m_OutputAbsoluteValues(false)
   , m_MaxDensity(0)
-  , m_NumCoveredVoxels(0)
-{
-}
-
-template< class OutputImageType, class RefImageType >
-TractDensityImageFilter< OutputImageType, RefImageType >::~TractDensityImageFilter()
 {
 }
 
@@ -62,57 +58,23 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::SetMode(const TDI
 template< class OutputImageType, class RefImageType >
 void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
 {
-  // generate upsampled image
-  mitk::BaseGeometry::Pointer geometry = m_FiberBundle->GetGeometry();
   typename OutputImageType::Pointer outImage = this->GetOutput();
 
-  // calculate new image parameters
-  itk::Vector<double,3> newSpacing;
-  mitk::Point3D newOrigin;
-  itk::Matrix<double, 3, 3> newDirection;
-  ImageRegion<3> upsampledRegion;
+  mitk::FiberImageGrid grid;
   if (m_UseImageGeometry && !m_InputImage.IsNull())
   {
     MITK_INFO << "TractDensityImageFilter: using image geometry";
-    newSpacing = m_InputImage->GetSpacing()/m_UpsamplingFactor;
-    upsampledRegion = m_InputImage->GetLargestPossibleRegion();
-    newOrigin = m_InputImage->GetOrigin();
-    typename OutputImageType::RegionType::SizeType size = upsampledRegion.GetSize();
-    size[0] *= m_UpsamplingFactor;
-    size[1] *= m_UpsamplingFactor;
-    size[2] *= m_UpsamplingFactor;
-    upsampledRegion.SetSize(size);
-    newDirection = m_InputImage->GetDirection();
+    grid = mitk::FiberImageGrid::FromReference(m_InputImage, m_UpsamplingFactor);
   }
   else
   {
     MITK_INFO << "TractDensityImageFilter: using fiber bundle geometry";
-    newSpacing = geometry->GetSpacing()/m_UpsamplingFactor;
-    newOrigin = geometry->GetOrigin();
-    mitk::Geometry3D::BoundsArrayType bounds = geometry->GetBounds();
-
-    // we retrieve the origin from a vtk-polydata (corner-based) and hance have to translate it to an image geometry
-    // i.e. center-based
-    newOrigin[0] += bounds.GetElement(0) + 0.5 * newSpacing[0];
-    newOrigin[1] += bounds.GetElement(2) + 0.5 * newSpacing[1];
-    newOrigin[2] += bounds.GetElement(4) + 0.5 * newSpacing[2];
-
-    for (int i=0; i<3; i++)
-      for (int j=0; j<3; j++)
-        newDirection[j][i] = geometry->GetMatrixColumn(i)[j];
-    upsampledRegion.SetSize(0, ceil( geometry->GetExtent(0)*m_UpsamplingFactor ) );
-    upsampledRegion.SetSize(1, ceil( geometry->GetExtent(1)*m_UpsamplingFactor ) );
-    upsampledRegion.SetSize(2, ceil( geometry->GetExtent(2)*m_UpsamplingFactor ) );
+    grid = mitk::FiberImageGrid::FromBundle(m_FiberBundle->GetGeometry(), m_UpsamplingFactor);
   }
-  typename OutputImageType::RegionType::SizeType upsampledSize = upsampledRegion.GetSize();
+  const itk::Vector<double,3> newSpacing = grid.Spacing;
+  typename OutputImageType::RegionType::SizeType upsampledSize = grid.Region.GetSize();
 
-  // apply new image parameters
-  outImage->SetSpacing( newSpacing );
-  outImage->SetOrigin( newOrigin );
-  outImage->SetDirection( newDirection );
-  outImage->SetLargestPossibleRegion( upsampledRegion );
-  outImage->SetBufferedRegion( upsampledRegion );
-  outImage->SetRequestedRegion( upsampledRegion );
+  grid.ApplyTo(outImage);
   outImage->Allocate();
   outImage->FillBuffer(0.0);
 
@@ -121,7 +83,7 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
   int d = upsampledSize[2];
 
   // set/initialize output
-  OutPixelType* outImageBufferPointer = (OutPixelType*)outImage->GetBufferPointer();
+  OutPixelType* outImageBufferPointer = outImage->GetBufferPointer();
 
   MITK_INFO << "TractDensityImageFilter: starting image generation";
   vtkSmartPointer<vtkPolyData> fiberPolyData = m_FiberBundle->GetFiberPolyData();
@@ -136,6 +98,10 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
     vtkPoints* points = cell->GetPoints();
 
     float weight = m_FiberBundle->GetFiberWeight(i);
+
+    // A streamline counts once per voxel it visits (Calamante's track density), however many of
+    // its segments pass the voxel.
+    std::vector< itk::OffsetValueType > visitedVoxels;
 
     // fill output image
     for( int j=0; j<numPoints-1; j++)
@@ -157,22 +123,19 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
       {
         if (!outImage->GetLargestPossibleRegion().IsInside(segment.first))
           continue;
-        if (outImage->GetPixel(segment.first)==0)
-          m_NumCoveredVoxels++;
-
         switch (m_Mode)
         {
-        case BINARY:
+        case TDI_MODE::BINARY:
         {
           outImage->SetPixel(segment.first, 1);
           break;
         }
-        case VISITATION_COUNT:
+        case TDI_MODE::VISITATION_COUNT:
         {
-          outImage->SetPixel(segment.first, outImage->GetPixel(segment.first) + 1);
+          visitedVoxels.push_back(outImage->ComputeOffset(segment.first));
           break;
         }
-        case DENSITY:
+        case TDI_MODE::DENSITY:
         {
           outImage->SetPixel(segment.first, outImage->GetPixel(segment.first)+segment.second * weight);
           break;
@@ -184,13 +147,18 @@ void TractDensityImageFilter< OutputImageType, RefImageType >::GenerateData()
         }
       }
     }
+
+    std::sort(visitedVoxels.begin(), visitedVoxels.end());
+    visitedVoxels.erase(std::unique(visitedVoxels.begin(), visitedVoxels.end()), visitedVoxels.end());
+    for (auto offset : visitedVoxels)
+      outImageBufferPointer[offset] += 1;
   }
 
   m_MaxDensity = 0;
   for (int i=0; i<w*h*d; i++)
     if (m_MaxDensity < outImageBufferPointer[i])
       m_MaxDensity = outImageBufferPointer[i];
-  if (!m_OutputAbsoluteValues && m_Mode!=BINARY)
+  if (!m_OutputAbsoluteValues && m_Mode!=TDI_MODE::BINARY)
   {
     MITK_INFO << "TractDensityImageFilter: max-normalizing output image";
     if (m_MaxDensity>0)
