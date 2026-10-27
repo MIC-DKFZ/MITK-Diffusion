@@ -35,7 +35,9 @@ namespace mitk
 {
   /**
    * \brief  Abstract class for tracking handler. A tracking handler deals with determining the next progression
-   * direction of a streamline fiber. There are different handlers for tensor images, peak images, ... */
+   * direction of a streamline fiber. There are different handlers for tensor images, peak images, ...
+   * Tensors, ODF directions and peaks are world (LPS) vectors (the project's gradient convention), so
+   * the handlers use them without applying the image rotation. */
 
   class MITKFIBERTRACKING_EXPORT TrackingDataHandler
   {
@@ -131,8 +133,6 @@ namespace mitk
     std::shared_ptr<mitk::StreamlineTractographyParameters> m_Parameters;
 
     void DataModified() { m_NeedsDataInit = true; }
-
-    vnl_matrix_fixed<float, 3, 3> m_FloatImageRotation;
   };
 
 } // namespace mitk

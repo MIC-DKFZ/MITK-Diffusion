@@ -343,7 +343,6 @@ std::shared_ptr<mitk::StreamlineTractographyParameters> QmitkStreamlineTrackingV
 //  bool m_AvoidStop = true;
 //  bool m_RandomSampling = false;
 //  float m_DeflectionMod = 1.0;
-//  bool m_ApplyDirectionMatrix = false;
 
   // NOT IN GUI BUT AUTOMATICALLY SET
   if (!m_InputImageNodes.empty())

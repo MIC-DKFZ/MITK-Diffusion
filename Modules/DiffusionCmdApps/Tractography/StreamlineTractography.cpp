@@ -199,9 +199,6 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("prior_flip_z"))
     params->m_PriorFlipZ = us::any_cast<bool>(parsedArgs["prior_flip_z"]);
 
-  if (parsedArgs.count("apply_image_rotation"))
-    params->m_ApplyDirectionMatrix = us::any_cast<bool>(parsedArgs["apply_image_rotation"]);
-
   if (parsedArgs.count("compress"))
     params->m_CompressFibers = us::any_cast<bool>(parsedArgs["compress"]);
   if (parsedArgs.count("no_compress"))

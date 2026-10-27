@@ -118,7 +118,6 @@ namespace mitk
     bool m_FlipZ = false;
     bool m_InterpolateTractographyData = true;
     bool m_InterpolateRoiImages = true;
-    bool m_ApplyDirectionMatrix = false;
 
     // output and postprocessing
     bool m_CompressFibers = true;

@@ -57,13 +57,6 @@ void TrackingHandlerOdf::InitForTracking()
         m_OdfHemisphereIndices.push_back(i);
     m_OdfFloatDirs.set_size(m_OdfHemisphereIndices.size(), 3);
 
-    auto double_dir = m_OdfImage->GetDirection().GetVnlMatrix();
-    for (int r=0; r<3; r++)
-      for (int c=0; c<3; c++)
-      {
-        m_FloatImageRotation[r][c] = double_dir[r][c];
-      }
-
     for (unsigned int i=0; i<m_OdfHemisphereIndices.size(); i++)
     {
       m_OdfFloatDirs[i][0] = odf.GetDirection(m_OdfHemisphereIndices[i])[0];
@@ -379,8 +372,6 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
     output_direction[1] *= -1;
   if (m_Parameters->m_FlipZ)
     output_direction[2] *= -1;
-  if (m_Parameters->m_ApplyDirectionMatrix)
-    output_direction = m_FloatImageRotation*output_direction;
 
   return output_direction;
 }
