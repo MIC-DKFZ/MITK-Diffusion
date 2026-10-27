@@ -361,9 +361,19 @@ int main( int argc, char* argv[] )
     if (arg != "")
     {
       spacings = split(arg ,',');
-      spacing[0] = atoi(spacings.at(0).c_str());
-      spacing[1] = atoi(spacings.at(1).c_str());
-      spacing[2] = atoi(spacings.at(2).c_str());
+      bool valid = spacings.size() == 3;
+      for (unsigned int i = 0; valid && i < 3; ++i)
+      {
+        // std::stof rejects text without a number; the value must be positive for the output size.
+        try { spacing[i] = std::stof(spacings[i]); }
+        catch (const std::exception&) { valid = false; }
+        valid = valid && spacing[i] > 0;
+      }
+      if (!valid)
+      {
+        MITK_ERROR << "--spacing needs three positive values in mm, e.g. 1,1,3";
+        return EXIT_FAILURE;
+      }
       useSpacing = true;
     }
   }
