@@ -408,8 +408,8 @@ float StreamlineTrackingFilter::FollowStreamline(itk::Point<float, 3> pos, vnl_v
     if (m_AbortTracking)
       return tractLength;
 
-    // the step moved by |dir| steps: the first one from the seed is half a step, and the handlers
-    // scale the direction with the interpolated magnitude
+    // the step moved by |dir| steps: GetNewDirection returns unit vectors, so |dir| is 1 except for
+    // the first step from the seed, which is half a step
     const float stepLength = dir.magnitude()*m_Parameters->GetStepSizeMm();
 
     // if yes, add new point to streamline

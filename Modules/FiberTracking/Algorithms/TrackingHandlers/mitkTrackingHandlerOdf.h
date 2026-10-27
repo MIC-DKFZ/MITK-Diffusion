@@ -65,7 +65,10 @@ protected:
   /** Peak direction near the hemisphere sampling direction idx (same orientation as that direction):
    *  climbs to the local maximum of the sampled values and fits a quadratic to their logarithm in
    *  the tangent plane of the neighbouring directions, so that deterministic tracking is not
-   *  limited to the sampling directions. */
+   *  limited to the sampling directions. With a previous direction, idx is the maximum of the ODF
+   *  weighted with |cos| to that direction, but the climb uses the unweighted values: the result is
+   *  the ODF peak whose basin holds idx (as MRtrix's SD_Stream searches the peak from the previous
+   *  direction), at most 10 neighbour steps away. */
   vnl_vector_fixed<float,3> RefinePeak(int idx, const vnl_vector< float >& values) const;
 
   struct OdfNeighbor
