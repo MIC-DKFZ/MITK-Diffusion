@@ -809,12 +809,8 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
 
     else
     {
-      m_Parameters.m_Misc.m_MotionVolumesBox = ""; // set empty.
-      m_Controls->m_MotionVolumesBox->setText("");
-      for (unsigned int i=0; i<m_Parameters.m_SignalGen.GetNumVolumes(); i++)
-      {
-        m_Parameters.m_SignalGen.m_MotionVolumes.push_back(i);
-      }
+      // blank: every volume moves, as the box's tooltip says
+      m_Parameters.m_SignalGen.m_MotionVolumes.assign(m_Parameters.m_SignalGen.GetNumVolumes(), true);
     }
   }
 

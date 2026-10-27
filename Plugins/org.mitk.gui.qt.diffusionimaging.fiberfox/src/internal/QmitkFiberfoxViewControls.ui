@@ -1779,7 +1779,7 @@
             <item row="0" column="1">
              <widget class="QLineEdit" name="m_MotionVolumesBox">
               <property name="toolTip">
-               <string>Type in the volume indices that should be affected by motion (e.g. &quot;0 3 7&quot; whithout quotation marks). Leave blank for motion in all volumes. Type in &quot;random&quot; to randomly select volumes for motion. A list of negative numbers (e.g. -1 -2 -3) excludes volumes (e.g. 1 2 3) selects all remaining volumes.</string>
+               <string>Type in the volume indices that should be affected by motion (e.g. &quot;0 3 7&quot; without quotation marks). Leave blank for motion in all volumes. Type in &quot;random&quot; to randomly select volumes for motion (volume 0 never moves). A list of negative numbers (e.g. -1 -2 -3) moves all volumes except 1, 2 and 3. A list with both signs or without numbers moves no volume.</string>
               </property>
               <property name="text">
                <string>random</string>
