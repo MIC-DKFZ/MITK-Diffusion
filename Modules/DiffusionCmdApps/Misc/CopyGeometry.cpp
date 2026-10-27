@@ -60,29 +60,9 @@ int main(int argc, char* argv[])
     mitk::Image::Pointer target = mitk::IOUtil::Load<mitk::Image>(imageName);
     if (originOnly)
     {
-      // Calculate correction to align centroids
-      double c[3];
-      c[0] = source->GetGeometry()->GetOrigin()[0]
-             + source->GetGeometry()->GetExtent(0)/2.0
-             - target->GetGeometry()->GetOrigin()[0]
-             - target->GetGeometry()->GetExtent(0)/2.0;
-
-      c[1] = source->GetGeometry()->GetOrigin()[1]
-             + source->GetGeometry()->GetExtent(1)/2.0
-             - target->GetGeometry()->GetOrigin()[1]
-             - target->GetGeometry()->GetExtent(1)/2.0;
-
-
-      c[2] = source->GetGeometry()->GetOrigin()[2]
-             + source->GetGeometry()->GetExtent(2)/2.0
-             - target->GetGeometry()->GetOrigin()[2]
-             - target->GetGeometry()->GetExtent(2)/2.0;
-
-      double newOrigin[3];
-      newOrigin[0] = target->GetGeometry()->GetOrigin()[0] +c[0];
-      newOrigin[1] = target->GetGeometry()->GetOrigin()[1] +c[1];
-      newOrigin[2] = target->GetGeometry()->GetOrigin()[2] +c[2];
-
+      // Shift the target so that the world centres of both voxel grids coincide.
+      const mitk::Vector3D shift = source->GetGeometry()->GetCenter() - target->GetGeometry()->GetCenter();
+      const mitk::Point3D newOrigin = target->GetGeometry()->GetOrigin() + shift;
       target->GetGeometry()->SetOrigin(newOrigin);
     }
     else
