@@ -31,7 +31,7 @@ Image based seeding:
 Interactive seeding:
 - Update on Parameter Change: When "Update on Parameter Change" is checked, each parameter change causes an instant retracking with the new parameters. This enables an intuitive exploration of the effects that the other tractography parameters have on the resulting tractogram.
 - Radius: Radius of the manually placed spherical seed region.
-- Num.Seeds: Number of seeds placed randomly inside the spherical seed region.
+- Num.Seeds: Number of seeds placed randomly inside the spherical seed region (uniformly distributed in its volume). With "Fix Random Seed" checked, the same seed points are used at every update.
 
 Parameters for both seeding modes:
 - Trials Per Seed: Try each seed N times until a valid streamline is obtained (only for probabilistic tractography).

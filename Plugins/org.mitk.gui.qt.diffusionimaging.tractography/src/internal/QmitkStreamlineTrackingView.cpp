@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qt
 #include <QMessageBox>
+#include <random>
 #include <QFileDialog>
 
 // MITK
@@ -641,7 +642,6 @@ void QmitkStreamlineTrackingView::InteractiveSeedChanged(bool posChanged)
   if (!posChanged && (!m_Controls->m_InteractiveBox->isChecked() || !m_Controls->m_ParamUpdateBox->isChecked()) )
     return;
 
-  std::srand(std::time(0));
   m_SeedPoints.clear();
 
   itk::Point<double> world_pos = this->GetRenderWindowPart()->GetSelectedPosition();
@@ -656,14 +656,23 @@ void QmitkStreamlineTrackingView::InteractiveSeedChanged(bool posChanged)
   m_InteractivePointSetNode->SetProperty("point 2D size", mitk::FloatProperty::New(radius*2));
   m_InteractivePointSetNode->SetData(pointset);
 
+  // Uniform in the ball: isotropic direction from three normal variates, radius R*cbrt(u).
+  // "Fix Random Seed" gives the same seed points at every update.
+  std::mt19937 rng(m_Controls->m_FixSeedBox->isChecked() ? 0u : std::random_device()());
+  std::normal_distribution<float> normal;
+  std::uniform_real_distribution<float> uniform;
   for (int i=1; i<num; i++)
   {
     itk::Vector<float> p;
-    p[0] = rand()%1000-500;
-    p[1] = rand()%1000-500;
-    p[2] = rand()%1000-500;
+    do
+    {
+      p[0] = normal(rng);
+      p[1] = normal(rng);
+      p[2] = normal(rng);
+    }
+    while (p.GetNorm() == 0.0f);
     p.Normalize();
-    p *= radius;
+    p *= radius * std::cbrt(uniform(rng));
     m_SeedPoints.push_back(world_pos+p);
   }
   m_InteractivePointSetNode->SetProperty("color", mitk::ColorProperty::New(1,0,0));
