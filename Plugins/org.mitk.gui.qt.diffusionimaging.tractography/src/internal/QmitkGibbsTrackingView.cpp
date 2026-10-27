@@ -57,21 +57,6 @@ QmitkTrackingWorker::QmitkTrackingWorker(QmitkGibbsTrackingView* view)
 
 void QmitkTrackingWorker::run()
 {
-  m_View->m_GlobalTracker = QmitkGibbsTrackingView::GibbsTrackingFilterType::New();
-
-  m_View->m_GlobalTracker->SetOdfImage(m_View->m_ItkOdfImage);
-  m_View->m_GlobalTracker->SetTensorImage(m_View->m_ItkTensorImage);
-  m_View->m_GlobalTracker->SetMaskImage(m_View->m_MaskImage);
-  m_View->m_GlobalTracker->SetStartTemperature((float)m_View->m_Controls->m_StartTempSlider->value()/100);
-  m_View->m_GlobalTracker->SetEndTemperature((float)m_View->m_Controls->m_EndTempSlider->value()/10000);
-  m_View->m_GlobalTracker->SetIterations(m_View->m_Controls->m_IterationsBox->text().toDouble());
-  m_View->m_GlobalTracker->SetParticleWeight((float)m_View->m_Controls->m_ParticleWeightSlider->value()/10000);
-  m_View->m_GlobalTracker->SetParticleWidth((float)(m_View->m_Controls->m_ParticleWidthSlider->value())/10);
-  m_View->m_GlobalTracker->SetParticleLength((float)(m_View->m_Controls->m_ParticleLengthSlider->value())/10);
-  m_View->m_GlobalTracker->SetInexBalance((float)m_View->m_Controls->m_InExBalanceSlider->value()/10);
-  m_View->m_GlobalTracker->SetMinFiberLength(m_View->m_Controls->m_FiberLengthSlider->value());
-  m_View->m_GlobalTracker->SetCurvatureThreshold(cos((float)m_View->m_Controls->m_CurvatureThresholdSlider->value()*itk::Math::pi/180));
-  m_View->m_GlobalTracker->SetRandomSeed(m_View->m_Controls->m_RandomSeedSlider->value());
   // run() is called in the tracking thread, where an escaping exception would terminate the
   // application; the message is shown by AfterThread in the GUI thread.
   m_View->m_TrackingError.clear();
@@ -122,7 +107,8 @@ QmitkGibbsTrackingView::QmitkGibbsTrackingView()
 
 QmitkGibbsTrackingView::~QmitkGibbsTrackingView()
 {
-  if (m_GlobalTracker.IsNull())
+  // m_GlobalTracker is set before the thread starts and reset only after it finished
+  if (!m_TrackingThread.isRunning())
     return;
 
   m_GlobalTracker->SetAbortTracking(true);
@@ -466,6 +452,27 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
     }
   }
   catch(...){};
+
+  // The filter is configured here, in the GUI thread: the worker thread must not read widgets, and
+  // the view must not see a half-assigned m_GlobalTracker.
+  m_GlobalTracker = GibbsTrackingFilterType::New();
+  m_GlobalTracker->SetOdfImage(m_ItkOdfImage);
+  m_GlobalTracker->SetTensorImage(m_ItkTensorImage);
+  m_GlobalTracker->SetMaskImage(m_MaskImage);
+  m_GlobalTracker->SetStartTemperature((float)m_Controls->m_StartTempSlider->value()/100);
+  m_GlobalTracker->SetEndTemperature((float)m_Controls->m_EndTempSlider->value()/10000);
+  m_GlobalTracker->SetIterations(m_Controls->m_IterationsBox->text().toDouble());
+  m_GlobalTracker->SetParticleWeight((float)m_Controls->m_ParticleWeightSlider->value()/10000);
+  m_GlobalTracker->SetParticleWidth((float)(m_Controls->m_ParticleWidthSlider->value())/10);
+  m_GlobalTracker->SetParticleLength((float)(m_Controls->m_ParticleLengthSlider->value())/10);
+  m_GlobalTracker->SetInexBalance((float)m_Controls->m_InExBalanceSlider->value()/10);
+  m_GlobalTracker->SetMinFiberLength(m_Controls->m_FiberLengthSlider->value());
+  m_GlobalTracker->SetCurvatureThreshold(cos((float)m_Controls->m_CurvatureThresholdSlider->value()*itk::Math::pi/180));
+  m_GlobalTracker->SetRandomSeed(m_Controls->m_RandomSeedSlider->value());
+
+  // set before start(): BeforeThread is queued, and a second click must not restart the run
+  m_ThreadIsRunning = true;
+  UpdateGUI();
 
   // start worker thread
   m_TrackingThread.start(QThread::LowestPriority);
