@@ -154,6 +154,11 @@ Facts the layout does not show:
   number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`). MITK-Data Fiberfox references
   depend on the random engines and seeds, so a change there is checked bit for bit against the
   old output.
+- `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
+  labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
+  without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
+  so fiber count and weights stay consistent; labeled fibers are found in the classifier's pool
+  by their exact geometry.
 
 ## Porting state
 
