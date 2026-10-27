@@ -481,6 +481,8 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     connect((QObject*) m_Controls->m_FiberBundleComboBox, SIGNAL(currentIndexChanged(int)), (QObject*) this, SLOT(OnFibSelected(int)));
     connect((QObject*) m_Controls->m_LineReadoutTimeBox, SIGNAL( valueChanged(double)), (QObject*) this, SLOT(OnTlineChanged()));
     connect((QObject*) m_Controls->m_SizeX, SIGNAL( valueChanged(int)), (QObject*) this, SLOT(OnTlineChanged()));
+    connect((QObject*) m_Controls->m_NumGradientsBox, SIGNAL( valueChanged(int)), (QObject*) this, SLOT(OnGradientSettingsChanged()));
+    connect((QObject*) m_Controls->m_BvalueBox, SIGNAL( valueChanged(int)), (QObject*) this, SLOT(OnGradientSettingsChanged()));
   }
   OnTlineChanged();
   UpdateGui();
@@ -530,6 +532,33 @@ void QmitkFiberfoxView::OnFibSelected(int )
 void QmitkFiberfoxView::OnBvalsBvecsCheck(int )
 {
   UpdateGui();
+}
+
+void QmitkFiberfoxView::SetGradientsFromGui()
+{
+  if (m_Controls->m_UseBvalsBvecsBox->isChecked())
+  {
+    double bval;
+    m_Parameters.SetGradienDirections( mitk::gradients::ReadBvalsBvecs(m_Controls->m_LoadBvalsEdit->text().toStdString(), m_Controls->m_LoadBvecsEdit->text().toStdString(), bval) );
+    m_Parameters.SetBvalue(bval);
+  }
+  else if (!m_LoadedGradients.empty())
+  {
+    // the gradients of a loaded .ffp without .bvals/.bvecs files, until count or b-value is changed
+    m_Parameters.SetGradienDirections(m_LoadedGradients);
+    m_Parameters.SetBvalue(m_LoadedBvalue);
+  }
+  else
+  {
+    m_Parameters.SetNumWeightedVolumes(m_Controls->m_NumGradientsBox->value());
+    m_Parameters.SetBvalue(m_Controls->m_BvalueBox->value());
+    m_Parameters.GenerateGradientHalfShell();
+  }
+}
+
+void QmitkFiberfoxView::OnGradientSettingsChanged()
+{
+  m_LoadedGradients.clear();
 }
 
 void QmitkFiberfoxView::UpdateParametersFromGui()
@@ -583,18 +612,7 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     m_Parameters.m_SignalGen.m_ImageOrigin = itkImg->GetOrigin();
     m_Parameters.m_SignalGen.m_ImageDirection = itkImg->GetDirection();
 
-    if (m_Controls->m_UseBvalsBvecsBox->isChecked())
-    {
-      double bval;
-      m_Parameters.SetGradienDirections( mitk::gradients::ReadBvalsBvecs(m_Controls->m_LoadBvalsEdit->text().toStdString(), m_Controls->m_LoadBvecsEdit->text().toStdString(), bval) );
-      m_Parameters.SetBvalue(bval);
-    }
-    else
-    {
-      m_Parameters.SetNumWeightedVolumes(m_Controls->m_NumGradientsBox->value());
-      m_Parameters.SetBvalue(m_Controls->m_BvalueBox->value());
-      m_Parameters.GenerateGradientHalfShell();
-    }
+    SetGradientsFromGui();
   }
   else if (m_Parameters.m_SignalGen.m_MaskImage.IsNotNull())   // use geometry of mask image
   {
@@ -604,18 +622,7 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     m_Parameters.m_SignalGen.m_ImageOrigin = itkImg->GetOrigin();
     m_Parameters.m_SignalGen.m_ImageDirection = itkImg->GetDirection();
 
-    if (m_Controls->m_UseBvalsBvecsBox->isChecked())
-    {
-      double bval;
-      m_Parameters.SetGradienDirections( mitk::gradients::ReadBvalsBvecs(m_Controls->m_LoadBvalsEdit->text().toStdString(), m_Controls->m_LoadBvecsEdit->text().toStdString(), bval) );
-      m_Parameters.SetBvalue(bval);
-    }
-    else
-    {
-      m_Parameters.SetNumWeightedVolumes(m_Controls->m_NumGradientsBox->value());
-      m_Parameters.SetBvalue(m_Controls->m_BvalueBox->value());
-      m_Parameters.GenerateGradientHalfShell();
-    }
+    SetGradientsFromGui();
   }
   else    // use GUI parameters
   {
@@ -630,18 +637,7 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     m_Parameters.m_SignalGen.m_ImageOrigin[2] = m_Parameters.m_SignalGen.m_ImageSpacing[2]/2;
     m_Parameters.m_SignalGen.m_ImageDirection.SetIdentity();
 
-    if (m_Controls->m_UseBvalsBvecsBox->isChecked())
-    {
-      double bval;
-      m_Parameters.SetGradienDirections( mitk::gradients::ReadBvalsBvecs(m_Controls->m_LoadBvalsEdit->text().toStdString(), m_Controls->m_LoadBvecsEdit->text().toStdString(), bval) );
-      m_Parameters.SetBvalue(bval);
-    }
-    else
-    {
-      m_Parameters.SetNumWeightedVolumes(m_Controls->m_NumGradientsBox->value());
-      m_Parameters.SetBvalue(m_Controls->m_BvalueBox->value());
-      m_Parameters.GenerateGradientHalfShell();
-    }
+    SetGradientsFromGui();
   }
 
   // signal relaxation
@@ -1412,6 +1408,16 @@ void QmitkFiberfoxView::LoadParameters()
   }
   else
     m_Controls->m_LoadBvecsEdit->setText("-");
+
+  // Without side files the gradients come from the .ffp itself; the boxes show only their count
+  // and b-value, so the view keeps them (set after the boxes, whose changes discard them).
+  m_LoadedGradients.clear();
+  if (m_Parameters.m_Misc.m_BvalsFile.empty() || m_Parameters.m_Misc.m_BvecsFile.empty())
+  {
+    m_Controls->m_UseBvalsBvecsBox->setChecked(false);
+    m_LoadedGradients = m_Parameters.m_SignalGen.GetGradientDirections();
+    m_LoadedBvalue = m_Parameters.m_SignalGen.GetBvalue();
+  }
 
   // m_NoiseDistributionBox offers 0 "Complex Gaussian" (no noise model) and 1 "Rician"
   if (m_Parameters.m_NoiseModel!=nullptr)

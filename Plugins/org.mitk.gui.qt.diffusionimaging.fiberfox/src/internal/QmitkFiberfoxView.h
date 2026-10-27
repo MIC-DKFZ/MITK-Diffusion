@@ -135,6 +135,7 @@ protected slots:
     void OnTemplateSelected(int value);
     void OnBvalsBvecsCheck(int value);
     void OnTlineChanged();
+    void OnGradientSettingsChanged();   ///< the loaded gradients give way to generated ones
 
 protected:
 
@@ -146,6 +147,7 @@ protected:
     void SimulateForExistingDwi(mitk::DataNode* imageNode);     ///< add artifacts to existing diffusion weighted image
     void SimulateImageFromFibers(mitk::DataNode* fiberNode);    ///< simulate new diffusion weighted image
     void UpdateParametersFromGui();  ///< update fiberfox paramater object
+    void SetGradientsFromGui();      ///< bvals/bvecs files, loaded gradients or a generated half shell
     void UpdateGui();                                           ///< enable/disbale buttons etc. according to current datamanager selection
     void PlanarFigureSelected( itk::Object* object, const itk::EventObject& );
     void EnableCrosshairNavigation();               ///< enable crosshair navigation if planar figure interaction ends
@@ -177,6 +179,8 @@ protected:
 
     friend class QmitkFiberfoxWorker;
     mitk::FiberfoxParameters  m_Parameters;
+    mitk::SignalGenerationParameters::GradientListType  m_LoadedGradients;  ///< of a .ffp without .bvals/.bvecs files
+    double                    m_LoadedBvalue = 0;
     /** m_Parameters of the last started simulation before ApplyDirectionMatrix (gradients as FSL
      * bvecs), saved as .ffp next to the simulated image */
     mitk::FiberfoxParameters  m_SimulatedParameters;
