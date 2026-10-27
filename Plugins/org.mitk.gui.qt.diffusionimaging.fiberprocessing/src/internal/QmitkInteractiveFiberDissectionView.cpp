@@ -69,6 +69,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_sparse_matrix.h>
 #include <numeric>
 #include <random>
+#include <stdexcept>
 
 #include <thread>
 
@@ -382,6 +383,8 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
   }
 
   m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+  if (GetBundle(m_testnode).IsNull())
+    throw std::runtime_error("Select the tractogram to dissect.");
   const unsigned int numPrototypes = m_Controls->m_NumPrototypes->value();
   MITK_INFO << "Create " << numPrototypes << " prototypes based on SFF";
 
@@ -920,6 +923,7 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
       return;
     }
 
+    this->GetDataStorage()->Remove(m_DistanceLabelNode);
     m_DistanceLabel = classifier->ExtractFibers(ids);
     classifier->ExcludeFromSampling(ids);
 
@@ -1052,6 +1056,8 @@ void QmitkInteractiveFiberDissectionView::ResetClassifier()
     m_positiveBundleNode = nullptr;
     m_negativeBundleNode = nullptr;
     m_newfibersBundleNode = nullptr;
+    // the next +Bundle starts empty, all its labels belong to the new session
+    m_posOffsetcounter = 0;
     m_positiveBundle = nullptr;
     m_negativeBundle = nullptr;
     m_newfibersBundle = nullptr;
@@ -1122,7 +1128,9 @@ void QmitkInteractiveFiberDissectionView::StartGeneralizationAlgorithm()
 
     cur_negativeBundle = GetBundle(m_negativeGenBundleNode);
     cur_positiveBundle = GetBundle(m_positiveGenBundleNode);
-    m_testnode->SetVisibility(false);
+    m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+    if (m_testnode.IsNotNull())
+      m_testnode->SetVisibility(false);
 
     if (!this->RunClassifier(cur_positiveBundle, cur_negativeBundle))
       return;
@@ -1139,6 +1147,7 @@ void QmitkInteractiveFiberDissectionView::StartGeneralizationAlgorithm()
     m_positiveBundle = mitk::FiberBundle::New();
     m_positiveBundleNode = CreateBundleNode("+Bundle", m_positiveBundle);
     this->GetDataStorage()->Add(m_positiveBundleNode);
+    m_posOffsetcounter = 0;
 
     UpdateGui();
 }
@@ -1157,7 +1166,8 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithmGen( )
                                                   );
     }
 
-    m_testnode->SetVisibility(false);
+    if (m_testnode.IsNotNull())
+      m_testnode->SetVisibility(false);
     this->RunClassifier(cur_positiveBundle, cur_negativeBundle);
 
     UpdateGui();
