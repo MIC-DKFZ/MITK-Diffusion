@@ -66,6 +66,8 @@ void TrackingHandlerPeaks::InitForTracking()
     m_DummyImage->Allocate();
     m_DummyImage->FillBuffer(0.0);
 
+    if (imageRegion4.GetSize(3)==0 || imageRegion4.GetSize(3)%3!=0)
+      mitkThrow() << "The 4th dimension of a peak image holds three components per peak, but its size is " << imageRegion4.GetSize(3) << ".";
     m_NumDirs = imageRegion4.GetSize(3)/3;
 
     m_NeedsDataInit = false;
@@ -116,10 +118,15 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::GetMatchingDirection(itk::Index<
           oldDir[0] = out_dir[0];
           oldDir[1] = out_dir[1];
           oldDir[2] = out_dir[2];
+          found = true;
           break;
         }
       }
     }
+
+    // not the last candidate, which may be NaN (e.g. MRtrix peak files)
+    if (!found)
+      out_dir.fill(0);
   }
   else
   {

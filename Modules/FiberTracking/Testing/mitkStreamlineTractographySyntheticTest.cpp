@@ -45,6 +45,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(MinTractLength_IsThePolylineLength);
   MITK_TEST(SeedInFirstVoxel_WithoutInterpolation);
   MITK_TEST(NoPreviousDirections_Tracks);
+  MITK_TEST(PeakImage_IncompletePeaks_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -578,6 +579,17 @@ public:
     auto params = MakeParameters();
     params->m_NumPreviousDirections = 0;
     CPPUNIT_ASSERT_EQUAL(vtkIdType(1), Track(params, MakeLineRoi({{9, 9, 1.0f}}), nullptr)->GetNumberOfLines());
+  }
+
+  /** A 4th dimension that is not a multiple of 3 used to be read as if it were. */
+  void PeakImage_IncompletePeaks_Throws()
+  {
+    auto image = PeakImgType::New();
+    PeakImgType::SizeType size = {{SizeX, SizeYZ, SizeYZ, 4}};
+    image->SetRegions(PeakImgType::RegionType(size));
+    image->Allocate();
+    image->FillBuffer(1.0f);
+    CPPUNIT_ASSERT_THROW(Track(MakeParameters(), MakeLineRoi({{9, 9, 1.0f}}), nullptr, image), mitk::Exception);
   }
 };
 
