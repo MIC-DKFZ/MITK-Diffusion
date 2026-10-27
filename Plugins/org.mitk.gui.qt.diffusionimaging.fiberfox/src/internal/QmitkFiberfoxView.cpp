@@ -329,6 +329,16 @@ void QmitkFiberfoxView::UpdateSimulationStatus()
 // Destructor
 QmitkFiberfoxView::~QmitkFiberfoxView()
 {
+  // Destroying a running QThread aborts the Workbench, and the worker and the filter use this view,
+  // so a running simulation is aborted and joined. AfterThread must not run any more: the widgets
+  // are gone. The abort flag is set repeatedly because the filter resets it when it starts.
+  if (m_Thread.isRunning())
+  {
+    disconnect(&m_Thread, SIGNAL(finished()), this, SLOT(AfterThread()));
+    do
+      m_TractsToDwiFilter->SetAbortGenerateData(true);
+    while (!m_Thread.wait(100));
+  }
   delete m_SimulationTimer;
 }
 
