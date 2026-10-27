@@ -261,6 +261,7 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
         break;
       case 3:
         newNode = GenerateColorHeatmap(fib);
+        name += "_fiber_bundle_image";
         break;
       case 4:
         newNode = GenerateFiberEndingsImage(fib);
