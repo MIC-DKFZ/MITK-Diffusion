@@ -8,17 +8,21 @@ Available sections:
 - \ref StrTrackUserManualSeeding
 - \ref StrTrackUserManualConstraints
 - \ref StrTrackUserManualParameters
+- \ref StrTrackUserManualTractographyPrior
 - \ref StrTrackUserManualNeighbourhoodSampling
 - \ref StrTrackUserManualDataHandling
 - \ref StrTrackUserManualPostprocessing
+- \ref StrTrackUserManualParameterFiles
 - \ref StrTrackUserManualReferences
 
 \section StrTrackUserManualInputData Input Data
 
 Select the data you want to track on in the datamanager. Supported file types are:
-- One or multiple DTI images selected in the datamanager.
-- One ODF image, e.g. obtained using MITK Q-ball reconstruction or MRtrix CSD (tractography similar to [6]). Input can bes discretely sampled ODFs or an SH representation of the ODFs.
+- One DTI image, or several DTI images for deterministic multi-tensor tractography.
+- One ODF image, e.g. obtained using MITK Q-ball reconstruction or MRtrix CSD (tractography similar to [6]). Input can be discretely sampled ODFs or an SH representation of the ODFs.
 - One peak image (4D float image).
+
+Other images (e.g. raw diffusion-weighted images) are not offered as input. A selection that mixes input types, or several images in probabilistic mode, is rejected with a message when the tractography is started.
 
 \section StrTrackUserManualSeeding Seeding
 
@@ -26,12 +30,12 @@ Specify how, where and how many tractography seed points are placed. This can be
 
 Image based seeding:
 - Seed Image: ROI image used to define the seed voxels. If no seed mask is specified, the whole image volume is seeded.
-- Seeds per voxel: If set to 1, the seed is defined as the voxel center. If > 1 the seeds are distributet randomly inside the voxel.
+- Seeds per voxel: If set to 1, the seed is defined as the voxel center. If > 1 the seeds are distributed randomly inside the voxel.
 
 Interactive seeding:
 - Update on Parameter Change: When "Update on Parameter Change" is checked, each parameter change causes an instant retracking with the new parameters. This enables an intuitive exploration of the effects that the other tractography parameters have on the resulting tractogram.
 - Radius: Radius of the manually placed spherical seed region.
-- Num.Seeds: Number of seeds placed randomly inside the spherical seed region.
+- Num.Seeds: Number of seeds placed randomly inside the spherical seed region (uniformly distributed in its volume). With "Fix Random Seed" checked, the same seed points are used at every update.
 
 Parameters for both seeding modes:
 - Trials Per Seed: Try each seed N times until a valid streamline is obtained (only for probabilistic tractography).
@@ -41,7 +45,7 @@ Parameters for both seeding modes:
 
 Specify various ROI and mask images to constrain the tractography process.
 
-- Mask Image: ROI image used to constrain the generated streamlines, typically a brain mask. Streamlines that leave the regions defined in this image will stop immediately.
+- Mask Image: ROI image used to constrain the generated streamlines, typically a brain mask. Streamlines that leave the regions defined in this image will stop immediately. Without a mask, streamlines stop at the border of the input image (their last point is the first one outside it).
 - Stop ROI Image: ROI image used to define stopping regions. Streamlines that enter the regions defined in this image will stop immediately.
 - Exclusion ROI Image: Fibers that enter a region defined in this image will be discarded.
 - Endpoint Constraints: Determines which fibers are accepted based on their endpoint location. Options are:
@@ -52,44 +56,51 @@ Specify various ROI and mask images to constrain the tractography process.
   - At least one EP is required to be located in the target image (command line option MIN_ONE_EP_IN_TARGET)
   - Exactly one EP is required to be located in the target image (command line option ONE_EP_IN_TARGET)
   - No EP is allowed to be located in the target image (command line option NO_EP_IN_TARGET)
-- Target Image: ROI image needed for endpoint constraints.
+- Target Image: ROI image needed for endpoint constraints. It is ignored with "No constraints on endpoint locations".
 
 \section StrTrackUserManualParameters Tractography Parameters
 
-- Mode: Toggle between deterministic and probabilistic tractography (also affects tracking prior proposals). Probabilistic ODF tractography samples the next direction from the discrete probability distribution provided by the discretized ODF. In case of probabilistic tensor tractography, an ODF is calculated from the tensor. Probabilistic peak tracking does not derive probabilities from the data but simply adds a normally distributed jitter to the proposed direction.
+- Mode: Toggle between deterministic and probabilistic tractography (also affects tracking prior proposals). Probabilistic ODF tractography samples the next direction from the discrete probability distribution provided by the discretized ODF. In case of probabilistic tensor tractography, an ODF is calculated from the tensor. Probabilistic peak tracking does not derive probabilities from the data but simply adds a normally distributed jitter to the proposed direction. Deterministic ODF tractography follows the ODF maximum between the discrete sampling directions (local maximum of the sampled ODF, refined by a quadratic fit to its neighbouring directions).
 - Sharpen ODFs: If you are using dODF or tensor images as input for probabilistic tractography, it is advisable to sharpen the ODFs (raise to the power of X). This is not necessary (and not recommended) for CSD fODFs, since they are naturally much sharper.
-- Cutoff: If the streamline reaches a position with an FA value or peak magnitude lower than the speciefied threshold, tracking is terminated. Typical values are 0.2 for FA/GFA and 0.1 for CSD peaks.
+- Cutoff: If the streamline reaches a position with an FA value or peak magnitude lower than the specified threshold, tracking is terminated. Typical values are 0.2 for FA/GFA and 0.1 for CSD peaks.
 - FA/GFA image used to determine streamline termination. If no image is specified, the FA/GFA image is automatically calculated from the input image. If multiple tensor images are used as input, it is recommended to provide such an image since the FA maps calculated from the individual input tensor images can not provide a suitable termination criterion.
 - ODF Cutoff: Additional threshold on the ODF magnitude. This is useful in case of CSD fODF tractography. For fODFs a good default value is 0.1, for normalized dODFs, e.g. Q-ball ODFs, this threshold should be very low (0.00025) or 0.
 - Step Size: The algorithm proceeds along the streamline with a fixed stepsize. Default is 0.5*minSpacing.
-- Min. Tract Length: Shorter fibers are discarded.
-- Max. Tract Length: Longer fibers are discarded.
-- Angular Threshold: Maximum angle between two successive steps (in degree). Default is 90° * step_size. For probabilistic tractography, candidate directions exceeding this threshold have probability 0, i.e. the respective ODF value is set to zero. The probabilities of the valid directions are normalized to sum to 1.
-- Loop Check: Stop streamline if the threshold on the angular stdev over the last 4 voxel lengths is exceeded. -1 = no loop check.
+- Min. Tract Length: Shorter fibers are discarded. The length is measured along the streamline (sum of its steps).
+- Max. Tract Length: Streamlines stop when they reach this length.
+- Angular Threshold: Maximum angle between two successive steps (in degree). The default -1 means automatic: 90° * step_size (step size in voxels), at most 86.9°; it follows later changes of the step size and is saved as -1 in parameter files. For probabilistic tractography, candidate directions exceeding this threshold have probability 0, i.e. the respective ODF value is set to zero. The probabilities of the valid directions are normalized to sum to 1.
+- Loop Check: Stop streamline if the mean angular deviation (in degree) of the step directions from their mean direction over the last 4 voxel lengths (at least 8 steps) exceeds this threshold. -1 = no loop check.
 - f and g values to balance between FACT [2] and TEND [3,4] tracking (only for tensor based tractography). For further information please refer to [2,3]
-- Peak Jitter: Used for probabilistic peak tractography. Since no probability are provided by the data, a gausian jitter is added to the peaks. The value influences the standard deviataion of the gaussian (dir[i] += normal(0, peak_jitter*|dir[i]|)).
+- Peak Jitter: Used for probabilistic peak tractography. Since the data provide no probabilities, Gaussian noise is added to the peaks: each component of the unit peak direction gets normal noise with standard deviation peak_jitter (dir[i] += normal(0, peak_jitter)), then the direction is normalized again. The mean deviation from the peak is about 1.25 * peak_jitter in radians (0.1: about 7°; the default 0.01: about 0.7°, i.e. nearly deterministic).
+- Second Order: Second order (midpoint) integration of the streamline, which avoids overshooting in curved tracts. Unchecked: first order (Euler) integration.
+- Fix Random Seed: Always use the same random numbers, so that a probabilistic tractography (and the seed positions inside the voxels) can be reproduced. The result does not depend on the number of threads: every seed point uses random numbers of its own.
 
 \section StrTrackUserManualTractographyPrior Tractography Prior
 It is possible to use a peak image as prior for tractography on arbitrary other input images. The local progression direction is determined as the weighted average between the direction obtained from the prior and the input data.
-- Weight: Weighting factor between prior and input data directions. A weight of zero means that no prior iformation is used. With a weight of one, tractography is performed directly on the prior directions itself.
+- Weight: Weighting factor between prior and input data directions. A weight of zero means that no prior information is used. With a weight of one, tractography is performed directly on the prior directions itself.
 - Restrict to Prior: The prior image is used as tractography mask. Voxels without prior peaks are excluded.
 - New Directions from Prior: By default, the prior is used even if there is no valid direction found in the data. If unchecked, the prior cannot create directions where there are none in the data.
 - Flip directions: Internally flips prior directions. This might be necessary depending on the input data.
 
+The cutoff of the tractography parameters (FA, GFA or peak magnitude) does not apply to the prior; the command line application uses the prior in the same way.
+
 \section StrTrackUserManualDataHandling Data Handling
-- Flip directions: Internally flips progression directions. This might be necessary depending on the input data.
+- Flip directions: Internally flips progression directions. Only needed for data with a wrong gradient orientation: MRtrix peak and SH files are converted by the MITK readers, dipy SH files with the reader option "SH convention" set to "FSL/Dipy".
 - Interpolate Tractography Data: Trilinearly interpolate the input image used for tractography.
 - Interpolate ROI Images: Trilinearly interpolate the ROI images used to constrain the tractography.
 
 \section StrTrackUserManualNeighbourhoodSampling Neighbourhood Sampling (for details see [1])
-- Neighborhood Samples: Number of neighborhood samples that are used to determine the next fiber progression direction.
+- Num. Samples: Number of neighborhood samples that are used to determine the next fiber progression direction.
 - Sampling Distance: Distance of the sampling positions from the current streamline position (in voxels).
 - Use Only Frontal Samples: Only neighborhood samples in front of the current streamline position are considered.
 - Use Stop-Votes: If checked, the majority of sampling points has to place a stop-vote for the streamline to terminate. If not checked, all sampling positions have to vote for a streamline termination.
 
 \section StrTrackUserManualPostprocessing Output and Postprocessing
-- Compress Fibers: Whole brain tractograms obtained with a small step size can contain billions of points. The tractograms can be compressed by removing points that do not really contribute to the fiber shape, such as many points on a straight line. An error threshold (in mm) can be defined to specify which points should be removed and which not.
-- Output Probability Map: No streamline are generated. Instead, the tractography outputs a visitation-count map that indicates the probability of a fiber to reach a voxel from the selected seed region. For this measure to be sensible, the number of seeds per voxel needs to be rather large.
+- Compress Fibers: Whole brain tractograms obtained with a small step size can contain billions of points. The tractograms can be compressed by removing points that do not really contribute to the fiber shape, such as many points on a straight line. The error threshold is one tenth of the smallest voxel size of the input image.
+- Output Probability Map: No streamlines are generated. Instead, the tractography outputs a visitation-count map that indicates the probability of a fiber to reach a voxel from the selected seed region. For this measure to be sensible, the number of seeds per voxel needs to be rather large.
+
+\section StrTrackUserManualParameterFiles Parameter Files
+"Save Parameters" writes all parameters of the view to a json file, "Load Parameters" sets the view from such a file (an automatic angular threshold is kept as -1). The command line application reads the same files (option parameter_file). A file that cannot be read or written gives a message.
 
 \section StrTrackUserManualReferences References
 

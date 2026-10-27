@@ -15,6 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkTrackingHandlerTensor.h"
+#include <algorithm>
+#include <cmath>
 
 namespace mitk
 {
@@ -37,6 +39,13 @@ void TrackingHandlerTensor::InitForTracking()
   if (m_NeedsDataInit)
   {
     m_NumberOfInputs = m_TensorImages.size();
+    // all tensor images are read at the voxel index of the first one
+    for (const auto& tensorImage : m_TensorImages)
+      if (tensorImage->GetLargestPossibleRegion()!=m_TensorImages.at(0)->GetLargestPossibleRegion()
+          || !tensorImage->GetSpacing().GetVnlVector().is_equal(m_TensorImages.at(0)->GetSpacing().GetVnlVector(), 1e-6)
+          || tensorImage->GetOrigin().EuclideanDistanceTo(m_TensorImages.at(0)->GetOrigin())>1e-6
+          || !tensorImage->GetDirection().GetVnlMatrix().is_equal(m_TensorImages.at(0)->GetDirection().GetVnlMatrix(), 1e-6))
+        mitkThrow() << "All tensor images used for multi-tensor tracking need the same geometry.";
     for (int i=0; i<m_NumberOfInputs; i++)
     {
       ItkPDImgType::Pointer pdImage = ItkPDImgType::New();
@@ -99,18 +108,12 @@ void TrackingHandlerTensor::InitForTracking()
             m_PdImage.at(i)->SetPixel(index, dir);
             if (!useUserFaImage)
               m_FaImage->SetPixel(index, m_FaImage->GetPixel(index)+tensor.GetFractionalAnisotropy());
-            m_EmaxImage.at(i)->SetPixel(index, 2/eigenvalues[2]);
+            // 0 for zero tensors: inf would make the interpolated TEND tensor NaN (0*inf) next to them
+            m_EmaxImage.at(i)->SetPixel(index, eigenvalues[2]>0 ? 2/eigenvalues[2] : 0);
           }
           if (!useUserFaImage)
             m_FaImage->SetPixel(index, m_FaImage->GetPixel(index)/m_NumberOfInputs);
         }
-
-    auto double_dir = m_TensorImages.at(0)->GetDirection().GetVnlMatrix();
-    for (int r=0; r<3; r++)
-      for (int c=0; c<3; c++)
-      {
-        m_FloatImageRotation[r][c] = double_dir[r][c];
-      }
 
     m_NeedsDataInit = false;
   }
@@ -187,7 +190,7 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::GetDirection(itk::Point<float, 
   itk::ContinuousIndex< float, 3> cIdx;
 
   vnl_vector_fixed<float,3> dir; dir.fill(0.0);
-  if ( !m_FaImage->TransformPhysicalPointToIndex(itkP, idx) || !m_FaImage->TransformPhysicalPointToContinuousIndex(itkP, cIdx) )
+  if ( !m_TensorImages.at(0)->TransformPhysicalPointToIndex(itkP, idx) || !m_TensorImages.at(0)->TransformPhysicalPointToContinuousIndex(itkP, cIdx) )
     return dir;
 
   int image_num = -1;
@@ -199,82 +202,42 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::GetDirection(itk::Point<float, 
   }
   else
   {
-    float frac_x = cIdx[0] - idx[0];
-    float frac_y = cIdx[1] - idx[1];
-    float frac_z = cIdx[2] - idx[2];
-    if (frac_x<0)
+    // Trilinear interpolation with the corner indices clamped to the image, as ITK's interpolators
+    // do for the FA image and the masks, so that the outermost half voxel is tracked too.
+    itk::Index<3> lo, hi;
+    float frac[3];
+    for (int d=0; d<3; ++d)
     {
-      idx[0] -= 1;
-      frac_x += 1;
+      auto size = static_cast<itk::IndexValueType>(m_TensorImages.at(0)->GetLargestPossibleRegion().GetSize(d));
+      auto base = static_cast<itk::IndexValueType>(std::floor(cIdx[d]));
+      frac[d] = 1 - (cIdx[d] - base);   // weight of the lower corner
+      lo[d] = std::clamp<itk::IndexValueType>(base, 0, size-1);
+      hi[d] = std::clamp<itk::IndexValueType>(base+1, 0, size-1);
     }
-    if (frac_y<0)
+    const float frac_x = frac[0], frac_y = frac[1], frac_z = frac[2];
+    auto corner = [&lo, &hi](bool x, bool y, bool z) { itk::Index<3> c = {{x ? hi[0] : lo[0], y ? hi[1] : lo[1], z ? hi[2] : lo[2]}}; return c; };
+
+    vnl_vector_fixed<float, 8> interpWeights;
+    interpWeights[0] = (  frac_x)*(  frac_y)*(  frac_z);
+    interpWeights[1] = (1-frac_x)*(  frac_y)*(  frac_z);
+    interpWeights[2] = (  frac_x)*(1-frac_y)*(  frac_z);
+    interpWeights[3] = (  frac_x)*(  frac_y)*(1-frac_z);
+    interpWeights[4] = (1-frac_x)*(1-frac_y)*(  frac_z);
+    interpWeights[5] = (  frac_x)*(1-frac_y)*(1-frac_z);
+    interpWeights[6] = (1-frac_x)*(  frac_y)*(1-frac_z);
+    interpWeights[7] = (1-frac_x)*(1-frac_y)*(1-frac_z);
+
+    const bool corners[8][3] = {{false, false, false}, {true, false, false}, {false, true, false}, {false, false, true},
+                                {true, true, false}, {false, true, true}, {true, false, true}, {true, true, true}};
+    for (int k=0; k<8; ++k)
     {
-      idx[1] -= 1;
-      frac_y += 1;
-    }
-    if (frac_z<0)
-    {
-      idx[2] -= 1;
-      frac_z += 1;
-    }
-    frac_x = 1-frac_x;
-    frac_y = 1-frac_y;
-    frac_z = 1-frac_z;
-
-    // int coordinates inside image?
-    if (idx[0] >= 0 && idx[0] < static_cast<itk::IndexValueType>(m_FaImage->GetLargestPossibleRegion().GetSize(0) - 1) &&
-        idx[1] >= 0 && idx[1] < static_cast<itk::IndexValueType>(m_FaImage->GetLargestPossibleRegion().GetSize(1) - 1) &&
-        idx[2] >= 0 && idx[2] < static_cast<itk::IndexValueType>(m_FaImage->GetLargestPossibleRegion().GetSize(2) - 1))
-    {
-      // trilinear interpolation
-      vnl_vector_fixed<float, 8> interpWeights;
-      interpWeights[0] = (  frac_x)*(  frac_y)*(  frac_z);
-      interpWeights[1] = (1-frac_x)*(  frac_y)*(  frac_z);
-      interpWeights[2] = (  frac_x)*(1-frac_y)*(  frac_z);
-      interpWeights[3] = (  frac_x)*(  frac_y)*(1-frac_z);
-      interpWeights[4] = (1-frac_x)*(1-frac_y)*(  frac_z);
-      interpWeights[5] = (  frac_x)*(1-frac_y)*(1-frac_z);
-      interpWeights[6] = (1-frac_x)*(  frac_y)*(1-frac_z);
-      interpWeights[7] = (1-frac_x)*(1-frac_y)*(1-frac_z);
-
-      dir = GetMatchingDirection(idx, oldDir, image_num) * interpWeights[0];
+      itk::Index<3> c = corner(corners[k][0], corners[k][1], corners[k][2]);
+      if (k==0)
+        dir = GetMatchingDirection(c, oldDir, image_num) * interpWeights[k];
+      else
+        dir += GetMatchingDirection(c, oldDir, image_num) * interpWeights[k];
       if (image_num>=0)
-        tensor += m_TensorImages[image_num]->GetPixel(idx) * m_EmaxImage[image_num]->GetPixel(idx) * interpWeights[0];
-
-      itk::Index<3> tmpIdx = idx; tmpIdx[0]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir, image_num) * interpWeights[1];
-      if (image_num>=0)
-        tensor += m_TensorImages[image_num]->GetPixel(tmpIdx) * m_EmaxImage[image_num]->GetPixel(tmpIdx) * interpWeights[1];
-
-      tmpIdx = idx; tmpIdx[1]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir, image_num) * interpWeights[2];
-      if (image_num>=0)
-        tensor += m_TensorImages[image_num]->GetPixel(tmpIdx) * m_EmaxImage[image_num]->GetPixel(tmpIdx) * interpWeights[2];
-
-      tmpIdx = idx; tmpIdx[2]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir, image_num) * interpWeights[3];
-      if (image_num>=0)
-        tensor += m_TensorImages[image_num]->GetPixel(tmpIdx) * m_EmaxImage[image_num]->GetPixel(tmpIdx) * interpWeights[3];
-
-      tmpIdx = idx; tmpIdx[0]++; tmpIdx[1]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir, image_num) * interpWeights[4];
-      if (image_num>=0)
-        tensor += m_TensorImages[image_num]->GetPixel(tmpIdx) * m_EmaxImage[image_num]->GetPixel(tmpIdx) * interpWeights[4];
-
-      tmpIdx = idx; tmpIdx[1]++; tmpIdx[2]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir, image_num) * interpWeights[5];
-      if (image_num>=0)
-        tensor += m_TensorImages[image_num]->GetPixel(tmpIdx) * m_EmaxImage[image_num]->GetPixel(tmpIdx) * interpWeights[5];
-
-      tmpIdx = idx; tmpIdx[2]++; tmpIdx[0]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir, image_num) * interpWeights[6];
-      if (image_num>=0)
-        tensor += m_TensorImages[image_num]->GetPixel(tmpIdx) * m_EmaxImage[image_num]->GetPixel(tmpIdx) * interpWeights[6];
-
-      tmpIdx = idx; tmpIdx[0]++; tmpIdx[1]++; tmpIdx[2]++;
-      dir +=  GetMatchingDirection(tmpIdx, oldDir, image_num) * interpWeights[7];
-      if (image_num>=0)
-        tensor += m_TensorImages[image_num]->GetPixel(tmpIdx) * m_EmaxImage[image_num]->GetPixel(tmpIdx) * interpWeights[7];
+        tensor += m_TensorImages[image_num]->GetPixel(c) * m_EmaxImage[image_num]->GetPixel(c) * interpWeights[k];
     }
   }
 
@@ -315,17 +278,12 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::ProposeDirection(const itk::Poi
     if (!olddirs.empty())
       oldDir = olddirs.back();
 
-    if (m_Parameters->m_FlipX)
-      oldDir[0] *= -1;
-    if (m_Parameters->m_FlipY)
-      oldDir[1] *= -1;
-    if (m_Parameters->m_FlipZ)
-      oldDir[2] *= -1;
-
-    float old_mag = oldDir.magnitude();
-
+    // same voxel without interpolation: keep the previous direction, still in the tracking frame
     if (!m_Parameters->m_InterpolateTractographyData && oldIndex==index)
       return oldDir;
+
+    FlipDirection(oldDir);  // to the data frame
+    float old_mag = oldDir.magnitude();
 
     output_direction = GetDirection(pos, oldDir, tensor);
     float mag = output_direction.magnitude();
@@ -366,8 +324,6 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::ProposeDirection(const itk::Poi
     output_direction[1] *= -1;
   if (m_Parameters->m_FlipZ)
     output_direction[2] *= -1;
-  if (m_Parameters->m_ApplyDirectionMatrix)
-    output_direction = m_FloatImageRotation*output_direction;
 
   return output_direction;
 }

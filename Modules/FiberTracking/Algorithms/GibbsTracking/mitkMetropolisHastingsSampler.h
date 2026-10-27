@@ -25,7 +25,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // ITK
 #include <itkImage.h>
-#include <itkTimeProbe.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 
 // MISC
@@ -49,8 +48,6 @@ public:
 
     void MakeProposal();    ///< make proposal for birth/death/shift/connection of particles
     int GetNumAcceptedProposals();
-    void SetProbabilities(float birth, float death, float shift, float optShift, float connect);    ///< update the probabilities of the single proposals
-    void PrintProposalTimes();  ///< print the state of the proposal time probes
 
 protected:
 
@@ -59,6 +56,7 @@ protected:
     void RemoveAndSaveTrack(EndPoint P);
     void MakeTrackProposal(EndPoint P);
     void ComputeEndPointProposalDistribution(EndPoint P);
+    bool ComputeOptimalShift(Particle* p, Particle& prop_p);  ///< proposal of the optimal shift of p
 
     /** generate random vectors */
     void DistortVector(float sigma, vnl_vector_fixed<float, 3>& vec);
@@ -71,7 +69,6 @@ protected:
 
     float m_InTemp;     ///< simulated annealing temperature
     float m_ExTemp;     ///< simulated annealing temperature
-    float m_Density;
 
     float m_BirthProb;          ///< probability for particle birth
     float m_DeathProb;          ///< probability for particle death
@@ -89,18 +86,10 @@ protected:
     float m_StopProb;
     float m_DelProb;
     float m_ParticleLength;
-    float m_ChempotParticle;
 
     ParticleGrid*   m_ParticleGrid;         ///< storest all particles
     EnergyComputer* m_EnergyComputer;       ///< computes internal and external energy of particles
     unsigned int    m_AcceptedProposals;    ///< counts accepted proposals
-
-    /** Time probes for the single proposals */
-    itk::TimeProbe  m_BirthTime;
-    itk::TimeProbe  m_DeathTime;
-    itk::TimeProbe  m_ShiftTime;
-    itk::TimeProbe  m_OptShiftTime;
-    itk::TimeProbe  m_ConnectionTime;
 };
 
 }

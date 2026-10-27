@@ -64,8 +64,12 @@ public:
 protected:
 
     bool ReallocateGrid();
+    Particle*& GridEntry(int gridindex);    ///< the cell slot that Particle::gridindex encodes
 
-    std::vector< Particle* >    m_Grid;             // the grid
+    /** Particles of each grid cell in insertion order, removal by swap with the last one. A cell
+     *  holds at most m_CellCapacity particles and grows on demand, so that the grid takes memory
+     *  for the particles it holds instead of cells*capacity pointers (1 GB for an HCP image). */
+    std::vector< std::vector< Particle* > >   m_Grid;
     std::vector< Particle >     m_Particles;        // particle container
     std::vector< int >          m_OccupationCount;  // number of particles per grid cell
 
@@ -79,7 +83,7 @@ protected:
     struct NeighborTracker  // to run over the neighbors
     {
         std::vector< int > cellidx;
-        std::vector< int > cellidx_c;
+        int cellnum;    // distinct cells in cellidx (fewer than 8 along an axis with one cell)
         int cellcnt;
         int pcnt;
     } m_NeighbourTracker;
@@ -96,7 +100,7 @@ public:
 
     Track()
     {
-        track.resize(1000);
+        track.reserve(1000);  // grows if needed: a track can pass any number of free particles
     }
 
     ~Track(){}
@@ -108,15 +112,6 @@ public:
         m_Probability = 1;
     }
 
-    bool isequal(Track& t)
-    {
-        for (int i = 0; i < m_Length;i++)
-        {
-            if (track[i].p != t.track[i].p || track[i].ep != t.track[i].ep)
-                return false;
-        }
-        return true;
-    }
 };
 
 }

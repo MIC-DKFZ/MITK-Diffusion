@@ -49,6 +49,8 @@ class mitkStreamlineTractographyTestSuite : public mitk::TestFixture
   MITK_TEST(Test_Odf4);
   MITK_TEST(Test_Odf5);
   MITK_TEST(Test_Odf6);
+  MITK_TEST(Test_Tensor1_FourThreads);
+  MITK_TEST(Test_Odf5_FourThreads);
   CPPUNIT_TEST_SUITE_END();
 
   typedef itk::VectorImage< short, 3>   ItkDwiType;
@@ -319,7 +321,7 @@ public:
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
 
-    CheckFibResult("Test_Odf1.fib", outFib);
+    CheckFibResult("Test_Odf1_v2.fib", outFib);  // regenerated when deterministic ODF peaks were refined between the sampling directions
 
     delete handler;
   }
@@ -339,7 +341,7 @@ public:
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
 
-    CheckFibResult("Test_Odf2.fib", outFib);
+    CheckFibResult("Test_Odf2_v2.fib", outFib);  // regenerated when deterministic ODF peaks were refined between the sampling directions
 
     delete handler;
   }
@@ -361,7 +363,7 @@ public:
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
 
-    CheckFibResult("Test_Odf3.fib", outFib);
+    CheckFibResult("Test_Odf3_v2.fib", outFib);  // regenerated when deterministic ODF peaks were refined between the sampling directions
 
     delete handler;
   }
@@ -382,7 +384,7 @@ public:
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
 
-    CheckFibResult("Test_Odf4.fib", outFib);
+    CheckFibResult("Test_Odf4_v2.fib", outFib);  // regenerated when deterministic ODF peaks were refined between the sampling directions
 
     delete handler;
   }
@@ -404,7 +406,8 @@ public:
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(poly);
 
-    CheckFibResult("Test_Odf5.fib", outFib);
+    // Regenerated when every seed point got its own random streams (results independent of the thread count).
+    CheckFibResult("Test_Odf5_v2.fib", outFib);
 
     delete handler;
   }
@@ -429,12 +432,25 @@ public:
     img->InitializeByItk(outImg.GetPointer());
     img->SetVolume(outImg->GetBufferPointer());
 
-    mitk::IOUtil::Save(img, mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + "Test_Odf6.nrrd");
-    CheckImageResult("Test_Odf6.nrrd", img);
+    CheckImageResult("Test_Odf6_v2.nrrd", img);
 
     delete handler;
   }
 
+
+  /** Same as Test_Tensor1 at four threads: the fiber order must not depend on the thread scheduling. */
+  void Test_Tensor1_FourThreads()
+  {
+    omp_set_num_threads(4);
+    Test_Tensor1();
+  }
+
+  /** Same as Test_Odf5 at four threads: probabilistic tracking must give the single-threaded result. */
+  void Test_Odf5_FourThreads()
+  {
+    omp_set_num_threads(4);
+    Test_Odf5();
+  }
 };
 
 MITK_TEST_SUITE_REGISTRATION(mitkStreamlineTractography)

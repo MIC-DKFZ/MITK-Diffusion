@@ -47,7 +47,8 @@ int main(int argc, char* argv[])
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input image (tensor, ODF or SH-coefficient image)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("parameters", "", mitkCommandLineParser::String, "Parameters:", "parameter file (.gtp)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "binary mask image", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "mask image (voxels above 0.5 are seeded, values weight the particle density); default: the whole image", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("seed", "", mitkCommandLineParser::Int, "Random seed:", "seed of the random generator, for reproducible runs (default: from the clock)", -1);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -87,12 +88,14 @@ int main(int argc, char* argv[])
     }
     else if ( dynamic_cast<mitk::ShImage*>(mitkImage.GetPointer()) )
     {
-      MITK_INFO << "Assuming MITK/MRtrix style SH convention!";
       mitk::Image::Pointer shImage = dynamic_cast<mitk::Image*>(mitkImage.GetPointer());
       gibbsTracker->SetOdfImage(mitk::convert::GetItkOdfFromShImage(shImage));
     }
     else
+    {
+      MITK_ERROR << "Unsupported input " << inFileName << ": expected a tensor, ODF or SH image.";
       return EXIT_FAILURE;
+    }
 
     // global tracking
     if (parsedArgs.count("mask"))
@@ -104,6 +107,8 @@ int main(int argc, char* argv[])
       gibbsTracker->SetMaskImage(itk_mask);
     }
 
+    if (parsedArgs.count("seed"))
+      gibbsTracker->SetRandomSeed(us::any_cast<int>(parsedArgs["seed"]));
     gibbsTracker->SetDuplicateImage(false);
     gibbsTracker->SetLoadParameterFile( paramFileName );
     //        gibbsTracker->SetLutPath( "" );
@@ -116,17 +121,17 @@ int main(int argc, char* argv[])
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    MITK_ERROR << e.GetDescription();
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    MITK_ERROR << e.what();
     return EXIT_FAILURE;
   }
   catch (...)
   {
-    std::cout << "ERROR!?!";
+    MITK_ERROR << "Unknown error.";
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

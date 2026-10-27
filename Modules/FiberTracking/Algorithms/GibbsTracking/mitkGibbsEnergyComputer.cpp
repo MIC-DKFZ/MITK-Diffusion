@@ -27,11 +27,10 @@ float GibbsEnergyComputer::EvaluateOdf(vnl_vector_fixed<float, 3>& pos, vnl_vect
     float result = 0;                       // average of sampled ODF values
     int xint, yint, zint;                   // voxel containing samplePos
 
-    // rotate particle direction according to image rotation
-    dir = m_RotationMatrix*dir;
-
-    // get interpolation for rotated direction
-    m_SphereInterpolator->getInterpolation(dir);
+    // Particles live in the image-axis frame (spacing-scaled index, no rotation), the ODF directions
+    // are world vectors: the lookup uses the rotated direction, the sample positions the particle's own.
+    vnl_vector_fixed<float, 3> worldDir = m_RotationMatrix*dir;
+    m_SphereInterpolator->getInterpolation(worldDir);
 
     // sample ODF values along particle direction
     for (int i=-sampleSteps; i <= sampleSteps;i++)
@@ -41,9 +40,9 @@ float GibbsEnergyComputer::EvaluateOdf(vnl_vector_fixed<float, 3>& pos, vnl_vect
         if (!m_UseTrilinearInterpolation)   // image has not enough slices to use trilinear interpolation
         {
             ItkOdfImgType::IndexType index;
-            index[0] = floor(pos[0]/m_Spacing[0]);
-            index[1] = floor(pos[1]/m_Spacing[1]);
-            index[2] = floor(pos[2]/m_Spacing[2]);
+            index[0] = floor(samplePos[0]/m_Spacing[0]);
+            index[1] = floor(samplePos[1]/m_Spacing[1]);
+            index[2] = floor(samplePos[2]/m_Spacing[2]);
             if (m_Image->GetLargestPossibleRegion().IsInside(index))
             {
                 result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +

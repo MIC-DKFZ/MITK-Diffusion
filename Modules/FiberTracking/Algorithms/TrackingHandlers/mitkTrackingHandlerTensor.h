@@ -54,10 +54,11 @@ public:
   int GetNumTensorImages() const { return m_TensorImages.size(); }
 
 
-  ItkUcharImgType::SpacingType GetSpacing() override{ return m_FaImage->GetSpacing(); }
-  itk::Point<float,3> GetOrigin() override{ return m_FaImage->GetOrigin(); }
-  ItkUcharImgType::DirectionType GetDirection() override{ return m_FaImage->GetDirection(); }
-  ItkUcharImgType::RegionType GetLargestPossibleRegion() override{ return m_FaImage->GetLargestPossibleRegion(); }
+  // The tensor grid is the tracking grid; the FA image is read through its interpolator and may have another grid.
+  ItkUcharImgType::SpacingType GetSpacing() override{ return m_TensorImages.at(0)->GetSpacing(); }
+  itk::Point<float,3> GetOrigin() override{ return m_TensorImages.at(0)->GetOrigin(); }
+  ItkUcharImgType::DirectionType GetDirection() override{ return m_TensorImages.at(0)->GetDirection(); }
+  ItkUcharImgType::RegionType GetLargestPossibleRegion() override{ return m_TensorImages.at(0)->GetLargestPossibleRegion(); }
 
 protected:
 
