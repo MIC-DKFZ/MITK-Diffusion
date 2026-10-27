@@ -386,7 +386,7 @@ QGroupBox {
       <item row="4" column="1">
        <widget class="QDoubleSpinBox" name="m_MergeDuplicatesBox">
         <property name="toolTip">
-         <string>Merge duplicate clusters withthe specified distance threshold. If threshold is &lt; 0, the threshold is set to half of the specified cluster size.</string>
+         <string>Merge duplicate clusters with the specified distance threshold. If threshold is &lt; 0, the threshold is set to half of the specified cluster size.</string>
         </property>
         <property name="minimum">
          <double>-1.000000000000000</double>
@@ -452,7 +452,7 @@ QGroupBox {
       <item row="0" column="1">
        <widget class="QSpinBox" name="m_ClusterSizeBox">
         <property name="toolTip">
-         <string>Cluster size in mm.</string>
+         <string>Cluster size: metric distance threshold (mm for the Euclidean metrics).</string>
         </property>
         <property name="minimum">
          <number>1</number>
@@ -482,7 +482,7 @@ QGroupBox {
       <item row="2" column="1">
        <widget class="QSpinBox" name="m_MinFibersBox">
         <property name="toolTip">
-         <string>Only output clusters with ate least the specified number of fibers.</string>
+         <string>Only output clusters with at least the specified number of fibers.</string>
         </property>
         <property name="minimum">
          <number>1</number>

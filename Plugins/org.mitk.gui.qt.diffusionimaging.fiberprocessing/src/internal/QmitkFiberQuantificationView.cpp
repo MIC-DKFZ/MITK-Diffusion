@@ -226,8 +226,8 @@ void QmitkFiberQuantificationView::OnSelectionChanged(berry::IWorkbenchPart::Poi
 void QmitkFiberQuantificationView::ProcessSelectedBundles()
 {
   if ( m_SelectedFB.empty() ){
-    QMessageBox::information( nullptr, "Warning", "No fibe bundle selected!");
-    MITK_WARN("QmitkFiberQuantificationView") << "no fibe bundle selected";
+    QMessageBox::information( nullptr, "Warning", "No fiber bundle selected!");
+    MITK_WARN("QmitkFiberQuantificationView") << "no fiber bundle selected";
     return;
   }
 
