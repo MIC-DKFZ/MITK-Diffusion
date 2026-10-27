@@ -19,97 +19,61 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <MitkFiberTrackingExports.h>
 #include <mitkParticle.h>
-#include <cstdlib>
+#include <algorithm>
+#include <vector>
 
 namespace mitk
 {
 
 /**
-* \brief Samples new tract from surrounding fiber segments.   */
+* rief Samples new tract from surrounding fiber segments: draws one of the added end points with
+* probability proportional to its weight. The buffers grow with the number of neighbours (up to
+* two end points per particle of the eight neighbouring grid cells) and keep their capacity
+* across clear(). */
 
 class MITKFIBERTRACKING_EXPORT SimpSamp
 {
-
-    float *P;
-    int cnt;
+    std::vector<float> P;   ///< P[0] = 0, P[i] = sum of the first i weights
 
 public:
-    EndPoint* objs;
-
+    std::vector<EndPoint> objs;
 
     SimpSamp()
     {
-        P = (float*) malloc(sizeof(float)*1000);
-        objs = (EndPoint*) malloc(sizeof(EndPoint)*1000);
-    }
-    ~SimpSamp()
-    {
-        free(P);
-        free(objs);
+        clear();
     }
 
     inline void clear()
     {
-        cnt = 1;
-        P[0] = 0;
+        P.assign(1, 0.0f);
+        objs.clear();
     }
 
     inline void add(float p, EndPoint obj)
     {
-        P[cnt] = P[cnt-1] + p;
-        objs[cnt-1] = obj;
-        cnt++;
+        P.push_back(P.back() + p);
+        objs.push_back(obj);
     }
 
+    /** Index of the end point whose interval [P[i], P[i+1]) contains prob*total; prob in [0,1]. */
     inline int draw(float prob)
     {
-        float r = prob*P[cnt-1];
-        int j;
-        int rl = 1;
-        int rh = cnt-1;
-        while(rh != rl)
-        {
-            j = rl + (rh-rl)/2;
-            if (r < P[j])
-            {
-                rh = j;
-                continue;
-            }
-            if (r > P[j])
-            {
-                rl = j+1;
-                continue;
-            }
-            break;
-        }
-        return rh-1;
+        const float r = prob*P.back();
+        const int bin = static_cast<int>(std::upper_bound(P.begin()+1, P.end(), r) - P.begin()) - 1;
+        return std::min(bin, static_cast<int>(objs.size())-1);  // r at the total: last end point
     }
-
-    inline EndPoint drawObj(float prob)
-    {
-        return objs[draw(prob)];
-    }
-
-    inline bool isempty()
-    {
-        if (cnt == 1)
-            return true;
-        else
-            return false;
-    }
-
 
     float probFor(int idx)
     {
-        return (P[idx+1]-P[idx])/P[cnt-1];
+        return (P[idx+1]-P[idx])/P.back();
     }
 
     float probFor(EndPoint& t)
     {
-        for (int i = 1; i< cnt;i++)
+        for (std::size_t i = 0; i < objs.size(); i++)
         {
-            if (t == objs[i-1])
-                return probFor(i-1);
+            if (t == objs[i])
+                return probFor(static_cast<int>(i));
         }
         return 0;
     }
@@ -118,5 +82,3 @@ public:
 }
 
 #endif
-
-

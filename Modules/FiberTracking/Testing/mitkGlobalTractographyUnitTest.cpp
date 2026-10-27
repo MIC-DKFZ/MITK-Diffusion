@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <mitkGibbsEnergyComputer.h>
 #include <mitkMetropolisHastingsSampler.h>
 #include <mitkParticleGrid.h>
+#include <mitkSimpSamp.h>
 #include <mitkSphereInterpolator.h>
 #include <random>
 #include <mitkTestFixture.h>
@@ -51,6 +52,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
   MITK_TEST(Neighbours_ThinImage_EachOnce);
   MITK_TEST(ParticleGrid_ReallocateMoveRemove_Consistent);
+  MITK_TEST(SimpSamp_MoreThanThousandEndPoints);
   MITK_TEST(SphereInterpolator_TruncatedLookupTables_Invalid);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
   MITK_TEST(OptimalShift_OneNeighbour_FacesIt);
@@ -235,6 +237,23 @@ public:
         found = n == p;
       CPPUNIT_ASSERT_MESSAGE("particle " + std::to_string(k) + " in its cell", found);
     }
+  }
+
+  /** The sampler of the track proposal had a fixed buffer of 1000 end points without bound check,
+   *  while eight grid cells can hold far more neighbours. */
+  void SimpSamp_MoreThanThousandEndPoints()
+  {
+    std::vector<mitk::Particle> particles(3000);
+    mitk::SimpSamp sampler;
+    sampler.clear();
+    for (auto &p : particles)
+      sampler.add(1.0f, mitk::EndPoint(&p, 1));
+    CPPUNIT_ASSERT_EQUAL(0, sampler.draw(0.0f));
+    CPPUNIT_ASSERT_EQUAL(1500, sampler.draw(0.5f));
+    CPPUNIT_ASSERT_EQUAL(2999, sampler.draw(1.0f));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0 / 3000, sampler.probFor(2999), 1e-9);
+    mitk::EndPoint last(&particles.back(), 1);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0 / 3000, sampler.probFor(last), 1e-9);
   }
 
   /** The lookup tables were read without a size check (a truncated file was read out of bounds) and
