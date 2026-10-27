@@ -164,6 +164,7 @@ protected:
     QTimer*                 m_SimulationTimer;
     QTime                   m_SimulationTime;
     QString                 m_SimulationStatusText;
+    std::string             m_SimulationError;  ///< message of the exception that stopped the last simulation, empty if none
 
     /** Image filters that do all the simulations. */
     itk::TractsToDWIImageFilter< short >::Pointer           m_TractsToDwiFilter;

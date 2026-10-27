@@ -73,12 +73,24 @@ QmitkFiberfoxWorker::QmitkFiberfoxWorker(QmitkFiberfoxView* view)
 
 void QmitkFiberfoxWorker::run()
 {
-  try{
+  // Written only here, in the worker thread; AfterThread reads it in the GUI thread after
+  // finished(), i.e. after this function has returned.
+  m_View->m_SimulationError.clear();
+  try
+  {
     m_View->m_TractsToDwiFilter->Update();
   }
-  catch( ... )
+  catch (const itk::ExceptionObject& e)
   {
-
+    m_View->m_SimulationError = e.GetDescription();
+  }
+  catch (const std::exception& e)
+  {
+    m_View->m_SimulationError = e.what();
+  }
+  catch (...)
+  {
+    m_View->m_SimulationError = "Unknown error.";
   }
   m_View->m_Thread.quit();
 }
@@ -136,6 +148,15 @@ void QmitkFiberfoxView::AfterThread()
   if (m_TractsToDwiFilter->GetAbortGenerateData())
   {
     MITK_INFO << "Simulation aborted.";
+    return;
+  }
+
+  // the filter attaches its output only at the very end, so a failed run has no image to add
+  if (!m_SimulationError.empty())
+  {
+    MITK_ERROR << "Simulation failed: " << m_SimulationError;
+    m_Controls->m_SimulationStatusText->append(QString("Simulation failed: ") + m_SimulationError.c_str());
+    QMessageBox::warning(nullptr, "Simulation failed", m_SimulationError.c_str());
     return;
   }
 
