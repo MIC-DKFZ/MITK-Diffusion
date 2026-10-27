@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // ITK
 #include <itkImageDuplicator.h>
+#include <itkImageRegionConstIterator.h>
 #include <itkResampleImageFilter.h>
 #include <itkTimeProbe.h>
 
@@ -125,8 +126,21 @@ GibbsTrackingFilter< ItkOdfImageType >
   int ppv = 0;
   // main loop
   int neededParts = 3000;
+  // Where no birth is ever accepted (e.g. only isotropic ODFs in the mask) the weight would be
+  // halved forever; 50 rounds reach a weight of 1e-17.
+  const int maxRounds = 50;
+  int round = 0;
   while (ppv<neededParts)
   {
+    if (round++ == maxRounds)
+    {
+      delete sampler;
+      delete encomp;
+      delete particleGrid;
+      delete interpolator;
+      mitkThrow() << "Could not estimate the particle weight: fewer than " << neededParts << " particles after "
+                  << maxRounds << " rounds. Check the input image and the mask, or set the particle weight.";
+    }
     if (ppv<1000)
       m_ParticleWeight /= 2;
     else
@@ -190,6 +204,13 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
 
   // check if mask image is given if it needs resampling
   PrepareMaskImage();
+
+  // particles are born only in voxels above 0.5; without any, the first birth proposal never ends
+  bool hasActiveVoxel = false;
+  for (ImageRegionConstIterator<ItkFloatImageType> maskIt(m_MaskImage, m_MaskImage->GetLargestPossibleRegion()); !maskIt.IsAtEnd() && !hasActiveVoxel; ++maskIt)
+    hasActiveVoxel = maskIt.Get() > 0.5;
+  if (!hasActiveVoxel)
+    mitkThrow() << "The mask image has no voxel with a value above 0.5 inside the image region; nothing to track.";
 
   // load parameter file
   LoadParameters();

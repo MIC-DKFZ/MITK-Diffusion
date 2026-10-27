@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <itkGibbsTrackingFilter.h>
 #include <itkImageRegionIteratorWithIndex.h>
 #include <mitkFiberBuilder.h>
 #include <mitkGibbsEnergyComputer.h>
@@ -46,10 +47,38 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
   MITK_TEST(OptimalShift_OneNeighbour_FacesIt);
+  MITK_TEST(Filter_EmptyMask_Throws);
+  MITK_TEST(Filter_WeightEstimationWithoutBirths_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfImageType = GibbsEnergyComputer::ItkOdfImgType;
   using FloatImageType = itk::Image<float, 3>;
+  using FilterType = itk::GibbsTrackingFilter<OdfImageType>;
+
+  static itk::Matrix<double, 3, 3> Identity()
+  {
+    itk::Matrix<double, 3, 3> identity;
+    identity.SetIdentity();
+    return identity;
+  }
+
+  /** Filter on a 7x7x7 image of isotropic ODFs with the given mask value, automatic weight. */
+  static FilterType::Pointer MakeFilter(float maskValue)
+  {
+    auto odfs = MakeImage<OdfImageType>(Identity());
+    OdfImageType::PixelType odf;
+    odf.Fill(1.0f);
+    odfs->FillBuffer(odf);
+    auto mask = MakeImage<FloatImageType>(Identity());
+    mask->FillBuffer(maskValue);
+
+    auto filter = FilterType::New();
+    filter->SetOdfImage(odfs);
+    filter->SetMaskImage(mask);
+    filter->SetRandomSeed(1);
+    filter->SetIterations(1000);
+    return filter;
+  }
 
   /** 7x7x7 voxels of 1 mm with the given direction matrix. */
   template <class TImage>
@@ -237,6 +266,22 @@ public:
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, (pTip - neighbourTip).magnitude(), 1e-5);
         CPPUNIT_ASSERT(energy.ComputeInternalEnergyConnection(&proposal, pEnd, neighbour, neighbourEnd) > 0);
       }
+  }
+
+  /** Particles are born only in mask voxels above 0.5; without any the first birth proposal used to
+   *  search forever. */
+  void Filter_EmptyMask_Throws()
+  {
+    auto filter = MakeFilter(0.0f);
+    CPPUNIT_ASSERT_THROW(filter->Update(), mitk::Exception);
+  }
+
+  /** Isotropic ODFs give no birth at any weight; the automatic weight estimation used to halve the
+   *  weight forever. */
+  void Filter_WeightEstimationWithoutBirths_Throws()
+  {
+    auto filter = MakeFilter(1.0f);
+    CPPUNIT_ASSERT_THROW(filter->Update(), mitk::Exception);
   }
 };
 
