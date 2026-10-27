@@ -28,6 +28,7 @@ found in the LICENSE file.
 #include <vtkPolyData.h>
 #include <vtkPolyLine.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <numeric>
@@ -176,6 +177,7 @@ class mitkFiberDissectionTestSuite : public mitk::TestFixture
   MITK_TEST(MoveFiber_LabelBundlesTrainAndPredict);
   MITK_TEST(SphereRoi_KeepsFibersOfBothOrientations);
   MITK_TEST(SphereRoi_IsASphere);
+  MITK_TEST(Classifier_LabeledFibersAreNoCandidates);
   CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -290,6 +292,62 @@ public:
 
     CPPUNIT_ASSERT_EQUAL(std::size_t(1), kept.size());
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, kept[0][1], 1e-6);
+  }
+
+  /** Labeled pool fibers are not classified, so the prediction node (predicted pool fibers plus
+   *  positive labels) holds each fiber once; fibers handed out for labeling but left unlabeled
+   *  are classified again in the next cycle. */
+  void Classifier_LabeledFibersAreNoCandidates()
+  {
+    auto pool = Bundle(ThreeClusters());
+    const std::vector<unsigned int> plusIds{0, 1, 2, 3, 4, 5};
+    const std::vector<unsigned int> minusIds{60, 61, 62, 120, 121, 122};
+
+    mitk::StreamlineFeatureExtractor classifier;
+    classifier.SetTractogramTest(pool);
+    classifier.SetTractogramPrototypes(Prototypes(pool));
+    classifier.SetTractogramPlus(mitk::StreamlineFeatureExtractor::SubsetByIds(pool, plusIds));
+    classifier.SetTractogramMinus(mitk::StreamlineFeatureExtractor::SubsetByIds(pool, minusIds));
+    classifier.SetActiveCycle(0);
+    classifier.Update();
+
+    const std::set<unsigned int> candidates(classifier.GetCandidateIds().begin(), classifier.GetCandidateIds().end());
+    const std::set<unsigned int> predicted(classifier.GetPredictedIds().begin(), classifier.GetPredictedIds().end());
+    CPPUNIT_ASSERT_EQUAL(pool->GetNumFibers() - 12, static_cast<unsigned int>(candidates.size()));
+    for (auto id : plusIds)
+    {
+      CPPUNIT_ASSERT(candidates.count(id) == 0 && predicted.count(id) == 0);
+      CPPUNIT_ASSERT(!classifier.IsAvailableForSampling(id));
+    }
+    for (auto id : minusIds)
+      CPPUNIT_ASSERT(candidates.count(id) == 0);
+    CPPUNIT_ASSERT(predicted.count(6) == 1);
+
+    // hand out uncertain fibers, the user labels none of them
+    const auto handedOut = classifier.GetDiverseUncertainIds(0.0f, 5);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(5), handedOut.size());
+    classifier.ExcludeFromSampling(handedOut);
+    for (auto id : handedOut)
+      CPPUNIT_ASSERT(!classifier.IsAvailableForSampling(id));
+    for (auto id : classifier.GetDiverseUncertainIds(0.0f, 20))
+      CPPUNIT_ASSERT(std::find(handedOut.begin(), handedOut.end(), id) == handedOut.end());
+
+    classifier.SetActiveCycle(1);
+    classifier.Update();
+    const std::set<unsigned int> nextCandidates(classifier.GetCandidateIds().begin(), classifier.GetCandidateIds().end());
+    CPPUNIT_ASSERT_EQUAL(candidates.size(), nextCandidates.size());
+    for (auto id : handedOut)
+    {
+      CPPUNIT_ASSERT(nextCandidates.count(id) == 1);
+      CPPUNIT_ASSERT(classifier.IsAvailableForSampling(id));
+    }
+
+    // an unlabeled fiber is a candidate again
+    classifier.SetTractogramPlus(mitk::StreamlineFeatureExtractor::SubsetByIds(pool, {0, 1, 2, 3, 4}));
+    classifier.SetActiveCycle(2);
+    classifier.Update();
+    const std::set<unsigned int> afterUnlabel(classifier.GetCandidateIds().begin(), classifier.GetCandidateIds().end());
+    CPPUNIT_ASSERT(afterUnlabel.count(5) == 1 && afterUnlabel.count(4) == 0);
   }
 };
 

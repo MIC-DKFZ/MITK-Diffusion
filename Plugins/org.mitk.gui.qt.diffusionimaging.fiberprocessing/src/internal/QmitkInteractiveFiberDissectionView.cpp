@@ -857,7 +857,7 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
 
      MITK_INFO << "Create Fibers to label based on Uncertainty";
 
-     // next batch of the most uncertain streamlines that are still in the pool
+     // next batch of the most uncertain streamlines not handed out for labeling yet
      const auto& uncertain = classifier->GetUncertainIds();
      const bool generalization = m_generalizationMode != 0;
      const auto numRequested = static_cast<std::size_t>((generalization ? m_Controls->m_NumRandomFibers2Ben : m_Controls->m_NumRandomFibers2)->value());
@@ -865,7 +865,7 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
      while (static_cast<std::size_t>(m_uncCounter) < uncertain.size() && ids.size() < numRequested)
      {
        const auto id = uncertain[m_uncCounter++];
-       if (classifier->IsInPool(id))
+       if (classifier->IsAvailableForSampling(id))
          ids.push_back(id);
      }
      if (ids.empty())
@@ -876,7 +876,7 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
 
      this->GetDataStorage()->Remove(m_UncertaintyLabelNode);
      m_UncertaintyLabel = classifier->ExtractFibers(ids);
-     classifier->RemoveFromPool(ids);
+     classifier->ExcludeFromSampling(ids);
 
      m_UncertaintyLabelNode = CreateBundleNode("UncertaintyLabel" + std::to_string(m_activeCycleCounter), m_UncertaintyLabel);
      this->GetDataStorage()->Add(m_UncertaintyLabelNode);
@@ -913,7 +913,7 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
     }
 
     m_DistanceLabel = classifier->ExtractFibers(ids);
-    classifier->RemoveFromPool(ids);
+    classifier->ExcludeFromSampling(ids);
 
     m_DistanceLabelNode = CreateBundleNode("DistanceLabel" + std::to_string(m_activeCycleCounter), m_DistanceLabel);
     this->GetDataStorage()->Add(m_DistanceLabelNode);
