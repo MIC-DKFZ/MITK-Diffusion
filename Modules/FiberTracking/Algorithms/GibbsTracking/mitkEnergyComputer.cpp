@@ -58,9 +58,6 @@ EnergyComputer::EnergyComputer(ItkFloatImageType* mask, ParticleGrid* particleGr
     }
     m_RotationMatrix = directionMatrix;
 
-    if (ODF_SAMPLING_SIZE != m_SphereInterpolator->nverts)
-        fprintf(stderr,"EnergyComputer: error during init: data does not match with interpolation scheme\n");
-
     int totsz = m_Size[0]*m_Size[1]*m_Size[2];
     m_CumulatedSpatialProbability.resize(totsz + 1, 0.0);
     m_ActiveIndices.resize(totsz, 0);
@@ -157,15 +154,4 @@ float EnergyComputer::CalcI0(float x)
     erg += y*y*-1.4889;
     erg += y*y*y*2.0389;
     return erg;
-}
-
-float EnergyComputer::mexp(float x)
-{
-    return((x>=7.0) ? 0 : ((x>=5.0) ? (-0.0029*x+0.0213) : ((x>=3.0) ? (-0.0215*x+0.1144) : ((x>=2.0) ? (-0.0855*x+0.3064) : ((x>=1.0) ? (-0.2325*x+0.6004) : ((x>=0.5) ? (-0.4773*x+0.8452) : ((x>=0.0) ? (-0.7869*x+1.0000) : 1 )))))));
-    //  return exp(-x);
-}
-
-int EnergyComputer::GetNumActiveVoxels()
-{
-    return m_NumActiveVoxels;
 }

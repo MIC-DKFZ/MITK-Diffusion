@@ -49,8 +49,6 @@ public:
     virtual float ComputeInternalEnergyConnection(Particle *p1,int ep1, Particle *p2, int ep2) = 0;
     virtual float ComputeInternalEnergy(Particle *dp) = 0;
 
-    int GetNumActiveVoxels();
-
 protected:
 
     vnl_matrix_fixed<float, 3, 3>   m_RotationMatrix;
@@ -76,9 +74,7 @@ protected:
     float   m_CurvatureThreshold;           // maximum angle accepted between two connected particles
 
     float SpatProb(vnl_vector_fixed<float, 3> pos);
-    float EvaluateOdf(vnl_vector_fixed<float, 3> &pos, vnl_vector_fixed<float, 3> dir);
     float CalcI0(float x);
-    float mexp(float x);
 };
 
 #endif

@@ -48,7 +48,6 @@ public:
 
     void MakeProposal();    ///< make proposal for birth/death/shift/connection of particles
     int GetNumAcceptedProposals();
-    void SetProbabilities(float birth, float death, float shift, float optShift, float connect);    ///< update the probabilities of the single proposals
 
 protected:
 
@@ -70,7 +69,6 @@ protected:
 
     float m_InTemp;     ///< simulated annealing temperature
     float m_ExTemp;     ///< simulated annealing temperature
-    float m_Density;
 
     float m_BirthProb;          ///< probability for particle birth
     float m_DeathProb;          ///< probability for particle death
@@ -88,7 +86,6 @@ protected:
     float m_StopProb;
     float m_DelProb;
     float m_ParticleLength;
-    float m_ChempotParticle;
 
     ParticleGrid*   m_ParticleGrid;         ///< storest all particles
     EnergyComputer* m_EnergyComputer;       ///< computes internal and external energy of particles

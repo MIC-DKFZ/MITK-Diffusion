@@ -22,7 +22,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkStandardFileLocations.h>
 #include <mitkFiberBuilder.h>
 #include <mitkMetropolisHastingsSampler.h>
-//#include <mitkEnergyComputer.h>
 #include <itkTensorImageToOdfImageFilter.h>
 #include <mitkGibbsEnergyComputer.h>
 
@@ -34,7 +33,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // MISC
 #include <fstream>
-// #include <QFile>
+#include <memory>
 #include <tinyxml2.h>
 #include <boost/timer/progress_display.hpp>
 #include <mitkLexicalCast.h>
@@ -108,18 +107,16 @@ GibbsTrackingFilter< ItkOdfImageType >
     randGen->SetSeed();
 
   // instantiate all necessary components
-  SphereInterpolator* interpolator = new SphereInterpolator(m_LutPath);
+  auto interpolator = std::make_unique<SphereInterpolator>(m_LutPath);
   // handle lookup table not found cases
   if( !interpolator->IsInValidState() )
   {
     m_IsInValidState = false;
     mitkThrow() << "Unable to load lookup tables.";
   }
-  ParticleGrid* particleGrid = new ParticleGrid(m_MaskImage, m_ParticleLength, m_ParticleGridCellCapacity);
-  GibbsEnergyComputer* encomp = new GibbsEnergyComputer(m_OdfImage, m_MaskImage, particleGrid, interpolator, randGen);
-
-  //    EnergyComputer* encomp = new EnergyComputer(m_OdfImage, m_MaskImage, particleGrid, interpolator, randGen);
-  MetropolisHastingsSampler* sampler = new MetropolisHastingsSampler(particleGrid, encomp, randGen, m_CurvatureThreshold);
+  auto particleGrid = std::make_unique<ParticleGrid>(m_MaskImage, m_ParticleLength, m_ParticleGridCellCapacity);
+  auto encomp = std::make_unique<GibbsEnergyComputer>(m_OdfImage, m_MaskImage, particleGrid.get(), interpolator.get(), randGen);
+  auto sampler = std::make_unique<MetropolisHastingsSampler>(particleGrid.get(), encomp.get(), randGen, m_CurvatureThreshold);
 
   float alpha = log(m_EndTemperature/m_StartTemperature);
   m_ParticleWeight = 0.01;
@@ -136,10 +133,6 @@ GibbsTrackingFilter< ItkOdfImageType >
   {
     if (round++ == maxRounds)
     {
-      delete sampler;
-      delete encomp;
-      delete particleGrid;
-      delete interpolator;
       mitkThrow() << "Could not estimate the particle weight: fewer than " << neededParts << " particles after "
                   << maxRounds << " rounds. Check the input image and the mask, or set the particle weight.";
     }
@@ -161,10 +154,6 @@ GibbsTrackingFilter< ItkOdfImageType >
     ppv = particleGrid->m_NumParticles;
     particleGrid->ResetGrid();
   }
-  delete sampler;
-  delete encomp;
-  delete particleGrid;
-  delete interpolator;
 
   MITK_INFO << "GibbsTrackingFilter: finished estimating particle weight";
 }
@@ -249,7 +238,7 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
     randGen->SetSeed();
 
   // load sphere interpolator to evaluate the ODFs
-  SphereInterpolator* interpolator = new SphereInterpolator(m_LutPath);
+  auto interpolator = std::make_unique<SphereInterpolator>(m_LutPath);
 
   // handle lookup table not found cases
   if( !interpolator->IsInValidState() )
@@ -258,14 +247,14 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
     mitkThrow() << "Unable to load lookup tables.";
   }
   // initialize the actual tracking components (ParticleGrid, Metropolis Hastings Sampler and Energy Computer)
-  ParticleGrid* particleGrid;
-  GibbsEnergyComputer* encomp;
-  MetropolisHastingsSampler* sampler;
+  std::unique_ptr<ParticleGrid> particleGrid;
+  std::unique_ptr<GibbsEnergyComputer> encomp;
+  std::unique_ptr<MetropolisHastingsSampler> sampler;
   try{
-    particleGrid = new ParticleGrid(m_MaskImage, m_ParticleLength, m_ParticleGridCellCapacity);
-    encomp = new GibbsEnergyComputer(m_OdfImage, m_MaskImage, particleGrid, interpolator, randGen);
+    particleGrid = std::make_unique<ParticleGrid>(m_MaskImage, m_ParticleLength, m_ParticleGridCellCapacity);
+    encomp = std::make_unique<GibbsEnergyComputer>(m_OdfImage, m_MaskImage, particleGrid.get(), interpolator.get(), randGen);
     encomp->SetParameters(m_ParticleWeight,m_ParticleWidth,m_ConnectionPotential*m_ParticleLength*m_ParticleLength,m_CurvatureThreshold,m_InexBalance,m_ParticlePotential);
-    sampler = new MetropolisHastingsSampler(particleGrid, encomp, randGen, m_CurvatureThreshold);
+    sampler = std::make_unique<MetropolisHastingsSampler>(particleGrid.get(), encomp.get(), randGen, m_CurvatureThreshold);
   }
   catch(...)
   {
@@ -291,7 +280,7 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   // of GetFiberBundle do not change the result of the run.
   auto buildFibers = [&]()
   {
-    FiberBuilder fiberBuilder(particleGrid, m_MaskImage);
+    FiberBuilder fiberBuilder(particleGrid.get(), m_MaskImage);
     FiberPolyDataType fibers = fiberBuilder.iterate(m_MinFiberLength);
     std::lock_guard<std::mutex> lock(m_FiberMutex);
     m_FiberPolyData = fibers;
@@ -347,11 +336,6 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
     buildFibers();
   }
   clock.Stop();
-
-  delete sampler;
-  delete encomp;
-  delete interpolator;
-  delete particleGrid;
 
   int h = clock.GetTotal()/3600;
   int m = ((int)clock.GetTotal()%3600)/60;

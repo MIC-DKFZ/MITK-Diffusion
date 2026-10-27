@@ -28,7 +28,6 @@ MetropolisHastingsSampler::MetropolisHastingsSampler(ParticleGrid* grid, EnergyC
     , m_ConnectionProb(0.45)
     , m_TractProb(0.5)
     , m_DelProb(0.1)
-    , m_ChempotParticle(0.0)
     , m_AcceptedProposals(0)
 {
     m_RandGen = randGen;
@@ -45,35 +44,10 @@ MetropolisHastingsSampler::MetropolisHastingsSampler(ParticleGrid* grid, EnergyC
     m_StopProb = exp(-1/m_TractProb);
 }
 
-void MetropolisHastingsSampler::SetProbabilities(float birth, float death, float shift, float optShift, float connect)
-{
-    m_BirthProb = birth;
-    m_DeathProb = death;
-    m_ShiftProb = shift;
-    m_OptShiftProb = optShift;
-    m_ConnectionProb = connect;
-    float sum = m_BirthProb+m_DeathProb+m_ShiftProb+m_OptShiftProb+m_ConnectionProb;
-    if (sum!=1 && sum>mitk::eps)
-    {
-        m_BirthProb /= sum;
-        m_DeathProb /= sum;
-        m_ShiftProb /= sum;
-        m_OptShiftProb /= sum;
-        m_ConnectionProb /= sum;
-    }
-    std::cout << "Update proposal probabilities" << std::endl;
-    std::cout << "Birth: " << m_BirthProb << std::endl;
-    std::cout << "Death: " << m_DeathProb << std::endl;
-    std::cout << "Shift: " << m_ShiftProb << std::endl;
-    std::cout << "Optimal shift: " << m_OptShiftProb << std::endl;
-    std::cout << "Connection: " << m_ConnectionProb << std::endl;
-}
-
 // update temperature of simulated annealing process
 void MetropolisHastingsSampler::SetTemperature(float val)
 {
     m_InTemp = val;
-    m_Density = exp(-m_ChempotParticle/m_InTemp);
 }
 
 // add small random number drawn from gaussian to each vector element
@@ -110,7 +84,7 @@ void MetropolisHastingsSampler::MakeProposal()
         prop.GetPos() = R;
         prop.GetDir() = N;
 
-        float prob =  m_Density * m_DeathProb /((m_BirthProb)*(m_ParticleGrid->m_NumParticles+1));
+        float prob =  m_DeathProb /((m_BirthProb)*(m_ParticleGrid->m_NumParticles+1));
 
         float ex_energy = m_EnergyComputer->ComputeExternalEnergy(R,N,nullptr);
         float in_energy = m_EnergyComputer->ComputeInternalEnergy(&prop);
@@ -139,7 +113,7 @@ void MetropolisHastingsSampler::MakeProposal()
                 float ex_energy = m_EnergyComputer->ComputeExternalEnergy(dp->GetPos(),dp->GetDir(),dp);
                 float in_energy = m_EnergyComputer->ComputeInternalEnergy(dp);
 
-                float prob = m_ParticleGrid->m_NumParticles * (m_BirthProb) /(m_Density*m_DeathProb); //*SpatProb(dp->R);
+                float prob = m_ParticleGrid->m_NumParticles * (m_BirthProb) /(m_DeathProb);
                 prob *= exp(-(in_energy/m_InTemp+ex_energy/m_ExTemp)) ;
                 if (prob > 1 || m_RandGen->GetVariate() < prob)
                 {

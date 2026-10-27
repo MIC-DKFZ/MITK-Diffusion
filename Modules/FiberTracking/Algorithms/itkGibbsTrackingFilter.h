@@ -155,7 +155,7 @@ protected:
     std::condition_variable m_FibersBuilt;  ///< signalled when m_FiberPolyData was built or sampling ended
 
     //Constant values
-    static const int m_ParticleGridCellCapacity = 1024;
+    static constexpr int m_ParticleGridCellCapacity = 1024;
 };
 }
 

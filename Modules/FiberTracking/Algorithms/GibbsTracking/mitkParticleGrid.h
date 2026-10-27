@@ -109,15 +109,6 @@ public:
         m_Probability = 1;
     }
 
-    bool isequal(Track& t)
-    {
-        for (int i = 0; i < m_Length;i++)
-        {
-            if (track[i].p != t.track[i].p || track[i].ep != t.track[i].ep)
-                return false;
-        }
-        return true;
-    }
 };
 
 }
