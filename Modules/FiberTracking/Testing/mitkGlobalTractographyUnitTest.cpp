@@ -19,6 +19,7 @@ found in the LICENSE file.
 #include <mitkMetropolisHastingsSampler.h>
 #include <mitkParticleGrid.h>
 #include <mitkSphereInterpolator.h>
+#include <random>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <vtkMath.h>
@@ -49,6 +50,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(EvaluateOdf_ThinImage_SamplesAlongParticle);
   MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
   MITK_TEST(Neighbours_ThinImage_EachOnce);
+  MITK_TEST(ParticleGrid_ReallocateMoveRemove_Consistent);
   MITK_TEST(SphereInterpolator_TruncatedLookupTables_Invalid);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
   MITK_TEST(OptimalShift_OneNeighbour_FacesIt);
@@ -190,6 +192,49 @@ public:
     while (grid.GetNextNeighbor() != nullptr)
       ++count;
     CPPUNIT_ASSERT_EQUAL(2, count);
+  }
+
+  /** More particles than the initial container (100k, so it is reallocated), moves across cells,
+   *  connections and removals: every particle stays findable in its own cell and the connections
+   *  stay consistent. */
+  void ParticleGrid_ReallocateMoveRemove_Consistent()
+  {
+    auto mask = FloatImageType::New();
+    FloatImageType::SizeType size = {{20, 20, 20}};
+    mask->SetRegions(FloatImageType::RegionType(size));
+    mask->Allocate();
+    mask->FillBuffer(1.0f);
+    mitk::ParticleGrid grid(mask, 1.0f, 1024); // cells of 2 mm: 11x11x11
+    std::mt19937 rng(1);
+    std::uniform_real_distribution<float> coordinate(0.0f, 20.0f);
+    auto randomPos = [&]() { return vnl_vector_fixed<float, 3>(coordinate(rng), coordinate(rng), coordinate(rng)); };
+
+    for (int i = 0; i < 120000; ++i)
+      CPPUNIT_ASSERT(grid.NewParticle(randomPos()) != nullptr);
+    for (int i = 0; i < 2000; i += 2)
+      grid.CreateConnection(grid.GetParticle(i), +1, grid.GetParticle(i + 1), -1);
+
+    for (int i = 0; i < 20000; ++i)
+    {
+      const int k = static_cast<int>(rng() % static_cast<unsigned int>(grid.m_NumParticles));
+      grid.GetParticle(k)->GetPos() = randomPos();
+      CPPUNIT_ASSERT(grid.TryUpdateGrid(k));
+    }
+    for (int i = 0; i < 20000; ++i)
+      grid.RemoveParticle(static_cast<int>(rng() % static_cast<unsigned int>(grid.m_NumParticles)));
+
+    CPPUNIT_ASSERT_EQUAL(100000, grid.m_NumParticles);
+    CPPUNIT_ASSERT(grid.CheckConsistency());
+    for (int k = 0; k < grid.m_NumParticles; k += 37)
+    {
+      mitk::Particle *p = grid.GetParticle(k);
+      vnl_vector_fixed<float, 3> pos = p->GetPos();
+      grid.ComputeNeighbors(pos);
+      bool found = false;
+      for (mitk::Particle *n = grid.GetNextNeighbor(); n != nullptr && !found; n = grid.GetNextNeighbor())
+        found = n == p;
+      CPPUNIT_ASSERT_MESSAGE("particle " + std::to_string(k) + " in its cell", found);
+    }
   }
 
   /** The lookup tables were read without a size check (a truncated file was read out of bounds) and
