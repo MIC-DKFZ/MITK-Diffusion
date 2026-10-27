@@ -111,6 +111,10 @@ protected:
     std::string GetTime();
     bool PrepareLogFile();  /** Prepares the log file and returns true if successful or false if failed. */
     void PrintToLog(std::string m, bool addTime=true, bool linebreak=true, bool stdOut=true);
+    /** Progress bar of 50 stars in the log, the status text and on stdout, for total steps. */
+    void StartProgress(unsigned long total);
+    /** One step of the progress bar; called from the parallel loops. */
+    void AdvanceProgress();
 
     /** Transform generated image compartment by compartment, channel by channel and slice by slice using DFT and add k-space artifacts/effects. */
     DoubleDwiType::Pointer SimulateKspaceAcquisition(std::vector< DoubleDwiType::Pointer >& images);
@@ -142,6 +146,10 @@ protected:
     std::vector< ItkDoubleImgType::Pointer >    m_VolumeFractions;
     std::string                                 m_StatusText;
     mutable std::mutex                          m_LogMutex;   ///< guards m_StatusText, m_Logfile, m_TimeProbe and the log output
+    std::mutex                                  m_ProgressMutex;
+    unsigned long                               m_ProgressTotal = 1;
+    unsigned long                               m_ProgressCount = 0;
+    unsigned long                               m_ProgressStars = 0;  ///< stars printed so far
 
     // MISC
     itk::TimeProbe                              m_TimeProbe;

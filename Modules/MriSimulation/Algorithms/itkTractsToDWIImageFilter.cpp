@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "itkTractsToDWIImageFilter.h"
-#include <boost/timer/progress_display.hpp>
 #include <vtkSmartPointer.h>
 #include <vtkPolyData.h>
 #include <vtkCellArray.h>
@@ -201,11 +200,7 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
     m_Parameters.m_Misc.m_AfterSimulationMessage += "Echo time was chosen too short! Time not sufficient to read slice. Internally adjusted to " + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_tEcho) + " ms\n";
   }
 
-  PrintToLog("0%   10   20   30   40   50   60   70   80   90   100%", false, true, false);
-  PrintToLog("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, false);
-  unsigned long lastTick = 0;
-
-  boost::timer::progress_display disp(static_cast<unsigned long>(num_gradient_volumes)*compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2));
+  StartProgress(static_cast<unsigned long>(num_gradient_volumes)*compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2));
 
   // The volumes are simulated in parallel, and every voxel vector holds one component per volume
   // (per coil for the k-space image). GetPixel/SetPixel of an itk::VectorImage copy the whole voxel
@@ -378,14 +373,7 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
             }
         }
 
-#pragma omp critical
-        {
-          ++disp;
-          unsigned long newTick = 50*disp.count()/disp.expected_count();
-          for (unsigned long tick = 0; tick<(newTick-lastTick); tick++)
-            PrintToLog("*", false, false, false);
-          lastTick = newTick;
-        }
+        AdvanceProgress();
       }
     }
     catch (...)
@@ -1021,7 +1009,6 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     int numNonFiberCompartments = m_Parameters.m_NonFiberModelList.size();
 
     double maxVolume = 0;
-    unsigned long lastTick = 0;
     int signalModelSeed = m_RandGen->GetIntegerVariate();
 
     PrintToLog("\n", false, false);
@@ -1041,7 +1028,6 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     unsigned int region_size_y = m_WorkingImageRegion.GetSize(1);
     unsigned int num_gradients = m_Parameters.m_SignalGen.GetNumVolumes();
     int numFibers = m_FiberBundle->GetNumFibers();
-    boost::timer::progress_display disp(numFibers*num_gradients);
 
     // Short fibers (mean length below 5 mm) are simulated with two threads, as before; the limit
     // applies to the fiber loop only, not to every later OpenMP region of the process.
@@ -1049,8 +1035,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     if (m_FiberBundle->GetMeanFiberLength()<5.0)
       fiberThreads = 2;
 
-    PrintToLog("0%   10   20   30   40   50   60   70   80   90   100%", false, true, false);
-    PrintToLog("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, false);
+    StartProgress(static_cast<unsigned long>(numFibers)*num_gradients);
 
     for (unsigned int g=0; g<num_gradients; ++g)
     {
@@ -1206,15 +1191,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
                 }
               }
 
-#pragma omp critical
-              {
-                // progress report
-                ++disp;
-                unsigned long newTick = 50*disp.count()/disp.expected_count();
-                for (unsigned int tick = 0; tick<(newTick-lastTick); ++tick)
-                  PrintToLog("*", false, false, false);
-                lastTick = newTick;
-              }
+              AdvanceProgress();
             }
             catch (...)
             {
@@ -1452,11 +1429,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
   }
   ImageRegionIterator<OutputImageType> it4 (m_OutputImage, m_OutputImage->GetLargestPossibleRegion());
   DoubleDwiType::PixelType signal; signal.SetSize(m_Parameters.m_SignalGen.GetNumVolumes());
-  boost::timer::progress_display disp2(m_OutputImage->GetLargestPossibleRegion().GetNumberOfPixels());
-
-  PrintToLog("0%   10   20   30   40   50   60   70   80   90   100%", false, true, false);
-  PrintToLog("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, false);
-  int lastTick = 0;
+  StartProgress(m_OutputImage->GetLargestPossibleRegion().GetNumberOfPixels());
 
   while(!it4.IsAtEnd())
   {
@@ -1467,11 +1440,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
       return;
     }
 
-    ++disp2;
-    unsigned long newTick = 50*disp2.count()/disp2.expected_count();
-    for (unsigned long tick = 0; tick<(newTick-lastTick); tick++)
-      PrintToLog("*", false, false, false);
-    lastTick = newTick;
+    AdvanceProgress();
 
     typename OutputImageType::IndexType index = it4.GetIndex();
     signal = doubleOutImage->GetPixel(index)*signalScale;
@@ -1528,6 +1497,34 @@ std::string TractsToDWIImageFilter< PixelType >::GetStatusText() const
 {
   std::lock_guard<std::mutex> lock(m_LogMutex);
   return m_StatusText;
+}
+
+template< class PixelType >
+void TractsToDWIImageFilter< PixelType >::StartProgress(unsigned long total)
+{
+  {
+    std::lock_guard<std::mutex> lock(m_ProgressMutex);
+    m_ProgressTotal = std::max(total, 1ul);
+    m_ProgressCount = 0;
+    m_ProgressStars = 0;
+  }
+  PrintToLog("0%   10   20   30   40   50   60   70   80   90   100%", false, true, true);
+  PrintToLog("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, true);
+}
+
+template< class PixelType >
+void TractsToDWIImageFilter< PixelType >::AdvanceProgress()
+{
+  unsigned long newStars = 0;
+  {
+    std::lock_guard<std::mutex> lock(m_ProgressMutex);
+    ++m_ProgressCount;
+    const unsigned long stars = 50*std::min(m_ProgressCount, m_ProgressTotal)/m_ProgressTotal;
+    newStars = stars - m_ProgressStars;
+    m_ProgressStars = stars;
+  }
+  if (newStars>0)
+    PrintToLog(std::string(newStars, '*'), false, false, true);
 }
 
 template< class PixelType >
