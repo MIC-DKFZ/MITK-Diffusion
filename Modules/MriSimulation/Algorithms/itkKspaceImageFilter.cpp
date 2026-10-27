@@ -22,6 +22,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <cstdio>
 #include <cstdlib>
 #include <math.h>
+#include <algorithm>
+#include <cmath>
 
 #include "itkKspaceImageFilter.h"
 #include <itkImageRegionConstIterator.h>
@@ -284,6 +286,19 @@ namespace itk {
   }
 
   template< class ScalarType >
+  bool KspaceImageFilter< ScalarType >::IsSkippedLine(int ky, int numLines, double partialFourier, bool reversePhase)
+  {
+    const int half = numLines/2;  // index of the k-space centre
+    const int acquired = std::clamp(static_cast<int>(std::lround(partialFourier*numLines)), half+1, numLines);
+    if (reversePhase)
+      return ky >= acquired;
+    const bool even = numLines%2 == 0;
+    if (even && ky == 0)
+      return false;
+    return ky < numLines - acquired + (even ? 1 : 0);
+  }
+
+  template< class ScalarType >
   void KspaceImageFilter< ScalarType >
   ::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
   {
@@ -335,14 +350,8 @@ namespace itk {
         tick %= static_cast<int>(numPix);
       }
 
-      // partial fourier
-      // two cases because we always want to skip the "later" parts of k-space
-      // in "normal" phase direction, the higher k-space indices are acquired first
-      // in reversed phase direction, the higher k-space indices are acquired later
-      // if the image has an even number of lines, never skip line zero since it is missing on the other side (DFT not completely syymetric in even case)
-      if ((m_Parameters->m_SignalGen.m_ReversePhase && kIdx[1]>std::ceil(kyMax*m_Parameters->m_SignalGen.m_PartialFourier)) ||
-          (!m_Parameters->m_SignalGen.m_ReversePhase && kIdx[1]<std::floor(kyMax*(1.0 - m_Parameters->m_SignalGen.m_PartialFourier)) &&
-           (kIdx[1]>0 || static_cast<int>(kyMax)%2 == 1)))
+      // partial fourier: the lines read last are not acquired
+      if (IsSkippedLine(kIdx[1], static_cast<int>(kyMax), m_Parameters->m_SignalGen.m_PartialFourier, m_Parameters->m_SignalGen.m_ReversePhase))
       {
         outputImage->SetPixel(kIdx, zero);
         ++oit;
@@ -518,9 +527,7 @@ namespace itk {
       int tick = oit.GetIndex()[1] * kxMax + oit.GetIndex()[0];
       auto kIdx = m_ReadoutScheme->GetActualKspaceIndex(tick);
 
-      if ((m_Parameters->m_SignalGen.m_ReversePhase && kIdx[1]>std::ceil(kyMax*m_Parameters->m_SignalGen.m_PartialFourier)) ||
-          (!m_Parameters->m_SignalGen.m_ReversePhase && kIdx[1]<std::floor(kyMax*(1.0 - m_Parameters->m_SignalGen.m_PartialFourier)) &&
-          (kIdx[1]>0 || static_cast<int>(kyMax)%2 == 1)))
+      if (IsSkippedLine(kIdx[1], kyMax, m_Parameters->m_SignalGen.m_PartialFourier, m_Parameters->m_SignalGen.m_ReversePhase))
       {
         // calculate symmetric index
         auto sym = m_ReadoutScheme->GetSymmetricIndex(kIdx);

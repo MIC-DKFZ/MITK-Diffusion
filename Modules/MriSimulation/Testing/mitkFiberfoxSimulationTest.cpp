@@ -11,6 +11,7 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <mitkTestingMacros.h>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <mitkTestFixture.h>
@@ -21,6 +22,7 @@ found in the LICENSE file.
 #include <mitkRawShModel.h>
 #include <mitkFiberfoxMotion.h>
 #include <itkRandomPhantomFilter.h>
+#include <itkKspaceImageFilter.h>
 
 namespace
 {
@@ -56,6 +58,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(MotionTransforms);
   MITK_TEST(MotionMovesFibersAndMapsTogether);
   MITK_TEST(RandomPhantom);
+  MITK_TEST(PartialFourierLines);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -334,6 +337,40 @@ public:
     CPPUNIT_ASSERT_EQUAL(std::size_t(2), bundles.size());
     for (const auto& bundle : bundles)
       CPPUNIT_ASSERT(bundle->GetNumFibers() > 0);
+  }
+
+  /** Partial Fourier acquires round(factor * lines) lines (at least up to the centre) in both phase
+   * directions, mirrored about the k-space centre; every skipped line but the unpaired line 0 of an
+   * even number of lines has its conjugate partner acquired. */
+  void PartialFourierLines()
+  {
+    using KspaceFilter = itk::KspaceImageFilter<float>;
+    for (int numLines : {19, 20, 21, 254})
+    {
+      for (float factor : {0.5f, 0.6f, 0.75f, 0.9f, 1.0f})
+      {
+        const int half = numLines/2;
+        const bool even = numLines%2 == 0;
+        const int expected = std::max(static_cast<int>(std::lround(static_cast<double>(factor)*numLines)), half+1);
+        int acquired[2] = {0, 0};
+        for (int ky=0; ky<numLines; ++ky)
+        {
+          const int mirror = even ? (numLines-ky)%numLines : numLines-1-ky;  // conjugate partner
+          for (bool reverse : {false, true})
+          {
+            const bool skipped = KspaceFilter::IsSkippedLine(ky, numLines, factor, reverse);
+            acquired[reverse] += skipped ? 0 : 1;
+            if (skipped)
+              CPPUNIT_ASSERT_MESSAGE("conjugate partner acquired", mirror != ky && !KspaceFilter::IsSkippedLine(mirror, numLines, factor, reverse));
+            if (mirror != ky || !even)
+              CPPUNIT_ASSERT_EQUAL_MESSAGE("directions mirrored", skipped, KspaceFilter::IsSkippedLine(mirror, numLines, factor, !reverse));
+          }
+        }
+        CPPUNIT_ASSERT_MESSAGE("centre acquired", !KspaceFilter::IsSkippedLine(half, numLines, factor, false) && !KspaceFilter::IsSkippedLine(half, numLines, factor, true));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("lines in normal phase direction", expected, acquired[0]);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("lines in reversed phase direction", expected, acquired[1]);
+      }
+    }
   }
 };
 

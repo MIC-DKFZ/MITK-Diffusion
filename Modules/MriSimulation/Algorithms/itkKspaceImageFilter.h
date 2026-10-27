@@ -90,6 +90,16 @@ namespace itk{
     /** Readout scheme (k-space trajectory and timing) of the acquisition type in the parameters. */
     static std::unique_ptr<mitk::AcquisitionType> CreateReadoutScheme(const mitk::FiberfoxParameters* parameters);
 
+    /**
+     * Whether partial Fourier leaves the phase-encoding line with k-space index ky (0 to numLines-1)
+     * unacquired. The partial Fourier factor is the fraction of the numLines lines that is acquired:
+     * round(partialFourier*numLines) lines, at least up to the k-space centre. They are the lines read
+     * first: the highest indices in normal and the lowest in reversed phase direction. With an even
+     * number of lines, line 0 (the highest frequency, without a conjugate partner) is always acquired
+     * and counted, so both directions acquire the same number of lines, mirrored about the centre.
+     */
+    static bool IsSkippedLine(int ky, int numLines, double partialFourier, bool reversePhase);
+
     void SetCompartmentImages( std::vector< InputImagePointerType > cImgs ) { m_CompartmentImages=cImgs; }  ///< One signal image per compartment.
     void SetT2( std::vector< float > t2Vector ) { m_T2=t2Vector; } ///< One T2 relaxation constant per compartment image.
     void SetT1( std::vector< float > t1Vector ) { m_T1=t1Vector; } ///< One T1 relaxation constant per compartment image.
