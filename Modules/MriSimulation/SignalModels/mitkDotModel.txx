@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_quaternion.h>
 #include <mitkDotModel.h>
 
-using namespace mitk;
+namespace mitk {
 
 template< class ScalarType >
 DotModel< ScalarType >::DotModel()
@@ -44,4 +44,6 @@ typename DotModel< ScalarType >::PixelType DotModel< ScalarType >::SimulateMeasu
     signal.SetSize(this->m_GradientList.size());
     signal.Fill(1);
     return signal;
+}
+
 }

@@ -243,7 +243,7 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
 
         for (unsigned int i=0; i<compartment_images.size(); i++)
         {
-          DiffusionSignalModel<double>* signalModel;
+          mitk::DiffusionSignalModel<double>* signalModel;
           if (i<numFiberCompartments)
             signalModel = m_Parameters.m_FiberModelList.at(i);
           else
@@ -1369,17 +1369,17 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
 
     switch (m_Parameters.m_SignalGen.m_AcquisitionType)
     {
-    case SignalGenerationParameters::SingleShotEpi:
+    case mitk::SignalGenerationParameters::SingleShotEpi:
     {
       PrintToLog("Acquisition type: single shot EPI", false);
       break;
     }
-    case SignalGenerationParameters::ConventionalSpinEcho:
+    case mitk::SignalGenerationParameters::ConventionalSpinEcho:
     {
       PrintToLog("Acquisition type: conventional spin echo (one RF pulse per line) with cartesian k-space trajectory", false);
       break;
     }
-    case SignalGenerationParameters::FastSpinEcho:
+    case mitk::SignalGenerationParameters::FastSpinEcho:
     {
       PrintToLog("Acquisition type: fast spin echo (one RF pulse per ETL lines) with cartesian k-space trajectory (ETL: " + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_EchoTrainLength) + ")", false);
       break;

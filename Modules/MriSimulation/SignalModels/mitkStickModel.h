@@ -54,7 +54,7 @@ protected:
 
 }
 
-#include "mitkStickModel.cpp"
+#include "mitkStickModel.txx"
 
 #endif
 

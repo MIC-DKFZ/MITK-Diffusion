@@ -70,7 +70,7 @@ int mitkFiberGenerationTest(int argc, char* argv[])
         mitk::FiberBundle::Pointer uniform = mitk::IOUtil::Load<mitk::FiberBundle>(argv[4]);
         mitk::FiberBundle::Pointer gaussian = mitk::IOUtil::Load<mitk::FiberBundle>(argv[5]);
 
-        FiberGenerationParameters parameters;
+        mitk::FiberGenerationParameters parameters;
         std::vector< mitk::PlanarEllipse::Pointer > fid; fid.push_back(pf1); fid.push_back(pf2); fid.push_back(pf3);
         std::vector< unsigned int > flip; flip.push_back(0); flip.push_back(0); flip.push_back(0);
         parameters.m_Fiducials.push_back(fid); parameters.m_FlipList.push_back(flip);
@@ -84,7 +84,7 @@ int mitkFiberGenerationTest(int argc, char* argv[])
         // check uniform fiber distribution
         {
             itk::FibersFromPlanarFiguresFilter::Pointer filter = itk::FibersFromPlanarFiguresFilter::New();
-            parameters.m_Distribution = FiberGenerationParameters::DISTRIBUTE_UNIFORM;
+            parameters.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_UNIFORM;
             filter->SetParameters(parameters);
             filter->SetFixSeed(true);
             filter->Update();
@@ -103,7 +103,7 @@ int mitkFiberGenerationTest(int argc, char* argv[])
         // check gaussian fiber distribution
         {
             itk::FibersFromPlanarFiguresFilter::Pointer filter = itk::FibersFromPlanarFiguresFilter::New();
-            parameters.m_Distribution = FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
+            parameters.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
             filter->SetParameters(parameters);
             filter->SetFixSeed(true);
             filter->Update();

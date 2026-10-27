@@ -169,5 +169,5 @@ protected:
     itk::TractsToDWIImageFilter< short >::Pointer           m_TractsToDwiFilter;
 
     friend class QmitkFiberfoxWorker;
-    FiberfoxParameters  m_Parameters;
+    mitk::FiberfoxParameters  m_Parameters;
 };

@@ -163,17 +163,17 @@ namespace itk {
 
     switch (m_Parameters->m_SignalGen.m_CoilSensitivityProfile)
     {
-      case SignalGenerationParameters::COIL_CONSTANT:
+      case mitk::SignalGenerationParameters::COIL_CONSTANT:
       {
         m_CoilSensitivityFactor = 1;                    // same signal everywhere
         break;
       }
-      case SignalGenerationParameters::COIL_LINEAR:
+      case mitk::SignalGenerationParameters::COIL_LINEAR:
       {
         m_CoilSensitivityFactor = -1/diagonal;          // about 50% of the signal in the image center remaining
         break;
       }
-      case SignalGenerationParameters::COIL_EXPONENTIAL:
+      case mitk::SignalGenerationParameters::COIL_EXPONENTIAL:
       {
         m_CoilSensitivityFactor = -log(0.1)/diagonal;   // about 32% of the signal in the image center remaining
         break;
@@ -238,15 +238,15 @@ namespace itk {
   }
 
   template< class ScalarType >
-  std::unique_ptr<AcquisitionType> KspaceImageFilter< ScalarType >::CreateReadoutScheme(const FiberfoxParameters* parameters)
+  std::unique_ptr<mitk::AcquisitionType> KspaceImageFilter< ScalarType >::CreateReadoutScheme(const mitk::FiberfoxParameters* parameters)
   {
     switch (parameters->m_SignalGen.m_AcquisitionType)
     {
-      case SignalGenerationParameters::ConventionalSpinEcho:
+      case mitk::SignalGenerationParameters::ConventionalSpinEcho:
         return std::make_unique<mitk::ConventionalSpinEcho>(parameters);
-      case SignalGenerationParameters::FastSpinEcho:
+      case mitk::SignalGenerationParameters::FastSpinEcho:
         return std::make_unique<mitk::FastSpinEcho>(parameters);
-      case SignalGenerationParameters::SingleShotEpi:
+      case mitk::SignalGenerationParameters::SingleShotEpi:
       default:
         return std::make_unique<mitk::SingleShotEpi>(parameters);
     }
@@ -262,9 +262,9 @@ namespace itk {
 
     switch (m_Parameters->m_SignalGen.m_CoilSensitivityProfile)
     {
-      case SignalGenerationParameters::COIL_CONSTANT:
+      case mitk::SignalGenerationParameters::COIL_CONSTANT:
       return 1;
-      case SignalGenerationParameters::COIL_LINEAR:
+      case mitk::SignalGenerationParameters::COIL_LINEAR:
       {
         VectorType diff = pos-coilPosition;
         float sens = diff.GetNorm()*m_CoilSensitivityFactor + 1;
@@ -272,7 +272,7 @@ namespace itk {
           sens = 0;
         return sens;
       }
-      case SignalGenerationParameters::COIL_EXPONENTIAL:
+      case mitk::SignalGenerationParameters::COIL_EXPONENTIAL:
       {
         VectorType diff = pos-coilPosition;
         float dist = static_cast<float>(diff.GetNorm());
@@ -432,13 +432,13 @@ namespace itk {
         // only necessary for eddy currents and non-constant coil sensitivity
         VectorType pos;
         if ((m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline) ||
-            m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=SignalGenerationParameters::COIL_CONSTANT)
+            m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
         {
           pos[0] = x; pos[1] = y; pos[2] = m_Z;
           pos = m_Transform*pos;
         }
 
-        if (m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=SignalGenerationParameters::COIL_CONSTANT)
+        if (m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
           f_real *= CoilSensitivity(pos);
 
         // simulate eddy currents and other distortions

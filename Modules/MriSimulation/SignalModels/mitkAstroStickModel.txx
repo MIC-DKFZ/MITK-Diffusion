@@ -17,7 +17,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_quaternion.h>
 #include <mitkAstroStickModel.h>
 
-using namespace mitk;
+namespace mitk {
 
 template< class ScalarType >
 AstroStickModel< ScalarType >::AstroStickModel()
@@ -123,4 +123,6 @@ typename AstroStickModel< ScalarType >::PixelType AstroStickModel< ScalarType >:
     }
 
     return signal;
+}
+
 }

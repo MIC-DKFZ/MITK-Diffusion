@@ -99,7 +99,7 @@ protected:
 
 }
 
-#include "mitkAstroStickModel.cpp"
+#include "mitkAstroStickModel.txx"
 
 #endif
 

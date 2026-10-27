@@ -50,7 +50,7 @@ protected:
 
 }
 
-#include "mitkDotModel.cpp"
+#include "mitkDotModel.txx"
 
 #endif
 

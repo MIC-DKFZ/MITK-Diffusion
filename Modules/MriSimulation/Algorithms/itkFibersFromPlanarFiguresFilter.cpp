@@ -62,7 +62,7 @@ void FibersFromPlanarFiguresFilter::GeneratePoints()
   {
     mitk::Vector2D p;
     switch (m_Parameters.m_Distribution) {
-    case FiberGenerationParameters::DISTRIBUTE_GAUSSIAN:
+    case mitk::FiberGenerationParameters::DISTRIBUTE_GAUSSIAN:
       p[0] = randGen->GetNormalVariate(0, m_Parameters.m_Variance);
       p[1] = randGen->GetNormalVariate(0, m_Parameters.m_Variance);
       break;

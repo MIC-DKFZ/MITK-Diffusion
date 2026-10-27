@@ -56,7 +56,7 @@ public:
   }
 
   // input
-  void SetParameters( FiberGenerationParameters param )  ///< Simulation parameters.
+  void SetParameters( mitk::FiberGenerationParameters param )  ///< Simulation parameters.
   {
     m_Parameters = param;
   }
@@ -76,7 +76,7 @@ protected:
 
   FiberContainerType              m_FiberBundles;    ///< container for the output fiber bundles
   std::vector< mitk::Vector2D >   m_2DPoints;        ///< container for the 2D fiber waypoints
-  FiberGenerationParameters       m_Parameters;
+  mitk::FiberGenerationParameters       m_Parameters;
   int                             m_FixSeed;
 };
 }

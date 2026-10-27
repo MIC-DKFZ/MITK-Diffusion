@@ -66,7 +66,7 @@ protected:
 
 }
 
-#include "mitkTensorModel.cpp"
+#include "mitkTensorModel.txx"
 
 #endif
 

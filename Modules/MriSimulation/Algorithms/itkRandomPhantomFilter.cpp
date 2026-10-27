@@ -314,7 +314,7 @@ void RandomPhantomFilter::GenerateData()
   for (unsigned int i=0; i<m_NumTracts; ++i)
   {
     MITK_INFO << "Generating Bundle_" << i+1;
-    FiberGenerationParameters       fiber_params;
+    mitk::FiberGenerationParameters       fiber_params;
     std::vector< mitk::PlanarEllipse::Pointer > bundle_waypoints;
 
     double curvyness = randGen->GetUniformVariate(m_CurvynessMin, m_CurvynessMax);
@@ -437,12 +437,12 @@ void RandomPhantomFilter::GenerateData()
     fiber_params.m_Density = static_cast<unsigned int>(std::ceil(c_area*density));
     if (randGen->GetIntegerVariate(1)==0)
     {
-      fiber_params.m_Distribution = FiberGenerationParameters::DISTRIBUTE_UNIFORM;
+      fiber_params.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_UNIFORM;
       MITK_INFO << "Distribution: uniform";
     }
     else
     {
-      fiber_params.m_Distribution = FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
+      fiber_params.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
       MITK_INFO << "Distribution: Gaussian";
     }
 

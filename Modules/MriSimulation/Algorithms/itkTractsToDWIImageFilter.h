@@ -68,11 +68,11 @@ public:
     itkSetMacro( FiberBundle, FiberBundleType )             ///< Input fiber bundle
     itkSetMacro( InputImage, typename OutputImageType::Pointer )     ///< Input diffusion-weighted image. If no fiber bundle is set, then the acquisition is simulated for this image without a new diffusion simulation.
     itkSetMacro( UseConstantRandSeed, bool )                ///< Seed for random generator.
-    void SetParameters( FiberfoxParameters param )  ///< Simulation parameters.
+    void SetParameters( mitk::FiberfoxParameters param )  ///< Simulation parameters.
     { m_Parameters = param; }
 
     /** Output */
-    FiberfoxParameters GetParameters(){ return m_Parameters; }
+    mitk::FiberfoxParameters GetParameters(){ return m_Parameters; }
     std::vector< ItkDoubleImgType::Pointer > GetVolumeFractions() ///< one double image for each compartment containing the corresponding volume fraction per voxel
     { return m_VolumeFractions; }
     std::string GetStatusText() const;   ///< log of the running simulation; safe to call from another thread

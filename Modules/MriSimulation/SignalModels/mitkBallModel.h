@@ -55,7 +55,7 @@ protected:
 
 }
 
-#include "mitkBallModel.cpp"
+#include "mitkBallModel.txx"
 
 #endif
 

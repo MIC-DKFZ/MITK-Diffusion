@@ -57,12 +57,12 @@ private:
 public:
 
   /** Members used inside the different (sub-)tests. All members are initialized via setUp().*/
-  FiberBundle::Pointer m_FiberBundle;
+  mitk::FiberBundle::Pointer m_FiberBundle;
   mitk::Image::Pointer m_Template;
 
   void setUp() override
   {
-    m_FiberBundle = mitk::IOUtil::Load<FiberBundle>(GetTestDataFilePath("DiffusionImaging/Fiberfox/SignalGen_BrainSlice.fib"));
+    m_FiberBundle = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/Fiberfox/SignalGen_BrainSlice.fib"));
     m_Template = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/SignalGen_BrainSliceTemplate.nii.gz"));
   }
 
@@ -120,7 +120,7 @@ public:
     return out;
   }
 
-  void StartSimulation(FiberfoxParameters parameters, mitk::Image::Pointer refImage, std::string out)
+  void StartSimulation(mitk::FiberfoxParameters parameters, mitk::Image::Pointer refImage, std::string out)
   {
     itk::TractsToDWIImageFilter< short >::Pointer tractsToDwiFilter = itk::TractsToDWIImageFilter< short >::New();
     tractsToDwiFilter->SetUseConstantRandSeed(true);
@@ -157,7 +157,7 @@ public:
 
   void Test1()
   {
-    FiberfoxParameters parameters;
+    mitk::FiberfoxParameters parameters;
     parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_1.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
@@ -168,7 +168,7 @@ public:
 
   void Test2()
   {
-    FiberfoxParameters parameters;
+    mitk::FiberfoxParameters parameters;
     parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_2.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
@@ -178,7 +178,7 @@ public:
 
   void Test3()
   {
-    FiberfoxParameters parameters;
+    mitk::FiberfoxParameters parameters;
     parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_3.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
@@ -188,7 +188,7 @@ public:
 
   void Test4()
   {
-    FiberfoxParameters parameters;
+    mitk::FiberfoxParameters parameters;
     parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_4.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
@@ -198,7 +198,7 @@ public:
 
   void Test5()
   {
-    FiberfoxParameters parameters;
+    mitk::FiberfoxParameters parameters;
     parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_5.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());

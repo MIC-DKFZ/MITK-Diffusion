@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkChiSquareNoiseModel.h>
 #include <random>
 
-using namespace mitk;
+namespace mitk {
 
 template< class ScalarType >
 ChiSquareNoiseModel< ScalarType >::ChiSquareNoiseModel()
@@ -47,4 +47,6 @@ void ChiSquareNoiseModel< ScalarType >::AddNoise(PixelType& pixel)
 {
     for( unsigned int i=0; i<pixel.Size(); i++)
         pixel[i] += (ScalarType)(m_Distribution(m_RandGen)-m_Distribution.n());
+}
+
 }

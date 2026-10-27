@@ -100,7 +100,7 @@ protected:
 
 }
 
-#include "mitkRawShModel.cpp"
+#include "mitkRawShModel.txx"
 
 #endif
 
