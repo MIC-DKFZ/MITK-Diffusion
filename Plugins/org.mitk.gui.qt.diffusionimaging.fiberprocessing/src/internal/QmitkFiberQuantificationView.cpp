@@ -31,8 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateAnd.h>
 #include <mitkImageCast.h>
 #include <mitkPeakImage.h>
-#include <mitkLabelSetImage.h>
-#include <mitkDICOMQIPropertyHelper.h>
 
 // ITK
 #include <itkTractDensityImageFilter.h>
@@ -41,7 +39,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkTractsToFiberEndingsImageFilter.h>
 #include <itkSignedMaurerDistanceMapImageFilter.h>
 #include <itkBinaryThinningImageFilter.h>
-#include <mitkLabelSetImage.h>
 
 #include <mitkLexicalCast.h>
 
@@ -251,15 +248,15 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
       DataNode::Pointer newNode = nullptr;
       switch(generationMethod){
       case 0:
-        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, true, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, true);
         name += "_TDI";
         break;
       case 1:
-        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, false, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, false);
         name += "_TDI";
         break;
       case 2:
-        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::BINARY, false, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::BINARY, false);
         name += "_envelope";
         break;
       case 3:
@@ -282,7 +279,7 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
         name += "_skeleton";
         break;
       case 8:
-        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::VISITATION_COUNT, true, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::VISITATION_COUNT, true);
         name += "_visitations";
         break;
       case 9:
@@ -484,7 +481,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateDistanceMap(mitk::
 }
 
 // generate tract density image from fiber bundle
-mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, itk::TDI_MODE mode, bool absolute, std::string name)
+mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, itk::TDI_MODE mode, bool absolute)
 {
   mitk::DataNode::Pointer node = mitk::DataNode::New();
   if (mode==itk::TDI_MODE::BINARY)
@@ -512,37 +509,9 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
     img->InitializeByItk(outImg.GetPointer());
     img->SetVolume(outImg->GetBufferPointer());
 
-
-    if (m_SelectedImage.IsNotNull())
-    {
-      mitk::MultiLabelSegmentation::Pointer multilabelImage = mitk::MultiLabelSegmentation::New();
-      multilabelImage->InitializeByLabeledImage(img);
-      mitk::Label::Pointer label = multilabelImage->GetLabel(1);
-      if (label.IsNull())
-      {
-        // no voxel of the reference grid is hit, so there is no label to describe
-        QMessageBox::information(nullptr, "Binary envelope", QString("The envelope of %1 is empty in the reference image.").arg(name.c_str()));
-        node->SetData(img);
-        return node;
-      }
-      label->SetName("Tractogram");
-
-      // Segmented Property Category Code Sequence (0062, 0003): the general category of this segment.
-      label->SetSegmentedPropertyCategory(DICOMCodeSequence("T-D000A", "SRT", "Anatomical Structure"));
-
-      // Segmented Property Type Code Sequence (0062, 000F): the specific property type of this segment.
-      label->SetSegmentedPropertyType(DICOMCodeSequenceWithModifiers("DUMMY", "SRT", name));
-
-      //Error: is undeclared//      mitk::DICOMQIPropertyHandler::DeriveDICOMSourceProperties(m_SelectedImage, multilabelImage);
-
-      // init data node
-      node->SetData(multilabelImage);
-    }
-    else
-    {
-      // init data node
-      node->SetData(img);
-    }
+    // A plain binary image also with a reference image: the ROI and parcellation selectors of
+    // the other fiber views accept images, not multilabel segmentations.
+    node->SetData(img);
 
   }
   else
