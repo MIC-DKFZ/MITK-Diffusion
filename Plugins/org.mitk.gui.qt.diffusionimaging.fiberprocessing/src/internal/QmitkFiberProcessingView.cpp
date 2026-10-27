@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "QmitkFiberProcessingView.h"
 
 #include <QMessageBox>
+#include <QStringList>
 #include <functional>
 
 #include <mitkNodePredicateFunction.h>
@@ -538,16 +539,25 @@ void QmitkFiberProcessingView::ExtractWithMask(bool onlyEnds, bool invert, bool 
         boost::split(strs,labels_string,boost::is_any_of(" ,;\t"));
 
         std::vector< unsigned short > labels_vector;
+        QStringList invalid;
         for (auto v : strs)
         {
+          if (v.empty())
+            continue;
           try{
             unsigned short l = boost::lexical_cast<unsigned short>(v);
             labels_vector.push_back(l);
           }
           catch(...)
           {
-
+            invalid.push_back(QString::fromStdString(v));
           }
+        }
+        // an empty label list means "all labels" to the extractor
+        if (!invalid.empty() || labels_vector.empty())
+        {
+          QMessageBox::information(nullptr, "No output generated:", QString("Invalid labels: \"%1\". Enter label values separated by spaces, commas or semicolons, or ALL.").arg(invalid.join(" ")));
+          return;
         }
         extractor->SetLabels(labels_vector);
       }

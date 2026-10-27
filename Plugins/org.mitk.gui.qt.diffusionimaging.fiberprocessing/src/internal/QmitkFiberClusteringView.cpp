@@ -194,6 +194,12 @@ void QmitkFiberClusteringView::StartClustering()
     metrics.push_back(std::move(metric));
   }
 
+  if ((m_Controls->m_MetricBox4->isChecked() && m_Controls->m_ParcellationBox->GetSelectedNode().IsNull())
+      || (m_Controls->m_MetricBox5->isChecked() && m_Controls->m_MapBox->GetSelectedNode().IsNull()))
+  {
+    QMessageBox::warning(nullptr, "Warning", "The anatomical metric needs a parcellation, the scalar map metric a scalar map.");
+    return;
+  }
   if (metrics.empty())
   {
     QMessageBox::warning(nullptr, "Warning", "No metric selected!");

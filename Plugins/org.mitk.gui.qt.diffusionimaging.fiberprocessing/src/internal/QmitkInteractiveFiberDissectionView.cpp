@@ -108,7 +108,10 @@ QmitkInteractiveFiberDissectionView::QmitkInteractiveFiberDissectionView()
 // Destructor
 QmitkInteractiveFiberDissectionView::~QmitkInteractiveFiberDissectionView()
 {
-
+  // the brush must not keep editing the label bundles once the view is closed
+  this->StopLabelingBrush();
+  if (m_StreamlineInteractorBrush.IsNotNull())
+    m_StreamlineInteractorBrush->SetDataNode(nullptr);
 }
 
 
