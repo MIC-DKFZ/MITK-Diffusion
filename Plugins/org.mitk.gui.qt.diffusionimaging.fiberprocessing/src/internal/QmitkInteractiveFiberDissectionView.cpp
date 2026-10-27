@@ -782,6 +782,11 @@ bool QmitkInteractiveFiberDissectionView::RunClassifier(mitk::FiberBundle::Point
       classifier->SetTractogramPlus(plus);
       classifier->SetTractogramMinus(minus);
       classifier->Update();
+
+      MITK_INFO << "Number of Cycles " << m_activeCycleCounter;
+      MITK_INFO << "Algorithm run succesfully";
+
+      this->CreatePredictionNode();
     }
     catch (const std::exception &e)
     {
@@ -790,10 +795,6 @@ bool QmitkInteractiveFiberDissectionView::RunClassifier(mitk::FiberBundle::Point
       return false;
     }
 
-    MITK_INFO << "Number of Cycles " << m_activeCycleCounter;
-    MITK_INFO << "Algorithm run succesfully";
-
-    this->CreatePredictionNode();
     m_activeCycleCounter += 1;
     return true;
 }
@@ -1058,8 +1059,17 @@ void QmitkInteractiveFiberDissectionView::addGeneralizationBundles(bool reset)
       return merged;
     };
 
-    cur_negativeBundle = merge(m_negativeGenBundleNode, m_negativeBundleNode, "-BundleGen", 255, 0, 0);
-    cur_positiveBundle = merge(m_positiveGenBundleNode, m_positiveBundleNode, "+BundleGen", 0, 255, 0);
+    try
+    {
+      cur_negativeBundle = merge(m_negativeGenBundleNode, m_negativeBundleNode, "-BundleGen", 255, 0, 0);
+      cur_positiveBundle = merge(m_positiveGenBundleNode, m_positiveBundleNode, "+BundleGen", 0, 255, 0);
+    }
+    catch (const std::exception &e)
+    {
+      MITK_ERROR << e.what();
+      QMessageBox::warning(nullptr, "Generalization", e.what());
+      return;
+    }
     m_negativeGenBundle = GetBundle(m_negativeGenBundleNode);
     m_positiveGenBundle = GetBundle(m_positiveGenBundleNode);
 
@@ -1140,7 +1150,17 @@ void QmitkInteractiveFiberDissectionView::AddSavedGeneralizationBundle(const mit
         return;
     }
 
-    auto merged = MergeBundles(tractogram, GetBundle(genNode));
+    mitk::FiberBundle::Pointer merged;
+    try
+    {
+      merged = MergeBundles(tractogram, GetBundle(genNode));
+    }
+    catch (const std::exception &e)
+    {
+      MITK_ERROR << e.what();
+      QMessageBox::warning(nullptr, "Generalization", e.what());
+      return;
+    }
     merged->SetFiberColors(r, g, b);
 
     this->GetDataStorage()->Remove(genNode);

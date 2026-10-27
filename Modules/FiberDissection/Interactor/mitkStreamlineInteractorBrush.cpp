@@ -35,6 +35,7 @@ found in the LICENSE file.
 #include <vtkRenderWindowInteractor.h>
 #include <vtkVector.h>
 #include <vtkPolyLine.h>
+#include <vtkFloatArray.h>
 
 mitk::StreamlineInteractorBrush::StreamlineInteractorBrush()
 {
@@ -240,919 +241,125 @@ void mitk::StreamlineInteractorBrush::SelectStreamline(StateMachineAction *, Int
     RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
+vtkIdType mitk::StreamlineInteractorBrush::PickFiber(const InteractionEvent *interactionEvent)
+{
+    const auto *positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
+    if (positionEvent == nullptr || GetDataNode() == nullptr)
+      return -1;
+
+    BaseRenderer *renderer = positionEvent->GetSender();
+    const auto mapperId = renderer->GetMapperID() == BaseRenderer::Standard2D ? BaseRenderer::Standard2D : BaseRenderer::Standard3D;
+
+    auto &picker = m_Picker[renderer];
+    picker = vtkSmartPointer<vtkCellPicker>::New();
+    picker->SetTolerance(0.01);
+    auto vtk_mapper = dynamic_cast<VtkMapper *>(GetDataNode()->GetMapper(mapperId));
+    if (vtk_mapper)
+    {
+      picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
+      picker->PickFromListOn();
+    }
+
+    auto displayPosition = positionEvent->GetPointerPositionOnScreen();
+    picker->Pick(displayPosition[0], displayPosition[1], 0, renderer->GetVtkRenderer());
+    return picker->GetCellId();
+}
+
+void mitk::StreamlineInteractorBrush::MoveFiber(FiberBundle *source, FiberBundle *target, unsigned int fiberId)
+{
+    if (source == nullptr || fiberId >= source->GetNumFibers())
+      mitkThrow() << "Fiber " << fiberId << " is not part of the bundle to move it from.";
+
+    if (target != nullptr)
+    {
+      auto movedWeights = vtkSmartPointer<vtkFloatArray>::New();
+      auto moved = FiberBundle::New(source->GeneratePolyDataByIds({fiberId}, movedWeights));
+      moved->SetFiberWeights(movedWeights);
+      auto joined = target->AddBundle(moved);
+      target->SetFiberPolyData(joined->GetFiberPolyData());
+      target->SetFiberWeights(joined->GetFiberWeights());
+    }
+
+    std::vector<unsigned int> remaining;
+    remaining.reserve(source->GetNumFibers() - 1);
+    for (unsigned int i = 0; i < source->GetNumFibers(); ++i)
+    {
+      if (i != fiberId)
+        remaining.push_back(i);
+    }
+    auto weights = vtkSmartPointer<vtkFloatArray>::New();
+    auto polyData = source->GeneratePolyDataByIds(remaining, weights);
+    source->SetFiberPolyData(polyData);
+    source->SetFiberWeights(weights);
+}
+
+namespace
+{
+  bool IsFiberOf(const mitk::FiberBundle *bundle, vtkIdType cellId)
+  {
+    return bundle != nullptr && cellId >= 0 && cellId < static_cast<vtkIdType>(bundle->GetNumFibers());
+  }
+}
+
 void mitk::StreamlineInteractorBrush::AddStreamlinePosBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
     DataInteractor::SetDataNode(m_manStreamlineNode);
 
-    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
-    if (positionEvent == nullptr)
+    const vtkIdType pickedCellID = this->PickFiber(interactionEvent);
+    if (IsFiberOf(m_manStreamline, pickedCellID) && m_PosStreamline.IsNotNull())
     {
-
-    }
-
-    if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
-    {
-
-        BaseRenderer *renderer = positionEvent->GetSender();
-
-        auto &picker = m_Picker[renderer];
-
-        picker = vtkSmartPointer<vtkCellPicker>::New();
-        picker->SetTolerance(0.01);
-        auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard2D);
-
-        auto vtk_mapper = dynamic_cast<VtkMapper *>(mapper);
-        if (vtk_mapper)
-        { // doing this each time is bizarre
-          picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
-          picker->PickFromListOn();
-        }
-
-      auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-      picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-      vtkIdType pickedCellID = picker->GetCellId();
-
-
-
-      if (picker->GetCellId()==-1)
-      {
-      }
-      else {
-
-
-          vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-          vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-          vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-          unsigned int counter = 0;
-          for ( int i=0; i<m_PosStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-          {
-
-            vtkCell* cell = m_PosStreamline->GetFiberPolyData()->GetCell(i);
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-        //    weights->InsertValue(counter, fib->GetFiberWeight(i));
-            vNewLines->InsertNextCell(container);
-            counter++;
-
-          }
-
-
-
-          vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(pickedCellID);
-
-          auto numPoints = cell->GetNumberOfPoints();
-          vtkPoints* points = cell->GetPoints();
-
-          vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-          for (unsigned int j=0; j<numPoints; j++)
-          {
-            double p[3];
-            points->GetPoint(j, p);
-
-            vtkIdType id = vNewPoints->InsertNextPoint(p);
-            container->GetPointIds()->InsertNextId(id);
-          }
-          vNewLines->InsertNextCell(container);
-
-          vNewPolyData->SetPoints(vNewPoints);
-          vNewPolyData->SetLines(vNewLines);
-
-
-          m_PosStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-          m_PosStreamline->GetFiberPolyData()->SetLines(vNewLines);
-          m_PosStreamline->SetFiberColors(0, 255, 0);
-
-
-          m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
-          m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
-          if (m_predlabeling==false)
-          {
-          vtkSmartPointer<vtkPolyData> vNewPolyData2 = vtkSmartPointer<vtkPolyData>::New();
-          vtkSmartPointer<vtkCellArray> vNewLines2 = vtkSmartPointer<vtkCellArray>::New();
-          vtkSmartPointer<vtkPoints> vNewPoints2 = vtkSmartPointer<vtkPoints>::New();
-
-
-         counter = 0;
-          for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-          {
-
-            vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints2->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-
-            vNewLines2->InsertNextCell(container);
-            counter++;
-
-          }
-          m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints2);
-          m_manStreamline->GetFiberPolyData()->SetLines(vNewLines2);
-          if (m_predlabeling==false){
-              m_manStreamline->SetFiberColors(255, 255, 255);
-            }
-          }
-
-
-
-
-
-    }
-    }
-    else
-    {
-        BaseRenderer *renderer = positionEvent->GetSender();
-
-        auto &picker = m_Picker[renderer];
-
-        picker = vtkSmartPointer<vtkCellPicker>::New();
-        picker->SetTolerance(0.01);
-        auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard3D);
-
-
-          auto vtk_mapper = dynamic_cast<VtkMapper *>(mapper);
-          if (vtk_mapper)
-          { // doing this each time is bizarre
-            picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
-            picker->PickFromListOn();
-          }
-
-        auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-        picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-        vtkIdType pickedCellID = picker->GetCellId();
-
-
-
-        if (picker->GetCellId()==-1)
-        {
-
-        }
-        else {
-
-
-            vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-            vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-            vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-            unsigned int counter = 0;
-            for ( int i=0; i<m_PosStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-            {
-
-              vtkCell* cell = m_PosStreamline->GetFiberPolyData()->GetCell(i);
-              auto numPoints = cell->GetNumberOfPoints();
-              vtkPoints* points = cell->GetPoints();
-
-              vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-              for (unsigned int j=0; j<numPoints; j++)
-              {
-                double p[3];
-                points->GetPoint(j, p);
-
-                vtkIdType id = vNewPoints->InsertNextPoint(p);
-                container->GetPointIds()->InsertNextId(id);
-              }
-
-              vNewLines->InsertNextCell(container);
-              counter++;
-
-            }
-
-
-
-            vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(pickedCellID);
-
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-            vNewLines->InsertNextCell(container);
-
-            vNewPolyData->SetPoints(vNewPoints);
-            vNewPolyData->SetLines(vNewLines);
-
-            m_PosStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-            m_PosStreamline->GetFiberPolyData()->SetLines(vNewLines);
-            m_PosStreamline->SetFiberColors(0, 255, 0);
-
-
-            m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
-            m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
-
-            if (m_predlabeling==false)
-            {
-            vtkSmartPointer<vtkPolyData> vNewPolyData2 = vtkSmartPointer<vtkPolyData>::New();
-            vtkSmartPointer<vtkCellArray> vNewLines2 = vtkSmartPointer<vtkCellArray>::New();
-            vtkSmartPointer<vtkPoints> vNewPoints2 = vtkSmartPointer<vtkPoints>::New();
-
-
-           counter = 0;
-            for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-            {
-
-              vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
-              auto numPoints = cell->GetNumberOfPoints();
-              vtkPoints* points = cell->GetPoints();
-
-              vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-              for (unsigned int j=0; j<numPoints; j++)
-              {
-                double p[3];
-                points->GetPoint(j, p);
-
-                vtkIdType id = vNewPoints2->InsertNextPoint(p);
-                container->GetPointIds()->InsertNextId(id);
-              }
-              vNewLines2->InsertNextCell(container);
-              counter++;
-
-            }
-            m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints2);
-            m_manStreamline->GetFiberPolyData()->SetLines(vNewLines2);
-            if (m_predlabeling==false){
-                m_manStreamline->SetFiberColors(255, 255, 255);
-              }
-            }
-
-        }
+      MoveFiber(m_manStreamline, m_PosStreamline, static_cast<unsigned int>(pickedCellID));
+      m_PosStreamline->SetFiberColors(0, 255, 0);
+      if (!m_predlabeling)
+        m_manStreamline->SetFiberColors(255, 255, 255);
     }
     RenderingManager::GetInstance()->RequestUpdateAll();
-  }
+}
 
 void mitk::StreamlineInteractorBrush::AddStreamlineNegBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
-
     DataInteractor::SetDataNode(m_manStreamlineNode);
 
-    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
-    if (positionEvent == nullptr)
+    // On the prediction, the fiber is only excluded from it, not labeled negative.
+    const vtkIdType pickedCellID = this->PickFiber(interactionEvent);
+    if (IsFiberOf(m_manStreamline, pickedCellID) && (m_predlabeling || m_NegStreamline.IsNotNull()))
     {
-
-    }
-
-    if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
-    {
-        BaseRenderer *renderer = positionEvent->GetSender();
-
-        auto &picker = m_Picker[renderer];
-
-        picker = vtkSmartPointer<vtkCellPicker>::New();
-        picker->SetTolerance(0.01);
-        auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard2D);
-
-        auto vtk_mapper = dynamic_cast<VtkMapper *>(mapper);
-        if (vtk_mapper)
-        { // doing this each time is bizarre
-          picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
-          picker->PickFromListOn();
-        }
-
-      auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-      picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-      vtkIdType pickedCellID = picker->GetCellId();
-
-
-
-      if (picker->GetCellId()==-1)
+      MoveFiber(m_manStreamline, m_predlabeling ? nullptr : m_NegStreamline.GetPointer(), static_cast<unsigned int>(pickedCellID));
+      if (!m_predlabeling)
       {
-
+        m_NegStreamline->SetFiberColors(255, 0, 0);
+        m_manStreamline->SetFiberColors(255, 255, 255);
       }
-      else {
-
-
-          vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-          vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-          vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-          unsigned int counter = 0;
-          for ( int i=0; i<m_NegStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-          {
-
-            vtkCell* cell = m_NegStreamline->GetFiberPolyData()->GetCell(i);
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-            vNewLines->InsertNextCell(container);
-            counter++;
-
-          }
-
-
-
-          vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(pickedCellID);
-
-          auto numPoints = cell->GetNumberOfPoints();
-          vtkPoints* points = cell->GetPoints();
-
-          vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-          for (unsigned int j=0; j<numPoints; j++)
-          {
-            double p[3];
-            points->GetPoint(j, p);
-
-            vtkIdType id = vNewPoints->InsertNextPoint(p);
-            container->GetPointIds()->InsertNextId(id);
-          }
-          vNewLines->InsertNextCell(container);
-
-          vNewPolyData->SetPoints(vNewPoints);
-          vNewPolyData->SetLines(vNewLines);
-
-          m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
-          m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
-
-          if (m_predlabeling==false)
-          {
-          
-
-          m_NegStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-          m_NegStreamline->GetFiberPolyData()->SetLines(vNewLines);
-          m_NegStreamline->SetFiberColors(255, 0, 0);
-          
-          vtkSmartPointer<vtkPolyData> vNewPolyData2 = vtkSmartPointer<vtkPolyData>::New();
-          vtkSmartPointer<vtkCellArray> vNewLines2 = vtkSmartPointer<vtkCellArray>::New();
-          vtkSmartPointer<vtkPoints> vNewPoints2 = vtkSmartPointer<vtkPoints>::New();
-
-
-         counter = 0;
-          for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-          {
-
-            vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints2->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-            vNewLines2->InsertNextCell(container);
-            counter++;
-
-          }
-          m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints2);
-          m_manStreamline->GetFiberPolyData()->SetLines(vNewLines2);
-          m_manStreamline->SetFiberColors(255, 255, 255);
-            }
-
-
-
-
-
-    }
-    }
-    else
-    {
-        BaseRenderer *renderer = positionEvent->GetSender();
-
-        auto &picker = m_Picker[renderer];
-
-
-
-          picker = vtkSmartPointer<vtkCellPicker>::New();
-          picker->SetTolerance(0.01);
-          auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard3D);
-
-
-          auto vtk_mapper = dynamic_cast<VtkMapper *>(mapper);
-          if (vtk_mapper)
-          { // doing this each time is bizarre
-            picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
-            picker->PickFromListOn();
-          }
-
-        auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-
-        picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-        vtkIdType pickedCellID = picker->GetCellId();
-
-
-        if (picker->GetCellId()==-1)
-        {
-
-        }
-        else
-        {
-            vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-            vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-            vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-            unsigned int counter = 0;
-            for ( int i=0; i<m_NegStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-            {
-              vtkCell* cell = m_NegStreamline->GetFiberPolyData()->GetCell(i);
-              auto numPoints = cell->GetNumberOfPoints();
-              vtkPoints* points = cell->GetPoints();
-
-              vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-              for (unsigned int j=0; j<numPoints; j++)
-              {
-                double p[3];
-                points->GetPoint(j, p);
-
-                vtkIdType id = vNewPoints->InsertNextPoint(p);
-                container->GetPointIds()->InsertNextId(id);
-              }
-              vNewLines->InsertNextCell(container);
-              counter++;
-
-            }
-
-
-
-            vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(pickedCellID);
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-            vNewLines->InsertNextCell(container);
-
-            vNewPolyData->SetPoints(vNewPoints);
-            vNewPolyData->SetLines(vNewLines);
-
-
-            m_manStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
-            m_manStreamline->GetFiberPolyData()->RemoveDeletedCells();
-
-            if (m_predlabeling==false)
-            {
-
-              m_NegStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-              m_NegStreamline->GetFiberPolyData()->SetLines(vNewLines);
-              m_NegStreamline->SetFiberColors(255, 0, 0);
-              vtkSmartPointer<vtkPolyData> vNewPolyData2 = vtkSmartPointer<vtkPolyData>::New();
-              vtkSmartPointer<vtkCellArray> vNewLines2 = vtkSmartPointer<vtkCellArray>::New();
-              vtkSmartPointer<vtkPoints> vNewPoints2 = vtkSmartPointer<vtkPoints>::New();
-
-
-              counter = 0;
-              for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-              {
-
-              vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
-              auto numPoints = cell->GetNumberOfPoints();
-              vtkPoints* points = cell->GetPoints();
-
-              vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-              for (unsigned int j=0; j<numPoints; j++)
-              {
-                double p[3];
-                points->GetPoint(j, p);
-
-                vtkIdType id = vNewPoints2->InsertNextPoint(p);
-                container->GetPointIds()->InsertNextId(id);
-              }
-              vNewLines2->InsertNextCell(container);
-              counter++;
-
-              }
-              m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints2);
-              m_manStreamline->GetFiberPolyData()->SetLines(vNewLines2);
-              m_manStreamline->SetFiberColors(255, 255, 255);
-            }
-
-        }
     }
     RenderingManager::GetInstance()->RequestUpdateAll();
-  }
+}
 
 void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAction *, InteractionEvent *interactionEvent)
 {
-
-    DataInteractor::SetDataNode(m_NegStreamlineNode);
-
-    auto positionEvent = dynamic_cast<const InteractionPositionEvent *>(interactionEvent);
-    if (m_NegStreamlineNode->IsVisible(nullptr) == true) {
-
-    if (positionEvent == nullptr)
+    // Unlabel: a picked fiber of the visible label bundles goes back to the bundle being labeled.
+    struct LabelBundle
     {
-    }
+      mitk::DataNode *node;
+      mitk::FiberBundle *bundle;
+      float r, g, b;
+    };
+    const LabelBundle labelBundles[] = {{m_NegStreamlineNode, m_NegStreamline, 255, 0, 0},
+                                        {m_PosStreamlineNode, m_PosStreamline, 0, 255, 0}};
 
-    if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
+    for (const auto &[node, bundle, r, g, b] : labelBundles)
     {
-        BaseRenderer *renderer = positionEvent->GetSender();
-
-        auto &picker = m_Picker[renderer];
-
-        picker = vtkSmartPointer<vtkCellPicker>::New();
-        picker->SetTolerance(0.01);
-        auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard2D);
-
-        auto vtk_mapper = dynamic_cast<VtkMapper *>(mapper);
-        if (vtk_mapper)
-        { // doing this each time is bizarre
-          picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
-          picker->PickFromListOn();
-        }
-
-      auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-      picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-      vtkIdType pickedCellID = picker->GetCellId();
-
-
-
-      if (picker->GetCellId()==-1)
-      {
-
-      }
-      else {
-
-
-          vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-          vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-          vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-          unsigned int counter = 0;
-          for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-          {
-
-            vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-            vNewLines->InsertNextCell(container);
-            counter++;
-
-          }
-
-
-
-          vtkCell* cell = m_NegStreamline->GetFiberPolyData()->GetCell(pickedCellID);
-
-          auto numPoints = cell->GetNumberOfPoints();
-          vtkPoints* points = cell->GetPoints();
-
-          vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-          for (unsigned int j=0; j<numPoints; j++)
-          {
-            double p[3];
-            points->GetPoint(j, p);
-
-            vtkIdType id = vNewPoints->InsertNextPoint(p);
-            container->GetPointIds()->InsertNextId(id);
-          }
-          vNewLines->InsertNextCell(container);
-
-          vNewPolyData->SetPoints(vNewPoints);
-          vNewPolyData->SetLines(vNewLines);
-
-          m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-          m_manStreamline->GetFiberPolyData()->SetLines(vNewLines);
-          if (m_predlabeling==false){
-              m_manStreamline->SetFiberColors(255, 255, 255);
-            }
-
-          m_NegStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
-          m_NegStreamline->GetFiberPolyData()->RemoveDeletedCells();
-
-
-
-
-
-    }
-    }
-    else
-    {
-        BaseRenderer *renderer = positionEvent->GetSender();
-
-        auto &picker = m_Picker[renderer];
-
-
-          picker = vtkSmartPointer<vtkCellPicker>::New();
-          picker->SetTolerance(0.01);
-          auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard3D);
-
-
-          auto vtk_mapper = dynamic_cast<VtkMapper *>(mapper);
-          if (vtk_mapper)
-          { // doing this each time is bizarre
-            picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
-            picker->PickFromListOn();
-          }
-        auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-
-        picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-        vtkIdType pickedCellID = picker->GetCellId();
-
-
-        if (picker->GetCellId()==-1)
-        {
-
-        }
-        else
-        {
-            vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-            vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-            vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-            unsigned int counter = 0;
-            for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-            {
-              vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
-              auto numPoints = cell->GetNumberOfPoints();
-              vtkPoints* points = cell->GetPoints();
-
-              vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-              for (unsigned int j=0; j<numPoints; j++)
-              {
-                double p[3];
-                points->GetPoint(j, p);
-
-                vtkIdType id = vNewPoints->InsertNextPoint(p);
-                container->GetPointIds()->InsertNextId(id);
-              }
-              vNewLines->InsertNextCell(container);
-              counter++;
-
-            }
-
-
-
-            vtkCell* cell = m_NegStreamline->GetFiberPolyData()->GetCell(pickedCellID);
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-            vNewLines->InsertNextCell(container);
-
-            vNewPolyData->SetPoints(vNewPoints);
-            vNewPolyData->SetLines(vNewLines);
-
-            m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-            m_manStreamline->GetFiberPolyData()->SetLines(vNewLines);
-            if (m_predlabeling==false){
-                m_manStreamline->SetFiberColors(255, 255, 255);
-              }
-
-            m_NegStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
-            m_NegStreamline->GetFiberPolyData()->RemoveDeletedCells();
-
-        }
-    }
-    }
-    DataInteractor::SetDataNode(m_PosStreamlineNode);
-
-    if (m_PosStreamlineNode->IsVisible(nullptr) == true) {
-    if (positionEvent == nullptr)
-    {
-
-    }
-
-    if (interactionEvent->GetSender()->GetMapperID() == BaseRenderer::Standard2D)
-    {
-
-
-        BaseRenderer *renderer = positionEvent->GetSender();
-
-        auto &picker = m_Picker[renderer];
-
-        picker = vtkSmartPointer<vtkCellPicker>::New();
-        picker->SetTolerance(0.01);
-        auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard2D);
-
-        auto vtk_mapper = dynamic_cast<VtkMapper *>(mapper);
-        if (vtk_mapper)
-        { // doing this each time is bizarre
-          picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
-          picker->PickFromListOn();
-        }
-
-      auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-      picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-      vtkIdType pickedCellID = picker->GetCellId();
-
-
-
-      if (picker->GetCellId()==-1)
-      {
-
-      }
-      else {
-
-
-          vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-          vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-          vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-          unsigned int counter = 0;
-          for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-          {
-
-            vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-            vNewLines->InsertNextCell(container);
-            counter++;
-
-          }
-
-
-
-          vtkCell* cell = m_PosStreamline->GetFiberPolyData()->GetCell(pickedCellID);
-
-          auto numPoints = cell->GetNumberOfPoints();
-          vtkPoints* points = cell->GetPoints();
-
-          vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-          for (unsigned int j=0; j<numPoints; j++)
-          {
-            double p[3];
-            points->GetPoint(j, p);
-
-            vtkIdType id = vNewPoints->InsertNextPoint(p);
-            container->GetPointIds()->InsertNextId(id);
-          }
-          vNewLines->InsertNextCell(container);
-
-          vNewPolyData->SetPoints(vNewPoints);
-          vNewPolyData->SetLines(vNewLines);
-
-          m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-          m_manStreamline->GetFiberPolyData()->SetLines(vNewLines);
-          if (m_predlabeling==false){
-              m_manStreamline->SetFiberColors(255, 255, 255);
-            }
-
-          m_PosStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
-          m_PosStreamline->GetFiberPolyData()->RemoveDeletedCells();
-
-
-
-
-
-    }
-    }
-    else
-    {
-        BaseRenderer *renderer = positionEvent->GetSender();
-
-        auto &picker = m_Picker[renderer];
-
-
-          picker = vtkSmartPointer<vtkCellPicker>::New();
-          picker->SetTolerance(0.01);
-          auto mapper = GetDataNode()->GetMapper(BaseRenderer::Standard3D);
-
-
-          auto vtk_mapper = dynamic_cast<VtkMapper *>(mapper);
-          if (vtk_mapper)
-          { // doing this each time is bizarre
-            picker->AddPickList(vtk_mapper->GetVtkProp(renderer));
-            picker->PickFromListOn();
-          }
-
-        auto displayPosition = positionEvent->GetPointerPositionOnScreen();
-
-        picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
-
-        vtkIdType pickedCellID = picker->GetCellId();
-
-
-        if (picker->GetCellId()==-1)
-        {
-
-        }
-        else
-        {
-            vtkSmartPointer<vtkPolyData> vNewPolyData = vtkSmartPointer<vtkPolyData>::New();
-            vtkSmartPointer<vtkCellArray> vNewLines = vtkSmartPointer<vtkCellArray>::New();
-            vtkSmartPointer<vtkPoints> vNewPoints = vtkSmartPointer<vtkPoints>::New();
-
-            unsigned int counter = 0;
-            for ( int i=0; i<m_manStreamline->GetFiberPolyData()->GetNumberOfCells(); i++)
-            {
-              vtkCell* cell = m_manStreamline->GetFiberPolyData()->GetCell(i);
-              auto numPoints = cell->GetNumberOfPoints();
-              vtkPoints* points = cell->GetPoints();
-
-              vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-              for (unsigned int j=0; j<numPoints; j++)
-              {
-                double p[3];
-                points->GetPoint(j, p);
-
-                vtkIdType id = vNewPoints->InsertNextPoint(p);
-                container->GetPointIds()->InsertNextId(id);
-              }
-              vNewLines->InsertNextCell(container);
-              counter++;
-
-            }
-
-
-
-            vtkCell* cell = m_PosStreamline->GetFiberPolyData()->GetCell(pickedCellID);
-            auto numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-
-            vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            for (unsigned int j=0; j<numPoints; j++)
-            {
-              double p[3];
-              points->GetPoint(j, p);
-
-              vtkIdType id = vNewPoints->InsertNextPoint(p);
-              container->GetPointIds()->InsertNextId(id);
-            }
-            vNewLines->InsertNextCell(container);
-
-            vNewPolyData->SetPoints(vNewPoints);
-            vNewPolyData->SetLines(vNewLines);
-
-            m_manStreamline->GetFiberPolyData()->SetPoints(vNewPoints);
-            m_manStreamline->GetFiberPolyData()->SetLines(vNewLines);
-            if (m_predlabeling==false){
-                m_manStreamline->SetFiberColors(255, 255, 255);
-              }
-
-            m_PosStreamline->GetFiberPolyData()->DeleteCell(pickedCellID);
-            m_PosStreamline->GetFiberPolyData()->RemoveDeletedCells();
-
-        }
-    }
+      if (node == nullptr || !node->IsVisible(nullptr))
+        continue;
+
+      DataInteractor::SetDataNode(node);
+      const vtkIdType pickedCellID = this->PickFiber(interactionEvent);
+      if (!IsFiberOf(bundle, pickedCellID) || m_manStreamline.IsNull())
+        continue;
+
+      MoveFiber(bundle, m_manStreamline, static_cast<unsigned int>(pickedCellID));
+      bundle->SetFiberColors(r, g, b);
+      if (!m_predlabeling)
+        m_manStreamline->SetFiberColors(255, 255, 255);
     }
     RenderingManager::GetInstance()->RequestUpdateAll();
-  }
-
+}
