@@ -95,7 +95,6 @@ QmitkGibbsTrackingView::QmitkGibbsTrackingView()
   , m_MaskImageNode(nullptr)
   , m_FiberBundleNode(nullptr)
   , m_ThreadIsRunning(false)
-  , m_ElapsedTime(0)
   , m_GlobalTracker(nullptr)
   , m_TrackingWorker(this)
 {
@@ -103,6 +102,8 @@ QmitkGibbsTrackingView::QmitkGibbsTrackingView()
   connect(&m_TrackingThread, SIGNAL(started()), this, SLOT(BeforeThread()));
   connect(&m_TrackingThread, SIGNAL(started()), &m_TrackingWorker, SLOT(run()));
   connect(&m_TrackingThread, SIGNAL(finished()), this, SLOT(AfterThread()));
+  m_MonitorTimer.setInterval(1000);
+  connect(&m_MonitorTimer, &QTimer::timeout, this, &QmitkGibbsTrackingView::TimerUpdate);
 }
 
 QmitkGibbsTrackingView::~QmitkGibbsTrackingView()
@@ -138,6 +139,7 @@ void QmitkGibbsTrackingView::StopGibbsTracking()
 void QmitkGibbsTrackingView::AfterThread()
 {
   m_ThreadIsRunning = false;
+  m_MonitorTimer.stop();
 
   UpdateGUI();
 
@@ -192,8 +194,8 @@ void QmitkGibbsTrackingView::BeforeThread()
 {
   m_ThreadIsRunning = true;
   m_TrackingTime = QTime::currentTime();
-  m_ElapsedTime = 0;
   m_TrackingTimer.restart();
+  m_MonitorTimer.start();
 
   UpdateGUI();
 }
@@ -210,7 +212,6 @@ void QmitkGibbsTrackingView::CreateQtPartControl( QWidget *parent )
 
     AdvancedSettings();
 
-    // connect( m_TrackingTimer, SIGNAL(elapsed()), this, SLOT(TimerUpdate()) );
     connect( m_Controls->m_TrackingStop, SIGNAL(clicked()), this, SLOT(StopGibbsTracking()) );
     connect( m_Controls->m_TrackingStart, SIGNAL(clicked()), this, SLOT(StartGibbsTracking()) );
     connect( m_Controls->m_AdvancedSettingsCheckbox, SIGNAL(clicked()), this, SLOT(AdvancedSettings()) );
@@ -330,10 +331,10 @@ void QmitkGibbsTrackingView::UpdateTrackingStatus()
   if (m_GlobalTracker.IsNull())
     return;
 
-  m_ElapsedTime += m_TrackingTimer.elapsed()/1000;
-  unsigned long hours = m_ElapsedTime/3600;
-  unsigned long minutes = (m_ElapsedTime%3600)/60;
-  unsigned long seconds = m_ElapsedTime%60;
+  const qint64 elapsedTime = m_TrackingTimer.elapsed()/1000;
+  const qint64 hours = elapsedTime/3600;
+  const qint64 minutes = (elapsedTime%3600)/60;
+  const qint64 seconds = elapsedTime%60;
 
   m_Controls->m_ProposalAcceptance->setText(QString::number(m_GlobalTracker->GetProposalAcceptance()*100)+"%");
 
