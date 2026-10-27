@@ -120,15 +120,18 @@ int main(int argc, char* argv[])
   }
   catch ( itk::ExceptionObject &err)
   {
-    std::cout << "Exception: " << err;
+    std::cout << "Exception: " << err << std::endl;
+    return EXIT_FAILURE;
   }
   catch ( std::exception& err)
   {
-    std::cout << "Exception: " << err.what();
+    std::cout << "Exception: " << err.what() << std::endl;
+    return EXIT_FAILURE;
   }
   catch ( ... )
   {
-    std::cout << "Exception!";
+    std::cout << "Exception!" << std::endl;
+    return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 
