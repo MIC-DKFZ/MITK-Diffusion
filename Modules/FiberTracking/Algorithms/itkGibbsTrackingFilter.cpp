@@ -130,7 +130,9 @@ GibbsTrackingFilter< ItkOdfImageType >
   // halved forever; 50 rounds reach a weight of 1e-17.
   const int maxRounds = 50;
   int round = 0;
-  while (ppv<neededParts)
+  // the abort flag is checked here too: the estimation can take long, and the view's Stop and
+  // destructor rely on it
+  while (ppv<neededParts && !m_AbortTracking)
   {
     if (round++ == maxRounds)
     {
@@ -147,7 +149,7 @@ GibbsTrackingFilter< ItkOdfImageType >
       m_ParticleWeight = ppv*m_ParticleWeight/neededParts;
 
     encomp->SetParameters(m_ParticleWeight,m_ParticleWidth,m_ConnectionPotential*m_ParticleLength*m_ParticleLength,m_CurvatureThreshold,m_InexBalance,m_ParticlePotential);
-    for( int step = 0; step < 10; step++ )
+    for( int step = 0; step < 10 && !m_AbortTracking; step++ )
     {
       // update temperatur for simulated annealing process
       float temperature = m_StartTemperature * exp(alpha*(((1.0)*step)/((1.0)*10)));

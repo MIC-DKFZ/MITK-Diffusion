@@ -52,6 +52,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(Filter_EmptyMask_Throws);
   MITK_TEST(Filter_WeightEstimationWithoutBirths_Throws);
   MITK_TEST(Filter_BrokenParameterFile_Throws);
+  MITK_TEST(Filter_AbortDuringPreparation_IsKept);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfImageType = GibbsEnergyComputer::ItkOdfImgType;
@@ -285,6 +286,19 @@ public:
   {
     auto filter = MakeFilter(1.0f);
     CPPUNIT_ASSERT_THROW(filter->Update(), mitk::Exception);
+  }
+
+  /** The view's Stop may come before the sampling starts. The flag used to be reset when the
+   *  parameters were loaded, and the weight estimation never checked it (here it would run all
+   *  its rounds and throw). */
+  void Filter_AbortDuringPreparation_IsKept()
+  {
+    auto filter = MakeFilter(1.0f);
+    filter->SetAbortTracking(true);
+    CPPUNIT_ASSERT_NO_THROW(filter->Update());
+    CPPUNIT_ASSERT(filter->GetFiberBundle() != nullptr);
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(0), filter->GetFiberBundle()->GetNumberOfLines());
+    CPPUNIT_ASSERT_EQUAL(0.0, filter->GetCurrentIteration());
   }
 
   /** A missing, non-XML or incomplete parameter file used to crash (null dereference) or to give an
