@@ -210,7 +210,7 @@ QGroupBox {
          <item row="0" column="1">
           <widget class="QLabel" name="m_TensorImageLabel">
            <property name="toolTip">
-            <string>Input Image. ODF, tensor, peak, and, in case of ML tractography, raw diffusion-weighted images are currently supported.</string>
+            <string>Input Image. Tensor, ODF, SH and peak images are supported.</string>
            </property>
            <property name="text">
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ff0000;&quot;&gt;select image in data-manager&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -727,7 +727,7 @@ QGroupBox {
        <item row="14" column="1">
         <widget class="QDoubleSpinBox" name="m_PeakJitterBox">
          <property name="toolTip">
-          <string>Important for probabilistic peak tractography and peak prior. Actual jitter is drawn from a normal distribution with peak_jitter*fabs(direction_value) as standard deviation.</string>
+          <string>Important for probabilistic peak tractography and peak prior. Each component of the unit peak direction gets normally distributed noise with peak_jitter as standard deviation (0.1: mean deviation about 7°).</string>
          </property>
          <property name="decimals">
           <number>3</number>
@@ -879,7 +879,7 @@ QGroupBox {
        <item row="9" column="1">
         <widget class="QDoubleSpinBox" name="m_MaxTractLengthBox">
          <property name="toolTip">
-          <string>Minimum tract length in mm. Shorter fibers are discarded.</string>
+          <string>Maximum tract length in mm. Streamlines stop when they reach it.</string>
          </property>
          <property name="statusTip">
           <string>Maximum fiber length (in mm)</string>
@@ -1034,7 +1034,7 @@ QGroupBox {
        <item row="10" column="1">
         <widget class="QSpinBox" name="m_AngularThresholdBox">
          <property name="toolTip">
-          <string>Angular threshold between two steps (in degree). Default: 90° * step_size</string>
+          <string>Angular threshold between two steps (in degree). -1: automatic, 90° * step_size (in voxels), at most 86.9°</string>
          </property>
          <property name="minimum">
           <number>-1</number>
@@ -1090,7 +1090,7 @@ QGroupBox {
        <item row="2" column="1">
         <widget class="QSpinBox" name="m_SharpenOdfsBox">
          <property name="toolTip">
-          <string>Rais ODF to the power of X</string>
+          <string>Raise ODF to the power of X</string>
          </property>
          <property name="minimum">
           <number>1</number>

@@ -14,34 +14,28 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkMLBSTrackingFilter_h_
-#define __itkMLBSTrackingFilter_h_
+#ifndef itkStreamlineTrackingFilter_h
+#define itkStreamlineTrackingFilter_h
 
-#include <itkImageToImageFilter.h>
-#include <itkVectorContainer.h>
-#include <itkVectorImage.h>
+#include <itkProcessObject.h>
+#include <itkLinearInterpolateImageFunction.h>
 #include <vtkSmartPointer.h>
 #include <vtkPolyData.h>
 #include <vtkCellArray.h>
 #include <vtkPoints.h>
 #include <vtkPolyLine.h>
-#include <vtkCleanPolyData.h>
-#include <itkOrientationDistributionFunction.h>
-#include <itkMersenneTwisterRandomVariateGenerator.h>
-#include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
-#include <mitkDiffusionPropertyHelper.h>
-#include <mitkPointSet.h>
+#include <atomic>
 #include <chrono>
+#include <deque>
 #include <TrackingHandlers/mitkTrackingDataHandler.h>
 #include <MitkFiberTrackingExports.h>
 #include <mitkFiberBundle.h>
-#include <mitkPeakImage.h>
 #include <mitkStreamlineTractographyParameters.h>
 
 namespace itk{
 
 /**
-* \brief Performs streamline tracking on the input image. Depending on the tracking handler this can be a tensor, peak or machine learning based tracking. */
+* \brief Performs streamline tracking on the input image. Depending on the tracking handler this can be a tensor, ODF or peak based tracking. */
 
 class MITKFIBERTRACKING_EXPORT StreamlineTrackingFilter : public ProcessObject
 {
@@ -58,7 +52,7 @@ public:
   itkCloneMacro(Self)
 
   /** Runtime information support. */
-  itkTypeMacro(StreamlineTrackingFilter, ImageToImageFilter)
+  itkTypeMacro(StreamlineTrackingFilter, ProcessObject)
 
   typedef itk::Image<unsigned char, 3>                ItkUcharImgType;
   typedef itk::Image<unsigned int, 3>                 ItkUintImgType;
@@ -72,14 +66,7 @@ public:
   typedef std::deque< itk::Point<float> > FiberType;
   typedef std::vector< FiberType > BundleType;
 
-  volatile bool    m_PauseTracking;
-  bool    m_AbortTracking;
-  bool    m_BuildFibersFinished;
-  int     m_BuildFibersReady;
-  volatile bool m_Stop;
-  mitk::PointSet::Pointer             m_SamplingPointset;
-  mitk::PointSet::Pointer             m_StopVotePointset;
-  mitk::PointSet::Pointer             m_AlternativePointset;
+  std::atomic<bool> m_AbortTracking;
 
   void SetDicomProperties(mitk::FiberBundle::Pointer fib);
 
@@ -92,9 +79,10 @@ public:
 
   itkSetMacro( StoppingRegions, ItkFloatImgType::Pointer) ///< Streamlines entering a stopping region will stop immediately
   itkSetMacro( TargetRegions, ItkFloatImgType::Pointer)    ///< Only streamline starting and ending in this mask are retained
-  itkSetMacro( DemoMode, bool )
   itkSetMacro( Verbose, bool )                        ///< If true, output tracking progress (might be slower)
-  itkSetMacro( StopTracking, bool )
+
+  /** Called from the GUI thread while the tracking threads run, hence no itkSetMacro (Modified() is not thread-safe). */
+  void SetStopTracking(bool stop) { m_StopTracking = stop; }
 
   ///< Use manually defined points in physical space as seed points instead of seed image
   void SetSeedPoints( const std::vector< itk::Point<float> >& sP) {
@@ -126,7 +114,7 @@ protected:
 
   bool IsValidFiber(FiberType* fib);  ///< Check endpoints
   void FiberToProbmap(FiberType* fib);
-  void GetSeedPointsFromSeedImage();
+  void GetSeedPointsFromSeedImage(const ItkFloatImgType* seedImage);
   void CalculateNewPosition(itk::Point<float, 3>& pos, vnl_vector_fixed<float,3>& dir);    ///< Calculate next integration step.
   float FollowStreamline(itk::Point<float, 3> start_pos, vnl_vector_fixed<float,3> dir, FiberType* fib, DirectionContainer* container, float tractLength, bool front, bool& exclude);       ///< Start streamline in one direction.
   vnl_vector_fixed<float,3> GetNewDirection(const itk::Point<float, 3>& pos, std::deque< vnl_vector_fixed<float,3> >& olddirs, itk::Index<3>& oldIndex); ///< Determine new direction by sample voting at the current position taking the last progression direction into account.
@@ -150,13 +138,13 @@ protected:
   ItkDoubleImgType::Pointer           m_OutputProbabilityMap;
 
   bool                                m_Verbose;
-  bool                                m_DemoMode;
   std::vector< itk::Point<float> >    m_SeedPoints;
-  unsigned int                        m_CurrentTracts;
-  unsigned int                        m_Progress;
-  bool                                m_StopTracking;
+  std::atomic<unsigned int>           m_CurrentTracts;  ///< read by GetStatusText from the GUI thread
+  std::atomic<unsigned int>           m_Progress;       ///< seed points processed, read by GetStatusText
+  std::atomic<unsigned int>           m_NumSeeds;
+  std::atomic<bool>                   m_StopTracking;
 
-  void BuildFibers(bool check);
+  void BuildFibers();
   float CheckCurvature(DirectionContainer *fib, bool front);
 
   mitk::TrackingDataHandler*          m_TrackingHandler;
@@ -171,6 +159,8 @@ protected:
   itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::Pointer   m_ExclusionInterpolator;
   bool                                                                     m_SeedImageSet;
   bool                                                                     m_TargetImageSet;
+  EndpointConstraints                                                      m_EpConstraints;  ///< parameters' constraint, or the automatic one for a set target image
+  std::vector< vnl_vector_fixed<float,3> >                                 m_ProbeVectors;   ///< neighbourhood sampling directions
 
   std::shared_ptr< mitk::StreamlineTractographyParameters > m_Parameters;
 
@@ -178,15 +168,9 @@ protected:
   // Directional priors
   mitk::TrackingDataHandler*                  m_TrackingPriorHandler;
 
-private:
-
 };
 
 }
 
-//#ifndef ITK_MANUAL_INSTANTIATION
-//#include "itkMLBSTrackingFilter.cpp"
-//#endif
-
-#endif //__itkMLBSTrackingFilter_h_
+#endif
 

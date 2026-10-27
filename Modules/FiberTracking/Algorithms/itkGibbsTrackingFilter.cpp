@@ -22,18 +22,18 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkStandardFileLocations.h>
 #include <mitkFiberBuilder.h>
 #include <mitkMetropolisHastingsSampler.h>
-//#include <mitkEnergyComputer.h>
 #include <itkTensorImageToOdfImageFilter.h>
 #include <mitkGibbsEnergyComputer.h>
 
 // ITK
 #include <itkImageDuplicator.h>
+#include <itkImageRegionConstIterator.h>
 #include <itkResampleImageFilter.h>
 #include <itkTimeProbe.h>
 
 // MISC
 #include <fstream>
-// #include <QFile>
+#include <memory>
 #include <tinyxml2.h>
 #include <boost/timer/progress_display.hpp>
 #include <mitkLexicalCast.h>
@@ -66,7 +66,8 @@ GibbsTrackingFilter< ItkOdfImageType >::GibbsTrackingFilter():
   m_RandomSeed(-1),
   m_LoadParameterFile(""),
   m_LutPath(""),
-  m_IsInValidState(true)
+  m_IsInValidState(true),
+  m_SamplingRunning(false)
 {
 
 }
@@ -81,12 +82,12 @@ GibbsTrackingFilter< ItkOdfImageType >::~GibbsTrackingFilter()
 template< class ItkOdfImageType >
 typename GibbsTrackingFilter< ItkOdfImageType >::FiberPolyDataType GibbsTrackingFilter< ItkOdfImageType >::GetFiberBundle()
 {
-  if (!m_AbortTracking)
+  std::unique_lock<std::mutex> lock(m_FiberMutex);
+  if (m_SamplingRunning)
   {
     m_BuildFibers = true;
-    while (m_BuildFibers){}
+    m_FibersBuilt.wait(lock, [this] { return !m_BuildFibers || !m_SamplingRunning; });
   }
-
   return m_FiberPolyData;
 }
 
@@ -97,16 +98,7 @@ GibbsTrackingFilter< ItkOdfImageType >
 {
   MITK_INFO << "GibbsTrackingFilter: estimating particle weight";
 
-  float minSpacing;
-  if(m_OdfImage->GetSpacing()[0]<m_OdfImage->GetSpacing()[1] && m_OdfImage->GetSpacing()[0]<m_OdfImage->GetSpacing()[2])
-    minSpacing = m_OdfImage->GetSpacing()[0];
-  else if (m_OdfImage->GetSpacing()[1] < m_OdfImage->GetSpacing()[2])
-    minSpacing = m_OdfImage->GetSpacing()[1];
-  else
-    minSpacing = m_OdfImage->GetSpacing()[2];
-  float m_ParticleLength = 1.5*minSpacing;
-  float m_ParticleWidth = 0.5*minSpacing;
-
+  // uses the particle length and width of the run (set by the user or defaulted in GenerateData)
   // seed random generators
   Statistics::MersenneTwisterRandomVariateGenerator::Pointer randGen = Statistics::MersenneTwisterRandomVariateGenerator::New();
   if (m_RandomSeed>-1)
@@ -115,35 +107,42 @@ GibbsTrackingFilter< ItkOdfImageType >
     randGen->SetSeed();
 
   // instantiate all necessary components
-  SphereInterpolator* interpolator = new SphereInterpolator(m_LutPath);
+  auto interpolator = std::make_unique<SphereInterpolator>(m_LutPath);
   // handle lookup table not found cases
   if( !interpolator->IsInValidState() )
   {
     m_IsInValidState = false;
-    m_AbortTracking = true;
-    m_BuildFibers = false;
     mitkThrow() << "Unable to load lookup tables.";
   }
-  ParticleGrid* particleGrid = new ParticleGrid(m_MaskImage, m_ParticleLength, m_ParticleGridCellCapacity);
-  GibbsEnergyComputer* encomp = new GibbsEnergyComputer(m_OdfImage, m_MaskImage, particleGrid, interpolator, randGen);
-
-  //    EnergyComputer* encomp = new EnergyComputer(m_OdfImage, m_MaskImage, particleGrid, interpolator, randGen);
-  MetropolisHastingsSampler* sampler = new MetropolisHastingsSampler(particleGrid, encomp, randGen, m_CurvatureThreshold);
+  auto particleGrid = std::make_unique<ParticleGrid>(m_MaskImage, m_ParticleLength, m_ParticleGridCellCapacity);
+  auto encomp = std::make_unique<GibbsEnergyComputer>(m_OdfImage, m_MaskImage, particleGrid.get(), interpolator.get(), randGen);
+  auto sampler = std::make_unique<MetropolisHastingsSampler>(particleGrid.get(), encomp.get(), randGen, m_CurvatureThreshold);
 
   float alpha = log(m_EndTemperature/m_StartTemperature);
   m_ParticleWeight = 0.01;
   int ppv = 0;
   // main loop
   int neededParts = 3000;
-  while (ppv<neededParts)
+  // Where no birth is ever accepted (e.g. only isotropic ODFs in the mask) the weight would be
+  // halved forever; 50 rounds reach a weight of 1e-17.
+  const int maxRounds = 50;
+  int round = 0;
+  // the abort flag is checked here too: the estimation can take long, and the view's Stop and
+  // destructor rely on it
+  while (ppv<neededParts && !m_AbortTracking)
   {
+    if (round++ == maxRounds)
+    {
+      mitkThrow() << "Could not estimate the particle weight: fewer than " << neededParts << " particles after "
+                  << maxRounds << " rounds. Check the input image and the mask, or set the particle weight.";
+    }
     if (ppv<1000)
       m_ParticleWeight /= 2;
     else
       m_ParticleWeight = ppv*m_ParticleWeight/neededParts;
 
     encomp->SetParameters(m_ParticleWeight,m_ParticleWidth,m_ConnectionPotential*m_ParticleLength*m_ParticleLength,m_CurvatureThreshold,m_InexBalance,m_ParticlePotential);
-    for( int step = 0; step < 10; step++ )
+    for( int step = 0; step < 10 && !m_AbortTracking; step++ )
     {
       // update temperatur for simulated annealing process
       float temperature = m_StartTemperature * exp(alpha*(((1.0)*step)/((1.0)*10)));
@@ -155,10 +154,6 @@ GibbsTrackingFilter< ItkOdfImageType >
     ppv = particleGrid->m_NumParticles;
     particleGrid->ResetGrid();
   }
-  delete sampler;
-  delete encomp;
-  delete particleGrid;
-  delete interpolator;
 
   MITK_INFO << "GibbsTrackingFilter: finished estimating particle weight";
 }
@@ -168,6 +163,9 @@ template< class ItkOdfImageType >
 void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
 {
   TimeProbe preClock; preClock.Start();
+  // before the preparation, so that a broken file is reported at once
+  LoadParameters();
+
   // check if input is Odf or tensor image and generate Odf if necessary
   if (m_OdfImage.IsNull() && m_TensorImage.IsNotNull())
   {
@@ -201,8 +199,12 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   // check if mask image is given if it needs resampling
   PrepareMaskImage();
 
-  // load parameter file
-  LoadParameters();
+  // particles are born only in voxels above 0.5; without any, the first birth proposal never ends
+  bool hasActiveVoxel = false;
+  for (ImageRegionConstIterator<ItkFloatImageType> maskIt(m_MaskImage, m_MaskImage->GetLargestPossibleRegion()); !maskIt.IsAtEnd() && !hasActiveVoxel; ++maskIt)
+    hasActiveVoxel = maskIt.Get() > 0.5;
+  if (!hasActiveVoxel)
+    mitkThrow() << "The mask image has no voxel with a value above 0.5 inside the image region; nothing to track.";
 
   // prepare parameters
   float minSpacing;
@@ -218,13 +220,15 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   if(m_ParticleWidth == 0)
     m_ParticleWidth = 0.5*minSpacing;
 
+  // angles above 90 degrees are not supported; clamped before the weight estimation, so that it
+  // estimates the weight for the threshold of the run
+  if (m_CurvatureThreshold < mitk::eps)
+    m_CurvatureThreshold = 0;
+
   if(m_ParticleWeight == 0)
     EstimateParticleWeight();
 
   float alpha = log(m_EndTemperature/m_StartTemperature);
-
-  if (m_CurvatureThreshold < mitk::eps)
-    m_CurvatureThreshold = 0;
 
   // seed random generators
   Statistics::MersenneTwisterRandomVariateGenerator::Pointer randGen = Statistics::MersenneTwisterRandomVariateGenerator::New();
@@ -234,32 +238,28 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
     randGen->SetSeed();
 
   // load sphere interpolator to evaluate the ODFs
-  SphereInterpolator* interpolator = new SphereInterpolator(m_LutPath);
+  auto interpolator = std::make_unique<SphereInterpolator>(m_LutPath);
 
   // handle lookup table not found cases
   if( !interpolator->IsInValidState() )
   {
     m_IsInValidState = false;
-    m_AbortTracking = true;
-    m_BuildFibers = false;
     mitkThrow() << "Unable to load lookup tables.";
   }
   // initialize the actual tracking components (ParticleGrid, Metropolis Hastings Sampler and Energy Computer)
-  ParticleGrid* particleGrid;
-  GibbsEnergyComputer* encomp;
-  MetropolisHastingsSampler* sampler;
+  std::unique_ptr<ParticleGrid> particleGrid;
+  std::unique_ptr<GibbsEnergyComputer> encomp;
+  std::unique_ptr<MetropolisHastingsSampler> sampler;
   try{
-    particleGrid = new ParticleGrid(m_MaskImage, m_ParticleLength, m_ParticleGridCellCapacity);
-    encomp = new GibbsEnergyComputer(m_OdfImage, m_MaskImage, particleGrid, interpolator, randGen);
+    particleGrid = std::make_unique<ParticleGrid>(m_MaskImage, m_ParticleLength, m_ParticleGridCellCapacity);
+    encomp = std::make_unique<GibbsEnergyComputer>(m_OdfImage, m_MaskImage, particleGrid.get(), interpolator.get(), randGen);
     encomp->SetParameters(m_ParticleWeight,m_ParticleWidth,m_ConnectionPotential*m_ParticleLength*m_ParticleLength,m_CurvatureThreshold,m_InexBalance,m_ParticlePotential);
-    sampler = new MetropolisHastingsSampler(particleGrid, encomp, randGen, m_CurvatureThreshold);
+    sampler = std::make_unique<MetropolisHastingsSampler>(particleGrid.get(), encomp.get(), randGen, m_CurvatureThreshold);
   }
   catch(...)
   {
     MITK_ERROR  << "Particle grid allocation failed. Not enough memory? Try to increase the particle length.";
     m_IsInValidState = false;
-    m_AbortTracking = true;
-    m_BuildFibers = false;
     return;
   }
 
@@ -276,57 +276,66 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   MITK_INFO << "Random seed: " << m_RandomSeed;
   MITK_INFO << "----------------------------------------";
 
+  // FiberBuilder only reads the grid (its labels are reset afterwards), so fibers built on request
+  // of GetFiberBundle do not change the result of the run.
+  auto buildFibers = [&]()
+  {
+    FiberBuilder fiberBuilder(particleGrid.get(), m_MaskImage);
+    FiberPolyDataType fibers = fiberBuilder.iterate(m_MinFiberLength);
+    std::lock_guard<std::mutex> lock(m_FiberMutex);
+    m_FiberPolyData = fibers;
+    m_NumAcceptedFibers = fibers->GetNumberOfLines();
+    m_BuildFibers = false;
+    m_FibersBuilt.notify_all();
+  };
+
   // main loop
   preClock.Stop();
   TimeProbe clock; clock.Start();
   m_NumAcceptedFibers = 0;
   m_CurrentIteration = 0;
-  bool just_built_fibers = false;
-  boost::timer::progress_display disp(m_Iterations);
-  if (!m_AbortTracking)
-    while (m_CurrentIteration<m_Iterations)
+  {
     {
-      just_built_fibers = false;
+      std::lock_guard<std::mutex> lock(m_FiberMutex);
+      m_SamplingRunning = true;
+    }
+    // GetFiberBundle waits only while the loop below can serve its request; this ends that on
+    // every way out of the block.
+    struct SamplingEnd
+    {
+      GibbsTrackingFilter *filter;
+      ~SamplingEnd()
+      {
+        std::lock_guard<std::mutex> lock(filter->m_FiberMutex);
+        filter->m_SamplingRunning = false;
+        filter->m_BuildFibers = false;
+        filter->m_FibersBuilt.notify_all();
+      }
+    } samplingEnd{this};
+
+    double iteration = 0;
+    boost::timer::progress_display disp(m_Iterations);
+    while (iteration<m_Iterations && !m_AbortTracking)
+    {
       ++disp;
-      m_CurrentIteration++;
-      if (m_AbortTracking)
-        break;
+      ++iteration;
+      m_CurrentIteration.store(iteration, std::memory_order_relaxed);
 
       // update temperatur for simulated annealing process
-      float temperature = m_StartTemperature * exp(alpha*m_CurrentIteration/m_Iterations);
+      float temperature = m_StartTemperature * exp(alpha*iteration/m_Iterations);
       sampler->SetTemperature(temperature);
       sampler->MakeProposal();
 
-      m_ProposalAcceptance = (float)sampler->GetNumAcceptedProposals()/m_CurrentIteration;
-      m_NumParticles = particleGrid->m_NumParticles;
-      m_NumConnections = particleGrid->m_NumConnections;
+      m_ProposalAcceptance.store((float)sampler->GetNumAcceptedProposals()/iteration, std::memory_order_relaxed);
+      m_NumParticles.store(particleGrid->m_NumParticles, std::memory_order_relaxed);
+      m_NumConnections.store(particleGrid->m_NumConnections, std::memory_order_relaxed);
 
-      if (m_AbortTracking)
-        break;
-
-      if (m_BuildFibers)
-      {
-        FiberBuilder fiberBuilder(particleGrid, m_MaskImage);
-        m_FiberPolyData = fiberBuilder.iterate(m_MinFiberLength);
-        m_NumAcceptedFibers = m_FiberPolyData->GetNumberOfLines();
-        m_BuildFibers = false;
-        just_built_fibers = true;
-      }
+      if (m_BuildFibers.load(std::memory_order_relaxed))
+        buildFibers();
     }
-  if (!just_built_fibers)
-  {
-    FiberBuilder fiberBuilder(particleGrid, m_MaskImage);
-    m_FiberPolyData = fiberBuilder.iterate(m_MinFiberLength);
-    m_NumAcceptedFibers = m_FiberPolyData->GetNumberOfLines();
+    buildFibers();
   }
   clock.Stop();
-
-  delete sampler;
-  delete encomp;
-  delete interpolator;
-  delete particleGrid;
-  m_AbortTracking = true;
-  m_BuildFibers = false;
 
   int h = clock.GetTotal()/3600;
   int m = ((int)clock.GetTotal()%3600)/60;
@@ -337,9 +346,6 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   MITK_INFO << "GibbsTrackingFilter: preparation of the data took " << m << "m and " << s << "s";
   MITK_INFO << "GibbsTrackingFilter: " << m_NumAcceptedFibers << " fibers accepted";
 
-  //    sampler->PrintProposalTimes();
-
-  SaveParameters();
 }
 
 template< class ItkOdfImageType >
@@ -381,110 +387,48 @@ void GibbsTrackingFilter< ItkOdfImageType >::PrepareMaskImage()
 
 // load tracking paramters from xml file (.gtp)
 template< class ItkOdfImageType >
-bool GibbsTrackingFilter< ItkOdfImageType >::LoadParameters()
+void GibbsTrackingFilter< ItkOdfImageType >::LoadParameters()
 {
-  m_AbortTracking = true;
-  try
+  if( m_LoadParameterFile.length()==0 )
+    return;
+
+  MITK_INFO << "GibbsTrackingFilter: loading parameter file " << m_LoadParameterFile;
+
+  tinyxml2::XMLDocument doc;
+  if (doc.LoadFile(m_LoadParameterFile.c_str()) != tinyxml2::XML_SUCCESS)
+    mitkThrow() << "Could not read Gibbs tracking parameter file " << m_LoadParameterFile << ": " << doc.ErrorStr();
+
+  // RootElement(), not FirstChild(): with an <?xml?> declaration, that is the first child.
+  tinyxml2::XMLElement* pElem = doc.RootElement() != nullptr ? doc.RootElement()->FirstChildElement("parameter_set") : nullptr;
+  if (pElem == nullptr)
+    mitkThrow() << "Gibbs tracking parameter file " << m_LoadParameterFile << " has no <parameter_set> element.";
+
+  // the type tag selects the type parsed, so that floats are read as before
+  auto read = [&](const char* name, auto typeTag)
   {
-    if( m_LoadParameterFile.length()==0 )
+    const char* value = pElem->Attribute(name);
+    if (value == nullptr)
+      mitkThrow() << "Gibbs tracking parameter file " << m_LoadParameterFile << " has no attribute " << name << ".";
+    try
     {
-      m_AbortTracking = false;
-      return true;
+      return boost::lexical_cast<decltype(typeTag)>(value);
     }
-
-    MITK_INFO << "GibbsTrackingFilter: loading parameter file " << m_LoadParameterFile;
-
-    tinyxml2::XMLDocument doc;
-    doc.LoadFile(m_LoadParameterFile.c_str());
-
-	
-    // RootElement(), not FirstChild(): with an <?xml?> declaration, that is the first child.
-    tinyxml2::XMLNode * hRoot = doc.RootElement();
-	
-    auto pElem = hRoot->FirstChildElement("parameter_set");
-
-    std::string iterations(pElem->Attribute("iterations"));
-    m_Iterations = boost::lexical_cast<double>(iterations);
-
-    std::string particleLength(pElem->Attribute("particle_length"));
-    m_ParticleLength = boost::lexical_cast<float>(particleLength);
-
-    std::string particleWidth(pElem->Attribute("particle_width"));
-    m_ParticleWidth = boost::lexical_cast<float>(particleWidth);
-
-    std::string partWeight(pElem->Attribute("particle_weight"));
-    m_ParticleWeight = boost::lexical_cast<float>(partWeight);
-
-    std::string startTemp(pElem->Attribute("temp_start"));
-    m_StartTemperature = boost::lexical_cast<float>(startTemp);
-
-    std::string endTemp(pElem->Attribute("temp_end"));
-    m_EndTemperature = boost::lexical_cast<float>(endTemp);
-
-    std::string inExBalance(pElem->Attribute("inexbalance"));
-    m_InexBalance = boost::lexical_cast<float>(inExBalance);
-
-    std::string fiberLength(pElem->Attribute("fiber_length"));
-    m_MinFiberLength = boost::lexical_cast<float>(fiberLength);
-
-    std::string curvThres(pElem->Attribute("curvature_threshold"));
-    m_CurvatureThreshold = cos(boost::lexical_cast<float>(curvThres)*itk::Math::pi/180);
-    m_AbortTracking = false;
-    MITK_INFO << "GibbsTrackingFilter: parameter file loaded successfully";
-    return true;
-  }
-  catch(...)
-  {
-    MITK_INFO << "GibbsTrackingFilter: could not load parameter file";
-    return false;
-  }
-}
-
-// save current tracking paramters to xml file (.gtp)
-template< class ItkOdfImageType >
-bool GibbsTrackingFilter< ItkOdfImageType >::SaveParameters()
-{
-  try
-  {
-    if( m_SaveParameterFile.length()==0 )
+    catch (const boost::bad_lexical_cast &)
     {
-      MITK_INFO << "GibbsTrackingFilter: no filename specified to save parameters";
-      return true;
+      mitkThrow() << "Gibbs tracking parameter file " << m_LoadParameterFile << ": " << name << "=\"" << value << "\" is not a number.";
     }
+  };
 
-    MITK_INFO << "GibbsTrackingFilter: saving parameter file " << m_SaveParameterFile;
-	
-    tinyxml2::XMLDocument documentXML;
-    //TiXmlDeclaration* declXML = new TiXmlDeclaration( "1.0", "", "" );
-    //documentXML.LinkEndChild( declXML );
-	
-	tinyxml2::XMLNode * mainXML = documentXML.NewElement("global_tracking_parameter_file");
-	documentXML.InsertFirstChild(mainXML);
-
-    auto paramXML = documentXML.NewElement("parameter_set");
-    paramXML->SetAttribute("iterations", m_Iterations);
-    paramXML->SetAttribute("particle_length", m_ParticleLength);
-    paramXML->SetAttribute("particle_width", m_ParticleWidth);
-    paramXML->SetAttribute("particle_weight", m_ParticleWeight);
-    paramXML->SetAttribute("temp_start", m_StartTemperature);
-    paramXML->SetAttribute("temp_end", m_EndTemperature);
-    paramXML->SetAttribute("inexbalance", m_InexBalance);
-    paramXML->SetAttribute("fiber_length", m_MinFiberLength);
-    paramXML->SetAttribute("curvature_threshold", m_CurvatureThreshold);
-    mainXML->InsertEndChild(paramXML);
-
-    if(!boost::algorithm::ends_with(m_SaveParameterFile, ".gtp"))
-      m_SaveParameterFile.append(".gtp");
-    documentXML.SaveFile( m_SaveParameterFile.c_str() );
-
-    MITK_INFO << "GibbsTrackingFilter: parameter file saved successfully";
-    return true;
-  }
-  catch(...)
-  {
-    MITK_INFO << "GibbsTrackingFilter: could not save parameter file";
-    return false;
-  }
+  m_Iterations = read("iterations", double());
+  m_ParticleLength = read("particle_length", float());
+  m_ParticleWidth = read("particle_width", float());
+  m_ParticleWeight = read("particle_weight", float());
+  m_StartTemperature = read("temp_start", float());
+  m_EndTemperature = read("temp_end", float());
+  m_InexBalance = read("inexbalance", float());
+  m_MinFiberLength = read("fiber_length", float());
+  m_CurvatureThreshold = cos(read("curvature_threshold", float())*itk::Math::pi/180);
+  MITK_INFO << "GibbsTrackingFilter: parameter file loaded successfully";
 }
 
 template< class ItkOdfImageType >

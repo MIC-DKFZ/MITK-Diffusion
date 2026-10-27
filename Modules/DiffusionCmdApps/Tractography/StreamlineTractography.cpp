@@ -17,17 +17,16 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkBaseData.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
-#include <metaCommand.h>
 #include <mitkCommandLineParser.h>
 #include <mitkLog.h>
 #include <usAny.h>
 #include <mitkIOUtil.h>
 #include <iostream>
-#include <fstream>
-#include <itksys/SystemTools.hxx>
+#include <memory>
 #include <itksys/SystemTools.hxx>
 
 #include <mitkFiberBundle.h>
+#include <mitkPeakImage.h>
 #include <itkStreamlineTrackingFilter.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingDataHandler.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
@@ -37,16 +36,37 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkStreamlineTractographyParameters.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
+namespace
+{
+int Run(int argc, char* argv[]);
+}
 
-const int numOdfSamples = 200;
-typedef itk::Image< itk::Vector< float, numOdfSamples > , 3 > SampledShImageType;
-
-/*!
-\brief
-*/
 int main(int argc, char* argv[])
+{
+  // Reader and filter errors (unreadable input, a seed image outside the mask, a missing target
+  // image for an endpoint constraint) end the run with a message instead of an abort.
+  try
+  {
+    return Run(argc, argv);
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    MITK_ERROR << e.GetDescription();
+  }
+  catch (const std::exception& e)
+  {
+    MITK_ERROR << e.what();
+  }
+  catch (...)
+  {
+    MITK_ERROR << "Unknown error.";
+  }
+  return EXIT_FAILURE;
+}
+
+namespace
+{
+int Run(int argc, char* argv[])
 {
   mitkCommandLineParser parser;
 
@@ -60,8 +80,8 @@ int main(int argc, char* argv[])
 
   parser.beginGroup("1. Mandatory arguments:");
   parser.addArgument("", "i", mitkCommandLineParser::StringList, "Input:", "input image (multiple possible for 'DetTensor' algorithm)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output fiberbundle/probability map", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("type", "", mitkCommandLineParser::String, "Type:", "which tracker to use (Peaks; Tensor; ODF; ODF-DIPY/FSL; RF)", us::Any(), false);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram (.fib, .vtk, .trk) or probability map (.nii, .nii.gz, .nrrd)", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("type", "", mitkCommandLineParser::String, "Type:", "which tracker to use (Peaks; Tensor; ODF; ODF-DIPY/FSL)", us::Any(), false);
   parser.addArgument("probabilistic", "", mitkCommandLineParser::Bool, "Probabilistic:", "Probabilistic tractography", us::Any(false));
   parser.endGroup();
 
@@ -83,13 +103,13 @@ int main(int argc, char* argv[])
   parser.beginGroup("4. Streamline integration parameters:");
   parser.addArgument("sharpen_odfs", "", mitkCommandLineParser::Int, "Sharpen ODFs:", "if you are using dODF images as input, it is advisable to sharpen the ODFs (power of X). this is not necessary for CSD fODFs, since they are narurally much sharper.");
   parser.addArgument("cutoff", "", mitkCommandLineParser::Float, "Cutoff:", "set the FA, GFA or Peak amplitude cutoff for terminating tracks", 0.1);
-  parser.addArgument("odf_cutoff", "", mitkCommandLineParser::Float, "ODF Cutoff:", "threshold on the ODF magnitude. this is useful in case of CSD fODF tractography.", 0.0);
+  parser.addArgument("odf_cutoff", "", mitkCommandLineParser::Float, "ODF Cutoff:", "threshold on the ODF magnitude. this is useful in case of CSD fODF tractography.", 0.00025);
   parser.addArgument("step_size", "", mitkCommandLineParser::Float, "Step size:", "step size (in voxels)", 0.5);
   parser.addArgument("min_tract_length", "", mitkCommandLineParser::Float, "Min. tract length:", "minimum fiber length (in mm)", 20);
   parser.addArgument("max_tract_length", "", mitkCommandLineParser::Float, "Max. tract length:", "maximum fiber length (in mm)", 400);
-  parser.addArgument("angular_threshold", "", mitkCommandLineParser::Float, "Angular threshold:", "angular threshold between two successive steps, (default: 90° * step_size, minimum 15°)");
-  parser.addArgument("loop_check", "", mitkCommandLineParser::Float, "Check for loops:", "threshold on angular stdev over the last 4 voxel lengths");
-  parser.addArgument("peak_jitter", "", mitkCommandLineParser::Float, "Peak jitter:", "important for probabilistic peak tractography and peak prior. actual jitter is drawn from a normal distribution with peak_jitter*fabs(direction_value) as standard deviation.", 0.01);
+  parser.addArgument("angular_threshold", "", mitkCommandLineParser::Float, "Angular threshold:", "angular threshold between two successive steps, (default: 90° * step_size, at most 86.9°)");
+  parser.addArgument("loop_check", "", mitkCommandLineParser::Float, "Check for loops:", "threshold on the mean angular deviation (degrees) from the mean direction over the last 4 voxel lengths (at least 8 steps)");
+  parser.addArgument("peak_jitter", "", mitkCommandLineParser::Float, "Peak jitter:", "important for probabilistic peak tractography and peak prior. each component of the unit peak direction gets normally distributed noise with peak_jitter as standard deviation (0.1: mean deviation about 7 degrees).", 0.01);
   parser.addArgument("first_order", "", mitkCommandLineParser::Bool, "First order integration:", "use first order integration. default is second order to avoids streamlineovershoot", false);
   parser.endGroup();
 
@@ -116,7 +136,7 @@ int main(int argc, char* argv[])
   parser.endGroup();
 
   parser.beginGroup("8. Additional input:");
-  parser.addArgument("additional_images", "", mitkCommandLineParser::StringList, "Additional images:", "specify a list of float images that hold additional information (FA, GFA, additional features for RF tractography)", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("additional_images", "", mitkCommandLineParser::StringList, "Additional images:", "FA (Tensor) or GFA (ODF) image used for the cutoff instead of the one computed from the input; only the first image is used", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.endGroup();
 
   parser.beginGroup("9. Misc:");
@@ -125,7 +145,8 @@ int main(int argc, char* argv[])
   parser.addArgument("flip_z", "", mitkCommandLineParser::Bool, "Flip Z:", "multiply z-coordinate of direction proposal by -1");
   parser.addArgument("no_data_interpolation", "", mitkCommandLineParser::Bool, "Don't interpolate input data:", "don't interpolate input image values");
   parser.addArgument("no_mask_interpolation", "", mitkCommandLineParser::Bool, "Don't interpolate masks:", "don't interpolate mask image values");
-  parser.addArgument("compress", "", mitkCommandLineParser::Bool, "Compress:", "compress output fibers (lossy)");
+  parser.addArgument("compress", "", mitkCommandLineParser::Bool, "Compress:", "compress output fibers (lossy, on by default)");
+  parser.addArgument("no_compress", "", mitkCommandLineParser::Bool, "Don't compress:", "write the output fibers without (lossy) compression");
   parser.addArgument("fix_seed", "", mitkCommandLineParser::Bool, "Fix Random Seed:", "always use the same random numbers");
   parser.addArgument("parameter_file", "", mitkCommandLineParser::String, "Parameter File:", "load parameters from json file (svae using MITK Diffusion GUI). the parameters loaded form this file are overwritten by the manually set parameters.", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.endGroup();
@@ -198,11 +219,10 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("prior_flip_z"))
     params->m_PriorFlipZ = us::any_cast<bool>(parsedArgs["prior_flip_z"]);
 
-  if (parsedArgs.count("apply_image_rotation"))
-    params->m_ApplyDirectionMatrix = us::any_cast<bool>(parsedArgs["apply_image_rotation"]);
-
   if (parsedArgs.count("compress"))
     params->m_CompressFibers = us::any_cast<bool>(parsedArgs["compress"]);
+  if (parsedArgs.count("no_compress"))
+    params->m_CompressFibers = !us::any_cast<bool>(parsedArgs["no_compress"]);
 
   if (parsedArgs.count("min_tract_length"))
     params->m_MinTractLengthMm = us::any_cast<float>(parsedArgs["min_tract_length"]);
@@ -252,6 +272,11 @@ int main(int argc, char* argv[])
       params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::ONE_EP_IN_TARGET;
     else if (us::any_cast<std::string>(parsedArgs["ep_constraint"]) == "NO_EP_IN_TARGET")
       params->m_EpConstraints = mitk::StreamlineTractographyParameters::EndpointConstraints::NO_EP_IN_TARGET;
+    else
+    {
+      MITK_ERROR << "Unknown endpoint constraint: " << us::any_cast<std::string>(parsedArgs["ep_constraint"]);
+      return EXIT_FAILURE;
+    }
   }
 
   if (parsedArgs.count("cutoff"))
@@ -291,10 +316,15 @@ int main(int argc, char* argv[])
     params->m_MaxNumFibers = us::any_cast<int>(parsedArgs["max_tracts"]);
 
 
-  std::string ext = itksys::SystemTools::GetFilenameExtension(outFile);
-  if (ext != ".fib" && ext != ".trk")
+  // Only the last extension counts, so that names may contain dots; .nii.gz is the one double extension.
+  std::string ext = itksys::SystemTools::LowerCase(itksys::SystemTools::GetFilenameLastExtension(outFile));
+  if (ext == ".gz" && itksys::SystemTools::LowerCase(itksys::SystemTools::GetFilenameWithoutLastExtension(outFile)).ends_with(".nii"))
+    ext = ".nii.gz";
+  const bool fiberOutput = ext == ".fib" || ext == ".vtk" || ext == ".trk";  // the FiberBundle writers
+  const bool imageOutput = ext == ".nii" || ext == ".nii.gz" || ext == ".nrrd";
+  if (!fiberOutput && !imageOutput)
   {
-    MITK_INFO << "Output file format not supported. Use one of .fib, .trk, .nii, .nii.gz, .nrrd";
+    MITK_ERROR << "Output file format not supported. Use one of .fib, .vtk, .trk (tractogram) or .nii, .nii.gz, .nrrd (probability map).";
     return EXIT_FAILURE;
   }
 
@@ -361,12 +391,10 @@ int main(int argc, char* argv[])
     addImages.at(0).push_back(itkimg);
   }
 
-  //    //////////////////////////////////////////////////////////////////
-  //      omp_set_num_threads(1);
-
   typedef itk::StreamlineTrackingFilter TrackerType;
   TrackerType::Pointer tracker = TrackerType::New();
 
+  std::unique_ptr<mitk::TrackingDataHandler> priorhandler;
   if (!prior_image.empty())
   {
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, std::vector<std::string>());
@@ -374,11 +402,11 @@ int main(int argc, char* argv[])
 
     if (priorImage.IsNull())
     {
-      MITK_INFO << "Only peak images are supported as prior at the moment!";
+      MITK_ERROR << "Only peak images are supported as prior.";
       return EXIT_FAILURE;
     }
 
-    mitk::TrackingDataHandler* priorhandler = new mitk::TrackingHandlerPeaks();
+    auto peakPrior = std::make_unique<mitk::TrackingHandlerPeaks>();
 
     typedef mitk::ImageToItk< mitk::TrackingHandlerPeaks::PeakImgType > CasterType;
     CasterType::Pointer caster = CasterType::New();
@@ -391,26 +419,36 @@ int main(int argc, char* argv[])
     prior_params->m_FlipY = params->m_PriorFlipY;
     prior_params->m_FlipZ = params->m_PriorFlipZ;
     prior_params->m_Cutoff = 0.0;
-    dynamic_cast<mitk::TrackingHandlerPeaks*>(priorhandler)->SetPeakImage(itkImg);
-    priorhandler->SetParameters(prior_params);
-    tracker->SetTrackingPriorHandler(priorhandler);
+    peakPrior->SetPeakImage(itkImg);
+    peakPrior->SetParameters(prior_params);
+    priorhandler = std::move(peakPrior);
+    tracker->SetTrackingPriorHandler(priorhandler.get());
   }
 
-  mitk::TrackingDataHandler* handler;
+  // the tracker only borrows the handlers
+  std::unique_ptr<mitk::TrackingDataHandler> handler;
   mitk::Image::Pointer reference_image;
   if (type == "Peaks")
   {
-    handler = new mitk::TrackingHandlerPeaks();
+    auto peakHandler = std::make_unique<mitk::TrackingHandlerPeaks>();
 
     MITK_INFO << "loading input peak image";
-    mitk::PeakImage::Pointer mitkImage = mitk::IOUtil::Load<mitk::PeakImage>(input_files.at(0));
+    // Without the reader preference, a 4D NIfTI peak file is read as a plain image.
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, std::vector<std::string>());
+    mitk::PeakImage::Pointer mitkImage = mitk::IOUtil::Load<mitk::PeakImage>(input_files.at(0), &functor);
+    if (mitkImage.IsNull())
+    {
+      MITK_ERROR << "Input is not a peak image: " << input_files.at(0);
+      return EXIT_FAILURE;
+    }
     reference_image = mitkImage;
     mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = mitkImage->GetItkPeakImage();
-    dynamic_cast<mitk::TrackingHandlerPeaks*>(handler)->SetPeakImage(itkImg);
+    peakHandler->SetPeakImage(itkImg);
+    handler = std::move(peakHandler);
   }
   else if (type == "Tensor" && params->m_Mode == mitk::StreamlineTractographyParameters::MODE::DETERMINISTIC)
   {
-    handler = new mitk::TrackingHandlerTensor();
+    auto tensorHandler = std::make_unique<mitk::TrackingHandlerTensor>();
 
     MITK_INFO << "loading input tensor images";
     std::vector< mitk::Image::Pointer > input_images;
@@ -419,15 +457,16 @@ int main(int argc, char* argv[])
       mitk::Image::Pointer mitkImage = mitk::IOUtil::Load<mitk::Image>(input_files.at(i));
       reference_image = mitkImage;
       mitk::TensorImage::ItkTensorImageType::Pointer itkImg = mitk::convert::GetItkTensorFromTensorImage(mitkImage);
-      dynamic_cast<mitk::TrackingHandlerTensor*>(handler)->AddTensorImage(itkImg.GetPointer());
+      tensorHandler->AddTensorImage(itkImg.GetPointer());
     }
 
     if (addImages.at(0).size()>0)
-      dynamic_cast<mitk::TrackingHandlerTensor*>(handler)->SetFaImage(addImages.at(0).at(0));
+      tensorHandler->SetFaImage(addImages.at(0).at(0));
+    handler = std::move(tensorHandler);
   }
   else if (type == "ODF" || type == "ODF-DIPY/FSL" || (type == "Tensor" && params->m_Mode == mitk::StreamlineTractographyParameters::MODE::PROBABILISTIC))
   {
-    handler = new mitk::TrackingHandlerOdf();
+    auto odfHandler = std::make_unique<mitk::TrackingHandlerOdf>();
 
     mitk::OdfImage::ItkOdfImageType::Pointer itkImg = nullptr;
 
@@ -437,7 +476,7 @@ int main(int argc, char* argv[])
       auto input = mitk::IOUtil::Load<mitk::Image>(input_files.at(0));
       reference_image = input;
       itkImg = mitk::convert::GetItkOdfFromTensorImage(input);
-      dynamic_cast<mitk::TrackingHandlerOdf*>(handler)->SetIsOdfFromTensor(true);
+      odfHandler->SetIsOdfFromTensor(true);
     }
     else
     {
@@ -463,17 +502,21 @@ int main(int argc, char* argv[])
         itkImg = mitk::convert::GetItkOdfFromOdfImage(mitkImg);
       }
       else
-        mitkThrow() << "";
+      {
+        MITK_ERROR << "Input is neither an SH nor an ODF image: " << input_files.at(0);
+        return EXIT_FAILURE;
+      }
     }
 
-    dynamic_cast<mitk::TrackingHandlerOdf*>(handler)->SetOdfImage(itkImg);
+    odfHandler->SetOdfImage(itkImg);
 
     if (addImages.at(0).size()>0)
-      dynamic_cast<mitk::TrackingHandlerOdf*>(handler)->SetGfaImage(addImages.at(0).at(0));
+      odfHandler->SetGfaImage(addImages.at(0).at(0));
+    handler = std::move(odfHandler);
   }
   else
   {
-    MITK_INFO << "Unknown tractography algorithm (" + type+"). Known types are Peaks, DetTensor, ProbTensor, DetODF, ProbODF, DetRF, ProbRF.";
+    MITK_ERROR << "Unknown tractography algorithm (" + type+"). Known types are Peaks, Tensor, ODF and ODF-DIPY/FSL.";
     return EXIT_FAILURE;
   }
 
@@ -501,13 +544,12 @@ int main(int argc, char* argv[])
   tracker->SetStoppingRegions(stop);
   tracker->SetTargetRegions(target);
   tracker->SetExclusionRegions(exclusion);
-  tracker->SetTrackingHandler(handler);
-  if (ext != ".fib" && ext != ".trk")
-    params->m_OutputProbMap = true;
+  tracker->SetTrackingHandler(handler.get());
+  params->m_OutputProbMap = imageOutput;
   tracker->SetParameters(params);
   tracker->Update();
 
-  if (ext == ".fib" || ext == ".trk")
+  if (fiberOutput)
   {
 
     vtkSmartPointer< vtkPolyData > poly = tracker->GetFiberPolyData();
@@ -537,13 +579,9 @@ int main(int argc, char* argv[])
     img->InitializeByItk(outImg.GetPointer());
     img->SetVolume(outImg->GetBufferPointer());
 
-    if (ext != ".nii" && ext != ".nii.gz" && ext != ".nrrd")
-      outFile += ".nii.gz";
-
     mitk::IOUtil::Save(img, outFile);
   }
 
-  delete handler;
-
   return EXIT_SUCCESS;
+}
 }

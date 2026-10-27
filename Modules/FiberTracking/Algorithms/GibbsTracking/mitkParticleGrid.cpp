@@ -40,21 +40,25 @@ ParticleGrid::ParticleGrid(ItkFloatImageType* image, float particleLength, int c
 
     m_CellCapacity = cellCapacity;          // maximum number of particles per grid cell
     m_ContainerCapacity = 100000;           // initial particle container capacity
-    unsigned long  numCells = m_GridSize[0]*m_GridSize[1]*m_GridSize[2];   // number of grid cells
-    unsigned long  gridSize = numCells*m_CellCapacity;
-    if ( (unsigned long)itk::NumericTraits<int>::max()<gridSize )
+    // gridindex = cell*capacity + slot must fit into an int; the product is formed in 64 bits
+    const unsigned long long numCells = static_cast<unsigned long long>(m_GridSize[0])*m_GridSize[1]*m_GridSize[2];
+    if ( static_cast<unsigned long long>(itk::NumericTraits<int>::max()) < numCells*static_cast<unsigned long long>(m_CellCapacity) )
         throw std::bad_alloc();
 
     m_Particles.resize(m_ContainerCapacity);        // allocate and initialize particles
-    m_Grid.resize(gridSize, nullptr);   // allocate and initialize particle grid
+    m_Grid.resize(numCells);                        // empty cells
     m_OccupationCount.resize(numCells, 0);          // allocate and initialize occupation counter array
     m_NeighbourTracker.cellidx.resize(8, 0);        // allocate and initialize neighbour tracker
-    m_NeighbourTracker.cellidx_c.resize(8, 0);
 
     for (int i = 0;i < m_ContainerCapacity;i++)     // initialize particle IDs
         m_Particles[i].ID = i;
 
-    std::cout << "ParticleGrid: allocated " << (sizeof(Particle)*m_ContainerCapacity + sizeof(Particle*)*m_GridSize[0]*m_GridSize[1]*m_GridSize[2])/1048576 << "mb for " << m_ContainerCapacity/1000 << "k particles." << std::endl;
+    std::cout << "ParticleGrid: allocated " << (sizeof(Particle)*m_ContainerCapacity + sizeof(m_Grid[0])*numCells)/1048576 << "mb for " << m_ContainerCapacity/1000 << "k particles." << std::endl;
+}
+
+Particle*& ParticleGrid::GridEntry(int gridindex)
+{
+    return m_Grid[gridindex/m_CellCapacity][gridindex%m_CellCapacity];
 }
 
 ParticleGrid::~ParticleGrid()
@@ -73,15 +77,13 @@ void ParticleGrid::ResetGrid()
     m_Grid.clear();
     m_OccupationCount.clear();
     m_NeighbourTracker.cellidx.clear();
-    m_NeighbourTracker.cellidx_c.clear();
 
-    int numCells = m_GridSize[0]*m_GridSize[1]*m_GridSize[2];   // number of grid cells
+    const std::size_t numCells = static_cast<std::size_t>(m_GridSize[0])*m_GridSize[1]*m_GridSize[2];
 
     m_Particles.resize(m_ContainerCapacity);        // allocate and initialize particles
-    m_Grid.resize(numCells*m_CellCapacity, nullptr);   // allocate and initialize particle grid
+    m_Grid.resize(numCells);                        // empty cells
     m_OccupationCount.resize(numCells, 0);          // allocate and initialize occupation counter array
     m_NeighbourTracker.cellidx.resize(8, 0);        // allocate and initialize neighbour tracker
-    m_NeighbourTracker.cellidx_c.resize(8, 0);
 
     for (int i = 0;i < m_ContainerCapacity;i++)     // initialize particle IDs
         m_Particles[i].ID = i;
@@ -95,17 +97,16 @@ bool ParticleGrid::ReallocateGrid()
         m_Particles.resize(new_capacity);                   // reallocate particles
 
         for (int i = 0; i<m_ContainerCapacity; i++)         // update particle addresses (changed during reallocation)
-            m_Grid[m_Particles[i].gridindex] = &m_Particles[i];
+            GridEntry(m_Particles[i].gridindex) = &m_Particles[i];
 
         for (int i = m_ContainerCapacity; i < new_capacity; i++)    // initialize IDs of ne particles
             m_Particles[i].ID = i;
 
         m_ContainerCapacity = new_capacity;     // update member variable
-        //std::cout << "ParticleGrid: allocated " << (sizeof(Particle)*m_ContainerCapacity + sizeof(Particle*)*m_GridSize[0]*m_GridSize[1]*m_GridSize[2])/1048576 << "mb for " << m_ContainerCapacity/1000 << "k particles." << std::endl;
     }
     catch(...)
     {
-        std::cout << "ParticleGrid: allocation of " << (sizeof(Particle)*new_capacity + sizeof(Particle*)*m_GridSize[0]*m_GridSize[1]*m_GridSize[2])/1048576 << "mb for " << new_capacity/1000 << "k particles failed!" << std::endl;
+        std::cout << "ParticleGrid: allocation of " << (sizeof(Particle)*new_capacity)/1048576 << "mb for " << new_capacity/1000 << "k particles failed!" << std::endl;
         return false;
     }
     return true;
@@ -152,7 +153,7 @@ Particle* ParticleGrid::NewParticle(vnl_vector_fixed<float, 3> R)
         p->pID = -1;
         m_NumParticles++;
         p->gridindex = m_CellCapacity*idx + m_OccupationCount[idx];
-        m_Grid[p->gridindex] = p;
+        m_Grid[idx].push_back(p);
         m_OccupationCount[idx]++;
         return p;
     }
@@ -192,13 +193,14 @@ bool ParticleGrid::TryUpdateGrid(int k)
         {
             // remove from old position in grid;
             int grdindex = p->gridindex;
-            m_Grid[grdindex] = m_Grid[cellidx*m_CellCapacity + m_OccupationCount[cellidx]-1];
-            m_Grid[grdindex]->gridindex = grdindex;
+            GridEntry(grdindex) = m_Grid[cellidx].back();
+            GridEntry(grdindex)->gridindex = grdindex;
+            m_Grid[cellidx].pop_back();
             m_OccupationCount[cellidx]--;
 
             // insert at new position in grid
             p->gridindex = idx*m_CellCapacity + m_OccupationCount[idx];
-            m_Grid[p->gridindex] = p;
+            m_Grid[idx].push_back(p);
             m_OccupationCount[idx]++;
             return true;
         }
@@ -227,10 +229,10 @@ void ParticleGrid::RemoveParticle(int k)
     // remove from grid
     if (idx < m_OccupationCount[cellIdx]-1)
     {
-        m_Grid[gridIndex] = m_Grid[cellIdx*m_CellCapacity+m_OccupationCount[cellIdx]-1];
-        m_Grid[cellIdx*m_CellCapacity+m_OccupationCount[cellIdx]-1] = nullptr;
-        m_Grid[gridIndex]->gridindex = gridIndex;
+        m_Grid[cellIdx][idx] = m_Grid[cellIdx].back();
+        m_Grid[cellIdx][idx]->gridindex = gridIndex;
     }
+    m_Grid[cellIdx].pop_back();
     m_OccupationCount[cellIdx]--;
 
     // remove from container
@@ -257,7 +259,7 @@ void ParticleGrid::RemoveParticle(int k)
         m_Particles[k] = m_Particles[m_NumParticles-1];         // move very last particle to empty slot
         m_Particles[m_NumParticles-1].ID = m_NumParticles-1;    // update ID of removed particle to match the index
         m_Particles[k].ID = k;                                  // update ID of moved particle
-        m_Grid[m_Particles[k].gridindex] = &m_Particles[k];     // update address of moved particle
+        GridEntry(m_Particles[k].gridindex) = &m_Particles[k];  // update address of moved particle
     }
     m_NumParticles--;
 }
@@ -300,14 +302,20 @@ void ParticleGrid::ComputeNeighbors(vnl_vector_fixed<float, 3> &R)
     m_NeighbourTracker.cellidx[7] = m_NeighbourTracker.cellidx[6] - dx;
 
 
-    m_NeighbourTracker.cellidx_c[0] = m_CellCapacity*m_NeighbourTracker.cellidx[0];
-    m_NeighbourTracker.cellidx_c[1] = m_CellCapacity*m_NeighbourTracker.cellidx[1];
-    m_NeighbourTracker.cellidx_c[2] = m_CellCapacity*m_NeighbourTracker.cellidx[2];
-    m_NeighbourTracker.cellidx_c[3] = m_CellCapacity*m_NeighbourTracker.cellidx[3];
-    m_NeighbourTracker.cellidx_c[4] = m_CellCapacity*m_NeighbourTracker.cellidx[4];
-    m_NeighbourTracker.cellidx_c[5] = m_CellCapacity*m_NeighbourTracker.cellidx[5];
-    m_NeighbourTracker.cellidx_c[6] = m_CellCapacity*m_NeighbourTracker.cellidx[6];
-    m_NeighbourTracker.cellidx_c[7] = m_CellCapacity*m_NeighbourTracker.cellidx[7];
+    // With one cell along an axis (d = 0) some of the 8 cells coincide; each is visited once, in the
+    // order above, so that every neighbour is returned once.
+    m_NeighbourTracker.cellnum = 0;
+    for (int k=0; k<8; ++k)
+    {
+        const int cell = m_NeighbourTracker.cellidx[k];
+        bool seen = false;
+        for (int j=0; j<m_NeighbourTracker.cellnum; ++j)
+            seen = seen || m_NeighbourTracker.cellidx[j] == cell;
+        if (seen)
+            continue;
+        m_NeighbourTracker.cellidx[m_NeighbourTracker.cellnum] = cell;
+        m_NeighbourTracker.cellnum++;
+    }
 
     m_NeighbourTracker.cellcnt = 0;
     m_NeighbourTracker.pcnt = 0;
@@ -317,20 +325,20 @@ Particle* ParticleGrid::GetNextNeighbor()
 {
     if (m_NeighbourTracker.pcnt < m_OccupationCount[m_NeighbourTracker.cellidx[m_NeighbourTracker.cellcnt]])
     {
-        return m_Grid[m_NeighbourTracker.cellidx_c[m_NeighbourTracker.cellcnt] + (m_NeighbourTracker.pcnt++)];
+        return m_Grid[m_NeighbourTracker.cellidx[m_NeighbourTracker.cellcnt]][m_NeighbourTracker.pcnt++];
     }
     else
     {
         for(;;)
         {
             m_NeighbourTracker.cellcnt++;
-            if (m_NeighbourTracker.cellcnt >= 8)
+            if (m_NeighbourTracker.cellcnt >= m_NeighbourTracker.cellnum)
                 return nullptr;
             if (m_OccupationCount[m_NeighbourTracker.cellidx[m_NeighbourTracker.cellcnt]] > 0)
                 break;
         }
         m_NeighbourTracker.pcnt = 1;
-        return m_Grid[m_NeighbourTracker.cellidx_c[m_NeighbourTracker.cellcnt]];
+        return m_Grid[m_NeighbourTracker.cellidx[m_NeighbourTracker.cellcnt]][0];
     }
 }
 

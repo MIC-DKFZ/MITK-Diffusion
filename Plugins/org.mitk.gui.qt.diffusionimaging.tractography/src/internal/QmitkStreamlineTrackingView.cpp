@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qt
 #include <QMessageBox>
+#include <random>
 #include <QFileDialog>
 
 // MITK
@@ -41,6 +42,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateProperty.h>
 #include <mitkNodePredicateDimension.h>
 #include <mitkOdfImage.h>
+#include <mitkPeakImage.h>
 #include <mitkShImage.h>
 #include <mitkSliceNavigationController.h>
 
@@ -68,8 +70,26 @@ QmitkStreamlineTrackingWorker::QmitkStreamlineTrackingWorker(QmitkStreamlineTrac
 
 void QmitkStreamlineTrackingWorker::run()
 {
+  // run() is called in the tracking thread, where an escaping exception would terminate the
+  // application; the message is shown by AfterThread in the GUI thread.
+  m_View->m_TrackingError.clear();
+  try
+  {
     m_View->m_Tracker->Update();
-    m_View->m_TrackingThread.quit();
+  }
+  catch (const itk::ExceptionObject &e)
+  {
+    m_View->m_TrackingError = e.GetDescription();
+  }
+  catch (const std::exception &e)
+  {
+    m_View->m_TrackingError = e.what();
+  }
+  catch (...)
+  {
+    m_View->m_TrackingError = "Unknown error.";
+  }
+  m_View->m_TrackingThread.quit();
 }
 
 QmitkStreamlineTrackingView::QmitkStreamlineTrackingView()
@@ -271,7 +291,7 @@ void QmitkStreamlineTrackingView::ParametersToGui(mitk::StreamlineTractographyPa
 
   m_Controls->m_NumSamplesBox->setValue(params.m_NumSamples);
   m_Controls->m_LoopCheckBox->setValue(params.GetLoopCheckDeg());
-  m_Controls->m_AngularThresholdBox->setValue(params.GetAngularThresholdDeg());
+  m_Controls->m_AngularThresholdBox->setValue(qRound(params.GetAngularThresholdDeg()));
   m_Controls->m_MinTractLengthBox->setValue(params.m_MinTractLengthMm);
   m_Controls->m_MaxTractLengthBox->setValue(params.m_MaxTractLengthMm);
   m_Controls->m_OutputProbMap->setChecked(params.m_OutputProbMap);
@@ -318,13 +338,6 @@ void QmitkStreamlineTrackingView::ParametersToGui(mitk::StreamlineTractographyPa
 std::shared_ptr<mitk::StreamlineTractographyParameters> QmitkStreamlineTrackingView::GetParametersFromGui()
 {
   std::shared_ptr<mitk::StreamlineTractographyParameters> params = std::make_shared<mitk::StreamlineTractographyParameters>();
-
-  // NOT IN GUI
-//  unsigned int m_NumPreviousDirections = 1;
-//  bool m_AvoidStop = true;
-//  bool m_RandomSampling = false;
-//  float m_DeflectionMod = 1.0;
-//  bool m_ApplyDirectionMatrix = false;
 
   // NOT IN GUI BUT AUTOMATICALLY SET
   if (!m_InputImageNodes.empty())
@@ -439,8 +452,17 @@ void QmitkStreamlineTrackingView::SaveParameters()
 
   m_ParameterFile = filename;
 
-  auto params = GetParametersFromGui();
-  params->SaveParameters(m_ParameterFile.toStdString());
+  // property_tree and the parameter class throw on unwritable files; without a catch the generic
+  // "save all data and quit" dialog would appear
+  try
+  {
+    auto params = GetParametersFromGui();
+    params->SaveParameters(m_ParameterFile.toStdString());
+  }
+  catch (const std::exception &e)
+  {
+    QMessageBox::warning(nullptr, "Streamline Tractography", QString("Could not save the parameters:\n") + e.what());
+  }
 }
 
 void QmitkStreamlineTrackingView::LoadParameters()
@@ -457,7 +479,15 @@ void QmitkStreamlineTrackingView::LoadParameters()
   m_ParameterFile = filename;
 
   mitk::StreamlineTractographyParameters params;
-  params.LoadParameters(m_ParameterFile.toStdString());
+  try
+  {
+    params.LoadParameters(m_ParameterFile.toStdString());
+  }
+  catch (const std::exception &e)
+  {
+    QMessageBox::warning(nullptr, "Streamline Tractography", QString("Could not load the parameters:\n") + e.what());
+    return;
+  }
   ParametersToGui(params);
 }
 
@@ -487,6 +517,18 @@ void QmitkStreamlineTrackingView::AfterThread()
 {
   auto params = m_Tracker->GetParameters();
   m_TrackingTimer->stop();
+  if (!m_TrackingError.empty())
+  {
+    MITK_ERROR << "Streamline tractography failed: " << m_TrackingError;
+    QMessageBox::warning(nullptr, "Streamline tractography failed", QString::fromStdString(m_TrackingError));
+    if (m_InteractivePointSetNode.IsNotNull())
+      m_InteractivePointSetNode->SetProperty("color", mitk::ColorProperty::New(1,1,1));
+    StartStopTrackingGui(false);
+    if (m_DeleteTrackingHandler)
+      DeleteTrackingHandler();
+    UpdateGui();
+    return;
+  }
   if (!params->m_OutputProbMap)
   {
     vtkSmartPointer<vtkPolyData> fiberBundle = m_Tracker->GetFiberPolyData();
@@ -611,7 +653,6 @@ void QmitkStreamlineTrackingView::InteractiveSeedChanged(bool posChanged)
   if (!posChanged && (!m_Controls->m_InteractiveBox->isChecked() || !m_Controls->m_ParamUpdateBox->isChecked()) )
     return;
 
-  std::srand(std::time(0));
   m_SeedPoints.clear();
 
   itk::Point<double> world_pos = this->GetRenderWindowPart()->GetSelectedPosition();
@@ -626,14 +667,23 @@ void QmitkStreamlineTrackingView::InteractiveSeedChanged(bool posChanged)
   m_InteractivePointSetNode->SetProperty("point 2D size", mitk::FloatProperty::New(radius*2));
   m_InteractivePointSetNode->SetData(pointset);
 
+  // Uniform in the ball: isotropic direction from three normal variates, radius R*cbrt(u).
+  // "Fix Random Seed" gives the same seed points at every update.
+  std::mt19937 rng(m_Controls->m_FixSeedBox->isChecked() ? 0u : std::random_device()());
+  std::normal_distribution<float> normal;
+  std::uniform_real_distribution<float> uniform;
   for (int i=1; i<num; i++)
   {
     itk::Vector<float> p;
-    p[0] = rand()%1000-500;
-    p[1] = rand()%1000-500;
-    p[2] = rand()%1000-500;
+    do
+    {
+      p[0] = normal(rng);
+      p[1] = normal(rng);
+      p[2] = normal(rng);
+    }
+    while (p.GetNorm() == 0.0f);
     p.Normalize();
-    p *= radius;
+    p *= radius * std::cbrt(uniform(rng));
     m_SeedPoints.push_back(world_pos+p);
   }
   m_InteractivePointSetNode->SetProperty("color", mitk::ColorProperty::New(1,0,0));
@@ -759,13 +809,13 @@ void QmitkStreamlineTrackingView::DeleteTrackingHandler()
 {
   if (!m_ThreadIsRunning && m_TrackingHandler != nullptr)
   {
-    if (m_TrackingPriorHandler != nullptr)
+    if (m_Tracker.IsNotNull())  // keeps no pointer to the handlers released here
     {
-      delete m_TrackingPriorHandler;
-      m_TrackingPriorHandler = nullptr;
+      m_Tracker->SetTrackingHandler(nullptr);
+      m_Tracker->SetTrackingPriorHandler(nullptr);
     }
-    delete m_TrackingHandler;
-    m_TrackingHandler = nullptr;
+    m_TrackingPriorHandler.reset();
+    m_TrackingHandler.reset();
     m_DeleteTrackingHandler = false;
     m_LastPrior = nullptr;
   }
@@ -786,7 +836,6 @@ void QmitkStreamlineTrackingView::OnSelectionChanged( berry::IWorkbenchPart::Poi
 {
   std::vector< mitk::DataNode::Pointer > last_nodes = m_InputImageNodes;
   m_InputImageNodes.clear();
-  m_AdditionalInputImages.clear();
   bool retrack = false;
 
   for( auto node : nodes )
@@ -794,20 +843,14 @@ void QmitkStreamlineTrackingView::OnSelectionChanged( berry::IWorkbenchPart::Poi
 
     if( node.IsNotNull() && dynamic_cast<mitk::Image*>(node->GetData()) )
     {
+      // Raw diffusion-weighted images were the input of the removed machine-learning tracker.
       if( dynamic_cast<mitk::TensorImage*>(node->GetData()) ||
           dynamic_cast<mitk::OdfImage*>(node->GetData()) ||
           dynamic_cast<mitk::ShImage*>(node->GetData()) ||
-          dynamic_cast<mitk::PeakImage*>(node->GetData()) ||
-          mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage( dynamic_cast<mitk::Image *>(node->GetData())))
+          dynamic_cast<mitk::PeakImage*>(node->GetData()) )
       {
         m_InputImageNodes.push_back(node);
         retrack = true;
-      }
-      else
-      {
-        mitk::Image* img = dynamic_cast<mitk::Image*>(node->GetData());
-        if (img!=nullptr && img->GetDimension()==3)
-          m_AdditionalInputImages.push_back(dynamic_cast<mitk::Image*>(node->GetData()));
       }
     }
   }
@@ -941,65 +984,74 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
 
   if (m_InputImageNodes.empty())
   {
-    QMessageBox::information(nullptr, "Information", "Please select an input image in the datamaneger (tensor, ODF, peak or dMRI image)!");
+    QMessageBox::information(nullptr, "Information", "Please select an input image in the datamanager (tensor, ODF, SH or peak image)!");
     return;
   }
   if (m_ThreadIsRunning || !m_Visible)
     return;
   if (m_Controls->m_InteractiveBox->isChecked() && m_SeedPoints.empty())
     return;
+
+  // Only the first input is used, except for deterministic multi-tensor tracking; inputs of another
+  // type would be cast to the first one's pixel type.
+  if (m_InputImageNodes.size()>1)
+  {
+    const std::string firstType = m_InputImageNodes.at(0)->GetData()->GetNameOfClass();
+    bool sameType = true;
+    for (const auto &node : m_InputImageNodes)
+      sameType = sameType && firstType == node->GetData()->GetNameOfClass();
+    if (!sameType || !dynamic_cast<mitk::TensorImage*>(m_InputImageNodes.at(0)->GetData()) || m_Controls->m_ModeBox->currentIndex()==1)
+    {
+      QMessageBox::information(nullptr, "Information", "Several input images are only supported for deterministic multi-tensor tractography (tensor images only). Please select a single input image.");
+      return;
+    }
+  }
+
   StartStopTrackingGui(true);
 
+  // The preparation casts the inputs and ROI images; on an error the view must leave the running state.
+  try
+  {
   m_Tracker = TrackerType::New();
-
-  if (params->m_EpConstraints == itk::StreamlineTrackingFilter::EndpointConstraints::NONE)
-      m_Tracker->SetTargetRegions(nullptr);
 
   if( dynamic_cast<mitk::TensorImage*>(m_InputImageNodes.at(0)->GetData()) )
   {
     if (m_Controls->m_ModeBox->currentIndex()==1)
     {
-      if (m_InputImageNodes.size()>1)
-      {
-        QMessageBox::information(nullptr, "Information", "Probabilistic tensor tractography is only implemented for single-tensor mode!");
-        StartStopTrackingGui(false);
-        return;
-      }
-
       if (m_TrackingHandler==nullptr)
       {
-        m_TrackingHandler = new mitk::TrackingHandlerOdf();
+        m_TrackingHandler = std::make_unique<mitk::TrackingHandlerOdf>();
         typedef itk::TensorImageToOdfImageFilter< float, float > FilterType;
         FilterType::Pointer filter = FilterType::New();
         filter->SetInput( mitk::convert::GetItkTensorFromTensorImage(dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())) );
         filter->Update();
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetOdfImage(filter->GetOutput());
+        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetOdfImage(filter->GetOutput());
 
         if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
         {
           ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
           mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
 
-          dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetGfaImage(itkImg);
+          dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetGfaImage(itkImg);
         }
       }
 
-      dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetIsOdfFromTensor(true);
+      dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetIsOdfFromTensor(true);
     }
     else
     {
       if (m_TrackingHandler==nullptr)
       {
-        m_TrackingHandler = new mitk::TrackingHandlerTensor();
+        m_TrackingHandler = std::make_unique<mitk::TrackingHandlerTensor>();
         for (unsigned int i=0; i<m_InputImageNodes.size(); ++i)
-          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler)->AddTensorImage(mitk::convert::GetItkTensorFromTensorImage(dynamic_cast<mitk::Image*>(m_InputImageNodes.at(i)->GetData())).GetPointer());
+          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler.get())->AddTensorImage(mitk::convert::GetItkTensorFromTensorImage(dynamic_cast<mitk::Image*>(m_InputImageNodes.at(i)->GetData())).GetPointer());
 
         if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
         {
           ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
           mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
 
-          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler)->SetFaImage(itkImg);
+          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler.get())->SetFaImage(itkImg);
         }
       }
     }
@@ -1009,29 +1061,35 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
   {
     if (m_TrackingHandler==nullptr)
     {
-      m_TrackingHandler = new mitk::TrackingHandlerOdf();
+      m_TrackingHandler = std::make_unique<mitk::TrackingHandlerOdf>();
 
       if (dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData()))
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetOdfImage(mitk::convert::GetItkOdfFromShImage(dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData())));
+        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetOdfImage(mitk::convert::GetItkOdfFromShImage(dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData())));
       else
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetOdfImage(mitk::convert::GetItkOdfFromOdfImage(dynamic_cast<mitk::OdfImage*>(m_InputImageNodes.at(0)->GetData())));
+        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetOdfImage(mitk::convert::GetItkOdfFromOdfImage(dynamic_cast<mitk::OdfImage*>(m_InputImageNodes.at(0)->GetData())));
 
       if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
       {
         ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
         mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler)->SetGfaImage(itkImg);
+        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetGfaImage(itkImg);
       }
+    }
+  }
+  else if (dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData()))
+  {
+    if (m_TrackingHandler==nullptr)
+    {
+      m_TrackingHandler = std::make_unique<mitk::TrackingHandlerPeaks>();
+      auto itk_peak_image = dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData())->GetItkPeakImage();
+      dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingHandler.get())->SetPeakImage(itk_peak_image);
     }
   }
   else
   {
-    if (m_TrackingHandler==nullptr)
-    {
-      m_TrackingHandler = new mitk::TrackingHandlerPeaks();
-      auto itk_peak_image = dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData())->GetItkPeakImage();
-      dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingHandler)->SetPeakImage(itk_peak_image);
-    }
+    QMessageBox::information(nullptr, "Information", "The selected input is not supported. Please select a tensor, ODF, SH or peak image.");
+    StartStopTrackingGui(false);
+    return;
   }
 
   if (m_Controls->m_InteractiveBox->isChecked())
@@ -1059,7 +1117,10 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     m_Tracker->SetStoppingRegions(mask);
   }
 
-  if (m_Controls->m_TargetImageSelectionWidget->GetSelectedNode().IsNotNull())
+  // With "No Constraints" the target widget is disabled but keeps its selection; the filter would
+  // turn a target into an endpoint constraint.
+  if (params->m_EpConstraints != itk::StreamlineTrackingFilter::EndpointConstraints::NONE
+      && m_Controls->m_TargetImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
     mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_TargetImageSelectionWidget->GetSelectedNode()->GetData()), mask);
@@ -1077,17 +1138,21 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
       caster->SetCopyMemFlag(true);
       caster->Update();
       mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = caster->GetOutput();
-      m_TrackingPriorHandler = new mitk::TrackingHandlerPeaks();
-      dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingPriorHandler)->SetPeakImage(itkImg);
+      auto priorHandler = std::make_unique<mitk::TrackingHandlerPeaks>();
+      priorHandler->SetPeakImage(itkImg);
+      m_TrackingPriorHandler = std::move(priorHandler);  // releases the copy of the previous prior
       m_LastPrior = m_Controls->m_PriorImageSelectionWidget->GetSelectedNode();
     }
 
     prior_params->m_FlipX = m_Controls->m_PriorFlipXBox->isChecked();
     prior_params->m_FlipY = m_Controls->m_PriorFlipYBox->isChecked();
     prior_params->m_FlipZ = m_Controls->m_PriorFlipZBox->isChecked();
+    // as in MitkStreamlineTractography: the data cutoff (FA/GFA/peak length) does not apply to the
+    // prior, which would otherwise stop streamlines with "Restrict to Prior"
+    prior_params->m_Cutoff = 0.0;
     m_TrackingPriorHandler->SetParameters(prior_params);
 
-    m_Tracker->SetTrackingPriorHandler(m_TrackingPriorHandler);
+    m_Tracker->SetTrackingPriorHandler(m_TrackingPriorHandler.get());
   }
   else if (m_Controls->m_PriorImageSelectionWidget->GetSelectedNode().IsNull())
     m_Tracker->SetTrackingPriorHandler(nullptr);
@@ -1143,8 +1208,18 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
 //  }
 
   m_Tracker->SetParameters(params);
-  m_Tracker->SetTrackingHandler(m_TrackingHandler);
+  m_Tracker->SetTrackingHandler(m_TrackingHandler.get());
   m_Tracker->SetVerbose(!m_Controls->m_InteractiveBox->isChecked());
+  }
+  catch (const std::exception &e)
+  {
+    StartStopTrackingGui(false);
+    m_Tracker = nullptr;
+    // a handler may be half built; the next start builds it anew
+    DeleteTrackingHandler();
+    QMessageBox::warning(nullptr, "Streamline Tractography", QString("Could not prepare the tractography:\n") + e.what());
+    return;
+  }
 
   m_ParentNode = m_InputImageNodes.at(0);
   m_TrackingThread.start(QThread::LowestPriority);

@@ -38,6 +38,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateOr.h>
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateProperty.h>
+#include <mitkNodePredicateFunction.h>
 
 // ITK
 #include <itkGibbsTrackingFilter.h>
@@ -57,27 +58,24 @@ QmitkTrackingWorker::QmitkTrackingWorker(QmitkGibbsTrackingView* view)
 
 void QmitkTrackingWorker::run()
 {
-  m_View->m_GlobalTracker = QmitkGibbsTrackingView::GibbsTrackingFilterType::New();
-
-  m_View->m_GlobalTracker->SetOdfImage(m_View->m_ItkOdfImage);
-  m_View->m_GlobalTracker->SetTensorImage(m_View->m_ItkTensorImage);
-  m_View->m_GlobalTracker->SetMaskImage(m_View->m_MaskImage);
-  m_View->m_GlobalTracker->SetStartTemperature((float)m_View->m_Controls->m_StartTempSlider->value()/100);
-  m_View->m_GlobalTracker->SetEndTemperature((float)m_View->m_Controls->m_EndTempSlider->value()/10000);
-  m_View->m_GlobalTracker->SetIterations(m_View->m_Controls->m_IterationsBox->text().toDouble());
-  m_View->m_GlobalTracker->SetParticleWeight((float)m_View->m_Controls->m_ParticleWeightSlider->value()/10000);
-  m_View->m_GlobalTracker->SetParticleWidth((float)(m_View->m_Controls->m_ParticleWidthSlider->value())/10);
-  m_View->m_GlobalTracker->SetParticleLength((float)(m_View->m_Controls->m_ParticleLengthSlider->value())/10);
-  m_View->m_GlobalTracker->SetInexBalance((float)m_View->m_Controls->m_InExBalanceSlider->value()/10);
-  m_View->m_GlobalTracker->SetMinFiberLength(m_View->m_Controls->m_FiberLengthSlider->value());
-  m_View->m_GlobalTracker->SetCurvatureThreshold(cos((float)m_View->m_Controls->m_CurvatureThresholdSlider->value()*itk::Math::pi/180));
-  m_View->m_GlobalTracker->SetRandomSeed(m_View->m_Controls->m_RandomSeedSlider->value());
-  try{
+  // run() is called in the tracking thread, where an escaping exception would terminate the
+  // application; the message is shown by AfterThread in the GUI thread.
+  m_View->m_TrackingError.clear();
+  try
+  {
     m_View->m_GlobalTracker->Update();
   }
-  catch( mitk::Exception& e )
+  catch (const itk::ExceptionObject &e)
   {
-    MITK_ERROR << "Internal error occured: " <<  e.what() << "\nAborting";
+    m_View->m_TrackingError = e.GetDescription();
+  }
+  catch (const std::exception &e)
+  {
+    m_View->m_TrackingError = e.what();
+  }
+  catch (...)
+  {
+    m_View->m_TrackingError = "Unknown error.";
   }
   m_View->m_TrackingThread.quit();
 }
@@ -98,7 +96,6 @@ QmitkGibbsTrackingView::QmitkGibbsTrackingView()
   , m_MaskImageNode(nullptr)
   , m_FiberBundleNode(nullptr)
   , m_ThreadIsRunning(false)
-  , m_ElapsedTime(0)
   , m_GlobalTracker(nullptr)
   , m_TrackingWorker(this)
 {
@@ -106,11 +103,14 @@ QmitkGibbsTrackingView::QmitkGibbsTrackingView()
   connect(&m_TrackingThread, SIGNAL(started()), this, SLOT(BeforeThread()));
   connect(&m_TrackingThread, SIGNAL(started()), &m_TrackingWorker, SLOT(run()));
   connect(&m_TrackingThread, SIGNAL(finished()), this, SLOT(AfterThread()));
+  m_MonitorTimer.setInterval(1000);
+  connect(&m_MonitorTimer, &QTimer::timeout, this, &QmitkGibbsTrackingView::TimerUpdate);
 }
 
 QmitkGibbsTrackingView::~QmitkGibbsTrackingView()
 {
-  if (m_GlobalTracker.IsNull())
+  // m_GlobalTracker is set before the thread starts and reset only after it finished
+  if (!m_TrackingThread.isRunning())
     return;
 
   m_GlobalTracker->SetAbortTracking(true);
@@ -140,32 +140,41 @@ void QmitkGibbsTrackingView::StopGibbsTracking()
 void QmitkGibbsTrackingView::AfterThread()
 {
   m_ThreadIsRunning = false;
+  m_MonitorTimer.stop();
 
   UpdateGUI();
+
+  // After an exception there is no result to show.
+  if (!m_TrackingError.empty())
+  {
+    MITK_ERROR << "Gibbs tracking failed: " << m_TrackingError;
+    QMessageBox::critical(nullptr, "Gibbs Tracking", QString("Tracking aborted:\n") + QString::fromStdString(m_TrackingError));
+    m_FiberBundleNode = nullptr;
+    m_GlobalTracker = nullptr;
+    m_ItkOdfImage = nullptr;
+    m_ItkTensorImage = nullptr;
+    return;
+  }
 
   if( !m_GlobalTracker->GetIsInValidState() )
   {
     QMessageBox::critical( nullptr, "Gibbs Tracking", "An internal error occured. Tracking aborted.\n Please check the log for details." );
     m_FiberBundleNode = nullptr;
+    m_GlobalTracker = nullptr;
+    m_ItkOdfImage = nullptr;
+    m_ItkTensorImage = nullptr;
     return;
   }
   UpdateTrackingStatus();
 
+  // Automatic values stay automatic (slider 0) for the next run, possibly on other data; the
+  // estimate is only shown.
   if(m_Controls->m_ParticleWeightSlider->value()==0)
-  {
-    m_Controls->m_ParticleWeightLabel->setText(QString::number(m_GlobalTracker->GetParticleWeight()));
-    m_Controls->m_ParticleWeightSlider->setValue(m_GlobalTracker->GetParticleWeight()*10000);
-  }
+    m_Controls->m_ParticleWeightLabel->setText("auto (" + QString::number(m_GlobalTracker->GetParticleWeight()) + ")");
   if(m_Controls->m_ParticleWidthSlider->value()==0)
-  {
-    m_Controls->m_ParticleWidthLabel->setText(QString::number(m_GlobalTracker->GetParticleWidth()));
-    m_Controls->m_ParticleWidthSlider->setValue(m_GlobalTracker->GetParticleWidth()*10);
-  }
+    m_Controls->m_ParticleWidthLabel->setText("auto (" + QString::number(m_GlobalTracker->GetParticleWidth()) + " mm)");
   if(m_Controls->m_ParticleLengthSlider->value()==0)
-  {
-    m_Controls->m_ParticleLengthLabel->setText(QString::number(m_GlobalTracker->GetParticleLength()));
-    m_Controls->m_ParticleLengthSlider->setValue(m_GlobalTracker->GetParticleLength()*10);
-  }
+    m_Controls->m_ParticleLengthLabel->setText("auto (" + QString::number(m_GlobalTracker->GetParticleLength()) + " mm)");
 
   GenerateFiberBundle();
   m_FiberBundleNode = 0;
@@ -182,8 +191,8 @@ void QmitkGibbsTrackingView::BeforeThread()
 {
   m_ThreadIsRunning = true;
   m_TrackingTime = QTime::currentTime();
-  m_ElapsedTime = 0;
   m_TrackingTimer.restart();
+  m_MonitorTimer.start();
 
   UpdateGUI();
 }
@@ -200,7 +209,6 @@ void QmitkGibbsTrackingView::CreateQtPartControl( QWidget *parent )
 
     AdvancedSettings();
 
-    // connect( m_TrackingTimer, SIGNAL(elapsed()), this, SLOT(TimerUpdate()) );
     connect( m_Controls->m_TrackingStop, SIGNAL(clicked()), this, SLOT(StopGibbsTracking()) );
     connect( m_Controls->m_TrackingStart, SIGNAL(clicked()), this, SLOT(StartGibbsTracking()) );
     connect( m_Controls->m_AdvancedSettingsCheckbox, SIGNAL(clicked()), this, SLOT(AdvancedSettings()) );
@@ -224,10 +232,13 @@ void QmitkGibbsTrackingView::CreateQtPartControl( QWidget *parent )
 
     m_Controls->m_MaskImageBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_MaskImageBox->SetZeroEntryText("--");
-    mitk::TNodePredicateDataType<mitk::Image>::Pointer isImagePredicate = mitk::TNodePredicateDataType<mitk::Image>::New();
-    mitk::NodePredicateProperty::Pointer isBinaryPredicate = mitk::NodePredicateProperty::New("binary", mitk::BoolProperty::New(true));
-    mitk::NodePredicateDimension::Pointer is3D = mitk::NodePredicateDimension::New(3);
-    m_Controls->m_MaskImageBox->SetPredicate( mitk::NodePredicateAnd::New(isBinaryPredicate, mitk::NodePredicateAnd::New(isImagePredicate, is3D)) );
+    // any 3D scalar image: the mask values weight the particle density (e.g. a white-matter
+    // probability map), voxels above 0.5 are seeded
+    auto isScalar3dImage = mitk::NodePredicateFunction::New([](const mitk::DataNode *node) {
+      auto image = dynamic_cast<const mitk::Image*>(node->GetData());
+      return image != nullptr && image->GetDimension() == 3 && image->GetPixelType().GetNumberOfComponents() == 1;
+    });
+    m_Controls->m_MaskImageBox->SetPredicate(isScalar3dImage);
 
     connect( (QObject*)(m_Controls->m_MaskImageBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGUI()));
     connect( (QObject*)(m_Controls->m_InputImageBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGUI()));
@@ -320,17 +331,18 @@ void QmitkGibbsTrackingView::UpdateTrackingStatus()
   if (m_GlobalTracker.IsNull())
     return;
 
-  m_ElapsedTime += m_TrackingTimer.elapsed()/1000;
-  unsigned long hours = m_ElapsedTime/3600;
-  unsigned long minutes = (m_ElapsedTime%3600)/60;
-  unsigned long seconds = m_ElapsedTime%60;
+  const qint64 elapsedTime = m_TrackingTimer.elapsed()/1000;
+  const qint64 hours = elapsedTime/3600;
+  const qint64 minutes = (elapsedTime%3600)/60;
+  const qint64 seconds = elapsedTime%60;
 
   m_Controls->m_ProposalAcceptance->setText(QString::number(m_GlobalTracker->GetProposalAcceptance()*100)+"%");
 
   m_Controls->m_TrackingTimeLabel->setText( QString::number(hours)+QString("h ")+QString::number(minutes)+QString("m ")+QString::number(seconds)+QString("s") );
   m_Controls->m_NumConnectionsLabel->setText( QString::number(m_GlobalTracker->GetNumConnections()) );
   m_Controls->m_NumParticlesLabel->setText( QString::number(m_GlobalTracker->GetNumParticles()) );
-  m_Controls->m_CurrentStepLabel->setText( QString::number(100*m_GlobalTracker->GetCurrentIteration()/m_GlobalTracker->GetIterations())+"%" );
+  if (m_GlobalTracker->GetIterations() > 0)
+    m_Controls->m_CurrentStepLabel->setText( QString::number(100*m_GlobalTracker->GetCurrentIteration()/m_GlobalTracker->GetIterations())+"%" );
   m_Controls->m_AcceptedFibersLabel->setText( QString::number(m_GlobalTracker->GetNumAcceptedFibers()) );
 }
 
@@ -403,6 +415,9 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
   }
   m_ImageNode = m_Controls->m_InputImageBox->GetSelectedNode();
 
+  // Both are reset: the input of an earlier run must not take precedence over the current one.
+  m_OdfImage = nullptr;
+  m_TensorImage = nullptr;
   if (dynamic_cast<mitk::OdfImage*>(m_ImageNode->GetData()))
     m_OdfImage = dynamic_cast<mitk::OdfImage*>(m_ImageNode->GetData());
   else if (dynamic_cast<mitk::TensorImage*>(m_ImageNode->GetData()))
@@ -410,6 +425,15 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
 
   if (m_OdfImage.IsNull() && m_TensorImage.IsNull())
     return;
+
+  // the line edit has no validator; invalid text would give an empty run
+  bool iterationsOk = false;
+  const double iterations = m_Controls->m_IterationsBox->text().toDouble(&iterationsOk);
+  if (!iterationsOk || iterations < 1)
+  {
+    QMessageBox::information(nullptr, "Gibbs Tracking", "The number of iterations must be a positive number.");
+    return;
+  }
 
   // cast odf to itk
   m_TrackingNode = m_ImageNode;
@@ -428,8 +452,7 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
     mitk::CastToItkImage(m_TensorImage, m_ItkTensorImage);
   }
 
-  // mask image found?
-  // catch exceptions thrown by the itkAccess macros
+  // a mask that cannot be used must not silently be replaced by the whole image
   try{
     if(m_Controls->m_MaskImageBox->GetSelectedNode().IsNotNull())
     {
@@ -438,7 +461,36 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
         mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_MaskImageNode->GetData()), m_MaskImage);
     }
   }
-  catch(...){};
+  catch (const std::exception &e)
+  {
+    QMessageBox::warning(nullptr, "Gibbs Tracking", QString("The mask image cannot be used:\n") + e.what());
+    m_ItkOdfImage = nullptr;
+    m_ItkTensorImage = nullptr;
+    m_MaskImage = nullptr;
+    m_TrackingNode = nullptr;
+    return;
+  }
+
+  // The filter is configured here, in the GUI thread: the worker thread must not read widgets, and
+  // the view must not see a half-assigned m_GlobalTracker.
+  m_GlobalTracker = GibbsTrackingFilterType::New();
+  m_GlobalTracker->SetOdfImage(m_ItkOdfImage);
+  m_GlobalTracker->SetTensorImage(m_ItkTensorImage);
+  m_GlobalTracker->SetMaskImage(m_MaskImage);
+  m_GlobalTracker->SetStartTemperature((float)m_Controls->m_StartTempSlider->value()/100);
+  m_GlobalTracker->SetEndTemperature((float)m_Controls->m_EndTempSlider->value()/10000);
+  m_GlobalTracker->SetIterations(iterations);
+  m_GlobalTracker->SetParticleWeight((float)m_Controls->m_ParticleWeightSlider->value()/10000);
+  m_GlobalTracker->SetParticleWidth((float)(m_Controls->m_ParticleWidthSlider->value())/10);
+  m_GlobalTracker->SetParticleLength((float)(m_Controls->m_ParticleLengthSlider->value())/10);
+  m_GlobalTracker->SetInexBalance((float)m_Controls->m_InExBalanceSlider->value()/10);
+  m_GlobalTracker->SetMinFiberLength(m_Controls->m_FiberLengthSlider->value());
+  m_GlobalTracker->SetCurvatureThreshold(cos((float)m_Controls->m_CurvatureThresholdSlider->value()*itk::Math::pi/180));
+  m_GlobalTracker->SetRandomSeed(m_Controls->m_RandomSeedSlider->value());
+
+  // set before start(): BeforeThread is queued, and a second click must not restart the run
+  m_ThreadIsRunning = true;
+  UpdateGUI();
 
   // start worker thread
   m_TrackingThread.start(QThread::LowestPriority);
@@ -453,9 +505,14 @@ void QmitkGibbsTrackingView::GenerateFiberBundle()
   if (m_Controls->m_VisualizeOnceButton->isChecked())
     m_Controls->m_VisualizeOnceButton->setChecked(false);
 
+  // nullptr while the filter still prepares the data (no fibers built yet)
   vtkSmartPointer<vtkPolyData> fiberBundle = m_GlobalTracker->GetFiberBundle();
-  if ( m_GlobalTracker->GetNumAcceptedFibers()==0 )
+  if (fiberBundle == nullptr || fiberBundle->GetNumberOfLines() == 0)
+  {
+    if (!m_ThreadIsRunning)
+      QMessageBox::information(nullptr, "Gibbs Tracking", "No fiber was accepted, so no tractogram was added or saved. More iterations, a lower particle weight or a shorter minimum fiber length may help.");
     return;
+  }
   m_FiberBundle = mitk::FiberBundle::New(fiberBundle);
   m_FiberBundle->SetTrackVisHeader(dynamic_cast<mitk::Image*>(m_ImageNode->GetData())->GetGeometry());
   mitk::DiffusionPropertyHelper::CopyDICOMProperties(m_ImageNode->GetData(), m_FiberBundle);
@@ -536,7 +593,8 @@ void QmitkGibbsTrackingView::SaveTrackingParameters()
     return;
   if(!filename.endsWith(".gtp"))
     filename += ".gtp";
-  documentXML.SaveFile( filename.toStdString().c_str() );
+  if (documentXML.SaveFile( filename.toStdString().c_str() ) != tinyxml2::XML_SUCCESS)
+    QMessageBox::warning(nullptr, "Gibbs Tracking", "Could not save the parameters to\n" + filename);
 }
 
 // load current tracking paramters from xml file (.gtp)
@@ -547,53 +605,46 @@ void QmitkGibbsTrackingView::LoadTrackingParameters()
     return;
 
   tinyxml2::XMLDocument doc;
-  doc.LoadFile(filename.toStdString().c_str());
-
+  tinyxml2::XMLElement* pElem = nullptr;
   // RootElement(), not FirstChild(): with an <?xml?> declaration, that is the first child.
-  tinyxml2::XMLNode * hRoot = doc.RootElement();
-  auto pElem = hRoot->FirstChildElement("parameter_set");
+  if (doc.LoadFile(filename.toStdString().c_str()) == tinyxml2::XML_SUCCESS && doc.RootElement() != nullptr)
+    pElem = doc.RootElement()->FirstChildElement("parameter_set");
+  if (pElem == nullptr)
+  {
+    QMessageBox::warning(nullptr, "Gibbs Tracking", "Not a Gibbs tracking parameter file (no <parameter_set>):\n" + filename);
+    return;
+  }
+  // checked before any widget changes, so that an incomplete file changes nothing
+  for (const char* name : {"iterations", "particle_length", "particle_width", "particle_weight", "temp_start",
+                           "temp_end", "inexbalance", "fiber_length", "curvature_threshold"})
+  {
+    if (pElem->Attribute(name) == nullptr)
+    {
+      QMessageBox::warning(nullptr, "Gibbs Tracking", QString("The parameter file has no attribute %1:\n%2").arg(name).arg(filename));
+      return;
+    }
+  }
 
-  QString iterations(pElem->Attribute("iterations"));
-  m_Controls->m_IterationsBox->setText(iterations);
+  m_Controls->m_IterationsBox->setText(pElem->Attribute("iterations"));
 
-  QString particleLength(pElem->Attribute("particle_length"));
-  float pLength = particleLength.toFloat();
-  QString particleWidth(pElem->Attribute("particle_width"));
-  float pWidth = particleWidth.toFloat();
+  // Rounded to the sliders' steps (truncation turned 0.29 into 0.28); the labels are then set from
+  // the sliders, so they show the values that are used, also when a slider clamps.
+  auto toSlider = [pElem](const char* name, float scale) { return qRound(QString(pElem->Attribute(name)).toFloat()*scale); };
+  m_Controls->m_ParticleLengthSlider->setValue(toSlider("particle_length", 10));
+  m_Controls->m_ParticleWidthSlider->setValue(toSlider("particle_width", 10));
+  m_Controls->m_ParticleWeightSlider->setValue(toSlider("particle_weight", 10000));
+  m_Controls->m_StartTempSlider->setValue(toSlider("temp_start", 100));
+  m_Controls->m_EndTempSlider->setValue(toSlider("temp_end", 10000));
+  m_Controls->m_InExBalanceSlider->setValue(toSlider("inexbalance", 10));
+  m_Controls->m_FiberLengthSlider->setValue(toSlider("fiber_length", 1));
+  m_Controls->m_CurvatureThresholdSlider->setValue(toSlider("curvature_threshold", 1));
 
-  if (pLength==0)
-    m_Controls->m_ParticleLengthLabel->setText("auto");
-  else
-    m_Controls->m_ParticleLengthLabel->setText(particleLength+" mm");
-  if (pWidth==0)
-    m_Controls->m_ParticleWidthLabel->setText("auto");
-  else
-    m_Controls->m_ParticleWidthLabel->setText(particleWidth+" mm");
-
-  m_Controls->m_ParticleWidthSlider->setValue(pWidth*10);
-  m_Controls->m_ParticleLengthSlider->setValue(pLength*10);
-
-  QString partWeight(pElem->Attribute("particle_weight"));
-  m_Controls->m_ParticleWeightSlider->setValue(partWeight.toFloat()*10000);
-  m_Controls->m_ParticleWeightLabel->setText(partWeight);
-
-  QString startTemp(pElem->Attribute("temp_start"));
-  m_Controls->m_StartTempSlider->setValue(startTemp.toFloat()*100);
-  m_Controls->m_StartTempLabel->setText(startTemp);
-
-  QString endTemp(pElem->Attribute("temp_end"));
-  m_Controls->m_EndTempSlider->setValue(endTemp.toFloat()*10000);
-  m_Controls->m_EndTempLabel->setText(endTemp);
-
-  QString inExBalance(pElem->Attribute("inexbalance"));
-  m_Controls->m_InExBalanceSlider->setValue(inExBalance.toFloat()*10);
-  m_Controls->m_InExBalanceLabel->setText(inExBalance);
-
-  QString fiberLength(pElem->Attribute("fiber_length"));
-  m_Controls->m_FiberLengthSlider->setValue(fiberLength.toInt());
-  m_Controls->m_FiberLengthLabel->setText(fiberLength+"mm");
-
-  QString curvThres(pElem->Attribute("curvature_threshold"));
-  m_Controls->m_CurvatureThresholdSlider->setValue(curvThres.toInt());
-  m_Controls->m_CurvatureThresholdLabel->setText(curvThres+"°");
+  SetParticleLength(m_Controls->m_ParticleLengthSlider->value());
+  SetParticleWidth(m_Controls->m_ParticleWidthSlider->value());
+  SetParticleWeight(m_Controls->m_ParticleWeightSlider->value());
+  SetStartTemp(m_Controls->m_StartTempSlider->value());
+  SetEndTemp(m_Controls->m_EndTempSlider->value());
+  SetInExBalance(m_Controls->m_InExBalanceSlider->value());
+  SetFiberLength(m_Controls->m_FiberLengthSlider->value());
+  SetCurvatureThreshold(m_Controls->m_CurvatureThresholdSlider->value());
 }

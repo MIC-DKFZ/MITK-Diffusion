@@ -146,6 +146,13 @@ Facts the layout does not show:
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
   set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
   voxel grid (`mitkFiberImageGrid.h`).
+- `ctest -R Tractography` runs the `FiberTracking` tests. Streamline tracking seeds its random
+  engines per seed point, so a tractogram with a fixed seed (`--fix_seed`, "Fix Random Seed") is
+  the same at any number of OpenMP threads; the handlers take tensors, ODF directions and peaks as
+  world (LPS) vectors and never apply the image rotation. Gibbs tracking samples the ODF along the
+  particle in the image-axis frame and looks it up at the world direction. MITK-Data tractography
+  references (`StreamlineTractography/ReferenceFibs/`, `gibbsTractogram_v3.fib`) depend on the
+  exact random engines and seeds, so a change there is checked bit for bit against the old output.
 - `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
   `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
   `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and
@@ -159,7 +166,7 @@ Facts the layout does not show:
 
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 54 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
+all 56 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,

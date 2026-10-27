@@ -74,7 +74,7 @@ namespace mitk
     bool m_EnableInteractive = false;
 
     // ROI constraints
-    EndpointConstraints m_EpConstraints;
+    EndpointConstraints m_EpConstraints = EndpointConstraints::NONE;
     // - mask image
     // - stop image
     // - exclusion image
@@ -92,7 +92,7 @@ namespace mitk
     float m_G = 0;
     bool m_FixRandomSeed = false;
     unsigned int m_NumPreviousDirections = 1;
-    float m_PeakJitter = 0.01; // actual jitter is drawn from a normal distribution with m_PeakJitter*fabs(direction_value) as standard deviation
+    float m_PeakJitter = 0.01; ///< probabilistic peak tracking: standard deviation of the normal noise added to each component of the unit peak direction
     bool m_SecondOrder = true;
 
     // prior
@@ -108,26 +108,23 @@ namespace mitk
     unsigned int m_NumSamples = 0;
     bool m_OnlyForwardSamples = false;
     bool m_StopVotes = false;
-    bool m_AvoidStop = true;
-    bool m_RandomSampling = false;
-    float m_DeflectionMod = 1.0;
 
     // data handling
     bool m_FlipX = false;
     bool m_FlipY = false;
     bool m_FlipZ = false;
     bool m_InterpolateTractographyData = true;
-    bool m_InterpolateRoiImages;
-    bool m_ApplyDirectionMatrix = false;
+    bool m_InterpolateRoiImages = true;
 
     // output and postprocessing
     bool m_CompressFibers = true;
     float m_Compression = 0.1;
     bool m_OutputProbMap = false;
 
-    float GetAngularThresholdDot() const;
-    float GetAngularThresholdDeg() const;
-    void SetAngularThresholdDeg(float angular_threshold_deg);
+    float GetAngularThresholdDot() const;           ///< cosine of the threshold in effect
+    float GetAngularThresholdDeg() const;           ///< user value; -1 means 90° * step size in voxels, at most 86.9°
+    float GetEffectiveAngularThresholdDeg() const;  ///< threshold in effect, in degrees
+    void SetAngularThresholdDeg(float angular_threshold_deg);  ///< -1 for automatic
 
     float GetLoopCheckDeg() const;
     void SetLoopCheckDeg(float loop_check_deg);
