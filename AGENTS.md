@@ -146,6 +146,13 @@ Facts the layout does not show:
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
   set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
   voxel grid (`mitkFiberImageGrid.h`).
+- `ctest -R Tractography` runs the `FiberTracking` tests. Streamline tracking seeds its random
+  engines per seed point, so a tractogram with a fixed seed (`--fix_seed`, "Fix Random Seed") is
+  the same at any number of OpenMP threads; the handlers take tensors, ODF directions and peaks as
+  world (LPS) vectors and never apply the image rotation. Gibbs tracking samples the ODF along the
+  particle in the image-axis frame and looks it up at the world direction. MITK-Data tractography
+  references (`StreamlineTractography/ReferenceFibs/`, `gibbsTractogram_v3.fib`) depend on the
+  exact random engines and seeds, so a change there is checked bit for bit against the old output.
 
 ## Porting state
 
