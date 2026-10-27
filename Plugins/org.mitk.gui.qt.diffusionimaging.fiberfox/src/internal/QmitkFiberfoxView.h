@@ -152,6 +152,11 @@ protected:
 
     void SaveParameters(QString filename);
 
+    /** Prototype signal models of m_Parameters that have no kernels yet. */
+    std::vector< mitk::RawShModel<>* > GetPrototypeModelsWithoutKernels();
+    /** Samples the kernels of the given models from the DWI; false if a model got no valid kernel. */
+    bool SamplePrototypeKernels(mitk::Image::Pointer diffImg, const std::vector< mitk::RawShModel<>* >& models);
+
 
     mitk::DataNode::Pointer                             m_SelectedImageNode;
 
