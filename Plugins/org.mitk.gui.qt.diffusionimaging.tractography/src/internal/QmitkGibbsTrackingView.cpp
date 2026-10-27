@@ -583,11 +583,25 @@ void QmitkGibbsTrackingView::LoadTrackingParameters()
     return;
 
   tinyxml2::XMLDocument doc;
-  doc.LoadFile(filename.toStdString().c_str());
-
+  tinyxml2::XMLElement* pElem = nullptr;
   // RootElement(), not FirstChild(): with an <?xml?> declaration, that is the first child.
-  tinyxml2::XMLNode * hRoot = doc.RootElement();
-  auto pElem = hRoot->FirstChildElement("parameter_set");
+  if (doc.LoadFile(filename.toStdString().c_str()) == tinyxml2::XML_SUCCESS && doc.RootElement() != nullptr)
+    pElem = doc.RootElement()->FirstChildElement("parameter_set");
+  if (pElem == nullptr)
+  {
+    QMessageBox::warning(nullptr, "Gibbs Tracking", "Not a Gibbs tracking parameter file (no <parameter_set>):\n" + filename);
+    return;
+  }
+  // checked before any widget changes, so that an incomplete file changes nothing
+  for (const char* name : {"iterations", "particle_length", "particle_width", "particle_weight", "temp_start",
+                           "temp_end", "inexbalance", "fiber_length", "curvature_threshold"})
+  {
+    if (pElem->Attribute(name) == nullptr)
+    {
+      QMessageBox::warning(nullptr, "Gibbs Tracking", QString("The parameter file has no attribute %1:\n%2").arg(name).arg(filename));
+      return;
+    }
+  }
 
   QString iterations(pElem->Attribute("iterations"));
   m_Controls->m_IterationsBox->setText(iterations);
