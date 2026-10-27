@@ -8,7 +8,7 @@ This view provides tools to derive additional information (such as tract density
 - Tractogram: The input streamlines.
 - Reference Image: The output images will have the same geometry as this reference image (optional). If a reference image with DICOM tags is used, the resulting tract envelope can be saved as DICOM Segmentation Object.
 
-Without a reference image, all fiber-derived images and principal fiber directions use the same grid, which covers the bounding box of the tractogram. The upsampling factor divides each voxel of the reference image or of this grid into factor x factor x factor voxels.
+Without a reference image, all fiber-derived images and principal fiber directions use the same grid, which covers the bounding box of the tractogram. For the fiber-derived images, the upsampling factor divides each voxel of the reference image or of this grid into factor x factor x factor voxels; the principal fiber directions are not upsampled.
 
 \section SecFDI Fiber-derived Images
 
@@ -25,7 +25,7 @@ Without a reference image, all fiber-derived images and principal fiber directio
 Calculate the voxel-wise principal fiber directions (fixels) from a tractogram.
 - Max. Peaks: Maximum number of output directions per voxel (at least 1).
 - Angular Threshold: Cluster directions that are close together using the specified threshold (in degree).
-- Size Threshold: Discard principal directions whose size is smaller than this fraction of the largest direction in the voxel. The size of a direction is the summed length of the fiber segments clustered into it, weighted by the fiber weights.
+- Size Threshold: Discard principal directions whose size is smaller than this fraction of the largest direction in the voxel. The size of a direction is the summed length of the fiber segments clustered into it, weighted by the fiber weights. The clustering can count a segment for two neighbouring clusters; when these are merged into one direction, the segment counts twice in its size.
 - Normalization: Normalize the principal fiber directions by the global maximum, the voxel-wise maximum or each direction individually.
 - Output \#Directions per Voxel: Generate an image that contains the number of principal directions per voxel as values.
 

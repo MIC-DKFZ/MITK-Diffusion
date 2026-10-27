@@ -388,6 +388,8 @@ TractsToVectorImageFilter< PixelType >::DirectionContainerType::Pointer TractsTo
     }
     return outDirs;
   }
+  // The mean-shift windows of this pass may overlap, so a direction can be a member of two
+  // clusters; when the next pass merges them, their sizes add and that direction counts twice.
   else
     return FastClustering(outDirs, newLengths);
 }
