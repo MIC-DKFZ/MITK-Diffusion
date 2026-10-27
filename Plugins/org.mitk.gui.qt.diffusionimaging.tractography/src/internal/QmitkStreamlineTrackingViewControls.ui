@@ -879,7 +879,7 @@ QGroupBox {
        <item row="9" column="1">
         <widget class="QDoubleSpinBox" name="m_MaxTractLengthBox">
          <property name="toolTip">
-          <string>Minimum tract length in mm. Shorter fibers are discarded.</string>
+          <string>Maximum tract length in mm. Streamlines stop when they reach it.</string>
          </property>
          <property name="statusTip">
           <string>Maximum fiber length (in mm)</string>
@@ -1090,7 +1090,7 @@ QGroupBox {
        <item row="2" column="1">
         <widget class="QSpinBox" name="m_SharpenOdfsBox">
          <property name="toolTip">
-          <string>Rais ODF to the power of X</string>
+          <string>Raise ODF to the power of X</string>
          </property>
          <property name="minimum">
           <number>1</number>

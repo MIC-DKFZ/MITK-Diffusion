@@ -752,7 +752,7 @@ QGroupBox {
       <item row="9" column="2">
        <widget class="QSlider" name="m_RandomSeedSlider">
         <property name="toolTip">
-         <string>auto = 1.5 * min. spacing; l</string>
+         <string>Seed of the random generator; auto = a new seed for every run.</string>
         </property>
         <property name="minimum">
          <number>-1</number>
