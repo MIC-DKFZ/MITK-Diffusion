@@ -349,8 +349,8 @@ int main( int argc, char* argv[] )
     }
   }
 
-  std::string outputFile = us::any_cast<std::string>(parsedArgs["i"]);
-  std::string inputFile = us::any_cast<std::string>(parsedArgs["o"]);
+  std::string inputFile = us::any_cast<std::string>(parsedArgs["i"]);
+  std::string outputFile = us::any_cast<std::string>(parsedArgs["o"]);
 
   std::vector<std::string> spacings;
   float spacing[] = { 0.0f, 0.0f, 0.0f };
