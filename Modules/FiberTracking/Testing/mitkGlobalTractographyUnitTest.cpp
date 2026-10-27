@@ -12,7 +12,9 @@ found in the LICENSE file.
 
 #include <itkGibbsTrackingFilter.h>
 #include <itkImageRegionIteratorWithIndex.h>
+#include <fstream>
 #include <mitkFiberBuilder.h>
+#include <mitkIOUtil.h>
 #include <mitkGibbsEnergyComputer.h>
 #include <mitkMetropolisHastingsSampler.h>
 #include <mitkParticleGrid.h>
@@ -49,6 +51,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(OptimalShift_OneNeighbour_FacesIt);
   MITK_TEST(Filter_EmptyMask_Throws);
   MITK_TEST(Filter_WeightEstimationWithoutBirths_Throws);
+  MITK_TEST(Filter_BrokenParameterFile_Throws);
   CPPUNIT_TEST_SUITE_END();
 
   using OdfImageType = GibbsEnergyComputer::ItkOdfImgType;
@@ -282,6 +285,47 @@ public:
   {
     auto filter = MakeFilter(1.0f);
     CPPUNIT_ASSERT_THROW(filter->Update(), mitk::Exception);
+  }
+
+  /** A missing, non-XML or incomplete parameter file used to crash (null dereference) or to give an
+   *  empty tractogram reported as success. */
+  void Filter_BrokenParameterFile_Throws()
+  {
+    auto expectThrow = [](const std::string &file, const std::string &expectedInMessage)
+    {
+      auto filter = MakeFilter(1.0f);
+      filter->SetLoadParameterFile(file);
+      try
+      {
+        filter->Update();
+      }
+      catch (const mitk::Exception &e)
+      {
+        CPPUNIT_ASSERT_MESSAGE(e.GetDescription(), std::string(e.GetDescription()).find(expectedInMessage) != std::string::npos);
+        return;
+      }
+      CPPUNIT_FAIL("no exception for " + file);
+    };
+    auto writeFile = [](const std::string &content)
+    {
+      std::ofstream stream;
+      const std::string file = mitk::IOUtil::CreateTemporaryFile(stream, "gibbs_XXXXXX.gtp");
+      stream << content;
+      return file;
+    };
+
+    expectThrow(mitk::IOUtil::GetTempPath() + "/no_such_gibbs_parameters.gtp", "Could not read");
+    const std::string notXml = writeFile("this is not xml");
+    expectThrow(notXml, "Could not read");
+    const std::string noSet = writeFile("<global_tracking_parameter_file/>");
+    expectThrow(noSet, "parameter_set");
+    const std::string noCurvature = writeFile(
+      "<?xml version=\"1.0\" ?><global_tracking_parameter_file><parameter_set iterations=\"1000\" "
+      "particle_length=\"1.5\" particle_width=\"0.5\" particle_weight=\"0.001\" temp_start=\"0.1\" "
+      "temp_end=\"0.001\" inexbalance=\"0\" fiber_length=\"10\"/></global_tracking_parameter_file>");
+    expectThrow(noCurvature, "curvature_threshold");
+    for (const auto &file : {notXml, noSet, noCurvature})
+      std::remove(file.c_str());
   }
 };
 

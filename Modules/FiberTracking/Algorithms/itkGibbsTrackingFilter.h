@@ -117,7 +117,7 @@ protected:
     ~GibbsTrackingFilter() override;
     void EstimateParticleWeight();
     void PrepareMaskImage();
-    bool LoadParameters();
+    void LoadParameters(); ///< throws mitk::Exception for a missing or incomplete file
     bool SaveParameters();
 
     // Input Images

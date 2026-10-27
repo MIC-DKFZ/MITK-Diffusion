@@ -172,6 +172,9 @@ template< class ItkOdfImageType >
 void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
 {
   TimeProbe preClock; preClock.Start();
+  // before the preparation, so that a broken file is reported at once
+  LoadParameters();
+
   // check if input is Odf or tensor image and generate Odf if necessary
   if (m_OdfImage.IsNull() && m_TensorImage.IsNotNull())
   {
@@ -211,9 +214,6 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
     hasActiveVoxel = maskIt.Get() > 0.5;
   if (!hasActiveVoxel)
     mitkThrow() << "The mask image has no voxel with a value above 0.5 inside the image region; nothing to track.";
-
-  // load parameter file
-  LoadParameters();
 
   // prepare parameters
   float minSpacing;
@@ -401,63 +401,48 @@ void GibbsTrackingFilter< ItkOdfImageType >::PrepareMaskImage()
 
 // load tracking paramters from xml file (.gtp)
 template< class ItkOdfImageType >
-bool GibbsTrackingFilter< ItkOdfImageType >::LoadParameters()
+void GibbsTrackingFilter< ItkOdfImageType >::LoadParameters()
 {
-  m_AbortTracking = true;
-  try
+  if( m_LoadParameterFile.length()==0 )
+    return;
+
+  MITK_INFO << "GibbsTrackingFilter: loading parameter file " << m_LoadParameterFile;
+
+  tinyxml2::XMLDocument doc;
+  if (doc.LoadFile(m_LoadParameterFile.c_str()) != tinyxml2::XML_SUCCESS)
+    mitkThrow() << "Could not read Gibbs tracking parameter file " << m_LoadParameterFile << ": " << doc.ErrorStr();
+
+  // RootElement(), not FirstChild(): with an <?xml?> declaration, that is the first child.
+  tinyxml2::XMLElement* pElem = doc.RootElement() != nullptr ? doc.RootElement()->FirstChildElement("parameter_set") : nullptr;
+  if (pElem == nullptr)
+    mitkThrow() << "Gibbs tracking parameter file " << m_LoadParameterFile << " has no <parameter_set> element.";
+
+  // the type tag selects the type parsed, so that floats are read as before
+  auto read = [&](const char* name, auto typeTag)
   {
-    if( m_LoadParameterFile.length()==0 )
+    const char* value = pElem->Attribute(name);
+    if (value == nullptr)
+      mitkThrow() << "Gibbs tracking parameter file " << m_LoadParameterFile << " has no attribute " << name << ".";
+    try
     {
-      m_AbortTracking = false;
-      return true;
+      return boost::lexical_cast<decltype(typeTag)>(value);
     }
+    catch (const boost::bad_lexical_cast &)
+    {
+      mitkThrow() << "Gibbs tracking parameter file " << m_LoadParameterFile << ": " << name << "=\"" << value << "\" is not a number.";
+    }
+  };
 
-    MITK_INFO << "GibbsTrackingFilter: loading parameter file " << m_LoadParameterFile;
-
-    tinyxml2::XMLDocument doc;
-    doc.LoadFile(m_LoadParameterFile.c_str());
-
-	
-    // RootElement(), not FirstChild(): with an <?xml?> declaration, that is the first child.
-    tinyxml2::XMLNode * hRoot = doc.RootElement();
-	
-    auto pElem = hRoot->FirstChildElement("parameter_set");
-
-    std::string iterations(pElem->Attribute("iterations"));
-    m_Iterations = boost::lexical_cast<double>(iterations);
-
-    std::string particleLength(pElem->Attribute("particle_length"));
-    m_ParticleLength = boost::lexical_cast<float>(particleLength);
-
-    std::string particleWidth(pElem->Attribute("particle_width"));
-    m_ParticleWidth = boost::lexical_cast<float>(particleWidth);
-
-    std::string partWeight(pElem->Attribute("particle_weight"));
-    m_ParticleWeight = boost::lexical_cast<float>(partWeight);
-
-    std::string startTemp(pElem->Attribute("temp_start"));
-    m_StartTemperature = boost::lexical_cast<float>(startTemp);
-
-    std::string endTemp(pElem->Attribute("temp_end"));
-    m_EndTemperature = boost::lexical_cast<float>(endTemp);
-
-    std::string inExBalance(pElem->Attribute("inexbalance"));
-    m_InexBalance = boost::lexical_cast<float>(inExBalance);
-
-    std::string fiberLength(pElem->Attribute("fiber_length"));
-    m_MinFiberLength = boost::lexical_cast<float>(fiberLength);
-
-    std::string curvThres(pElem->Attribute("curvature_threshold"));
-    m_CurvatureThreshold = cos(boost::lexical_cast<float>(curvThres)*itk::Math::pi/180);
-    m_AbortTracking = false;
-    MITK_INFO << "GibbsTrackingFilter: parameter file loaded successfully";
-    return true;
-  }
-  catch(...)
-  {
-    MITK_INFO << "GibbsTrackingFilter: could not load parameter file";
-    return false;
-  }
+  m_Iterations = read("iterations", double());
+  m_ParticleLength = read("particle_length", float());
+  m_ParticleWidth = read("particle_width", float());
+  m_ParticleWeight = read("particle_weight", float());
+  m_StartTemperature = read("temp_start", float());
+  m_EndTemperature = read("temp_end", float());
+  m_InexBalance = read("inexbalance", float());
+  m_MinFiberLength = read("fiber_length", float());
+  m_CurvatureThreshold = cos(read("curvature_threshold", float())*itk::Math::pi/180);
+  MITK_INFO << "GibbsTrackingFilter: parameter file loaded successfully";
 }
 
 // save current tracking paramters to xml file (.gtp)
