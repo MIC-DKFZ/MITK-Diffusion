@@ -335,7 +335,7 @@ int main( int argc, char* argv[] )
       return EXIT_FAILURE;
     }
 
-    if (parsedArgs.count("sinc-int"))
+    if (parsedArgs.count("win-sinc"))
       useLinearInterpol = false;
 
     if (parsedArgs.count("nearest-neigh"))
@@ -422,7 +422,7 @@ int main( int argc, char* argv[] )
     if (useSpacing)
       resultImage = ResampleBySpacing(inputImage,spacing,useLinearInterpol,useNN);
     else
-      resultImage = TransformToReference(refImage,inputImage,useLinearInterpol,useNN);
+      resultImage = TransformToReference(refImage,inputImage,!useLinearInterpol,useNN);
 
 
     mitk::IOUtil::Save(resultImage, outputFile);
