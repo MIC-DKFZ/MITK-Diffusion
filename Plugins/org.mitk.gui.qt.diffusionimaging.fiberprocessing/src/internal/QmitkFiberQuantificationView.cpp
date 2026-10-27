@@ -31,8 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateAnd.h>
 #include <mitkImageCast.h>
 #include <mitkPeakImage.h>
-#include <mitkLabelSetImage.h>
-#include <mitkDICOMQIPropertyHelper.h>
 
 // ITK
 #include <itkTractDensityImageFilter.h>
@@ -41,12 +39,46 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkTractsToFiberEndingsImageFilter.h>
 #include <itkSignedMaurerDistanceMapImageFilter.h>
 #include <itkBinaryThinningImageFilter.h>
-#include <mitkLabelSetImage.h>
 
 #include <mitkLexicalCast.h>
 
 const std::string QmitkFiberQuantificationView::VIEW_ID = "org.mitk.views.fiberquantification";
 using namespace mitk;
+
+namespace
+{
+  /**
+   * An image without pixel buffer on the grid of the reference image. The image generators use
+   * their reference image only for its grid (mitk::FiberImageGrid::FromReference, the direction
+   * filter with SetOnlyUseMaskGeometry), so any 3D image, also a DWI or another multi-component
+   * image, can serve as reference without converting its pixels.
+   */
+  template <class TImage>
+  typename TImage::Pointer ReferenceGrid(const mitk::Image* reference)
+  {
+    const mitk::BaseGeometry* geometry = reference->GetGeometry();
+    typename TImage::SpacingType spacing;
+    typename TImage::DirectionType direction;
+    typename TImage::PointType origin;
+    typename TImage::RegionType region;
+    for (unsigned int i=0; i<3; ++i)
+    {
+      spacing[i] = geometry->GetSpacing()[i];
+      origin[i] = geometry->GetOrigin()[i];
+      region.SetSize(i, reference->GetDimension(i));
+      // column i of the geometry matrix is direction i scaled by the spacing along i
+      for (unsigned int j=0; j<3; ++j)
+        direction[j][i] = geometry->GetMatrixColumn(i)[j] / spacing[i];
+    }
+
+    auto grid = TImage::New();
+    grid->SetSpacing(spacing);
+    grid->SetOrigin(origin);
+    grid->SetDirection(direction);
+    grid->SetRegions(region);
+    return grid;
+  }
+}
 
 QmitkFiberQuantificationView::QmitkFiberQuantificationView()
   : QmitkAbstractView()
@@ -125,9 +157,7 @@ void QmitkFiberQuantificationView::CalculateFiberDirections()
   itk::TractsToVectorImageFilter<float>::Pointer fOdfFilter = itk::TractsToVectorImageFilter<float>::New();
   if (m_SelectedImage.IsNotNull())
   {
-    ItkUcharImgType::Pointer itkMaskImage = ItkUcharImgType::New();
-    mitk::CastToItkImage<ItkUcharImgType>(m_SelectedImage, itkMaskImage);
-    fOdfFilter->SetMaskImage(itkMaskImage);
+    fOdfFilter->SetMaskImage(ReferenceGrid<ItkUcharImgType>(m_SelectedImage));
   }
 
   // extract directions from fiber bundle
@@ -196,8 +226,8 @@ void QmitkFiberQuantificationView::OnSelectionChanged(berry::IWorkbenchPart::Poi
 void QmitkFiberQuantificationView::ProcessSelectedBundles()
 {
   if ( m_SelectedFB.empty() ){
-    QMessageBox::information( nullptr, "Warning", "No fibe bundle selected!");
-    MITK_WARN("QmitkFiberQuantificationView") << "no fibe bundle selected";
+    QMessageBox::information( nullptr, "Warning", "No fiber bundle selected!");
+    MITK_WARN("QmitkFiberQuantificationView") << "no fiber bundle selected";
     return;
   }
 
@@ -210,22 +240,28 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
     {
       mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
       QString name(node->GetName().c_str());
+      if (fib->GetNumFibers()==0)
+      {
+        QMessageBox::information(nullptr, "No output generated:", QString("%1 contains no fibers.").arg(name));
+        continue;
+      }
       DataNode::Pointer newNode = nullptr;
       switch(generationMethod){
       case 0:
-        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, true, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, true);
         name += "_TDI";
         break;
       case 1:
-        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, false, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::DENSITY, false);
         name += "_TDI";
         break;
       case 2:
-        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::BINARY, false, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::BINARY, false);
         name += "_envelope";
         break;
       case 3:
         newNode = GenerateColorHeatmap(fib);
+        name += "_fiber_bundle_image";
         break;
       case 4:
         newNode = GenerateFiberEndingsImage(fib);
@@ -244,7 +280,7 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
         name += "_skeleton";
         break;
       case 8:
-        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::VISITATION_COUNT, true, node->GetName());
+        newNode = GenerateTractDensityImage(fib, itk::TDI_MODE::VISITATION_COUNT, true);
         name += "_visitations";
         break;
       case 9:
@@ -281,7 +317,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateFiberEndingsPointS
       pointSet->InsertPoint(count, itkPoint);
       count++;
     }
-    if (numPoints>2)
+    if (numPoints>1)
     {
       double* point = points->GetPoint(numPoints-1);
       itk::Point<double,3> itkPoint = mitk::imv::GetItkPoint(point);
@@ -335,9 +371,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateFiberEndingsImage(
   generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
-    OutImageType::Pointer itkImage = OutImageType::New();
-    CastToItkImage(m_SelectedImage, itkImage);
-    generator->SetInputImage(itkImage);
+    generator->SetInputImage(ReferenceGrid<OutImageType>(m_SelectedImage));
     generator->SetUseImageGeometry(true);
   }
   generator->Update();
@@ -365,9 +399,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateColorHeatmap(mitk:
   generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
-    itk::Image<unsigned char, 3>::Pointer itkImage = itk::Image<unsigned char, 3>::New();
-    CastToItkImage(m_SelectedImage, itkImage);
-    generator->SetInputImage(itkImage);
+    generator->SetInputImage(ReferenceGrid<itk::Image<unsigned char, 3>>(m_SelectedImage));
     generator->SetUseImageGeometry(true);
   }
   generator->Update();
@@ -395,9 +427,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateBinarySkeleton(mit
   envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
-    UcharImageType::Pointer itkImage = UcharImageType::New();
-    CastToItkImage(m_SelectedImage, itkImage);
-    envelope_generator->SetInputImage(itkImage);
+    envelope_generator->SetInputImage(ReferenceGrid<UcharImageType>(m_SelectedImage));
     envelope_generator->SetUseImageGeometry(true);
 
   }
@@ -428,9 +458,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateDistanceMap(mitk::
   envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
-    UcharImageType::Pointer itkImage = UcharImageType::New();
-    CastToItkImage(m_SelectedImage, itkImage);
-    envelope_generator->SetInputImage(itkImage);
+    envelope_generator->SetInputImage(ReferenceGrid<UcharImageType>(m_SelectedImage));
     envelope_generator->SetUseImageGeometry(true);
 
   }
@@ -454,7 +482,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateDistanceMap(mitk::
 }
 
 // generate tract density image from fiber bundle
-mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, itk::TDI_MODE mode, bool absolute, std::string name)
+mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, itk::TDI_MODE mode, bool absolute)
 {
   mitk::DataNode::Pointer node = mitk::DataNode::New();
   if (mode==itk::TDI_MODE::BINARY)
@@ -469,9 +497,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
     generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
     if (m_SelectedImage.IsNotNull())
     {
-      OutImageType::Pointer itkImage = OutImageType::New();
-      CastToItkImage(m_SelectedImage, itkImage);
-      generator->SetInputImage(itkImage);
+      generator->SetInputImage(ReferenceGrid<OutImageType>(m_SelectedImage));
       generator->SetUseImageGeometry(true);
 
     }
@@ -484,30 +510,9 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
     img->InitializeByItk(outImg.GetPointer());
     img->SetVolume(outImg->GetBufferPointer());
 
-
-    if (m_SelectedImage.IsNotNull())
-    {
-      mitk::MultiLabelSegmentation::Pointer multilabelImage = mitk::MultiLabelSegmentation::New();
-      multilabelImage->InitializeByLabeledImage(img);
-      mitk::Label::Pointer label = multilabelImage->GetLabel(1);
-      label->SetName("Tractogram");
-
-      // Segmented Property Category Code Sequence (0062, 0003): the general category of this segment.
-      label->SetSegmentedPropertyCategory(DICOMCodeSequence("T-D000A", "SRT", "Anatomical Structure"));
-
-      // Segmented Property Type Code Sequence (0062, 000F): the specific property type of this segment.
-      label->SetSegmentedPropertyType(DICOMCodeSequenceWithModifiers("DUMMY", "SRT", name));
-
-      //Error: is undeclared//      mitk::DICOMQIPropertyHandler::DeriveDICOMSourceProperties(m_SelectedImage, multilabelImage);
-
-      // init data node
-      node->SetData(multilabelImage);
-    }
-    else
-    {
-      // init data node
-      node->SetData(img);
-    }
+    // A plain binary image also with a reference image: the ROI and parcellation selectors of
+    // the other fiber views accept images, not multilabel segmentations.
+    node->SetData(img);
 
   }
   else
@@ -522,9 +527,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
     generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
     if (m_SelectedImage.IsNotNull())
     {
-      OutImageType::Pointer itkImage = OutImageType::New();
-      CastToItkImage(m_SelectedImage, itkImage);
-      generator->SetInputImage(itkImage);
+      generator->SetInputImage(ReferenceGrid<OutImageType>(m_SelectedImage));
       generator->SetUseImageGeometry(true);
 
     }

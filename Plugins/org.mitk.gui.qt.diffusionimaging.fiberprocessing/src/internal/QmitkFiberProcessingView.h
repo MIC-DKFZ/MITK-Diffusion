@@ -179,8 +179,8 @@ protected:
   float                                 m_UpsamplingFactor; ///< upsampling factor for all image generations
   mitk::DataNode::Pointer               m_RoiImageNode;
 
-  unsigned int                          m_StartInteractionObserverTag;
-  unsigned int                          m_EndInteractionObserverTag;
+  /** The planar figures this view observes, with the tag of its observer */
+  std::vector<std::pair<mitk::PlanarFigure::Pointer, unsigned long>> m_FigureObservers;
   mitk::DataNode::Pointer               m_InteractiveNode;
 
   void AddCompositeToDatastorage(mitk::DataNode::Pointer pfc, std::vector<mitk::DataNode::Pointer> children, mitk::DataNode::Pointer parentNode=nullptr);
@@ -190,6 +190,10 @@ protected:
   mitk::DataNode::Pointer GenerateColorHeatmap(mitk::FiberBundle::Pointer fib);
   mitk::DataNode::Pointer GenerateFiberEndingsImage(mitk::FiberBundle::Pointer fib);
   mitk::DataNode::Pointer GenerateFiberEndingsPointSet(mitk::FiberBundle::Pointer fib);
+
+  /** Fills an empty bundle or planar figure selection with the topmost top-level node of that
+   *  kind, other than excluded. */
+  void SelectTopmostIfEmpty(const mitk::DataNode* excluded);
 
   void NodeAdded( const mitk::DataNode* node ) override;
   void NodeRemoved(const mitk::DataNode* node) override;

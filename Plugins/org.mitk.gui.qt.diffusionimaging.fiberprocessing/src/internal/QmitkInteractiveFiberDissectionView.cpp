@@ -69,6 +69,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vnl/vnl_sparse_matrix.h>
 #include <numeric>
 #include <random>
+#include <stdexcept>
 
 #include <thread>
 
@@ -107,7 +108,10 @@ QmitkInteractiveFiberDissectionView::QmitkInteractiveFiberDissectionView()
 // Destructor
 QmitkInteractiveFiberDissectionView::~QmitkInteractiveFiberDissectionView()
 {
-
+  // the brush must not keep editing the label bundles once the view is closed
+  this->StopLabelingBrush();
+  if (m_StreamlineInteractorBrush.IsNotNull())
+    m_StreamlineInteractorBrush->SetDataNode(nullptr);
 }
 
 
@@ -382,6 +386,8 @@ void QmitkInteractiveFiberDissectionView::SFFPrototypes()
   }
 
   m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+  if (GetBundle(m_testnode).IsNull())
+    throw std::runtime_error("Select the tractogram to dissect.");
   const unsigned int numPrototypes = m_Controls->m_NumPrototypes->value();
   MITK_INFO << "Create " << numPrototypes << " prototypes based on SFF";
 
@@ -723,6 +729,13 @@ void QmitkInteractiveFiberDissectionView::UncheckLabelingBrushes()
 
 void QmitkInteractiveFiberDissectionView::StartLabelingBrush(mitk::DataNode::Pointer toLabelNode, bool fromPrediction)
 {
+    // the label bundles exist from the first sampling on and are gone after a reset
+    if (toLabelNode.IsNull() || m_negativeBundleNode.IsNull() || m_positiveBundleNode.IsNull())
+    {
+      MITK_WARN << "Nothing to label: sample streamlines first.";
+      return;
+    }
+
     this->CreateStreamlineInteractorBrush();
     m_StreamlineInteractorBrush->EnableInteraction(true);
     m_StreamlineInteractorBrush->LabelfromPrediction(fromPrediction);
@@ -782,6 +795,11 @@ bool QmitkInteractiveFiberDissectionView::RunClassifier(mitk::FiberBundle::Point
       classifier->SetTractogramPlus(plus);
       classifier->SetTractogramMinus(minus);
       classifier->Update();
+
+      MITK_INFO << "Number of Cycles " << m_activeCycleCounter;
+      MITK_INFO << "Algorithm run succesfully";
+
+      this->CreatePredictionNode();
     }
     catch (const std::exception &e)
     {
@@ -790,10 +808,6 @@ bool QmitkInteractiveFiberDissectionView::RunClassifier(mitk::FiberBundle::Point
       return false;
     }
 
-    MITK_INFO << "Number of Cycles " << m_activeCycleCounter;
-    MITK_INFO << "Algorithm run succesfully";
-
-    this->CreatePredictionNode();
     m_activeCycleCounter += 1;
     return true;
 }
@@ -856,7 +870,7 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
 
      MITK_INFO << "Create Fibers to label based on Uncertainty";
 
-     // next batch of the most uncertain streamlines that are still in the pool
+     // next batch of the most uncertain streamlines not handed out for labeling yet
      const auto& uncertain = classifier->GetUncertainIds();
      const bool generalization = m_generalizationMode != 0;
      const auto numRequested = static_cast<std::size_t>((generalization ? m_Controls->m_NumRandomFibers2Ben : m_Controls->m_NumRandomFibers2)->value());
@@ -864,7 +878,7 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
      while (static_cast<std::size_t>(m_uncCounter) < uncertain.size() && ids.size() < numRequested)
      {
        const auto id = uncertain[m_uncCounter++];
-       if (classifier->IsInPool(id))
+       if (classifier->IsAvailableForSampling(id))
          ids.push_back(id);
      }
      if (ids.empty())
@@ -875,12 +889,13 @@ void QmitkInteractiveFiberDissectionView::CreateUncertaintySampleNode()
 
      this->GetDataStorage()->Remove(m_UncertaintyLabelNode);
      m_UncertaintyLabel = classifier->ExtractFibers(ids);
-     classifier->RemoveFromPool(ids);
+     classifier->ExcludeFromSampling(ids);
 
      m_UncertaintyLabelNode = CreateBundleNode("UncertaintyLabel" + std::to_string(m_activeCycleCounter), m_UncertaintyLabel);
      this->GetDataStorage()->Add(m_UncertaintyLabelNode);
 
-     m_PredictionNode->SetVisibility(false);
+     if (m_PredictionNode.IsNotNull())
+       m_PredictionNode->SetVisibility(false);
      (generalization ? m_Controls->m_unclabelingBrushGen : m_Controls->m_unclabelingBrush)->setChecked(true);
 
      UpdateGui();
@@ -911,13 +926,15 @@ void QmitkInteractiveFiberDissectionView::CreateDistanceSampleNode()
       return;
     }
 
+    this->GetDataStorage()->Remove(m_DistanceLabelNode);
     m_DistanceLabel = classifier->ExtractFibers(ids);
-    classifier->RemoveFromPool(ids);
+    classifier->ExcludeFromSampling(ids);
 
     m_DistanceLabelNode = CreateBundleNode("DistanceLabel" + std::to_string(m_activeCycleCounter), m_DistanceLabel);
     this->GetDataStorage()->Add(m_DistanceLabelNode);
 
-    m_PredictionNode->SetVisibility(false);
+    if (m_PredictionNode.IsNotNull())
+      m_PredictionNode->SetVisibility(false);
 
     if (generalization)
       m_Controls->m_distlabelingBrushGen->setChecked(true);
@@ -933,7 +950,8 @@ void QmitkInteractiveFiberDissectionView::RemovefromUncertaintyBrush( bool check
     {
         m_Controls->m_predlabelingBrush->setChecked(false);
         m_Controls->m_predlabelingBrushGen->setChecked(false);
-        m_UncertaintyLabel->SetFiberColors(255, 255, 255);
+        if (m_UncertaintyLabel.IsNotNull())
+          m_UncertaintyLabel->SetFiberColors(255, 255, 255);
         this->StartLabelingBrush(m_UncertaintyLabelNode, false);
     }
     else
@@ -952,7 +970,8 @@ void QmitkInteractiveFiberDissectionView::RemovefromDistanceBrush(bool checked)
         m_Controls->m_predlabelingBrush->setChecked(false);
         m_Controls->m_predlabelingBrushGen->setChecked(false);
 
-        m_DistanceLabel->SetFiberColors(255, 255, 255);
+        if (m_DistanceLabel.IsNotNull())
+          m_DistanceLabel->SetFiberColors(255, 255, 255);
         this->StartLabelingBrush(m_DistanceLabelNode, false);
     }
     else
@@ -1019,6 +1038,20 @@ void QmitkInteractiveFiberDissectionView::ResetClassifier()
     m_uncCounter = 0;
 
     classifier.reset();
+
+    // No brush may keep working on the bundles of the old session. The samples to label belong to
+    // the old classifier and go; the prediction stays as a result but is no longer edited.
+    m_Controls->m_BrushButton->setChecked(false);
+    this->UncheckLabelingBrushes();
+    this->StopLabelingBrush();
+    this->GetDataStorage()->Remove(m_UncertaintyLabelNode);
+    this->GetDataStorage()->Remove(m_DistanceLabelNode);
+    m_UncertaintyLabelNode = nullptr;
+    m_DistanceLabelNode = nullptr;
+    m_UncertaintyLabel = nullptr;
+    m_DistanceLabel = nullptr;
+    m_PredictionNode = nullptr;
+
     this->GetDataStorage()->Remove(m_positiveBundleNode);
     this->GetDataStorage()->Remove(m_negativeBundleNode);
     this->GetDataStorage()->Remove(m_newfibersBundleNode);
@@ -1026,15 +1059,14 @@ void QmitkInteractiveFiberDissectionView::ResetClassifier()
     m_positiveBundleNode = nullptr;
     m_negativeBundleNode = nullptr;
     m_newfibersBundleNode = nullptr;
+    // the next +Bundle starts empty, all its labels belong to the new session
+    m_posOffsetcounter = 0;
     m_positiveBundle = nullptr;
     m_negativeBundle = nullptr;
     m_newfibersBundle = nullptr;
     m_Controls->m_TrainClassifier->setEnabled(false);
     m_Controls->m_CreateUncertantyMap->setEnabled(false);
     m_Controls->m_AddDistanceFibers->setEnabled(false);
-    m_Controls->m_distlabelingBrush->setChecked(false);
-    m_Controls->m_unclabelingBrush->setChecked(false);
-    m_Controls->m_predlabelingBrush->setChecked(false);
 
     UpdateGui();
 }
@@ -1058,8 +1090,17 @@ void QmitkInteractiveFiberDissectionView::addGeneralizationBundles(bool reset)
       return merged;
     };
 
-    cur_negativeBundle = merge(m_negativeGenBundleNode, m_negativeBundleNode, "-BundleGen", 255, 0, 0);
-    cur_positiveBundle = merge(m_positiveGenBundleNode, m_positiveBundleNode, "+BundleGen", 0, 255, 0);
+    try
+    {
+      cur_negativeBundle = merge(m_negativeGenBundleNode, m_negativeBundleNode, "-BundleGen", 255, 0, 0);
+      cur_positiveBundle = merge(m_positiveGenBundleNode, m_positiveBundleNode, "+BundleGen", 0, 255, 0);
+    }
+    catch (const std::exception &e)
+    {
+      MITK_ERROR << e.what();
+      QMessageBox::warning(nullptr, "Generalization", e.what());
+      return;
+    }
     m_negativeGenBundle = GetBundle(m_negativeGenBundleNode);
     m_positiveGenBundle = GetBundle(m_positiveGenBundleNode);
 
@@ -1090,7 +1131,9 @@ void QmitkInteractiveFiberDissectionView::StartGeneralizationAlgorithm()
 
     cur_negativeBundle = GetBundle(m_negativeGenBundleNode);
     cur_positiveBundle = GetBundle(m_positiveGenBundleNode);
-    m_testnode->SetVisibility(false);
+    m_testnode = m_Controls->m_TestBundleBox->GetSelectedNode();
+    if (m_testnode.IsNotNull())
+      m_testnode->SetVisibility(false);
 
     if (!this->RunClassifier(cur_positiveBundle, cur_negativeBundle))
       return;
@@ -1107,6 +1150,7 @@ void QmitkInteractiveFiberDissectionView::StartGeneralizationAlgorithm()
     m_positiveBundle = mitk::FiberBundle::New();
     m_positiveBundleNode = CreateBundleNode("+Bundle", m_positiveBundle);
     this->GetDataStorage()->Add(m_positiveBundleNode);
+    m_posOffsetcounter = 0;
 
     UpdateGui();
 }
@@ -1125,7 +1169,8 @@ void QmitkInteractiveFiberDissectionView::StartAlgorithmGen( )
                                                   );
     }
 
-    m_testnode->SetVisibility(false);
+    if (m_testnode.IsNotNull())
+      m_testnode->SetVisibility(false);
     this->RunClassifier(cur_positiveBundle, cur_negativeBundle);
 
     UpdateGui();
@@ -1140,7 +1185,17 @@ void QmitkInteractiveFiberDissectionView::AddSavedGeneralizationBundle(const mit
         return;
     }
 
-    auto merged = MergeBundles(tractogram, GetBundle(genNode));
+    mitk::FiberBundle::Pointer merged;
+    try
+    {
+      merged = MergeBundles(tractogram, GetBundle(genNode));
+    }
+    catch (const std::exception &e)
+    {
+      MITK_ERROR << e.what();
+      QMessageBox::warning(nullptr, "Generalization", e.what());
+      return;
+    }
     merged->SetFiberColors(r, g, b);
 
     this->GetDataStorage()->Remove(genNode);

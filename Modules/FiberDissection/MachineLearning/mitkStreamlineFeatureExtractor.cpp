@@ -97,7 +97,11 @@ void StreamlineFeatureExtractor::SetTractogramTest(const mitk::FiberBundle::Poin
   m_PoolFibers = ToMatrix(tractogram, "The tractogram");
   m_PoolIds.resize(m_PoolFibers.size() / FiberStride);
   std::iota(m_PoolIds.begin(), m_PoolIds.end(), 0);
+  m_PoolKeys.resize(m_PoolIds.size());
+  for (std::size_t i = 0; i < m_PoolIds.size(); ++i)
+    m_PoolKeys[i] = Hash(&m_PoolFibers[i * FiberStride]);
   m_PoolActive.assign(m_PoolIds.size(), 1);
+  m_PoolHandedOut.assign(m_PoolIds.size(), 0);
   m_PrototypeColumns.clear();
   m_LocalColumns.clear();
 }
@@ -264,7 +268,7 @@ void StreamlineFeatureExtractor::ReducePool(const std::vector<std::uint64_t> &po
   std::vector<std::size_t> keep;
   for (std::size_t i = 0; i < numCandidates; ++i)
   {
-    if (m_PoolActive[i] && score[i] <= threshold)
+    if (score[i] <= threshold)
       keep.push_back(i);
   }
 
@@ -279,10 +283,13 @@ void StreamlineFeatureExtractor::ReducePool(const std::vector<std::uint64_t> &po
   {
     std::copy_n(m_PoolFibers.begin() + keep[k] * FiberStride, FiberStride, fibers.begin() + k * FiberStride);
     m_PoolIds[k] = m_PoolIds[keep[k]];
+    m_PoolKeys[k] = m_PoolKeys[keep[k]];
   }
   m_PoolFibers.swap(fibers);
   m_PoolIds.resize(keep.size());
+  m_PoolKeys.resize(keep.size());
   m_PoolActive.assign(keep.size(), 1);
+  m_PoolHandedOut.assign(keep.size(), 0);
 
   for (auto& column : m_PrototypeColumns)
   {
@@ -528,6 +535,13 @@ void StreamlineFeatureExtractor::Update()
     ReducePool(plusKeys);
   }
 
+  // Labeled pool fibers are training samples, not candidates. Fibers handed out for labeling but
+  // left unlabeled are candidates again.
+  const std::unordered_set<std::uint64_t> labeled(localKeys.begin(), localKeys.end());
+  for (std::size_t i = 0; i < m_PoolIds.size(); ++i)
+    m_PoolActive[i] = labeled.count(m_PoolKeys[i]) ? 0 : 1;
+  m_PoolHandedOut.assign(m_PoolIds.size(), 0);
+
   AddLocalColumns(localKeys, localReferences);
   if (m_PrototypeColumns.empty())
   {
@@ -621,7 +635,7 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetDiverseUncertainIds(flo
   std::vector<unsigned int> order;
   for (std::size_t i = 0; i < m_CandidateIds.size(); ++i)
   {
-    if (IsInPool(m_CandidateIds[i]))
+    if (IsAvailableForSampling(m_CandidateIds[i]))
       order.push_back(i);
   }
   std::stable_sort(order.begin(), order.end(), [this](unsigned int a, unsigned int b) { return m_Entropies[a] > m_Entropies[b]; });
@@ -642,19 +656,22 @@ std::vector<unsigned int> StreamlineFeatureExtractor::GetDiverseUncertainIds(flo
   return ids;
 }
 
-bool StreamlineFeatureExtractor::IsInPool(unsigned int id) const
+bool StreamlineFeatureExtractor::IsAvailableForSampling(unsigned int id) const
 {
   const auto it = std::lower_bound(m_PoolIds.begin(), m_PoolIds.end(), id);
-  return it != m_PoolIds.end() && *it == id && m_PoolActive[it - m_PoolIds.begin()];
+  if (it == m_PoolIds.end() || *it != id)
+    return false;
+  const auto position = it - m_PoolIds.begin();
+  return m_PoolActive[position] && !m_PoolHandedOut[position];
 }
 
-void StreamlineFeatureExtractor::RemoveFromPool(const std::vector<unsigned int> &ids)
+void StreamlineFeatureExtractor::ExcludeFromSampling(const std::vector<unsigned int> &ids)
 {
   for (auto id : ids)
   {
     const auto it = std::lower_bound(m_PoolIds.begin(), m_PoolIds.end(), id);
     if (it != m_PoolIds.end() && *it == id)
-      m_PoolActive[it - m_PoolIds.begin()] = 0;
+      m_PoolHandedOut[it - m_PoolIds.begin()] = 1;
   }
 }
 

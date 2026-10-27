@@ -648,10 +648,42 @@ QGroupBox {
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="QDoubleSpinBox" name="m_ExtractDirX"/>
+           <widget class="QDoubleSpinBox" name="m_ExtractDirX">
+            <property name="toolTip">
+             <string>Direction to remove; its length and sign do not matter.</string>
+            </property>
+            <property name="minimum">
+             <double>-1.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>1.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
+            <property name="value">
+             <double>0.000000000000000</double>
+            </property>
+           </widget>
           </item>
           <item row="1" column="1">
-           <widget class="QDoubleSpinBox" name="m_ExtractDirY"/>
+           <widget class="QDoubleSpinBox" name="m_ExtractDirY">
+            <property name="toolTip">
+             <string>Direction to remove; its length and sign do not matter.</string>
+            </property>
+            <property name="minimum">
+             <double>-1.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>1.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
+            <property name="value">
+             <double>0.000000000000000</double>
+            </property>
+           </widget>
           </item>
           <item row="2" column="0">
            <widget class="QLabel" name="label_4">
@@ -661,7 +693,23 @@ QGroupBox {
            </widget>
           </item>
           <item row="2" column="1">
-           <widget class="QDoubleSpinBox" name="m_ExtractDirZ"/>
+           <widget class="QDoubleSpinBox" name="m_ExtractDirZ">
+            <property name="toolTip">
+             <string>Direction to remove; its length and sign do not matter.</string>
+            </property>
+            <property name="minimum">
+             <double>-1.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>1.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
+            <property name="value">
+             <double>1.000000000000000</double>
+            </property>
+           </widget>
           </item>
           <item row="3" column="0">
            <widget class="QLabel" name="label_5">
@@ -1653,7 +1701,7 @@ QGroupBox {
           <string>Returns all fibers contained in bundle X that are not contained in bundle Y (not commutative!). Select at least two fiber bundles to execute.</string>
          </property>
          <property name="text">
-          <string>Substract</string>
+          <string>Subtract</string>
          </property>
         </widget>
        </item>
@@ -1723,7 +1771,7 @@ QGroupBox {
           </font>
          </property>
          <property name="toolTip">
-          <string>Merge selected fiber bundles. Select at least two fiber bundles to execute.</string>
+          <string>Add a copy of each selected fiber bundle.</string>
          </property>
          <property name="text">
           <string>Copy</string>
@@ -1775,7 +1823,7 @@ QGroupBox {
       <item row="0" column="0">
        <widget class="QLabel" name="label_2">
         <property name="toolTip">
-         <string>Input DTI</string>
+         <string>Selected fiber bundles</string>
         </property>
         <property name="text">
          <string>Fiber Bundle:</string>
@@ -1785,7 +1833,7 @@ QGroupBox {
       <item row="1" column="0">
        <widget class="QLabel" name="label_6">
         <property name="toolTip">
-         <string>Binary seed ROI. If not specified, the whole image area is seeded.</string>
+         <string>Selected binary mask or label image for the extraction or removal with an ROI image.</string>
         </property>
         <property name="text">
          <string>ROI:</string>

@@ -9,4 +9,6 @@ MITK_CREATE_MODULE(
     PUBLIC OpenCV|opencv_ml
 )
 
+add_subdirectory(Testing)
+
 endif()
