@@ -179,8 +179,8 @@ protected:
   float                                 m_UpsamplingFactor; ///< upsampling factor for all image generations
   mitk::DataNode::Pointer               m_RoiImageNode;
 
-  unsigned int                          m_StartInteractionObserverTag;
-  unsigned int                          m_EndInteractionObserverTag;
+  /** The planar figures this view observes, with the tag of its observer */
+  std::vector<std::pair<mitk::PlanarFigure::Pointer, unsigned long>> m_FigureObservers;
   mitk::DataNode::Pointer               m_InteractiveNode;
 
   void AddCompositeToDatastorage(mitk::DataNode::Pointer pfc, std::vector<mitk::DataNode::Pointer> children, mitk::DataNode::Pointer parentNode=nullptr);

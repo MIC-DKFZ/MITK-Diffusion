@@ -1279,24 +1279,20 @@ void QmitkFiberProcessingView::AddObservers()
     mitk::PlanarFigure* figure = dynamic_cast<mitk::PlanarFigure*>(node->GetData());
     if (figure!=nullptr)
     {
-      figure->RemoveAllObservers();
-
-      // add observer for event when interaction with figure starts
+      // add observer for event when interaction with figure ends
       SimpleCommandType::Pointer endInteractionCommand = SimpleCommandType::New();
       endInteractionCommand->SetCallbackFunction( this, &QmitkFiberProcessingView::OnEndInteraction);
-      m_EndInteractionObserverTag = figure->AddObserver( mitk::EndInteractionPlanarFigureEvent(), endInteractionCommand );
+      m_FigureObservers.emplace_back(figure, figure->AddObserver( mitk::EndInteractionPlanarFigureEvent(), endInteractionCommand ));
     }
   }
 }
 
 void QmitkFiberProcessingView::RemoveObservers()
 {
-  for (auto node : m_SelectedPF)
-  {
-    mitk::PlanarFigure* figure = dynamic_cast<mitk::PlanarFigure*>(node->GetData());
-    if (figure!=nullptr)
-      figure->RemoveAllObservers();
-  }
+  // only the observers of this view: other views (e.g. Measurement) observe the same figures
+  for (const auto& [figure, tag] : m_FigureObservers)
+    figure->RemoveObserver(tag);
+  m_FigureObservers.clear();
 }
 
 void QmitkFiberProcessingView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& nodes)
