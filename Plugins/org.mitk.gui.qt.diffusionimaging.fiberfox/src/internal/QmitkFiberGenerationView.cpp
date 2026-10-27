@@ -84,6 +84,16 @@ QmitkFiberGenerationView::QmitkFiberGenerationView()
 // Destructor
 QmitkFiberGenerationView::~QmitkFiberGenerationView()
 {
+  // the fiducials stay in the data storage after the view is closed
+  for (auto& entry : m_DataNodeToPlanarFigureData)
+    RemoveObservers(entry.second);
+}
+
+void QmitkFiberGenerationView::RemoveObservers(QmitkPlanarFigureData& data)
+{
+  data.m_Figure->RemoveObserver( data.m_SelectObserverTag );
+  data.m_Figure->RemoveObserver( data.m_StartInteractionObserverTag );
+  data.m_Figure->RemoveObserver( data.m_EndInteractionObserverTag );
 }
 
 void QmitkFiberGenerationView::CreateQtPartControl( QWidget *parent )
@@ -1074,25 +1084,19 @@ void QmitkFiberGenerationView::NodeRemoved(const mitk::DataNode* node)
 
   if( it != m_DataNodeToPlanarFigureData.end() )
   {
-    QmitkPlanarFigureData& data = it->second;
-
-    // remove observers
-    data.m_Figure->RemoveObserver( data.m_EndPlacementObserverTag );
-    data.m_Figure->RemoveObserver( data.m_SelectObserverTag );
-    data.m_Figure->RemoveObserver( data.m_StartInteractionObserverTag );
-    data.m_Figure->RemoveObserver( data.m_EndInteractionObserverTag );
-
+    RemoveObservers(it->second);
     m_DataNodeToPlanarFigureData.erase( it );
   }
 }
 
 void QmitkFiberGenerationView::NodeAdded( const mitk::DataNode* node )
 {
-  // add observer for selection in renderwindow
-  mitk::PlanarFigure* figure = dynamic_cast<mitk::PlanarFigure*>(node->GetData());
+  // add observer for selection in renderwindow; only fiducials (ellipses) are this view's figures,
+  // the planar figures of other views keep their own interaction
+  mitk::PlanarEllipse* figure = dynamic_cast<mitk::PlanarEllipse*>(node->GetData());
   bool isPositionMarker (false);
   node->GetBoolProperty("isContourMarker", isPositionMarker);
-  if( figure && !isPositionMarker )
+  if( figure && !isPositionMarker && m_DataNodeToPlanarFigureData.count(const_cast<mitk::DataNode*>(node))==0 )
   {
     MITK_DEBUG << "figure added. will add interactor if needed.";
     mitk::PlanarFigureInteractor::Pointer figureInteractor
@@ -1112,11 +1116,7 @@ void QmitkFiberGenerationView::NodeAdded( const mitk::DataNode* node )
     QmitkPlanarFigureData data;
     data.m_Figure = figure;
 
-    //        // add observer for event when figure has been placed
     typedef itk::SimpleMemberCommand< QmitkFiberGenerationView > SimpleCommandType;
-    //        SimpleCommandType::Pointer initializationCommand = SimpleCommandType::New();
-    //        initializationCommand->SetCallbackFunction( this, &QmitkFiberGenerationView::PlanarFigureInitialized );
-    //        data.m_EndPlacementObserverTag = figure->AddObserver( mitk::EndPlacementPlanarFigureEvent(), initializationCommand );
 
     // add observer for event when figure is picked (selected)
     typedef itk::MemberCommand< QmitkFiberGenerationView > MemberCommandType;
