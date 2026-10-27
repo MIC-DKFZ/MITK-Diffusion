@@ -96,7 +96,7 @@ public:
   {
     // A 5 mm first segment along -y, then 1 mm steps along x. Within +-5 mm of the points
     // 1 to 4, the first segment deviates from the mean direction by more than 15 degrees on
-    // average; the window used to stop before the first segment and kept the whole fiber.
+    // average, so the window must reach the first segment and cut it off.
     mitk::FiberProcessingTestHelper::Polyline fiber = {{0, 5, 0}, {0, 0, 0}};
     for (int i = 1; i <= 20; ++i)
       fiber.push_back({static_cast<double>(i), 0, 0});

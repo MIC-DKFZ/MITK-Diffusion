@@ -91,7 +91,8 @@ public:
 
   void Directions_NoDirectionAllowed_Throws()
   {
-    // The component axis has MaxNumDirections x 3 entries; 0 used to write past the image buffer.
+    // The component axis has MaxNumDirections x 3 entries; 0 must be refused, as it leaves no room
+    // for the directions written to the image buffer.
     auto filter = DirectionFilterType::New();
     filter->SetFiberBundle(CrossingAndParallelFibers());
     filter->SetMaskImage(CreateMask(1, 1, 3));

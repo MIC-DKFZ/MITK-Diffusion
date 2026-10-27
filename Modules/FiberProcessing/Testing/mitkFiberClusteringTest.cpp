@@ -174,8 +174,8 @@ public:
 
   void Metrics_FibersWithFewerThanFourPoints()
   {
-    // The metrics step through every fourth point; with fewer than four points the step was 0
-    // and the loop never ended.
+    // The metrics step through every fourth point; fewer than four points must not give a step
+    // of 0, which would never end the loop.
     vnl_matrix<float> s(3, 3);
     vnl_matrix<float> t(3, 3);
     for (unsigned int i = 0; i < 3; ++i)
