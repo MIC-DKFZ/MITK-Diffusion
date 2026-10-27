@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarEllipse.h>
 #include <mitkFiberBundle.h>
 #include <mitkFiberfoxParameters.h>
+#include <MitkMriSimulationExports.h>
 
 // ITK
 #include <itkProcessObject.h>
@@ -36,7 +37,7 @@ namespace itk{
 /**
 * \brief Generates artificial fibers distributed in and interpolated between the input planar figures.   */
 
-class FibersFromPlanarFiguresFilter : public ProcessObject
+class MITKMRISIMULATION_EXPORT FibersFromPlanarFiguresFilter : public ProcessObject
 {
 public:
 
@@ -80,9 +81,5 @@ protected:
   int                             m_FixSeed;
 };
 }
-
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkFibersFromPlanarFiguresFilter.cpp"
-#endif
 
 #endif

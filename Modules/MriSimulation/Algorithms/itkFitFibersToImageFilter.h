@@ -14,6 +14,7 @@
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkDiffusionSignalModel.h>
+#include <MitkMriSimulationExports.h>
 
 class VnlCostFunction : public vnl_cost_function
 {
@@ -313,7 +314,7 @@ namespace itk{
 * \brief Fits the tractogram to the input image by assigning a weight to each fiber (similar to https://doi.org/10.1016/j.neuroimage.2015.06.092).  */
 
 
-class FitFibersToImageFilter : public ImageSource< mitk::PeakImage::ItkPeakImageType >
+class MITKMRISIMULATION_EXPORT FitFibersToImageFilter : public ImageSource< mitk::PeakImage::ItkPeakImageType >
 {
 
 public:
@@ -469,9 +470,5 @@ protected:
 };
 
 }
-
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkFitFibersToImageFilter.cpp"
-#endif
 
 #endif // __itkFitFibersToImageFilter_h__

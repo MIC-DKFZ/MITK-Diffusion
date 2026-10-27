@@ -14,9 +14,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-//#ifndef __itkRandomPhantomFilter_cpp
-//#define __itkRandomPhantomFilter_cpp
-
 #include "itkRandomPhantomFilter.h"
 
 #include <itkFibersFromPlanarFiguresFilter.h>
@@ -462,5 +459,4 @@ void RandomPhantomFilter::GenerateData()
 }
 
 }
-//#endif // __itkRandomPhantomFilter_cpp
 

@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarEllipse.h>
 #include <mitkFiberBundle.h>
 #include <mitkFiberfoxParameters.h>
+#include <MitkMriSimulationExports.h>
 
 // ITK
 #include <itkProcessObject.h>
@@ -30,7 +31,7 @@ namespace itk{
 /**
 * \brief  */
 
-class RandomPhantomFilter : public ProcessObject
+class MITKMRISIMULATION_EXPORT RandomPhantomFilter : public ProcessObject
 {
 public:
 
@@ -106,9 +107,5 @@ protected:
   Statistics::MersenneTwisterRandomVariateGenerator::Pointer randGen;
 };
 }
-
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkRandomPhantomFilter.cpp"
-#endif
 
 #endif

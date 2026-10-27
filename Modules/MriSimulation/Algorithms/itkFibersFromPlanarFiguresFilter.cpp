@@ -14,9 +14,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkibersFromPlanarFiguresFilter_cpp
-#define __itkibersFromPlanarFiguresFilter_cpp
-
 #include "itkFibersFromPlanarFiguresFilter.h"
 #include <algorithm>
 
@@ -242,5 +239,4 @@ void FibersFromPlanarFiguresFilter::GenerateData()
 }
 
 }
-#endif // __itkFibersFromPlanarFiguresFilter_cpp
 

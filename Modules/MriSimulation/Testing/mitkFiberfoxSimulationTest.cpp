@@ -20,6 +20,7 @@ found in the LICENSE file.
 #include <itkTractsToDWIImageFilter.h>
 #include <mitkRawShModel.h>
 #include <mitkFiberfoxMotion.h>
+#include <itkRandomPhantomFilter.h>
 
 namespace
 {
@@ -54,6 +55,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(InversionRecovery);
   MITK_TEST(MotionTransforms);
   MITK_TEST(MotionMovesFibersAndMapsTogether);
+  MITK_TEST(RandomPhantom);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -316,6 +318,22 @@ public:
       CPPUNIT_ASSERT_MESSAGE("fibers moved as reported", maxFiberError < 1e-3);
       CPPUNIT_ASSERT_MESSAGE("maps read at the exact inverse position", maxDistanceError < 1e-3);
     }
+  }
+
+  /** One bundle with fibers per requested tract. The filter is part of the module library, so the
+   * test driver links its exported class like any other client. */
+  void RandomPhantom()
+  {
+    auto filter = itk::RandomPhantomFilter::New();
+    filter->SetNumTracts(2);
+    filter->SetMinStreamlineDensity(5);
+    filter->SetMaxStreamlineDensity(10);
+    filter->SetFixSeed(1);
+    filter->Update();
+    auto bundles = filter->GetFiberBundles();
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), bundles.size());
+    for (const auto& bundle : bundles)
+      CPPUNIT_ASSERT(bundle->GetNumFibers() > 0);
   }
 };
 

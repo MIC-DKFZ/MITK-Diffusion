@@ -1,6 +1,10 @@
 set(CPP_FILES
 
   mitkFiberfoxParameters.cpp
+
+  Algorithms/itkFitFibersToImageFilter.cpp
+  Algorithms/itkFibersFromPlanarFiguresFilter.cpp
+  Algorithms/itkRandomPhantomFilter.cpp
 )
 
 set(H_FILES
