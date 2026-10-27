@@ -176,4 +176,7 @@ protected:
 
     friend class QmitkFiberfoxWorker;
     mitk::FiberfoxParameters  m_Parameters;
+    /** m_Parameters of the last started simulation before ApplyDirectionMatrix (gradients as FSL
+     * bvecs), saved as .ffp next to the simulated image */
+    mitk::FiberfoxParameters  m_SimulatedParameters;
 };

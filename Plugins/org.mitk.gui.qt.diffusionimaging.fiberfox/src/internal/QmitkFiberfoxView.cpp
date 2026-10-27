@@ -287,10 +287,12 @@ void QmitkFiberfoxView::AfterThread()
   if (!parameters.m_Misc.m_OutputPath.empty())
   {
     try{
-      QString outputFileName(parameters.m_Misc.m_OutputPath.c_str());
-      outputFileName += parameters.m_Misc.m_ResultNode->GetName().c_str();
-      outputFileName.replace(QString("."), QString("_"));
-      SaveParameters(outputFileName+".ffp");
+      // dots only in the node name (b-value, noise variance), the folder may contain some
+      QString name(parameters.m_Misc.m_ResultNode->GetName().c_str());
+      name.replace(QString("."), QString("_"));
+      QString outputFileName = QString(parameters.m_Misc.m_OutputPath.c_str()) + name;
+      // the parameters of this run (FSL bvecs, sampled prototypes), not the GUI's current state
+      m_SimulatedParameters.SaveParameters((outputFileName+".ffp").toStdString());
       outputFileName += ".dwi";
       QString status("Saving output image to ");
       status += outputFileName;
@@ -310,7 +312,6 @@ void QmitkFiberfoxView::AfterThread()
       m_Controls->m_SimulationStatusText->append("Unknown exception during DWI writing!");
     }
   }
-  parameters.m_SignalGen.m_FrequencyMap = nullptr;
 }
 
 void QmitkFiberfoxView::UpdateSimulationStatus()
@@ -1974,6 +1975,7 @@ void QmitkFiberfoxView::SimulateForExistingDwi(mitk::DataNode* imageNode)
                                             +"_"+m_Parameters.m_Misc.m_SignalModelString
                                             +m_Parameters.m_Misc.m_ArtifactModelString);
 
+  m_SimulatedParameters = m_Parameters;
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetInputImage(itkVectorImagePointer);
@@ -2016,6 +2018,7 @@ void QmitkFiberfoxView::SimulateImageFromFibers(mitk::DataNode* fiberNode)
     return;
   }
 
+  m_SimulatedParameters = m_Parameters;
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetFiberBundle(fiberBundle);
