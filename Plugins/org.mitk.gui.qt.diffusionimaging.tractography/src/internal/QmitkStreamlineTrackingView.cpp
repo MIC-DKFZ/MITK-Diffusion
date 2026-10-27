@@ -458,8 +458,17 @@ void QmitkStreamlineTrackingView::SaveParameters()
 
   m_ParameterFile = filename;
 
-  auto params = GetParametersFromGui();
-  params->SaveParameters(m_ParameterFile.toStdString());
+  // property_tree and the parameter class throw on unwritable files; without a catch the generic
+  // "save all data and quit" dialog would appear
+  try
+  {
+    auto params = GetParametersFromGui();
+    params->SaveParameters(m_ParameterFile.toStdString());
+  }
+  catch (const std::exception &e)
+  {
+    QMessageBox::warning(nullptr, "Streamline Tractography", QString("Could not save the parameters:\n") + e.what());
+  }
 }
 
 void QmitkStreamlineTrackingView::LoadParameters()
@@ -476,7 +485,15 @@ void QmitkStreamlineTrackingView::LoadParameters()
   m_ParameterFile = filename;
 
   mitk::StreamlineTractographyParameters params;
-  params.LoadParameters(m_ParameterFile.toStdString());
+  try
+  {
+    params.LoadParameters(m_ParameterFile.toStdString());
+  }
+  catch (const std::exception &e)
+  {
+    QMessageBox::warning(nullptr, "Streamline Tractography", QString("Could not load the parameters:\n") + e.what());
+    return;
+  }
   ParametersToGui(params);
 }
 
