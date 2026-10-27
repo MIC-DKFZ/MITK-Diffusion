@@ -80,6 +80,7 @@ protected:
     {
         std::vector< int > cellidx;
         std::vector< int > cellidx_c;
+        int cellnum;    // distinct cells in cellidx (fewer than 8 along an axis with one cell)
         int cellcnt;
         int pcnt;
     } m_NeighbourTracker;

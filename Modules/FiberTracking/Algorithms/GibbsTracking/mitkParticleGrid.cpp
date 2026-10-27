@@ -300,14 +300,21 @@ void ParticleGrid::ComputeNeighbors(vnl_vector_fixed<float, 3> &R)
     m_NeighbourTracker.cellidx[7] = m_NeighbourTracker.cellidx[6] - dx;
 
 
-    m_NeighbourTracker.cellidx_c[0] = m_CellCapacity*m_NeighbourTracker.cellidx[0];
-    m_NeighbourTracker.cellidx_c[1] = m_CellCapacity*m_NeighbourTracker.cellidx[1];
-    m_NeighbourTracker.cellidx_c[2] = m_CellCapacity*m_NeighbourTracker.cellidx[2];
-    m_NeighbourTracker.cellidx_c[3] = m_CellCapacity*m_NeighbourTracker.cellidx[3];
-    m_NeighbourTracker.cellidx_c[4] = m_CellCapacity*m_NeighbourTracker.cellidx[4];
-    m_NeighbourTracker.cellidx_c[5] = m_CellCapacity*m_NeighbourTracker.cellidx[5];
-    m_NeighbourTracker.cellidx_c[6] = m_CellCapacity*m_NeighbourTracker.cellidx[6];
-    m_NeighbourTracker.cellidx_c[7] = m_CellCapacity*m_NeighbourTracker.cellidx[7];
+    // With one cell along an axis (d = 0) some of the 8 cells coincide; each is visited once, in the
+    // order above, so that every neighbour is returned once.
+    m_NeighbourTracker.cellnum = 0;
+    for (int k=0; k<8; ++k)
+    {
+        const int cell = m_NeighbourTracker.cellidx[k];
+        bool seen = false;
+        for (int j=0; j<m_NeighbourTracker.cellnum; ++j)
+            seen = seen || m_NeighbourTracker.cellidx[j] == cell;
+        if (seen)
+            continue;
+        m_NeighbourTracker.cellidx[m_NeighbourTracker.cellnum] = cell;
+        m_NeighbourTracker.cellidx_c[m_NeighbourTracker.cellnum] = m_CellCapacity*cell;
+        m_NeighbourTracker.cellnum++;
+    }
 
     m_NeighbourTracker.cellcnt = 0;
     m_NeighbourTracker.pcnt = 0;
@@ -324,7 +331,7 @@ Particle* ParticleGrid::GetNextNeighbor()
         for(;;)
         {
             m_NeighbourTracker.cellcnt++;
-            if (m_NeighbourTracker.cellcnt >= 8)
+            if (m_NeighbourTracker.cellcnt >= m_NeighbourTracker.cellnum)
                 return nullptr;
             if (m_OccupationCount[m_NeighbourTracker.cellidx[m_NeighbourTracker.cellcnt]] > 0)
                 break;

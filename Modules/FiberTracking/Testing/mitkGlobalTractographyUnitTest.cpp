@@ -48,6 +48,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(EvaluateOdf_RotatedImage_SamplesAlongParticle);
   MITK_TEST(EvaluateOdf_ThinImage_SamplesAlongParticle);
   MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
+  MITK_TEST(Neighbours_ThinImage_EachOnce);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
   MITK_TEST(OptimalShift_OneNeighbour_FacesIt);
   MITK_TEST(Filter_EmptyMask_Throws);
@@ -167,6 +168,27 @@ public:
     // along the column all samples lie in it; across it 7 of the 21 samples (x in [3, 4))
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, energy.EvaluateOdf(pos, vnl_vector_fixed<float, 3>(0.0f, 1.0f, 0.0f)), 1e-4);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0 / 21.0, energy.EvaluateOdf(pos, vnl_vector_fixed<float, 3>(1.0f, 0.0f, 0.0f)), 1e-4);
+  }
+
+  /** With one grid cell along an axis (single-slice data), the 8 neighbour cells contain duplicates;
+   *  every neighbour was returned twice (or four times). */
+  void Neighbours_ThinImage_EachOnce()
+  {
+    auto mask = FloatImageType::New();
+    FloatImageType::SizeType size = {{7, 7, 1}};
+    mask->SetRegions(FloatImageType::RegionType(size));
+    mask->Allocate();
+    mask->FillBuffer(1.0f);
+    mitk::ParticleGrid grid(mask, 1.5f, 16); // cells of 3 mm: 3x3x1
+    grid.NewParticle(vnl_vector_fixed<float, 3>(3.5f, 3.5f, 0.5f));
+    grid.NewParticle(vnl_vector_fixed<float, 3>(4.0f, 3.0f, 0.5f));
+
+    vnl_vector_fixed<float, 3> query(3.6f, 3.6f, 0.5f);
+    grid.ComputeNeighbors(query);
+    int count = 0;
+    while (grid.GetNextNeighbor() != nullptr)
+      ++count;
+    CPPUNIT_ASSERT_EQUAL(2, count);
   }
 
   /** Every particle of every chain becomes a fiber point, in chain order, also when the chain is
