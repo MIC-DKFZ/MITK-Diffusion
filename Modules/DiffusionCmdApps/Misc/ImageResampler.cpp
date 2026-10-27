@@ -381,39 +381,47 @@ int main( int argc, char* argv[] )
   }
 
 
-  mitk::Image::Pointer refImage;
-  if (!useSpacing)
-    refImage = mitk::IOUtil::Load<mitk::Image>(refImageFile);
-
-  mitk::Image::Pointer inputDWI = mitk::IOUtil::Load<mitk::Image>(inputFile);
-  if ( mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(inputDWI.GetPointer()))
+  try
   {
-    mitk::Image::Pointer outputImage;
+    mitk::Image::Pointer refImage;
+    if (!useSpacing)
+      refImage = mitk::IOUtil::Load<mitk::Image>(refImageFile);
+
+    mitk::Image::Pointer inputDWI = mitk::IOUtil::Load<mitk::Image>(inputFile);
+    if ( mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(inputDWI.GetPointer()))
+    {
+      mitk::Image::Pointer outputImage;
+
+      if (useSpacing)
+        outputImage = ResampleDWIbySpacing(inputDWI, spacing);
+      else
+      {
+        MITK_WARN << "Not supported yet, to resample a DWI please set a new spacing.";
+        return EXIT_FAILURE;
+      }
+
+      mitk::IOUtil::Save(outputImage, outputFile.c_str());
+
+      return EXIT_SUCCESS;
+    }
+    mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inputFile);
+
+
+    mitk::Image::Pointer resultImage;
 
     if (useSpacing)
-      outputImage = ResampleDWIbySpacing(inputDWI, spacing);
+      resultImage = ResampleBySpacing(inputImage,spacing,useLinearInterpol,useNN);
     else
-    {
-      MITK_WARN << "Not supported yet, to resample a DWI please set a new spacing.";
-      return EXIT_FAILURE;
-    }
+      resultImage = TransformToReference(refImage,inputImage,useLinearInterpol,useNN);
 
-    mitk::IOUtil::Save(outputImage, outputFile.c_str());
 
-    return EXIT_SUCCESS;
+    mitk::IOUtil::Save(resultImage, outputFile);
   }
-  mitk::Image::Pointer inputImage = mitk::IOUtil::Load<mitk::Image>(inputFile);
-
-
-  mitk::Image::Pointer resultImage;
-
-  if (useSpacing)
-    resultImage = ResampleBySpacing(inputImage,spacing,useLinearInterpol,useNN);
-  else
-    resultImage = TransformToReference(refImage,inputImage,useLinearInterpol,useNN);
-
-
-  mitk::IOUtil::Save(resultImage, outputFile);
+  catch (const std::exception& e)
+  {
+    std::cout << e.what() << std::endl;
+    return EXIT_FAILURE;
+  }
 
   return EXIT_SUCCESS;
 }
