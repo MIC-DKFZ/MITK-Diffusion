@@ -146,12 +146,20 @@ Facts the layout does not show:
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
   set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
   voxel grid (`mitkFiberImageGrid.h`).
+- `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
+  `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
+  `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and
+  `SetGradientsFromImage` stores a DWI's gradients in that form. With a constant seed
+  (`SetUseConstantRandSeed`, `MitkFiberfox --fix_seed`) a simulation gives the same image at any
+  number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`). MITK-Data Fiberfox references
+  depend on the random engines and seeds, so a change there is checked bit for bit against the
+  old output.
 
 ## Porting state
 
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 49 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
+all 54 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,
@@ -164,8 +172,6 @@ all 49 diffusion tests pass. The Workbench has not been started. Remove an item 
   is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.
   `DiffusionDebug` leaves the plugin off; `DiffusionRelease`, `Tractography`, `Fiberfox` and
   `IVIM` switch Python on and build it.
-- `FiberfoxParameters` (`Modules/MriSimulation/mitkFiberfoxParameters.h`) deep-copies its signal
-  models on copy construction but shares them on assignment, and never deletes them.
 
 ## Commands
 

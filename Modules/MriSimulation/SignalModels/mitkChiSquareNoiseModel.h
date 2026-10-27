@@ -52,7 +52,7 @@ protected:
 
 }
 
-#include "mitkChiSquareNoiseModel.cpp"
+#include "mitkChiSquareNoiseModel.txx"
 
 #endif
 

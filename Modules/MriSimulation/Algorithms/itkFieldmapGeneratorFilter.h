@@ -37,7 +37,7 @@ class FieldmapGeneratorFilter : public ImageSource< OutputImageType >
 
 public:
     typedef FieldmapGeneratorFilter Self;
-    typedef ProcessObject Superclass;
+    typedef ImageSource< OutputImageType > Superclass;
     typedef SmartPointer< Self > Pointer;
     typedef SmartPointer< const Self > ConstPointer;
 
@@ -67,11 +67,11 @@ public:
 
 protected:
 
-    void BeforeThreadedGenerateData();
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
+    void BeforeThreadedGenerateData() override;
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
     FieldmapGeneratorFilter();
-    virtual ~FieldmapGeneratorFilter();
+    ~FieldmapGeneratorFilter() override;
 
     itk::Vector<double>                 m_Spacing;              ///< output image spacing
     mitk::Point3D                       m_Origin;               ///< output image origin

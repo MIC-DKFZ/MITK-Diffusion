@@ -32,16 +32,9 @@ class DotModel : public DiffusionSignalModel< ScalarType >
 public:
 
   DotModel();
-  template< class OtherType >DotModel(DotModel<OtherType>* model)
-  {
-    this->m_CompartmentId = model->m_CompartmentId;
-    this->m_T1 = model->GetT1();
-    this->m_T2 = model->GetT2();
-    this->m_GradientList = model->GetGradientList();
-    this->m_VolumeFractionImage = model->GetVolumeFractionImage();
-    this->m_RandGen = model->GetRandomGenerator();
-  }
-  ~DotModel();
+  ~DotModel() override;
+
+  DiffusionSignalModel< ScalarType >* Clone() const override { return new DotModel(*this); }
 
   typedef typename DiffusionSignalModel< ScalarType >::PixelType      PixelType;
   typedef typename DiffusionSignalModel< ScalarType >::GradientType   GradientType;
@@ -57,7 +50,7 @@ protected:
 
 }
 
-#include "mitkDotModel.cpp"
+#include "mitkDotModel.txx"
 
 #endif
 

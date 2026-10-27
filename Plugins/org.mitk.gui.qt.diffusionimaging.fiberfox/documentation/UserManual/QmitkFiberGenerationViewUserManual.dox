@@ -25,7 +25,7 @@ Fiber strands are defined simply by placing markers in a 3D image volume. The fi
 
 <b>Fiber Options:</b>
 \li <b>Real Time Fibers</b>: If checked, each parameter adjustment (fiducial position, number of fibers, ...) will be directly applied to the selected fiber bundle. If unchecked, the fibers will only be generated if the corresponding button "Generate Fibers" is clicked.
-\li <b>Fiber Distribution</b>: Specifies if the fiber distribution inside the bundle follows a uniform or normal distribution.
+\li <b>Fiber Distribution</b>: Specifies if the fiber distribution inside the bundle follows a uniform or normal distribution. Uniform: the fibers are spread evenly over the ellipse of each fiducial. Normal: the fiber positions follow a normal distribution with the given variance, in a frame where the ellipse radii are 1, cut off at the ellipse. Each fiber passes through every fiducial inside its ellipse, so the bundle starts and ends within the first and the last fiducial.
 \li <b>\# Fibers</b>: Specifies the number of fibers that will be generated for the selected bundle.
 \li <b>Advanced Options</b>: Show/hide advanced options
 \li <b>Fiber Sampling</b>: Adjusts the distenace of the fiber sampling points (in mm). A higher sampling rate is needed if high curvatures are modeled.
@@ -46,6 +46,9 @@ Fiber strands are defined simply by placing markers in a 3D image volume. The fi
 \li <b>Include Fiducials</b>: If checked, the specified transformation is also applied to the fiducials belonging to the selected fiber bundle and the fiducials are also copied.
 
 \imageMacro{FiberfoxExamples.png, "Fig. 2: Examples of artificial crossing (a\,b)\, fanning (c\,d)\, highly curved (e\,f)\, kissing (g\,h) and twisting (i\,j) fibers as well as of the corresponding tensor images generated with Fiberfox.",4}
+
+<b>Random Phantom:</b>
+\li Generates the given number of bundles with random pathways in a volume of the given size. Each bundle starts with an elliptical cross-section whose two radii (in mm) are drawn from the given radius range; its number of fibers is its mean cross-sectional area times a density drawn from the given range (fibers per cm²). Each minimum must not be larger than its maximum.
 
 \imageMacro{random_phantom.png, "Fig. 3: Example of a random fiber phantom containing all kinds of configurations.",4}
 

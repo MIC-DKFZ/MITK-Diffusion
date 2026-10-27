@@ -29,6 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageCast.h>
 #include <itkImageFileWriter.h>
 #include <mitkLocaleSwitch.h>
+#include <itkMersenneTwisterRandomVariateGenerator.h>
 
 class mitkFiberFitTestSuite : public mitk::TestFixture
 {
@@ -40,6 +41,7 @@ class mitkFiberFitTestSuite : public mitk::TestFixture
   MITK_TEST(Fit4);
   MITK_TEST(Fit5);
   MITK_TEST(Fit6);
+  MITK_TEST(RegularizationGradients);
   CPPUNIT_TEST_SUITE_END();
 
   typedef itk::Image<float, 3> ItkFloatImgType;
@@ -159,6 +161,52 @@ public:
     }
   }
 
+  /**
+   * The L-BFGS-B fit needs the gradient of its cost: compare VnlCostFunction::gradf with central
+   * differences of f on a small random problem. VOXEL_VARIANCE is left out: whether its voxel means
+   * are differentiated is an open question (the gradient treats them as constant).
+   */
+  void RegularizationGradients()
+  {
+    auto randGen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+    randGen->SetSeed(3);
+    const unsigned int rows = 20, cols = 6;
+    vnl_sparse_matrix<double> A(rows, cols);
+    vnl_vector<double> b(rows);
+    for (unsigned int r = 0; r < rows; ++r)
+    {
+      b[r] = randGen->GetUniformVariate(0, 2);
+      for (unsigned int c = 0; c < cols; ++c)
+        if (randGen->GetUniformVariate(0, 1) < 0.5)
+          A(r, c) = randGen->GetUniformVariate(0, 1);
+    }
+    vnl_vector<double> x(cols);
+    for (unsigned int c = 0; c < cols; ++c)
+      x[c] = randGen->GetUniformVariate(0.1, 1.0);
+
+    for (auto regu : { VnlCostFunction::NONE, VnlCostFunction::MSM, VnlCostFunction::VARIANCE, VnlCostFunction::LASSO, VnlCostFunction::GROUP_LASSO, VnlCostFunction::GROUP_VARIANCE })
+    {
+      VnlCostFunction cost(cols);
+      cost.SetProblem(A, b, 0.1, regu);
+      cost.SetGroupSizes({ 2, 4 });
+      vnl_vector<double> gradient(cols);
+      cost.gradf(x, gradient);
+      const double h = 1e-6;
+      double maxError = 0, maxGradient = 0;
+      for (unsigned int c = 0; c < cols; ++c)
+      {
+        vnl_vector<double> xp(x), xm(x);
+        xp[c] += h;
+        xm[c] -= h;
+        const double numeric = (cost.f(xp) - cost.f(xm)) / (2 * h);
+        maxError = std::max(maxError, std::fabs(numeric - gradient[c]));
+        maxGradient = std::max(maxGradient, std::fabs(numeric));
+      }
+      MITK_INFO << "Regularization " << regu << ": gradient error " << maxError << " of " << maxGradient;
+      CPPUNIT_ASSERT_MESSAGE("gradient of regularization " + std::to_string(regu), maxError <= 1e-6 * std::max(1.0, maxGradient));
+    }
+  }
+
   void Fit1()
   {
     omp_set_num_threads(1);
@@ -172,10 +220,10 @@ public:
     test = test->AddBundles(output_tracts);
     mitk::FiberBundle::Pointer ref = LoadFib("out/NONE_fitted.fib");
     CompareFibs(test, ref, "NONE_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "NONE_fitted_image.nrrd");
-    CompareImages(fitter->GetResidualImage(), "NONE_residual_image.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "NONE_underexplained_image.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "NONE_overexplained_image.nrrd");
+    CompareImages(fitter->GetFittedImage(), "NONE_fitted_image_v2.nrrd");
+    CompareImages(fitter->GetResidualImage(), "NONE_residual_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "NONE_underexplained_image_v2.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "NONE_overexplained_image_v2.nrrd");
   }
 
   void Fit2()
@@ -191,10 +239,10 @@ public:
     test = test->AddBundles(output_tracts);
     mitk::FiberBundle::Pointer ref = LoadFib("out/MSM_fitted.fib");
     CompareFibs(test, ref, "MSM_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "MSM_fitted_image.nrrd");
-    CompareImages(fitter->GetResidualImage(), "MSM_residual_image.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "MSM_underexplained_image.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "MSM_overexplained_image.nrrd");
+    CompareImages(fitter->GetFittedImage(), "MSM_fitted_image_v2.nrrd");
+    CompareImages(fitter->GetResidualImage(), "MSM_residual_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "MSM_underexplained_image_v2.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "MSM_overexplained_image_v2.nrrd");
   }
 
   void Fit3()
@@ -210,10 +258,10 @@ public:
     test = test->AddBundles(output_tracts);
     mitk::FiberBundle::Pointer ref = LoadFib("out/MSE_fitted.fib");
     CompareFibs(test, ref, "MSE_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "MSE_fitted_image.nrrd");
-    CompareImages(fitter->GetResidualImage(), "MSE_residual_image.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "MSE_underexplained_image.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "MSE_overexplained_image.nrrd");
+    CompareImages(fitter->GetFittedImage(), "MSE_fitted_image_v3.nrrd");
+    CompareImages(fitter->GetResidualImage(), "MSE_residual_image_v3.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "MSE_underexplained_image_v3.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "MSE_overexplained_image_v3.nrrd");
   }
 
   void Fit4()
@@ -229,10 +277,10 @@ public:
     test = test->AddBundles(output_tracts);
     mitk::FiberBundle::Pointer ref = LoadFib("out/LocalMSE_fitted.fib");
     CompareFibs(test, ref, "LocalMSE_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "LocalMSE_fitted_image.nrrd");
-    CompareImages(fitter->GetResidualImage(), "LocalMSE_residual_image.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "LocalMSE_underexplained_image.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "LocalMSE_overexplained_image.nrrd");
+    CompareImages(fitter->GetFittedImage(), "LocalMSE_fitted_image_v2.nrrd");
+    CompareImages(fitter->GetResidualImage(), "LocalMSE_residual_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "LocalMSE_underexplained_image_v2.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "LocalMSE_overexplained_image_v2.nrrd");
   }
 
   void Fit5()
@@ -247,10 +295,10 @@ public:
     test = test->AddBundles(output_tracts);
     mitk::FiberBundle::Pointer ref = LoadFib("out/GroupMSE_fitted.fib");
     CompareFibs(test, ref, "GroupMSE_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "GroupMSE_fitted_image.nrrd");
-    CompareImages(fitter->GetResidualImage(), "GroupMSE_residual_image.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "GroupMSE_underexplained_image.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "GroupMSE_overexplained_image.nrrd");
+    CompareImages(fitter->GetFittedImage(), "GroupMSE_fitted_image_v2.nrrd");
+    CompareImages(fitter->GetResidualImage(), "GroupMSE_residual_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "GroupMSE_underexplained_image_v2.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "GroupMSE_overexplained_image_v2.nrrd");
   }
 
   void Fit6()
@@ -266,10 +314,10 @@ public:
     test = test->AddBundles(output_tracts);
     mitk::FiberBundle::Pointer ref = LoadFib("out/GroupLasso_fitted.fib");
     CompareFibs(test, ref, "GroupLasso_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "GroupLasso_fitted_image.nrrd");
-    CompareImages(fitter->GetResidualImage(), "GroupLasso_residual_image.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "GroupLasso_underexplained_image.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "GroupLasso_overexplained_image.nrrd");
+    CompareImages(fitter->GetFittedImage(), "GroupLasso_fitted_image_v2.nrrd");
+    CompareImages(fitter->GetResidualImage(), "GroupLasso_residual_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "GroupLasso_underexplained_image_v2.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "GroupLasso_overexplained_image_v2.nrrd");
   }
 
 };

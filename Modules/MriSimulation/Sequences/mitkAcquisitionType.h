@@ -30,7 +30,7 @@ class AcquisitionType
 {
 public:
 
-  AcquisitionType(FiberfoxParameters* parameters)
+  AcquisitionType(const FiberfoxParameters* parameters)
   {
     m_Parameters = parameters;
     kxMax = static_cast<int>(m_Parameters->m_SignalGen.m_CroppedRegion.GetSize(0));
@@ -42,7 +42,8 @@ public:
   virtual float GetTimeFromLastDiffusionGradient(const int& tick) = 0;                    ///< Time passed since readout started in milliseconds
   virtual float GetTimeFromRf(const int& tick) = 0;                  ///< Time passed since RF pulse was applied in milliseconds
   virtual itk::Index< 2 > GetActualKspaceIndex(const int& tick) = 0;   ///< Transfer simple image iterator index to desired k-space index (depends on k-space readout scheme)
-  virtual void AdjustEchoTime() = 0;                                   ///< Depending on the k-space readout scheme and acquisition parameters the minimum TE varies. This has to be checked and adjusted in this method.
+  /** Shortest echo time (ms) the readout scheme allows with the current parameters. The simulation raises TE to it once, before the slices are simulated in parallel. */
+  virtual float GetMinimumEchoTime() const = 0;
   itk::Index< 2 > GetSymmetricIndex(const itk::Index< 2 >& index)
   {
     itk::Index< 2 > sym;
@@ -53,7 +54,7 @@ public:
 
 protected:
 
-  FiberfoxParameters*         m_Parameters;
+  const FiberfoxParameters*   m_Parameters;
   itk::Size< 2 >              m_Size;
 
   float dt;   // time to read one k-space voxe

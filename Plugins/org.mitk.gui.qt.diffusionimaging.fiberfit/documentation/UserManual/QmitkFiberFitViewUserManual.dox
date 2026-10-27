@@ -19,7 +19,7 @@ Linearly fits a scalar weight for each streamline in order to optimally explain 
   - Group Variance: Constrain the fiber weights to be similar for each bundle individually (command-line tool only). Command line tool string "GrouplVariance".
   - No regularization. Command line tool string "NONE".
 - Suppress Outliers: Perform second optimization run with an upper weight bound based on the first weight estimation (99% quantile).
-- Output Residuals: Add residual images to the data manager.
+- Output Residuals: Add residual images to the data manager. The fitted, residual, over- and underexplained images are in the units of the input image.
 
 [1] Smith, Robert E., Jacques-Donald Tournier, Fernando Calamante, and Alan Connelly. “SIFT2: Enabling Dense Quantitative Assessment of Brain White Matter Connectivity Using Streamlines Tractography.” NeuroImage 119, no. Supplement C (October 1, 2015): 338–51. https://doi.org/10.1016/j.neuroimage.2015.06.092.
 

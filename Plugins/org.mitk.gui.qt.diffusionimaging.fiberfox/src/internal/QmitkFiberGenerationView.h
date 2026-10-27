@@ -144,5 +144,5 @@ protected:
     std::vector< mitk::DataNode::Pointer >              m_SelectedImages;
 
     QString m_ParameterFile;    ///< parameter file name
-    FiberfoxParameters  m_Parameters;
+    mitk::FiberfoxParameters  m_Parameters;
 };

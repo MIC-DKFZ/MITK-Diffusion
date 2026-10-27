@@ -176,13 +176,13 @@ void QmitkFiberGenerationView::UpdateParametersFromGui()
   switch(m_Controls->m_DistributionBox->currentIndex())
   {
   case 0:
-    m_Parameters.m_FiberGen.m_Distribution = FiberGenerationParameters::DISTRIBUTE_UNIFORM;
+    m_Parameters.m_FiberGen.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_UNIFORM;
     break;
   case 1:
-    m_Parameters.m_FiberGen.m_Distribution = FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
+    m_Parameters.m_FiberGen.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
     break;
   default:
-    m_Parameters.m_FiberGen.m_Distribution = FiberGenerationParameters::DISTRIBUTE_UNIFORM;
+    m_Parameters.m_FiberGen.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_UNIFORM;
   }
   m_Parameters.m_FiberGen.m_Variance = m_Controls->m_VarianceBox->value();
   m_Parameters.m_FiberGen.m_Density = m_Controls->m_FiberDensityBox->value();
@@ -1064,12 +1064,12 @@ void QmitkFiberGenerationView::NodeRemoved(const mitk::DataNode* node)
   mitk::DataNode* nonConstNode = const_cast<mitk::DataNode*>(node);
   std::map<mitk::DataNode*, QmitkPlanarFigureData>::iterator it = m_DataNodeToPlanarFigureData.find(nonConstNode);
 
-  if (dynamic_cast<FiberBundle*>(node->GetData()))
+  if (dynamic_cast<mitk::FiberBundle*>(node->GetData()))
   {
     m_SelectedBundles.clear();
     m_SelectedBundles2.clear();
   }
-  else if (dynamic_cast<Image*>(node->GetData()))
+  else if (dynamic_cast<mitk::Image*>(node->GetData()))
     m_SelectedImages.clear();
 
   if( it != m_DataNodeToPlanarFigureData.end() )

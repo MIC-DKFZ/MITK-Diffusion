@@ -14,9 +14,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-//#ifndef __itkRandomPhantomFilter_cpp
-//#define __itkRandomPhantomFilter_cpp
-
 #include "itkRandomPhantomFilter.h"
 
 #include <itkFibersFromPlanarFiguresFilter.h>
@@ -107,8 +104,10 @@ void RandomPhantomFilter::TransformPlanarFigure(mitk::PlanarEllipse* pe, mitk::V
   v1.Normalize();
   v2.Normalize();
 
-  p1 = p0 + mitk::Vector2D(radius1);
-  p2 = p0 + mitk::Vector2D(radius2);
+  // along the ellipse axes; Vector2D(radius) would put both points on the diagonal, which the
+  // ellipse turns into radii sqrt(2) times too large
+  p1 = p0 + v1*radius1;
+  p2 = p0 + v2*radius2;
 
   p3 = p0 + mitk::Vector2D(v3);
   pe->SetControlPoint(1, p1);
@@ -296,6 +295,13 @@ void RandomPhantomFilter::SetStartRadiusMin(unsigned int StartRadiusMin)
 
 void RandomPhantomFilter::GenerateData()
 {
+  // a step size of 0 never leaves the volume, a minimum radius of 0 never grows a radius above 5 mm
+  if (m_StepSizeMax==0 || m_StartRadiusMin==0)
+    itkExceptionMacro("The maximum step size and the minimum start radius must be larger than 0.");
+  if (m_StepSizeMin>m_StepSizeMax || m_StartRadiusMin>m_StartRadiusMax || m_CurvynessMin>m_CurvynessMax
+      || m_MinTwist>m_MaxTwist || m_MinStreamlineDensity>m_MaxStreamlineDensity)
+    itkExceptionMacro("Each minimum must not be larger than its maximum.");
+
   randGen = Statistics::MersenneTwisterRandomVariateGenerator::New();
   if (m_FixSeed>=0)
     randGen->SetSeed(m_FixSeed);
@@ -305,7 +311,7 @@ void RandomPhantomFilter::GenerateData()
   for (unsigned int i=0; i<m_NumTracts; ++i)
   {
     MITK_INFO << "Generating Bundle_" << i+1;
-    FiberGenerationParameters       fiber_params;
+    mitk::FiberGenerationParameters       fiber_params;
     std::vector< mitk::PlanarEllipse::Pointer > bundle_waypoints;
 
     double curvyness = randGen->GetUniformVariate(m_CurvynessMin, m_CurvynessMax);
@@ -428,12 +434,12 @@ void RandomPhantomFilter::GenerateData()
     fiber_params.m_Density = static_cast<unsigned int>(std::ceil(c_area*density));
     if (randGen->GetIntegerVariate(1)==0)
     {
-      fiber_params.m_Distribution = FiberGenerationParameters::DISTRIBUTE_UNIFORM;
+      fiber_params.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_UNIFORM;
       MITK_INFO << "Distribution: uniform";
     }
     else
     {
-      fiber_params.m_Distribution = FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
+      fiber_params.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
       MITK_INFO << "Distribution: Gaussian";
     }
 
@@ -453,5 +459,4 @@ void RandomPhantomFilter::GenerateData()
 }
 
 }
-//#endif // __itkRandomPhantomFilter_cpp
 

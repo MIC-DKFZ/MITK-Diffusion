@@ -23,13 +23,13 @@ This file is based heavily on a corresponding ITK filter.
 #define __itkDftImageFilter_h_
 
 #include <itkImageToImageFilter.h>
-#include <itkDiffusionTensor3D.h>
-#include <mitkFiberfoxParameters.h>
+#include <complex>
 
 namespace itk{
 
 /**
-* \brief 2D Discrete Fourier Transform Filter (complex to real). Special issue for Fiberfox -> rearranges slice. */
+* \brief Inverse 2D DFT of a Fiberfox k-space slice (complex to complex), with the indices of both images
+* centred like KspaceImageFilter's forward transform, which carries the 1/N factor. */
 
 template< class TPixelType >
 class DftImageFilter :
@@ -54,8 +54,6 @@ public:
     typedef typename Superclass::OutputImageType        OutputImageType;
     typedef typename Superclass::OutputImageRegionType  OutputImageRegionType;
 
-    void SetParameters( FiberfoxParameters& param ){ m_Parameters = param; }
-
 protected:
     DftImageFilter();
     ~DftImageFilter() override {}
@@ -63,9 +61,6 @@ protected:
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
-private:
-
-    FiberfoxParameters  m_Parameters;
 };
 
 }

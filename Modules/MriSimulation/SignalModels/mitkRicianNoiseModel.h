@@ -53,7 +53,7 @@ protected:
 
 }
 
-#include "mitkRicianNoiseModel.cpp"
+#include "mitkRicianNoiseModel.txx"
 
 #endif
 

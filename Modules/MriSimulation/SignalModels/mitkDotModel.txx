@@ -15,34 +15,35 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 #include <vnl/vnl_cross.h>
 #include <vnl/vnl_quaternion.h>
-#include <mitkChiSquareNoiseModel.h>
+#include <mitkDotModel.h>
 
-using namespace mitk;
-
-template< class ScalarType >
-ChiSquareNoiseModel< ScalarType >::ChiSquareNoiseModel()
-{
-    m_RandGen.seed();
-}
+namespace mitk {
 
 template< class ScalarType >
-ChiSquareNoiseModel< ScalarType >::~ChiSquareNoiseModel()
+DotModel< ScalarType >::DotModel()
 {
 
 }
 
 template< class ScalarType >
-void ChiSquareNoiseModel< ScalarType >::SetSeed(int seed)
+DotModel< ScalarType >::~DotModel()
 {
-    if (seed>=0)
-        m_RandGen.seed(seed);
-    else
-        m_RandGen.seed();
+
 }
 
 template< class ScalarType >
-void ChiSquareNoiseModel< ScalarType >::AddNoise(PixelType& pixel)
+ScalarType DotModel< ScalarType >::SimulateMeasurement(unsigned int /*dir*/, GradientType& )
 {
-    for( unsigned int i=0; i<pixel.Size(); i++)
-        pixel[i] += (ScalarType)(m_Distribution(m_RandGen)-m_Distribution.n());
+    return 1;
+}
+
+template< class ScalarType >
+typename DotModel< ScalarType >::PixelType DotModel< ScalarType >::SimulateMeasurement(GradientType& )
+{
+    PixelType signal;
+    signal.SetSize(this->m_GradientList.size());
+    signal.Fill(1);
+    return signal;
+}
+
 }

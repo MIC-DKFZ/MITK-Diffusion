@@ -22,6 +22,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <cstdio>
 #include <cstdlib>
 #include <math.h>
+#include <algorithm>
+#include <cmath>
 
 #include "itkKspaceImageFilter.h"
 #include <itkImageRegionConstIterator.h>
@@ -32,6 +34,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFastSpinEcho.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <itkImageFileWriter.h>
+#include <limits>
+#include <boost/lexical_cast.hpp>
 
 namespace itk {
 
@@ -54,10 +58,8 @@ namespace itk {
   ::BeforeThreadedGenerateData()
   {
     m_Spike = std::complex<ScalarType>(0,0);
+    m_SpikeTick = std::numeric_limits<long>::max();
     m_SpikeLog = "";
-    m_TransX = -m_Translation[0];
-    m_TransY = -m_Translation[1];
-    m_TransZ = -m_Translation[2];
 
     kxMax = m_Parameters->m_SignalGen.m_CroppedRegion.GetSize(0);
     kyMax = m_Parameters->m_SignalGen.m_CroppedRegion.GetSize(1);
@@ -76,8 +78,11 @@ namespace itk {
     ringing_lines_x = static_cast<int>(ceil(kxMax/2 * ringing_factor));
     ringing_lines_y = static_cast<int>(ceil(kyMax/2 * ringing_factor));
 
-    // Adjust noise variance since it is the intended variance in physical space and not in k-space:
-    float noiseVar = m_Parameters->m_SignalGen.m_PartialFourier*m_Parameters->m_SignalGen.m_NoiseVariance/(kyMax*kxMax);
+    // Adjust noise variance since it is the intended variance in physical space and not in k-space.
+    // It is the per-component image variance of a fully sampled acquisition: with partial Fourier the
+    // conjugate filling already keeps the total noise power (moving it from the imaginary to the real
+    // part), so the variance is not scaled with the acquired fraction.
+    float noiseVar = m_Parameters->m_SignalGen.m_NoiseVariance/(kyMax*kxMax);
 
     m_RandGen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
     if (m_RandSeed>=0)  // always generate the same random numbers?
@@ -134,10 +139,14 @@ namespace itk {
         m_RfImage = nullptr;
     }
 
-    m_Gamma = 42576000*itk::Math::twopi;    // Gyromagnetic ratio in Hz/T
+    // Gyromagnetic ratio in Hz/T: the eddy phase phi enters exp(i 2 pi (k x + phi)) in cycles, like the
+    // field map term (Hz times s), so the field G*r in T times gamma-bar gives Hz. With 2 pi * 42.576
+    // MHz/T (rad/(s T)) the eddy field acted 2 pi times stronger than the documented mT/m.
+    m_Gamma = 42576000;
     if ( m_Parameters->m_SignalGen.m_EddyStrength>0 && m_DiffusionGradientDirection.GetNorm()>0.001)
     {
-      m_DiffusionGradientDirection = m_DiffusionGradientDirection *  m_Parameters->m_SignalGen.m_EddyStrength/1000 *  m_Gamma;
+      // a separate member: scaling m_DiffusionGradientDirection itself scaled it again on every Update()
+      m_EddyFieldGradient = m_DiffusionGradientDirection *  m_Parameters->m_SignalGen.m_EddyStrength/1000 *  m_Gamma;
       m_IsBaseline = false;
     }
     else {
@@ -156,44 +165,29 @@ namespace itk {
 
     switch (m_Parameters->m_SignalGen.m_CoilSensitivityProfile)
     {
-      case SignalGenerationParameters::COIL_CONSTANT:
+      case mitk::SignalGenerationParameters::COIL_CONSTANT:
       {
         m_CoilSensitivityFactor = 1;                    // same signal everywhere
         break;
       }
-      case SignalGenerationParameters::COIL_LINEAR:
+      case mitk::SignalGenerationParameters::COIL_LINEAR:
       {
         m_CoilSensitivityFactor = -1/diagonal;          // about 50% of the signal in the image center remaining
         break;
       }
-      case SignalGenerationParameters::COIL_EXPONENTIAL:
+      case mitk::SignalGenerationParameters::COIL_EXPONENTIAL:
       {
         m_CoilSensitivityFactor = -log(0.1)/diagonal;   // about 32% of the signal in the image center remaining
         break;
       }
     }
 
-    switch (m_Parameters->m_SignalGen.m_AcquisitionType)
-    {
-      case SignalGenerationParameters::SingleShotEpi:
-        m_ReadoutScheme = new mitk::SingleShotEpi(m_Parameters);
-      break;
-      case SignalGenerationParameters::ConventionalSpinEcho:
-        m_ReadoutScheme = new mitk::ConventionalSpinEcho(m_Parameters);
-      break;
-      case SignalGenerationParameters::FastSpinEcho:
-        m_ReadoutScheme = new mitk::FastSpinEcho(m_Parameters);
-      break;
-      default:
-        m_ReadoutScheme = new mitk::SingleShotEpi(m_Parameters);
-    }
-
-    m_ReadoutScheme->AdjustEchoTime();
+    m_ReadoutScheme = CreateReadoutScheme(m_Parameters);
 
     m_MovedFmap = nullptr;
     if (m_Parameters->m_Misc.m_DoAddDistortions && m_Parameters->m_SignalGen.m_FrequencyMap.IsNotNull() && m_Parameters->m_SignalGen.m_DoAddMotion)
     {
-      // we have to account for the head motion since this also moves our frequency map
+      // the frequency map moves with the head: the moved map at x is the map at the unmoved position of x
       itk::LinearInterpolateImageFunction< itk::Image< float, 3 >, float >::Pointer   fmapInterpolator;
       fmapInterpolator = itk::LinearInterpolateImageFunction< itk::Image< float, 3 >, float >::New();
       fmapInterpolator->SetInputImage(m_Parameters->m_SignalGen.m_FrequencyMap);
@@ -215,8 +209,7 @@ namespace itk {
 
         itk::Point<float, 3> point3D;
         m_Parameters->m_SignalGen.m_FrequencyMap->TransformIndexToPhysicalPoint(index, point3D);
-        m_FiberBundle->TransformPoint<float>( point3D, m_RotationMatrix, m_TransX, m_TransY, m_TransZ );
-        it.Set(mitk::imv::GetImageValue<float>(point3D, true, fmapInterpolator));
+        it.Set(mitk::imv::GetImageValue<float>(m_Motion.Inverse(point3D), true, fmapInterpolator));
         ++it;
       }
     }
@@ -230,42 +223,79 @@ namespace itk {
         float relaxation = (1.0-std::exp(-m_Parameters->m_SignalGen.m_tRep/m_T1[i]));
 
         // account for inversion pulse and TI
-        if (m_Parameters->m_SignalGen.m_tInv > 0)
-          relaxation *= (1.0-std::exp(std::log(2) - m_Parameters->m_SignalGen.m_tInv/m_T1[i]));
+        const float tInv = m_Parameters->m_SignalGen.m_tInv;
+        if (tInv > 0 && tInv < m_Parameters->m_SignalGen.m_tRep)
+        {
+          // inversion recovery with a 90 degree excitation every TR: 1 - 2 exp(-TI/T1) + exp(-TR/T1)
+          relaxation = 1.0 - 2.0*std::exp(-tInv/m_T1[i]) + std::exp(-m_Parameters->m_SignalGen.m_tRep/m_T1[i]);
+        }
+        else if (tInv > 0)
+        {
+          // TI >= TR has no standard formula; the product kept from earlier versions is an open point
+          relaxation *= (1.0-std::exp(std::log(2) - tInv/m_T1[i]));
+        }
 
         m_T1Relax.push_back(relaxation);
       }
   }
 
   template< class ScalarType >
-  float KspaceImageFilter< ScalarType >::CoilSensitivity(VectorType& pos)
+  std::unique_ptr<mitk::AcquisitionType> KspaceImageFilter< ScalarType >::CreateReadoutScheme(const mitk::FiberfoxParameters* parameters)
   {
-    // *************************************************************************
-    // Coil ring is moving with excited slice (FIX THIS SOMETIME)
-    m_CoilPosition[2] = pos[2];
-    // *************************************************************************
+    switch (parameters->m_SignalGen.m_AcquisitionType)
+    {
+      case mitk::SignalGenerationParameters::ConventionalSpinEcho:
+        return std::make_unique<mitk::ConventionalSpinEcho>(parameters);
+      case mitk::SignalGenerationParameters::FastSpinEcho:
+        return std::make_unique<mitk::FastSpinEcho>(parameters);
+      case mitk::SignalGenerationParameters::SingleShotEpi:
+      default:
+        return std::make_unique<mitk::SingleShotEpi>(parameters);
+    }
+  }
+
+  template< class ScalarType >
+  float KspaceImageFilter< ScalarType >::CoilSensitivity(VectorType& pos) const
+  {
+    // The coil ring moves with the excited slice. A local copy: all work units call this at once,
+    // and for oblique images pos[2] differs between pixels of one slice.
+    VectorType coilPosition = m_CoilPosition;
+    coilPosition[2] = pos[2];
 
     switch (m_Parameters->m_SignalGen.m_CoilSensitivityProfile)
     {
-      case SignalGenerationParameters::COIL_CONSTANT:
+      case mitk::SignalGenerationParameters::COIL_CONSTANT:
       return 1;
-      case SignalGenerationParameters::COIL_LINEAR:
+      case mitk::SignalGenerationParameters::COIL_LINEAR:
       {
-        VectorType diff = pos-m_CoilPosition;
+        VectorType diff = pos-coilPosition;
         float sens = diff.GetNorm()*m_CoilSensitivityFactor + 1;
         if (sens<0)
           sens = 0;
         return sens;
       }
-      case SignalGenerationParameters::COIL_EXPONENTIAL:
+      case mitk::SignalGenerationParameters::COIL_EXPONENTIAL:
       {
-        VectorType diff = pos-m_CoilPosition;
+        VectorType diff = pos-coilPosition;
         float dist = static_cast<float>(diff.GetNorm());
         return std::exp(-dist*m_CoilSensitivityFactor);
       }
       default:
       return 1;
     }
+  }
+
+  template< class ScalarType >
+  bool KspaceImageFilter< ScalarType >::IsSkippedLine(int ky, int numLines, double partialFourier, bool reversePhase)
+  {
+    const int half = numLines/2;  // index of the k-space centre
+    const int acquired = std::clamp(static_cast<int>(std::lround(partialFourier*numLines)), half+1, numLines);
+    if (reversePhase)
+      return ky >= acquired;
+    const bool even = numLines%2 == 0;
+    if (even && ky == 0)
+      return false;
+    return ky < numLines - acquired + (even ? 1 : 0);
   }
 
   template< class ScalarType >
@@ -299,10 +329,16 @@ namespace itk {
     else
         ky_shift = kyMax/2;
 
+    // Largest noise-free sample of this work unit (the spike amplitude). With one work unit the first
+    // of equal maxima in readout order wins; the merge below keeps that rule for any number of units.
+    std::complex<ScalarType> spike(0,0);
+    long spikeTick = -1;
+
     std::complex<ScalarType> zero = std::complex<ScalarType>(0, 0);
     while( !oit.IsAtEnd() )
     {
       int tick = oit.GetIndex()[1] * kxMax + oit.GetIndex()[0];
+      const long readoutTick = tick;
 
       // get current k-space index (depends on the chosen k-space readout scheme)
       itk::Index< 2 > kIdx = m_ReadoutScheme->GetActualKspaceIndex(tick);
@@ -314,14 +350,8 @@ namespace itk {
         tick %= static_cast<int>(numPix);
       }
 
-      // partial fourier
-      // two cases because we always want to skip the "later" parts of k-space
-      // in "normal" phase direction, the higher k-space indices are acquired first
-      // in reversed phase direction, the higher k-space indices are acquired later
-      // if the image has an even number of lines, never skip line zero since it is missing on the other side (DFT not completely syymetric in even case)
-      if ((m_Parameters->m_SignalGen.m_ReversePhase && kIdx[1]>std::ceil(kyMax*m_Parameters->m_SignalGen.m_PartialFourier)) ||
-          (!m_Parameters->m_SignalGen.m_ReversePhase && kIdx[1]<std::floor(kyMax*(1.0 - m_Parameters->m_SignalGen.m_PartialFourier)) &&
-           (kIdx[1]>0 || static_cast<int>(kyMax)%2 == 1)))
+      // partial fourier: the lines read last are not acquired
+      if (IsSkippedLine(kIdx[1], static_cast<int>(kyMax), m_Parameters->m_SignalGen.m_PartialFourier, m_Parameters->m_SignalGen.m_ReversePhase))
       {
         outputImage->SetPixel(kIdx, zero);
         ++oit;
@@ -411,13 +441,13 @@ namespace itk {
         // only necessary for eddy currents and non-constant coil sensitivity
         VectorType pos;
         if ((m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline) ||
-            m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=SignalGenerationParameters::COIL_CONSTANT)
+            m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
         {
           pos[0] = x; pos[1] = y; pos[2] = m_Z;
           pos = m_Transform*pos;
         }
 
-        if (m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=SignalGenerationParameters::COIL_CONSTANT)
+        if (m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
           f_real *= CoilSensitivity(pos);
 
         // simulate eddy currents and other distortions
@@ -425,7 +455,7 @@ namespace itk {
         if (  m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline)
         {
           // duration (tRead) already included in "eddyDecay"
-          phi += (m_DiffusionGradientDirection[0]*pos[0]+m_DiffusionGradientDirection[1]*pos[1]+m_DiffusionGradientDirection[2]*pos[2]) * eddyDecay;
+          phi += (m_EddyFieldGradient[0]*pos[0]+m_EddyFieldGradient[1]*pos[1]+m_EddyFieldGradient[2]*pos[2]) * eddyDecay;
         }
 
         // simulate distortions
@@ -457,14 +487,29 @@ namespace itk {
       }
       s /= numPix;
 
-      if (m_SpikesPerSlice>0 && sqrt(s.imag()*s.imag()+s.real()*s.real()) > sqrt(m_Spike.imag()*m_Spike.imag()+m_Spike.real()*m_Spike.real()) )
-        m_Spike = s;
+      if (m_SpikesPerSlice>0 && sqrt(s.imag()*s.imag()+s.real()*s.real()) > sqrt(spike.imag()*spike.imag()+spike.real()*spike.real()) )
+      {
+        spike = s;
+        spikeTick = readoutTick;
+      }
 
       s += outputImage->GetPixel(kIdx); // add precalculated noise
       outputImage->SetPixel(kIdx, s);
       m_KSpaceImage->SetPixel(kIdx, sqrt(s.imag()*s.imag()+s.real()*s.real()) );
 
       ++oit;
+    }
+
+    if (spikeTick>=0)
+    {
+      std::lock_guard<std::mutex> lock(m_SpikeMutex);
+      const auto magnitude = sqrt(spike.imag()*spike.imag()+spike.real()*spike.real());
+      const auto maxMagnitude = sqrt(m_Spike.imag()*m_Spike.imag()+m_Spike.real()*m_Spike.real());
+      if (magnitude > maxMagnitude || (magnitude == maxMagnitude && spikeTick < m_SpikeTick))
+      {
+        m_Spike = spike;
+        m_SpikeTick = spikeTick;
+      }
     }
   }
 
@@ -482,9 +527,7 @@ namespace itk {
       int tick = oit.GetIndex()[1] * kxMax + oit.GetIndex()[0];
       auto kIdx = m_ReadoutScheme->GetActualKspaceIndex(tick);
 
-      if ((m_Parameters->m_SignalGen.m_ReversePhase && kIdx[1]>std::ceil(kyMax*m_Parameters->m_SignalGen.m_PartialFourier)) ||
-          (!m_Parameters->m_SignalGen.m_ReversePhase && kIdx[1]<std::floor(kyMax*(1.0 - m_Parameters->m_SignalGen.m_PartialFourier)) &&
-          (kIdx[1]>0 || static_cast<int>(kyMax)%2 == 1)))
+      if (IsSkippedLine(kIdx[1], kyMax, m_Parameters->m_SignalGen.m_PartialFourier, m_Parameters->m_SignalGen.m_ReversePhase))
       {
         // calculate symmetric index
         auto sym = m_ReadoutScheme->GetSymmetricIndex(kIdx);
@@ -508,7 +551,7 @@ namespace itk {
       outputImage->SetPixel(spikeIdx, m_Spike);
       m_SpikeLog += "[" + boost::lexical_cast<std::string>(spikeIdx[0]) + "," + boost::lexical_cast<std::string>(spikeIdx[1]) + "," + boost::lexical_cast<std::string>(m_Zidx) + "] Magnitude: " + boost::lexical_cast<std::string>(m_Spike.real()) + "+" + boost::lexical_cast<std::string>(m_Spike.imag()) + "i\n";
     }
-    delete m_ReadoutScheme;
+    m_ReadoutScheme.reset();
   }
 }
 #endif

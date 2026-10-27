@@ -14,10 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkibersFromPlanarFiguresFilter_cpp
-#define __itkibersFromPlanarFiguresFilter_cpp
-
 #include "itkFibersFromPlanarFiguresFilter.h"
+#include <algorithm>
 
 #include <itkOrientationDistributionFunction.h>
 #include <itkDiffusionOdfGeneralizedFaImageFilter.h>
@@ -61,7 +59,7 @@ void FibersFromPlanarFiguresFilter::GeneratePoints()
   {
     mitk::Vector2D p;
     switch (m_Parameters.m_Distribution) {
-    case FiberGenerationParameters::DISTRIBUTE_GAUSSIAN:
+    case mitk::FiberGenerationParameters::DISTRIBUTE_GAUSSIAN:
       p[0] = randGen->GetNormalVariate(0, m_Parameters.m_Variance);
       p[1] = randGen->GetNormalVariate(0, m_Parameters.m_Variance);
       break;
@@ -83,21 +81,8 @@ void FibersFromPlanarFiguresFilter::SetFixSeed(int FixSeed)
   m_FixSeed = FixSeed;
 }
 
-/*
-void AddGyry()
-{
-mitk::BaseGeometry* geom = pe->GetGeometry();
-mitk::Vector3D translation;
-      pos += bundle_waypoints.at(c-1)->GetPlaneGeometry()->GetNormal() * randGen->GetUniformVariate(m_StepSizeMin, m_StepSizeMax);
-  // translate
-  geom->Translate(translation);
-}
-*/
-
 void FibersFromPlanarFiguresFilter::GenerateData()
 {
-  bool m_Gyrus = true;
-
   // check if enough fiducials are available
   for (unsigned int i=0; i<m_Parameters.m_Fiducials.size(); i++)
     if (m_Parameters.m_Fiducials.at(i).size()<2)
@@ -135,7 +120,7 @@ void FibersFromPlanarFiguresFilter::GenerateData()
 
       // apply twist
       vnl_matrix_fixed<double, 2, 2> tRot;
-      tRot[0][0] = tDir[0];
+      tRot[0][0] = std::clamp(tDir[0], -1.0, 1.0);  // rounding must not make acos NaN
       tRot[1][1] = tRot[0][0];
       tRot[1][0] = sin(acos(tRot[0][0]));
       tRot[0][1] = -tRot[1][0];
@@ -147,11 +132,6 @@ void FibersFromPlanarFiguresFilter::GenerateData()
       vnl_vector_fixed< double, 2 > newP;
       newP[0] = m_2DPoints.at(j)[0];
       newP[1] = m_2DPoints.at(j)[1];
-      if (m_Gyrus)
-      {
-        newP[0] *= 1.5;
-        newP[1] *= 1.5;
-      }
 
       double alpha = acos(eDir[0]);
       if (eDir[1]>0)
@@ -176,13 +156,6 @@ void FibersFromPlanarFiguresFilter::GenerateData()
 
       wc = figure->GetWorldControlPoint(0);
 
-      if (m_Gyrus)
-      {
-        mitk::Vector3D d = wc-w;
-        auto l = d.GetNorm();
-        MITK_INFO << l;
-      }
-
       vtkIdType id = m_VtkPoints->InsertNextPoint(w.GetDataPointer());
       container->GetPointIds()->InsertNextId(id);
 
@@ -200,17 +173,16 @@ void FibersFromPlanarFiguresFilter::GenerateData()
 
         eDir = p1-p0; eDir.Normalize();
         mitk::Vector2D tDir2 = p3-p0; tDir2.Normalize();
-        mitk::Vector2D temp; temp.Fill(0);
-        temp.SetVnlVector(tRot.transpose() * tDir2.GetVnlVector());
+        // the twist turns from the previous fiducial's direction, so its sign is that of tDir x tDir2
+        // (tRot holds only the previous increment, which gave the wrong sign for non-monotone twists)
+        const double cross = tDir[0]*tDir2[1] - tDir[1]*tDir2[0];
 
         // apply twist
-        tRot[0][0] = tDir[0]*tDir2[0] + tDir[1]*tDir2[1];
-        if (tRot[0][0]>1.0)
-          tRot[0][0] = 1.0;
+        tRot[0][0] = std::clamp(tDir[0]*tDir2[0] + tDir[1]*tDir2[1], -1.0, 1.0);
         tRot[1][1] = tRot[0][0];
         tRot[1][0] = sin(acos(tRot[0][0]));
         tRot[0][1] = -tRot[1][0];
-        if (temp[1]<0)
+        if (cross<0)
           tRot.inplace_transpose();
         m_2DPoints[j].SetVnlVector(tRot*m_2DPoints[j].GetVnlVector());
         tDir = tDir2;
@@ -218,11 +190,6 @@ void FibersFromPlanarFiguresFilter::GenerateData()
         // apply new ellipse shape
         newP[0] = m_2DPoints.at(j)[0];
         newP[1] = m_2DPoints.at(j)[1];
-        if (m_Gyrus && k==bundle.size()-1)
-        {
-          newP[0] *= 1.5;
-          newP[1] *= 1.5;
-        }
 
         // calculate normal
         mitk::PlaneGeometry* planeGeo = const_cast<mitk::PlaneGeometry*>(figure->GetPlaneGeometry());
@@ -272,5 +239,4 @@ void FibersFromPlanarFiguresFilter::GenerateData()
 }
 
 }
-#endif // __itkFibersFromPlanarFiguresFilter_cpp
 

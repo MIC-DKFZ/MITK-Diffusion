@@ -8,11 +8,13 @@
 #include <vnl/algo/vnl_lbfgsb.h>
 #include <vnl/vnl_sparse_matrix.h>
 #include <vnl/vnl_sparse_matrix_linear_system.h>
+#include <memory>
 #include <itkImageDuplicator.h>
 #include <itkTimeProbe.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkDiffusionSignalModel.h>
+#include <MitkMriSimulationExports.h>
 
 class VnlCostFunction : public vnl_cost_function
 {
@@ -29,7 +31,7 @@ public:
     NONE
   };
 
-  vnl_sparse_matrix_linear_system< double >* S;
+  std::unique_ptr< vnl_sparse_matrix_linear_system< double > > S;
   vnl_sparse_matrix< double > m_A;
   vnl_sparse_matrix< double > m_A_Ones; // matrix indicating active weights with 1
   vnl_vector< double > m_b;
@@ -42,7 +44,7 @@ public:
 
   void SetProblem(vnl_sparse_matrix< double >& A, vnl_vector<double>& b, double lambda, REGU regu)
   {
-    S = new vnl_sparse_matrix_linear_system<double>(A, b);
+    S = std::make_unique< vnl_sparse_matrix_linear_system<double> >(A, b);
     m_A = A;
     m_b = b;
     m_Lambda = lambda;
@@ -161,9 +163,10 @@ public:
 
   void grad_regu_Variance(vnl_vector<double> const &x, vnl_vector<double> &dx)
   {
+    // d/dx_k sum_i (x_i - mean)^2 = 2 (x_k - mean): the deviations from the mean sum to zero
     double mean = x.mean();
     vnl_vector<double> tx = x-mean; // difference to mean
-    dx += 10000.0*tx*(2.0-2.0/dim)/dim;
+    dx += 10000.0*m_Lambda*2.0*tx/dim;
   }
 
   void grad_regu_Lasso(vnl_vector<double> const &x, vnl_vector<double> &dx)
@@ -190,7 +193,8 @@ public:
       offset += g;
     }
 
-    dx += 10000.0*tx*(2.0-2.0/dim)/dim;
+    // per group as in grad_regu_Variance
+    dx += 10000.0*m_Lambda*2.0*tx/dim;
   }
 
   void grad_regu_VoxelVariance(vnl_vector<double> const &x, vnl_vector<double> &dx)
@@ -310,13 +314,13 @@ namespace itk{
 * \brief Fits the tractogram to the input image by assigning a weight to each fiber (similar to https://doi.org/10.1016/j.neuroimage.2015.06.092).  */
 
 
-class FitFibersToImageFilter : public ImageSource< mitk::PeakImage::ItkPeakImageType >
+class MITKMRISIMULATION_EXPORT FitFibersToImageFilter : public ImageSource< mitk::PeakImage::ItkPeakImageType >
 {
 
 public:
 
   typedef FitFibersToImageFilter Self;
-  typedef ProcessObject Superclass;
+  typedef ImageSource< mitk::PeakImage::ItkPeakImageType > Superclass;
   typedef SmartPointer< Self > Pointer;
   typedef SmartPointer< const Self > ConstPointer;
 
@@ -466,9 +470,5 @@ protected:
 };
 
 }
-
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkFitFibersToImageFilter.cpp"
-#endif
 
 #endif // __itkFitFibersToImageFilter_h__
