@@ -900,6 +900,12 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
       m_Parameters.m_Misc.m_ArtifactModelString += QString::number(m_Parameters.m_SignalGen.m_NoiseVariance).toStdString();
       m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Noise-Variance", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_NoiseVariance));
     }
+
+    // The k-space filter adds complex Gaussian noise whenever m_NoiseVariance>0, so with a noise
+    // model (which keeps its own variance) the image would get both noises. Until the module adds
+    // k-space noise only without a noise model, the view sets this variance to 0.
+    if (m_Parameters.m_NoiseModel!=nullptr)
+      m_Parameters.m_SignalGen.m_NoiseVariance = 0;
   }
 
   // signal models
