@@ -971,21 +971,33 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
     return;
   if (m_Controls->m_InteractiveBox->isChecked() && m_SeedPoints.empty())
     return;
+
+  // Only the first input is used, except for deterministic multi-tensor tracking; inputs of another
+  // type would be cast to the first one's pixel type.
+  if (m_InputImageNodes.size()>1)
+  {
+    const std::string firstType = m_InputImageNodes.at(0)->GetData()->GetNameOfClass();
+    bool sameType = true;
+    for (const auto &node : m_InputImageNodes)
+      sameType = sameType && firstType == node->GetData()->GetNameOfClass();
+    if (!sameType || !dynamic_cast<mitk::TensorImage*>(m_InputImageNodes.at(0)->GetData()) || m_Controls->m_ModeBox->currentIndex()==1)
+    {
+      QMessageBox::information(nullptr, "Information", "Several input images are only supported for deterministic multi-tensor tractography (tensor images only). Please select a single input image.");
+      return;
+    }
+  }
+
   StartStopTrackingGui(true);
 
+  // The preparation casts the inputs and ROI images; on an error the view must leave the running state.
+  try
+  {
   m_Tracker = TrackerType::New();
 
   if( dynamic_cast<mitk::TensorImage*>(m_InputImageNodes.at(0)->GetData()) )
   {
     if (m_Controls->m_ModeBox->currentIndex()==1)
     {
-      if (m_InputImageNodes.size()>1)
-      {
-        QMessageBox::information(nullptr, "Information", "Probabilistic tensor tractography is only implemented for single-tensor mode!");
-        StartStopTrackingGui(false);
-        return;
-      }
-
       if (m_TrackingHandler==nullptr)
       {
         m_TrackingHandler = new mitk::TrackingHandlerOdf();
@@ -1174,6 +1186,16 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
   m_Tracker->SetParameters(params);
   m_Tracker->SetTrackingHandler(m_TrackingHandler);
   m_Tracker->SetVerbose(!m_Controls->m_InteractiveBox->isChecked());
+  }
+  catch (const std::exception &e)
+  {
+    StartStopTrackingGui(false);
+    m_Tracker = nullptr;
+    // a handler may be half built; the next start builds it anew
+    DeleteTrackingHandler();
+    QMessageBox::warning(nullptr, "Streamline Tractography", QString("Could not prepare the tractography:\n") + e.what());
+    return;
+  }
 
   m_ParentNode = m_InputImageNodes.at(0);
   m_TrackingThread.start(QThread::LowestPriority);
