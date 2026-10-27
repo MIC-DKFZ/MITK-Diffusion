@@ -210,6 +210,11 @@ void QmitkFiberQuantificationView::ProcessSelectedBundles()
     {
       mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
       QString name(node->GetName().c_str());
+      if (fib->GetNumFibers()==0)
+      {
+        QMessageBox::information(nullptr, "No output generated:", QString("%1 contains no fibers.").arg(name));
+        continue;
+      }
       DataNode::Pointer newNode = nullptr;
       switch(generationMethod){
       case 0:
@@ -490,6 +495,13 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
       mitk::MultiLabelSegmentation::Pointer multilabelImage = mitk::MultiLabelSegmentation::New();
       multilabelImage->InitializeByLabeledImage(img);
       mitk::Label::Pointer label = multilabelImage->GetLabel(1);
+      if (label.IsNull())
+      {
+        // no voxel of the reference grid is hit, so there is no label to describe
+        QMessageBox::information(nullptr, "Binary envelope", QString("The envelope of %1 is empty in the reference image.").arg(name.c_str()));
+        node->SetData(img);
+        return node;
+      }
       label->SetName("Tractogram");
 
       // Segmented Property Category Code Sequence (0062, 0003): the general category of this segment.
