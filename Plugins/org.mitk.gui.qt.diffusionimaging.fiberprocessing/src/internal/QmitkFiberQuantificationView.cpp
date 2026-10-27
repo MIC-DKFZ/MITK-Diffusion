@@ -48,6 +48,41 @@ See LICENSE.txt or http://www.mitk.org for details.
 const std::string QmitkFiberQuantificationView::VIEW_ID = "org.mitk.views.fiberquantification";
 using namespace mitk;
 
+namespace
+{
+  /**
+   * An image without pixel buffer on the grid of the reference image. The image generators use
+   * their reference image only for its grid (mitk::FiberImageGrid::FromReference, the direction
+   * filter with SetOnlyUseMaskGeometry), so any 3D image, also a DWI or another multi-component
+   * image, can serve as reference without converting its pixels.
+   */
+  template <class TImage>
+  typename TImage::Pointer ReferenceGrid(const mitk::Image* reference)
+  {
+    const mitk::BaseGeometry* geometry = reference->GetGeometry();
+    typename TImage::SpacingType spacing;
+    typename TImage::DirectionType direction;
+    typename TImage::PointType origin;
+    typename TImage::RegionType region;
+    for (unsigned int i=0; i<3; ++i)
+    {
+      spacing[i] = geometry->GetSpacing()[i];
+      origin[i] = geometry->GetOrigin()[i];
+      region.SetSize(i, reference->GetDimension(i));
+      // column i of the geometry matrix is direction i scaled by the spacing along i
+      for (unsigned int j=0; j<3; ++j)
+        direction[j][i] = geometry->GetMatrixColumn(i)[j] / spacing[i];
+    }
+
+    auto grid = TImage::New();
+    grid->SetSpacing(spacing);
+    grid->SetOrigin(origin);
+    grid->SetDirection(direction);
+    grid->SetRegions(region);
+    return grid;
+  }
+}
+
 QmitkFiberQuantificationView::QmitkFiberQuantificationView()
   : QmitkAbstractView()
   , m_Controls( 0 )
@@ -125,9 +160,7 @@ void QmitkFiberQuantificationView::CalculateFiberDirections()
   itk::TractsToVectorImageFilter<float>::Pointer fOdfFilter = itk::TractsToVectorImageFilter<float>::New();
   if (m_SelectedImage.IsNotNull())
   {
-    ItkUcharImgType::Pointer itkMaskImage = ItkUcharImgType::New();
-    mitk::CastToItkImage<ItkUcharImgType>(m_SelectedImage, itkMaskImage);
-    fOdfFilter->SetMaskImage(itkMaskImage);
+    fOdfFilter->SetMaskImage(ReferenceGrid<ItkUcharImgType>(m_SelectedImage));
   }
 
   // extract directions from fiber bundle
@@ -340,9 +373,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateFiberEndingsImage(
   generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
-    OutImageType::Pointer itkImage = OutImageType::New();
-    CastToItkImage(m_SelectedImage, itkImage);
-    generator->SetInputImage(itkImage);
+    generator->SetInputImage(ReferenceGrid<OutImageType>(m_SelectedImage));
     generator->SetUseImageGeometry(true);
   }
   generator->Update();
@@ -370,9 +401,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateColorHeatmap(mitk:
   generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
-    itk::Image<unsigned char, 3>::Pointer itkImage = itk::Image<unsigned char, 3>::New();
-    CastToItkImage(m_SelectedImage, itkImage);
-    generator->SetInputImage(itkImage);
+    generator->SetInputImage(ReferenceGrid<itk::Image<unsigned char, 3>>(m_SelectedImage));
     generator->SetUseImageGeometry(true);
   }
   generator->Update();
@@ -400,9 +429,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateBinarySkeleton(mit
   envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
-    UcharImageType::Pointer itkImage = UcharImageType::New();
-    CastToItkImage(m_SelectedImage, itkImage);
-    envelope_generator->SetInputImage(itkImage);
+    envelope_generator->SetInputImage(ReferenceGrid<UcharImageType>(m_SelectedImage));
     envelope_generator->SetUseImageGeometry(true);
 
   }
@@ -433,9 +460,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateDistanceMap(mitk::
   envelope_generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
   if (m_SelectedImage.IsNotNull())
   {
-    UcharImageType::Pointer itkImage = UcharImageType::New();
-    CastToItkImage(m_SelectedImage, itkImage);
-    envelope_generator->SetInputImage(itkImage);
+    envelope_generator->SetInputImage(ReferenceGrid<UcharImageType>(m_SelectedImage));
     envelope_generator->SetUseImageGeometry(true);
 
   }
@@ -474,9 +499,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
     generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
     if (m_SelectedImage.IsNotNull())
     {
-      OutImageType::Pointer itkImage = OutImageType::New();
-      CastToItkImage(m_SelectedImage, itkImage);
-      generator->SetInputImage(itkImage);
+      generator->SetInputImage(ReferenceGrid<OutImageType>(m_SelectedImage));
       generator->SetUseImageGeometry(true);
 
     }
@@ -534,9 +557,7 @@ mitk::DataNode::Pointer QmitkFiberQuantificationView::GenerateTractDensityImage(
     generator->SetUpsamplingFactor(m_Controls->m_UpsamplingSpinBox->value());
     if (m_SelectedImage.IsNotNull())
     {
-      OutImageType::Pointer itkImage = OutImageType::New();
-      CastToItkImage(m_SelectedImage, itkImage);
-      generator->SetInputImage(itkImage);
+      generator->SetInputImage(ReferenceGrid<OutImageType>(m_SelectedImage));
       generator->SetUseImageGeometry(true);
 
     }
