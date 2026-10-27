@@ -39,6 +39,7 @@ found in the LICENSE file.
 
 mitk::StreamlineInteractorBrush::StreamlineInteractorBrush()
 {
+    // the fiber under the mouse: orange, unlike the label colours green and red
     m_ColorForHighlight[0] = 1.0;
     m_ColorForHighlight[1] = 0.5;
     m_ColorForHighlight[2] = 0.0;
@@ -207,7 +208,7 @@ void mitk::StreamlineInteractorBrush::SelectStreamline(StateMachineAction *, Int
         if (m_predlabeling==false)
             {
         vtkIdType pickedCellID = picker->GetCellId();
-        m_manStreamline->SetSingleFiberColor(0.0, 255.0, 0.0, pickedCellID);
+        m_manStreamline->SetSingleFiberColor(255 * m_ColorForHighlight[0], 255 * m_ColorForHighlight[1], 255 * m_ColorForHighlight[2], pickedCellID);
 
         }
     }
@@ -234,7 +235,7 @@ void mitk::StreamlineInteractorBrush::SelectStreamline(StateMachineAction *, Int
         if (m_predlabeling==false)
             {
         vtkIdType pickedCellID = picker->GetCellId();
-        m_manStreamline->SetSingleFiberColor(0.0, 255.0, 0.0, pickedCellID);
+        m_manStreamline->SetSingleFiberColor(255 * m_ColorForHighlight[0], 255 * m_ColorForHighlight[1], 255 * m_ColorForHighlight[2], pickedCellID);
 //        m_manStreamline->SetFloatProperty("shape.tuberadius", 1.0);
         }
     }
@@ -363,5 +364,7 @@ void mitk::StreamlineInteractorBrush::AddStreamlinetolabelsBundle(StateMachineAc
       if (!m_predlabeling)
         m_manStreamline->SetFiberColors(255, 255, 255);
     }
+    // hovering picks on the interactor's node, which is the bundle being labeled
+    DataInteractor::SetDataNode(m_manStreamlineNode);
     RenderingManager::GetInstance()->RequestUpdateAll();
 }
