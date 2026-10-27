@@ -46,6 +46,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkGlobalTractographyUnitTestSuite);
   MITK_TEST(EvaluateOdf_RotatedImage_SamplesAlongParticle);
+  MITK_TEST(EvaluateOdf_ThinImage_SamplesAlongParticle);
   MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
   MITK_TEST(OptimalShift_OneNeighbour_FacesIt);
@@ -133,6 +134,39 @@ public:
     // across the row the particle sees the row only at its centre sample
     vnl_vector_fixed<float, 3> across(0.0f, 1.0f, 0.0f);
     CPPUNIT_ASSERT(energy.EvaluateOdf(pos, across) < 0.5);
+  }
+
+  /** Images with fewer than 3 voxels along an axis use nearest-neighbour sampling, which looked up
+   *  the particle centre's voxel for all 21 samples instead of the sample positions. */
+  void EvaluateOdf_ThinImage_SamplesAlongParticle()
+  {
+    auto odfs = OdfImageType::New();
+    OdfImageType::SizeType size = {{7, 7, 2}};
+    odfs->SetRegions(OdfImageType::RegionType(size));
+    odfs->Allocate();
+    // isotropic ODFs, 1 in the voxel column x = 3 and 0 elsewhere
+    itk::ImageRegionIteratorWithIndex<OdfImageType> it(odfs, odfs->GetLargestPossibleRegion());
+    for (it.GoToBegin(); !it.IsAtEnd(); ++it)
+    {
+      OdfImageType::PixelType odf;
+      odf.Fill(it.GetIndex()[0] == 3 ? 1.0f : 0.0f);
+      it.Set(odf);
+    }
+    auto mask = FloatImageType::New();
+    mask->SetRegions(FloatImageType::RegionType(size));
+    mask->Allocate();
+    mask->FillBuffer(1.0f);
+
+    SphereInterpolator interpolator("");
+    CPPUNIT_ASSERT(interpolator.IsInValidState());
+    mitk::ParticleGrid grid(mask, 1.5f, 16);
+    auto rng = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+    GibbsEnergyComputer energy(odfs, mask, &grid, &interpolator, rng);
+
+    vnl_vector_fixed<float, 3> pos(3.5f, 3.5f, 0.5f); // centre of voxel (3,3,0)
+    // along the column all samples lie in it; across it 7 of the 21 samples (x in [3, 4))
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, energy.EvaluateOdf(pos, vnl_vector_fixed<float, 3>(0.0f, 1.0f, 0.0f)), 1e-4);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0 / 21.0, energy.EvaluateOdf(pos, vnl_vector_fixed<float, 3>(1.0f, 0.0f, 0.0f)), 1e-4);
   }
 
   /** Every particle of every chain becomes a fiber point, in chain order, also when the chain is
