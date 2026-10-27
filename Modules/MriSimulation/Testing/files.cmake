@@ -7,4 +7,5 @@ SET(MODULE_CUSTOM_TESTS
   mitkFiberfoxParametersTest.cpp
   mitkFiberfoxSignalModelTest.cpp
   mitkFiberfoxSimulationTest.cpp
+  mitkFiberfoxKspaceTest.cpp
 )
