@@ -108,7 +108,8 @@ void TrackingHandlerTensor::InitForTracking()
             m_PdImage.at(i)->SetPixel(index, dir);
             if (!useUserFaImage)
               m_FaImage->SetPixel(index, m_FaImage->GetPixel(index)+tensor.GetFractionalAnisotropy());
-            m_EmaxImage.at(i)->SetPixel(index, 2/eigenvalues[2]);
+            // 0 for zero tensors: inf would make the interpolated TEND tensor NaN (0*inf) next to them
+            m_EmaxImage.at(i)->SetPixel(index, eigenvalues[2]>0 ? 2/eigenvalues[2] : 0);
           }
           if (!useUserFaImage)
             m_FaImage->SetPixel(index, m_FaImage->GetPixel(index)/m_NumberOfInputs);

@@ -41,6 +41,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(Interpolation_TracksTheOutermostVoxelLayer);
   MITK_TEST(Flips_FollowTheFlippedField);
   MITK_TEST(TensorFaImage_OnAnotherGrid);
+  MITK_TEST(Tend_NextToZeroTensors);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -489,6 +490,39 @@ public:
 
     CPPUNIT_ASSERT_EQUAL(2u, expected->GetNumFibers());
     CPPUNIT_ASSERT_MESSAGE("FA image on a finer grid gives the same tractogram", expected->Equals(result));
+  }
+
+  /** TEND scales each tensor by 2/lambda1. Zero tensors (background, masked tensor files) gave inf,
+   *  and inf times the interpolation weight 0 of a neighbouring corner made the direction NaN, so
+   *  TEND stopped at every voxel next to a zero tensor. */
+  void Tend_NextToZeroTensors()
+  {
+    auto tensors = MakeTensorField(vnl_vector_fixed<double, 3>(1, 0, 0));
+    TensorImageType::PixelType zero;
+    zero.Fill(0.0f);
+    for (int x = 0; x < 20; ++x)
+      for (int z = 0; z < 20; ++z)
+      {
+        TensorImageType::IndexType idx = {{x, 10, z}};
+        tensors->SetPixel(idx, zero);
+      }
+    auto seeds = FloatImgType::New();
+    FloatImgType::SizeType size = {{20, 20, 20}};
+    seeds->SetRegions(FloatImgType::RegionType(size));
+    seeds->Allocate();
+    seeds->FillBuffer(0.0f);
+    FloatImgType::IndexType seed = {{9, 9, 9}};
+    seeds->SetPixel(seed, 1.0f);
+
+    auto params = MakeParameters();
+    params->m_F = 0.3f;
+    params->m_G = 0.7f;
+    mitk::TrackingHandlerTensor handler;
+    handler.SetTensorImage(tensors.GetPointer());
+    auto fibers = mitk::FiberBundle::New(TrackWith(handler, params, seeds));
+
+    CPPUNIT_ASSERT_EQUAL(1u, fibers->GetNumFibers());
+    CPPUNIT_ASSERT_MESSAGE("streamline runs along the zero-tensor plane", fibers->GetFiberLength(0) > 15);
   }
 };
 
