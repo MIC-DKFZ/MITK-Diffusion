@@ -621,6 +621,8 @@ void QmitkFiberGenerationView::GenerateFibers()
 
   UpdateParametersFromGui();
 
+  // the filter returns one bundle per fiducial list, i.e. only for bundles with two or more fiducials
+  std::vector< mitk::DataNode::Pointer > targetNodes;
   for (unsigned int i=0; i<m_SelectedBundles.size(); i++)
   {
     mitk::DataStorage::SetOfObjects::ConstPointer children = GetDataStorage()->GetDerivations(m_SelectedBundles.at(i));
@@ -670,13 +672,14 @@ void QmitkFiberGenerationView::GenerateFibers()
         }
         else
           flip.push_back(0);
+        count++;  // the constant radius is that of the first fiducial
       }
-      count++;
     }
     if (fib.size()>1)
     {
       m_Parameters.m_FiberGen.m_Fiducials.push_back(fib);
       m_Parameters.m_FiberGen.m_FlipList.push_back(flip);
+      targetNodes.push_back(m_SelectedBundles.at(i));
     }
     else if (fib.size()>0)
       m_SelectedBundles.at(i)->SetData( mitk::FiberBundle::New() );
@@ -689,11 +692,11 @@ void QmitkFiberGenerationView::GenerateFibers()
   filter->Update();
   std::vector< mitk::FiberBundle::Pointer > fiberBundles = filter->GetFiberBundles();
 
-  for (unsigned int i=0; i<fiberBundles.size(); i++)
+  for (unsigned int i=0; i<fiberBundles.size() && i<targetNodes.size(); i++)
   {
-    m_SelectedBundles.at(i)->SetData( fiberBundles.at(i) );
+    targetNodes.at(i)->SetData( fiberBundles.at(i) );
     if (fiberBundles.at(i)->GetNumFibers()>50000)
-      m_SelectedBundles.at(i)->SetVisibility(false);
+      targetNodes.at(i)->SetVisibility(false);
   }
 
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
