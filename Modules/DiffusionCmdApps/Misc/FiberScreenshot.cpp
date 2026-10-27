@@ -88,6 +88,11 @@ int main(int argc, char* argv[])
   {
     mitk::RenderingTestHelper renderingHelper(640*2, 480*2);
     std::vector< mitk::FiberBundle::Pointer > tractograms = mitk::FiberBundleIOHelper::load_fibs(inFibs);
+    if (tractograms.empty())
+    {
+      std::cout << "No tractogram could be loaded." << std::endl;
+      return EXIT_FAILURE;
+    }
     for (auto fib : tractograms)
     {
       fib->RotateAroundAxis(rotateX, rotateY, rotateZ);
