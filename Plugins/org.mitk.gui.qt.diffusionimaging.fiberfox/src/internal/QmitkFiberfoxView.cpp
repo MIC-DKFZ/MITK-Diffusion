@@ -1385,22 +1385,19 @@ void QmitkFiberfoxView::LoadParameters()
   else
     m_Controls->m_LoadBvecsEdit->setText("-");
 
+  // m_NoiseDistributionBox offers 0 "Complex Gaussian" (no noise model) and 1 "Rician"
   if (m_Parameters.m_NoiseModel!=nullptr)
   {
     m_Controls->m_AddNoise->setChecked(m_Parameters.m_Misc.m_DoAddNoise);
-    if (dynamic_cast<mitk::RicianNoiseModel<double>*>(m_Parameters.m_NoiseModel.get()))
-    {
-      m_Controls->m_NoiseDistributionBox->setCurrentIndex(0);
-    }
-    else if (dynamic_cast<mitk::ChiSquareNoiseModel<double>*>(m_Parameters.m_NoiseModel.get()))
-    {
-      m_Controls->m_NoiseDistributionBox->setCurrentIndex(1);
-    }
+    m_Controls->m_NoiseDistributionBox->setCurrentIndex(1);
+    if (dynamic_cast<mitk::ChiSquareNoiseModel<double>*>(m_Parameters.m_NoiseModel.get()))
+      QMessageBox::information(nullptr, "Noise distribution", "The parameter file uses chi-square noise, which this view does not offer. Rician noise is selected instead.");
     m_Controls->m_NoiseLevel->setValue(m_Parameters.m_NoiseModel->GetNoiseVariance());
   }
   else
   {
     m_Controls->m_AddNoise->setChecked(m_Parameters.m_Misc.m_DoAddNoise);
+    m_Controls->m_NoiseDistributionBox->setCurrentIndex(0);
     m_Controls->m_NoiseLevel->setValue(m_Parameters.m_SignalGen.m_NoiseVariance);
   }
 
