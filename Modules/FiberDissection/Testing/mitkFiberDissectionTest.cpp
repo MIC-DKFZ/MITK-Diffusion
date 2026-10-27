@@ -10,11 +10,15 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkSphereInteractor.h>
 #include <mitkStreamlineFeatureExtractor.h>
 #include <mitkStreamlineInteractorBrush.h>
 
+#include <mitkDataNode.h>
 #include <mitkException.h>
 #include <mitkFiberBundle.h>
+#include <mitkRenderingManagerFactory.h>
+#include <mitkSurface.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -122,6 +126,47 @@ namespace
       ids.push_back(i);
     return mitk::StreamlineFeatureExtractor::SubsetByIds(pool, ids);
   }
+
+  /** A sphere ROI node as the SphereInteractor creates it: a sphere surface around the origin of
+   *  its geometry, and its radius as property. */
+  mitk::DataNode::Pointer SphereRoi(const Point &center, float radius)
+  {
+    // the interactor requests render updates; registered once for the whole test driver
+    static mitk::TestingRenderingManagerFactory renderingManagerFactory;
+
+    auto node = mitk::DataNode::New();
+    node->SetData(mitk::Surface::New());
+    mitk::Point3D origin;
+    origin[0] = center[0];
+    origin[1] = center[1];
+    origin[2] = center[2];
+    node->GetData()->GetGeometry()->SetOrigin(origin);
+    node->SetFloatProperty(mitk::SphereInteractor::DATANODE_PROPERTY_SIZE, radius);
+    mitk::SphereInteractor::UpdateSurface(node);
+    return node;
+  }
+
+  /** The fibers of bundle that the sphere ROI selection of the Interactive Fiber Dissection view
+   *  keeps, as their first points. */
+  std::vector<Point> SelectBySphereRois(mitk::FiberBundle *bundle, const mitk::DataNode::Pointer &start, const mitk::DataNode::Pointer &end)
+  {
+    auto workingNode = mitk::DataNode::New();
+    workingNode->SetData(bundle);
+    auto reducedNode = mitk::DataNode::New();
+    reducedNode->SetData(mitk::FiberBundle::New());
+
+    auto interactor = mitk::SphereInteractor::New();
+    interactor->workingBundleNode(workingNode, reducedNode);
+    interactor->m_startDataNode = start;
+    interactor->m_endDataNode = end;
+    interactor->ExtractFibers();
+
+    auto reduced = dynamic_cast<mitk::FiberBundle *>(reducedNode->GetData());
+    std::vector<Point> firstPoints;
+    for (unsigned int i = 0; i < reduced->GetNumFibers(); ++i)
+      firstPoints.push_back(FirstPoint(reduced, i));
+    return firstPoints;
+  }
 }
 
 class mitkFiberDissectionTestSuite : public mitk::TestFixture
@@ -129,6 +174,7 @@ class mitkFiberDissectionTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkFiberDissectionTestSuite);
   MITK_TEST(MoveFiber_KeepsFiberCountAndWeights);
   MITK_TEST(MoveFiber_LabelBundlesTrainAndPredict);
+  MITK_TEST(SphereRoi_KeepsFibersOfBothOrientations);
   CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -216,6 +262,21 @@ public:
     CPPUNIT_ASSERT(targetFibers >= 50);
     CPPUNIT_ASSERT(classifier.GetPredictedIds().size() - targetFibers <= 3);
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(classifier.GetPredictedIds().size()) + 6, prediction->GetNumFibers());
+  }
+
+  /** A streamline connecting the two ROIs is kept whichever end it starts at. */
+  void SphereRoi_KeepsFibersOfBothOrientations()
+  {
+    auto bundle = Bundle({Line({0, 0, 0}, {40, 0, 0}),     // start ROI -> end ROI
+                          Line({40, 0, 0}, {0, 0, 0}),     // end ROI -> start ROI
+                          Line({0, 0, 20}, {40, 0, 0})});  // misses the start ROI
+    const auto kept = SelectBySphereRois(bundle, SphereRoi({0, 0, 0}, 5), SphereRoi({40, 0, 0}, 5));
+
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), kept.size());
+    std::set<double> startX;
+    for (const auto &p : kept)
+      startX.insert(p[0]);
+    CPPUNIT_ASSERT(startX.count(0) == 1 && startX.count(40) == 1);
   }
 };
 
