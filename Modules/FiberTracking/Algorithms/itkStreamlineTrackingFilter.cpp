@@ -615,7 +615,9 @@ void StreamlineTrackingFilter::GenerateData()
   m_CurrentTracts = 0;
   int num_seeds = static_cast<int>(m_SeedPoints.size());
   m_NumSeeds = static_cast<unsigned int>(num_seeds);
-  itk::Index<3> zeroIndex; zeroIndex.Fill(0);
+  // no previous voxel at the seed: an index outside every image, so that the handlers' "same voxel
+  // as before" shortcut never applies there
+  itk::Index<3> noIndex; noIndex.Fill(-1);
   m_Progress = 0;
   int print_interval = num_seeds/100;
   bool verbose = m_Verbose && print_interval>=100;
@@ -663,7 +665,7 @@ void StreamlineTrackingFilter::GenerateData()
       // get starting direction
       vnl_vector_fixed<float,3> dir; dir.fill(0.0);
       std::deque< vnl_vector_fixed<float,3> > olddirs;
-      dir = GetNewDirection(worldPos, olddirs, zeroIndex) * 0.5f;
+      dir = GetNewDirection(worldPos, olddirs, noIndex) * 0.5f;
 
       bool exclude = false;
       if (m_ExclusionRegions.IsNotNull() && mitk::imv::IsInsideMask<float>(worldPos, m_Parameters->m_InterpolateRoiImages, m_ExclusionInterpolator))

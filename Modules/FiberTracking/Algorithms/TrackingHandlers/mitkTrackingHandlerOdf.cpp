@@ -240,7 +240,7 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
   if (gfa<m_Parameters->m_Cutoff)
     return output_direction;
 
-  vnl_vector_fixed<float,3> last_dir;
+  vnl_vector_fixed<float,3> last_dir; last_dir.fill(0.0);
   if (!olddirs.empty())
     last_dir = olddirs.back();
 

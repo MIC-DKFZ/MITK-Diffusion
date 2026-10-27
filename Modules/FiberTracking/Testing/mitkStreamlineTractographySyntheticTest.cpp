@@ -43,6 +43,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   MITK_TEST(TensorFaImage_OnAnotherGrid);
   MITK_TEST(Tend_NextToZeroTensors);
   MITK_TEST(MinTractLength_IsThePolylineLength);
+  MITK_TEST(SeedInFirstVoxel_WithoutInterpolation);
   CPPUNIT_TEST_SUITE_END();
 
   using PeakImgType = mitk::TrackingHandlerPeaks::PeakImgType;
@@ -543,6 +544,31 @@ public:
     params = MakeParameters();
     params->m_MinTractLengthMm = length + 0.25f*params->GetStepSizeMm();
     CPPUNIT_ASSERT_EQUAL(vtkIdType(0), Track(params, seeds, nullptr, nullptr, MakeInnerMask())->GetNumberOfLines());
+  }
+
+  /** The seed's "previous voxel" was index (0,0,0); without interpolation the handlers then
+   *  returned the (empty or uninitialized) previous direction for a seed in that voxel. */
+  void SeedInFirstVoxel_WithoutInterpolation()
+  {
+    auto seeds = FloatImgType::New();
+    FloatImgType::SizeType size = {{20, 20, 20}};
+    seeds->SetRegions(FloatImgType::RegionType(size));
+    seeds->Allocate();
+    seeds->FillBuffer(0.0f);
+    FloatImgType::IndexType first = {{0, 0, 0}};
+    seeds->SetPixel(first, 1.0f);
+
+    auto params = MakeParameters();
+    params->m_InterpolateTractographyData = false;
+    mitk::TrackingHandlerOdf odfHandler;
+    odfHandler.SetOdfImage(MakeOdfField(vnl_vector_fixed<double, 3>(1, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("ODF", vtkIdType(1), TrackWith(odfHandler, params, seeds)->GetNumberOfLines());
+
+    params = MakeParameters();
+    params->m_InterpolateTractographyData = false;
+    mitk::TrackingHandlerTensor tensorHandler;
+    tensorHandler.SetTensorImage(MakeTensorField(vnl_vector_fixed<double, 3>(1, 0, 0)).GetPointer());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("tensor", vtkIdType(1), TrackWith(tensorHandler, params, seeds)->GetNumberOfLines());
   }
 };
 
