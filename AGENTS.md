@@ -146,6 +146,14 @@ Facts the layout does not show:
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
   set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
   voxel grid (`mitkFiberImageGrid.h`).
+- `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
+  `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
+  `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and
+  `SetGradientsFromImage` stores a DWI's gradients in that form. With a constant seed
+  (`SetUseConstantRandSeed`, `MitkFiberfox --fix_seed`) a simulation gives the same image at any
+  number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`). MITK-Data Fiberfox references
+  depend on the random engines and seeds, so a change there is checked bit for bit against the
+  old output.
 
 ## Porting state
 
