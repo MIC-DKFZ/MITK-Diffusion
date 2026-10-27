@@ -26,7 +26,7 @@ namespace mitk
 {
 
 /**
-* rief Samples new tract from surrounding fiber segments: draws one of the added end points with
+* \brief Samples new tract from surrounding fiber segments: draws one of the added end points with
 * probability proportional to its weight. The buffers grow with the number of neighbours (up to
 * two end points per particle of the eight neighbouring grid cells) and keep their capacity
 * across clear(). */
