@@ -24,6 +24,7 @@ found in the LICENSE file.
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkOdfImage.h>
 #include <mitkPeakImage.h>
+#include <mitkPointShell.h>
 #include <mitkShImage.h>
 #include <mitkTensorImage.h>
 
@@ -44,7 +45,11 @@ found in the LICENSE file.
 #include <itkTensorToL2NormImageFilter.h>
 #include <itkTensorToRgbImageFilter.h>
 
+#include <vnl/algo/vnl_svd.h>
+#include <vnl/vnl_cross.h>
+
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -84,6 +89,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(PrincipalDirection_RecordedOutput);
   MITK_TEST(FlipPeaks_NegatesChosenAxes);
   MITK_TEST(MaximaExtraction_RecordedOutput);
+  MITK_TEST(MaximaExtraction_SyntheticOdfs_FibreDirections);
   MITK_TEST(Filters_OutputTakenBeforeUpdate_GetsResult);
   MITK_TEST(EigenvalueCorrection_RecordedOutput);
   CPPUNIT_TEST_SUITE_END();
@@ -1043,6 +1049,89 @@ public:
       CPPUNIT_ASSERT_EQUAL(r < 3 ? coefficients->GetOrigin()[r] : 0.0, peaks->GetOrigin()[r]);
       for (unsigned int c = 0; c < 4; ++c)
         CPPUNIT_ASSERT_EQUAL(r < 3 && c < 3 ? coefficients->GetDirection()[r][c] : (r == c ? 1.0 : 0.0), peaks->GetDirection()[r][c]);
+    }
+  }
+
+  using Direction = vnl_vector_fixed<double, 3>;
+
+  /**
+   * Order-8 SH coefficients (MITK's convention) of an ODF with one sharp lobe (u.d)^20 per fibre
+   * direction d, fitted by least squares on 1002 directions; without fibres the ODF is isotropic.
+   */
+  static itk::Vector<float, 45> FibreOdf(const std::vector<Direction> &fibres)
+  {
+    const vnl_matrix<double> &directions = mitk::pointshell::Directions(1002);
+    const vnl_matrix<float> basis = mitk::sh::CalcShBasisForDirections(8, directions, true);
+    vnl_matrix<double> b(basis.rows(), basis.cols());
+    for (unsigned int r = 0; r < b.rows(); ++r)
+      for (unsigned int c = 0; c < b.cols(); ++c)
+        b(r, c) = basis(r, c);
+    vnl_vector<double> values(directions.cols(), 1.0);
+    if (!fibres.empty())
+    {
+      values.fill(0.0);
+      for (unsigned int i = 0; i < directions.cols(); ++i)
+        for (const auto &fibre : fibres)
+          values[i] += std::pow(dot_product(directions.get_column(i), fibre), 20);
+    }
+    const vnl_vector<double> coefficients = vnl_svd<double>(b).solve(values);
+    itk::Vector<float, 45> pixel;
+    for (unsigned int j = 0; j < 45; ++j)
+      pixel[j] = static_cast<float>(coefficients[j]);
+    return pixel;
+  }
+
+  // ODFs of known fibre configurations: each fibre gives exactly one peak, close to its direction,
+  // and an isotropic ODF, where every sampled direction is a maximum, gives none. The fibres are
+  // rotated off the axes of the ODF direction table.
+  void MaximaExtraction_SyntheticOdfs_FibreDirections()
+  {
+    const Direction e1 = Direction(1, 2, 3).normalize();
+    const Direction e2 = vnl_cross_3d(e1, Direction(0, 0, 1)).normalize();
+    const Direction e3 = vnl_cross_3d(e1, e2);
+    const Direction at60 = std::cos(itk::Math::pi / 3) * e1 + std::sin(itk::Math::pi / 3) * e2;
+    const std::vector<std::vector<Direction>> voxels = {{}, {e1}, {e1, e2}, {e1, e2, e3}, {e1, at60}};
+
+    using ShImageType = itk::Image<itk::Vector<float, 45>, 3>;
+    auto coefficients = ShImageType::New();
+    ShImageType::RegionType region;
+    region.SetSize({{voxels.size(), 1, 1}});
+    coefficients->SetRegions(region);
+    coefficients->Allocate();
+    for (unsigned int x = 0; x < voxels.size(); ++x)
+      coefficients->SetPixel({{x, 0, 0}}, FibreOdf(voxels[x]));
+
+    using FilterType = itk::OdfMaximaExtractionFilter<float, 8, ODF_SAMPLING_SIZE>;
+    auto filter = FilterType::New();
+    filter->SetInput(coefficients);
+    filter->SetMaxNumPeaks(3);
+    filter->SetNormalizationMethod(FilterType::SINGLE_VEC_NORM);
+    filter->Update();
+
+    for (unsigned int x = 0; x < voxels.size(); ++x)
+    {
+      const unsigned int count = filter->GetNumDirectionsImage()->GetPixel({{x, 0, 0}});
+      CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(voxels[x].size()), count);
+      // Each fibre is matched by exactly one peak axis.
+      for (const auto &fibre : voxels[x])
+      {
+        unsigned int matches = 0;
+        double largestAngle = 0;
+        for (unsigned int p = 0; p < count; ++p)
+        {
+          Direction peak;
+          for (unsigned int c = 0; c < 3; ++c)
+            peak[c] = filter->GetPeakImage()->GetPixel({{x, 0, 0, 3 * p + c}});
+          const double angle = std::acos(std::min(1.0, std::abs(dot_product(peak, fibre)))) * 180 / itk::Math::pi;
+          if (angle < 20)
+          {
+            ++matches;
+            largestAngle = std::max(largestAngle, angle);
+          }
+        }
+        MITK_INFO << "voxel " << x << " fibre " << fibre << ": " << matches << " peaks, " << largestAngle << " degrees";
+        CPPUNIT_ASSERT_EQUAL(1u, matches);
+      }
     }
   }
 
