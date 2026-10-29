@@ -23,14 +23,20 @@ found in the LICENSE file.
 #include <mitkVtkMapper.h>
 
 #include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkImageData.h>
 #include <vtkMapper.h>
 #include <vtkPlane.h>
 #include <vtkPlaneCollection.h>
 #include <vtkPointData.h>
+#include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPropAssembly.h>
 #include <vtkPropCollection.h>
 #include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkWindowToImageFilter.h>
+#include <algorithm>
 
 #include <cmath>
 #include <set>
@@ -51,6 +57,7 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   MITK_TEST(Mapper3D_ClippingPlaneFromProperty);
   MITK_TEST(Mapper3D_ClippingPlaneChange_AppliedWithoutRebuild);
   MITK_TEST(Mapper2D_SlabAroundThePlane);
+  MITK_TEST(Mapper2D_NodeOpacity_AppliedToTheFibers);
   MITK_TEST(Rendering_LeavesTheBundleUnchanged);
   CPPUNIT_TEST_SUITE_END();
 
@@ -263,6 +270,64 @@ public:
       CPPUNIT_ASSERT_DOUBLES_EQUAL(2.5 * normal.GetNorm(), std::abs(offset), 1e-6);
       CPPUNIT_ASSERT(offset * alignment < 0);
     }
+  }
+
+  /** Largest difference of any pixel and colour channel of the rendered frame from the first
+   *  pixel (the background) */
+  int BrightestPixel()
+  {
+    vtkRenderWindow *renderWindow = m_RenderingTestHelper.GetVtkRenderWindow();
+    const auto swapBuffers = renderWindow->GetSwapBuffers();
+    renderWindow->SwapBuffersOff();
+    m_RenderingTestHelper.Render();
+    auto grabber = vtkSmartPointer<vtkWindowToImageFilter>::New();
+    grabber->SetInput(renderWindow);
+    grabber->ShouldRerenderOff();
+    grabber->ReadFrontBufferOff();
+    grabber->Update();
+    renderWindow->SetSwapBuffers(swapBuffers);
+
+    vtkImageData *capture = grabber->GetOutput();
+    int dimensions[3];
+    capture->GetDimensions(dimensions);
+    const int components = capture->GetNumberOfScalarComponents();
+    const auto *pixels = static_cast<const unsigned char *>(capture->GetScalarPointer());
+    const vtkIdType numValues = static_cast<vtkIdType>(dimensions[0]) * dimensions[1] * components;
+    int brightest = 0;
+    for (vtkIdType i = 0; i < numValues; ++i)
+      brightest = std::max(brightest, std::abs(static_cast<int>(pixels[i]) - static_cast<int>(pixels[i % components])));
+    return brightest;
+  }
+
+  // #4: since the VTK 9 port the 2D mapper drew the fibers opaque whatever the node's opacity.
+  void Mapper2D_NodeOpacity_AppliedToTheFibers()
+  {
+    // A white fiber in the axial slice through the centre of the bundle and two 10 mm above and
+    // below it, outside the slab; one fiber in the slab, so no fibers overlap in the image.
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    auto lines = vtkSmartPointer<vtkCellArray>::New();
+    for (const double z : {0.0, -10.0, 10.0})
+    {
+      const vtkIdType ids[2] = {points->InsertNextPoint(-20, 5 + z, z), points->InsertNextPoint(20, 5 + z, z)};
+      lines->InsertNextCell(2, ids);
+    }
+    auto polyData = vtkSmartPointer<vtkPolyData>::New();
+    polyData->SetPoints(points);
+    polyData->SetLines(lines);
+    auto fib = mitk::FiberBundle::New(polyData);
+    fib->SetFiberColors(255, 255, 255);
+    m_Node->SetData(fib);
+
+    m_Node->SetOpacity(1.0f);
+    Render2D(mitk::AnatomicalPlane::Axial);
+    const int opaque = BrightestPixel();
+    CPPUNIT_ASSERT_MESSAGE("the fiber in the slice is drawn", opaque > 200);
+
+    m_Node->SetOpacity(0.3f);
+    vtkActor *actor = Render2D(mitk::AnatomicalPlane::Axial);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3, actor->GetProperty()->GetOpacity(), 1e-6);
+    const int translucent = BrightestPixel();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("the fiber is blended with opacity 0.3", 0.3 * opaque, static_cast<double>(translucent), 13.0);
   }
 
   void Rendering_LeavesTheBundleUnchanged()
