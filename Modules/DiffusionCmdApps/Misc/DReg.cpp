@@ -83,6 +83,16 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("coreg"))
     coreg = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["coreg"]);
 
+  // load_mitk_images skips paths that do not exist; check them before the registration runs.
+  for (const auto& file : coreg)
+  {
+    if (!ist::FileExists(file))
+    {
+      std::cout << "--coreg: " << file << " does not exist." << std::endl;
+      return EXIT_FAILURE;
+    }
+  }
+
   try
   {
     typedef itk::Image< float, 3 > ItkFloatImageType;
