@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
 #include <mitkTestingMacros.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkFiberBundle.h>
 #include <omp.h>
@@ -61,8 +62,8 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
   {
     omp_set_num_threads(1);
 
-    mitk::Image::Pointer odf_image = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/qBallImage.qbi"));
-    mitk::Image::Pointer mask_image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/diffusionImageMask.nrrd"));
+    mitk::Image::Pointer odf_image = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("qBallImage.qbi"));
+    mitk::Image::Pointer mask_image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("diffusionImageMask.nrrd"));
 
     itk_mask_image = MaskImgType::New();
     mitk::CastToItkImage(mask_image, itk_mask_image);
@@ -76,9 +77,9 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
   {
     mitk::FiberBundle::Pointer fib = nullptr;
 
-    if (itksys::SystemTools::FileExists(GetTestDataFilePath("DiffusionImaging/" + filename)))
+    if (itksys::SystemTools::FileExists(mitk::GetDiffusionTestDataFilePath("" + filename)))
     {
-      mitk::BaseData::Pointer baseData = mitk::IOUtil::Load(GetTestDataFilePath("DiffusionImaging/" + filename)).at(0);
+      mitk::BaseData::Pointer baseData = mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath("" + filename)).at(0);
       fib = dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
     }
     return fib;
@@ -116,7 +117,7 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
     tracker->SetMaskImage(itk_mask_image);
     tracker->SetDuplicateImage(false);
     tracker->SetRandomSeed(1);
-    tracker->SetLoadParameterFile(GetTestDataFilePath("DiffusionImaging/gibbsTrackingParameters.gtp"));
+    tracker->SetLoadParameterFile(mitk::GetDiffusionTestDataFilePath("gibbsTrackingParameters.gtp"));
     tracker->Update();
 
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(tracker->GetFiberBundle());
@@ -136,7 +137,7 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
     tracker->SetMaskImage(itk_mask_image);
     tracker->SetDuplicateImage(false);
     tracker->SetRandomSeed(1);
-    tracker->SetLoadParameterFile(GetTestDataFilePath("DiffusionImaging/gibbsTrackingParameters.gtp"));
+    tracker->SetLoadParameterFile(mitk::GetDiffusionTestDataFilePath("gibbsTrackingParameters.gtp"));
 
     std::atomic<bool> done(false);
     std::string error;

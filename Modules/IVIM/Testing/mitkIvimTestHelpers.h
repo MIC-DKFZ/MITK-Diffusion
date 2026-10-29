@@ -170,7 +170,7 @@ namespace mitk::IvimTesting
   }
 
   /** A mask of the FWE DWI, 1 at the given voxels, with the origin of
-      DiffusionImaging/FWE/ReferenceFWImage.nrrd: that image was stored with fewer digits than the
+      FWE/ReferenceFWImage.nrrd of the test data: that image was stored with fewer digits than the
       DWI, so its origin differs from the DWI's by rounding (up to 4.5e-5 mm). */
   inline Image::Pointer MakeMaskWithRoundedOrigin(const VectorImageType* image,
                                                   const std::vector<itk::Index<3>>& voxels,

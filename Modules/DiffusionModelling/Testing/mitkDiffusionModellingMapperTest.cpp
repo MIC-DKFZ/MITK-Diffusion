@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <mitkSliceNavigationController.h>
 #include <mitkRenderingTestHelper.h>
 #include <mitkTensorImage.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <mitkVtkMapper.h>
@@ -91,7 +92,7 @@ public:
   {
     m_RenderingTestHelper = mitk::RenderingTestHelper(640, 480);
     m_Node = mitk::DataNode::New();
-    m_Node->SetData(mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/tensorImage.dti")));
+    m_Node->SetData(mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("tensorImage.dti")));
     m_RenderingTestHelper.AddNodeToStorage(m_Node);
     m_Node->SetIntProperty("ShowMaxNumber", 100000);
   }
@@ -135,7 +136,7 @@ public:
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Peak Image"}, std::vector<std::string>());
     auto peakNode = mitk::DataNode::New();
-    peakNode->SetData(mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &functor));
+    peakNode->SetData(mitk::IOUtil::Load<mitk::PeakImage>(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), &functor));
     m_RenderingTestHelper.GetDataStorage()->Remove(m_Node);
     m_RenderingTestHelper.AddNodeToStorage(peakNode);
     m_RenderingTestHelper.SetViewDirection(mitk::AnatomicalPlane::Axial);

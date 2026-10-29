@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -53,7 +54,7 @@ class mitkDiffusionB0ExtractionFilterTestSuite : public mitk::TestFixture
    */
   static std::vector<std::string> MultiB0Files()
   {
-    return { "DiffusionImaging/ImageReconstruction/test_multi.dwi", "DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi" };
+    return { "ImageReconstruction/test_multi.dwi", "FWE/InputDiffusionWeightedImage.dwi" };
   }
 
   /** Gradients with volume 0 (b0) shortened to b = 3000 * 0.01^2 = 0.3, which rounds to 0. */
@@ -79,7 +80,7 @@ public:
   void setUp() override
   {
     // test.dwi: volume 0 is the only b0 volume.
-    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"));
+    auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi"));
     m_Dwi = PropHelper::GetItkVectorImage(image);
     m_Gradients = PropHelper::GetGradientContainer(image);
     m_BValue = PropHelper::GetReferenceBValue(image);
@@ -163,7 +164,7 @@ public:
   {
     for (const auto& file : MultiB0Files())
     {
-      auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(file));
+      auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(file));
       auto dwi = PropHelper::GetItkVectorImage(image);
       auto gradients = PropHelper::GetGradientContainer(image);
       const auto b0 = ZeroGradientIndices(gradients);
@@ -195,7 +196,7 @@ public:
   {
     for (const auto& file : MultiB0Files())
     {
-      auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(file));
+      auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(file));
       auto dwi = PropHelper::GetItkVectorImage(image);
       auto gradients = PropHelper::GetGradientContainer(image);
       const auto b0 = ZeroGradientIndices(gradients);

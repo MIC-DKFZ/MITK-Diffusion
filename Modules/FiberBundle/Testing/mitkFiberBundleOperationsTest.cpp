@@ -16,6 +16,7 @@ found in the LICENSE file.
 #include <mitkITKImageImport.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkStandaloneDataStorage.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -92,7 +93,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
   {
-    return mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/" + relativePath));
+    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("" + relativePath));
   }
 
   /** original.fib with a different weight per fiber */
@@ -177,7 +178,7 @@ public:
     for (const std::string name : {"ROI1.pf", "ROI1.pf", "ROI2.pf", "ROI3.pf"})
     {
       auto node = mitk::DataNode::New();
-      node->SetData(mitk::IOUtil::Load(GetTestDataFilePath("DiffusionImaging/" + name)).at(0));
+      node->SetData(mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath("" + name)).at(0));
       storage->Add(node, compositeNode);
       auto ids = fib->ExtractFiberIdSubset(node, storage);
       excluded.insert(ids.begin(), ids.end());
@@ -934,7 +935,7 @@ public:
   void ColorFibersByScalarMap_Mask_ColoursAndWeightsFromTheMask()
   {
     auto fib = LoadFibers("FiberProcessing/original.fib");
-    auto mask = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/MASK.nrrd"));
+    auto mask = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/MASK.nrrd"));
     fib->ColorFibersByScalarMap(mask, true, true, mitk::LookupTable::JET, 1.0, false);
     auto colours = fib->GetFiberColors();
     CPPUNIT_ASSERT_EQUAL(fib->GetFiberPolyData()->GetNumberOfPoints(), colours->GetNumberOfTuples());

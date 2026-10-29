@@ -16,6 +16,7 @@ found in the LICENSE file.
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -163,7 +164,7 @@ public:
   void LinearLeastSquares_SingleShell_SameAsItk()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"), &functor);
+    auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi"), &functor);
     auto dwi = DwiType::New();
     mitk::CastToItkImage(image, dwi);
     const double bValue = mitk::DiffusionPropertyHelper::GetReferenceBValue(image);

@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkFiberBundle.h>
 #include <mitkIOUtil.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -29,8 +30,8 @@ class mitkFiberTransformationTestSuite : public mitk::TestFixture
 public:
   void TransformationChain_EqualsReference()
   {
-    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/fiberBundleX.fib"));
-    auto reference = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/fiberBundleX_transformed.fib"));
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("fiberBundleX.fib"));
+    auto reference = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("fiberBundleX_transformed.fib"));
 
     fib->RotateAroundAxis(90, 45, 10);
     fib->TranslateFibers(2, 3, 5);

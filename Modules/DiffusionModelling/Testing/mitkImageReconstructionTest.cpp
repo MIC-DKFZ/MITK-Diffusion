@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionPropertyHelper.h>
 
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
@@ -58,7 +59,7 @@ class mitkImageReconstructionTestSuite : public mitk::TestFixture
   void setUp() override
   {
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    dwi = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"), &functor);
+    dwi = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi"), &functor);
     b_value = mitk::DiffusionPropertyHelper::GetReferenceBValue( dwi );
     gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(dwi);
 
@@ -73,7 +74,7 @@ class mitkImageReconstructionTestSuite : public mitk::TestFixture
 
   void DtiTest()
   {
-    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
 
     typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, float > TensorReconstructionImageFilterType;
     TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
@@ -89,7 +90,7 @@ class mitkImageReconstructionTestSuite : public mitk::TestFixture
   void NumericQball()
   {
     MITK_INFO << "Numerical Q-ball reconstruction";
-    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QN0.qbi"));
+    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QN0.qbi"));
     typedef itk::DiffusionQballReconstructionImageFilter<short, short, float, ODF_SAMPLING_SIZE> QballReconstructionImageFilterType;
     QballReconstructionImageFilterType::Pointer filter = QballReconstructionImageFilterType::New();
     filter->SetBValue( b_value );
@@ -105,7 +106,7 @@ class mitkImageReconstructionTestSuite : public mitk::TestFixture
   void StandardQball()
   {
     MITK_INFO << "Standard Q-ball reconstruction";
-    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0_v2.qbi"));
+    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA0_v2.qbi"));
     typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
     FilterType::Pointer filter = FilterType::New();
     filter->SetBValue( b_value );
@@ -122,7 +123,7 @@ class mitkImageReconstructionTestSuite : public mitk::TestFixture
   void CsaQball()
   {
     MITK_INFO << "CSA Q-ball reconstruction";
-    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA6_v2.qbi"));
+    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA6_v2.qbi"));
     typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
     FilterType::Pointer filter = FilterType::New();
     filter->SetBValue( b_value );
@@ -139,7 +140,7 @@ class mitkImageReconstructionTestSuite : public mitk::TestFixture
   void ADC()
   {
     MITK_INFO << "ADC profile reconstruction";
-    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA4_v2.qbi"));
+    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA4_v2.qbi"));
     typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
     FilterType::Pointer filter = FilterType::New();
     filter->SetBValue( b_value );
@@ -156,7 +157,7 @@ class mitkImageReconstructionTestSuite : public mitk::TestFixture
   void RawSignal()
   {
     MITK_INFO << "Raw signal modeling";
-    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA5_v2.qbi"));
+    mitk::OdfImage::Pointer odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA5_v2.qbi"));
     typedef itk::AnalyticalDiffusionQballReconstructionImageFilter<short,short,float,4,ODF_SAMPLING_SIZE> FilterType;
     FilterType::Pointer filter = FilterType::New();
     filter->SetBValue( b_value );

@@ -17,6 +17,7 @@ found in the LICENSE file.
 #include <mitkExceptionMacro.h>
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -382,14 +383,14 @@ public:
 
   mitk::FiberBundle::Pointer LoadFiberBundleX()
   {
-    return mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/fiberBundleX.fib"));
+    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("fiberBundleX.fib"));
   }
 
   template <class TImage>
   typename TImage::Pointer LoadRoiImage()
   {
     auto image = TImage::New();
-    mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ROIIMAGE.nrrd")), image);
+    mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ROIIMAGE.nrrd")), image);
     return image;
   }
 

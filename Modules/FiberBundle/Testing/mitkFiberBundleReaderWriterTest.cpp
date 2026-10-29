@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTestingConfig.h>
 #include <mitkIOUtil.h>
 
+#include "mitkDiffusionTestData.h"
 #include "mitkTestFixture.h"
 
 class mitkFiberBundleReaderWriterTestSuite : public mitk::TestFixture
@@ -43,7 +44,7 @@ public:
     fib1 = nullptr;
     fib2 = nullptr;
 
-    std::string filename = GetTestDataFilePath("DiffusionImaging/fiberBundleX.fib");
+    std::string filename = mitk::GetDiffusionTestDataFilePath("fiberBundleX.fib");
 
     std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load( filename);
     mitk::BaseData::Pointer baseData = fibInfile.at(0);

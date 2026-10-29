@@ -11,6 +11,7 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <mitkTestingMacros.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkFiberfoxParameters.h>
 #include <mitkIOUtil.h>
@@ -135,7 +136,7 @@ public:
     CPPUNIT_ASSERT_EQUAL(0, CountingModel::s_Alive);
 
     SetCountingModels(parameters);
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp"), true);
     CPPUNIT_ASSERT_EQUAL(0, CountingModel::s_Alive);
     CPPUNIT_ASSERT_EQUAL(std::size_t(2), parameters.m_FiberModelList.size());
     CPPUNIT_ASSERT_EQUAL(std::size_t(2), parameters.m_NonFiberModelList.size());
@@ -144,7 +145,7 @@ public:
   void CopyKeepsLoadedModels()
   {
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp"), true);
     mitk::FiberfoxParameters copy;
     copy = parameters;
 
@@ -231,7 +232,7 @@ public:
       the rest of the file is read. */
   void MotionVolumes()
   {
-    std::ifstream in(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"));
+    std::ifstream in(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp"));
     const std::string original((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     const std::string tag = "<motionvolumes>random</motionvolumes>";
     CPPUNIT_ASSERT(original.find(tag) != std::string::npos);
@@ -272,7 +273,7 @@ public:
 
     // "random", the file's own text, never moves volume 0
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp"), true);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(parameters.m_SignalGen.GetNumVolumes()), parameters.m_SignalGen.m_MotionVolumes.size());
     CPPUNIT_ASSERT(!parameters.m_SignalGen.m_MotionVolumes.at(0));
 
@@ -300,7 +301,7 @@ public:
   void GradientsInFile()
   {
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
     const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_gradients_XXXXXX");
     const std::string file = folder + "/saved.ffp";
     parameters.SaveParameters(file);
@@ -321,7 +322,7 @@ public:
   /** A .ffp without basic.direction loads with the identity (it aborted with "No such node"). */
   void MissingDirection()
   {
-    std::ifstream in(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"));
+    std::ifstream in(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp"));
     std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     const auto begin = text.find("<direction>");
     const auto end = text.find("</direction>");

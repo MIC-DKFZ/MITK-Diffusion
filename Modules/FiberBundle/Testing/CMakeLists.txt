@@ -1,5 +1,6 @@
 # DCMTK: mitkFiberBundleIOTest edits a DICOM tractogram to test the reader on incomplete files
 MITK_CREATE_MODULE_TESTS(PACKAGE_DEPENDS PRIVATE DCMTK|dcmdata+ofstd)
+include(mitkDiffusionTestData)
 
 mitkAddCustomModuleTest(mitkFiberBundleReaderWriterTest mitkFiberBundleReaderWriterTest)
 mitkAddCustomModuleTest(mitkFiberBundleOperationsTest mitkFiberBundleOperationsTest)

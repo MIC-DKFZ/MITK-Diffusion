@@ -1,4 +1,5 @@
 MITK_CREATE_MODULE_TESTS(PACKAGE_DEPENDS PRIVATE ITK|ITKIONRRD+ITKIONIFTI)
+include(mitkDiffusionTestData)
 
 mitkAddCustomModuleTest(mitkDiffusionPropertySerializerTest mitkDiffusionPropertySerializerTest)
 mitkAddCustomModuleTest(mitkDiffusionPropertyHelperTest mitkDiffusionPropertyHelperTest)

@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkIOUtil.h"
 #include "mitkTestingMacros.h"
+#include "mitkDiffusionTestData.h"
 #include "mitkTestFixture.h"
 #include "itkNonLocalMeansDenoisingFilter.h"
 #include "mitkITKImageImport.h"
@@ -76,7 +77,7 @@ public:
   void setUp() override
   {
     //generate test images
-    std::string imagePath = GetTestDataFilePath("DiffusionImaging/Denoising/test_multi.dwi");
+    std::string imagePath = mitk::GetDiffusionTestDataFilePath("Denoising/test_multi.dwi");
 
     m_Image =  mitk::IOUtil::Load<mitk::Image>(imagePath);
     // Also makes the driver link MitkDiffusionImage, which --as-needed drops otherwise; its
@@ -107,7 +108,7 @@ public:
 
   void Denoise_NLMg_shouldReturnTrue()
   {
-    std::string referenceImagePath = GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMg.dwi");
+    std::string referenceImagePath = mitk::GetDiffusionTestDataFilePath("Denoising/test_multi_NLMg.dwi");
     m_ReferenceImage =  mitk::IOUtil::Load<mitk::Image>(referenceImagePath);
 
     m_DenoisingFilter->SetUseRicianAdaption(false);
@@ -129,7 +130,7 @@ public:
 
   void Denoise_NLMr_shouldReturnTrue()
   {
-    std::string referenceImagePath = GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMr.dwi");
+    std::string referenceImagePath = mitk::GetDiffusionTestDataFilePath("Denoising/test_multi_NLMr.dwi");
     m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(referenceImagePath);
 
     m_DenoisingFilter->SetUseRicianAdaption(true);
@@ -151,7 +152,7 @@ public:
 
   void Denoise_NLMv_shouldReturnTrue()
   {
-    std::string referenceImagePath = GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMv.dwi");
+    std::string referenceImagePath = mitk::GetDiffusionTestDataFilePath("Denoising/test_multi_NLMv.dwi");
     m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(referenceImagePath);
     m_DenoisingFilter->SetUseRicianAdaption(false);
     m_DenoisingFilter->SetUseJointInformation(true);
@@ -172,7 +173,7 @@ public:
 
   void Denoise_NLMvr_shouldReturnTrue()
   {
-    std::string referenceImagePath = GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMvr_v2.dwi");
+    std::string referenceImagePath = mitk::GetDiffusionTestDataFilePath("Denoising/test_multi_NLMvr_v2.dwi");
     m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(referenceImagePath);
 
     m_DenoisingFilter->SetUseRicianAdaption(true);
@@ -194,7 +195,7 @@ public:
 
   void Denoise_SeveralWorkUnits_SameResultAndCountsEveryVoxel()
   {
-    m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMg.dwi"));
+    m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Denoising/test_multi_NLMg.dwi"));
 
     // All work units increment the progress counter.
     m_DenoisingFilter->SetNumberOfWorkUnits(4);
@@ -269,7 +270,7 @@ public:
     m_DenoisingFilter->SetInputImage(vectorImage);
     m_DenoisingFilter->UpdateLargestPossibleRegion();
 
-    m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Denoising/test_multi_NLMg.dwi"));
+    m_ReferenceImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Denoising/test_multi_NLMg.dwi"));
     mitk::GrabItkImageMemory(m_DenoisingFilter->GetOutput(), m_DenoisedImage);
     m_DenoisedImage->SetPropertyList(m_Image->GetPropertyList()->Clone());
     MITK_ASSERT_EQUAL(m_DenoisedImage, m_ReferenceImage, "NLMg after a run on another input should return the reference.");

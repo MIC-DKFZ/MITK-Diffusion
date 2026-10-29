@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -56,13 +57,13 @@ class mitkDiffusionReconstructionMultishellTestSuite : public mitk::TestFixture
   mitk::Image::Pointer LoadDwi(const std::string &path)
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    return mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(path), &functor);
+    return mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(path), &functor);
   }
 
 public:
   void setUp() override
   {
-    auto image = LoadDwi("DiffusionImaging/ImageReconstruction/test_multi.dwi");
+    auto image = LoadDwi("ImageReconstruction/test_multi.dwi");
     m_Dwi = DwiType::New();
     mitk::CastToItkImage(image, m_Dwi);
 
@@ -124,7 +125,7 @@ public:
     filter->SetFunctor(functor);
     filter->Update();
 
-    auto expectedImage = LoadDwi("DiffusionImaging/ImageReconstruction/" + reference);
+    auto expectedImage = LoadDwi("ImageReconstruction/" + reference);
     auto expected = DwiType::New();
     mitk::CastToItkImage(expectedImage, expected);
     auto output = filter->GetOutput();

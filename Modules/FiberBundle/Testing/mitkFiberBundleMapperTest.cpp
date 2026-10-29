@@ -17,6 +17,7 @@ found in the LICENSE file.
 #include <mitkProperties.h>
 #include <mitkRenderingTestHelper.h>
 #include <mitkSliceNavigationController.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <mitkVtkMapper.h>
@@ -109,7 +110,7 @@ public:
   void setUp() override
   {
     m_RenderingTestHelper = mitk::RenderingTestHelper(640, 480);
-    m_Fibers = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/Rendering/test_fibers.fib"));
+    m_Fibers = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("Rendering/test_fibers.fib"));
     m_Node = mitk::DataNode::New();
     m_Node->SetData(m_Fibers);
     m_RenderingTestHelper.AddNodeToStorage(m_Node);

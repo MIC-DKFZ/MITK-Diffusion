@@ -24,6 +24,7 @@ found in the LICENSE file.
 #include <mitkShImage.h>
 #include <mitkSlicedGeometry3D.h>
 #include <mitkTensorImage.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -160,7 +161,7 @@ public:
   // the slice navigation creates them.
   void GlyphGenerator_SliceOfStandardPlanes()
   {
-    auto image = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/tensorImage.dti"));
+    auto image = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("tensorImage.dti"));
     const std::tuple<mitk::AnatomicalPlane, unsigned int, Orientation, int> expected[] = {
       {mitk::AnatomicalPlane::Axial, 2, Orientation::Axial, 1},
       {mitk::AnatomicalPlane::Sagittal, 0, Orientation::Sagittal, 20},
@@ -387,7 +388,7 @@ public:
   static mitk::ShImage::Pointer LoadShImage()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
-    return mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    return mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &functor);
   }
 
   // The glyphs of an SH image follow its convention: they equal those of its ODF image.
@@ -462,7 +463,7 @@ public:
   void OdfMapper_DefaultProperties_KeepExistingValues()
   {
     auto node = mitk::DataNode::New();
-    node->SetData(mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti")));
+    node->SetData(mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti")));
     node->SetBoolProperty("VisibleOdfs_T", true);
     node->SetFloatProperty("Scaling", 7);
     node->SetIntProperty("layer", 3);

@@ -17,6 +17,7 @@ found in the LICENSE file.
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -92,7 +93,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   mitk::Image::Pointer LoadDwi(const std::string &path)
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    return mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(path), &functor);
+    return mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(path), &functor);
   }
 
   TensorImageType::Pointer CorrectEigenvalues(mitk::Image::Pointer dwi)
@@ -115,7 +116,7 @@ public:
   // so the correction loop runs several iterations.
   void EigenvalueCorrection_ThreadCount_SameResult()
   {
-    auto dwi = LoadDwi("DiffusionImaging/diffusionImage.hdwi");
+    auto dwi = LoadDwi("diffusionImage.hdwi");
 
 #ifdef _OPENMP
     const int maxThreads = omp_get_max_threads();
@@ -154,7 +155,7 @@ public:
   // of the bits of all tensor components, so any numerical change shows.
   void EigenvalueCorrection_RecordedOutput()
   {
-    auto tensors = CorrectEigenvalues(LoadDwi("DiffusionImaging/diffusionImage.hdwi"));
+    auto tensors = CorrectEigenvalues(LoadDwi("diffusionImage.hdwi"));
     std::uint64_t hash = 14695981039346656037ull;
     itk::ImageRegionConstIterator<TensorImageType> it(tensors, tensors->GetLargestPossibleRegion());
     for (; !it.IsAtEnd(); ++it)
@@ -366,14 +367,14 @@ public:
 
   mitk::TensorImage::ItkTensorImageType::Pointer LoadItkTensors(const std::string &path)
   {
-    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath(path));
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath(path));
     return mitk::convert::GetItkTensorFromTensorImage(tensorImage.GetPointer());
   }
 
   // Masks are read with the input's voxel indices; another size meant out-of-bounds access.
   void PrincipalDirection_MaskOfOtherSize_Throws()
   {
-    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("ImageReconstruction/test_dti.dti");
     auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
     filter->SetInput(tensors);
     filter->SetMaskImage(MaskLargerThan(tensors.GetPointer()));
@@ -385,7 +386,7 @@ public:
   // (1e-6 of a voxel) would refuse the first.
   void PrincipalDirection_MaskOriginRounded_Accepted()
   {
-    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("ImageReconstruction/test_dti.dti");
     for (const double shift : {5e-6, 1e-3})
     {
       auto mask = itk::Image<unsigned char, 3>::New();
@@ -411,8 +412,8 @@ public:
   // The all-ones mask generated without a user mask was kept and reused for the next input.
   void PrincipalDirection_SecondInput_SameAsFreshFilter()
   {
-    auto smallTensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
-    auto tensors = LoadItkTensors("DiffusionImaging/FWE/ReferenceTensorImage.dti");
+    auto smallTensors = LoadItkTensors("ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("FWE/ReferenceTensorImage.dti");
 
     auto reused = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
     reused->SetInput(smallTensors);
@@ -435,7 +436,7 @@ public:
   void MaximaExtraction_MaskOfOtherSize_Throws()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &functor);
     auto coefficients = mitk::convert::GetItkShFromShImage<15>(shImage.GetPointer());
 
     auto filter = itk::OdfMaximaExtractionFilter<float, 4, 20242>::New();
@@ -461,7 +462,7 @@ public:
   void ShToRgb_MatchesOdfOfBothConventions()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &functor);
     auto coefficients = mitk::convert::GetItkShFromShImage<15>(shImage.GetPointer());
 
     for (auto convention : {mitk::ShImage::MRTRIX, mitk::ShImage::FSL})
@@ -524,7 +525,7 @@ public:
   // Simulated signals fitted with ITK's tensor reconstruction give the input tensors back.
   void TensorToDwi_RoundTrip()
   {
-    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("ImageReconstruction/test_dti.dti");
     auto dwi = TensorToDwi(tensors);
     CPPUNIT_ASSERT_EQUAL(13u, dwi->GetNumberOfComponentsPerPixel());
 
@@ -552,8 +553,8 @@ public:
   // The baseline generated for the first input was kept and used for the next one.
   void TensorToDwi_SecondInput_SameAsFreshFilter()
   {
-    auto smallTensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
-    auto tensors = LoadItkTensors("DiffusionImaging/FWE/ReferenceTensorImage.dti");
+    auto smallTensors = LoadItkTensors("ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("FWE/ReferenceTensorImage.dti");
 
     auto reused = DwiToTensorFilterType::New();
     reused->SetGradientList(TensorToDwiGradients().GetPointer());
@@ -574,7 +575,7 @@ public:
   // The mask zeroed only the diffusion-weighted volumes.
   void TensorToDwi_Mask_AppliesToBaseline()
   {
-    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("ImageReconstruction/test_dti.dti");
     auto mask = itk::Image<short, 3>::New();
     mask->SetRegions(tensors->GetLargestPossibleRegion());
     mask->Allocate();
@@ -647,7 +648,7 @@ public:
   // Voxels whose peak was removed by the FA threshold were counted as having one direction.
   void PrincipalDirection_FaThreshold_NoDirection()
   {
-    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("ImageReconstruction/test_dti.dti");
     for (float threshold : {0.0f, 1.1f})
     {
       auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
@@ -670,7 +671,7 @@ public:
   // uninitialized while a write went past the 3D origin.
   void PrincipalDirection_PeakImageGeometry()
   {
-    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/FWE/ReferenceTensorImage.dti"));
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("FWE/ReferenceTensorImage.dti"));
     auto itkTensorImage = mitk::convert::GetItkTensorFromTensorImage(tensorImage.GetPointer());
 
     auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
@@ -692,7 +693,7 @@ public:
 
   ScalarImageType::Pointer LoadScalarImage(const std::string &path)
   {
-    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(path));
+    auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(path));
     ScalarImageType::Pointer itkImage;
     mitk::CastToItkImage(image, itkImage);
     return itkImage;
@@ -725,13 +726,13 @@ public:
   void TensorMeasures_MatchReferences()
   {
     using FilterType = itk::TensorDerivedMeasurementsFilter<float>;
-    auto tensors = LoadItkTensors("DiffusionImaging/tensorImage.dti");
+    auto tensors = LoadItkTensors("tensorImage.dti");
 
     const std::pair<FilterType::Measure, std::string> references[] = {
       {FilterType::FA, "FA"}, {FilterType::AD, "AD"}, {FilterType::RD, "RD"}};
     for (const auto &[measure, name] : references)
     {
-      auto reference = LoadScalarImage("DiffusionImaging/tensorImage_" + name + ".nrrd");
+      auto reference = LoadScalarImage("tensorImage_" + name + ".nrrd");
       CPPUNIT_ASSERT_MESSAGE(name, MaxDifference(reference, TensorMeasure(tensors, measure)) < 1e-6);
     }
 
@@ -807,12 +808,12 @@ public:
   // GFA of the ODFs in qBallImage.qbi as stored in MITK-Data.
   void Gfa_MatchesReference()
   {
-    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/qBallImage.qbi"));
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("qBallImage.qbi"));
     auto filter = itk::DiffusionOdfGeneralizedFaImageFilter<float, float, ODF_SAMPLING_SIZE>::New();
     filter->SetInput(mitk::convert::GetItkOdfFromOdfImage(odfImage.GetPointer()));
     filter->SetComputationMethod(itk::DiffusionOdfGeneralizedFaImageFilter<float, float, ODF_SAMPLING_SIZE>::GFA_STANDARD);
     filter->Update();
-    CPPUNIT_ASSERT(MaxDifference(LoadScalarImage("DiffusionImaging/qBallImage_GFA.nrrd"), filter->GetOutput()) < 1e-6);
+    CPPUNIT_ASSERT(MaxDifference(LoadScalarImage("qBallImage_GFA.nrrd"), filter->GetOutput()) < 1e-6);
   }
 
   // The MRtrix CSD coefficients (order 8) sampled on the ODF directions give the ODF file that
@@ -822,10 +823,10 @@ public:
     mitk::IFileReader::Options options;
     options["SH convention"] = std::string("MITK legacy (MRtrix 0.2)");
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, options);
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &functor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image_sh.nii.gz"), &functor);
     CPPUNIT_ASSERT_EQUAL(8u, shImage->ShOrder());
     auto odfs = mitk::convert::GetItkOdfFromShImage(shImage.GetPointer());
-    auto reference = mitk::convert::GetItkOdfFromOdfImage(mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image.qbi")).GetPointer());
+    auto reference = mitk::convert::GetItkOdfFromOdfImage(mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image.qbi")).GetPointer());
 
     CPPUNIT_ASSERT(odfs->GetLargestPossibleRegion() == reference->GetLargestPossibleRegion());
     itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> it(odfs, odfs->GetLargestPossibleRegion());
@@ -918,8 +919,8 @@ public:
 
   void Convert_WrongImageType_Throws()
   {
-    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
-    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi"));
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA0.qbi"));
     CPPUNIT_ASSERT_THROW(mitk::convert::GetItkOdfFromShImage(tensorImage.GetPointer()), mitk::Exception);
     CPPUNIT_ASSERT_THROW(mitk::convert::GetOdfFromShImage(odfImage.GetPointer()), mitk::Exception);
     CPPUNIT_ASSERT_THROW(mitk::convert::GetItkShFromShImage<15>(odfImage.GetPointer()), mitk::Exception);
@@ -940,18 +941,18 @@ public:
   void RgbFilters_RecordedOutput()
   {
     auto tensorRgb = itk::TensorToRgbImageFilter<mitk::TensorImage::ItkTensorImageType>::New();
-    tensorRgb->SetInput(LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    tensorRgb->SetInput(LoadItkTensors("ImageReconstruction/test_dti.dti"));
     tensorRgb->Update();
 
     auto odfRgb = itk::OdfToRgbImageFilter<mitk::OdfImage::ItkOdfImageType>::New();
-    odfRgb->SetInput(mitk::convert::GetItkOdfFromOdfImage(mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image.qbi")).GetPointer()));
+    odfRgb->SetInput(mitk::convert::GetItkOdfFromOdfImage(mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image.qbi")).GetPointer()));
     odfRgb->Update();
 
     // csd_image.qbi was made from the coefficients read in MITK's legacy basis.
     mitk::IFileReader::Options options;
     options["SH convention"] = std::string("MITK legacy (MRtrix 0.2)");
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, options);
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &functor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image_sh.nii.gz"), &functor);
     auto shRgb = itk::ShToRgbImageFilter<itk::Image<itk::Vector<float, 45>, 3>, 8>::New();
     shRgb->SetInput(mitk::convert::GetItkShFromShImage<45>(shImage.GetPointer()));
     shRgb->SetShConvention(mitk::ShImage::MRTRIX);
@@ -967,7 +968,7 @@ public:
   void TensorToOdf_RecordedOutput()
   {
     auto filter = itk::TensorImageToOdfImageFilter<float, float>::New();
-    filter->SetInput(LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    filter->SetInput(LoadItkTensors("ImageReconstruction/test_dti.dti"));
     filter->Update();
     double sum = 0;
     double sumOfSquares = 0;
@@ -986,7 +987,7 @@ public:
   void PrincipalDirection_RecordedOutput()
   {
     auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
-    filter->SetInput(LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    filter->SetInput(LoadItkTensors("ImageReconstruction/test_dti.dti"));
     filter->Update();
 
     double sums[3] = {0, 0, 0};
@@ -1009,7 +1010,7 @@ public:
   void MaximaExtraction_RecordedOutput()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &functor);
     auto coefficients = mitk::convert::GetItkShFromShImage<15>(shImage.GetPointer());
 
     using FilterType = itk::OdfMaximaExtractionFilter<float, 4, ODF_SAMPLING_SIZE>;
@@ -1049,7 +1050,7 @@ public:
   // Update(), as in a pipeline, stayed empty.
   void Filters_OutputTakenBeforeUpdate_GetsResult()
   {
-    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    auto tensors = LoadItkTensors("ImageReconstruction/test_dti.dti");
 
     auto toOdf = itk::TensorImageToOdfImageFilter<float, float>::New();
     toOdf->SetInput(tensors);
@@ -1065,7 +1066,7 @@ public:
     CPPUNIT_ASSERT(numDirections == principal->GetOutput());
 
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &functor);
     auto maxima = itk::OdfMaximaExtractionFilter<float, 4, ODF_SAMPLING_SIZE>::New();
     maxima->SetInput(mitk::convert::GetItkShFromShImage<15>(shImage.GetPointer()));
     auto numPeaks = maxima->GetOutput();
@@ -1076,7 +1077,7 @@ public:
   void FlipPeaks_NegatesChosenAxes()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Peak Image"}, std::vector<std::string>());
-    auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &functor);
+    auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), &functor);
     auto peaks = peakImage->GetItkPeakImage();
     const bool flips[][3] = {{true, false, false}, {false, true, true}};
     for (const auto &flip : flips)

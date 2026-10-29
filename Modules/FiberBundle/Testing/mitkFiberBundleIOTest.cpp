@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <mitkTemporoSpatialStringProperty.h>
 #include <mitkIOMimeTypes.h>
 #include <mitkIOUtil.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <mitkCustomMimeType.h>
@@ -106,7 +107,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
   {
-    return mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/" + relativePath));
+    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("" + relativePath));
   }
 
   /** original.fib with a different weight per fiber */
@@ -553,7 +554,7 @@ public:
 
   void VtkReaderWriter_RasOption_RoundTrip()
   {
-    const std::string input = GetTestDataFilePath("DiffusionImaging/FiberProcessing/original.fib");
+    const std::string input = mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib");
     auto lps = mitk::IOUtil::Load<mitk::FiberBundle>(input);
     mitk::IFileReader::Options rasOption;
     rasOption["Use RAS space"] = true;
@@ -1068,8 +1069,8 @@ public:
   {
     // The command line apps load their tractogram with load_fib: a file with other data must
     // throw instead of giving a null bundle.
-    CPPUNIT_ASSERT_EQUAL(71u, mitk::FiberBundleIOHelper::load_fib(GetTestDataFilePath("DiffusionImaging/FiberProcessing/original.fib"))->GetNumFibers());
-    CPPUNIT_ASSERT_THROW(mitk::FiberBundleIOHelper::load_fib(GetTestDataFilePath("DiffusionImaging/FiberProcessing/MASK.nrrd")), mitk::Exception);
+    CPPUNIT_ASSERT_EQUAL(71u, mitk::FiberBundleIOHelper::load_fib(mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib"))->GetNumFibers());
+    CPPUNIT_ASSERT_THROW(mitk::FiberBundleIOHelper::load_fib(mitk::GetDiffusionTestDataFilePath("FiberProcessing/MASK.nrrd")), mitk::Exception);
 
     std::streambuf *coutBuffer = std::cout.rdbuf();
     try
@@ -1246,7 +1247,7 @@ public:
   void TrkWriter_LpsOptionAndOldMitkFiles_WriteConsistentHeaders()
   {
     auto fib = LoadFibers("FiberProcessing/original.fib");
-    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/mask_image.nii.gz"));
+    auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/mask_image.nii.gz"));
     mitk::IFileWriter::Options ras;
     ras["Print header"] = false;
     mitk::IFileWriter::Options lps = ras;
@@ -1327,7 +1328,7 @@ public:
     // Reference images stored in LPS and in LAS orientation
     for (const std::string name : {"StreamlineTractography/mask_image.nii.gz", "mean_FA.nii.gz"})
     {
-      auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/" + name));
+      auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("" + name));
       auto withReference = fib->GetDeepCopy();
       withReference->SetTrackVisHeader(image->GetGeometry());
       mitk::IOUtil::Save(withReference, path, options);

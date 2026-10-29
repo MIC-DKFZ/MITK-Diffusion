@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -50,7 +51,7 @@ public:
     // it; the b0 volume is the reference. The volumes are scaled copies of a brain FA map, reduced
     // to 3 mm to keep the two affine registrations short. MITK-Data's DWIs are too small for the
     // registration (3 slices or 11 voxels per axis).
-    auto fa = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/mean_FA.nii.gz"));
+    auto fa = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("mean_FA.nii.gz"));
     FloatImageType::Pointer itkFa;
     mitk::CastToItkImage(fa, itkFa);
     auto shrinker = itk::ShrinkImageFilter<FloatImageType, FloatImageType>::New();

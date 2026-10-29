@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -101,7 +102,7 @@ class mitkDiffusionVolumeEditingTestSuite : public mitk::TestFixture
 public:
   void setUp() override
   {
-    m_Dwi = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    m_Dwi = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_multi.dwi"));
   }
 
   void tearDown() override

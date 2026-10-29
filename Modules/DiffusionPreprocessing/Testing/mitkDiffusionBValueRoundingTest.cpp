@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -76,7 +77,7 @@ public:
   void Correct_Dwi_ShellsRoundedDataKept()
   {
     // dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi: shells of about 1000, 1995 and 2995.
-    auto dwi = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi"));
+    auto dwi = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi"));
     auto rounded = mitk::DiffusionImageEditing::RoundBValues(dwi, 100);
 
     std::vector<double> shells;
