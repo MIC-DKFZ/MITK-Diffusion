@@ -322,6 +322,14 @@ bool mitk::SignalGenerationParameters::SetMotionVolumes(const std::string& text,
   return true;
 }
 
+void mitk::SignalGenerationParameters::CheckInversionTime() const
+{
+  if (m_tInv > 0 && m_tInv >= m_tRep)
+    mitkThrow() << "The inversion time TI (" << m_tInv << " ms) must be shorter than the repetition time TR ("
+                << m_tRep << " ms): the inversion pulse comes before the excitation within one repetition."
+                << " Set TI to 0 to simulate without inversion pulse.";
+}
+
 void mitk::SignalGenerationParameters::ApplyDirectionMatrix()
 {
   // world = MF^T bvec with the measurement frame of FSL bvecs (frame axes as rows)

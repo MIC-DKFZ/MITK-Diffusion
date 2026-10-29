@@ -218,6 +218,9 @@ namespace itk {
     // calculate T1 relaxation (independent of actual readout)
     m_T1Relax.clear();
     if ( m_Parameters->m_SignalGen.m_DoSimulateRelaxation)
+    {
+      // the inversion-recovery signal below holds for TI < TR only
+      m_Parameters->m_SignalGen.CheckInversionTime();
       for (unsigned int i=0; i<m_CompartmentImages.size(); i++)
       {
         // account for T1 relaxation (how much magnetization is available since last excitation?)
@@ -225,19 +228,15 @@ namespace itk {
 
         // account for inversion pulse and TI
         const float tInv = m_Parameters->m_SignalGen.m_tInv;
-        if (tInv > 0 && tInv < m_Parameters->m_SignalGen.m_tRep)
+        if (tInv > 0)
         {
           // inversion recovery with a 90 degree excitation every TR: 1 - 2 exp(-TI/T1) + exp(-TR/T1)
           relaxation = 1.0 - 2.0*std::exp(-tInv/m_T1[i]) + std::exp(-m_Parameters->m_SignalGen.m_tRep/m_T1[i]);
         }
-        else if (tInv > 0)
-        {
-          // TI >= TR has no standard formula; this product with the inversion term is not a textbook model
-          relaxation *= (1.0-std::exp(std::log(2) - tInv/m_T1[i]));
-        }
 
         m_T1Relax.push_back(relaxation);
       }
+    }
   }
 
   template< class ScalarType >

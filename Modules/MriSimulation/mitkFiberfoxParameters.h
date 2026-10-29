@@ -186,6 +186,12 @@ namespace mitk
      * signs) moves no volume and returns false.
      */
     bool SetMotionVolumes(const std::string& text, itk::Statistics::MersenneTwisterRandomVariateGenerator* randgen);
+    /**
+     * Throws a mitk::Exception if an inversion pulse is set (TI > 0) and TI is not shorter than
+     * TR: the inversion comes before the excitation within one repetition, and the
+     * inversion-recovery signal 1 - 2 exp(-TI/T1) + exp(-TR/T1) holds only for TI < TR.
+     */
+    void CheckInversionTime() const;
 
   protected:
 

@@ -1971,6 +1971,8 @@ void QmitkFiberfoxView::SimulateForExistingDwi(mitk::DataNode* imageNode)
   }
 
   UpdateParametersFromGui();
+  // TI >= TR stops here with its message (GenerateImage), before the simulation thread starts
+  m_Parameters.m_SignalGen.CheckInversionTime();
 
   mitk::Image::Pointer diffImg = dynamic_cast<mitk::Image*>(imageNode->GetData());
   ItkDwiType::Pointer itkVectorImagePointer = ItkDwiType::New();
@@ -1998,6 +2000,7 @@ void QmitkFiberfoxView::SimulateImageFromFibers(mitk::DataNode* fiberNode)
   if (fiberBundle->GetNumFibers()<=0) { return; }
 
   UpdateParametersFromGui();
+  m_Parameters.m_SignalGen.CheckInversionTime();
 
   m_TractsToDwiFilter = itk::TractsToDWIImageFilter< short >::New();
   m_Parameters.m_Misc.m_ParentNode = fiberNode;

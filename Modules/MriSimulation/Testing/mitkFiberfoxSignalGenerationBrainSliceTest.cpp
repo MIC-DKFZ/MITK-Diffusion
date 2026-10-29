@@ -200,10 +200,10 @@ public:
   void Test5()
   {
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5.ffp"), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5_v2.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5_OUT_v3.nii.gz"), &functor);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5_OUT_v4.nii.gz"), &functor);
     StartSimulation(parameters, refImage, "BrainSlice_5_OUT.nii.gz");
   }
 
