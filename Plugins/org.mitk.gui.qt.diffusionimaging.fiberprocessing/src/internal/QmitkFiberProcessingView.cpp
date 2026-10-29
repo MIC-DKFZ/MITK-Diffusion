@@ -1493,7 +1493,6 @@ void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
         {
           fib->SetFiberColors(255, 255, 255);
           fiberBundles.at(i)->SetFloatProperty("opacity", op);
-          fiberBundles.at(i)->SetBoolProperty("Fiber2DfadeEFX", false);
         }
         m_InteractiveNode->SetData(extFB);
       }

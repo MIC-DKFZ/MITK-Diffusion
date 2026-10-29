@@ -74,13 +74,6 @@ public:
   std::string GetStudyName(int i){ return m_Study_names.at(i); }
   std::string GetSeriesName(int i){ return m_Series_names.at(i); }
 
-  std::vector<std::string> sop_instance_uids() const;
-  std::vector<std::string> frame_of_reference_uids() const;
-  std::vector<std::string> series_instance_uids() const;
-  std::vector<std::string> study_instance_uids() const;
-  std::vector<std::string> patient_names() const;
-  std::vector<std::string> patient_ids() const;
-
 protected:
   DiffusionDICOMFileReader();
   ~DiffusionDICOMFileReader() override;

@@ -167,36 +167,6 @@ bool mitk::DiffusionDICOMFileReader
 
 }
 
-std::vector<std::string> mitk::DiffusionDICOMFileReader::patient_ids() const
-{
-  return m_patient_ids;
-}
-
-std::vector<std::string> mitk::DiffusionDICOMFileReader::patient_names() const
-{
-  return m_patient_names;
-}
-
-std::vector<std::string> mitk::DiffusionDICOMFileReader::study_instance_uids() const
-{
-  return m_study_instance_uids;
-}
-
-std::vector<std::string> mitk::DiffusionDICOMFileReader::series_instance_uids() const
-{
-  return m_series_instance_uids;
-}
-
-std::vector<std::string> mitk::DiffusionDICOMFileReader::frame_of_reference_uids() const
-{
-  return m_frame_of_reference_uids;
-}
-
-std::vector<std::string> mitk::DiffusionDICOMFileReader::sop_instance_uids() const
-{
-  return m_sop_instance_uids;
-}
-
 void mitk::DiffusionDICOMFileReader
 ::AnalyzeInputFiles()
 {
