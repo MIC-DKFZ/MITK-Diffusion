@@ -75,7 +75,16 @@ public:
     void ResampleSpline(float pointDistance=1);
     void ResampleSpline(float pointDistance, double tension, double continuity, double bias );
     void ResampleLinear(double pointDistance=1);
+    /** Resamples every fiber to targetPoints points at equal arc length along it, both end
+     *  points included (dipy's set_number_of_points), also fibers that have targetPoints points
+     *  already. A fiber without length gets targetPoints copies of its position. */
     void ResampleToNumPoints(unsigned int targetPoints);
+
+    /** The polyline through points resampled to numPoints points at equal arc length along it,
+     *  both end points included; a polyline without length or of one point gives numPoints copies
+     *  of its first point, an empty one nothing. Used by ResampleToNumPoints and the fiber
+     *  clustering filter, so that both resample the same way. */
+    static std::vector< vnl_vector_fixed<double, 3> > ResamplePolylineToNumPoints(const std::vector< vnl_vector_fixed<double, 3> >& points, unsigned int numPoints);
 
     mitk::FiberBundle::Pointer FilterByWeights(float weight_thr, bool invert=false) const;
     bool RemoveShortFibers(float lengthInMM);

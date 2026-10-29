@@ -115,7 +115,6 @@ std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(const mitk
   // QuickBundles compares fibers point by point (MDF), so each fiber is resampled to m_NumPoints
   // points at equal arc length along it, both end points included (as dipy's
   // set_number_of_points); also fibers that already have m_NumPoints unevenly spaced points.
-  // FiberBundle::ResampleToNumPoints does neither: it steps by chord length and keeps such fibers.
   vtkSmartPointer<vtkPolyData> polyData = tractogram->GetFiberPolyData();
   std::vector< vnl_matrix<float> > out_fib;
 
@@ -145,22 +144,10 @@ std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(const mitk
     }
     else
     {
-      std::vector< double > arc(numPoints, 0.0);
-      for (int j=1; j<numPoints; j++)
-        arc[j] = arc[j-1] + (p[j]-p[j-1]).magnitude();
-
-      int seg = 0;
+      const auto q = mitk::FiberBundle::ResamplePolylineToNumPoints(p, m_NumPoints);
       for (unsigned int k=0; k<m_NumPoints; k++)
-      {
-        const double target = m_NumPoints>1 ? arc.back()*k/(m_NumPoints-1) : 0.0;
-        while (seg<numPoints-2 && arc[seg+1]<target)
-          ++seg;
-        const double segLength = arc[seg+1]-arc[seg];
-        const double a = segLength>0 ? std::min(1.0, std::max(0.0, (target-arc[seg])/segLength)) : 0.0;
-        const vnl_vector_fixed< double, 3 > q = p[seg] + a*(p[seg+1]-p[seg]);
         for (unsigned int d=0; d<3; ++d)
-          streamline(d, k) = q[d];
-      }
+          streamline(d, k) = q[k][d];
     }
 
     out_fib.push_back(streamline);
