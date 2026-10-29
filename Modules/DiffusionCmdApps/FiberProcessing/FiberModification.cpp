@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
   parser.beginGroup("2. Resampling:");
   parser.addArgument("spline_resampling", "", mitkCommandLineParser::Float, "Spline resampling:", "Resample fiber using splines with the given point distance (in mm)");
   parser.addArgument("linear_resampling", "", mitkCommandLineParser::Float, "Linear resampling:", "Resample fiber linearly with the given point distance (in mm)");
-  parser.addArgument("num_resampling", "", mitkCommandLineParser::Int, "Num. fiber points resampling:", "Resample all fibers to the given number of points, at equal chord distance (not arc length); fibers that already have this number of points are kept as they are");
+  parser.addArgument("num_resampling", "", mitkCommandLineParser::Int, "Num. fiber points resampling:", "Resample all fibers to the given number of points, at equal distance along the fiber (arc length), end points included; also fibers that already have this number of points");
   parser.addArgument("compress", "", mitkCommandLineParser::Float, "Compress:", "Compress fiber using the given error threshold (in mm)");
   parser.endGroup();
 
