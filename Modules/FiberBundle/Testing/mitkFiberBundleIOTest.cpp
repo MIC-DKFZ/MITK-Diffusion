@@ -73,6 +73,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TckReader_AllFloatTypes_ReadSamePoints);
   MITK_TEST(TckReader_ReadOnlyOrUnterminatedFile_Loads);
   MITK_TEST(TckReader_HeaderWithoutEnd_Throws);
+  MITK_TEST(TckReader_OnePointStreamlines_KeepFileOrder);
   MITK_TEST(TrkReader_ScalarsAndProperties_AreSkipped);
   MITK_TEST(TrkReader_InvalidFiles_Throw);
   MITK_TEST(TrkReader_NonRasVoxelOrders_FollowTrackVisDefinition);
@@ -153,10 +154,10 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   static void WriteTck(const std::string &path,
                        const std::string &datatype,
                        const std::string &extraHeader = "",
-                       bool terminator = true)
+                       bool terminator = true,
+                       const std::vector<Fiber> &fibers = TckFibers())
   {
     const bool bigEndian = datatype.substr(datatype.size() - 2) == "BE";
-    const auto fibers = TckFibers();
     // padded with spaces as MRtrix writes its header lines
     std::string header = "mrtrix tracks    \n" + extraHeader + "datatype: " + datatype +
                          "\ncount: " + std::to_string(fibers.size()) + "    \nfile: . 1024\nEND\n";
@@ -661,6 +662,62 @@ public:
     const std::string unterminated = m_TempDir + "/unterminated.tck";
     WriteTck<float>(unterminated, "Float32LE", "", false);
     AssertTckFibers(mitk::IOUtil::Load<mitk::FiberBundle>(unterminated), "file without end marker");
+  }
+
+  /** Fiber of n points along x from x0, in RAS as MRtrix stores it */
+  static Fiber TckLine(int n, double x0)
+  {
+    Fiber fiber;
+    for (int j = 0; j < n; ++j)
+      fiber.push_back({x0 + j, 2.0 * n, 3.0});
+    return fiber;
+  }
+
+  // #20: one-point streamlines were moved before all others (vtkCleanPolyData made them
+  // vertices), so the i-th fiber no longer matched the i-th value of a per-streamline weight file.
+  void TckReader_OnePointStreamlines_KeepFileOrder()
+  {
+    const std::vector<int> fileCounts = {5, 1, 0, 7, 3, 1};
+    std::vector<Fiber> fibers;
+    for (std::size_t i = 0; i < fileCounts.size(); ++i)
+      fibers.push_back(TckLine(fileCounts[i], 10.0 * i));
+    const std::string path = m_TempDir + "/one_point.tck";
+    WriteTck<float>(path, "Float32LE", "", true, fibers);
+
+    // the empty streamline has no fiber; all others keep their order
+    auto check = [&fibers, &fileCounts](mitk::FiberBundle *fib, const std::string &message)
+    {
+      std::vector<std::size_t> expected;
+      for (std::size_t i = 0; i < fileCounts.size(); ++i)
+        if (fileCounts[i] > 0)
+          expected.push_back(i);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(message, static_cast<unsigned int>(expected.size()), fib->GetNumFibers());
+      for (unsigned int k = 0; k < expected.size(); ++k)
+      {
+        const Fiber &fiber = fibers[expected[k]];
+        vtkCell *cell = fib->GetFiberPolyData()->GetCell(k);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ", fiber " + std::to_string(k), static_cast<vtkIdType>(fiber.size()), cell->GetNumberOfPoints());
+        for (std::size_t j = 0; j < fiber.size(); ++j)
+        {
+          const double *p = cell->GetPoints()->GetPoint(static_cast<vtkIdType>(j));
+          CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -fiber[j][0], p[0], 1e-6);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, -fiber[j][1], p[1], 1e-6);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message, fiber[j][2], p[2], 1e-6);
+        }
+      }
+    };
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(path);
+    check(fib, "tck file");
+
+    // weights given in file order stay with their fibers through a .fib file
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      fib->SetFiberWeight(i, 1.0f + i);
+    const std::string fibPath = m_TempDir + "/one_point.fib";
+    mitk::IOUtil::Save(fib, fibPath);
+    auto reloaded = mitk::IOUtil::Load<mitk::FiberBundle>(fibPath);
+    check(reloaded, "fib file");
+    for (unsigned int i = 0; i < reloaded->GetNumFibers(); ++i)
+      CPPUNIT_ASSERT_EQUAL(1.0f + i, reloaded->GetFiberWeight(i));
   }
 
   void TckReader_HeaderWithoutEnd_Throws()
