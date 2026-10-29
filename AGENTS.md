@@ -172,8 +172,8 @@ Facts the layout does not show:
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
   set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
   voxel grid (`mitkFiberImageGrid.h`). The clustering filter prepares each fiber's metric data
-  once (`ClusteringMetric::PrepareFiber`); the metric values equal the former vnl formulation bit for bit
-  (`Metrics_SameValuesAsVnlFormulation`), which the clustering outputs depend on.
+  once (`ClusteringMetric::PrepareFiber`); the metric values equal the former vnl formulation
+  bit for bit (`Metrics_SameValuesAsVnlFormulation`), which the clustering outputs depend on.
 - `ctest -R Tractography` runs the `FiberTracking` tests. Streamline tracking seeds its random
   engines per seed point, so a tractogram with a fixed seed (`--fix_seed`, "Fix Random Seed") is
   the same at any number of OpenMP threads; the handlers take tensors, ODF directions and peaks as
