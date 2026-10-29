@@ -50,7 +50,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QFileDialog>
 #include <QMessageBox>
 #include "usModuleRegistry.h"
-#include <mitkChiSquareNoiseModel.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkIOUtil.h>
 #include <QScrollBar>

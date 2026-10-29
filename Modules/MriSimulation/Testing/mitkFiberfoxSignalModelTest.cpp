@@ -16,7 +16,8 @@ found in the LICENSE file.
 #include <mitkFiberfoxParameters.h>
 #include <mitkRawShModel.h>
 #include <mitkAstroStickModel.h>
-#include <mitkChiSquareNoiseModel.h>
+#include <mitkNoncentralChiNoiseModel.h>
+#include <cmath>
 #include <mitkDiffusionImageHelperFunctions.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
@@ -220,13 +221,14 @@ public:
   {
     const double variance = 100;
     const unsigned int samples = 200000;
-    for (unsigned int coils : { 1u })
+    for (unsigned int coils : { 1u, 4u, 8u })
       for (double signal : { 0.0, 1000.0 })
       {
-        mitk::ChiSquareNoiseModel<double> model;
+        mitk::NoncentralChiNoiseModel<double> model;
         model.SetSeed(1);
         model.SetNoiseVariance(variance);
-        mitk::ChiSquareNoiseModel<double>::PixelType pixel(samples);
+        model.SetNumberOfCoils(coils);
+        mitk::NoncentralChiNoiseModel<double>::PixelType pixel(samples);
         pixel.Fill(signal);
         model.AddNoise(pixel);
         double sum = 0, sumOfSquares = 0;

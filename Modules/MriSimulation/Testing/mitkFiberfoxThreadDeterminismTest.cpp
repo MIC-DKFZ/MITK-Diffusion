@@ -160,7 +160,7 @@ public:
     });
   }
 
-  /** Rician and chi-square noise: equal with a constant seed, different without. */
+  /** Rician and noncentral chi noise: equal with a constant seed, different without. */
   void NoiseModelsFollowSeed()
   {
     for (bool rician : { true, false })
@@ -170,10 +170,14 @@ public:
         if (rician)
           parameters.m_NoiseModel = std::make_shared< mitk::RicianNoiseModel<double> >();
         else
-          parameters.m_NoiseModel = std::make_shared< mitk::ChiSquareNoiseModel<double> >();
+        {
+          auto chi = std::make_shared< mitk::NoncentralChiNoiseModel<double> >();
+          chi->SetNumberOfCoils(4);
+          parameters.m_NoiseModel = chi;
+        }
         parameters.m_NoiseModel->SetNoiseVariance(50);
       };
-      const std::string name = rician ? "Rician" : "chi-square";
+      const std::string name = rician ? "Rician" : "noncentral chi";
       auto first = Simulate("param5.ffp", 8, addNoise);
       auto second = Simulate("param5.ffp", 8, addNoise);
       CPPUNIT_ASSERT_EQUAL_MESSAGE(name + " noise with a constant seed is reproducible", 0ul, CountDifferences<DwiType>(first->GetOutput(), second->GetOutput()));
