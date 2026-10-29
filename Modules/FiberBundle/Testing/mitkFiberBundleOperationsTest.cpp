@@ -82,6 +82,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ResampleLinear_SyntheticFibers_EqualChordSpacingOnTheFiber);
   MITK_TEST(ResampleSpline_StraightFiber_PointsOnTheLine);
   MITK_TEST(ResampleToNumPoints_StraightFiber_EqualSpacing);
+  MITK_TEST(ResampleToNumPoints_CurvedFibers_EqualArcLengthSpacing);
   MITK_TEST(Compress_SyntheticFibers_RemovesOnlyPointsWithinTheError);
   MITK_TEST(ApplyCurvatureThreshold_CircularArc_RadiusDecides);
   MITK_TEST(ColorFibersByOrientation_ThreePointFiber_SegmentDirections);
@@ -948,6 +949,82 @@ public:
       CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0 * j, p[0], 1e-5);
       CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, p[1], 1e-6);
       CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, p[2], 1e-6);
+    }
+  }
+
+  /** Arc length along the polyline at which p lies on it, searched from segment *segment on
+   *  (points come in order along the line); -1 if p is not on the polyline. */
+  static double ArcLengthOnPolyline(const double *p, const std::vector<std::array<double, 3>> &line, std::size_t *segment)
+  {
+    double arc = 0;
+    for (std::size_t k = 0; k < *segment; ++k)
+      arc += Distance(line[k].data(), line[k + 1].data());
+    for (std::size_t k = *segment; k + 1 < line.size(); ++k)
+    {
+      const double length = Distance(line[k].data(), line[k + 1].data());
+      if (DistanceToPolyline(p, {line[k], line[k + 1]}) < 1e-4)
+      {
+        *segment = k;
+        return arc + Distance(line[k].data(), p);
+      }
+      arc += length;
+    }
+    return -1;
+  }
+
+  // #16: the points were placed at equal straight-line (chord) distance, which on curved fibers
+  // is not equal arc length, and fibers that already had the requested number of points were
+  // kept with their uneven spacing.
+  void ResampleToNumPoints_CurvedFibers_EqualArcLengthSpacing()
+  {
+    // A half circle of radius 10 mm and two turns of a helix, both with uneven point steps, and a
+    // straight fiber that already has 7 unevenly spaced points.
+    std::vector<std::array<double, 3>> arc, helix;
+    for (int j = 0; j <= 60; ++j)
+    {
+      const double u = j / 60.0;
+      const double phi = itk::Math::pi * u * u;
+      arc.push_back({10 * std::cos(phi), 10 * std::sin(phi), 0});
+    }
+    for (int j = 0; j <= 200; ++j)
+    {
+      const double u = j / 200.0;
+      const double phi = 4 * itk::Math::pi * std::sqrt(u);
+      helix.push_back({5 * std::cos(phi), 5 * std::sin(phi), 20 * std::sqrt(u)});
+    }
+    const std::vector<std::array<double, 3>> line = {{0, 0, 0}, {0.5, 0, 0}, {1, 0, 0}, {5, 0, 0}, {6, 0, 0}, {11, 0, 0}, {12, 0, 0}};
+    const std::vector<std::vector<std::array<double, 3>>> fibers = {arc, helix, line};
+    auto fib = MakeBundle(fibers);
+    for (unsigned int i = 0; i < 3; ++i)
+      fib->SetFiberWeight(i, 1.5f + i);
+    // the input as stored (float), against which the result is measured
+    std::vector<std::vector<std::array<double, 3>>> stored;
+    std::vector<double> lengths;
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      stored.push_back(FiberPoints(fib, i));
+      lengths.push_back(fib->GetFiberLength(i));
+    }
+
+    const unsigned int n = 7;
+    fib->ResampleToNumPoints(n);
+    CPPUNIT_ASSERT_EQUAL(3u, fib->GetNumFibers());
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      const std::string message = "fiber " + std::to_string(i);
+      const auto points = FiberPoints(fib, i);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(message, static_cast<std::size_t>(n), points.size());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ": weight", 1.5f + i, fib->GetFiberWeight(i));
+      for (int c = 0; c < 3; ++c)
+      {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": first point", stored[i].front()[c], points.front()[c], 1e-5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": last point", stored[i].back()[c], points.back()[c], 1e-5);
+      }
+      std::size_t segment = 0;
+      for (unsigned int k = 0; k < n; ++k)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": arc length of point " + std::to_string(k),
+                                             lengths[i] * k / (n - 1),
+                                             ArcLengthOnPolyline(points[k].data(), stored[i], &segment), 1e-3);
     }
   }
 
