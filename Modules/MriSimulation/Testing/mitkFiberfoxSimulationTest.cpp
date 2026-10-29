@@ -56,6 +56,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(NoGradients);
   MITK_TEST(PrototypeNeedsOneShell);
   MITK_TEST(InversionRecovery);
+  MITK_TEST(InversionTimeNotBelowRepetitionTime);
   MITK_TEST(MotionTransforms);
   MITK_TEST(MotionMovesFibersAndMapsTogether);
   MITK_TEST(RandomPhantom);
@@ -203,6 +204,23 @@ public:
     MITK_INFO << "Inversion recovery: largest deviation " << maxDeviation << " of signals up to " << maxPlain;
     CPPUNIT_ASSERT(maxPlain > 10);
     CPPUNIT_ASSERT_MESSAGE("signal scaled by the inversion-recovery factor", maxDeviation < 1e-4 * maxPlain);
+  }
+
+  /** The inversion pulse comes before the excitation within one repetition: TI >= TR is refused. */
+  void InversionTimeNotBelowRepetitionTime()
+  {
+    for (double inversion : { 4000.0, 5000.0 })
+    {
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+      parameters.m_SignalGen.m_tRep = 4000;
+      parameters.m_SignalGen.m_tInv = inversion;
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetFiberBundle(m_FiberBundle);
+      CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+    }
   }
 
   /** x' = R (x - c) + c + t with R = Rz Ry Rx; the inverse is exact for rotations about all axes. */
