@@ -91,6 +91,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(CopyDicomReferenceTags_BothNamingsAndMissingTags);
   MITK_TEST(TrkWriter_Header_DescribesReferenceGrid);
   MITK_TEST(TrkWriter_LpsOptionAndOldMitkFiles_WriteConsistentHeaders);
+  MITK_TEST(TrkWriter_Version1File_WritesVersion2);
   MITK_TEST(DicomReader_NoAlgorithmIdentification_LoadsAndKeepsLocale);
   MITK_TEST(PlanarFigureComposite_RoundTripAndBrokenFile_KeepLocale);
   MITK_TEST(PlanarFigureComposite_UnknownOperation_Throws);
@@ -1279,6 +1280,32 @@ public:
       mitk::IOUtil::Save(loaded, path, lps);
       AssertSpecPointsMatchBundle(fib, ReadTrkAsSpec(path, header, inside), order + " saved again with Use LPS");
       CPPUNIT_ASSERT_MESSAGE(order + " saved again with Use LPS: inside the image grid", inside);
+    }
+  }
+
+  /** A version-1 file has no matrix; saved again it gets one, and with it version 2, without
+   *  which nibabel and dipy ignore the matrix. */
+  void TrkWriter_Version1File_WritesVersion2()
+  {
+    auto header = MakeTrkHeader("RAS", {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}});
+    header.version = 1;
+    const std::string original = m_TempDir + "/version1.trk";
+    WriteTrk(original, header);
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(original);
+
+    for (bool useLps : {false, true})
+    {
+      mitk::IFileWriter::Options options;
+      options["Print header"] = false;
+      options["Use LPS coordinate system (default is RAS)"] = useLps;
+      const std::string path = m_TempDir + "/version1_saved.trk";
+      mitk::IOUtil::Save(fib, path, options);
+      TrkHeader saved;
+      bool inside = false;
+      AssertSpecPointsMatchBundle(fib, ReadTrkAsSpec(path, saved, inside), useLps ? "Use LPS" : "RAS");
+      CPPUNIT_ASSERT_EQUAL(2, static_cast<int>(saved.version));
+      CPPUNIT_ASSERT_EQUAL(1.0f, saved.vox_to_ras[3][3]);
+      CPPUNIT_ASSERT_MESSAGE("inside the declared volume", inside);
     }
   }
 

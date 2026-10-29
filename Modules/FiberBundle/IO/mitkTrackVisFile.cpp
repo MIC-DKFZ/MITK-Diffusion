@@ -331,6 +331,8 @@ void mitk::TrackVisFile::SetGrid(Header& header, const double indexToRas[3][4], 
   for (int c=0; c<3; ++c)
     header.vox_to_ras[3][c] = 0;
   header.vox_to_ras[3][3] = 1;
+  // readers (TrackVis spec, nibabel, dipy, HasMatrix) use vox_to_ras only from version 2 on
+  header.version = 2;
 
   for (int k=0; k<3; ++k)
   {
