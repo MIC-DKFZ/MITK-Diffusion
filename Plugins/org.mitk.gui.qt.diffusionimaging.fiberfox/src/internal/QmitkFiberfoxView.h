@@ -174,8 +174,11 @@ protected:
     static QWidget* ModelWidget(const CompartmentControls& compartment, CompartmentModel type);   ///< nullptr if not offered
     /** Signal model of the selected entry with the widget's parameters, nullptr for none. */
     mitk::DiffusionSignalModel<>* NewCompartmentModel(const CompartmentControls& compartment);
-    /** Selects the entry of the model's type and shows the model's parameters; nothing if not offered. */
-    void ShowCompartmentModel(const CompartmentControls& compartment, mitk::DiffusionSignalModel<>* model);
+    /**
+     * Selects the entry of the model's type and shows the model's parameters; nothing if not offered.
+     * A tensor model is shown as a zeppelin if zeppelin is set and the compartment offers one.
+     */
+    void ShowCompartmentModel(const CompartmentControls& compartment, mitk::DiffusionSignalModel<>* model, bool zeppelin);
     /** Shows the parameter widget of the entry with the given index only. */
     void ShowCompartmentWidget(int compartmentId, int index);
     void UpdateGui();                                           ///< enable/disbale buttons etc. according to current datamanager selection

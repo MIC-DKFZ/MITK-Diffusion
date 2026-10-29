@@ -64,9 +64,29 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateOr.h>
+#include <algorithm>
 
 namespace
 {
+  /**
+   * The model names of a signal model string as the view writes it, one per model in list order
+   * ("StickZeppelinBallBall"); empty if the string is not of that form.
+   */
+  std::vector<std::string> ModelNames(std::string modelString)
+  {
+    static const std::vector<std::string> names = {"Stick", "Zeppelin", "Tensor", "Ball", "Astrosticks", "Dot", "Prototype"};
+    std::vector<std::string> result;
+    while (!modelString.empty())
+    {
+      auto name = std::find_if(names.begin(), names.end(), [&](const std::string& n) { return modelString.compare(0, n.size(), n)==0; });
+      if (name==names.end())
+        return {};
+      result.push_back(*name);
+      modelString.erase(0, name->size());
+    }
+    return result;
+  }
+
   /** The parameters of a started simulation as saved next to its image (ListMovedVolumes). */
   mitk::FiberfoxParameters SimulatedParameters(const mitk::FiberfoxParameters& parameters)
   {
@@ -1072,14 +1092,13 @@ mitk::DiffusionSignalModel<>* QmitkFiberfoxView::NewCompartmentModel(const Compa
   return model;
 }
 
-void QmitkFiberfoxView::ShowCompartmentModel(const CompartmentControls& compartment, mitk::DiffusionSignalModel<>* model)
+void QmitkFiberfoxView::ShowCompartmentModel(const CompartmentControls& compartment, mitk::DiffusionSignalModel<>* model, bool zeppelin)
 {
-  // a zeppelin is saved as a tensor, so it is shown as one
   CompartmentModel type = CompartmentModel::None;
   if (dynamic_cast<mitk::StickModel<>*>(model))
     type = CompartmentModel::Stick;
   else if (dynamic_cast<mitk::TensorModel<>*>(model))
-    type = CompartmentModel::Tensor;
+    type = zeppelin && ModelWidget(compartment, CompartmentModel::Zeppelin)!=nullptr ? CompartmentModel::Zeppelin : CompartmentModel::Tensor;
   else if (dynamic_cast<mitk::BallModel<>*>(model))
     type = CompartmentModel::Ball;
   else if (dynamic_cast<mitk::AstroStickModel<>*>(model))
@@ -1106,6 +1125,16 @@ void QmitkFiberfoxView::ShowCompartmentModel(const CompartmentControls& compartm
     parameters->SetT2(stick->GetT2());
     parameters->SetT1(stick->GetT1());
     parameters->SetD(stick->GetDiffusivity());
+    break;
+  }
+  case CompartmentModel::Zeppelin:
+  {
+    auto parameters = static_cast<QmitkZeppelinModelParametersWidget*>(widget);
+    auto tensor = static_cast<mitk::TensorModel<>*>(model);
+    parameters->SetT2(tensor->GetT2());
+    parameters->SetT1(tensor->GetT1());
+    parameters->SetD1(tensor->GetDiffusivity1());
+    parameters->SetD2(tensor->GetDiffusivity2());
     break;
   }
   case CompartmentModel::Tensor:
@@ -1156,7 +1185,6 @@ void QmitkFiberfoxView::ShowCompartmentModel(const CompartmentControls& compartm
     parameters->SetMaxAdc(prototype->GetAdcRange().second);
     break;
   }
-  case CompartmentModel::Zeppelin:
   case CompartmentModel::None:
     break;
   }
@@ -1544,6 +1572,10 @@ void QmitkFiberfoxView::LoadParameters()
   m_Controls->m_Compartment4Box->setCurrentIndex(0);
 
   const auto compartments = Compartments();
+  // A zeppelin is saved as a tensor; the file's signal model string, one name per model in list
+  // order, tells them apart, so a saved view loads back as it was.
+  const auto modelNames = ModelNames(m_Parameters.m_Misc.m_SignalModelString);
+  const bool namesMatch = modelNames.size()==m_Parameters.m_FiberModelList.size()+m_Parameters.m_NonFiberModelList.size();
   for (unsigned int i=0; i<m_Parameters.m_FiberModelList.size()+m_Parameters.m_NonFiberModelList.size(); i++)
   {
     mitk::DiffusionSignalModel<mitk::ScalarType>* signalModel = nullptr;
@@ -1570,7 +1602,7 @@ void QmitkFiberfoxView::LoadParameters()
     const CompartmentControls& compartment = compartments[signalModel->m_CompartmentId-1];
     if (compVolNode.IsNotNull())
       compartment.volumeFraction->SetSelectedNode(compVolNode);
-    ShowCompartmentModel(compartment, signalModel);
+    ShowCompartmentModel(compartment, signalModel, namesMatch && modelNames[i]=="Zeppelin");
   }
 
   // Prototype kernels of the file are reused by NewPrototypeModel while the widgets keep the settings
