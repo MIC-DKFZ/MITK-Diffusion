@@ -6,9 +6,11 @@
 # debug/ and release/ are bound to the main checkout through MITK_EXTENSION_DIRS, so a worktree
 # needs a tree of its own. This one is the inner build only: it repeats the superbuild's
 # MITK-Configure step with the worktree as extension and reuses the externals in debug/ep and
-# the test data in debug/MITK-Data. Rerun it after the superbuild in debug/ was re-run.
-# Extra arguments come last and override the initial cache, e.g.
-# -DMITK_BUILD_CONFIGURATION=Fiberfox to check another build configuration.
+# MITK's test data in debug/MITK-Data. The diffusion test data is the checkout
+# <workspace>/mitk-diffusion-test-data, where new references are committed. Rerun it after the
+# superbuild in debug/ was re-run. Extra arguments come last and override the initial cache, e.g.
+# -DMITK_BUILD_CONFIGURATION=Fiberfox to check another build configuration, or
+# -DMITK_DIFFUSION_DATA_DIR=<checkout> for other diffusion test data.
 set -euo pipefail
 
 worktree=$(realpath "$1")
@@ -32,4 +34,5 @@ grep -q "^set(MITK_EXTENSION_DIRS \"$worktree\"" "$cache"
 mapfile -t defs < <(sed -e "s/^cmd='//" -e "s/'$//" "$ws/debug/ep/tmp/MITK-Configure-cfgcmd.txt" \
   | tr ';' '\n' | grep '^-D')
 
-cmake "${defs[@]}" -G "Unix Makefiles" -C "$cache" -S "$ws/mitk" -B "$build" "$@"
+cmake "${defs[@]}" -DMITK_DIFFUSION_DATA_DIR:PATH="$ws/mitk-diffusion-test-data" \
+  -G "Unix Makefiles" -C "$cache" -S "$ws/mitk" -B "$build" "$@"
