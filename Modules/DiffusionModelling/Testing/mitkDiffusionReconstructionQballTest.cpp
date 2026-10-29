@@ -15,6 +15,7 @@ found in the LICENSE file.
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -174,7 +175,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   Dwi LoadHalfSphereDwi()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"), &functor);
+    auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi"), &functor);
     Dwi dwi;
     dwi.image = DwiType::New();
     mitk::CastToItkImage(image, dwi.image);

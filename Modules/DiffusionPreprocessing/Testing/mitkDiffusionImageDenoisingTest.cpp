@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -91,7 +92,7 @@ public:
   void setUp() override
   {
     // test.dwi: volume 0 is the b0 volume, much brighter than the weighted ones.
-    m_Dwi = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"));
+    m_Dwi = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi"));
   }
 
   void tearDown() override

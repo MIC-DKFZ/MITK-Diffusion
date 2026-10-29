@@ -20,6 +20,7 @@ found in the LICENSE file.
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkShImage.h>
 #include <mitkTensorImage.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <mitkBaseDataSerializer.h>
@@ -221,7 +222,7 @@ public:
   void TensorReader_Nrrd_LeavesNoTemporaryFiles()
   {
     const unsigned int before = CountTemporaryTensorCopies();
-    mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/tensorImage.dti"));
+    mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("tensorImage.dti"));
     CPPUNIT_ASSERT_EQUAL(before, CountTemporaryTensorCopies());
   }
 
@@ -254,14 +255,14 @@ public:
   {
     const std::string missingDir = m_TempDir + "/missing/";
 
-    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(tensorImage, missingDir + "tensor.dti"), std::exception);
 
-    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi"));
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA0.qbi"));
     CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(odfImage, missingDir + "odf.odf"), std::exception);
 
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &functor);
     CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(shImage, missingDir + "sh.shi"), std::exception);
 
     CPPUNIT_ASSERT(!itksys::SystemTools::FileExists(missingDir));
@@ -300,16 +301,16 @@ public:
   // Clone() returned nullptr for these types, and cloning through mitk::Image lost the type.
   void Clone_KeepsTypeAndPixels()
   {
-    CheckClone(mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti")));
-    CheckClone(mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi")));
+    CheckClone(mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti")));
+    CheckClone(mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA0.qbi")));
 
     mitk::PreferenceListReaderOptionsFunctor peakFunctor({"Peak Image"}, std::vector<std::string>());
-    auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &peakFunctor);
+    auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), &peakFunctor);
     CheckClone(peakImage);
     CPPUNIT_ASSERT(peakImage->Clone().IsNotNull());
 
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &shFunctor);
     shImage->SetShConvention(mitk::ShImage::FSL);
     CheckClone(shImage);
     mitk::ShImage::Pointer shClone = shImage->Clone();
@@ -321,7 +322,7 @@ public:
   void PeakImage_SetCustomColorWithoutPolydata()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Peak Image"}, std::vector<std::string>());
-    auto loaded = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &functor);
+    auto loaded = mitk::IOUtil::Load<mitk::PeakImage>(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), &functor);
     auto itkPeaks = loaded->GetItkPeakImage();
 
     auto peaks = mitk::PeakImage::New();
@@ -368,13 +369,13 @@ public:
   void ShAndPeakIO_DotsInFileName()
   {
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &shFunctor);
     const std::string shPath = m_TempDir + "/sh.v2.shi";
     mitk::IOUtil::Save(shImage, shPath);
     AssertEqualShCoefficients(shImage, mitk::IOUtil::Load<mitk::ShImage>(shPath, &shFunctor));
 
     mitk::PreferenceListReaderOptionsFunctor peakFunctor({"Peak Image"}, std::vector<std::string>());
-    auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &peakFunctor);
+    auto peakImage = mitk::IOUtil::Load<mitk::PeakImage>(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), &peakFunctor);
     const std::string peakPath = m_TempDir + "/peaks.v2.nrrd";
     mitk::IOUtil::Save(peakImage, peakPath);
     AssertEqualPixels(peakImage, mitk::IOUtil::Load<mitk::PeakImage>(peakPath, &peakFunctor));
@@ -392,14 +393,14 @@ public:
   // both readers were offered for every NIfTI and NRRD file.
   void MimeTypes_ShAndPeakReadersOnlyForMatchingFiles()
   {
-    for (const std::string file : {"DiffusionImaging/mean_FA.nii.gz", "DiffusionImaging/tensorImage_FA.nrrd"})
+    for (const std::string file : {"mean_FA.nii.gz", "tensorImage_FA.nrrd"})
     {
-      const auto descriptions = ReaderDescriptions(GetTestDataFilePath(file));
+      const auto descriptions = ReaderDescriptions(mitk::GetDiffusionTestDataFilePath(file));
       CPPUNIT_ASSERT_MESSAGE(file, descriptions.count("SH Image") == 0);
       CPPUNIT_ASSERT_MESSAGE(file, descriptions.count("Peak Image") == 0);
     }
 
-    const auto shDescriptions = ReaderDescriptions(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"));
+    const auto shDescriptions = ReaderDescriptions(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"));
     CPPUNIT_ASSERT(shDescriptions.count("SH Image") == 1);
     CPPUNIT_ASSERT(shDescriptions.count("Peak Image") == 1);
   }
@@ -409,9 +410,9 @@ public:
   void MimeTypes_ReplacedFile_CheckedAgain()
   {
     const std::string path = m_TempDir + "/replaced.nii.gz";
-    std::filesystem::copy_file(GetTestDataFilePath("DiffusionImaging/mean_FA.nii.gz"), path);
+    std::filesystem::copy_file(mitk::GetDiffusionTestDataFilePath("mean_FA.nii.gz"), path);
     CPPUNIT_ASSERT(ReaderDescriptions(path).count("SH Image") == 0);
-    std::filesystem::copy_file(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), path, std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::copy_file(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), path, std::filesystem::copy_options::overwrite_existing);
     const auto descriptions = ReaderDescriptions(path);
     CPPUNIT_ASSERT(descriptions.count("SH Image") == 1);
     CPPUNIT_ASSERT(descriptions.count("Peak Image") == 1);
@@ -421,7 +422,7 @@ public:
   void ShWriter_NewNiftiFile_ReadsBackAsSh()
   {
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &shFunctor);
     const std::string path = m_TempDir + "/sh.nii.gz";
     mitk::IOUtil::Save(shImage, path);
     AssertEqualShCoefficients(shImage, mitk::IOUtil::Load<mitk::ShImage>(path, &shFunctor));
@@ -431,7 +432,7 @@ public:
   void ShIO_ConventionSurvivesSaving()
   {
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &shFunctor);
     for (auto convention : {mitk::ShImage::FSL, mitk::ShImage::MRTRIX})
     {
       shImage->SetShConvention(convention);
@@ -464,7 +465,7 @@ public:
   // MRtrix writes RAS directions; MITK's peaks are LPS.
   void PeakReader_MrtrixPeaks_ConvertedToLps()
   {
-    const std::string mrtrixFile = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_peak_image.nii.gz");
+    const std::string mrtrixFile = mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_peak_image.nii.gz");
     auto raw = LoadPeaks(mrtrixFile, false);
     auto converted = LoadPeaks(mrtrixFile, true);
 
@@ -491,7 +492,7 @@ public:
       CPPUNIT_ASSERT(std::isfinite(points->GetPoint(i)[0]) && std::isfinite(points->GetPoint(i)[1]) && std::isfinite(points->GetPoint(i)[2]));
 
     // Peak files without the MRtrix description, e.g. NIfTI files of earlier MITK versions, read unchanged.
-    const std::string mitkFile = GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz");
+    const std::string mitkFile = mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz");
     CPPUNIT_ASSERT(Values(LoadPeaks(mitkFile, false)) == Values(LoadPeaks(mitkFile, true)));
   }
 
@@ -499,7 +500,7 @@ public:
   void ShIO_OriginKeepsDoublePrecision()
   {
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &shFunctor);
     mitk::Point3D origin;
     origin[0] = 0.1;
     origin[1] = -20.3;
@@ -562,7 +563,7 @@ public:
     }
   }
 
-  // Pixel buffers and geometry of MITK-Data files as read before the readers were restructured.
+  // Pixel buffers and geometry of mitk-diffusion-test-data files as read before the readers were restructured.
   void Readers_RecordedContent()
   {
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
@@ -580,21 +581,21 @@ public:
       double spacing[3];
     };
     const Recorded recorded[] = {
-      {mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/tensorImage.dti")).GetPointer(),
+      {mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("tensorImage.dti")).GetPointer(),
        910238346892541248ull, {0, 0, 0}, {3, 3, 3}},
-      {mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/FWE/ReferenceTensorImage.dti")).GetPointer(),
+      {mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("FWE/ReferenceTensorImage.dti")).GetPointer(),
        14634070166575176342ull, {-14.1639, 13.4743, -12.6538}, {2, 2, 2}},
-      {mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi")).GetPointer(),
+      {mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA0.qbi")).GetPointer(),
        17363730383617297091ull, {1, 1, 1}, {2, 2, 2}},
-      {mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image.qbi")).GetPointer(),
+      {mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image.qbi")).GetPointer(),
        13068465665225140656ull, {0, 0, 0}, {3, 3, 3}},
-      {mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor).GetPointer(),
+      {mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &shFunctor).GetPointer(),
        13341037711982211669ull, {0.615, 1.0005, 0.7045}, {1.23, 2.001, 1.409}},
-      {mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"), &legacyShFunctor).GetPointer(),
+      {mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image_sh.nii.gz"), &legacyShFunctor).GetPointer(),
        8054354499704950156ull, {0, 0, 0}, {3, 3, 3}},
-      {mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &peakFunctor).GetPointer(),
+      {mitk::IOUtil::Load<mitk::PeakImage>(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), &peakFunctor).GetPointer(),
        1038741785062553984ull, {0.615, 1.0005, 0.7045}, {1.23, 2.001, 1.409}},
-      {mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/FiberFit/csd_peak_image.nii.gz"), &peakFunctor).GetPointer(),
+      {mitk::IOUtil::Load<mitk::PeakImage>(mitk::GetDiffusionTestDataFilePath("FiberFit/csd_peak_image.nii.gz"), &peakFunctor).GetPointer(),
        14391242496329318739ull, {0, 0, 0}, {3, 3, 3}}};
     for (const auto &[image, hash, origin, spacing] : recorded)
     {
@@ -610,9 +611,9 @@ public:
   // Tensor and ODF images survive saving in each of their formats bit for bit.
   void TensorAndOdfIO_RoundTrip()
   {
-    for (const std::string file : {"DiffusionImaging/tensorImage.dti", "DiffusionImaging/FWE/ReferenceTensorImage.dti"})
+    for (const std::string file : {"tensorImage.dti", "FWE/ReferenceTensorImage.dti"})
     {
-      auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath(file));
+      auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath(file));
       const std::string path = m_TempDir + "/tensor.dti";
       mitk::IOUtil::Save(tensorImage, path);
       auto reloaded = mitk::IOUtil::Load<mitk::TensorImage>(path);
@@ -620,7 +621,7 @@ public:
       AssertEqualGeometry(tensorImage, reloaded);
     }
 
-    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi"));
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA0.qbi"));
     for (const std::string extension : {".odf", ".qbi"})
     {
       const std::string path = m_TempDir + "/odf" + extension;
@@ -634,9 +635,9 @@ public:
   // The peak polydata holds one two-point line per peak longer than 0.001, with a colour per point.
   void PeakImage_PolydataHasOneLinePerPeak()
   {
-    for (const std::string file : {"DiffusionImaging/peak_image_test.nii.gz", "DiffusionImaging/FiberFit/csd_peak_image.nii.gz"})
+    for (const std::string file : {"peak_image_test.nii.gz", "FiberFit/csd_peak_image.nii.gz"})
     {
-      auto peakImage = LoadPeaks(GetTestDataFilePath(file), std::nullopt);
+      auto peakImage = LoadPeaks(mitk::GetDiffusionTestDataFilePath(file), std::nullopt);
       auto itkPeaks = peakImage->GetItkPeakImage();
       const auto size = itkPeaks->GetLargestPossibleRegion().GetSize();
       vtkIdType expectedLines = 0;
@@ -684,23 +685,23 @@ public:
   // Scene files keep tensor, ODF, SH and peak images with their type and pixels.
   void Serializers_RoundTrip()
   {
-    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     auto tensorReloaded = mitk::IOUtil::Load<mitk::TensorImage>(Serialize(tensorImage, "tensor"));
     AssertEqualPixels(tensorImage, tensorReloaded);
     AssertEqualGeometry(tensorImage, tensorReloaded);
 
-    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_QA0.qbi"));
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_QA0.qbi"));
     auto odfReloaded = mitk::IOUtil::Load<mitk::OdfImage>(Serialize(odfImage, "odf"));
     AssertEqualPixels(odfImage, odfReloaded);
     AssertEqualGeometry(odfImage, odfReloaded);
 
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &shFunctor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &shFunctor);
     auto shReloaded = mitk::IOUtil::Load<mitk::ShImage>(Serialize(shImage, "sh"), &shFunctor);
     AssertEqualShCoefficients(shImage, shReloaded);
     AssertEqualGeometry(shImage, shReloaded);
 
-    auto peakImage = LoadPeaks(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), std::nullopt);
+    auto peakImage = LoadPeaks(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), std::nullopt);
     auto peakReloaded = LoadPeaks(Serialize(peakImage, "peaks"), std::nullopt);
     AssertEqualPixels(peakImage, peakReloaded);
     AssertEqualGeometry(peakImage, peakReloaded);
@@ -769,7 +770,7 @@ public:
   // The colour map was built once and kept when the pixels changed later.
   void RgbCache_FollowsPixelChanges()
   {
-    auto image = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto image = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     const auto before = Colours(image);
     CPPUNIT_ASSERT(image->GetVtkImageData() == image->GetVtkImageData());
 
@@ -800,7 +801,7 @@ public:
   void RgbCache_FollowsShConvention()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
-    auto image = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto image = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &functor);
     CPPUNIT_ASSERT_EQUAL(mitk::ShImage::MRTRIX, image->GetShConvention());
     const auto mrtrix = Colours(image);
 
@@ -808,7 +809,7 @@ public:
     const auto fsl = Colours(image);
     CPPUNIT_ASSERT(mrtrix != fsl);
 
-    auto reference = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto reference = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &functor);
     reference->SetShConvention(mitk::ShImage::FSL);
     CPPUNIT_ASSERT(fsl == Colours(reference));
   }
@@ -818,7 +819,7 @@ public:
   void PeakImage_PolydataFollowsPixelChanges()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Peak Image"}, std::vector<std::string>());
-    auto peaks = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), &functor);
+    auto peaks = mitk::IOUtil::Load<mitk::PeakImage>(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), &functor);
     vtkSmartPointer<vtkPolyData> before = peaks->GetPolyData();
     CPPUNIT_ASSERT(before->GetNumberOfLines() > 1);
     peaks->SetCustomColor(0, 255, 0);
@@ -893,7 +894,7 @@ public:
   // or the default "auto" is empty and MRtrix 3 files are not converted.
   void ShReader_NoOption_ReadsMrtrix3FileConverted()
   {
-    const std::string path = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz");
+    const std::string path = mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image_sh.nii.gz");
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
     auto csd = mitk::IOUtil::Load<mitk::ShImage>(path, &functor);
     // MRtrix 3.0.8 sh2amp at voxel (30, 30, 1), RAS (-1, 0, 0).
@@ -943,9 +944,9 @@ public:
       CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value, mitk::sh::GetValue(ShCoefficients(LoadSh(path, "MITK legacy (MRtrix 0.2)"), 0, 0, 0), 2, x, true), 1e-6);
     }
 
-    // The MRtrix 3 FOD in MITK-Data, voxel (30, 30, 1): amplitudes of MRtrix 3.0.8 sh2amp at
+    // The MRtrix 3 FOD in mitk-diffusion-test-data, voxel (30, 30, 1): amplitudes of MRtrix 3.0.8 sh2amp at
     // RAS (-1, 0, 0), (0, -1, 0), (0, 0, 1), (-0.48, 0.6, 0.64), given here as LPS directions.
-    auto csd = LoadSh(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz"));
+    auto csd = LoadSh(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image_sh.nii.gz"));
     const vnl_vector<float> csdCoefficients = ShCoefficients(csd, 30, 30, 1);
     const double directions[4][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.48, -0.6, 0.64}};
     const double amplitudes[4] = {0.20321192, -0.00769596, -0.007680845, 0.023118196};
@@ -1029,7 +1030,7 @@ public:
   // peak files read them mirrored in x and y.
   void PeakWriter_Nifti_RasWithMarker()
   {
-    auto peaks = LoadPeaks(GetTestDataFilePath("DiffusionImaging/peak_image_test.nii.gz"), std::nullopt);
+    auto peaks = LoadPeaks(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), std::nullopt);
     const auto lps = Values(peaks);
     const unsigned int numVoxels = peaks->GetDimension(0) * peaks->GetDimension(1) * peaks->GetDimension(2);
     unsigned int nonZero = 0;

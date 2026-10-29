@@ -152,7 +152,7 @@ NonLocalMeansDenoisingFilter< TPixelType >
   // search window and patches are clipped to the image once instead of testing every element:
   // GetPixel and IsInside per patch element and channel took most of the run time. Every sum runs
   // over the search and patch positions in x-y-z loop order, the order the NLM references in
-  // MITK-Data were computed in.
+  // mitk-diffusion-test-data were computed in.
   const TPixelType* buffer = inputImage->GetBufferPointer();
   const typename InputImageType::IndexType bufferIndex = inputImage->GetBufferedRegion().GetIndex();
   const OffsetValueType* offsetTable = inputImage->GetOffsetTable();

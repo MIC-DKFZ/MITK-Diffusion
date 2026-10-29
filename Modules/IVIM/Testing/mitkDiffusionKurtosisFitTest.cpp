@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -393,7 +394,7 @@ public:
   void TestMulti_RotatedVolumes_SameMaps()
   {
     // test_multi.dwi starts with its b=0 volumes; rotated by 3 it starts with a b=3000 volume.
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_multi.dwi"));
     const unsigned int n = dwi.image->GetVectorLength();
     const unsigned int shift = 3;
 
@@ -637,10 +638,10 @@ public:
   {
     // A mask stored with fewer digits than the DWI, as FWE/ReferenceFWImage.nrrd, has the DWI's voxel
     // grid and is fitted (MitkDiffusionKurtosisFit -m), not rejected for its origin.
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     const itk::Index<3> inside = {{5, 5, 5}};
     const auto mask =
-      MakeMaskWithRoundedOrigin(dwi.image, {inside}, GetTestDataFilePath("DiffusionImaging/FWE/ReferenceFWImage.nrrd"));
+      MakeMaskWithRoundedOrigin(dwi.image, {inside}, mitk::GetDiffusionTestDataFilePath("FWE/ReferenceFWImage.nrrd"));
 
     const mitk::kurtosis::FitConfiguration configuration{};
     const auto expected = Values(mitk::kurtosis::ComputeMaps(dwi.dwi, nullptr, configuration, 0).d.GetPointer());
@@ -653,7 +654,7 @@ public:
 
   void ComputeMaps_FractionalMask_FitsWhereGreaterThanZero()
   {
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     // 0.3 as in a probability or partial-volume map; 1e-300 would become 0 in a float mask; -0.3 is
     // not greater than 0.
     const itk::Index<3> fractional = {{5, 5, 5}};
@@ -682,8 +683,8 @@ public:
   {
     // As MitkDiffusionKurtosisFit -i FWE/InputDiffusionWeightedImage.dwi -m FWE/ReferenceFWImage.nrrd:
     // the mask is a free-water fraction map (0 to 0.957) with the origin rounded.
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
-    const auto mask = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/FWE/ReferenceFWImage.nrrd"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
+    const auto mask = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("FWE/ReferenceFWImage.nrrd"));
     const auto maskValues = Values(mask.GetPointer());
 
     const mitk::kurtosis::FitConfiguration configuration{};
@@ -746,7 +747,7 @@ public:
       {FitScale::Logarithmic, true, false, {0.0009155695528, -0.1464026451}, {0.0009440105723, 0.1495620297}},
       {FitScale::Logarithmic, true, true, {0.0009155695528, -0.1464026451}, {0.0009440105723, 0.1495620297}}};
 
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_multi.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 1;
     for (const auto& r : recorded)
     {
@@ -785,7 +786,7 @@ public:
       {FitScale::Logarithmic, false, {0.000462749254, -2.514910376}, 1},
       {FitScale::Logarithmic, true, {0.001386206961, 0.4066007701}, 470.2786883}};
 
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi"));
     for (const auto& r : recorded)
     {
       mitk::kurtosis::FitConfiguration config;
@@ -816,7 +817,7 @@ public:
       {false, {0.0009018910306, 0.1809233881}, {0.0008731558535, 0.491172703}},
       {true, {0.0009018910306, 0.1809233881}, {0.0008731558535, 0.491172703}}};
 
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_multi.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 1;
     for (const auto& r : recorded)
     {
@@ -869,7 +870,7 @@ public:
   void TestMulti_SmoothingVarianceZero_SameAsNoSmoothing()
   {
     // The view's default smoothing variance is 0.
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_multi.dwi"));
     auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
     filter->Update();
     auto zeroVarianceFilter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue);
@@ -886,7 +887,7 @@ public:
   {
     // MitkDiffusionKurtosisFit's defaults: smoothing variance 1.5 mm^2, K bounds -1000..1000. The
     // values are those of TestMulti_Smoothed_MatchRecordedValues.
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_multi.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_multi.dwi"));
     mitk::kurtosis::FitConfiguration configuration;
     configuration.useKBounds = true;
     configuration.kLowerBound = -1000;

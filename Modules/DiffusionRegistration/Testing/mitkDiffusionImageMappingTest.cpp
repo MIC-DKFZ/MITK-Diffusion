@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -110,7 +111,7 @@ class mitkDiffusionImageMappingTestSuite : public mitk::TestFixture
 public:
   void setUp() override
   {
-    m_Image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"));
+    m_Image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi"));
     // 90 degrees about z
     m_Rotation.fill(0.0);
     m_Rotation[0][1] = -1;

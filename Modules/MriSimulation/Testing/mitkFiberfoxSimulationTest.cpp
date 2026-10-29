@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
@@ -68,7 +69,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   FilterType::Pointer Simulate(mitk::FiberBundle::Pointer fibers, const std::string& parameterFile = "param5.ffp")
   {
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/" + parameterFile), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/" + parameterFile), true);
     auto filter = FilterType::New();
     filter->SetUseConstantRandSeed(true);
     filter->SetParameters(parameters);
@@ -81,7 +82,7 @@ public:
 
   void setUp() override
   {
-    m_FiberBundle = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/Fiberfox/Signalgen.fib"));
+    m_FiberBundle = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("Fiberfox/Signalgen.fib"));
   }
 
   void tearDown() override { m_FiberBundle = nullptr; }
@@ -123,7 +124,7 @@ public:
   void NoGradients()
   {
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
     parameters.SetGradienDirections(mitk::SignalGenerationParameters::GradientListType());
     auto filter = FilterType::New();
     filter->SetParameters(parameters);
@@ -137,7 +138,7 @@ public:
     for (bool multiShell : { false, true })
     {
       mitk::FiberfoxParameters parameters;
-      parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+      parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
       auto prototype = new mitk::RawShModel<double>();
       vnl_vector<double> coefficients(6, 0.0);
       coefficients[0] = 1;
@@ -175,7 +176,7 @@ public:
     for (double inversion : { 0.0, ti })
     {
       mitk::FiberfoxParameters parameters;
-      parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+      parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
       parameters.m_SignalGen.m_tRep = tr;
       parameters.m_SignalGen.m_tInv = inversion;
       for (auto model : parameters.m_FiberModelList)
@@ -257,7 +258,7 @@ public:
     for (bool random : { true, false })
     {
       mitk::FiberfoxParameters parameters;
-      parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+      parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
       parameters.m_SignalGen.m_DoAddMotion = true;
       parameters.m_SignalGen.m_DoRandomizeMotion = random;
       parameters.m_SignalGen.m_MotionVolumes.assign(parameters.m_SignalGen.GetNumVolumes(), true);
@@ -326,7 +327,7 @@ public:
     // An empty list moves every volume, like a blank motion-volume text: the first linear volume
     // gets 1/N of the motion.
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
     parameters.m_SignalGen.m_DoAddMotion = true;
     parameters.m_SignalGen.m_DoRandomizeMotion = false;
     parameters.m_SignalGen.m_MotionVolumes.clear();

@@ -21,6 +21,7 @@ found in the LICENSE file.
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -160,7 +161,7 @@ public:
   void setUp() override
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    m_Dwi = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"), &functor);
+    m_Dwi = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi"), &functor);
   }
 
   void tearDown() override { m_Dwi = nullptr; }
@@ -178,7 +179,7 @@ public:
     for (const auto &[method, file, tolerance] : cases)
     {
       const auto result = mitk::ReconstructQball(m_Dwi, Parameters(method));
-      auto reference = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/" + file));
+      auto reference = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/" + file));
       CPPUNIT_ASSERT_MESSAGE(file, result.odf.IsNotNull());
       CPPUNIT_ASSERT_MESSAGE(file, mitk::Equal(*result.odf, *reference, tolerance, true));
       CPPUNIT_ASSERT_EQUAL_MESSAGE(file, method != mitk::QballMethod::Numerical, result.sh.IsNotNull());
@@ -231,7 +232,7 @@ public:
 
   void Qball_NoDwi_Throws()
   {
-    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     CPPUNIT_ASSERT_THROW(mitk::ReconstructQball(tensors, Parameters(mitk::QballMethod::Standard)), mitk::Exception);
     CPPUNIT_ASSERT_THROW(mitk::ReconstructQball(nullptr, Parameters(mitk::QballMethod::Standard)), mitk::Exception);
   }
@@ -294,14 +295,14 @@ public:
   void Tensors_LinearLeastSquares_MatchesReference()
   {
     auto tensors = mitk::ReconstructTensors(m_Dwi, mitk::TensorFit::LinearLeastSquares, 0, false);
-    auto reference = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto reference = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     CPPUNIT_ASSERT(mitk::Equal(*tensors, *reference, 1e-4, true));
   }
 
   static mitk::Image::Pointer LoadDwi(const std::string &path)
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    return mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(path), &functor);
+    return mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(path), &functor);
   }
 
   static TensorImageType::Pointer ItkTensors(const mitk::TensorImage *image)
@@ -322,7 +323,7 @@ public:
   // mitkDiffusionModellingAlgorithmsTest); without zeroing, the function gives the filter's tensors.
   void Tensors_EigenvalueCorrection_SameAsFilter()
   {
-    auto dwi = LoadDwi("DiffusionImaging/diffusionImage.hdwi");
+    auto dwi = LoadDwi("diffusionImage.hdwi");
     DwiType::Pointer itkDwi;
     mitk::CastToItkImage(dwi, itkDwi);
     auto filter = itk::TensorReconstructionWithEigenvalueCorrectionFilter<short, float>::New();
@@ -338,7 +339,7 @@ public:
   // Zeroing sets exactly the tensors with a negative eigenvalue to zero, for both fits.
   void Tensors_ZeroNegativeEigenvalues()
   {
-    auto dwi = LoadDwi("DiffusionImaging/diffusionImage.hdwi");
+    auto dwi = LoadDwi("diffusionImage.hdwi");
     for (auto fit : {mitk::TensorFit::LinearLeastSquares, mitk::TensorFit::EigenvalueCorrection})
     {
       auto raw = ItkTensors(mitk::ReconstructTensors(dwi, fit, 0, false));
@@ -366,7 +367,7 @@ public:
 
   void Tensors_NoDwi_Throws()
   {
-    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     CPPUNIT_ASSERT_THROW(mitk::ReconstructTensors(tensors, mitk::TensorFit::LinearLeastSquares, 0, false), mitk::Exception);
     CPPUNIT_ASSERT_THROW(mitk::ReconstructTensors(nullptr, mitk::TensorFit::EigenvalueCorrection, 0, false), mitk::Exception);
   }
@@ -389,7 +390,7 @@ public:
   // gradients equal to the table.
   void TensorsToDwi_WorldGradients()
   {
-    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     auto dwi = mitk::TensorsToDwi(tensors, 92, 1000);
 
     CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi));
@@ -415,7 +416,7 @@ public:
   static mitk::ShImage::Pointer LoadShImage()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
-    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(GetTestDataFilePath("DiffusionImaging/sh_image_test.nii.gz"), &functor);
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz"), &functor);
     shImage->SetShConvention(mitk::ShImage::MRTRIX);
     return shImage;
   }
@@ -570,13 +571,13 @@ public:
   {
     auto shImage = LoadShImage();
     CPPUNIT_ASSERT_THROW(mitk::ExtractPeaks(shImage, mitk::PeakParameters(), MaskLargerThan(shImage)), itk::ExceptionObject);
-    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     CPPUNIT_ASSERT_THROW(mitk::ExtractTensorPeaks(tensors, 0.2, true, MaskLargerThan(tensors)), itk::ExceptionObject);
   }
 
   void TensorPeaks_SameAsFilter()
   {
-    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     for (bool normalize : {false, true})
     {
       auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
@@ -596,10 +597,10 @@ public:
 
   static mitk::Image::Pointer LoadImage(const std::string &path)
   {
-    return mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath(path));
+    return mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(path));
   }
 
-  // MITK-Data holds the indices of tensorImage.dti; the function reproduces FA, AD and RD.
+  // mitk-diffusion-test-data holds the indices of tensorImage.dti; the function reproduces FA, AD and RD.
   // tensorImage_CA.nrrd and tensorImage_MD.nrrd are older than this repository's history and differ
   // from today's filter (CA: 106 voxels, up to 0.031; MD: 12096 voxels, up to 1.5e-3 at values of
   // about 1e-3, so not the mean eigenvalue), and tensorImage_RA.nrrd holds ITK's RA formula, which
@@ -607,12 +608,12 @@ public:
   // against the eigenvalues), so CA, MD and RA are compared with the filter.
   void TensorIndices_MatchReferences()
   {
-    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/tensorImage.dti"));
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("tensorImage.dti"));
     const std::vector<std::pair<mitk::TensorIndex, std::string>> cases = {
       {mitk::TensorIndex::FA, "FA"}, {mitk::TensorIndex::AD, "AD"}, {mitk::TensorIndex::RD, "RD"}};
     for (const auto &[index, name] : cases)
     {
-      auto reference = LoadImage("DiffusionImaging/tensorImage_" + name + ".nrrd");
+      auto reference = LoadImage("tensorImage_" + name + ".nrrd");
       auto result = mitk::TensorIndexImage(tensors, index, 1.0);
       CPPUNIT_ASSERT_MESSAGE(name, mitk::Equal(*result, *reference, 1e-5, true));
     }
@@ -634,8 +635,8 @@ public:
 
   void Gfa_MatchesReference()
   {
-    auto odfs = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/qBallImage.qbi"));
-    auto reference = LoadImage("DiffusionImaging/qBallImage_GFA.nrrd");
+    auto odfs = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("qBallImage.qbi"));
+    auto reference = LoadImage("qBallImage_GFA.nrrd");
     CPPUNIT_ASSERT(mitk::Equal(*mitk::GfaImage(odfs, 1.0), *reference, 1e-5, true));
   }
 
@@ -679,16 +680,16 @@ public:
   // The view's scale factor multiplies the index (e.g. diffusivities in 10^-3 mm^2/s).
   void Indices_Scale()
   {
-    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     CheckScaled<float>(mitk::TensorIndexImage(tensors, mitk::TensorIndex::MD, 1), mitk::TensorIndexImage(tensors, mitk::TensorIndex::MD, 1000), 1000);
-    auto odfs = mitk::IOUtil::Load<mitk::OdfImage>(GetTestDataFilePath("DiffusionImaging/qBallImage.qbi"));
+    auto odfs = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("qBallImage.qbi"));
     CheckScaled<float>(mitk::GfaImage(odfs, 1), mitk::GfaImage(odfs, 2.5), 2.5);
     CheckScaled<double>(mitk::AdcImage(m_Dwi, false, 1), mitk::AdcImage(m_Dwi, false, 1000), 1000);
   }
 
   void Indices_WrongInput_Throws()
   {
-    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test_dti.dti"));
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
     CPPUNIT_ASSERT_THROW(mitk::TensorIndexImage(nullptr, mitk::TensorIndex::FA, 1), mitk::Exception);
     CPPUNIT_ASSERT_THROW(mitk::GfaImage(tensors, 1), mitk::Exception);
     CPPUNIT_ASSERT_THROW(mitk::GfaImage(nullptr, 1), mitk::Exception);

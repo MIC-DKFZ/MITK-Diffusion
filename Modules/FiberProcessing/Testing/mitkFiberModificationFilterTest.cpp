@@ -12,6 +12,7 @@ found in the LICENSE file.
 
 #include <itkFiberCurvatureFilter.h>
 #include <mitkIOUtil.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -21,7 +22,7 @@ found in the LICENSE file.
 
 #include <cmath>
 
-/** Filters that modify fibers (curvature filter), on MITK-Data input and synthetic fibers. */
+/** Filters that modify fibers (curvature filter), on mitk-diffusion-test-data input and synthetic fibers. */
 class mitkFiberModificationFilterTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkFiberModificationFilterTestSuite);
@@ -63,7 +64,7 @@ class mitkFiberModificationFilterTestSuite : public mitk::TestFixture
 public:
   void Curvature_SameResultForAnyThreadCount()
   {
-    auto original = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/original.fib"));
+    auto original = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib"));
     const int threads = omp_get_max_threads();
     omp_set_num_threads(1);
     auto single = Curvature(original, false);

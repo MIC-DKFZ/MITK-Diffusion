@@ -17,6 +17,7 @@ found in the LICENSE file.
 #include <mitkExceptionMacro.h>
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -376,20 +377,20 @@ public:
     CPPUNIT_ASSERT_EQUAL(static_cast<int>(dense[3]), static_cast<int>(sparse[3]));
   }
 
-  // Safety net on MITK-Data: fiberBundleX.fib (196 fibers, weights 1) and ROIIMAGE.nrrd. The sums
+  // Safety net on mitk-diffusion-test-data: fiberBundleX.fib (196 fibers, weights 1) and ROIIMAGE.nrrd. The sums
   // are invariants of the methods, the grid sizes, maxima and counts the results recorded on
   // 2026-10-23, so that refactoring cannot change them unnoticed.
 
   mitk::FiberBundle::Pointer LoadFiberBundleX()
   {
-    return mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/fiberBundleX.fib"));
+    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("fiberBundleX.fib"));
   }
 
   template <class TImage>
   typename TImage::Pointer LoadRoiImage()
   {
     auto image = TImage::New();
-    mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ROIIMAGE.nrrd")), image);
+    mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ROIIMAGE.nrrd")), image);
     return image;
   }
 

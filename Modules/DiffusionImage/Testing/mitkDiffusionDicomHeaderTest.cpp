@@ -19,7 +19,7 @@ found in the LICENSE file.
 #include <mitkDiffusionHeaderSiemensDICOMFileReader.h>
 #include <mitkDiffusionHeaderSiemensMosaicDICOMFileReader.h>
 
-/** Parts of the diffusion DICOM import that work without DICOM files (MITK-Data has no DICOM DWIs). */
+/** Parts of the diffusion DICOM import that work without DICOM files (mitk-diffusion-test-data has no DICOM DWIs). */
 class mitkDiffusionDicomHeaderTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionDicomHeaderTestSuite);

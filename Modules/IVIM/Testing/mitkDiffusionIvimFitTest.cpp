@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -203,7 +204,7 @@ public:
       {Method::DThenDStar, {0.2727041887, 0.0007509544279, 0.03006975278}, {0.7812152505, 0.000633834512, 0.01429907046}},
       {Method::LinearDThenF, {0.3739915474, 0.0005149761726, 0.0208512924}, {0.7865119576, 0.000659120793, 0.01361831184}}};
 
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     const std::size_t center = 5 + 11 * 5 + 121 * 5;
     for (const auto& r : recorded)
     {
@@ -427,7 +428,7 @@ public:
 
   void Fwe_MultiThreaded_SameAsSingleThreaded()
   {
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     for (auto method : {Method::FitAll, Method::DStarFixed, Method::DThenDStar, Method::LinearDThenF})
     {
       auto single = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue, method);
@@ -497,7 +498,7 @@ public:
 
   void ComputeMaps_Fwe_SameAsFilterWithDwiGeometry()
   {
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     for (auto method : {Method::FitAll, Method::DStarFixed, Method::DThenDStar, Method::LinearDThenF})
     {
       auto filter = MakeFilter(dwi.image, dwi.gradients, dwi.referenceBValue, method);
@@ -627,10 +628,10 @@ public:
 
   void ComputeMaps_FweMaskWithRoundedOrigin_FitsInside()
   {
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     const itk::Index<3> inside = {{5, 5, 5}};
     const auto mask =
-      MakeMaskWithRoundedOrigin(dwi.image, {inside}, GetTestDataFilePath("DiffusionImaging/FWE/ReferenceFWImage.nrrd"));
+      MakeMaskWithRoundedOrigin(dwi.image, {inside}, mitk::GetDiffusionTestDataFilePath("FWE/ReferenceFWImage.nrrd"));
 
     const auto parameters = MakeParameters(Method::DStarFixed);
     const auto expected = Values(mitk::ivim::ComputeMaps(dwi.dwi, nullptr, parameters).d.GetPointer());
@@ -643,7 +644,7 @@ public:
 
   void ComputeMaps_FweMask_SameAsUnmaskedInside()
   {
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     const std::vector<itk::Index<3>> inside = {{{5, 5, 5}}, {{2, 7, 4}}, {{10, 0, 3}}};
     std::vector<std::size_t> insideOffsets;
     for (const auto& index : inside)
@@ -674,7 +675,7 @@ public:
 
   void ComputeMaps_FractionalMask_FitsWhereGreaterThanZero()
   {
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     // 0.3 as in a probability or partial-volume map; 1e-300 would become 0 in a float mask; -0.3 is
     // not greater than 0.
     const itk::Index<3> fractional = {{5, 5, 5}};
@@ -703,7 +704,7 @@ public:
 
   void GetDiffusionSignal_Fwe_VoxelSignalOrNothingOutside()
   {
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     const itk::Index<3> index = {{5, 4, 3}};
     mitk::Point3D world;
     dwi.dwi->GetGeometry()->IndexToWorld(index, world);
@@ -721,7 +722,7 @@ public:
 
   void AverageDiffusionSignalInMask_TwoVoxels_MeanNotRounded()
   {
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     const itk::Index<3> first = {{5, 5, 5}};
     const itk::Index<3> second = {{6, 5, 5}};
     const auto roi = mitk::AverageDiffusionSignalInMask(dwi.dwi, MakeMask(dwi.image, {first, second}));
@@ -741,7 +742,7 @@ public:
 
   void AverageDiffusionSignalInMask_NoOverlap_NoVoxels()
   {
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     auto mask = MakeMask(dwi.image, {{{5, 5, 5}}});
     auto origin = mask->GetGeometry()->GetOrigin();
     origin[0] += 1000;
@@ -755,7 +756,7 @@ public:
   void AverageDiffusionSignalInMask_FractionalMask_VoxelsGreaterThanZero()
   {
     // The voxels ComputeMaps fits with this mask (ComputeMaps_FractionalMask_FitsWhereGreaterThanZero).
-    auto dwi = LoadDwi(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto dwi = LoadDwi(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     const itk::Index<3> fractional = {{5, 5, 5}};
     const itk::Index<3> tiny = {{2, 7, 4}};
     const itk::Index<3> negative = {{10, 0, 3}};

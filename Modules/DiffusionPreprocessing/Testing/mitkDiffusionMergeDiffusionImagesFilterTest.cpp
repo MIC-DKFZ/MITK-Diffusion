@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -52,7 +53,7 @@ class mitkDiffusionMergeDiffusionImagesFilterTestSuite : public mitk::TestFixtur
 public:
   void setUp() override
   {
-    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"));
+    auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi"));
     m_Dwi = PropHelper::GetItkVectorImage(image);
     m_Gradients = PropHelper::GetGradientContainer(image);
     m_BValue = PropHelper::GetReferenceBValue(image);

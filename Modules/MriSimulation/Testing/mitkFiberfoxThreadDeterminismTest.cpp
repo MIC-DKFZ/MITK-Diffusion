@@ -11,6 +11,7 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include <mitkTestingMacros.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
@@ -65,7 +66,7 @@ public:
 
   void setUp() override
   {
-    m_FiberBundle = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/Fiberfox/Signalgen.fib"));
+    m_FiberBundle = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("Fiberfox/Signalgen.fib"));
     m_MaxThreads = omp_get_max_threads();
   }
 
@@ -81,7 +82,7 @@ public:
   {
     omp_set_num_threads(threads);
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/" + parameterFile), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/" + parameterFile), true);
     if (modify)
       modify(parameters);
     auto filter = FilterType::New();
@@ -187,7 +188,7 @@ public:
   {
     omp_set_num_threads(8);
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
     for (auto model : parameters.m_FiberModelList)
       delete model;
     parameters.m_FiberModelList = { new ThrowingModel() };

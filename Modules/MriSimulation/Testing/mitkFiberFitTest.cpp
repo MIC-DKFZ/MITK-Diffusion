@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <omp.h>
 #include <itkFitFibersToImageFilter.h>
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
@@ -57,7 +58,7 @@ public:
 
   mitk::FiberBundle::Pointer LoadFib(std::string fib_name)
   {
-    std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load(GetTestDataFilePath("DiffusionImaging/FiberFit/" + fib_name));
+    std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath("FiberFit/" + fib_name));
     mitk::BaseData::Pointer baseData = fibInfile.at(0);
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
     return fib;
@@ -73,7 +74,7 @@ public:
     tracts.push_back(LoadFib("Cluster_4.fib"));
 
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, std::vector<std::string>());
-    mitk::PeakImage::Pointer peaks = mitk::IOUtil::Load<mitk::PeakImage>(GetTestDataFilePath("DiffusionImaging/FiberFit/csd_peak_image.nii.gz"), &functor);
+    mitk::PeakImage::Pointer peaks = mitk::IOUtil::Load<mitk::PeakImage>(mitk::GetDiffusionTestDataFilePath("FiberFit/csd_peak_image.nii.gz"), &functor);
 
 
     typedef mitk::ImageToItk< mitk::PeakImage::ItkPeakImageType > CasterType;
@@ -122,7 +123,7 @@ public:
     mitk::LocaleSwitch localeSwitch("C");
     typedef mitk::ImageToItk< mitk::PeakImage::ItkPeakImageType > CasterType;
     CasterType::Pointer caster = CasterType::New();
-    caster->SetInput(mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/FiberFit/out/" + name)));
+    caster->SetInput(mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("FiberFit/out/" + name)));
     caster->Update();
     mitk::PeakImage::ItkPeakImageType::Pointer refImage = caster->GetOutput();
 

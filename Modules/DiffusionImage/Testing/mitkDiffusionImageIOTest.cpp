@@ -10,6 +10,7 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -31,7 +32,7 @@ found in the LICENSE file.
 #include <fstream>
 #include <iterator>
 
-/** Reading and writing of DWIs as NRRD and NIfTI, on MITK-Data input and on synthetic files. */
+/** Reading and writing of DWIs as NRRD and NIfTI, on mitk-diffusion-test-data input and on synthetic files. */
 class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionImageIOTestSuite);
@@ -186,7 +187,7 @@ class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
 public:
   void setUp() override
   {
-    m_Dwi = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi"));
+    m_Dwi = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi"));
     m_TempDir = mitk::IOUtil::CreateTemporaryDirectory("DiffusionImageIOTest_XXXXXX");
   }
 
@@ -263,7 +264,7 @@ public:
   void NrrdReader_BothFrameKinds_ReadsIdentity()
   {
     // Has the standard field and MITK's key/value pair.
-    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/FWE/InputDiffusionWeightedImage.dwi"));
+    auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     CPPUNIT_ASSERT(PropHelper::IsDiffusionWeightedImage(image));
     CPPUNIT_ASSERT(PropHelper::GetMeasurementFrame(image) == Identity());
   }
@@ -284,7 +285,7 @@ public:
 
   void NrrdReader_DetachedHeader_Reads()
   {
-    auto image = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/diffusionImage.hdwi"));
+    auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("diffusionImage.hdwi"));
     CPPUNIT_ASSERT(PropHelper::IsDiffusionWeightedImage(image));
     CPPUNIT_ASSERT_EQUAL(size_t(130), image->GetPixelType().GetNumberOfComponents());
     CPPUNIT_ASSERT_DOUBLES_EQUAL(650.0, PropHelper::GetReferenceBValue(image), 1e-6);
@@ -336,7 +337,7 @@ public:
   void NiftiReader_PositiveDeterminant_NegatesBvecX()
   {
     // qform diag(-1,-1,1) in RAS, so the ITK matrix is the identity with determinant +1: FSL negates x.
-    const auto base = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/diffusion_image");
+    const auto base = mitk::GetDiffusionTestDataFilePath("StreamlineTractography/diffusion_image");
     auto functor = DwiReaderFunctor();
     auto image = mitk::IOUtil::Load<mitk::Image>(base + ".nii.gz", &functor);
     PropHelper::MeasurementFrameType toWorld = Identity();
@@ -347,7 +348,7 @@ public:
   void NiftiReader_NegativeDeterminant_RotatesBvecs()
   {
     // qform diag(-1,1,1) in RAS (LAS storage), so the ITK matrix is diag(1,-1,1), determinant -1.
-    const auto base = GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_1_OUT");
+    const auto base = mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_1_OUT");
     auto functor = DwiReaderFunctor();
     auto image = mitk::IOUtil::Load<mitk::Image>(base + ".nii.gz", &functor);
     PropHelper::MeasurementFrameType toWorld = Identity();
@@ -380,7 +381,7 @@ public:
   void NiftiWriter_RoundTrip_KeepsDataAndGradients()
   {
     auto functor = DwiReaderFunctor();
-    auto source = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/diffusion_image.nii.gz"), &functor);
+    auto source = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/diffusion_image.nii.gz"), &functor);
     CPPUNIT_ASSERT(PropHelper::IsDiffusionWeightedImage(source));
 
     const auto path = m_TempDir + "/roundtrip.nii.gz";
@@ -398,7 +399,7 @@ public:
   void NiftiReader_Volumes_BecomeVectorComponents()
   {
     // Volume t of the 4-D file is component t of each voxel.
-    const auto path = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/diffusion_image.nii.gz");
+    const auto path = mitk::GetDiffusionTestDataFilePath("StreamlineTractography/diffusion_image.nii.gz");
     auto functor = DwiReaderFunctor();
     auto dwi = PropHelper::GetItkVectorImage(mitk::IOUtil::Load<mitk::Image>(path, &functor));
 
@@ -438,27 +439,27 @@ public:
 
   void ReaderSelection_PlainImages_NoDwiReader()
   {
-    CPPUNIT_ASSERT(!OffersDwiReader(GetTestDataFilePath("DiffusionImaging/tensorImage_FA.nrrd")));
-    CPPUNIT_ASSERT(!OffersDwiReader(GetTestDataFilePath("DiffusionImaging/diffusionImageMask.nrrd")));
-    CPPUNIT_ASSERT(!OffersDwiReader(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/mask_image.nii.gz")));
+    CPPUNIT_ASSERT(!OffersDwiReader(mitk::GetDiffusionTestDataFilePath("tensorImage_FA.nrrd")));
+    CPPUNIT_ASSERT(!OffersDwiReader(mitk::GetDiffusionTestDataFilePath("diffusionImageMask.nrrd")));
+    CPPUNIT_ASSERT(!OffersDwiReader(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/mask_image.nii.gz")));
 
     // NIfTI file names with more dots and without bvals/bvecs.
     const auto dotted = m_TempDir + "/sub.01.nii.gz";
-    itksys::SystemTools::CopyFileAlways(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/mask_image.nii.gz"), dotted);
+    itksys::SystemTools::CopyFileAlways(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/mask_image.nii.gz"), dotted);
     CPPUNIT_ASSERT(!OffersDwiReader(dotted));
   }
 
   void ReaderSelection_DiffusionFiles_DwiReaderIsDefault()
   {
-    CPPUNIT_ASSERT_EQUAL(DwiReaderDescription(), DefaultReader(GetTestDataFilePath("DiffusionImaging/ImageReconstruction/test.dwi")));
-    CPPUNIT_ASSERT_EQUAL(DwiReaderDescription(), DefaultReader(GetTestDataFilePath("DiffusionImaging/StreamlineTractography/diffusion_image.nii.gz")));
+    CPPUNIT_ASSERT_EQUAL(DwiReaderDescription(), DefaultReader(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test.dwi")));
+    CPPUNIT_ASSERT_EQUAL(DwiReaderDescription(), DefaultReader(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/diffusion_image.nii.gz")));
 
     const auto nrrd = m_TempDir + "/dwi.nrrd";
     mitk::IOUtil::Save(m_Dwi, "DWI_NRRD", nrrd);
     CPPUNIT_ASSERT_EQUAL(DwiReaderDescription(), DefaultReader(nrrd));
 
     // HCP layout: data.nii.gz with "bvals" and "bvecs" in the same folder.
-    const auto source = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/diffusion_image");
+    const auto source = mitk::GetDiffusionTestDataFilePath("StreamlineTractography/diffusion_image");
     itksys::SystemTools::CopyFileAlways(source + ".nii.gz", m_TempDir + "/data.nii.gz");
     itksys::SystemTools::CopyFileAlways(source + ".bvals", m_TempDir + "/bvals");
     itksys::SystemTools::CopyFileAlways(source + ".bvecs", m_TempDir + "/bvecs");
@@ -474,7 +475,7 @@ public:
     CPPUNIT_ASSERT(PropHelper::IsDiffusionWeightedImage(mitk::IOUtil::Load<mitk::Image>(m_TempDir + "/default.nii.gz", &functor)));
 
     // Plain images still go to MITK's writers.
-    auto plain = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/tensorImage_FA.nrrd"));
+    auto plain = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("tensorImage_FA.nrrd"));
     mitk::IOUtil::Save(plain, m_TempDir + "/plain.nrrd");
     CPPUNIT_ASSERT(!OffersDwiReader(m_TempDir + "/plain.nrrd"));
   }
