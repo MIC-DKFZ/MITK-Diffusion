@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImage.h>
 #include <mitkSliceNavigationController.h>
 #include <QmitkRenderWindow.h>
+#include <QMessageBox>
 
 const std::string QmitkFieldmapGeneratorView::VIEW_ID = "org.mitk.views.fieldmapgenerator";
 
@@ -38,7 +39,7 @@ QmitkFieldmapGeneratorView::QmitkFieldmapGeneratorView()
 
 QmitkFieldmapGeneratorView::~QmitkFieldmapGeneratorView()
 {
-
+  delete m_Controls;
 }
 
 void QmitkFieldmapGeneratorView::CreateQtPartControl( QWidget *parent )
@@ -55,7 +56,7 @@ void QmitkFieldmapGeneratorView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_SelectedImageBox->SetPredicate(isMitkImage);
 
     m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
-    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
+    connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()), Qt::UniqueConnection);
 
     connect((QObject*) m_Controls->m_GenerateFieldmap, SIGNAL(clicked()), (QObject*) this, SLOT(GenerateFieldmap()));
     connect((QObject*) m_Controls->m_PlaceFieldSource, SIGNAL(clicked()), (QObject*) this, SLOT(PlaceFieldSource()));
@@ -189,7 +190,15 @@ void QmitkFieldmapGeneratorView::GenerateFieldmap()
   filter->SetImageRegion(imageRegion);
   filter->SetGradient(gradient);
   filter->SetOffset(offset);
-  filter->Update();
+  try
+  {
+    filter->Update();
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    QMessageBox::warning(nullptr, "Fieldmap not generated", e.GetDescription());
+    return;
+  }
 
   mitk::DataNode::Pointer resultNode = mitk::DataNode::New();
   mitk::Image::Pointer image = mitk::Image::New();
@@ -213,7 +222,8 @@ void QmitkFieldmapGeneratorView::Hidden()
 void QmitkFieldmapGeneratorView::Activated()
 {
   m_SliceChangeListener.RenderWindowPartActivated(this->GetRenderWindowPart());
-  connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()));
+  // every activation would add another connection otherwise
+  connect(&m_SliceChangeListener, SIGNAL(SliceChanged()), this, SLOT(OnSliceChanged()), Qt::UniqueConnection);
 }
 
 void QmitkFieldmapGeneratorView::Deactivated()
@@ -222,9 +232,6 @@ void QmitkFieldmapGeneratorView::Deactivated()
 
 void QmitkFieldmapGeneratorView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& nodes)
 {
-  if (m_Controls->m_SelectedImageBox->GetSelectedNode().IsNotNull())
-    m_Controls->m_SelectedImageBox->GetSelectedNode()->RemoveObserver( m_PropertyObserverTag );
-
   m_Controls->m_InputData->setTitle("Please Select Reference Image");
   m_SelectedSource = nullptr;
 

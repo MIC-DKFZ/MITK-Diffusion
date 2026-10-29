@@ -146,7 +146,7 @@
       <item row="0" column="0">
        <widget class="QComboBox" name="m_Compartment2Box">
         <property name="toolTip">
-         <string>Select signal model for intra-axonal compartment.</string>
+         <string>Select signal model for inter-axonal compartment.</string>
         </property>
         <item>
          <property name="text">
@@ -419,7 +419,7 @@
          <item row="14" column="0">
           <widget class="QCheckBox" name="m_ReversePhaseBox">
            <property name="toolTip">
-            <string>Output one image per compartment containing the corresponding volume fractions per voxel.</string>
+            <string>Reverse the phase encoding direction (posterior-anterior instead of anterior-posterior).</string>
            </property>
            <property name="text">
             <string>Reverse Phase Encoding Direction</string>
@@ -436,6 +436,9 @@
            </property>
            <property name="decimals">
             <number>4</number>
+           </property>
+           <property name="minimum">
+            <double>0.000100000000000</double>
            </property>
            <property name="maximum">
             <double>100.000000000000000</double>
@@ -952,7 +955,7 @@
          <item row="0" column="1">
           <widget class="QSpinBox" name="m_SizeX">
            <property name="toolTip">
-            <string>Fiber sampling factor which determines the accuracy of the calculated fiber and non-fiber volume fractions.</string>
+            <string>Image size in x direction (number of voxels).</string>
            </property>
            <property name="minimum">
             <number>1</number>
@@ -971,7 +974,7 @@
          <item row="0" column="2">
           <widget class="QSpinBox" name="m_SizeY">
            <property name="toolTip">
-            <string>Fiber sampling factor which determines the accuracy of the calculated fiber and non-fiber volume fractions.</string>
+            <string>Image size in y direction (number of voxels).</string>
            </property>
            <property name="minimum">
             <number>1</number>
@@ -990,7 +993,7 @@
          <item row="0" column="3">
           <widget class="QSpinBox" name="m_SizeZ">
            <property name="toolTip">
-            <string>Fiber sampling factor which determines the accuracy of the calculated fiber and non-fiber volume fractions.</string>
+            <string>Image size in z direction (number of voxels).</string>
            </property>
            <property name="minimum">
             <number>1</number>
@@ -1779,7 +1782,7 @@
             <item row="0" column="1">
              <widget class="QLineEdit" name="m_MotionVolumesBox">
               <property name="toolTip">
-               <string>Type in the volume indices that should be affected by motion (e.g. &quot;0 3 7&quot; whithout quotation marks). Leave blank for motion in all volumes. Type in &quot;random&quot; to randomly select volumes for motion. A list of negative numbers (e.g. -1 -2 -3) excludes volumes (e.g. 1 2 3) selects all remaining volumes.</string>
+               <string>Type in the volume indices that should be affected by motion (e.g. &quot;0 3 7&quot; without quotation marks). Leave blank for motion in all volumes. Type in &quot;random&quot; to randomly select volumes for motion (volume 0 never moves). A list of negative numbers (e.g. -1 -2 -3) moves all volumes except 1, 2 and 3. A list with both signs or without numbers moves no volume.</string>
               </property>
               <property name="text">
                <string>random</string>
@@ -2613,7 +2616,7 @@
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select a binary image to define the area of signal generation. Outside of the mask image only noise will be actively generated.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="sizeAdjustPolicy">
-            <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+            <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
            </property>
           </widget>
          </item>
@@ -2680,7 +2683,7 @@
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select a fiber bundle to generate the white matter signal from. You can either use the fiber definition tab to manually define an input fiber bundle or you can also use any existing bundle, e.g. yielded by a tractography algorithm.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="sizeAdjustPolicy">
-            <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+            <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
            </property>
           </widget>
          </item>
@@ -2709,7 +2712,7 @@
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The parameters for the simulation (e.g. spacing, size, diffuison-weighted gradients, b-value) are adopted from this image.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="sizeAdjustPolicy">
-            <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+            <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
            </property>
           </widget>
          </item>
