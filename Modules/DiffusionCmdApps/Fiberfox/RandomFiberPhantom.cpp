@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionDataIOHelper.h>
 #include <itkRandomPhantomFilter.h>
 #include <boost/lexical_cast.hpp>
+#include <itksys/SystemTools.hxx>
 
 int main(int argc, char* argv[])
 {
@@ -145,6 +146,9 @@ int main(int argc, char* argv[])
     filter->SetFixSeed(fix_seed);
     filter->Update();
     auto fibs = filter->GetFiberBundles();
+    // the writer does not create the folder
+    if (!out_folder.empty() && !itksys::SystemTools::MakeDirectory(out_folder).IsSuccess())
+      mitkThrow() << "Cannot create the output folder " << out_folder;
 
     int c = 1;
     for (auto fib : fibs)
