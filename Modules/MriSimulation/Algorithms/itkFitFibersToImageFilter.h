@@ -349,6 +349,7 @@ public:
   itkGetMacro( GradientTolerance, double)
   itkSetMacro( Lambda, double)
   itkGetMacro( Lambda, double)
+  /** Maximum number of L-BFGS-B iterations (not function evaluations); none if not positive. */
   itkSetMacro( MaxIterations, int)
   itkGetMacro( MaxIterations, int)
   itkSetMacro( FilterOutliers, bool)

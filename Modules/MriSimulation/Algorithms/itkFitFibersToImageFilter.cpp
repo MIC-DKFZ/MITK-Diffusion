@@ -5,6 +5,33 @@
 #include <mitkLbfgsbMutex.h>
 #include <mutex>
 
+namespace
+{
+  /**
+   * vnl_lbfgsb limits only the function evaluations (several per iteration, by default 2000);
+   * this one also stops after the given number of iterations (none if not positive). The best
+   * weights found so far are kept either way.
+   */
+  class IterationLimitedLbfgsb : public vnl_lbfgsb
+  {
+  public:
+    IterationLimitedLbfgsb(vnl_cost_function& f, int maxIterations)
+      : vnl_lbfgsb(f)
+      , m_MaxIterations(maxIterations)
+    {}
+
+  protected:
+    bool report_iter() override
+    {
+      const bool stop = vnl_lbfgsb::report_iter();
+      return stop || (m_MaxIterations > 0 && this->get_num_iterations() >= m_MaxIterations);
+    }
+
+  private:
+    int m_MaxIterations;
+  };
+}
+
 namespace itk{
 
 FitFibersToImageFilter::FitFibersToImageFilter()
@@ -486,7 +513,7 @@ void FitFibersToImageFilter::GenerateData()
   cost.SetGroupSizes(m_GroupSizes);
   m_Weights.set_size(m_NumUnknowns);
   m_Weights.fill( 1.0/m_NumUnknowns );
-  vnl_lbfgsb minimizer(cost);
+  IterationLimitedLbfgsb minimizer(cost, m_MaxIterations);
   vnl_vector<double> l; l.set_size(m_NumUnknowns); l.fill(0);
   vnl_vector<long> bound_selection; bound_selection.set_size(m_NumUnknowns); bound_selection.fill(1);
   minimizer.set_bound_selection(bound_selection);
@@ -514,7 +541,6 @@ void FitFibersToImageFilter::GenerateData()
   MITK_INFO << "Fitting fibers";
   minimizer.set_trace(m_Verbose);
 
-  minimizer.set_max_function_evals(m_MaxIterations);
   // the netlib L-BFGS-B code keeps its working variables in static storage (see AGENTS.md)
   std::unique_lock<std::mutex> lbfgsbLock(mitk::GetLbfgsbMutex());
   minimizer.minimize(m_Weights);
