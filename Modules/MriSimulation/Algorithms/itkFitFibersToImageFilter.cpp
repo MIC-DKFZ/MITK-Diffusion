@@ -572,9 +572,6 @@ void FitFibersToImageFilter::GenerateData()
 
   MITK_INFO << "Weighting fibers";
   m_RmsDiffPerBundle.set_size(m_Tractograms.size());
-  std::streambuf *old = std::cout.rdbuf(); // <-- save
-  std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf());
   if (m_FitIndividualFibers)
   {
     unsigned int fiber_count = 0;
@@ -609,7 +606,6 @@ void FitFibersToImageFilter::GenerateData()
       m_Tractograms.at(i)->SetFiberWeights(m_Weights[i]);
     }
   }
-  std::cout.rdbuf (old);
 
   // transform back: b was scaled by T/S (mean tract density over mean signal) for the fit
   A *= m_MeanSignal/m_MeanTractDensity;
