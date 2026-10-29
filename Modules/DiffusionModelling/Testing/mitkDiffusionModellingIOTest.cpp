@@ -889,8 +889,8 @@ public:
     return path;
   }
 
-  // The option labels were globals initialized after the reader that the library constructs
-  // when it is loaded, so the default "auto" was empty and MRtrix 3 files were not converted.
+  // The reader is constructed while the library is loaded; its option labels must be valid then,
+  // or the default "auto" is empty and MRtrix 3 files are not converted.
   void ShReader_NoOption_ReadsMrtrix3FileConverted()
   {
     const std::string path = GetTestDataFilePath("DiffusionImaging/StreamlineTractography/csd_image_sh.nii.gz");
@@ -901,8 +901,8 @@ public:
   }
 
   // MITK's basis is MRtrix 0.2's; MRtrix 3 (every FOD since 3.0) uses an orthonormal basis whose
-  // functions with m != 0 are sqrt(2) times MITK's. MRtrix 3 files were read as MITK's, which put
-  // 23 % of the ODF maximum into wrong directions, and MITK's files were read wrongly by MRtrix.
+  // functions with m != 0 are sqrt(2) times MITK's. Reading MRtrix 3 files as MITK's puts 23 % of
+  // the ODF maximum into wrong directions, and MRtrix reads MITK's legacy files wrongly.
   void ShReader_Mrtrix3_ConvertedToMitkBasis()
   {
     const vnl_vector_fixed<double, 3> x(1, 0, 0);
@@ -917,7 +917,7 @@ public:
     const auto unmarked = WriteShNifti("unmarked.nii.gz", coefficients, "", identity);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value, mitk::sh::GetValue(ShCoefficients(LoadSh(marked), 0, 0, 0), 2, x, true), 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value, mitk::sh::GetValue(ShCoefficients(LoadSh(unmarked, "MRtrix 3"), 0, 0, 0), 2, x, true), 1e-6);
-    // Files without a marker, which includes every SH file of earlier MITK versions, read as before.
+    // Files without a marker, which includes every SH file of earlier MITK versions, are read in the legacy basis.
     CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value / std::sqrt(2.0), mitk::sh::GetValue(ShCoefficients(LoadSh(unmarked), 0, 0, 0), 2, x, true), 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value / std::sqrt(2.0), mitk::sh::GetValue(ShCoefficients(LoadSh(marked, "MITK legacy (MRtrix 0.2)"), 0, 0, 0), 2, x, true), 1e-6);
 

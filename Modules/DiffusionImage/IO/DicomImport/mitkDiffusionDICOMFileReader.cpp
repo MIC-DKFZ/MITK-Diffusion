@@ -153,9 +153,9 @@ bool mitk::DiffusionDICOMFileReader
     mitk::CastToMitkImage( helper.LoadToVector<short, 3>( filenames ), output_image );
   }
 
-  // DICOM keeps the gradient handling it had before the NRRD/NIfTI convention of world-vector
-  // gradients (no DICOM test data yet): header vectors, rotated by the image matrix if
-  // m_ApplyRotationToGradients, without measurement frame.
+  // DICOM gradients are the header vectors, rotated by the image matrix if
+  // m_ApplyRotationToGradients, without measurement frame; DICOM is not part of the world-vector
+  // convention of NRRD and NIfTI, because there is no DICOM test data to check it against.
   mitk::DiffusionPropertyHelper::MeasurementFrameType identity;
   identity.set_identity();
   mitk::DiffusionPropertyHelper::InitializeImage(output_image, directions.GetPointer(), max_bvalue, identity, m_ApplyRotationToGradients);

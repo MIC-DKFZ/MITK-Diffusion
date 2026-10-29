@@ -70,7 +70,7 @@ namespace mitk
   {
     Options defaultOptions;
     // On by default: only files whose descrip names MRtrix are converted; NIfTI peak files of
-    // earlier MITK versions have no descrip and read as before.
+    // earlier MITK versions have no descrip and are read as LPS.
     defaultOptions[ConvertMrtrixOption] = true;
     this->SetDefaultOptions(defaultOptions);
 

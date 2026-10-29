@@ -56,8 +56,8 @@ namespace itk
     b0Image->Allocate();
 
     // The mean is summed in double and rounded for an integer output type; accumulating x/n in
-    // float and truncating made exact integer means one too low (9 b0 volumes of test_multi.dwi)
-    // and biased every b0 image by about -0.5.
+    // float and truncating would make exact integer means one too low (9 b0 volumes of
+    // test_multi.dwi) and bias every b0 image by about -0.5.
     const double count = indices.size();
     ImageRegionConstIterator<InputImageType> inIt(input, input->GetLargestPossibleRegion());
     ImageRegionIterator<OutputImageType> outIt(b0Image, b0Image->GetLargestPossibleRegion());

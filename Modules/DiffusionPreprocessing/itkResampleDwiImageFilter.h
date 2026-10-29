@@ -59,7 +59,7 @@ inline Point<double, 3> ResampledImageOrigin(const Point<double, 3>& origin, con
 
 /**
  * \brief An interpolated value as pixel of type T: rounded and clamped to the range of an integer
- * type. ITK's cast truncates, which biased every resampled value by about -0.5, i.e. -0.18 % of the
+ * type. ITK's cast truncates, which would bias every resampled value by about -0.5, i.e. -0.18 % of the
  * b0 signal to -1.86 % of the b=3000 signal of FWE/InputDiffusionWeightedImage.dwi (tensor MD
  * +1.2 % after resampling it from 2 to 1 mm).
  */
@@ -82,7 +82,7 @@ enum class ResampleGridMode { SamplingFactor, Spacing, Size };
  * value, spacing * size / value. The sizes are truncated, after adding 1e-6 voxels: a size that is
  * an integer in exact arithmetic can come out just below it (spacing 1.2 -> 0.4 gives
  * 2.9999999999999996 per voxel, the spacing of an oblique image 1.9999999999999998), and
- * truncating it lost a voxel.
+ * truncating it would lose a voxel.
  */
 inline void ResampledImageGrid(const Vector<double, 3>& spacing, const ImageRegion<3>& region, ResampleGridMode mode, const Vector<double, 3>& value, Vector<double, 3>& newSpacing, ImageRegion<3>& newRegion)
 {

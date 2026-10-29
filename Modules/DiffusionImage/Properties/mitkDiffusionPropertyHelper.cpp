@@ -211,8 +211,8 @@ void mitk::DiffusionPropertyHelper::ApplyMeasurementFrameAndRotationMatrix(mitk:
   GetGradientTransform(image, rotation, frame);
   MITK_INFO << "Modified gradients = original gradients" << (rotation ? " * image rotation" : "") << (frame ? " * measurement frame" : "");
 
-  // Row vectors in the legacy order g * R * MF, one factor after the other as always, so that the
-  // results stay the same to the last bit; the NRRD and NIfTI readers switch R off.
+  // Row vectors in the order g * R * MF, one factor after the other: the reference results depend
+  // on this order to the last bit. The NRRD and NIfTI readers switch R off.
   GradientDirectionsContainerType::Pointer directions = GradientDirectionsContainerType::New();
   for (auto vec : originalDirections->CastToSTLConstContainer())
   {
