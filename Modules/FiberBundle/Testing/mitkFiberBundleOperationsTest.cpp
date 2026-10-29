@@ -93,7 +93,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
   {
-    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("" + relativePath));
+    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath(relativePath));
   }
 
   /** original.fib with a different weight per fiber */
@@ -178,7 +178,7 @@ public:
     for (const std::string name : {"ROI1.pf", "ROI1.pf", "ROI2.pf", "ROI3.pf"})
     {
       auto node = mitk::DataNode::New();
-      node->SetData(mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath("" + name)).at(0));
+      node->SetData(mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath(name)).at(0));
       storage->Add(node, compositeNode);
       auto ids = fib->ExtractFiberIdSubset(node, storage);
       excluded.insert(ids.begin(), ids.end());

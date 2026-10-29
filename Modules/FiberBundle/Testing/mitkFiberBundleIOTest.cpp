@@ -64,7 +64,7 @@ found in the LICENSE file.
 #include <vector>
 
 /** Regression tests for the fiber bundle readers and writers. Files are written to a temporary
- *  directory, nothing is added to MITK-Data. */
+ *  directory, nothing is added to mitk-diffusion-test-data. */
 class mitkFiberBundleIOTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkFiberBundleIOTestSuite);
@@ -107,7 +107,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
   {
-    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("" + relativePath));
+    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath(relativePath));
   }
 
   /** original.fib with a different weight per fiber */
@@ -1328,7 +1328,7 @@ public:
     // Reference images stored in LPS and in LAS orientation
     for (const std::string name : {"StreamlineTractography/mask_image.nii.gz", "mean_FA.nii.gz"})
     {
-      auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("" + name));
+      auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(name));
       auto withReference = fib->GetDeepCopy();
       withReference->SetTrackVisHeader(image->GetGeometry());
       mitk::IOUtil::Save(withReference, path, options);

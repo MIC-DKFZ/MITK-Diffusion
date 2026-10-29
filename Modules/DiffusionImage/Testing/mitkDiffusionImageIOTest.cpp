@@ -32,7 +32,7 @@ found in the LICENSE file.
 #include <fstream>
 #include <iterator>
 
-/** Reading and writing of DWIs as NRRD and NIfTI, on MITK-Data input and on synthetic files. */
+/** Reading and writing of DWIs as NRRD and NIfTI, on mitk-diffusion-test-data input and on synthetic files. */
 class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionImageIOTestSuite);

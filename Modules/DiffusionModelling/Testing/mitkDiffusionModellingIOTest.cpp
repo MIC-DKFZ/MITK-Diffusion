@@ -563,7 +563,7 @@ public:
     }
   }
 
-  // Pixel buffers and geometry of MITK-Data files as read before the readers were restructured.
+  // Pixel buffers and geometry of mitk-diffusion-test-data files as read before the readers were restructured.
   void Readers_RecordedContent()
   {
     mitk::PreferenceListReaderOptionsFunctor shFunctor({"SH Image"}, std::vector<std::string>());
@@ -944,7 +944,7 @@ public:
       CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrix3Value, mitk::sh::GetValue(ShCoefficients(LoadSh(path, "MITK legacy (MRtrix 0.2)"), 0, 0, 0), 2, x, true), 1e-6);
     }
 
-    // The MRtrix 3 FOD in MITK-Data, voxel (30, 30, 1): amplitudes of MRtrix 3.0.8 sh2amp at
+    // The MRtrix 3 FOD in mitk-diffusion-test-data, voxel (30, 30, 1): amplitudes of MRtrix 3.0.8 sh2amp at
     // RAS (-1, 0, 0), (0, -1, 0), (0, 0, 1), (-0.48, 0.6, 0.64), given here as LPS directions.
     auto csd = LoadSh(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image_sh.nii.gz"));
     const vnl_vector<float> csdCoefficients = ShCoefficients(csd, 30, 30, 1);

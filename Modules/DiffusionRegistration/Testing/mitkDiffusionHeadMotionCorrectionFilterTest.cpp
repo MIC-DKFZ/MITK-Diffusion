@@ -49,7 +49,7 @@ public:
   {
     // A motion-free DWI with two weighted volumes and the b0 volume last, as Philips scanners store
     // it; the b0 volume is the reference. The volumes are scaled copies of a brain FA map, reduced
-    // to 3 mm to keep the two affine registrations short. MITK-Data's DWIs are too small for the
+    // to 3 mm to keep the two affine registrations short. The test data's DWIs are too small for the
     // registration (3 slices or 11 voxels per axis).
     auto fa = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("mean_FA.nii.gz"));
     FloatImageType::Pointer itkFa;

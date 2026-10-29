@@ -30,7 +30,7 @@ found in the LICENSE file.
 
 /**
  * The radial multi-shell to single-shell filter with its three functors, as MitkMultishellMethods
- * runs it ("-b mean"), against the references in MITK-Data.
+ * runs it ("-b mean"), against the references in mitk-diffusion-test-data.
  */
 class mitkDiffusionReconstructionMultishellTestSuite : public mitk::TestFixture
 {

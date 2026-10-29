@@ -32,7 +32,7 @@ found in the LICENSE file.
  * k-space acquisition of Fiberfox on synthetic input images (the input-image mode of the
  * simulation: no signal model, no relaxation, signal scale 1): each artifact against its
  * definition, the noise statistics, the readout schemes and the field map generator. Needs no
- * MITK-Data. The definitions are those of the method check of review #13.
+ * mitk-diffusion-test-data. The definitions are those of the method check of review #13.
  */
 class mitkFiberfoxKspaceTestSuite : public mitk::TestFixture
 {

@@ -600,7 +600,7 @@ public:
     return mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(path));
   }
 
-  // MITK-Data holds the indices of tensorImage.dti; the function reproduces FA, AD and RD.
+  // mitk-diffusion-test-data holds the indices of tensorImage.dti; the function reproduces FA, AD and RD.
   // tensorImage_CA.nrrd and tensorImage_MD.nrrd are older than this repository's history and differ
   // from today's filter (CA: 106 voxels, up to 0.031; MD: 12096 voxels, up to 1.5e-3 at values of
   // about 1e-3, so not the mean eigenvalue), and tensorImage_RA.nrrd holds ITK's RA formula, which

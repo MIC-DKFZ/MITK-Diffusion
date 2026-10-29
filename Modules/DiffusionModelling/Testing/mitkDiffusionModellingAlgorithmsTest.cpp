@@ -720,7 +720,7 @@ public:
     return maxDifference;
   }
 
-  // FA, AD and RD reproduce the MITK-Data references. The MD reference was made by an older
+  // FA, AD and RD reproduce the mitk-diffusion-test-data references. The MD reference was made by an older
   // version and is not used; MD is checked against the trace, L2 and L3 against the eigenvalues.
   // The RA reference holds ITK's unit-dependent formula; RA is checked against the eigenvalues.
   void TensorMeasures_MatchReferences()
@@ -805,7 +805,7 @@ public:
     CPPUNIT_ASSERT_EQUAL(0.0, RelativeAnisotropy(Tensor(0, 0, 0, 0, 0, 0)));
   }
 
-  // GFA of the ODFs in qBallImage.qbi as stored in MITK-Data.
+  // GFA of the ODFs in qBallImage.qbi as stored in mitk-diffusion-test-data.
   void Gfa_MatchesReference()
   {
     auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("qBallImage.qbi"));

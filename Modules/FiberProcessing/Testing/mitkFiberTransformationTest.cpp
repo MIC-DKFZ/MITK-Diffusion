@@ -20,7 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
-/** A chain of FiberBundle transformations on fiberBundleX.fib against the MITK-Data reference. */
+/** A chain of FiberBundle transformations on fiberBundleX.fib against the mitk-diffusion-test-data reference. */
 class mitkFiberTransformationTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkFiberTransformationTestSuite);

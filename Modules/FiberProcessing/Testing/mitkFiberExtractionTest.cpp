@@ -25,7 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTestingMacros.h>
 
 /** Fiber extraction with planar figures and ROI images on fiberBundleX.fib, subtraction and
- *  addition of bundles, against the MITK-Data references. */
+ *  addition of bundles, against the mitk-diffusion-test-data references. */
 class mitkFiberExtractionTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkFiberExtractionTestSuite);
@@ -40,7 +40,7 @@ class mitkFiberExtractionTestSuite : public mitk::TestFixture
 
   mitk::FiberBundle::Pointer Load(const std::string& file)
   {
-    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("" + file));
+    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath(file));
   }
 
   /** ROI1 OR (ROI2 AND ROI3) */
@@ -49,7 +49,7 @@ class mitkFiberExtractionTestSuite : public mitk::TestFixture
     auto storage = mitk::StandaloneDataStorage::New();
     auto figure = [this](const std::string& file) {
       auto node = mitk::DataNode::New();
-      node->SetData(mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath("" + file)).at(0));
+      node->SetData(mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath(file)).at(0));
       return node;
     };
 

@@ -290,7 +290,7 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
   // from the DWI with the fewest such voxels. The first version (2013-08) kept a copy of the last
   // DWI that reduced the count; the copies were removed in 2013-10, which gave this order. No paper
   // describes the smoothing (the code credits only the 0.01 threshold to O. Pasternak). The choice
-  // matters only for voxels that the loop never corrects: in all MITK-Data DWIs one voxel of
+  // matters only for voxels that the loop never corrects: in all mitk-diffusion-test-data DWIs one voxel of
   // ImageReconstruction/test.dwi, which this order makes positive definite (smallest eigenvalue
   // +2.1e-4 mm^2/s instead of -5.2e-6). The order is kept.
 

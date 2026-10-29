@@ -77,9 +77,9 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
   {
     mitk::FiberBundle::Pointer fib = nullptr;
 
-    if (itksys::SystemTools::FileExists(mitk::GetDiffusionTestDataFilePath("" + filename)))
+    if (itksys::SystemTools::FileExists(mitk::GetDiffusionTestDataFilePath(filename)))
     {
-      mitk::BaseData::Pointer baseData = mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath("" + filename)).at(0);
+      mitk::BaseData::Pointer baseData = mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath(filename)).at(0);
       fib = dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
     }
     return fib;

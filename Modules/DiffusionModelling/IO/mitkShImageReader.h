@@ -43,7 +43,7 @@ namespace mitk
    *
    * SH images in vector layout (a 3D image with one vector of coefficients per voxel, as MITK's
    * generic image writer and older MITK versions wrote them) are not read as SH images; MITK's
-   * image reader reads them as plain multi-component images. The two such files in MITK-Data
+   * image reader reads them as plain multi-component images. The two such files in mitk-diffusion-test-data
    * (qBallImage_SHCoeffs.nrrd, StreamlineTractography/qball_image_sh.nii.gz) hold coefficients in
    * the FSL/Dipy basis, not MITK's, so reading them with MITK's default would give wrong ODFs.
    */

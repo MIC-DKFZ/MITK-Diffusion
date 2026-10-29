@@ -26,7 +26,7 @@ found in the LICENSE file.
 #include <utility>
 #include <vector>
 
-/** Synthetic DWIs and MITK-Data input shared by the IVIM and kurtosis fit tests. */
+/** Synthetic DWIs and mitk-diffusion-test-data input shared by the IVIM and kurtosis fit tests. */
 namespace mitk::IvimTesting
 {
   using VectorImageType = DiffusionPropertyHelper::ImageType;

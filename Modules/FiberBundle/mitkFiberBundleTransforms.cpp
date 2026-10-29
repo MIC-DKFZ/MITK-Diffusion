@@ -110,7 +110,7 @@ void mitk::FiberBundle::RotateAroundAxis(double x, double y, double z)
   mitk::Point3D center = geom->GetCenter();
 
   // evaluated as (rotZ*rotY)*rotX: the rounding of this order gives the points of the fiber
-  // references in MITK-Data
+  // references in mitk-diffusion-test-data
   const vnl_matrix_fixed< double, 3, 3 > rot = rotZ*rotY*rotX;
   auto colors = GetFiberColors();
   MovePoints(this, [&](double* p)

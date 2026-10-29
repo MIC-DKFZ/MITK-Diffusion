@@ -377,7 +377,7 @@ public:
     CPPUNIT_ASSERT_EQUAL(static_cast<int>(dense[3]), static_cast<int>(sparse[3]));
   }
 
-  // Safety net on MITK-Data: fiberBundleX.fib (196 fibers, weights 1) and ROIIMAGE.nrrd. The sums
+  // Safety net on mitk-diffusion-test-data: fiberBundleX.fib (196 fibers, weights 1) and ROIIMAGE.nrrd. The sums
   // are invariants of the methods, the grid sizes, maxima and counts the results recorded on
   // 2026-10-23, so that refactoring cannot change them unnoticed.
 

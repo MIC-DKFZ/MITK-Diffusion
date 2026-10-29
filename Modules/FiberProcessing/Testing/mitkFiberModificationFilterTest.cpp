@@ -22,7 +22,7 @@ found in the LICENSE file.
 
 #include <cmath>
 
-/** Filters that modify fibers (curvature filter), on MITK-Data input and synthetic fibers. */
+/** Filters that modify fibers (curvature filter), on mitk-diffusion-test-data input and synthetic fibers. */
 class mitkFiberModificationFilterTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkFiberModificationFilterTestSuite);

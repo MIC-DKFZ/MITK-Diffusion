@@ -432,7 +432,7 @@ public:
 
   void FiberFitBundles_PartitionAsQuickBundles()
   {
-    // Safety net on MITK-Data: the five FiberFit bundles (2157 fibers) joined and clustered as
+    // Safety net on mitk-diffusion-test-data: the five FiberFit bundles (2157 fibers) joined and clustered as
     // MitkFiberClustering does with its defaults (10 mm, EU_MEAN, 12 points, duplicate merging
     // at half the cluster size). dipy's QuickBundles gives the same partition into 7 clusters.
     std::vector<mitk::FiberBundle::Pointer> bundles;
