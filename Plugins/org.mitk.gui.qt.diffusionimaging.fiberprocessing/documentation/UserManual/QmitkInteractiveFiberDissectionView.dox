@@ -10,7 +10,7 @@ Interactively train a classifier for tract dissection. The workflow implemented 
 
 \section SecDissectionPreprocessing Preprocessing
 
-- Resample Bundle: Necessary to calculate dissimilarity features proposed by Olivetti et al. [2]. Needs to be done prior to training.
+- Resample Bundle: Resamples every streamline of the training bundle to 40 points, equally spaced along the streamline with both end points kept, as a new bundle. Necessary to calculate dissimilarity features proposed by Olivetti et al. [2]. Needs to be done prior to training.
 - Number of prototypes: Define the number of prototypes and hence, the number of features to be generated per streamline. More prototypes mean more features and eventually increase the performance of the classifier. However, more features also mean more computational effort. We found 75 to be a good tradeoff since during the segmentation process iterative features are calculated (refer to our publication [1]).
 
 \section SecDissectionActiveLearning Active Learning
