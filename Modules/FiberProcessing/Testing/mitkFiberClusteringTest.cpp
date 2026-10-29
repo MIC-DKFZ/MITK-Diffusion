@@ -12,6 +12,7 @@ found in the LICENSE file.
 
 #include <mitkTractClusteringFilter.h>
 #include <mitkClusteringMetricAnatomic.h>
+#include <mitkClusteringMetricEuclideanMax.h>
 #include <mitkClusteringMetricEuclideanMean.h>
 #include <mitkClusteringMetricEuclideanStd.h>
 #include <mitkClusteringMetricInnerAngles.h>
@@ -24,6 +25,7 @@ found in the LICENSE file.
 #include <mitkExceptionMacro.h>
 
 #include <itkImageRegionIteratorWithIndex.h>
+#include <itkLinearInterpolateImageFunction.h>
 
 #include "mitkFiberProcessingTestHelper.h"
 
@@ -34,6 +36,7 @@ found in the LICENSE file.
 #include <cmath>
 #include <memory>
 #include <random>
+#include <string>
 
 /** Fiber clustering on synthetic bundles whose partition is known. */
 class mitkFiberClusteringTestSuite : public mitk::TestFixture
@@ -49,6 +52,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
   MITK_TEST(Anatomic_PointOutsideFirstParcellation);
   MITK_TEST(Update_TwiceGivesSameOutputs);
   MITK_TEST(Metrics_Definitions);
+  MITK_TEST(Metrics_SameValuesAsVnlFormulation);
   MITK_TEST(Outputs_KeepRasFlagAndSetHeaderOnly);
   MITK_TEST(FiberFitBundles_PartitionAsQuickBundles);
   CPPUNIT_TEST_SUITE_END();
@@ -371,6 +375,213 @@ public:
       auto m = Points(line);
       CPPUNIT_ASSERT(std::isfinite(angles.CalculateDistance(m, m, flipped)));
     }
+  }
+
+  // #35: the metrics compute without per-comparison allocations, the anatomic and scalar map
+  // metrics from per-fiber data prepared once. These are the former vnl formulations; the
+  // clustering results depend on the metric values bit for bit.
+  static float VnlDistance(const vnl_matrix<float>& s, unsigned int i, const vnl_matrix<float>& t, unsigned int j)
+  {
+    return (s.get_column(i) - t.get_column(j)).magnitude();
+  }
+
+  static float VnlEuclideanMean(float scale, const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool& flipped)
+  {
+    float d_direct = 0, d_flipped = 0;
+    for (unsigned int i = 0; i < s.cols(); ++i)
+    {
+      d_direct += VnlDistance(s, i, t, i);
+      d_flipped += VnlDistance(s, i, t, s.cols() - i - 1);
+    }
+    flipped = d_direct > d_flipped;
+    return scale * (flipped ? d_flipped : d_direct) / s.cols();
+  }
+
+  static float VnlEuclideanStdOrMax(float scale, const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool max, bool& flipped)
+  {
+    float d_direct = 0, d_flipped = 0;
+    vnl_vector<float> dists_d(s.cols()), dists_f(s.cols());
+    for (unsigned int i = 0; i < s.cols(); ++i)
+    {
+      dists_d[i] = VnlDistance(s, i, t, i);
+      d_direct += dists_d[i];
+      dists_f[i] = VnlDistance(s, i, t, s.cols() - i - 1);
+      d_flipped += dists_f[i];
+    }
+    flipped = d_direct > d_flipped;
+    vnl_vector<float>& dists = flipped ? dists_f : dists_d;
+    if (max)
+      return scale * dists.max_value();
+    float d = (flipped ? d_flipped : d_direct) / s.cols();
+    dists -= d;
+    d += dists.magnitude() / std::sqrt(static_cast<float>(s.cols()));
+    return scale * d / 2;
+  }
+
+  static float VnlLength(float scale, const vnl_matrix<float>& s, const vnl_matrix<float>& t)
+  {
+    float l1 = 0, l2 = 0;
+    for (unsigned int i = 0; i + 1 < s.cols(); ++i)
+    {
+      l1 += (s.get_column(i + 1) - s.get_column(i)).magnitude();
+      l2 += (t.get_column(i + 1) - t.get_column(i)).magnitude();
+    }
+    return scale * std::fabs(l1 - l2);
+  }
+
+  static float VnlAnatomic(const mitk::ClusteringMetricAnatomic& metric, unsigned int numLabels, const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool& flipped)
+  {
+    vnl_matrix<float> hist1(27, numLabels, 0.0f), hist2(27, numLabels, 0.0f);
+    float d_direct = 0, d_flipped = 0;
+    for (unsigned int i = 0; i < s.cols(); ++i)
+    {
+      metric.GetHistogramAtPoint(itk::Point<float, 3>(s.get_column(i).data_block()), hist1);
+      metric.GetHistogramAtPoint(itk::Point<float, 3>(t.get_column(i).data_block()), hist2);
+      d_direct += VnlDistance(s, i, t, i);
+      d_flipped += VnlDistance(s, i, t, s.cols() - i - 1);
+    }
+    flipped = d_direct > d_flipped;
+
+    float label_intersection = 0;
+    for (unsigned int c = 0; c < hist1.cols(); ++c)
+    {
+      bool l1 = false, l2 = false;
+      for (unsigned int r = 0; r < hist1.rows(); ++r)
+      {
+        l1 = l1 || hist1[r][c] > 0;
+        l2 = l2 || hist2[r][c] > 0;
+        if (l1 && l2)
+        {
+          label_intersection += 1;
+          break;
+        }
+      }
+    }
+    float similarity = 0;
+    if (label_intersection > 0)
+    {
+      hist1.normalize_rows();
+      hist2.normalize_rows();
+      label_intersection /= static_cast<short>(numLabels);
+      for (unsigned int l = 0; l < hist1.rows(); ++l)
+        similarity += dot_product(hist1.get_row(l), hist2.get_row(l));
+      similarity /= hist1.rows();
+      similarity *= label_intersection;
+    }
+    return similarity > 0 ? metric.GetScale() * 0.2 / similarity : 9999;
+  }
+
+  using FloatInterpolator = itk::LinearInterpolateImageFunction<itk::Image<float, 3>, float>;
+
+  static float VnlScalarMap(const std::vector<FloatInterpolator::Pointer>& interpolators, float scale, const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool& flipped)
+  {
+    auto values = [&interpolators](const vnl_matrix<float>& m, unsigned int i) {
+      vnl_vector<float> vals(static_cast<unsigned int>(interpolators.size()));
+      for (unsigned int c = 0; c < interpolators.size(); ++c)
+        vals[c] = mitk::imv::GetImageValue<float>(itk::Point<float, 3>(m.get_column(i).data_block()), true, interpolators[c]);
+      return vals;
+    };
+    float d_direct = 0, d_flipped = 0;
+    const unsigned int inc = s.cols() >= 4 ? s.cols() / 4 : 1;
+    for (unsigned int i = 0; i < s.cols(); i += inc)
+    {
+      d_direct += VnlDistance(s, i, t, i);
+      d_flipped += VnlDistance(s, i, t, s.cols() - i - 1);
+    }
+    flipped = d_direct > d_flipped;
+    float map_distance = 0;
+    for (unsigned int i = 0; i < s.cols(); ++i)
+      map_distance += (values(s, i) - values(t, flipped ? s.cols() - i - 1 : i)).magnitude();
+    return scale * map_distance;
+  }
+
+  void Metrics_SameValuesAsVnlFormulation()
+  {
+    // Two parcellations (labels 0..6 and 20..23, 1 mm voxels) and two float maps, overlapping;
+    // fibers partly outside them.
+    using ShortImage = itk::Image<short, 3>;
+    using FloatImage = itk::Image<float, 3>;
+    std::mt19937 rng(11);
+    auto parcellation = [&rng](double origin, short firstLabel, short numLabels) {
+      auto parc = ShortImage::New();
+      parc->SetRegions(ShortImage::RegionType(ShortImage::SizeType{{12, 12, 12}}));
+      parc->SetOrigin(itk::Point<double, 3>(origin));
+      parc->Allocate();
+      std::uniform_int_distribution<int> label(0, numLabels - 1);
+      for (itk::ImageRegionIteratorWithIndex<ShortImage> it(parc, parc->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+        it.Set(static_cast<short>(firstLabel + label(rng)));
+      return parc;
+    };
+    mitk::ClusteringMetricAnatomic anatomic;
+    anatomic.SetParcellations({parcellation(0, 0, 7), parcellation(4, 20, 4)});
+    anatomic.SetScale(1.5f);
+    const unsigned int numLabels = 11;
+
+    std::vector<FloatImage::Pointer> maps;
+    std::vector<FloatInterpolator::Pointer> interpolators;
+    std::uniform_real_distribution<float> value(-5.0f, 5.0f);
+    for (int m = 0; m < 2; ++m)
+    {
+      auto map = FloatImage::New();
+      map->SetRegions(FloatImage::RegionType(FloatImage::SizeType{{14, 14, 14}}));
+      map->SetOrigin(itk::Point<double, 3>(m * 2.0));
+      map->Allocate();
+      for (itk::ImageRegionIteratorWithIndex<FloatImage> it(map, map->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+        it.Set(value(rng));
+      maps.push_back(map);
+      auto interpolator = FloatInterpolator::New();
+      interpolator->SetInputImage(map);
+      interpolators.push_back(interpolator);
+    }
+    mitk::ClusteringMetricScalarMap scalarMap;
+    scalarMap.SetImages(maps);
+
+    mitk::ClusteringMetricEuclideanMean mean;
+    mitk::ClusteringMetricEuclideanStd std;
+    mitk::ClusteringMetricEuclideanMax max;
+    mitk::ClusteringMetricLength length;
+    mean.SetScale(1.25f);
+    std.SetScale(0.75f);
+
+    std::uniform_real_distribution<float> coordinate(-2.0f, 18.0f);
+    for (const unsigned int numPoints : {12u, 3u, 1u, 40u})
+      for (int pair = 0; pair < 50; ++pair)
+      {
+        vnl_matrix<float> s(3, numPoints), t(3, numPoints);
+        for (unsigned int k = 0; k < numPoints; ++k)
+          for (unsigned int d = 0; d < 3; ++d)
+          {
+            s(d, k) = coordinate(rng);
+            t(d, k) = coordinate(rng);
+          }
+        // the second fiber close to the first one reversed in every other pair: flips both ways
+        if (pair % 2 == 1)
+          for (unsigned int k = 0; k < numPoints; ++k)
+            for (unsigned int d = 0; d < 3; ++d)
+              t(d, k) = s(d, numPoints - 1 - k) + 0.1f * coordinate(rng);
+
+        const std::string message = std::to_string(numPoints) + " points, pair " + std::to_string(pair);
+        bool flipped = false, expectedFlip = false;
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("EU_MEAN, " + message, VnlEuclideanMean(1.25f, s, t, expectedFlip), mean.CalculateDistance(s, t, flipped));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("EU_MEAN flip, " + message, expectedFlip, flipped);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("EU_STD, " + message, VnlEuclideanStdOrMax(0.75f, s, t, false, expectedFlip), std.CalculateDistance(s, t, flipped));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("EU_STD flip, " + message, expectedFlip, flipped);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("EU_MAX, " + message, VnlEuclideanStdOrMax(1.0f, s, t, true, expectedFlip), max.CalculateDistance(s, t, flipped));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("EU_MAX flip, " + message, expectedFlip, flipped);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("LENGTH, " + message, VnlLength(1.0f, s, t), length.CalculateDistance(s, t, flipped));
+
+        const float expectedAnatomic = VnlAnatomic(anatomic, numLabels, s, t, expectedFlip);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("ANAT, " + message, expectedAnatomic, anatomic.CalculateDistance(s, t, flipped));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("ANAT flip, " + message, expectedFlip, flipped);
+        const auto sAnatomic = anatomic.PrepareFiber(s);
+        const auto tAnatomic = anatomic.PrepareFiber(t);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("ANAT prepared, " + message, expectedAnatomic,
+                                     anatomic.CalculatePreparedDistance(s, t, sAnatomic.get(), tAnatomic.get(), flipped));
+
+        const float expectedMap = VnlScalarMap(interpolators, scalarMap.GetScale(), s, t, expectedFlip);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("MAP, " + message, expectedMap, scalarMap.CalculateDistance(s, t, flipped));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("MAP flip, " + message, expectedFlip, flipped);
+      }
   }
 
   void Clusters_KeepInputWeights()
