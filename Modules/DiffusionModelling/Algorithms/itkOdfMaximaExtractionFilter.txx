@@ -104,12 +104,8 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 ::BeforeThreadedGenerateData()
 {
   typename CoefficientImageType::Pointer ShCoeffImage = static_cast< CoefficientImageType* >( this->ProcessObject::GetInput(0) );
-  itk::Vector<double,3> spacing = ShCoeffImage->GetSpacing();
-  mitk::Point3D origin = ShCoeffImage->GetOrigin();
-  itk::Matrix<double, 3, 3> direction = ShCoeffImage->GetDirection();
-  ImageRegion<3> imageRegion = ShCoeffImage->GetLargestPossibleRegion();
 
-  // The mask is read with the input's voxel indices.
+  // The mask is read with the input's voxel indices; without a mask every voxel is processed.
   if (m_MaskImage.IsNotNull() && !mitk::HasVoxelGridOf(m_MaskImage, ShCoeffImage))
     itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the SH image.");
 
@@ -118,17 +114,6 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   m_PeakImage->Allocate();
   m_PeakImage->FillBuffer(0.0);
 
-  m_MaskGenerated = m_MaskImage.IsNull();
-  if (m_MaskGenerated)
-  {
-    m_MaskImage = ItkUcharImgType::New();
-    m_MaskImage->SetSpacing( spacing );
-    m_MaskImage->SetOrigin( origin );
-    m_MaskImage->SetDirection( direction );
-    m_MaskImage->SetRegions( imageRegion );
-    m_MaskImage->Allocate();
-    m_MaskImage->FillBuffer(1);
-  }
   // Masked voxels and voxels with an ODF maximum near 0 are skipped and keep 0 directions.
   this->GetOutput()->FillBuffer(0);
 
@@ -161,9 +146,6 @@ template< class PixelType, int ShOrder, int NrOdfDirections >
 void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 ::AfterThreadedGenerateData()
 {
-  // A mask generated for this input must not be reused for the next one.
-  if (m_MaskGenerated)
-    m_MaskImage = nullptr;
   m_Progress.reset();
 }
 
@@ -187,7 +169,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   while( !cit.IsAtEnd() )
   {
     typename CoefficientImageType::IndexType idx3 = cit.GetIndex();
-    if (m_MaskImage->GetPixel(idx3)==0)
+    if (m_MaskImage.IsNotNull() && m_MaskImage->GetPixel(idx3)==0)
     {
       advance();
       continue;
@@ -306,7 +288,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       }
 
       if (m_ApplyDirectionMatrix)
-        dir = m_MaskImage->GetDirection()*dir;
+        dir = ShCoeffImage->GetDirection()*dir;
 
       if (m_FlipX)
         dir[0] = -dir[0];

@@ -45,26 +45,10 @@ template< class TTensorPixelType>
 void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::BeforeThreadedGenerateData()
 {
   typename InputImageType::Pointer inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
-  Vector<double,3> spacing3 = inputImagePointer->GetSpacing();
-  mitk::Point3D origin3 = inputImagePointer->GetOrigin();
-  itk::Matrix<double, 3, 3> direction3 = inputImagePointer->GetDirection();
-  ImageRegion<3> imageRegion3 = inputImagePointer->GetLargestPossibleRegion();
 
-  // The mask is read with the input's voxel indices.
+  // The mask is read with the input's voxel indices; without a mask every voxel is processed.
   if (m_MaskImage.IsNotNull() && !mitk::HasVoxelGridOf(m_MaskImage, inputImagePointer))
     itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the tensor image.");
-
-  m_MaskGenerated = m_MaskImage.IsNull();
-  if (m_MaskGenerated)
-  {
-    m_MaskImage = ItkUcharImgType::New();
-    m_MaskImage->SetSpacing( spacing3 );
-    m_MaskImage->SetOrigin( origin3 );
-    m_MaskImage->SetDirection( direction3 );
-    m_MaskImage->SetRegions( imageRegion3 );
-    m_MaskImage->Allocate();
-    m_MaskImage->FillBuffer(1);
-  }
 
   // The number of directions is written only for voxels inside the mask with a non-zero tensor.
   this->GetOutput()->FillBuffer(0);
@@ -73,15 +57,6 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::BeforeThre
   mitk::CopyGeometryTo4D(inputImagePointer, m_PeakImage, 3);
   m_PeakImage->Allocate();
   m_PeakImage->FillBuffer(0.0);
-}
-
-template< class TTensorPixelType>
-void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
-::AfterThreadedGenerateData()
-{
-  // A mask generated for this input must not be reused for the next one.
-  if (m_MaskGenerated)
-    m_MaskImage = nullptr;
 }
 
 template< class TTensorPixelType>
@@ -101,7 +76,7 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>
   while( !tensorIterator.IsAtEnd() )
   {
     typename InputImageType::IndexType index = tensorIterator.GetIndex();
-    if (m_MaskImage->GetPixel(index)==0)
+    if (m_MaskImage.IsNotNull() && m_MaskImage->GetPixel(index)==0)
     {
       ++tensorIterator;
       ++numDirectionsIterator;

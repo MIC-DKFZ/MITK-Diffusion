@@ -85,13 +85,11 @@ public:
 
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread ) override;
-    void AfterThreadedGenerateData() override;
 
 private:
 
     bool                                m_NormalizeVectors;     ///< Normalizes the output vector to length 1
     ItkUcharImgType::Pointer            m_MaskImage;            ///< Extraction is only performed inside of the binary mask
-    bool                                m_MaskGenerated = false; ///< m_MaskImage was generated for the current update only
     PeakImageType::Pointer              m_PeakImage;
     bool                                m_UsePolarCoordinates;
     float                               m_FaThreshold;
