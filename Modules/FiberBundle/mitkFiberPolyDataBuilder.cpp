@@ -42,6 +42,13 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundleDetail::CleanFiberPolyData(vtkPoly
   vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
   points->SetDataType(inPoints->GetDataType());
   vtkSmartPointer<vtkCellArray> lines = vtkSmartPointer<vtkCellArray>::New();
+  // Sized for the input and squeezed below, as vtkCleanPolyData does: arrays grown point by point
+  // keep up to twice the memory, and every bundle keeps these arrays.
+  vtkIdType numInputIds = 0;
+  for (vtkCellArray* cells : {polyData->GetVerts(), polyData->GetLines(), polyData->GetPolys(), polyData->GetStrips()})
+    numInputIds += cells->GetNumberOfConnectivityIds();
+  points->Reserve(inPoints->GetNumberOfPoints());
+  lines->AllocateExact(polyData->GetNumberOfCells(), numInputIds);
 
   vtkPointData* inPointData = polyData->GetPointData();
   vtkCellData* inCellData = polyData->GetCellData();
@@ -75,6 +82,8 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundleDetail::CleanFiberPolyData(vtkPoly
     cellData->CopyData(inCellData, cellId, newCellId);
   }
 
+  points->Squeeze();
+  lines->Squeeze();
   cleaned->SetPoints(points);
   if (polyData->GetNumberOfCells()>0)
     cleaned->SetLines(lines);
