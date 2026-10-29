@@ -756,17 +756,9 @@ void TractsToDWIImageFilter< PixelType >::InitializeData()
       PrintToLog("Maximum translation: " + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_Translation) + "mm", false);
     }
   }
+  // an empty list moves every volume, like a blank motion-volume text (SetMotionVolumes)
   if ( m_Parameters.m_SignalGen.m_MotionVolumes.empty() )
-  {
-    // no motion in first volume
-    m_Parameters.m_SignalGen.m_MotionVolumes.push_back(false);
-
-    // motion in all other volumes
-    while ( m_Parameters.m_SignalGen.m_MotionVolumes.size() < m_Parameters.m_SignalGen.GetNumVolumes() )
-    {
-      m_Parameters.m_SignalGen.m_MotionVolumes.push_back(true);
-    }
-  }
+    m_Parameters.m_SignalGen.m_MotionVolumes.assign(m_Parameters.m_SignalGen.GetNumVolumes(), true);
   // we need to know for every volume if there is motion. if this information is missing, then set corresponding fal to false
   while ( m_Parameters.m_SignalGen.m_MotionVolumes.size()<m_Parameters.m_SignalGen.GetNumVolumes() )
   {
@@ -1304,7 +1296,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     unsigned int num_gradients = m_Parameters.m_SignalGen.GetNumVolumes();
     int numFibers = m_FiberBundle->GetNumFibers();
 
-    // Short fibers (mean length below 5 mm) are simulated with two threads, as before; the limit
+    // Short fibers (mean length below 5 mm) are simulated with two threads; the limit
     // applies to the fiber loop only, not to every later OpenMP region of the process.
     int fiberThreads = omp_get_max_threads();
     if (m_FiberBundle->GetMeanFiberLength()<5.0)
@@ -1388,7 +1380,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
 
     if (m_Parameters.m_SignalGen.m_DoSimulateRelaxation)
       PrintToLog("Simulating signal relaxation", false);
-    if (m_Parameters.m_SignalGen.m_NoiseVariance>0 && m_Parameters.m_Misc.m_DoAddNoise)
+    if (m_Parameters.m_SignalGen.m_NoiseVariance>0 && m_Parameters.m_Misc.m_DoAddNoise && m_Parameters.m_NoiseModel==nullptr)
       PrintToLog("Simulating complex Gaussian noise: " + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_NoiseVariance), false);
     if (m_Parameters.m_SignalGen.m_FrequencyMap.IsNotNull() && m_Parameters.m_Misc.m_DoAddDistortions)
       PrintToLog("Simulating distortions", false);

@@ -403,7 +403,7 @@ void GibbsTrackingFilter< ItkOdfImageType >::LoadParameters()
   if (pElem == nullptr)
     mitkThrow() << "Gibbs tracking parameter file " << m_LoadParameterFile << " has no <parameter_set> element.";
 
-  // the type tag selects the type parsed, so that floats are read as before
+  // the type tag selects the type parsed: float parameters are parsed as float, not rounded from double
   auto read = [&](const char* name, auto typeTag)
   {
     const char* value = pElem->Attribute(name);

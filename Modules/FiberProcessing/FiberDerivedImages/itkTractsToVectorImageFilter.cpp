@@ -200,8 +200,9 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
           dirCont->push_back(dir);
           directionsContainer->InsertElement(idx, dirCont);
 
-          std::vector< double > lengths; lengths.push_back(fiberWeight*segment.second);
-          peakLengths->InsertElement(idx, lengths);
+          // grows the container like InsertElement, without copying a temporary vector (GCC 13 at
+          // -O2/-O3 reported a false -Warray-bounds on that copy)
+          peakLengths->CreateElementAt(idx).push_back(fiberWeight*segment.second);
         }
       }
 

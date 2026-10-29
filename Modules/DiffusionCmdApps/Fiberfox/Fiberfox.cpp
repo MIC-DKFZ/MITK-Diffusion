@@ -28,8 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLexicalCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
-#include <mitkFiberfoxParameters.h>
-#include <boost/lexical_cast.hpp>
 
 using namespace mitk;
 
@@ -182,7 +180,10 @@ static int RunFiberfox(int argc, char* argv[])
   {
     MITK_DEBUG << outName << ".ffp";
     parameters.m_Misc.m_OutputAdditionalImages = true;
-    parameters.SaveParameters(outName+".ffp");
+    // as the view: the saved file lists the volumes this run moves
+    mitk::FiberfoxParameters saved = parameters;
+    saved.ListMovedVolumes();
+    saved.SaveParameters(outName+".ffp");
   }
   else
     parameters.m_Misc.m_OutputAdditionalImages = false;

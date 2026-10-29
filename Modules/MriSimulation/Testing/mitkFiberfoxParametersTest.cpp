@@ -161,7 +161,7 @@ public:
   }
 
   /**
-   * Gradient convention (D-M1): .ffp gradients are FSL bvecs of the simulated geometry. The gradients
+   * Gradient convention: .ffp gradients are FSL bvecs of the simulated geometry. The gradients
    * of a DWI template are stored in that form (equal to the bvecs MITK's NIfTI writer writes for it),
    * and ApplyDirectionMatrix turns them back into the template's world gradients.
    */
@@ -226,7 +226,9 @@ public:
     itksys::SystemTools::RemoveADirectory(folder);
   }
 
-  /** The motion-volume string of a .ffp file; an unreadable one moves no volume and the rest of the file is read. */
+  /** The motion-volume string of a .ffp file (SignalGenerationParameters::SetMotionVolumes, also
+      used by the Fiberfox view): blank moves every volume, an unreadable one moves no volume and
+      the rest of the file is read. */
   void MotionVolumes()
   {
     std::ifstream in(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"));
@@ -237,10 +239,13 @@ public:
 
     const std::vector<std::pair<std::string, std::vector<unsigned int>>> cases = {
       { "2 4", { 2, 4 } },        // moved volumes
+      { " 2 4 ", { 2, 4 } },      // surrounding spaces
       { "-0 -1", {} },            // all but volumes 0 and 1 (checked below)
       { "abc", {} },              // unreadable: none
       { "1 -2", {} },             // both signs: none
-      { "", {} } };
+      { "2 4x", {} },             // a partial number: none
+      { "", {} },                 // blank: all (checked below)
+      { "  ", {} } };             // spaces only: blank
     for (const auto& c : cases)
     {
       std::string text = original;
@@ -258,10 +263,37 @@ public:
         bool expected = std::find(c.second.begin(), c.second.end(), i) != c.second.end();
         if (c.first == "-0 -1")
           expected = i > 1;
+        if (c.first.find_first_not_of(' ') == std::string::npos)
+          expected = true;
         CPPUNIT_ASSERT_EQUAL_MESSAGE("'" + c.first + "': volume " + std::to_string(i), expected, static_cast<bool>(moved[i]));
       }
     }
     itksys::SystemTools::RemoveADirectory(folder);
+
+    // "random", the file's own text, never moves volume 0
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"), true);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(parameters.m_SignalGen.GetNumVolumes()), parameters.m_SignalGen.m_MotionVolumes.size());
+    CPPUNIT_ASSERT(!parameters.m_SignalGen.m_MotionVolumes.at(0));
+
+    // ListMovedVolumes: the saved text moves the drawn volumes again
+    CPPUNIT_ASSERT(parameters.m_SignalGen.m_DoAddMotion);
+    mitk::FiberfoxParameters listed = parameters;
+    listed.ListMovedVolumes();
+    CPPUNIT_ASSERT(listed.m_Misc.m_MotionVolumesBox != "random");
+    mitk::FiberfoxParameters reparsed = parameters;
+    CPPUNIT_ASSERT(reparsed.m_SignalGen.SetMotionVolumes(listed.m_Misc.m_MotionVolumesBox, nullptr));
+    CPPUNIT_ASSERT(parameters.m_SignalGen.m_MotionVolumes == reparsed.m_SignalGen.m_MotionVolumes);
+    // no moved volume: saved without motion; empty list: stays blank
+    listed = parameters;
+    listed.m_SignalGen.m_MotionVolumes.assign(listed.m_SignalGen.GetNumVolumes(), false);
+    listed.ListMovedVolumes();
+    CPPUNIT_ASSERT(!listed.m_SignalGen.m_DoAddMotion);
+    listed = parameters;
+    listed.m_SignalGen.m_MotionVolumes.clear();
+    listed.ListMovedVolumes();
+    CPPUNIT_ASSERT(listed.m_SignalGen.m_DoAddMotion);
+    CPPUNIT_ASSERT(listed.m_Misc.m_MotionVolumesBox.empty());
   }
 
   /** A saved .ffp keeps its gradients when it is copied without its .bvals/.bvecs files. */

@@ -1,6 +1,7 @@
 set(H_FILES
 
     mitkDiffusionImageHelperFunctions.h
+    mitkMaskGeometry.h
 
     IO/mitkDiffusionImageMimeTypes.h
 
@@ -31,6 +32,7 @@ set(H_FILES
 set(CPP_FILES
 
     mitkDiffusionImageHelperFunctions.cpp
+    mitkMaskGeometry.cpp
 
     IO/mitkDiffusionImageServiceActivator.cpp
     IO/mitkDiffusionImageMimeTypes.cpp

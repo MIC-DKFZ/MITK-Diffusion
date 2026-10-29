@@ -61,32 +61,12 @@ namespace
     return direction;
   }
 
-  /**
-   * DiffusionPropertyHelper::GetGradientTransform, which tells which factors InitializeImage applies
-   * to the original gradients, is protected; a public accessor belongs to the DiffusionImage module.
-   */
-  struct GradientTransformAccess : PropHelper
-  {
-    using PropHelper::GetGradientTransform;
-  };
-
   itk::FixedArray<bool, 3> ToFixedArray(const std::array<bool, 3>& axes)
   {
     itk::FixedArray<bool, 3> result;
     for (unsigned int i = 0; i < 3; ++i)
       result[i] = axes[i];
     return result;
-  }
-
-  /**
-   * DiffusionPropertyHelper::CopyProperties for a const source; without the original gradients
-   * InitializeImage derives them from the modified ones.
-   */
-  void CopyProperties(const mitk::Image* source, mitk::Image* target, bool keepOriginalGradients)
-  {
-    target->SetPropertyList(source->GetPropertyList()->Clone());
-    if (!keepOriginalGradients)
-      target->GetPropertyList()->RemoveProperty(PropHelper::GetOriginalGradientContainerPropertyName());
   }
 
   void CheckDwi(const mitk::Image* image)
@@ -111,7 +91,7 @@ namespace
       newGradients->push_back(change(g));
 
     mitk::Image::Pointer newDwi = dwi->Clone();
-    CopyProperties(dwi, newDwi, false);
+    PropHelper::CopyProperties(dwi, newDwi, true);
     PropHelper::SetGradientContainer(newDwi, newGradients);
     PropHelper::InitializeImage(newDwi);
     return newDwi;
@@ -267,7 +247,7 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::FlipAxes(const Image* image, c
       newGradients->push_back(mirror * g);
 
     newImage = GrabItkImageMemory(flipper->GetOutput());
-    CopyProperties(image, newImage, false);
+    PropHelper::CopyProperties(image, newImage, true);
     PropHelper::SetGradientContainer(newImage, newGradients);
     PropHelper::InitializeImage(newImage);
   }
@@ -349,7 +329,7 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::ApplyHeader(const Image* image
     // The property helper works on row vectors: modified = original * R * MF, with the image
     // rotation R and the frame MF each applied only if the image's flags say so.
     std::optional<MatrixType> rotation, frame;
-    GradientTransformAccess::GetGradientTransform(image, rotation, frame);
+    PropHelper::GetGradientTransform(image, rotation, frame);
     MatrixType transform;
     transform.set_identity();
     if (rotation)
@@ -379,7 +359,7 @@ bool mitk::DiffusionImageEditing::AppliesImageRotationToGradients(const Image* d
   if (!PropHelper::IsDiffusionWeightedImage(dwi))
     mitkThrow() << "Not a diffusion-weighted image.";
   std::optional<MatrixType> rotation, frame;
-  GradientTransformAccess::GetGradientTransform(dwi, rotation, frame);
+  PropHelper::GetGradientTransform(dwi, rotation, frame);
   return rotation.has_value();
 }
 
@@ -500,7 +480,7 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::Crop(const Image* image, const
   {
     auto cropped = CropItkImage(ToItkDwi(image).GetPointer(), lower, upper);
     newImage = GrabItkImageMemory(cropped);
-    CopyProperties(image, newImage, true);
+    PropHelper::CopyProperties(image, newImage);
     PropHelper::InitializeImage(newImage);
   }
   else if (image->GetPixelType().GetNumberOfComponents() == 1 && image->GetDimension() == 3)
@@ -568,7 +548,7 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::Resample(const Image* image, R
 
     // The direction matrix stays, so the original gradients and the frame stay valid.
     newImage = GrabItkImageMemory(resampler->GetOutput());
-    CopyProperties(image, newImage, true);
+    PropHelper::CopyProperties(image, newImage);
     PropHelper::InitializeImage(newImage);
   }
   else if (image->GetPixelType().GetNumberOfComponents() == 1 && image->GetDimension() == 3)
@@ -606,7 +586,7 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::RemoveVolumes(const Image* dwi
   filter->Update();
 
   Image::Pointer newImage = GrabItkImageMemory(filter->GetOutput());
-  CopyProperties(dwi, newImage, false);
+  PropHelper::CopyProperties(dwi, newImage, true);
   PropHelper::SetGradientContainer(newImage, filter->GetNewDirections());
   PropHelper::InitializeImage(newImage);
   return newImage;
@@ -702,7 +682,7 @@ mitk::Image::Pointer mitk::DiffusionImageEditing::ReduceGradients(const Image* d
   filter->Update();
 
   Image::Pointer newImage = GrabItkImageMemory(filter->GetOutput());
-  CopyProperties(dwi, newImage, false);
+  PropHelper::CopyProperties(dwi, newImage, true);
   PropHelper::SetGradientContainer(newImage, filter->GetGradientDirections());
   PropHelper::InitializeImage(newImage);
   return newImage;

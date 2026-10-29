@@ -174,7 +174,7 @@ void FibersFromPlanarFiguresFilter::GenerateData()
         eDir = p1-p0; eDir.Normalize();
         mitk::Vector2D tDir2 = p3-p0; tDir2.Normalize();
         // the twist turns from the previous fiducial's direction, so its sign is that of tDir x tDir2
-        // (tRot holds only the previous increment, which gave the wrong sign for non-monotone twists)
+        // (not that of tRot, which holds only the previous increment and differs for non-monotone twists)
         const double cross = tDir[0]*tDir2[1] - tDir[1]*tDir2[0];
 
         // apply twist

@@ -65,6 +65,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateOr.h>
 
+namespace
+{
+  /** The parameters of a started simulation as saved next to its image (ListMovedVolumes). */
+  mitk::FiberfoxParameters SimulatedParameters(const mitk::FiberfoxParameters& parameters)
+  {
+    mitk::FiberfoxParameters simulated = parameters;
+    simulated.ListMovedVolumes();
+    return simulated;
+  }
+}
+
 QmitkFiberfoxWorker::QmitkFiberfoxWorker(QmitkFiberfoxView* view)
   : m_View(view)
 {
@@ -825,54 +836,14 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Rotation-y", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Rotation[1]));
     m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Rotation-z", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Rotation[2]));
 
-    if ( m_Parameters.m_Misc.m_MotionVolumesBox == "random" )
+    auto randgen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+    randgen->SetSeed();
+    if (!m_Parameters.m_SignalGen.SetMotionVolumes(m_Parameters.m_Misc.m_MotionVolumesBox, randgen))
     {
-      // as FiberfoxParameters::LoadParameters: volume 0 stays, every other volume moves with probability 1/2
-      auto randgen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
-      randgen->SetSeed();
-      m_Parameters.m_SignalGen.m_MotionVolumes.push_back(false);
-      for ( size_t i=1; i < m_Parameters.m_SignalGen.GetNumVolumes(); ++i )
-        m_Parameters.m_SignalGen.m_MotionVolumes.push_back( bool( randgen->GetIntegerVariate()%2 ) );
-    }
-
-    else if ( ! m_Parameters.m_Misc.m_MotionVolumesBox.empty() )
-    {
-      // The parser of FiberfoxParameters::LoadParameters (deferred: one shared function): positive
-      // numbers name the moved volumes, negative numbers the volumes that stay. Anything else (no
-      // numbers, both signs) moves no volume, with a warning.
-      std::stringstream stream( m_Parameters.m_Misc.m_MotionVolumesBox );
-      std::vector<int> numbers;
-      int number = 0;
-      while( stream >> number )
-        numbers.push_back( number );
-      const bool parsed = !numbers.empty();
-      const bool negative = parsed && *std::max_element(numbers.begin(), numbers.end()) <= 0
-          && *std::min_element(numbers.begin(), numbers.end()) < 0;
-      const bool positive = parsed && *std::min_element(numbers.begin(), numbers.end()) >= 0;
-
-      m_Parameters.m_SignalGen.m_MotionVolumes.assign(m_Parameters.m_SignalGen.GetNumVolumes(), negative);
-      if (negative || positive)
-      {
-        for (auto n : numbers)
-        {
-          const int index = negative ? -n : n;
-          if (index >= 0 && index < static_cast<int>(m_Parameters.m_SignalGen.GetNumVolumes()))
-            m_Parameters.m_SignalGen.m_MotionVolumes.at(index) = !negative;
-        }
-      }
-      else
-      {
-        MITK_WARN << "Cannot read the motion volumes '" << m_Parameters.m_Misc.m_MotionVolumesBox << "'. No volume is moved.";
-        QMessageBox::warning(nullptr, "Motion volumes", "Cannot read the motion volumes \""
-                             + m_Controls->m_MotionVolumesBox->text()
-                             + "\": give \"random\", the indices of the moved volumes, or the negative indices of the volumes that stay. No volume is moved.");
-      }
-    }
-
-    else
-    {
-      // blank: every volume moves, as the box's tooltip says
-      m_Parameters.m_SignalGen.m_MotionVolumes.assign(m_Parameters.m_SignalGen.GetNumVolumes(), true);
+      MITK_WARN << "Cannot read the motion volumes '" << m_Parameters.m_Misc.m_MotionVolumesBox << "'. No volume is moved.";
+      QMessageBox::warning(nullptr, "Motion volumes", "Cannot read the motion volumes \""
+                           + m_Controls->m_MotionVolumesBox->text()
+                           + "\": give \"random\", the indices of the moved volumes, or the negative indices of the volumes that stay. No volume is moved.");
     }
   }
 
@@ -962,12 +933,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
       m_Parameters.m_Misc.m_ArtifactModelString += QString::number(m_Parameters.m_SignalGen.m_NoiseVariance).toStdString();
       m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Noise-Variance", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_NoiseVariance));
     }
-
-    // The k-space filter adds complex Gaussian noise whenever m_NoiseVariance>0, so with a noise
-    // model (which keeps its own variance) the image would get both noises. Until the module adds
-    // k-space noise only without a noise model, the view sets this variance to 0.
-    if (m_Parameters.m_NoiseModel!=nullptr)
-      m_Parameters.m_SignalGen.m_NoiseVariance = 0;
   }
 
   // signal models
@@ -1931,79 +1896,6 @@ void QmitkFiberfoxView::OnAddRinging(int value)
     m_Controls->m_ZeroRinging->setVisible(false);
 }
 
-QmitkFiberfoxView::GradientListType QmitkFiberfoxView::GenerateHalfShell(int NPoints)
-{
-  NPoints *= 2;
-  GradientListType pointshell;
-
-  int numB0 = NPoints/20;
-  if (numB0==0)
-    numB0=1;
-  GradientType g;
-  g.Fill(0.0);
-  for (int i=0; i<numB0; i++)
-    pointshell.push_back(g);
-
-  if (NPoints==0)
-    return pointshell;
-
-  vnl_vector<double> theta; theta.set_size(NPoints);
-  vnl_vector<double> phi; phi.set_size(NPoints);
-  double C = sqrt(4*itk::Math::pi);
-  phi(0) = 0.0;
-  phi(NPoints-1) = 0.0;
-  for(int i=0; i<NPoints; i++)
-  {
-    theta(i) = acos(-1.0+2.0*i/(NPoints-1.0)) - itk::Math::pi / 2.0;
-    if( i>0 && i<NPoints-1)
-    {
-      phi(i) = (phi(i-1) + C /
-                sqrt(NPoints*(1-(-1.0+2.0*i/(NPoints-1.0))*(-1.0+2.0*i/(NPoints-1.0)))));
-      // % (2*DIST_POINTSHELL_PI);
-    }
-  }
-
-  for(int i=0; i<NPoints; i++)
-  {
-    g[2] = sin(theta(i));
-    if (g[2]<0)
-      continue;
-    g[0] = cos(theta(i)) * cos(phi(i));
-    g[1] = cos(theta(i)) * sin(phi(i));
-    pointshell.push_back(g);
-  }
-
-  return pointshell;
-}
-
-template<int ndirs>
-std::vector<itk::Vector<double,3> > QmitkFiberfoxView::MakeGradientList()
-{
-  std::vector<itk::Vector<double,3> > retval;
-  const vnl_matrix_fixed<double, 3, ndirs> &U = mitk::pointshell::Directions<ndirs>();
-
-
-  // Add 0 vector for B0
-  int numB0 = ndirs/10;
-  if (numB0==0)
-    numB0=1;
-  itk::Vector<double,3> v;
-  v.Fill(0.0);
-  for (int i=0; i<numB0; i++)
-  {
-    retval.push_back(v);
-  }
-
-  for(int i=0; i<ndirs;i++)
-  {
-    itk::Vector<double,3> v;
-    v[0] = U.get(0,i); v[1] = U.get(1,i); v[2] = U.get(2,i);
-    retval.push_back(v);
-  }
-
-  return retval;
-}
-
 void QmitkFiberfoxView::GenerateImage()
 {
   // set before the thread starts and cleared in AfterThread: a second click before the queued
@@ -2092,7 +1984,7 @@ void QmitkFiberfoxView::SimulateForExistingDwi(mitk::DataNode* imageNode)
                                             +"_"+m_Parameters.m_Misc.m_SignalModelString
                                             +m_Parameters.m_Misc.m_ArtifactModelString);
 
-  m_SimulatedParameters = m_Parameters;
+  m_SimulatedParameters = SimulatedParameters(m_Parameters);
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetInputImage(itkVectorImagePointer);
@@ -2134,7 +2026,7 @@ void QmitkFiberfoxView::SimulateImageFromFibers(mitk::DataNode* fiberNode)
     return;
   }
 
-  m_SimulatedParameters = m_Parameters;
+  m_SimulatedParameters = SimulatedParameters(m_Parameters);
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetFiberBundle(fiberBundle);

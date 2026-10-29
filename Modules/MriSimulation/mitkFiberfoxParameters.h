@@ -131,7 +131,7 @@ namespace mitk
     unsigned int                        m_EchoTrainLength;          ///< Only relevant for Fast Spin Echo sequence (number of k-space lines acquired with one RF pulse)
     bool                                m_ReversePhase;             ///< If true, the phase readout direction will be inverted (-y instead of y)
     float                               m_PartialFourier;           ///< Partial fourier factor (0.5-1)
-    float                               m_NoiseVariance;            ///< Variance of complex gaussian noise
+    float                               m_NoiseVariance;            ///< Variance of the complex Gaussian k-space noise; not added when FiberfoxParameters::m_NoiseModel is set
     unsigned int                        m_NumberOfCoils;            ///< Number of coils in multi-coil acquisition
     CoilSensitivityProfile              m_CoilSensitivityProfile;   ///< Choose between constant, linear or exponential sensitivity profile of the used coils
     float                               m_CoilSensitivity;          ///< signal remaining in slice center
@@ -153,7 +153,7 @@ namespace mitk
     bool                                m_DoAddMotion;              ///< Enable motion artifacts.
     bool                                m_DoRandomizeMotion;        ///< Toggles between random and linear motion.
     bool                                m_DoAddDrift;               ///< Add quadratic signal drift.
-    std::vector< bool >                 m_MotionVolumes;            ///< Indicates the image volumes that are affected by motion
+    std::vector< bool >                 m_MotionVolumes;            ///< Indicates the image volumes that are affected by motion; empty: all, missing entries: not moved
     ///< with positive numbers, inverted logic with negative numbers.
     itk::Vector<float,3>                m_Translation;              ///< Maximum translational motion.
     itk::Vector<float,3>                m_Rotation;                 ///< Maximum rotational motion.
@@ -178,6 +178,14 @@ namespace mitk
      * gradients). Without it, the gradients are taken as world vectors.
      */
     void ApplyDirectionMatrix();
+    /**
+     * Sets m_MotionVolumes, one flag per volume, from the motion-volume text of the Fiberfox view
+     * or of a .ffp file (leading and trailing spaces ignored): "random" moves every volume but the
+     * first with probability 1/2, a blank text moves every volume, positive numbers name the
+     * moved volumes and negative numbers the volumes that stay. Any other text (no numbers, both
+     * signs) moves no volume and returns false.
+     */
+    bool SetMotionVolumes(const std::string& text, itk::Statistics::MersenneTwisterRandomVariateGenerator* randgen);
 
   protected:
 
@@ -340,6 +348,14 @@ namespace mitk
      * with asFslBvecs false, as world vectors for a simulation without ApplyDirectionMatrix.
      */
     void SetGradientsFromImage(const mitk::Image* dwi, bool asFslBvecs=true);
+    /**
+     * For the .ffp saved next to a simulated image: with motion, the motion-volume text becomes the
+     * list of the volumes that m_SignalGen.m_MotionVolumes moves, so that loading the file moves the
+     * same volumes ("random" would draw anew). An empty list stays blank (every volume moves, in
+     * SetMotionVolumes and TractsToDWIImageFilter alike); a list without a moved volume switches
+     * motion off, because a blank text would move every volume.
+     */
+    void ListMovedVolumes();
 
     void PrintSelf();                           ///< Print parameters to stdout.
     void SaveParameters(std::string filename);  ///< Save image generation parameters to .ffp file.

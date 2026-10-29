@@ -276,7 +276,7 @@ vtkSmartPointer<vtkMatrix4x4> mitk::TrackVisFile::VoxmmToLps(const Header& heade
     for (int i=0; i<4; ++i)
       for (int j=0; j<4; ++j)
       {
-        // Divided in float, as MITK always did (same points as before); the reorientation only
+        // Divided in float, so that MITK's own files keep their points to the last bit; the reorientation only
         // reorders and negates the columns of the float matrix.
         if (j<3)
           matrix->SetElement(i, j, static_cast<float>(voxToRas->GetElement(i, j))/header.voxel_size[j]);
@@ -331,6 +331,8 @@ void mitk::TrackVisFile::SetGrid(Header& header, const double indexToRas[3][4], 
   for (int c=0; c<3; ++c)
     header.vox_to_ras[3][c] = 0;
   header.vox_to_ras[3][3] = 1;
+  // readers (TrackVis spec, nibabel, dipy, HasMatrix) use vox_to_ras only from version 2 on
+  header.version = 2;
 
   for (int k=0; k<3; ++k)
   {

@@ -207,7 +207,7 @@ namespace
     if (bestCandidate < 0)
       return 0;
 
-    // The grid step (0.00149) alone gave errors of up to half a step, 7.5 % at D* = 0.01. A
+    // The grid step (0.00149) alone allows errors of up to half a step, 7.5 % at D* = 0.01. A
     // golden-section search refines the best value between its neighbours.
     const double step = (maxDStar - minDStar) / numberOfCandidates;
     const double best = minDStar + bestCandidate * step;

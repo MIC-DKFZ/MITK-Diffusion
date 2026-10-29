@@ -98,8 +98,6 @@ public:
     typedef itk::Image<float, 3>            ItkFloatImgType;
     typedef itk::Image<unsigned char, 3>    ItkUcharImgType;
 
-    template<int ndirs> std::vector<itk::Vector<double,3> > MakeGradientList();
-
 protected slots:
 
     void SetOutputPath();           ///< path where image is automatically saved to after the simulation is finished
@@ -138,8 +136,6 @@ protected slots:
     void OnGradientSettingsChanged();   ///< loaded gradients and prototypes give way to the changed settings
 
 protected:
-
-    GradientListType GenerateHalfShell(int NPoints);    ///< generate vectors distributed over the halfsphere
 
     Ui::QmitkFiberfoxViewControls* m_Controls;
 

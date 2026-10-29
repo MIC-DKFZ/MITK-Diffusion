@@ -610,7 +610,7 @@ void QmitkControlVisualizationPropertiesView::FlipPeaks()
       caster->SetInput(static_cast<const mitk::Image*>(peaks));
       caster->Update();
 
-      itk::FlipPeaksFilter< float >::Pointer flipper = itk::FlipPeaksFilter< float >::New();
+      itk::FlipPeaksFilter::Pointer flipper = itk::FlipPeaksFilter::New();
       flipper->SetInput(caster->GetOutput());
       flipper->SetFlipX(m_Controls->m_FlipPeaksX->isChecked());
       flipper->SetFlipY(m_Controls->m_FlipPeaksY->isChecked());

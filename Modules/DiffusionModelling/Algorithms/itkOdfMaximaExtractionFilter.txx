@@ -19,6 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkOdfMaximaExtractionFilter.h"
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionConstIteratorWithIndex.h>
+#include <mitkMaskGeometry.h>
 #include <itkImageRegionIterator.h>
 #include <vnl/vnl_vector.h>
 #include <itkOrientationDistributionFunction.h>
@@ -107,7 +108,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   ImageRegion<3> imageRegion = ShCoeffImage->GetLargestPossibleRegion();
 
   // The mask is read with the input's voxel indices.
-  if (m_MaskImage.IsNotNull() && (m_MaskImage->GetLargestPossibleRegion() != imageRegion || !m_MaskImage->IsSameImageGeometryAs(ShCoeffImage)))
+  if (m_MaskImage.IsNotNull() && !mitk::HasVoxelGridOf(m_MaskImage, ShCoeffImage))
     itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the SH image.");
 
   m_PeakImage = PeakImageType::New();

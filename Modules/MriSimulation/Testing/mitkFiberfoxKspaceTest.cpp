@@ -46,6 +46,7 @@ class mitkFiberfoxKspaceTestSuite : public mitk::TestFixture
   MITK_TEST(NoiseFullFourier);
   MITK_TEST(NoisePartialFourier);
   MITK_TEST(NoiseMultiCoil);
+  MITK_TEST(NoKspaceNoiseWithNoiseModel);
   MITK_TEST(ReadoutSchemes);
   MITK_TEST(FieldmapGenerator);
   CPPUNIT_TEST_SUITE_END();
@@ -447,6 +448,23 @@ public:
     MITK_INFO << coils << " coils: mean magnitude " << sum / n << " (expected " << expected << ")";
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(coils), filter->GetOutputImagesReal().size());
     CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, sum / n, 0.03 * expected);
+  }
+
+  /** With a noise model (Rician, chi-square) the model adds the noise of the run after the k-space
+      step, so the k-space step adds no complex Gaussian noise of its own, whatever its variance. */
+  void NoKspaceNoiseWithNoiseModel()
+  {
+    auto image = MakeImage(32, 32, 2, 2, [](int, int) { return 0.0; });
+    auto parameters = MakeParameters(image);
+    parameters.m_Misc.m_DoAddNoise = true;
+    parameters.m_SignalGen.m_NoiseVariance = 100;
+    parameters.m_NoiseModel = std::make_shared< mitk::RicianNoiseModel<> >();
+    parameters.m_NoiseModel->SetNoiseVariance(100);
+    auto filter = Acquire(image, parameters);
+
+    double varReal, varImag, meanMagnitude;
+    NoiseStatistics(filter, varReal, varImag, meanMagnitude);
+    CPPUNIT_ASSERT_EQUAL(0.0, meanMagnitude);
   }
 
   /**

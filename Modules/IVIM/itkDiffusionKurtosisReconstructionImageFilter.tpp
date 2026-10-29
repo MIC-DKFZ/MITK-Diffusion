@@ -66,7 +66,7 @@ namespace itk
       return;
 
     // Smoothed in double: an integer image would truncate the smoothed signal (100 and 101
-    // alternating gave 100), which biased K by -0.02 on test_multi.dwi.
+    // alternating would give 100), which biases K by -0.02 on test_multi.dwi.
     using ScalarImageType = Image<double, 3>;
     using GaussianFilterType = DiscreteGaussianImageFilter<ScalarImageType, ScalarImageType>;
     using IndexSelectionType = VectorIndexSelectionCastImageFilter<InputImageType, ScalarImageType>;

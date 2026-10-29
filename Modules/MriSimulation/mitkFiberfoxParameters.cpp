@@ -281,6 +281,47 @@ void mitk::SignalGenerationParameters::SetGradienDirections(mitk::DiffusionPrope
   }
 }
 
+bool mitk::SignalGenerationParameters::SetMotionVolumes(const std::string& text, itk::Statistics::MersenneTwisterRandomVariateGenerator* randgen)
+{
+  const std::size_t first = text.find_first_not_of(" \t\n\r");
+  const std::string trimmed = first == std::string::npos ? "" : text.substr(first, text.find_last_not_of(" \t\n\r") - first + 1);
+  const unsigned int numVolumes = GetNumVolumes();
+
+  if (trimmed == "random")
+  {
+    m_MotionVolumes.assign(numVolumes, false);
+    for (unsigned int i = 1; i < numVolumes; ++i)
+      m_MotionVolumes[i] = bool( randgen->GetIntegerVariate()%2 );
+    return true;
+  }
+  if (trimmed.empty())
+  {
+    m_MotionVolumes.assign(numVolumes, true);
+    return true;
+  }
+
+  std::stringstream stream( trimmed );
+  std::vector<int> numbers;
+  int number = 0;
+  while( stream >> number )
+    numbers.push_back( number );
+  const bool parsed = !numbers.empty() && stream.eof();
+  const bool negative = parsed && *std::max_element(numbers.begin(), numbers.end()) <= 0
+      && *std::min_element(numbers.begin(), numbers.end()) < 0;
+  const bool positive = parsed && *std::min_element(numbers.begin(), numbers.end()) >= 0;
+
+  m_MotionVolumes.assign(numVolumes, negative);
+  if (!negative && !positive)
+    return false;
+  for (auto n : numbers)
+  {
+    const int index = negative ? -n : n;
+    if (index >= 0 && index < static_cast<int>(numVolumes))
+      m_MotionVolumes[index] = !negative;
+  }
+  return true;
+}
+
 void mitk::SignalGenerationParameters::ApplyDirectionMatrix()
 {
   // world = MF^T bvec with the measurement frame of FSL bvecs (frame axes as rows)
@@ -322,6 +363,20 @@ void mitk::FiberfoxParameters::SetGradientsFromImage(const mitk::Image* dwi, boo
   }
   m_SignalGen.m_Bvalue = mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi);
   SetGradienDirections(gradients);
+}
+
+void mitk::FiberfoxParameters::ListMovedVolumes()
+{
+  if (!m_SignalGen.m_DoAddMotion)
+    return;
+  std::string moved;
+  for (std::size_t i = 0; i < m_SignalGen.m_MotionVolumes.size(); ++i)
+    if (m_SignalGen.m_MotionVolumes[i])
+      moved += (moved.empty() ? "" : " ") + std::to_string(i);
+  if (moved.empty() && !m_SignalGen.m_MotionVolumes.empty())
+    m_SignalGen.m_DoAddMotion = false;
+  else
+    m_Misc.m_MotionVolumesBox = moved;
 }
 
 void mitk::FiberfoxParameters::SaveParameters(std::string filename)
@@ -727,7 +782,7 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
       m_SignalGen.m_ImageOrigin[1] = ReadVal<float>(v1,"basic.origin.y",m_SignalGen.m_ImageOrigin[1]);
       m_SignalGen.m_ImageOrigin[2] = ReadVal<float>(v1,"basic.origin.z",m_SignalGen.m_ImageOrigin[2]);
 
-      // a file without direction gets the identity (decided by default, D-M8); read as double, as written
+      // a file without direction gets the identity; read as double, as written
       m_SignalGen.m_ImageDirection.SetIdentity();
       const auto direction = v1.second.get_child_optional("basic.direction");
       if (direction)
@@ -820,45 +875,8 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
       }
 
       m_Misc.m_MotionVolumesBox = ReadVal<std::string>(v1,"artifacts.motionvolumes", m_Misc.m_MotionVolumesBox);
-      m_SignalGen.m_MotionVolumes.clear();
-
-      if ( m_Misc.m_MotionVolumesBox == "random" )
-      {
-        m_SignalGen.m_MotionVolumes.push_back(0);
-        for ( size_t i=1; i < m_SignalGen.GetNumVolumes(); ++i )
-        {
-          m_SignalGen.m_MotionVolumes.push_back( bool( randgen->GetIntegerVariate()%2 ) );
-        }
-        MITK_DEBUG << "mitkFiberfoxParameters.cpp: Case m_Misc.m_MotionVolumesBox == \"random\".";
-      }
-      else
-      {
-        // A list of volume indices: positive numbers name the moved volumes, negative numbers the
-        // volumes that stay. Anything else (no numbers, both signs) moves no volume, with a warning;
-        // the rest of the file is still read.
-        std::stringstream stream( m_Misc.m_MotionVolumesBox );
-        std::vector<int> numbers;
-        int number = 0;
-        while( stream >> number )
-          numbers.push_back( number );
-        const bool parsed = !numbers.empty();
-        const bool negative = parsed && *std::max_element(numbers.begin(), numbers.end()) <= 0
-            && *std::min_element(numbers.begin(), numbers.end()) < 0;
-        const bool positive = parsed && *std::min_element(numbers.begin(), numbers.end()) >= 0;
-
-        m_SignalGen.m_MotionVolumes.assign(m_SignalGen.GetNumVolumes(), negative);
-        if (negative || positive)
-        {
-          for (auto n : numbers)
-          {
-            const int index = negative ? -n : n;
-            if (index >= 0 && index < static_cast<int>(m_SignalGen.GetNumVolumes()))
-              m_SignalGen.m_MotionVolumes.at(index) = !negative;
-          }
-        }
-        else
-          MITK_WARN << "Cannot read the motion volumes '" << m_Misc.m_MotionVolumesBox << "' (indices of the moved volumes, or negative indices of the volumes that stay). No volume is moved.";
-      }
+      if (!m_SignalGen.SetMotionVolumes(m_Misc.m_MotionVolumesBox, randgen))
+        MITK_WARN << "Cannot read the motion volumes '" << m_Misc.m_MotionVolumesBox << "' (indices of the moved volumes, or negative indices of the volumes that stay). No volume is moved.";
 
       try
       {
