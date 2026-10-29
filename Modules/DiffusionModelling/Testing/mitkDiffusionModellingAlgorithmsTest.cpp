@@ -62,6 +62,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(Adc_ZeroBaselineValue_LeftOutInBothModes);
   MITK_TEST(Adc_MeanAdc_IsMeanOverAcquiredDirections);
   MITK_TEST(PrincipalDirection_MaskOfOtherSize_Throws);
+  MITK_TEST(PrincipalDirection_MaskOriginRounded_Accepted);
   MITK_TEST(PrincipalDirection_SecondInput_SameAsFreshFilter);
   MITK_TEST(MaximaExtraction_MaskOfOtherSize_Throws);
   MITK_TEST(ShToRgb_MatchesOdfOfBothConventions);
@@ -377,6 +378,34 @@ public:
     filter->SetInput(tensors);
     filter->SetMaskImage(MaskLargerThan(tensors.GetPointer()));
     CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+  }
+
+  // The rule of mitk::HasVoxelGridOf, as for IVIM and kurtosis: an origin off by rounding (a mask
+  // saved as NIfTI with a float origin) is the same grid, 1e-3 mm is not. ITK's default tolerance
+  // (1e-6 of a voxel) refused the first.
+  void PrincipalDirection_MaskOriginRounded_Accepted()
+  {
+    auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
+    for (const double shift : {5e-6, 1e-3})
+    {
+      auto mask = itk::Image<unsigned char, 3>::New();
+      mask->SetRegions(tensors->GetLargestPossibleRegion());
+      mask->SetSpacing(tensors->GetSpacing());
+      auto origin = tensors->GetOrigin();
+      origin[0] += shift;
+      mask->SetOrigin(origin);
+      mask->SetDirection(tensors->GetDirection());
+      mask->Allocate();
+      mask->FillBuffer(1);
+
+      auto filter = itk::DiffusionTensorPrincipalDirectionImageFilter<float>::New();
+      filter->SetInput(tensors);
+      filter->SetMaskImage(mask);
+      if (shift < 1e-4)
+        CPPUNIT_ASSERT_NO_THROW(filter->Update());
+      else
+        CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+    }
   }
 
   // The all-ones mask generated without a user mask was kept and reused for the next input.

@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkArray.h"
 #include "vnl/vnl_vector.h"
 #include <mitkImageGeometry4D.h>
+#include <mitkMaskGeometry.h>
 
 
 namespace itk {
@@ -50,7 +51,7 @@ void DiffusionTensorPrincipalDirectionImageFilter< TTensorPixelType>::BeforeThre
   ImageRegion<3> imageRegion3 = inputImagePointer->GetLargestPossibleRegion();
 
   // The mask is read with the input's voxel indices.
-  if (m_MaskImage.IsNotNull() && (m_MaskImage->GetLargestPossibleRegion() != imageRegion3 || !m_MaskImage->IsSameImageGeometryAs(inputImagePointer)))
+  if (m_MaskImage.IsNotNull() && !mitk::HasVoxelGridOf(m_MaskImage, inputImagePointer))
     itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the tensor image.");
 
   m_MaskGenerated = m_MaskImage.IsNull();
