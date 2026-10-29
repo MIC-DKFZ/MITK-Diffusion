@@ -65,6 +65,29 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateOr.h>
 
+namespace
+{
+  /** The parameters of a started simulation as saved next to its image. The motion volumes are
+      stored as the indices that moved, so that loading the .ffp moves the same volumes ("random"
+      would draw anew); a run in which no volume moved is saved without motion, because a blank
+      text moves every volume. */
+  mitk::FiberfoxParameters SimulatedParameters(const mitk::FiberfoxParameters& parameters)
+  {
+    mitk::FiberfoxParameters simulated = parameters;
+    if (!simulated.m_SignalGen.m_DoAddMotion)
+      return simulated;
+    std::string moved;
+    for (std::size_t i = 0; i < simulated.m_SignalGen.m_MotionVolumes.size(); ++i)
+      if (simulated.m_SignalGen.m_MotionVolumes[i])
+        moved += (moved.empty() ? "" : " ") + std::to_string(i);
+    if (moved.empty())
+      simulated.m_SignalGen.m_DoAddMotion = false;
+    else
+      simulated.m_Misc.m_MotionVolumesBox = moved;
+    return simulated;
+  }
+}
+
 QmitkFiberfoxWorker::QmitkFiberfoxWorker(QmitkFiberfoxView* view)
   : m_View(view)
 {
@@ -825,54 +848,14 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Rotation-y", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Rotation[1]));
     m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Rotation-z", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Rotation[2]));
 
-    if ( m_Parameters.m_Misc.m_MotionVolumesBox == "random" )
+    auto randgen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+    randgen->SetSeed();
+    if (!m_Parameters.m_SignalGen.SetMotionVolumes(m_Parameters.m_Misc.m_MotionVolumesBox, randgen))
     {
-      // as FiberfoxParameters::LoadParameters: volume 0 stays, every other volume moves with probability 1/2
-      auto randgen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
-      randgen->SetSeed();
-      m_Parameters.m_SignalGen.m_MotionVolumes.push_back(false);
-      for ( size_t i=1; i < m_Parameters.m_SignalGen.GetNumVolumes(); ++i )
-        m_Parameters.m_SignalGen.m_MotionVolumes.push_back( bool( randgen->GetIntegerVariate()%2 ) );
-    }
-
-    else if ( ! m_Parameters.m_Misc.m_MotionVolumesBox.empty() )
-    {
-      // The parser of FiberfoxParameters::LoadParameters (deferred: one shared function): positive
-      // numbers name the moved volumes, negative numbers the volumes that stay. Anything else (no
-      // numbers, both signs) moves no volume, with a warning.
-      std::stringstream stream( m_Parameters.m_Misc.m_MotionVolumesBox );
-      std::vector<int> numbers;
-      int number = 0;
-      while( stream >> number )
-        numbers.push_back( number );
-      const bool parsed = !numbers.empty();
-      const bool negative = parsed && *std::max_element(numbers.begin(), numbers.end()) <= 0
-          && *std::min_element(numbers.begin(), numbers.end()) < 0;
-      const bool positive = parsed && *std::min_element(numbers.begin(), numbers.end()) >= 0;
-
-      m_Parameters.m_SignalGen.m_MotionVolumes.assign(m_Parameters.m_SignalGen.GetNumVolumes(), negative);
-      if (negative || positive)
-      {
-        for (auto n : numbers)
-        {
-          const int index = negative ? -n : n;
-          if (index >= 0 && index < static_cast<int>(m_Parameters.m_SignalGen.GetNumVolumes()))
-            m_Parameters.m_SignalGen.m_MotionVolumes.at(index) = !negative;
-        }
-      }
-      else
-      {
-        MITK_WARN << "Cannot read the motion volumes '" << m_Parameters.m_Misc.m_MotionVolumesBox << "'. No volume is moved.";
-        QMessageBox::warning(nullptr, "Motion volumes", "Cannot read the motion volumes \""
-                             + m_Controls->m_MotionVolumesBox->text()
-                             + "\": give \"random\", the indices of the moved volumes, or the negative indices of the volumes that stay. No volume is moved.");
-      }
-    }
-
-    else
-    {
-      // blank: every volume moves, as the box's tooltip says
-      m_Parameters.m_SignalGen.m_MotionVolumes.assign(m_Parameters.m_SignalGen.GetNumVolumes(), true);
+      MITK_WARN << "Cannot read the motion volumes '" << m_Parameters.m_Misc.m_MotionVolumesBox << "'. No volume is moved.";
+      QMessageBox::warning(nullptr, "Motion volumes", "Cannot read the motion volumes \""
+                           + m_Controls->m_MotionVolumesBox->text()
+                           + "\": give \"random\", the indices of the moved volumes, or the negative indices of the volumes that stay. No volume is moved.");
     }
   }
 
@@ -2092,7 +2075,7 @@ void QmitkFiberfoxView::SimulateForExistingDwi(mitk::DataNode* imageNode)
                                             +"_"+m_Parameters.m_Misc.m_SignalModelString
                                             +m_Parameters.m_Misc.m_ArtifactModelString);
 
-  m_SimulatedParameters = m_Parameters;
+  m_SimulatedParameters = SimulatedParameters(m_Parameters);
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetInputImage(itkVectorImagePointer);
@@ -2134,7 +2117,7 @@ void QmitkFiberfoxView::SimulateImageFromFibers(mitk::DataNode* fiberNode)
     return;
   }
 
-  m_SimulatedParameters = m_Parameters;
+  m_SimulatedParameters = SimulatedParameters(m_Parameters);
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetFiberBundle(fiberBundle);

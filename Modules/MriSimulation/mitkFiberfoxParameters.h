@@ -178,6 +178,14 @@ namespace mitk
      * gradients). Without it, the gradients are taken as world vectors.
      */
     void ApplyDirectionMatrix();
+    /**
+     * Sets m_MotionVolumes, one flag per volume, from the motion-volume text of the Fiberfox view
+     * or of a .ffp file (leading and trailing spaces ignored): "random" moves every volume but the
+     * first with probability 1/2, a blank text moves every volume, positive numbers name the
+     * moved volumes and negative numbers the volumes that stay. Any other text (no numbers, both
+     * signs) moves no volume and returns false.
+     */
+    bool SetMotionVolumes(const std::string& text, itk::Statistics::MersenneTwisterRandomVariateGenerator* randgen);
 
   protected:
 

@@ -226,7 +226,9 @@ public:
     itksys::SystemTools::RemoveADirectory(folder);
   }
 
-  /** The motion-volume string of a .ffp file; an unreadable one moves no volume and the rest of the file is read. */
+  /** The motion-volume string of a .ffp file (SignalGenerationParameters::SetMotionVolumes, also
+      used by the Fiberfox view): blank moves every volume, an unreadable one moves no volume and
+      the rest of the file is read. */
   void MotionVolumes()
   {
     std::ifstream in(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"));
@@ -237,10 +239,13 @@ public:
 
     const std::vector<std::pair<std::string, std::vector<unsigned int>>> cases = {
       { "2 4", { 2, 4 } },        // moved volumes
+      { " 2 4 ", { 2, 4 } },      // surrounding spaces
       { "-0 -1", {} },            // all but volumes 0 and 1 (checked below)
       { "abc", {} },              // unreadable: none
       { "1 -2", {} },             // both signs: none
-      { "", {} } };
+      { "2 4x", {} },             // a partial number: none
+      { "", {} },                 // blank: all (checked below)
+      { "  ", {} } };             // spaces only: blank
     for (const auto& c : cases)
     {
       std::string text = original;
@@ -258,10 +263,18 @@ public:
         bool expected = std::find(c.second.begin(), c.second.end(), i) != c.second.end();
         if (c.first == "-0 -1")
           expected = i > 1;
+        if (c.first.find_first_not_of(' ') == std::string::npos)
+          expected = true;
         CPPUNIT_ASSERT_EQUAL_MESSAGE("'" + c.first + "': volume " + std::to_string(i), expected, static_cast<bool>(moved[i]));
       }
     }
     itksys::SystemTools::RemoveADirectory(folder);
+
+    // "random", the file's own text, never moves volume 0
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"), true);
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(parameters.m_SignalGen.GetNumVolumes()), parameters.m_SignalGen.m_MotionVolumes.size());
+    CPPUNIT_ASSERT(!parameters.m_SignalGen.m_MotionVolumes.at(0));
   }
 
   /** A saved .ffp keeps its gradients when it is copied without its .bvals/.bvecs files. */
