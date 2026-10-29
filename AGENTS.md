@@ -164,15 +164,15 @@ Facts the layout does not show:
   lines, and drops fibers without points with a warning; `SetFiberPolyData` gives the new fibers
   weight 1. The mask cut (`RemoveFibersOutside`) cuts segments at the mask border;
   `ResamplePolylineToNumPoints` (equal arc length) serves `ResampleToNumPoints` and the
-  clustering filter. Tests that change the OpenMP thread count use `mitk::OmpThreadGuard`
-  (`CMake/mitkOmpThreadGuard.h`, in the include path of each driver that includes
-  `mitkDiffusionTestData`).
+  clustering filter. The `FiberBundle` and `FiberProcessing` tests that change the OpenMP thread
+  count use `mitk::OmpThreadGuard` (`CMake/mitkOmpThreadGuard.h`, in the include path of each
+  test driver whose `Testing/CMakeLists.txt` includes `mitkDiffusionTestData`).
 - `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter)Test'`
   runs the `FiberProcessing` tests. Its filters read const bundles and give the same result at
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
   set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
-  voxel grid (`mitkFiberImageGrid.h`). Clustering metrics prepare per-fiber data once
-  (`ClusteringMetric::PrepareFiber`); their values equal the former vnl formulation bit for bit
+  voxel grid (`mitkFiberImageGrid.h`). The clustering filter prepares each fiber's metric data
+  once (`ClusteringMetric::PrepareFiber`); the metric values equal the former vnl formulation bit for bit
   (`Metrics_SameValuesAsVnlFormulation`), which the clustering outputs depend on.
 - `ctest -R Tractography` runs the `FiberTracking` tests. Streamline tracking seeds its random
   engines per seed point, so a tractogram with a fixed seed (`--fix_seed`, "Fix Random Seed") is
