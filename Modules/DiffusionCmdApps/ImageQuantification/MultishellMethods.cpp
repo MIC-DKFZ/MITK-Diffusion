@@ -123,6 +123,15 @@ int main(int argc, char* argv[])
       for(; it != originalShellMap.end(); ++it)
         bValueList.put(i++,it->first);
 
+      // A fit needs at least as many shells (besides b=0) as unknowns: kurtosis 2, bi-exponential 3.
+      // Checked before the first output is written.
+      if ((applyAKC && bValueList.size() < 2) || (applyBiExp && bValueList.size() < 3))
+      {
+        std::cout << "The kurtosis fit needs 2 and the bi-exponential fit 3 shells besides b=0; "
+                  << inName << " has " << bValueList.size() << "." << std::endl;
+        return EXIT_FAILURE;
+      }
+
       double targetBValue = bValueList.mean();
       if( targetType == "min" )
         targetBValue = bValueList.min_value();
