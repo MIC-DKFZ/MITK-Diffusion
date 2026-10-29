@@ -232,10 +232,9 @@ int main(int argc, char* argv[])
     }
 
     // Cutting at the mask comes before the length filter, so that no piece shorter than
-    // --min_length remains, and before resampling and compression: the cut keeps the fiber
-    // points inside the mask, so on compressed or coarsely resampled fibers it would lose the
-    // in-mask parts between distant points, and --num_resampling gives each output piece its
-    // number of points. Without any fiber left the result is an empty bundle.
+    // --min_length remains, and before resampling and compression: the pieces are cut from the
+    // fibers as given (at the mask border, also between two points), and --num_resampling gives
+    // each output piece its number of points. Without any fiber left the result is an empty bundle.
     if ( mask.IsNotNull() )
     {
       if (remove_outside)

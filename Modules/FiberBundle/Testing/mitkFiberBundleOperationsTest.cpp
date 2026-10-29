@@ -279,7 +279,7 @@ public:
     CPPUNIT_ASSERT_EQUAL(4u, inside->GetNumFibers());
     AssertPiece(inside, 0, {3.5, 5, 5}, {5.5, 5, 5}, 2, 2.0f, "outside removed, A");
     AssertPiece(inside, 1, {3.5, 5, 5}, {5.5, 5, 5}, 5, 3.0f, "outside removed, B");
-    CPPUNIT_ASSERT_MESSAGE("a fiber inside the mask keeps its points", FiberPoints(inside, 2) == fiberC);
+    CPPUNIT_ASSERT_MESSAGE("a fiber inside the mask keeps its points", FiberPoints(inside, 2) == FiberPoints(fib, 2));
     CPPUNIT_ASSERT_EQUAL(4.0f, inside->GetFiberWeight(2));
     AssertPiece(inside, 3, {3.5, 3.5, 5}, {5.5, 5.5, 5}, 2, 5.0f, "outside removed, D");
 
