@@ -94,6 +94,8 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(ShReader_VectorLayout_OpensBothWays);
   MITK_TEST(ShReader_VectorLayout_MitkFslBasis);
   MITK_TEST(MimeTypes_VectorLayoutDwi_NoShReader);
+  MITK_TEST(MimeTypes_Sh4dNifti_ImageReaderIsDefault);
+  MITK_TEST(PeakReader_MrtrixKnownDirections_Lps);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -446,7 +448,7 @@ public:
     for (auto convention : {mitk::ShImage::FSL, mitk::ShImage::MRTRIX})
     {
       shImage->SetShConvention(convention);
-      for (const std::string extension : {".nii.gz", ".shi"})
+      for (const std::string extension : {".nii.gz", ".shi", ".nrrd"})
       {
         const std::string path = m_TempDir + "/convention" + std::to_string(convention) + extension;
         mitk::IOUtil::Save(shImage, path);
@@ -1210,6 +1212,58 @@ public:
       writer->Update();
       CPPUNIT_ASSERT_EQUAL_MESSAGE(path, dwi ? std::size_t(0) : std::size_t(1), ReaderDescriptions(path).count("SH Image"));
     }
+  }
+
+  // A 4D NIfTI file whose volume count fits SH and peak images is opened by MITK's image reader
+  // unless the SH or peak reader is chosen; this rests on the mime-type rank and MITK's reader order.
+  void MimeTypes_Sh4dNifti_ImageReaderIsDefault()
+  {
+    const std::string path = mitk::GetDiffusionTestDataFilePath("sh_image_test.nii.gz");
+    const auto descriptions = ReaderDescriptions(path);
+    CPPUNIT_ASSERT(descriptions.count("SH Image") == 1 && descriptions.count("Peak Image") == 1);
+    const std::string defaultReader = mitk::FileReaderSelector(path).GetDefault().GetDescription();
+    CPPUNIT_ASSERT_MESSAGE(defaultReader, defaultReader != "SH Image" && defaultReader != "Peak Image");
+
+    auto data = mitk::IOUtil::Load(path).at(0);
+    CPPUNIT_ASSERT(dynamic_cast<mitk::Image *>(data.GetPointer()) != nullptr);
+    CPPUNIT_ASSERT(dynamic_cast<mitk::ShImage *>(data.GetPointer()) == nullptr);
+    CPPUNIT_ASSERT(dynamic_cast<mitk::PeakImage *>(data.GetPointer()) == nullptr);
+  }
+
+  // MRtrix (sh2peaks, 3.0.8 checked) writes peaks as scanner RAS vectors, whatever the image
+  // orientation, and names itself in the NIfTI descrip; MITK reads them as world LPS vectors.
+  void PeakReader_MrtrixKnownDirections_Lps()
+  {
+    using ImageType = mitk::PeakImage::ItkPeakImageType;
+    auto image = ImageType::New();
+    ImageType::RegionType region;
+    region.SetSize({{2, 1, 1, 6}});
+    image->SetRegions(region);
+    // An oblique image: the peaks are world vectors, the image rotation does not apply.
+    const Matrix3 rotation = RotationZ30();
+    ImageType::DirectionType direction;
+    direction.SetIdentity();
+    for (unsigned int r = 0; r < 3; ++r)
+      for (unsigned int c = 0; c < 3; ++c)
+        direction[r][c] = rotation(r, c);
+    image->SetDirection(direction);
+    image->Allocate();
+    // RAS peaks per voxel: (1, 0, 0) and (0, 0.6, 0.8); (0.6, 0.8, 0) and none.
+    const float ras[2][6] = {{1, 0, 0, 0, 0.6f, 0.8f}, {0.6f, 0.8f, 0, 0, 0, 0}};
+    for (unsigned int x = 0; x < 2; ++x)
+      for (unsigned int j = 0; j < 6; ++j)
+        image->SetPixel({{x, 0, 0, j}}, ras[x][j]);
+    itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "ITK_FileNotes", "MRtrix version: 3.0.8");
+    const std::string path = m_TempDir + "/mrtrix_peaks.nii.gz";
+    auto writer = itk::ImageFileWriter<ImageType>::New();
+    writer->SetInput(image);
+    writer->SetFileName(path);
+    writer->Update();
+
+    auto peaks = LoadPeaks(path, std::nullopt)->GetItkPeakImage();
+    for (unsigned int x = 0; x < 2; ++x)
+      for (unsigned int j = 0; j < 6; ++j)
+        CPPUNIT_ASSERT_EQUAL(j % 3 == 2 ? ras[x][j] : -ras[x][j], peaks->GetPixel({{x, 0, 0, j}}));
   }
 };
 
