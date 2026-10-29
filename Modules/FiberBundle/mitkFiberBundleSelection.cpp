@@ -139,7 +139,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(const mitk::FiberBu
 
   MITK_INFO << "Subtracting fibers";
 
-  // End points of every fiber; a bundle has no fiber without points (vtkCleanPolyData in
+  // End points of every fiber; a bundle has no fiber without points (CleanFiberPolyData in
   // UpdateFiberGeometry removes empty cells), so the index is the fiber id.
   using EndPoints = std::array< itk::Point<float, 3>, 2 >;
   auto endPoints = [](vtkPolyData* polyData, unsigned int numFibers)

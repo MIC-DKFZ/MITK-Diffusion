@@ -74,6 +74,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(TckReader_ReadOnlyOrUnterminatedFile_Loads);
   MITK_TEST(TckReader_HeaderWithoutEnd_Throws);
   MITK_TEST(TckReader_OnePointStreamlines_KeepFileOrder);
+  MITK_TEST(VtkReader_LoadedBundle_ArraysSizedToTheFibers);
   MITK_TEST(TrkReader_ScalarsAndProperties_AreSkipped);
   MITK_TEST(TrkReader_InvalidFiles_Throw);
   MITK_TEST(TrkReader_NonRasVoxelOrders_FollowTrackVisDefinition);
@@ -718,6 +719,19 @@ public:
     check(reloaded, "fib file");
     for (unsigned int i = 0; i < reloaded->GetNumFibers(); ++i)
       CPPUNIT_ASSERT_EQUAL(1.0f + i, reloaded->GetFiberWeight(i));
+  }
+
+  // A bundle keeps its point and line arrays for its lifetime; arrays grown point by point held up
+  // to twice the memory of the fibers (1.7 times for this file).
+  void VtkReader_LoadedBundle_ArraysSizedToTheFibers()
+  {
+    auto fib = LoadFibers("FiberProcessing/original.fib");
+    vtkPolyData *polyData = fib->GetFiberPolyData();
+    vtkDataArray *points = polyData->GetPoints()->GetData();
+    vtkCellArray *lines = polyData->GetLines();
+    CPPUNIT_ASSERT_EQUAL(points->GetNumberOfValues(), points->GetCapacity());
+    CPPUNIT_ASSERT_EQUAL(lines->GetConnectivityArray()->GetNumberOfValues(), lines->GetConnectivityArray()->GetCapacity());
+    CPPUNIT_ASSERT_EQUAL(lines->GetOffsetsArray()->GetNumberOfValues(), lines->GetOffsetsArray()->GetCapacity());
   }
 
   void TckReader_HeaderWithoutEnd_Throws()

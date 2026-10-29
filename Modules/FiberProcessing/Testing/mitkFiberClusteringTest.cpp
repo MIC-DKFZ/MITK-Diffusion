@@ -20,6 +20,7 @@ found in the LICENSE file.
 #include <mitkClusteringMetricScalarMap.h>
 #include <mitkIOUtil.h>
 #include <mitkDiffusionTestData.h>
+#include <mitkOmpThreadGuard.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <mitkExceptionMacro.h>
@@ -110,8 +111,7 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
     for (int i = 1; i <= 26; ++i)
       distances.push_back(10.0f * i);
 
-    const int previousThreads = omp_get_max_threads();
-    omp_set_num_threads(threads);
+    mitk::OmpThreadGuard threadGuard(threads);
     mitk::TractClusteringFilter clusterer;
     clusterer.SetTractogram(fib);
     if (inCentroids.IsNotNull())
@@ -119,7 +119,6 @@ class mitkFiberClusteringTestSuite : public mitk::TestFixture
     clusterer.SetDistances(distances);
     clusterer.AddMetric(std::make_unique<mitk::ClusteringMetricEuclideanMean>());
     clusterer.Update();
-    omp_set_num_threads(previousThreads);
     return {clusterer.GetOutFiberIndices(), clusterer.GetOutCentroids()};
   }
 
@@ -266,15 +265,15 @@ public:
     for (int i = 0; i < numPairs; ++i)
       sequential[i] = metric.CalculateDistance(s[i], t[i], flipped);
 
-    const int previousThreads = omp_get_max_threads();
-    omp_set_num_threads(8);
-#pragma omp parallel for
-    for (int i = 0; i < numPairs; ++i)
     {
-      bool f = false;
-      parallel[i] = metric.CalculateDistance(s[i], t[i], f);
+      mitk::OmpThreadGuard threads(8);
+#pragma omp parallel for
+      for (int i = 0; i < numPairs; ++i)
+      {
+        bool f = false;
+        parallel[i] = metric.CalculateDistance(s[i], t[i], f);
+      }
     }
-    omp_set_num_threads(previousThreads);
     for (int i = 0; i < numPairs; ++i)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(sequential[i], parallel[i], 1e-3);
   }

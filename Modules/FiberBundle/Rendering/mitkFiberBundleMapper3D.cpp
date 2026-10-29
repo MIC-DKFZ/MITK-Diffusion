@@ -20,6 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkProperties.h>
 
 #include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkIdList.h>
 #include <vtkLookupTable.h>
 #include <vtkOpenGLPolyDataMapper.h>
 #include <vtkPlane.h>
@@ -30,6 +32,51 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkRibbonFilter.h>
 #include <vtkTubeFilter.h>
 #include <vtkUnsignedCharArray.h>
+
+namespace
+{
+  /**
+   * The fibers of fiberPolyData without its one-point lines, for vtkRibbonFilter.
+   *
+   * A bundle keeps one-point fibers as one-point lines in their place (file order of .tck files).
+   * vtkRibbonFilter skips each with the warning "Less than two points in line!", which floods the
+   * log for tractograms with many one-point streamlines; vtkTubeFilter skips them silently. They
+   * give no ribbon either way. Points and point data (the colours) are shared; cell data is left
+   * out, the fibers are coloured by point.
+   */
+  vtkSmartPointer<vtkPolyData> WithoutOnePointLines(vtkPolyData* fiberPolyData)
+  {
+    vtkCellArray* inLines = fiberPolyData->GetLines();
+    vtkIdType numShortLines = 0;
+    vtkIdType numShortLineIds = 0;
+    for (vtkIdType i=0; i<inLines->GetNumberOfCells(); ++i)
+    {
+      const vtkIdType size = inLines->GetCellSize(i);
+      if (size<2)
+      {
+        ++numShortLines;
+        numShortLineIds += size;
+      }
+    }
+    if (numShortLines==0)
+      return fiberPolyData;
+
+    vtkSmartPointer<vtkCellArray> lines = vtkSmartPointer<vtkCellArray>::New();
+    lines->AllocateExact(inLines->GetNumberOfCells()-numShortLines, inLines->GetNumberOfConnectivityIds()-numShortLineIds);
+    vtkSmartPointer<vtkIdList> ids = vtkSmartPointer<vtkIdList>::New();
+    for (vtkIdType i=0; i<inLines->GetNumberOfCells(); ++i)
+    {
+      inLines->GetCellAtId(i, ids);
+      if (ids->GetNumberOfIds()>=2)
+        lines->InsertNextCell(ids);
+    }
+    vtkSmartPointer<vtkPolyData> longLines = vtkSmartPointer<vtkPolyData>::New();
+    longLines->SetPoints(fiberPolyData->GetPoints());
+    longLines->GetPointData()->ShallowCopy(fiberPolyData->GetPointData());
+    longLines->SetLines(lines);
+    return longLines;
+  }
+}
 
 mitk::FiberBundleMapper3D::FiberBundleMapper3D()
 {
@@ -64,7 +111,7 @@ void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *rendere
   else if (shape.ribbonWidth>0.0f)
   {
     vtkSmartPointer<vtkRibbonFilter> tubeFilter = vtkSmartPointer<vtkRibbonFilter>::New();
-    tubeFilter->SetInputData(fiberPolyData);
+    tubeFilter->SetInputData(WithoutOnePointLines(fiberPolyData));
     tubeFilter->SetWidth(shape.ribbonWidth);
     tubeFilter->Update();
     fiberPolyData = tubeFilter->GetOutput();

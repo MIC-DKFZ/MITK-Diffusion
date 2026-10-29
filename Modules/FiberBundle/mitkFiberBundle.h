@@ -130,6 +130,8 @@ public:
     void SetFiberWeights(float newWeight);
     void SetFiberWeight(unsigned int fiber, float weight);
     void SetFiberWeights(vtkSmartPointer<vtkFloatArray> weights);
+    /** Replaces the fibers; the new fibers have weight 1 (set theirs with SetFiberWeights) and
+     *  are coloured by orientation. */
     void SetFiberPolyData(vtkSmartPointer<vtkPolyData>);
     vtkSmartPointer<vtkPolyData> GetFiberPolyData() const;
     itkGetConstMacro( NumFibers, unsigned int)

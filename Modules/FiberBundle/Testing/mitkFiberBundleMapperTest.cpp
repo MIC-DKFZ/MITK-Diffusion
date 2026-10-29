@@ -26,6 +26,7 @@ found in the LICENSE file.
 #include <vtkCellArray.h>
 #include <vtkImageData.h>
 #include <vtkMapper.h>
+#include <vtkOutputWindow.h>
 #include <vtkPlane.h>
 #include <vtkPlaneCollection.h>
 #include <vtkPointData.h>
@@ -35,12 +36,14 @@ found in the LICENSE file.
 #include <vtkPropCollection.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
+#include <vtkStringOutputWindow.h>
 #include <vtkWindowToImageFilter.h>
 #include <algorithm>
 
 #include <cmath>
 #include <set>
 #include <string>
+#include <vector>
 
 /**
  * The fiber bundle mappers in an offscreen render window: what they hand to VTK, the properties
@@ -54,6 +57,7 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   MITK_TEST(DefaultProperties_NamesAndTypesTheControlsWrite);
   MITK_TEST(Mapper3D_LinesWithOneColourPerPoint);
   MITK_TEST(Mapper3D_TubesAndRibbonsGiveSurfaces);
+  MITK_TEST(Mapper3D_RibbonsWithOnePointFibers_NoWarnings);
   MITK_TEST(Mapper3D_ClippingPlaneFromProperty);
   MITK_TEST(Mapper3D_ClippingPlaneChange_AppliedWithoutRebuild);
   MITK_TEST(Mapper2D_SlabAroundThePlane);
@@ -177,6 +181,42 @@ public:
 
     m_Node->SetFloatProperty("shape.ribbonwidth", 0.0f);
     CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(m_Fibers->GetNumFibers()), Input(Render3D())->GetNumberOfLines());
+  }
+
+  // A bundle keeps one-point fibers as one-point lines (#20); vtkRibbonFilter warned once for each.
+  void Mapper3D_RibbonsWithOnePointFibers_NoWarnings()
+  {
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    auto lines = vtkSmartPointer<vtkCellArray>::New();
+    for (const vtkIdType numPoints : {5, 1, 4, 1})
+    {
+      std::vector<vtkIdType> ids;
+      for (vtkIdType j = 0; j < numPoints; ++j)
+        ids.push_back(points->InsertNextPoint(2.0 * j, 3.0 * numPoints + 0.3 * j * j, 0.0));
+      lines->InsertNextCell(numPoints, ids.data());
+    }
+    auto polyData = vtkSmartPointer<vtkPolyData>::New();
+    polyData->SetPoints(points);
+    polyData->SetLines(lines);
+    m_Node->SetData(mitk::FiberBundle::New(polyData));
+    m_Node->SetFloatProperty("shape.ribbonwidth", 0.5f);
+
+    auto messages = vtkSmartPointer<vtkStringOutputWindow>::New();
+    const vtkSmartPointer<vtkOutputWindow> previous = vtkOutputWindow::GetInstance();
+    vtkOutputWindow::SetInstance(messages);
+    vtkPolyData *ribbons = nullptr;
+    try
+    {
+      ribbons = Input(Render3D());
+    }
+    catch (...)
+    {
+      vtkOutputWindow::SetInstance(previous);
+      throw;
+    }
+    vtkOutputWindow::SetInstance(previous);
+    CPPUNIT_ASSERT_MESSAGE(messages->GetOutput(), messages->GetOutput().find("Less than two points") == std::string::npos);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("one ribbon per fiber of two or more points", static_cast<vtkIdType>(2), ribbons->GetNumberOfStrips());
   }
 
   void Mapper3D_ClippingPlaneFromProperty()

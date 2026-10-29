@@ -42,6 +42,13 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundleDetail::CleanFiberPolyData(vtkPoly
   vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
   points->SetDataType(inPoints->GetDataType());
   vtkSmartPointer<vtkCellArray> lines = vtkSmartPointer<vtkCellArray>::New();
+  // Sized for the input and squeezed below, as vtkCleanPolyData does: arrays grown point by point
+  // keep up to twice the memory, and every bundle keeps these arrays.
+  vtkIdType numInputIds = 0;
+  for (vtkCellArray* cells : {polyData->GetVerts(), polyData->GetLines(), polyData->GetPolys(), polyData->GetStrips()})
+    numInputIds += cells->GetNumberOfConnectivityIds();
+  points->Reserve(inPoints->GetNumberOfPoints());
+  lines->AllocateExact(polyData->GetNumberOfCells(), numInputIds);
 
   vtkPointData* inPointData = polyData->GetPointData();
   vtkCellData* inCellData = polyData->GetCellData();
@@ -75,6 +82,8 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundleDetail::CleanFiberPolyData(vtkPoly
     cellData->CopyData(inCellData, cellId, newCellId);
   }
 
+  points->Squeeze();
+  lines->Squeeze();
   cleaned->SetPoints(points);
   if (polyData->GetNumberOfCells()>0)
     cleaned->SetLines(lines);
@@ -157,7 +166,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundleDetail::FiberPolyDataBuilder::Create
 
 void mitk::FiberBundleDetail::FiberPolyDataBuilder::ReplaceFibersOf(FiberBundle* fib) const
 {
-  // The weights follow the polydata: SetFiberPolyData sizes the weight array for the new fibers.
+  // SetFiberPolyData gives the new fibers weight 1; their own weights follow.
   const Fibers fibers = this->GetFibers();
   fib->SetFiberPolyData(fibers.polyData);
   fib->SetFiberWeights(fibers.weights);

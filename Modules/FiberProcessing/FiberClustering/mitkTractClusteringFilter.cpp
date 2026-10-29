@@ -522,7 +522,15 @@ void TractClusteringFilter::GenerateData()
     return;
   }
 
-  // Each fiber's metric data once, in parallel, instead of in each of its comparisons.
+  // Each fiber's metric data once, in parallel, instead of in each of its comparisons. With ANAT it
+  // takes about 1 KB per fiber, so it is released once the clusters are known and, by this guard,
+  // on every other way out of GenerateData (no centroids, exceptions).
+  struct FiberDataRelease
+  {
+    std::vector< FiberDataList >& fiberData;
+    void operator()() { fiberData.clear(); fiberData.shrink_to_fit(); }
+    ~FiberDataRelease() { (*this)(); }
+  } releaseFiberData{m_FiberData};
   m_FiberData.clear();
   m_FiberData.resize(T.size());
 #pragma omp parallel for
@@ -589,7 +597,7 @@ void TractClusteringFilter::GenerateData()
       m_OutUnassigned->SetFiberColors(0, 0, 0);
     }
   }
-  m_FiberData.clear();
+  releaseFiberData();
   MITK_INFO << "Final number of clusters: " << m_OutTractograms.size() << " (discarded " << m_DiscardedClusters << " clusters)";
 
   // Each cluster gets the JET colour of its rank in the output. The fibers keep the weights of the
