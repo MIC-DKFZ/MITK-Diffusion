@@ -382,7 +382,7 @@ public:
 
   // The rule of mitk::HasVoxelGridOf, as for IVIM and kurtosis: an origin off by rounding (a mask
   // saved as NIfTI with a float origin) is the same grid, 1e-3 mm is not. ITK's default tolerance
-  // (1e-6 of a voxel) refused the first.
+  // (1e-6 of a voxel) would refuse the first.
   void PrincipalDirection_MaskOriginRounded_Accepted()
   {
     auto tensors = LoadItkTensors("DiffusionImaging/ImageReconstruction/test_dti.dti");
