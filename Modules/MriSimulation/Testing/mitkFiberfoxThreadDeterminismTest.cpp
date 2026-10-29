@@ -42,7 +42,8 @@ namespace
  * A Fiberfox simulation with a constant seed has to give the same result at every OpenMP thread
  * count, bit for bit: the signal generation and k-space tests compare with references computed
  * once, and users compare simulations across machines. The cases cover two coils, spikes, motion,
- * eddy currents, distortions, ghosts and partial Fourier (param1, param3, param6).
+ * eddy currents, distortions, ghosts and partial Fourier (param1, param3, param6), and besides the
+ * output the coil, phase and k-space images and the spike log.
  */
 class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
 {
@@ -107,6 +108,14 @@ public:
     return differences;
   }
 
+  /** The spike log at the end of the status text (empty without spikes); it has no times. */
+  static std::string SpikeLog(const FilterType* filter)
+  {
+    const std::string text = filter->GetStatusText();
+    const auto start = text.find("\nSpike log:");
+    return start == std::string::npos ? std::string() : text.substr(start);
+  }
+
   void CompareAtThreadCounts(const std::string& parameterFile, const Modifier& modify = Modifier())
   {
     auto reference = Simulate(parameterFile, 1, modify);
@@ -129,6 +138,14 @@ public:
       }
       MITK_INFO << parameterFile << ", " << threads << " threads: " << complexDifferences << " coil image values differ from 1 thread";
       CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": coil images at " + std::to_string(threads) + " threads equal the 1-thread images", 0ul, complexDifferences);
+
+      // the other k-space results: phase, k-space magnitude and the spike log
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": phase image at " + std::to_string(threads) + " threads",
+                                   0ul, CountDifferences<DoubleDwiType>(test->GetPhaseImage(), reference->GetPhaseImage()));
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": k-space image at " + std::to_string(threads) + " threads",
+                                   0ul, CountDifferences<DoubleDwiType>(test->GetKspaceImage(), reference->GetKspaceImage()));
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": spike log at " + std::to_string(threads) + " threads",
+                                   SpikeLog(reference), SpikeLog(test));
     }
   }
 

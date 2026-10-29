@@ -21,13 +21,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVectorImage.h>
 #include <cmath>
 #include <mitkFiberfoxParameters.h>
-#include <itkTimeProbe.h>
 #include <mitkRawShModel.h>
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <mitkPointSet.h>
 #include <itkLinearInterpolateImageFunction.h>
 #include <mitkFiberfoxMotion.h>
-#include <mutex>
+#include <mitkFiberfoxLog.h>
 
 namespace itk
 {
@@ -75,7 +74,10 @@ public:
     mitk::FiberfoxParameters GetParameters(){ return m_Parameters; }
     std::vector< ItkDoubleImgType::Pointer > GetVolumeFractions() ///< one double image for each compartment containing the corresponding volume fraction per voxel
     { return m_VolumeFractions; }
-    std::string GetStatusText() const;   ///< log of the running simulation; safe to call from another thread
+    std::string GetStatusText() const   ///< log of the running simulation; safe to call from another thread
+    { return m_Log->GetStatusText(); }
+    mitk::FiberfoxLog* GetLog() const   ///< log and progress (itk::ProgressEvent of the log) of the simulation
+    { return m_Log; }
     itkGetMacro( PhaseImage, DoubleDwiType::Pointer )
     itkGetMacro( KspaceImage, DoubleDwiType::Pointer )
     itkGetMacro( CoilPointset, mitk::PointSet::Pointer )
@@ -107,17 +109,66 @@ protected:
     void CheckPrototypeShells(mitk::DiffusionSignalModel<double>* model);
     vnl_vector_fixed<double, 3> GetVnlVector(double point[3]);
     vnl_vector_fixed<double, 3> GetVnlVector(Vector< float, 3 >& vector);
-    double RoundToNearest(double num);
-    std::string GetTime();
     bool PrepareLogFile();  /** Prepares the log file and returns true if successful or false if failed. */
-    void PrintToLog(std::string m, bool addTime=true, bool linebreak=true, bool stdOut=true);
+    void PrintToLog(const std::string& m, bool addTime=true, bool linebreak=true, bool stdOut=true)
+    { m_Log->Print(m, addTime, linebreak, stdOut); }
     /** Progress bar of 50 stars in the log, the status text and on stdout, for total steps. */
-    void StartProgress(unsigned long total);
+    void StartProgress(unsigned long total)
+    { m_Log->StartProgress(total); }
     /** One step of the progress bar; called from the parallel loops. */
-    void AdvanceProgress();
+    void AdvanceProgress()
+    { m_Log->AdvanceProgress(); }
 
-    /** Transform generated image compartment by compartment, channel by channel and slice by slice using DFT and add k-space artifacts/effects. */
+    /** Volume, slice and coil of one spike. */
+    struct Spike
+    {
+      unsigned int volume;
+      unsigned int slice;
+      unsigned int coil;
+    };
+
+    /** What the k-space jobs of one run share; they only read it. */
+    struct KspaceRun
+    {
+      const std::vector< DoubleDwiType::Pointer >* compartmentImages;
+      std::vector< itk::Vector<double, 3> > coilPositions;
+      std::vector< Spike > spikes;
+      int threadsPerSlice;
+      bool storeTimings;   ///< the job of volume 0, slice 0 and coil 0 stores the readout timings
+      DoubleDwiType::Pointer magnitude;
+    };
+
+    /**
+     * Transform generated image compartment by compartment, channel by channel and slice by slice using DFT and add k-space artifacts/effects.
+     * One job per volume in parallel (SimulateKspaceVolume), one per slice and coil in it (SimulateKspaceCoil).
+     */
     DoubleDwiType::Pointer SimulateKspaceAcquisition(std::vector< DoubleDwiType::Pointer >& images);
+    /** Image on the grid of the output image, but with the unshifted origin, with the given number of components, all 0. */
+    DoubleDwiType::Pointer NewKspaceResultImage(unsigned int components) const;
+    /** Coil positions in m, relative to the image centre, evenly spaced on a circle around the z axis; also fills m_CoilPointset. */
+    std::vector< itk::Vector<double, 3> > ComputeCoilPositions();
+    /** Draws coil, slice and volume of every spike from the run's generator. */
+    std::vector< Spike > DrawSpikes(unsigned int numVolumes, unsigned int numSlices);
+    /** Simulates the acquisition of all slices and coils of volume g; returns its spike log. */
+    std::string SimulateKspaceVolume(const KspaceRun& run, unsigned int g);
+    /** Slice z of volume g of every compartment image, with the T1 and T2 of the compartment's signal model. */
+    void ExtractCompartmentSlices(const std::vector< DoubleDwiType::Pointer >& images, unsigned int g, unsigned int z,
+                                  std::vector< Float2DImageType::Pointer >& slices, std::vector< float >& t1, std::vector< float >& t2) const;
+    /**
+     * Acquires slice z of volume g with coil c (k-space filter, then DFT back to image space) and stores
+     * the result in the coil's real and imaginary images, the magnitude and the phase; returns the spike log.
+     */
+    std::string SimulateKspaceCoil(const KspaceRun& run, unsigned int g, unsigned int z, unsigned int c,
+                                   const std::vector< Float2DImageType::Pointer >& slices, const std::vector< float >& t1, const std::vector< float >& t2);
+    /** Root mean square over the coils of the summed squared magnitude and phase in slice z of volume g. */
+    void CombineCoils(DoubleDwiType* magnitude, unsigned int g, unsigned int z);
+    /**
+     * Component k of the voxel at index. The volumes are simulated in parallel, and every voxel vector holds one
+     * component per volume (per coil for the k-space image). GetPixel/SetPixel of an itk::VectorImage copy the whole
+     * voxel vector, so a write-back that way overwrites the components other threads store at the same time (lost
+     * updates, seen as zeros in the output). Each thread therefore writes only its own component.
+     */
+    static double& Component(DoubleDwiType* image, const DoubleDwiType::IndexType& index, unsigned int k);
 
     /**
      * Adds the signal of every fiber segment in volume g to the fiber compartment images and the
@@ -164,18 +215,11 @@ protected:
     std::vector < typename DoubleDwiType::Pointer > m_OutputImagesReal;
     std::vector < typename DoubleDwiType::Pointer > m_OutputImagesImag;
     std::vector< ItkDoubleImgType::Pointer >    m_VolumeFractions;
-    std::string                                 m_StatusText;
-    mutable std::mutex                          m_LogMutex;   ///< guards m_StatusText, m_Logfile, m_TimeProbe and the log output
-    std::mutex                                  m_ProgressMutex;
-    unsigned long                               m_ProgressTotal = 1;
-    unsigned long                               m_ProgressCount = 0;
-    unsigned long                               m_ProgressStars = 0;  ///< stars printed so far
+    mitk::FiberfoxLog::Pointer                  m_Log;
 
     // MISC
-    itk::TimeProbe                              m_TimeProbe;
     bool                                        m_UseConstantRandSeed;
     bool                                        m_MaskImageSet;
-    std::ofstream                                    m_Logfile;
     std::string                                 m_MotionLog;
     std::string                                 m_SpikeLog;
 
