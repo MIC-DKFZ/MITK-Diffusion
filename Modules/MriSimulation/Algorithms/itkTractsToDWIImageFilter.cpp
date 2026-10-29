@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkCellArray.h>
 #include <vtkPoints.h>
 #include <vtkPolyLine.h>
+#include <vtkIdList.h>
 #include <itkImageRegionIteratorWithIndex.h>
 #include <itkResampleImageFilter.h>
 #include <itkNearestNeighborInterpolateImageFunction.h>
@@ -167,13 +168,11 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
   auto num_slices = compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2);
   auto num_gradient_volumes = static_cast<int>(compartment_images.at(0)->GetVectorLength());
   auto max_threads = omp_get_max_threads();
-  int out_threads = Math::ceil(std::sqrt(max_threads));
-  int in_threads = Math::floor(std::sqrt(max_threads));
-  if (out_threads > num_gradient_volumes)
-  {
-    out_threads = num_gradient_volumes;
-    in_threads = Math::floor(static_cast<float>(max_threads/out_threads));
-  }
+  // Volumes in parallel first: the k-space filter prepares each slice in one thread, and the
+  // threads left over work on the slices of fewer volumes. The seeds are per volume, slice and coil,
+  // so the split does not change the result.
+  int out_threads = std::max(1, std::min(max_threads, num_gradient_volumes));
+  int in_threads = std::max(1, max_threads/out_threads);
   PrintToLog("Parallel volumes: " + boost::lexical_cast<std::string>(out_threads), false, true, true);
   PrintToLog("Threads per slice: " + boost::lexical_cast<std::string>(in_threads), false, true, true);
 
@@ -977,6 +976,11 @@ double TractsToDWIImageFilter< PixelType >::SimulateFiberSignal(unsigned int g, 
     // thread-safe, and a fiber segment has to get the same draws at any thread count and in every
     // volume. Each thread therefore calls its own clone, reseeded per segment from the run's seed.
     std::vector< std::vector< std::unique_ptr< mitk::DiffusionSignalModel<double> > > > threadModels(fiberThreads);
+    std::vector< vtkSmartPointer<vtkIdList> > threadIdLists(fiberThreads);
+    for (auto& list : threadIdLists)
+      list = vtkSmartPointer<vtkIdList>::New();
+    if (fiberPolyData->NeedToBuildCells())
+      fiberPolyData->BuildCells();
 
     for (int chunkStart=0; chunkStart<numFibers; chunkStart+=chunkSize)
     {
@@ -997,15 +1001,19 @@ double TractsToDWIImageFilter< PixelType >::SimulateFiberSignal(unsigned int g, 
           if (fiberWeight == 0)
             continue;
 
-          int numPoints = -1;
+          // GetCellPoints with a list per thread and GetPoint into a buffer are thread-safe once
+          // the cells are built (before the loop)
+          vtkIdType numCellPoints = 0;
+          const vtkIdType* pointIds = nullptr;
+          fiberPolyData->GetCellPoints(i, numCellPoints, pointIds, threadIdLists[omp_get_thread_num()]);
+          const int numPoints = static_cast<int>(numCellPoints);
           std::vector< itk::Vector<double, 3> > points_copy;
-#pragma omp critical
+          points_copy.reserve(numPoints);
+          for (int j=0; j<numPoints; j++)
           {
-            vtkCell* cell = fiberPolyData->GetCell(i);
-            numPoints = cell->GetNumberOfPoints();
-            vtkPoints* points = cell->GetPoints();
-            for (int j=0; j<numPoints; j++)
-              points_copy.push_back(GetItkVector(points->GetPoint(j)));
+            double point[3];
+            fiberPolyData->GetPoints()->GetPoint(pointIds[j], point);
+            points_copy.push_back(GetItkVector(point));
           }
 
           if (numPoints<2)
@@ -1610,8 +1618,7 @@ void TractsToDWIImageFilter< PixelType >::SimulateMotion(int g)
 
     // the fibers are moved from their unmoved position, never step by step, so that rounding and the
     // bounding box centre of moved fibers do not accumulate
-    m_FiberBundleTransformed = m_FiberBundle->GetDeepCopy();
-    m_FiberBundleTransformed->TransformFibers(m_Motion.back().GetTransform());
+    SetMovedFiberPoints(m_Motion.back().GetTransform());
 
     // move mask image accoring to new transform
     if (m_MaskImageSet)
@@ -1645,7 +1652,7 @@ void TractsToDWIImageFilter< PixelType >::SimulateMotion(int g)
     if (signalGen.m_DoAddMotion && g>0 && signalGen.m_MotionVolumes[g-1])
     {
       // the last volume was randomly moved: back to the unmoved fibers and mask
-      m_FiberBundleTransformed = m_FiberBundle->GetDeepCopy();
+      SetMovedFiberPoints(nullptr);
 
       if (m_MaskImageSet)
       {
@@ -1670,6 +1677,31 @@ void TractsToDWIImageFilter< PixelType >::SimulateMotion(int g)
         + "," + boost::lexical_cast<std::string>(translation[1])
         + "," + boost::lexical_cast<std::string>(translation[2]) + "\n";
   }
+}
+
+template< class PixelType >
+void TractsToDWIImageFilter< PixelType >::SetMovedFiberPoints(const mitk::FiberfoxMotion::TransformType* transform)
+{
+  vtkPoints* unmoved = m_FiberBundle->GetFiberPolyData()->GetPoints();
+  vtkPoints* moved = m_FiberBundleTransformed->GetFiberPolyData()->GetPoints();
+  if (unmoved==nullptr || moved==nullptr)
+    return;
+  for (vtkIdType id=0; id<unmoved->GetNumberOfPoints(); ++id)
+  {
+    double p[3];
+    unmoved->GetPoint(id, p);
+    if (transform!=nullptr)
+    {
+      // in single precision, the precision of the stored points, as FiberBundle::TransformFibers
+      itk::Point<float, 3> point = mitk::imv::GetItkPoint(p);
+      point = transform->TransformPoint(point);
+      p[0] = point[0];
+      p[1] = point[1];
+      p[2] = point[2];
+    }
+    moved->SetPoint(id, p);
+  }
+  moved->Modified();
 }
 
 template< class PixelType >

@@ -136,6 +136,12 @@ protected:
 
     /** Move fibers to simulate headmotion */
     void SimulateMotion(int g=-1);
+    /**
+     * Writes the points of m_FiberBundle, moved by the transform (unmoved without one), into the
+     * points of m_FiberBundleTransformed, a copy with the same point ids made once per run: one moved
+     * tractogram in memory whatever the number of moved volumes.
+     */
+    void SetMovedFiberPoints(const mitk::FiberfoxMotion::TransformType* transform);
 
     void CheckVolumeFractionImages();
     ItkDoubleImgType::Pointer NormalizeInsideMask(ItkDoubleImgType::Pointer image);
