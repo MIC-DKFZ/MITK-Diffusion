@@ -74,7 +74,6 @@ TractsToDWIImageFilter< PixelType >::TractsToDWIImageFilter()
   , m_UseConstantRandSeed(false)
   , m_RandGen(itk::Statistics::MersenneTwisterRandomVariateGenerator::New())
 {
-  m_DoubleInterpolator = itk::LinearInterpolateImageFunction< ItkDoubleImgType, float >::New();
   m_NullDir.Fill(0);
 }
 
@@ -1133,13 +1132,30 @@ void TractsToDWIImageFilter< PixelType >::SimulateNonFiberSignal(unsigned int g,
   if (m_Parameters.m_SignalGen.m_AxonRadius<0.0001 && maxVolume>0)  // no fiber volume: nothing to correct
     density_correctiony_global = m_VoxelVolume/maxVolume;
 
-  // generate non-fiber signal
-  ImageRegionIterator<ItkUcharImgType> it3(m_TransformedMaskImage, m_TransformedMaskImage->GetLargestPossibleRegion());
-  while(!it3.IsAtEnd())
-  {
+  // The voxels are independent: each writes only its own pixels. A non-fiber model that draws
+  // random numbers draws them per voxel in mask order, so then the voxels run in that order.
+  std::vector< DoubleDwiType::IndexType > voxels;
+  for (ImageRegionConstIterator<ItkUcharImgType> it3(m_TransformedMaskImage, m_TransformedMaskImage->GetLargestPossibleRegion()); !it3.IsAtEnd(); ++it3)
     if (it3.Get()>0)
+      voxels.push_back(it3.GetIndex());
+  const bool randomDraws = std::any_of(m_Parameters.m_NonFiberModelList.begin(), m_Parameters.m_NonFiberModelList.end(),
+                                       [](const mitk::DiffusionSignalModel<double>* model) { return model->UsesRandomNumbers(); });
+  const int threads = randomDraws ? 1 : omp_get_max_threads();
+  std::vector< DoubleInterpolatorType::Pointer > interpolators(threads);
+  for (auto& interpolator : interpolators)
+    interpolator = DoubleInterpolatorType::New();
+
+  std::atomic<bool> loopFailed(false);
+  std::exception_ptr loopException;
+#pragma omp parallel for num_threads(threads) schedule(static)
+  for (long v=0; v<static_cast<long>(voxels.size()); ++v)
+  {
+    if (loopFailed)
+      continue;
+    try
     {
-      DoubleDwiType::IndexType index = it3.GetIndex();
+      DoubleInterpolatorType* interpolator = interpolators[omp_get_thread_num()];
+      DoubleDwiType::IndexType index = voxels[v];
       double iAxVolume = intraAxonalVolumeImage->GetPixel(index);
 
       // get non-transformed point (remove headmotion tranformation)
@@ -1166,7 +1182,7 @@ void TractsToDWIImageFilter< PixelType >::SimulateNonFiberSignal(unsigned int g,
           DoubleDwiType::PixelType pix = m_CompartmentImages.at(0)->GetPixel(index);
           pix[g] = 0;
           m_CompartmentImages.at(0)->SetPixel(index, pix);
-          SimulateExtraAxonalSignal(index, volume_fraction_point, 0, g);
+          SimulateExtraAxonalSignal(index, volume_fraction_point, 0, g, interpolator);
         }
       }
       else
@@ -1187,8 +1203,8 @@ void TractsToDWIImageFilter< PixelType >::SimulateNonFiberSignal(unsigned int g,
         double density_correction_voxel = density_correctiony_global;
         if ( m_Parameters.m_FiberModelList[0]->GetVolumeFractionImage()!=nullptr && iAxVolume>0.0001 )
         {
-          m_DoubleInterpolator->SetInputImage(m_Parameters.m_FiberModelList[0]->GetVolumeFractionImage());
-          double volume_fraction = mitk::imv::GetImageValue<double>(volume_fraction_point, true, m_DoubleInterpolator);
+          interpolator->SetInputImage(m_Parameters.m_FiberModelList[0]->GetVolumeFractionImage());
+          double volume_fraction = mitk::imv::GetImageValue<double>(volume_fraction_point, true, interpolator);
           if (volume_fraction<0)
             mitkThrow() << "Volume fraction image (index 1) contains negative values (intra-axonal compartment)!";
           density_correction_voxel = m_VoxelVolume*volume_fraction/iAxVolume; // remove iAxVolume sclaing and scale to volume_fraction
@@ -1224,11 +1240,20 @@ void TractsToDWIImageFilter< PixelType >::SimulateNonFiberSignal(unsigned int g,
         iAxVolume = density_correction_voxel*iAxVolume; // new intra-axonal volume = old intra-axonal volume * correction factor
 
         // simulate other compartments
-        SimulateExtraAxonalSignal(index, volume_fraction_point, iAxVolume, g);
+        SimulateExtraAxonalSignal(index, volume_fraction_point, iAxVolume, g, interpolator);
       }
     }
-    ++it3;
+    catch (...)
+    {
+      // an exception must not leave the OpenMP region (std::terminate); the first one is rethrown after the loop
+#pragma omp critical (FiberfoxNonFiberException)
+      if (!loopException)
+        loopException = std::current_exception();
+      loopFailed = true;
+    }
   }
+  if (loopException)
+    std::rethrow_exception(loopException);
 }
 
 template< class PixelType >
@@ -1719,7 +1744,7 @@ itk::Point<float, 3> TractsToDWIImageFilter< PixelType >::GetMovedPoint(itk::Ind
 
 template< class PixelType >
 void TractsToDWIImageFilter< PixelType >::
-SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3>& volume_fraction_point, double intraAxonalVolume, int g)
+SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3>& volume_fraction_point, double intraAxonalVolume, int g, DoubleInterpolatorType* interpolator)
 {
   int numFiberCompartments = m_Parameters.m_FiberModelList.size();
   int numNonFiberCompartments = m_Parameters.m_NonFiberModelList.size();
@@ -1733,8 +1758,8 @@ SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3
     {
       for (int i=0; i<numNonFiberCompartments; ++i)
       {
-        m_DoubleInterpolator->SetInputImage(m_Parameters.m_NonFiberModelList[i]->GetVolumeFractionImage());
-        double compartment_fraction = mitk::imv::GetImageValue<double>(volume_fraction_point, true, m_DoubleInterpolator);
+        interpolator->SetInputImage(m_Parameters.m_NonFiberModelList[i]->GetVolumeFractionImage());
+        double compartment_fraction = mitk::imv::GetImageValue<double>(volume_fraction_point, true, interpolator);
         if (compartment_fraction<0)
           mitkThrow() << "Volume fraction image (index " << i << ") contains values less than zero!";
 
@@ -1787,8 +1812,8 @@ SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3
     {
       if (m_Parameters.m_FiberModelList[i]->GetVolumeFractionImage()!=nullptr)
       {
-        m_DoubleInterpolator->SetInputImage(m_Parameters.m_FiberModelList[i]->GetVolumeFractionImage());
-        interAxonalVolume = mitk::imv::GetImageValue<double>(volume_fraction_point, true, m_DoubleInterpolator)*m_VoxelVolume;
+        interpolator->SetInputImage(m_Parameters.m_FiberModelList[i]->GetVolumeFractionImage());
+        interAxonalVolume = mitk::imv::GetImageValue<double>(volume_fraction_point, true, interpolator)*m_VoxelVolume;
         if (interAxonalVolume<0)
           mitkThrow() << "Volume fraction image (index " << i+1 << ") contains negative values!";
       }
@@ -1808,8 +1833,8 @@ SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3
       double volume = nonFiberVolume;
       if (m_Parameters.m_NonFiberModelList[i]->GetVolumeFractionImage()!=nullptr)
       {
-        m_DoubleInterpolator->SetInputImage(m_Parameters.m_NonFiberModelList[i]->GetVolumeFractionImage());
-        volume = mitk::imv::GetImageValue<double>(volume_fraction_point, true, m_DoubleInterpolator)*m_VoxelVolume;
+        interpolator->SetInputImage(m_Parameters.m_NonFiberModelList[i]->GetVolumeFractionImage());
+        volume = mitk::imv::GetImageValue<double>(volume_fraction_point, true, interpolator)*m_VoxelVolume;
         if (volume<0)
           mitkThrow() << "Volume fraction image (index " << numFiberCompartments+i+1 << ") contains negative values (non-fiber compartment)!";
 
