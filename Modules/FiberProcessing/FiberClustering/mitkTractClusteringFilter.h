@@ -107,9 +107,16 @@ public:
 
 protected:
 
+  /** The data each metric prepares from one fiber or centroid (ClusteringMetric::PrepareFiber) */
+  using FiberDataList = std::vector< std::unique_ptr<ClusteringMetric::FiberData> >;
+
   void GenerateData();
   std::vector< vnl_matrix<float> > ResampleFibers(const FiberBundle* tractogram);
   float CalcOverlap(const vnl_matrix<float>& t) const;
+  FiberDataList PrepareFiber(const vnl_matrix<float>& t) const;
+
+  /** The mean of the metric distances of fiber t and centroid v; flip is that of the last metric. */
+  float Distance(const vnl_matrix<float>& t, const FiberDataList& tData, const vnl_matrix<float>& v, const FiberDataList& vData, bool& flip) const;
 
   std::vector< Cluster > ClusterStep(const std::vector< unsigned int >& f_indices, std::vector< float > distances);
 
@@ -126,6 +133,8 @@ protected:
   std::vector< mitk::FiberBundle::Pointer >   m_OutCentroids;
   mitk::FiberBundle::Pointer                  m_OutUnassigned;
   std::vector<vnl_matrix<float> >             T;
+  /** The prepared data of the fibers in T, used during GenerateData */
+  std::vector< FiberDataList >                m_FiberData;
   unsigned int                                m_MinClusterSize;
   unsigned int                                m_MaxClusters;
   unsigned int                                m_DiscardedClusters;

@@ -42,17 +42,13 @@ public:
 
     // Every fourth point; fibers with fewer than four points use every point.
     const unsigned int inc = s.cols()>=4 ? s.cols()/4 : 1;
-    for (unsigned int i=0; i<s.cols(); i += inc)
-    {
-      d_direct += (s.get_column(i)-t.get_column(i)).magnitude();
-      d_flipped += (s.get_column(i)-t.get_column(s.cols()-i-1)).magnitude();
-    }
+    SumPointDistances(s, t, inc, d_direct, d_flipped);
 
     // The distance is the difference of the fiber lengths in mm, over all segments.
     for (unsigned int i=0; i+1<s.cols(); ++i)
     {
-      l1 += (s.get_column(i+1)-s.get_column(i)).magnitude();
-      l2 += (t.get_column(i+1)-t.get_column(i)).magnitude();
+      l1 += PointDistance(s, i+1, s, i);
+      l2 += PointDistance(t, i+1, t, i);
     }
 
     if (d_direct>d_flipped)

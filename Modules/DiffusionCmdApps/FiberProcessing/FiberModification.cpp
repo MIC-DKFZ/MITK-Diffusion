@@ -246,8 +246,9 @@ int main(int argc, char* argv[])
     }
 
     // RemoveShortFibers and RemoveLongFibers refuse to remove every fiber and leave the bundle
-    // unchanged; here that means an empty result.
-    if (minFiberLength>0 && !fib->RemoveShortFibers(minFiberLength))
+    // unchanged; here that means an empty result. An empty bundle (nothing left after the mask
+    // cut) has nothing to filter and gets no second warning.
+    if (minFiberLength>0 && fib->GetNumFibers()>0 && !fib->RemoveShortFibers(minFiberLength))
     {
       MITK_WARN << "Every fiber is shorter than " << minFiberLength << " mm.";
       fib = mitk::FiberBundle::New();

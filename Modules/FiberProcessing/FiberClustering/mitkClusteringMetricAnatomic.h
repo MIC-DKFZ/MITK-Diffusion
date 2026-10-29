@@ -23,6 +23,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkNumericTraits.h>
 
 #include <map>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mitk
 {
@@ -43,64 +46,116 @@ public:
 
   float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
-    vnl_matrix<float> hist1; hist1.set_size( (2*m_Radius+1)*(2*m_Radius+1)*(2*m_Radius+1), m_NumLabels ); hist1.fill(0);
-    vnl_matrix<float> hist2; hist2.set_size( (2*m_Radius+1)*(2*m_Radius+1)*(2*m_Radius+1), m_NumLabels ); hist2.fill(0);
+    const auto sData = PrepareFiber(s);
+    const auto tData = PrepareFiber(t);
+    return CalculatePreparedDistance(s, t, sData.get(), tData.get(), flipped);
+  }
 
+  /**
+   * The label histograms of a fiber (one row per direction, see GetHistogramAtPoint), rows
+   * normalized as vnl_matrix::normalize_rows() does, kept sparse: only their non-zero entries,
+   * by label, and the labels found in any row. The dense float sums over all labels add only
+   * exact zeros besides these entries, so the sparse sums are the same bit for bit.
+   */
+  class HistogramData : public FiberData
+  {
+  public:
+    std::vector<short> labels;
+    std::vector<std::size_t> rowStart;
+    std::vector<std::pair<short, float>> entries;
+  };
 
-    float d_direct = 0;
-    float d_flipped = 0;
-
-    vnl_vector<float> dists_d; dists_d.set_size(s.cols());
-    vnl_vector<float> dists_f; dists_f.set_size(s.cols());
-
+  std::unique_ptr<FiberData> PrepareFiber(const vnl_matrix<float>& s) const override
+  {
+    const unsigned int numRows = (2*m_Radius+1)*(2*m_Radius+1)*(2*m_Radius+1);
+    vnl_matrix<float> hist; hist.set_size(numRows, m_NumLabels); hist.fill(0);
     for (unsigned int i=0; i<s.cols(); ++i)
     {
       itk::Point<float, 3> p;
       p[0] = s[0][i];
       p[1] = s[1][i];
       p[2] = s[2][i];
-      GetHistogramAtPoint(p, hist1);
-
-      p[0] = t[0][i];
-      p[1] = t[1][i];
-      p[2] = t[2][i];
-      GetHistogramAtPoint(p, hist2);
-
-      d_direct += (s.get_column(i)-t.get_column(i)).magnitude();
-      d_flipped += (s.get_column(i)-t.get_column(s.cols()-i-1)).magnitude();
+      GetHistogramAtPoint(p, hist);
     }
 
-    flipped = d_direct>d_flipped;
-
-    float label_intersection = 0;
-    for (unsigned int c=0; c<hist1.cols(); ++c)
-    {
-      bool l1 = false;
-      bool l2 = false;
-      for (unsigned int r=0; r<hist1.rows(); ++r)
-      {
-        if (hist1[r][c]>0)
-          l1 = true;
-        if (hist2[r][c]>0)
-          l2 = true;
-        if (l1 && l2)
+    auto data = std::make_unique<HistogramData>();
+    for (unsigned int c=0; c<hist.cols(); ++c)
+      for (unsigned int r=0; r<hist.rows(); ++r)
+        if (hist[r][c]>0)
         {
-          label_intersection += 1;
+          data->labels.push_back(static_cast<short>(c));
           break;
         }
+
+    hist.normalize_rows();
+    for (unsigned int r=0; r<hist.rows(); ++r)
+    {
+      data->rowStart.push_back(data->entries.size());
+      for (unsigned int c=0; c<hist.cols(); ++c)
+        if (hist[r][c]!=0)
+          data->entries.emplace_back(static_cast<short>(c), hist[r][c]);
+    }
+    data->rowStart.push_back(data->entries.size());
+    return data;
+  }
+
+  float CalculatePreparedDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t,
+                                  const FiberData* sData, const FiberData* tData, bool &flipped) const override
+  {
+    const auto& h1 = dynamic_cast<const HistogramData&>(*sData);
+    const auto& h2 = dynamic_cast<const HistogramData&>(*tData);
+
+    float d_direct = 0;
+    float d_flipped = 0;
+    SumPointDistances(s, t, 1, d_direct, d_flipped);
+    flipped = d_direct>d_flipped;
+
+    // labels found in both fibers
+    float label_intersection = 0;
+    for (auto l1 = h1.labels.begin(), l2 = h2.labels.begin(); l1!=h1.labels.end() && l2!=h2.labels.end();)
+    {
+      if (*l1<*l2)
+        ++l1;
+      else if (*l2<*l1)
+        ++l2;
+      else
+      {
+        label_intersection += 1;
+        ++l1;
+        ++l2;
       }
     }
 
     float similarity = 0;
     if (label_intersection>0)
     {
-      hist1.normalize_rows();
-      hist2.normalize_rows();
       label_intersection /= m_NumLabels;
 
-      for (unsigned int l=0; l<hist1.rows(); ++l)
-        similarity += dot_product( hist1.get_row(l), hist2.get_row(l) );
-      similarity /= hist1.rows();
+      const unsigned int numRows = static_cast<unsigned int>(h1.rowStart.size()-1);
+      for (unsigned int l=0; l<numRows; ++l)
+      {
+        // the dot product of the two rows, summed in label order as vnl's dot_product
+        float dot = 0;
+        auto e1 = h1.entries.begin()+static_cast<std::ptrdiff_t>(h1.rowStart[l]);
+        const auto end1 = h1.entries.begin()+static_cast<std::ptrdiff_t>(h1.rowStart[l+1]);
+        auto e2 = h2.entries.begin()+static_cast<std::ptrdiff_t>(h2.rowStart[l]);
+        const auto end2 = h2.entries.begin()+static_cast<std::ptrdiff_t>(h2.rowStart[l+1]);
+        while (e1!=end1 && e2!=end2)
+        {
+          if (e1->first<e2->first)
+            ++e1;
+          else if (e2->first<e1->first)
+            ++e2;
+          else
+          {
+            dot += e1->second*e2->second;
+            ++e1;
+            ++e2;
+          }
+        }
+        similarity += dot;
+      }
+      similarity /= numRows;
       similarity *= label_intersection;
     }
 

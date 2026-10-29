@@ -110,6 +110,26 @@ float TractClusteringFilter::CalcOverlap(const vnl_matrix<float>& t) const
   return overlap;
 }
 
+TractClusteringFilter::FiberDataList TractClusteringFilter::PrepareFiber(const vnl_matrix<float>& t) const
+{
+  FiberDataList data;
+  data.reserve(m_Metrics.size());
+  for (const auto& m : m_Metrics)
+    data.push_back(m->PrepareFiber(t));
+  return data;
+}
+
+float TractClusteringFilter::Distance(const vnl_matrix<float>& t, const FiberDataList& tData, const vnl_matrix<float>& v, const FiberDataList& vData, bool& flip) const
+{
+  bool f = false;
+  float d = 0;
+  for (std::size_t m=0; m<m_Metrics.size(); ++m)
+    d += m_Metrics[m]->CalculatePreparedDistance(t, v, tData[m].get(), vData[m].get(), f);
+  d /= m_Metrics.size();
+  flip = f;
+  return d;
+}
+
 std::vector<vnl_matrix<float> > TractClusteringFilter::ResampleFibers(const mitk::FiberBundle* tractogram)
 {
   // QuickBundles compares fibers point by point (MDF), so each fiber is resampled to m_NumPoints
@@ -161,9 +181,10 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
   float dist_thres = distances.back();
   distances.pop_back();
   std::vector< Cluster > C;
-  // The centroid (mean) of each cluster, computed when a fiber joins the cluster instead of in
-  // every comparison with it.
+  // The centroid (mean) of each cluster and its prepared metric data, computed when a fiber joins
+  // the cluster instead of in every comparison with it.
   std::vector< vnl_matrix<float> > means;
+  std::vector< FiberDataList > meansData;
 
   int N = f_indices.size();
 
@@ -173,12 +194,14 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
   c1.n = 1;
   C.push_back(c1);
   means.push_back(c1.h / c1.n);
+  meansData.push_back(PrepareFiber(means.back()));
   if (f_indices.size()==1)
     return C;
 
   for (int i=1; i<N; ++i)
   {
     const vnl_matrix<float>& t = T.at(f_indices.at(i));
+    const FiberDataList& tData = m_FiberData.at(f_indices.at(i));
 
     int min_cluster_index = -1;
     float min_cluster_distance = 99999;
@@ -186,12 +209,8 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
 
     for (unsigned int k=0; k<C.size(); ++k)
     {
-      const vnl_matrix<float>& v = means[k];
       bool f = false;
-      float d = 0;
-      for (const auto& m : m_Metrics)
-        d += m->CalculateDistance(t, v, f);
-      d /= m_Metrics.size();
+      const float d = Distance(t, tData, means[k], meansData[k], f);
 
       if (d<min_cluster_distance)
       {
@@ -211,6 +230,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
         c.h += vnl_matrix<float>(t).fliplr();  // fliplr() flips in place
       c.n += 1;
       means[min_cluster_index] = c.h / c.n;
+      meansData[min_cluster_index] = PrepareFiber(means[min_cluster_index]);
     }
     else
     {
@@ -219,6 +239,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::ClusterStep
       c.h = t;
       c.n = 1;
       means.push_back(c.h / c.n);
+      meansData.push_back(PrepareFiber(means.back()));
       C.push_back(std::move(c));
     }
   }
@@ -303,11 +324,14 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
   MITK_INFO << "Merging duplicate clusters with distance threshold " << mergeThreshold;
 
   std::vector< TractClusteringFilter::Cluster > new_clusters;
-  // The centroids of new_clusters, computed when a cluster is added or merged into.
+  // The centroids of new_clusters and their prepared metric data, computed when a cluster is
+  // added or merged into.
   std::vector< vnl_matrix<float> > means;
+  std::vector< FiberDataList > meansData;
   for (Cluster& c1 : clusters)
   {
     vnl_matrix<float> t = c1.h / c1.n;
+    FiberDataList tData = PrepareFiber(t);
 
     // Distances in parallel, the nearest cluster afterwards in cluster order: with equal
     // distances the first cluster wins whatever the number of threads.
@@ -316,13 +340,8 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
 #pragma omp parallel for
     for (int k2=0; k2<(int)new_clusters.size(); ++k2)
     {
-      const vnl_matrix<float>& v = means[k2];
-
       bool f = false;
-      float d = 0;
-      for (const auto& m : m_Metrics)
-        d += m->CalculateDistance(t, v, f);
-      distances[k2] = d / m_Metrics.size();
+      distances[k2] = Distance(t, tData, means[k2], meansData[k2], f);
       flips[k2] = f;
     }
 
@@ -342,6 +361,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
     if (min_idx<0)
     {
       means.push_back(std::move(t));
+      meansData.push_back(std::move(tData));
       new_clusters.push_back(std::move(c1));
     }
     else
@@ -357,6 +377,7 @@ std::vector< TractClusteringFilter::Cluster > TractClusteringFilter::MergeDuplic
       else
         c2.h += c1.h.fliplr();
       means[min_idx] = c2.h / c2.n;
+      meansData[min_idx] = PrepareFiber(means[min_idx]);
     }
   }
 
@@ -381,6 +402,10 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
     C.push_back(c);
   }
 
+  std::vector< FiberDataList > centroidsData;
+  for (const vnl_matrix<float>& centroid : centroids)
+    centroidsData.push_back(PrepareFiber(centroid));
+
   // The nearest centroid of each fiber in parallel; the clusters are filled afterwards in fiber
   // order, so that their fiber order and centroid sums do not depend on the number of threads.
   std::vector< int > assignedCluster(N, -1);
@@ -389,6 +414,7 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
   for (int i=0; i<N; ++i)
   {
     const vnl_matrix<float>& t = T.at(f_indices.at(i));
+    const FiberDataList& tData = m_FiberData.at(f_indices.at(i));
 
     int min_cluster_index = -1;
     float min_cluster_distance = 99999;
@@ -396,22 +422,17 @@ std::vector<TractClusteringFilter::Cluster> TractClusteringFilter::AddToKnownClu
 
     if (CalcOverlap(t)>=m_OverlapThreshold)
     {
-      int c_idx = 0;
-      for (const vnl_matrix<float>& centroid : centroids)
+      for (std::size_t c_idx=0; c_idx<centroids.size(); ++c_idx)
       {
         bool f = false;
-        float d = 0;
-        for (const auto& m : m_Metrics)
-          d += m->CalculateDistance(t, centroid, f);
-        d /= m_Metrics.size();
+        const float d = Distance(t, tData, centroids[c_idx], centroidsData[c_idx], f);
 
         if (d<min_cluster_distance)
         {
           min_cluster_distance = d;
-          min_cluster_index = c_idx;
+          min_cluster_index = static_cast<int>(c_idx);
           flip = f;
         }
-        ++c_idx;
       }
     }
 
@@ -501,6 +522,13 @@ void TractClusteringFilter::GenerateData()
     return;
   }
 
+  // Each fiber's metric data once, in parallel, instead of in each of its comparisons.
+  m_FiberData.clear();
+  m_FiberData.resize(T.size());
+#pragma omp parallel for
+  for (int i=0; i<static_cast<int>(T.size()); ++i)
+    m_FiberData[static_cast<std::size_t>(i)] = PrepareFiber(T[static_cast<std::size_t>(i)]);
+
   std::vector< unsigned int > f_indices;
   for (unsigned int i=0; i<T.size(); ++i)
     f_indices.push_back(i);
@@ -561,6 +589,7 @@ void TractClusteringFilter::GenerateData()
       m_OutUnassigned->SetFiberColors(0, 0, 0);
     }
   }
+  m_FiberData.clear();
   MITK_INFO << "Final number of clusters: " << m_OutTractograms.size() << " (discarded " << m_DiscardedClusters << " clusters)";
 
   // Each cluster gets the JET colour of its rank in the output. The fibers keep the weights of the
