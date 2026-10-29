@@ -139,9 +139,10 @@ Facts the layout does not show:
   `FSL`. `ShImageReader` converts files so marked or whose descrip starts with
   `MRtrix version: 3`, and reads unmarked files (the 4D SH files of earlier MITK versions) in the
   legacy basis. For unmarked files its option "SH convention" forces one; "FSL/Dipy" converts
-  dipy's default basis (`descoteaux07`, legacy) from the FSL bvec frame. MITK's image reader stays
-  the default for 4D SH NIfTI files (`MimeTypes_Sh4dNifti_ImageReaderIsDefault`); the SH reader
-  ("SH Image") is chosen in the open dialog or with a `PreferenceListReaderOptionsFunctor`. Older
+  dipy's default basis (`descoteaux07`, legacy) from the FSL bvec frame, which is not MITK's FSL
+  definition (taken unchanged). MITK's image reader stays the default for 4D SH NIfTI files
+  (`MimeTypes_Sh4dNifti_ImageReaderIsDefault`); the SH reader ("SH Image") is chosen in the open
+  dialog or with a `PreferenceListReaderOptionsFunctor`. Older
   coefficient files with the coefficients as vector pixels of a 3D image
   (`qBallImage_SHCoeffs.nrrd`, `StreamlineTractography/qball_image_sh.nii.gz`) get the SH reader
   offered too (confidence `PartiallySupported`, NRRD DWIs excluded), which reads them, with

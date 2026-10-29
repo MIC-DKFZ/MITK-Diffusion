@@ -856,7 +856,7 @@ public:
     CPPUNIT_ASSERT_EQUAL(255, static_cast<int>(colors->GetTypedComponent(0, 1)));
   }
 
-  static mitk::ShImage::Pointer LoadSh(const std::string &path, const std::string &convention = "auto (file marker, else MITK legacy)")
+  static mitk::ShImage::Pointer LoadSh(const std::string &path, const std::string &convention = "auto (file marker, else MITK legacy; vector layout: MITK FSL)")
   {
     mitk::IFileReader::Options options;
     options["SH convention"] = convention;

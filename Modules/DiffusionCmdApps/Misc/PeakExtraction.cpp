@@ -27,7 +27,7 @@ namespace
 {
   /** Values of --shConvention and the "SH convention" option of the SH reader they select. */
   const std::map<std::string, std::string> SH_CONVENTIONS = {
-    {"auto", "auto (file marker, else MITK legacy)"},
+    {"auto", "auto (file marker, else MITK legacy; vector layout: MITK FSL)"},
     {"MITK", "MITK legacy (MRtrix 0.2)"},
     {"MRtrix", "MRtrix 3"},
     {"MRtrix3", "MRtrix 3"},

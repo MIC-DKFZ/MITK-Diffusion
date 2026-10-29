@@ -43,7 +43,7 @@ namespace
   // Constant initialization: the reader is constructed while the library is loaded, possibly
   // before dynamically initialized globals of this file.
   constexpr const char *CONVENTION_OPTION = "SH convention";
-  constexpr const char *AUTO = "auto (file marker, else MITK legacy)";
+  constexpr const char *AUTO = "auto (file marker, else MITK legacy; vector layout: MITK FSL)";
   constexpr const char *MRTRIX3 = "MRtrix 3";
   constexpr const char *MITK_LEGACY = "MITK legacy (MRtrix 0.2)";
   constexpr const char *FSL_DIPY = "FSL/Dipy";
