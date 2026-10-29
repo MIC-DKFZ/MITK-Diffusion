@@ -60,6 +60,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ApplyCurvatureThreshold_KeepsTwoPointFibersAndNoSinglePoints);
   MITK_TEST(TransformFibers_NoTransform_Throws);
   MITK_TEST(SetFiberPolyData_LeavesOldPolyDataAndPointDataBehind);
+  MITK_TEST(SetFiberPolyData_EqualFiberCount_NewFibersGetWeightOne);
   MITK_TEST(SetSingleFiberColor_UsesRgbOrder);
   MITK_TEST(SetFiberColors_ChecksTheArray);
   MITK_TEST(ColorFibersByOrientation_OnePointFibers_GetColours);
@@ -477,6 +478,22 @@ public:
     CPPUNIT_ASSERT_MESSAGE("Point data of the old fibers is not carried over",
                            !fib->GetFiberPolyData()->GetPointData()->HasArray("STALE"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("The old polydata is not changed", oldNumPoints, oldPolyData->GetNumberOfPoints());
+  }
+
+  // #32: with as many new fibers as old ones, the new fibers kept the weights of the old ones.
+  void SetFiberPolyData_EqualFiberCount_NewFibersGetWeightOne()
+  {
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}}, {{0, 1, 0}, {1, 1, 0}}});
+    fib->SetFiberWeight(0, 3.0f);
+    fib->SetFiberWeight(1, 4.0f);
+    auto other = MakeBundle({{{5, 5, 5}, {6, 5, 5}}, {{5, 6, 5}, {6, 6, 5}}});
+    auto oldWeights = fib->GetFiberWeights();
+
+    fib->SetFiberPolyData(other->GetFiberPolyData());
+    CPPUNIT_ASSERT_EQUAL(2u, fib->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL(1.0f, fib->GetFiberWeight(0));
+    CPPUNIT_ASSERT_EQUAL(1.0f, fib->GetFiberWeight(1));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("a weight array taken before is not changed", 4.0f, oldWeights->GetValue(1));
   }
 
   void SetSingleFiberColor_UsesRgbOrder()
