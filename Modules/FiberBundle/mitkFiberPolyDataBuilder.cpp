@@ -157,7 +157,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundleDetail::FiberPolyDataBuilder::Create
 
 void mitk::FiberBundleDetail::FiberPolyDataBuilder::ReplaceFibersOf(FiberBundle* fib) const
 {
-  // The weights follow the polydata: SetFiberPolyData sizes the weight array for the new fibers.
+  // SetFiberPolyData gives the new fibers weight 1; their own weights follow.
   const Fibers fibers = this->GetFibers();
   fib->SetFiberPolyData(fibers.polyData);
   fib->SetFiberWeights(fibers.weights);
