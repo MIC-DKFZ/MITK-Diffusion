@@ -457,11 +457,7 @@ public:
     return fslImage;
   }
 
-  /**
-   * The non-zero peak axes of a voxel. itk::OdfMaximaExtractionFilter keeps both of two antipodal
-   * candidates whose refined lengths are exactly equal, which depends on the last bit of the ODF
-   * values; such a duplicate axis is counted once.
-   */
+  /** The non-zero peaks of a voxel. */
   static std::vector<Direction> Peaks(const PeakItkImageType *image, const itk::Index<3> &voxel)
   {
     std::vector<Direction> peaks;
@@ -471,10 +467,7 @@ public:
       Direction peak;
       for (unsigned int c = 0; c < 3; ++c)
         peak[c] = image->GetPixel({{voxel[0], voxel[1], voxel[2], 3 * p + c}});
-      const bool duplicate = std::any_of(peaks.begin(), peaks.end(), [&peak](const Direction &other) {
-        return std::abs(dot_product(peak, other)) > std::cos(1.0 * itk::Math::pi / 180) * peak.two_norm() * other.two_norm();
-      });
-      if (peak.two_norm() > 0 && !duplicate)
+      if (peak.two_norm() > 0)
         peaks.push_back(peak);
     }
     return peaks;
@@ -511,9 +504,9 @@ public:
   }
 
   /**
-   * Mask of the voxels whose ODF varies by more than a tenth of its maximum. Every direction of an
-   * isotropic ODF (the background of sh_image_test.nii.gz) is a maximum, so its peaks depend on
-   * rounding.
+   * Mask of the voxels whose ODF varies by more than a tenth of its maximum: the isotropic
+   * background of sh_image_test.nii.gz has no peaks, and the broad maxima of weakly anisotropic
+   * ODFs move with the last bits of the coefficients.
    */
   static mitk::Image::Pointer AnisotropyMask(const mitk::ShImage *shImage, unsigned int &count)
   {

@@ -1011,8 +1011,8 @@ public:
     CPPUNIT_ASSERT_EQUAL(47u, withDirection);
   }
 
-  // Peaks of sh_image_test.nii.gz as extracted before the 3D/4D geometry code was shared,
-  // summarized per component, with the number of peaks and the 4D geometry.
+  // Peaks of sh_image_test.nii.gz, summarized per component, with the number of peaks and the 4D
+  // geometry. Its 244 isotropic voxels have no peak, each axis of the others one.
   void MaximaExtraction_RecordedOutput()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
@@ -1034,10 +1034,10 @@ public:
     itk::ImageRegionConstIterator<MaskImageType> itNum(filter->GetNumDirectionsImage(), filter->GetNumDirectionsImage()->GetLargestPossibleRegion());
     for (; !itNum.IsAtEnd(); ++itNum)
       numPeaks += itNum.Get();
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(303.91917738690972, sums[0], 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(505.74287556356285, sums[1], 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(414.1981383588427, sums[2], 1e-6);
-    CPPUNIT_ASSERT_EQUAL(809u, numPeaks);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(58.92215708270669, sums[0], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.298910463810898, sums[1], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(16.957745654814062, sums[2], 1e-6);
+    CPPUNIT_ASSERT_EQUAL(76u, numPeaks);
 
     CPPUNIT_ASSERT(filter->GetNumDirectionsImage()->GetLargestPossibleRegion() == coefficients->GetLargestPossibleRegion());
     CPPUNIT_ASSERT(filter->GetNumDirectionsImage()->IsSameImageGeometryAs(coefficients));
@@ -1081,9 +1081,10 @@ public:
     return pixel;
   }
 
-  // ODFs of known fibre configurations: each fibre gives exactly one peak, close to its direction,
-  // and an isotropic ODF, where every sampled direction is a maximum, gives none. The fibres are
-  // rotated off the axes of the ODF direction table.
+  // ODFs of known fibre configurations: each fibre gives exactly one peak, and an isotropic ODF,
+  // where every sampled direction is a maximum, gives none. The fibres are rotated off the axes of
+  // the ODF direction table, whose 252 directions are about 13 degrees apart; the refined peaks
+  // are within 0.11 degrees of the fibres, 0.64 for the 60-degree crossing, whose lobes overlap.
   void MaximaExtraction_SyntheticOdfs_FibreDirections()
   {
     const Direction e1 = Direction(1, 2, 3).normalize();
@@ -1091,6 +1092,7 @@ public:
     const Direction e3 = vnl_cross_3d(e1, e2);
     const Direction at60 = std::cos(itk::Math::pi / 3) * e1 + std::sin(itk::Math::pi / 3) * e2;
     const std::vector<std::vector<Direction>> voxels = {{}, {e1}, {e1, e2}, {e1, e2, e3}, {e1, at60}};
+    const double toleranceInDegrees[] = {0, 0.2, 0.2, 0.2, 1};
 
     using ShImageType = itk::Image<itk::Vector<float, 45>, 3>;
     auto coefficients = ShImageType::New();
@@ -1116,7 +1118,6 @@ public:
       for (const auto &fibre : voxels[x])
       {
         unsigned int matches = 0;
-        double largestAngle = 0;
         for (unsigned int p = 0; p < count; ++p)
         {
           Direction peak;
@@ -1126,10 +1127,9 @@ public:
           if (angle < 20)
           {
             ++matches;
-            largestAngle = std::max(largestAngle, angle);
+            CPPUNIT_ASSERT(angle < toleranceInDegrees[x]);
           }
         }
-        MITK_INFO << "voxel " << x << " fibre " << fibre << ": " << matches << " peaks, " << largestAngle << " degrees";
         CPPUNIT_ASSERT_EQUAL(1u, matches);
       }
     }

@@ -87,8 +87,9 @@ Image< unsigned char, 3 > >
     itkSetMacro( MaxNumPeaks, unsigned int)                 ///< maximum number of peaks per voxel. if more peaks are detected, only the largest are kept.
     itkSetMacro( RelativePeakThreshold, double)             ///< threshold on the peak length relative to the largest peak inside the current voxel
     itkSetMacro( AbsolutePeakThreshold, double)             ///< hard threshold on the peak length of all local maxima
-    /** Cosine, not an angle: of two peaks whose |cos| of the angle between them exceeds it, the
-      * shorter is discarded. Default 0.9 (about 25.8 degrees); the view converts degrees with cos(). */
+    /** Cosine, not an angle: a peak whose |cos| of the angle to a larger peak that is kept exceeds
+      * it is discarded, so each axis is kept once. Default 0.9 (about 25.8 degrees); the view
+      * converts degrees with cos(). */
     itkSetMacro( AngularThreshold, double)
     itkSetMacro( MaskImage, ItkUcharImgType::Pointer)       ///< only voxels inside the binary mask are processed
     itkSetMacro( NormalizationMethod, NormalizationMethods) ///< normalization method of ODF peaks
