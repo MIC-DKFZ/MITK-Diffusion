@@ -5,7 +5,7 @@ mitk_diffusion_create_cmdapps(
   APPS
     FileFormatConverter
     ImageResampler:MitkDiffusionPreprocessing
-    CopyGeometry
+    CopyGeometry:MitkDiffusionRegistration
     DiffusionDICOMLoader:MitkDiffusionPreprocessing
     ShToOdfImage
     DImp

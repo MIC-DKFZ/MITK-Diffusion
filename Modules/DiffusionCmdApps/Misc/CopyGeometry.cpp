@@ -18,6 +18,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImage.h>
 #include <mitkIOUtil.h>
 #include "mitkCommandLineParser.h"
+#include <mitkDiffusionImageMapping.h>
+#include <mitkDiffusionPropertyHelper.h>
+#include <vnl/vnl_inverse.h>
 
 /*!
 \brief Copies transformation matrix of one image to another
@@ -68,9 +71,17 @@ int main(int argc, char* argv[])
     {
       mitk::BaseGeometry* s_geom = source->GetGeometry();
       mitk::BaseGeometry* t_geom = target->GetGeometry();
+      const mitk::DiffusionImageMapping::MatrixType oldMatrix = t_geom->GetIndexToWorldTransform()->GetMatrix().GetVnlMatrix();
 
       t_geom->SetIndexToWorldTransform(s_geom->GetIndexToWorldTransform());
       target->SetGeometry(t_geom);
+
+      // The world gradients of a DWI follow the anatomy, so they turn with the image, as in DReg.
+      if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(target))
+      {
+        const mitk::DiffusionImageMapping::MatrixType newMatrix = s_geom->GetIndexToWorldTransform()->GetMatrix().GetVnlMatrix();
+        mitk::DiffusionImageMapping::RotateGradients(target, newMatrix * vnl_inverse(oldMatrix));
+      }
     }
     mitk::IOUtil::Save(target, outImage);
   }
