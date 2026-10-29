@@ -53,7 +53,8 @@ namespace mitk
     static bool IsDiffusionWeightedImage(const mitk::Image *);
     static bool IsDiffusionWeightedImage(const mitk::DataNode* node);
 
-    static void CopyProperties(mitk::BaseData* source, mitk::BaseData* target, bool ignore_original_gradients=false);
+    /** Copies all properties; without the original gradients (ignore_original_gradients) InitializeImage derives them from the modified ones. */
+    static void CopyProperties(const mitk::BaseData* source, mitk::BaseData* target, bool ignore_original_gradients=false);
 
     static ImageType::Pointer GetItkVectorImage(Image *image);
     static const BValueMapType & GetBValueMap(const mitk::Image *);
@@ -93,6 +94,12 @@ namespace mitk
 
     static void CopyDICOMProperties(const BaseData *source, BaseData *target);
 
+    /**
+    * \brief The factors InitializeImage applies to the original gradients: the image rotation
+    * (direction matrix) and the measurement frame, each empty if the image's flags say it is not applied
+    */
+    static void GetGradientTransform(const mitk::Image* image, std::optional<MeasurementFrameType>& rotation, std::optional<MeasurementFrameType>& frame);
+
   protected:
 
     static const std::string GRADIENTCONTAINERPROPERTYNAME;
@@ -117,12 +124,6 @@ namespace mitk
     * \warning first set the MeasurementFrame
     */
     static void UnApplyMeasurementFrameAndRotationMatrix(mitk::Image* image);
-
-    /**
-    * \brief The factors of ApplyMeasurementFrameAndRotationMatrix: the image rotation (direction
-    * matrix) and the measurement frame, each empty if the image's flags say it is not applied
-    */
-    static void GetGradientTransform(const mitk::Image* image, std::optional<MeasurementFrameType>& rotation, std::optional<MeasurementFrameType>& frame);
 
     /**
     * \brief Update the BValueMap (m_B_ValueMap) using the current gradient directions (m_Directions)

@@ -28,16 +28,6 @@ namespace
   using PropHelper = mitk::DiffusionPropertyHelper;
   using VolumeType = itk::Image<PropHelper::DiffusionPixelType, 3>;
 
-  /**
-   * DiffusionPropertyHelper::CopyProperties(source, target, true) for a const source: all
-   * properties except the original gradients, which InitializeImage derives again.
-   */
-  void CopyPropertiesWithoutOriginalGradients(const mitk::BaseData* source, mitk::BaseData* target)
-  {
-    target->SetPropertyList(source->GetPropertyList()->Clone());
-    target->GetPropertyList()->RemoveProperty(PropHelper::GetOriginalGradientContainerPropertyName());
-  }
-
   /** Direct (moving to target) affine matrix of the registration; throws if it has none. */
   mitk::DiffusionImageMapping::MatrixType AffineMatrix(const mitk::MAPRegistrationWrapper* registration)
   {
@@ -126,7 +116,7 @@ mitk::Image::Pointer mitk::DiffusionImageMapping::MapImage(const Image* moving, 
   composer->Update();
 
   Image::Pointer result = GrabItkImageMemory(composer->GetOutput());
-  CopyPropertiesWithoutOriginalGradients(moving, result);
+  PropHelper::CopyProperties(moving, result, true);
   RotateGradients(result, affine);
   return result;
 }
@@ -137,7 +127,7 @@ mitk::Image::Pointer mitk::DiffusionImageMapping::RefineGeometry(const Image* mo
     mitkThrow() << "No image or no registration given.";
 
   Image::Pointer result = ImageMappingHelper::refineGeometry(moving, registration, true);
-  CopyPropertiesWithoutOriginalGradients(moving, result);
+  PropHelper::CopyProperties(moving, result, true);
   if (PropHelper::IsDiffusionWeightedImage(result))
     RotateGradients(result, AffineMatrix(registration));
   return result;

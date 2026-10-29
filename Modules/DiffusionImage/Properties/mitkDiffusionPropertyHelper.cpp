@@ -284,7 +284,7 @@ bool mitk::DiffusionPropertyHelper::AreAlike(GradientDirectionType g1, GradientD
   return diff.two_norm() < precision || diff2.two_norm() < precision;
 }
 
-void mitk::DiffusionPropertyHelper::CopyProperties(BaseData *source, BaseData *target, bool ignore_original_gradients)
+void mitk::DiffusionPropertyHelper::CopyProperties(const BaseData *source, BaseData *target, bool ignore_original_gradients)
 {
   mitk::PropertyList::Pointer props = source->GetPropertyList()->Clone();
   if (ignore_original_gradients)
