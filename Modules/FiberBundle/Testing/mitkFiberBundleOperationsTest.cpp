@@ -50,6 +50,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkFiberBundleOperationsTestSuite);
   MITK_TEST(ExtractFiberIdSubset_NotWithOverlappingChildren_EqualsSetDifference);
   MITK_TEST(RemoveFibersOutside_MaskMissesAllFibers_ReturnsEmptyBundle);
+  MITK_TEST(RemoveFibersOutside_SegmentsCrossingTheMask_CutAtTheMaskBorder);
   MITK_TEST(ExtractFiberSubset_RoiIsNoPlanarFigure_Throws);
   MITK_TEST(Weights_RemovingOrSplittingFibers_FollowTheirFibers);
   MITK_TEST(CompressAndSubtract_EightThreads_EqualOneThread);
@@ -216,6 +217,80 @@ public:
     auto outside = fib->RemoveFibersOutside(mask, true);
     CPPUNIT_ASSERT(outside.IsNotNull());
     CPPUNIT_ASSERT_EQUAL(fib->GetNumFibers(), outside->GetNumFibers());
+  }
+
+  /** Points of fiber i of fib */
+  static std::vector<std::array<double, 3>> FiberPoints(mitk::FiberBundle *fib, unsigned int i)
+  {
+    vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+    std::vector<std::array<double, 3>> points;
+    for (vtkIdType j = 0; j < cell->GetNumberOfPoints(); ++j)
+    {
+      double p[3];
+      cell->GetPoints()->GetPoint(j, p);
+      points.push_back({p[0], p[1], p[2]});
+    }
+    return points;
+  }
+
+  static void AssertPiece(mitk::FiberBundle *fib, unsigned int i, const std::array<double, 3> &first, const std::array<double, 3> &last,
+                          std::size_t numPoints, float weight, const std::string &message)
+  {
+    const auto points = FiberPoints(fib, i);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ": number of points", numPoints, points.size());
+    for (int c = 0; c < 3; ++c)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": first point", first[c], points.front()[c], 1e-5);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": last point", last[c], points.back()[c], 1e-5);
+    }
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ": weight", weight, fib->GetFiberWeight(i));
+  }
+
+  // #1: the cut tested only the fiber points, so a segment that crosses the mask without a point
+  // inside it was dropped by "remove outside" and kept whole by "remove inside", and the kept
+  // pieces ended at their last point on the kept side instead of at the mask border.
+  void RemoveFibersOutside_SegmentsCrossingTheMask_CutAtTheMaskBorder()
+  {
+    // 10 x 10 x 10 voxels of 1 mm, origin 0, set where the x index is 4 or 5: x from 3.5 to 5.5 mm
+    auto mask = mitk::FiberBundle::ItkUcharImgType::New();
+    mitk::FiberBundle::ItkUcharImgType::RegionType region;
+    region.SetSize({{10, 10, 10}});
+    mask->SetRegions(region);
+    mask->Allocate();
+    mask->FillBuffer(0);
+    for (itk::IndexValueType y = 0; y < 10; ++y)
+      for (itk::IndexValueType z = 0; z < 10; ++z)
+      {
+        mask->SetPixel({{4, y, z}}, 1);
+        mask->SetPixel({{5, y, z}}, 1);
+      }
+
+    // A: two points, both outside the mask; B: the same line in steps of 0.5 mm; C: inside the
+    // mask, across several voxel borders; D: diagonal in the x-y plane, both points outside.
+    std::vector<std::array<double, 3>> fiberB;
+    for (int j = 0; j <= 18; ++j)
+      fiberB.push_back({0.5 * j, 5, 5});
+    const std::vector<std::array<double, 3>> fiberC = {{3.6, 1, 1}, {4.2, 3.3, 2}, {5.4, 8, 8.7}};
+    auto fib = MakeBundle({{{0, 5, 5}, {9, 5, 5}}, fiberB, fiberC, {{2, 2, 5}, {7, 7, 5}}});
+    for (unsigned int i = 0; i < 4; ++i)
+      fib->SetFiberWeight(i, 2.0f + i);
+
+    auto inside = fib->RemoveFibersOutside(mask);
+    CPPUNIT_ASSERT_EQUAL(4u, inside->GetNumFibers());
+    AssertPiece(inside, 0, {3.5, 5, 5}, {5.5, 5, 5}, 2, 2.0f, "outside removed, A");
+    AssertPiece(inside, 1, {3.5, 5, 5}, {5.5, 5, 5}, 5, 3.0f, "outside removed, B");
+    CPPUNIT_ASSERT_MESSAGE("a fiber inside the mask keeps its points", FiberPoints(inside, 2) == fiberC);
+    CPPUNIT_ASSERT_EQUAL(4.0f, inside->GetFiberWeight(2));
+    AssertPiece(inside, 3, {3.5, 3.5, 5}, {5.5, 5.5, 5}, 2, 5.0f, "outside removed, D");
+
+    auto outside = fib->RemoveFibersOutside(mask, true);
+    CPPUNIT_ASSERT_EQUAL(6u, outside->GetNumFibers());
+    AssertPiece(outside, 0, {0, 5, 5}, {3.5, 5, 5}, 2, 2.0f, "inside removed, A before the mask");
+    AssertPiece(outside, 1, {5.5, 5, 5}, {9, 5, 5}, 2, 2.0f, "inside removed, A after the mask");
+    AssertPiece(outside, 2, {0, 5, 5}, {3.5, 5, 5}, 8, 3.0f, "inside removed, B before the mask");
+    AssertPiece(outside, 3, {5.5, 5, 5}, {9, 5, 5}, 8, 3.0f, "inside removed, B after the mask");
+    AssertPiece(outside, 4, {2, 2, 5}, {3.5, 3.5, 5}, 2, 5.0f, "inside removed, D before the mask");
+    AssertPiece(outside, 5, {5.5, 5.5, 5}, {7, 7, 5}, 2, 5.0f, "inside removed, D after the mask");
   }
 
   void ExtractFiberSubset_RoiIsNoPlanarFigure_Throws()
