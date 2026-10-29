@@ -55,7 +55,7 @@ mitk-diffusion code too. Read the matching rule before touching CMake, a module 
 
 | Path | What it is |
 | --- | --- |
-| `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters; in `Algorithms/Reconstruction/` the functions the reconstruction views and apps call (`mitkDiffusionReconstruction.h`: tensors, Q-ball, tensors to DWI; `mitkDiffusionPeaks.h`; `mitkDiffusionIndices.h`) and the ODF direction tables (`mitkPointShell.h`). `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk and DICOM tractography IO. `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`. |
+| `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO; `mitkMaskGeometry.h` holds the voxel-grid rule (`HasVoxelGridOf`, 1e-4 mm) of every filter that takes a mask. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters; in `Algorithms/Reconstruction/` the functions the reconstruction views and apps call (`mitkDiffusionReconstruction.h`: tensors, Q-ball, tensors to DWI; `mitkDiffusionPeaks.h`; `mitkDiffusionIndices.h`) and the ODF direction tables (`mitkPointShell.h`). `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk and DICOM tractography IO. `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`. |
 | `mitk-diffusion/Modules/DiffusionCmdApps/` | Command line tools, one subfolder per group, each group switched by a `BUILD_Diffusion*CmdApps` option. A group's `CMakeLists.txt` is one call of `mitk_diffusion_create_cmdapps` (defined in `Modules/DiffusionCmdApps/CMakeLists.txt`) with the option, the modules of the group and its apps, `<App>` or `<App>:<module>,...` for modules only that app links. The apps link with `--no-as-needed`: a diffusion module registers its readers and writers when it is loaded, and an app that only loads and saves files uses none of its symbols. |
 | `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. |
 | `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI). Each starts with `set_always.txt`, which resets every variable a configuration changes (external packages; every diffusion module, cmd-app group and plugin off), and then switches on what it contains; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
@@ -95,7 +95,10 @@ Facts the layout does not show:
 
 - Modules, plugins and command line apps compile with `-Werror` unless they pass
   `WARNINGS_NO_ERRORS` (`mitk/CMake/mitkFunctionCreateModule.cmake`). Fix warnings rather than
-  adding that option.
+  adding that option. GCC 13 at -O3 (`release/`) reports warnings the Debug trees never show, e.g.
+  `-Warray-bounds` on an inlined `std::vector` copy; to check a change without a Release build,
+  compile its translation unit with the flags of the target's `flags.make` in
+  `release/MITK-build`, output to a scratch folder.
 - MITK's superbuild fetches only the Boost libraries listed in `MITK_USE_Boost_HEADER_LIBRARIES`
   and `MITK_USE_Boost_COMPILED_LIBRARIES`; a feature adds its own with
   `mitkFunctionRequireBoostLibraries` (example: `MITK_USE_Python3` in `mitk/CMakeLists.txt`).
@@ -122,9 +125,12 @@ Facts the layout does not show:
   with m != 0 are MRtrix 3's divided by sqrt(2)) at world (LPS) directions. `ShImageWriter` writes
   MRtrix 3's orthonormal basis and marks the file `MITK_SH_convention=MRtrix3` (NRRD key, NIfTI
   descrip); `ShImageReader` converts files so marked or whose descrip starts with
-  `MRtrix version: 3`, and reads unmarked files (all of earlier MITK versions) in the legacy basis.
-  Its option "SH convention" forces one; "FSL/Dipy" converts dipy's default basis (`descoteaux07`,
-  legacy) from the FSL bvec frame. NIfTI peak images are written in RAS with the descrip
+  `MRtrix version: 3`, and reads unmarked files (the 4D SH files of earlier MITK versions) in the
+  legacy basis. Its option "SH convention" forces one; "FSL/Dipy" converts dipy's default basis
+  (`descoteaux07`, legacy) from the FSL bvec frame. Older coefficient files with the coefficients
+  as vector pixels of a 3D image (`qBallImage_SHCoeffs.nrrd`,
+  `StreamlineTractography/qball_image_sh.nii.gz`) are no SH files to MITK and open as plain
+  vector images. NIfTI peak images are written in RAS with the descrip
   `MITK_peak_convention=RAS` and read back to LPS; NRRD peaks are LPS.
 - Reconstruction: `mitk::pointshell::Directions(n)` holds the ODF sampling directions as data;
   their order is part of the ODF file format (252 values per voxel) and of Fiberfox references.
@@ -171,9 +177,11 @@ Facts the layout does not show:
 
 ## Porting state
 
-In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
-test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 57 diffusion tests pass. The Workbench has not been started. Remove an item once it is fixed.
+In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
+line apps, plugins, user manuals) compile and link without warnings, and all 57 diffusion tests
+pass. `DiffusionRelease` is built less often; its last full build stopped at the GCC 13 warning
+named under "Facts", which is fixed but not rebuilt there. The Workbench has not been started.
+Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,
