@@ -17,6 +17,7 @@ found in the LICENSE file.
 #include <mitkPlanarFigureComposite.h>
 #include <mitkStandaloneDataStorage.h>
 #include <mitkDiffusionTestData.h>
+#include <mitkOmpThreadGuard.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -41,6 +42,7 @@ found in the LICENSE file.
 #include <map>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -54,6 +56,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ExtractFiberSubset_RoiIsNoPlanarFigure_Throws);
   MITK_TEST(Weights_RemovingOrSplittingFibers_FollowTheirFibers);
   MITK_TEST(CompressAndSubtract_EightThreads_EqualOneThread);
+  MITK_TEST(OmpThreadGuard_FailingCase_RestoresThreadCount);
   MITK_TEST(SubsampleFibers_WithoutRandomSeed_IsReproducible);
   MITK_TEST(ResampleToNumPoints_FibersWithoutLength_Terminate);
   MITK_TEST(DerivedBundles_KeepRasFlagAndHeader);
@@ -350,13 +353,12 @@ public:
     auto shortFibers = source->GetDeepCopy();
     shortFibers->RemoveLongFibers(source->GetMedianFiberLength());
 
-    const int threads = omp_get_max_threads();
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
     auto compressedSingle = source->GetDeepCopy();
     compressedSingle->Compress(0.1f);
     auto subtractedSingle = source->SubtractBundle(shortFibers);
 
-    omp_set_num_threads(8);
+    threads.SetNumberOfThreads(8);
     for (int run = 0; run < 3; ++run)
     {
       auto compressed = source->GetDeepCopy();
@@ -364,7 +366,25 @@ public:
       AssertIdentical(compressedSingle, compressed, "Compress, run " + std::to_string(run));
       AssertIdentical(subtractedSingle, source->SubtractBundle(shortFibers), "SubtractBundle, run " + std::to_string(run));
     }
-    omp_set_num_threads(threads);
+  }
+
+  // #32: the thread count a failing case set stayed for all later cases of the driver.
+  void OmpThreadGuard_FailingCase_RestoresThreadCount()
+  {
+    const int before = omp_get_max_threads();
+    const int other = before == 3 ? 2 : 3;
+    try
+    {
+      mitk::OmpThreadGuard threads(other);
+      CPPUNIT_ASSERT_EQUAL(other, omp_get_max_threads());
+      threads.SetNumberOfThreads(5);
+      CPPUNIT_ASSERT_EQUAL(5, omp_get_max_threads());
+      throw std::runtime_error("a failing assertion");
+    }
+    catch (const std::runtime_error &)
+    {
+    }
+    CPPUNIT_ASSERT_EQUAL(before, omp_get_max_threads());
   }
 
   void SubsampleFibers_WithoutRandomSeed_IsReproducible()

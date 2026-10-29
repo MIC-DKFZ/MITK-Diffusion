@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <itkFiberCurvatureFilter.h>
 #include <mitkIOUtil.h>
 #include <mitkDiffusionTestData.h>
+#include <mitkOmpThreadGuard.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -65,12 +66,10 @@ public:
   void Curvature_SameResultForAnyThreadCount()
   {
     auto original = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib"));
-    const int threads = omp_get_max_threads();
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
     auto single = Curvature(original, false);
-    omp_set_num_threads(8);
+    threads.SetNumberOfThreads(8);
     auto multi = Curvature(original, false);
-    omp_set_num_threads(threads);
     CPPUNIT_ASSERT(single->GetNumFibers() > original->GetNumFibers());
     CPPUNIT_ASSERT(single->Equals(multi));
   }

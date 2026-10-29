@@ -6,6 +6,9 @@
 # CMakeExternals/MITK-Diffusion-Data.cmake). C++ tests read it through
 # mitk::GetDiffusionTestDataFilePath() from mitkDiffusionTestData.h, test arguments in CMake as
 # ${MITK_DIFFUSION_DATA_DIR}/<path>.
+#
+# The same include path gets mitkOmpThreadGuard.h, which restores the OpenMP thread count a test
+# case changes, also when the case fails.
 
 if(BUILD_TESTING AND MODULE_IS_ENABLED)
   if(NOT MITK_DIFFUSION_DATA_DIR OR NOT IS_DIRECTORY "${MITK_DIFFUSION_DATA_DIR}")
@@ -18,5 +21,7 @@ if(BUILD_TESTING AND MODULE_IS_ENABLED)
 
   configure_file("${CMAKE_CURRENT_LIST_DIR}/mitkDiffusionTestData.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/mitkDiffusionTestData.h" @ONLY)
+  configure_file("${CMAKE_CURRENT_LIST_DIR}/mitkOmpThreadGuard.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/mitkOmpThreadGuard.h" COPYONLY)
   target_include_directories(${TESTDRIVER} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 endif()
