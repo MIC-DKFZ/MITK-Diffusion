@@ -69,7 +69,7 @@ where an existing helper fits>
 ## Tests
 
 <new and changed tests per step, then the exact build and ctest commands, run from where; which
-need MITK-Data; a skip is reported as a skip>
+need the test data (`MITK_DIFFUSION_DATA_DIR`); a skip is reported as a skip>
 
 ## Open points for the user
 

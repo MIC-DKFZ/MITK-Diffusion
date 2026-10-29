@@ -28,20 +28,21 @@ builds against the v2026.06 release. "Porting state" lists what is still open.
 
 The workspace root is not a git repository. Besides the build trees it holds `prompts/`
 (handoff prompts for new sessions), `gitlab_issues/` (issue drafts and handoff plans from the
-skills), `mitk-data/` (a clone of https://git.dkfz.de/mic/mitk-data for committing test data;
-the build trees read their own `MITK-Data` checkouts), a one-line `CLAUDE.md` importing this
-file and `.claude`, a symlink to `mitk-diffusion/.claude`: Claude Code
-reads `.claude/settings.json` only from the folder a session starts in, and loads skills from a
-subfolder only once a file there is touched. Edit both under `mitk-diffusion/`. Check
-`git -C mitk-diffusion status --short --branch` before and after working.
+skills), `mitk-diffusion-test-data/` (a clone of the test data repository, see "Test data";
+new references are committed there), `mitk-data/` (a clone of MITK-Data, which mitk-diffusion
+no longer reads), a one-line `CLAUDE.md` importing this file and `.claude`, a symlink to
+`mitk-diffusion/.claude`: Claude Code reads `.claude/settings.json` only from the folder a session
+starts in, and loads skills from a subfolder only once a file there is touched. Edit both under
+`mitk-diffusion/`. Check `git -C mitk-diffusion status --short --branch` before and after working.
 
 Git worktrees go under `mitk-diffusion/.worktrees/` (git-ignored). A build tree is bound to one
 `MITK_EXTENSION_DIRS` path, so `debug/` and `release/` build only the main checkout. A worktree
 gets a Debug inner build of its own in `wt-build/<worktree name>`, configured by
 `mitk-diffusion/.claude/scripts/configure-worktree-build.sh` (see "Commands"); it reuses the
-externals in `debug/ep` and the test data in `debug/MITK-Data`. `mitkConfig.h` embeds the
-extension path, so the first build of a tree compiles nearly all of MITK: keep the tree as long
-as its worktree exists, and rerun the script after a superbuild in `debug/`.
+externals in `debug/ep` and MITK's test data in `debug/MITK-Data`, and reads the diffusion test
+data from `mitk-diffusion-test-data/`. `mitkConfig.h` embeds the extension path, so the first
+build of a tree compiles nearly all of MITK: keep the tree as long as its worktree exists, and
+rerun the script after a superbuild in `debug/`.
 
 When MITK changed an interface, adapt mitk-diffusion to it. MITK usually migrated its own modules
 in the same commit, so `git -C mitk log -S'<old symbol>'` shows the intended replacement. If a
@@ -59,10 +60,10 @@ mitk-diffusion code too. Read the matching rule before touching CMake, a module 
 | `mitk-diffusion/Modules/DiffusionCmdApps/` | Command line tools, one subfolder per group, each group switched by a `BUILD_Diffusion*CmdApps` option. A group's `CMakeLists.txt` is one call of `mitk_diffusion_create_cmdapps` (defined in `Modules/DiffusionCmdApps/CMakeLists.txt`) with the option, the modules of the group and its apps, `<App>` or `<App>:<module>,...` for modules only that app links. The apps link with `--no-as-needed`: a diffusion module registers its readers and writers when it is loaded, and an app that only loads and saves files uses none of its symbols. |
 | `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. |
 | `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI). Each starts with `set_always.txt`, which resets every variable a configuration changes (external packages; every diffusion module, cmd-app group and plugin off), and then switches on what it contains; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
-| `mitk-diffusion/CMakeExternals/`, `CMake/PackageDepends/` | OpenCV, which MITK no longer provides, added to the superbuild by the extension. |
+| `mitk-diffusion/CMakeExternals/`, `CMake/PackageDepends/` | OpenCV, which MITK no longer provides, added to the superbuild by the extension; `MITK-Diffusion-Data`, the test data (see "Test data"). |
 | `mitk-diffusion/.claude/` | Skills (`bug-report`, `feature-request`, `improvement-request`, `handoff`, `investigate`, `review`), `settings.json`, `scripts/create_gitlab_issue.py`, which searches and creates issues in the GitLab project with `GITLAB_TOKEN` from `mitk-diffusion/.env` (git-ignored), and `scripts/configure-worktree-build.sh` for a worktree's build tree. |
 | `mitk/` | MITK itself, see above. |
-| `debug/` | Superbuild tree, Debug, `MITK_BUILD_CONFIGURATION=DiffusionDebug`; externals in `debug/ep/`, the MITK + diffusion build in `debug/MITK-build/`, test data checkout in `debug/MITK-Data/`. |
+| `debug/` | Superbuild tree, Debug, `MITK_BUILD_CONFIGURATION=DiffusionDebug`; externals in `debug/ep/`, the MITK + diffusion build in `debug/MITK-build/`, MITK's test data checkout in `debug/MITK-Data/`. |
 | `release/` | The same as a Release build, `DiffusionRelease`. |
 
 ## How the build works
@@ -110,8 +111,18 @@ Facts the layout does not show:
   `Debug`, `set_release.txt` forces `Release`.
 - Configuring `FiberTracking` downloads a lookup-table tarball from mitk.org into its binary
   `resource/` folder, so it needs network. MITK embeds module resources only from `resource/`.
-- Module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each `Testing/`
-  folder and read input from `${MITK_DATA_DIR}/DiffusionImaging/`.
+- Test data: module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each
+  `Testing/` folder and read their input and references from a checkout of
+  https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion-test-data (branch `main`; paths as
+  below `DiffusionImaging/` in MITK-Data, which no test reads), named by `MITK_DIFFUSION_DATA_DIR`.
+  The superbuild clones it at the commit pinned in `CMakeExternals/MITK-Diffusion-Data.cmake`
+  unless the variable is given, and passes it to the inner build. A `Testing/CMakeLists.txt`
+  includes `mitkDiffusionTestData` after `MITK_CREATE_MODULE_TESTS()`: it fails the configure
+  when the variable is unset and gives C++ `mitk::GetDiffusionTestDataFilePath("<path>")`
+  (`mitkDiffusionTestData.h`); CMake test arguments use `${MITK_DIFFUSION_DATA_DIR}/<path>`. New
+  or changed references are committed in `mitk-diffusion-test-data/` (pushed only when the user
+  asks; then raise the pinned commit). A changed reference gets a new file name
+  (`<name>_v2.<ext>`, `_v3`, ...) and the old file stays, so other branches keep finding theirs.
 - Gradient convention: the modified gradients (`DiffusionPropertyHelper::GetGradientContainer`),
   which all filters, mappers, trackers and Fiberfox use, are world (LPS) vectors,
   `modified = MF^T * original` with the stored measurement frame `MF` (frame axes as rows) and
@@ -147,8 +158,8 @@ Facts the layout does not show:
 - `ctest -R mitkFiberBundle` runs the `FiberBundle` tests; `mitkFiberBundleMapperTest` renders
   offscreen (EGL) and is skipped with exit code 77 where no OpenGL context can be created.
   `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
-  give the same result at any number of OpenMP threads; MITK-Data fiber references depend on
-  exact point positions, so a change there is checked bit for bit against the old output.
+  give the same result at any number of OpenMP threads; fiber references in the test data
+  depend on exact point positions, so a change there is checked bit for bit against the old output.
 - `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter)Test'`
   runs the `FiberProcessing` tests. Its filters read const bundles and give the same result at
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
@@ -158,17 +169,18 @@ Facts the layout does not show:
   engines per seed point, so a tractogram with a fixed seed (`--fix_seed`, "Fix Random Seed") is
   the same at any number of OpenMP threads; the handlers take tensors, ODF directions and peaks as
   world (LPS) vectors and never apply the image rotation. Gibbs tracking samples the ODF along the
-  particle in the image-axis frame and looks it up at the world direction. MITK-Data tractography
-  references (`StreamlineTractography/ReferenceFibs/`, `gibbsTractogram_v3.fib`) depend on the
-  exact random engines and seeds, so a change there is checked bit for bit against the old output.
+  particle in the image-axis frame and looks it up at the world direction. Tractography
+  references in the test data (`StreamlineTractography/ReferenceFibs/`, `gibbsTractogram_v3.fib`)
+  depend on the exact random engines and seeds, so a change there is checked bit for bit against
+  the old output.
 - `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
   `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
   `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and
   `SetGradientsFromImage` stores a DWI's gradients in that form. With a constant seed
   (`SetUseConstantRandSeed`, `MitkFiberfox --fix_seed`) a simulation gives the same image at any
-  number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`). MITK-Data Fiberfox references
-  depend on the random engines and seeds, so a change there is checked bit for bit against the
-  old output.
+  number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`). Fiberfox references in the
+  test data depend on the random engines and seeds, so a change there is checked bit for bit
+  against the old output.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
   labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
   without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
@@ -206,6 +218,7 @@ Run from the workspace root. Both superbuild trees use Unix Makefiles; for Relea
 | `cmake --build debug/MITK-build -j$(nproc)` | Rebuild MITK + diffusion: the normal edit-compile loop. |
 | `cmake --build debug/MITK-build --target MitkFiberTracking -j$(nproc)` | One module (`Mitk<Module>`); a plugin target is its folder name with `_` for `.`, e.g. `org_mitk_gui_qt_diffusionimaging_tractography`. |
 | `cmake debug/MITK-build` | Re-configure the inner build after editing CMake files in `mitk-diffusion/`. |
+| `cmake -DMITK_DIFFUSION_DATA_DIR=$PWD/mitk-diffusion-test-data debug` | Let the superbuild pass the workspace clone of the test data instead of cloning its own; the inner build gets it at the next superbuild, or at once with the same `-D` on `debug/MITK-build`. |
 | `ctest --test-dir debug/MITK-build -R Fiber` | Run tests matching a pattern; `-N` lists without running. Never call a test driver directly. |
 | `debug/MITK-build/bin/MitkWorkbench` | Start the Workbench with the diffusion plugins; command line apps are in the same `bin/`. |
 | `mitk-diffusion/.claude/scripts/configure-worktree-build.sh mitk-diffusion/.worktrees/<name> wt-build/<name>` | Configure a worktree's own build tree (about 20 s), and re-configure it after editing CMake files. Extra arguments override the initial cache, e.g. `-DMITK_BUILD_CONFIGURATION=Fiberfox` in a throwaway tree to check another configuration. Build it like `debug/MITK-build`. |
@@ -260,4 +273,4 @@ Run from the workspace root. Both superbuild trees use Unix Makefiles; for Relea
 ### Data
 
 - Never add patient data, DWI/NIfTI/NRRD/DICOM files or tractograms to the repository; test
-  input belongs in MITK-Data.
+  input belongs in mitk-diffusion-test-data.
