@@ -21,6 +21,8 @@ found in the LICENSE file.
 #include <vtkLookupTable.h>
 #include <vtkProperty.h>
 
+#include <algorithm>
+
 mitk::OdfVtkMapper2D::LocalStorage::LocalStorage()
   : m_Actor(vtkSmartPointer<vtkActor>::New()), m_Mapper(vtkSmartPointer<vtkPolyDataMapper>::New())
 {
@@ -89,9 +91,11 @@ void mitk::OdfVtkMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
                            localStorage->m_LastPlaneAxis1 != plane->GetAxisVector(1) ||
                            localStorage->m_LastViewportSize != viewportSize ||
                            localStorage->m_LastViewportOrigin != viewportOrigin;
+  // GetPropertyList(renderer) creates the renderer's list on its first call, which counts as a
+  // change; it is taken before the generate time, or the next render would regenerate once.
+  const auto propertiesTime = std::max(node->GetPropertyList()->GetMTime(), node->GetPropertyList(renderer)->GetMTime());
   const auto lastTime = localStorage->GetLastGenerateDataTime().GetMTime();
-  if (!viewChanged && !localStorage->IsGenerateDataRequired(renderer, this, this->GetDataNode()) &&
-      lastTime >= node->GetPropertyList()->GetMTime() && lastTime >= node->GetPropertyList(renderer)->GetMTime())
+  if (!viewChanged && !localStorage->IsGenerateDataRequired(renderer, this, this->GetDataNode()) && lastTime >= propertiesTime)
     return;
 
   localStorage->UpdateGenerateDataTime();
@@ -104,9 +108,11 @@ void mitk::OdfVtkMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
   bool visible = false;
   node->GetVisibility(visible, renderer, "visible");
   const auto slice = OdfGlyphGenerator::GetSlice(*image, this->GetTimestep(), *plane);
+  // Glyphs are shown only where their orientation is switched on; a missing property hides them.
+  bool orientationVisible = false;
   if (visible && slice)
-    node->GetBoolProperty(GetVisibilityPropertyName(slice->orientation), visible, renderer);
-  if (!visible || !slice)
+    node->GetBoolProperty(GetVisibilityPropertyName(slice->orientation), orientationVisible, renderer);
+  if (!orientationVisible)
   {
     this->ResetMapper(renderer);
     return;
