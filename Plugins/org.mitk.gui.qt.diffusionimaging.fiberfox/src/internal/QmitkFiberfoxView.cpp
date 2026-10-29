@@ -406,7 +406,6 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_DotWidget2->SetT2(2200);
 
     m_Controls->m_PrototypeWidget1->setVisible(false);
-    m_Controls->m_PrototypeWidget2->setVisible(false);
     m_Controls->m_PrototypeWidget3->setVisible(false);
     m_Controls->m_PrototypeWidget4->setVisible(false);
 
