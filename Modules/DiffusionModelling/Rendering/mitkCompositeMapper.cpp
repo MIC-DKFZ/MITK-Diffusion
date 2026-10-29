@@ -105,5 +105,5 @@ void mitk::CompositeMapper::SetDefaultProperties(DataNode *node, BaseRenderer *r
   LevelWindow opacityLevelWindow;
   opacityLevelWindow.SetRangeMinMax(0, 255);
   opacityLevelWindow.SetWindowBounds(0, 0);
-  node->AddProperty("opaclevelwindow", LevelWindowProperty::New(opacityLevelWindow));
+  node->AddProperty("opaclevelwindow", LevelWindowProperty::New(opacityLevelWindow), renderer, overwrite);
 }
