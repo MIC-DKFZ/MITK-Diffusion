@@ -348,6 +348,14 @@ namespace mitk
      * with asFslBvecs false, as world vectors for a simulation without ApplyDirectionMatrix.
      */
     void SetGradientsFromImage(const mitk::Image* dwi, bool asFslBvecs=true);
+    /**
+     * For the .ffp saved next to a simulated image: with motion, the motion-volume text becomes the
+     * list of the volumes that m_SignalGen.m_MotionVolumes moves, so that loading the file moves the
+     * same volumes ("random" would draw anew). An empty list stays blank (every volume moves, in
+     * SetMotionVolumes and TractsToDWIImageFilter alike); a list without a moved volume switches
+     * motion off, because a blank text would move every volume.
+     */
+    void ListMovedVolumes();
 
     void PrintSelf();                           ///< Print parameters to stdout.
     void SaveParameters(std::string filename);  ///< Save image generation parameters to .ffp file.

@@ -180,7 +180,10 @@ static int RunFiberfox(int argc, char* argv[])
   {
     MITK_DEBUG << outName << ".ffp";
     parameters.m_Misc.m_OutputAdditionalImages = true;
-    parameters.SaveParameters(outName+".ffp");
+    // as the view: the saved file lists the volumes this run moves
+    mitk::FiberfoxParameters saved = parameters;
+    saved.ListMovedVolumes();
+    saved.SaveParameters(outName+".ffp");
   }
   else
     parameters.m_Misc.m_OutputAdditionalImages = false;

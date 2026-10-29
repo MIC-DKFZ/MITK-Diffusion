@@ -275,6 +275,25 @@ public:
     parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"), true);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(parameters.m_SignalGen.GetNumVolumes()), parameters.m_SignalGen.m_MotionVolumes.size());
     CPPUNIT_ASSERT(!parameters.m_SignalGen.m_MotionVolumes.at(0));
+
+    // ListMovedVolumes: the saved text moves the drawn volumes again
+    CPPUNIT_ASSERT(parameters.m_SignalGen.m_DoAddMotion);
+    mitk::FiberfoxParameters listed = parameters;
+    listed.ListMovedVolumes();
+    CPPUNIT_ASSERT(listed.m_Misc.m_MotionVolumesBox != "random");
+    mitk::FiberfoxParameters reparsed = parameters;
+    CPPUNIT_ASSERT(reparsed.m_SignalGen.SetMotionVolumes(listed.m_Misc.m_MotionVolumesBox, nullptr));
+    CPPUNIT_ASSERT(parameters.m_SignalGen.m_MotionVolumes == reparsed.m_SignalGen.m_MotionVolumes);
+    // no moved volume: saved without motion; empty list: stays blank
+    listed = parameters;
+    listed.m_SignalGen.m_MotionVolumes.assign(listed.m_SignalGen.GetNumVolumes(), false);
+    listed.ListMovedVolumes();
+    CPPUNIT_ASSERT(!listed.m_SignalGen.m_DoAddMotion);
+    listed = parameters;
+    listed.m_SignalGen.m_MotionVolumes.clear();
+    listed.ListMovedVolumes();
+    CPPUNIT_ASSERT(listed.m_SignalGen.m_DoAddMotion);
+    CPPUNIT_ASSERT(listed.m_Misc.m_MotionVolumesBox.empty());
   }
 
   /** A saved .ffp keeps its gradients when it is copied without its .bvals/.bvecs files. */

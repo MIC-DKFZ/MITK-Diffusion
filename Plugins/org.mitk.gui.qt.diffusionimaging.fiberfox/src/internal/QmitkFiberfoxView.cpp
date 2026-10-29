@@ -67,23 +67,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 namespace
 {
-  /** The parameters of a started simulation as saved next to its image. The motion volumes are
-      stored as the indices that moved, so that loading the .ffp moves the same volumes ("random"
-      would draw anew); a run in which no volume moved is saved without motion, because a blank
-      text moves every volume. */
+  /** The parameters of a started simulation as saved next to its image (ListMovedVolumes). */
   mitk::FiberfoxParameters SimulatedParameters(const mitk::FiberfoxParameters& parameters)
   {
     mitk::FiberfoxParameters simulated = parameters;
-    if (!simulated.m_SignalGen.m_DoAddMotion)
-      return simulated;
-    std::string moved;
-    for (std::size_t i = 0; i < simulated.m_SignalGen.m_MotionVolumes.size(); ++i)
-      if (simulated.m_SignalGen.m_MotionVolumes[i])
-        moved += (moved.empty() ? "" : " ") + std::to_string(i);
-    if (moved.empty())
-      simulated.m_SignalGen.m_DoAddMotion = false;
-    else
-      simulated.m_Misc.m_MotionVolumesBox = moved;
+    simulated.ListMovedVolumes();
     return simulated;
   }
 }

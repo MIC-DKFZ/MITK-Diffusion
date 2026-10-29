@@ -365,6 +365,20 @@ void mitk::FiberfoxParameters::SetGradientsFromImage(const mitk::Image* dwi, boo
   SetGradienDirections(gradients);
 }
 
+void mitk::FiberfoxParameters::ListMovedVolumes()
+{
+  if (!m_SignalGen.m_DoAddMotion)
+    return;
+  std::string moved;
+  for (std::size_t i = 0; i < m_SignalGen.m_MotionVolumes.size(); ++i)
+    if (m_SignalGen.m_MotionVolumes[i])
+      moved += (moved.empty() ? "" : " ") + std::to_string(i);
+  if (moved.empty() && !m_SignalGen.m_MotionVolumes.empty())
+    m_SignalGen.m_DoAddMotion = false;
+  else
+    m_Misc.m_MotionVolumesBox = moved;
+}
+
 void mitk::FiberfoxParameters::SaveParameters(std::string filename)
 {
   if(filename.empty())
