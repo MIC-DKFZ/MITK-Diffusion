@@ -36,6 +36,7 @@ set(CPP_FILES
 
   # Algorithms
   Algorithms/mitkLbfgsbMutex.cpp
+  Algorithms/itkFlipPeaksFilter.cpp
   Algorithms/Reconstruction/mitkDiffusionReconstruction.cpp
   Algorithms/Reconstruction/mitkDiffusionReconstructionQball.cpp
   Algorithms/Reconstruction/mitkDiffusionPeaks.cpp
@@ -71,6 +72,7 @@ set(H_FILES
   IO/mitkPeakImageReader.h
   IO/mitkPeakImageWriter.h
   IO/mitkPeakImageSerializer.h
+  IO/mitkSerializeWithWriter.h
 
   # Rendering
   Rendering/mitkOdfGlyphGenerator.h
@@ -78,6 +80,7 @@ set(H_FILES
   Rendering/mitkCompositeMapper.h
   Rendering/mitkPeakImageMapper2D.h
   Rendering/mitkPeakImageMapper3D.h
+  Rendering/mitkPeakImageMapperHelper.h
 
   # Reconstruction
   Algorithms/Reconstruction/mitkDiffusionReconstruction.h

@@ -1081,7 +1081,7 @@ public:
     const bool flips[][3] = {{true, false, false}, {false, true, true}};
     for (const auto &flip : flips)
     {
-      auto filter = itk::FlipPeaksFilter<float>::New();
+      auto filter = itk::FlipPeaksFilter::New();
       filter->SetInput(peaks);
       filter->SetFlipX(flip[0]);
       filter->SetFlipY(flip[1]);

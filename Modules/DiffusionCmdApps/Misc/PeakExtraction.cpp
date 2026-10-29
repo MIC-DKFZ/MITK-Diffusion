@@ -36,7 +36,7 @@ namespace
   /** Negates the selected world components of every peak (FlipPeaksFilter, as the controls view). */
   mitk::PeakImage::Pointer FlipPeaks(mitk::PeakImage *peaks, bool x, bool y, bool z)
   {
-    auto flipper = itk::FlipPeaksFilter<mitk::PeakImage::PixelType>::New();
+    auto flipper = itk::FlipPeaksFilter::New();
     flipper->SetInput(peaks->GetItkPeakImage());
     flipper->SetFlipX(x);
     flipper->SetFlipY(y);

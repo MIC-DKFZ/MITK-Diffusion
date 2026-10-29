@@ -18,6 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkImageToImageFilter.h>
 #include <mitkPeakImage.h>
+#include <MitkDiffusionModellingExports.h>
 
 namespace itk{
 
@@ -25,8 +26,7 @@ namespace itk{
 * \brief Flip peaks along specified axes
 */
 
-template< class PixelType >
-class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImageType, mitk::PeakImage::ItkPeakImageType >
+class MITKDIFFUSIONMODELLING_EXPORT FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImageType, mitk::PeakImage::ItkPeakImageType >
 {
 
     public:
@@ -43,9 +43,9 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
     /** Runtime information support. */
     itkOverrideGetNameOfClassMacro(FlipPeaksFilter)
 
-    typedef typename Superclass::InputImageType InputImageType;
-    typedef typename Superclass::OutputImageType OutputImageType;
-    typedef typename OutputImageType::RegionType         OutputImageRegionType;
+    typedef Superclass::InputImageType InputImageType;
+    typedef Superclass::OutputImageType OutputImageType;
+    typedef OutputImageType::RegionType         OutputImageRegionType;
 
     itkSetMacro( FlipX, bool)                               ///< flip peaks in x direction
     itkSetMacro( FlipY, bool)                               ///< flip peaks in y direction
@@ -65,10 +65,6 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
 };
 
 }
-
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkFlipPeaksFilter.txx"
-#endif
 
 #endif //__itkFlipPeaksFilter_h_
 
