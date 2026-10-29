@@ -141,8 +141,8 @@ public:
 
         mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
         fib = fib->RemoveFibersOutside(mask);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_outside.fib"));
-//        mitk::IOUtil::Save(fib, mitk::IOUtil::GetTempPath()+"remove_outside.fib");
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_outside_v2.fib"));
+//        mitk::IOUtil::Save(fib, mitk::IOUtil::GetTempPath()+"remove_outside_v2.fib");
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
@@ -152,7 +152,7 @@ public:
 
         mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
         fib = fib->RemoveFibersOutside(mask, true);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_inside.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_inside_v2.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
