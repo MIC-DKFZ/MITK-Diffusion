@@ -24,6 +24,7 @@ This file is based heavily on a corresponding ITK filter.
 
 #include <itkImageToImageFilter.h>
 #include <complex>
+#include <vector>
 
 namespace itk{
 
@@ -61,6 +62,13 @@ protected:
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
+private:
+    /** e^{-2 pi i k x / n} for the centred indices k and x of an axis of n samples, row k. */
+    static std::vector< std::complex<double> > Factors(unsigned int n);
+
+    /** The transform is separable: the rows transformed along x (row y at y*nx), then the factors along y. */
+    std::vector< std::complex<double> > m_Rows;
+    std::vector< std::complex<double> > m_FactorsY;
 };
 
 }
