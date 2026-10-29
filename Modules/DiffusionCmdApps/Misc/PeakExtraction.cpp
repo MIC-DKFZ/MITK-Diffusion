@@ -65,7 +65,7 @@ int main(int argc, char* argv[])
   parser.addArgument("rel_peakthr", "r", mitkCommandLineParser::Float, "Relative peak threshold", "peaks below this fraction of the largest peak of their voxel are dropped", 0.4, true);
   parser.addArgument("abs_peakthr", "a", mitkCommandLineParser::Float, "Absolute peak threshold", "peaks whose ODF value is below are dropped", 0.03, true);
   parser.addArgument("angular_thr", "", mitkCommandLineParser::Float, "Angular threshold", "in degrees: of two peaks closer than this, the smaller one is dropped", 15, true);
-  parser.addArgument("shConvention", "s", mitkCommandLineParser::String, "SH convention", "how the coefficients in the file are defined: auto (file marker, else MITK), MITK (legacy, MRtrix 0.2), MRtrix3, FSL (dipy's default basis in the FSL bvec frame)", std::string("auto"), true);
+  parser.addArgument("shConvention", "s", mitkCommandLineParser::String, "SH convention", "how the coefficients in the file are defined: auto (file marker, else MITK; MITK's FSL definition for coefficient vectors of a 3D image, as earlier MITK versions saved them), MITK (legacy, MRtrix 0.2), MRtrix3, FSL (dipy's default basis in the FSL bvec frame)", std::string("auto"), true);
   parser.addArgument("flipX", "", mitkCommandLineParser::Bool, "Flip X", "negate the x component (world) of the peaks", us::Any(), true);
   parser.addArgument("flipY", "", mitkCommandLineParser::Bool, "Flip Y", "negate the y component (world) of the peaks", us::Any(), true);
   parser.addArgument("flipZ", "", mitkCommandLineParser::Bool, "Flip Z", "negate the z component (world) of the peaks", us::Any(), true);

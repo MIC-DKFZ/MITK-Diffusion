@@ -140,8 +140,9 @@ Facts the layout does not show:
   legacy basis. Its option "SH convention" forces one; "FSL/Dipy" converts dipy's default basis
   (`descoteaux07`, legacy) from the FSL bvec frame. Older coefficient files with the coefficients
   as vector pixels of a 3D image (`qBallImage_SHCoeffs.nrrd`,
-  `StreamlineTractography/qball_image_sh.nii.gz`) are no SH files to MITK and open as plain
-  vector images. NIfTI peak images are written in RAS with the descrip
+  `StreamlineTractography/qball_image_sh.nii.gz`) open as plain vector images by default; the SH
+  reader is offered for them (confidence `PartiallySupported`, NRRD DWIs excluded) and reads them,
+  with "auto", in MITK's FSL definition (`ShImage::FSL`), the basis of those MITK versions. NIfTI peak images are written in RAS with the descrip
   `MITK_peak_convention=RAS` and read back to LPS; NRRD peaks are LPS.
 - Reconstruction: `mitk::pointshell::Directions(n)` holds the ODF sampling directions as data;
   their order is part of the ODF file format (252 values per voxel) and of Fiberfox references.

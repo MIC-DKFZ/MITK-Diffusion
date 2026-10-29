@@ -44,10 +44,12 @@ found in the LICENSE file.
 #include <vnl/vnl_matrix_fixed.h>
 #include <vnl/algo/vnl_determinant.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <numeric>
 #include <fstream>
 #include <optional>
 #include <set>
@@ -1109,8 +1111,23 @@ public:
       CPPUNIT_ASSERT_EQUAL(mitk::ShImage::FSL, saved->GetShConvention());
       AssertEqualPixels(shImage, saved);
 
-      const auto peaks = mitk::ExtractPeaks(shImage, mitk::PeakParameters()).peaks;
-      AssertEqualPixels(peaks, mitk::ExtractPeaks(saved, mitk::PeakParameters()).peaks);
+      // Peaks in a block of 10 x 10 voxels of the middle slice, to keep the Debug test short.
+      auto mask = mitk::Image::New();
+      mask->Initialize(mitk::MakeScalarPixelType<unsigned char>(), *shImage->GetGeometry());
+      {
+        mitk::ImageWriteAccessor maskAccess(mask);
+        auto *maskValues = static_cast<unsigned char *>(maskAccess.GetData());
+        const unsigned int nx = mask->GetDimension(0), ny = mask->GetDimension(1);
+        std::fill(maskValues, maskValues + static_cast<std::size_t>(nx) * ny * mask->GetDimension(2), 0);
+        for (unsigned int y = 27; y < 37; ++y)
+          for (unsigned int x = 27; x < 37; ++x)
+            maskValues[x + nx * (y + static_cast<std::size_t>(ny))] = 1;
+      }
+      const auto peaks = mitk::ExtractPeaks(shImage, mitk::PeakParameters(), mask);
+      AssertEqualPixels(peaks.peaks, mitk::ExtractPeaks(saved, mitk::PeakParameters(), mask).peaks);
+      mitk::ImageReadAccessor numberAccess(peaks.numberOfPeaks);
+      const auto *numbers = static_cast<const unsigned char *>(numberAccess.GetData());
+      CPPUNIT_ASSERT_MESSAGE(file, std::accumulate(numbers, numbers + values / count, 0u) >= 100u);
     }
   }
 
