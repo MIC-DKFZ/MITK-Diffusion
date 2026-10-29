@@ -26,8 +26,8 @@
       <string>Save Parameters</string>
      </property>
      <property name="icon">
-      <iconset>
-       <normaloff>:/QmitkDiffusionImaging/general_icons/download.ico</normaloff>:/QmitkDiffusionImaging/general_icons/download.ico</iconset>
+      <iconset resource="../../resources/QmitkFiberfox.qrc">
+       <normaloff>:/QmitkFiberfox/download.png</normaloff>:/QmitkFiberfox/download.png</iconset>
      </property>
     </widget>
    </item>
@@ -40,8 +40,8 @@
       <string>Load Parameters</string>
      </property>
      <property name="icon">
-      <iconset>
-       <normaloff>:/QmitkDiffusionImaging/general_icons/upload.ico</normaloff>:/QmitkDiffusionImaging/general_icons/upload.ico</iconset>
+      <iconset resource="../../resources/QmitkFiberfox.qrc">
+       <normaloff>:/QmitkFiberfox/upload.png</normaloff>:/QmitkFiberfox/upload.png</iconset>
      </property>
     </widget>
    </item>
@@ -507,8 +507,8 @@
              <string>Generate Fibers</string>
             </property>
             <property name="icon">
-             <iconset>
-              <normaloff>:/QmitkDiffusionImaging/general_icons/right.ico</normaloff>:/QmitkDiffusionImaging/general_icons/right.ico</iconset>
+             <iconset resource="../../resources/QmitkFiberfox.qrc">
+              <normaloff>:/QmitkFiberfox/right.png</normaloff>:/QmitkFiberfox/right.png</iconset>
             </property>
            </widget>
           </item>
@@ -631,7 +631,7 @@
              <item row="0" column="1">
               <widget class="QCheckBox" name="m_AdvancedOptionsBox">
                <property name="toolTip">
-                <string>Disable to only generate fibers if &quot;Generate Fibers&quot; button is pressed.</string>
+                <string>Show the advanced fiber generation options.</string>
                </property>
                <property name="text">
                 <string>Advanced Options</string>
@@ -773,10 +773,10 @@
                 <number>2</number>
                </property>
                <property name="minimum">
-                <double>-360.000000000000000</double>
+                <double>-99999.000000000000000</double>
                </property>
                <property name="maximum">
-                <double>360.000000000000000</double>
+                <double>99999.000000000000000</double>
                </property>
                <property name="singleStep">
                 <double>0.100000000000000</double>
@@ -792,10 +792,10 @@
                 <number>2</number>
                </property>
                <property name="minimum">
-                <double>-360.000000000000000</double>
+                <double>-99999.000000000000000</double>
                </property>
                <property name="maximum">
-                <double>360.000000000000000</double>
+                <double>99999.000000000000000</double>
                </property>
                <property name="singleStep">
                 <double>0.100000000000000</double>
@@ -949,8 +949,8 @@
              <string>Align With Grid</string>
             </property>
             <property name="icon">
-             <iconset>
-              <normaloff>:/QmitkDiffusionImaging/general_icons/right.ico</normaloff>:/QmitkDiffusionImaging/general_icons/right.ico</iconset>
+             <iconset resource="../../resources/QmitkFiberfox.qrc">
+              <normaloff>:/QmitkFiberfox/right.png</normaloff>:/QmitkFiberfox/right.png</iconset>
             </property>
            </widget>
           </item>
@@ -1296,7 +1296,7 @@
           <item row="0" column="1">
            <widget class="QSpinBox" name="m_VolumeSizeY">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Size of the phantom volume along x.</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1315,7 +1315,7 @@
           <item row="0" column="0">
            <widget class="QSpinBox" name="m_VolumeSizeX">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Size of the phantom volume along y.</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1334,7 +1334,7 @@
           <item row="0" column="2">
            <widget class="QSpinBox" name="m_VolumeSizeZ">
             <property name="toolTip">
-             <string>Specify number of fibers to generate for the selected bundle.</string>
+             <string>Size of the phantom volume along z.</string>
             </property>
             <property name="minimum">
              <number>1</number>
@@ -1529,8 +1529,8 @@
           <string>Generate</string>
          </property>
          <property name="icon">
-          <iconset>
-           <normaloff>:/QmitkDiffusionImaging/general_icons/right.ico</normaloff>:/QmitkDiffusionImaging/general_icons/right.ico</iconset>
+          <iconset resource="../../resources/QmitkFiberfox.qrc">
+           <normaloff>:/QmitkFiberfox/right.png</normaloff>:/QmitkFiberfox/right.png</iconset>
          </property>
         </widget>
        </item>
@@ -1890,10 +1890,6 @@
          <property name="text">
           <string>Copy Bundles</string>
          </property>
-         <property name="icon">
-          <iconset>
-           <normaloff>:/QmitkDiffusionImaging/general_icons/copy2.ico</normaloff>:/QmitkDiffusionImaging/general_icons/copy2.ico</iconset>
-         </property>
         </widget>
        </item>
        <item row="1" column="0">
@@ -1910,8 +1906,8 @@
           <string>Transform Selection</string>
          </property>
          <property name="icon">
-          <iconset>
-           <normaloff>:/QmitkDiffusionImaging/general_icons/refresh.ico</normaloff>:/QmitkDiffusionImaging/general_icons/refresh.ico</iconset>
+          <iconset resource="../../resources/QmitkFiberfox.qrc">
+           <normaloff>:/QmitkFiberfox/refresh.xpm</normaloff>:/QmitkFiberfox/refresh.xpm</iconset>
          </property>
         </widget>
        </item>
@@ -1927,10 +1923,6 @@
          </property>
          <property name="text">
           <string>Join Bundles</string>
-         </property>
-         <property name="icon">
-          <iconset>
-           <normaloff>:/QmitkDiffusionImaging/general_icons/plus.ico</normaloff>:/QmitkDiffusionImaging/general_icons/plus.ico</iconset>
          </property>
         </widget>
        </item>

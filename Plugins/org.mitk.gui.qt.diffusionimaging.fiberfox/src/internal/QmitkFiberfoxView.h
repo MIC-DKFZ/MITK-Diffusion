@@ -135,6 +135,7 @@ protected slots:
     void OnTemplateSelected(int value);
     void OnBvalsBvecsCheck(int value);
     void OnTlineChanged();
+    void OnGradientSettingsChanged();   ///< loaded gradients and prototypes give way to the changed settings
 
 protected:
 
@@ -142,15 +143,26 @@ protected:
 
     Ui::QmitkFiberfoxViewControls* m_Controls;
 
+    void StartSimulation();     ///< GenerateImage without its exception handling
     void SimulateForExistingDwi(mitk::DataNode* imageNode);     ///< add artifacts to existing diffusion weighted image
     void SimulateImageFromFibers(mitk::DataNode* fiberNode);    ///< simulate new diffusion weighted image
     void UpdateParametersFromGui();  ///< update fiberfox paramater object
+    void SetGradientsFromGui();      ///< bvals/bvecs files, loaded gradients or a generated half shell
     void UpdateGui();                                           ///< enable/disbale buttons etc. according to current datamanager selection
     void PlanarFigureSelected( itk::Object* object, const itk::EventObject& );
     void EnableCrosshairNavigation();               ///< enable crosshair navigation if planar figure interaction ends
     void DisableCrosshairNavigation();              ///< disable crosshair navigation if planar figure interaction starts
 
     void SaveParameters(QString filename);
+
+    /** The widget of a compartment's prototype model, nullptr for compartment 2 (none). */
+    QmitkPrototypeSignalParametersWidget* GetPrototypeWidget(int compartmentId);
+    /** A prototype model of the widget's settings, with the loaded kernels if they still apply. */
+    mitk::RawShModel<>* NewPrototypeModel(QmitkPrototypeSignalParametersWidget* widget, int compartmentId);
+    /** Prototype signal models of m_Parameters that have no kernels yet. */
+    std::vector< mitk::RawShModel<>* > GetPrototypeModelsWithoutKernels();
+    /** Samples the kernels of the given models from the DWI; false if a model got no valid kernel. */
+    bool SamplePrototypeKernels(mitk::Image::Pointer diffImg, const std::vector< mitk::RawShModel<>* >& models);
 
 
     mitk::DataNode::Pointer                             m_SelectedImageNode;
@@ -164,10 +176,24 @@ protected:
     QTimer*                 m_SimulationTimer;
     QTime                   m_SimulationTime;
     QString                 m_SimulationStatusText;
+    std::string             m_SimulationError;  ///< message of the exception that stopped the last simulation, empty if none
 
     /** Image filters that do all the simulations. */
     itk::TractsToDWIImageFilter< short >::Pointer           m_TractsToDwiFilter;
 
     friend class QmitkFiberfoxWorker;
     mitk::FiberfoxParameters  m_Parameters;
+    mitk::SignalGenerationParameters::GradientListType  m_LoadedGradients;  ///< of a .ffp without .bvals/.bvecs files
+    double                    m_LoadedBvalue = 0;
+    /** Prototype model with kernels from a loaded .ffp and the widget settings it was loaded with. */
+    struct LoadedPrototype
+    {
+      std::unique_ptr< mitk::DiffusionSignalModel<> > m_Model;
+      std::vector<double>       m_WidgetSettings;
+      std::vector<int>          m_Shells;   ///< non-zero b-values of the file's gradients
+    };
+    std::map< int, LoadedPrototype > m_LoadedPrototypes;   ///< by compartment id
+    /** m_Parameters of the last started simulation before ApplyDirectionMatrix (gradients as FSL
+     * bvecs), saved as .ffp next to the simulated image */
+    mitk::FiberfoxParameters  m_SimulatedParameters;
 };
