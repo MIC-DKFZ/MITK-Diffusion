@@ -17,6 +17,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkCommandLineParser.h"
 
+#include <cmath>
+
 #include <mitkIOUtil.h>
 #include <mitkImage.h>
 #include <mitkImageCast.h>
@@ -187,10 +189,11 @@ int main( int argc, char* argv[] )
       bool valid = spacings.size() == 3;
       for (unsigned int i = 0; valid && i < 3; ++i)
       {
-        // std::stof rejects text without a number; the value must be positive for the output size.
-        try { spacing[i] = std::stof(spacings[i]); }
+        // The whole entry must be a number (std::stof stops at "2x"); positive and finite for the output size.
+        std::size_t parsed = 0;
+        try { spacing[i] = std::stof(spacings[i], &parsed); }
         catch (const std::exception&) { valid = false; }
-        valid = valid && spacing[i] > 0;
+        valid = valid && parsed == spacings[i].size() && std::isfinite(spacing[i]) && spacing[i] > 0;
       }
       if (!valid)
       {
