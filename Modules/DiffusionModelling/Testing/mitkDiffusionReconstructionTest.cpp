@@ -34,6 +34,7 @@ found in the LICENSE file.
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkImageRegionIterator.h>
+#include <itkOdfMaximaExtractionFilter.h>
 #include <itkTensorDerivedMeasurementsFilter.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
 
@@ -67,6 +68,7 @@ class mitkDiffusionReconstructionTestSuite : public mitk::TestFixture
   MITK_TEST(TensorsToDwi_WorldGradients);
   MITK_TEST(Peaks_FslConvention_SameAsMrtrix);
   MITK_TEST(Peaks_EachAxisOnce);
+  MITK_TEST(Peaks_SameAsFilter_AllVolumes);
   MITK_TEST(Peaks_MaskOfOtherSize_Throws);
   MITK_TEST(TensorPeaks_SameAsFilter);
   MITK_TEST(TensorIndices_MatchReferences);
@@ -615,6 +617,39 @@ public:
           CPPUNIT_ASSERT_EQUAL(1u, count);
       }
     }
+  }
+
+  // The peak image is 4D; mitk::GrabItkImageMemory would take over only its first volume and leave
+  // the others uninitialized, so ExtractPeaks takes the whole channel. Every volume, the last
+  // included, equals the filter's.
+  void Peaks_SameAsFilter_AllVolumes()
+  {
+    auto shImage = LoadShImage();
+    mitk::PeakParameters parameters;
+    parameters.maxPeaks = 2;
+    const auto result = mitk::ExtractPeaks(shImage, parameters);
+
+    using FilterType = itk::OdfMaximaExtractionFilter<float, 4, ODF_SAMPLING_SIZE>;
+    auto filter = FilterType::New();
+    filter->SetInput(mitk::ImageToItkImage<ShItkImageType::PixelType, 3>(shImage.GetPointer()));
+    filter->SetToolkit(FilterType::MRTRIX);
+    filter->SetAngularThreshold(std::cos(parameters.angularThreshold * itk::Math::pi / 180));
+    filter->SetMaxNumPeaks(parameters.maxPeaks);
+    filter->SetRelativePeakThreshold(parameters.relativeThreshold);
+    filter->SetAbsolutePeakThreshold(parameters.absoluteThreshold);
+    filter->SetNormalizationMethod(FilterType::MAX_VEC_NORM);
+    filter->Update();
+
+    auto peaks = result.peaks->GetItkPeakImage();
+    CPPUNIT_ASSERT(SameVoxels(filter->GetPeakImage().GetPointer(), peaks.GetPointer()));
+    const auto size = peaks->GetLargestPossibleRegion().GetSize();
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(6), size[3]);
+    bool lastVolumeSet = false;
+    for (itk::IndexValueType z = 0; z < static_cast<itk::IndexValueType>(size[2]); ++z)
+      for (itk::IndexValueType y = 0; y < static_cast<itk::IndexValueType>(size[1]); ++y)
+        for (itk::IndexValueType x = 0; x < static_cast<itk::IndexValueType>(size[0]); ++x)
+          lastVolumeSet = lastVolumeSet || peaks->GetPixel({{x, y, z, 5}}) != 0;
+    CPPUNIT_ASSERT(lastVolumeSet);
   }
 
   static mitk::Image::Pointer MaskLargerThan(const mitk::Image *image)
