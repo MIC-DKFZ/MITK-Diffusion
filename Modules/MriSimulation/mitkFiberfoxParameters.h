@@ -131,7 +131,7 @@ namespace mitk
     unsigned int                        m_EchoTrainLength;          ///< Only relevant for Fast Spin Echo sequence (number of k-space lines acquired with one RF pulse)
     bool                                m_ReversePhase;             ///< If true, the phase readout direction will be inverted (-y instead of y)
     float                               m_PartialFourier;           ///< Partial fourier factor (0.5-1)
-    float                               m_NoiseVariance;            ///< Variance of complex gaussian noise
+    float                               m_NoiseVariance;            ///< Variance of the complex Gaussian k-space noise; not added when FiberfoxParameters::m_NoiseModel is set
     unsigned int                        m_NumberOfCoils;            ///< Number of coils in multi-coil acquisition
     CoilSensitivityProfile              m_CoilSensitivityProfile;   ///< Choose between constant, linear or exponential sensitivity profile of the used coils
     float                               m_CoilSensitivity;          ///< signal remaining in slice center

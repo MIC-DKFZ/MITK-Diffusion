@@ -100,7 +100,8 @@ namespace itk {
     outputImage->Allocate();
     std::complex<ScalarType> zero = std::complex<ScalarType>(0, 0);
     outputImage->FillBuffer(zero);
-    if (m_Parameters->m_SignalGen.m_NoiseVariance>0 && m_Parameters->m_Misc.m_DoAddNoise)
+    // A noise model (Rician, chi-square) adds the noise of the run itself, after the k-space step.
+    if (m_Parameters->m_SignalGen.m_NoiseVariance>0 && m_Parameters->m_Misc.m_DoAddNoise && m_Parameters->m_NoiseModel==nullptr)
     {
       ImageRegionIterator< OutputImageType > oit(outputImage, outputImage->GetLargestPossibleRegion());
       while( !oit.IsAtEnd() )
