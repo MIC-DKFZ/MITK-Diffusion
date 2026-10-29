@@ -49,9 +49,9 @@ namespace mitk::FiberBundleDetail
     return {ids, static_cast<std::size_t>(numPoints)};
   }
 
-  /** The fibers of polyData as a FiberBundle keeps them (UpdateFiberGeometry): vtkCleanPolyData
-   *  without point merging turns one-point fibers into vertices placed before all lines and drops
-   *  fibers without points; cell data goes along with its cells. */
+  /** The fibers of polyData as a FiberBundle keeps them (UpdateFiberGeometry): every cell with
+   *  points as a line, in cell order, fibers without points dropped; only used points, numbered
+   *  in the order of first use. Point and cell data go along with their points and cells. */
   vtkSmartPointer<vtkPolyData> CleanFiberPolyData(vtkPolyData* polyData);
 
   /** Builds the cell lookup of polyData, which FiberPointIds would otherwise build on first use. */
@@ -114,8 +114,8 @@ namespace mitk::FiberBundleDetail
     std::vector<std::array<float, 3>> m_Pending;
     std::vector<vtkIdType> m_PointIds;
     std::vector<float> m_Weights;
-    /** Fibers that CleanFiberPolyData moves or drops: fewer than two points */
-    std::size_t m_NumShortFibers = 0;
+    /** Fibers without points, which CleanFiberPolyData drops */
+    std::size_t m_NumEmptyFibers = 0;
     vtkSmartPointer<vtkIdList> m_IdBuffer;
   };
 }

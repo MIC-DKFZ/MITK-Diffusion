@@ -109,7 +109,12 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GetFiberPolyData() const
 
 void mitk::FiberBundle::UpdateFiberGeometry()
 {
+  // Fibers without points (e.g. empty streamlines of a .tck file) are dropped; the fibers after
+  // them move up, so per-fiber values given in file order no longer match.
+  const vtkIdType numCells = m_FiberPolyData->GetNumberOfCells();
   m_FiberPolyData = FiberBundleDetail::CleanFiberPolyData(m_FiberPolyData);
+  if (m_FiberPolyData->GetNumberOfCells()<numCells)
+    MITK_WARN << "Removed " << numCells-m_FiberPolyData->GetNumberOfCells() << " fibers without points.";
 
   m_FiberLengths.clear();
   m_MeanFiberLength = 0;
@@ -231,7 +236,7 @@ void mitk::FiberBundle::SetFiberWeight(unsigned int fiber, float weight)
 
 unsigned int mitk::FiberBundle::GetNumberOfPoints() const
 {
-  // the point ids of all cells (fibers, and vertices for one-point fibers)
+  // the point ids of all cells (every fiber is a line; other cell types for completeness)
   const vtkIdType points = m_FiberPolyData->GetVerts()->GetNumberOfConnectivityIds()
       + m_FiberPolyData->GetLines()->GetNumberOfConnectivityIds()
       + m_FiberPolyData->GetPolys()->GetNumberOfConnectivityIds()
