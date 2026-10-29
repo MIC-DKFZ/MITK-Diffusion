@@ -756,17 +756,9 @@ void TractsToDWIImageFilter< PixelType >::InitializeData()
       PrintToLog("Maximum translation: " + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_Translation) + "mm", false);
     }
   }
+  // an empty list moves every volume, like a blank motion-volume text (SetMotionVolumes)
   if ( m_Parameters.m_SignalGen.m_MotionVolumes.empty() )
-  {
-    // no motion in first volume
-    m_Parameters.m_SignalGen.m_MotionVolumes.push_back(false);
-
-    // motion in all other volumes
-    while ( m_Parameters.m_SignalGen.m_MotionVolumes.size() < m_Parameters.m_SignalGen.GetNumVolumes() )
-    {
-      m_Parameters.m_SignalGen.m_MotionVolumes.push_back(true);
-    }
-  }
+    m_Parameters.m_SignalGen.m_MotionVolumes.assign(m_Parameters.m_SignalGen.GetNumVolumes(), true);
   // we need to know for every volume if there is motion. if this information is missing, then set corresponding fal to false
   while ( m_Parameters.m_SignalGen.m_MotionVolumes.size()<m_Parameters.m_SignalGen.GetNumVolumes() )
   {

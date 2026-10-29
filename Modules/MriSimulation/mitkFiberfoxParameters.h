@@ -153,7 +153,7 @@ namespace mitk
     bool                                m_DoAddMotion;              ///< Enable motion artifacts.
     bool                                m_DoRandomizeMotion;        ///< Toggles between random and linear motion.
     bool                                m_DoAddDrift;               ///< Add quadratic signal drift.
-    std::vector< bool >                 m_MotionVolumes;            ///< Indicates the image volumes that are affected by motion
+    std::vector< bool >                 m_MotionVolumes;            ///< Indicates the image volumes that are affected by motion; empty: all, missing entries: not moved
     ///< with positive numbers, inverted logic with negative numbers.
     itk::Vector<float,3>                m_Translation;              ///< Maximum translational motion.
     itk::Vector<float,3>                m_Rotation;                 ///< Maximum rotational motion.

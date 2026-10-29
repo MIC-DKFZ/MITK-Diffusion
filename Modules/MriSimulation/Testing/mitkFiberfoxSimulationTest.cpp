@@ -260,7 +260,8 @@ public:
       parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
       parameters.m_SignalGen.m_DoAddMotion = true;
       parameters.m_SignalGen.m_DoRandomizeMotion = random;
-      parameters.m_SignalGen.m_MotionVolumes.clear();  // all volumes but the first
+      parameters.m_SignalGen.m_MotionVolumes.assign(parameters.m_SignalGen.GetNumVolumes(), true);
+      parameters.m_SignalGen.m_MotionVolumes[0] = false;  // all volumes but the first
       parameters.m_SignalGen.m_Rotation[0] = 10;
       parameters.m_SignalGen.m_Rotation[1] = 10;
       parameters.m_SignalGen.m_Rotation[2] = 10;
@@ -321,6 +322,22 @@ public:
       CPPUNIT_ASSERT_MESSAGE("fibers moved as reported", maxFiberError < 1e-3);
       CPPUNIT_ASSERT_MESSAGE("maps read at the exact inverse position", maxDistanceError < 1e-3);
     }
+
+    // An empty list moves every volume, like a blank motion-volume text: the first linear volume
+    // gets 1/N of the motion.
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
+    parameters.m_SignalGen.m_DoAddMotion = true;
+    parameters.m_SignalGen.m_DoRandomizeMotion = false;
+    parameters.m_SignalGen.m_MotionVolumes.clear();
+    parameters.m_SignalGen.m_Translation[0] = 5;
+    auto filter = MotionProbeFilter::New();
+    filter->SetUseConstantRandSeed(true);
+    filter->SetParameters(parameters);
+    filter->SetFiberBundle(m_FiberBundle);
+    filter->Update();
+    const auto& motion = filter->GetMotion();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0 / parameters.m_SignalGen.GetNumVolumes(), motion.front().GetTranslation()[0], 1e-12);
   }
 
   /** One bundle with fibers per requested tract. The filter is part of the module library, so the
