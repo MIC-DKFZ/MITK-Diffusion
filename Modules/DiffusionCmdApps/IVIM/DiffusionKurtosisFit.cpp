@@ -68,7 +68,7 @@ int main( int argc, char* argv[] )
   parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. 'nii' or 'nrrd' (default)");
 
   // optional arguments
-  parser.addArgument("mask", "m", mitkCommandLineParser::String, "Masking Image: ", "ROI (segmentation)", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("mask", "m", mitkCommandLineParser::String, "Masking Image: ", "Fit only where this image is greater than 0, also below 1 (others get 0); it must have the geometry of the input", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("help", "h", mitkCommandLineParser::Bool, "Help", "Show this help text");
   parser.addArgument("omitbzero", "om", mitkCommandLineParser::Bool, "Omit b0:", "Omit b0 value during fit (default = false)", us::Any());
   parser.addArgument("lowerkbound", "kl", mitkCommandLineParser::Float, "lower Kbound:", "Magnitude of the lower boundary for the kurtosis parameter: K >= -value (default = 1000)", us::Any());
