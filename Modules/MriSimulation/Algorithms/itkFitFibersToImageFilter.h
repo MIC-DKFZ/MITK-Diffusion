@@ -404,6 +404,17 @@ protected:
 
   void GetClosestPeak(itk::Index<4> idx, PeakImgType::Pointer m_PeakImage , vnl_vector_fixed<float,3> fiber_dir, int& id, double& w, double& peak_mag );
 
+  /**
+   * The one traversal of the fiber segments that all three systems are built from. For every voxel a
+   * segment passes (mitk::imv::IntersectImage on the voxel grid of grid with the given spacing) that
+   * lies in grid and in the mask, if one is set, calls visit(column, segment, voxel, length): column is
+   * the unknown of the fiber (individual fit) or of its bundle, segment the vector from the segment's
+   * start to its end, length the length of the segment in the voxel. Tractograms, fibers and segments
+   * are visited in order. Also fills m_GroupSizes and counts the fibers in fiber_count.
+   */
+  template <class Visitor>
+  void ForEachSegmentVoxel(const itk::ImageBase<3>* grid, const itk::Vector<double, 3>& spacing, Visitor visit);
+
   void CreatePeakSystem();
   void CreateDiffSystem();
   void CreateScalarSystem();
