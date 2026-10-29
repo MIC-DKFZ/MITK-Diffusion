@@ -64,7 +64,7 @@ If no fiber bundle but a diffusion-weighted image is selected, the specified art
 
 The group-boxes "Intra-axonal Compartment", "Inter-axonal Compartment" and "Extra-axonal Compartments" allow the specification which model to use and the corresponding model parameters. Currently the following models are implemented:
 \li <b>Stick</b>: The “stick” model describes diffusion in an idealized cylinder with zero radius. Parameter: Diffusivity <em>d</em>
-\li <b>Zeppelin</b>: Cylindrically symmetric diffusion tensor. Parameters: Parallel diffusivity <em>d<sub>||</sub></em> and perpendicular diffusivity  <em>d<sub>⊥</sub></em>
+\li <b>Zeppelin</b>: Cylindrically symmetric diffusion tensor. Parameters: Parallel diffusivity <em>d<sub>||</sub></em> and perpendicular diffusivity  <em>d<sub>⊥</sub></em>. A parameter file stores it as a tensor with two equal perpendicular diffusivities; loading a file saved by this view selects "Zeppelin" again.
 \li <b>Tensor</b>: Full diffusion tensor. Parameters: Parallel diffusivity <em>d<sub>||</sub></em> and perpendicular diffusivity constants  <em>d<sub>⊥1</sub></em> and <em>d<sub>⊥2</sub></em>
 \li <b>Ball</b>: Isotropic compartment. Parameter: Diffusivity <em>d</em>
 \li <b>Astrosticks</b>: Consists of multiple stick models pointing in different directions. The single stick orientations can either be distributed equally over the sphere or are sampled randomly. The model represents signal coming from a type of glial cell called astrocytes, or populations of axons with arbitrary orientation. Parameters: randomization of the stick orientations and diffusivity of the sticks <em>d</em>.
