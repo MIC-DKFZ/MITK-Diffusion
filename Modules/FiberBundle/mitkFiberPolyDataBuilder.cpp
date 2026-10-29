@@ -13,7 +13,7 @@ found in the LICENSE file.
 #include "mitkFiberPolyDataBuilder.h"
 
 #include <vtkCellData.h>
-#include <vtkCleanPolyData.h>
+#include <vtkPointData.h>
 #include <vtkPolyData.h>
 
 void mitk::FiberBundleDetail::CopyMetadata(const FiberBundle* source, FiberBundle* target)
@@ -27,11 +27,58 @@ void mitk::FiberBundleDetail::CopyMetadata(const FiberBundle* source, FiberBundl
 
 vtkSmartPointer<vtkPolyData> mitk::FiberBundleDetail::CleanFiberPolyData(vtkPolyData* polyData)
 {
-  vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
-  cleaner->SetInputData(polyData);
-  cleaner->PointMergingOff();
-  cleaner->Update();
-  return cleaner->GetOutput();
+  // What vtkCleanPolyData without point merging does, except that every cell stays a line in
+  // its place: vtkCleanPolyData makes one-point lines vertices, which VTK numbers before all
+  // lines, and the fiber order must stay that of the file (per-streamline weight files, #20).
+  // Points are renumbered in the order of first use and consecutive repeats of a point id in a
+  // cell are dropped, as vtkCleanPolyData does, so bundles of fibers with two or more points come
+  // out exactly as before.
+  // Without points the result is an empty polydata, without points or cell arrays, like the
+  // output of vtkCleanPolyData; otherwise a line array is set when the input has cells.
+  vtkSmartPointer<vtkPolyData> cleaned = vtkSmartPointer<vtkPolyData>::New();
+  vtkPoints* inPoints = polyData->GetPoints();
+  if (inPoints==nullptr || inPoints->GetNumberOfPoints()<1)
+    return cleaned;
+  vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+  points->SetDataType(inPoints->GetDataType());
+  vtkSmartPointer<vtkCellArray> lines = vtkSmartPointer<vtkCellArray>::New();
+
+  vtkPointData* inPointData = polyData->GetPointData();
+  vtkCellData* inCellData = polyData->GetCellData();
+  vtkPointData* pointData = cleaned->GetPointData();
+  vtkCellData* cellData = cleaned->GetCellData();
+  pointData->CopyAllOn(vtkDataSetAttributes::COPYTUPLE);
+  pointData->CopyAllocate(inPointData);
+  cellData->CopyAllOn(vtkDataSetAttributes::COPYTUPLE);
+  cellData->CopyAllocate(inCellData);
+
+  std::vector<vtkIdType> pointMap(static_cast<std::size_t>(inPoints->GetNumberOfPoints()), -1);
+  std::vector<vtkIdType> cellPoints;
+  vtkSmartPointer<vtkIdList> idBuffer = vtkSmartPointer<vtkIdList>::New();
+  for (vtkIdType cellId=0; cellId<polyData->GetNumberOfCells(); ++cellId)
+  {
+    cellPoints.clear();
+    for (const vtkIdType id : FiberPointIds(polyData, cellId, idBuffer))
+    {
+      vtkIdType& newId = pointMap[static_cast<std::size_t>(id)];
+      if (newId<0)
+      {
+        newId = points->InsertNextPoint(inPoints->GetPoint(id));
+        pointData->CopyData(inPointData, id, newId);
+      }
+      if (cellPoints.empty() || cellPoints.back()!=newId)
+        cellPoints.push_back(newId);
+    }
+    if (cellPoints.empty())
+      continue;
+    const vtkIdType newCellId = lines->InsertNextCell(static_cast<vtkIdType>(cellPoints.size()), cellPoints.data());
+    cellData->CopyData(inCellData, cellId, newCellId);
+  }
+
+  cleaned->SetPoints(points);
+  if (polyData->GetNumberOfCells()>0)
+    cleaned->SetLines(lines);
+  return cleaned;
 }
 
 mitk::FiberBundleDetail::FiberPolyDataBuilder::FiberPolyDataBuilder()
@@ -70,8 +117,8 @@ void mitk::FiberBundleDetail::FiberPolyDataBuilder::EndFiber(float weight)
     m_PointIds[j] = m_Points->InsertNextPoint(m_Pending[j].data());
   m_Lines->InsertNextCell(static_cast<vtkIdType>(m_PointIds.size()), m_PointIds.data());
   m_Weights.push_back(weight);
-  if (m_PointIds.size()<2)
-    ++m_NumShortFibers;
+  if (m_PointIds.empty())
+    ++m_NumEmptyFibers;
   m_Pending.clear();
 }
 
@@ -86,10 +133,10 @@ mitk::FiberBundleDetail::FiberPolyDataBuilder::Fibers mitk::FiberBundleDetail::F
   fibers.weights->SetNumberOfValues(static_cast<vtkIdType>(m_Weights.size()));
   for (std::size_t i=0; i<m_Weights.size(); ++i)
     fibers.weights->SetValue(static_cast<vtkIdType>(i), m_Weights[i]);
-  if (m_NumShortFibers==0)
+  if (m_NumEmptyFibers==0)
     return fibers;
 
-  // The bundle would reorder or drop these fibers; the weights take the same way as cell data.
+  // The bundle would drop these fibers; the weights take the same way as cell data.
   fibers.polyData->GetCellData()->AddArray(fibers.weights);
   vtkSmartPointer<vtkPolyData> cleaned = CleanFiberPolyData(fibers.polyData);
   vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();

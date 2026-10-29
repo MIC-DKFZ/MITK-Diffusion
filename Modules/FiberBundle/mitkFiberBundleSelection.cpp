@@ -40,7 +40,6 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GeneratePolyDataByIds(const std:
     builder.AddFiber(m_FiberPolyData, id, this->GetFiberWeight(id));
   }
 
-  // in the order of a bundle made of the polydata, which may differ from that of fiberIds
   const auto fibers = builder.GetFibers();
   weights->SetNumberOfValues(fibers.weights->GetNumberOfValues());
   for (vtkIdType i=0; i<fibers.weights->GetNumberOfValues(); ++i)
@@ -525,7 +524,7 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
       if (r<minRadius)
       {
         j += 2;
-        // a single point is no fiber (it would become a vertex cell)
+        // a single point is no fiber
         if (builder.GetNumberOfPendingPoints()>1)
           builder.EndFiber(weight);
         else

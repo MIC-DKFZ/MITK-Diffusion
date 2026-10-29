@@ -90,7 +90,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(TransformFibers_ItkTransform_MovesEveryPoint);
   MITK_TEST(ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat);
   MITK_TEST(TrackVisHeader_JoinedAndMovedBundles_ContainEveryPoint);
-  MITK_TEST(Weights_OnePointFibersChangingPlace_FollowTheirFibers);
+  MITK_TEST(Weights_OnePointFibers_KeepPlaceAndWeight);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -520,7 +520,7 @@ public:
 
   void ColorFibersByOrientation_OnePointFibers_GetColours()
   {
-    // the one-point fiber becomes a vertex cell; its point is on no line
+    // the point of the one-point fiber has no orientation
     auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}}, {{5, 5, 5}}, {{0, 3, 0}, {0, 4, 0}}});
     auto colours = fib->GetFiberColors();
     CPPUNIT_ASSERT_EQUAL(fib->GetFiberPolyData()->GetNumberOfPoints(), colours->GetNumberOfTuples());
@@ -1250,10 +1250,9 @@ public:
     }
   }
 
-  void Weights_OnePointFibersChangingPlace_FollowTheirFibers()
+  void Weights_OnePointFibers_KeepPlaceAndWeight()
   {
-    // A bundle keeps fibers of one point before all others (vtkCleanPolyData makes them vertices),
-    // so a fiber of one point that an operation puts behind others changes its place.
+    // Fibers of one point keep their place among the others (#20) and their weights.
     auto a = MakeBundle({{{0, 0, 0}, {0, 1, 0}}, {{1, 0, 0}, {1, 1, 0}}});
     a->SetFiberWeight(0, 1.0f);
     a->SetFiberWeight(1, 2.0f);
@@ -1263,6 +1262,8 @@ public:
 
     auto joined = a->AddBundle(b);
     CPPUNIT_ASSERT_EQUAL(4u, joined->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("the one-point fiber of b follows the fibers of a", static_cast<vtkIdType>(1),
+                                 joined->GetFiberPolyData()->GetCell(2)->GetNumberOfPoints());
     AssertWeightsByFirstPoint({a, b}, joined, "AddBundle");
     AssertWeightsByFirstPoint({a, b}, a->AddBundles({b}), "AddBundles");
 
