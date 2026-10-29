@@ -54,6 +54,12 @@ void mitk::FiberBundleMapper2D::Update(mitk::BaseRenderer * renderer)
   FBXLocalStorage *localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
   localStorage->m_Actor->GetProperty()->SetLighting(false);
 
+  // The node's opacity, set on every render as the 3D mapper does; it needs no rebuild of the
+  // slab. VTK multiplies it with the alpha of the fiber colours.
+  float opacity = 1.0f;
+  this->GetDataNode()->GetOpacity(opacity, renderer);
+  localStorage->m_Actor->GetProperty()->SetOpacity(opacity);
+
   int lineWidth = 0;
   this->GetDataNode()->GetIntProperty("shape.linewidth", lineWidth);
 

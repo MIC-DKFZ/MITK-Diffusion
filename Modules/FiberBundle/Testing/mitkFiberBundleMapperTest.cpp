@@ -327,6 +327,7 @@ public:
     vtkActor *actor = Render2D(mitk::AnatomicalPlane::Axial);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3, actor->GetProperty()->GetOpacity(), 1e-6);
     const int translucent = BrightestPixel();
+    MITK_INFO << "Brightest fiber pixel at opacity 1.0: " << opaque << ", at 0.3: " << translucent;
     CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("the fiber is blended with opacity 0.3", 0.3 * opaque, static_cast<double>(translucent), 13.0);
   }
 
