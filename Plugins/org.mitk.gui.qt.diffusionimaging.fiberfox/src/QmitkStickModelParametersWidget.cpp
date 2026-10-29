@@ -23,7 +23,6 @@ const std::string QmitkStickModelParametersWidget::VIEW_ID = "org.mitk.views.Sti
 QmitkStickModelParametersWidget::QmitkStickModelParametersWidget( QWidget * parent, Qt::WindowFlags )
     : QWidget(parent)
 {
-    m_Controls = nullptr;
     this->CreateQtPartControl(this);
 }
 
@@ -36,7 +35,7 @@ void QmitkStickModelParametersWidget::CreateQtPartControl(QWidget *parent)
     if (!m_Controls)
     {
         // create GUI widgets
-        m_Controls = new Ui::QmitkStickModelParametersWidgetControls;
+        m_Controls = std::make_unique<Ui::QmitkStickModelParametersWidgetControls>();
         m_Controls->setupUi(parent);
     }
 }

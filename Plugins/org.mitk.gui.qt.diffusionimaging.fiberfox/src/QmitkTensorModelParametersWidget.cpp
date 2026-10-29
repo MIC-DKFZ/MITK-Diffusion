@@ -23,7 +23,6 @@ const std::string QmitkTensorModelParametersWidget::VIEW_ID = "org.mitk.views.te
 QmitkTensorModelParametersWidget::QmitkTensorModelParametersWidget( QWidget * parent, Qt::WindowFlags )
     : QWidget(parent)
 {
-    m_Controls = nullptr;
     this->CreateQtPartControl(this);
 }
 
@@ -36,7 +35,7 @@ void QmitkTensorModelParametersWidget::CreateQtPartControl(QWidget *parent)
     if (!m_Controls)
     {
         // create GUI widgets
-        m_Controls = new Ui::QmitkTensorModelParametersWidgetControls;
+        m_Controls = std::make_unique<Ui::QmitkTensorModelParametersWidgetControls>();
         m_Controls->setupUi(parent);
 
         connect((QObject*) m_Controls->m_D1box, SIGNAL(valueChanged(double)), (QObject*) this, SLOT(DChanged(double)));
