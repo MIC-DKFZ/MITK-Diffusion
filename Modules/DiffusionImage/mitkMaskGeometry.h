@@ -23,7 +23,7 @@ namespace mitk
       origin, spacing and direction equal within MITK's tolerances for geometries that differ only
       by rounding (mitkNodePredicateGeometry.h: 1e-4 mm, 1e-6 for the direction). A mask stored with
       fewer digits than the DWI, e.g. as NIfTI with a float origin, still has the DWI's voxel grid.
-      The rule of every diffusion filter that takes a mask (IVIM, kurtosis, peak extraction). */
+      The rule of the IVIM, kurtosis and peak extraction filters. */
   MITKDIFFUSIONIMAGE_EXPORT bool HasVoxelGridOf(const itk::ImageBase<3>* mask, const itk::ImageBase<3>* image);
 }
 
