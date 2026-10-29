@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
   try
   {
     // load input image
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images", "SH Image", "ODF Image", "Tensor Image"}, std::vector<std::string>());
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images", "SH Image", "ODF Image", "Diffusion Tensor Image"}, std::vector<std::string>());
     auto input = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
     bool is_odf = (dynamic_cast<mitk::ShImage*>(input.GetPointer()) || dynamic_cast<mitk::OdfImage*>(input.GetPointer()));
@@ -173,7 +173,10 @@ int main(int argc, char* argv[])
       fileWriter->Update();
     }
     else
-      std::cout << "Diffusion index " << index << " not supported for supplied file type.";
+    {
+      std::cout << "Diffusion index " << index << " not supported for supplied file type." << std::endl;
+      return EXIT_FAILURE;
+    }
   }
   catch (const itk::ExceptionObject& e)
   {

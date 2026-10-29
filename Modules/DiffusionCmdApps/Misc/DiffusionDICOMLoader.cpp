@@ -17,8 +17,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkImage.h"
 #include "mitkBaseData.h"
 #include <mitkDiffusionPropertyHelper.h>
-#include <mitkImageCast.h>
-#include <mitkITKImageImport.h>
 
 #include "mitkCommandLineParser.h"
 #include <itksys/SystemTools.hxx>
@@ -26,7 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkDiffusionDICOMFileReader.h"
 
-#include "itkMergeDiffusionImagesFilter.h"
+#include <mitkDiffusionImageEditing.h>
 #include <mitkIOUtil.h>
 
 static mitk::StringList& GetInputFilenames()
@@ -35,7 +33,6 @@ static mitk::StringList& GetInputFilenames()
   return inputs;
 }
 
-// FIXME slash at the end
 void SetInputFileNames( std::string input_directory )
 {
   // I. Get all files in directory
@@ -46,9 +43,9 @@ void SetInputFileNames( std::string input_directory )
   mitk::StringList inputlist;//, mergedlist;
   for( unsigned long idx=0; idx<input.GetNumberOfFiles(); idx++)
   {
-    if( ! itksys::SystemTools::FileIsDirectory( input.GetFile(idx)) )
+    std::string fullpath = input_directory + "/" + std::string( input.GetFile(idx) );
+    if( ! itksys::SystemTools::FileIsDirectory( fullpath ) )
     {
-      std::string fullpath = input_directory + "/" + std::string( input.GetFile(idx) );
       //inputlist.push_back(  itksys::SystemTools::ConvertToOutputPath( fullpath.c_str() ) );
       inputlist.push_back(  fullpath.c_str() );
 
@@ -79,15 +76,7 @@ static mitk::Image::Pointer ReadInDICOMFiles( mitk::StringList& input_files, con
   return images.front();
 }
 
-typedef short DiffusionPixelType;
-typedef itk::VectorImage<DiffusionPixelType,3>         DwiImageType;
-typedef DwiImageType::PixelType                        DwiPixelType;
-typedef DwiImageType::RegionType                       DwiRegionType;
-typedef std::vector< DwiImageType::Pointer >  DwiImageContainerType;
-
 typedef mitk::Image          DiffusionImageType;
-typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType    GradientContainerType;
-typedef std::vector< GradientContainerType::ConstPointer >  GradientListContainerType;
 
 void SearchForInputInSubdirs( std::string root_directory, std::string subdir_prefix , std::vector<DiffusionImageType::Pointer>& output_container)
 {
@@ -101,7 +90,7 @@ void SearchForInputInSubdirs( std::string root_directory, std::string subdir_pre
   {
     std::string current_path = rootdir.GetFile(idx);
 
-    std::string directory_path = std::string(rootdir.GetPath()) + current_path;
+    std::string directory_path = std::string(rootdir.GetPath()) + "/" + current_path;
 
     MITK_INFO("dicom.loader.inputrootdir.test") << "ProbePath:   " << current_path << "\n"
                                                 << "escaped to " <<  itksys::SystemTools::ConvertToOutputPath( directory_path.c_str() );
@@ -151,7 +140,6 @@ int main(int argc, char* argv[])
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input Directory" ,"input directory containing dicom files", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output File Name", "output file", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("dwprefix", "p", mitkCommandLineParser::String, "Recursive Scan Prefix", "prefix for subfolders search rootdir is specified by the 'inputdir' argument value", us::Any(), true);
-  parser.addArgument("dryrun", "s", mitkCommandLineParser::Bool, "Dry run","do not read, only look for input files ", us::Any(), true );
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -178,92 +166,53 @@ int main(int argc, char* argv[])
   // retrieve the output
   std::string outputFile = us::any_cast< std::string >( parsedArgs["o"] );
 
-  // if the executable is called with a single directory, just parse the given folder for files and read them into a diffusion image
-  if( !search_for_subdirs )
+  try
   {
-    SetInputFileNames( inputDirectory );
-
-    MITK_INFO << "Got " << GetInputFilenames().size() << " input files.";
-    mitk::Image::Pointer d_img = ReadInDICOMFiles( GetInputFilenames(), outputFile );
-    if (d_img.IsNull())
-      return EXIT_FAILURE;
-
-    try
+    // if the executable is called with a single directory, just parse the given folder for files and read them into a diffusion image
+    if( !search_for_subdirs )
     {
+      SetInputFileNames( inputDirectory );
+
+      MITK_INFO << "Got " << GetInputFilenames().size() << " input files.";
+      mitk::Image::Pointer d_img = ReadInDICOMFiles( GetInputFilenames(), outputFile );
+      if (d_img.IsNull())
+        return EXIT_FAILURE;
+
       mitk::IOUtil::Save(d_img, outputFile.c_str());
     }
-    catch( const itk::ExceptionObject& e)
-    {
-      MITK_ERROR << "Failed to write out the output file. \n\t Reason : ITK Exception " << e.what();
-    }
-
-  }
-  // if the --dwprefix flag is set, then we have to look for the directories, load each of them separately and afterwards merge the images
-  else
-  {
-    std::vector<mitk::Image::Pointer> output_container;
-
-    SearchForInputInSubdirs( inputDirectory, subdir_prefix, output_container );
-    if (output_container.empty())
-    {
-      MITK_ERROR << "No diffusion-weighted image found in the subfolders of " << inputDirectory;
-      return EXIT_FAILURE;
-    }
-
-    // final output image
-    mitk::Image::Pointer image = mitk::Image::New();
-    if( output_container.size() > 1 )
-    {
-      DwiImageContainerType       imageContainer;
-      GradientListContainerType   gradientListContainer;
-      std::vector< double >       bValueContainer;
-
-      for ( std::vector< mitk::Image::Pointer >::iterator dwi = output_container.begin();
-        dwi != output_container.end(); ++dwi )
-      {
-        mitk::DiffusionPropertyHelper::ImageType::Pointer itkVectorImagePointer = mitk::DiffusionPropertyHelper::ImageType::New();
-        mitk::CastToItkImage(*dwi, itkVectorImagePointer);
-
-        imageContainer.push_back(itkVectorImagePointer);
-        gradientListContainer.push_back( mitk::DiffusionPropertyHelper::GetGradientContainer(*dwi));
-        bValueContainer.push_back( mitk::DiffusionPropertyHelper::GetReferenceBValue(*dwi));
-      }
-
-      typedef itk::MergeDiffusionImagesFilter<short> FilterType;
-      FilterType::Pointer filter = FilterType::New();
-      filter->SetImageVolumes(imageContainer);
-      filter->SetGradientLists(gradientListContainer);
-      filter->SetBValues(bValueContainer);
-      filter->Update();
-
-      vnl_matrix_fixed< double, 3, 3 > mf; mf.set_identity();
-
-      image = mitk::GrabItkImageMemory( filter->GetOutput() );
-
-      mitk::DiffusionPropertyHelper::SetGradientContainer(image, filter->GetOutputGradients());
-      mitk::DiffusionPropertyHelper::SetReferenceBValue(image, filter->GetB_Value());
-      mitk::DiffusionPropertyHelper::SetMeasurementFrame(image, mf);
-      mitk::DiffusionPropertyHelper::InitializeImage( image );
-    }
-    // just output the image if there was only one folder found
+    // if the --dwprefix flag is set, then we have to look for the directories, load each of them separately and afterwards merge the images
     else
     {
-      image = output_container.at(0);
-    }
+      std::vector<mitk::Image::Pointer> output_container;
 
-    MITK_INFO("dicom.import.writeout") << " [OutputFile] " << outputFile.c_str();
+      SearchForInputInSubdirs( inputDirectory, subdir_prefix, output_container );
+      if (output_container.empty())
+      {
+        MITK_ERROR << "No diffusion-weighted image found in the subfolders of " << inputDirectory;
+        return EXIT_FAILURE;
+      }
 
-    try
-    {
+      // one DWI per subfolder, concatenated if there are several
+      mitk::Image::Pointer image = output_container.at(0);
+      if( output_container.size() > 1 )
+      {
+        std::vector<const mitk::Image*> dwis;
+        for (const auto& dwi : output_container)
+          dwis.push_back(dwi);
+        image = mitk::DiffusionImageEditing::MergeDwis(dwis);
+      }
+
+      MITK_INFO("dicom.import.writeout") << " [OutputFile] " << outputFile.c_str();
+
       mitk::IOUtil::Save(image, outputFile.c_str());
     }
-    catch( const itk::ExceptionObject& e)
-    {
-      MITK_ERROR << "Failed to write out the output file. \n\t Reason : ITK Exception " << e.what();
-    }
-
+  }
+  catch (const std::exception& e)
+  {
+    MITK_ERROR << "Failed to load or write the DWI: " << e.what();
+    return EXIT_FAILURE;
   }
 
-  return 1;
+  return EXIT_SUCCESS;
 }
 

@@ -48,16 +48,17 @@ int main(int argc, char* argv[])
 
   parser.setTitle("Multishell Methods");
   parser.setCategory("Preprocessing Tools");
-  parser.setDescription("");
+  parser.setDescription("Maps a multi-shell DWI to a single shell at the target b-value with an ADC average, a kurtosis fit or a bi-exponential fit; writes <output>_ADC.dwi, _AKC.dwi, _BiExp.dwi.");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input file", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output file", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("adc", "D", mitkCommandLineParser::Bool, "ADC:", "ADC Average", us::Any(), false);
-  parser.addArgument("akc", "K", mitkCommandLineParser::Bool, "Kurtosis fit:", "Kurtosis Fit", us::Any(), false);
-  parser.addArgument("biexp", "B", mitkCommandLineParser::Bool, "BiExp fit:", "BiExp fit", us::Any(), false);
+  parser.addArgument("adc", "D", mitkCommandLineParser::Bool, "ADC:", "ADC Average", us::Any(), true);
+  parser.addArgument("akc", "K", mitkCommandLineParser::Bool, "Kurtosis fit:", "Kurtosis Fit", us::Any(), true);
+  parser.addArgument("biexp", "B", mitkCommandLineParser::Bool, "BiExp fit:", "BiExp fit", us::Any(), true);
   parser.addArgument("targetbvalue", "b", mitkCommandLineParser::String, "b Value:", "target bValue (mean, min, max)", us::Any(), false);
+  parser.addArgument("round_bvalues", "", mitkCommandLineParser::Int, "Round b-values:", "round the b-values to multiples of this value; the shells are the rounded b-values", 1000, true);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -66,10 +67,24 @@ int main(int argc, char* argv[])
   // mandatory arguments
   std::string inName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string outName = us::any_cast<std::string>(parsedArgs["o"]);
-  bool applyADC = us::any_cast<bool>(parsedArgs["adc"]);
-  bool applyAKC = us::any_cast<bool>(parsedArgs["akc"]);
-  bool applyBiExp = us::any_cast<bool>(parsedArgs["biexp"]);
+  bool applyADC = parsedArgs.count("adc") && us::any_cast<bool>(parsedArgs["adc"]);
+  bool applyAKC = parsedArgs.count("akc") && us::any_cast<bool>(parsedArgs["akc"]);
+  bool applyBiExp = parsedArgs.count("biexp") && us::any_cast<bool>(parsedArgs["biexp"]);
   std::string targetType = us::any_cast<std::string>(parsedArgs["targetbvalue"]);
+  int roundingValue = 1000;
+  if (parsedArgs.count("round_bvalues"))
+    roundingValue = us::any_cast<int>(parsedArgs["round_bvalues"]);
+
+  if (!applyADC && !applyAKC && !applyBiExp)
+  {
+    std::cout << "Select at least one method: --adc, --akc or --biexp." << std::endl;
+    return EXIT_FAILURE;
+  }
+  if (targetType != "mean" && targetType != "min" && targetType != "max")
+  {
+    std::cout << "--targetbvalue must be mean, min or max." << std::endl;
+    return EXIT_FAILURE;
+  }
 
   try
   {
@@ -82,9 +97,8 @@ int main(int argc, char* argv[])
     {
       typedef itk::RadialMultishellToSingleshellImageFilter<short, short> FilterType;
 
-      const auto rounded = mitk::DiffusionImageEditing::RoundBValues(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi), mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi), 1000);
-      mitk::DiffusionPropertyHelper::SetReferenceBValue(dwi, rounded.referenceBValue);
-      mitk::DiffusionPropertyHelper::SetGradientContainer(dwi, rounded.gradients);
+      // The image overload also rebuilds the b-value map, which defines the shells below.
+      dwi = mitk::DiffusionImageEditing::RoundBValues(dwi, roundingValue);
 
       // filter input parameter
       const mitk::DiffusionPropertyHelper::BValueMapType
@@ -103,16 +117,23 @@ int main(int argc, char* argv[])
 
 
       vnl_vector<double> bValueList(originalShellMap.size()-1);
-      double targetBValue = bValueList.mean();
 
       mitk::DiffusionPropertyHelper::BValueMapType::const_iterator it = originalShellMap.begin();
       ++it; int i = 0 ;
       for(; it != originalShellMap.end(); ++it)
         bValueList.put(i++,it->first);
 
-      if( targetType == "mean" )
-        targetBValue = bValueList.mean();
-      else if( targetType == "min" )
+      // A fit needs at least as many shells (besides b=0) as unknowns: kurtosis 2, bi-exponential 3.
+      // Checked before the first output is written.
+      if ((applyAKC && bValueList.size() < 2) || (applyBiExp && bValueList.size() < 3))
+      {
+        std::cout << "The kurtosis fit needs 2 and the bi-exponential fit 3 shells besides b=0; "
+                  << inName << " has " << bValueList.size() << "." << std::endl;
+        return EXIT_FAILURE;
+      }
+
+      double targetBValue = bValueList.mean();
+      if( targetType == "min" )
         targetBValue = bValueList.min_value();
       else if( targetType == "max" )
         targetBValue = bValueList.max_value();
@@ -186,6 +207,11 @@ int main(int argc, char* argv[])
 
         mitk::IOUtil::Save(outImage, (std::string(outName) + "_BiExp.dwi").c_str());
       }
+    }
+    else
+    {
+      std::cout << inName << " is no diffusion-weighted image." << std::endl;
+      return EXIT_FAILURE;
     }
   }
   catch (const itk::ExceptionObject& e)

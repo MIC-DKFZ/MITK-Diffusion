@@ -35,12 +35,12 @@ int main(int argc, char* argv[])
   parser.addArgument("sh_order", "", mitkCommandLineParser::Int, "Spherical harmonics order", "spherical harmonics order", 4);
   parser.addArgument("b0_threshold", "", mitkCommandLineParser::Int, "b0 threshold", "baseline image intensity threshold", 0);
   parser.addArgument("round_bvalues", "", mitkCommandLineParser::Int, "Round b-values", "round to specified integer", 0);
-  parser.addArgument("lambda", "", mitkCommandLineParser::Float, "Lambda", "ragularization factor lambda", 0.006);
+  parser.addArgument("lambda", "", mitkCommandLineParser::Float, "Lambda", "regularization factor lambda", 0.006);
   parser.addArgument("output_sampled", "", mitkCommandLineParser::Bool, "Output sampled ODFs", "output file containing the sampled ODFs");
 
   parser.setCategory("Signal Modelling");
   parser.setTitle("Qball Reconstruction");
-  parser.setDescription("");
+  parser.setDescription("Q-ball reconstruction of a DWI as SH coefficients: constant solid angle for one shell, the multi-shell method for three equidistant shells.");
   parser.setContributor("MIC");
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
     }
 
     auto bMap = mitk::DiffusionPropertyHelper::GetBValueMap(dwi);
-    MITK_INFO <<  bMap.size();
+    MITK_INFO << "b-values (shells including b=0): " << bMap.size();
     if(bMap.size()!=4 && bMap.size()!=2)
       mitkThrow() << "Only three equidistant shells or a single shell are supported. Found " << bMap.size();
 

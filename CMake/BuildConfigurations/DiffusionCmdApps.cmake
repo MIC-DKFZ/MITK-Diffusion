@@ -13,7 +13,8 @@ set(BLUEBERRY_USE_QT_HELP OFF CACHE BOOL "Enable support for integrating bundle 
 
 set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
 
-# The Misc command line apps link MitkTestingHelper, which MITK builds only with testing on.
+# The command line app FiberScreenshot links MitkTestingHelper, which MITK builds only with
+# testing on.
 set(BUILD_TESTING ON CACHE BOOL "Build the MITK tests" FORCE)
 
 # modules; FiberDissection, the only user of OpenCV, stays off: no command line app uses it.

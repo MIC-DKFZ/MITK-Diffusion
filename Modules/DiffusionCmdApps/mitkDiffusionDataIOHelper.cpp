@@ -16,6 +16,33 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkDiffusionDataIOHelper.h"
 
+namespace
+{
+  /**
+   * Silences std::cout until destroyed, also when a reader throws. The same as mitk::CoutSilencer
+   * of FiberBundle, which this module does not depend on (the IVIM build has no FiberBundle).
+   */
+  class CoutSilencer
+  {
+  public:
+    CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
+    ~CoutSilencer() { this->Restore(); }
+    CoutSilencer(const CoutSilencer&) = delete;
+    CoutSilencer& operator=(const CoutSilencer&) = delete;
+
+    void Restore()
+    {
+      if (m_Old != nullptr)
+        std::cout.rdbuf(m_Old);
+      m_Old = nullptr;
+    }
+
+  private:
+    std::stringstream m_Buffer;
+    std::streambuf* m_Old;
+  };
+}
+
 std::vector< std::string > mitk::DiffusionDataIOHelper::get_file_list(const std::string& path, const std::vector<std::string> extensions)
 {
   std::vector< std::string > file_list;
@@ -45,9 +72,7 @@ std::vector< std::string > mitk::DiffusionDataIOHelper::get_file_list(const std:
 std::vector< mitk::Image::Pointer > mitk::DiffusionDataIOHelper::load_mitk_images(const std::vector<std::string> files, std::vector<std::string>* filenames)
 {
   mitk::LocaleSwitch localeSwitch("C");
-  std::streambuf *old = std::cout.rdbuf(); // <-- save
-  std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf());       // <-- redirect
+  CoutSilencer silencer;
   std::vector< mitk::Image::Pointer > out;
   for (auto f : files)
   {
@@ -80,7 +105,7 @@ std::vector< mitk::Image::Pointer > mitk::DiffusionDataIOHelper::load_mitk_image
     }
   }
 
-  std::cout.rdbuf (old);              // <-- restore
+  silencer.Restore();
   MITK_INFO << "Loaded " << out.size() << " images";
   return out;
 }
