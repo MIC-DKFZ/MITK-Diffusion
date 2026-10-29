@@ -1304,7 +1304,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     unsigned int num_gradients = m_Parameters.m_SignalGen.GetNumVolumes();
     int numFibers = m_FiberBundle->GetNumFibers();
 
-    // Short fibers (mean length below 5 mm) are simulated with two threads, as before; the limit
+    // Short fibers (mean length below 5 mm) are simulated with two threads; the limit
     // applies to the fiber loop only, not to every later OpenMP region of the process.
     int fiberThreads = omp_get_max_threads();
     if (m_FiberBundle->GetMeanFiberLength()<5.0)

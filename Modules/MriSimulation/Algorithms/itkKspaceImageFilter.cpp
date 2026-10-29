@@ -141,12 +141,12 @@ namespace itk {
     }
 
     // Gyromagnetic ratio in Hz/T: the eddy phase phi enters exp(i 2 pi (k x + phi)) in cycles, like the
-    // field map term (Hz times s), so the field G*r in T times gamma-bar gives Hz. With 2 pi * 42.576
-    // MHz/T (rad/(s T)) the eddy field acted 2 pi times stronger than the documented mT/m.
+    // field map term (Hz times s), so the field G*r in T times gamma-bar gives Hz; the angular
+    // 2 pi * 42.576 MHz/T would make the eddy field 2 pi times stronger than the documented mT/m.
     m_Gamma = 42576000;
     if ( m_Parameters->m_SignalGen.m_EddyStrength>0 && m_DiffusionGradientDirection.GetNorm()>0.001)
     {
-      // a separate member: scaling m_DiffusionGradientDirection itself scaled it again on every Update()
+      // a separate member, so that m_DiffusionGradientDirection stays unscaled when Update() runs again
       m_EddyFieldGradient = m_DiffusionGradientDirection *  m_Parameters->m_SignalGen.m_EddyStrength/1000 *  m_Gamma;
       m_IsBaseline = false;
     }
@@ -232,7 +232,7 @@ namespace itk {
         }
         else if (tInv > 0)
         {
-          // TI >= TR has no standard formula; the product kept from earlier versions is an open point
+          // TI >= TR has no standard formula; this product with the inversion term is not a textbook model
           relaxation *= (1.0-std::exp(std::log(2) - tInv/m_T1[i]));
         }
 

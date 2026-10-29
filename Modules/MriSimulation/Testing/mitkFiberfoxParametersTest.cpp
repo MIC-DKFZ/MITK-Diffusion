@@ -161,7 +161,7 @@ public:
   }
 
   /**
-   * Gradient convention (D-M1): .ffp gradients are FSL bvecs of the simulated geometry. The gradients
+   * Gradient convention: .ffp gradients are FSL bvecs of the simulated geometry. The gradients
    * of a DWI template are stored in that form (equal to the bvecs MITK's NIfTI writer writes for it),
    * and ApplyDirectionMatrix turns them back into the template's world gradients.
    */

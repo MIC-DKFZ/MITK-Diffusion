@@ -28,8 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLexicalCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
-#include <mitkFiberfoxParameters.h>
-#include <boost/lexical_cast.hpp>
 
 using namespace mitk;
 

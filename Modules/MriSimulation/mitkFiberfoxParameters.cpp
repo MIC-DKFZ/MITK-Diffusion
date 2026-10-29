@@ -768,7 +768,7 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
       m_SignalGen.m_ImageOrigin[1] = ReadVal<float>(v1,"basic.origin.y",m_SignalGen.m_ImageOrigin[1]);
       m_SignalGen.m_ImageOrigin[2] = ReadVal<float>(v1,"basic.origin.z",m_SignalGen.m_ImageOrigin[2]);
 
-      // a file without direction gets the identity (decided by default, D-M8); read as double, as written
+      // a file without direction gets the identity; read as double, as written
       m_SignalGen.m_ImageDirection.SetIdentity();
       const auto direction = v1.second.get_child_optional("basic.direction");
       if (direction)
