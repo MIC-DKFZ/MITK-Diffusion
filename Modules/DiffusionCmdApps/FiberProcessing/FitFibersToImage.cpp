@@ -140,7 +140,8 @@ int main(int argc, char* argv[])
     {
       fitter->SetDiffImage(mitk::DiffusionPropertyHelper::GetItkVectorImage(mitk_image));
       model = std::make_unique< mitk::TensorModel<> >();
-      model->SetBvalue(1000);
+      // the gradient norms encode sqrt(b/b_ref), so the model needs the image's reference b-value
+      model->SetBvalue(mitk::DiffusionPropertyHelper::GetReferenceBValue(mitk_image));
       model->SetDiffusivity1(0.0010);
       model->SetDiffusivity2(0.00015);
       model->SetDiffusivity3(0.00015);
