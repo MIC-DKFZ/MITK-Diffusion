@@ -569,17 +569,10 @@ namespace
 
 QmitkPrototypeSignalParametersWidget* QmitkFiberfoxView::GetPrototypeWidget(int compartmentId)
 {
-  switch (compartmentId)
-  {
-  case 1:
-    return m_Controls->m_PrototypeWidget1;
-  case 3:
-    return m_Controls->m_PrototypeWidget3;
-  case 4:
-    return m_Controls->m_PrototypeWidget4;
-  default:
-    return nullptr;   // compartment 2 offers no prototype model
-  }
+  if (compartmentId<1 || compartmentId>4)
+    return nullptr;
+  // nullptr for compartment 2, which offers no prototype model
+  return static_cast<QmitkPrototypeSignalParametersWidget*>(ModelWidget(Compartments().at(compartmentId-1), CompartmentModel::Prototype));
 }
 
 mitk::RawShModel<>* QmitkFiberfoxView::NewPrototypeModel(QmitkPrototypeSignalParametersWidget* widget, int compartmentId)
@@ -637,6 +630,17 @@ void QmitkFiberfoxView::OnGradientSettingsChanged()
 void QmitkFiberfoxView::UpdateParametersFromGui()
 {
   m_Parameters.ClearSignalParameters();
+  ReadOutputSettings();
+  ReadImageGeometry();
+  ReadArtifacts();
+  ReadSequence();
+  ReadNoise();
+  ReadCompartments();
+  SetResultProperties();
+}
+
+void QmitkFiberfoxView::ReadOutputSettings()
+{
   m_Parameters.m_Misc.m_CheckAdvancedSignalOptionsBox = m_Controls->m_AdvancedOptionsBox_2->isChecked();
   m_Parameters.m_Misc.m_OutputAdditionalImages = m_Controls->m_VolumeFractionsBox->isChecked();
 
@@ -651,7 +655,10 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   else {
     m_Parameters.m_Misc.m_OutputPath = "";
   }
+}
 
+void QmitkFiberfoxView::ReadImageGeometry()
+{
   if (m_Controls->m_MaskComboBox->GetSelectedNode().IsNotNull())
   {
     mitk::Image::Pointer mitkMaskImage = dynamic_cast<mitk::Image*>(m_Controls->m_MaskComboBox->GetSelectedNode()->GetData());
@@ -714,13 +721,15 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
 
     SetGradientsFromGui();
   }
+}
 
+void QmitkFiberfoxView::ReadArtifacts()
+{
   // signal relaxation
   m_Parameters.m_SignalGen.m_DoSimulateRelaxation = false;
   if (m_Controls->m_RelaxationBox->isChecked())
   {
     m_Parameters.m_SignalGen.m_DoSimulateRelaxation = true;
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Relaxation", mitk::BoolProperty::New(true));
     m_Parameters.m_Misc.m_ArtifactModelString += "_RELAX";
   }
   m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition = m_Parameters.m_SignalGen.m_DoSimulateRelaxation;
@@ -732,7 +741,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   {
     m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
     m_Parameters.m_Misc.m_ArtifactModelString += "_GHOST";
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Ghost", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_KspaceLineOffset));
   }
 
   // Aliasing
@@ -742,7 +750,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   {
     m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
     m_Parameters.m_Misc.m_ArtifactModelString += "_ALIASING";
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Aliasing", mitk::DoubleProperty::New(m_Controls->m_WrapBox->value()));
   }
 
   // Spikes
@@ -753,8 +760,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   {
     m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
     m_Parameters.m_Misc.m_ArtifactModelString += "_SPIKES";
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Spikes.Number", mitk::IntProperty::New(m_Parameters.m_SignalGen.m_Spikes));
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Spikes.Amplitude", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_SpikeAmplitude));
   }
 
   // Drift
@@ -763,7 +768,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   if (m_Controls->m_AddDrift->isChecked())
   {
     m_Parameters.m_Misc.m_ArtifactModelString += "_DRIFT";
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Drift", mitk::FloatProperty::New(m_Parameters.m_SignalGen.m_Drift));
   }
 
   // gibbs ringing
@@ -772,7 +776,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   if (m_Controls->m_AddGibbsRinging->isChecked())
   {
     m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Ringing", mitk::BoolProperty::New(true));
     m_Parameters.m_Misc.m_ArtifactModelString += "_RINGING";
   }
 
@@ -799,7 +802,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     duplicator->Update();
     m_Parameters.m_SignalGen.m_FrequencyMap = duplicator->GetOutput();
     m_Parameters.m_Misc.m_ArtifactModelString += "_DISTORTED";
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Distortions", mitk::BoolProperty::New(true));
   }
 
   m_Parameters.m_SignalGen.m_EddyStrength = m_Controls->m_EddyGradientStrength->value();
@@ -808,7 +810,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   {
     m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
     m_Parameters.m_Misc.m_ArtifactModelString += "_EDDY";
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Eddy-strength", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_EddyStrength));
   }
 
   // Motion
@@ -828,13 +829,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
   {
     m_Parameters.m_SignalGen.m_DoAddMotion = true;
     m_Parameters.m_Misc.m_ArtifactModelString += "_MOTION";
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Random", mitk::BoolProperty::New(m_Parameters.m_SignalGen.m_DoRandomizeMotion));
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Translation-x", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Translation[0]));
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Translation-y", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Translation[1]));
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Translation-z", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Translation[2]));
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Rotation-x", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Rotation[0]));
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Rotation-y", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Rotation[1]));
-    m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Motion.Rotation-z", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_Rotation[2]));
 
     auto randgen = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
     randgen->SetSeed();
@@ -846,7 +840,10 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
                            + "\": give \"random\", the indices of the moved volumes, or the negative indices of the volumes that stay. No volume is moved.");
     }
   }
+}
 
+void QmitkFiberfoxView::ReadSequence()
+{
   // other imaging parameters
   m_Parameters.m_SignalGen.m_AcquisitionType = (mitk::SignalGenerationParameters::AcquisitionType)m_Controls->m_AcquisitionTypeBox->currentIndex();
   m_Parameters.m_SignalGen.m_CoilSensitivityProfile = (mitk::SignalGenerationParameters::CoilSensitivityProfile)m_Controls->m_CoilSensBox->currentIndex();
@@ -876,7 +873,10 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
 //                              + " to obtain a maximum  signal of 75% of the data type maximum."
 //                                " Relaxation and other effects that affect the signal intensities are not accounted for.");
 //  }
+}
 
+void QmitkFiberfoxView::ReadNoise()
+{
   // Noise
   m_Parameters.m_Misc.m_DoAddNoise = m_Controls->m_AddNoise->isChecked();
   m_Parameters.m_SignalGen.m_NoiseVariance = m_Controls->m_NoiseLevel->value();
@@ -890,7 +890,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
       {
         m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
         m_Parameters.m_Misc.m_ArtifactModelString += "_COMPLEX-GAUSSIAN-";
-        m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Noise-Distribution", mitk::StringProperty::New("Complex Gaussian"));
       }
       break;
     }
@@ -900,7 +899,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
       {
         m_Parameters.m_NoiseModel = std::make_shared< mitk::RicianNoiseModel<mitk::ScalarType> >();
         m_Parameters.m_Misc.m_ArtifactModelString += "_RICIAN-";
-        m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Noise-Distribution", mitk::StringProperty::New("Rician"));
         m_Parameters.m_NoiseModel->SetNoiseVariance(m_Parameters.m_SignalGen.m_NoiseVariance);
       }
       break;
@@ -914,7 +912,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
         chi->SetNumberOfCoils(m_Parameters.m_SignalGen.m_NumberOfCoils);
         m_Parameters.m_NoiseModel = chi;
         m_Parameters.m_Misc.m_ArtifactModelString += "_NONCENTRAL-CHI-";
-        m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Noise-Distribution", mitk::StringProperty::New("Noncentral chi"));
         m_Parameters.m_NoiseModel->SetNoiseVariance(m_Parameters.m_SignalGen.m_NoiseVariance);
       }
       break;
@@ -925,7 +922,6 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
       {
         m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
         m_Parameters.m_Misc.m_ArtifactModelString += "_COMPLEX-GAUSSIAN-";
-        m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Noise-Distribution", mitk::StringProperty::New("Complex Gaussian"));
       }
       break;
     }
@@ -934,325 +930,381 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     if (m_Parameters.m_SignalGen.m_NoiseVariance>0)
     {
       m_Parameters.m_Misc.m_ArtifactModelString += QString::number(m_Parameters.m_SignalGen.m_NoiseVariance).toStdString();
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Noise-Variance", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_NoiseVariance));
     }
   }
+}
 
-  // signal models
+std::vector<QmitkFiberfoxView::CompartmentControls> QmitkFiberfoxView::Compartments() const
+{
+  using M = CompartmentModel;
+  return {
+    {1, "Intra-axonal compartment", m_Controls->m_Compartment1Box, m_Controls->m_Comp1VolumeFraction, nullptr,
+     {{M::Stick, m_Controls->m_StickWidget1}, {M::Zeppelin, m_Controls->m_ZeppelinWidget1},
+      {M::Tensor, m_Controls->m_TensorWidget1}, {M::Prototype, m_Controls->m_PrototypeWidget1}}},
+    {2, "Inter-axonal compartment", m_Controls->m_Compartment2Box, m_Controls->m_Comp2VolumeFraction, m_Controls->m_Comp2FractionFrame,
+     {{M::None, nullptr}, {M::Stick, m_Controls->m_StickWidget2}, {M::Zeppelin, m_Controls->m_ZeppelinWidget2},
+      {M::Tensor, m_Controls->m_TensorWidget2}}},
+    {3, "Extra-axonal compartment 1", m_Controls->m_Compartment3Box, m_Controls->m_Comp3VolumeFraction, nullptr,
+     {{M::Ball, m_Controls->m_BallWidget1}, {M::Astrosticks, m_Controls->m_AstrosticksWidget1},
+      {M::Dot, m_Controls->m_DotWidget1}, {M::Prototype, m_Controls->m_PrototypeWidget3}}},
+    {4, "Extra-axonal compartment 2", m_Controls->m_Compartment4Box, m_Controls->m_Comp4VolumeFraction, m_Controls->m_Comp4FractionFrame,
+     {{M::None, nullptr}, {M::Ball, m_Controls->m_BallWidget2}, {M::Astrosticks, m_Controls->m_AstrosticksWidget2},
+      {M::Dot, m_Controls->m_DotWidget2}, {M::Prototype, m_Controls->m_PrototypeWidget4}}}
+  };
+}
+
+std::string QmitkFiberfoxView::ModelName(CompartmentModel type)
+{
+  switch (type)
   {
-    // compartment 1
-    switch (m_Controls->m_Compartment1Box->currentIndex())
-    {
-    case 0:
-    {
-      mitk::StickModel<mitk::ScalarType>* model = new mitk::StickModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity(m_Controls->m_StickWidget1->GetD());
-      model->SetT2(m_Controls->m_StickWidget1->GetT2());
-      model->SetT1(m_Controls->m_StickWidget1->GetT1());
-      model->m_CompartmentId = 1;
-      m_Parameters.m_FiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Stick";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.Description", mitk::StringProperty::New("Intra-axonal compartment") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.Model", mitk::StringProperty::New("Stick") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.D", mitk::DoubleProperty::New(m_Controls->m_StickWidget1->GetD()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    case 1:
-    {
-      mitk::TensorModel<mitk::ScalarType>* model = new mitk::TensorModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity1(m_Controls->m_ZeppelinWidget1->GetD1());
-      model->SetDiffusivity2(m_Controls->m_ZeppelinWidget1->GetD2());
-      model->SetDiffusivity3(m_Controls->m_ZeppelinWidget1->GetD2());
-      model->SetT2(m_Controls->m_ZeppelinWidget1->GetT2());
-      model->SetT1(m_Controls->m_ZeppelinWidget1->GetT1());
-      model->m_CompartmentId = 1;
-      m_Parameters.m_FiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Zeppelin";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.Description", mitk::StringProperty::New("Intra-axonal compartment") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.Model", mitk::StringProperty::New("Zeppelin") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.D1", mitk::DoubleProperty::New(m_Controls->m_ZeppelinWidget1->GetD1()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.D2", mitk::DoubleProperty::New(m_Controls->m_ZeppelinWidget1->GetD2()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    case 2:
-    {
-      mitk::TensorModel<mitk::ScalarType>* model = new mitk::TensorModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity1(m_Controls->m_TensorWidget1->GetD1());
-      model->SetDiffusivity2(m_Controls->m_TensorWidget1->GetD2());
-      model->SetDiffusivity3(m_Controls->m_TensorWidget1->GetD3());
-      model->SetT2(m_Controls->m_TensorWidget1->GetT2());
-      model->SetT1(m_Controls->m_TensorWidget1->GetT1());
-      model->m_CompartmentId = 1;
-      m_Parameters.m_FiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Tensor";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.Description", mitk::StringProperty::New("Intra-axonal compartment") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.Model", mitk::StringProperty::New("Tensor") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.D1", mitk::DoubleProperty::New(m_Controls->m_TensorWidget1->GetD1()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.D2", mitk::DoubleProperty::New(m_Controls->m_TensorWidget1->GetD2()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.D3", mitk::DoubleProperty::New(m_Controls->m_TensorWidget1->GetD3()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    case 3:
-    {
-      mitk::RawShModel<mitk::ScalarType>* model = NewPrototypeModel(m_Controls->m_PrototypeWidget1, 1);
-      m_Parameters.m_SignalGen.m_DoSimulateRelaxation = false;
-      m_Parameters.m_FiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Prototype";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.Description", mitk::StringProperty::New("Intra-axonal compartment") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment1.Model", mitk::StringProperty::New("Prototype") );
-      break;
-    }
-    }
-    if (m_Controls->m_Comp1VolumeFraction->GetSelectedNode().IsNotNull())
-    {
-      mitk::DataNode::Pointer volumeNode = m_Controls->m_Comp1VolumeFraction->GetSelectedNode();
-      ItkDoubleImgType::Pointer comp1VolumeImage = ItkDoubleImgType::New();
-      mitk::Image* img = dynamic_cast<mitk::Image*>(volumeNode->GetData());
-      CastToItkImage< ItkDoubleImgType >(img, comp1VolumeImage);
-      m_Parameters.m_FiberModelList.back()->SetVolumeFractionImage(comp1VolumeImage);
-    }
+  case CompartmentModel::Stick:       return "Stick";
+  case CompartmentModel::Zeppelin:    return "Zeppelin";
+  case CompartmentModel::Tensor:      return "Tensor";
+  case CompartmentModel::Ball:        return "Ball";
+  case CompartmentModel::Astrosticks: return "Astrosticks";
+  case CompartmentModel::Dot:         return "Dot";
+  case CompartmentModel::Prototype:   return "Prototype";
+  case CompartmentModel::None:        break;
+  }
+  return "";
+}
 
-    // compartment 2
-    switch (m_Controls->m_Compartment2Box->currentIndex())
-    {
-    case 0:
-      break;
-    case 1:
-    {
-      mitk::StickModel<mitk::ScalarType>* model = new mitk::StickModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity(m_Controls->m_StickWidget2->GetD());
-      model->SetT2(m_Controls->m_StickWidget2->GetT2());
-      model->SetT1(m_Controls->m_StickWidget2->GetT1());
-      model->m_CompartmentId = 2;
-      m_Parameters.m_FiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Stick";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.Description", mitk::StringProperty::New("Inter-axonal compartment") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.Model", mitk::StringProperty::New("Stick") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.D", mitk::DoubleProperty::New(m_Controls->m_StickWidget2->GetD()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    case 2:
-    {
-      mitk::TensorModel<mitk::ScalarType>* model = new mitk::TensorModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity1(m_Controls->m_ZeppelinWidget2->GetD1());
-      model->SetDiffusivity2(m_Controls->m_ZeppelinWidget2->GetD2());
-      model->SetDiffusivity3(m_Controls->m_ZeppelinWidget2->GetD2());
-      model->SetT2(m_Controls->m_ZeppelinWidget2->GetT2());
-      model->SetT1(m_Controls->m_ZeppelinWidget2->GetT1());
-      model->m_CompartmentId = 2;
-      m_Parameters.m_FiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Zeppelin";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.Description", mitk::StringProperty::New("Inter-axonal compartment") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.Model", mitk::StringProperty::New("Zeppelin") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.D1", mitk::DoubleProperty::New(m_Controls->m_ZeppelinWidget2->GetD1()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.D2", mitk::DoubleProperty::New(m_Controls->m_ZeppelinWidget2->GetD2()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    case 3:
-    {
-      mitk::TensorModel<mitk::ScalarType>* model = new mitk::TensorModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity1(m_Controls->m_TensorWidget2->GetD1());
-      model->SetDiffusivity2(m_Controls->m_TensorWidget2->GetD2());
-      model->SetDiffusivity3(m_Controls->m_TensorWidget2->GetD3());
-      model->SetT2(m_Controls->m_TensorWidget2->GetT2());
-      model->SetT1(m_Controls->m_TensorWidget2->GetT1());
-      model->m_CompartmentId = 2;
-      m_Parameters.m_FiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Tensor";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.Description", mitk::StringProperty::New("Inter-axonal compartment") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.Model", mitk::StringProperty::New("Tensor") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.D1", mitk::DoubleProperty::New(m_Controls->m_TensorWidget2->GetD1()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.D2", mitk::DoubleProperty::New(m_Controls->m_TensorWidget2->GetD2()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.D3", mitk::DoubleProperty::New(m_Controls->m_TensorWidget2->GetD3()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment2.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    }
-    if (m_Controls->m_Comp2VolumeFraction->GetSelectedNode().IsNotNull() && m_Parameters.m_FiberModelList.size()==2)
-    {
-      mitk::DataNode::Pointer volumeNode = m_Controls->m_Comp2VolumeFraction->GetSelectedNode();
-      ItkDoubleImgType::Pointer comp1VolumeImage = ItkDoubleImgType::New();
-      mitk::Image* img = dynamic_cast<mitk::Image*>(volumeNode->GetData());
-      CastToItkImage< ItkDoubleImgType >(img, comp1VolumeImage);
-      m_Parameters.m_FiberModelList.back()->SetVolumeFractionImage(comp1VolumeImage);
-    }
+QmitkFiberfoxView::CompartmentModel QmitkFiberfoxView::SelectedModel(const CompartmentControls& compartment)
+{
+  const int index = compartment.box->currentIndex();
+  if (index<0 || index>=static_cast<int>(compartment.entries.size()))
+    return CompartmentModel::None;
+  return compartment.entries[index].first;
+}
 
-    // compartment 3
-    switch (m_Controls->m_Compartment3Box->currentIndex())
-    {
-    case 0:
-    {
-      mitk::BallModel<mitk::ScalarType>* model = new mitk::BallModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity(m_Controls->m_BallWidget1->GetD());
-      model->SetT2(m_Controls->m_BallWidget1->GetT2());
-      model->SetT1(m_Controls->m_BallWidget1->GetT1());
-      model->m_CompartmentId = 3;
-      m_Parameters.m_NonFiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Ball";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.Description", mitk::StringProperty::New("Extra-axonal compartment 1") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.Model", mitk::StringProperty::New("Ball") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.D", mitk::DoubleProperty::New(m_Controls->m_BallWidget1->GetD()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    case 1:
-    {
-      mitk::AstroStickModel<mitk::ScalarType>* model = new mitk::AstroStickModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity(m_Controls->m_AstrosticksWidget1->GetD());
-      model->SetT2(m_Controls->m_AstrosticksWidget1->GetT2());
-      model->SetT1(m_Controls->m_AstrosticksWidget1->GetT1());
-      model->SetRandomizeSticks(m_Controls->m_AstrosticksWidget1->GetRandomizeSticks());
-      model->m_CompartmentId = 3;
-      m_Parameters.m_NonFiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Astrosticks";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.Description", mitk::StringProperty::New("Extra-axonal compartment 1") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.Model", mitk::StringProperty::New("Astrosticks") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.D", mitk::DoubleProperty::New(m_Controls->m_AstrosticksWidget1->GetD()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.RandomSticks", mitk::BoolProperty::New(m_Controls->m_AstrosticksWidget1->GetRandomizeSticks()) );
-      break;
-    }
-    case 2:
-    {
-      mitk::DotModel<mitk::ScalarType>* model = new mitk::DotModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetT2(m_Controls->m_DotWidget1->GetT2());
-      model->SetT1(m_Controls->m_DotWidget1->GetT1());
-      model->m_CompartmentId = 3;
-      m_Parameters.m_NonFiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Dot";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.Description", mitk::StringProperty::New("Extra-axonal compartment 1") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.Model", mitk::StringProperty::New("Dot") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    case 3:
-    {
-      mitk::RawShModel<mitk::ScalarType>* model = NewPrototypeModel(m_Controls->m_PrototypeWidget3, 3);
-      m_Parameters.m_SignalGen.m_DoSimulateRelaxation = false;
-      m_Parameters.m_NonFiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Prototype";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.Description", mitk::StringProperty::New("Extra-axonal compartment 1") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment3.Model", mitk::StringProperty::New("Prototype") );
-      break;
-    }
-    }
-    if (m_Controls->m_Comp3VolumeFraction->GetSelectedNode().IsNotNull())
-    {
-      mitk::DataNode::Pointer volumeNode = m_Controls->m_Comp3VolumeFraction->GetSelectedNode();
-      ItkDoubleImgType::Pointer comp1VolumeImage = ItkDoubleImgType::New();
-      mitk::Image* img = dynamic_cast<mitk::Image*>(volumeNode->GetData());
-      CastToItkImage< ItkDoubleImgType >(img, comp1VolumeImage);
-      m_Parameters.m_NonFiberModelList.back()->SetVolumeFractionImage(comp1VolumeImage);
-    }
+QWidget* QmitkFiberfoxView::ModelWidget(const CompartmentControls& compartment, CompartmentModel type)
+{
+  for (const auto& entry : compartment.entries)
+    if (entry.first==type)
+      return entry.second;
+  return nullptr;
+}
 
-    switch (m_Controls->m_Compartment4Box->currentIndex())
-    {
-    case 0:
-      break;
-    case 1:
-    {
-      mitk::BallModel<mitk::ScalarType>* model = new mitk::BallModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity(m_Controls->m_BallWidget2->GetD());
-      model->SetT2(m_Controls->m_BallWidget2->GetT2());
-      model->SetT1(m_Controls->m_BallWidget2->GetT1());
-      model->m_CompartmentId = 4;
-      m_Parameters.m_NonFiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Ball";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.Description", mitk::StringProperty::New("Extra-axonal compartment 2") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.Model", mitk::StringProperty::New("Ball") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.D", mitk::DoubleProperty::New(m_Controls->m_BallWidget2->GetD()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    case 2:
-    {
-      mitk::AstroStickModel<mitk::ScalarType>* model = new mitk::AstroStickModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
-      model->SetDiffusivity(m_Controls->m_AstrosticksWidget2->GetD());
-      model->SetT2(m_Controls->m_AstrosticksWidget2->GetT2());
-      model->SetT1(m_Controls->m_AstrosticksWidget2->GetT1());
-      model->SetRandomizeSticks(m_Controls->m_AstrosticksWidget2->GetRandomizeSticks());
-      model->m_CompartmentId = 4;
-      m_Parameters.m_NonFiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Astrosticks";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.Description", mitk::StringProperty::New("Extra-axonal compartment 2") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.Model", mitk::StringProperty::New("Astrosticks") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.D", mitk::DoubleProperty::New(m_Controls->m_AstrosticksWidget2->GetD()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.RandomSticks", mitk::BoolProperty::New(m_Controls->m_AstrosticksWidget2->GetRandomizeSticks()) );
-      break;
-    }
-    case 3:
-    {
-      mitk::DotModel<mitk::ScalarType>* model = new mitk::DotModel<mitk::ScalarType>();
-      model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
-      model->SetT2(m_Controls->m_DotWidget2->GetT2());
-      model->SetT1(m_Controls->m_DotWidget2->GetT1());
-      model->m_CompartmentId = 4;
-      m_Parameters.m_NonFiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Dot";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.Description", mitk::StringProperty::New("Extra-axonal compartment 2") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.Model", mitk::StringProperty::New("Dot") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.T2", mitk::DoubleProperty::New(model->GetT2()) );
-      break;
-    }
-    case 4:
-    {
-      mitk::RawShModel<mitk::ScalarType>* model = NewPrototypeModel(m_Controls->m_PrototypeWidget4, 4);
+mitk::DiffusionSignalModel<>* QmitkFiberfoxView::NewCompartmentModel(const CompartmentControls& compartment)
+{
+  const CompartmentModel type = SelectedModel(compartment);
+  QWidget* widget = ModelWidget(compartment, type);
+  mitk::DiffusionSignalModel<>* model = nullptr;
+  switch (type)
+  {
+  case CompartmentModel::None:
+    return nullptr;
+  case CompartmentModel::Prototype:
+    return NewPrototypeModel(static_cast<QmitkPrototypeSignalParametersWidget*>(widget), compartment.id);
+  case CompartmentModel::Stick:
+  {
+    auto parameters = static_cast<QmitkStickModelParametersWidget*>(widget);
+    auto stick = new mitk::StickModel<>();
+    stick->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
+    stick->SetDiffusivity(parameters->GetD());
+    stick->SetT2(parameters->GetT2());
+    stick->SetT1(parameters->GetT1());
+    model = stick;
+    break;
+  }
+  case CompartmentModel::Zeppelin:
+  {
+    // a tensor with the second and third diffusivity equal
+    auto parameters = static_cast<QmitkZeppelinModelParametersWidget*>(widget);
+    auto tensor = new mitk::TensorModel<>();
+    tensor->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
+    tensor->SetDiffusivity1(parameters->GetD1());
+    tensor->SetDiffusivity2(parameters->GetD2());
+    tensor->SetDiffusivity3(parameters->GetD2());
+    tensor->SetT2(parameters->GetT2());
+    tensor->SetT1(parameters->GetT1());
+    model = tensor;
+    break;
+  }
+  case CompartmentModel::Tensor:
+  {
+    auto parameters = static_cast<QmitkTensorModelParametersWidget*>(widget);
+    auto tensor = new mitk::TensorModel<>();
+    tensor->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
+    tensor->SetDiffusivity1(parameters->GetD1());
+    tensor->SetDiffusivity2(parameters->GetD2());
+    tensor->SetDiffusivity3(parameters->GetD3());
+    tensor->SetT2(parameters->GetT2());
+    tensor->SetT1(parameters->GetT1());
+    model = tensor;
+    break;
+  }
+  case CompartmentModel::Ball:
+  {
+    auto parameters = static_cast<QmitkBallModelParametersWidget*>(widget);
+    auto ball = new mitk::BallModel<>();
+    ball->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
+    ball->SetDiffusivity(parameters->GetD());
+    ball->SetT2(parameters->GetT2());
+    ball->SetT1(parameters->GetT1());
+    model = ball;
+    break;
+  }
+  case CompartmentModel::Astrosticks:
+  {
+    auto parameters = static_cast<QmitkAstrosticksModelParametersWidget*>(widget);
+    auto astrosticks = new mitk::AstroStickModel<>();
+    astrosticks->SetBvalue(m_Parameters.m_SignalGen.GetBvalue());
+    astrosticks->SetDiffusivity(parameters->GetD());
+    astrosticks->SetT2(parameters->GetT2());
+    astrosticks->SetT1(parameters->GetT1());
+    astrosticks->SetRandomizeSticks(parameters->GetRandomizeSticks());
+    model = astrosticks;
+    break;
+  }
+  case CompartmentModel::Dot:
+  {
+    auto parameters = static_cast<QmitkDotModelParametersWidget*>(widget);
+    auto dot = new mitk::DotModel<>();
+    dot->SetT2(parameters->GetT2());
+    dot->SetT1(parameters->GetT1());
+    model = dot;
+    break;
+  }
+  }
+  model->SetGradientList(m_Parameters.m_SignalGen.GetGradientDirections());
+  model->m_CompartmentId = compartment.id;
+  return model;
+}
+
+void QmitkFiberfoxView::ShowCompartmentModel(const CompartmentControls& compartment, mitk::DiffusionSignalModel<>* model)
+{
+  // a zeppelin is saved as a tensor, so it is shown as one
+  CompartmentModel type = CompartmentModel::None;
+  if (dynamic_cast<mitk::StickModel<>*>(model))
+    type = CompartmentModel::Stick;
+  else if (dynamic_cast<mitk::TensorModel<>*>(model))
+    type = CompartmentModel::Tensor;
+  else if (dynamic_cast<mitk::BallModel<>*>(model))
+    type = CompartmentModel::Ball;
+  else if (dynamic_cast<mitk::AstroStickModel<>*>(model))
+    type = CompartmentModel::Astrosticks;
+  else if (dynamic_cast<mitk::DotModel<>*>(model))
+    type = CompartmentModel::Dot;
+  else if (dynamic_cast<mitk::RawShModel<>*>(model))
+    type = CompartmentModel::Prototype;
+
+  int index = -1;
+  for (std::size_t i=0; i<compartment.entries.size(); ++i)
+    if (compartment.entries[i].first==type)
+      index = static_cast<int>(i);
+  if (index<0 || type==CompartmentModel::None)
+    return;   // the compartment does not offer this model
+
+  QWidget* widget = compartment.entries[index].second;
+  switch (type)
+  {
+  case CompartmentModel::Stick:
+  {
+    auto parameters = static_cast<QmitkStickModelParametersWidget*>(widget);
+    auto stick = static_cast<mitk::StickModel<>*>(model);
+    parameters->SetT2(stick->GetT2());
+    parameters->SetT1(stick->GetT1());
+    parameters->SetD(stick->GetDiffusivity());
+    break;
+  }
+  case CompartmentModel::Tensor:
+  {
+    auto parameters = static_cast<QmitkTensorModelParametersWidget*>(widget);
+    auto tensor = static_cast<mitk::TensorModel<>*>(model);
+    parameters->SetT2(tensor->GetT2());
+    parameters->SetT1(tensor->GetT1());
+    parameters->SetD1(tensor->GetDiffusivity1());
+    parameters->SetD2(tensor->GetDiffusivity2());
+    parameters->SetD3(tensor->GetDiffusivity3());
+    break;
+  }
+  case CompartmentModel::Ball:
+  {
+    auto parameters = static_cast<QmitkBallModelParametersWidget*>(widget);
+    auto ball = static_cast<mitk::BallModel<>*>(model);
+    parameters->SetT2(ball->GetT2());
+    parameters->SetT1(ball->GetT1());
+    parameters->SetD(ball->GetDiffusivity());
+    break;
+  }
+  case CompartmentModel::Astrosticks:
+  {
+    auto parameters = static_cast<QmitkAstrosticksModelParametersWidget*>(widget);
+    auto astrosticks = static_cast<mitk::AstroStickModel<>*>(model);
+    parameters->SetT2(astrosticks->GetT2());
+    parameters->SetT1(astrosticks->GetT1());
+    parameters->SetD(astrosticks->GetDiffusivity());
+    parameters->SetRandomizeSticks(astrosticks->GetRandomizeSticks());
+    break;
+  }
+  case CompartmentModel::Dot:
+  {
+    auto parameters = static_cast<QmitkDotModelParametersWidget*>(widget);
+    parameters->SetT2(model->GetT2());
+    parameters->SetT1(model->GetT1());
+    break;
+  }
+  case CompartmentModel::Prototype:
+  {
+    auto parameters = static_cast<QmitkPrototypeSignalParametersWidget*>(widget);
+    auto prototype = static_cast<mitk::RawShModel<>*>(model);
+    parameters->SetNumberOfSamples(prototype->GetMaxNumKernels());
+    parameters->SetMinFa(prototype->GetFaRange().first);
+    parameters->SetMaxFa(prototype->GetFaRange().second);
+    parameters->SetMinAdc(prototype->GetAdcRange().first);
+    parameters->SetMaxAdc(prototype->GetAdcRange().second);
+    break;
+  }
+  case CompartmentModel::Zeppelin:
+  case CompartmentModel::None:
+    break;
+  }
+  compartment.box->setCurrentIndex(index);
+}
+
+void QmitkFiberfoxView::ShowCompartmentWidget(int compartmentId, int index)
+{
+  const auto compartments = Compartments();
+  const CompartmentControls& compartment = compartments.at(compartmentId-1);
+  for (const auto& entry : compartment.entries)
+    if (entry.second!=nullptr)
+      entry.second->setVisible(false);
+
+  const bool valid = index>=0 && index<static_cast<int>(compartment.entries.size());
+  if (valid && compartment.entries[index].second!=nullptr)
+    compartment.entries[index].second->setVisible(true);
+  if (compartment.fractionFrame!=nullptr)
+    compartment.fractionFrame->setVisible(valid && compartment.entries[index].first!=CompartmentModel::None);
+}
+
+void QmitkFiberfoxView::ReadCompartments()
+{
+  for (const auto& compartment : Compartments())
+  {
+    const CompartmentModel type = SelectedModel(compartment);
+    mitk::DiffusionSignalModel<>* model = NewCompartmentModel(compartment);
+    if (model==nullptr)
+      continue;
+    if (type==CompartmentModel::Prototype)
       m_Parameters.m_SignalGen.m_DoSimulateRelaxation = false;
+
+    // compartments 1 and 2 hold the fibers, 3 and 4 the rest of the voxel
+    if (compartment.id<=2)
+      m_Parameters.m_FiberModelList.push_back(model);
+    else
       m_Parameters.m_NonFiberModelList.push_back(model);
-      m_Parameters.m_Misc.m_SignalModelString += "Prototype";
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.Description", mitk::StringProperty::New("Extra-axonal compartment 2") );
-      m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Compartment4.Model", mitk::StringProperty::New("Prototype") );
-      break;
-    }
-    }
-    if (m_Controls->m_Comp4VolumeFraction->GetSelectedNode().IsNotNull() && m_Parameters.m_NonFiberModelList.size()==2)
+    m_Parameters.m_Misc.m_SignalModelString += ModelName(type);
+
+    if (compartment.volumeFraction->GetSelectedNode().IsNotNull())
     {
-      mitk::DataNode::Pointer volumeNode = m_Controls->m_Comp4VolumeFraction->GetSelectedNode();
-      ItkDoubleImgType::Pointer compVolumeImage = ItkDoubleImgType::New();
-      mitk::Image* img = dynamic_cast<mitk::Image*>(volumeNode->GetData());
-      CastToItkImage< ItkDoubleImgType >(img, compVolumeImage);
-      m_Parameters.m_NonFiberModelList.back()->SetVolumeFractionImage(compVolumeImage);
+      ItkDoubleImgType::Pointer volumeImage = ItkDoubleImgType::New();
+      mitk::Image* img = dynamic_cast<mitk::Image*>(compartment.volumeFraction->GetSelectedNode()->GetData());
+      CastToItkImage< ItkDoubleImgType >(img, volumeImage);
+      model->SetVolumeFractionImage(volumeImage);
     }
   }
+}
 
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.SignalScale", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_SignalScale));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.FiberRadius", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_AxonRadius));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Tinhom", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_tInhom));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.echoTrainLength", mitk::IntProperty::New(m_Parameters.m_SignalGen.m_EchoTrainLength));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Tline", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_tLine));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.TE", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.m_tEcho));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.b-value", mitk::DoubleProperty::New(m_Parameters.m_SignalGen.GetBvalue()));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.NoPartialVolume", mitk::BoolProperty::New(m_Parameters.m_SignalGen.m_DoDisablePartialVolume));
-  // a prototype model switches relaxation off after the relaxation block set the property
-  m_Parameters.m_Misc.m_ResultNode->SetProperty("Fiberfox.Relaxation", mitk::BoolProperty::New(m_Parameters.m_SignalGen.m_DoSimulateRelaxation));
-  m_Parameters.m_Misc.m_ResultNode->AddProperty("binary", mitk::BoolProperty::New(false));
+void QmitkFiberfoxView::SetResultProperties()
+{
+  auto& signalGen = m_Parameters.m_SignalGen;   // GetBvalue is not const
+  const auto& misc = m_Parameters.m_Misc;
+  mitk::DataNode* node = misc.m_ResultNode;
+
+  node->SetProperty("Fiberfox.Relaxation", mitk::BoolProperty::New(signalGen.m_DoSimulateRelaxation));
+  if (misc.m_DoAddGhosts)
+    node->SetProperty("Fiberfox.Ghost", mitk::DoubleProperty::New(signalGen.m_KspaceLineOffset));
+  if (misc.m_DoAddAliasing)
+    node->SetProperty("Fiberfox.Aliasing", mitk::DoubleProperty::New(m_Controls->m_WrapBox->value()));  // in percent, as in the view
+  if (misc.m_DoAddSpikes)
+  {
+    node->SetProperty("Fiberfox.Spikes.Number", mitk::IntProperty::New(signalGen.m_Spikes));
+    node->SetProperty("Fiberfox.Spikes.Amplitude", mitk::DoubleProperty::New(signalGen.m_SpikeAmplitude));
+  }
+  if (signalGen.m_DoAddDrift)
+    node->SetProperty("Fiberfox.Drift", mitk::FloatProperty::New(signalGen.m_Drift));
+  if (signalGen.m_DoAddGibbsRinging)
+    node->SetProperty("Fiberfox.Ringing", mitk::BoolProperty::New(true));
+  if (misc.m_DoAddDistortions && signalGen.m_FrequencyMap.IsNotNull())
+    node->SetProperty("Fiberfox.Distortions", mitk::BoolProperty::New(true));
+  if (misc.m_DoAddEddyCurrents)
+    node->SetProperty("Fiberfox.Eddy-strength", mitk::DoubleProperty::New(signalGen.m_EddyStrength));
+  if (signalGen.m_DoAddMotion)
+  {
+    node->SetProperty("Fiberfox.Motion.Random", mitk::BoolProperty::New(signalGen.m_DoRandomizeMotion));
+    node->SetProperty("Fiberfox.Motion.Translation-x", mitk::DoubleProperty::New(signalGen.m_Translation[0]));
+    node->SetProperty("Fiberfox.Motion.Translation-y", mitk::DoubleProperty::New(signalGen.m_Translation[1]));
+    node->SetProperty("Fiberfox.Motion.Translation-z", mitk::DoubleProperty::New(signalGen.m_Translation[2]));
+    node->SetProperty("Fiberfox.Motion.Rotation-x", mitk::DoubleProperty::New(signalGen.m_Rotation[0]));
+    node->SetProperty("Fiberfox.Motion.Rotation-y", mitk::DoubleProperty::New(signalGen.m_Rotation[1]));
+    node->SetProperty("Fiberfox.Motion.Rotation-z", mitk::DoubleProperty::New(signalGen.m_Rotation[2]));
+  }
+  if (misc.m_DoAddNoise && signalGen.m_NoiseVariance>0)
+  {
+    std::string distribution = "Complex Gaussian";   // in k-space, without a noise model
+    if (dynamic_cast<mitk::NoncentralChiNoiseModel<mitk::ScalarType>*>(m_Parameters.m_NoiseModel.get()))
+      distribution = "Noncentral chi";
+    else if (m_Parameters.m_NoiseModel)
+      distribution = "Rician";
+    node->SetProperty("Fiberfox.Noise-Distribution", mitk::StringProperty::New(distribution));
+    node->SetProperty("Fiberfox.Noise-Variance", mitk::DoubleProperty::New(signalGen.m_NoiseVariance));
+  }
+
+  for (const auto& compartment : Compartments())
+  {
+    const CompartmentModel type = SelectedModel(compartment);
+    mitk::DiffusionSignalModel<>* model = nullptr;
+    for (auto list : {&m_Parameters.m_FiberModelList, &m_Parameters.m_NonFiberModelList})
+      for (auto m : *list)
+        if (static_cast<int>(m->m_CompartmentId)==compartment.id)
+          model = m;
+    if (model==nullptr)
+      continue;
+
+    const std::string prefix = "Fiberfox.Compartment" + std::to_string(compartment.id) + ".";
+    node->SetProperty(prefix + "Description", mitk::StringProperty::New(compartment.description));
+    node->SetProperty(prefix + "Model", mitk::StringProperty::New(ModelName(type)));
+    switch (type)
+    {
+    case CompartmentModel::Stick:
+      node->SetProperty(prefix + "D", mitk::DoubleProperty::New(static_cast<mitk::StickModel<>*>(model)->GetDiffusivity()));
+      break;
+    case CompartmentModel::Ball:
+      node->SetProperty(prefix + "D", mitk::DoubleProperty::New(static_cast<mitk::BallModel<>*>(model)->GetDiffusivity()));
+      break;
+    case CompartmentModel::Astrosticks:
+      node->SetProperty(prefix + "D", mitk::DoubleProperty::New(static_cast<mitk::AstroStickModel<>*>(model)->GetDiffusivity()));
+      node->SetProperty(prefix + "RandomSticks", mitk::BoolProperty::New(static_cast<mitk::AstroStickModel<>*>(model)->GetRandomizeSticks()));
+      break;
+    case CompartmentModel::Zeppelin:
+    case CompartmentModel::Tensor:
+    {
+      auto tensor = static_cast<mitk::TensorModel<>*>(model);
+      node->SetProperty(prefix + "D1", mitk::DoubleProperty::New(tensor->GetDiffusivity1()));
+      node->SetProperty(prefix + "D2", mitk::DoubleProperty::New(tensor->GetDiffusivity2()));
+      if (type==CompartmentModel::Tensor)
+        node->SetProperty(prefix + "D3", mitk::DoubleProperty::New(tensor->GetDiffusivity3()));
+      break;
+    }
+    case CompartmentModel::Dot:
+    case CompartmentModel::Prototype:
+    case CompartmentModel::None:
+      break;
+    }
+    if (type!=CompartmentModel::Prototype)
+      node->SetProperty(prefix + "T2", mitk::DoubleProperty::New(model->GetT2()));
+  }
+
+  node->SetProperty("Fiberfox.SignalScale", mitk::DoubleProperty::New(signalGen.m_SignalScale));
+  node->SetProperty("Fiberfox.FiberRadius", mitk::DoubleProperty::New(signalGen.m_AxonRadius));
+  node->SetProperty("Fiberfox.Tinhom", mitk::DoubleProperty::New(signalGen.m_tInhom));
+  node->SetProperty("Fiberfox.echoTrainLength", mitk::IntProperty::New(signalGen.m_EchoTrainLength));
+  node->SetProperty("Fiberfox.Tline", mitk::DoubleProperty::New(signalGen.m_tLine));
+  node->SetProperty("Fiberfox.TE", mitk::DoubleProperty::New(signalGen.m_tEcho));
+  node->SetProperty("Fiberfox.b-value", mitk::DoubleProperty::New(signalGen.GetBvalue()));
+  node->SetProperty("Fiberfox.NoPartialVolume", mitk::BoolProperty::New(signalGen.m_DoDisablePartialVolume));
+  node->SetProperty("binary", mitk::BoolProperty::New(false));
 }
 
 std::vector< mitk::RawShModel<>* > QmitkFiberfoxView::GetPrototypeModelsWithoutKernels()
@@ -1491,6 +1543,7 @@ void QmitkFiberfoxView::LoadParameters()
   m_Controls->m_Compartment3Box->setCurrentIndex(0);
   m_Controls->m_Compartment4Box->setCurrentIndex(0);
 
+  const auto compartments = Compartments();
   for (unsigned int i=0; i<m_Parameters.m_FiberModelList.size()+m_Parameters.m_NonFiberModelList.size(); i++)
   {
     mitk::DiffusionSignalModel<mitk::ScalarType>* signalModel = nullptr;
@@ -1512,160 +1565,12 @@ void QmitkFiberfoxView::LoadParameters()
       GetDataStorage()->Add(compVolNode);
     }
 
-    switch (signalModel->m_CompartmentId)
-    {
-    case 1:
-    {
-      if (compVolNode.IsNotNull())
-        m_Controls->m_Comp1VolumeFraction->SetSelectedNode(compVolNode);
-      if (dynamic_cast<mitk::StickModel<>*>(signalModel))
-      {
-        mitk::StickModel<>* model = dynamic_cast<mitk::StickModel<>*>(signalModel);
-        m_Controls->m_StickWidget1->SetT2(model->GetT2());
-        m_Controls->m_StickWidget1->SetT1(model->GetT1());
-        m_Controls->m_StickWidget1->SetD(model->GetDiffusivity());
-        m_Controls->m_Compartment1Box->setCurrentIndex(0);
-        break;
-      }
-      else if (dynamic_cast<mitk::TensorModel<>*>(signalModel))
-      {
-        mitk::TensorModel<>* model = dynamic_cast<mitk::TensorModel<>*>(signalModel);
-        m_Controls->m_TensorWidget1->SetT2(model->GetT2());
-        m_Controls->m_TensorWidget1->SetT1(model->GetT1());
-        m_Controls->m_TensorWidget1->SetD1(model->GetDiffusivity1());
-        m_Controls->m_TensorWidget1->SetD2(model->GetDiffusivity2());
-        m_Controls->m_TensorWidget1->SetD3(model->GetDiffusivity3());
-        m_Controls->m_Compartment1Box->setCurrentIndex(2);
-        break;
-      }
-      else if (dynamic_cast<mitk::RawShModel<>*>(signalModel))
-      {
-        mitk::RawShModel<>* model = dynamic_cast<mitk::RawShModel<>*>(signalModel);
-        m_Controls->m_PrototypeWidget1->SetNumberOfSamples(model->GetMaxNumKernels());
-        m_Controls->m_PrototypeWidget1->SetMinFa(model->GetFaRange().first);
-        m_Controls->m_PrototypeWidget1->SetMaxFa(model->GetFaRange().second);
-        m_Controls->m_PrototypeWidget1->SetMinAdc(model->GetAdcRange().first);
-        m_Controls->m_PrototypeWidget1->SetMaxAdc(model->GetAdcRange().second);
-        m_Controls->m_Compartment1Box->setCurrentIndex(3);
-        break;
-      }
-      break;
-    }
-    case 2:
-    {
-      if (compVolNode.IsNotNull())
-        m_Controls->m_Comp2VolumeFraction->SetSelectedNode(compVolNode);
-      if (dynamic_cast<mitk::StickModel<>*>(signalModel))
-      {
-        mitk::StickModel<>* model = dynamic_cast<mitk::StickModel<>*>(signalModel);
-        m_Controls->m_StickWidget2->SetT2(model->GetT2());
-        m_Controls->m_StickWidget2->SetT1(model->GetT1());
-        m_Controls->m_StickWidget2->SetD(model->GetDiffusivity());
-        m_Controls->m_Compartment2Box->setCurrentIndex(1);
-        break;
-      }
-      else if (dynamic_cast<mitk::TensorModel<>*>(signalModel))
-      {
-        mitk::TensorModel<>* model = dynamic_cast<mitk::TensorModel<>*>(signalModel);
-        m_Controls->m_TensorWidget2->SetT2(model->GetT2());
-        m_Controls->m_TensorWidget2->SetT1(model->GetT1());
-        m_Controls->m_TensorWidget2->SetD1(model->GetDiffusivity1());
-        m_Controls->m_TensorWidget2->SetD2(model->GetDiffusivity2());
-        m_Controls->m_TensorWidget2->SetD3(model->GetDiffusivity3());
-        m_Controls->m_Compartment2Box->setCurrentIndex(3);
-        break;
-      }
-      break;
-    }
-    case 3:
-    {
-      if (compVolNode.IsNotNull())
-        m_Controls->m_Comp3VolumeFraction->SetSelectedNode(compVolNode);
-      if (dynamic_cast<mitk::BallModel<>*>(signalModel))
-      {
-        mitk::BallModel<>* model = dynamic_cast<mitk::BallModel<>*>(signalModel);
-        m_Controls->m_BallWidget1->SetT2(model->GetT2());
-        m_Controls->m_BallWidget1->SetT1(model->GetT1());
-        m_Controls->m_BallWidget1->SetD(model->GetDiffusivity());
-        m_Controls->m_Compartment3Box->setCurrentIndex(0);
-        break;
-      }
-      else if (dynamic_cast<mitk::AstroStickModel<>*>(signalModel))
-      {
-        mitk::AstroStickModel<>* model = dynamic_cast<mitk::AstroStickModel<>*>(signalModel);
-        m_Controls->m_AstrosticksWidget1->SetT2(model->GetT2());
-        m_Controls->m_AstrosticksWidget1->SetT1(model->GetT1());
-        m_Controls->m_AstrosticksWidget1->SetD(model->GetDiffusivity());
-        m_Controls->m_AstrosticksWidget1->SetRandomizeSticks(model->GetRandomizeSticks());
-        m_Controls->m_Compartment3Box->setCurrentIndex(1);
-        break;
-      }
-      else if (dynamic_cast<mitk::DotModel<>*>(signalModel))
-      {
-        mitk::DotModel<>* model = dynamic_cast<mitk::DotModel<>*>(signalModel);
-        m_Controls->m_DotWidget1->SetT2(model->GetT2());
-        m_Controls->m_DotWidget1->SetT1(model->GetT1());
-        m_Controls->m_Compartment3Box->setCurrentIndex(2);
-        break;
-      }
-      else if (dynamic_cast<mitk::RawShModel<>*>(signalModel))
-      {
-        mitk::RawShModel<>* model = dynamic_cast<mitk::RawShModel<>*>(signalModel);
-        m_Controls->m_PrototypeWidget3->SetNumberOfSamples(model->GetMaxNumKernels());
-        m_Controls->m_PrototypeWidget3->SetMinFa(model->GetFaRange().first);
-        m_Controls->m_PrototypeWidget3->SetMaxFa(model->GetFaRange().second);
-        m_Controls->m_PrototypeWidget3->SetMinAdc(model->GetAdcRange().first);
-        m_Controls->m_PrototypeWidget3->SetMaxAdc(model->GetAdcRange().second);
-        m_Controls->m_Compartment3Box->setCurrentIndex(3);
-        break;
-      }
-      break;
-    }
-    case 4:
-    {
-      if (compVolNode.IsNotNull())
-        m_Controls->m_Comp4VolumeFraction->SetSelectedNode(compVolNode);
-      if (dynamic_cast<mitk::BallModel<>*>(signalModel))
-      {
-        mitk::BallModel<>* model = dynamic_cast<mitk::BallModel<>*>(signalModel);
-        m_Controls->m_BallWidget2->SetT2(model->GetT2());
-        m_Controls->m_BallWidget2->SetT1(model->GetT1());
-        m_Controls->m_BallWidget2->SetD(model->GetDiffusivity());
-        m_Controls->m_Compartment4Box->setCurrentIndex(1);
-        break;
-      }
-      else if (dynamic_cast<mitk::AstroStickModel<>*>(signalModel))
-      {
-        mitk::AstroStickModel<>* model = dynamic_cast<mitk::AstroStickModel<>*>(signalModel);
-        m_Controls->m_AstrosticksWidget2->SetT2(model->GetT2());
-        m_Controls->m_AstrosticksWidget2->SetT1(model->GetT1());
-        m_Controls->m_AstrosticksWidget2->SetD(model->GetDiffusivity());
-        m_Controls->m_AstrosticksWidget2->SetRandomizeSticks(model->GetRandomizeSticks());
-        m_Controls->m_Compartment4Box->setCurrentIndex(2);
-        break;
-      }
-      else if (dynamic_cast<mitk::DotModel<>*>(signalModel))
-      {
-        mitk::DotModel<>* model = dynamic_cast<mitk::DotModel<>*>(signalModel);
-        m_Controls->m_DotWidget2->SetT2(model->GetT2());
-        m_Controls->m_DotWidget2->SetT1(model->GetT1());
-        m_Controls->m_Compartment4Box->setCurrentIndex(3);
-        break;
-      }
-      else if (dynamic_cast<mitk::RawShModel<>*>(signalModel))
-      {
-        mitk::RawShModel<>* model = dynamic_cast<mitk::RawShModel<>*>(signalModel);
-        m_Controls->m_PrototypeWidget4->SetNumberOfSamples(model->GetMaxNumKernels());
-        m_Controls->m_PrototypeWidget4->SetMinFa(model->GetFaRange().first);
-        m_Controls->m_PrototypeWidget4->SetMaxFa(model->GetFaRange().second);
-        m_Controls->m_PrototypeWidget4->SetMinAdc(model->GetAdcRange().first);
-        m_Controls->m_PrototypeWidget4->SetMaxAdc(model->GetAdcRange().second);
-        m_Controls->m_Compartment4Box->setCurrentIndex(4);
-        break;
-      }
-      break;
-    }
-    }
+    if (signalModel->m_CompartmentId<1 || signalModel->m_CompartmentId>compartments.size())
+      continue;
+    const CompartmentControls& compartment = compartments[signalModel->m_CompartmentId-1];
+    if (compVolNode.IsNotNull())
+      compartment.volumeFraction->SetSelectedNode(compVolNode);
+    ShowCompartmentModel(compartment, signalModel);
   }
 
   // Prototype kernels of the file are reused by NewPrototypeModel while the widgets keep the settings
@@ -1728,107 +1633,22 @@ void QmitkFiberfoxView::ShowAdvancedOptions(int state)
 
 void QmitkFiberfoxView::Comp1ModelFrameVisibility(int index)
 {
-  m_Controls->m_StickWidget1->setVisible(false);
-  m_Controls->m_ZeppelinWidget1->setVisible(false);
-  m_Controls->m_TensorWidget1->setVisible(false);
-  m_Controls->m_PrototypeWidget1->setVisible(false);
-
-  switch (index)
-  {
-  case 0:
-    m_Controls->m_StickWidget1->setVisible(true);
-    break;
-  case 1:
-    m_Controls->m_ZeppelinWidget1->setVisible(true);
-    break;
-  case 2:
-    m_Controls->m_TensorWidget1->setVisible(true);
-    break;
-  case 3:
-    m_Controls->m_PrototypeWidget1->setVisible(true);
-    break;
-  }
+  ShowCompartmentWidget(1, index);
 }
 
 void QmitkFiberfoxView::Comp2ModelFrameVisibility(int index)
 {
-  m_Controls->m_StickWidget2->setVisible(false);
-  m_Controls->m_ZeppelinWidget2->setVisible(false);
-  m_Controls->m_TensorWidget2->setVisible(false);
-  m_Controls->m_Comp2FractionFrame->setVisible(false);
-
-  switch (index)
-  {
-  case 0:
-    break;
-  case 1:
-    m_Controls->m_StickWidget2->setVisible(true);
-    m_Controls->m_Comp2FractionFrame->setVisible(true);
-    break;
-  case 2:
-    m_Controls->m_ZeppelinWidget2->setVisible(true);
-    m_Controls->m_Comp2FractionFrame->setVisible(true);
-    break;
-  case 3:
-    m_Controls->m_TensorWidget2->setVisible(true);
-    m_Controls->m_Comp2FractionFrame->setVisible(true);
-    break;
-  }
+  ShowCompartmentWidget(2, index);
 }
 
 void QmitkFiberfoxView::Comp3ModelFrameVisibility(int index)
 {
-  m_Controls->m_BallWidget1->setVisible(false);
-  m_Controls->m_AstrosticksWidget1->setVisible(false);
-  m_Controls->m_DotWidget1->setVisible(false);
-  m_Controls->m_PrototypeWidget3->setVisible(false);
-
-  switch (index)
-  {
-  case 0:
-    m_Controls->m_BallWidget1->setVisible(true);
-    break;
-  case 1:
-    m_Controls->m_AstrosticksWidget1->setVisible(true);
-    break;
-  case 2:
-    m_Controls->m_DotWidget1->setVisible(true);
-    break;
-  case 3:
-    m_Controls->m_PrototypeWidget3->setVisible(true);
-    break;
-  }
+  ShowCompartmentWidget(3, index);
 }
 
 void QmitkFiberfoxView::Comp4ModelFrameVisibility(int index)
 {
-  m_Controls->m_BallWidget2->setVisible(false);
-  m_Controls->m_AstrosticksWidget2->setVisible(false);
-  m_Controls->m_DotWidget2->setVisible(false);
-  m_Controls->m_PrototypeWidget4->setVisible(false);
-  m_Controls->m_Comp4FractionFrame->setVisible(false);
-
-  switch (index)
-  {
-  case 0:
-    break;
-  case 1:
-    m_Controls->m_BallWidget2->setVisible(true);
-    m_Controls->m_Comp4FractionFrame->setVisible(true);
-    break;
-  case 2:
-    m_Controls->m_AstrosticksWidget2->setVisible(true);
-    m_Controls->m_Comp4FractionFrame->setVisible(true);
-    break;
-  case 3:
-    m_Controls->m_DotWidget2->setVisible(true);
-    m_Controls->m_Comp4FractionFrame->setVisible(true);
-    break;
-  case 4:
-    m_Controls->m_PrototypeWidget4->setVisible(true);
-    m_Controls->m_Comp4FractionFrame->setVisible(true);
-    break;
-  }
+  ShowCompartmentWidget(4, index);
 }
 
 void QmitkFiberfoxView::OnAddMotion(int value)
