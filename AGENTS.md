@@ -111,6 +111,14 @@ Facts the layout does not show:
   `Debug`, `set_release.txt` forces `Release`.
 - Configuring `FiberTracking` downloads a lookup-table tarball from mitk.org into its binary
   `resource/` folder, so it needs network. MITK embeds module resources only from `resource/`.
+- The readers and writers of the diffusion files are registered by the service activators of
+  `DiffusionImage`, `DiffusionModelling` and `FiberBundle` when the module's library is loaded.
+  The Workbench loads a diffusion module otherwise only when a diffusion view starts, so each of
+  the three has an `autoload/IO` module (`Mitk<Module>IO`, no code of its own) that MitkCore
+  auto-loads from `lib/MitkCore/` and that loads the module. The modules themselves cannot be
+  auto-loaded: MITK forbids depending on an auto-loaded module. `mitkDiffusionWorkbenchReadersTest`
+  (`Modules/FiberBundle/Testing/WorkbenchReaders/`, a driver that links no diffusion module) opens
+  a file of every diffusion type as the Workbench does.
 - Test data: module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each
   `Testing/` folder and read their input and references from a checkout of
   https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion-test-data (branch `main`; paths as
@@ -181,6 +189,20 @@ Facts the layout does not show:
   while `minimize` runs; the cost function may release it during its evaluation.
 - `ctest -R mitkFiberBundle` runs the `FiberBundle` tests; `mitkFiberBundleMapperTest` renders
   offscreen (EGL) and is skipped with exit code 77 where no OpenGL context can be created.
+  The 3D fiber mapper draws tubes on the GPU from the lines (`Rendering/mitkFiberTubeShader.h`:
+  VTK's tube shading with a geometry shader of the radius in mm; while tubes are on, the input
+  carries a per-point direction so that the quads of neighbouring segments share their edge) and
+  ribbons on the CPU. Each 2D window holds only the tiles of 1 mm along its plane normal near its
+  slab (`Rendering/mitkFiberSlabTiles.h`, an actor per tile, each segment in one tile; the index
+  `mitkFiberSlabIndex.h` holds the geometry only, so new colours keep the tiles): a slice or
+  rotation step uploads only the tiles it newly needs. The image is the whole bundle's except
+  where two fibers lie within about 0.05 mm in depth, the depth resolution of MITK's 2D camera
+  (900 000 mm from the plane, clipping range 0.1-1e6 mm): there the tiles' draw order decides
+  (about 0.5 % of the fiber pixels of a dense whole-brain tractogram), so the mapper test compares
+  at a narrow clipping range. A cell picked on the 2D prop is a run of a tile;
+  `FiberBundleMapper2D::PickedFiber` gives its fiber. Both fiber mappers keep their inputs and
+  clipping planes and only move the planes: a new input or plane collection makes VTK rebuild the
+  GPU buffers of that input.
   `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
   give the same result at any number of OpenMP threads; fiber references in the test data
   depend on exact point positions, so a change there is checked bit for bit against the old output.
@@ -254,7 +276,7 @@ Facts the layout does not show:
 ## Porting state
 
 In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
-line apps, plugins, user manuals) compile and link without warnings, and all 69 diffusion tests
+line apps, plugins, user manuals) compile and link without warnings, and all 70 diffusion tests
 pass. `DiffusionRelease` is built less often; its last full build stopped at the GCC 13 warning
 named under "Facts", which is fixed but not rebuilt there. The Workbench has not been started.
 Remove an item once it is fixed.

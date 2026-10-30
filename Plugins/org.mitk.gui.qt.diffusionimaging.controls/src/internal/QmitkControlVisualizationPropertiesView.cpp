@@ -824,8 +824,9 @@ void QmitkControlVisualizationPropertiesView::FiberSlicingThickness2D()
     if ( fabs(fibThickness-currentThickness) < 0.001 )
       return;
 
+    // the 2D mapper reads the thickness on every render and takes the tiles of fibers the new slab
+    // needs; RequestUpdate2D would only copy the colours of every window's tiles anew
     node->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(fibThickness));
-    dynamic_cast<mitk::FiberBundle*>(node->GetData())->RequestUpdate2D();
   });
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }

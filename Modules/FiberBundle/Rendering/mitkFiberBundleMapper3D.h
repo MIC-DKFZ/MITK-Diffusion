@@ -24,19 +24,21 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <vtkSmartPointer.h>
 
-#include <array>
-
 class vtkActor;
 class vtkLookupTable;
 class vtkOpenGLPolyDataMapper;
+class vtkPlane;
 class vtkPropAssembly;
 
 namespace mitk {
 
 /**
- * \brief 3D mapper of fiber bundles: lines, tubes (shape.tuberadius) or ribbons
+ * \brief 3D mapper of fiber bundles: lines, tubes (shape.tuberadius, in mm) or ribbons
  * (shape.ribbonwidth) with the bundle's colours, optionally clipped at the plane of the
  * 3DClipping property.
+ *
+ * Tubes are drawn on the GPU from the lines (mitkFiberTubeShader.h); ribbons are built on the
+ * CPU with vtkRibbonFilter, whose band orientation follows each whole fiber.
  */
 class MITKFIBERBUNDLE_EXPORT FiberBundleMapper3D : public VtkMapper
 {
@@ -50,16 +52,6 @@ public:
   static void SetDefaultProperties(DataNode* node, BaseRenderer* renderer = nullptr, bool overwrite = false );
   void GenerateDataForRenderer(mitk::BaseRenderer* renderer) override;
 
-  /** The node properties that change the geometry the mapper builds. */
-  struct ShapeParameters
-  {
-    float tubeRadius = 0;
-    int tubeSides = 0;
-    int lineWidth = 0;
-    float ribbonWidth = 0;
-    bool operator==(const ShapeParameters&) const = default;
-  };
-
   class  LocalStorage3D : public mitk::Mapper::BaseLocalStorage
   {
   public:
@@ -67,12 +59,14 @@ public:
     vtkSmartPointer<vtkOpenGLPolyDataMapper> m_FiberMapper;
     vtkSmartPointer<vtkPropAssembly> m_FiberAssembly;
 
+    // time the input was last built from the bundle
     itk::TimeStamp m_LastUpdateTime;
-    // shape of the last update; each render window builds its own
-    ShapeParameters m_Shape;
-    // origin and normal of the clipping plane last applied to m_FiberMapper
-    std::array<double, 6> m_ClippingPlane = {};
-    bool m_ClippingPlaneApplied = false;
+    // ribbon width of the input; 0: the input is the lines (also for tubes)
+    float m_RibbonWidth = 0;
+    // The plane of 3DClipping, in the fiber mapper's plane collection while its normal is not
+    // zero, and moved in place: a new plane changes the mapper's modified time, and VTK then
+    // rebuilds the GPU buffers of the whole bundle (#46).
+    vtkSmartPointer<vtkPlane> m_ClippingPlane;
     LocalStorage3D();
   };
 
@@ -84,8 +78,10 @@ protected:
 
   FiberBundleMapper3D();
   ~FiberBundleMapper3D() override = default;
-  void InternalGenerateData(mitk::BaseRenderer *renderer, const FiberBundle* fiberBundle, const ShapeParameters& shape);
-  /** Applies the plane of the node's 3DClipping property to the fiber mapper when it changed. */
+  /** Gives the fiber mapper a new input: the lines, or ribbons for ribbonWidth > 0 */
+  void InternalGenerateData(mitk::BaseRenderer *renderer, const FiberBundle* fiberBundle, float ribbonWidth);
+  /** Moves the fiber mapper's clipping plane to the node's 3DClipping property (on every render;
+   *  an unchanged plane leaves the mapper unchanged), or removes it for a zero normal. */
   void UpdateClippingPlane(LocalStorage3D* localStorage);
 
 private:
