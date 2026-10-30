@@ -14,12 +14,15 @@ found in the LICENSE file.
 
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkImageReadAccessor.h>
+#include <mitkModelDirectionRotation.h>
 #include <mitkOdfImage.h>
 #include <mitkPeakImage.h>
+#include <mitkShImage.h>
 #include <mitkTensorImage.h>
 #include <mitkTestFixture.h>
 
 #include <vnl/vnl_matrix_fixed.h>
+#include <vnl/vnl_rotation_matrix.h>
 
 using namespace mitk::CmdAppTest;
 
@@ -33,6 +36,7 @@ class mitkDiffusionCmdAppsMiscTestSuite : public mitk::TestFixture
   MITK_TEST(CopyGeometry_RotatedReference_TurnsTensors);
   MITK_TEST(CopyGeometry_UnknownInputType_Fails);
   MITK_TEST(CopyGeometry_InputTypeMismatch_Fails);
+  MITK_TEST(CopyGeometry_RotatedReference_TurnsShOdfPeaks);
   MITK_TEST(DiffusionDICOMLoader_MissingFolder_Fails);
   MITK_TEST(ShToOdfImage_Odfs);
   MITK_TEST(PeakExtraction_Peaks);
@@ -116,6 +120,66 @@ public:
   {
     const auto dir = WorkDir("CopyGeometryFails");
     RunFails("CopyGeometry", {"-i", Data("sh_image_test.nii.gz"), "-r", Data("sh_image_test.nii.gz"), "-o", "out.nii.gz", "-t", "tensor"}, dir);
+  }
+
+  /**
+   * Runs CopyGeometry on the test-data file with a reference whose grid is the input's turned by
+   * an oblique rotation, and compares the output with the input turned in-process by
+   * ModelDirectionRotation: guards the reader selection (-t) and the writing of each image type.
+   */
+  template <class TImage>
+  static void CheckTurnedByApp(const std::string &dir, const std::string &file, const std::vector<std::string> &args,
+                               const std::vector<std::string> &readers, const std::string &output)
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor(readers, std::vector<std::string>());
+    typename TImage::Pointer expected = dynamic_cast<TImage *>(mitk::IOUtil::Load(Data(file), &functor).at(0).GetPointer());
+    CPPUNIT_ASSERT_MESSAGE(file + " is no " + TImage::GetStaticNameOfClass(), expected.IsNotNull());
+
+    const vnl_matrix_fixed<double, 3, 3> rotation = vnl_rotation_matrix(vnl_vector_fixed<double, 3>(1, 2, 3).normalize() * 0.5);
+    // 2x2x2 voxels: NRRD would store a single-voxel reference as a 2D image and lose its z axis.
+    auto reference = mitk::Image::New();
+    unsigned int size[3] = {2, 2, 2};
+    reference->Initialize(mitk::MakeScalarPixelType<float>(), 3, size);
+    const vnl_matrix_fixed<double, 3, 3> turned = rotation * expected->GetGeometry()->GetIndexToWorldTransform()->GetMatrix().GetVnlMatrix();
+    auto transform = mitk::AffineTransform3D::New();
+    transform->SetMatrix(mitk::AffineTransform3D::MatrixType(turned.as_matrix()));
+    transform->SetOffset(expected->GetGeometry()->GetIndexToWorldTransform()->GetOffset());
+    reference->GetGeometry()->SetIndexToWorldTransform(transform);
+    const std::string referenceFile = "reference_" + output + ".nrrd";
+    mitk::IOUtil::Save(reference, Path(dir, referenceFile));
+
+    std::vector<std::string> appArgs = {"-i", Data(file), "-r", referenceFile, "-o", output};
+    appArgs.insert(appArgs.end(), args.begin(), args.end());
+    RunOk("CopyGeometry", appArgs, dir);
+    auto result = Load<TImage>(dir, output, readers);
+
+    mitk::ModelDirectionRotation::Rotate(expected, rotation);
+    std::size_t count = expected->GetPixelType().GetNumberOfComponents();
+    for (unsigned int d = 0; d < expected->GetDimension(); ++d)
+      count *= expected->GetDimension(d);
+    mitk::ImageReadAccessor expectedAccessor(expected.GetPointer());
+    mitk::ImageReadAccessor resultAccessor(result.GetPointer());
+    const auto *e = static_cast<const float *>(expectedAccessor.GetData());
+    const auto *r = static_cast<const float *>(resultAccessor.GetData());
+    double maxValue = 0;
+    double maxDifference = 0;
+    for (std::size_t i = 0; i < count; ++i)
+    {
+      maxValue = std::max(maxValue, static_cast<double>(std::abs(e[i])));
+      maxDifference = std::max(maxDifference, static_cast<double>(std::abs(e[i] - r[i])));
+    }
+    MITK_INFO << output << ": max difference " << maxDifference << " of max value " << maxValue;
+    CPPUNIT_ASSERT(maxValue > 0);
+    CPPUNIT_ASSERT_MESSAGE(output, maxDifference <= 1e-5 * maxValue);
+  }
+
+  // SH and peak NIfTI files are read as such only with -t; ODF files by their extension (#22).
+  void CopyGeometry_RotatedReference_TurnsShOdfPeaks()
+  {
+    const auto dir = WorkDir("CopyGeometryModels");
+    CheckTurnedByApp<mitk::ShImage>(dir, "sh_image_test.nii.gz", {"-t", "sh"}, {"SH Image"}, "sh.nii.gz");
+    CheckTurnedByApp<mitk::PeakImage>(dir, "peak_image_test.nii.gz", {"-t", "peak"}, {"Peak Image"}, "peaks.nii.gz");
+    CheckTurnedByApp<mitk::OdfImage>(dir, "dwi_voxel_b0x3_b1000x192_CSAODF.qbi", {}, {}, "odfs.odf");
   }
 
   // -t sh on a tensor file: the tensor reader wins over the preferred SH reader, and the app
