@@ -41,6 +41,7 @@ class mitkFiberfoxSignalModelTestSuite : public mitk::TestFixture
   MITK_TEST(PrototypeSurvivesCopy);
   MITK_TEST(PrototypeSaveLoad);
   MITK_TEST(SampleKernels_B0WithShortVector_TensorFitTakesItAsB0);
+  MITK_TEST(SampleKernels_FirstB0ByTheRule_NormalizesKernels);
   MITK_TEST(AstroSticksVector);
   MITK_TEST(NoncentralChiNoiseMoments);
   CPPUNIT_TEST_SUITE_END();
@@ -266,6 +267,23 @@ public:
     ModelType model;
     CPPUNIT_ASSERT_EQUAL(1u, SampledKernels(TensorDwi(gradients, std::vector<double>(gradients.size(), 1000)), model));
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, std::fabs(model.GetPrototypeDirection(0) * Direction(1, 0, 0)), 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, model.GetBaselineSignal(0), 1e-12);
+  }
+
+  /**
+   * The first b0 volume by MITK's rule (here the b = 0.3 volume, index 0) normalizes the kernels; a
+   * voxel with a volume above it is skipped. The exact zero vector at index 1 carries a lower
+   * baseline (noise), so taking it as the reference would skip the only voxel.
+   */
+  void SampleKernels_FirstB0ByTheRule_NormalizesKernels()
+  {
+    auto gradients = SixDirections();
+    gradients.insert(gradients.begin(), mitk::DiffusionPropertyHelper::GradientDirectionType(0.0));
+    gradients.insert(gradients.begin(), ShortB0Vector());
+    std::vector<double> s0(gradients.size(), 1000);
+    s0[1] = 990;
+    ModelType model;
+    CPPUNIT_ASSERT_EQUAL(1u, SampledKernels(TensorDwi(gradients, s0), model));
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, model.GetBaselineSignal(0), 1e-12);
   }
 
