@@ -57,17 +57,17 @@ START ${_file_url}$<TARGET_FILE:${PROJECT_NAME}>
 ")
 
 # One test per suite (CPPUNIT_TEST_SUITE_NAMED_REGISTRATION name), added when the plug-in of its
-# views is built. Each test starts its own Workbench with a profile of its own in the build tree
-# (XDG folders), so it neither reads nor changes the user's profile and preferences.
+# views is built. Each test starts its own Workbench, which creates a new profile below TMPDIR for
+# the run (see MitkDiffusionUiTestWorkbench.cpp), so it neither reads nor changes the user's
+# profile and preferences, nor those of an earlier run.
 function(mitk_diffusion_add_ui_test suite plugin)
   if(NOT MITK_BUILD_APP_Workbench OR NOT MITK_BUILD_${plugin})
     return()
   endif()
-  set(_profile "${CMAKE_CURRENT_BINARY_DIR}/profiles/${suite}")
   add_test(NAME mitkDiffusionViewsUiTest_${suite}
     COMMAND ${_test_app} --MITK.no-crash-dumps
   )
-  set(_environment "QT_QPA_PLATFORM=offscreen;MITK_DIFFUSION_UITEST=${suite};XDG_DATA_HOME=${_profile}/data;XDG_CONFIG_HOME=${_profile}/config;XDG_CACHE_HOME=${_profile}/cache")
+  set(_environment "QT_QPA_PLATFORM=offscreen;MITK_DIFFUSION_UITEST=${suite}")
   if(TARGET ${_streamline_app})
     list(APPEND _environment "MITK_DIFFUSION_UITEST_STREAMLINE_APP=$<TARGET_FILE:${_streamline_app}>")
   endif()
