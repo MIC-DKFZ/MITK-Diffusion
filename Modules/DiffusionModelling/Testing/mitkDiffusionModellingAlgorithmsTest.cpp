@@ -68,6 +68,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(EigenvalueCorrection_InvalidGradients_Throws);
   MITK_TEST(TensorToL2Norm_FrobeniusNorm);
   MITK_TEST(Adc_NearZeroBValue_CountsAsBaseline);
+  MITK_TEST(Adc_BValueRoundingToOne_IsWeighted);
   MITK_TEST(Adc_ZeroBaselineValue_LeftOutInBothModes);
   MITK_TEST(Adc_MeanAdc_IsMeanOverAcquiredDirections);
   MITK_TEST(PrincipalDirection_MaskOfOtherSize_Throws);
@@ -78,6 +79,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(TensorToDwi_RoundTrip);
   MITK_TEST(TensorToDwi_SecondInput_SameAsFreshFilter);
   MITK_TEST(TensorToDwi_Mask_AppliesToBaseline);
+  MITK_TEST(TensorToDwi_BValueRoundingToZero_GetsBaseline);
   MITK_TEST(OdfToRgb_ZeroOdf_Black);
   MITK_TEST(Sh_InvalidCoefficientCounts_Throw);
   MITK_TEST(PrincipalDirection_FaThreshold_NoDirection);
@@ -275,6 +277,39 @@ public:
   {
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(false), 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.001, Adc(true), 1e-6);
+  }
+
+  // b = 0.8 s/mm^2 rounds to 1, a shell of its own in the b-value map, so a DWI whose lowest b-value
+  // is 0.8 has no b0 volume, as for the tensor and Q-ball reconstructions. The filter counted every
+  // b <= 1 as unweighted.
+  void Adc_BValueRoundingToOne_IsWeighted()
+  {
+    const double g[7][3] = {{std::sqrt(0.0008), 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.7071068, 0.7071068, 0}, {0.7071068, 0, 0.7071068}, {0, 0.7071068, 0.7071068}};
+    auto dwi = itk::VectorImage<short, 3>::New();
+    itk::VectorImage<short, 3>::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    dwi->SetRegions(region);
+    dwi->SetVectorLength(7);
+    dwi->Allocate();
+    itk::VariableLengthVector<short> pixel(7);
+    auto gradients = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+    for (unsigned int i = 0; i < 7; ++i)
+    {
+      const mitk::DiffusionPropertyHelper::GradientDirectionType direction(g[i][0], g[i][1], g[i][2]);
+      gradients->push_back(direction);
+      pixel[i] = static_cast<short>(std::round(10000 * std::exp(-1000 * direction.squared_magnitude() * 0.001)));
+    }
+    dwi->FillBuffer(pixel);
+
+    for (bool fitSignal : {false, true})
+    {
+      auto filter = itk::AdcImageFilter<short, double>::New();
+      filter->SetInput(dwi);
+      filter->SetGradientDirections(gradients.GetPointer());
+      filter->SetB_value(1000);
+      filter->SetFitSignal(fitSignal);
+      CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+    }
   }
 
   // MitkDiffusionIndices --index md of a DWI is the mean ADC of the acquired directions, which its
@@ -595,6 +630,44 @@ public:
       for (unsigned int i = 0; i < dwi->GetNumberOfComponentsPerPixel(); ++i)
         CPPUNIT_ASSERT_EQUAL(short(0), it.Get()[i]);
     }
+  }
+
+  // b = 0.3 s/mm^2 rounds to 0, a b0 volume of the b-value map, so its signal is the baseline. The
+  // filter attenuated every gradient longer than machine epsilon.
+  void TensorToDwi_BValueRoundingToZero_GetsBaseline()
+  {
+    auto tensors = TensorImageType::New();
+    TensorImageType::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    tensors->SetRegions(region);
+    tensors->Allocate();
+    itk::DiffusionTensor3D<float> tensor;
+    tensor.Fill(0);
+    tensor[0] = 0.003f;
+    tensor[3] = 0.001f;
+    tensor[5] = 0.001f;
+    tensors->FillBuffer(tensor);
+
+    auto baseline = itk::Image<short, 3>::New();
+    baseline->SetRegions(region);
+    baseline->Allocate();
+    baseline->FillBuffer(10000);
+
+    auto gradients = itk::VectorContainer<unsigned int, vnl_vector_fixed<double, 3>>::New();
+    gradients->push_back(vnl_vector_fixed<double, 3>(0.0));
+    gradients->push_back(vnl_vector_fixed<double, 3>(std::sqrt(0.0003), 0, 0));
+    gradients->push_back(vnl_vector_fixed<double, 3>(1, 0, 0));
+
+    auto filter = DwiToTensorFilterType::New();
+    filter->SetInput(tensors);
+    filter->SetGradientList(gradients.GetPointer());
+    filter->SetBValue(1000);
+    filter->SetExternalBaselineImage(baseline);
+    filter->Update();
+    const auto signal = filter->GetOutput()->GetPixel({{0, 0, 0}});
+    CPPUNIT_ASSERT_EQUAL(short(10000), signal[0]);
+    CPPUNIT_ASSERT_EQUAL(short(10000), signal[1]);
+    CPPUNIT_ASSERT_EQUAL(short(497), signal[2]); // 10000 exp(-3), truncated
   }
 
   // The GFA of an all-zero ODF is NaN, which was converted to unsigned char unclamped.
