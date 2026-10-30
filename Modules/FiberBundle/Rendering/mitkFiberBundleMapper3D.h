@@ -80,7 +80,8 @@ protected:
   ~FiberBundleMapper3D() override = default;
   /** Gives the fiber mapper a new input: the lines, or ribbons for ribbonWidth > 0 */
   void InternalGenerateData(mitk::BaseRenderer *renderer, const FiberBundle* fiberBundle, float ribbonWidth);
-  /** Applies the plane of the node's 3DClipping property to the fiber mapper when it changed. */
+  /** Moves the fiber mapper's clipping plane to the node's 3DClipping property (on every render;
+   *  an unchanged plane leaves the mapper unchanged), or removes it for a zero normal. */
   void UpdateClippingPlane(LocalStorage3D* localStorage);
 
 private:

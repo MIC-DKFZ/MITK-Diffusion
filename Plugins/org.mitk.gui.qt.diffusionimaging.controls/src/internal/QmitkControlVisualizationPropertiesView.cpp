@@ -824,8 +824,9 @@ void QmitkControlVisualizationPropertiesView::FiberSlicingThickness2D()
     if ( fabs(fibThickness-currentThickness) < 0.001 )
       return;
 
+    // the 2D mapper reads the thickness on every render; RequestUpdate2D would give each 2D
+    // window a new input copy and a new upload of the whole bundle
     node->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(fibThickness));
-    dynamic_cast<mitk::FiberBundle*>(node->GetData())->RequestUpdate2D();
   });
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
