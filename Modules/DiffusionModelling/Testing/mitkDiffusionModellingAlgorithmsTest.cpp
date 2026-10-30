@@ -52,6 +52,8 @@ found in the LICENSE file.
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -90,6 +92,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(FlipPeaks_NegatesChosenAxes);
   MITK_TEST(MaximaExtraction_RecordedOutput);
   MITK_TEST(MaximaExtraction_SyntheticOdfs_FibreDirections);
+  MITK_TEST(MaximaExtraction_WorkUnits_SameResult);
   MITK_TEST(Filters_OutputTakenBeforeUpdate_GetsResult);
   MITK_TEST(EigenvalueCorrection_RecordedOutput);
   CPPUNIT_TEST_SUITE_END();
@@ -1133,6 +1136,55 @@ public:
         CPPUNIT_ASSERT_EQUAL(1u, matches);
       }
     }
+  }
+
+  // The peak refinement (L-BFGS-B) runs in every work unit at once only because the cost
+  // evaluation releases the lock that guards netlib's static state; the peaks of one and of eight
+  // work units must be the same bit for bit. A block of the white matter of the CSD image keeps
+  // the Debug test short.
+  void MaximaExtraction_WorkUnits_SameResult()
+  {
+    mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
+    auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image_sh.nii.gz"), &functor);
+    auto coefficients = mitk::convert::GetItkShFromShImage<45>(shImage.GetPointer());
+
+    auto mask = MaskImageType::New();
+    mask->CopyInformation(coefficients);
+    mask->SetRegions(coefficients->GetLargestPossibleRegion());
+    mask->Allocate();
+    mask->FillBuffer(0);
+    for (itk::IndexValueType z = 0; z < static_cast<itk::IndexValueType>(mask->GetLargestPossibleRegion().GetSize(2)); ++z)
+      for (itk::IndexValueType y = 24; y < 36; ++y)
+        for (itk::IndexValueType x = 24; x < 36; ++x)
+          mask->SetPixel({{x, y, z}}, 1);
+
+    using FilterType = itk::OdfMaximaExtractionFilter<float, 8, ODF_SAMPLING_SIZE>;
+    std::vector<FilterType::Pointer> filters;
+    for (unsigned int workUnits : {1u, 8u})
+    {
+      auto filter = FilterType::New();
+      filter->SetInput(coefficients);
+      filter->SetMaskImage(mask);
+      filter->SetMaxNumPeaks(3);
+      filter->SetNumberOfWorkUnits(workUnits);
+      filter->Update();
+      filters.push_back(filter);
+    }
+
+    unsigned int numPeaks = 0;
+    itk::ImageRegionConstIterator<MaskImageType> itSerial(filters[0]->GetOutput(), filters[0]->GetOutput()->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<MaskImageType> itParallel(filters[1]->GetOutput(), filters[1]->GetOutput()->GetLargestPossibleRegion());
+    for (; !itSerial.IsAtEnd(); ++itSerial, ++itParallel)
+    {
+      CPPUNIT_ASSERT_EQUAL(itSerial.Get(), itParallel.Get());
+      numPeaks += itSerial.Get();
+    }
+    CPPUNIT_ASSERT(numPeaks > 300);
+    using PeakImageType = FilterType::PeakImageType;
+    itk::ImageRegionConstIterator<PeakImageType> itSerialPeaks(filters[0]->GetPeakImage(), filters[0]->GetPeakImage()->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<PeakImageType> itParallelPeaks(filters[1]->GetPeakImage(), filters[1]->GetPeakImage()->GetLargestPossibleRegion());
+    for (; !itSerialPeaks.IsAtEnd(); ++itSerialPeaks, ++itParallelPeaks)
+      CPPUNIT_ASSERT_EQUAL(itSerialPeaks.Get(), itParallelPeaks.Get());
   }
 
   // Three filters replaced their primary output during the update, so an output taken before

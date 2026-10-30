@@ -181,7 +181,6 @@ Image< unsigned char, 3 > >
 
     PeakImageType::Pointer                      m_PeakImage;
     ItkUcharImgType::Pointer                    m_MaskImage;              ///< only voxels inside the binary mask are processed
-    bool                                        m_MaskGenerated = false;  ///< m_MaskImage was generated for the current update only
 
     Toolkit                                     m_Toolkit;
     bool                                        m_FlipX;
