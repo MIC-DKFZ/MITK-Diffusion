@@ -285,7 +285,7 @@ namespace
   mitk::FiberBundle::Pointer MergeBundles(mitk::FiberBundle::Pointer a, mitk::FiberBundle::Pointer b)
   {
     if (a.IsNull())
-      return b.IsNotNull() ? b->GetDeepCopy() : mitk::FiberBundle::New();
+      return b.IsNotNull() ? b->Clone() : mitk::FiberBundle::New();
     return a->AddBundle(b);
   }
 }

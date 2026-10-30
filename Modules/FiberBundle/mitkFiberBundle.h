@@ -148,10 +148,6 @@ public:
 
     unsigned int GetNumberOfPoints() const;
 
-    /** The same as Clone(), an independent copy of fibers, weights, colours, metadata and
-     *  properties. Use Clone(); this name remains for the fiber processing and atTRACTive views. */
-    mitk::FiberBundle::Pointer GetDeepCopy() const;
-
     // compare fiber bundles
     bool Equals(const FiberBundle* fib, double eps=0.01) const;
 
