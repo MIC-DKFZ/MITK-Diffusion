@@ -229,16 +229,19 @@ Facts the layout does not show:
   reports progress through `itk::ProgressEvent`. With a field map or eddy currents the k-space step
   approximates the phase by L time segments (Sutton et al. 2003; `.ffp` `image.kspaceTimeSegments`
   -1, the default and the value of files without it: from 1.25 x the phase spread in cycles + 8 up
-  until a residual check of the pixels passes, which keeps the relative RMS error below 0.1 %,
-  1.1e-5 measured; or a fixed L > 0), or sums the exact phase per pixel and sample (0; `MitkFiberfox
-  --exact_kspace`, view "Distortion Phase"). A slice takes the exact sum where the time segments
-  would take longer (automatic count) or need more than 256 MiB (any L); the log counts such slice
-  jobs. `mitkFiberfoxKspaceTest::TimeSegmentsHoldForStrongPhase` checks the bound. The references
-  with distortions or eddy currents are exact sums: an explicit 0 reproduces param1, param6 and
-  param8 bit for bit (`mitkFiberfoxSignalGenerationTest::Test1Exact`, ...), BrainSlice_4 within 1
-  (`Test4Exact`); the default reproduces all four within 1. Fiberfox references in the test data
-  depend on the random engines and seeds, so a change there is checked bit for bit against the old
-  output.
+  until a residual check of pixels from every histogram bin passes, which keeps the relative RMS
+  error below 0.1 %, 1.6e-5 measured; or a fixed L > 0), or sums the exact phase per pixel and sample
+  (0; `MitkFiberfox --exact_kspace`, view "Distortion Phase"). A slice takes the exact sum where the
+  time segments would take longer on one core (automatic count; estimated in measured -O3 times, not
+  per work unit, so the result does not depend on the threads) or need more than the slice job's
+  share of `KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET` (2 GiB for all parallel volumes; any L);
+  the log counts such slice jobs. `mitkFiberfoxKspaceTest::TimeSegmentsHoldForStrongPhase` checks the
+  bound, `mitkFiberfoxThreadDeterminismTest::TimeSegmentsInSliceThreads` the setup in several work
+  units of a slice job. The references with distortions or eddy currents are exact sums: an explicit
+  0 reproduces param1, param6 and param8 bit for bit (`mitkFiberfoxSignalGenerationTest::Test1Exact`,
+  ...), BrainSlice_4 within 1 (`Test4Exact`); the default reproduces all four within 1. Fiberfox
+  references in the test data depend on the random engines and seeds, so a change there is checked
+  bit for bit against the old output.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
   labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
   without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
