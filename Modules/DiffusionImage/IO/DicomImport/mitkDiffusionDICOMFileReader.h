@@ -55,9 +55,10 @@ public:
    * The files are split by series and geometry and sorted by image position, acquisition number,
    * acquisition time, trigger time and SOP instance UID. Siemens mosaics are split into slices if
    * resolveMosaic is set. Each image gets the "name" property (series description, else study
-   * description, else fallbackName, else the "diffusion.dicom.importname" property) and the
-   * properties DICOM.patient_id, DICOM.patient_name, DICOM.study_instance_uid,
-   * DICOM.series_instance_uid, DICOM.sop_instance_uid and DICOM.frame_of_reference_uid.
+   * description, else fallbackName, else the "diffusion.dicom.importname" property; an empty
+   * description counts as none) and the properties DICOM.patient_id, DICOM.patient_name,
+   * DICOM.study_instance_uid, DICOM.series_instance_uid, DICOM.sop_instance_uid and
+   * DICOM.frame_of_reference_uid ("-" for a missing element, empty for an empty one).
    */
   static std::vector<Image::Pointer> LoadDiffusionDicomSeries(const StringList& files, bool resolveMosaic, bool applyRotationToGradients, const std::string& fallbackName = "");
 

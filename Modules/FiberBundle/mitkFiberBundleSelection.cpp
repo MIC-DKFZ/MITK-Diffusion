@@ -90,7 +90,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundles(const std::vector< mitk
 mitk::FiberBundle::Pointer mitk::FiberBundle::AddBundle(const mitk::FiberBundle* fib) const
 {
   if (fib==nullptr)
-    return this->GetDeepCopy();
+    return this->Clone();
 
   MITK_INFO << "Adding fibers";
   FiberPolyDataBuilder builder;
@@ -135,7 +135,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubsampleFibers(float factor, bool
 mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(const mitk::FiberBundle* fib) const
 {
   if (fib==nullptr)
-    return this->GetDeepCopy();
+    return this->Clone();
 
   MITK_INFO << "Subtracting fibers";
 

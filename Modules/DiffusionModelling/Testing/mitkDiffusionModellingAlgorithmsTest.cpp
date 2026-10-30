@@ -56,6 +56,7 @@ found in the LICENSE file.
 #include <vector>
 
 #ifdef _OPENMP
+#include <mitkOmpThreadGuard.h>
 #include <omp.h>
 #endif
 
@@ -129,17 +130,14 @@ public:
 
 #ifdef _OPENMP
     const int maxThreads = omp_get_max_threads();
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
 #endif
     auto serial = CorrectEigenvalues(dwi);
 #ifdef _OPENMP
-    omp_set_num_threads(std::max(maxThreads, 4));
+    threads.SetNumberOfThreads(std::max(maxThreads, 4));
 #endif
     auto parallel1 = CorrectEigenvalues(dwi);
     auto parallel2 = CorrectEigenvalues(dwi);
-#ifdef _OPENMP
-    omp_set_num_threads(maxThreads);
-#endif
 
     unsigned int differing = 0;
     unsigned int nonZero = 0;

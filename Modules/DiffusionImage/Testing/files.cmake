@@ -4,4 +4,5 @@ set(MODULE_CUSTOM_TESTS
   mitkDiffusionImageIOTest.cpp
   mitkDiffusionImageHelperFunctionsTest.cpp
   mitkDiffusionDicomHeaderTest.cpp
+  mitkDiffusionDicomSeriesTest.cpp
 )

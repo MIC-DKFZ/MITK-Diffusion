@@ -834,7 +834,7 @@ void TractsToDWIImageFilter< PixelType >::InitializeFiberData()
 
   // The weights are normalized below; the simulation works on a copy, so the caller's bundle (the
   // tractogram shown in the Workbench) keeps its weights.
-  m_FiberBundle = m_FiberBundle->GetDeepCopy();
+  m_FiberBundle = m_FiberBundle->Clone();
   // All volumes rotate about the same point, so that fibers, mask and maps move together; computed
   // once, the geometry centre is the bounding box of all fibers.
   m_MotionCenter = m_FiberBundle->GetGeometry()->GetCenter();
@@ -898,7 +898,7 @@ void TractsToDWIImageFilter< PixelType >::InitializeFiberData()
   }
 
   // a second fiber bundle is needed to store the transformed version of the m_FiberBundleWorkingCopy
-  m_FiberBundleTransformed = m_FiberBundle->GetDeepCopy();
+  m_FiberBundleTransformed = m_FiberBundle->Clone();
 }
 
 

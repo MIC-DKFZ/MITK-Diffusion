@@ -30,10 +30,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkFiberBundle.h>
+#include <mitkOmpThreadGuard.h>
 #include <omp.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkEqual.h>
 #include <mitkStreamlineTractographyParameters.h>
+#include <mitkDiffusionReconstruction.h>
+#include <itkImageRegionConstIteratorWithIndex.h>
+#include <algorithm>
 
 class mitkStreamlineTractographyTestSuite : public mitk::TestFixture
 {
@@ -52,6 +56,7 @@ class mitkStreamlineTractographyTestSuite : public mitk::TestFixture
   MITK_TEST(Test_Odf6);
   MITK_TEST(Test_Tensor1_FourThreads);
   MITK_TEST(Test_Odf5_FourThreads);
+  MITK_TEST(TensorInput_FollowsAFitOfTheTestDwi);
   CPPUNIT_TEST_SUITE_END();
 
   typedef itk::VectorImage< short, 3>   ItkDwiType;
@@ -77,10 +82,11 @@ public:
   std::shared_ptr<mitk::StreamlineTractographyParameters> params;
 
   itk::StreamlineTrackingFilter::Pointer tracker;
+  std::unique_ptr<mitk::OmpThreadGuard> m_Threads;  ///< 1 thread per case, restored in tearDown
 
   void setUp() override
   {
-    omp_set_num_threads(1);
+    m_Threads = std::make_unique<mitk::OmpThreadGuard>(1);
 
     gfa_threshold = 0.2f;
     odf_threshold = 0.1f;
@@ -181,7 +187,7 @@ public:
 
   void tearDown() override
   {
-
+    m_Threads.reset();
   }
 
   void CheckFibResult(std::string ref_file, mitk::FiberBundle::Pointer test_fib)
@@ -442,15 +448,48 @@ public:
   /** Same as Test_Tensor1 at four threads: the fiber order must not depend on the thread scheduling. */
   void Test_Tensor1_FourThreads()
   {
-    omp_set_num_threads(4);
+    m_Threads->SetNumberOfThreads(4);
     Test_Tensor1();
   }
 
   /** Same as Test_Odf5 at four threads: probabilistic tracking must give the single-threaded result. */
   void Test_Odf5_FourThreads()
   {
-    omp_set_num_threads(4);
+    m_Threads->SetNumberOfThreads(4);
     Test_Odf5();
+  }
+
+  /**
+   * tensor_image.dti is the linear least-squares fit of diffusion_image_v2 (the test DWI with FSL
+   * bvecs), so its directions follow the phantom's bundles. diffusion_image.bvecs holds the same
+   * gradients with x not negated, as earlier MITK versions wrote NIfTI bvecs: read as FSL bvecs,
+   * they give directions mirrored in x, 47 degrees (median) off the bundles.
+   */
+  void TensorInput_FollowsAFitOfTheTestDwi()
+  {
+    auto dwi = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/diffusion_image_v2.nii.gz"));
+    auto fitted = mitk::ReconstructTensors(dwi, mitk::TensorFit::LinearLeastSquares, 0, false);
+    auto itkFitted = mitk::ImageToItkImage<mitk::TrackingHandlerTensor::TensorType, 3>(fitted.GetPointer());
+
+    std::vector<double> angles;
+    itk::ImageRegionConstIteratorWithIndex<mitk::TrackingHandlerTensor::ItkTensorImageType> it(itk_tensor_image, itk_tensor_image->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+    {
+      auto input = it.Get();
+      if (input.GetFractionalAnisotropy() < 0.4)
+        continue;
+      mitk::TrackingHandlerTensor::TensorType::EigenValuesArrayType values;
+      mitk::TrackingHandlerTensor::TensorType::EigenVectorsMatrixType inputVectors, fittedVectors;
+      input.ComputeEigenAnalysis(values, inputVectors);
+      itkFitted->GetPixel(it.GetIndex()).ComputeEigenAnalysis(values, fittedVectors);
+      double dot = 0;
+      for (int c = 0; c < 3; ++c)
+        dot += inputVectors(2, c) * fittedVectors(2, c);
+      angles.push_back(std::acos(std::min(1.0, std::abs(dot))) * 180.0 / itk::Math::pi);
+    }
+    CPPUNIT_ASSERT(angles.size() > 500);
+    std::nth_element(angles.begin(), angles.begin() + angles.size() / 2, angles.end());
+    CPPUNIT_ASSERT_MESSAGE("median angle " + std::to_string(angles[angles.size() / 2]), angles[angles.size() / 2] < 1.0);
   }
 };
 

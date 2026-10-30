@@ -327,7 +327,7 @@ void QmitkFiberProcessingView::PruneBundle()
   for (auto node : m_SelectedFB)
   {
     // on a copy: when the second step would leave no fibers, the bundle stays as it was
-    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData())->GetDeepCopy();
+    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData())->Clone();
     if (!fib->RemoveShortFibers(minLength) || !fib->RemoveLongFibers(maxLength))
       QMessageBox::information(nullptr, "No output generated:", "The resulting fiber bundle contains no fibers.");
     else
@@ -1282,7 +1282,7 @@ void QmitkFiberProcessingView::CopyBundles()
   for (auto node : bundleNodes)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    mitk::FiberBundle::Pointer newFib = fib->GetDeepCopy();
+    mitk::FiberBundle::Pointer newFib = fib->Clone();
 
     node->SetVisibility(false);
     QString name("");

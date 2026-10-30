@@ -120,7 +120,7 @@ public:
     // The pieces keep the coordinate convention of the input and a TrackVis header set on it, not
     // the header derived from the input's bounding box.
     auto plain = mitk::FiberProcessingTestHelper::CreateBundle({Hairpin(0), Hairpin(10)});
-    auto withMetadata = plain->GetDeepCopy();
+    auto withMetadata = plain->Clone();
     mitk::FiberProcessingTestHelper::SetMetadata(withMetadata);
     for (auto input : {plain, withMetadata})
     {

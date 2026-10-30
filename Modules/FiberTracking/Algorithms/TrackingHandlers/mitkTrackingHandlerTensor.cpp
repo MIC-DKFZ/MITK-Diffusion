@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkTrackingHandlerTensor.h"
-#include <algorithm>
 #include <cmath>
 
 namespace mitk
@@ -202,43 +201,15 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::GetDirection(itk::Point<float, 
   }
   else
   {
-    // Trilinear interpolation with the corner indices clamped to the image, as ITK's interpolators
-    // do for the FA image and the masks, so that the outermost half voxel is tracked too.
-    itk::Index<3> lo, hi;
-    float frac[3];
-    for (int d=0; d<3; ++d)
-    {
-      auto size = static_cast<itk::IndexValueType>(m_TensorImages.at(0)->GetLargestPossibleRegion().GetSize(d));
-      auto base = static_cast<itk::IndexValueType>(std::floor(cIdx[d]));
-      frac[d] = 1 - (cIdx[d] - base);   // weight of the lower corner
-      lo[d] = std::clamp<itk::IndexValueType>(base, 0, size-1);
-      hi[d] = std::clamp<itk::IndexValueType>(base+1, 0, size-1);
-    }
-    const float frac_x = frac[0], frac_y = frac[1], frac_z = frac[2];
-    auto corner = [&lo, &hi](bool x, bool y, bool z) { itk::Index<3> c = {{x ? hi[0] : lo[0], y ? hi[1] : lo[1], z ? hi[2] : lo[2]}}; return c; };
-
-    vnl_vector_fixed<float, 8> interpWeights;
-    interpWeights[0] = (  frac_x)*(  frac_y)*(  frac_z);
-    interpWeights[1] = (1-frac_x)*(  frac_y)*(  frac_z);
-    interpWeights[2] = (  frac_x)*(1-frac_y)*(  frac_z);
-    interpWeights[3] = (  frac_x)*(  frac_y)*(1-frac_z);
-    interpWeights[4] = (1-frac_x)*(1-frac_y)*(  frac_z);
-    interpWeights[5] = (  frac_x)*(1-frac_y)*(1-frac_z);
-    interpWeights[6] = (1-frac_x)*(  frac_y)*(1-frac_z);
-    interpWeights[7] = (1-frac_x)*(1-frac_y)*(1-frac_z);
-
-    const bool corners[8][3] = {{false, false, false}, {true, false, false}, {false, true, false}, {false, false, true},
-                                {true, true, false}, {false, true, true}, {true, false, true}, {true, true, true}};
-    for (int k=0; k<8; ++k)
-    {
-      itk::Index<3> c = corner(corners[k][0], corners[k][1], corners[k][2]);
-      if (k==0)
-        dir = GetMatchingDirection(c, oldDir, image_num) * interpWeights[k];
-      else
-        dir += GetMatchingDirection(c, oldDir, image_num) * interpWeights[k];
-      if (image_num>=0)
-        tensor += m_TensorImages[image_num]->GetPixel(c) * m_EmaxImage[image_num]->GetPixel(c) * interpWeights[k];
-    }
+    // GetMatchingDirection replaces a zero oldDir by the first corner's direction, which the
+    // other corners are then matched to; the TEND tensor is interpolated with the same weights.
+    dir = InterpolateDirection(cIdx, m_TensorImages.at(0)->GetLargestPossibleRegion(),
+      [&](const itk::Index<3>& c, float weight) {
+        vnl_vector_fixed<float,3> matched = GetMatchingDirection(c, oldDir, image_num);
+        if (image_num>=0)
+          tensor += m_TensorImages[image_num]->GetPixel(c) * m_EmaxImage[image_num]->GetPixel(c) * weight;
+        return matched;
+      });
   }
 
   return dir;
@@ -259,30 +230,19 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::GetLargestEigenvector(TensorTyp
   return dir;
 }
 
-vnl_vector_fixed<float,3> TrackingHandlerTensor::ProposeDirection(const itk::Point<float, 3>& pos, std::deque<vnl_vector_fixed<float, 3> >& olddirs, itk::Index<3>& oldIndex)
+bool TrackingHandlerTensor::PassesCutoff(const itk::Point<float, 3>& pos)
+{
+  float fa = mitk::imv::GetImageValue<float>(pos, m_Parameters->m_InterpolateTractographyData, m_FaInterpolator);
+  return fa>=m_Parameters->m_Cutoff;
+}
+
+TrackingDataHandler::TrackingDirectionType TrackingHandlerTensor::ProposeDataDirection(const itk::Point<float, 3>& pos, const TrackingDirectionType& oldDir)
 {
   vnl_vector_fixed<float,3> output_direction; output_direction.fill(0);
   TensorType tensor; tensor.Fill(0);
 
   try
   {
-    itk::Index<3> index;
-    if (!m_TensorImages.at(0)->TransformPhysicalPointToIndex(pos, index))
-      return output_direction;
-
-    float fa = mitk::imv::GetImageValue<float>(pos, m_Parameters->m_InterpolateTractographyData, m_FaInterpolator);
-    if (fa<m_Parameters->m_Cutoff)
-      return output_direction;
-
-    vnl_vector_fixed<float,3> oldDir; oldDir.fill(0.0);
-    if (!olddirs.empty())
-      oldDir = olddirs.back();
-
-    // same voxel without interpolation: keep the previous direction, still in the tracking frame
-    if (!m_Parameters->m_InterpolateTractographyData && oldIndex==index)
-      return oldDir;
-
-    FlipDirection(oldDir);  // to the data frame
     float old_mag = oldDir.magnitude();
 
     output_direction = GetDirection(pos, oldDir, tensor);
@@ -317,13 +277,6 @@ vnl_vector_fixed<float,3> TrackingHandlerTensor::ProposeDirection(const itk::Poi
   {
 
   }
-
-  if (m_Parameters->m_FlipX)
-    output_direction[0] *= -1;
-  if (m_Parameters->m_FlipY)
-    output_direction[1] *= -1;
-  if (m_Parameters->m_FlipZ)
-    output_direction[2] *= -1;
 
   return output_direction;
 }

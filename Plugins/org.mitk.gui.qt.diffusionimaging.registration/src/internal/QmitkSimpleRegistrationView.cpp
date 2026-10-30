@@ -234,7 +234,7 @@ void QmitkSimpleRegistrationView::StartTractoRegistration()
     return;
   }
 
-  mitk::FiberBundle::Pointer fib_copy = fib->GetDeepCopy();
+  mitk::FiberBundle::Pointer fib_copy = fib->Clone();
   fib_copy->TransformFibers(affine);
   mitk::DiffusionPropertyHelper::CopyProperties(fib, fib_copy);
 

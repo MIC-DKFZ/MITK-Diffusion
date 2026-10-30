@@ -129,7 +129,13 @@ Facts the layout does not show:
   without the image rotation. NIfTI bvals/bvecs follow FSL, as MRtrix does (voxel frame, x negated
   when the image matrix has a positive determinant); NRRD uses the standard `measurement frame`
   field. NRRD files of earlier MITK versions (only MITK's `measurement frame:=` key) are read as
-  before, with the image rotation applied; DICOM import is unchanged and has no test data.
+  before, with the image rotation applied. DICOM import is unchanged;
+  `mitkDiffusionDicomSeriesTest` reads synthetic series of each vendor parser (`DicomDwi/`:
+  Siemens mosaic and non-mosaic CSA2, GE, Philips; identity orientation; values in that
+  folder's README). Untested: the gradient frame of oblique scans (all vendors), Siemens CSA1
+  and enhanced multi-frame series. Not handled: GE b-values stored as b + 1e9 (newer GE
+  scanners) are read as they are; a Siemens mosaic gets the mosaic frame's position as origin,
+  not its first slice's (FIXME in `mitkDiffusionDICOMFileReaderHelper.h`).
   `ctest -R 'mitkDiffusion(Property|Image|Dicom)'` runs the `DiffusionImage` tests of readers,
   writers and property helper.
 - SH and peak files: MITK's SH basis (`mitk::sh`, `mrtrix = true`) is MRtrix 0.2's (functions
@@ -177,9 +183,13 @@ Facts the layout does not show:
   lines, and drops fibers without points with a warning; `SetFiberPolyData` gives the new fibers
   weight 1. The mask cut (`RemoveFibersOutside`) cuts segments at the mask border;
   `ResamplePolylineToNumPoints` (equal arc length) serves `ResampleToNumPoints` and the
-  clustering filter. The `FiberBundle` and `FiberProcessing` tests that change the OpenMP thread
-  count use `mitk::OmpThreadGuard` (`CMake/mitkOmpThreadGuard.h`, in the include path of each
-  test driver whose `Testing/CMakeLists.txt` includes `mitkDiffusionTestData`).
+  clustering filter. `Compress(error)` keeps every original point within `error` of the
+  compressed fiber. A bundle is copied with `Clone()`. The module needs no MITK DICOM module or
+  ITK IO of its own; `MitkDICOM` reaches its dependents through `MitkDiffusionImage`. Tests that
+  change the OpenMP thread count (`FiberBundle`, `FiberProcessing`, `FiberTracking`,
+  `MriSimulation`, `mitkDiffusionModellingAlgorithmsTest`) use `mitk::OmpThreadGuard`
+  (`CMake/mitkOmpThreadGuard.h`, in the include path of each test driver whose
+  `Testing/CMakeLists.txt` includes `mitkDiffusionTestData`).
 - `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter|RoiImage)Test'`
   runs the `FiberProcessing` tests. Its filters read const bundles and give the same result at
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
@@ -194,7 +204,11 @@ Facts the layout does not show:
   particle in the image-axis frame and looks it up at the world direction. Tractography
   references in the test data (`StreamlineTractography/ReferenceFibs/`, `gibbsTractogram_v3.fib`)
   depend on the exact random engines and seeds, so a change there is checked bit for bit against
-  the old output.
+  the old output. The streamline inputs (`tensor_image.dti`, `qball_*`) follow the phantom's
+  bundles and match fits of `StreamlineTractography/diffusion_image_v2` (FSL bvecs;
+  `tensor_image.dti` in value, `qball_*` in direction only);
+  `diffusion_image.bvecs` has x not negated, as earlier MITK versions wrote bvecs, and read as
+  FSL bvecs gives directions mirrored in x (`TensorInput_FollowsAFitOfTheTestDwi`).
 - `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
   `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
   `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and

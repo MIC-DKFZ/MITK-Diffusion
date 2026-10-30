@@ -77,11 +77,6 @@ mitk::FiberBundle::~FiberBundle()
 
 }
 
-mitk::FiberBundle::Pointer mitk::FiberBundle::GetDeepCopy() const
-{
-  return this->Clone();
-}
-
 void mitk::FiberBundle::SetFiberPolyData(vtkSmartPointer<vtkPolyData> fiberPD)
 {
   // A new object instead of the old one changed in place: the old one may be in use elsewhere

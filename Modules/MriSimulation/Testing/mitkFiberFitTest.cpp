@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itksys/SystemTools.hxx>
 #include <mitkTestingConfig.h>
 #include <mitkIOUtil.h>
+#include <mitkOmpThreadGuard.h>
 #include <omp.h>
 #include <cstring>
 #include <itkFitFibersToImageFilter.h>
@@ -216,15 +217,11 @@ public:
   void SameAtThreadCounts()
   {
     // restores the OpenMP thread count for the later cases, also when an assertion throws
-    struct ThreadCountGuard
-    {
-      int threads = omp_get_max_threads();
-      ~ThreadCountGuard() { omp_set_num_threads(threads); }
-    } threadCountGuard;
+    mitk::OmpThreadGuard threadCountGuard(1);
 
-    auto fit = [this](int threads)
+    auto fit = [this, &threadCountGuard](int threads)
     {
-      omp_set_num_threads(threads);
+      threadCountGuard.SetNumberOfThreads(threads);
       setUp();   // fresh tractograms: the fit writes its weights into them
       fitter->SetRegularization(VnlCostFunction::VOXEL_VARIANCE);
       fitter->Update();
@@ -253,7 +250,7 @@ public:
 
   void Fit1()
   {
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
 //    fitter->SetLambda(0.1);
     fitter->SetFilterOutliers(false);
     fitter->SetRegularization(VnlCostFunction::NONE);
@@ -272,7 +269,7 @@ public:
 
   void Fit2()
   {
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
 //    fitter->SetLambda(0.1);
     fitter->SetFilterOutliers(false);
     fitter->SetRegularization(VnlCostFunction::MSM);
@@ -291,7 +288,7 @@ public:
 
   void Fit3()
   {
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
 //    fitter->SetLambda(0.1);
     fitter->SetFilterOutliers(false);
     fitter->SetRegularization(VnlCostFunction::VARIANCE);
@@ -310,7 +307,7 @@ public:
 
   void Fit4()
   {
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
     fitter->SetLambda(100);
     fitter->SetFilterOutliers(false);
     fitter->SetRegularization(VnlCostFunction::VOXEL_VARIANCE);
@@ -329,7 +326,7 @@ public:
 
   void Fit5()
   {
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
     fitter->SetFilterOutliers(false);
     fitter->SetRegularization(VnlCostFunction::GROUP_VARIANCE);
     fitter->Update();
@@ -347,7 +344,7 @@ public:
 
   void Fit6()
   {
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
     fitter->SetLambda(1000);
     fitter->SetFilterOutliers(false);
     fitter->SetRegularization(VnlCostFunction::GROUP_LASSO);
