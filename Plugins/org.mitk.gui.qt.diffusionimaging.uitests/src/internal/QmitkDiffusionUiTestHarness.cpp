@@ -31,6 +31,21 @@ found in the LICENSE file.
 
 namespace
 {
+  /** The full name of the case whose method is named caseName, or an empty string. */
+  std::string FindCase(CppUnit::Test *test, const std::string &caseName)
+  {
+    const auto name = test->getName();
+    if (name.ends_with("::" + caseName))
+      return name;
+    for (int i = 0; i < test->getChildTestCount(); ++i)
+    {
+      const auto found = FindCase(test->getChildTestAt(i), caseName);
+      if (!found.empty())
+        return found;
+    }
+    return std::string();
+  }
+
   class SuiteRunnable : public Poco::Runnable
   {
   public:
@@ -46,13 +61,26 @@ namespace
         return;
       }
 
+      // MITK_DIFFUSION_UITEST_CASE=<method name> runs that case alone, e.g. while debugging it.
+      std::string testPath;
+      if (const char *caseName = std::getenv("MITK_DIFFUSION_UITEST_CASE"); caseName != nullptr && *caseName != '\0')
+      {
+        testPath = FindCase(test, caseName);
+        if (testPath.empty())
+        {
+          MITK_ERROR << "The diffusion UI test suite \"" << m_Suite << "\" has no case " << caseName;
+          delete test;
+          return;
+        }
+      }
+
       QmitkDiffusionUiTest::DialogHandler::Instance().Start();
       CppUnit::TextUi::TestRunner runner;
       // Names each case as it ends, so the log shows where a crash or hang happened.
       CppUnit::BriefTestProgressListener progress;
       runner.eventManager().addListener(&progress);
       runner.addTest(test);
-      m_Passed = runner.run("", false, true, false);
+      m_Passed = runner.run(testPath, false, true, false);
       QmitkDiffusionUiTest::DialogHandler::Instance().Stop();
     }
 

@@ -16,6 +16,8 @@ found in the LICENSE file.
 #include <berryIWorkbenchPage.h>
 
 #include <mitkDataStorage.h>
+#include <mitkImage.h>
+#include <mitkLabelSetImage.h>
 #include <mitkLogBackendBase.h>
 
 #include <cppunit/TestAssert.h>
@@ -83,6 +85,42 @@ namespace QmitkDiffusionUiTest
    * that the box holds it (it lists only nodes its predicate accepts).
    */
   void ChooseNode(QWidget *root, const char *boxName, mitk::DataNode *node);
+
+  /** True if the QmitkDataStorageComboBox of the view lists the node. */
+  bool BoxOffers(QWidget *root, const char *boxName, const mitk::DataNode *node);
+
+  /**
+   * \brief Chooses the node (nullptr: none) in a QmitkSingleNodeSelectionWidget of the view and
+   * checks that the widget took it (it takes only nodes its predicate accepts).
+   */
+  void ChooseInWidget(QWidget *root, const char *widgetName, mitk::DataNode *node);
+
+  /** True if the QmitkSingleNodeSelectionWidget of the view accepts the node. */
+  bool WidgetOffers(QWidget *root, const char *widgetName, const mitk::DataNode *node);
+
+  /** Voxels of a 3D grid, by index. */
+  using VoxelSet = std::function<bool(const itk::Index<3> &)>;
+
+  /** A label of CreateSegmentation: its value, its group and its voxels. */
+  struct LabelRegion
+  {
+    mitk::Label::PixelType value;
+    unsigned int group;
+    VoxelSet voxels;
+  };
+
+  /**
+   * \brief A multi-label segmentation on the voxel grid of the reference image (its first three
+   * dimensions), as the Segmentation view draws it: one label image per group, the labels with
+   * the given values. Groups are created up to the highest group index used.
+   */
+  mitk::MultiLabelSegmentation::Pointer CreateSegmentation(const mitk::Image *reference, const std::vector<LabelRegion> &labels);
+
+  /** An unsigned char image on the voxel grid of the reference image: value inside the voxels, 0 elsewhere. */
+  mitk::Image::Pointer CreateMask(const mitk::Image *reference, const VoxelSet &voxels, unsigned char value = 1);
+
+  /** A float image on the voxel grid of the reference image with the value of the function at each voxel. */
+  mitk::Image::Pointer CreateScalarImage(const mitk::Image *reference, const std::function<float(const itk::Index<3> &)> &value);
 
   /** Selects the nodes as the Data Manager does (workbench selection service). */
   void Select(const QList<mitk::DataNode::Pointer> &nodes);

@@ -17,7 +17,7 @@ project(org_mitk_gui_qt_diffusionimaging_uitests)
 mitk_create_plugin(
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_UITESTS_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkFiberBundle MitkDiffusionModelling MitkQtWidgets MitkSceneSerialization
+  MODULE_DEPENDS MitkFiberBundle MitkDiffusionModelling MitkMultilabel MitkQtWidgets MitkSceneSerialization
   TEST_PLUGIN
 )
 
@@ -38,6 +38,13 @@ mitk_use_modules(TARGET ${_test_app} MODULES MitkAppUtil)
 target_link_libraries(${_test_app} PRIVATE org_blueberry_core_runtime)
 add_dependencies(${_test_app} ${PROJECT_NAME})
 set_target_properties(${_test_app} PROPERTIES NO_INSTALL TRUE)
+
+# The streamline view is compared with the command line app (same input, prior and parameter
+# file); the modules, and so the apps, are configured before the plug-ins.
+set(_streamline_app ${MITK_MODULE_NAME_PREFIX}StreamlineTractography)
+if(TARGET ${_streamline_app})
+  add_dependencies(${_test_app} ${_streamline_app})
+endif()
 
 if(WIN32)
   set(_file_url "file:///")
@@ -60,8 +67,12 @@ function(mitk_diffusion_add_ui_test suite plugin)
   add_test(NAME mitkDiffusionViewsUiTest_${suite}
     COMMAND ${_test_app} --MITK.no-crash-dumps
   )
+  set(_environment "QT_QPA_PLATFORM=offscreen;MITK_DIFFUSION_UITEST=${suite};XDG_DATA_HOME=${_profile}/data;XDG_CONFIG_HOME=${_profile}/config;XDG_CACHE_HOME=${_profile}/cache")
+  if(TARGET ${_streamline_app})
+    list(APPEND _environment "MITK_DIFFUSION_UITEST_STREAMLINE_APP=$<TARGET_FILE:${_streamline_app}>")
+  endif()
   set_tests_properties(mitkDiffusionViewsUiTest_${suite} PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;MITK_DIFFUSION_UITEST=${suite};XDG_DATA_HOME=${_profile}/data;XDG_CONFIG_HOME=${_profile}/config;XDG_CACHE_HOME=${_profile}/cache"
+    ENVIRONMENT "${_environment}"
     SKIP_RETURN_CODE 77
     TIMEOUT 600
   )

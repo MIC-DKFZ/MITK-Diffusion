@@ -20,12 +20,14 @@ found in the LICENSE file.
 #include <mitkCoreServices.h>
 #include <mitkDiffusionTestData.h>
 #include <mitkIDataStorageService.h>
+#include <mitkImagePixelWriteAccessor.h>
 #include <mitkIOUtil.h>
 #include <mitkLog.h>
 #include <mitkRenderingManager.h>
 #include <mitkWorkbenchUtil.h>
 
 #include <QmitkDataStorageComboBoxWithSelectNone.h>
+#include <QmitkSingleNodeSelectionWidget.h>
 
 #include <QAbstractButton>
 #include <QApplication>
@@ -38,6 +40,7 @@ found in the LICENSE file.
 #include <QTimer>
 
 #include <iostream>
+#include <optional>
 
 berry::IWorkbenchPage::Pointer QmitkDiffusionUiTest::GetPage()
 {
@@ -138,6 +141,80 @@ void QmitkDiffusionUiTest::ChooseNode(QWidget *root, const char *boxName, mitk::
   Wait(20);
   CPPUNIT_ASSERT_MESSAGE(std::string(boxName) + " does not hold " + (node != nullptr ? node->GetName() : "none"),
                          box->GetSelectedNode().GetPointer() == node);
+}
+
+bool QmitkDiffusionUiTest::BoxOffers(QWidget *root, const char *boxName, const mitk::DataNode *node)
+{
+  return GetChild<QmitkDataStorageComboBox>(root, boxName)->Find(node) >= 0;
+}
+
+void QmitkDiffusionUiTest::ChooseInWidget(QWidget *root, const char *widgetName, mitk::DataNode *node)
+{
+  auto *widget = GetChild<QmitkSingleNodeSelectionWidget>(root, widgetName);
+  widget->SetCurrentSelectedNode(node);
+  Wait(20);
+  CPPUNIT_ASSERT_MESSAGE(std::string(widgetName) + " does not take " + (node != nullptr ? node->GetName() : "none"),
+                         widget->GetSelectedNode().GetPointer() == node);
+}
+
+bool QmitkDiffusionUiTest::WidgetOffers(QWidget *root, const char *widgetName, const mitk::DataNode *node)
+{
+  auto *predicate = GetChild<QmitkSingleNodeSelectionWidget>(root, widgetName)->GetNodePredicate();
+  return predicate == nullptr || predicate->CheckNode(node);
+}
+
+namespace
+{
+  /** Sets the value at every voxel of a 3D image for which the function gives one. */
+  template <typename TPixel>
+  void FillVoxels(mitk::Image *image, const std::function<std::optional<TPixel>(const itk::Index<3> &)> &value)
+  {
+    mitk::ImagePixelWriteAccessor<TPixel, 3> access(image);
+    const auto size = [image](unsigned int d) { return static_cast<itk::IndexValueType>(image->GetDimension(d)); };
+    itk::Index<3> index;
+    for (index[2] = 0; index[2] < size(2); ++index[2])
+      for (index[1] = 0; index[1] < size(1); ++index[1])
+        for (index[0] = 0; index[0] < size(0); ++index[0])
+        {
+          if (const auto v = value(index))
+            access.SetPixelByIndex(index, *v);
+        }
+  }
+}
+
+mitk::MultiLabelSegmentation::Pointer QmitkDiffusionUiTest::CreateSegmentation(const mitk::Image *reference, const std::vector<LabelRegion> &labels)
+{
+  auto segmentation = mitk::MultiLabelSegmentation::New();
+  segmentation->Initialize(reference->GetTimeGeometry());
+  for (const auto &label : labels)
+  {
+    while (segmentation->GetNumberOfGroups() <= label.group)
+      segmentation->AddGroup();
+    // Without the value correction the label keeps its value, as label values of a loaded file.
+    segmentation->AddLabel(mitk::Label::New(label.value, "label " + std::to_string(label.value)), label.group, true, false);
+    FillVoxels<mitk::Label::PixelType>(segmentation->GetGroupImage(label.group), [&label](const itk::Index<3> &index) {
+      return label.voxels(index) ? std::optional<mitk::Label::PixelType>(label.value) : std::nullopt;
+    });
+  }
+  return segmentation;
+}
+
+mitk::Image::Pointer QmitkDiffusionUiTest::CreateMask(const mitk::Image *reference, const VoxelSet &voxels, unsigned char value)
+{
+  auto mask = mitk::Image::New();
+  mask->Initialize(mitk::MakeScalarPixelType<unsigned char>(), *reference->GetGeometry());
+  FillVoxels<unsigned char>(mask, [&voxels, value](const itk::Index<3> &index) {
+    return std::optional<unsigned char>(voxels(index) ? value : 0);
+  });
+  return mask;
+}
+
+mitk::Image::Pointer QmitkDiffusionUiTest::CreateScalarImage(const mitk::Image *reference, const std::function<float(const itk::Index<3> &)> &value)
+{
+  auto image = mitk::Image::New();
+  image->Initialize(mitk::MakeScalarPixelType<float>(), *reference->GetGeometry());
+  FillVoxels<float>(image, [&value](const itk::Index<3> &index) { return std::optional<float>(value(index)); });
+  return image;
 }
 
 void QmitkDiffusionUiTest::Select(const QList<mitk::DataNode::Pointer> &nodes)
@@ -253,6 +330,9 @@ void QmitkDiffusionUiTest::DialogHandler::AnswerFileDialog(const QString &path)
       dialog->reject();
       return true;
     }
+    // An existing file is overwritten without asking: the question would be a modal dialog
+    // inside this answer, which the handler (busy) could not answer.
+    dialog->setOption(QFileDialog::DontConfirmOverwrite, true);
     // QFileDialog::accept() is protected; it is QDialog's public slot.
     static_cast<QDialog *>(dialog)->accept();
     return true;
