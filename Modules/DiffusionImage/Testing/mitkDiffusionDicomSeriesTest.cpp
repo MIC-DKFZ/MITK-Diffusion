@@ -14,12 +14,17 @@ found in the LICENSE file.
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
+#include <mitkDiffusionDICOMFileReader.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkIOUtil.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
+#include <gdcmReader.h>
+#include <gdcmWriter.h>
+
 #include <array>
 #include <cmath>
+#include <filesystem>
 
 /**
  * Reads the synthetic DWI DICOM series of mitk-diffusion-test-data (DicomDwi/, one per vendor
@@ -33,6 +38,7 @@ class mitkDiffusionDicomSeriesTestSuite : public mitk::TestFixture
   MITK_TEST(Siemens_CsaHeader_GradientsAndSlices);
   MITK_TEST(GE_PrivateTags_GradientsAndSlices);
   MITK_TEST(Philips_PrivateAndStandardTags_GradientsAndSlices);
+  MITK_TEST(EmptyAndMissingTags_EmptyValuesAndPlaceholder);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -48,17 +54,23 @@ class mitkDiffusionDicomSeriesTestSuite : public mitk::TestFixture
                                                        {1000, {0, 0.8, 0.6}},
                                                        {2000, {-0.48, 0.6, 0.64}}}};
 
-  static mitk::Image::Pointer Load(const std::string& folder)
+  std::string m_TempFolder;
+
+  /** Loads the series in the folder of the given file; the reader loads every DICOM file there. */
+  static mitk::Image::Pointer LoadFile(const std::string& file)
   {
-    // The reader loads every DICOM file in the folder of the given file.
     mitk::PreferenceListReaderOptionsFunctor functor(mitk::PreferenceListReaderOptionsFunctor::ListType({"Diffusion Weighted Images"}),
                                                      mitk::PreferenceListReaderOptionsFunctor::ListType());
-    const std::string file = mitk::GetDiffusionTestDataFilePath("DicomDwi/" + folder + "/" + (folder == "SiemensMosaic" ? "v0.dcm" : "v0_z0.dcm"));
     auto data = mitk::IOUtil::Load(file, &functor);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("one image per series", std::size_t(1), data.size());
     mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.front().GetPointer());
     CPPUNIT_ASSERT(image.IsNotNull());
     return image;
+  }
+
+  static mitk::Image::Pointer Load(const std::string& folder)
+  {
+    return LoadFile(mitk::GetDiffusionTestDataFilePath("DicomDwi/" + folder + "/" + (folder == "SiemensMosaic" ? "v0.dcm" : "v0_z0.dcm")));
   }
 
   /** Checks the DWI properties and the pixel value 1000 v + 100 z + 10 y + x of every voxel and volume. */
@@ -107,6 +119,13 @@ class mitkDiffusionDicomSeriesTestSuite : public mitk::TestFixture
   }
 
 public:
+  void tearDown() override
+  {
+    if (!m_TempFolder.empty())
+      std::filesystem::remove_all(m_TempFolder);
+    m_TempFolder.clear();
+  }
+
   void SiemensMosaic_CsaHeader_GradientsAndSlices() { Check("SiemensMosaic", 4); }
 
   void Siemens_CsaHeader_GradientsAndSlices() { Check("Siemens", 2); }
@@ -114,6 +133,54 @@ public:
   void GE_PrivateTags_GradientsAndSlices() { Check("GE", 2); }
 
   void Philips_PrivateAndStandardTags_GradientsAndSlices() { Check("Philips", 2); }
+
+  /**
+   * Anonymized series carry type 2 elements such as the patient name with zero length. Such a
+   * value is present but empty and stays empty in the DICOM.* properties, so that
+   * mitk::CopyDicomReferenceTags reports it as missing instead of copying a placeholder into a
+   * DICOM tractogram; only an absent element gives "-". An empty series description names the
+   * image after the study description. The Siemens series is copied with these elements changed
+   * and loaded as the DICOM import view and MitkDiffusionDICOMLoader do: the "Diffusion Weighted
+   * Images" mime type does not take files with an empty series description.
+   */
+  void EmptyAndMissingTags_EmptyValuesAndPlaceholder()
+  {
+    m_TempFolder = mitk::IOUtil::CreateTemporaryDirectory("mitkDiffusionDicomSeriesTest-XXXXXX");
+    const gdcm::Tag emptied[] = {{0x0008, 0x103E}, {0x0010, 0x0010}, {0x0020, 0x0052}}; // series description, patient name, frame of reference UID
+    const gdcm::Tag patientId(0x0010, 0x0020);
+    mitk::StringList files;
+    for (unsigned int v = 0; v < m_Volumes.size(); ++v)
+      for (unsigned int z = 0; z < 2; ++z)
+      {
+        const std::string name = "v" + std::to_string(v) + "_z" + std::to_string(z) + ".dcm";
+        gdcm::Reader reader;
+        reader.SetFileName(mitk::GetDiffusionTestDataFilePath("DicomDwi/Siemens/" + name).c_str());
+        CPPUNIT_ASSERT_MESSAGE(name, reader.Read());
+        auto& dataSet = reader.GetFile().GetDataSet();
+        for (const auto& tag : emptied)
+        {
+          auto element = dataSet.GetDataElement(tag);
+          element.Empty();
+          dataSet.Replace(element);
+        }
+        dataSet.Remove(patientId);
+        files.push_back(m_TempFolder + "/" + name);
+        gdcm::Writer writer;
+        writer.SetFile(reader.GetFile());
+        writer.SetFileName(files.back().c_str());
+        CPPUNIT_ASSERT_MESSAGE(name, writer.Write());
+      }
+
+    const auto images = mitk::DiffusionDICOMFileReader::LoadDiffusionDicomSeries(files, true, true);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), images.size());
+    const auto& image = images.front();
+    CPPUNIT_ASSERT(PropHelper::IsDiffusionWeightedImage(image));
+    CPPUNIT_ASSERT_EQUAL(std::size_t(4), std::size_t(PropHelper::GetGradientContainer(image)->Size()));
+    CPPUNIT_ASSERT_EQUAL(std::string("synthetic DWI"), image->GetProperty("name")->GetValueAsString());
+    CPPUNIT_ASSERT_EQUAL(std::string(), image->GetProperty("DICOM.patient_name")->GetValueAsString());
+    CPPUNIT_ASSERT_EQUAL(std::string(), image->GetProperty("DICOM.frame_of_reference_uid")->GetValueAsString());
+    CPPUNIT_ASSERT_EQUAL(std::string("-"), image->GetProperty("DICOM.patient_id")->GetValueAsString());
+  }
 };
 
 MITK_TEST_SUITE_REGISTRATION(mitkDiffusionDicomSeries)

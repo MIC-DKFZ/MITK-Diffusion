@@ -251,8 +251,10 @@ void mitk::DiffusionDICOMFileReader
     // stay in step with the outputs.
     auto tagValue = [&](const gdcm::Tag& tag) {
       const char* value = gdcmScanner.GetValue( frame_0->Filename.c_str(), tag );
-      const std::string text = value != nullptr ? TrimDicomPadding(value) : std::string();
-      return text.empty() ? std::string("-") : text;
+      // "-" marks a missing element only. A present but empty one (the patient name of an
+      // anonymized series) stays empty, so mitk::CopyDicomReferenceTags reports it as missing
+      // instead of writing "-" into a DICOM tractogram.
+      return value != nullptr ? TrimDicomPadding(value) : std::string("-");
     };
     std::string sop_instance_uid, frame_of_reference_uid, series_instance_uid, study_instance_uid, patient_name, patient_id;
 
@@ -444,10 +446,11 @@ std::vector<mitk::Image::Pointer> mitk::DiffusionDICOMFileReader
   {
     Image::Pointer image = reader->GetOutput(o).GetMitkImage();
 
+    // An empty description names nothing, like a missing one ("-").
     std::string name = reader->GetSeriesName(o);
-    if (name == "-")
+    if (name.empty() || name == "-")
       name = reader->GetStudyName(o);
-    if (name == "-")
+    if (name.empty() || name == "-")
     {
       name = fallbackName;
       if (name.empty())
