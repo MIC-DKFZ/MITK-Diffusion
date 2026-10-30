@@ -462,7 +462,9 @@ void QmitkIVIMView::OnSliceChanged()
   }
 
   const auto dirs = mitk::DiffusionPropertyHelper::GetGradientContainer(diffusionImg);
-  const auto bval = mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg);
+  // As the maps (mitk::ivim::ComputeMaps, mitk::kurtosis::ComputeMaps): the reference b-value
+  // property is a float, widened to double for the fit.
+  const double bval = mitk::DiffusionPropertyHelper::GetReferenceBValue(diffusionImg);
   if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
     FitKurtosisVoxel(signal, dirs, bval);
   else
@@ -487,7 +489,7 @@ mitk::kurtosis::FitConfiguration QmitkIVIMView::GetKurtosisFitConfiguration() co
   return configuration;
 }
 
-void QmitkIVIMView::FitKurtosisVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, float bval)
+void QmitkIVIMView::FitKurtosisVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, double bval)
 {
   m_KurtosisMeasurements = signal;
 
@@ -526,10 +528,12 @@ void QmitkIVIMView::FitKurtosisVoxel(const vnl_vector<double>& signal, DirContai
   }
   m_Controls->m_ChartWidget->SetCurveData(m_FitCurveId, y);
 
+  // GetBValues gives exactly 0 for the volumes the DWI's b-value map counts as b=0, which are the
+  // volumes the fit omits.
   std::vector< std::pair<double, double> > y_meas;
   for (unsigned int i=0; i<m_KurtosisMeasurements.size(); ++i)
   {
-    if (!m_Controls->m_OmitBZeroCB->isChecked() || m_KurtosisBValues[i] > 0.01)
+    if (!m_Controls->m_OmitBZeroCB->isChecked() || m_KurtosisBValues[i] > 0)
       y_meas.emplace_back(m_KurtosisBValues[i], m_KurtosisMeasurements[i]);
   }
 
@@ -548,7 +552,7 @@ mitk::ivim::FitParameters QmitkIVIMView::GetIvimFitParameters() const
   return parameters;
 }
 
-void QmitkIVIMView::FitIvimVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, float bval)
+void QmitkIVIMView::FitIvimVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, double bval)
 {
   // The preview always shows D*, also when no D* map is generated.
   auto parameters = this->GetIvimFitParameters();
