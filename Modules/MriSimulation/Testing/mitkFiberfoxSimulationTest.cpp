@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <vector>
 #include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkIOUtil.h>
@@ -24,6 +25,7 @@ found in the LICENSE file.
 #include <mitkFiberfoxMotion.h>
 #include <itkRandomPhantomFilter.h>
 #include <itkKspaceImageFilter.h>
+#include <mitkFiberfoxLog.h>
 
 namespace
 {
@@ -56,10 +58,13 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(NoGradients);
   MITK_TEST(PrototypeNeedsOneShell);
   MITK_TEST(InversionRecovery);
+  MITK_TEST(InversionTimeNotBelowRepetitionTime);
+  MITK_TEST(InversionTimeUnusedWithoutRelaxation);
   MITK_TEST(MotionTransforms);
   MITK_TEST(MotionMovesFibersAndMapsTogether);
   MITK_TEST(RandomPhantom);
   MITK_TEST(PartialFourierLines);
+  MITK_TEST(LogReportsProgress);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -203,6 +208,47 @@ public:
     MITK_INFO << "Inversion recovery: largest deviation " << maxDeviation << " of signals up to " << maxPlain;
     CPPUNIT_ASSERT(maxPlain > 10);
     CPPUNIT_ASSERT_MESSAGE("signal scaled by the inversion-recovery factor", maxDeviation < 1e-4 * maxPlain);
+  }
+
+  /** The inversion pulse comes before the excitation within one repetition: TI >= TR is refused. */
+  void InversionTimeNotBelowRepetitionTime()
+  {
+    for (double inversion : { 4000.0, 5000.0 })
+    {
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+      parameters.m_SignalGen.m_tRep = 4000;
+      parameters.m_SignalGen.m_tInv = inversion;
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetFiberBundle(m_FiberBundle);
+      CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+    }
+  }
+
+  /** TI enters only the T1 relaxation: without relaxation TI >= TR is simulated, and TI changes nothing. */
+  void InversionTimeUnusedWithoutRelaxation()
+  {
+    std::vector<FilterType::OutputImageType::Pointer> outputs;
+    for (double inversion : { 0.0, 5000.0 })
+    {
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+      parameters.m_SignalGen.m_DoSimulateRelaxation = false;
+      parameters.m_SignalGen.m_tRep = 4000;
+      parameters.m_SignalGen.m_tInv = inversion;
+      CPPUNIT_ASSERT_NO_THROW(parameters.m_SignalGen.CheckInversionTime());
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetFiberBundle(m_FiberBundle);
+      CPPUNIT_ASSERT_NO_THROW(filter->Update());
+      outputs.push_back(filter->GetOutput());
+    }
+    const auto n = outputs[0]->GetLargestPossibleRegion().GetNumberOfPixels() * outputs[0]->GetNumberOfComponentsPerPixel();
+    CPPUNIT_ASSERT_EQUAL(n, outputs[1]->GetLargestPossibleRegion().GetNumberOfPixels() * outputs[1]->GetNumberOfComponentsPerPixel());
+    CPPUNIT_ASSERT_MESSAGE("same image with and without TI", std::equal(outputs[0]->GetBufferPointer(), outputs[0]->GetBufferPointer() + n, outputs[1]->GetBufferPointer()));
   }
 
   /** x' = R (x - c) + c + t with R = Rz Ry Rx; the inverse is exact for rotations about all axes. */
@@ -389,6 +435,31 @@ public:
         CPPUNIT_ASSERT_EQUAL_MESSAGE("lines in reversed phase direction", expected, acquired[1]);
       }
     }
+  }
+
+  /** The log of a simulation (k-space steps run in parallel) reports each step's progress bar
+   * through itk::ProgressEvent, from 0 to 1, and keeps the whole text. */
+  void LogReportsProgress()
+  {
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+    auto filter = FilterType::New();
+    filter->SetUseConstantRandSeed(true);
+    filter->SetParameters(parameters);
+    filter->SetFiberBundle(m_FiberBundle);
+
+    mitk::FiberfoxLog* log = filter->GetLog();
+    std::vector<double> progress;
+    log->AddObserver(itk::ProgressEvent(), [&](const itk::EventObject&) { progress.push_back(log->GetProgress()); });
+    filter->Update();
+
+    CPPUNIT_ASSERT_MESSAGE("progress events", !progress.empty());
+    for (double p : progress)
+      CPPUNIT_ASSERT_MESSAGE("progress in (0, 1]", p > 0 && p <= 1);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("last step complete", 1.0, progress.back());
+    const std::string text = filter->GetStatusText();
+    CPPUNIT_ASSERT_MESSAGE("status text", text.find("Finished simulation") != std::string::npos);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("status text of filter and log", log->GetStatusText(), text);
   }
 };
 

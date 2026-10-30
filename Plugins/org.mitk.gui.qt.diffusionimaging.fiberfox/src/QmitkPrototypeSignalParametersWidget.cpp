@@ -23,7 +23,6 @@ const std::string QmitkPrototypeSignalParametersWidget::VIEW_ID = "org.mitk.view
 QmitkPrototypeSignalParametersWidget::QmitkPrototypeSignalParametersWidget( QWidget * parent, Qt::WindowFlags )
     : QWidget(parent)
 {
-    m_Controls = nullptr;
     this->CreateQtPartControl(this);
 }
 
@@ -36,7 +35,7 @@ void QmitkPrototypeSignalParametersWidget::CreateQtPartControl(QWidget *parent)
     if (!m_Controls)
     {
         // create GUI widgets
-        m_Controls = new Ui::QmitkPrototypeSignalParametersWidgetControls;
+        m_Controls = std::make_unique<Ui::QmitkPrototypeSignalParametersWidgetControls>();
         m_Controls->setupUi(parent);
 
     }

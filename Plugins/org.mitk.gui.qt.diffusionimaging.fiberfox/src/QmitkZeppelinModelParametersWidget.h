@@ -18,6 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 //QT headers
 #include <QWidget>
+#include <memory>
 #include <QString>
 #include "ui_QmitkZeppelinModelParametersWidgetControls.h"
 #include <org_mitk_gui_qt_diffusionimaging_fiberfox_Export.h>
@@ -54,7 +55,7 @@ public slots:
 
 protected:
     // member variables
-    Ui::QmitkZeppelinModelParametersWidgetControls* m_Controls;
+    std::unique_ptr<Ui::QmitkZeppelinModelParametersWidgetControls> m_Controls;
     void UpdateUi();
 
 private:

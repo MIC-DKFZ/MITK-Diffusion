@@ -7,6 +7,7 @@ SET(MODULE_CUSTOM_TESTS
   mitkFiberClusteringTest.cpp
   mitkFiberModificationFilterTest.cpp
   mitkFiberExtractionFilterTest.cpp
+  mitkFiberRoiImageTest.cpp
 )
 
 

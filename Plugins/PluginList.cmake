@@ -1,5 +1,7 @@
 set(MITK_PLUGINS
   org.mitk.gui.qt.diffusionimaging.controls:OFF
+  # After controls, which it requires: the configure reads the targets of required plugins.
+  org.mitk.gui.qt.diffusionimaging.attractive:OFF
   org.mitk.gui.qt.diffusionimaging.denoising:OFF
   org.mitk.gui.qt.diffusionimaging.fiberfox:OFF
   org.mitk.gui.qt.diffusionimaging.fiberprocessing:OFF

@@ -18,6 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 //QT headers
 #include <QWidget>
+#include <memory>
 #include <QString>
 #include "ui_QmitkAstrosticksModelParametersWidgetControls.h"
 #include <org_mitk_gui_qt_diffusionimaging_fiberfox_Export.h>
@@ -52,7 +53,7 @@ public slots:
 
 protected:
     // member variables
-    Ui::QmitkAstrosticksModelParametersWidgetControls* m_Controls;
+    std::unique_ptr<Ui::QmitkAstrosticksModelParametersWidgetControls> m_Controls;
 
 private:
 

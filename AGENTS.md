@@ -58,8 +58,8 @@ mitk-diffusion code too. Read the matching rule before touching CMake, a module 
 | --- | --- |
 | `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO; `mitkMaskGeometry.h` holds the voxel-grid rule (`HasVoxelGridOf`, 1e-4 mm) of the IVIM, kurtosis and peak filters' masks. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters; in `Algorithms/Reconstruction/` the functions the reconstruction views and apps call (`mitkDiffusionReconstruction.h`: tensors, Q-ball, tensors to DWI; `mitkDiffusionPeaks.h`; `mitkDiffusionIndices.h`) and the ODF direction tables (`mitkPointShell.h`). `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk and DICOM tractography IO. `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`. |
 | `mitk-diffusion/Modules/DiffusionCmdApps/` | Command line tools, one subfolder per group, each group switched by a `BUILD_Diffusion*CmdApps` option. A group's `CMakeLists.txt` is one call of `mitk_diffusion_create_cmdapps` (defined in `Modules/DiffusionCmdApps/CMakeLists.txt`) with the option, the modules of the group and its apps, `<App>` or `<App>:<module>,...` for modules only that app links. The apps link with `--no-as-needed`: a diffusion module registers its readers and writers when it is loaded, and an app that only loads and saves files uses none of its symbols. |
-| `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. |
-| `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI). Each starts with `set_always.txt`, which resets every variable a configuration changes (external packages; every diffusion module, cmd-app group and plugin off), and then switches on what it contains; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
+| `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. atTRACTive (`...attractive`, on `FiberDissection`) is a plugin of its own, so the other fiber views (`...fiberprocessing`) build without OpenCV. |
+| `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI); `Tractography`, `Fiberfox` and `IVIM` include the fiber processing views, only `DiffusionDebug`/`DiffusionRelease` and `atTRACTive` build OpenCV and atTRACTive. Each starts with `set_always.txt`, which resets every variable a configuration changes (external packages; every diffusion module, cmd-app group and plugin off), and then switches on what it contains; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
 | `mitk-diffusion/CMakeExternals/`, `CMake/PackageDepends/` | OpenCV, which MITK no longer provides, added to the superbuild by the extension; `MITK-Diffusion-Data`, the test data (see "Test data"). |
 | `mitk-diffusion/.claude/` | Skills (`bug-report`, `feature-request`, `improvement-request`, `handoff`, `investigate`, `review`), `settings.json`, `scripts/create_gitlab_issue.py`, which searches and creates issues in the GitLab project with `GITLAB_TOKEN` from `mitk-diffusion/.env` (git-ignored), and `scripts/configure-worktree-build.sh` for a worktree's build tree. |
 | `mitk/` | MITK itself, see above. |
@@ -180,7 +180,7 @@ Facts the layout does not show:
   clustering filter. The `FiberBundle` and `FiberProcessing` tests that change the OpenMP thread
   count use `mitk::OmpThreadGuard` (`CMake/mitkOmpThreadGuard.h`, in the include path of each
   test driver whose `Testing/CMakeLists.txt` includes `mitkDiffusionTestData`).
-- `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter)Test'`
+- `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter|RoiImage)Test'`
   runs the `FiberProcessing` tests. Its filters read const bundles and give the same result at
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
   set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
@@ -201,21 +201,29 @@ Facts the layout does not show:
 - `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
   `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
   `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and
-  `SetGradientsFromImage` stores a DWI's gradients in that form. With a constant seed
+  `SetGradientsFromImage` stores a DWI's gradients in that form. Noise is complex Gaussian in
+  k-space, or a noise model on the magnitude image: Rician or noncentral chi (`.ffp`
+  `artifacts.noisetype` `noncentralchi` with `artifacts.noisecoils`; the `chisquare` type of earlier
+  files is read as noncentral chi with the file's `numberofcoils`). With relaxation, an inversion
+  time must be shorter than TR (`CheckInversionTime`); without, TI is not used. With a constant seed
   (`SetUseConstantRandSeed`, `MitkFiberfox --fix_seed`) a simulation gives the same image at any
-  number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`). Fiberfox references in the
+  number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`: output, coil, phase and k-space
+  images, spike log), and so does a fiber fit (`mitkFiberFitTest`; `--max_iter` counts L-BFGS-B
+  iterations). The simulation log (status text, log file, progress) is `mitk::FiberfoxLog`, which
+  reports progress through `itk::ProgressEvent`. Fiberfox references in the
   test data depend on the random engines and seeds, so a change there is checked bit for bit
   against the old output.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
   labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
   without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
   so fiber count and weights stay consistent; labeled fibers are found in the classifier's pool
-  by their exact geometry.
+  by their exact geometry. The module depends only on `FiberBundle` and OpenCV (`opencv_ml`);
+  its one user is the atTRACTive plugin.
 
 ## Porting state
 
 In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
-line apps, plugins, user manuals) compile and link without warnings, and all 57 diffusion tests
+line apps, plugins, user manuals) compile and link without warnings, and all 58 diffusion tests
 pass. `DiffusionRelease` is built less often; its last full build stopped at the GCC 13 warning
 named under "Facts", which is fixed but not rebuilt there. The Workbench has not been started.
 Remove an item once it is fixed.
@@ -226,6 +234,8 @@ Remove an item once it is fixed.
   `mitk/Modules/QtWidgets/test/CMakeLists.txt:108` configures a test driver that does not exist.
   With Qt off (`DiffusionCmdApps`), the same happens there and in
   `mitk/Modules/RESTAPI/test/CMakeLists.txt:5-13` and `mitk/Modules/Agent/test/CMakeLists.txt:4`.
+  A throwaway tree of `configure-worktree-build.sh` reuses `debug/ep`, which has no Python, so
+  `Tractography`, `Fiberfox` and `IVIM` stop there earlier, at `FindPython3` (NumPy missing).
 - MITK's `org.mitk.gui.qt.segmentation` does not compile with Python off: `MakeError` in
   `mitk/Plugins/org.mitk.gui.qt.segmentation/src/internal/QmitkSegmentationRestRoutes.cpp:465`
   is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.

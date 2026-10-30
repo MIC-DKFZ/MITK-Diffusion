@@ -23,7 +23,6 @@ const std::string QmitkAstrosticksModelParametersWidget::VIEW_ID = "org.mitk.vie
 QmitkAstrosticksModelParametersWidget::QmitkAstrosticksModelParametersWidget( QWidget * parent, Qt::WindowFlags )
     : QWidget(parent)
 {
-    m_Controls = nullptr;
     this->CreateQtPartControl(this);
 }
 
@@ -36,7 +35,7 @@ void QmitkAstrosticksModelParametersWidget::CreateQtPartControl(QWidget *parent)
     if (!m_Controls)
     {
         // create GUI widgets
-        m_Controls = new Ui::QmitkAstrosticksModelParametersWidgetControls;
+        m_Controls = std::make_unique<Ui::QmitkAstrosticksModelParametersWidgetControls>();
         m_Controls->setupUi(parent);
     }
 }

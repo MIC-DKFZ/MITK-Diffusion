@@ -23,7 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionSignalModel.h>
 #include <mitkDataNode.h>
 #include <mitkRicianNoiseModel.h>
-#include <mitkChiSquareNoiseModel.h>
+#include <mitkNoncentralChiNoiseModel.h>
 #include <mitkImage.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkPlanarEllipse.h>
@@ -186,6 +186,13 @@ namespace mitk
      * signs) moves no volume and returns false.
      */
     bool SetMotionVolumes(const std::string& text, itk::Statistics::MersenneTwisterRandomVariateGenerator* randgen);
+    /**
+     * Throws a mitk::Exception if relaxation is simulated, an inversion pulse is set (TI > 0) and
+     * TI is not shorter than TR: the inversion comes before the excitation within one repetition,
+     * and the inversion-recovery signal 1 - 2 exp(-TI/T1) + exp(-TR/T1) holds only for TI < TR.
+     * Without relaxation TI is not used, so any TI passes.
+     */
+    void CheckInversionTime() const;
 
   protected:
 

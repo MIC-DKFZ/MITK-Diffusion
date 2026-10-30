@@ -28,6 +28,7 @@ set(BUILD_DiffusionTractographyCmdApps ON CACHE BOOL "" FORCE)
 set(BUILD_DiffusionIVIMCmdApps ON CACHE BOOL "" FORCE)
 
 # plugins
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.attractive" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.controls" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.denoising" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.fiberfox" ON CACHE BOOL "" FORCE)

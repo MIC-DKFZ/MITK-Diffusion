@@ -20,51 +20,17 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define QmitkInteractiveFiberDissectionView_h
 #include "ui_QmitkInteractiveFiberDissectionViewControls.h"
 
-
 #include <QmitkAbstractView.h>
+#include <mitkDataNode.h>
 #include <mitkFiberBundle.h>
-#include <mitkDataInteractor.h>
-#include <mitkStreamlineInteractor.h>
+#include <mitkImage.h>
 #include <mitkSphereInteractor.h>
 #include <mitkSphereSegmentationInteractor.h>
-#include <mitkStreamlineInteractorBrush.h>
 #include <mitkStreamlineFeatureExtractor.h>
-#include <mitkStatisticModel.h> 
-
-#include <mitkTensorImage.h>
-#include <mitkDataStorage.h>
-#include <mitkDataNode.h>
-#include <mitkImage.h>
+#include <mitkStreamlineInteractorBrush.h>
 #include <itkImage.h>
-#include <random>
-#include <mitkPointSet.h>
-#include <mitkPointSetShapeProperty.h>
-#include <QTimer>
-#include <QmitkStdMultiWidget.h>
-#include <QmitkSliceNavigationListener.h>
-#include <mitkILifecycleAwarePart.h>
-#include <itkCastImageFilter.h>
-#include <itkVTKImageImport.h>
-#include <itkVTKImageExport.h>
-#include <itkRegionOfInterestImageFilter.h>
 
-#include <vtkLinearExtrusionFilter.h>
-#include <vtkPolyDataToImageStencil.h>
-#include <vtkSelectEnclosedPoints.h>
-#include <vtkImageImport.h>
-#include <vtkImageExport.h>
-#include <vtkImageStencil.h>
-#include <vtkSmartPointer.h>
-#include <vtkSelection.h>
-#include <vtkSelectionNode.h>
-#include <vtkExtractSelection.h>
-#include <vtkFloatArray.h>
-#include <vtkCellPicker.h>
-
-#include <mitkSurface.h>
-
-#include <vtkSphereSource.h>
-#include <vtkPolyDataMapper.h>
+#include <memory>
 
 /*!
 \brief View to dissect fiber bundles with active learning
@@ -129,8 +95,6 @@ protected:
 
   virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
 
-  void OnEndInteraction();
-  void CreateStreamlineInteractor();
   void CreateStreamlineInteractorBrush();
   void StartLabelingBrush(mitk::DataNode::Pointer toLabelNode, bool fromPrediction);
   void StopLabelingBrush();
@@ -144,13 +108,7 @@ protected:
 
 
 
-  int m_IterationCounter;                                      ///< used for data node naming
-  int m_RandomExtractionCounter;                               ///< used for random extracton of different Streamlines
   int m_activeCycleCounter;
-  int m_newpos;
-  int m_newneg;
-  int m_startneg;
-  int m_createdStreamlineCounter;
   int m_uncCounter;
   int m_prototypecounter;
   int m_posOffsetcounter;
@@ -162,9 +120,6 @@ protected:
 
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
   mitk::DataNode::Pointer               m_testnode;
-  mitk::Image::Pointer                  m_SelectedImage;
-  mitk::DataNode::Pointer               m_SelectedPS;
-  mitk::DataNode::Pointer               m_SelectedImageNode;
   mitk::FiberBundle::Pointer            m_positiveBundle;
   mitk::FiberBundle::Pointer            m_newfibersBundle;
   mitk::FiberBundle::Pointer            m_negativeBundle;
@@ -187,18 +142,13 @@ protected:
   mitk::DataNode::Pointer               m_Prototypes;
 
  // This code is for atTRACTive generalization
-  mitk::FiberBundle::Pointer            m_positiveGenBundle;
-  mitk::FiberBundle::Pointer            m_negativeGenBundle;
   mitk::DataNode::Pointer               m_positiveGenBundleNode;
   mitk::DataNode::Pointer               m_negativeGenBundleNode;
 
 
 
 
-  vtkSmartPointer<vtkPolyData>          m_positiveFibersData;
-  vtkSmartPointer<vtkPolyData>          m_newfibersFibersData;
 
-  mitk::DataNode::Pointer               circleNode;
 
   mitk::StreamlineInteractorBrush::Pointer   m_StreamlineInteractorBrush;
 

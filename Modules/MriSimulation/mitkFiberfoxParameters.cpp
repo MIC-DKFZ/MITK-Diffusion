@@ -62,14 +62,18 @@ void mitk::FiberfoxParameters::CopyFrom(const mitk::FiberfoxParameters& params)
   m_Misc = params.m_Misc;
   m_MissingTags = params.m_MissingTags;
 
-  // a noise model of the same type with the same variance, but its own random generator
+  // a noise model of the same type with the same variance (and coils), but its own random generator
   m_NoiseModel = nullptr;
   if (params.m_NoiseModel!=nullptr)
   {
     if (dynamic_cast<mitk::RicianNoiseModel<>*>(params.m_NoiseModel.get()))
       m_NoiseModel = std::make_shared< mitk::RicianNoiseModel<> >();
-    else if (dynamic_cast<mitk::ChiSquareNoiseModel<>*>(params.m_NoiseModel.get()))
-      m_NoiseModel = std::make_shared< mitk::ChiSquareNoiseModel<> >();
+    else if (auto chi = dynamic_cast<mitk::NoncentralChiNoiseModel<>*>(params.m_NoiseModel.get()))
+    {
+      auto copy = std::make_shared< mitk::NoncentralChiNoiseModel<> >();
+      copy->SetNumberOfCoils(chi->GetNumberOfCoils());
+      m_NoiseModel = copy;
+    }
     m_NoiseModel->SetNoiseVariance(params.m_NoiseModel->GetNoiseVariance());
   }
 
@@ -322,6 +326,15 @@ bool mitk::SignalGenerationParameters::SetMotionVolumes(const std::string& text,
   return true;
 }
 
+void mitk::SignalGenerationParameters::CheckInversionTime() const
+{
+  // TI enters only the T1 relaxation term of the k-space simulation; without relaxation it has no effect
+  if (m_DoSimulateRelaxation && m_tInv > 0 && m_tInv >= m_tRep)
+    mitkThrow() << "The inversion time TI (" << m_tInv << " ms) must be shorter than the repetition time TR ("
+                << m_tRep << " ms): the inversion pulse comes before the excitation within one repetition."
+                << " Set TI to 0 to simulate without inversion pulse.";
+}
+
 void mitk::SignalGenerationParameters::ApplyDirectionMatrix()
 {
   // world = MF^T bvec with the measurement frame of FSL bvecs (frame axes as rows)
@@ -501,8 +514,11 @@ void mitk::FiberfoxParameters::SaveParameters(std::string filename)
     parameters.put("fiberfox.image.artifacts.noisevariance", m_NoiseModel->GetNoiseVariance());
     if (dynamic_cast<mitk::RicianNoiseModel<>*>(m_NoiseModel.get()))
       parameters.put("fiberfox.image.artifacts.noisetype", "rice");
-    else if (dynamic_cast<mitk::ChiSquareNoiseModel<>*>(m_NoiseModel.get()))
-      parameters.put("fiberfox.image.artifacts.noisetype", "chisquare");
+    else if (auto chi = dynamic_cast<mitk::NoncentralChiNoiseModel<>*>(m_NoiseModel.get()))
+    {
+      parameters.put("fiberfox.image.artifacts.noisetype", "noncentralchi");
+      parameters.put("fiberfox.image.artifacts.noisecoils", chi->GetNumberOfCoils());
+    }
   }
 
   for (std::size_t i=0; i<m_FiberModelList.size()+m_NonFiberModelList.size(); i++)
@@ -894,10 +910,18 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
 
       try
       {
-        if (ReadVal<std::string>(v1,"artifacts.noisetype","")=="chisquare")
+        // "chisquare", the noise type of earlier MITK versions, added signal-independent noise with a
+        // made-up distribution; its files are read as noncentral chi noise with their variance and
+        // the coil count of the acquisition
+        const auto noiseType = ReadVal<std::string>(v1,"artifacts.noisetype","");
+        if (noiseType=="noncentralchi" || noiseType=="chisquare")
         {
-          m_NoiseModel = std::make_shared< mitk::ChiSquareNoiseModel<> >();
-          m_NoiseModel->SetNoiseVariance(ReadVal<float>(v1,"artifacts.noisevariance",m_NoiseModel->GetNoiseVariance()));
+          if (noiseType=="chisquare")
+            MITK_WARN << "The chi-square noise of this parameter file is simulated as noncentral chi noise of " << m_SignalGen.m_NumberOfCoils << " coils.";
+          auto chi = std::make_shared< mitk::NoncentralChiNoiseModel<> >();
+          chi->SetNoiseVariance(ReadVal<float>(v1,"artifacts.noisevariance",chi->GetNoiseVariance()));
+          chi->SetNumberOfCoils(noiseType=="chisquare" ? m_SignalGen.m_NumberOfCoils : ReadVal<unsigned int>(v1,"artifacts.noisecoils",m_SignalGen.m_NumberOfCoils));
+          m_NoiseModel = chi;
         }
       }
       catch(...)
