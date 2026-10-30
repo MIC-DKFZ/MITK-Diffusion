@@ -64,7 +64,7 @@ found in the LICENSE file.
 #include <vector>
 
 /** Regression tests for the fiber bundle readers and writers. Files are written to a temporary
- *  directory, nothing is added to mitk-diffusion-test-data. */
+ *  directory; the third-party tractograms are read from mitk-diffusion-test-data. */
 class mitkFiberBundleIOTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkFiberBundleIOTestSuite);
@@ -103,6 +103,7 @@ class mitkFiberBundleIOTestSuite : public mitk::TestFixture
   MITK_TEST(VtkReaderWriter_RasOption_RoundTrip);
   MITK_TEST(PlanarFigureComposite_AllOperations_RoundTrip);
   MITK_TEST(Serializers_BundleAndComposite_RoundTrip);
+  MITK_TEST(Readers_ThirdPartyTractograms_KnownPositions);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -1434,6 +1435,35 @@ public:
         {
           CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(name, std::round(headerIndex[c]), headerIndex[c], 1e-3);
           CPPUNIT_ASSERT_MESSAGE(name, headerIndex[c] > -0.5 && headerIndex[c] < header.dim[c] - 0.5);
+        }
+      }
+    }
+  }
+
+  void Readers_ThirdPartyTractograms_KnownPositions()
+  {
+    // Written by nibabel (TrackVis version 2, image axes rotated by 10 degrees about z, without
+    // the header fingerprint of old MITK files), by dipy against an LAS reference image and by
+    // MRtrix tckconvert; ThirdPartyTractograms/README.md describes how. All hold these fibers,
+    // given in RAS millimetres.
+    const std::vector<Fiber> rasFibers = {{{1.5, 2.0, 3.0}, {4.0, 5.25, 5.0}, {7.0, 8.0, 6.5}},
+                                          {{-1.0, -2.0, -3.0}, {-4.0, -5.0, 0.5}},
+                                          {{0.0, 0.0, 0.0}, {0.5, -1.0, 1.0}, {1.0, -2.0, 2.0}, {1.5, -3.0, 3.0}}};
+    for (const std::string name : {"nibabel_trackvis2.trk", "dipy_las.trk", "mrtrix.tck"})
+    {
+      auto fib = LoadFibers("ThirdPartyTractograms/" + name);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, static_cast<unsigned int>(rasFibers.size()), fib->GetNumFibers());
+      for (unsigned int i = 0; i < rasFibers.size(); ++i)
+      {
+        vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(name, static_cast<vtkIdType>(rasFibers[i].size()), cell->GetNumberOfPoints());
+        for (unsigned int j = 0; j < rasFibers[i].size(); ++j)
+        {
+          const double *p = cell->GetPoints()->GetPoint(j);
+          const std::string where = name + " fiber " + std::to_string(i) + " point " + std::to_string(j);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(where, -rasFibers[i][j][0], p[0], 1e-4);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(where, -rasFibers[i][j][1], p[1], 1e-4);
+          CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(where, rasFibers[i][j][2], p[2], 1e-4);
         }
       }
     }
