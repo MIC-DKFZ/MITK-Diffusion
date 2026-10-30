@@ -129,7 +129,13 @@ Facts the layout does not show:
   without the image rotation. NIfTI bvals/bvecs follow FSL, as MRtrix does (voxel frame, x negated
   when the image matrix has a positive determinant); NRRD uses the standard `measurement frame`
   field. NRRD files of earlier MITK versions (only MITK's `measurement frame:=` key) are read as
-  before, with the image rotation applied; DICOM import is unchanged and has no test data.
+  before, with the image rotation applied. DICOM import is unchanged;
+  `mitkDiffusionDicomSeriesTest` reads synthetic series of each vendor parser (`DicomDwi/`:
+  Siemens mosaic and non-mosaic CSA2, GE, Philips; identity orientation; values in that
+  folder's README). Untested: the gradient frame of oblique scans (all vendors), Siemens CSA1
+  and enhanced multi-frame series. Not handled: GE b-values stored as b + 1e9 (newer GE
+  scanners) are read as they are; a Siemens mosaic gets the mosaic frame's position as origin,
+  not its first slice's (FIXME in `mitkDiffusionDICOMFileReaderHelper.h`).
   `ctest -R 'mitkDiffusion(Property|Image|Dicom)'` runs the `DiffusionImage` tests of readers,
   writers and property helper.
 - SH and peak files: MITK's SH basis (`mitk::sh`, `mrtrix = true`) is MRtrix 0.2's (functions
@@ -228,7 +234,7 @@ Facts the layout does not show:
 ## Porting state
 
 In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
-line apps, plugins, user manuals) compile and link without warnings, and all 58 diffusion tests
+line apps, plugins, user manuals) compile and link without warnings, and all 59 diffusion tests
 pass. `DiffusionRelease` is built less often; its last full build stopped at the GCC 13 warning
 named under "Facts", which is fixed but not rebuilt there. The Workbench has not been started.
 Remove an item once it is fixed.

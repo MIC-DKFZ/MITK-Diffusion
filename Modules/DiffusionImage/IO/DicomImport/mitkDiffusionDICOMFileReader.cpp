@@ -54,6 +54,16 @@ static void PerformHeaderAnalysis( mitk::DiffusionHeaderDICOMFileReader::DICOMHe
             << "  :: \t"<< weighted_images << " b > 0";
 }
 
+/** A DICOM string value without the trailing spaces that pad odd-length values to even length;
+ *  gdcm::Scanner returns the values padded, and the series description becomes the image name.
+ *  The zero byte that pads UIDs already ends the C string. */
+static std::string TrimDicomPadding(const char* value)
+{
+  std::string text(value);
+  const auto end = text.find_last_not_of(' ');
+  return end == std::string::npos ? std::string() : text.substr(0, end + 1);
+}
+
 mitk::DiffusionDICOMFileReader::DiffusionDICOMFileReader() = default;
 
 mitk::DiffusionDICOMFileReader::~DiffusionDICOMFileReader() = default;
@@ -241,7 +251,10 @@ void mitk::DiffusionDICOMFileReader
     // stay in step with the outputs.
     auto tagValue = [&](const gdcm::Tag& tag) {
       const char* value = gdcmScanner.GetValue( frame_0->Filename.c_str(), tag );
-      return value != nullptr ? std::string(value) : std::string("-");
+      // "-" marks a missing element only. A present but empty one (the patient name of an
+      // anonymized series) stays empty, so mitk::CopyDicomReferenceTags reports it as missing
+      // instead of writing "-" into a DICOM tractogram.
+      return value != nullptr ? TrimDicomPadding(value) : std::string("-");
     };
     std::string sop_instance_uid, frame_of_reference_uid, series_instance_uid, study_instance_uid, patient_name, patient_id;
 
@@ -316,17 +329,8 @@ void mitk::DiffusionDICOMFileReader
       m_patient_names.push_back(patient_name);
       m_patient_ids.push_back(patient_id);
 
-      const char* ch_StudyDescription = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_StudyDescription );
-      const char* ch_SeriesDescription = gdcmScanner.GetValue( frame_0->Filename.c_str(), t_SeriesDescription );
-      if( ch_StudyDescription != nullptr )
-        m_Study_names.push_back(ch_StudyDescription);
-      else
-        m_Study_names.push_back("-");
-
-      if( ch_SeriesDescription != nullptr )
-        m_Series_names.push_back(ch_SeriesDescription);
-      else
-        m_Series_names.push_back("-");
+      m_Study_names.push_back(tagValue(t_StudyDescription));
+      m_Series_names.push_back(tagValue(t_SeriesDescription));
     }
     else
     {
@@ -442,10 +446,11 @@ std::vector<mitk::Image::Pointer> mitk::DiffusionDICOMFileReader
   {
     Image::Pointer image = reader->GetOutput(o).GetMitkImage();
 
+    // An empty description names nothing, like a missing one ("-").
     std::string name = reader->GetSeriesName(o);
-    if (name == "-")
+    if (name.empty() || name == "-")
       name = reader->GetStudyName(o);
-    if (name == "-")
+    if (name.empty() || name == "-")
     {
       name = fallbackName;
       if (name.empty())
