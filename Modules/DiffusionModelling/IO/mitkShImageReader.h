@@ -22,6 +22,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "vnl/vnl_vector_fixed.h"
 #include "mitkShImage.h"
 #include "itkVectorImage.h"
+#include <itkImage.h>
+#include <itkMatrix.h>
+#include <itkMetaDataDictionary.h>
+#include <itkVector.h>
 #include <mitkAbstractFileReader.h>
 #include <mitkBaseData.h>
 #include <mitkMimeType.h>
@@ -42,10 +46,12 @@ namespace mitk
    * them into MITK's basis at world directions.
    *
    * SH images in vector layout (a 3D image with one vector of coefficients per voxel, as MITK's
-   * generic image writer and older MITK versions wrote them) are not read as SH images; MITK's
-   * image reader reads them as plain multi-component images. The two such files in mitk-diffusion-test-data
-   * (qBallImage_SHCoeffs.nrrd, StreamlineTractography/qball_image_sh.nii.gz) hold coefficients in
-   * the FSL/Dipy basis, not MITK's, so reading them with MITK's default would give wrong ODFs.
+   * generic image writer and older MITK versions wrote them, e.g. qBallImage_SHCoeffs.nrrd and
+   * StreamlineTractography/qball_image_sh.nii.gz) are read only when this reader is chosen
+   * explicitly (open dialog, PreferenceListReaderOptionsFunctor): its confidence for them is
+   * PartiallySupported, so MITK's image reader stays the default and reads them as plain
+   * multi-component images. "auto" reads them in MITK's FSL definition (ShImage::FSL), the basis
+   * of the Q-ball filters of those versions.
    */
   class ShImageReader : public mitk::AbstractFileReader
   {
@@ -60,6 +66,7 @@ namespace mitk
 
     using AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
+    ConfidenceLevel GetConfidenceLevel() const override;
 
   protected:
 
@@ -68,7 +75,22 @@ namespace mitk
     ShImageReader* Clone() const override;
 
     template <int sh_order>
+    using CoefficientImageType = itk::Image<itk::Vector<float, (sh_order + 1) * (sh_order + 2) / 2>, 3>;
+
+    template <int sh_order>
     mitk::Image::Pointer ConvertShImage(ShImage::ShOnDiskType::Pointer img);
+
+    template <int sh_order>
+    mitk::Image::Pointer ConvertVectorShImage(VectorImageType::Pointer img);
+
+    /** Converts the coefficients into MITK's basis as the file and the option say; vectorLayout: read from a 3D vector image. */
+    template <int sh_order>
+    mitk::Image::Pointer TakeCoefficients(CoefficientImageType<sh_order> *coefficients,
+                                          const itk::MetaDataDictionary &dictionary,
+                                          const itk::Matrix<double, 3, 3> &direction,
+                                          bool vectorLayout);
+
+    mitk::Image::Pointer ReadVectorLayout(const std::string &location);
   };
 
 } //namespace MITK

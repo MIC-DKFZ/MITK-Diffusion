@@ -25,11 +25,13 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 #include <mitkBaseDataSerializer.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkDiffusionPeaks.h>
 
 #include <mitkITKImageImport.h>
 
 #include <itkImageFileReader.h>
 #include <itkImageFileWriter.h>
+#include <itkImageRegionConstIterator.h>
 #include <itkMetaDataObject.h>
 #include <itkVectorImage.h>
 #include <vtkImageData.h>
@@ -42,14 +44,19 @@ found in the LICENSE file.
 #include <vnl/vnl_matrix_fixed.h>
 #include <vnl/algo/vnl_determinant.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <numeric>
 #include <fstream>
 #include <optional>
 #include <set>
 #include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
 class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
 {
@@ -84,6 +91,9 @@ class mitkDiffusionModellingIOTestSuite : public mitk::TestFixture
   MITK_TEST(ShReader_Mrtrix3_ConvertedToMitkBasis);
   MITK_TEST(ShReader_Dipy_ConvertedFromBvecFrame);
   MITK_TEST(PeakWriter_Nifti_RasWithMarker);
+  MITK_TEST(ShReader_VectorLayout_OpensBothWays);
+  MITK_TEST(ShReader_VectorLayout_MitkFslBasis);
+  MITK_TEST(MimeTypes_VectorLayoutDwi_NoShReader);
   CPPUNIT_TEST_SUITE_END();
 
   using Matrix3 = vnl_matrix_fixed<double, 3, 3>;
@@ -1062,6 +1072,143 @@ public:
       // MITK's marker converts back whatever the MRtrix option says.
       CPPUNIT_ASSERT(Values(LoadPeaks(path, false)) == lps);
       CPPUNIT_ASSERT(Values(LoadPeaks(path, true)) == lps);
+    }
+  }
+
+  /** Earlier MITK versions saved SH coefficients as one vector per voxel of a 3D image. */
+  static std::vector<std::pair<std::string, unsigned int>> VectorLayoutShFiles()
+  {
+    return {{"qBallImage_SHCoeffs.nrrd", 4}, {"StreamlineTractography/qball_image_sh.nii.gz", 6}};
+  }
+
+  // MITK's image reader stays the default for SH coefficients in vector layout, as the component
+  // count alone does not tell SH coefficients from other vectors; the SH reader is offered and
+  // reads them unchanged. Saved by the SH writer and read back, they give the same coefficients,
+  // so the same glyphs, and the same peaks.
+  void ShReader_VectorLayout_OpensBothWays()
+  {
+    for (const auto &[file, order] : VectorLayoutShFiles())
+    {
+      const std::string path = mitk::GetDiffusionTestDataFilePath(file);
+      mitk::Image::Pointer plain = dynamic_cast<mitk::Image *>(mitk::IOUtil::Load(path).at(0).GetPointer());
+      CPPUNIT_ASSERT_MESSAGE(file, plain.IsNotNull() && dynamic_cast<mitk::ShImage *>(plain.GetPointer()) == nullptr);
+      const std::size_t count = (order + 1) * (order + 2) / 2;
+      CPPUNIT_ASSERT_EQUAL(count, plain->GetPixelType().GetNumberOfComponents());
+      CPPUNIT_ASSERT_MESSAGE(file, ReaderDescriptions(path).count("SH Image") == 1);
+
+      auto shImage = LoadSh(path);
+      CPPUNIT_ASSERT_EQUAL(order, shImage->ShOrder());
+      CPPUNIT_ASSERT_EQUAL(mitk::ShImage::FSL, shImage->GetShConvention());
+      AssertEqualGeometry(plain, shImage);
+      const std::size_t values = count * plain->GetDimension(0) * plain->GetDimension(1) * plain->GetDimension(2);
+      mitk::ImageReadAccessor plainAccess(plain.GetPointer());
+      mitk::ImageReadAccessor shAccess(shImage.GetPointer());
+      CPPUNIT_ASSERT(std::memcmp(plainAccess.GetData(), shAccess.GetData(), values * sizeof(float)) == 0);
+
+      const std::string savedPath = m_TempDir + "/vector_layout_sh" + std::to_string(order) + ".nii.gz";
+      mitk::IOUtil::Save(shImage, savedPath);
+      auto saved = LoadSh(savedPath);
+      CPPUNIT_ASSERT_EQUAL(mitk::ShImage::FSL, saved->GetShConvention());
+      AssertEqualPixels(shImage, saved);
+
+      // Peaks in a block of 10 x 10 voxels of the middle slice, to keep the Debug test short.
+      auto mask = mitk::Image::New();
+      mask->Initialize(mitk::MakeScalarPixelType<unsigned char>(), *shImage->GetGeometry());
+      {
+        mitk::ImageWriteAccessor maskAccess(mask);
+        auto *maskValues = static_cast<unsigned char *>(maskAccess.GetData());
+        const unsigned int nx = mask->GetDimension(0), ny = mask->GetDimension(1);
+        std::fill(maskValues, maskValues + static_cast<std::size_t>(nx) * ny * mask->GetDimension(2), 0);
+        for (unsigned int y = 27; y < 37; ++y)
+          for (unsigned int x = 27; x < 37; ++x)
+            maskValues[x + nx * (y + static_cast<std::size_t>(ny))] = 1;
+      }
+      const auto peaks = mitk::ExtractPeaks(shImage, mitk::PeakParameters(), mask);
+      AssertEqualPixels(peaks.peaks, mitk::ExtractPeaks(saved, mitk::PeakParameters(), mask).peaks);
+      mitk::ImageReadAccessor numberAccess(peaks.numberOfPeaks);
+      const auto *numbers = static_cast<const unsigned char *>(numberAccess.GetData());
+      CPPUNIT_ASSERT_MESSAGE(file, std::accumulate(numbers, numbers + values / count, 0u) >= 100u);
+    }
+  }
+
+  /** Mean Pearson correlation of the ODFs of an SH image with those of an ODF image, over voxels with an ODF. */
+  static double MeanOdfCorrelation(mitk::ShImage *shImage, const std::string &odfFile)
+  {
+    auto shOdfs = mitk::convert::GetItkOdfFromShImage(shImage);
+    auto odfImage = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath(odfFile));
+    auto odfs = mitk::convert::GetItkOdfFromOdfImage(odfImage);
+    CPPUNIT_ASSERT(shOdfs->GetLargestPossibleRegion() == odfs->GetLargestPossibleRegion());
+    double sum = 0;
+    unsigned int voxels = 0;
+    itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> itSh(shOdfs, shOdfs->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> it(odfs, odfs->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it, ++itSh)
+    {
+      const unsigned int n = ODF_SAMPLING_SIZE;
+      double meanA = 0, meanB = 0;
+      for (unsigned int i = 0; i < n; ++i)
+      {
+        meanA += itSh.Get()[i] / n;
+        meanB += it.Get()[i] / n;
+      }
+      double ab = 0, aa = 0, bb = 0;
+      for (unsigned int i = 0; i < n; ++i)
+      {
+        ab += (itSh.Get()[i] - meanA) * (it.Get()[i] - meanB);
+        aa += (itSh.Get()[i] - meanA) * (itSh.Get()[i] - meanA);
+        bb += (it.Get()[i] - meanB) * (it.Get()[i] - meanB);
+      }
+      if (aa > 0 && bb > 0)
+      {
+        sum += ab / std::sqrt(aa * bb);
+        ++voxels;
+      }
+    }
+    CPPUNIT_ASSERT(voxels > 0);
+    return sum / voxels;
+  }
+
+  // The vector-layout files hold coefficients in MITK's FSL definition (the basis of MITK's
+  // earlier Q-ball filters): read so, their ODFs follow the Q-ball ODFs saved from the same data;
+  // read in MITK's own basis, they do not.
+  void ShReader_VectorLayout_MitkFslBasis()
+  {
+    const std::string odfFiles[] = {"qBallImage.qbi", "StreamlineTractography/qball_image.qbi"};
+    const auto files = VectorLayoutShFiles();
+    for (unsigned int f = 0; f < files.size(); ++f)
+    {
+      auto shImage = LoadSh(mitk::GetDiffusionTestDataFilePath(files[f].first));
+      const double fsl = MeanOdfCorrelation(shImage, odfFiles[f]);
+      shImage->SetShConvention(mitk::ShImage::MRTRIX);
+      const double mitkBasis = MeanOdfCorrelation(shImage, odfFiles[f]);
+      CPPUNIT_ASSERT_MESSAGE(files[f].first, fsl > 0.95);
+      CPPUNIT_ASSERT_MESSAGE(files[f].first, mitkBasis < 0.5);
+    }
+  }
+
+  // A DWI in NRRD has one vector of volumes per voxel too; with 15 volumes it is no SH image.
+  void MimeTypes_VectorLayoutDwi_NoShReader()
+  {
+    using VectorImageType = itk::VectorImage<float, 3>;
+    for (const bool dwi : {false, true})
+    {
+      auto image = VectorImageType::New();
+      VectorImageType::RegionType region;
+      region.SetSize({{2, 2, 2}});
+      image->SetRegions(region);
+      image->SetVectorLength(15);
+      image->Allocate();
+      VectorImageType::PixelType pixel(15);
+      pixel.Fill(1);
+      image->FillBuffer(pixel);
+      if (dwi)
+        itk::EncapsulateMetaData<std::string>(image->GetMetaDataDictionary(), "modality", "DWMRI");
+      const std::string path = m_TempDir + (dwi ? "/dwi.nrrd" : "/vectors.nrrd");
+      auto writer = itk::ImageFileWriter<VectorImageType>::New();
+      writer->SetInput(image);
+      writer->SetFileName(path);
+      writer->Update();
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(path, dwi ? std::size_t(0) : std::size_t(1), ReaderDescriptions(path).count("SH Image"));
     }
   }
 };
