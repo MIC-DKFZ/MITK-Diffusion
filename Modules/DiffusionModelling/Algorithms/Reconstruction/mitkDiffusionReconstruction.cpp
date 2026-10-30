@@ -156,11 +156,10 @@ mitk::TensorImage::ItkTensorImageType::Pointer mitk::ReconstructTensorsLinearLea
   const double roundedReference = BValueMapProperty::GetBValue(GradientContainerType::Element(0.0, 0.0, 1.0), referenceBValue);
   for (unsigned int i = 0; i < gradients->Size(); ++i)
   {
-    const double b = BValueMapProperty::GetBValue(gradients->ElementAt(i), referenceBValue);
-    isB0[i] = b == 0;
+    isB0[i] = DiffusionPropertyHelper::IsB0(gradients->ElementAt(i), referenceBValue);
     if (isB0[i])
       ++numberOfB0;
-    else if (b != roundedReference)
+    else if (BValueMapProperty::GetBValue(gradients->ElementAt(i), referenceBValue) != roundedReference)
       allAtReferenceBValue = false;
   }
   if (numberOfB0 == 0)

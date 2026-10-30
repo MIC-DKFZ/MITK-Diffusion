@@ -28,8 +28,8 @@ namespace itk
   /** \class B0ImageExtractionImageFilter
    * \brief Averages the b0 volumes of a DWI into one 3D image.
    *
-   * A b0 volume is one whose b-value rounds to 0 (mitk::IsB0), so the reference b-value is needed
-   * along with the gradients. Throws if the image has no b0 volume.
+   * A b0 volume is one whose b-value rounds to 0 (mitk::DiffusionPropertyHelper::IsB0), so the
+   * reference b-value is needed along with the gradients. Throws if the image has no b0 volume.
    */
   template <class TInputImagePixelType, class TOutputImagePixelType>
   class B0ImageExtractionImageFilter

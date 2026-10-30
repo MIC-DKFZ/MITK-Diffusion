@@ -192,7 +192,7 @@ vnl_vector<double> mitk::kurtosis::GetBValues(const DiffusionPropertyHelper::Gra
     // The b=0 volumes, whose mean is S0, are those the b-value map of the DWI counts as b=0, as for
     // the IVIM baselines; b=0 volumes stored with a tiny gradient would otherwise switch the voxel
     // to the fit of S0.
-    if (BValueMapProperty::GetBValue(gradient, referenceBValue) == 0)
+    if (DiffusionPropertyHelper::IsB0(gradient, referenceBValue))
     {
       bValues[i] = 0;
       continue;

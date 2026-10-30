@@ -33,6 +33,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImageFileWriter.h>
 #include <mitkLocaleSwitch.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
+#include <mitkDiffusionPropertyHelper.h>
+#include <mitkTensorModel.h>
+#include <vtkCellArray.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyLine.h>
+#include <vtkSmartPointer.h>
+#include <array>
+#include <cmath>
 
 class mitkFiberFitTestSuite : public mitk::TestFixture
 {
@@ -46,6 +55,7 @@ class mitkFiberFitTestSuite : public mitk::TestFixture
   MITK_TEST(Fit6);
   MITK_TEST(RegularizationGradients);
   MITK_TEST(SameAtThreadCounts);
+  MITK_TEST(DwiFit_B0WithShortVector_SameWeightsAsZeroVector);
   CPPUNIT_TEST_SUITE_END();
 
   typedef itk::Image<float, 3> ItkFloatImgType;
@@ -246,6 +256,94 @@ public:
       const auto n = a->GetLargestPossibleRegion().GetNumberOfPixels();
       CPPUNIT_ASSERT_MESSAGE("output image", std::memcmp(a->GetBufferPointer(), b->GetBufferPointer(), n*sizeof(*a->GetBufferPointer())) == 0);
     }
+  }
+
+  /**
+   * Weights of a fit to a DWI with the b0 volume stored as exact zero vector or as a short vector
+   * (b = 0.3, a b0 volume by MITK's rule), same signal values. The fit leaves the b0 volumes out
+   * of the mean signal it subtracts, so both agree up to the model's attenuation at b = 0.3 (the
+   * weights differ by about 2e-4). Counting the short vector as a weighted volume moves both means
+   * and the weights by about 9 %.
+   */
+  void DwiFit_B0WithShortVector_SameWeightsAsZeroVector()
+  {
+    using PropHelper = mitk::DiffusionPropertyHelper;
+    const double s = std::sqrt(0.5);
+    const std::vector<PropHelper::GradientDirectionType> weighted = { {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {s, s, 0}, {s, 0, s}, {0, s, s} };
+
+    // Three voxels along x: a bundle along y in voxels 0 and 1, a bundle along z in voxels 1 and 2.
+    auto bundle = [](const std::vector<std::array<double, 3>>& from, const std::array<double, 3>& step)
+    {
+      auto points = vtkSmartPointer<vtkPoints>::New();
+      auto lines = vtkSmartPointer<vtkCellArray>::New();
+      for (const auto& p : from)
+      {
+        auto line = vtkSmartPointer<vtkPolyLine>::New();
+        line->GetPointIds()->InsertNextId(points->InsertNextPoint(p[0], p[1], p[2]));
+        line->GetPointIds()->InsertNextId(points->InsertNextPoint(p[0] + step[0], p[1] + step[1], p[2] + step[2]));
+        lines->InsertNextCell(line);
+      }
+      auto polyData = vtkSmartPointer<vtkPolyData>::New();
+      polyData->SetPoints(points);
+      polyData->SetLines(lines);
+      return mitk::FiberBundle::New(polyData);
+    };
+
+    auto fit = [&](const PropHelper::GradientDirectionType& b0Vector)
+    {
+      auto gradients = PropHelper::GradientDirectionsContainerType::New();
+      gradients->push_back(b0Vector);
+      for (const auto& g : weighted)
+        gradients->push_back(g);
+
+      // Measured signal: a tensor along the bundles of the voxel and free water. The b0 volume has
+      // the same value for both b0 vectors.
+      auto dwi = PropHelper::ImageType::New();
+      PropHelper::ImageType::RegionType region;
+      region.SetSize({{3, 1, 1}});
+      dwi->SetRegions(region);
+      dwi->SetVectorLength(gradients->Size());
+      dwi->Allocate();
+      for (unsigned int x = 0; x < 3; ++x)
+      {
+        const double alongY = x == 0 ? 1.0 : (x == 1 ? 0.5 : 0.0);
+        PropHelper::ImageType::PixelType pixel(gradients->Size());
+        pixel[0] = 1000;
+        for (unsigned int i = 1; i < gradients->Size(); ++i)
+        {
+          const auto& g = gradients->ElementAt(i);
+          auto stick = [&](double gu) { return std::exp(-1000 * (1.0e-3 * gu * gu + 0.15e-3 * (1 - gu * gu))); };
+          const double tissue = alongY * stick(g[1]) + (1 - alongY) * stick(g[2]);
+          pixel[i] = static_cast<short>(std::round(1000 * (0.7 * tissue + 0.3 * std::exp(-1000 * 3.0e-3))));
+        }
+        dwi->SetPixel({{x, 0, 0}}, pixel);
+      }
+
+      mitk::TensorModel<> model;
+      model.SetBvalue(1000);
+      model.SetDiffusivity1(1.0e-3);
+      model.SetDiffusivity2(0.15e-3);
+      model.SetDiffusivity3(0.15e-3);
+      model.SetGradientList(gradients.GetPointer());
+
+      auto filter = FitterType::New();
+      filter->SetDiffImage(dwi);
+      filter->SetSignalModel(&model);
+      filter->SetTractograms({ bundle({ {0.1, -0.4, 0.1}, {1.1, -0.4, 0.1} }, {0, 0.8, 0}),
+                               bundle({ {1.2, 0.1, -0.4}, {2.2, 0.1, -0.4} }, {0, 0, 0.8}) });
+      filter->SetFitIndividualFibers(false);
+      filter->SetRegularization(VnlCostFunction::NONE);
+      filter->SetVerbose(false);
+      filter->Update();
+      return filter->GetWeights();
+    };
+
+    const auto zeroVector = fit(PropHelper::GradientDirectionType(0.0));
+    const auto shortVector = fit(PropHelper::GradientDirectionType(0, std::sqrt(0.0003), 0));
+    MITK_INFO << "Weights with zero b0 vector " << zeroVector << ", with short b0 vector " << shortVector;
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), static_cast<std::size_t>(shortVector.size()));
+    for (unsigned int i = 0; i < 2; ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(zeroVector[i], shortVector[i], 1e-3 * zeroVector[i]);
   }
 
   void Fit1()

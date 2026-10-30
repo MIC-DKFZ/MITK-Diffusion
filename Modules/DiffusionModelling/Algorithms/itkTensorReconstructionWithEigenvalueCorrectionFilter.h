@@ -29,9 +29,8 @@ namespace itk
  * Tensor reconstruction that first smooths the DWI where the fitted tensors have negative
  * eigenvalues (free-water preprocessing). The input is a DWI with one component per gradient
  * direction; a volume is a baseline volume when its b-value rounds to 0
- * (mitk::BValueMapProperty::GetBValue), as in the b-value map. Other filters of the module use
- * other limits (AdcImageFilter: b <= 1 s/mm^2). Voxels whose b0 mean is 0 or below the B0
- * threshold get a zero tensor.
+ * (mitk::DiffusionPropertyHelper::IsB0), as in the b-value map. Voxels whose b0 mean is 0 or
+ * below the B0 threshold get a zero tensor.
  */
 template <class TDiffusionPixelType, class TTensorPixelType>
 class TensorReconstructionWithEigenvalueCorrectionFilter

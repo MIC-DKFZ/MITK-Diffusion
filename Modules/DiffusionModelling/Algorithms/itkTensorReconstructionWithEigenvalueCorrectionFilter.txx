@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImageRegionIterator.h"
 #include <itkImageDuplicator.h>
 #include <mitkBValueMapProperty.h>
+#include <mitkDiffusionPropertyHelper.h>
 
 namespace itk
 {
@@ -60,7 +61,7 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
   int numberb0=0;
   for(int i=0; i<nof; i++)
   {
-    if (mitk::BValueMapProperty::GetBValue(m_GradientDirectionContainer->ElementAt(i), m_BValue) == 0)
+    if (mitk::DiffusionPropertyHelper::IsB0(m_GradientDirectionContainer->ElementAt(i), m_BValue))
       numberb0++;
   }
 
@@ -82,7 +83,7 @@ TensorReconstructionWithEigenvalueCorrectionFilter<TDiffusionPixelType, TTensorP
   {
     vnl_vector_fixed <double, 3 > vec = m_GradientDirectionContainer->ElementAt(i);
 
-    if (mitk::BValueMapProperty::GetBValue(vec, m_BValue) == 0)
+    if (mitk::DiffusionPropertyHelper::IsB0(vec, m_BValue))
     {
       // the diffusion encoding gradient is approximately zero, wo we are dealing with a non-diffusion weighted volume
       m_B0Mask[i]=1;
