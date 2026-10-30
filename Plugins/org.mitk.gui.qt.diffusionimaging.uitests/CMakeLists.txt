@@ -21,6 +21,9 @@ mitk_create_plugin(
   TEST_PLUGIN
 )
 
+# QmitkAbstractView (the test selection view) without Require-Plugin, see manifest_headers.cmake.
+target_link_libraries(${PROJECT_NAME} PRIVATE org_mitk_gui_qt_common)
+
 set(TESTDRIVER ${PROJECT_NAME})
 set(MODULE_IS_ENABLED TRUE)
 include(mitkDiffusionTestData)
