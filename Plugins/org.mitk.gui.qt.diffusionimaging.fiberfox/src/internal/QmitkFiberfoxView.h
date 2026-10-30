@@ -219,7 +219,7 @@ protected:
 
     friend class QmitkFiberfoxWorker;
     mitk::FiberfoxParameters  m_Parameters;
-    mitk::SignalGenerationParameters::GradientListType  m_LoadedGradients;  ///< of a .ffp without .bvals/.bvecs files
+    mitk::SignalGenerationParameters::GradientListType  m_LoadedGradients;  ///< of the loaded .ffp, until a gradient setting changes
     double                    m_LoadedBvalue = 0;
     /** Prototype model with kernels from a loaded .ffp and the widget settings it was loaded with. */
     struct LoadedPrototype

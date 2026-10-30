@@ -870,6 +870,36 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
         m_Misc.m_BvalsFile = filename+".bvals";
         m_Misc.m_BvecsFile = filename+".bvecs";
         m_SignalGen.SetGradienDirections( mitk::gradients::ReadBvalsBvecs(m_Misc.m_BvalsFile, m_Misc.m_BvecsFile, m_SignalGen.m_Bvalue) );
+
+        // The .bvals/.bvecs files hold the gradients as unit vectors with b-values rounded to 1e-6
+        // s/mm^2, and a vector normalized once more can change in its last bits, so gradients read
+        // from them drifted with every save and load. Where they still give the gradients written
+        // into the file itself (not edited since), those are taken as written.
+        const auto writtenBvalue = v1.second.get_optional<double>("bvalue");
+        const auto writtenGradients = v1.second.get_child_optional("gradients");
+        if (writtenBvalue && writtenGradients && std::abs(*writtenBvalue - m_SignalGen.m_Bvalue) <= 1e-5)
+        {
+          SignalGenerationParameters::GradientListType written;
+          for (const auto& v2 : *writtenGradients)
+          {
+            SignalGenerationParameters::GradientType g;
+            g[0] = v2.second.get<double>("x", 0);
+            g[1] = v2.second.get<double>("y", 0);
+            g[2] = v2.second.get<double>("z", 0);
+            written.push_back(g);
+          }
+          const auto read = m_SignalGen.GetGradientDirections();
+          // 1e-6 is far above the rounding of the files (below 1e-7 for b-values down to 1 s/mm^2)
+          const auto same = [](const SignalGenerationParameters::GradientType& a, const SignalGenerationParameters::GradientType& b)
+          {
+            return std::abs(a[0]-b[0])<=1e-6 && std::abs(a[1]-b[1])<=1e-6 && std::abs(a[2]-b[2])<=1e-6;
+          };
+          if (written.size()==read.size() && std::equal(written.begin(), written.end(), read.begin(), same))
+          {
+            m_SignalGen.m_Bvalue = *writtenBvalue;
+            m_SignalGen.SetGradienDirections(written);
+          }
+        }
       }
       else
       {

@@ -27,7 +27,6 @@ found in the LICENSE file.
 #include <QDoubleSpinBox>
 #include <QProcess>
 #include <QPushButton>
-#include <QRegularExpression>
 #include <QSpinBox>
 
 #include <vtkCellArray.h>
@@ -140,26 +139,8 @@ public:
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(second));
     GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
     CPPUNIT_ASSERT(std::filesystem::exists(second));
-    // Same parameters; numbers may differ in the last bit: the gradient directions go through the
-    // direction matrix on loading and back on saving (found by this test, see the findings).
-    const auto firstLines = QString::fromStdString(Content(first)).split('\n');
-    const auto secondLines = QString::fromStdString(Content(second)).split('\n');
-    CPPUNIT_ASSERT_EQUAL(firstLines.size(), secondLines.size());
-    const QRegularExpression number("-?[0-9]+\\.?[0-9]*(e[-+]?[0-9]+)?");
-    for (qsizetype i = 0; i < firstLines.size(); ++i)
-    {
-      QString firstText = firstLines[i];
-      QString secondText = secondLines[i];
-      CPPUNIT_ASSERT_EQUAL_MESSAGE("line " + std::to_string(i), firstText.replace(number, "#").toStdString(), secondText.replace(number, "#").toStdString());
-      auto firstNumbers = number.globalMatch(firstLines[i]);
-      auto secondNumbers = number.globalMatch(secondLines[i]);
-      while (firstNumbers.hasNext() && secondNumbers.hasNext())
-      {
-        const double a = firstNumbers.next().captured().toDouble();
-        const double b = secondNumbers.next().captured().toDouble();
-        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("line " + std::to_string(i), a, b, 1e-12 * std::max(1.0, std::abs(a)));
-      }
-    }
+    for (const std::string extension : {"", ".bvals", ".bvecs"})
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(extension, Content(first + extension), Content(second + extension));
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 

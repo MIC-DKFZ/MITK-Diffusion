@@ -7,7 +7,7 @@ It is possible to use manually created artificial fiber bundles (see Fiber Gener
 The simulation can be modified using specified acquisition settings such as gradient direction, b-value, image size, image resolution, echo time, and much more.
 Additionally it enables the simulation of magnetic resonance artifacts including thermal noise, Gibbs ringing, N/2 ghosting, aliasing, susceptibility distortions, eddy currents and motion artifacts.
 The employed parameters can be saved and loaded as xml file with the ending ".ffp" (Fiberfox parameters).
-The .ffp file holds the b-value and the gradient directions; saving "x.ffp" also writes them to "x.ffp.bvals" and "x.ffp.bvecs", and loading prefers these two files when they exist. A loaded file without these two files keeps its own gradient directions until the number of gradient directions or the b-value is changed. Without any gradient direction the simulation stops with a message.
+The .ffp file holds the b-value and the gradient directions; saving "x.ffp" also writes them to "x.ffp.bvals" and "x.ffp.bvecs", and loading prefers these two files when they exist (where they still hold the gradients of the .ffp, up to their rounding, the .ffp's values are taken, so that saving again gives the same file). The loaded gradient directions are kept until a gradient setting (number of directions, b-value, bvals/bvecs files) is changed. Without any gradient direction the simulation stops with a message.
 If the simulation stops with an error (e.g. four compartments without volume fraction maps), the view shows the message and adds no image. Closing the view during a simulation aborts it.
 It is furthermore possible to add artifacts to an already existing diffusion-weighted image.
 

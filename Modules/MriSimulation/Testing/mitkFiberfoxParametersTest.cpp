@@ -68,6 +68,7 @@ class mitkFiberfoxParametersTestSuite : public mitk::TestFixture
   MITK_TEST(MissingDirection);
   MITK_TEST(NoiseModelInFile);
   MITK_TEST(TimeSegmentsInFile);
+  MITK_TEST(SaveLoadSaveGivesTheSameFiles);
   CPPUNIT_TEST_SUITE_END();
 
   /** Parameters whose only models are two counting fiber models and one counting non-fiber model. */
@@ -419,6 +420,44 @@ public:
       loaded.LoadParameters(earlierFile, true);
       CPPUNIT_ASSERT_EQUAL(mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, loaded.m_SignalGen.m_KspaceTimeSegments);
     }
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+  /**
+   * Saving, loading and saving again gives the same files, as the Fiberfox view's "Save Parameters"
+   * and "Load Parameters" do: the view's half-shell protocol and a test-data file with .bvals/.bvecs
+   * files. Those files hold the gradients as unit vectors with b-values rounded to 1e-6 s/mm^2, and
+   * a gradient normalized once more can change in its last bits.
+   */
+  void SaveLoadSaveGivesTheSameFiles()
+  {
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_roundtrip_XXXXXX");
+    const auto content = [](const std::string& file)
+    {
+      std::ifstream in(file);
+      CPPUNIT_ASSERT_MESSAGE(file, in.good());
+      return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    };
+    const auto roundTrip = [&](mitk::FiberfoxParameters& parameters, const std::string& name)
+    {
+      const std::string first = folder + "/" + name + "_first.ffp";
+      const std::string second = folder + "/" + name + "_second.ffp";
+      parameters.SaveParameters(first);
+      mitk::FiberfoxParameters loaded;
+      loaded.LoadParameters(first, true);
+      CPPUNIT_ASSERT_MESSAGE(loaded.m_MissingTags, loaded.m_MissingTags.empty());
+      loaded.SaveParameters(second);
+      for (const std::string extension : { "", ".bvals", ".bvecs" })
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(name + extension, content(first + extension), content(second + extension));
+    };
+
+    mitk::FiberfoxParameters generated;   // the view's default protocol
+    generated.SetBvalue(1000);
+    generated.SetNumWeightedVolumes(30);
+    roundTrip(generated, "halfshell");
+
+    mitk::FiberfoxParameters fromFile;
+    fromFile.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_1.ffp"), true);
+    roundTrip(fromFile, "brainslice");
     itksys::SystemTools::RemoveADirectory(folder);
   }
 };
