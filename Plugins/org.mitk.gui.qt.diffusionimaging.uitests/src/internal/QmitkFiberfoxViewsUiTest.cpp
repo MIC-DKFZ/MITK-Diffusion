@@ -62,6 +62,7 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Fiberfox_AbortAndCloseDuringKspaceStep_NoImageNoCrash);
   CPPUNIT_TEST(Fiberfox_FourCompartmentsAndMultiShellPrototype_MessagesThenRuns);
   CPPUNIT_TEST(Fiberfox_CompartmentModels_ShownAsSavedAfterLoad);
+  CPPUNIT_TEST(Fiberfox_PrototypeSignal_SavedSampledAndReused);
   CPPUNIT_TEST(Fiberfox_SaveLoadSave_IdenticalParameterFiles);
   CPPUNIT_TEST(Fiberfox_NonXmlParameterFile_Message);
   CPPUNIT_TEST(Generation_RandomPhantomMinAboveMax_MessageForEachRange);
@@ -435,6 +436,81 @@ public:
     GetChild<QComboBox>(view, "m_Compartment2Box")->setCurrentIndex(0);
     CPPUNIT_ASSERT(GetChild<QWidget>(view, "m_Comp2FractionFrame")->isHidden());
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /**
+   * A prototype compartment saved with "No" to the sampling question: the file has the model
+   * without kernels. Saved with "Yes", the kernels are sampled from the template DWI, the same
+   * for a template whose b0 volume is stored with a short gradient (b = 0.3). The file's kernels are
+   * used for a run without template DWI; a changed FA limit asks for a template again.
+   */
+  void Fiberfox_PrototypeSignal_SavedSampledAndReused()
+  {
+    using Helper = mitk::DiffusionPropertyHelper;
+    auto *view = ShowFiberfox();
+    auto dwi = Load("ImageReconstruction/test.dwi");
+    auto *image = ImageOf(dwi);
+    const double referenceBValue = Helper::GetReferenceBValue(image);
+    auto shortB0 = image->Clone();
+    auto gradients = Helper::GradientDirectionsContainerType::New();
+    unsigned int numB0 = 0;
+    for (const auto &g : *Helper::GetOriginalGradientContainer(image))
+    {
+      const bool b0 = g.two_norm() == 0;
+      numB0 += b0 ? 1 : 0;
+      Helper::GradientDirectionType shortVector(0.0);
+      shortVector[0] = std::sqrt(0.3 / referenceBValue);
+      gradients->push_back(b0 ? shortVector : g);
+    }
+    CPPUNIT_ASSERT(numB0 > 0);
+    Helper::SetOriginalGradientContainer(shortB0, gradients);
+    Helper::InitializeImage(shortB0);
+    auto shortB0Node = AddNode(shortB0, "short b0 vector");
+
+    GetChild<QComboBox>(view, "m_Compartment1Box")->setCurrentIndex(3);
+    auto *prototype = GetChild<QWidget>(view, "m_PrototypeWidget1");
+    GetChild<QDoubleSpinBox>(prototype, "m_MinFaBox")->setValue(0);
+    GetChild<QDoubleSpinBox>(prototype, "m_MaxFaBox")->setValue(1);
+    GetChild<QDoubleSpinBox>(prototype, "m_MaxAdcBox")->setValue(1);
+    GetChild<QSpinBox>(prototype, "m_NumSamplesBox")->setValue(20);
+
+    const auto withoutKernels = m_TempDir + "/without_kernels.ffp";
+    DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(withoutKernels));
+    DialogHandler::Instance().AnswerMessageBox(QMessageBox::No);
+    GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+    CPPUNIT_ASSERT(OneMessage().contains("sample prototype signals"));
+    CPPUNIT_ASSERT(std::filesystem::exists(withoutKernels));
+    CPPUNIT_ASSERT_EQUAL(std::string("prototype"), Element(withoutKernels, "model"));
+    CPPUNIT_ASSERT_EQUAL(std::string("0"), Element(withoutKernels, "numSamples"));
+
+    std::vector<std::string> sampled;
+    for (const auto &[node, file] : {std::make_pair(dwi, m_TempDir + "/zero_b0.ffp"), std::make_pair(shortB0Node, m_TempDir + "/short_b0.ffp")})
+    {
+      ChooseNode(view, "m_TemplateComboBox", node);
+      DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
+      DialogHandler::Instance().AnswerMessageBox(QMessageBox::Yes);
+      GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+      CPPUNIT_ASSERT(OneMessage().contains("sample prototype signals"));
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(file, std::string("20"), Element(file, "numSamples"));
+      sampled.push_back(Element(file, "compartments"));
+    }
+    CPPUNIT_ASSERT_EQUAL(sampled[0], sampled[1]);
+
+    // The file's kernels without a template DWI.
+    ChooseNode(view, "m_TemplateComboBox", nullptr);
+    LoadParameters(view, m_TempDir + "/zero_b0.ffp");
+    CPPUNIT_ASSERT_EQUAL(3, GetChild<QComboBox>(view, "m_Compartment1Box")->currentIndex());
+    auto fibers = AddFibers(view);
+    LogCapture log;
+    auto result = Simulate(view, fibers);
+    CPPUNIT_ASSERT(!log.Contains("Sampling signal kernels"));
+    CPPUNIT_ASSERT_EQUAL(std::string("Prototype"), StringProperty(result, "Fiberfox.Compartment1.Model"));
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+
+    GetChild<QDoubleSpinBox>(prototype, "m_MinFaBox")->setValue(0.1);
+    Start(view);
+    CPPUNIT_ASSERT(OneMessage().contains("Prototype signal but no diffusion-weighted image selected"));
+    CPPUNIT_ASSERT(!Running(view));
   }
 
   void Fiberfox_SaveLoadSave_IdenticalParameterFiles()
