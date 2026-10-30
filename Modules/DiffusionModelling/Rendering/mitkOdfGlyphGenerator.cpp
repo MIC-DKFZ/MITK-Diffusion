@@ -24,9 +24,7 @@ found in the LICENSE file.
 #include <vtkCellArray.h>
 #include <vtkFloatArray.h>
 #include <vtkIdList.h>
-#include <vtkIdTypeArray.h>
 #include <vtkLookupTable.h>
-#include <vtkMaskPoints.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkUnsignedCharArray.h>
@@ -34,9 +32,11 @@ found in the LICENSE file.
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <mutex>
+#include <numeric>
 #include <utility>
 #include <vector>
 
@@ -196,6 +196,54 @@ namespace
     }
   }
 
+  /**
+   * A fixed pseudo-random number per voxel buffer offset: the finalizer of splitmix64, a
+   * bijection, so no two voxels tie.
+   */
+  std::uint64_t VoxelHash(vtkIdType offset)
+  {
+    auto z = static_cast<std::uint64_t>(offset) + 0x9e3779b97f4a7c15ull;
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+    return z ^ (z >> 31);
+  }
+
+  /**
+   * Indices of the candidate voxels that get a glyph, ascending; at most maxGlyphs of them.
+   * Striding keeps every n-th candidate from the first, n = candidates / maxGlyphs rounded up,
+   * so that the glyphs spread over the whole slice. Random placement keeps exactly the maxGlyphs
+   * candidates with the smallest VoxelHash: a voxel that stays in view keeps its glyph as long as
+   * about as many voxels are in view, so the glyphs do not jump when the view is panned, and a
+   * voxel kept in a view is kept in every smaller view that contains it.
+   */
+  std::vector<std::size_t> SelectGlyphs(const std::vector<vtkIdType> &voxelOffsets, std::size_t maxGlyphs, bool randomPlacement)
+  {
+    const std::size_t numCandidates = voxelOffsets.size();
+    std::vector<std::size_t> selected;
+    if (!randomPlacement)
+    {
+      const std::size_t ratio = (numCandidates + maxGlyphs - 1) / maxGlyphs;
+      for (std::size_t i = 0; i < numCandidates; i += ratio)
+        selected.push_back(i);
+      return selected;
+    }
+
+    selected.resize(numCandidates);
+    std::iota(selected.begin(), selected.end(), std::size_t(0));
+    if (maxGlyphs < numCandidates)
+    {
+      std::vector<std::uint64_t> hashes(numCandidates);
+      for (std::size_t i = 0; i < numCandidates; ++i)
+        hashes[i] = VoxelHash(voxelOffsets[i]);
+      std::nth_element(selected.begin(), selected.begin() + maxGlyphs, selected.end(), [&hashes](std::size_t a, std::size_t b) {
+        return hashes[a] < hashes[b];
+      });
+      selected.resize(maxGlyphs);
+      std::sort(selected.begin(), selected.end());
+    }
+    return selected;
+  }
+
   /** The base triangles on the points of the glyph that starts at firstPoint. */
   template <typename IdType>
   void WriteTriangles(const BaseMesh &mesh, vtkIdType firstPoint, IdType *connectivity)
@@ -304,10 +352,8 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   const unsigned int axis2 = slice.normalAxis == 2 ? 1 : 2;
 
   // Candidate glyph centres on the plane, row by row, with the buffer offsets of their voxels.
-  auto centers = vtkSmartPointer<vtkPoints>::New();
-  centers->SetDataTypeToDouble();
-  auto voxelOffsets = vtkSmartPointer<vtkIdTypeArray>::New();
-  voxelOffsets->SetName("VoxelOffsets");
+  std::vector<std::array<double, 3>> candidateCenters;
+  std::vector<vtkIdType> candidateOffsets;
   itk::IndexValueType voxel[3];
   voxel[slice.normalAxis] = slice.index;
   Point3D continuousIndex;
@@ -326,30 +372,15 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
         if (std::fabs(offset * window->axis1) > window->halfSize1 || std::fabs(offset * window->axis2) > window->halfSize2)
           continue;
       }
-      centers->InsertNextPoint(center.GetDataPointer());
-      voxelOffsets->InsertNextValue(voxel[0] + dims[0] * (voxel[1] + dims[1] * voxel[2]));
+      candidateCenters.push_back({center[0], center[1], center[2]});
+      candidateOffsets.push_back(voxel[0] + dims[0] * (voxel[1] + dims[1] * voxel[2]));
     }
   }
-
-  const vtkIdType numCandidates = centers->GetNumberOfPoints();
-  if (numCandidates == 0)
+  if (candidateCenters.empty())
     return result;
 
-  auto candidates = vtkSmartPointer<vtkPolyData>::New();
-  candidates->SetPoints(centers);
-  candidates->GetPointData()->AddArray(voxelOffsets);
-  const vtkIdType maxGlyphs = std::min<vtkIdType>(settings.maxGlyphs, numCandidates);
-  auto mask = vtkSmartPointer<vtkMaskPoints>::New();
-  mask->SetInputData(candidates);
-  mask->SetMaximumNumberOfPoints(maxGlyphs);
-  // Rounded up, so that in striding mode the kept voxels spread over the whole slice.
-  mask->SetOnRatio((numCandidates + maxGlyphs - 1) / maxGlyphs);
-  mask->SetRandomMode(settings.randomPlacement);
-  mask->GenerateVerticesOff();
-  mask->Update();
-  vtkPolyData *kept = mask->GetOutput();
-  auto keptOffsets = vtkIdTypeArray::SafeDownCast(kept->GetPointData()->GetArray("VoxelOffsets"));
-  const vtkIdType numGlyphs = kept->GetNumberOfPoints();
+  const auto selected = SelectGlyphs(candidateOffsets, static_cast<std::size_t>(settings.maxGlyphs), settings.randomPlacement);
+  const auto numGlyphs = static_cast<vtkIdType>(selected.size());
 
   // Everything the glyph loop reads is fetched before it: the loop runs in parallel, and
   // GetShBasis locks a mutex.
@@ -357,8 +388,8 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   std::vector<vtkIdType> glyphVoxelOffsets(numGlyphs);
   for (vtkIdType g = 0; g < numGlyphs; ++g)
   {
-    kept->GetPoint(g, glyphCenters[g].data());
-    glyphVoxelOffsets[g] = keptOffsets->GetValue(g);
+    glyphCenters[g] = candidateCenters[selected[g]];
+    glyphVoxelOffsets[g] = candidateOffsets[selected[g]];
   }
   const vnl_matrix<float> *shBasis = kind == VoxelKind::Sh ? &GetShBasis(numComponents, mrtrix) : nullptr;
   const BaseMesh &baseMesh = GetBaseMeshArrays();

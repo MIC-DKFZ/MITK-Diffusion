@@ -61,7 +61,10 @@ namespace mitk
       /** One colour per glyph from its principal direction instead of colours by ODF value. */
       bool colourByDirection = false;
       int maxGlyphs = 500;
-      /** Random subset of the voxels when there are more than maxGlyphs, else every n-th voxel. */
+      /**
+       * With more voxels than maxGlyphs: a fixed pseudo-random subset of exactly maxGlyphs voxels,
+       * in which a voxel keeps its glyph while it stays in view; else every n-th voxel.
+       */
       bool randomPlacement = true;
     };
 

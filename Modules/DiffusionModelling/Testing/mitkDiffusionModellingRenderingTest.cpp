@@ -49,6 +49,7 @@ found in the LICENSE file.
 #include <limits>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -68,6 +69,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_RotatedImage_OrientationFromWorldAxes);
   MITK_TEST(GlyphGenerator_PositionsAndWindow);
   MITK_TEST(GlyphGenerator_MaxGlyphs_SpreadsOverSlice);
+  MITK_TEST(GlyphGenerator_RandomPlacement_StableSubset);
   MITK_TEST(GlyphGenerator_NormalizationScaleAndColours);
   MITK_TEST(GlyphGenerator_ShMatchesOdfOfBothConventions);
   MITK_TEST(GlyphGenerator_Order2ShIsNoTensor);
@@ -321,6 +323,91 @@ public:
 
     settings.maxGlyphs = 0;
     CPPUNIT_ASSERT_EQUAL(vtkIdType(0), mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings)->GetNumberOfPoints());
+  }
+
+  /** The voxels (x and y index) of the glyphs of an image of MakeOdfImage with constant ODFs. */
+  static std::set<std::pair<int, int>> GlyphVoxels(vtkPolyData *glyphs)
+  {
+    std::set<std::pair<int, int>> voxels;
+    for (vtkIdType g = 0; g < glyphs->GetNumberOfPoints() / ODF_SAMPLING_SIZE; ++g)
+    {
+      const auto center = GlyphCenter(glyphs, g);
+      voxels.emplace(static_cast<int>(std::lround(center[0] - 10)), static_cast<int>(std::lround((center[1] - 20) / 2)));
+    }
+    return voxels;
+  }
+
+  /** Window over size x size voxels of an image of MakeOdfImage, from voxel (firstX, firstY). */
+  static mitk::OdfGlyphGenerator::Window VoxelWindow(int firstX, int firstY, int size)
+  {
+    mitk::OdfGlyphGenerator::Window window;
+    window.center[0] = 10 + firstX + (size - 1) / 2.0;
+    window.center[1] = 20 + 2 * (firstY + (size - 1) / 2.0);
+    window.center[2] = 30;
+    window.axis1.Fill(0);
+    window.axis1[0] = 1;
+    window.axis2.Fill(0);
+    window.axis2[1] = 1;
+    window.halfSize1 = size / 2.0;
+    window.halfSize2 = size;
+    return window;
+  }
+
+  // Random placement keeps exactly maxGlyphs voxels, chosen by a fixed hash per voxel: the same
+  // voxels at every call, a voxel kept with fewer glyphs is kept with more, a voxel kept in a view
+  // is kept in a smaller view that contains it, and a pan keeps the glyphs that stay in view,
+  // except near the selection threshold.
+  void GlyphGenerator_RandomPlacement_StableSubset()
+  {
+    auto image = MakeOdfImage(40, 40, 1, 1);
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 30, 0, 0, 1));
+    CPPUNIT_ASSERT(slice.has_value());
+    auto settings = AllGlyphs();
+    settings.randomPlacement = true;
+    const auto keptVoxels = [&](int maxGlyphs, const mitk::OdfGlyphGenerator::Window *window) {
+      settings.maxGlyphs = maxGlyphs;
+      return GlyphVoxels(mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, window, settings));
+    };
+
+    std::set<std::pair<int, int>> fewer;
+    for (const int maxGlyphs : {1, 37, 400, 1599, 1600, 5000})
+    {
+      const auto kept = keptVoxels(maxGlyphs, nullptr);
+      const std::string name = std::to_string(maxGlyphs) + " glyphs";
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, std::min<std::size_t>(maxGlyphs, 40 * 40), kept.size());
+      CPPUNIT_ASSERT_MESSAGE(name, std::includes(kept.begin(), kept.end(), fewer.begin(), fewer.end()));
+      CPPUNIT_ASSERT_MESSAGE(name, kept == keptVoxels(maxGlyphs, nullptr));
+      fewer = kept;
+    }
+
+    // Zoomed in on 20 x 20 voxels.
+    const auto window = VoxelWindow(10, 10, 20);
+    const auto inWindow = keptVoxels(200, &window);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(200), inWindow.size());
+    for (const auto &voxel : keptVoxels(200, nullptr))
+    {
+      if (voxel.first >= 10 && voxel.first < 30 && voxel.second >= 10 && voxel.second < 30)
+        CPPUNIT_ASSERT(inWindow.count(voxel) == 1);
+    }
+
+    // Panned by 5 voxels. A new random subset of a quarter of the voxels would keep about a
+    // quarter of the glyphs that stay in view.
+    const auto panned = VoxelWindow(15, 10, 20);
+    const auto before = keptVoxels(100, &window);
+    const auto after = keptVoxels(100, &panned);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(100), after.size());
+    int stayInView = 0;
+    int kept = 0;
+    for (const auto &voxel : before)
+    {
+      if (voxel.first >= 15)
+      {
+        ++stayInView;
+        kept += static_cast<int>(after.count(voxel));
+      }
+    }
+    CPPUNIT_ASSERT(stayInView > 50);
+    CPPUNIT_ASSERT_MESSAGE(std::to_string(kept) + " of " + std::to_string(stayInView) + " glyphs kept", kept >= 0.9 * stayInView);
   }
 
   /** Radius of each point of the first glyph around its centre. */
