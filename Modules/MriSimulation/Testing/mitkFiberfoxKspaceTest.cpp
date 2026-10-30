@@ -404,7 +404,7 @@ public:
 
   /**
    * The time-segmented phase (SignalGenerationParameters::m_KspaceTimeSegments) approximates the exact
-   * sum of a field map and eddy currents: with the automatic segment count (phase spread + 8) the
+   * sum of a field map and eddy currents: with the automatic segment count (1.25 phase spread + 8) the
    * complex image differs by less than 0.1 % (relative RMS), with too few segments by far more. Single
    * shot EPI in both phase directions with ghosts and aliasing, and conventional spin echo.
    */

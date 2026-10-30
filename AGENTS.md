@@ -221,7 +221,11 @@ Facts the layout does not show:
   number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`: output, coil, phase and k-space
   images, spike log), and so does a fiber fit (`mitkFiberFitTest`; `--max_iter` counts L-BFGS-B
   iterations). The simulation log (status text, log file, progress) is `mitk::FiberfoxLog`, which
-  reports progress through `itk::ProgressEvent`. Fiberfox references in the
+  reports progress through `itk::ProgressEvent`. With a field map or eddy currents the k-space step
+  sums the exact phase per pixel and sample (`.ffp` `image.kspaceTimeSegments` 0, the default and
+  the value of files without it), or approximates it by L time segments (Sutton et al. 2003; L > 0,
+  or -1 for 1.25 x the phase spread in cycles + 8, which stays below 0.1 % relative RMS error;
+  `MitkFiberfox --fast_kspace` / `--time_segments`). Fiberfox references in the
   test data depend on the random engines and seeds, so a change there is checked bit for bit
   against the old output.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the

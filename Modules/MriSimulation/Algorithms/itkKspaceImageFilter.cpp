@@ -466,9 +466,10 @@ namespace itk {
       energy[r] = magnitude*weight[r]*magnitude*weight[r];
     }
 
-    // Phase spread: the largest phase difference (cycles) between two pixels with signal over the
-    // readout. The automatic count is the spread plus 8; the k-space test and the measurements of
-    // issue #47 found a relative RMS error below 0.1 % of the image with it.
+    // Phase spread S: the largest phase difference (cycles) between two pixels with signal over the
+    // readout. The automatic count is 1.25 S + 8: issue #47 measured a relative RMS error of 1e-5 or
+    // less with it at S from 0 to 62 (S + 8 gave 4e-4 at S = 31 and 1e-3 at S = 62); the stated bound
+    // is 0.1 %.
     std::array<double, 2> lowU = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
     std::array<double, 2> highU = {std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest()};
     for (std::size_t r=0; r<numPixels; ++r)
@@ -483,7 +484,7 @@ namespace itk {
       if (highU[d] >= lowU[d])
         phaseSpread += (highU[d]-lowU[d])*span[d];
     const unsigned int numSegments = m_Parameters->m_SignalGen.m_KspaceTimeSegments > 0 ?
-          static_cast<unsigned int>(m_Parameters->m_SignalGen.m_KspaceTimeSegments) : static_cast<unsigned int>(std::ceil(phaseSpread)) + 8;
+          static_cast<unsigned int>(m_Parameters->m_SignalGen.m_KspaceTimeSegments) : static_cast<unsigned int>(std::ceil(1.25*phaseSpread)) + 8;
 
     // segment times: ticks whose readout time is closest to L times evenly spaced over the readout
     const auto [minTime, maxTime] = std::minmax_element(echoTime.begin(), echoTime.end());
@@ -499,8 +500,8 @@ namespace itk {
     }
 
     // Histogram of u weighted by signal energy. The interpolators fitted at the bins hold for the
-    // pixels between them if the bins sample the phase finely: at least 8 bins per cycle of phase
-    // spread and 16 over the range of u along each axis (coarser if that gives more than maxBins bins).
+    // pixels between them if the bins sample the phase finely: 4 bins per cycle of phase spread along
+    // each axis, and at least 16 in all for a small spread (coarser if that gives more than maxBins bins).
     const std::size_t maxBins = 512;
     std::map< std::array<long long, 2>, std::array<double, 3> > histogram;
     for (double coarsening = 1; ; coarsening *= 2)
@@ -510,7 +511,8 @@ namespace itk {
       for (unsigned int d=0; d<2; ++d)
         if (highU[d] > lowU[d] && span[d] > 0)
         {
-          const double numBins = std::ceil(std::max(8*(highU[d]-lowU[d])*span[d], 16.0)/coarsening);
+          const double axisSpread = (highU[d]-lowU[d])*span[d];
+          const double numBins = std::ceil(std::max(4*axisSpread, 16*axisSpread/phaseSpread)/coarsening);
           binWidth[d] = (highU[d]-lowU[d])/numBins;
           single = single && numBins <= 1;
         }
