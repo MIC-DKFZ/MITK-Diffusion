@@ -87,6 +87,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_CoarseMesh_TensorValuesAtItsDirections);
   MITK_TEST(GlyphGenerator_CoarseMesh_ShValuesAtItsDirections);
   MITK_TEST(GlyphGenerator_CoarseMesh_OdfValuesOfNearestDirection);
+  MITK_TEST(GlyphGenerator_CoarseMesh_NoLargerThanFullGlyph);
   MITK_TEST(OdfMapper_DefaultProperties_KeepExistingValues);
   MITK_TEST(OdfMapper_GenerationRequired);
   CPPUNIT_TEST_SUITE_END();
@@ -1219,8 +1220,9 @@ public:
   }
 
   // At a coarse level the glyph point j lies in mesh direction u_j at the tensor's value there,
-  // the ellipsoid's radius 1 / sqrt(u^T D^-2 u) or the tensor ODF u^T D u, normalized by the
-  // largest value at the ODF directions. The colour by direction is that of the full mesh.
+  // the ellipsoid's radius 1 / sqrt(u^T D^-2 u) or the tensor ODF u^T D u, limited to the range
+  // of the values at the ODF directions and normalized by the largest of them. The colour by
+  // direction is that of the full mesh.
   void GlyphGenerator_CoarseMesh_TensorValuesAtItsDirections()
   {
     auto image = MakeDegenerateTensorImage();
@@ -1243,8 +1245,12 @@ public:
     for (const bool ellipsoids : {true, false})
     {
       double largest = 0;
+      double smallest = std::numeric_limits<double>::max();
       for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      {
         largest = std::max(largest, value(ellipsoids, OdfType::GetDirection(i)));
+        smallest = std::min(smallest, value(ellipsoids, OdfType::GetDirection(i)));
+      }
 
       auto settings = AllGlyphs();
       settings.tensorEllipsoids = ellipsoids;
@@ -1256,7 +1262,7 @@ public:
       for (vtkIdType j = 0; j < n; ++j)
       {
         const mitk::Vector3D u = MeshDirection(n, j);
-        const double radius = value(ellipsoids, MeshDirection(n, j)) / largest * 0.5;
+        const double radius = std::clamp(value(ellipsoids, MeshDirection(n, j)), smallest, largest) / largest * 0.5;
         mitk::Point3D expected;
         expected.Fill(0);
         expected[0] = 2;
@@ -1277,8 +1283,9 @@ public:
   }
 
   // At a coarse level the glyph point j of an SH image lies in mesh direction u_j at the SH
-  // series there, normalized by the largest value at the ODF directions and scaled by the GFA of
-  // the ODF there; its colour is that of the normalized value.
+  // series there, limited to the range of the values at the ODF directions, normalized by the
+  // largest of them and scaled by the GFA of the ODF there; its colour is that of the normalized
+  // value.
   void GlyphGenerator_CoarseMesh_ShValuesAtItsDirections()
   {
     auto shImage = LoadShImage();
@@ -1328,6 +1335,7 @@ public:
         const double largest = odf.GetMaxValue();
         if (!(largest > 0))
           continue;
+        const double smallest = *std::min_element(odf.Begin(), odf.End());
         ++checkedGlyphs;
         const double scale = 1.5 * odf.GetGeneralizedFractionalAnisotropy() * slice->glyphSpacing * 0.5;
         mitk::Point3D center;
@@ -1339,7 +1347,8 @@ public:
         for (vtkIdType j = 0; j < n; ++j)
         {
           const mitk::Vector3D u = MeshDirection(n, j);
-          const double normalized = mitk::sh::GetValue(coefficients, order, MeshDirection(n, j), mrtrix) / largest;
+          const double meshValue = mitk::sh::GetValue(coefficients, order, MeshDirection(n, j), mrtrix);
+          const double normalized = std::clamp(meshValue, smallest, largest) / largest;
           const std::string name = "glyph " + std::to_string(g) + " point " + std::to_string(j);
           CPPUNIT_ASSERT_MESSAGE(name, Distance(glyphs->GetPoint(g * n + j), center + u * (normalized * scale)) < 1e-4);
           // The colour of the normalized value, or of a value next to it when it lies at the
@@ -1404,6 +1413,59 @@ public:
           lut->GetColor(1 - normalized[nearest], rgb);
           for (unsigned int c = 0; c < 3; ++c)
             CPPUNIT_ASSERT_EQUAL_MESSAGE(name, int(static_cast<unsigned char>(255.0 * rgb[c])), int(colours->GetTypedComponent(j, c)));
+        }
+      }
+    }
+  }
+
+  // The ellipsoid of a needle-like tensor is far larger along its axis than at the nearest ODF
+  // direction; a coarse direction closer to the axis must not make the glyph larger than the full
+  // one, which reaches half the glyph spacing times the scaling.
+  void GlyphGenerator_CoarseMesh_NoLargerThanFullGlyph()
+  {
+    using ItkTensorImageType = mitk::TensorImage::ItkTensorImageType;
+    auto itkImage = ItkTensorImageType::New();
+    ItkTensorImageType::RegionType region;
+    region.SetSize({{8, 1, 1}});
+    itkImage->SetRegions(region);
+    itkImage->Allocate();
+    // Needles of eigenvalues 1, 1e-3, 1e-3 along directions between those of the meshes.
+    for (itk::IndexValueType x = 0; x < 8; ++x)
+    {
+      vnl_vector_fixed<double, 3> axis(std::cos(0.37 * x + 0.1), std::sin(0.37 * x + 0.1), 0.3 * x - 1.1);
+      axis.normalize();
+      ItkTensorImageType::PixelType tensor;
+      tensor.Fill(0);
+      for (unsigned int r = 0; r < 3; ++r)
+        for (unsigned int c = r; c < 3; ++c)
+          tensor(r, c) = (r == c ? 1e-3 : 0) + (1 - 1e-3) * axis[r] * axis[c];
+      itkImage->SetPixel({{x, 0, 0}}, tensor);
+    }
+    auto image = mitk::TensorImage::New();
+    image->InitializeByItk(itkImage.GetPointer());
+    image->SetVolume(itkImage->GetBufferPointer());
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 0, 0, 0, 1));
+
+    for (const bool ellipsoids : {true, false})
+    {
+      for (const double width : {0.0, 10.0, 30.0})
+      {
+        auto settings = AllGlyphs();
+        settings.tensorEllipsoids = ellipsoids;
+        settings.pixelsPerMm = PixelsPerMm(*slice, 1, width);
+        auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+        const vtkIdType n = glyphs->GetNumberOfPoints() / 8;
+        for (vtkIdType g = 0; g < 8; ++g)
+        {
+          mitk::Point3D center(0.0);
+          center[0] = static_cast<double>(g);
+          double largest = 0;
+          for (vtkIdType j = 0; j < n; ++j)
+            largest = std::max(largest, Distance(glyphs->GetPoint(g * n + j), center));
+          const std::string name = (ellipsoids ? "ellipsoid " : "tensor ODF ") + std::to_string(g) + ", " + std::to_string(n) + " points";
+          CPPUNIT_ASSERT_MESSAGE(name + ": " + std::to_string(largest), largest <= 0.5 + 1e-6);
+          if (n == ODF_SAMPLING_SIZE)
+            CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(name, 0.5, largest, 1e-6);
         }
       }
     }

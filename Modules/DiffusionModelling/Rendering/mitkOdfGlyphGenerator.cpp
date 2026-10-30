@@ -762,11 +762,19 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
     else if (settings.scaleBy == ODFSB_PC)
       scale = settings.scaling * odf.GetPrincipleCurvature(settings.indexParam1, settings.indexParam2, 0);
 
-    if (fullMesh)
-      std::copy(odf.Begin(), odf.End(), meshValues);
-    else
-      SampleMesh(kind, voxelValues, numComponents, meshShBasis, settings.tensorEllipsoids, mesh, meshValues);
     const OdfRange range = GetRange(odf);
+    if (fullMesh)
+    {
+      std::copy(odf.Begin(), odf.End(), meshValues);
+    }
+    else
+    {
+      SampleMesh(kind, voxelValues, numComponents, meshShBasis, settings.tensorEllipsoids, mesh, meshValues);
+      // A sharp ODF can exceed its largest value at the ODF directions many times in between,
+      // e.g. the ellipsoid of a needle-like tensor; a coarse glyph keeps the size of the full one.
+      for (vtkIdType j = 0; j < numMeshPoints; ++j)
+        meshValues[j] = std::min(std::max(meshValues[j], range.min), range.max);
+    }
 
     const double *center = glyphCenters[g].data();
     const vtkIdType first = g * numMeshPoints;

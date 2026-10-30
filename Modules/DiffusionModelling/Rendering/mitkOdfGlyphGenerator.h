@@ -40,7 +40,7 @@ namespace mitk
    * Glyphs that are small on screen (Settings::pixelsPerMm) are geodesic spheres of fewer
    * directions, with the voxel's values at those directions; ODF images give each the value of the
    * nearest ODF direction. Their size, colour by direction and normalization still come from the
-   * ODF at the ODF_SAMPLING_SIZE directions.
+   * ODF at the ODF_SAMPLING_SIZE directions, and their values are limited to its range.
    */
   class MITKDIFFUSIONMODELLING_EXPORT OdfGlyphGenerator
   {
