@@ -63,6 +63,7 @@ class QmitkFiberProcessingViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Processing_SelectedBundleDeleted_NotUsed);
   CPPUNIT_TEST(Processing_SegmentationRoi_AsBinaryMaskAlsoOneSlice);
   CPPUNIT_TEST(Processing_RoiImageOfFigures_ObliqueGridUnionAndExtraction);
+  CPPUNIT_TEST(Processing_RoiImageWithBundleLoaded_SelectedImageGridElseBundleGrid);
   CPPUNIT_TEST(Processing_CurvatureDecimalsScalarMapBoxUnplacedCircle);
   CPPUNIT_TEST(Quantification_EnvelopeEndingsAndReferenceImages);
   CPPUNIT_TEST(Clustering_MissingInputs_MessagesAndClusters);
@@ -300,12 +301,12 @@ public:
     return p.EuclideanDistanceTo(a + ab * t);
   }
 
-  void Processing_RoiImageOfFigures_ObliqueGridUnionAndExtraction()
+  /**
+   * An image with anisotropic voxels (30 x 30 x 12 voxels of 2 x 2 x 1 mm), rotated by 20 degrees
+   * about x and 10 about z, centred on the point: a grid unlike a fiber bundle's.
+   */
+  static mitk::Image::Pointer CreateObliqueImage(const mitk::Point3D &centre)
   {
-    // An image with anisotropic voxels (2 x 2 x 1 mm), rotated by 20 degrees about x and 10 about
-    // z, centred on the test bundle.
-    auto bundle = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib"));
-    const auto centre = bundle->GetGeometry()->GetCenter();
     using ItkImage = itk::Image<unsigned char, 3>;
     auto itkImage = ItkImage::New();
     ItkImage::SizeType size = {{30, 30, 12}};
@@ -328,28 +329,57 @@ public:
     itkImage->FillBuffer(0);
     mitk::Image::Pointer image;
     mitk::CastToMitkImage(itkImage, image);
-    auto imageNode = AddNode(image, "oblique");
+    return image;
+  }
 
-    // A circle and a rectangle on the axial slice of the image through the bundle's centre, as
-    // a render window gives the plane to a figure drawn there.
+  /** The axial slice plane of the image through the point, as a render window gives it to a figure drawn there. */
+  static mitk::PlaneGeometry::Pointer AxialPlaneThrough(const mitk::Image *image, const mitk::Point3D &point)
+  {
     auto controller = mitk::SliceNavigationController::New();
     controller->SetInputWorldTimeGeometry(image->GetTimeGeometry());
     controller->Update(mitk::AnatomicalPlane::Axial);
-    controller->SelectSliceByPoint(centre);
-    mitk::PlaneGeometry::Pointer plane = controller->GetCurrentPlaneGeometry()->Clone();
+    controller->SelectSliceByPoint(point);
+    return controller->GetCurrentPlaneGeometry()->Clone();
+  }
+
+  /** The point projected onto the plane. */
+  static mitk::Point3D ProjectOntoPlane(const mitk::PlaneGeometry *plane, const mitk::Point3D &point)
+  {
+    return point - plane->GetNormal() / plane->GetNormal().GetNorm() * plane->SignedDistanceFromPlane(point);
+  }
+
+  /** A circle on the plane around the centre (a point of the plane). */
+  static mitk::PlanarCircle::Pointer CreateCircle(mitk::PlaneGeometry *plane, const mitk::Point3D &centre, double radius)
+  {
+    mitk::Vector3D u = plane->GetAxisVector(0);
+    u.Normalize();
+    auto circle = mitk::PlanarCircle::New();
+    circle->SetPlaneGeometry(plane);
+    mitk::Point2D point2D;
+    plane->Map(centre, point2D);
+    circle->PlaceFigure(point2D);
+    plane->Map(centre + u * radius, point2D);
+    circle->SetControlPoint(1, point2D);
+    return circle;
+  }
+
+  void Processing_RoiImageOfFigures_ObliqueGridUnionAndExtraction()
+  {
+    auto bundle = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib"));
+    const auto centre = bundle->GetGeometry()->GetCenter();
+    auto image = CreateObliqueImage(centre);
+    auto imageNode = AddNode(image, "oblique");
+
+    // A circle and a rectangle on the axial slice of the image through the bundle's centre.
+    auto plane = AxialPlaneThrough(image, centre);
     mitk::Vector3D u = plane->GetAxisVector(0);
     mitk::Vector3D v = plane->GetAxisVector(1);
     u.Normalize();
     v.Normalize();
-    const mitk::Point3D circleCentre = centre - plane->GetNormal() / plane->GetNormal().GetNorm() * plane->SignedDistanceFromPlane(centre);
+    const mitk::Point3D circleCentre = ProjectOntoPlane(plane, centre);
     const double radius = 4;
-    auto circle = mitk::PlanarCircle::New();
-    circle->SetPlaneGeometry(plane);
+    auto circle = CreateCircle(plane, circleCentre, radius);
     mitk::Point2D point2D;
-    plane->Map(circleCentre, point2D);
-    circle->PlaceFigure(point2D);
-    plane->Map(circleCentre + u * radius, point2D);
-    circle->SetControlPoint(1, point2D);
     const mitk::Point3D rectangleCentre = circleCentre + u * 9.0;
     const double halfSide = 3;
     auto rectangle = mitk::PlanarPolygon::New();
@@ -436,6 +466,67 @@ public:
                              closest <= 3.0 + 1e-6);
     }
     CPPUNIT_ASSERT(roiVoxels > 0);
+  }
+
+  void Processing_RoiImageWithBundleLoaded_SelectedImageGridElseBundleGrid()
+  {
+    // A tractogram in the storage, which the view selects whenever no bundle is selected, and an
+    // image on another grid.
+    auto fib = Load("FiberProcessing/original.fib");
+    const auto *bundleGeometry = Fibers(fib)->GetGeometry();
+    const auto centre = bundleGeometry->GetCenter();
+    auto image = CreateObliqueImage(centre);
+    auto imageNode = AddNode(image, "oblique");
+    auto plane = AxialPlaneThrough(image, centre);
+    const auto circleCentre = ProjectOntoPlane(plane, centre);
+    auto circleNode = AddNode(CreateCircle(plane, circleCentre, 4), "Circle1");
+
+    auto *view = ShowProcessing();
+    auto *generate = GetChild<QCommandLinkButton>(view, "m_GenerateRoiImage");
+    // The ROI image of the selection, removed from the storage; its figure's centre is set.
+    auto generateRoiImage = [&](const QList<mitk::DataNode::Pointer> &selection) {
+      Select(selection);
+      CPPUNIT_ASSERT(generate->isEnabled());
+      generate->click();
+      Wait(50);
+      mitk::DataNode::Pointer roi;
+      for (const auto &node : GetNodesOfClass("Image"))
+        if (node != imageNode)
+          roi = node;
+      CPPUNIT_ASSERT(roi.IsNotNull());
+      GetDataStorage()->Remove(roi);
+      mitk::Image::Pointer roiImage = dynamic_cast<mitk::Image *>(roi->GetData());
+      itk::Index<3> index;
+      roiImage->GetGeometry()->WorldToIndex(circleCentre, index);
+      mitk::ImagePixelReadAccessor<unsigned char, 3> access(roiImage);
+      CPPUNIT_ASSERT(access.GetPixelByIndex(index) != 0);
+      return roiImage;
+    };
+
+    // Image and figure selected: the image's grid, also with the bundle the view selected itself
+    // and with the bundle selected too.
+    Select({imageNode, circleNode});
+    CPPUNIT_ASSERT_EQUAL(QString::fromStdString(fib->GetName()), GetChild<QLabel>(view, "m_FibLabel")->text());
+    for (const auto &selection : {QList<mitk::DataNode::Pointer>{imageNode, circleNode}, QList<mitk::DataNode::Pointer>{fib, imageNode, circleNode}})
+    {
+      auto roiImage = generateRoiImage(selection);
+      CPPUNIT_ASSERT(mitk::Equal(*image->GetGeometry(), *roiImage->GetGeometry(), 1e-6, 1e-6, true));
+    }
+
+    // Only the figure selected: the grid of the bundle the view selected, 1 mm voxels from the
+    // corner of the bundle's bounding box.
+    auto roiImage = generateRoiImage({circleNode});
+    const auto *roiGeometry = roiImage->GetGeometry();
+    const auto bounds = bundleGeometry->GetBounds();
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(bounds[2 * i], roiGeometry->GetOrigin()[i], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, roiGeometry->GetSpacing()[i], 1e-9);
+      CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(bundleGeometry->GetExtent(i)), roiImage->GetDimension(i));
+      for (unsigned int j = 0; j < 3; ++j)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(i == j ? 1.0 : 0.0, roiGeometry->GetMatrixColumn(i)[j], 1e-9);
+    }
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 
   void Processing_CurvatureDecimalsScalarMapBoxUnplacedCircle()
