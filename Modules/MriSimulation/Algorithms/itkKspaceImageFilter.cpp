@@ -383,9 +383,10 @@ namespace itk {
    * there (issue #47, review). The error falls steeply once L exceeds the accumulated phase S in
    * cycles (the time-bandwidth product of the fit), hence the automatic count 1.25 S + 8; it grows by
    * a quarter until the energy-weighted RMS interpolation residual of the pixels at sampled readout
-   * times is below 1e-4. Where the time segments would take longer than the exact sum on one core
-   * (estimated before each fit, with the fits done), or more memory than MAX_TIME_SEGMENT_BYTES, the
-   * slice takes the exact sum (GetTimeSegmentsCapped).
+   * times, estimated from pixels of every bin of the histogram, is below 1e-4. Where the time
+   * segments would take longer than the exact sum on one core (estimated before each fit, with the
+   * fits done), or more memory than MAX_TIME_SEGMENT_BYTES, the slice takes the exact sum
+   * (GetTimeSegmentsCapped).
    */
   template< class ScalarType >
   void KspaceImageFilter< ScalarType >::ComputeTimeSegmentation(bool eddyCurrents, bool distortions)
@@ -544,9 +545,11 @@ namespace itk {
     // each axis, at least 16 in all for a small spread. Fewer bins break the fit (2 per cycle gave
     // errors above 100 % with a field map and eddy currents), so their number is not limited; it is at
     // most the number of pixels.
-    std::map< std::array<long long, 2>, std::array<double, 3> > histogram;
+    using BinKey = std::array<long long, 2>;
+    std::map< BinKey, std::array<double, 3> > histogram;
+    std::vector< BinKey > pixelBin(numPixels, {0, 0});
+    std::array<double, 2> binWidth = {0.0, 0.0};
     {
-      std::array<double, 2> binWidth = {0.0, 0.0};
       const double totalSpread = axisSpread[0] + axisSpread[1];
       for (unsigned int d=0; d<2; ++d)
         if (axisSpread[d] > 0)
@@ -555,7 +558,7 @@ namespace itk {
       {
         if (energy[r] <= 0)
           continue;
-        std::array<long long, 2> key = {0, 0};
+        BinKey& key = pixelBin[r];
         for (unsigned int d=0; d<2; ++d)
           if (binWidth[d] > 0)
             key[d] = static_cast<long long>(std::floor((u[r][d]-lowU[d])/binWidth[d]));
@@ -564,31 +567,59 @@ namespace itk {
         bin[1] += energy[r]*u[r][0];
         bin[2] += energy[r]*u[r][1];
       }
-      // A field whose values cluster (e.g. one value per image column of a linear field) leaves empty
-      // bins between the clusters, where the fit is free and grows large; the pixels beside them then
-      // got errors up to 11 %. Along a single axis the empty bins in the range are therefore fitted too,
-      // at their centre with 1 % of the mean bin weight. With two axes the pixel residual check below
-      // guards against this.
-      if ((axisSpread[0] > 0) != (axisSpread[1] > 0) && !histogram.empty())
+    }
+    // the bins with pixels, for the residual check
+    std::map< BinKey, std::size_t > occupiedIndex;
+    std::vector< std::array<double, 3> > occupied;
+    for (const auto& [key, bin] : histogram)
+    {
+      occupiedIndex.emplace(key, occupied.size());
+      occupied.push_back(bin);
+    }
+    const std::size_t numOccupiedBins = occupied.size();
+
+    // Empty bins next to occupied ones leave the fit free there, and it grows large: the pixels of an
+    // occupied bin that do not sit at its mean then got errors up to 11 % (a field whose values
+    // cluster, e.g. one value per image column of a linear field) and 0.17 % (a cluster of a few voxels
+    // with outlying field values plus eddy currents). The empty bins are therefore fitted too, at their
+    // centre with 1 % of the mean bin weight: along a single axis every one between the first and the
+    // last occupied bin, with two axes the eight neighbours of every occupied bin (filling the whole
+    // range there made the fit costlier than the exact sum in most slices). An axis without spread
+    // keeps the value of its pixels.
+    if (numOccupiedBins > 0 && (axisSpread[0] > 0 || axisSpread[1] > 0))
+    {
+      double meanEnergy = 0;
+      for (const auto& [key, bin] : histogram)
+        meanEnergy += bin[0];
+      meanEnergy /= numOccupiedBins;
+      std::map< BinKey, std::array<double, 3> > filled;
+      const auto fill = [&](const BinKey& key)
+      {
+        if (histogram.count(key) > 0)
+          return;
+        std::array<double, 3> bin = {0.01*meanEnergy, 0, 0};
+        for (unsigned int d=0; d<2; ++d)
+          bin[1+d] = bin[0]*(binWidth[d] > 0 ? lowU[d] + (key[d]+0.5)*binWidth[d] : lowU[d]);
+        filled.emplace(key, bin);
+      };
+      if (axisSpread[0] > 0 && axisSpread[1] > 0)
+      {
+        for (const auto& [key, bin] : histogram)
+          for (long long i=-1; i<=1; ++i)
+            for (long long j=-1; j<=1; ++j)
+              fill({key[0]+i, key[1]+j});
+      }
+      else
       {
         const unsigned int d = axisSpread[0] > 0 ? 0 : 1;
-        double meanEnergy = 0;
-        for (const auto& [key, bin] : histogram)
-          meanEnergy += bin[0];
-        meanEnergy /= histogram.size();
-        const long long first = histogram.begin()->first[d];
-        const long long last = histogram.rbegin()->first[d];
-        for (long long i=first+1; i<last; ++i)
+        for (long long i=histogram.begin()->first[d]+1; i<histogram.rbegin()->first[d]; ++i)
         {
-          std::array<long long, 2> key = {0, 0};
+          BinKey key = {0, 0};
           key[d] = i;
-          if (histogram.count(key) > 0)
-            continue;
-          std::array<double, 3> bin = {0.01*meanEnergy, 0, 0};
-          bin[1+d] = bin[0]*(lowU[d] + (i+0.5)*binWidth[d]);
-          histogram.emplace(key, bin);
+          fill(key);
         }
       }
+      histogram.insert(filled.begin(), filled.end());
     }
     // the distinct v in readout order; ticks with the same v share their interpolators (spin echo lines)
     std::vector< std::size_t > distinct;
@@ -612,21 +643,59 @@ namespace itk {
       binWeight.push_back(std::sqrt(bin[0]));
       binU.push_back({bin[1]/bin[0], bin[2]/bin[0]});
     }
-    // The residual check takes at most 1024 of the pixels with signal, evenly spread, and up to 256
-    // readout times, 16 per segment: in a test application of 93 small slice jobs it otherwise took
-    // longer than the transforms. Its estimate changed by 1 % with 1024 pixels of 9268.
+    // The residual check takes the pixel farthest from the bin mean in every occupied bin, where the fit
+    // is worst (a cluster of a few voxels with outlying field values otherwise fell between the pixels
+    // evenly spread and passed with 0.17 % error), plus at most 1024 pixels with signal evenly spread,
+    // at up to 256 readout times, 16 per segment: in a test application of 93 small slice jobs all
+    // pixels took longer than the transforms. A check pixel stands for its share of the energy of its
+    // bin, so the check estimates the energy-weighted RMS residual of all pixels with signal.
     std::vector< std::size_t > checkPixels;
-    double checkEnergy = 0;
+    std::vector< double > checkWeight;
+    double totalEnergy = 0;
     {
-      const auto numSignalPixels = static_cast<std::size_t>(std::count_if(energy.begin(), energy.end(), [](double e) { return e > 0; }));
+      std::vector< std::size_t > binOfPixel(numPixels, 0);
+      std::vector< std::size_t > farthest(numOccupiedBins, 0);
+      std::vector< double > farthestDistance(numOccupiedBins, -1.0);
+      std::size_t numSignalPixels = 0;
+      for (std::size_t r=0; r<numPixels; ++r)
+      {
+        if (energy[r] <= 0)
+          continue;
+        ++numSignalPixels;
+        const std::size_t b = occupiedIndex.at(pixelBin[r]);
+        binOfPixel[r] = b;
+        double distance = 0;
+        for (unsigned int d=0; d<2; ++d)
+          if (binWidth[d] > 0)
+          {
+            const double offset = (u[r][d] - occupied[b][1+d]/occupied[b][0])/binWidth[d];
+            distance += offset*offset;
+          }
+        if (distance > farthestDistance[b])
+        {
+          farthestDistance[b] = distance;
+          farthest[b] = r;
+        }
+      }
+      std::vector< char > selected(numPixels, 0);
+      for (const std::size_t r : farthest)
+        selected[r] = 1;
       const std::size_t step = std::max<std::size_t>(1, numSignalPixels/1024);
       std::size_t count = 0;
       for (std::size_t r=0; r<numPixels; ++r)
         if (energy[r] > 0 && count++ % step == 0)
+          selected[r] = 1;
+      std::vector< double > selectedEnergy(numOccupiedBins, 0.0);
+      for (std::size_t r=0; r<numPixels; ++r)
+        if (selected[r])
         {
           checkPixels.push_back(r);
-          checkEnergy += energy[r];
+          selectedEnergy[binOfPixel[r]] += energy[r];
         }
+      for (const std::size_t r : checkPixels)
+        checkWeight.push_back(energy[r]*occupied[binOfPixel[r]][0]/selectedEnergy[binOfPixel[r]]);
+      for (const auto& bin : occupied)
+        totalEnergy += bin[0];
     }
     const auto residualSamples = [&distinct](unsigned int numSegments) { return std::min<std::size_t>({256, 16*std::size_t(numSegments), distinct.size()}); };
 
@@ -740,11 +809,11 @@ namespace itk {
           std::complex<double> fitted(0, 0);
           for (unsigned int l=0; l<numSegments; ++l)
             fitted += sampleWeights[l*numResidualSamples + s]*phase[l];
-          sum += energy[checkPixels[i]]*std::norm(std::polar(1.0, itk::Math::twopi*(ur[0]*vt[0] + ur[1]*vt[1])) - fitted);
+          sum += checkWeight[i]*std::norm(std::polar(1.0, itk::Math::twopi*(ur[0]*vt[0] + ur[1]*vt[1])) - fitted);
         }
         residual[s] = sum;
       });
-      if (std::accumulate(residual.begin(), residual.end(), 0.0) <= 1e-8*checkEnergy*numResidualSamples)
+      if (std::accumulate(residual.begin(), residual.end(), 0.0) <= 1e-8*totalEnergy*numResidualSamples)
         break;
       spentTime += fitTime(numSegments) + check;
       numSegments = static_cast<unsigned int>(std::ceil(1.25*numSegments));
