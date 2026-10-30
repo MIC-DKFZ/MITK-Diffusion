@@ -20,6 +20,7 @@ found in the LICENSE file.
 #include <mitkVtkMapper.h>
 
 #include <vtkActor.h>
+#include <vtkGlyph3DMapper.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkSmartPointer.h>
 
@@ -39,6 +40,9 @@ namespace mitk
    * moves, the mapper keeps them, and fills the new view at the render of level of detail 1 that
    * MITK's RenderingManager runs about 200 ms after the last render of a renderer with LOD
    * enabled (IsLODEnabled). A new slice, new data or new properties are drawn at once.
+   *
+   * Tensor ellipsoids coloured by direction (OdfGlyphGenerator::CanDrawEllipsoidInstances) are
+   * drawn as GPU instances of one sphere, all other glyphs as one mesh.
    */
   class MITKDIFFUSIONMODELLING_EXPORT OdfVtkMapper2D : public VtkMapper
   {
@@ -51,6 +55,9 @@ namespace mitk
 
     /** The glyphs are already in world coordinates; the image geometry must not move them again. */
     void UpdateVtkTransform(BaseRenderer *) override {}
+
+    /** Both VTK mappers hold GPU buffers, also the one the actor does not use at the moment. */
+    void ReleaseGraphicsResources(BaseRenderer *renderer) override;
 
     /**
      * True while the renderer shows glyphs of the node, so that the RenderingManager renders it
@@ -90,7 +97,10 @@ namespace mitk
       LocalStorage();
 
       vtkSmartPointer<vtkActor> m_Actor;
+      /** Draws the glyph mesh of OdfGlyphGenerator::Generate. */
       vtkSmartPointer<vtkPolyDataMapper> m_Mapper;
+      /** Draws the tensor ellipsoids of OdfGlyphGenerator::GenerateEllipsoidInstances. */
+      vtkSmartPointer<vtkGlyph3DMapper> m_InstanceMapper;
 
       /** The view the glyphs were generated (or failed) for; none while no glyphs are shown. */
       std::optional<GlyphView> m_GeneratedView;

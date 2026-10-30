@@ -26,13 +26,24 @@ found in the LICENSE file.
 #include <cmath>
 
 mitk::OdfVtkMapper2D::LocalStorage::LocalStorage()
-  : m_Actor(vtkSmartPointer<vtkActor>::New()), m_Mapper(vtkSmartPointer<vtkPolyDataMapper>::New())
+  : m_Actor(vtkSmartPointer<vtkActor>::New()),
+    m_Mapper(vtkSmartPointer<vtkPolyDataMapper>::New()),
+    m_InstanceMapper(vtkSmartPointer<vtkGlyph3DMapper>::New())
 {
-  m_Mapper->SetLookupTable(vtkSmartPointer<vtkLookupTable>::New());
-  m_Mapper->ScalarVisibilityOn();
-  m_Mapper->SetScalarModeToUsePointFieldData();
-  m_Mapper->SelectColorArray("ODF_COLORS");
+  for (vtkMapper *mapper : {static_cast<vtkMapper *>(m_Mapper), static_cast<vtkMapper *>(m_InstanceMapper)})
+  {
+    mapper->SetLookupTable(vtkSmartPointer<vtkLookupTable>::New());
+    mapper->ScalarVisibilityOn();
+    mapper->SetScalarModeToUsePointFieldData();
+    mapper->SelectColorArray("ODF_COLORS");
+  }
   m_Mapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
+  // Each instance is the sphere scaled along its axes, then rotated (checked by the mapper test).
+  m_InstanceMapper->SetOrientationModeToQuaternion();
+  m_InstanceMapper->SetOrientationArray("Orientation");
+  m_InstanceMapper->SetScaleModeToScaleByVectorComponents();
+  m_InstanceMapper->SetScaleArray("Scale");
+  m_InstanceMapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
   m_Actor->SetMapper(m_Mapper);
   m_Actor->GetProperty()->SetInterpolationToGouraud();
   m_Actor->VisibilityOff();
@@ -181,7 +192,24 @@ void mitk::OdfVtkMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
     const auto *image = static_cast<const Image *>(node->GetData());
     auto settings = this->GetSettings();
     settings.pixelsPerMm = view->pixelsPerMm;
-    localStorage->m_Mapper->SetInputData(OdfGlyphGenerator::Generate(*image, this->GetTimestep(), view->slice, &view->window, settings));
+    // One sphere and three values per glyph are far less to build and upload than a mesh per glyph.
+    if (OdfGlyphGenerator::CanDrawEllipsoidInstances(*image, settings))
+    {
+      auto sphere = OdfGlyphGenerator::GetInstanceSphere(view->slice, settings);
+      // A new source is uploaded again; the spheres of the mesh levels differ in their number of points.
+      vtkPolyData *source = localStorage->m_InstanceMapper->GetSource();
+      if (source == nullptr || source->GetNumberOfPoints() != sphere->GetNumberOfPoints())
+        localStorage->m_InstanceMapper->SetSourceData(sphere);
+      localStorage->m_InstanceMapper->SetInputData(OdfGlyphGenerator::GenerateEllipsoidInstances(*image, this->GetTimestep(), view->slice, &view->window, settings));
+      localStorage->m_Mapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
+      localStorage->m_Actor->SetMapper(localStorage->m_InstanceMapper);
+    }
+    else
+    {
+      localStorage->m_Mapper->SetInputData(OdfGlyphGenerator::Generate(*image, this->GetTimestep(), view->slice, &view->window, settings));
+      localStorage->m_InstanceMapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
+      localStorage->m_Actor->SetMapper(localStorage->m_Mapper);
+    }
     localStorage->m_Actor->VisibilityOn();
   }
   catch (const Exception &e)
@@ -195,7 +223,15 @@ void mitk::OdfVtkMapper2D::ResetMapper(BaseRenderer *renderer)
 {
   LocalStorage *localStorage = m_LSH.GetLocalStorage(renderer);
   localStorage->m_Mapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
+  localStorage->m_InstanceMapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
   localStorage->m_Actor->VisibilityOff();
+}
+
+void mitk::OdfVtkMapper2D::ReleaseGraphicsResources(BaseRenderer *renderer)
+{
+  LocalStorage *localStorage = m_LSH.GetLocalStorage(renderer);
+  localStorage->m_Mapper->ReleaseGraphicsResources(renderer->GetRenderWindow());
+  localStorage->m_InstanceMapper->ReleaseGraphicsResources(renderer->GetRenderWindow());
 }
 
 void mitk::OdfVtkMapper2D::SetDefaultProperties(DataNode *node, BaseRenderer *renderer, bool overwrite)

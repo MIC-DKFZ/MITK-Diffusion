@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <mitkCompositeMapper.h>
 #include <mitkIOUtil.h>
 #include <mitkOdfImage.h>
+#include <mitkOdfNormalizationMethodProperty.h>
 #include <mitkOdfVtkMapper2D.h>
 #include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
@@ -81,14 +82,20 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   MITK_TEST(SliceChange_GlyphsGeneratedAtOnce);
   MITK_TEST(LodEnabled_OnlyWhileGlyphsShown);
   MITK_TEST(Zoom_MeshLevelFollowsGlyphWidth);
+  MITK_TEST(Zoom_MeshLevelOfGlyphMeshes);
+  MITK_TEST(TensorEllipsoids_InstancesOnlyForTheirSettings);
+  MITK_TEST(TensorEllipsoids_InstancesDrawnWhereTheMeshIs);
   MITK_TEST(InstancedEllipsoid_ScaledThenRotated);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::RenderingTestHelper m_RenderingTestHelper;
   mitk::DataNode::Pointer m_Node;
 
-  /** Polydata of the visible glyph actor in the node's 2D prop, or nullptr. */
-  static vtkPolyData *FindGlyphs(vtkProp *prop)
+  /**
+   * The visible glyph actor in the node's 2D prop, or nullptr. Its mapper's input is the glyph
+   * mesh or, for instanced ellipsoids, one point per glyph; both have colours "ODF_COLORS".
+   */
+  static vtkActor *FindGlyphActor(vtkProp *prop)
   {
     if (auto assembly = vtkPropAssembly::SafeDownCast(prop))
     {
@@ -96,40 +103,64 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
       parts->InitTraversal();
       for (int i = 0; i < parts->GetNumberOfItems(); ++i)
       {
-        if (auto glyphs = FindGlyphs(parts->GetNextProp()))
-          return glyphs;
+        if (auto glyphActor = FindGlyphActor(parts->GetNextProp()))
+          return glyphActor;
       }
     }
     else if (auto actor = vtkActor::SafeDownCast(prop); actor != nullptr && actor->GetVisibility() && actor->GetMapper() != nullptr)
     {
       auto polyData = vtkPolyData::SafeDownCast(actor->GetMapper()->GetInputDataObject(0, 0));
       if (polyData != nullptr && polyData->GetPointData()->GetArray("ODF_COLORS") != nullptr)
-        return polyData;
+        return actor;
     }
     return nullptr;
   }
 
   mitk::BaseRenderer *Renderer() { return mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow()); }
 
-  /** The glyphs the node's 2D mapper currently hands to VTK, or nullptr. */
-  vtkPolyData *Glyphs()
+  vtkActor *GlyphActor()
   {
     auto mapper = dynamic_cast<mitk::VtkMapper *>(m_Node->GetMapper(mitk::BaseRenderer::Standard2D));
     CPPUNIT_ASSERT(mapper != nullptr);
-    return FindGlyphs(mapper->GetVtkProp(this->Renderer()));
+    return FindGlyphActor(mapper->GetVtkProp(this->Renderer()));
   }
 
-  /** Number of glyphs of a glyph mesh: each of n points has 2 n - 4 triangles. */
-  static vtkIdType NumberOfGlyphs(vtkPolyData *glyphs)
+  /** The glyphs the node's 2D mapper currently hands to VTK, or nullptr. */
+  vtkPolyData *Glyphs()
   {
+    vtkActor *actor = this->GlyphActor();
+    return actor != nullptr ? vtkPolyData::SafeDownCast(actor->GetMapper()->GetInputDataObject(0, 0)) : nullptr;
+  }
+
+  /** The sphere the current glyphs are instances of; nullptr for a glyph mesh. */
+  vtkPolyData *InstanceSphere()
+  {
+    vtkActor *actor = this->GlyphActor();
+    CPPUNIT_ASSERT(actor != nullptr);
+    auto instanceMapper = vtkGlyph3DMapper::SafeDownCast(actor->GetMapper());
+    return instanceMapper != nullptr ? instanceMapper->GetSource() : nullptr;
+  }
+
+  /** Number of current glyphs: one per point of instances; in a mesh each glyph of n points has 2 n - 4 triangles. */
+  vtkIdType NumberOfGlyphs()
+  {
+    vtkPolyData *glyphs = this->Glyphs();
+    if (this->InstanceSphere() != nullptr)
+      return glyphs->GetNumberOfPoints();
     return (2 * glyphs->GetNumberOfPoints() - glyphs->GetNumberOfPolys()) / 4;
   }
 
-  static vtkIdType PointsPerGlyph(vtkPolyData *glyphs) { return glyphs->GetNumberOfPoints() / NumberOfGlyphs(glyphs); }
+  vtkIdType PointsPerGlyph()
+  {
+    if (vtkPolyData *sphere = this->InstanceSphere())
+      return sphere->GetNumberOfPoints();
+    return this->Glyphs()->GetNumberOfPoints() / this->NumberOfGlyphs();
+  }
 
   /**
-   * Points per glyph of the mesh for the renderer's zoom: tensorImage.dti's glyphs are at most
-   * "Scaling" x 3 mm wide; below 16 pixels 42 points, below 40 pixels 162.
+   * Points per glyph of the mesh, or of the instances' sphere, for the renderer's zoom:
+   * tensorImage.dti's glyphs are at most "Scaling" x 3 mm wide; below 16 pixels 42 points, below
+   * 40 pixels 162.
    */
   vtkIdType ExpectedPointsPerGlyph()
   {
@@ -162,22 +193,31 @@ public:
 
   // tensorImage.dti has 64x64x3 voxels, all in view. The render window of the test is none of
   // the standard display's windows, so its view follows the plane, not the window name. With
-  // VTK 9.7 the former clipping pipeline left no glyph at all.
+  // VTK 9.7 the former clipping pipeline left no glyph at all. A tensor image's defaults
+  // (ellipsoids coloured by direction) give instances of a sphere, colours by value a mesh.
   void TensorImage_GlyphsOfEachView()
   {
     const std::tuple<mitk::AnatomicalPlane, std::string, vtkIdType> views[] = {
       {mitk::AnatomicalPlane::Axial, "VisibleOdfs_T", 64 * 64},
       {mitk::AnatomicalPlane::Sagittal, "VisibleOdfs_S", 64 * 3},
       {mitk::AnatomicalPlane::Coronal, "VisibleOdfs_C", 64 * 3}};
-    for (const auto &[view, property, numGlyphs] : views)
+    for (const bool instanced : {true, false})
     {
-      m_Node->SetBoolProperty("VisibleOdfs_T", false);
-      m_Node->SetBoolProperty("VisibleOdfs_S", false);
-      m_Node->SetBoolProperty("VisibleOdfs_C", false);
-      m_Node->SetBoolProperty(property.c_str(), true);
-      vtkPolyData *glyphs = this->RenderGlyphs(view);
-      CPPUNIT_ASSERT_MESSAGE(property, glyphs != nullptr);
-      CPPUNIT_ASSERT_EQUAL_MESSAGE(property, numGlyphs * this->ExpectedPointsPerGlyph(), glyphs->GetNumberOfPoints());
+      m_Node->SetBoolProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", instanced);
+      for (const auto &[view, property, numGlyphs] : views)
+      {
+        const std::string message = property + (instanced ? ", instances" : ", mesh");
+        m_Node->SetBoolProperty("VisibleOdfs_T", false);
+        m_Node->SetBoolProperty("VisibleOdfs_S", false);
+        m_Node->SetBoolProperty("VisibleOdfs_C", false);
+        m_Node->SetBoolProperty(property.c_str(), true);
+        vtkPolyData *glyphs = this->RenderGlyphs(view);
+        CPPUNIT_ASSERT_MESSAGE(message, glyphs != nullptr);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(message, instanced, this->InstanceSphere() != nullptr);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(message, numGlyphs, this->NumberOfGlyphs());
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(message, this->ExpectedPointsPerGlyph(), this->PointsPerGlyph());
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(message, numGlyphs * (instanced ? 1 : this->ExpectedPointsPerGlyph()), glyphs->GetNumberOfPoints());
+      }
     }
   }
 
@@ -337,7 +377,8 @@ public:
     m_Node->SetBoolProperty("VisibleOdfs_T", true);
     vtkSmartPointer<vtkPolyData> glyphs = this->RenderGlyphs(mitk::AnatomicalPlane::Axial);
     CPPUNIT_ASSERT(glyphs != nullptr);
-    CPPUNIT_ASSERT_EQUAL(64 * 64 * this->ExpectedPointsPerGlyph(), glyphs->GetNumberOfPoints());
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(64 * 64), this->NumberOfGlyphs());
+    CPPUNIT_ASSERT_EQUAL(this->ExpectedPointsPerGlyph(), this->PointsPerGlyph());
     mitk::BaseRenderer *renderer = this->Renderer();
     mitk::RenderingManager *renderingManager = mitk::RenderingManager::GetInstance();
     CPPUNIT_ASSERT_EQUAL(0, renderingManager->GetNextLOD(renderer));
@@ -367,8 +408,8 @@ public:
       regenerated->GetBounds(newBounds);
       CPPUNIT_ASSERT_MESSAGE(name + ": glyphs of the new view", !std::equal(bounds, bounds + 6, newBounds));
       // Zoomed in by 2, a quarter of the slice is in view.
-      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, this->ExpectedPointsPerGlyph(), PointsPerGlyph(regenerated));
-      CPPUNIT_ASSERT_MESSAGE(name, NumberOfGlyphs(regenerated) < 64 * 64 / 2);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, this->ExpectedPointsPerGlyph(), this->PointsPerGlyph());
+      CPPUNIT_ASSERT_MESSAGE(name, this->NumberOfGlyphs() < 64 * 64 / 2);
       glyphs = regenerated;
     }
   }
@@ -406,10 +447,15 @@ public:
     CPPUNIT_ASSERT_EQUAL(0u, renderer->GetNumberOfVisibleLODEnabledMappers());
   }
 
-  // The glyph mesh follows the glyphs' width on screen, so a zoom changes it, at the render of
-  // LOD 1 as any zoom.
-  void Zoom_MeshLevelFollowsGlyphWidth()
+  // The glyph mesh, and the sphere of instanced ellipsoids, follow the glyphs' width on screen, so
+  // a zoom changes it, at the render of LOD 1 as any zoom.
+  void Zoom_MeshLevelFollowsGlyphWidth() { this->ZoomThroughMeshLevels(true); }
+
+  void Zoom_MeshLevelOfGlyphMeshes() { this->ZoomThroughMeshLevels(false); }
+
+  void ZoomThroughMeshLevels(bool instanced)
   {
+    m_Node->SetBoolProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", instanced);
     m_Node->SetBoolProperty("VisibleOdfs_T", true);
     // Glyphs at most 3 mm wide: 42 points at the fitted zoom of 2.5 pixels per mm.
     m_Node->SetFloatProperty("Scaling", 1);
@@ -419,8 +465,9 @@ public:
     for (int step = 0; step < 3; ++step)
     {
       CPPUNIT_ASSERT(glyphs != nullptr);
-      CPPUNIT_ASSERT_EQUAL(this->ExpectedPointsPerGlyph(), PointsPerGlyph(glyphs));
-      levels.insert(PointsPerGlyph(glyphs));
+      CPPUNIT_ASSERT_EQUAL(instanced, this->InstanceSphere() != nullptr);
+      CPPUNIT_ASSERT_EQUAL(this->ExpectedPointsPerGlyph(), this->PointsPerGlyph());
+      levels.insert(this->PointsPerGlyph());
       camera->Zoom(2.5, camera->GetCameraPositionOnPlane());
       m_RenderingTestHelper.Render();
       CPPUNIT_ASSERT(this->Glyphs() == glyphs.GetPointer());
@@ -429,6 +476,82 @@ public:
       glyphs = this->Glyphs();
     }
     CPPUNIT_ASSERT(levels == std::set<vtkIdType>({42, 162, ODF_SAMPLING_SIZE}));
+  }
+
+  // Tensor ellipsoids coloured by direction and normalized by their maximum are instances of a
+  // sphere; any other of these settings gives a glyph mesh, and switching back instances again,
+  // for the same voxels.
+  void TensorEllipsoids_InstancesOnlyForTheirSettings()
+  {
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) != nullptr);
+    CPPUNIT_ASSERT(this->InstanceSphere() != nullptr);
+    const vtkIdType numGlyphs = this->NumberOfGlyphs();
+    const std::pair<std::string, std::function<void(bool)>> changes[] = {
+      {"colours by value", [this](bool on) { m_Node->SetBoolProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", !on); }},
+      {"tensor ODFs", [this](bool on) { m_Node->SetBoolProperty("DiffusionCore.Rendering.OdfVtkMapper.SwitchTensorView", !on); }},
+      {"min-max", [this](bool on) {
+         auto normalization = mitk::OdfNormalizationMethodProperty::New();
+         if (on)
+           normalization->SetNormalizationToMinMax();
+         m_Node->SetProperty("Normalization", normalization);
+       }}};
+    for (const auto &[name, change] : changes)
+    {
+      change(true);
+      m_RenderingTestHelper.Render();
+      CPPUNIT_ASSERT_MESSAGE(name, this->Glyphs() != nullptr && this->InstanceSphere() == nullptr);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, numGlyphs, this->NumberOfGlyphs());
+      change(false);
+      m_RenderingTestHelper.Render();
+      CPPUNIT_ASSERT_MESSAGE(name, this->Glyphs() != nullptr && this->InstanceSphere() != nullptr);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, numGlyphs, this->NumberOfGlyphs());
+    }
+  }
+
+  // In MITK's 2D view the instanced ellipsoids cover the pixels of the glyph meshes of the same
+  // tensors. The meshes are a little wider (normalized by the largest of their 252 radii, not by
+  // the largest eigenvalue), so the drawn areas agree only mostly.
+  void TensorEllipsoids_InstancesDrawnWhereTheMeshIs()
+  {
+    // The ODF mapper alone, without the image's colour map under the glyphs.
+    m_Node->GetMapper(mitk::BaseRenderer::Standard2D);
+    m_Node->SetMapper(mitk::BaseRenderer::Standard2D, mitk::OdfVtkMapper2D::New());
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    // At 10 pixels per mm the glyphs are full meshes, at most 9 mm (90 pixels) wide.
+    vtkRenderWindow *window = m_RenderingTestHelper.GetVtkRenderWindow();
+    window->SwapBuffersOff();
+    std::vector<bool> drawn[2];
+    for (const bool instanced : {true, false})
+    {
+      m_Node->SetBoolProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", instanced);
+      CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) != nullptr);
+      mitk::CameraController *camera = this->Renderer()->GetCameraController();
+      camera->Zoom(4, camera->GetCameraPositionOnPlane());
+      mitk::RenderingManager::GetInstance()->ExecutePendingHighResRenderingRequest();
+      m_RenderingTestHelper.Render();
+      CPPUNIT_ASSERT_EQUAL(instanced, this->InstanceSphere() != nullptr);
+      const Picture picture = Grab(window);
+      for (int y = 0; y < picture.height; ++y)
+      {
+        for (int x = 0; x < picture.width; ++x)
+          drawn[instanced ? 0 : 1].push_back(picture.Drawn(x, y));
+      }
+    }
+    std::size_t both = 0;
+    std::size_t either = 0;
+    std::size_t instancePixels = 0;
+    std::size_t meshPixels = 0;
+    for (std::size_t i = 0; i < drawn[0].size(); ++i)
+    {
+      both += drawn[0][i] && drawn[1][i] ? 1 : 0;
+      either += drawn[0][i] || drawn[1][i] ? 1 : 0;
+      instancePixels += drawn[0][i] ? 1 : 0;
+      meshPixels += drawn[1][i] ? 1 : 0;
+    }
+    CPPUNIT_ASSERT_MESSAGE(std::to_string(instancePixels) + " / " + std::to_string(meshPixels) + " / " + std::to_string(both) + " pixels", instancePixels > 5000 && instancePixels < drawn[0].size() / 2);
+    const double overlap = static_cast<double>(both) / either;
+    CPPUNIT_ASSERT_MESSAGE("overlap " + std::to_string(overlap), overlap > 0.8);
   }
 
   /** RGB pixels of a render window, row by row from the bottom. */
@@ -466,6 +589,24 @@ public:
     }
   };
 
+  /** The pixels of the last render; the window must not swap its buffers. */
+  static Picture Grab(vtkRenderWindow *window)
+  {
+    auto grabber = vtkSmartPointer<vtkWindowToImageFilter>::New();
+    grabber->SetInput(window);
+    grabber->ShouldRerenderOff();
+    grabber->ReadFrontBufferOff();
+    grabber->SetInputBufferTypeToRGB();
+    grabber->Update();
+    Picture picture;
+    const int *dimensions = grabber->GetOutput()->GetDimensions();
+    picture.width = dimensions[0];
+    picture.height = dimensions[1];
+    const auto *pixels = static_cast<const unsigned char *>(grabber->GetOutput()->GetScalarPointer());
+    picture.rgb.assign(pixels, pixels + 3 * picture.width * picture.height);
+    return picture;
+  }
+
   /**
    * The actor alone in the renderer, in a parallel view of 2.4 units along a world axis: along z
    * (x to the right, y up) or along x (y to the right, z up).
@@ -483,19 +624,7 @@ public:
     camera->SetClippingRange(1, 20);
     window->Render();
     window->WaitForCompletion();
-    auto grabber = vtkSmartPointer<vtkWindowToImageFilter>::New();
-    grabber->SetInput(window);
-    grabber->ShouldRerenderOff();
-    grabber->ReadFrontBufferOff();
-    grabber->SetInputBufferTypeToRGB();
-    grabber->Update();
-    Picture picture;
-    const int *dimensions = grabber->GetOutput()->GetDimensions();
-    picture.width = dimensions[0];
-    picture.height = dimensions[1];
-    const auto *pixels = static_cast<const unsigned char *>(grabber->GetOutput()->GetScalarPointer());
-    picture.rgb.assign(pixels, pixels + 3 * picture.width * picture.height);
-    return picture;
+    return Grab(window);
   }
 
   static vtkSmartPointer<vtkUnsignedCharArray> WhiteColours(vtkIdType numberOfPoints)
