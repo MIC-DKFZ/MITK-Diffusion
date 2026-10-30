@@ -286,23 +286,14 @@ void QmitkIVIMView::AutoThreshold()
     return;
   }
 
-  // find bzero index
-  int index = -1;
-  auto directions = mitk::DiffusionPropertyHelper::GetGradientContainer(dimg);
-  for(DirContainerType::ConstIterator it = directions->Begin();
-      it != directions->End(); ++it)
-  {
-    index++;
-    GradientDirectionType g = it.Value();
-    if(g[0] == 0 && g[1] == 0 && g[2] == 0 )
-      break;
-  }
-
   VecImgType::Pointer vecimg = VecImgType::New();
   mitk::CastToItkImage(dimg, vecimg);
 
-  int vecLength = vecimg->GetVectorLength();
-  index = index > vecLength-1 ? vecLength-1 : index;
+  // The histogram is taken on the first b0 volume (DiffusionPropertyHelper::IsB0), or on the last
+  // volume of a DWI without one.
+  const auto b0Indices = mitk::DiffusionPropertyHelper::GetB0Indices(mitk::DiffusionPropertyHelper::GetGradientContainer(dimg),
+                                                                     mitk::DiffusionPropertyHelper::GetReferenceBValue(dimg));
+  const int index = b0Indices.empty() ? static_cast<int>(vecimg->GetVectorLength()) - 1 : static_cast<int>(b0Indices.front());
 
   MITK_INFO << "Performing Histogram Analysis on Channel" << index;
 

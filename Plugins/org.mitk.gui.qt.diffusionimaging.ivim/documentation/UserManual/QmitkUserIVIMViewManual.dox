@@ -27,7 +27,7 @@ The non-linear fits of methods 1 to 3 penalize D outside [0, 0.003] mm²/s and D
 
 Parameters:
 \li <b>D*</b> (method 2): the fixed D* in mm²/s.
-\li <b>Signal threshold</b>: diffusion-weighted measurements at or below this value, in the units of the image, are left out of the fit. The "*" button sets it from the histogram of the b=0 volume: twice the most frequent value between the image minimum and half of the image maximum.
+\li <b>Signal threshold</b>: diffusion-weighted measurements at or below this value, in the units of the image, are left out of the fit. The "*" button sets it from the histogram of the first b=0 volume (b-value rounds to 0 s/mm²; the last volume of an image without one): twice the most frequent value between the image minimum and half of the image maximum.
 \li <b>Ignore b&lt; (first fit)</b> (methods 3 and 4): the b-value threshold in s/mm² of the first fit.
 \li <b>Output Maps</b>: the maps of f, D and D* to generate, named "f Fit-n", "D Fit-n" and "D* Fit-n" with the method number n. For methods 3 and 4, D* is searched only when its map is checked; the preview always shows it.
 
