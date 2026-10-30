@@ -13,6 +13,7 @@ set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberTracking ON CACHE BOOL "" FORCE)
 
 # cmdapps
@@ -21,6 +22,7 @@ set(BUILD_DiffusionTractographyCmdApps ON CACHE BOOL "" FORCE)
 
 # plugins
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.controls" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.fiberprocessing" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.preprocessing" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.registration" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.reconstruction" ON CACHE BOOL "" FORCE)
