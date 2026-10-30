@@ -131,8 +131,11 @@ Facts the layout does not show:
   field. NRRD files of earlier MITK versions (only MITK's `measurement frame:=` key) are read as
   before, with the image rotation applied; the DWI and tensor NRRD readers share the frame parsing
   (`IO/mitkNrrdMeasurementFrame.h`). A volume is b0 when its b-value rounds to 0 (b < 0.5,
-  `DiffusionPropertyHelper::IsB0`/`GetB0Indices`, shell 0 of the b-value map); every filter that
-  takes b0 volumes asks it (MRtrix's default `bzero_threshold` is 10, dipy's `b0_threshold` 50).
+  `DiffusionPropertyHelper::IsB0`/`GetB0Indices`, shell 0 of the b-value map); the modules' filters
+  that take b0 volumes ask it (MRtrix's default `bzero_threshold` is 10, dipy's `b0_threshold` 50),
+  and ITK's tensor fit, which takes only zero vectors as b0, gets them zeroed. Two view sites still
+  take only exact zero vectors as b0: the Fiberfox view's prototype tensor fit and the IVIM view's
+  histogram volume.
   Fiberfox simulates its protocol's gradients as given. DICOM import is unchanged;
   `mitkDiffusionDicomSeriesTest` reads synthetic series of each vendor parser (`DicomDwi/`:
   Siemens mosaic and non-mosaic CSA2, GE, Philips; identity orientation; values in that
