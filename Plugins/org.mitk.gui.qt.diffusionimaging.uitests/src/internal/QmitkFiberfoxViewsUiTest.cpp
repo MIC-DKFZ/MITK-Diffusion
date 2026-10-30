@@ -15,12 +15,15 @@ found in the LICENSE file.
 #include <mitkDiffusionTestData.h>
 #include <mitkFiberBundle.h>
 #include <mitkIOUtil.h>
+#include <mitkPlanarEllipse.h>
+#include <mitkPlanarFigureInteractor.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
 #include <cppunit/extensions/HelperMacros.h>
 
 #include <QCheckBox>
 #include <QCommandLinkButton>
+#include <QDoubleSpinBox>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QSpinBox>
@@ -44,6 +47,7 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Fiberfox_NonXmlParameterFile_Message);
   CPPUNIT_TEST(Generation_RandomPhantomMinAboveMax_MessageForEachRange);
   CPPUNIT_TEST(Generation_Buttons_HaveIcons);
+  CPPUNIT_TEST(Generation_Fiducials_FibersOfTheRightBundlePositionKeptViewClosed);
   CPPUNIT_TEST(Fieldmap_TwoSources_FieldmapBelowImage);
   CPPUNIT_TEST_SUITE_END();
 
@@ -126,6 +130,55 @@ public:
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
     GetChild<QCommandLinkButton>(view, "m_LoadParametersButton")->click();
     CPPUNIT_ASSERT(OneMessage().contains("Cannot read"));
+  }
+
+  void Generation_Fiducials_FibersOfTheRightBundlePositionKeptViewClosed()
+  {
+    auto *view = ShowView(GenerationId, "QmitkFiberGenerationViewControls");
+    // The first bundle with one fiducial, the second with two; added with the view open, which
+    // observes them (selection in a render window).
+    auto fiducial = [](int i) {
+      return mitk::IOUtil::Load<mitk::PlanarEllipse>(mitk::GetDiffusionTestDataFilePath("Fiberfox/Fiducial_" + std::to_string(i) + ".pf"));
+    };
+    auto first = AddNode(mitk::FiberBundle::New(), "Bundle_0");
+    auto second = AddNode(mitk::FiberBundle::New(), "Bundle_1");
+    auto single = AddNode(fiducial(0), "Fiducial_0", first);
+    auto start = AddNode(fiducial(1), "Fiducial_1", second);
+    start->SetIntProperty("layer", 1);
+    auto end = AddNode(fiducial(2), "Fiducial_2", second);
+    end->SetIntProperty("layer", 2);
+
+    // Only a bundle with two fiducials gets fibers, the one it belongs to.
+    Select({first, second});
+    GetChild<QCommandLinkButton>(view, "m_GenerateFibersButton")->click();
+    Wait(50);
+    CPPUNIT_ASSERT_EQUAL(0u, dynamic_cast<mitk::FiberBundle *>(first->GetData())->GetNumFibers());
+    CPPUNIT_ASSERT(dynamic_cast<mitk::FiberBundle *>(second->GetData())->GetNumFibers() > 0);
+
+    // A fiducial beyond y = 360 mm keeps its place when another of its boxes is edited.
+    auto *ellipse = dynamic_cast<mitk::PlanarEllipse *>(end->GetData());
+    auto origin = ellipse->GetGeometry()->GetOrigin();
+    origin[1] = 400;
+    ellipse->GetGeometry()->SetOrigin(origin);
+    Select({end});
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(400.0, GetChild<QDoubleSpinBox>(view, "m_FidPosY")->value(), 1e-6);
+    auto *axis = GetChild<QDoubleSpinBox>(view, "m_FidAxis1");
+    axis->setValue(axis->value() + 0.5);
+    emit axis->editingFinished();
+    Wait(20);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(400.0, ellipse->GetGeometry()->GetOrigin()[1], 1e-6);
+
+    // With the view closed, selecting a fiducial (as a click in a render window does) reaches
+    // no view.
+    HideView(GenerationId);
+    for (const auto &node : {single, start, end})
+    {
+      Select({node});
+      dynamic_cast<mitk::PlanarEllipse *>(node->GetData())->InvokeEvent(mitk::SelectPlanarFigureEvent());
+      dynamic_cast<mitk::PlanarEllipse *>(node->GetData())->InvokeEvent(mitk::EndInteractionPlanarFigureEvent());
+    }
+    Wait(50);
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 
   void Generation_RandomPhantomMinAboveMax_MessageForEachRange()
