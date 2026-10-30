@@ -27,7 +27,7 @@ class mitkDiffusionCmdAppsTractographyTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE_END();
 
 public:
-  void HelpAndXml() { CheckHelpAndXml({"GlobalTractography", "StreamlineTractography"}); }
+  void HelpAndXml() { CheckHelpAndXml("Tractography", {"GlobalTractography", "StreamlineTractography"}); }
 
   void StreamlineTractography_Tensor_Fibers()
   {

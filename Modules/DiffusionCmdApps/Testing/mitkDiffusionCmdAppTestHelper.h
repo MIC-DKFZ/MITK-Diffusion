@@ -49,7 +49,10 @@ namespace mitk::CmdAppTest
     return (std::filesystem::path(MITK_DIFFUSION_CMDAPP_DIR) / ("Mitk" + app)).string();
   }
 
-  /** A fresh, empty working folder for one test case. */
+  /**
+   * A fresh, empty working folder for one test case. The folder is deleted first, and the group
+   * tests may run in parallel (ctest -j), so each name belongs to one test case of one group.
+   */
   inline std::string WorkDir(const std::string &name)
   {
     const auto dir = std::filesystem::temp_directory_path() / "mitkDiffusionCmdAppTests" / name;
@@ -108,9 +111,9 @@ namespace mitk::CmdAppTest
    * well-formed XML: MITK's parser writes the help texts unescaped, so a '<' or '&' in them breaks
    * the description for the Workbench. Parser warnings printed before the XML are skipped.
    */
-  inline void CheckHelpAndXml(const std::vector<std::string> &apps)
+  inline void CheckHelpAndXml(const std::string &group, const std::vector<std::string> &apps)
   {
-    const std::string dir = WorkDir("help");
+    const std::string dir = WorkDir("help" + group);
     for (const auto &app : apps)
     {
       const auto help = RunOk(app, {"--help"}, dir);

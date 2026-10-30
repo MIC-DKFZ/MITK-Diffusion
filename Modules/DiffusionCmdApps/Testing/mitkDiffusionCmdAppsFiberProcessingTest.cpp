@@ -44,8 +44,9 @@ class mitkDiffusionCmdAppsFiberProcessingTestSuite : public mitk::TestFixture
 public:
   void HelpAndXml()
   {
-    CheckHelpAndXml({"Sift2WeightCopy", "FiberExtraction", "FiberExtractionRoi", "FiberModification", "FitFibersToImage",
-                     "FiberDirectionExtraction", "FiberJoin", "FiberClustering", "TractDensityFilter", "FiberColoring"});
+    CheckHelpAndXml("FiberProcessing", {"Sift2WeightCopy", "FiberExtraction", "FiberExtractionRoi", "FiberModification",
+                                        "FitFibersToImage", "FiberDirectionExtraction", "FiberJoin", "FiberClustering",
+                                        "TractDensityFilter", "FiberColoring"});
   }
 
   // The length filter runs before the resampling, which would change the lengths.

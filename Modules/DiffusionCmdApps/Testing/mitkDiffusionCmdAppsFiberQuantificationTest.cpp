@@ -27,7 +27,7 @@ class mitkDiffusionCmdAppsFiberQuantificationTestSuite : public mitk::TestFixtur
   CPPUNIT_TEST_SUITE_END();
 
 public:
-  void HelpAndXml() { CheckHelpAndXml({"PrintFiberStatistics", "TractDensity"}); }
+  void HelpAndXml() { CheckHelpAndXml("FiberQuantification", {"PrintFiberStatistics", "TractDensity"}); }
 
   // With a reference image, the density map has its voxel grid.
   void TractDensity_ReferenceGrid()

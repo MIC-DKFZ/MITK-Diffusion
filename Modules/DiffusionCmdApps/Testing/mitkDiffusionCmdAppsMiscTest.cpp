@@ -43,8 +43,8 @@ class mitkDiffusionCmdAppsMiscTestSuite : public mitk::TestFixture
 public:
   void HelpAndXml()
   {
-    CheckHelpAndXml({"FileFormatConverter", "ImageResampler", "CopyGeometry", "DiffusionDICOMLoader", "ShToOdfImage",
-                     "DReg", "FiberScreenshot", "PeakExtraction"});
+    CheckHelpAndXml("Misc", {"FileFormatConverter", "ImageResampler", "CopyGeometry", "DiffusionDICOMLoader",
+                             "ShToOdfImage", "DReg", "FiberScreenshot", "PeakExtraction"});
   }
 
   void FileFormatConverter_DwiToNifti_KeepsGradients()

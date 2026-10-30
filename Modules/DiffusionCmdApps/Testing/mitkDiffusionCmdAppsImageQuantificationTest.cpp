@@ -36,7 +36,7 @@ class mitkDiffusionCmdAppsImageQuantificationTestSuite : public mitk::TestFixtur
 public:
   void HelpAndXml()
   {
-    CheckHelpAndXml({"DiffusionIndices", "QballReconstruction", "TensorReconstruction", "MultishellMethods"});
+    CheckHelpAndXml("ImageQuantification", {"DiffusionIndices", "QballReconstruction", "TensorReconstruction", "MultishellMethods"});
   }
 
   // Only the extension leaves the output name (#43).

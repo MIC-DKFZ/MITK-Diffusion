@@ -34,7 +34,7 @@ class mitkDiffusionCmdAppsIVIMTestSuite : public mitk::TestFixture
   static std::string Dwi() { return Data("dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi"); }
 
 public:
-  void HelpAndXml() { CheckHelpAndXml({"DiffusionIvimFit", "DiffusionKurtosisFit"}); }
+  void HelpAndXml() { CheckHelpAndXml("IVIM", {"DiffusionIvimFit", "DiffusionKurtosisFit"}); }
 
   // Fit type 1 keeps D* at --dstar; --output_type nii writes NIfTI.
   void DiffusionIvimFit_FixedDstar_InDstarMap()

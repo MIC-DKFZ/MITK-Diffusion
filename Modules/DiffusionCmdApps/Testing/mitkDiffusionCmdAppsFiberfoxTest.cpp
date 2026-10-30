@@ -28,7 +28,7 @@ class mitkDiffusionCmdAppsFiberfoxTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE_END();
 
 public:
-  void HelpAndXml() { CheckHelpAndXml({"Fiberfox", "RandomFiberPhantom"}); }
+  void HelpAndXml() { CheckHelpAndXml("Fiberfox", {"Fiberfox", "RandomFiberPhantom"}); }
 
   // A DWI as input gets only the artifacts of the parameters, which is fast (a fiber simulation of
   // BrainSlice_1 takes about a minute in Debug). The output prefix keeps its dot (#43).
