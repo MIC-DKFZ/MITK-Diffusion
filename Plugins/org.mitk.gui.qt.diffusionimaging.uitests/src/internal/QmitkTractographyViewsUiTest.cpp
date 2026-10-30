@@ -47,6 +47,8 @@ found in the LICENSE file.
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <utility>
 
 using namespace QmitkDiffusionUiTest;
 
@@ -72,11 +74,16 @@ class QmitkTractographyViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Streamline_TwoLabelTarget_AsBinaryMaskAndLabelDifference);
   CPPUNIT_TEST(Streamline_SegmentationRegions_OfferedAndSeedsAsBinaryMask);
   CPPUNIT_TEST(Tooltips_PeakJitterMaxLengthRandomSeed_DescribeTheParameter);
+  CPPUNIT_TEST(Streamline_InteractiveWithSeedAndTargetConstraint_MessageAndTracksAgain);
+  CPPUNIT_TEST(Streamline_ParameterFileAngle_RoundedToTheBox);
+  CPPUNIT_TEST(Streamline_FlipXAndCompress_FixedSeedRepeats);
   CPPUNIT_TEST(Gibbs_OdfThenTensor_ResultOfEachInput);
   CPPUNIT_TEST(Gibbs_BadIterationsAndParameterFiles_Messages);
   CPPUNIT_TEST(Gibbs_ViewClosedWhileRunning_NoCrash);
   CPPUNIT_TEST(Gibbs_Visualization_FibersAndStatusUpdateDuringRun);
   CPPUNIT_TEST(Gibbs_ProbabilityMapAndSegmentation_OfferedAndUsedAsMask);
+  CPPUNIT_TEST(Gibbs_StopDuringWeightEstimation_RunEnds);
+  CPPUNIT_TEST(Gibbs_ParameterFileNoFibersReadOnlyFolder_LabelsAndMessages);
   CPPUNIT_TEST_SUITE_END();
 
   static constexpr const char *StreamlineId = "org.mitk.views.streamlinetracking";
@@ -672,6 +679,101 @@ public:
     CPPUNIT_ASSERT(GetChild<QSlider>(gibbs, "m_RandomSeedSlider")->toolTip().contains("Seed of the random generator"));
   }
 
+  void Streamline_InteractiveWithSeedAndTargetConstraint_MessageAndTracksAgain()
+  {
+    auto tensors = Load("StreamlineTractography/tensor_image.dti");
+    auto seeds = Load("StreamlineTractography/seed_image.nii.gz");
+    seeds->SetBoolProperty("binary", true);
+    auto target = AddNode(CreateMask(ImageOf(tensors), [](const itk::Index<3> &i) { return i[0] < 32; }), "left half");
+    target->SetBoolProperty("binary", true);
+    auto *view = ShowStreamline();
+    Select({tensors});
+    InitializeViews();
+    GetChild<QComboBox>(view, "m_ModeBox")->setCurrentIndex(0);
+    GetChild<QComboBox>(view, "m_EpConstraintsBox")->setCurrentIndex(3); // one endpoint in seed, one in target
+    ChooseInWidget(view, "m_SeedImageSelectionWidget", seeds);
+    ChooseInWidget(view, "m_TargetImageSelectionWidget", target);
+
+    // Interactive seeds are no seed image: the tracker refuses the constraint, the view says so.
+    auto *interactive = GetChild<QCheckBox>(view, "m_InteractiveBox");
+    interactive->setChecked(true);
+    DialogHandler::Instance().TakeMessages();
+    SetCrosshair(TestImageVoxel(30, 38, 1));
+    CPPUNIT_ASSERT(WaitFor([]() { return !DialogHandler::Instance().PeekMessages().isEmpty(); }, 60000));
+    const auto messages = DialogHandler::Instance().TakeMessages();
+    CPPUNIT_ASSERT_MESSAGE(messages.front().toStdString(), messages.size() == 1 && messages.front().contains("Streamline tractography failed"));
+
+    // The view tracks again.
+    interactive->setChecked(false);
+    GetChild<QComboBox>(view, "m_EpConstraintsBox")->setCurrentIndex(0);
+    Track(view);
+    CPPUNIT_ASSERT(StreamlineResult(tensors)->GetNumFibers() > 0);
+  }
+
+  void Streamline_ParameterFileAngle_RoundedToTheBox()
+  {
+    auto *view = ShowStreamline();
+    auto *angle = GetChild<QSpinBox>(view, "m_AngularThresholdBox");
+    angle->setValue(30);
+    const auto file = m_TempDir + "/angle.stp";
+    DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
+    GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+
+    // A file with 22.5 degrees (written by the command line app or by hand): the box shows 23.
+    std::string content;
+    {
+      std::ifstream in(file);
+      content.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    const std::string saved = "\"angluar_threshold_deg\": \"30\"";
+    const auto at = content.find(saved);
+    CPPUNIT_ASSERT_MESSAGE(content, at != std::string::npos);
+    content.replace(at, saved.size(), "\"angluar_threshold_deg\": \"22.5\"");
+    std::ofstream(file) << content;
+    angle->setValue(10);
+    DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
+    GetChild<QCommandLinkButton>(view, "m_LoadParametersButton")->click();
+    CPPUNIT_ASSERT_EQUAL(23, angle->value());
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  void Streamline_FlipXAndCompress_FixedSeedRepeats()
+  {
+    auto tensors = Load("StreamlineTractography/tensor_image.dti");
+    auto odfs = Load("StreamlineTractography/qball_image.qbi");
+    auto peaks = LoadWithReader("StreamlineTractography/qball_peak_image.nii.gz", "Peak Image");
+    auto *view = ShowStreamline();
+    auto *mode = GetChild<QComboBox>(view, "m_ModeBox");
+    auto *flipX = GetChild<QCheckBox>(view, "m_FlipXBox");
+
+    // Flipped directions: another tractogram, and with a fixed seed the same one twice.
+    for (const auto &[input, probabilistic] : {std::pair{tensors, false}, std::pair{tensors, true}, std::pair{peaks, true}, std::pair{odfs, true}})
+    {
+      const auto name = input->GetName() + (probabilistic ? " probabilistic" : " deterministic");
+      Select({input});
+      mode->setCurrentIndex(probabilistic ? 1 : 0);
+      flipX->setChecked(false);
+      auto notFlipped = TrackAndTake(view, input);
+      flipX->setChecked(true);
+      auto flipped = TrackAndTake(view, input);
+      CPPUNIT_ASSERT_MESSAGE(name, flipped->GetNumFibers() > 0 && !flipped->Equals(notFlipped));
+      CPPUNIT_ASSERT_MESSAGE(name, TrackAndTake(view, input)->Equals(flipped));
+    }
+    flipX->setChecked(false);
+
+    // "Compress Fibers": the same fibers with fewer points.
+    Select({tensors});
+    mode->setCurrentIndex(0);
+    auto *compress = GetChild<QCheckBox>(view, "m_ResampleFibersBox");
+    CPPUNIT_ASSERT(compress->isChecked());
+    auto compressed = TrackAndTake(view, tensors);
+    compress->setChecked(false);
+    auto uncompressed = TrackAndTake(view, tensors);
+    CPPUNIT_ASSERT_EQUAL(uncompressed->GetNumFibers(), compressed->GetNumFibers());
+    CPPUNIT_ASSERT(compressed->GetNumberOfPoints() < uncompressed->GetNumberOfPoints());
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
   static QWidget *ShowGibbs()
   {
     auto *view = ShowView(GibbsId, "QmitkGibbsTrackingViewControls");
@@ -852,6 +954,61 @@ public:
       GetDataStorage()->Remove(node);
     }
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  void Gibbs_StopDuringWeightEstimation_RunEnds()
+  {
+    auto odfs = Load("StreamlineTractography/qball_image.qbi");
+    auto *view = ShowGibbs();
+    GetChild<QLineEdit>(view, "m_IterationsBox")->setText("100000000");
+    CPPUNIT_ASSERT_EQUAL(0, GetChild<QSlider>(view, "m_ParticleWeightSlider")->value()); // automatic
+    ChooseNode(view, "m_InputImageBox", odfs);
+    auto *start = GetChild<QCommandLinkButton>(view, "m_TrackingStart");
+    auto *stop = GetChild<QCommandLinkButton>(view, "m_TrackingStop");
+    start->click();
+    Wait(1000);
+    stop->click();
+    CPPUNIT_ASSERT(!stop->isEnabled());
+    // 1e8 iterations would run for hours.
+    CPPUNIT_ASSERT(WaitFor([start]() { return start->isEnabled(); }, 60000));
+    DialogHandler::Instance().TakeMessages();
+  }
+
+  void Gibbs_ParameterFileNoFibersReadOnlyFolder_LabelsAndMessages()
+  {
+    auto odfs = Load("StreamlineTractography/qball_image.qbi");
+    auto *view = ShowGibbs();
+
+    // Start temperature 0.29 is kept, not truncated to 0.28.
+    const auto file = m_TempDir + "/temperature.gtp";
+    std::ofstream(file) << "<?xml version=\"1.0\"?><global_tracking_parameter_file file_version=\"0.1\"><parameter_set iterations=\"1000\" "
+                           "particle_length=\"0\" particle_width=\"0\" particle_weight=\"0\" temp_start=\"0.29\" temp_end=\"0.001\" "
+                           "inexbalance=\"0\" fiber_length=\"20\" curvature_threshold=\"45\"/></global_tracking_parameter_file>";
+    DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
+    GetChild<QCommandLinkButton>(view, "m_LoadTrackingParameters")->click();
+    CPPUNIT_ASSERT_EQUAL(29, GetChild<QSlider>(view, "m_StartTempSlider")->value());
+    CPPUNIT_ASSERT_EQUAL(QString("0.29"), GetChild<QLabel>(view, "m_StartTempLabel")->text());
+    CPPUNIT_ASSERT_EQUAL(QString("1000"), GetChild<QLineEdit>(view, "m_IterationsBox")->text());
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+
+    // A run too short to accept a fiber: a message, no tractogram.
+    GetChild<QLineEdit>(view, "m_IterationsBox")->setText("10");
+    GetChild<QSlider>(view, "m_ParticleWeightSlider")->setValue(3);
+    ChooseNode(view, "m_InputImageBox", odfs);
+    TrackGibbs(view);
+    auto messages = DialogHandler::Instance().TakeMessages();
+    CPPUNIT_ASSERT(messages.size() == 1 && messages.front().contains("No fiber was accepted"));
+    CPPUNIT_ASSERT(GetNodesOfClass("FiberBundle").empty());
+
+    // Saving into a folder without write permission: a message.
+    const auto readOnly = std::filesystem::path(m_TempDir) / "read-only";
+    std::filesystem::create_directory(readOnly);
+    std::filesystem::permissions(readOnly, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
+    DialogHandler::Instance().AnswerFileDialog(QString::fromStdString((readOnly / "parameters.gtp").string()));
+    GetChild<QCommandLinkButton>(view, "m_SaveTrackingParameters")->click();
+    std::filesystem::permissions(readOnly, std::filesystem::perms::owner_all);
+    messages = DialogHandler::Instance().TakeMessages();
+    CPPUNIT_ASSERT(messages.size() == 1 && messages.front().contains("Could not save the parameters"));
   }
 };
 
