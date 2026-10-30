@@ -228,14 +228,17 @@ Facts the layout does not show:
   iterations). The simulation log (status text, log file, progress) is `mitk::FiberfoxLog`, which
   reports progress through `itk::ProgressEvent`. With a field map or eddy currents the k-space step
   approximates the phase by L time segments (Sutton et al. 2003; `.ffp` `image.kspaceTimeSegments`
-  -1, the default and the value of files without it, for 1.25 x the phase spread in cycles + 8,
-  which stays below 0.1 % relative RMS error; or a fixed L > 0), or sums the exact phase per pixel
-  and sample (0; `MitkFiberfox --exact_kspace`, view "Distortion Phase"). The references with
-  distortions or eddy currents are exact sums: an explicit 0 reproduces param1, param6 and param8
-  bit for bit (`mitkFiberfoxSignalGenerationTest::Test1Exact`, ...), BrainSlice_4 within 1
-  (`Test4Exact`); the default reproduces all four within 1. Fiberfox references in the
-  test data depend on the random engines and seeds, so a change there is checked bit for bit
-  against the old output.
+  -1, the default and the value of files without it: from 1.25 x the phase spread in cycles + 8 up
+  until a residual check of the pixels passes, which keeps the relative RMS error below 0.1 %,
+  1.1e-5 measured; or a fixed L > 0), or sums the exact phase per pixel and sample (0; `MitkFiberfox
+  --exact_kspace`, view "Distortion Phase"). A slice takes the exact sum where the time segments
+  would take longer (automatic count) or need more than 256 MiB (any L); the log counts such slice
+  jobs. `mitkFiberfoxKspaceTest::TimeSegmentsHoldForStrongPhase` checks the bound. The references
+  with distortions or eddy currents are exact sums: an explicit 0 reproduces param1, param6 and
+  param8 bit for bit (`mitkFiberfoxSignalGenerationTest::Test1Exact`, ...), BrainSlice_4 within 1
+  (`Test4Exact`); the default reproduces all four within 1. Fiberfox references in the test data
+  depend on the random engines and seeds, so a change there is checked bit for bit against the old
+  output.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
   labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
   without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
