@@ -129,7 +129,11 @@ Facts the layout does not show:
   without the image rotation. NIfTI bvals/bvecs follow FSL, as MRtrix does (voxel frame, x negated
   when the image matrix has a positive determinant); NRRD uses the standard `measurement frame`
   field. NRRD files of earlier MITK versions (only MITK's `measurement frame:=` key) are read as
-  before, with the image rotation applied; DICOM import is unchanged and has no test data.
+  before, with the image rotation applied. DICOM import is unchanged;
+  `mitkDiffusionDicomSeriesTest` reads synthetic series of each vendor parser (`DicomDwi/`:
+  Siemens mosaic and non-mosaic CSA2, GE, Philips; identity orientation; values in that
+  folder's README). Untested: the gradient frame of oblique Siemens/Philips
+  scans, GE b-values stored as b + 1e9, Siemens CSA1 and enhanced multi-frame series.
   `ctest -R 'mitkDiffusion(Property|Image|Dicom)'` runs the `DiffusionImage` tests of readers,
   writers and property helper.
 - SH and peak files: MITK's SH basis (`mitk::sh`, `mrtrix = true`) is MRtrix 0.2's (functions
