@@ -609,6 +609,7 @@ void QmitkFiberProcessingView::ExtractWithMask(bool onlyEnds, bool invert, bool 
           name = "passing-" + name;
       }
 
+      newNode->SetName(name);
       float currentThickness = 0;
       node->GetFloatProperty("Fiber2DSliceThickness", currentThickness);
       newNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(currentThickness));

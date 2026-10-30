@@ -184,11 +184,12 @@ public:
     GetChild<QComboBox>(view, "m_ExtractionBoxMask")->setCurrentIndex(2); // passing ROI
     GetChild<QCommandLinkButton>(view, "m_ExtractFibersButton")->click();
     Wait(50);
-    // One extracted bundle below each input.
+    // One extracted bundle below each input, named after the ROI.
     for (const auto &bundle : {first, second})
     {
       auto derived = GetDataStorage()->GetDerivations(bundle);
       CPPUNIT_ASSERT_EQUAL_MESSAGE(bundle->GetName(), 1u, derived->Size());
+      CPPUNIT_ASSERT_MESSAGE(derived->front()->GetName(), derived->front()->GetName().starts_with("passing-"));
       CPPUNIT_ASSERT(Fibers(derived->front())->GetNumFibers() > 0);
     }
 
