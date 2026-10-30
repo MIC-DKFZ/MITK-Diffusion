@@ -28,7 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkTestingComparisonImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <mitkRicianNoiseModel.h>
-#include <mitkChiSquareNoiseModel.h>
 #include <mitkIOUtil.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkProperties.h>
@@ -87,6 +86,14 @@ public:
   {
     bool out = true;
     typedef itk::VectorImage< short, 3 > DwiImageType;
+    // the iterators below walk both images in step
+    if (dwi1->GetLargestPossibleRegion().GetSize() != dwi2->GetLargestPossibleRegion().GetSize()
+        || dwi1->GetVectorLength() != dwi2->GetVectorLength())
+    {
+      MITK_INFO << "Image size " << dwi1->GetLargestPossibleRegion().GetSize() << " x " << dwi1->GetVectorLength()
+                << " differs from the reference size " << dwi2->GetLargestPossibleRegion().GetSize() << " x " << dwi2->GetVectorLength();
+      return false;
+    }
     try{
       itk::ImageRegionIterator< DwiImageType > it1(dwi1, dwi1->GetLargestPossibleRegion());
       itk::ImageRegionIterator< DwiImageType > it2(dwi2, dwi2->GetLargestPossibleRegion());
@@ -137,7 +144,7 @@ public:
 
     if (refImage.IsNotNull())
     {
-      if(mitk::DiffusionPropertyHelper::GetGradientContainer(refImage).IsNotNull() )
+      CPPUNIT_ASSERT_MESSAGE("Reference should be a diffusion-weighted image", mitk::DiffusionPropertyHelper::GetGradientContainer(refImage).IsNotNull());
       {
         ItkDwiType::Pointer itkTestImagePointer = ItkDwiType::New();
         mitk::CastToItkImage(testImage, itkTestImagePointer);
@@ -200,10 +207,10 @@ public:
   void Test5()
   {
     mitk::FiberfoxParameters parameters;
-    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5.ffp"), true);
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5_v2.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5_OUT_v3.nii.gz"), &functor);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5_OUT_v4.nii.gz"), &functor);
     StartSimulation(parameters, refImage, "BrainSlice_5_OUT.nii.gz");
   }
 

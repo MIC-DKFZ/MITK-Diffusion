@@ -27,6 +27,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageGeometry4D.h>
 #include <mitkLbfgsbMutex.h>
 
+#include <limits>
+
 namespace itk {
 
 
@@ -102,12 +104,8 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 ::BeforeThreadedGenerateData()
 {
   typename CoefficientImageType::Pointer ShCoeffImage = static_cast< CoefficientImageType* >( this->ProcessObject::GetInput(0) );
-  itk::Vector<double,3> spacing = ShCoeffImage->GetSpacing();
-  mitk::Point3D origin = ShCoeffImage->GetOrigin();
-  itk::Matrix<double, 3, 3> direction = ShCoeffImage->GetDirection();
-  ImageRegion<3> imageRegion = ShCoeffImage->GetLargestPossibleRegion();
 
-  // The mask is read with the input's voxel indices.
+  // The mask is read with the input's voxel indices; without a mask every voxel is processed.
   if (m_MaskImage.IsNotNull() && !mitk::HasVoxelGridOf(m_MaskImage, ShCoeffImage))
     itkExceptionMacro(<< "The mask image must have the same size, spacing, origin and direction as the SH image.");
 
@@ -116,17 +114,6 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   m_PeakImage->Allocate();
   m_PeakImage->FillBuffer(0.0);
 
-  m_MaskGenerated = m_MaskImage.IsNull();
-  if (m_MaskGenerated)
-  {
-    m_MaskImage = ItkUcharImgType::New();
-    m_MaskImage->SetSpacing( spacing );
-    m_MaskImage->SetOrigin( origin );
-    m_MaskImage->SetDirection( direction );
-    m_MaskImage->SetRegions( imageRegion );
-    m_MaskImage->Allocate();
-    m_MaskImage->FillBuffer(1);
-  }
   // Masked voxels and voxels with an ODF maximum near 0 are skipped and keep 0 directions.
   this->GetOutput()->FillBuffer(0);
 
@@ -159,9 +146,6 @@ template< class PixelType, int ShOrder, int NrOdfDirections >
 void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 ::AfterThreadedGenerateData()
 {
-  // A mask generated for this input must not be reused for the next one.
-  if (m_MaskGenerated)
-    m_MaskImage = nullptr;
   m_Progress.reset();
 }
 
@@ -185,7 +169,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   while( !cit.IsAtEnd() )
   {
     typename CoefficientImageType::IndexType idx3 = cit.GetIndex();
-    if (m_MaskImage->GetPixel(idx3)==0)
+    if (m_MaskImage.IsNotNull() && m_MaskImage->GetPixel(idx3)==0)
     {
       advance();
       continue;
@@ -197,6 +181,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       coeffs[j] = c[j];
 
     double max = 0;
+    double min = std::numeric_limits<double>::max();
     for (int i=0; i<NrOdfDirections; i++)
     {
       odf[i] = 0;
@@ -204,8 +189,13 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
         odf[i] += c[j]*m_ShBasis(i,j);
       if (odf[i]>max)
         max = odf[i];
+      if (odf[i]<min)
+        min = odf[i];
     }
-    if (max<0.0001)
+    // In an isotropic ODF every sampled direction is a maximum, and the float rounding of the
+    // values decides which of them become peaks. An ODF that varies by no more than 1e-5 of its
+    // maximum (rounding is about 1e-7) therefore has no peak.
+    if (max<0.0001 || max-min <= 1e-5*max)
     {
       advance();
       continue;
@@ -252,28 +242,25 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 
     std::sort( candidates.begin(), candidates.end(), CompareVectors );  // sort peaks
 
-    // kick out directions to close to a larger direction
-    for (unsigned int i=0; i<candidates.size(); i++)
+    // From the largest down, a candidate closer than the angular threshold to a peak kept before
+    // is dropped. Each axis gives two opposite (antipodal) candidates, often of exactly equal
+    // length; only the first of them is kept.
+    for (const DirectionType &v1 : candidates)
     {
-      DirectionType v1 = candidates.at(i);
       double val = v1.magnitude();
       if (val<max*m_RelativePeakThreshold || val<m_AbsolutePeakThreshold)
         break;
 
       bool flag = true;
-      for (unsigned int j=0; j<candidates.size(); j++)
-        if (i!=j)
+      for (const DirectionType &v2 : final_peaks)
+      {
+        double angle = fabs(dot_product(v1,v2)/(val*v2.magnitude()));
+        if (angle>m_AngularThreshold)
         {
-          DirectionType v2 = candidates.at(j);
-          double val2 = v2.magnitude();
-          double angle = fabs(dot_product(v1,v2)/(val*val2));
-          // Of two peaks of exactly equal length both are kept, e.g. antipodal duplicates.
-          if (angle>m_AngularThreshold && val<val2)
-          {
-            flag = false;
-            break;
-          }
+          flag = false;
+          break;
         }
+      }
 
       if (flag)
         final_peaks.push_back(v1);
@@ -301,7 +288,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       }
 
       if (m_ApplyDirectionMatrix)
-        dir = m_MaskImage->GetDirection()*dir;
+        dir = ShCoeffImage->GetDirection()*dir;
 
       if (m_FlipX)
         dir[0] = -dir[0];

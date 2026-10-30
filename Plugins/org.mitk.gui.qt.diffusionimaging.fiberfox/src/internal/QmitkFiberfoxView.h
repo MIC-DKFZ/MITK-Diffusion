@@ -142,8 +142,45 @@ protected:
     void StartSimulation();     ///< GenerateImage without its exception handling
     void SimulateForExistingDwi(mitk::DataNode* imageNode);     ///< add artifacts to existing diffusion weighted image
     void SimulateImageFromFibers(mitk::DataNode* fiberNode);    ///< simulate new diffusion weighted image
-    void UpdateParametersFromGui();  ///< update fiberfox paramater object
+    void UpdateParametersFromGui();  ///< update fiberfox paramater object: the Read* functions in this order, then SetResultProperties
+    void ReadOutputSettings();       ///< output path and additional images
+    void ReadImageGeometry();        ///< mask, image geometry (template, mask or boxes) and gradients
+    void ReadArtifacts();            ///< relaxation, k-space artifacts and motion
+    void ReadSequence();             ///< acquisition type, coils and timing
+    void ReadNoise();                ///< noise distribution and variance
+    void ReadCompartments();         ///< signal model and volume fraction map of each compartment
+    void SetResultProperties();      ///< "Fiberfox.*" properties of the result node, from the parameters read
     void SetGradientsFromGui();      ///< bvals/bvecs files, loaded gradients or a generated half shell
+
+    /** Signal model types the compartment boxes offer. */
+    enum class CompartmentModel { None, Stick, Zeppelin, Tensor, Ball, Astrosticks, Dot, Prototype };
+    /** The controls of one compartment: the model type and parameter widget of each entry of its box. */
+    struct CompartmentControls
+    {
+      int id;   ///< m_CompartmentId of its signal model, 1 to 4
+      std::string description;
+      QComboBox* box;
+      QmitkDataStorageComboBoxWithSelectNone* volumeFraction;
+      QWidget* fractionFrame;   ///< shown only with a model selected; nullptr where always shown
+      std::vector< std::pair<CompartmentModel, QWidget*> > entries;   ///< by box index; no widget for None
+    };
+    /**
+     * The one mapping between box entries, parameter widgets and signal models, used to create the
+     * models, to show loaded ones and to show the selected widget. Compartment id at index id-1.
+     */
+    std::vector<CompartmentControls> Compartments() const;
+    static std::string ModelName(CompartmentModel type);   ///< as in result names and properties
+    static CompartmentModel SelectedModel(const CompartmentControls& compartment);
+    static QWidget* ModelWidget(const CompartmentControls& compartment, CompartmentModel type);   ///< nullptr if not offered
+    /** Signal model of the selected entry with the widget's parameters, nullptr for none. */
+    mitk::DiffusionSignalModel<>* NewCompartmentModel(const CompartmentControls& compartment);
+    /**
+     * Selects the entry of the model's type and shows the model's parameters; nothing if not offered.
+     * A tensor model is shown as a zeppelin if zeppelin is set and the compartment offers one.
+     */
+    void ShowCompartmentModel(const CompartmentControls& compartment, mitk::DiffusionSignalModel<>* model, bool zeppelin);
+    /** Shows the parameter widget of the entry with the given index only. */
+    void ShowCompartmentWidget(int compartmentId, int index);
     void UpdateGui();                                           ///< enable/disbale buttons etc. according to current datamanager selection
     void PlanarFigureSelected( itk::Object* object, const itk::EventObject& );
     void EnableCrosshairNavigation();               ///< enable crosshair navigation if planar figure interaction ends

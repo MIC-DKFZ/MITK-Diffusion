@@ -30,15 +30,30 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace
 {
   /** What the SH and the peak mime type need from the header of a NRRD or NIfTI file. */
-  struct Scalar4DHeader
+  struct ImageHeader
   {
     bool scalar4D = false;   ///< scalar pixels in four dimensions
     unsigned int volumes = 0; ///< size of the fourth dimension
+    bool vector3D = false;   ///< vector pixels in three dimensions, not a DWI
+    unsigned int components = 0; ///< vector length
   };
 
-  Scalar4DHeader ProbeScalar4D(itk::ImageIOBase *io, const std::string &path)
+  /** The modality key of a NRRD DWI, as the DWI mime type checks it. */
+  bool IsDwi(const itk::MetaDataDictionary &dictionary)
   {
-    Scalar4DHeader header;
+    for (const auto &key : dictionary.GetKeys())
+    {
+      std::string value;
+      if (key.find("modality") != std::string::npos && itk::ExposeMetaData<std::string>(dictionary, key, value)
+          && value.find("DWMRI") != std::string::npos)
+        return true;
+    }
+    return false;
+  }
+
+  ImageHeader ProbeHeader(itk::ImageIOBase *io, const std::string &path)
+  {
+    ImageHeader header;
     try
     {
       if (io->CanReadFile(path.c_str()))
@@ -49,6 +64,12 @@ namespace
         {
           header.scalar4D = true;
           header.volumes = io->GetDimensions(3);
+        }
+        else if (io->GetPixelType() == itk::CommonEnums::IOPixel::VECTOR && io->GetNumberOfDimensions() == 3
+                 && !IsDwi(io->GetMetaDataDictionary()))
+        {
+          header.vector3D = true;
+          header.components = io->GetNumberOfComponents();
         }
       }
     }
@@ -63,13 +84,13 @@ namespace
    * header is read once for both: the result for the last file is kept as long as its
    * modification time and size stay the same.
    */
-  Scalar4DHeader ReadScalar4DHeader(const std::string &path)
+  ImageHeader ReadHeader(const std::string &path)
   {
     static std::mutex mutex;
     static std::string lastPath;
     static std::filesystem::file_time_type lastTime;
     static std::uintmax_t lastSize = 0;
-    static Scalar4DHeader lastHeader;
+    static ImageHeader lastHeader;
 
     std::error_code timeError, sizeError;
     const auto time = std::filesystem::last_write_time(path, timeError);
@@ -82,10 +103,10 @@ namespace
         return lastHeader;
     }
 
-    // A file that NRRD cannot read as a scalar 4D image is still tried with NIfTI.
-    Scalar4DHeader header = ProbeScalar4D(itk::NrrdImageIO::New(), path);
-    if (!header.scalar4D)
-      header = ProbeScalar4D(itk::NiftiImageIO::New(), path);
+    // A file that NRRD cannot read as a scalar 4D or vector 3D image is still tried with NIfTI.
+    ImageHeader header = ProbeHeader(itk::NrrdImageIO::New(), path);
+    if (!header.scalar4D && !header.vector3D)
+      header = ProbeHeader(itk::NiftiImageIO::New(), path);
 
     if (cacheable)
     {
@@ -96,6 +117,15 @@ namespace
       lastHeader = header;
     }
     return header;
+  }
+
+  /** Whether count is the coefficient count of an even SH order from 2 to 12 (6, 15, 28, 45, 66, 91). */
+  bool IsShCoefficientCount(unsigned int count)
+  {
+    for (unsigned int order = 2; order <= 12; order += 2)
+      if (count == (order + 1) * (order + 2) / 2)
+        return true;
+    return false;
   }
 }
 
@@ -142,21 +172,16 @@ bool DiffusionIOMimeTypes::SHImageMimeType::AppliesTo(const std::string &path) c
   if (ext==".shi")
     return true;
 
-  const auto header = ReadScalar4DHeader(path);
-  if (!header.scalar4D)
-    return false;
-  switch (header.volumes)
-  {
-  case 6:
-  case 15:
-  case 28:
-  case 45:
-  case 66:
-  case 91:
-    return true;
-  default:
-    return false;
-  }
+  const auto header = ReadHeader(path);
+  if (header.scalar4D)
+    return IsShCoefficientCount(header.volumes);
+  return header.vector3D && IsShCoefficientCount(header.components);
+}
+
+bool DiffusionIOMimeTypes::IsShVectorLayout(const std::string &path)
+{
+  const auto header = ReadHeader(path);
+  return header.vector3D && IsShCoefficientCount(header.components);
 }
 
 DiffusionIOMimeTypes::SHImageMimeType* DiffusionIOMimeTypes::SHImageMimeType::Clone() const
@@ -216,7 +241,7 @@ bool DiffusionIOMimeTypes::PeakImageMimeType::AppliesTo(const std::string &path)
   if (ext==".peak")
     return true;
 
-  const auto header = ReadScalar4DHeader(path);
+  const auto header = ReadHeader(path);
   return header.scalar4D && header.volumes % 3 == 0;
 }
 

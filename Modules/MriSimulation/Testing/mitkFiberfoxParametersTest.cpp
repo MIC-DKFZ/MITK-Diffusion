@@ -66,6 +66,7 @@ class mitkFiberfoxParametersTestSuite : public mitk::TestFixture
   MITK_TEST(MotionVolumes);
   MITK_TEST(GradientsInFile);
   MITK_TEST(MissingDirection);
+  MITK_TEST(NoiseModelInFile);
   CPPUNIT_TEST_SUITE_END();
 
   /** Parameters whose only models are two counting fiber models and one counting non-fiber model. */
@@ -340,6 +341,54 @@ public:
     CPPUNIT_ASSERT(parameters.m_SignalGen.m_ImageDirection == identity);
     CPPUNIT_ASSERT(parameters.m_MissingTags.find("basic.direction") != std::string::npos);
     CPPUNIT_ASSERT_EQUAL(std::size_t(2), parameters.m_NonFiberModelList.size());
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /**
+   * Noncentral chi noise keeps its variance and coil count through a copy and a .ffp file. The
+   * chi-square type of earlier MITK versions is read as noncentral chi noise with the file's
+   * variance and number of channels.
+   */
+  void NoiseModelInFile()
+  {
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+    parameters.m_SignalGen.m_NumberOfCoils = 3;
+    auto chi = std::make_shared< mitk::NoncentralChiNoiseModel<double> >();
+    chi->SetNoiseVariance(30);
+    chi->SetNumberOfCoils(4);
+    parameters.m_NoiseModel = chi;
+
+    const auto check = [](const mitk::FiberfoxParameters& p, unsigned int coils)
+    {
+      auto model = dynamic_cast<mitk::NoncentralChiNoiseModel<double>*>(p.m_NoiseModel.get());
+      CPPUNIT_ASSERT(model != nullptr);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(30.0, model->GetNoiseVariance(), 1e-6);
+      CPPUNIT_ASSERT_EQUAL(coils, model->GetNumberOfCoils());
+    };
+    check(mitk::FiberfoxParameters(parameters), 4);
+
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_noise_XXXXXX");
+    const std::string file = folder + "/noise.ffp";
+    parameters.SaveParameters(file);
+    mitk::FiberfoxParameters loaded;
+    loaded.LoadParameters(file, true);
+    check(loaded, 4);
+
+    std::ifstream in(file);
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    in.close();
+    const auto type = text.find("noncentralchi");
+    const auto coilsBegin = text.find("<noisecoils>");
+    const auto coilsEnd = text.find("</noisecoils>");
+    CPPUNIT_ASSERT(type != std::string::npos && coilsBegin != std::string::npos && coilsEnd != std::string::npos);
+    text.erase(coilsBegin, coilsEnd + std::string("</noisecoils>").size() - coilsBegin);
+    text.replace(text.find("noncentralchi"), std::string("noncentralchi").size(), "chisquare");
+    const std::string oldFile = folder + "/chisquare.ffp";
+    std::ofstream(oldFile) << text;
+    mitk::FiberfoxParameters old;
+    old.LoadParameters(oldFile, true);
+    check(old, 3);
     itksys::SystemTools::RemoveADirectory(folder);
   }
 };

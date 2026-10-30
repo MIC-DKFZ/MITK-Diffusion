@@ -100,7 +100,7 @@ namespace itk {
     outputImage->Allocate();
     std::complex<ScalarType> zero = std::complex<ScalarType>(0, 0);
     outputImage->FillBuffer(zero);
-    // A noise model (Rician, chi-square) adds the noise of the run itself, after the k-space step.
+    // A noise model (Rician, noncentral chi) adds the noise of the run itself, after the k-space step.
     if (m_Parameters->m_SignalGen.m_NoiseVariance>0 && m_Parameters->m_Misc.m_DoAddNoise && m_Parameters->m_NoiseModel==nullptr)
     {
       ImageRegionIterator< OutputImageType > oit(outputImage, outputImage->GetLargestPossibleRegion());
@@ -218,6 +218,9 @@ namespace itk {
     // calculate T1 relaxation (independent of actual readout)
     m_T1Relax.clear();
     if ( m_Parameters->m_SignalGen.m_DoSimulateRelaxation)
+    {
+      // the inversion-recovery signal below holds for TI < TR only
+      m_Parameters->m_SignalGen.CheckInversionTime();
       for (unsigned int i=0; i<m_CompartmentImages.size(); i++)
       {
         // account for T1 relaxation (how much magnetization is available since last excitation?)
@@ -225,19 +228,113 @@ namespace itk {
 
         // account for inversion pulse and TI
         const float tInv = m_Parameters->m_SignalGen.m_tInv;
-        if (tInv > 0 && tInv < m_Parameters->m_SignalGen.m_tRep)
+        if (tInv > 0)
         {
           // inversion recovery with a 90 degree excitation every TR: 1 - 2 exp(-TI/T1) + exp(-TR/T1)
           relaxation = 1.0 - 2.0*std::exp(-tInv/m_T1[i]) + std::exp(-m_Parameters->m_SignalGen.m_tRep/m_T1[i]);
         }
-        else if (tInv > 0)
-        {
-          // TI >= TR has no standard formula; this product with the inversion term is not a textbook model
-          relaxation *= (1.0-std::exp(std::log(2) - tInv/m_T1[i]));
-        }
 
         m_T1Relax.push_back(relaxation);
       }
+    }
+
+    m_CompartmentSpectra.clear();
+    const bool eddyCurrents = m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline;
+    const bool distortions = m_Parameters->m_Misc.m_DoAddDistortions && (m_MovedFmap.IsNotNull() || m_Parameters->m_SignalGen.m_FrequencyMap.IsNotNull());
+    if (!eddyCurrents && !distortions)
+      ComputeCompartmentSpectra();
+  }
+
+  template< class ScalarType >
+  void KspaceImageFilter< ScalarType >::ComputeCompartmentSpectra()
+  {
+    const std::size_t nx = static_cast<std::size_t>(xMax);
+    const std::size_t ny = static_cast<std::size_t>(yMax);
+    const std::size_t nkx = static_cast<std::size_t>(kxMax);
+    const std::size_t nky = static_cast<std::size_t>(kyMax);
+    // centred indices as in the sum over pixels in DynamicThreadedGenerateData: (0 -- N) --> (-N/2 -- N/2)
+    const double xShift = static_cast<double>(nx/2);
+    const double yShift = static_cast<double>(ny/2);
+    const double kxShift = static_cast<double>(nkx/2);
+    const double kyShift = static_cast<double>(nky/2);
+    const bool ghosts = m_Parameters->m_Misc.m_DoAddGhosts;
+    const std::size_t parities = ghosts ? 2 : 1;
+
+    // factors along x per line parity (the ghost offset shifts kx of odd and even lines apart)
+    std::vector< std::complex<double> > factorsX(parities*nkx*nx);
+    for (std::size_t p=0; p<parities; ++p)
+      for (std::size_t kx=0; kx<nkx; ++kx)
+      {
+        double k = static_cast<double>(kx) - kxShift;
+        if (ghosts)
+          k += (p == 1) ? -m_Parameters->m_SignalGen.m_KspaceLineOffset : m_Parameters->m_SignalGen.m_KspaceLineOffset;
+        k /= xMax;
+        for (std::size_t x=0; x<nx; ++x)
+          factorsX[(p*nkx + kx)*nx + x] = std::polar(1.0, itk::Math::twopi * k * (static_cast<double>(x) - xShift));
+      }
+
+    // factors along y; signal from outside the FOV is wrapped back (aliasing)
+    std::vector< std::complex<double> > factorsY(nky*ny);
+    for (std::size_t y=0; y<ny; ++y)
+    {
+      double position = static_cast<double>(y) - yShift;
+      if (m_Parameters->m_Misc.m_DoAddAliasing)
+      {
+        if (position < -yMaxFov_half)
+          position += yMaxFov;
+        else if (position > yMaxFov_half)
+          position -= yMaxFov;
+      }
+      for (std::size_t ky=0; ky<nky; ++ky)
+        factorsY[ky*ny + y] = std::polar(1.0, itk::Math::twopi * (static_cast<double>(ky) - kyShift) / yMaxFov * position);
+    }
+
+    // signal scale and coil sensitivity depend on the position only
+    std::vector< double > weight(nx*ny, m_Parameters->m_SignalGen.m_SignalScale);
+    if (m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
+      for (std::size_t y=0; y<ny; ++y)
+        for (std::size_t x=0; x<nx; ++x)
+        {
+          VectorType pos;
+          pos[0] = static_cast<float>(x) - static_cast<float>(xShift);
+          pos[1] = static_cast<float>(y) - static_cast<float>(yShift);
+          pos[2] = m_Z;
+          pos = m_Transform*pos;
+          weight[y*nx + x] *= CoilSensitivity(pos);
+        }
+
+    std::vector< std::complex<double> > rows(parities*ny*nkx);
+    for (const auto& compartment : m_CompartmentImages)
+    {
+      itkAssertOrThrowMacro(compartment->GetBufferedRegion() == compartment->GetLargestPossibleRegion(), "The compartment slices must be buffered whole.");
+      const ScalarType* signal = compartment->GetBufferPointer();
+
+      // separable: first along x for every row and parity, then along y
+      for (std::size_t p=0; p<parities; ++p)
+        for (std::size_t y=0; y<ny; ++y)
+          for (std::size_t kx=0; kx<nkx; ++kx)
+          {
+            std::complex<double> sum(0, 0);
+            const std::complex<double>* factors = &factorsX[(p*nkx + kx)*nx];
+            for (std::size_t x=0; x<nx; ++x)
+              sum += (signal[y*nx + x] * weight[y*nx + x]) * factors[x];
+            rows[(p*ny + y)*nkx + kx] = sum;
+          }
+
+      std::vector< std::complex<double> > spectrum(nkx*nky);
+      for (std::size_t ky=0; ky<nky; ++ky)
+      {
+        const std::size_t p = ghosts ? ky%2 : 0;
+        for (std::size_t kx=0; kx<nkx; ++kx)
+        {
+          std::complex<double> sum(0, 0);
+          for (std::size_t y=0; y<ny; ++y)
+            sum += factorsY[ky*ny + y] * rows[(p*ny + y)*nkx + kx];
+          spectrum[ky*nkx + kx] = sum;
+        }
+      }
+      m_CompartmentSpectra.push_back(std::move(spectrum));
+    }
   }
 
   template< class ScalarType >
@@ -305,7 +402,6 @@ namespace itk {
   {
     typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
     ImageRegionIterator< OutputImageType > oit(outputImage, outputRegionForThread);
-    typedef ImageRegionConstIterator< InputImageType > InputIteratorType;
 
     // precalculate shifts for DFT
     float x_shift = 0;
@@ -336,6 +432,15 @@ namespace itk {
     long spikeTick = -1;
 
     std::complex<ScalarType> zero = std::complex<ScalarType>(0, 0);
+    const bool precomputed = !m_CompartmentSpectra.empty();
+    // per work unit, not per sample
+    std::vector< float > relaxFactor(m_CompartmentImages.size(), 1.0f);
+    std::vector< const ScalarType* > compartmentSignals;
+    for (const auto& compartment : m_CompartmentImages)
+      compartmentSignals.push_back(compartment->GetBufferPointer());
+    const long inputWidth = static_cast<long>(xMax);
+    const long numInputPixels = static_cast<long>(m_CompartmentImages[0]->GetLargestPossibleRegion().GetNumberOfPixels());
+
     while( !oit.IsAtEnd() )
     {
       int tick = oit.GetIndex()[1] * kxMax + oit.GetIndex()[0];
@@ -386,7 +491,6 @@ namespace itk {
       }
 
       // calcualte signal relaxation factors
-      std::vector< float > relaxFactor;
       if ( m_Parameters->m_SignalGen.m_DoSimulateRelaxation)
       {
         // time passes since application of the RF pulse
@@ -397,96 +501,106 @@ namespace itk {
         for (unsigned int i=0; i<m_CompartmentImages.size(); i++)
         {
           // account for T2 relaxation (how much transverse magnetization is left since applicatiohn of RF pulse?)
-          relaxFactor.push_back(m_T1Relax[i] * std::exp(-tRf/m_T2[i] -fabs(t)/ m_Parameters->m_SignalGen.m_tInhom));
+          relaxFactor[i] = m_T1Relax[i] * std::exp(-tRf/m_T2[i] -fabs(t)/ m_Parameters->m_SignalGen.m_tInhom);
         }
       }
 
-      // shift k for DFT: (0 -- N) --> (-N/2 -- N/2)
-      float kx = kIdx[0] - kx_shift;
-      float ky = kIdx[1] - ky_shift;
-
-      // add ghosting by adding gradient delay induced offset
-      if (m_Parameters->m_Misc.m_DoAddGhosts)
-      {
-        if (kIdx[1]%2 == 1)
-          kx -= m_Parameters->m_SignalGen.m_KspaceLineOffset;
-        else
-          kx += m_Parameters->m_SignalGen.m_KspaceLineOffset;
-      }
-
-      // pull stuff out of inner loop
-      t /= 1000; // time in seconds
-      kx /= xMax;
-      ky /= yMaxFov;
-
-      // calculate signal s at k-space position (kx, ky)
       std::complex<ScalarType> s(0,0);
-      InputIteratorType it(m_CompartmentImages[0], m_CompartmentImages[0]->GetLargestPossibleRegion() );
-      while( !it.IsAtEnd() )
+      if (precomputed)
       {
-        typename InputImageType::IndexType input_idx = it.GetIndex();
-
-        // shift x,y for DFT: (0 -- N) --> (-N/2 -- N/2)
-        float x = input_idx[0] - x_shift;
-        float y = input_idx[1] - y_shift;
-
-        // sum compartment signals and simulate relaxation
-        ScalarType f_real = 0;
-        for (unsigned int i=0; i<m_CompartmentImages.size(); i++)
-          if ( m_Parameters->m_SignalGen.m_DoSimulateRelaxation)
-            f_real += m_CompartmentImages[i]->GetPixel(input_idx) * relaxFactor[i];
-          else
-            f_real += m_CompartmentImages[i]->GetPixel(input_idx);
-
-        // vector from image center to current position (in meter)
-        // only necessary for eddy currents and non-constant coil sensitivity
-        VectorType pos;
-        if ((m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline) ||
-            m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
-        {
-          pos[0] = x; pos[1] = y; pos[2] = m_Z;
-          pos = m_Transform*pos;
-        }
-
-        if (m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
-          f_real *= CoilSensitivity(pos);
-
-        // simulate eddy currents and other distortions
-        float phi = 0;   // phase shift
-        if (  m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline)
-        {
-          // duration (tRead) already included in "eddyDecay"
-          phi += (m_EddyFieldGradient[0]*pos[0]+m_EddyFieldGradient[1]*pos[1]+m_EddyFieldGradient[2]*pos[2]) * eddyDecay;
-        }
-
-        // simulate distortions
-        if (m_Parameters->m_Misc.m_DoAddDistortions)
-        {
-          if (m_MovedFmap.IsNotNull())    // if we have headmotion, use moved map
-            phi += m_MovedFmap->GetPixel(input_idx) * t;
-          else if (m_Parameters->m_SignalGen.m_FrequencyMap.IsNotNull())
-          {
-            itk::Image<float, 3>::IndexType index; index[0] = input_idx[0]; index[1] = input_idx[1]; index[2] = m_Zidx;
-            phi += m_Parameters->m_SignalGen.m_FrequencyMap->GetPixel(index) * t;
-          }
-        }
-
-        // if signal comes from outside FOV, mirror it back (wrap-around artifact - aliasing
-        if (m_Parameters->m_Misc.m_DoAddAliasing)
-        {
-          if (y<-yMaxFov_half)
-            y += yMaxFov;
-          else if (y>yMaxFov_half)
-            y -= yMaxFov;
-        }
-
-        // actual DFT term
-        std::complex<ScalarType> f(f_real * m_Parameters->m_SignalGen.m_SignalScale, 0);
-        s += f * std::exp( std::complex<ScalarType>(0, itk::Math::twopi * (kx*x + ky*y + phi )) );
-
-        ++it;
+        const std::size_t k = static_cast<std::size_t>(kIdx[1])*static_cast<std::size_t>(kxMax) + static_cast<std::size_t>(kIdx[0]);
+        std::complex<double> sum(0, 0);
+        for (std::size_t i=0; i<m_CompartmentSpectra.size(); ++i)
+          sum += static_cast<double>(relaxFactor[i]) * m_CompartmentSpectra[i][k];
+        s = std::complex<ScalarType>(sum / static_cast<double>(numPix));
       }
-      s /= numPix;
+      else
+      {
+        // shift k for DFT: (0 -- N) --> (-N/2 -- N/2)
+        float kx = kIdx[0] - kx_shift;
+        float ky = kIdx[1] - ky_shift;
+
+        // add ghosting by adding gradient delay induced offset
+        if (m_Parameters->m_Misc.m_DoAddGhosts)
+        {
+          if (kIdx[1]%2 == 1)
+            kx -= m_Parameters->m_SignalGen.m_KspaceLineOffset;
+          else
+            kx += m_Parameters->m_SignalGen.m_KspaceLineOffset;
+        }
+
+        // pull stuff out of inner loop
+        t /= 1000; // time in seconds
+        kx /= xMax;
+        ky /= yMaxFov;
+
+        // calculate signal s at k-space position (kx, ky)
+        for (long pixel=0; pixel<numInputPixels; ++pixel)
+        {
+          typename InputImageType::IndexType input_idx;
+          input_idx[0] = pixel % inputWidth;
+          input_idx[1] = pixel / inputWidth;
+
+          // shift x,y for DFT: (0 -- N) --> (-N/2 -- N/2)
+          float x = input_idx[0] - x_shift;
+          float y = input_idx[1] - y_shift;
+
+          // sum compartment signals and simulate relaxation
+          ScalarType f_real = 0;
+          for (unsigned int i=0; i<m_CompartmentImages.size(); i++)
+            if ( m_Parameters->m_SignalGen.m_DoSimulateRelaxation)
+              f_real += compartmentSignals[i][pixel] * relaxFactor[i];
+            else
+              f_real += compartmentSignals[i][pixel];
+
+          // vector from image center to current position (in meter)
+          // only necessary for eddy currents and non-constant coil sensitivity
+          VectorType pos;
+          if ((m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline) ||
+              m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
+          {
+            pos[0] = x; pos[1] = y; pos[2] = m_Z;
+            pos = m_Transform*pos;
+          }
+
+          if (m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
+            f_real *= CoilSensitivity(pos);
+
+          // simulate eddy currents and other distortions
+          float phi = 0;   // phase shift
+          if (  m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline)
+          {
+            // duration (tRead) already included in "eddyDecay"
+            phi += (m_EddyFieldGradient[0]*pos[0]+m_EddyFieldGradient[1]*pos[1]+m_EddyFieldGradient[2]*pos[2]) * eddyDecay;
+          }
+
+          // simulate distortions
+          if (m_Parameters->m_Misc.m_DoAddDistortions)
+          {
+            if (m_MovedFmap.IsNotNull())    // if we have headmotion, use moved map
+              phi += m_MovedFmap->GetPixel(input_idx) * t;
+            else if (m_Parameters->m_SignalGen.m_FrequencyMap.IsNotNull())
+            {
+              itk::Image<float, 3>::IndexType index; index[0] = input_idx[0]; index[1] = input_idx[1]; index[2] = m_Zidx;
+              phi += m_Parameters->m_SignalGen.m_FrequencyMap->GetPixel(index) * t;
+            }
+          }
+
+          // if signal comes from outside FOV, mirror it back (wrap-around artifact - aliasing
+          if (m_Parameters->m_Misc.m_DoAddAliasing)
+          {
+            if (y<-yMaxFov_half)
+              y += yMaxFov;
+            else if (y>yMaxFov_half)
+              y -= yMaxFov;
+          }
+
+          // actual DFT term
+          std::complex<ScalarType> f(f_real * m_Parameters->m_SignalGen.m_SignalScale, 0);
+          s += f * std::exp( std::complex<ScalarType>(0, itk::Math::twopi * (kx*x + ky*y + phi )) );
+        }
+        s /= numPix;
+      }
 
       if (m_SpikesPerSlice>0 && sqrt(s.imag()*s.imag()+s.real()*s.real()) > sqrt(spike.imag()*spike.imag()+spike.real()*spike.real()) )
       {

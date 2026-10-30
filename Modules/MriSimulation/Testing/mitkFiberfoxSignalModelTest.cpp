@@ -16,6 +16,8 @@ found in the LICENSE file.
 #include <mitkFiberfoxParameters.h>
 #include <mitkRawShModel.h>
 #include <mitkAstroStickModel.h>
+#include <mitkNoncentralChiNoiseModel.h>
+#include <cmath>
 #include <mitkDiffusionImageHelperFunctions.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
@@ -37,6 +39,7 @@ class mitkFiberfoxSignalModelTestSuite : public mitk::TestFixture
   MITK_TEST(PrototypeSurvivesCopy);
   MITK_TEST(PrototypeSaveLoad);
   MITK_TEST(AstroSticksVector);
+  MITK_TEST(NoncentralChiNoiseMoments);
   CPPUNIT_TEST_SUITE_END();
 
   using ModelType = mitk::RawShModel<double>;
@@ -206,6 +209,50 @@ public:
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(m_Gradients.size()), signal.Size());
     for (unsigned int g = 0; g < m_Gradients.size(); ++g)
       CPPUNIT_ASSERT_DOUBLES_EQUAL(model.SimulateMeasurement(g, f), signal[g], 1e-12);
+  }
+
+  /**
+   * Magnitude noise of n coils combined by sum of squares, variance s2 per real and imaginary
+   * part, follows a noncentral chi distribution: E[M^2] = 2 n s2 + S^2, at S = 0
+   * E[M] = sqrt(2 s2) Gamma(n + 1/2) / Gamma(n), and at high signal E[M] = sqrt(S^2 + (2n - 1) s2)
+   * with variance s2. One coil is Rician.
+   */
+  void NoncentralChiNoiseMoments()
+  {
+    const double variance = 100;
+    const unsigned int samples = 200000;
+    for (unsigned int coils : { 1u, 4u, 8u })
+      for (double signal : { 0.0, 1000.0 })
+      {
+        mitk::NoncentralChiNoiseModel<double> model;
+        model.SetSeed(1);
+        model.SetNoiseVariance(variance);
+        model.SetNumberOfCoils(coils);
+        mitk::NoncentralChiNoiseModel<double>::PixelType pixel(samples);
+        pixel.Fill(signal);
+        model.AddNoise(pixel);
+        double sum = 0, sumOfSquares = 0;
+        for (unsigned int i = 0; i < samples; ++i)
+        {
+          sum += pixel[i];
+          sumOfSquares += pixel[i] * pixel[i];
+        }
+        const double mean = sum / samples;
+        const double meanSquare = sumOfSquares / samples;
+        const double expectedMeanSquare = 2 * coils * variance + signal * signal;
+        const double expectedMean = signal == 0
+          ? std::sqrt(2 * variance) * std::exp(std::lgamma(coils + 0.5) - std::lgamma(coils))
+          : std::sqrt(signal * signal + (2.0 * coils - 1) * variance);
+        const double expectedVariance = expectedMeanSquare - expectedMean * expectedMean;
+        // M^2 / s2 is noncentral chi-square with 2n degrees of freedom and noncentrality S^2 / s2
+        const double varianceOfSquare = 4 * coils * variance * variance + 4 * signal * signal * variance;
+        MITK_INFO << "Noncentral chi noise, " << coils << " coils, signal " << signal << ": mean " << mean
+                  << " (expected " << expectedMean << "), variance " << meanSquare - mean * mean
+                  << " (expected " << expectedVariance << "), mean square " << meanSquare << " (expected " << expectedMeanSquare << ")";
+        // five standard errors of the sample mean and of the sample mean square
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedMean, mean, 5 * std::sqrt(expectedVariance / samples));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedMeanSquare, meanSquare, 5 * std::sqrt(varianceOfSquare / samples));
+      }
   }
 };
 

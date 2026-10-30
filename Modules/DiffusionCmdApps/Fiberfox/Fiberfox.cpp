@@ -77,6 +77,8 @@ static int RunFiberfox(int argc, char* argv[])
 
   FiberfoxParameters parameters;
   parameters.LoadParameters(paramName, fix_seed);
+  // refuse TI >= TR before the fibers are loaded
+  parameters.m_SignalGen.CheckInversionTime();
 
   // Test if /path/dir is an existing directory:
   std::string file_extension = "";

@@ -28,6 +28,13 @@ public:
 
   static std::vector<CustomMimeType*> Get();
 
+  /**
+   * True for a NRRD or NIfTI file with SH coefficients in vector layout, as earlier MITK versions
+   * saved them: a 3D image with one vector per voxel whose length is the coefficient count of an
+   * SH order from 2 to 12. NRRD DWIs (modality DWMRI) are not.
+   */
+  static bool IsShVectorLayout(const std::string &path);
+
   class  SHImageMimeType : public CustomMimeType
   {
   public:

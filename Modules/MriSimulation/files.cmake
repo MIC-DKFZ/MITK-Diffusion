@@ -5,6 +5,7 @@ set(CPP_FILES
   Algorithms/itkFitFibersToImageFilter.cpp
   Algorithms/itkFibersFromPlanarFiguresFilter.cpp
   Algorithms/itkRandomPhantomFilter.cpp
+  Algorithms/mitkFiberfoxLog.cpp
 )
 
 set(H_FILES
@@ -18,6 +19,7 @@ set(H_FILES
   Algorithms/itkFieldmapGeneratorFilter.h
   Algorithms/itkRandomPhantomFilter.h
   Algorithms/mitkFiberfoxMotion.h
+  Algorithms/mitkFiberfoxLog.h
 
   SignalModels/mitkDiffusionSignalModel.h
   SignalModels/mitkTensorModel.h
@@ -35,8 +37,8 @@ set(H_FILES
   SignalModels/mitkDiffusionNoiseModel.h
   SignalModels/mitkRicianNoiseModel.h
   SignalModels/mitkRicianNoiseModel.txx
-  SignalModels/mitkChiSquareNoiseModel.h
-  SignalModels/mitkChiSquareNoiseModel.txx
+  SignalModels/mitkNoncentralChiNoiseModel.h
+  SignalModels/mitkNoncentralChiNoiseModel.txx
 
   Sequences/mitkAcquisitionType.h
   Sequences/mitkSingleShotEpi.h

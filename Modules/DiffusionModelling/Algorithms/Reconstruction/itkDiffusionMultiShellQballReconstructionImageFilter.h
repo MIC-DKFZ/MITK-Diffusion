@@ -95,6 +95,8 @@ public:
      * For the Analytical-Reconstruction it is needed to set a
      * BValue Map containing three shells in an arithmetic series
      *  (e.g. 0, 1000, 2000, 3000).
+     * Set before SetGradientImage; without a map, SetGradientImage builds the DWI's own map
+     * (mitk::BValueMapProperty::CreateBValueMap).
      */
     inline void SetBValueMap(BValueMap map){this->m_BValueMap = map;}
 

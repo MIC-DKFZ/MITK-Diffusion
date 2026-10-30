@@ -17,13 +17,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkDftImageFilter_txx
 #define __itkDftImageFilter_txx
 
-#include <ctime>
-#include <cstdio>
-#include <cstdlib>
-
 #include "itkDftImageFilter.h"
-#include <itkImageRegionConstIterator.h>
-#include <itkImageRegionConstIteratorWithIndex.h>
+#include <itkMath.h>
 #include <itkImageRegionIterator.h>
 
 namespace itk {
@@ -38,56 +33,66 @@ DftImageFilter< TPixelType >
 }
 
 template< class TPixelType >
+std::vector< std::complex<double> > DftImageFilter< TPixelType >::Factors(unsigned int n)
+{
+  // indices centred at n/2 (even n) or (n-1)/2 (odd n), as in KspaceImageFilter
+  const long shift = n/2;
+  std::vector< std::complex<double> > factors(static_cast<std::size_t>(n)*n);
+  for (long k=0; k<static_cast<long>(n); ++k)
+    for (long x=0; x<static_cast<long>(n); ++x)
+    {
+      // the exponent modulo n keeps the angle exact for large indices
+      const long product = ((k-shift)*(x-shift)) % static_cast<long>(n);
+      factors[k*n + x] = std::polar(1.0, -itk::Math::twopi * static_cast<double>(product) / n);
+    }
+  return factors;
+}
+
+template< class TPixelType >
 void DftImageFilter< TPixelType >
 ::BeforeThreadedGenerateData()
 {
+  const InputImageType* inputImage = this->GetInput();
+  const auto size = inputImage->GetLargestPossibleRegion().GetSize();
+  itkAssertOrThrowMacro(inputImage->GetBufferedRegion() == inputImage->GetLargestPossibleRegion(), "The k-space slice must be buffered whole.");
+  const std::size_t nx = size[0];
+  const std::size_t ny = size[1];
 
+  m_FactorsY = Factors(ny);
+  const auto factorsX = Factors(nx);
+
+  // first pass along x; every output pixel then needs only its column of m_Rows
+  const std::complex<TPixelType>* input = inputImage->GetBufferPointer();
+  m_Rows.assign(nx*ny, std::complex<double>(0, 0));
+  for (std::size_t y=0; y<ny; ++y)
+    for (std::size_t kx=0; kx<nx; ++kx)
+    {
+      std::complex<double> s(0, 0);
+      for (std::size_t x=0; x<nx; ++x)
+        s += std::complex<double>(input[y*nx + x]) * factorsX[kx*nx + x];
+      m_Rows[y*nx + kx] = s;
+    }
 }
 
 template< class TPixelType >
 void DftImageFilter< TPixelType >
 ::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread)
 {
-  typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
-
+  OutputImageType* outputImage = this->GetOutput();
   ImageRegionIterator< OutputImageType > oit(outputImage, outputRegionForThread);
 
-  typedef ImageRegionConstIterator< InputImageType > InputIteratorType;
-  typename InputImageType::Pointer inputImage  = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
+  const std::size_t nx = outputImage->GetLargestPossibleRegion().GetSize(0);
+  const std::size_t ny = outputImage->GetLargestPossibleRegion().GetSize(1);
 
-  float szx = outputImage->GetLargestPossibleRegion().GetSize(0);
-  float szy = outputImage->GetLargestPossibleRegion().GetSize(1);
-
-  float x_shift = 0;
-  float y_shift = 0;
-  if (static_cast<int>(szx)%2==1)
-      x_shift = (szx-1)/2;
-  else
-      x_shift = szx/2;
-  if (static_cast<int>(szy)%2==1)
-      y_shift = (szy-1)/2;
-  else
-      y_shift = szy/2;
-
+  // each pixel sums in a fixed order, so the result does not depend on the work units
   while( !oit.IsAtEnd() )
   {
-    float kx = oit.GetIndex()[0] - x_shift;
-    float ky = oit.GetIndex()[1] - y_shift;
-    kx /= szx;
-    ky /= szy;
-
-    std::complex<TPixelType> s(0,0);
-    InputIteratorType it(inputImage, inputImage->GetLargestPossibleRegion() );
-    while( !it.IsAtEnd() )
-    {
-      float x = it.GetIndex()[0] - x_shift;
-      float y = it.GetIndex()[1] - y_shift;
-
-      s += it.Get() * exp( std::complex<TPixelType>(0, -itk::Math::twopi * (kx*x + ky*y) ) );
-      ++it;
-    }
-
-    oit.Set(s);
+    const std::size_t kx = oit.GetIndex()[0];
+    const std::size_t ky = oit.GetIndex()[1];
+    std::complex<double> s(0, 0);
+    for (std::size_t y=0; y<ny; ++y)
+      s += m_FactorsY[ky*ny + y] * m_Rows[y*nx + kx];
+    oit.Set(std::complex<TPixelType>(s));
     ++oit;
   }
 }
