@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkCommandLineParser.h"
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkDiffusionImageEditing.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkDiffusionReconstruction.h>
@@ -49,10 +50,8 @@ int main(int argc, char* argv[])
 
   std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string outfilename = us::any_cast<std::string>(parsedArgs["o"]);
-  if (itksys::SystemTools::GetFilenamePath(outfilename).size()>0)
-    outfilename = itksys::SystemTools::GetFilenamePath(outfilename)+"/"+itksys::SystemTools::GetFilenameWithoutExtension(outfilename);
-  else
-    outfilename = itksys::SystemTools::GetFilenameWithoutExtension(outfilename);
+  // The stem of the SH (.nii.gz) and ODF (.odf) outputs.
+  outfilename = mitk::DiffusionDataIOHelper::GetPathWithoutExtension(outfilename);
 
   int threshold = 0;
   if (parsedArgs.count("b0_threshold"))

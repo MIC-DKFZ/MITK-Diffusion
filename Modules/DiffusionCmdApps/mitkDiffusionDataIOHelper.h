@@ -27,14 +27,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkDirectory.h>
 #include <mitkLocaleSwitch.h>
 
-typedef itksys::SystemTools ist;
-
 namespace mitk{
 
 class MITKDIFFUSIONCMDAPPS_EXPORT DiffusionDataIOHelper
 {
 public:
 
+  /**
+   * The extension of the file name: the longest extension of a MIME type registered with MITK
+   * (e.g. ".nii.gz", ".fib"), compared case-insensitively and returned as written, with the dot;
+   * empty if none matches. Other dots belong to the name: "sub.01.nii.gz" has ".nii.gz".
+   */
+  static std::string GetExtension(const std::string& path);
+
+  /** The path without GetExtension(path), with its folder. */
+  static std::string GetPathWithoutExtension(const std::string& path);
+
+  /** The file name without folder and without GetExtension(path); a stem for derived outputs. */
+  static std::string GetNameWithoutExtension(const std::string& path);
+
+  /** The files in the folder whose names end with one of the extensions (e.g. ".nii.gz"), sorted. */
   static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string > extensions);
 
   static std::vector< mitk::Image::Pointer > load_mitk_images(const std::vector<std::string> files, std::vector<std::string>* filenames=nullptr);
@@ -84,80 +96,6 @@ public:
     std::cout.clear();
     MITK_INFO << "Loaded 0 images";
     return nullptr;
-  }
-
-  template< class TYPE >
-  static std::vector< typename TYPE::Pointer > load_itk_images(const std::vector<std::string> files, std::vector<std::string>* filenames=nullptr)
-  {
-    std::cout.setstate(std::ios_base::failbit);
-    std::vector< typename TYPE::Pointer > out;
-
-    try {
-      for (auto f : files)
-      {
-        if (itksys::SystemTools::FileExists(f, true))
-        {
-          mitk::Image::Pointer image = mitk::IOUtil::Load<mitk::Image>(f);
-          if (image.IsNotNull())
-          {
-            typedef mitk::ImageToItk< TYPE > CasterType;
-            typename CasterType::Pointer caster = CasterType::New();
-            caster->SetInput(image);
-            caster->Update();
-            typename TYPE::Pointer itk_image = caster->GetOutput();
-
-            out.push_back(itk_image);
-            if (filenames!=nullptr)
-              filenames->push_back(f);
-          }
-        }
-        else if (itksys::SystemTools::PathExists(f))
-        {
-          if (!f.empty() && f.back() != '/')
-            f += "/";
-
-          auto list = get_file_list(f, {".nrrd",".nii.gz",".nii"});
-          for (auto file : list)
-          {
-            mitk::Image::Pointer image = mitk::IOUtil::Load<mitk::Image>(file);
-            if (image.IsNotNull())
-            {
-              typedef mitk::ImageToItk< TYPE > CasterType;
-              typename CasterType::Pointer caster = CasterType::New();
-              caster->SetInput(image);
-              caster->Update();
-              typename TYPE::Pointer itk_image = caster->GetOutput();
-
-              out.push_back(itk_image);
-              if (filenames!=nullptr)
-                filenames->push_back(file);
-            }
-          }
-        }
-      }
-    }
-    catch (const itk::ExceptionObject& e)
-    {
-      std::cout.clear();
-      std::cout << e.what();
-      return out;
-    }
-    catch (std::exception& e)
-    {
-      std::cout.clear();
-      std::cout << e.what();
-      return out;
-    }
-    catch (...)
-    {
-      std::cout.clear();
-      std::cout << "ERROR!?!";
-      return out;
-    }
-
-    std::cout.clear();
-    MITK_INFO << "Loaded " << out.size() << " images";
-    return out;
   }
 
 };

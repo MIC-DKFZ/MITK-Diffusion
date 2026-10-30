@@ -36,6 +36,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkKurtosisFitFunctor.h>
 #include <mitkDiffusionImageEditing.h>
 #include <mitkIOUtil.h>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkProperties.h>
 #include <mitkImageCast.h>
@@ -66,7 +67,8 @@ int main(int argc, char* argv[])
 
   // mandatory arguments
   std::string inName = us::any_cast<std::string>(parsedArgs["i"]);
-  std::string outName = us::any_cast<std::string>(parsedArgs["o"]);
+  // The stem of the _ADC.dwi, _AKC.dwi and _BiExp.dwi outputs.
+  std::string outName = mitk::DiffusionDataIOHelper::GetPathWithoutExtension(us::any_cast<std::string>(parsedArgs["o"]));
   bool applyADC = parsedArgs.count("adc") && us::any_cast<bool>(parsedArgs["adc"]);
   bool applyAKC = parsedArgs.count("akc") && us::any_cast<bool>(parsedArgs["akc"]);
   bool applyBiExp = parsedArgs.count("biexp") && us::any_cast<bool>(parsedArgs["biexp"]);
