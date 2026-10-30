@@ -39,6 +39,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <array>
 #include <map>
 #include <numeric>
+#include <functional>
 #include <vnl/vnl_matrix.h>
 #include <vnl/vnl_vector.h>
 #include <vnl/algo/vnl_svd.h>
@@ -611,6 +612,18 @@ namespace itk {
       return transforms + fit + numGroups*L*numTicks < exactCost;
     };
 
+    // In parallel when the slice job has more than one work unit (with few volumes the setup took longer
+    // than the exact sum in all work units); each index writes its own result, so the result does not
+    // depend on the threads.
+    const auto parallelFor = [this](std::size_t count, const std::function<void(std::size_t)>& function)
+    {
+      if (this->GetNumberOfWorkUnits() > 1)
+        this->GetMultiThreader()->ParallelizeArray(0, count, [&function](SizeValueType i) { function(i); }, nullptr);
+      else
+        for (std::size_t i=0; i<count; ++i)
+          function(i);
+    };
+
     unsigned int numSegments = requested > 0 ? static_cast<unsigned int>(requested) :
                                                phaseSpread > 0 ? static_cast<unsigned int>(std::ceil(1.25*phaseSpread)) + 8 : 1;
     std::vector< std::array<double, 2> > segmentV;
@@ -652,14 +665,14 @@ namespace itk {
       // energy-weighted residual of the pixels' phase factors at readout times evenly spread over the
       // distinct ones, both ends included; its RMS estimates the relative RMS error of the k-space
       std::vector< std::complex<double> > segmentPhase(signalPixels.size()*numSegments);
-      for (std::size_t i=0; i<signalPixels.size(); ++i)
+      parallelFor(signalPixels.size(), [&](std::size_t i)
       {
         const auto& ur = u[signalPixels[i]];
         for (unsigned int l=0; l<numSegments; ++l)
           segmentPhase[i*numSegments + l] = std::polar(1.0, itk::Math::twopi*(ur[0]*segmentV[l][0] + ur[1]*segmentV[l][1]));
-      }
+      });
       std::vector< double > residual(numResidualSamples, 0.0);
-      for (std::size_t s=0; s<numResidualSamples; ++s)
+      parallelFor(numResidualSamples, [&](std::size_t s)
       {
         const std::size_t index = numResidualSamples==1 ? 0 : s*(distinct.size()-1)/(numResidualSamples-1);
         const auto& vt = v[distinct[index]];
@@ -676,7 +689,7 @@ namespace itk {
           sum += energy[signalPixels[i]]*std::norm(std::polar(1.0, itk::Math::twopi*(ur[0]*vt[0] + ur[1]*vt[1])) - fitted);
         }
         residual[s] = sum;
-      }
+      });
       if (std::accumulate(residual.begin(), residual.end(), 0.0) <= 1e-8*totalEnergy*numResidualSamples)
         break;
       numSegments = static_cast<unsigned int>(std::ceil(1.25*numSegments));
@@ -685,16 +698,16 @@ namespace itk {
     // least-squares interpolators a(v) of every distinct v
     m_SegmentWeights.assign(distinct.size()*numSegments, std::complex<double>(0, 0));
     if (numBins > 0)
-      for (std::size_t i=0; i<distinct.size(); ++i)
+      parallelFor(distinct.size(), [&](std::size_t i)
       {
         std::vector< std::complex<double> > target(numBins), a(numSegments);
         SolveSegmentWeights(pseudoInverse, binU, binWeight, v[distinct[i]], target, a);
         std::copy(a.begin(), a.end(), m_SegmentWeights.begin() + static_cast<std::ptrdiff_t>(i*numSegments));
-      }
+      });
 
     // spectra of every group times the phase factor at every segment time
     m_CompartmentSpectra.assign(numGroups*numSegments, std::vector< std::complex<double> >());
-    for (std::size_t l=0; l<numSegments; ++l)
+    parallelFor(numSegments, [&](std::size_t l)
     {
       std::vector< std::complex<double> > phase(numPixels);
       for (std::size_t r=0; r<numPixels; ++r)
@@ -732,7 +745,7 @@ namespace itk {
         }
         m_CompartmentSpectra[g*numSegments + l] = std::move(spectrum);
       }
-    }
+    });
     m_NumSegments = numSegments;
   }
 
