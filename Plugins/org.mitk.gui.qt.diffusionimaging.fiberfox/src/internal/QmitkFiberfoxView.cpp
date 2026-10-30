@@ -424,6 +424,8 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_GeometryMessage->setVisible(false);
     m_Controls->m_AdvancedSignalOptionsFrame->setVisible(false);
     m_Controls->m_NoiseFrame->setVisible(false);
+    m_Controls->m_NoiseCoilsLabel->setVisible(false);
+    m_Controls->m_NoiseCoilsBox->setVisible(false);
     m_Controls->m_ZeroRinging->setVisible(false);
     m_Controls->m_GhostFrame->setVisible(false);
     m_Controls->m_DistortionsFrame->setVisible(false);
@@ -485,6 +487,12 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     connect((QObject*) m_Controls->m_AbortSimulationButton, SIGNAL(clicked()), (QObject*) this, SLOT(KillThread()));
     connect((QObject*) m_Controls->m_GenerateImageButton, SIGNAL(clicked()), (QObject*) this, SLOT(GenerateImage()));
     connect((QObject*) m_Controls->m_AddNoise, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddNoise(int)));
+    // the noise channel count is a parameter of the noncentral chi distribution (index 2) only
+    connect(m_Controls->m_NoiseDistributionBox, &QComboBox::currentIndexChanged, this, [this](int index)
+    {
+      m_Controls->m_NoiseCoilsLabel->setVisible(index==2);
+      m_Controls->m_NoiseCoilsBox->setVisible(index==2);
+    });
     connect((QObject*) m_Controls->m_AddGhosts, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddGhosts(int)));
     connect((QObject*) m_Controls->m_AddDistortions, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddDistortions(int)));
     connect((QObject*) m_Controls->m_AddEddy, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddEddy(int)));
@@ -926,9 +934,10 @@ void QmitkFiberfoxView::ReadNoise()
     {
       if (m_Parameters.m_SignalGen.m_NoiseVariance>0)
       {
-        // the magnitude noise of the "Number of Channels" coils, without simulating each coil
+        // The magnitude noise of "Channels" coils, without simulating each coil. Its own box, not
+        // "Number of Channels" (the coils simulated in k-space): .ffp files keep both counts.
         auto chi = std::make_shared< mitk::NoncentralChiNoiseModel<mitk::ScalarType> >();
-        chi->SetNumberOfCoils(m_Parameters.m_SignalGen.m_NumberOfCoils);
+        chi->SetNumberOfCoils(m_Controls->m_NoiseCoilsBox->value());
         m_Parameters.m_NoiseModel = chi;
         m_Parameters.m_Misc.m_ArtifactModelString += "_NONCENTRAL-CHI-";
         m_Parameters.m_NoiseModel->SetNoiseVariance(m_Parameters.m_SignalGen.m_NoiseVariance);
@@ -1270,8 +1279,11 @@ void QmitkFiberfoxView::SetResultProperties()
   if (misc.m_DoAddNoise && signalGen.m_NoiseVariance>0)
   {
     std::string distribution = "Complex Gaussian";   // in k-space, without a noise model
-    if (dynamic_cast<mitk::NoncentralChiNoiseModel<mitk::ScalarType>*>(m_Parameters.m_NoiseModel.get()))
+    if (auto chi = dynamic_cast<mitk::NoncentralChiNoiseModel<mitk::ScalarType>*>(m_Parameters.m_NoiseModel.get()))
+    {
       distribution = "Noncentral chi";
+      node->SetProperty("Fiberfox.Noise-Channels", mitk::IntProperty::New(static_cast<int>(chi->GetNumberOfCoils())));
+    }
     else if (m_Parameters.m_NoiseModel)
       distribution = "Rician";
     node->SetProperty("Fiberfox.Noise-Distribution", mitk::StringProperty::New(distribution));
@@ -1524,9 +1536,8 @@ void QmitkFiberfoxView::LoadParameters()
     m_Controls->m_NoiseDistributionBox->setCurrentIndex(1);
     if (auto chi = dynamic_cast<mitk::NoncentralChiNoiseModel<double>*>(m_Parameters.m_NoiseModel.get()))
     {
-      // the view takes the coil count of the noise from "Number of Channels"
       m_Controls->m_NoiseDistributionBox->setCurrentIndex(2);
-      m_Controls->m_NumCoilsBox->setValue(chi->GetNumberOfCoils());
+      m_Controls->m_NoiseCoilsBox->setValue(chi->GetNumberOfCoils());
     }
     m_Controls->m_NoiseLevel->setValue(m_Parameters.m_NoiseModel->GetNoiseVariance());
   }
