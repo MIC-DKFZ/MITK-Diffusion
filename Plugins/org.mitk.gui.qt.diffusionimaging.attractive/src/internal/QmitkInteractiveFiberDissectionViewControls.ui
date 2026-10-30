@@ -273,7 +273,7 @@ QGroupBox {
              </property>
              <property name="icon">
               <iconset>
-               <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</iconset>
+               <normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</iconset>
              </property>
              <property name="iconSize">
               <size>
@@ -415,7 +415,7 @@ QGroupBox {
              </property>
              <property name="icon">
               <iconset>
-               <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</iconset>
+               <normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</iconset>
              </property>
              <property name="iconSize">
               <size>
@@ -458,7 +458,7 @@ QGroupBox {
              </property>
              <property name="icon">
               <iconset>
-               <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</iconset>
+               <normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</iconset>
              </property>
              <property name="iconSize">
               <size>
@@ -520,7 +520,7 @@ QGroupBox {
              </property>
              <property name="icon">
               <iconset>
-               <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/eraze.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/eraze.png</iconset>
+               <normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/eraze.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/eraze.png</iconset>
              </property>
              <property name="iconSize">
               <size>
@@ -729,7 +729,7 @@ QGroupBox {
              </property>
              <property name="icon">
               <iconset>
-               <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</iconset>
+               <normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</iconset>
              </property>
              <property name="iconSize">
               <size>
@@ -785,7 +785,7 @@ QGroupBox {
              </property>
              <property name="icon">
               <iconset>
-               <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/brush.png</iconset>
+               <normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/brush.png</iconset>
              </property>
              <property name="iconSize">
               <size>
@@ -929,7 +929,7 @@ QGroupBox {
              </property>
              <property name="icon">
               <iconset>
-               <normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/eraze.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.fiberprocessing/resources/eraze.png</iconset>
+               <normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/eraze.png</normaloff>:/org.mitk.gui.qt.diffusionimaging.attractive/resources/eraze.png</iconset>
              </property>
              <property name="iconSize">
               <size>

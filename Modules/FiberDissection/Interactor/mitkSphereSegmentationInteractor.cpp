@@ -44,7 +44,6 @@ found in the LICENSE file.
 #include "mitkSurface.h"
 #include "mitkFiberBundle.h"
 #include "mitkInteractionPositionEvent.h"
-#include <mitkLabelSetImage.h>
 
 #include <vtkSphereSource.h>
 

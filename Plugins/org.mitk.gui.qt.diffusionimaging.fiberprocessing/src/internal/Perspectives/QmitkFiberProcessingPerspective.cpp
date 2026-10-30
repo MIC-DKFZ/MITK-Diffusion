@@ -16,6 +16,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkFiberProcessingPerspective.h"
 #include "berryIViewLayout.h"
+#include <berryIViewRegistry.h>
+#include <berryIWorkbench.h>
+#include <berryPlatformUI.h>
 
 void QmitkFiberProcessingPerspective::CreateInitialLayout(berry::IPageLayout::Pointer layout)
 {
@@ -46,6 +49,9 @@ void QmitkFiberProcessingPerspective::CreateInitialLayout(berry::IPageLayout::Po
 
   left->AddView("org.mitk.views.fiberprocessing");
   left->AddView("org.mitk.views.fiberquantification");
-  left->AddView("org.mitk.views.interactivefiberdissection");
+  // atTRACTive is a plugin of its own that builds only with OpenCV.
+  const QString attractive = "org.mitk.views.interactivefiberdissection";
+  if (berry::PlatformUI::GetWorkbench()->GetViewRegistry()->Find(attractive).IsNotNull())
+    left->AddView(attractive);
   left->AddView("org.mitk.views.fiberclustering");
 }

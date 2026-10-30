@@ -55,6 +55,7 @@ set(BUILD_DiffusionIVIMCmdApps OFF CACHE BOOL "" FORCE)
 # plugins
 set("MITK_BUILD_org.mitk.gui.qt.viewnavigator" ON CACHE BOOL "" FORCE) # always ON
 
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.attractive" OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.controls" OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.denoising" OFF CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.fiberfox" OFF CACHE BOOL "" FORCE)

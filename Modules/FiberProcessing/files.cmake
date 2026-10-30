@@ -9,6 +9,7 @@ set(H_FILES
   FiberModification/itkFiberExtractionFilter.h
   FiberModification/mitkFiberWeightsFile.h
   FiberModification/mitkDerivedFiberBundle.h
+  FiberModification/mitkPlanarFigureRoiImage.h
 
   # Clustering
   FiberClustering/mitkTractClusteringFilter.h
@@ -26,6 +27,7 @@ set(CPP_FILES
   FiberClustering/mitkTractClusteringFilter.cpp
   FiberModification/itkFiberCurvatureFilter.cpp
   FiberModification/mitkFiberWeightsFile.cpp
+  FiberModification/mitkPlanarFigureRoiImage.cpp
 )
 
 set(RESOURCE_FILES
