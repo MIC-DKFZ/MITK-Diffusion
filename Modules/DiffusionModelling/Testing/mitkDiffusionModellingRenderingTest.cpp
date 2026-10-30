@@ -34,6 +34,7 @@ found in the LICENSE file.
 #include <vtkUnsignedCharArray.h>
 #include <vtkSmartPointer.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <optional>
@@ -57,6 +58,8 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_NormalizationScaleAndColours);
   MITK_TEST(GlyphGenerator_ShMatchesOdfOfBothConventions);
   MITK_TEST(GlyphGenerator_Order2ShIsNoTensor);
+  MITK_TEST(GlyphGenerator_TensorOdfs_MatchOdfImage);
+  MITK_TEST(GlyphGenerator_TensorEllipsoid_Semiaxes);
   MITK_TEST(GlyphGenerator_UnsupportedImage_Throws);
   MITK_TEST(OdfMapper_DefaultProperties_KeepExistingValues);
   CPPUNIT_TEST_SUITE_END();
@@ -382,6 +385,65 @@ public:
     {
       for (int c = 0; c < 3; ++c)
         CPPUNIT_ASSERT_EQUAL(static_cast<int>(std::fabs(direction[c]) * 255), int(colors->GetTypedComponent(i, c)));
+    }
+  }
+
+  // Tensor glyphs in ODF mode are the ODFs that convert::GetOdfFromTensorImage computes, so the
+  // generator reads the six tensor elements in the order of the tensor filters.
+  void GlyphGenerator_TensorOdfs_MatchOdfImage()
+  {
+    auto tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
+    auto odfs = mitk::convert::GetOdfFromTensorImage(tensors);
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*tensors, 0, *Plane(0, 0, tensors->GetGeometry()->GetCenter()[2], 0, 0, 1));
+    CPPUNIT_ASSERT(slice.has_value());
+    auto tensorGlyphs = mitk::OdfGlyphGenerator::Generate(*tensors, 0, *slice, nullptr, AllGlyphs());
+    auto odfGlyphs = mitk::OdfGlyphGenerator::Generate(*odfs, 0, *slice, nullptr, AllGlyphs());
+    CPPUNIT_ASSERT(tensorGlyphs->GetNumberOfPoints() > 0);
+    CPPUNIT_ASSERT_EQUAL(odfGlyphs->GetNumberOfPoints(), tensorGlyphs->GetNumberOfPoints());
+    for (vtkIdType i = 0; i < tensorGlyphs->GetNumberOfPoints(); ++i)
+      for (int c = 0; c < 3; ++c)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(odfGlyphs->GetPoint(i)[c], tensorGlyphs->GetPoint(i)[c], 1e-5);
+  }
+
+  // The ellipsoid of diag(3, 1, 1) has the semi-axes 3, 1, 1 along x, y, z: the glyph point in
+  // direction u lies at 1 / sqrt(ux^2/9 + uy^2 + uz^2), normalized to the largest of the sampled
+  // directions, times half the spacing from the voxel centre.
+  void GlyphGenerator_TensorEllipsoid_Semiaxes()
+  {
+    using ItkTensorImageType = mitk::TensorImage::ItkTensorImageType;
+    auto itkImage = ItkTensorImageType::New();
+    ItkTensorImageType::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    itkImage->SetRegions(region);
+    itkImage->Allocate();
+    ItkTensorImageType::PixelType tensor;
+    tensor.Fill(0);
+    tensor(0, 0) = 3;
+    tensor(1, 1) = 1;
+    tensor(2, 2) = 1;
+    itkImage->FillBuffer(tensor);
+    auto image = mitk::TensorImage::New();
+    image->InitializeByItk(itkImage.GetPointer());
+    image->SetVolume(itkImage->GetBufferPointer());
+
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 0, 0, 0, 1));
+    CPPUNIT_ASSERT(slice.has_value());
+    auto settings = AllGlyphs();
+    settings.tensorEllipsoids = true;
+    auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(ODF_SAMPLING_SIZE), glyphs->GetNumberOfPoints());
+    std::vector<double> radii;
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+    {
+      const auto u = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>::GetDirection(i);
+      radii.push_back(1 / std::sqrt(u[0] * u[0] / 9 + u[1] * u[1] + u[2] * u[2]));
+    }
+    const double largest = *std::max_element(radii.begin(), radii.end());
+    for (vtkIdType i = 0; i < ODF_SAMPLING_SIZE; ++i)
+    {
+      const auto u = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>::GetDirection(i);
+      for (int c = 0; c < 3; ++c)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(u[c] * radii[i] / largest * 0.5, glyphs->GetPoint(i)[c], 1e-5);
     }
   }
 

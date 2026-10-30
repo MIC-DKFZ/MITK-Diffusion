@@ -23,6 +23,8 @@ found in the LICENSE file.
 #include <vtkPolyDataMapper.h>
 #include <vtkSmartPointer.h>
 
+#include <limits>
+
 namespace mitk
 {
   /**
@@ -42,6 +44,9 @@ namespace mitk
 
     vtkProp *GetVtkProp(BaseRenderer *renderer) override;
 
+    /** The glyphs are already in world coordinates; the image geometry must not move them again. */
+    void UpdateVtkTransform(BaseRenderer *) override {}
+
     static void SetDefaultProperties(DataNode *node, BaseRenderer *renderer = nullptr, bool overwrite = false);
 
     /** Name of the node property that switches the glyphs of an orientation on. */
@@ -55,12 +60,12 @@ namespace mitk
       vtkSmartPointer<vtkActor> m_Actor;
       vtkSmartPointer<vtkPolyDataMapper> m_Mapper;
 
-      /** The view the glyphs were generated for. */
-      Point3D m_LastPlaneOrigin;
-      Vector3D m_LastPlaneAxis0;
-      Vector3D m_LastPlaneAxis1;
-      Vector2D m_LastViewportSize;
-      Vector2D m_LastViewportOrigin;
+      /** The view the glyphs were generated for; NaN, which differs from every view, before the first. */
+      Point3D m_LastPlaneOrigin{std::numeric_limits<ScalarType>::quiet_NaN()};
+      Vector3D m_LastPlaneAxis0{std::numeric_limits<ScalarType>::quiet_NaN()};
+      Vector3D m_LastPlaneAxis1{std::numeric_limits<ScalarType>::quiet_NaN()};
+      Vector2D m_LastViewportSize{std::numeric_limits<ScalarType>::quiet_NaN()};
+      Vector2D m_LastViewportOrigin{std::numeric_limits<ScalarType>::quiet_NaN()};
     };
 
   protected:
