@@ -23,7 +23,7 @@ found in the LICENSE file.
 #include <vtkPolyDataMapper.h>
 #include <vtkSmartPointer.h>
 
-#include <limits>
+#include <optional>
 
 namespace mitk
 {
@@ -52,6 +52,23 @@ namespace mitk
     /** Name of the node property that switches the glyphs of an orientation on. */
     static const char *GetVisibilityPropertyName(OdfGlyphGenerator::Orientation orientation);
 
+    /** What the glyphs of a renderer are generated for. */
+    struct GlyphView
+    {
+      OdfGlyphGenerator::Slice slice;
+      Vector3D planeAxis0;
+      Vector3D planeAxis1;
+      /** The part of the plane in view. */
+      OdfGlyphGenerator::Window window;
+    };
+
+    /**
+     * Whether the glyphs of a renderer have to be generated again: for new data, new node
+     * properties or another time step (contentChanged), and for any change of the view.
+     * \param generated the view the current glyphs were generated for; none if there are none
+     */
+    static bool IsGenerationRequired(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged);
+
     class LocalStorage : public Mapper::BaseLocalStorage
     {
     public:
@@ -60,12 +77,8 @@ namespace mitk
       vtkSmartPointer<vtkActor> m_Actor;
       vtkSmartPointer<vtkPolyDataMapper> m_Mapper;
 
-      /** The view the glyphs were generated for; NaN, which differs from every view, before the first. */
-      Point3D m_LastPlaneOrigin{std::numeric_limits<ScalarType>::quiet_NaN()};
-      Vector3D m_LastPlaneAxis0{std::numeric_limits<ScalarType>::quiet_NaN()};
-      Vector3D m_LastPlaneAxis1{std::numeric_limits<ScalarType>::quiet_NaN()};
-      Vector2D m_LastViewportSize{std::numeric_limits<ScalarType>::quiet_NaN()};
-      Vector2D m_LastViewportOrigin{std::numeric_limits<ScalarType>::quiet_NaN()};
+      /** The view the glyphs were generated (or failed) for; none while no glyphs are shown. */
+      std::optional<GlyphView> m_GeneratedView;
     };
 
   protected:
@@ -77,6 +90,9 @@ namespace mitk
 
   private:
     OdfGlyphGenerator::Settings GetSettings() const;
+
+    /** The view to draw glyphs for; none if the renderer shows no glyphs of the node. */
+    std::optional<GlyphView> GetVisibleView(BaseRenderer *renderer) const;
 
     LocalStorageHandler<LocalStorage> m_LSH;
   };

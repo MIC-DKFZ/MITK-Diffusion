@@ -78,6 +78,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_ValueColours_FromLookupTable);
   MITK_TEST(GlyphGenerator_ThreadCount_SameOutput);
   MITK_TEST(OdfMapper_DefaultProperties_KeepExistingValues);
+  MITK_TEST(OdfMapper_GenerationRequired);
   CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -1024,6 +1025,56 @@ public:
     CPPUNIT_ASSERT(node->GetBoolProperty("VisibleOdfs_T", visibleOdfs) && !visibleOdfs);
     CPPUNIT_ASSERT(node->GetFloatProperty("Scaling", scaling) && scaling == 3);
     CPPUNIT_ASSERT(node->GetIntProperty("layer", layer) && layer == 100);
+  }
+
+  /** A view of layer 1 of an image, with a window of 20 x 10 mm around (5, 6, 3). */
+  static mitk::OdfVtkMapper2D::GlyphView MakeGlyphView()
+  {
+    mitk::OdfVtkMapper2D::GlyphView view;
+    view.slice.normalAxis = 2;
+    view.slice.index = 1;
+    view.slice.planeIndex = 1;
+    view.planeAxis0.Fill(0);
+    view.planeAxis0[0] = 100;
+    view.planeAxis1.Fill(0);
+    view.planeAxis1[1] = 80;
+    view.window.center[0] = 5;
+    view.window.center[1] = 6;
+    view.window.center[2] = 3;
+    view.window.axis1.Fill(0);
+    view.window.axis1[0] = 1;
+    view.window.axis2.Fill(0);
+    view.window.axis2[1] = 1;
+    view.window.halfSize1 = 10;
+    view.window.halfSize2 = 5;
+    return view;
+  }
+
+  // The rule of the 2D mapper: glyphs are generated the first time, for new content and for a
+  // change of the slice, the plane axes or the part of the plane in view.
+  void OdfMapper_GenerationRequired()
+  {
+    using GlyphView = mitk::OdfVtkMapper2D::GlyphView;
+    const GlyphView generated = MakeGlyphView();
+    CPPUNIT_ASSERT(mitk::OdfVtkMapper2D::IsGenerationRequired(std::nullopt, generated, false));
+    CPPUNIT_ASSERT(!mitk::OdfVtkMapper2D::IsGenerationRequired(generated, generated, false));
+    CPPUNIT_ASSERT(mitk::OdfVtkMapper2D::IsGenerationRequired(generated, generated, true));
+
+    const std::pair<std::string, std::function<void(GlyphView &)>> changes[] = {
+      {"normal axis", [](GlyphView &v) { v.slice.normalAxis = 1; }},
+      {"slice index", [](GlyphView &v) { v.slice.index = 2; }},
+      {"plane index", [](GlyphView &v) { v.slice.planeIndex = 1.2; }},
+      {"plane axis 0", [](GlyphView &v) { v.planeAxis0[1] = 1; }},
+      {"plane axis 1", [](GlyphView &v) { v.planeAxis1[0] = 1; }},
+      {"pan", [](GlyphView &v) { v.window.center[0] += 0.5; }},
+      {"zoom", [](GlyphView &v) { v.window.halfSize1 *= 1.1; v.window.halfSize2 *= 1.1; }},
+      {"window axes", [](GlyphView &v) { std::swap(v.window.axis1, v.window.axis2); }}};
+    for (const auto &[name, change] : changes)
+    {
+      GlyphView current = generated;
+      change(current);
+      CPPUNIT_ASSERT_MESSAGE(name, mitk::OdfVtkMapper2D::IsGenerationRequired(generated, current, false));
+    }
   }
 };
 

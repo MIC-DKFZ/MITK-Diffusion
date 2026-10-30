@@ -72,68 +72,97 @@ mitk::OdfGlyphGenerator::Settings mitk::OdfVtkMapper2D::GetSettings() const
   return settings;
 }
 
-void mitk::OdfVtkMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
+namespace
 {
-  LocalStorage *localStorage = m_LSH.GetLocalStorage(renderer);
+  bool SameWindow(const mitk::OdfGlyphGenerator::Window &a, const mitk::OdfGlyphGenerator::Window &b)
+  {
+    return a.center == b.center && a.axis1 == b.axis1 && a.axis2 == b.axis2 && a.halfSize1 == b.halfSize1 &&
+           a.halfSize2 == b.halfSize2;
+  }
+}
+
+bool mitk::OdfVtkMapper2D::IsGenerationRequired(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged)
+{
+  if (!generated || contentChanged)
+    return true;
+  const bool sliceChanged = generated->slice.normalAxis != current.slice.normalAxis ||
+                            generated->slice.index != current.slice.index ||
+                            generated->slice.planeIndex != current.slice.planeIndex ||
+                            generated->planeAxis0 != current.planeAxis0 || generated->planeAxis1 != current.planeAxis1;
+  return sliceChanged || !SameWindow(generated->window, current.window);
+}
+
+std::optional<mitk::OdfVtkMapper2D::GlyphView> mitk::OdfVtkMapper2D::GetVisibleView(BaseRenderer *renderer) const
+{
   const DataNode *node = this->GetDataNode();
   const auto *image = dynamic_cast<const Image *>(node->GetData());
   const PlaneGeometry *plane = renderer->GetCurrentWorldPlaneGeometry();
   if (image == nullptr || plane == nullptr)
-  {
-    this->ResetMapper(renderer);
-    return;
-  }
-
-  const Vector2D viewportSize = renderer->GetViewportSizeInMM().GetVectorFromOrigin();
-  const Vector2D viewportOrigin = renderer->GetOriginInMM().GetVectorFromOrigin();
-  const bool viewChanged = localStorage->m_LastPlaneOrigin != plane->GetOrigin() ||
-                           localStorage->m_LastPlaneAxis0 != plane->GetAxisVector(0) ||
-                           localStorage->m_LastPlaneAxis1 != plane->GetAxisVector(1) ||
-                           localStorage->m_LastViewportSize != viewportSize ||
-                           localStorage->m_LastViewportOrigin != viewportOrigin;
-  // GetPropertyList(renderer) creates the renderer's list on its first call, which counts as a
-  // change; it is taken before the generate time, or the next render would regenerate once.
-  const auto propertiesTime = std::max(node->GetPropertyList()->GetMTime(), node->GetPropertyList(renderer)->GetMTime());
-  const auto lastTime = localStorage->GetLastGenerateDataTime().GetMTime();
-  if (!viewChanged && !localStorage->IsGenerateDataRequired(renderer, this, this->GetDataNode()) && lastTime >= propertiesTime)
-    return;
-
-  localStorage->UpdateGenerateDataTime();
-  localStorage->m_LastPlaneOrigin = plane->GetOrigin();
-  localStorage->m_LastPlaneAxis0 = plane->GetAxisVector(0);
-  localStorage->m_LastPlaneAxis1 = plane->GetAxisVector(1);
-  localStorage->m_LastViewportSize = viewportSize;
-  localStorage->m_LastViewportOrigin = viewportOrigin;
+    return std::nullopt;
 
   bool visible = false;
   node->GetVisibility(visible, renderer, "visible");
+  if (!visible)
+    return std::nullopt;
   const auto slice = OdfGlyphGenerator::GetSlice(*image, this->GetTimestep(), *plane);
   // Glyphs are shown only where their orientation is switched on; a missing property hides them.
   bool orientationVisible = false;
-  if (visible && slice)
+  if (slice)
     node->GetBoolProperty(GetVisibilityPropertyName(slice->orientation), orientationVisible, renderer);
   if (!orientationVisible)
-  {
-    this->ResetMapper(renderer);
-    return;
-  }
+    return std::nullopt;
+
+  GlyphView view;
+  view.slice = *slice;
+  view.planeAxis0 = plane->GetAxisVector(0);
+  view.planeAxis1 = plane->GetAxisVector(1);
 
   // The rectangle of the plane in view.
-  OdfGlyphGenerator::Window window;
+  const Vector2D viewportSize = renderer->GetViewportSizeInMM().GetVectorFromOrigin();
+  const Vector2D viewportOrigin = renderer->GetOriginInMM().GetVectorFromOrigin();
   Point2D center2D;
   center2D[0] = viewportOrigin[0] + viewportSize[0] / 2;
   center2D[1] = viewportOrigin[1] + viewportSize[1] / 2;
-  plane->Map(center2D, window.center);
-  window.axis1 = plane->GetAxisVector(0);
-  window.axis1.Normalize();
-  window.axis2 = plane->GetAxisVector(1);
-  window.axis2.Normalize();
-  window.halfSize1 = viewportSize[0] / 2;
-  window.halfSize2 = viewportSize[1] / 2;
+  plane->Map(center2D, view.window.center);
+  view.window.axis1 = view.planeAxis0;
+  view.window.axis1.Normalize();
+  view.window.axis2 = view.planeAxis1;
+  view.window.axis2.Normalize();
+  view.window.halfSize1 = viewportSize[0] / 2;
+  view.window.halfSize2 = viewportSize[1] / 2;
+  return view;
+}
 
+void mitk::OdfVtkMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
+{
+  LocalStorage *localStorage = m_LSH.GetLocalStorage(renderer);
+  const DataNode *node = this->GetDataNode();
+  // GetPropertyList(renderer) creates the renderer's list on its first call, which counts as a
+  // change; it is taken before the generate time, or the next render would regenerate once.
+  const auto propertiesTime = std::max(node->GetPropertyList()->GetMTime(), node->GetPropertyList(renderer)->GetMTime());
+  const bool contentChanged = localStorage->IsGenerateDataRequired(renderer, this, this->GetDataNode()) ||
+                              localStorage->GetLastGenerateDataTime().GetMTime() < propertiesTime;
+
+  const auto view = this->GetVisibleView(renderer);
+  if (!view)
+  {
+    if (localStorage->m_GeneratedView)
+    {
+      localStorage->m_GeneratedView.reset();
+      this->ResetMapper(renderer);
+    }
+    return;
+  }
+  if (!IsGenerationRequired(localStorage->m_GeneratedView, *view, contentChanged))
+    return;
+
+  localStorage->UpdateGenerateDataTime();
+  // Also set when the generation fails, so that the error is not repeated at every render.
+  localStorage->m_GeneratedView = view;
   try
   {
-    localStorage->m_Mapper->SetInputData(OdfGlyphGenerator::Generate(*image, this->GetTimestep(), *slice, &window, this->GetSettings()));
+    const auto *image = static_cast<const Image *>(node->GetData());
+    localStorage->m_Mapper->SetInputData(OdfGlyphGenerator::Generate(*image, this->GetTimestep(), view->slice, &view->window, this->GetSettings()));
     localStorage->m_Actor->VisibilityOn();
   }
   catch (const Exception &e)
