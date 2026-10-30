@@ -53,6 +53,7 @@ namespace itk {
     , m_IsBaseline(true)
     , m_StoreTimings(false)
     , m_NumSegments(0)
+    , m_TimeSegmentsCapped(false)
   {
     m_DiffusionGradientDirection.Fill(0.0);
     m_CoilPosition.Fill(0.0);
@@ -247,7 +248,9 @@ namespace itk {
 
     m_CompartmentSpectra.clear();
     m_SegmentWeights.clear();
+    m_SegmentWeightIndex.clear();
     m_NumSegments = 0;
+    m_TimeSegmentsCapped = false;
     const bool eddyCurrents = m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline;
     const bool distortions = m_Parameters->m_Misc.m_DoAddDistortions && (m_MovedFmap.IsNotNull() || m_Parameters->m_SignalGen.m_FrequencyMap.IsNotNull());
     if (!eddyCurrents && !distortions)
@@ -373,12 +376,16 @@ namespace itk {
    * so s(k_j) ~ sum_l a_l(j) S_l(k_j), where S_l is the spectrum of the signal times the phase factor
    * at t_l: L separable DFTs per compartment instead of a sum over all pixels per sample. a(j) is the
    * least-squares fit over the pixels' values of u, binned to a histogram weighted by signal energy:
-   * minimise sum_b w_b |exp(i 2 pi u_b . v(j)) - sum_l a_l exp(i 2 pi u_b . v_l)|^2. The segment times
-   * are spaced evenly in accumulated phase, the largest phase change between two pixels with signal
-   * summed along the readout: the eddy factor changes about five times faster at the start of an EPI
-   * readout than at the echo, and segments evenly in time missed the 0.1 % bound there (issue #47,
-   * review). The error falls steeply once L exceeds the accumulated phase in cycles (the
-   * time-bandwidth product of the fit), hence the automatic count below.
+   * minimise sum_b w_b |exp(i 2 pi u_b . v(j)) - sum_l a_l exp(i 2 pi u_b . v_l)|^2.
+   *
+   * The segment times are spaced evenly in accumulated phase, the largest phase change between two
+   * pixels with signal summed along the readout: the eddy factor changes about five times faster at
+   * the start of an EPI readout than at the echo, and segments evenly in time missed the 0.1 % bound
+   * there (issue #47, review). The error falls steeply once L exceeds the accumulated phase S in
+   * cycles (the time-bandwidth product of the fit), hence the automatic count 1.25 S + 8; it grows by
+   * a quarter until the energy-weighted RMS interpolation residual of the pixels at sampled readout
+   * times is below 1e-4. Where the time segments would cost more than the exact sum, or more memory
+   * than MAX_TIME_SEGMENT_BYTES, the slice takes the exact sum (GetTimeSegmentsCapped).
    */
   template< class ScalarType >
   void KspaceImageFilter< ScalarType >::ComputeTimeSegmentation(bool eddyCurrents, bool distortions)
@@ -480,11 +487,10 @@ namespace itk {
           lowU[d] = std::min(lowU[d], u[r][d]);
           highU[d] = std::max(highU[d], u[r][d]);
         }
-    // range(u) . range(v) per axis, for the histogram
-    double spanSpread = 0;
+    std::array<double, 2> axisSpread = {0.0, 0.0};
     for (unsigned int d=0; d<2; ++d)
-      if (highU[d] >= lowU[d])
-        spanSpread += (highU[d]-lowU[d])*span[d];
+      if (highU[d] > lowU[d])
+        axisSpread[d] = (highU[d]-lowU[d])*span[d];
 
     // Ticks in the order of their readout time (v is a function of it in every readout scheme) and the
     // phase accumulated up to each: the largest phase change (cycles) between two pixels with signal.
@@ -496,48 +502,24 @@ namespace itk {
     {
       double step = 0;
       for (unsigned int d=0; d<2; ++d)
-        if (highU[d] > lowU[d])
+        if (axisSpread[d] > 0)
           step += (highU[d]-lowU[d])*std::fabs(v[order[i]][d] - v[order[i-1]][d]);
       accumulated[i] = accumulated[i-1] + step;
     }
-
-    // Phase spread S: the phase accumulated over the readout, range(u) . range(v) for v monotone in
-    // time. The automatic count is 1.25 S + 8: issue #47 measured a relative RMS error of 1e-5 or
-    // less with it at S from 0 to 62 (S + 8 gave 4e-4 at S = 31 and 1e-3 at S = 62); the stated bound
-    // is 0.1 %.
     const double phaseSpread = accumulated.back();
-    const unsigned int numSegments = m_Parameters->m_SignalGen.m_KspaceTimeSegments > 0 ?
-          static_cast<unsigned int>(m_Parameters->m_SignalGen.m_KspaceTimeSegments) : static_cast<unsigned int>(std::ceil(1.25*phaseSpread)) + 8;
-
-    // segment times: the ticks whose accumulated phase is closest to L values evenly spaced over the readout
-    std::vector< std::array<double, 2> > segmentV;
-    for (unsigned int l=0; l<numSegments; ++l)
-    {
-      const double target = numSegments==1 ? 0.5*phaseSpread : phaseSpread*l/(numSegments-1.0);
-      auto next = std::lower_bound(accumulated.begin(), accumulated.end(), target);
-      if (next == accumulated.end() || (next != accumulated.begin() && target - *(next-1) <= *next - target))
-        --next;
-      segmentV.push_back(v[order[static_cast<std::size_t>(next - accumulated.begin())]]);
-    }
 
     // Histogram of u weighted by signal energy. The interpolators fitted at the bins hold for the
     // pixels between them if the bins sample the phase finely: 4 bins per cycle of phase spread along
-    // each axis, and at least 16 in all for a small spread (coarser if that gives more than maxBins bins).
-    const std::size_t maxBins = 512;
+    // each axis, at least 16 in all for a small spread. Fewer bins break the fit (2 per cycle gave
+    // errors above 100 % with a field map and eddy currents), so their number is not limited; it is at
+    // most the number of pixels.
     std::map< std::array<long long, 2>, std::array<double, 3> > histogram;
-    for (double coarsening = 1; ; coarsening *= 2)
     {
       std::array<double, 2> binWidth = {0.0, 0.0};
-      bool single = true;
+      const double totalSpread = axisSpread[0] + axisSpread[1];
       for (unsigned int d=0; d<2; ++d)
-        if (highU[d] > lowU[d] && span[d] > 0)
-        {
-          const double axisSpread = (highU[d]-lowU[d])*span[d];
-          const double numBins = std::ceil(std::max(4*axisSpread, 16*axisSpread/spanSpread)/coarsening);
-          binWidth[d] = (highU[d]-lowU[d])/numBins;
-          single = single && numBins <= 1;
-        }
-      histogram.clear();
+        if (axisSpread[d] > 0)
+          binWidth[d] = (highU[d]-lowU[d])/std::ceil(std::max(4*axisSpread[d], 16*axisSpread[d]/totalSpread));
       for (std::size_t r=0; r<numPixels; ++r)
       {
         if (energy[r] <= 0)
@@ -551,56 +533,178 @@ namespace itk {
         bin[1] += energy[r]*u[r][0];
         bin[2] += energy[r]*u[r][1];
       }
-      if (histogram.size() <= maxBins || single)
-        break;
+      // A field whose values cluster (e.g. one value per image column of a linear field) leaves empty
+      // bins between the clusters, where the fit is free and grows large; the pixels beside them then
+      // got errors up to 11 %. Along a single axis the empty bins in the range are therefore fitted too,
+      // at their centre with 1 % of the mean bin weight. With two axes the pixel residual check below
+      // guards against this.
+      if ((axisSpread[0] > 0) != (axisSpread[1] > 0) && !histogram.empty())
+      {
+        const unsigned int d = axisSpread[0] > 0 ? 0 : 1;
+        double meanEnergy = 0;
+        for (const auto& [key, bin] : histogram)
+          meanEnergy += bin[0];
+        meanEnergy /= histogram.size();
+        const long long first = histogram.begin()->first[d];
+        const long long last = histogram.rbegin()->first[d];
+        for (long long i=first+1; i<last; ++i)
+        {
+          std::array<long long, 2> key = {0, 0};
+          key[d] = i;
+          if (histogram.count(key) > 0)
+            continue;
+          std::array<double, 3> bin = {0.01*meanEnergy, 0, 0};
+          bin[1+d] = bin[0]*(lowU[d] + (i+0.5)*binWidth[d]);
+          histogram.emplace(key, bin);
+        }
+      }
+    }
+    // the distinct v in readout order; ticks with the same v share their interpolators (spin echo lines)
+    std::vector< std::size_t > distinct;
+    m_SegmentWeightIndex.assign(numTicks, 0);
+    {
+      std::map< std::array<double, 2>, std::size_t > seen;
+      for (const std::size_t tick : order)
+      {
+        const auto [found, inserted] = seen.emplace(v[tick], distinct.size());
+        if (inserted)
+          distinct.push_back(tick);
+        m_SegmentWeightIndex[tick] = found->second;
+      }
     }
 
-    // least-squares interpolators a(tick), the same for ticks with the same v (spin echo lines)
-    m_SegmentWeights.assign(numTicks*numSegments, std::complex<double>(0, 0));
-    if (!histogram.empty())
+    const std::size_t numBins = histogram.size();
+    std::vector< std::array<double, 2> > binU;
+    std::vector< double > binWeight;
+    for (const auto& [key, bin] : histogram)
     {
-      const std::size_t numBins = histogram.size();
-      std::vector< std::array<double, 2> > binU;
-      vnl_vector< double > binWeight(static_cast<unsigned int>(numBins));
-      for (const auto& [key, bin] : histogram)
+      binWeight.push_back(std::sqrt(bin[0]));
+      binU.push_back({bin[1]/bin[0], bin[2]/bin[0]});
+    }
+    // the pixels with signal, for the residual check
+    std::vector< std::size_t > signalPixels;
+    double totalEnergy = 0;
+    for (std::size_t r=0; r<numPixels; ++r)
+      if (energy[r] > 0)
       {
-        binWeight[static_cast<unsigned int>(binU.size())] = std::sqrt(bin[0]);
-        binU.push_back({bin[1]/bin[0], bin[2]/bin[0]});
+        signalPixels.push_back(r);
+        totalEnergy += energy[r];
       }
+    const std::size_t numResidualSamples = std::min<std::size_t>(256, distinct.size());
+
+    const int requested = m_Parameters->m_SignalGen.m_KspaceTimeSegments;
+    const std::size_t numGroups = groups.size();
+    // Operation counts in complex multiply-adds. The exact sum takes one complex exponential and a few
+    // products per pixel and sample, 25 to 35 multiply-adds' time at -O3 (issue #47, measured); 20
+    // leaves the close cases to the exact sum, which has no approximation error.
+    const double exactCost = 20.0*numTicks*numPixels;
+    const auto withinCap = [&](unsigned int numSegments)
+    {
+      const double L = numSegments;
+      const double bytes = sizeof(std::complex<double>)*L*(numGroups*numTicks + distinct.size() + numBins + signalPixels.size());
+      if (bytes > MAX_TIME_SEGMENT_BYTES)
+        return false;
+      if (requested > 0)
+        return true;
+      const double transforms = numGroups*L*(parities*ny*nkx*nx + nky*nkx*ny) + 10*L*numPixels;
+      const double fit = 8*numBins*L*L + distinct.size()*numBins*L + numResidualSamples*signalPixels.size()*L;
+      return transforms + fit + numGroups*L*numTicks < exactCost;
+    };
+
+    unsigned int numSegments = requested > 0 ? static_cast<unsigned int>(requested) :
+                                               phaseSpread > 0 ? static_cast<unsigned int>(std::ceil(1.25*phaseSpread)) + 8 : 1;
+    std::vector< std::array<double, 2> > segmentV;
+    vnl_matrix< std::complex<double> > pseudoInverse;
+    for (;;)
+    {
+      if (!withinCap(numSegments))
+      {
+        // the exact sum in DynamicThreadedGenerateData
+        m_TimeSegmentsCapped = true;
+        m_SegmentWeightIndex.clear();
+        return;
+      }
+
+      // segment times: the ticks whose accumulated phase is closest to L values evenly spaced over the readout
+      segmentV.clear();
+      for (unsigned int l=0; l<numSegments; ++l)
+      {
+        const double target = numSegments==1 ? 0.5*phaseSpread : phaseSpread*l/(numSegments-1.0);
+        auto next = std::lower_bound(accumulated.begin(), accumulated.end(), target);
+        if (next == accumulated.end() || (next != accumulated.begin() && target - *(next-1) <= *next - target))
+          --next;
+        segmentV.push_back(v[order[static_cast<std::size_t>(next - accumulated.begin())]]);
+      }
+
+      if (numBins == 0)
+        break;
+
       vnl_matrix< std::complex<double> > basis(static_cast<unsigned int>(numBins), numSegments);
       for (std::size_t b=0; b<numBins; ++b)
         for (unsigned int l=0; l<numSegments; ++l)
-          basis(static_cast<unsigned int>(b), l) = binWeight[static_cast<unsigned int>(b)]*std::polar(1.0, itk::Math::twopi*(binU[b][0]*segmentV[l][0] + binU[b][1]*segmentV[l][1]));
+          basis(static_cast<unsigned int>(b), l) = binWeight[b]*std::polar(1.0, itk::Math::twopi*(binU[b][0]*segmentV[l][0] + binU[b][1]*segmentV[l][1]));
       // nearly equal segment phases (a weak field) make the basis ill-conditioned; drop those directions
       vnl_svd< std::complex<double> > svd(basis, -1e-8);
-      const vnl_matrix< std::complex<double> > pseudoInverse = svd.pinverse();
+      pseudoInverse = svd.pinverse();
 
-      std::map< std::array<double, 2>, std::size_t > solved;
-      vnl_vector< std::complex<double> > target(static_cast<unsigned int>(numBins));
-      for (std::size_t tick=0; tick<numTicks; ++tick)
+      if (requested > 0)
+        break;
+      // energy-weighted residual of the pixels' phase factors at readout times evenly spread over the
+      // distinct ones, both ends included; its RMS estimates the relative RMS error of the k-space
+      std::vector< std::complex<double> > segmentPhase(signalPixels.size()*numSegments);
+      for (std::size_t i=0; i<signalPixels.size(); ++i)
       {
-        const auto found = solved.find(v[tick]);
-        if (found != solved.end())
-        {
-          std::copy_n(&m_SegmentWeights[found->second*numSegments], numSegments, &m_SegmentWeights[tick*numSegments]);
-          continue;
-        }
-        for (std::size_t b=0; b<numBins; ++b)
-          target[static_cast<unsigned int>(b)] = binWeight[static_cast<unsigned int>(b)]*std::polar(1.0, itk::Math::twopi*(binU[b][0]*v[tick][0] + binU[b][1]*v[tick][1]));
-        const vnl_vector< std::complex<double> > a = pseudoInverse*target;
-        std::copy_n(a.data_block(), numSegments, &m_SegmentWeights[tick*numSegments]);
-        solved.emplace(v[tick], tick);
+        const auto& ur = u[signalPixels[i]];
+        for (unsigned int l=0; l<numSegments; ++l)
+          segmentPhase[i*numSegments + l] = std::polar(1.0, itk::Math::twopi*(ur[0]*segmentV[l][0] + ur[1]*segmentV[l][1]));
       }
+      std::vector< double > residual(numResidualSamples, 0.0);
+      for (std::size_t s=0; s<numResidualSamples; ++s)
+      {
+        const std::size_t index = numResidualSamples==1 ? 0 : s*(distinct.size()-1)/(numResidualSamples-1);
+        const auto& vt = v[distinct[index]];
+        std::vector< std::complex<double> > target(numBins), a(numSegments);
+        SolveSegmentWeights(pseudoInverse, binU, binWeight, vt, target, a);
+        double sum = 0;
+        for (std::size_t i=0; i<signalPixels.size(); ++i)
+        {
+          const auto& ur = u[signalPixels[i]];
+          const std::complex<double>* phase = &segmentPhase[i*numSegments];
+          std::complex<double> fitted(0, 0);
+          for (unsigned int l=0; l<numSegments; ++l)
+            fitted += a[l]*phase[l];
+          sum += energy[signalPixels[i]]*std::norm(std::polar(1.0, itk::Math::twopi*(ur[0]*vt[0] + ur[1]*vt[1])) - fitted);
+        }
+        residual[s] = sum;
+      }
+      if (std::accumulate(residual.begin(), residual.end(), 0.0) <= 1e-8*totalEnergy*numResidualSamples)
+        break;
+      numSegments = static_cast<unsigned int>(std::ceil(1.25*numSegments));
     }
 
+    // least-squares interpolators a(v) of every distinct v
+    m_SegmentWeights.assign(distinct.size()*numSegments, std::complex<double>(0, 0));
+    if (numBins > 0)
+      for (std::size_t i=0; i<distinct.size(); ++i)
+      {
+        std::vector< std::complex<double> > target(numBins), a(numSegments);
+        SolveSegmentWeights(pseudoInverse, binU, binWeight, v[distinct[i]], target, a);
+        std::copy(a.begin(), a.end(), m_SegmentWeights.begin() + static_cast<std::ptrdiff_t>(i*numSegments));
+      }
+
     // spectra of every group times the phase factor at every segment time
-    std::vector< std::complex<double> > input(numPixels);
-    std::vector< std::complex<double> > rows(parities*ny*nkx);
-    for (const auto& group : groups)
-      for (unsigned int l=0; l<numSegments; ++l)
+    m_CompartmentSpectra.assign(numGroups*numSegments, std::vector< std::complex<double> >());
+    for (std::size_t l=0; l<numSegments; ++l)
+    {
+      std::vector< std::complex<double> > phase(numPixels);
+      for (std::size_t r=0; r<numPixels; ++r)
+        phase[r] = std::polar(1.0, itk::Math::twopi*(u[r][0]*segmentV[l][0] + u[r][1]*segmentV[l][1]));
+      std::vector< std::complex<double> > input(numPixels);
+      std::vector< std::complex<double> > rows(parities*ny*nkx);
+      for (std::size_t g=0; g<numGroups; ++g)
       {
         for (std::size_t r=0; r<numPixels; ++r)
-          input[r] = (group[r]*weight[r]) * std::polar(1.0, itk::Math::twopi*(u[r][0]*segmentV[l][0] + u[r][1]*segmentV[l][1]));
+          input[r] = (groups[g][r]*weight[r]) * phase[r];
 
         for (std::size_t p=0; p<parities; ++p)
           for (std::size_t y=0; y<ny; ++y)
@@ -626,9 +730,28 @@ namespace itk {
             spectrum[ky*nkx + kx] = sum;
           }
         }
-        m_CompartmentSpectra.push_back(std::move(spectrum));
+        m_CompartmentSpectra[g*numSegments + l] = std::move(spectrum);
       }
+    }
     m_NumSegments = numSegments;
+  }
+
+  template< class ScalarType >
+  void KspaceImageFilter< ScalarType >::SolveSegmentWeights(const vnl_matrix< std::complex<double> >& pseudoInverse, const std::vector< std::array<double, 2> >& binU,
+                                                           const std::vector< double >& binWeight, const std::array<double, 2>& v,
+                                                           std::vector< std::complex<double> >& target, std::vector< std::complex<double> >& a)
+  {
+    const std::size_t numBins = binU.size();
+    for (std::size_t b=0; b<numBins; ++b)
+      target[b] = binWeight[b]*std::polar(1.0, itk::Math::twopi*(binU[b][0]*v[0] + binU[b][1]*v[1]));
+    for (std::size_t l=0; l<a.size(); ++l)
+    {
+      const std::complex<double>* row = pseudoInverse[static_cast<unsigned int>(l)];
+      std::complex<double> sum(0, 0);
+      for (std::size_t b=0; b<numBins; ++b)
+        sum += row[b]*target[b];
+      a[l] = sum;
+    }
   }
 
   template< class ScalarType >
@@ -812,7 +935,7 @@ namespace itk {
       {
         // time-segmented approximation of the phase, see ComputeTimeSegmentation
         const std::size_t k = static_cast<std::size_t>(kIdx[1])*static_cast<std::size_t>(kxMax) + static_cast<std::size_t>(kIdx[0]);
-        const std::complex<double>* a = &m_SegmentWeights[static_cast<std::size_t>(tick)*m_NumSegments];
+        const std::complex<double>* a = &m_SegmentWeights[m_SegmentWeightIndex[static_cast<std::size_t>(tick)]*m_NumSegments];
         const std::size_t numGroups = m_CompartmentSpectra.size()/m_NumSegments;
         std::complex<double> sum(0, 0);
         for (std::size_t g=0; g<numGroups; ++g)

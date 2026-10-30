@@ -27,6 +27,8 @@ This file is based heavily on a corresponding ITK filter.
 #include <mutex>
 #include <memory>
 #include <complex>
+#include <array>
+#include <vnl/vnl_matrix.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkFiberfoxParameters.h>
 #include <mitkFiberfoxMotion.h>
@@ -84,6 +86,11 @@ namespace itk{
     itkGetMacro( TickImage, typename InputImageType::Pointer )    ///< k-space readout ordering encoded in the voxels
     itkGetMacro( RfImage, typename InputImageType::Pointer )    ///< time passed since last RF pulse encoded per voxel
     itkGetMacro( SpikeLog, std::string )
+    itkGetConstMacro( NumSegments, unsigned int )   ///< time segments of the last update; 0 for the exact sum and without distortions and eddy currents
+    itkGetConstMacro( TimeSegmentsCapped, bool )    ///< time segments were asked for, but would have cost more than the exact sum, which the last update took
+
+    /** Memory limit of the spectra and interpolators of the time segments of one slice job (one job runs per parallel volume). */
+    static constexpr double MAX_TIME_SEGMENT_BYTES = 256.0*1024*1024;
 
     void SetParameters( const mitk::FiberfoxParameters* param ){ m_Parameters = param; }
     void SetMotion( const mitk::FiberfoxMotion& motion ){ m_Motion = motion; }  ///< head motion of the volume; moves the frequency map
@@ -120,6 +127,10 @@ namespace itk{
     void ComputeDftFactors(std::vector< std::complex<double> >& factorsX, std::vector< std::complex<double> >& factorsY, std::vector< double >& weight) const;
     /** Fills m_CompartmentSpectra and m_SegmentWeights for the time-segmented approximation; see there. */
     void ComputeTimeSegmentation(bool eddyCurrents, bool distortions);
+    /** Least-squares interpolators a of the time segments at v (see ComputeTimeSegmentation); target holds the weighted phase factors of the bins. */
+    static void SolveSegmentWeights(const vnl_matrix< std::complex<double> >& pseudoInverse, const std::vector< std::array<double, 2> >& binU,
+                                    const std::vector< double >& binWeight, const std::array<double, 2>& v,
+                                    std::vector< std::complex<double> >& target, std::vector< std::complex<double> >& a);
 
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
@@ -185,7 +196,9 @@ namespace itk{
      * the other two paths.
      */
     std::vector< std::complex<double> >     m_SegmentWeights;
+    std::vector< std::size_t >              m_SegmentWeightIndex;
     unsigned int                            m_NumSegments;
+    bool                                    m_TimeSegmentsCapped;
 
   private:
 

@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVnlForwardFFTImageFilter.h>
 #include <itkVectorImage.h>
 #include <cmath>
+#include <atomic>
 #include <mitkFiberfoxParameters.h>
 #include <mitkRawShModel.h>
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
@@ -136,6 +137,7 @@ protected:
       int threadsPerSlice;
       bool storeTimings;   ///< the job of volume 0, slice 0 and coil 0 stores the readout timings
       DoubleDwiType::Pointer magnitude;
+      std::atomic<unsigned int>* cappedJobs;   ///< counts the jobs that took the exact sum instead of the time segments asked for
     };
 
     /**

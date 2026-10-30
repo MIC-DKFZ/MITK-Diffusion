@@ -29,16 +29,6 @@ found in the LICENSE file.
 #include <mitkConventionalSpinEcho.h>
 #include <mitkFastSpinEcho.h>
 
-/** The k-space filter with the count of time segments of its last update readable (0: exact sum). */
-class KspaceSegmentsProbe : public itk::KspaceImageFilter<float>
-{
-public:
-  using Self = KspaceSegmentsProbe;
-  using Pointer = itk::SmartPointer<Self>;
-  itkFactorylessNewMacro(Self)
-  unsigned int NumSegments() const { return m_NumSegments; }
-};
-
 /**
  * k-space acquisition of Fiberfox on synthetic input images (the input-image mode of the
  * simulation: no signal model, no relaxation, signal scale 1): each artifact against its
@@ -547,7 +537,7 @@ public:
       compartments.push_back(compartment);
     }
 
-    auto filter = KspaceSegmentsProbe::New();
+    auto filter = itk::KspaceImageFilter<float>::New();
     filter->SetCompartmentImages(compartments);
     filter->SetT2({90, 2000});
     filter->SetT1({900, 4000});
@@ -565,7 +555,7 @@ public:
     filter->SetDiffusionGradientDirection(gradient);
     filter->SetRandSeed(0);
     filter->Update();
-    numSegments = filter->NumSegments();
+    numSegments = filter->GetNumSegments();
     const auto* data = filter->GetOutput()->GetBufferPointer();
     return std::vector<std::complex<float>>(data, data + filter->GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels());
   }

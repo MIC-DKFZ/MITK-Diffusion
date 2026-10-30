@@ -176,6 +176,8 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
   m_PhaseImage = NewKspaceResultImage(compartment_images.at(0)->GetVectorLength());
   m_KspaceImage = NewKspaceResultImage(m_Parameters.m_SignalGen.m_NumberOfCoils);  // one value per coil
   run.coilPositions = ComputeCoilPositions();
+  std::atomic<unsigned int> cappedJobs(0);
+  run.cappedJobs = &cappedJobs;
 
   auto max_threads = omp_get_max_threads();
   // Volumes in parallel first: the k-space filter prepares each slice in one thread, and the
@@ -231,6 +233,11 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
 
   for (const auto& spikeLog : spikeLogs)
     m_SpikeLog += spikeLog;
+
+  if (cappedJobs > 0)
+    PrintToLog("\nPhase of distortions and eddy currents: exact sum in " + boost::lexical_cast<std::string>(cappedJobs.load()) + " of "
+               + boost::lexical_cast<std::string>(static_cast<unsigned int>(num_gradient_volumes)*num_slices*m_Parameters.m_SignalGen.m_NumberOfCoils)
+               + " slice jobs (slice, volume and coil), since their time segments would have taken more time or memory than it", false, true, true);
 
   PrintToLog("\n", false);
   return run.magnitude;
@@ -339,6 +346,8 @@ std::string TractsToDWIImageFilter< PixelType >::SimulateKspaceCoil(const Kspace
   const bool storeTimings = run.storeTimings && g==0 && z==0 && c==0;
   idft->SetStoreTimings(storeTimings);
   idft->Update();
+  if (idft->GetTimeSegmentsCapped())
+    ++(*run.cappedJobs);
 
   std::string spikeLog;
   if (numSpikes>0)
