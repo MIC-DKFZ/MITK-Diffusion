@@ -113,13 +113,11 @@ bool mitk::RawShModel< ScalarType >::SampleKernels(Image::Pointer diffImg, ItkUc
     adcImage = adcFilter->GetOutput();
   }
 
+  // The first b0 volume (mitk::DiffusionPropertyHelper::IsB0) normalizes the kernels.
   int b0Index = 0;
-  for (unsigned int i=0; i<mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(diffImg)->Size(); i++)
-    if (mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(diffImg)->GetElement(i).magnitude()<0.001 )
-    {
-      b0Index = i;
-      break;
-    }
+  const auto b0Indices = mitk::DiffusionPropertyHelper::GetB0Indices(mitk::DiffusionPropertyHelper::GetGradientContainer(diffImg), mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg));
+  if (!b0Indices.empty())
+    b0Index = b0Indices.front();
 
   double max = 0;
   {
