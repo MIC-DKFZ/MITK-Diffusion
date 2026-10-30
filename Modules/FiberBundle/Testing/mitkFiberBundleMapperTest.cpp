@@ -252,16 +252,35 @@ public:
     int drawnPixels = 0;
   };
 
-  /** Compares two frames of 3-component pixels; a pixel is drawn where it differs from the
-   *  background (the first pixel) by more than 10 in a channel. */
+  /** Whether the 3-component pixel starting at value i differs from the background (the first
+   *  pixel) by more than 10 in a channel */
+  static bool Drawn(const std::vector<unsigned char> &image, std::size_t i)
+  {
+    for (std::size_t c = 0; c < 3; ++c)
+      if (std::abs(static_cast<int>(image[i + c]) - static_cast<int>(image[c])) > 10)
+        return true;
+    return false;
+  }
+
+  /** Pixels drawn in the reference but not in the frame, with pixels of the frame drawn on both
+   *  sides (left and right, or above and below): holes inside the frame's tubes */
+  static int EnclosedHoles(const std::vector<unsigned char> &frame, const std::vector<unsigned char> &reference, int width)
+  {
+    const int height = static_cast<int>(frame.size() / 3) / width;
+    auto drawn = [&frame, width](int x, int y) { return Drawn(frame, 3 * (static_cast<std::size_t>(y) * width + x)); };
+    int holes = 0;
+    for (int y = 1; y + 1 < height; ++y)
+      for (int x = 1; x + 1 < width; ++x)
+        if (!drawn(x, y) && Drawn(reference, 3 * (static_cast<std::size_t>(y) * width + x)) &&
+            ((drawn(x - 1, y) && drawn(x + 1, y)) || (drawn(x, y - 1) && drawn(x, y + 1))))
+          ++holes;
+    return holes;
+  }
+
+  /** Compares two frames of 3-component pixels, drawn as in Drawn */
   static ImageDifference Compare(const std::vector<unsigned char> &a, const std::vector<unsigned char> &b)
   {
-    auto drawn = [](const std::vector<unsigned char> &image, std::size_t i) {
-      for (std::size_t c = 0; c < 3; ++c)
-        if (std::abs(static_cast<int>(image[i + c]) - static_cast<int>(image[c])) > 10)
-          return true;
-      return false;
-    };
+    auto drawn = &Drawn;
     ImageDifference result;
     int both = 0, either = 0;
     double sum = 0;
@@ -315,11 +334,16 @@ public:
     const std::vector<unsigned char> cpuTubes = Capture();
 
     const ImageDifference difference = Compare(gpuTubes, cpuTubes);
+    // At a bend, the quads of two segments leave a wedge open on the outer side unless they share
+    // their edge at the common point; the wedges show as background pixels inside the tube.
+    const int holes = EnclosedHoles(gpuTubes, cpuTubes, m_RenderingTestHelper.GetVtkRenderWindow()->GetSize()[0]);
     MITK_INFO << "GPU tubes: " << difference.drawnPixels << " pixels drawn, overlap with the CPU tubes "
-              << difference.overlap << ", mean colour difference " << difference.meanDifference;
+              << difference.overlap << ", mean colour difference " << difference.meanDifference
+              << ", holes inside the tubes " << holes;
     CPPUNIT_ASSERT_MESSAGE("tubes drawn", difference.drawnPixels > 10000);
     CPPUNIT_ASSERT_MESSAGE("same pixels as the CPU tubes", difference.overlap > 0.9);
     CPPUNIT_ASSERT_MESSAGE("same colours as the CPU tubes", difference.meanDifference < 20.0);
+    CPPUNIT_ASSERT_MESSAGE("no holes at the joints of the tubes", holes <= 5);
   }
 
   // Picking in the 3D window: the depth of the tube surface (MITK's world point picking reads the
