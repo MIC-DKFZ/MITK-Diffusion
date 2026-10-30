@@ -142,8 +142,10 @@ Facts the layout does not show:
   dipy's default basis (`descoteaux07`, legacy) from the FSL bvec frame, which is not MITK's FSL
   definition (taken unchanged). MITK's image reader stays the default for 4D SH NIfTI files
   (`MimeTypes_Sh4dNifti_ImageReaderIsDefault`); the SH reader ("SH Image") is chosen in the open
-  dialog or with a `PreferenceListReaderOptionsFunctor`. Older
-  coefficient files with the coefficients as vector pixels of a 3D image
+  dialog or with a `PreferenceListReaderOptionsFunctor`. That functor takes the first reader on
+  its list in ascending confidence, not in list order, so a list naming "SH Image" and a
+  `Supported` reader of the same file gets the SH reader. Older coefficient files with the
+  coefficients as vector pixels of a 3D image
   (`qBallImage_SHCoeffs.nrrd`, `StreamlineTractography/qball_image_sh.nii.gz`) get the SH reader
   offered too (confidence `PartiallySupported`, NRRD DWIs excluded), which reads them, with
   "auto", in MITK's FSL definition, the basis of those MITK versions. NIfTI peak images are
