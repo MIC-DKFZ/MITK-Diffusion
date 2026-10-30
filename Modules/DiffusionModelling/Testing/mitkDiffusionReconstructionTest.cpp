@@ -32,6 +32,7 @@ found in the LICENSE file.
 #include <itkDiffusionMultiShellQballReconstructionImageFilter.h>
 #include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
 #include <itkImageRegionConstIterator.h>
+#include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkImageRegionIterator.h>
 #include <itkTensorDerivedMeasurementsFilter.h>
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
@@ -65,6 +66,7 @@ class mitkDiffusionReconstructionTestSuite : public mitk::TestFixture
   MITK_TEST(PointShellGradients_TableAndB0);
   MITK_TEST(TensorsToDwi_WorldGradients);
   MITK_TEST(Peaks_FslConvention_SameAsMrtrix);
+  MITK_TEST(Peaks_EachAxisOnce);
   MITK_TEST(Peaks_MaskOfOtherSize_Throws);
   MITK_TEST(TensorPeaks_SameAsFilter);
   MITK_TEST(TensorIndices_MatchReferences);
@@ -455,11 +457,7 @@ public:
     return fslImage;
   }
 
-  /**
-   * The non-zero peak axes of a voxel. itk::OdfMaximaExtractionFilter keeps both of two antipodal
-   * candidates whose refined lengths are exactly equal, which depends on the last bit of the ODF
-   * values; such a duplicate axis is counted once.
-   */
+  /** The non-zero peaks of a voxel. */
   static std::vector<Direction> Peaks(const PeakItkImageType *image, const itk::Index<3> &voxel)
   {
     std::vector<Direction> peaks;
@@ -469,10 +467,7 @@ public:
       Direction peak;
       for (unsigned int c = 0; c < 3; ++c)
         peak[c] = image->GetPixel({{voxel[0], voxel[1], voxel[2], 3 * p + c}});
-      const bool duplicate = std::any_of(peaks.begin(), peaks.end(), [&peak](const Direction &other) {
-        return std::abs(dot_product(peak, other)) > std::cos(1.0 * itk::Math::pi / 180) * peak.two_norm() * other.two_norm();
-      });
-      if (peak.two_norm() > 0 && !duplicate)
+      if (peak.two_norm() > 0)
         peaks.push_back(peak);
     }
     return peaks;
@@ -509,9 +504,9 @@ public:
   }
 
   /**
-   * Mask of the voxels whose ODF varies by more than a tenth of its maximum. Every direction of an
-   * isotropic ODF (the background of sh_image_test.nii.gz) is a maximum, so its peaks depend on
-   * rounding.
+   * Mask of the voxels whose ODF varies by more than a tenth of its maximum: the isotropic
+   * background of sh_image_test.nii.gz has no peaks, and the broad maxima of weakly anisotropic
+   * ODFs move with the last bits of the coefficients.
    */
   static mitk::Image::Pointer AnisotropyMask(const mitk::ShImage *shImage, unsigned int &count)
   {
@@ -553,6 +548,52 @@ public:
     fslImage->SetShConvention(mitk::ShImage::MRTRIX);
     const auto misread = mitk::ExtractPeaks(fslImage, parameters, mask);
     CPPUNIT_ASSERT(PeakDifference(expected.peaks, misread.peaks) > 0.1);
+  }
+
+  // Of two peak candidates closer than the angular threshold only the larger is kept, also when
+  // both have exactly the same length, as the two opposite (antipodal) candidates of one axis in
+  // voxel (6, 4, 1) in MITK's convention. Isotropic voxels (the background, whose coefficients
+  // other than the first are 1e-8 of it) have no peak.
+  void Peaks_EachAxisOnce()
+  {
+    auto mrtrixImage = LoadShImage();
+    auto fslImage = ToFsl(mrtrixImage);
+    const mitk::PeakParameters parameters;
+    const double closest = std::cos(parameters.angularThreshold * itk::Math::pi / 180);
+    const itk::Index<3> antipodalPair = {{6, 4, 1}};
+
+    for (mitk::ShImage *shImage : {mrtrixImage.GetPointer(), fslImage.GetPointer()})
+    {
+      const auto result = mitk::ExtractPeaks(shImage, parameters);
+      auto peaks = result.peaks->GetItkPeakImage();
+      itk::Image<unsigned char, 3>::Pointer numberOfPeaks;
+      mitk::CastToItkImage(result.numberOfPeaks, numberOfPeaks);
+      auto coefficients = mitk::ImageToItkImage<itk::Vector<float, 15>, 3>(mrtrixImage.GetPointer());
+
+      for (itk::ImageRegionConstIteratorWithIndex<ShItkImageType> it(coefficients, coefficients->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+      {
+        const auto voxel = it.GetIndex();
+        const unsigned int count = numberOfPeaks->GetPixel(voxel);
+        std::vector<Direction> axes;
+        for (unsigned int p = 0; p < count; ++p)
+        {
+          Direction peak;
+          for (unsigned int c = 0; c < 3; ++c)
+            peak[c] = peaks->GetPixel({{voxel[0], voxel[1], voxel[2], 3 * p + c}});
+          for (const auto &other : axes)
+            CPPUNIT_ASSERT(std::abs(dot_product(peak, other)) <= closest * peak.two_norm() * other.two_norm());
+          axes.push_back(peak);
+        }
+
+        double anisotropic = 0;
+        for (unsigned int j = 1; j < 15; ++j)
+          anisotropic = std::max(anisotropic, std::abs(static_cast<double>(it.Get()[j])));
+        if (anisotropic < 1e-6 * it.Get()[0])
+          CPPUNIT_ASSERT_EQUAL(0u, count);
+        if (voxel == antipodalPair)
+          CPPUNIT_ASSERT_EQUAL(1u, count);
+      }
+    }
   }
 
   static mitk::Image::Pointer MaskLargerThan(const mitk::Image *image)

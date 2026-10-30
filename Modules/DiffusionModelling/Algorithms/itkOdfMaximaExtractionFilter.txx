@@ -27,6 +27,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageGeometry4D.h>
 #include <mitkLbfgsbMutex.h>
 
+#include <limits>
+
 namespace itk {
 
 
@@ -197,6 +199,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
       coeffs[j] = c[j];
 
     double max = 0;
+    double min = std::numeric_limits<double>::max();
     for (int i=0; i<NrOdfDirections; i++)
     {
       odf[i] = 0;
@@ -204,8 +207,13 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
         odf[i] += c[j]*m_ShBasis(i,j);
       if (odf[i]>max)
         max = odf[i];
+      if (odf[i]<min)
+        min = odf[i];
     }
-    if (max<0.0001)
+    // In an isotropic ODF every sampled direction is a maximum, and the float rounding of the
+    // values decides which of them become peaks. An ODF that varies by no more than 1e-5 of its
+    // maximum (rounding is about 1e-7) therefore has no peak.
+    if (max<0.0001 || max-min <= 1e-5*max)
     {
       advance();
       continue;
@@ -252,28 +260,25 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
 
     std::sort( candidates.begin(), candidates.end(), CompareVectors );  // sort peaks
 
-    // kick out directions to close to a larger direction
-    for (unsigned int i=0; i<candidates.size(); i++)
+    // From the largest down, a candidate closer than the angular threshold to a peak kept before
+    // is dropped. Each axis gives two opposite (antipodal) candidates, often of exactly equal
+    // length; only the first of them is kept.
+    for (const DirectionType &v1 : candidates)
     {
-      DirectionType v1 = candidates.at(i);
       double val = v1.magnitude();
       if (val<max*m_RelativePeakThreshold || val<m_AbsolutePeakThreshold)
         break;
 
       bool flag = true;
-      for (unsigned int j=0; j<candidates.size(); j++)
-        if (i!=j)
+      for (const DirectionType &v2 : final_peaks)
+      {
+        double angle = fabs(dot_product(v1,v2)/(val*v2.magnitude()));
+        if (angle>m_AngularThreshold)
         {
-          DirectionType v2 = candidates.at(j);
-          double val2 = v2.magnitude();
-          double angle = fabs(dot_product(v1,v2)/(val*val2));
-          // Of two peaks of exactly equal length both are kept, e.g. antipodal duplicates.
-          if (angle>m_AngularThreshold && val<val2)
-          {
-            flag = false;
-            break;
-          }
+          flag = false;
+          break;
         }
+      }
 
       if (flag)
         final_peaks.push_back(v1);

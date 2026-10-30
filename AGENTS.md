@@ -147,8 +147,11 @@ Facts the layout does not show:
   their order is part of the ODF file format (252 values per voxel) and of Fiberfox references.
   The single-shell Q-ball methods take volumes whose b-value rounds to 0 as b0 and need one
   non-zero shell; the multi-shell method needs b, 2b, 3b. `ReconstructQball` computes the sampled
-  ODFs only when asked (`QballParameters::sampledOdf`). `ctest -R 'ImageReconstruction|DiffusionReconstruction'`
-  runs their tests.
+  ODFs only when asked (`QballParameters::sampledOdf`). Peak extraction
+  (`itk::OdfMaximaExtractionFilter`) keeps a refined maximum only if it is farther than the
+  angular threshold from every larger one kept, so each axis appears once, and gives no peak
+  where the sampled ODF varies by at most 1e-5 of its maximum (isotropic).
+  `ctest -R 'ImageReconstruction|DiffusionReconstruction'` runs their tests.
 - `ctest -R 'mitkDiffusionModelling|PeakShImageReader|ImageReconstruction'` runs the
   `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
   display needed) and is skipped with exit code 77 where no OpenGL context can be created.
