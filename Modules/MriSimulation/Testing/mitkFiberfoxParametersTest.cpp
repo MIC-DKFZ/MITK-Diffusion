@@ -393,12 +393,17 @@ public:
     itksys::SystemTools::RemoveADirectory(folder);
   }
 
-  /** The k-space time segments are saved and loaded; files without the setting keep the exact sum (0). */
+  /**
+   * The k-space time segments are saved and loaded; files without the setting keep the exact sum (0),
+   * also when loaded into parameters that held another count, and are not reported as incomplete.
+   */
   void TimeSegmentsInFile()
   {
+    const std::string earlierFile = mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp");
     mitk::FiberfoxParameters earlier;
-    earlier.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp"), true);
+    earlier.LoadParameters(earlierFile, true);
     CPPUNIT_ASSERT_EQUAL(0, earlier.m_SignalGen.m_KspaceTimeSegments);
+    CPPUNIT_ASSERT_MESSAGE(earlier.m_MissingTags, earlier.m_MissingTags.find("kspaceTimeSegments") == std::string::npos);
 
     const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_segments_XXXXXX");
     const std::string file = folder + "/segments.ffp";
@@ -409,6 +414,8 @@ public:
       mitk::FiberfoxParameters loaded;
       loaded.LoadParameters(file, true);
       CPPUNIT_ASSERT_EQUAL(segments, loaded.m_SignalGen.m_KspaceTimeSegments);
+      loaded.LoadParameters(earlierFile, true);
+      CPPUNIT_ASSERT_EQUAL(0, loaded.m_SignalGen.m_KspaceTimeSegments);
     }
     itksys::SystemTools::RemoveADirectory(folder);
   }
