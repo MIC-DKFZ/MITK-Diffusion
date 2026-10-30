@@ -36,6 +36,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkKurtosisFitFunctor.h>
 #include <mitkDiffusionImageEditing.h>
 #include <mitkIOUtil.h>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkProperties.h>
 #include <mitkImageCast.h>
@@ -48,12 +49,12 @@ int main(int argc, char* argv[])
 
   parser.setTitle("Multishell Methods");
   parser.setCategory("Preprocessing Tools");
-  parser.setDescription("Maps a multi-shell DWI to a single shell at the target b-value with an ADC average, a kurtosis fit or a bi-exponential fit; writes <output>_ADC.dwi, _AKC.dwi, _BiExp.dwi.");
+  parser.setDescription("Maps a multi-shell DWI to a single shell at the target b-value with an ADC average, a kurtosis fit or a bi-exponential fit; writes OUTPUT_ADC.dwi, OUTPUT_AKC.dwi, OUTPUT_BiExp.dwi.");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input file", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output file", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output name OUTPUT; the extension of a known file type is dropped, other dots stay", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("adc", "D", mitkCommandLineParser::Bool, "ADC:", "ADC Average", us::Any(), true);
   parser.addArgument("akc", "K", mitkCommandLineParser::Bool, "Kurtosis fit:", "Kurtosis Fit", us::Any(), true);
   parser.addArgument("biexp", "B", mitkCommandLineParser::Bool, "BiExp fit:", "BiExp fit", us::Any(), true);
@@ -66,7 +67,8 @@ int main(int argc, char* argv[])
 
   // mandatory arguments
   std::string inName = us::any_cast<std::string>(parsedArgs["i"]);
-  std::string outName = us::any_cast<std::string>(parsedArgs["o"]);
+  // The stem of the _ADC.dwi, _AKC.dwi and _BiExp.dwi outputs.
+  std::string outName = mitk::DiffusionDataIOHelper::GetPathWithoutExtension(us::any_cast<std::string>(parsedArgs["o"]));
   bool applyADC = parsedArgs.count("adc") && us::any_cast<bool>(parsedArgs["adc"]);
   bool applyAKC = parsedArgs.count("akc") && us::any_cast<bool>(parsedArgs["akc"]);
   bool applyBiExp = parsedArgs.count("biexp") && us::any_cast<bool>(parsedArgs["biexp"]);

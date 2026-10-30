@@ -71,7 +71,7 @@ int main( int argc, char* argv[] )
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output Prefix: ", "Prefix for the output images", us::Any(), false);
   parser.addArgument("output_type", "", mitkCommandLineParser::String, "Output Type: ", "choose data type of output image, e.g. 'nii' or 'nrrd' ", std::string("nrrd"));
   parser.addArgument("b_threshold", "", mitkCommandLineParser::Float, "b-threshold:", "Omit smaller b-values for first fit", 170.0);
-  parser.addArgument("fit_type", "", mitkCommandLineParser::Int, "Fit:", "Jointly fit D, f and D* (0); Fit D&f with fixed D* (1); Fit D&f (high b), then fit D* (2); Linearly fit D&f (high b), then fit D* (3)", 2);
+  parser.addArgument("fit_type", "", mitkCommandLineParser::Int, "Fit:", "Jointly fit D, f and D* (0); Fit D and f with fixed D* (1); Fit D and f (high b), then fit D* (2); Linearly fit D and f (high b), then fit D* (3)", 2);
   parser.addArgument("dstar", "", mitkCommandLineParser::Float, "D*:", "Fixed D* for fit type 1", 0.06);
   parser.addArgument("mask", "m", mitkCommandLineParser::String, "Masking Image: ", "Fit only where this image is greater than 0, also below 1 (others get 0); it must have the geometry of the input", us::Any(), true, false, false, mitkCommandLineParser::Input);
 

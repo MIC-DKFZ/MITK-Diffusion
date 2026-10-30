@@ -29,9 +29,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkClusteringMetricInnerAngles.h>
 #include <mitkClusteringMetricLength.h>
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkExceptionMacro.h>
-
-typedef itksys::SystemTools ist;
 
 /*!
 \brief Spatially cluster fibers
@@ -254,7 +253,7 @@ int main(int argc, char* argv[])
     {
       mitk::FiberBundle::Pointer centroid = mitk::FiberBundle::New();
       centroid = centroid->AddBundles(centroids);
-      mitk::IOUtil::Save(centroid, out_root + ist::GetFilenameWithoutExtension(inFileName) + "_Centroids" + file_ending);
+      mitk::IOUtil::Save(centroid, out_root + mitk::DiffusionDataIOHelper::GetNameWithoutExtension(inFileName) + "_Centroids" + file_ending);
     }
   }
   catch (const itk::ExceptionObject& e)

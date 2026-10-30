@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
   parser.addArgument("", "m", mitkCommandLineParser::String, "Moving:", "moving image", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("resample", "", mitkCommandLineParser::Bool, "Resample:", "resample moving image", false);
-  parser.addArgument("coreg", "", mitkCommandLineParser::StringList, "", "additionally apply transform to these images", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("coreg", "", mitkCommandLineParser::StringList, "", "additionally apply transform to these images (files or folders); written next to the output as NAME_registered.EXT", us::Any(), true, false, false, mitkCommandLineParser::Input);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
   // load_mitk_images skips paths that do not exist; check them before the registration runs.
   for (const auto& file : coreg)
   {
-    if (!ist::FileExists(file))
+    if (!itksys::SystemTools::FileExists(file))
     {
       std::cout << "--coreg: " << file << " does not exist." << std::endl;
       return EXIT_FAILURE;
@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
     mitk::Image::Pointer registered_image = apply_transform(moving, fixed_single, reg, resample);
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(registered_image))
     {
-      std::string file_extension = itksys::SystemTools::GetFilenameExtension(o);
+      std::string file_extension = mitk::DiffusionDataIOHelper::GetExtension(o);
       if (file_extension==".nii" || file_extension==".nii.gz")
         mitk::IOUtil::Save(registered_image, "DWI_NIFTI", o);
       else
@@ -129,15 +129,15 @@ int main(int argc, char* argv[])
       mitk::IOUtil::Save(registered_image, o);
 
     // Next to the output; for an output without folder, in the working directory.
-    std::string path = ist::GetFilenamePath(o);
+    std::string path = itksys::SystemTools::GetFilenamePath(o);
     if (!path.empty())
       path += "/";
     std::vector< std::string > file_names;
     auto coreg_images = mitk::DiffusionDataIOHelper::load_mitk_images(coreg, &file_names);
     for (unsigned int i=0; i<coreg_images.size(); ++i)
     {
-      std::string ext = ist::GetFilenameExtension(file_names.at(i));
-      std::string out_name = path + ist::GetFilenameWithoutExtension(file_names.at(i)) + "_registered" + ext;
+      std::string ext = mitk::DiffusionDataIOHelper::GetExtension(file_names.at(i));
+      std::string out_name = path + mitk::DiffusionDataIOHelper::GetNameWithoutExtension(file_names.at(i)) + "_registered" + ext;
 
       registered_image = apply_transform(coreg_images.at(i), fixed_single, reg, resample);
       if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(registered_image))
