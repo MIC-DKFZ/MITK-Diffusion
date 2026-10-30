@@ -111,6 +111,14 @@ Facts the layout does not show:
   `Debug`, `set_release.txt` forces `Release`.
 - Configuring `FiberTracking` downloads a lookup-table tarball from mitk.org into its binary
   `resource/` folder, so it needs network. MITK embeds module resources only from `resource/`.
+- The readers and writers of the diffusion files are registered by the service activators of
+  `DiffusionImage`, `DiffusionModelling` and `FiberBundle` when the module's library is loaded.
+  The Workbench loads a diffusion module otherwise only when a diffusion view starts, so each of
+  the three has an `autoload/IO` module (`Mitk<Module>IO`, no code of its own) that MitkCore
+  auto-loads from `lib/MitkCore/` and that loads the module. The modules themselves cannot be
+  auto-loaded: MITK forbids depending on an auto-loaded module. `mitkDiffusionWorkbenchReadersTest`
+  (`Modules/FiberBundle/Testing/WorkbenchReaders/`, a driver that links no diffusion module) opens
+  a file of every diffusion type as the Workbench does.
 - Test data: module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each
   `Testing/` folder and read their input and references from a checkout of
   https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion-test-data (branch `main`; paths as
