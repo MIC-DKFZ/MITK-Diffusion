@@ -33,6 +33,7 @@ found in the LICENSE file.
 #include <QDoubleSpinBox>
 #include <QSpinBox>
 
+#include <algorithm>
 #include <cmath>
 
 using namespace QmitkDiffusionUiTest;
@@ -56,6 +57,7 @@ class QmitkReconstructionViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Qball_MultiShellWithoutShells_Refused);
   CPPUNIT_TEST(Quantification_TensorIndices_LevelWindowsFollowScale);
   CPPUNIT_TEST(Peaks_ShImage_NoBackgroundPeaksOnePeakAtVoxel);
+  CPPUNIT_TEST(Peaks_SegmentationMask_AsBinaryUnionOtherGridMessage);
   CPPUNIT_TEST_SUITE_END();
 
   static constexpr const char *TensorId = "org.mitk.views.tensorreconstruction";
@@ -308,6 +310,65 @@ public:
     };
     CPPUNIT_ASSERT_EQUAL(1u, peakCount(6, 4, 1));
     CPPUNIT_ASSERT_EQUAL(0u, peakCount(0, 0, 0));
+  }
+
+  void Peaks_SegmentationMask_AsBinaryUnionOtherGridMessage()
+  {
+    auto sh = LoadWithReader("sh_image_test.nii.gz", "SH Image");
+    auto *image = dynamic_cast<mitk::Image *>(sh->GetData());
+    // Two labels in two groups; the binary mask has the same voxels. Voxel (6, 4, 1), which has a
+    // peak, is in the label of the second group.
+    const VoxelSet first = [](const itk::Index<3> &i) { return i[0] < 5; };
+    const VoxelSet second = [](const itk::Index<3> &i) { return i[0] >= 5 && i[1] < 5; };
+    auto segmentation = AddNode(CreateSegmentation(image, {{1, 0, first}, {2, 1, second}}), "segmentation");
+    auto binary = AddNode(CreateMask(image, [&](const itk::Index<3> &i) { return first(i) || second(i); }), "binary");
+    binary->SetBoolProperty("binary", true);
+
+    auto *view = ShowView(PeaksId, "QmitkOdfMaximaExtractionViewControls");
+    Choose(view, "m_ImageBox", sh);
+    auto extract = [view](const mitk::DataNode::Pointer &mask) {
+      ChooseNode(view, "m_MaskBox", mask);
+      GetChild<QCommandLinkButton>(view, "m_StartPeakExtractionButton")->click();
+      CPPUNIT_ASSERT_MESSAGE(mask->GetName(), WaitFor([]() { return !GetNodesOfClass("PeakImage").empty(); }));
+      auto node = GetNodesOfClass("PeakImage").front();
+      GetDataStorage()->Remove(node);
+      return mitk::PeakImage::Pointer(dynamic_cast<mitk::PeakImage *>(node->GetData()));
+    };
+    auto withSegmentation = extract(segmentation);
+    auto withBinary = extract(binary);
+
+    const unsigned int nx = withBinary->GetDimension(0), ny = withBinary->GetDimension(1), nz = withBinary->GetDimension(2);
+    const unsigned int values = nx * ny * nz * withBinary->GetDimension(3);
+    mitk::ImageReadAccessor segmentationAccess(withSegmentation.GetPointer());
+    mitk::ImageReadAccessor binaryAccess(withBinary.GetPointer());
+    auto *fromSegmentation = static_cast<const float *>(segmentationAccess.GetData());
+    auto *fromBinary = static_cast<const float *>(binaryAccess.GetData());
+    CPPUNIT_ASSERT(std::equal(fromBinary, fromBinary + values, fromSegmentation));
+    // Peaks inside the union only; the one at (6, 4, 1) is kept.
+    unsigned int outside = 0;
+    for (unsigned int v = 0; v < values; ++v)
+    {
+      const unsigned int voxel = v % (nx * ny * nz);
+      const itk::Index<3> index = {{voxel % nx, (voxel / nx) % ny, voxel / (nx * ny)}};
+      outside += !first(index) && !second(index) && fromBinary[v] != 0 ? 1 : 0;
+    }
+    CPPUNIT_ASSERT_EQUAL(0u, outside);
+    double norm = 0;
+    for (unsigned int c = 0; c < 3; ++c)
+      norm += std::pow(fromBinary[6 + nx * (4 + ny * (1 + nz * c))], 2);
+    CPPUNIT_ASSERT(norm > 0);
+
+    // A segmentation of another grid: a message, no peak image.
+    auto other = mitk::Image::New();
+    unsigned int size[] = {10, 10, 3};
+    other->Initialize(mitk::MakeScalarPixelType<unsigned char>(), 3, size);
+    auto otherGrid = AddNode(CreateSegmentation(other, {{1, 0, first}}), "other grid");
+    ChooseNode(view, "m_MaskBox", otherGrid);
+    GetChild<QCommandLinkButton>(view, "m_StartPeakExtractionButton")->click();
+    CPPUNIT_ASSERT(WaitFor([]() { return !DialogHandler::Instance().PeekMessages().isEmpty(); }, 30000));
+    Wait(200);
+    CPPUNIT_ASSERT_EQUAL(qsizetype(1), DialogHandler::Instance().TakeMessages().size());
+    CPPUNIT_ASSERT(GetNodesOfClass("PeakImage").empty());
   }
 };
 

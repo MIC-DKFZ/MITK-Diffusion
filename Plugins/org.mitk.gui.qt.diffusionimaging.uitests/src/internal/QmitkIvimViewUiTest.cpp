@@ -55,6 +55,8 @@ class QmitkIvimViewUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(AutoThreshold_FirstVolumeWeighted_UsesFirstB0Volume);
   CPPUNIT_TEST(Preview_NonIntegerReferenceBValue_EqualsMapValues);
   CPPUNIT_TEST(Mask_RoiPreviewAndMapsInsideOnly);
+  CPPUNIT_TEST(Mask_TwoLabelSegmentation_UnionOfLabelsOtherGridMessage);
+  CPPUNIT_TEST(Mask_OneSliceSegmentation_OfferedAndUsed);
   CPPUNIT_TEST_SUITE_END();
 
   static constexpr const char *IvimId = "org.mitk.views.ivim";
@@ -272,6 +274,73 @@ public:
     auto *d = dynamic_cast<mitk::Image *>(Map("D Fit-" + method)->GetData());
     CPPUNIT_ASSERT(Voxel(d, 4, 4, 4) != 0.0);
     CPPUNIT_ASSERT_EQUAL(0.0, Voxel(d, 0, 0, 0));
+  }
+
+  void Mask_TwoLabelSegmentation_UnionOfLabelsOtherGridMessage()
+  {
+    auto dwi = Load(DwiFile);
+    auto *image = dynamic_cast<mitk::Image *>(dwi->GetData());
+    // Two labels in two groups, four voxels each, in slices 4 and 5.
+    auto block = [](const itk::Index<3> &i, itk::IndexValueType z) { return i[0] >= 4 && i[0] < 6 && i[1] >= 4 && i[1] < 6 && i[2] == z; };
+    auto segmentation = AddNode(CreateSegmentation(image, {{1, 0, [&](const itk::Index<3> &i) { return block(i, 4); }},
+                                                           {2, 1, [&](const itk::Index<3> &i) { return block(i, 5); }}}),
+                                "segmentation");
+    SelectDwi(dwi);
+    InitializeViews();
+    CPPUNIT_ASSERT(BoxOffers(m_View, "m_MaskBox", segmentation));
+    GetChild<QmitkDataStorageComboBox>(m_View, "m_MaskBox")->SetSelectedNode(segmentation);
+    Wait(50);
+    CPPUNIT_ASSERT_EQUAL(QString("Averaging 8 voxels!"), GetChild<QLabel>(m_View, "m_Warning")->text());
+
+    GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(0);
+    GetChild<QCheckBox>(m_View, "m_CheckD")->setChecked(true);
+    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    const auto name = "D Fit-" + std::to_string(GetChild<QComboBox>(m_View, "m_MethodCombo")->currentIndex() + 1);
+    auto *d = dynamic_cast<mitk::Image *>(Map(name)->GetData());
+    CPPUNIT_ASSERT(Voxel(d, 4, 4, 4) != 0.0);
+    CPPUNIT_ASSERT(Voxel(d, 5, 5, 5) != 0.0);
+    CPPUNIT_ASSERT_EQUAL(0.0, Voxel(d, 4, 4, 6));
+    CPPUNIT_ASSERT_EQUAL(0.0, Voxel(d, 0, 0, 0));
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+    GetDataStorage()->Remove(Map(name));
+
+    // A segmentation of another grid: the preview and the fit say so; no map.
+    auto other = mitk::Image::New();
+    unsigned int size[] = {11, 11, 11};
+    other->Initialize(mitk::MakeScalarPixelType<unsigned char>(), 3, size);
+    mitk::Vector3D spacing;
+    spacing.Fill(1.7);
+    other->SetSpacing(spacing);
+    auto otherGrid = AddNode(CreateSegmentation(other, {{1, 0, [](const itk::Index<3> &) { return true; }}}), "other grid");
+    GetChild<QmitkDataStorageComboBox>(m_View, "m_MaskBox")->SetSelectedNode(otherGrid);
+    Wait(50);
+    CPPUNIT_ASSERT(GetChild<QLabel>(m_View, "m_Warning")->text() != QString("Averaging 8 voxels!"));
+    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    const auto messages = DialogHandler::Instance().TakeMessages();
+    CPPUNIT_ASSERT_EQUAL(qsizetype(1), messages.size());
+    CPPUNIT_ASSERT_MESSAGE(messages.front().toStdString(), messages.front().contains("Fit failed"));
+    CPPUNIT_ASSERT(GetDataStorage()->GetNamedNode(name) == nullptr);
+  }
+
+  void Mask_OneSliceSegmentation_OfferedAndUsed()
+  {
+    // A DWI of one voxel (one slice) and a segmentation of it.
+    auto dwi = Load("dwi_voxel_b0x27_b1000x81_b2000x81_b3000x81.dwi");
+    auto segmentation = AddNode(CreateSegmentation(dynamic_cast<mitk::Image *>(dwi->GetData()), {{1, 0, [](const itk::Index<3> &) { return true; }}}),
+                                "one slice");
+    SelectDwi(dwi);
+    InitializeViews();
+    CPPUNIT_ASSERT(BoxOffers(m_View, "m_MaskBox", segmentation));
+    GetChild<QmitkDataStorageComboBox>(m_View, "m_MaskBox")->SetSelectedNode(segmentation);
+    Wait(50);
+    CPPUNIT_ASSERT_EQUAL(QString("Averaging 1 voxels!"), GetChild<QLabel>(m_View, "m_Warning")->text());
+
+    GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(0);
+    GetChild<QCheckBox>(m_View, "m_CheckD")->setChecked(true);
+    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    const auto method = std::to_string(GetChild<QComboBox>(m_View, "m_MethodCombo")->currentIndex() + 1);
+    CPPUNIT_ASSERT(Voxel(dynamic_cast<mitk::Image *>(Map("D Fit-" + method)->GetData()), 0, 0, 0) != 0.0);
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 };
 

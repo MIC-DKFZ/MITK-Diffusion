@@ -20,7 +20,7 @@ found in the LICENSE file.
 #include <mitkCoreServices.h>
 #include <mitkDiffusionTestData.h>
 #include <mitkIDataStorageService.h>
-#include <mitkImagePixelWriteAccessor.h>
+#include <mitkImageWriteAccessor.h>
 #include <mitkIOUtil.h>
 #include <mitkLog.h>
 #include <mitkRenderingManager.h>
@@ -165,11 +165,31 @@ bool QmitkDiffusionUiTest::WidgetOffers(QWidget *root, const char *widgetName, c
 
 namespace
 {
-  /** Sets the value at every voxel of a 3D image for which the function gives one. */
+  /**
+   * \brief An image on the voxel grid of the reference image. Its dimensions are given
+   * explicitly: initialized from the reference's geometry, an image of one slice would be 2D,
+   * which the mask boxes (3D binary images) do not take.
+   */
+  template <typename TPixel>
+  mitk::Image::Pointer CreateImageOnGrid(const mitk::Image *reference)
+  {
+    unsigned int dimensions[] = {reference->GetDimension(0), reference->GetDimension(1), reference->GetDimension(2)};
+    auto image = mitk::Image::New();
+    image->Initialize(mitk::MakeScalarPixelType<TPixel>(), 3, dimensions);
+    image->SetTimeGeometry(reference->GetTimeGeometry()->Clone());
+    return image;
+  }
+
+  /**
+   * \brief Sets the value at every voxel of a 3D grid for which the function gives one. A
+   * segmentation's group image of one slice may be 2D, so the voxels are addressed in the raw
+   * buffer.
+   */
   template <typename TPixel>
   void FillVoxels(mitk::Image *image, const std::function<std::optional<TPixel>(const itk::Index<3> &)> &value)
   {
-    mitk::ImagePixelWriteAccessor<TPixel, 3> access(image);
+    mitk::ImageWriteAccessor access(image);
+    auto *data = static_cast<TPixel *>(access.GetData());
     const auto size = [image](unsigned int d) { return static_cast<itk::IndexValueType>(image->GetDimension(d)); };
     itk::Index<3> index;
     for (index[2] = 0; index[2] < size(2); ++index[2])
@@ -177,7 +197,7 @@ namespace
         for (index[0] = 0; index[0] < size(0); ++index[0])
         {
           if (const auto v = value(index))
-            access.SetPixelByIndex(index, *v);
+            data[index[0] + size(0) * (index[1] + size(1) * index[2])] = *v;
         }
   }
 }
@@ -201,8 +221,7 @@ mitk::MultiLabelSegmentation::Pointer QmitkDiffusionUiTest::CreateSegmentation(c
 
 mitk::Image::Pointer QmitkDiffusionUiTest::CreateMask(const mitk::Image *reference, const VoxelSet &voxels, unsigned char value)
 {
-  auto mask = mitk::Image::New();
-  mask->Initialize(mitk::MakeScalarPixelType<unsigned char>(), *reference->GetGeometry());
+  auto mask = CreateImageOnGrid<unsigned char>(reference);
   FillVoxels<unsigned char>(mask, [&voxels, value](const itk::Index<3> &index) {
     return std::optional<unsigned char>(voxels(index) ? value : 0);
   });
@@ -211,8 +230,7 @@ mitk::Image::Pointer QmitkDiffusionUiTest::CreateMask(const mitk::Image *referen
 
 mitk::Image::Pointer QmitkDiffusionUiTest::CreateScalarImage(const mitk::Image *reference, const std::function<float(const itk::Index<3> &)> &value)
 {
-  auto image = mitk::Image::New();
-  image->Initialize(mitk::MakeScalarPixelType<float>(), *reference->GetGeometry());
+  auto image = CreateImageOnGrid<float>(reference);
   FillVoxels<float>(image, [&value](const itk::Index<3> &index) { return std::optional<float>(value(index)); });
   return image;
 }

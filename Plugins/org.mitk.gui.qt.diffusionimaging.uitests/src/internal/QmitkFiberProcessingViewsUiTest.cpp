@@ -14,6 +14,7 @@ found in the LICENSE file.
 
 #include <mitkDiffusionTestData.h>
 #include <mitkFiberBundle.h>
+#include <mitkImagePixelReadAccessor.h>
 #include <mitkIOUtil.h>
 #include <mitkPointSet.h>
 
@@ -44,6 +45,7 @@ class QmitkFiberProcessingViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Processing_BadParameters_Messages);
   CPPUNIT_TEST(Processing_TwoBundlesAndMask_ExtractAndCopy);
   CPPUNIT_TEST(Processing_SelectedBundleDeleted_NotUsed);
+  CPPUNIT_TEST(Processing_SegmentationRoi_AsBinaryMaskAlsoOneSlice);
   CPPUNIT_TEST(Quantification_EnvelopeEndingsAndReferenceImages);
   CPPUNIT_TEST(Clustering_MissingInputs_MessagesAndClusters);
   CPPUNIT_TEST_SUITE_END();
@@ -220,6 +222,55 @@ public:
     // A removal without a bundle changes nothing and does not crash.
     Remove(view, 1);
     CPPUNIT_ASSERT(GetNodesOfClass("FiberBundle").empty());
+  }
+
+  /** The bundles "passing" the ROI image, extracted below the bundle (removed from the storage). */
+  static mitk::FiberBundle::Pointer ExtractPassing(QWidget *view, const mitk::DataNode::Pointer &fib, const mitk::DataNode::Pointer &roi)
+  {
+    Select({fib, roi});
+    CPPUNIT_ASSERT_EQUAL(QString::fromStdString(roi->GetName()), GetChild<QLabel>(view, "m_PfLabel")->text());
+    GetChild<QCommandLinkButton>(view, "m_ExtractFibersButton")->click();
+    Wait(50);
+    auto derived = GetDataStorage()->GetDerivations(fib);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(roi->GetName(), 1u, derived->Size());
+    mitk::FiberBundle::Pointer result = Fibers(derived->front());
+    GetDataStorage()->Remove(derived->front());
+    return result;
+  }
+
+  void Processing_SegmentationRoi_AsBinaryMaskAlsoOneSlice()
+  {
+    auto *view = ShowProcessing();
+    GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(1);
+    GetChild<QComboBox>(view, "m_ExtractionBoxMask")->setCurrentIndex(2); // passing ROI
+    auto fib = Load("FiberProcessing/original.fib");
+    auto mask = LoadMask("FiberProcessing/MASK.nrrd");
+    auto *maskImage = dynamic_cast<mitk::Image *>(mask->GetData());
+    auto inMask = [maskImage](const itk::Index<3> &i) {
+      mitk::ImagePixelReadAccessor<unsigned char, 3> access(maskImage);
+      return access.GetPixelByIndex(i) != 0;
+    };
+
+    // The mask as two labels in two groups.
+    auto segmentation = AddNode(CreateSegmentation(maskImage, {{1, 0, [&](const itk::Index<3> &i) { return inMask(i) && i[0] < 15; }},
+                                                               {2, 1, [&](const itk::Index<3> &i) { return inMask(i) && i[0] >= 15; }}}),
+                                "segmentation");
+    auto fromMask = ExtractPassing(view, fib, mask);
+    CPPUNIT_ASSERT(fromMask->GetNumFibers() > 0);
+    CPPUNIT_ASSERT(ExtractPassing(view, fib, segmentation)->Equals(fromMask));
+
+    // A segmentation of one slice of the mask's grid, and the binary image of the same voxels.
+    auto oneSlice = mitk::Image::New();
+    unsigned int size[] = {maskImage->GetDimension(0), maskImage->GetDimension(1), 1};
+    oneSlice->Initialize(mitk::MakeScalarPixelType<unsigned char>(), 3, size);
+    oneSlice->SetOrigin(maskImage->GetGeometry()->GetOrigin());
+    auto oneSliceSegmentation = AddNode(CreateSegmentation(oneSlice, {{1, 0, inMask}}), "one slice segmentation");
+    auto oneSliceMask = AddNode(CreateMask(oneSlice, inMask), "one slice mask");
+    oneSliceMask->SetBoolProperty("binary", true);
+    auto fromOneSliceMask = ExtractPassing(view, fib, oneSliceMask);
+    CPPUNIT_ASSERT(fromOneSliceMask->GetNumFibers() > 0);
+    CPPUNIT_ASSERT(ExtractPassing(view, fib, oneSliceSegmentation)->Equals(fromOneSliceMask));
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 
   void Quantification_EnvelopeEndingsAndReferenceImages()
