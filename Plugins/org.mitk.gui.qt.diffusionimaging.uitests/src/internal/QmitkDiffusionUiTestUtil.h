@@ -78,6 +78,12 @@ namespace QmitkDiffusionUiTest
   /** The nodes whose data has this class name (GetNameOfClass()), in data storage order. */
   std::vector<mitk::DataNode::Pointer> GetNodesOfClass(const std::string &className);
 
+  /**
+   * \brief Chooses the node (nullptr: none) in a QmitkDataStorageComboBox of the view and checks
+   * that the box holds it (it lists only nodes its predicate accepts).
+   */
+  void ChooseNode(QWidget *root, const char *boxName, mitk::DataNode *node);
+
   /** Selects the nodes as the Data Manager does (workbench selection service). */
   void Select(const QList<mitk::DataNode::Pointer> &nodes);
 

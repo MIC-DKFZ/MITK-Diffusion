@@ -22,6 +22,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 // Qmitk
 #include "QmitkFiberQuantificationView.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 // Qt
 #include <QMessageBox>
 
@@ -102,6 +104,7 @@ void QmitkFiberQuantificationView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkFiberQuantificationViewControls;
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     connect( m_Controls->m_ProcessFiberBundleButton, SIGNAL(clicked()), this, SLOT(ProcessSelectedBundles()) );

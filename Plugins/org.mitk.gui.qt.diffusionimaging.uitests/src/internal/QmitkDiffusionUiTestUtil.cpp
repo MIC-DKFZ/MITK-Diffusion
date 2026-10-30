@@ -25,6 +25,8 @@ found in the LICENSE file.
 #include <mitkRenderingManager.h>
 #include <mitkWorkbenchUtil.h>
 
+#include <QmitkDataStorageComboBoxWithSelectNone.h>
+
 #include <QAbstractButton>
 #include <QApplication>
 #include <QColorDialog>
@@ -122,6 +124,20 @@ std::vector<mitk::DataNode::Pointer> QmitkDiffusionUiTest::GetNodesOfClass(const
       result.push_back(node);
   }
   return result;
+}
+
+void QmitkDiffusionUiTest::ChooseNode(QWidget *root, const char *boxName, mitk::DataNode *node)
+{
+  auto *box = GetChild<QmitkDataStorageComboBox>(root, boxName);
+  // The box with a "none" entry has a SetSelectedNode of its own, which the base class does not
+  // declare virtual.
+  if (auto *boxWithNone = qobject_cast<QmitkDataStorageComboBoxWithSelectNone *>(box))
+    boxWithNone->SetSelectedNode(node);
+  else
+    box->SetSelectedNode(node);
+  Wait(20);
+  CPPUNIT_ASSERT_MESSAGE(std::string(boxName) + " does not hold " + (node != nullptr ? node->GetName() : "none"),
+                         box->GetSelectedNode().GetPointer() == node);
 }
 
 void QmitkDiffusionUiTest::Select(const QList<mitk::DataNode::Pointer> &nodes)
