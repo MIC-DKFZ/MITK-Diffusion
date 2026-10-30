@@ -96,11 +96,11 @@ protected:
 
   mitk::ivim::FitParameters GetIvimFitParameters() const;
   /** Fits and plots the signal of the selected voxel or the ROI average. */
-  void FitIvimVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, float bval);
+  void FitIvimVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, double bval);
 
   mitk::kurtosis::FitConfiguration GetKurtosisFitConfiguration() const;
   /** Fits and plots the signal of the selected voxel or the ROI average. */
-  void FitKurtosisVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, float bval);
+  void FitKurtosisVoxel(const vnl_vector<double>& signal, DirContainerType::ConstPointer dirs, double bval);
 
   /** Adds a map below the DWI with a jet lookup table and, if given, the level window [0, max]. */
   void AddMapNode(mitk::Image* map, const QString& name, std::optional<double> levelWindowMax, mitk::DataNode* parent);

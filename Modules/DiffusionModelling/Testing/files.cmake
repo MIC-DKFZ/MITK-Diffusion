@@ -1,5 +1,6 @@
 set(MODULE_TESTS
   mitkDiffusionModellingAlgorithmsTest.cpp
+  mitkDiffusionModellingDirectionRotationTest.cpp
   mitkDiffusionModellingIOTest.cpp
   mitkDiffusionModellingRenderingTest.cpp
   mitkDiffusionReconstructionMultishellTest.cpp

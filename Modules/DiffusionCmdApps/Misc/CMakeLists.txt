@@ -8,7 +8,6 @@ mitk_diffusion_create_cmdapps(
     CopyGeometry:MitkDiffusionRegistration
     DiffusionDICOMLoader:MitkDiffusionPreprocessing
     ShToOdfImage
-    DImp
     DReg:MitkDiffusionRegistration
     FiberScreenshot:MitkTestingHelper
     PeakExtraction

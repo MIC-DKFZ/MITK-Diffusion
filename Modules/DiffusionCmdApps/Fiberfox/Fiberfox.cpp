@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLexicalCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 
 using namespace mitk;
 
@@ -43,7 +44,7 @@ static int RunFiberfox(int argc, char* argv[])
   parser.setContributor("MIC");
   parser.setDescription("Command line interface to Fiberfox." " Simulate a diffusion-weighted image from a tractogram using the specified parameter file.");
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output root:", "output folder and file prefix", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output root:", "output folder and file prefix; an extension of a known file type (e.g. .nii.gz) sets the image format and is not part of the prefix", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram or diffusion-weighted image", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("parameters", "p", mitkCommandLineParser::String, "Parameter file:", "fiberfox parameter file (.ffp)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("template", "t", mitkCommandLineParser::String, "Template image:", "use parameters of the template image", us::Any(), true, false, false, mitkCommandLineParser::Input);
@@ -111,10 +112,10 @@ static int RunFiberfox(int argc, char* argv[])
       parameters.m_Misc.m_OutputPath = itksys::SystemTools::GetCurrentWorkingDirectory() + '/';
     }
 
-    file_extension = itksys::SystemTools::GetFilenameExtension(outName);
-    if( ! itksys::SystemTools::GetFilenameWithoutExtension( outName ).empty() )
+    file_extension = mitk::DiffusionDataIOHelper::GetExtension(outName);
+    if( ! mitk::DiffusionDataIOHelper::GetNameWithoutExtension( outName ).empty() )
     {
-      parameters.m_Misc.m_OutputPrefix = itksys::SystemTools::GetFilenameWithoutExtension( outName );
+      parameters.m_Misc.m_OutputPrefix = mitk::DiffusionDataIOHelper::GetNameWithoutExtension( outName );
     }
     else
     {

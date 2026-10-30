@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "QmitkFiberfoxView.h"
 
 // MITK
+#include <mitkDiffusionMasks.h>
 #include <mitkImage.h>
 #include <mitkImageToItk.h>
 #include <mitkImageCast.h>
@@ -457,8 +458,6 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     isDiffusionImage = mitk::NodePredicateOr::New(isDiffusionImage, isOdf);
     mitk::NodePredicateNot::Pointer noDiffusionImage = mitk::NodePredicateNot::New(isDiffusionImage);
     mitk::NodePredicateAnd::Pointer isNonDiffMitkImage = mitk::NodePredicateAnd::New(isMitkImage, noDiffusionImage);
-    mitk::NodePredicateProperty::Pointer isBinaryPredicate = mitk::NodePredicateProperty::New("binary", mitk::BoolProperty::New(true));
-    mitk::NodePredicateAnd::Pointer isBinaryMitkImage = mitk::NodePredicateAnd::New( isNonDiffMitkImage, isBinaryPredicate );
 
     m_Controls->m_FrequencyMapBox->SetPredicate(isNonDiffMitkImage);
     m_Controls->m_Comp1VolumeFraction->SetPredicate(isNonDiffMitkImage);
@@ -469,7 +468,7 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_Comp3VolumeFraction->SetZeroEntryText("--");
     m_Controls->m_Comp4VolumeFraction->SetPredicate(isNonDiffMitkImage);
     m_Controls->m_Comp4VolumeFraction->SetZeroEntryText("--");
-    m_Controls->m_MaskComboBox->SetPredicate(isBinaryMitkImage);
+    m_Controls->m_MaskComboBox->SetPredicate(mitk::GetBinaryMaskPredicate());
     m_Controls->m_MaskComboBox->SetZeroEntryText("--");
     m_Controls->m_TemplateComboBox->SetPredicate(isMitkImage);
     m_Controls->m_TemplateComboBox->SetZeroEntryText("--");
@@ -540,8 +539,8 @@ void QmitkFiberfoxView::OnTlineChanged()
   }
   else if (m_Controls->m_MaskComboBox->GetSelectedNode().IsNotNull())   // use geometry of mask image
   {
-    mitk::Image::Pointer img = dynamic_cast<mitk::Image*>(m_Controls->m_MaskComboBox->GetSelectedNode()->GetData());
-    num_pix_line = img->GetDimension(0);
+    // the mask may be a segmentation, which is not an image: its index extent is the size
+    num_pix_line = m_Controls->m_MaskComboBox->GetSelectedNode()->GetData()->GetGeometry()->GetExtent(0);
   }
   else
   {
@@ -688,7 +687,7 @@ void QmitkFiberfoxView::ReadImageGeometry()
 {
   if (m_Controls->m_MaskComboBox->GetSelectedNode().IsNotNull())
   {
-    mitk::Image::Pointer mitkMaskImage = dynamic_cast<mitk::Image*>(m_Controls->m_MaskComboBox->GetSelectedNode()->GetData());
+    mitk::Image::ConstPointer mitkMaskImage = mitk::GetMaskImage(m_Controls->m_MaskComboBox->GetSelectedNode()->GetData());
     mitk::CastToItkImage<ItkUcharImgType>(mitkMaskImage, m_Parameters.m_SignalGen.m_MaskImage);
     itk::ImageDuplicator<ItkUcharImgType>::Pointer duplicator = itk::ImageDuplicator<ItkUcharImgType>::New();
     duplicator->SetInputImage(m_Parameters.m_SignalGen.m_MaskImage);

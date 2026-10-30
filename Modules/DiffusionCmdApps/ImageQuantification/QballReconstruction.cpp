@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkCommandLineParser.h"
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkDiffusionImageEditing.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkDiffusionReconstruction.h>
@@ -31,7 +32,7 @@ int main(int argc, char* argv[])
   mitkCommandLineParser parser;
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input image", "input raw dwi (.dwi or .nii/.nii.gz)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output image", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output image", "output name: SH coefficients go to NAME.nii.gz, sampled ODFs to NAME.odf; the extension of a known file type is dropped, other dots stay", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("sh_order", "", mitkCommandLineParser::Int, "Spherical harmonics order", "spherical harmonics order", 4);
   parser.addArgument("b0_threshold", "", mitkCommandLineParser::Int, "b0 threshold", "baseline image intensity threshold", 0);
   parser.addArgument("round_bvalues", "", mitkCommandLineParser::Int, "Round b-values", "round to specified integer", 0);
@@ -49,10 +50,8 @@ int main(int argc, char* argv[])
 
   std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string outfilename = us::any_cast<std::string>(parsedArgs["o"]);
-  if (itksys::SystemTools::GetFilenamePath(outfilename).size()>0)
-    outfilename = itksys::SystemTools::GetFilenamePath(outfilename)+"/"+itksys::SystemTools::GetFilenameWithoutExtension(outfilename);
-  else
-    outfilename = itksys::SystemTools::GetFilenameWithoutExtension(outfilename);
+  // The stem of the SH (.nii.gz) and ODF (.odf) outputs.
+  outfilename = mitk::DiffusionDataIOHelper::GetPathWithoutExtension(outfilename);
 
   int threshold = 0;
   if (parsedArgs.count("b0_threshold"))

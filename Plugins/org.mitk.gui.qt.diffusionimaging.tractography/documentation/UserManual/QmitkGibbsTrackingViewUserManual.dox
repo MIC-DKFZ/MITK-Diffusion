@@ -13,7 +13,7 @@ Mandatory Input:
 \li One ODF or tensor image selected in the datamanager
 
 Optional Input:
-\li Mask Image: Any 3D scalar image, e.g. a white matter probability mask. Particles are only placed in voxels with a value above 0.5; inside the mask the value weights the probability to generate fiber segments in the respective voxel. Without a mask the whole image is used. A mask without any voxel above 0.5 stops the run with a message.
+\li Mask Image: Any 3D scalar image, e.g. a white matter probability mask. Particles are only placed in voxels with a value above 0.5; inside the mask the value weights the probability to generate fiber segments in the respective voxel. A segmentation can be selected too; it counts as 1 inside its labels (also hidden ones) and 0 elsewhere. Without a mask the whole image is used. A mask without any voxel above 0.5 stops the run with a message.
 
 \section QmitkGibbsTrackingUserManualParameters Parameters
 

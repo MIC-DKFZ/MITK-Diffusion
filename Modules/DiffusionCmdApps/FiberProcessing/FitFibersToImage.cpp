@@ -30,6 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkITKImageImport.h>
 #include <mitkFiberBundleIOHelper.h>
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkLocaleSwitch.h>
 
 typedef itk::Point<float, 4> PointType4;
@@ -263,7 +264,7 @@ int main(int argc, char* argv[])
       for (unsigned int bundle=0; bundle<output_tracts.size(); bundle++)
       {
         std::string name = fib_names.at(bundle);
-        name = itksys::SystemTools::GetFilenameWithoutExtension(name);
+        name = mitk::DiffusionDataIOHelper::GetNameWithoutExtension(name);
         auto fib = output_tracts.at(bundle);
         if (filter_zero)
           fib = fib->FilterByWeights(0.0);

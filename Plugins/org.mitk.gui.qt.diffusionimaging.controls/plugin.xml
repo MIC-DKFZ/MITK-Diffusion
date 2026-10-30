@@ -49,6 +49,7 @@
 
     <view id="org.mitk.views.controlvisualizationpropertiesview"
     name="Visualization"
+    category="Visualization"
     icon="resources/vizControls.png"
     class="QmitkControlVisualizationPropertiesView">
     <keywordReference id="org.mitk.views.controlvisualizationpropertiesview.Keyword"/>
