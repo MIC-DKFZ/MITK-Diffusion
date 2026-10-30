@@ -36,6 +36,10 @@ namespace mitk
    * turned into ODFs: TensorImage (6 values), OdfImage (ODF_SAMPLING_SIZE values) or ShImage
    * (coefficients in the image's SH convention). The output has the point arrays "ODF_COLORS"
    * (RGBA) and "Normals".
+   *
+   * Glyphs that are small on screen (Settings::pixelsPerMm) are geodesic spheres of fewer
+   * directions, with the voxel's values at those directions. Their size, colour by direction and
+   * normalization still come from the ODF at the ODF_SAMPLING_SIZE directions.
    */
   class MITKDIFFUSIONMODELLING_EXPORT OdfGlyphGenerator
   {
@@ -66,6 +70,13 @@ namespace mitk
        * in which a voxel keeps its glyph while it stays in view; else every n-th voxel.
        */
       bool randomPlacement = true;
+      /**
+       * Screen pixels per mm in the plane, for the mesh of the glyphs of tensor and SH images. A
+       * glyph is at most scaling x glyph spacing x pixelsPerMm pixels wide; below 40 pixels it
+       * has 162 points (320 triangles), else the ODF_SAMPLING_SIZE points of the ODF base mesh.
+       * 0 gives every glyph the base mesh.
+       */
+      double pixelsPerMm = 0;
     };
 
     /** The voxel layer of the image a plane shows. */

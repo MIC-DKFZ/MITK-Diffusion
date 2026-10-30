@@ -15,6 +15,7 @@ found in the LICENSE file.
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkImageReadAccessor.h>
 #include <mitkOdfImage.h>
+#include <mitkPointShell.h>
 #include <mitkShImage.h>
 #include <mitkTensorImage.h>
 
@@ -29,6 +30,8 @@ found in the LICENSE file.
 #include <vtkPoints.h>
 #include <vtkUnsignedCharArray.h>
 
+#include <vnl/vnl_inverse.h>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -37,6 +40,7 @@ found in the LICENSE file.
 #include <map>
 #include <mutex>
 #include <numeric>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -51,19 +55,22 @@ namespace
     Sh
   };
 
-  /** SH basis for the glyph directions, computed on first use per coefficient count and convention. */
-  const vnl_matrix<float> &GetShBasis(unsigned int numCoefficients, bool mrtrix)
+  /**
+   * SH basis for the numDirections directions of mitk::pointshell, computed on first use per
+   * coefficient count, convention and direction count.
+   */
+  const vnl_matrix<float> &GetShBasis(unsigned int numCoefficients, bool mrtrix, unsigned int numDirections)
   {
     static std::mutex mutex;
-    static std::map<std::pair<unsigned int, bool>, vnl_matrix<float>> bases;
+    static std::map<std::tuple<unsigned int, bool, unsigned int>, vnl_matrix<float>> bases;
 
     const std::lock_guard<std::mutex> lock(mutex);
-    const auto key = std::make_pair(numCoefficients, mrtrix);
+    const auto key = std::make_tuple(numCoefficients, mrtrix, numDirections);
     auto basis = bases.find(key);
     if (basis == bases.end())
     {
       const unsigned int order = mitk::sh::ShOrder(static_cast<int>(numCoefficients));
-      basis = bases.emplace(key, mitk::sh::CalcShBasisForDirections(order, OdfType::GetDirections().as_matrix(), mrtrix)).first;
+      basis = bases.emplace(key, mitk::sh::CalcShBasisForDirections(order, mitk::pointshell::Directions(numDirections), mrtrix)).first;
     }
     return basis->second;
   }
@@ -99,18 +106,28 @@ namespace
     return odf;
   }
 
-  /** The ODF base mesh as plain arrays. */
+  /** A glyph mesh: unit directions and the triangles between them. */
   struct BaseMesh
   {
-    /** Unit directions, with the values the base mesh's float points hold. */
+    /** Unit directions; the full mesh holds the values of the ODF base mesh's float points. */
     std::vector<std::array<double, 3>> points;
-    /** Point ids of the triangles, in the order of the base mesh. */
+    /** Point ids of the triangles, counterclockwise seen from outside. */
     std::vector<std::array<vtkIdType, 3>> triangles;
     /** Per point, the triangles that contain it, in ascending order. */
     std::vector<std::vector<vtkIdType>> pointTriangles;
   };
 
-  /** Built on first use from any thread, and never changed. */
+  void FillPointTriangles(BaseMesh &mesh)
+  {
+    mesh.pointTriangles.resize(mesh.points.size());
+    for (std::size_t t = 0; t < mesh.triangles.size(); ++t)
+    {
+      for (const vtkIdType id : mesh.triangles[t])
+        mesh.pointTriangles[id].push_back(static_cast<vtkIdType>(t));
+    }
+  }
+
+  /** The ODF base mesh of the ODF_SAMPLING_SIZE directions; built on first use from any thread, and never changed. */
   const BaseMesh &GetBaseMeshArrays()
   {
     static const BaseMesh mesh = [] {
@@ -130,16 +147,280 @@ namespace
           mitkThrow() << "The ODF base mesh has a cell of " << ids->GetNumberOfIds() << " points.";
         result.triangles.push_back({ids->GetId(0), ids->GetId(1), ids->GetId(2)});
       }
-
-      result.pointTriangles.resize(result.points.size());
-      for (std::size_t t = 0; t < result.triangles.size(); ++t)
-      {
-        for (const vtkIdType id : result.triangles[t])
-          result.pointTriangles[id].push_back(static_cast<vtkIdType>(t));
-      }
+      FillPointTriangles(result);
       return result;
     }();
     return mesh;
+  }
+
+  using Direction = std::array<double, 3>;
+
+  Direction Normalized(const Direction &d)
+  {
+    const double length = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+    return {d[0] / length, d[1] / length, d[2] / length};
+  }
+
+  double Distance(const Direction &a, const Direction &b)
+  {
+    return std::sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]));
+  }
+
+  /**
+   * The geodesic sphere of the given frequency f: each face of the icosahedron of
+   * mitk::pointshell::Directions(12) divided into f^2 triangles, its points projected onto the
+   * sphere. The pointshell tables of 10 f^2 + 2 directions hold these points (to about 1e-15);
+   * the mesh's points are the table's directions in the table's order, so values at them can be
+   * computed like those of the ODF directions.
+   */
+  BaseMesh BuildGeodesicMesh(unsigned int frequency)
+  {
+    const vnl_matrix<double> &vertices = mitk::pointshell::Directions(12);
+    std::vector<Direction> icosahedron(12);
+    for (unsigned int k = 0; k < 12; ++k)
+      icosahedron[k] = Normalized({vertices(0, k), vertices(1, k), vertices(2, k)});
+
+    // The faces are the triples of vertices at edge length, the smallest distance between two.
+    double edge = std::numeric_limits<double>::max();
+    for (unsigned int a = 0; a < 12; ++a)
+      for (unsigned int b = a + 1; b < 12; ++b)
+        edge = std::min(edge, Distance(icosahedron[a], icosahedron[b]));
+    std::vector<std::array<unsigned int, 3>> faces;
+    for (unsigned int a = 0; a < 12; ++a)
+      for (unsigned int b = a + 1; b < 12; ++b)
+        for (unsigned int c = b + 1; c < 12; ++c)
+        {
+          const auto &A = icosahedron[a];
+          const auto &B = icosahedron[b];
+          const auto &C = icosahedron[c];
+          if (Distance(A, B) > 1.01 * edge || Distance(B, C) > 1.01 * edge || Distance(A, C) > 1.01 * edge)
+            continue;
+          // Counterclockwise seen from outside, as the triangles of the ODF base mesh.
+          const Direction ab = {B[0] - A[0], B[1] - A[1], B[2] - A[2]};
+          const Direction ac = {C[0] - A[0], C[1] - A[1], C[2] - A[2]};
+          const Direction normal = {ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]};
+          if (normal[0] * (A[0] + B[0] + C[0]) + normal[1] * (A[1] + B[1] + C[1]) + normal[2] * (A[2] + B[2] + C[2]) > 0)
+            faces.push_back({a, b, c});
+          else
+            faces.push_back({a, c, b});
+        }
+    if (faces.size() != 20)
+      mitkThrow() << "The 12 directions of mitk::pointshell form " << faces.size() << " icosahedron faces, not 20.";
+
+    const vnl_matrix<double> &directions = mitk::pointshell::Directions(10 * frequency * frequency + 2);
+    BaseMesh mesh;
+    for (unsigned int k = 0; k < directions.cols(); ++k)
+      mesh.points.push_back({directions(0, k), directions(1, k), directions(2, k)});
+    const auto pointId = [&mesh](const Direction &d) {
+      std::size_t nearest = 0;
+      for (std::size_t k = 1; k < mesh.points.size(); ++k)
+      {
+        if (Distance(mesh.points[k], d) < Distance(mesh.points[nearest], d))
+          nearest = k;
+      }
+      if (Distance(mesh.points[nearest], d) > 1e-6)
+        mitkThrow() << "The pointshell table of " << mesh.points.size() << " directions is no geodesic sphere.";
+      return static_cast<vtkIdType>(nearest);
+    };
+
+    for (const auto &face : faces)
+    {
+      const auto &A = icosahedron[face[0]];
+      const auto &B = icosahedron[face[1]];
+      const auto &C = icosahedron[face[2]];
+      // ids[i][j]: the point A + i/f (B - A) + j/f (C - A), i + j <= f.
+      std::vector<std::vector<vtkIdType>> ids(frequency + 1);
+      for (unsigned int i = 0; i <= frequency; ++i)
+      {
+        for (unsigned int j = 0; i + j <= frequency; ++j)
+        {
+          Direction p;
+          for (unsigned int c = 0; c < 3; ++c)
+            p[c] = A[c] + (B[c] - A[c]) * i / frequency + (C[c] - A[c]) * j / frequency;
+          ids[i].push_back(pointId(Normalized(p)));
+        }
+      }
+      for (unsigned int i = 0; i < frequency; ++i)
+      {
+        for (unsigned int j = 0; i + j < frequency; ++j)
+        {
+          mesh.triangles.push_back({ids[i][j], ids[i + 1][j], ids[i][j + 1]});
+          if (i + j + 1 < frequency)
+            mesh.triangles.push_back({ids[i + 1][j], ids[i + 1][j + 1], ids[i][j + 1]});
+        }
+      }
+    }
+    FillPointTriangles(mesh);
+    return mesh;
+  }
+
+  /** Built on first use from any thread, and never changed. */
+  template <unsigned int Frequency>
+  const BaseMesh &GetGeodesicMesh()
+  {
+    static const BaseMesh mesh = BuildGeodesicMesh(Frequency);
+    return mesh;
+  }
+
+  /**
+   * The mesh of the glyphs: the full ODF mesh, or for glyphs that are small on screen a geodesic
+   * sphere of fewer directions, which looks the same at that size and is far cheaper to build and
+   * draw. A glyph is at most scaling * glyph spacing wide (its normalized maximum is 1).
+   * ODF images always get the full mesh: their values exist only at the ODF directions.
+   */
+  const BaseMesh &ChooseMesh(VoxelKind kind, const mitk::OdfGlyphGenerator::Slice &slice, const mitk::OdfGlyphGenerator::Settings &settings)
+  {
+    if (kind != VoxelKind::Odf && settings.pixelsPerMm > 0)
+    {
+      const double widthInPixels = settings.scaling * slice.glyphSpacing * settings.pixelsPerMm;
+      if (widthInPixels < 40)
+        return GetGeodesicMesh<4>();
+    }
+    return GetBaseMeshArrays();
+  }
+
+  /** Radii of a tensor's ellipsoid in any direction, with the arithmetic of OdfType::InitFromEllipsoid. */
+  class EllipsoidRadii
+  {
+  public:
+    explicit EllipsoidRadii(const itk::DiffusionTensor3D<float> &tensor)
+    {
+      itk::FixedArray<float, 6> nullTensor;
+      nullTensor.Fill(0);
+      if (tensor == nullTensor)
+        return;
+      itk::DiffusionTensor3D<float>::EigenValuesArrayType eigenValues;
+      itk::DiffusionTensor3D<float>::EigenVectorsMatrixType eigenVectors;
+      tensor.ComputeEigenAnalysis(eigenValues, eigenVectors);
+      double a = eigenValues[0];
+      double b = eigenValues[1];
+      double c = eigenValues[2];
+      // A null tensor or one with an eigenvalue <= 0 has no ellipsoid; its glyph has size 0.
+      if (a <= 0.0 || b <= 0.0 || c <= 0.0)
+        return;
+
+      // Scaled towards 1 for a better numerical condition.
+      const float minExponent = std::fmin(std::ilogb(a), std::fmin(std::ilogb(b), std::ilogb(c)));
+      const float maxExponent = std::fmax(std::ilogb(c), std::fmax(std::ilogb(b), std::ilogb(a)));
+      const auto scaleExponent = static_cast<int>(std::floor(0.5 * (minExponent + maxExponent)));
+      m_Scaling = std::pow(2, scaleExponent);
+      m_Axes = {a / m_Scaling, b / m_Scaling, c / m_Scaling};
+      // The eigenvectors are the rows of eigenVectors.
+      for (int row = 0; row < 3; ++row)
+        for (int col = 0; col < 3; ++col)
+          m_EigenBase(row, col) = eigenVectors(col, row);
+      m_EigenBase = vnl_inverse(m_EigenBase);
+      m_Valid = true;
+    }
+
+    float operator()(const Direction &direction) const
+    {
+      if (!m_Valid)
+        return 0;
+      vnl_vector_fixed<double, 3> g(direction[0], direction[1], direction[2]);
+      g = m_EigenBase * g;
+      g = g.normalize();
+      const auto radius = static_cast<float>(m_Scaling / std::sqrt((g[0] / m_Axes[0]) * (g[0] / m_Axes[0]) + (g[1] / m_Axes[1]) * (g[1] / m_Axes[1]) + (g[2] / m_Axes[2]) * (g[2] / m_Axes[2])));
+      return radius < 0 || std::isnan(radius) ? 0 : radius;
+    }
+
+  private:
+    bool m_Valid = false;
+    double m_Scaling = 1;
+    std::array<double, 3> m_Axes = {1, 1, 1};
+    vnl_matrix_fixed<double, 3, 3> m_EigenBase;
+  };
+
+  /** g^T D g with the arithmetic of OdfType::InitFromTensor. */
+  float TensorOdfValue(const itk::DiffusionTensor3D<float> &tensor, const Direction &direction)
+  {
+    const auto g0 = static_cast<float>(direction[0]);
+    const auto g1 = static_cast<float>(direction[1]);
+    const auto g2 = static_cast<float>(direction[2]);
+    const float value = g0 * (tensor[0] * g0 + tensor[1] * g1 + tensor[2] * g2) +
+                        g1 * (tensor[1] * g0 + tensor[3] * g1 + tensor[4] * g2) +
+                        g2 * (tensor[2] * g0 + tensor[4] * g1 + tensor[5] * g2);
+    return value < 0 || std::isnan(value) ? 0 : value;
+  }
+
+  /**
+   * The voxel's values at the points of a coarse mesh, computed at its directions as ToOdf does at
+   * the ODF directions.
+   * \param meshShBasis the SH basis at the mesh's directions, for SH images
+   */
+  void SampleMesh(VoxelKind kind, const float *values, unsigned int numComponents, const vnl_matrix<float> *meshShBasis, bool tensorEllipsoids, const BaseMesh &mesh, float *result)
+  {
+    switch (kind)
+    {
+      case VoxelKind::Tensor:
+      {
+        const itk::DiffusionTensor3D<float> tensor(values);
+        if (tensorEllipsoids)
+        {
+          const EllipsoidRadii radii(tensor);
+          for (std::size_t j = 0; j < mesh.points.size(); ++j)
+            result[j] = radii(mesh.points[j]);
+        }
+        else
+        {
+          for (std::size_t j = 0; j < mesh.points.size(); ++j)
+            result[j] = TensorOdfValue(tensor, mesh.points[j]);
+        }
+        break;
+      }
+      case VoxelKind::Sh:
+      {
+        const vnl_vector<float> coefficients(values, numComponents);
+        const vnl_vector<float> meshValues = *meshShBasis * coefficients;
+        std::copy(meshValues.begin(), meshValues.end(), result);
+        break;
+      }
+      case VoxelKind::Odf:
+        mitkThrow() << "ODF images have no values between their ODF directions.";
+    }
+  }
+
+  /** Smallest and largest value of an ODF, compared as OdfType::MinMaxNormalize and MaxNormalize compare them. */
+  struct OdfRange
+  {
+    float min = std::numeric_limits<float>::max();
+    float max = std::numeric_limits<float>::lowest();
+  };
+
+  OdfRange GetRange(const OdfType &odf)
+  {
+    OdfRange range;
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+    {
+      range.max = odf[i] > range.max ? odf[i] : range.max;
+      range.min = odf[i] < range.min ? odf[i] : range.min;
+    }
+    return range;
+  }
+
+  /**
+   * A value of the glyph normalized by its ODF's range for the glyph's shape and for its colour,
+   * with the arithmetic of OdfType::MinMaxNormalize and MaxNormalize. "Global maximum" is not
+   * implemented and normalizes like "Maximum".
+   */
+  std::pair<float, float> Normalize(float value, const OdfRange &range, int normalization)
+  {
+    switch (normalization)
+    {
+      case mitk::ODFN_MINMAX:
+      {
+        // A constant ODF (e.g. all zero) has no range and stays zero.
+        const float normalized = range.max > range.min ? (value - range.min) / (range.max - range.min) : 0.0f;
+        return {normalized, normalized};
+      }
+      case mitk::ODFN_NONE:
+        return {value, range.max == 0 ? 0.0f : value / range.max};
+      default:
+      {
+        const float normalized = range.max == 0 ? 0.0f : value / range.max;
+        return {normalized, normalized};
+      }
+    }
   }
 
   /**
@@ -391,24 +672,26 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
     glyphCenters[g] = candidateCenters[selected[g]];
     glyphVoxelOffsets[g] = candidateOffsets[selected[g]];
   }
-  const vnl_matrix<float> *shBasis = kind == VoxelKind::Sh ? &GetShBasis(numComponents, mrtrix) : nullptr;
-  const BaseMesh &baseMesh = GetBaseMeshArrays();
-  const auto numBasePoints = static_cast<vtkIdType>(baseMesh.points.size());
-  const auto numBaseTriangles = static_cast<vtkIdType>(baseMesh.triangles.size());
+  const BaseMesh &mesh = ChooseMesh(kind, slice, settings);
+  const bool fullMesh = &mesh == &GetBaseMeshArrays();
+  const auto numMeshPoints = static_cast<vtkIdType>(mesh.points.size());
+  const auto numMeshTriangles = static_cast<vtkIdType>(mesh.triangles.size());
+  const vnl_matrix<float> *shBasis = kind == VoxelKind::Sh ? &GetShBasis(numComponents, mrtrix, ODF_SAMPLING_SIZE) : nullptr;
+  const vnl_matrix<float> *meshShBasis = kind == VoxelKind::Sh && !fullMesh ? &GetShBasis(numComponents, mrtrix, mesh.points.size()) : nullptr;
 
   auto pointCoordinates = vtkSmartPointer<vtkFloatArray>::New();
   pointCoordinates->SetNumberOfComponents(3);
-  pointCoordinates->SetNumberOfTuples(numGlyphs * numBasePoints);
+  pointCoordinates->SetNumberOfTuples(numGlyphs * numMeshPoints);
   float *pointData = pointCoordinates->GetPointer(0);
   auto normals = vtkSmartPointer<vtkFloatArray>::New();
   normals->SetName("Normals");
   normals->SetNumberOfComponents(3);
-  normals->SetNumberOfTuples(numGlyphs * numBasePoints);
+  normals->SetNumberOfTuples(numGlyphs * numMeshPoints);
   float *normalData = normals->GetPointer(0);
 
   // 32-bit point ids, which halve the memory of the triangles, unless the ids or the offsets
   // (3 per triangle) exceed them. The offsets are not stored: all cells are triangles.
-  const vtkIdType numConnectivityIds = 3 * numGlyphs * numBaseTriangles;
+  const vtkIdType numConnectivityIds = 3 * numGlyphs * numMeshTriangles;
   vtkSmartPointer<vtkDataArray> connectivity;
   vtkTypeInt32 *connectivity32 = nullptr;
   vtkTypeInt64 *connectivity64 = nullptr;
@@ -429,7 +712,7 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
 
   auto colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   colors->SetNumberOfComponents(4);
-  colors->SetNumberOfTuples(numGlyphs * numBasePoints);
+  colors->SetNumberOfTuples(numGlyphs * numMeshPoints);
   colors->SetName("ODF_COLORS");
   unsigned char *colorData = colors->GetPointer(0);
 
@@ -443,10 +726,12 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   const ImageReadAccessor access(&image, image.GetVolumeData(t));
   const auto *values = static_cast<const float *>(access.GetData());
 
-  // Writes only the glyph's own ranges of the output arrays. colorValues and triangleNormals are
-  // the scratch space of the calling thread.
-  const auto writeGlyph = [&](vtkIdType g, vtkFloatArray *colorValues, float *triangleNormals) {
-    const OdfType odf = ToOdf(kind, values + glyphVoxelOffsets[g] * numComponents, numComponents, shBasis, settings.tensorEllipsoids);
+  // Writes only the glyph's own ranges of the output arrays. colorValues, triangleNormals and
+  // meshValues are the scratch space of the calling thread.
+  const auto writeGlyph = [&](vtkIdType g, vtkFloatArray *colorValues, float *triangleNormals, float *meshValues) {
+    const float *voxelValues = values + glyphVoxelOffsets[g] * numComponents;
+    // The full ODF gives the glyph's size, its range and its direction at every mesh level.
+    const OdfType odf = ToOdf(kind, voxelValues, numComponents, shBasis, settings.tensorEllipsoids);
 
     double scale = settings.scaling;
     if (settings.scaleBy == ODFSB_GFA)
@@ -454,34 +739,26 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
     else if (settings.scaleBy == ODFSB_PC)
       scale = settings.scaling * odf.GetPrincipleCurvature(settings.indexParam1, settings.indexParam2, 0);
 
-    // "Global maximum" is not implemented and normalizes like "Maximum".
-    OdfType shapeOdf = odf;
-    OdfType colorOdf;
-    switch (settings.normalization)
-    {
-      case ODFN_MINMAX:
-        shapeOdf = odf.MinMaxNormalize();
-        colorOdf = shapeOdf;
-        break;
-      case ODFN_NONE:
-        colorOdf = odf.MaxNormalize();
-        break;
-      default:
-        shapeOdf = odf.MaxNormalize();
-        colorOdf = shapeOdf;
-    }
+    if (fullMesh)
+      std::copy(odf.Begin(), odf.End(), meshValues);
+    else
+      SampleMesh(kind, voxelValues, numComponents, meshShBasis, settings.tensorEllipsoids, mesh, meshValues);
+    const OdfRange range = GetRange(odf);
 
     const double *center = glyphCenters[g].data();
-    const vtkIdType first = g * numBasePoints;
+    const vtkIdType first = g * numMeshPoints;
     float *glyphPoints = pointData + 3 * first;
-    for (vtkIdType j = 0; j < numBasePoints; ++j)
+    float *colorValueData = colorValues->GetPointer(0);
+    for (vtkIdType j = 0; j < numMeshPoints; ++j)
     {
-      const double factor = static_cast<double>(shapeOdf.GetElement(j)) * scale * slice.glyphSpacing * 0.5;
+      const auto [shapeValue, colorValue] = Normalize(meshValues[j], range, settings.normalization);
+      const double factor = static_cast<double>(shapeValue) * scale * slice.glyphSpacing * 0.5;
       // Scaled in float and then moved, as the glyph source and transform of the mapper did.
       for (unsigned int c = 0; c < 3; ++c)
-        glyphPoints[3 * j + c] = static_cast<float>(static_cast<double>(static_cast<float>(baseMesh.points[j][c] * factor)) + center[c]);
+        glyphPoints[3 * j + c] = static_cast<float>(static_cast<double>(static_cast<float>(mesh.points[j][c] * factor)) + center[c]);
+      colorValueData[j] = 1 - colorValue;
     }
-    ComputeGlyphNormals(baseMesh, glyphPoints, triangleNormals, normalData + 3 * first);
+    ComputeGlyphNormals(mesh, glyphPoints, triangleNormals, normalData + 3 * first);
 
     unsigned char *glyphColors = colorData + 4 * first;
     if (settings.colourByDirection)
@@ -490,33 +767,31 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
       const vnl_vector_fixed<double, 3> direction = odf.GetPrincipalDiffusionDirection();
       for (unsigned int c = 0; c < 3; ++c)
         rgba[c] = static_cast<unsigned char>(static_cast<int>(std::fabs(direction[c]) * 255));
-      for (vtkIdType j = 0; j < numBasePoints; ++j)
+      for (vtkIdType j = 0; j < numMeshPoints; ++j)
         std::copy(rgba, rgba + 4, glyphColors + 4 * j);
     }
     else
     {
-      float *colorValueData = colorValues->GetPointer(0);
-      for (vtkIdType j = 0; j < numBasePoints; ++j)
-        colorValueData[j] = 1 - colorOdf.GetElement(j);
       lut->MapScalarsThroughTable(colorValues, glyphColors, VTK_RGBA);
     }
 
-    const vtkIdType firstId = 3 * g * numBaseTriangles;
+    const vtkIdType firstId = 3 * g * numMeshTriangles;
     if (connectivity32 != nullptr)
-      WriteTriangles(baseMesh, first, connectivity32 + firstId);
+      WriteTriangles(mesh, first, connectivity32 + firstId);
     else
-      WriteTriangles(baseMesh, first, connectivity64 + firstId);
+      WriteTriangles(mesh, first, connectivity64 + firstId);
   };
 
   // The glyphs are independent, so the output is the same at any number of threads.
 #pragma omp parallel
   {
     auto colorValues = vtkSmartPointer<vtkFloatArray>::New();
-    colorValues->SetNumberOfValues(numBasePoints);
-    std::vector<float> triangleNormals(3 * numBaseTriangles);
+    colorValues->SetNumberOfValues(numMeshPoints);
+    std::vector<float> triangleNormals(3 * numMeshTriangles);
+    std::vector<float> meshValues(numMeshPoints);
 #pragma omp for schedule(dynamic, 16)
     for (vtkIdType g = 0; g < numGlyphs; ++g)
-      writeGlyph(g, colorValues, triangleNormals.data());
+      writeGlyph(g, colorValues, triangleNormals.data(), meshValues.data());
   }
 
   auto points = vtkSmartPointer<vtkPoints>::New();

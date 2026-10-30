@@ -27,6 +27,7 @@ found in the LICENSE file.
 #include <mitkTensorImage.h>
 #include <mitkDiffusionTestData.h>
 #include <mitkOmpThreadGuard.h>
+#include <mitkPointShell.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -39,6 +40,8 @@ found in the LICENSE file.
 #include <vtkPolyDataNormals.h>
 #include <vtkUnsignedCharArray.h>
 #include <vtkSmartPointer.h>
+
+#include <vnl/vnl_inverse.h>
 
 #include <algorithm>
 #include <array>
@@ -79,6 +82,10 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_FullMesh_RecordedOutput);
   MITK_TEST(GlyphGenerator_ValueColours_FromLookupTable);
   MITK_TEST(GlyphGenerator_ThreadCount_SameOutput);
+  MITK_TEST(GlyphGenerator_MeshLevel_ByGlyphWidth);
+  MITK_TEST(GlyphGenerator_CoarseMesh_ClosedSurface);
+  MITK_TEST(GlyphGenerator_CoarseMesh_TensorValuesAtItsDirections);
+  MITK_TEST(GlyphGenerator_CoarseMesh_ShValuesAtItsDirections);
   MITK_TEST(OdfMapper_DefaultProperties_KeepExistingValues);
   MITK_TEST(OdfMapper_GenerationRequired);
   CPPUNIT_TEST_SUITE_END();
@@ -1072,6 +1079,16 @@ public:
     auto cases = GlyphCases();
     // The whole layer, more glyphs than threads by far.
     cases.front().window.reset();
+    // The cases of tensors and SH at the coarse mesh too.
+    for (std::size_t i = 0, numCases = cases.size(); i < numCases; ++i)
+    {
+      if (dynamic_cast<mitk::OdfImage *>(cases[i].image.GetPointer()) != nullptr)
+        continue;
+      auto coarse = cases[i];
+      coarse.name += ", coarse";
+      coarse.settings.pixelsPerMm = PixelsPerMm(coarse.slice, coarse.settings.scaling, 30);
+      cases.push_back(coarse);
+    }
     mitk::OmpThreadGuard threads(1);
     for (const auto &glyphCase : cases)
     {
@@ -1087,6 +1104,251 @@ public:
         CPPUNIT_ASSERT_MESSAGE(name, referenceFingerprints == Fingerprints(glyphs));
         CPPUNIT_ASSERT_EQUAL_MESSAGE(name, referenceNormals, NormalsFingerprint(glyphs));
       }
+    }
+  }
+
+  /** Pixels per mm that make the glyphs of the slice widthInPixels wide at the given scaling. */
+  static double PixelsPerMm(const mitk::OdfGlyphGenerator::Slice &slice, double scaling, double widthInPixels)
+  {
+    return widthInPixels / (scaling * slice.glyphSpacing);
+  }
+
+  /** Direction j of the mesh with n points: the pointshell table of n directions. */
+  static vnl_vector_fixed<double, 3> MeshDirection(unsigned int n, unsigned int j)
+  {
+    const auto &directions = mitk::pointshell::Directions(n);
+    return vnl_vector_fixed<double, 3>(directions(0, j), directions(1, j), directions(2, j));
+  }
+
+  // Glyphs narrower than 40 pixels on screen (scaling x glyph spacing x pixels per mm) are
+  // geodesic spheres of 162 directions; pixels per mm 0 and ODF images keep the full mesh.
+  void GlyphGenerator_MeshLevel_ByGlyphWidth()
+  {
+    std::vector<std::pair<std::string, mitk::Image::Pointer>> images = {
+      {"tensor", MakeDegenerateTensorImage().GetPointer()}, {"SH", LoadShImage().GetPointer()}};
+    const std::tuple<double, double, vtkIdType> cases[] = {
+      {1, 0, ODF_SAMPLING_SIZE}, {1, 39.9, 162}, {1, 40.1, ODF_SAMPLING_SIZE}, {2.5, 39.9, 162}, {2.5, 40.1, ODF_SAMPLING_SIZE}, {1, 0.01, 162}};
+    for (const auto &[name, image] : images)
+    {
+      mitk::Point3D layer1;
+      image->GetGeometry()->IndexToWorld(mitk::Point3D(0.0), layer1);
+      const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(layer1[0], layer1[1], layer1[2], 0, 0, 1));
+      CPPUNIT_ASSERT_MESSAGE(name, slice.has_value());
+      auto settings = AllGlyphs();
+      settings.tensorEllipsoids = true;
+      const vtkIdType numGlyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings)->GetNumberOfPoints() / ODF_SAMPLING_SIZE;
+      CPPUNIT_ASSERT_MESSAGE(name, numGlyphs > 0);
+      for (const auto &[scaling, width, pointsPerGlyph] : cases)
+      {
+        settings.scaling = static_cast<float>(scaling);
+        settings.pixelsPerMm = PixelsPerMm(*slice, scaling, width);
+        auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+        const std::string message = name + ", scaling " + std::to_string(scaling) + ", " + std::to_string(width) + " pixels";
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(message, numGlyphs * pointsPerGlyph, glyphs->GetNumberOfPoints());
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(message, numGlyphs * (2 * pointsPerGlyph - 4), glyphs->GetNumberOfPolys());
+      }
+    }
+
+    auto odfs = MakeOdfImage(2, 1, 1, 1);
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*odfs, 0, *Plane(0, 0, 30, 0, 0, 1));
+    auto settings = AllGlyphs();
+    settings.pixelsPerMm = PixelsPerMm(*slice, 1, 10);
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(2 * ODF_SAMPLING_SIZE), mitk::OdfGlyphGenerator::Generate(*odfs, 0, *slice, nullptr, settings)->GetNumberOfPoints());
+  }
+
+  // A coarse glyph is a closed surface on the 162 directions of mitk::pointshell, in their order,
+  // with triangles counterclockwise seen from outside and the normals of vtkPolyDataNormals.
+  void GlyphGenerator_CoarseMesh_ClosedSurface()
+  {
+    auto image = MakeDegenerateTensorImage();
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 0, 0, 0, 1));
+    for (const bool ellipsoids : {true, false})
+    {
+      auto settings = AllGlyphs();
+      settings.tensorEllipsoids = ellipsoids;
+      settings.pixelsPerMm = PixelsPerMm(*slice, 1, 30);
+      auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+      const vtkIdType n = 162;
+      CPPUNIT_ASSERT_EQUAL(3 * n, glyphs->GetNumberOfPoints());
+      CPPUNIT_ASSERT_EQUAL(3 * 320, static_cast<int>(glyphs->GetNumberOfPolys()));
+      CPPUNIT_ASSERT(NormalsDeviation(glyphs) <= 1e-5);
+
+      // Glyph 2, the rotated diag(3, 1, 1), has positive values in every direction.
+      const double center[3] = {2, 0, 0};
+      for (vtkIdType j = 0; j < n; ++j)
+      {
+        mitk::Vector3D direction;
+        for (unsigned int c = 0; c < 3; ++c)
+          direction[c] = glyphs->GetPoint(2 * n + j)[c] - center[c];
+        direction.Normalize();
+        CPPUNIT_ASSERT((direction - mitk::Vector3D(MeshDirection(n, j))).GetNorm() < 1e-5);
+      }
+
+      std::map<std::pair<vtkIdType, vtkIdType>, int> directedEdges;
+      auto ids = vtkSmartPointer<vtkIdList>::New();
+      for (vtkIdType t = 2 * 320; t < 3 * 320; ++t)
+      {
+        glyphs->GetPolys()->GetCellAtId(t, ids);
+        CPPUNIT_ASSERT_EQUAL(vtkIdType(3), ids->GetNumberOfIds());
+        double p[3][3];
+        for (vtkIdType k = 0; k < 3; ++k)
+        {
+          CPPUNIT_ASSERT(ids->GetId(k) >= 2 * n && ids->GetId(k) < 3 * n);
+          glyphs->GetPoint(ids->GetId(k), p[k]);
+          ++directedEdges[{ids->GetId(k), ids->GetId((k + 1) % 3)}];
+        }
+        double normal[3];
+        const double ab[3] = {p[1][0] - p[0][0], p[1][1] - p[0][1], p[1][2] - p[0][2]};
+        const double ac[3] = {p[2][0] - p[0][0], p[2][1] - p[0][1], p[2][2] - p[0][2]};
+        vtkMath::Cross(ab, ac, normal);
+        double outward = 0;
+        for (unsigned int c = 0; c < 3; ++c)
+          outward += normal[c] * ((p[0][c] + p[1][c] + p[2][c]) / 3 - center[c]);
+        CPPUNIT_ASSERT(outward > 0);
+      }
+      // Closed and consistently oriented: every edge once in each direction.
+      CPPUNIT_ASSERT_EQUAL(std::size_t(3 * 320), directedEdges.size());
+      for (const auto &[edge, count] : directedEdges)
+      {
+        CPPUNIT_ASSERT_EQUAL(1, count);
+        CPPUNIT_ASSERT(directedEdges.count({edge.second, edge.first}) == 1);
+      }
+    }
+  }
+
+  // At a coarse level the glyph point j lies in mesh direction u_j at the tensor's value there,
+  // the ellipsoid's radius 1 / sqrt(u^T D^-2 u) or the tensor ODF u^T D u, normalized by the
+  // largest value at the ODF directions. The colour by direction is that of the full mesh.
+  void GlyphGenerator_CoarseMesh_TensorValuesAtItsDirections()
+  {
+    auto image = MakeDegenerateTensorImage();
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 0, 0, 0, 1));
+    // Voxel 2: diag(3, 1, 1) rotated by 30 degrees about z.
+    const double c = std::cos(itk::Math::pi / 6);
+    const double s = std::sin(itk::Math::pi / 6);
+    vnl_matrix_fixed<double, 3, 3> tensor(0.0);
+    tensor(0, 0) = 3 * c * c + s * s;
+    tensor(0, 1) = tensor(1, 0) = 2 * c * s;
+    tensor(1, 1) = 3 * s * s + c * c;
+    tensor(2, 2) = 1;
+    const vnl_matrix_fixed<double, 3, 3> inverse = vnl_inverse(tensor);
+    const vnl_matrix_fixed<double, 3, 3> inverseSquared = inverse * inverse;
+    const auto value = [&](bool ellipsoids, const vnl_vector_fixed<double, 3> &u) {
+      return ellipsoids ? 1 / std::sqrt(dot_product(u, inverseSquared * u)) : dot_product(u, tensor * u);
+    };
+
+    for (const bool ellipsoids : {true, false})
+    {
+      double largest = 0;
+      for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+        largest = std::max(largest, value(ellipsoids, OdfType::GetDirection(i)));
+
+      auto settings = AllGlyphs();
+      settings.tensorEllipsoids = ellipsoids;
+      settings.colourByDirection = true;
+      auto full = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+      settings.pixelsPerMm = PixelsPerMm(*slice, 1, 30);
+      auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+      const vtkIdType n = 162;
+      CPPUNIT_ASSERT_EQUAL(3 * n, glyphs->GetNumberOfPoints());
+      for (vtkIdType j = 0; j < n; ++j)
+      {
+        const mitk::Vector3D u = MeshDirection(n, j);
+        const double radius = value(ellipsoids, MeshDirection(n, j)) / largest * 0.5;
+        mitk::Point3D expected;
+        expected.Fill(0);
+        expected[0] = 2;
+        expected += u * radius;
+        CPPUNIT_ASSERT(Distance(glyphs->GetPoint(2 * n + j), expected) < 1e-5);
+        // The null tensor and the one with a negative eigenvalue have no ellipsoid.
+        if (ellipsoids)
+        {
+          CPPUNIT_ASSERT(Distance(glyphs->GetPoint(j), mitk::Point3D(0.0)) == 0);
+          CPPUNIT_ASSERT(Distance(glyphs->GetPoint(n + j), [] { mitk::Point3D p(0.0); p[0] = 1; return p; }()) == 0);
+        }
+      }
+      auto colours = vtkUnsignedCharArray::SafeDownCast(glyphs->GetPointData()->GetArray("ODF_COLORS"));
+      auto fullColours = vtkUnsignedCharArray::SafeDownCast(full->GetPointData()->GetArray("ODF_COLORS"));
+      for (int k = 0; k < 4; ++k)
+        CPPUNIT_ASSERT_EQUAL(int(fullColours->GetTypedComponent(2 * ODF_SAMPLING_SIZE, k)), int(colours->GetTypedComponent(2 * n, k)));
+    }
+  }
+
+  // At a coarse level the glyph point j of an SH image lies in mesh direction u_j at the SH
+  // series there, normalized by the largest value at the ODF directions and scaled by the GFA of
+  // the ODF there; its colour is that of the normalized value.
+  void GlyphGenerator_CoarseMesh_ShValuesAtItsDirections()
+  {
+    auto shImage = LoadShImage();
+    const unsigned int numCoefficients = shImage->GetPixelType().GetNumberOfComponents();
+    const int order = static_cast<int>(mitk::sh::ShOrder(static_cast<int>(numCoefficients)));
+    mitk::Point3D layer1Index;
+    layer1Index.Fill(0);
+    layer1Index[2] = 1;
+    mitk::Point3D origin;
+    shImage->GetGeometry()->IndexToWorld(layer1Index, origin);
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*shImage, 0, *Plane(origin[0], origin[1], origin[2], 0, 0, 1));
+    CPPUNIT_ASSERT(slice.has_value() && slice->normalAxis == 2 && slice->index == 1);
+
+    auto lut = vtkSmartPointer<vtkLookupTable>::New();
+    lut->SetRange(0, 1);
+    lut->Build();
+    const auto colour = [&lut](double normalizedValue) {
+      double rgb[3];
+      lut->GetColor(1 - normalizedValue, rgb);
+      std::array<int, 3> result;
+      for (unsigned int k = 0; k < 3; ++k)
+        result[k] = static_cast<unsigned char>(255.0 * rgb[k]);
+      return result;
+    };
+
+    mitk::ImageReadAccessor access(shImage.GetPointer(), shImage->GetVolumeData(0));
+    const auto *values = static_cast<const float *>(access.GetData());
+    for (const auto convention : {mitk::ShImage::MRTRIX, mitk::ShImage::FSL})
+    {
+      shImage->SetShConvention(convention);
+      const bool mrtrix = convention == mitk::ShImage::MRTRIX;
+      auto settings = AllGlyphs();
+      settings.scaling = 1.5;
+      settings.scaleBy = mitk::ODFSB_GFA;
+      settings.pixelsPerMm = PixelsPerMm(*slice, settings.scaling, 30);
+      auto glyphs = mitk::OdfGlyphGenerator::Generate(*shImage, 0, *slice, nullptr, settings);
+      const vtkIdType n = 162;
+      CPPUNIT_ASSERT_EQUAL(100 * n, glyphs->GetNumberOfPoints());
+      auto colours = vtkUnsignedCharArray::SafeDownCast(glyphs->GetPointData()->GetArray("ODF_COLORS"));
+      int checkedGlyphs = 0;
+      for (vtkIdType g = 0; g < 100; ++g)
+      {
+        const vnl_vector<float> coefficients(values + ((g % 10) + 10 * ((g / 10) + 10 * 1)) * numCoefficients, numCoefficients);
+        OdfType odf;
+        for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+          odf[i] = mitk::sh::GetValue(coefficients, order, OdfType::GetDirection(i), mrtrix);
+        const double largest = odf.GetMaxValue();
+        if (!(largest > 0))
+          continue;
+        ++checkedGlyphs;
+        const double scale = 1.5 * odf.GetGeneralizedFractionalAnisotropy() * slice->glyphSpacing * 0.5;
+        mitk::Point3D center;
+        mitk::Point3D index;
+        index[0] = static_cast<double>(g % 10);
+        index[1] = static_cast<double>(g / 10);
+        index[2] = 1;
+        shImage->GetGeometry()->IndexToWorld(index, center);
+        for (vtkIdType j = 0; j < n; ++j)
+        {
+          const mitk::Vector3D u = MeshDirection(n, j);
+          const double normalized = mitk::sh::GetValue(coefficients, order, MeshDirection(n, j), mrtrix) / largest;
+          const std::string name = "glyph " + std::to_string(g) + " point " + std::to_string(j);
+          CPPUNIT_ASSERT_MESSAGE(name, Distance(glyphs->GetPoint(g * n + j), center + u * (normalized * scale)) < 1e-4);
+          // The colour of the normalized value, or of a value next to it when it lies at the
+          // border of two colours (float sums in another order).
+          std::array<int, 3> actual;
+          for (unsigned int k = 0; k < 3; ++k)
+            actual[k] = colours->GetTypedComponent(g * n + j, k);
+          CPPUNIT_ASSERT_MESSAGE(name, actual == colour(normalized) || actual == colour(normalized - 1e-5) || actual == colour(normalized + 1e-5));
+        }
+      }
+      CPPUNIT_ASSERT(checkedGlyphs > 50);
     }
   }
 
