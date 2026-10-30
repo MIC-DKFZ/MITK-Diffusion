@@ -110,6 +110,8 @@ namespace itk{
     ~KspaceImageFilter() override {}
 
     float CoilSensitivity(VectorType& pos) const;
+    /** Fills m_CompartmentSpectra; see there. */
+    void ComputeCompartmentSpectra();
 
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
@@ -155,6 +157,15 @@ namespace itk{
     float                                   yMaxFov_half;
     float                                   numPix;
     bool                                    m_StoreTimings;
+
+    /**
+     * Without eddy currents and distortions the phase of a k-space sample does not depend on its
+     * readout time: s(k) = sum_i relaxation_i(t(k)) F_i(k) / numPix, with F_i the spectrum of
+     * compartment i (signal scale and coil sensitivity included; ghost offset and aliasing in the
+     * DFT factors). Then m_CompartmentSpectra holds F_i at index ky*kxMax + kx; otherwise it is
+     * empty and every sample sums over all pixels.
+     */
+    std::vector< std::vector< std::complex<double> > > m_CompartmentSpectra;
 
   private:
 

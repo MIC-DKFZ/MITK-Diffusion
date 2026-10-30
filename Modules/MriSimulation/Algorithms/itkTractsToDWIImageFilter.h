@@ -132,10 +132,18 @@ protected:
     void SimulateNonFiberSignal(unsigned int g, const ItkDoubleImgType* intraAxonalVolume, double maxVolume);
 
     /** Generate signal of non-fiber compartments. */
-    void SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3>& volume_fraction_point, double intraAxonalVolume, int g);
+    using DoubleInterpolatorType = itk::LinearInterpolateImageFunction< ItkDoubleImgType, float >;
+    /** The interpolator reads the volume fraction maps; one per thread. */
+    void SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3>& volume_fraction_point, double intraAxonalVolume, int g, DoubleInterpolatorType* interpolator);
 
     /** Move fibers to simulate headmotion */
     void SimulateMotion(int g=-1);
+    /**
+     * Writes the points of m_FiberBundle, moved by the transform (unmoved without one), into the
+     * points of m_FiberBundleTransformed, a copy with the same point ids made once per run: one moved
+     * tractogram in memory whatever the number of moved volumes.
+     */
+    void SetMovedFiberPoints(const mitk::FiberfoxMotion::TransformType* transform);
 
     void CheckVolumeFractionImages();
     ItkDoubleImgType::Pointer NormalizeInsideMask(ItkDoubleImgType::Pointer image);
@@ -190,7 +198,6 @@ protected:
     int                                         m_NumMotionVolumes;
 
     itk::Statistics::MersenneTwisterRandomVariateGenerator::Pointer m_RandGen;
-    itk::LinearInterpolateImageFunction< ItkDoubleImgType, float >::Pointer   m_DoubleInterpolator;
     itk::Vector<double,3>                       m_NullDir;
 
     Float2DImageType::Pointer                   m_TickImage;
