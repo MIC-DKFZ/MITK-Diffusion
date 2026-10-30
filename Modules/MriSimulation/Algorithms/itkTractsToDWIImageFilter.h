@@ -68,6 +68,8 @@ public:
     itkSetMacro( FiberBundle, FiberBundleType )             ///< Input fiber bundle
     itkSetMacro( InputImage, typename OutputImageType::Pointer )     ///< Input diffusion-weighted image. If no fiber bundle is set, then the acquisition is simulated for this image without a new diffusion simulation.
     itkSetMacro( UseConstantRandSeed, bool )                ///< Seed for random generator.
+    /** Memory of the time segments of all k-space slice jobs together; KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET by default (tests set less). */
+    itkSetMacro( TimeSegmentMemoryBudget, double )
     void SetParameters( mitk::FiberfoxParameters param )  ///< Simulation parameters.
     { m_Parameters = param; }
 
@@ -222,6 +224,7 @@ protected:
 
     // MISC
     bool                                        m_UseConstantRandSeed;
+    double                                      m_TimeSegmentMemoryBudget;
     bool                                        m_MaskImageSet;
     std::string                                 m_MotionLog;
     std::string                                 m_SpikeLog;
