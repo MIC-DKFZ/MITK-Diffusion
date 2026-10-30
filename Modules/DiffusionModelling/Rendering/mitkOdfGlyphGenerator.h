@@ -38,8 +38,9 @@ namespace mitk
    * (RGBA) and "Normals".
    *
    * Glyphs that are small on screen (Settings::pixelsPerMm) are geodesic spheres of fewer
-   * directions, with the voxel's values at those directions. Their size, colour by direction and
-   * normalization still come from the ODF at the ODF_SAMPLING_SIZE directions.
+   * directions, with the voxel's values at those directions; ODF images give each the value of the
+   * nearest ODF direction. Their size, colour by direction and normalization still come from the
+   * ODF at the ODF_SAMPLING_SIZE directions.
    */
   class MITKDIFFUSIONMODELLING_EXPORT OdfGlyphGenerator
   {
@@ -71,10 +72,10 @@ namespace mitk
        */
       bool randomPlacement = true;
       /**
-       * Screen pixels per mm in the plane, for the mesh of the glyphs of tensor and SH images. A
-       * glyph is at most scaling x glyph spacing x pixelsPerMm pixels wide; below 16 pixels it
-       * has 42 points (80 triangles), below 40 pixels 162 points (320 triangles), else the
-       * ODF_SAMPLING_SIZE points of the ODF base mesh. 0 gives every glyph the base mesh.
+       * Screen pixels per mm in the plane, for the mesh of the glyphs. A glyph is at most
+       * scaling x glyph spacing x pixelsPerMm pixels wide; below 16 pixels it has 42 points (80
+       * triangles), below 40 pixels 162 points (320 triangles), else the ODF_SAMPLING_SIZE points
+       * of the ODF base mesh. 0 gives every glyph the base mesh.
        */
       double pixelsPerMm = 0;
     };

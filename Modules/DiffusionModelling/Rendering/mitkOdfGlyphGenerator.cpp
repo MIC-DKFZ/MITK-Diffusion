@@ -115,6 +115,8 @@ namespace
     std::vector<std::array<vtkIdType, 3>> triangles;
     /** Per point, the triangles that contain it, in ascending order. */
     std::vector<std::vector<vtkIdType>> pointTriangles;
+    /** Per point of a coarse mesh, the nearest of the ODF directions. */
+    std::vector<unsigned int> nearestOdfDirections;
   };
 
   void FillPointTriangles(BaseMesh &mesh)
@@ -251,6 +253,23 @@ namespace
       }
     }
     FillPointTriangles(mesh);
+
+    const auto &odfDirections = OdfType::GetDirections();
+    for (const auto &point : mesh.points)
+    {
+      unsigned int nearest = 0;
+      double largestCosine = -2;
+      for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      {
+        const double cosine = point[0] * odfDirections(0, i) + point[1] * odfDirections(1, i) + point[2] * odfDirections(2, i);
+        if (cosine > largestCosine)
+        {
+          largestCosine = cosine;
+          nearest = i;
+        }
+      }
+      mesh.nearestOdfDirections.push_back(nearest);
+    }
     return mesh;
   }
 
@@ -266,11 +285,10 @@ namespace
    * The mesh of the glyphs: the full ODF mesh, or for glyphs that are small on screen a geodesic
    * sphere of fewer directions, which looks the same at that size and is far cheaper to build and
    * draw. A glyph is at most scaling * glyph spacing wide (its normalized maximum is 1).
-   * ODF images always get the full mesh: their values exist only at the ODF directions.
    */
-  const BaseMesh &ChooseMesh(VoxelKind kind, const mitk::OdfGlyphGenerator::Slice &slice, const mitk::OdfGlyphGenerator::Settings &settings)
+  const BaseMesh &ChooseMesh(const mitk::OdfGlyphGenerator::Slice &slice, const mitk::OdfGlyphGenerator::Settings &settings)
   {
-    if (kind != VoxelKind::Odf && settings.pixelsPerMm > 0)
+    if (settings.pixelsPerMm > 0)
     {
       const double widthInPixels = settings.scaling * slice.glyphSpacing * settings.pixelsPerMm;
       if (widthInPixels < 16)
@@ -347,7 +365,8 @@ namespace
 
   /**
    * The voxel's values at the points of a coarse mesh, computed at its directions as ToOdf does at
-   * the ODF directions.
+   * the ODF directions. ODF images have values only at the ODF directions; a point gets the value
+   * of the nearest one, at most 7 degrees off, which a glyph under 40 pixels does not show.
    * \param meshShBasis the SH basis at the mesh's directions, for SH images
    */
   void SampleMesh(VoxelKind kind, const float *values, unsigned int numComponents, const vnl_matrix<float> *meshShBasis, bool tensorEllipsoids, const BaseMesh &mesh, float *result)
@@ -378,7 +397,9 @@ namespace
         break;
       }
       case VoxelKind::Odf:
-        mitkThrow() << "ODF images have no values between their ODF directions.";
+        for (std::size_t j = 0; j < mesh.points.size(); ++j)
+          result[j] = values[mesh.nearestOdfDirections[j]];
+        break;
     }
   }
 
@@ -674,7 +695,7 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
     glyphCenters[g] = candidateCenters[selected[g]];
     glyphVoxelOffsets[g] = candidateOffsets[selected[g]];
   }
-  const BaseMesh &mesh = ChooseMesh(kind, slice, settings);
+  const BaseMesh &mesh = ChooseMesh(slice, settings);
   const bool fullMesh = &mesh == &GetBaseMeshArrays();
   const auto numMeshPoints = static_cast<vtkIdType>(mesh.points.size());
   const auto numMeshTriangles = static_cast<vtkIdType>(mesh.triangles.size());

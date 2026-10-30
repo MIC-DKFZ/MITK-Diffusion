@@ -86,6 +86,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_CoarseMesh_ClosedSurface);
   MITK_TEST(GlyphGenerator_CoarseMesh_TensorValuesAtItsDirections);
   MITK_TEST(GlyphGenerator_CoarseMesh_ShValuesAtItsDirections);
+  MITK_TEST(GlyphGenerator_CoarseMesh_OdfValuesOfNearestDirection);
   MITK_TEST(OdfMapper_DefaultProperties_KeepExistingValues);
   MITK_TEST(OdfMapper_GenerationRequired);
   CPPUNIT_TEST_SUITE_END();
@@ -1079,11 +1080,9 @@ public:
     auto cases = GlyphCases();
     // The whole layer, more glyphs than threads by far.
     cases.front().window.reset();
-    // The cases of tensors and SH at the coarse meshes too.
+    // The cases at the coarse meshes too.
     for (std::size_t i = 0, numCases = cases.size(); i < numCases; ++i)
     {
-      if (dynamic_cast<mitk::OdfImage *>(cases[i].image.GetPointer()) != nullptr)
-        continue;
       for (const auto &[width, n] : coarseLevels)
       {
         auto coarse = cases[i];
@@ -1124,11 +1123,11 @@ public:
   }
 
   // Glyphs narrower than 16 and 40 pixels on screen (scaling x glyph spacing x pixels per mm)
-  // are geodesic spheres of 42 and 162 directions; pixels per mm 0 and ODF images keep the full mesh.
+  // are geodesic spheres of 42 and 162 directions; pixels per mm 0 keeps the full mesh.
   void GlyphGenerator_MeshLevel_ByGlyphWidth()
   {
     std::vector<std::pair<std::string, mitk::Image::Pointer>> images = {
-      {"tensor", MakeDegenerateTensorImage().GetPointer()}, {"SH", LoadShImage().GetPointer()}};
+      {"tensor", MakeDegenerateTensorImage().GetPointer()}, {"SH", LoadShImage().GetPointer()}, {"ODF", MakeOdfImage(2, 1, 1, 1).GetPointer()}};
     const std::tuple<double, double, vtkIdType> cases[] = {
       {1, 0, ODF_SAMPLING_SIZE}, {1, 0.01, 42}, {1, 15.9, 42}, {1, 16.1, 162}, {1, 39.9, 162}, {1, 40.1, ODF_SAMPLING_SIZE},
       {2.5, 15.9, 42}, {2.5, 16.1, 162}, {2.5, 39.9, 162}, {2.5, 40.1, ODF_SAMPLING_SIZE}};
@@ -1153,11 +1152,6 @@ public:
       }
     }
 
-    auto odfs = MakeOdfImage(2, 1, 1, 1);
-    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*odfs, 0, *Plane(0, 0, 30, 0, 0, 1));
-    auto settings = AllGlyphs();
-    settings.pixelsPerMm = PixelsPerMm(*slice, 1, 10);
-    CPPUNIT_ASSERT_EQUAL(vtkIdType(2 * ODF_SAMPLING_SIZE), mitk::OdfGlyphGenerator::Generate(*odfs, 0, *slice, nullptr, settings)->GetNumberOfPoints());
   }
 
   /** Glyph widths in pixels that give the coarse meshes, and their numbers of points. */
@@ -1357,6 +1351,61 @@ public:
         }
       }
       CPPUNIT_ASSERT(checkedGlyphs > 50);
+    }
+  }
+
+  // ODF images have values only at the ODF directions: at a coarse level, glyph point j lies in
+  // mesh direction u_j at the value of the ODF direction nearest to u_j, normalized by the ODF's
+  // range, and has the colour of that normalized value.
+  void GlyphGenerator_CoarseMesh_OdfValuesOfNearestDirection()
+  {
+    auto image = MakeOdfImage(1, 1, 1, 0);
+    OdfType odf;
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      odf[i] = 1 + static_cast<float>(i) / ODF_SAMPLING_SIZE;
+    {
+      mitk::ImagePixelWriteAccessor<itk::Vector<float, ODF_SAMPLING_SIZE>, 3> access(image);
+      itk::Vector<float, ODF_SAMPLING_SIZE> values;
+      std::copy(odf.Begin(), odf.End(), values.Begin());
+      access.SetPixelByIndex({{0, 0, 0}}, values);
+    }
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 30, 0, 0, 1));
+    mitk::Point3D center;
+    center[0] = 10;
+    center[1] = 20;
+    center[2] = 30;
+    auto lut = vtkSmartPointer<vtkLookupTable>::New();
+    lut->SetRange(0, 1);
+    lut->Build();
+
+    for (const auto &[width, n] : coarseLevels)
+    {
+      for (const int normalization : {mitk::ODFN_MINMAX, mitk::ODFN_MAX})
+      {
+        auto settings = AllGlyphs();
+        settings.normalization = normalization;
+        settings.pixelsPerMm = PixelsPerMm(*slice, 1, width);
+        auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+        CPPUNIT_ASSERT_EQUAL(n, glyphs->GetNumberOfPoints());
+        const OdfType normalized = normalization == mitk::ODFN_MINMAX ? odf.MinMaxNormalize() : odf.MaxNormalize();
+        auto colours = vtkUnsignedCharArray::SafeDownCast(glyphs->GetPointData()->GetArray("ODF_COLORS"));
+        for (vtkIdType j = 0; j < n; ++j)
+        {
+          const auto u = MeshDirection(n, j);
+          unsigned int nearest = 0;
+          for (unsigned int i = 1; i < ODF_SAMPLING_SIZE; ++i)
+          {
+            if (dot_product(u, OdfType::GetDirection(i)) > dot_product(u, OdfType::GetDirection(nearest)))
+              nearest = i;
+          }
+          const std::string name = std::to_string(n) + " points, normalization " + std::to_string(normalization) + ", point " + std::to_string(j);
+          CPPUNIT_ASSERT_MESSAGE(name, Distance(glyphs->GetPoint(j), center + mitk::Vector3D(u) * (normalized[nearest] * 0.5)) < 1e-5);
+          double rgb[3];
+          lut->GetColor(1 - normalized[nearest], rgb);
+          for (unsigned int c = 0; c < 3; ++c)
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(name, int(static_cast<unsigned char>(255.0 * rgb[c])), int(colours->GetTypedComponent(j, c)));
+        }
+      }
     }
   }
 
