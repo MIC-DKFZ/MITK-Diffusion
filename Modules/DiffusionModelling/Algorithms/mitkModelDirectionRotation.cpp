@@ -114,7 +114,7 @@ namespace
     const std::size_t volume = static_cast<std::size_t>(image->GetDimension(0)) * image->GetDimension(1) * image->GetDimension(2);
     const unsigned int numberOfPeaks = image->GetDimension(3) / 3;
 
-    NumberOfValues(image);
+    NumberOfValues(image); // throws unless the components are float, as the pointer below assumes
     mitk::ImageWriteAccessor accessor(image);
     auto *data = static_cast<float *>(accessor.GetData());
     for (unsigned int peak = 0; peak < numberOfPeaks; ++peak)
