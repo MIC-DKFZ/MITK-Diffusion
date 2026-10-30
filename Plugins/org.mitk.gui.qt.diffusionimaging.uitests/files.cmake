@@ -14,6 +14,7 @@ set(INTERNAL_CPP_FILES
   QmitkFiberProcessingViewsUiTest.cpp
   QmitkFiberfoxViewsUiTest.cpp
   QmitkPreprocessingViewsUiTest.cpp
+  QmitkAttractiveViewUiTest.cpp
 )
 
 set(MOC_H_FILES
