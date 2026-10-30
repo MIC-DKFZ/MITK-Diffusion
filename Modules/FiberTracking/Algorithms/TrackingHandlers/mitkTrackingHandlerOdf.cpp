@@ -217,28 +217,15 @@ bool TrackingHandlerOdf::GetIsOdfFromTensor() const
   return m_OdfFromTensor;
 }
 
-vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<float, 3>& pos, std::deque<vnl_vector_fixed<float, 3> >& olddirs, itk::Index<3>& oldIndex)
+bool TrackingHandlerOdf::PassesCutoff(const itk::Point<float, 3>& pos)
 {
-
-  vnl_vector_fixed<float,3> output_direction; output_direction.fill(0);
-
-  itk::Index<3> idx;
-  auto isinside = m_OdfImage->TransformPhysicalPointToIndex(pos, idx);
-
-  if ( !isinside )
-    return output_direction;
-
-  // check GFA threshold for termination
   float gfa = mitk::imv::GetImageValue<float>(pos, m_Parameters->m_InterpolateTractographyData, m_GfaInterpolator);
-  if (gfa<m_Parameters->m_Cutoff)
-    return output_direction;
+  return gfa>=m_Parameters->m_Cutoff;
+}
 
-  vnl_vector_fixed<float,3> last_dir; last_dir.fill(0.0);
-  if (!olddirs.empty())
-    last_dir = olddirs.back();
-
-  if (!m_Parameters->m_InterpolateTractographyData && oldIndex==idx)
-    return last_dir;
+TrackingDataHandler::TrackingDirectionType TrackingHandlerOdf::ProposeDataDirection(const itk::Point<float, 3>& pos, const TrackingDirectionType& last_dir)
+{
+  vnl_vector_fixed<float,3> output_direction; output_direction.fill(0);
 
   ItkOdfImageType::PixelType odf_values = mitk::imv::GetImageValue<ItkOdfImageType::PixelType>(pos, m_Parameters->m_InterpolateTractographyData, m_OdfInterpolator);
   vnl_vector< float > probs; probs.set_size(m_OdfHemisphereIndices.size());
@@ -275,13 +262,11 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
   }
 
   // no previous direction
-  if (max_odf_val>m_Parameters->m_OdfCutoff && (olddirs.empty() || last_dir.magnitude()<=0.5))
+  if (max_odf_val>m_Parameters->m_OdfCutoff && last_dir.magnitude()<=0.5)
   {
-    // the ODF directions are in the data frame; the flip options map them to the tracking frame
     if (m_Parameters->m_Mode==MODE::DETERMINISTIC)  // return maximum peak
     {
       output_direction = RefinePeak(max_idx_d, probs);
-      FlipDirection(output_direction);
       return output_direction * max_odf_val;
     }
     else if (m_Parameters->m_Mode==MODE::PROBABILISTIC) // sample from complete ODF
@@ -289,7 +274,6 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
       int max_sample_idx = SampleOdf(probs, angles);
       if (max_sample_idx>=0)
         output_direction = m_OdfFloatDirs.get_row(max_sample_idx) * probs[max_sample_idx];
-      FlipDirection(output_direction);
       return output_direction;
     }
   }
@@ -297,14 +281,6 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
   {
     return output_direction;
   }
-
-  // correct previous direction
-  if (m_Parameters->m_FlipX)
-    last_dir[0] *= -1;
-  if (m_Parameters->m_FlipY)
-    last_dir[1] *= -1;
-  if (m_Parameters->m_FlipZ)
-    last_dir[2] *= -1;
 
   // calculate angles between previous direction and ODF directions
   angles = m_OdfFloatDirs*last_dir;
@@ -365,13 +341,6 @@ vnl_vector_fixed<float,3> TrackingHandlerOdf::ProposeDirection(const itk::Point<
   }
   else
     output_direction.fill(0);
-
-  if (m_Parameters->m_FlipX)
-    output_direction[0] *= -1;
-  if (m_Parameters->m_FlipY)
-    output_direction[1] *= -1;
-  if (m_Parameters->m_FlipZ)
-    output_direction[2] *= -1;
 
   return output_direction;
 }

@@ -15,7 +15,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkTrackingHandlerPeaks.h"
-#include <algorithm>
 #include <cmath>
 
 namespace mitk
@@ -167,13 +166,6 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::GetDirection(itk::Index<3> idx3,
     dir[k] = m_PeakImage->GetPixel(idx4);
   }
 
-  if (m_Parameters->m_FlipX)
-    dir[0] *= -1;
-  if (m_Parameters->m_FlipY)
-    dir[1] *= -1;
-  if (m_Parameters->m_FlipZ)
-    dir[2] *= -1;
-
   return dir;
 }
 
@@ -188,39 +180,10 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::GetDirection(itk::Point<float, 3
 
   if (interpolate)
   {
-    // Trilinear interpolation with the corner indices clamped to the image, as ITK's interpolators
-    // do for the FA/GFA, ODF and mask images, so that the outermost half voxel is tracked too.
-    itk::Index<3> lo, hi;
-    float frac[3];
-    for (int d=0; d<3; ++d)
-    {
-      auto size = static_cast<itk::IndexValueType>(m_DummyImage->GetLargestPossibleRegion().GetSize(d));
-      auto base = static_cast<itk::IndexValueType>(std::floor(cIdx[d]));
-      frac[d] = 1 - (cIdx[d] - base);   // weight of the lower corner
-      lo[d] = std::clamp<itk::IndexValueType>(base, 0, size-1);
-      hi[d] = std::clamp<itk::IndexValueType>(base+1, 0, size-1);
-    }
-    const float frac_x = frac[0], frac_y = frac[1], frac_z = frac[2];
-    auto corner = [&lo, &hi](bool x, bool y, bool z) { itk::Index<3> c = {{x ? hi[0] : lo[0], y ? hi[1] : lo[1], z ? hi[2] : lo[2]}}; return c; };
-
-    vnl_vector_fixed<float, 8> interpWeights;
-    interpWeights[0] = (  frac_x)*(  frac_y)*(  frac_z);
-    interpWeights[1] = (1-frac_x)*(  frac_y)*(  frac_z);
-    interpWeights[2] = (  frac_x)*(1-frac_y)*(  frac_z);
-    interpWeights[3] = (  frac_x)*(  frac_y)*(1-frac_z);
-    interpWeights[4] = (1-frac_x)*(1-frac_y)*(  frac_z);
-    interpWeights[5] = (  frac_x)*(1-frac_y)*(1-frac_z);
-    interpWeights[6] = (1-frac_x)*(  frac_y)*(1-frac_z);
-    interpWeights[7] = (1-frac_x)*(1-frac_y)*(1-frac_z);
-
-    dir = GetMatchingDirection(corner(false, false, false), oldDir) * interpWeights[0];
-    dir +=  GetMatchingDirection(corner(true, false, false), oldDir) * interpWeights[1];
-    dir +=  GetMatchingDirection(corner(false, true, false), oldDir) * interpWeights[2];
-    dir +=  GetMatchingDirection(corner(false, false, true), oldDir) * interpWeights[3];
-    dir +=  GetMatchingDirection(corner(true, true, false), oldDir) * interpWeights[4];
-    dir +=  GetMatchingDirection(corner(false, true, true), oldDir) * interpWeights[5];
-    dir +=  GetMatchingDirection(corner(true, false, true), oldDir) * interpWeights[6];
-    dir +=  GetMatchingDirection(corner(true, true, true), oldDir) * interpWeights[7];
+    // GetMatchingDirection replaces a zero oldDir by the first corner's direction, which the
+    // other corners are then matched to.
+    dir = InterpolateDirection(cIdx, m_DummyImage->GetLargestPossibleRegion(),
+      [&](const itk::Index<3>& c, float) { return GetMatchingDirection(c, oldDir); });
   }
   else
     dir = GetMatchingDirection(idx3, oldDir);
@@ -228,22 +191,10 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::GetDirection(itk::Point<float, 3
   return dir;
 }
 
-vnl_vector_fixed<float,3> TrackingHandlerPeaks::ProposeDirection(const itk::Point<float, 3>& pos, std::deque<vnl_vector_fixed<float, 3> >& olddirs, itk::Index<3>& oldIndex)
+TrackingDataHandler::TrackingDirectionType TrackingHandlerPeaks::ProposeDataDirection(const itk::Point<float, 3>& pos, const TrackingDirectionType& oldDir)
 {
-  // CHECK: wann wird wo normalisiert
   vnl_vector_fixed<float,3> output_direction; output_direction.fill(0);
-
-  itk::Index<3> index;
-  if (!m_DummyImage->TransformPhysicalPointToIndex(pos, index))
-    return output_direction;
-
-  vnl_vector_fixed<float,3> oldDir; oldDir.fill(0.0);
-  if (!olddirs.empty())
-    oldDir = olddirs.back();
   float old_mag = oldDir.magnitude();
-
-  if (!m_Parameters->m_InterpolateTractographyData && oldIndex==index)
-    return oldDir;
 
   output_direction = GetDirection(pos, m_Parameters->m_InterpolateTractographyData, oldDir);
   float mag = output_direction.magnitude();
@@ -254,12 +205,18 @@ vnl_vector_fixed<float,3> TrackingHandlerPeaks::ProposeDirection(const itk::Poin
     {
       // Each component of the unit peak direction gets normal noise with standard deviation
       // m_PeakJitter (ITK's GetNormalVariate takes the variance), so that the spread depends
-      // neither on the peak's orientation nor on its length.
+      // neither on the peak's orientation nor on its length. The draws are components in the
+      // tracking frame, negated here for flipped axes (the data frame), so that fixed-seed tracts
+      // with flip options match those of earlier versions.
       output_direction.normalize();
       auto rng = GetThreadRngItk();
       double variance = static_cast<double>(m_Parameters->m_PeakJitter)*m_Parameters->m_PeakJitter;
+      const bool flipped[3] = {m_Parameters->m_FlipX, m_Parameters->m_FlipY, m_Parameters->m_FlipZ};
       for (int c=0; c<3; ++c)
-        output_direction[c] += rng->GetNormalVariate(0, variance);
+      {
+        double noise = rng->GetNormalVariate(0, variance);
+        output_direction[c] += flipped[c] ? -noise : noise;
+      }
     }
 
     output_direction.normalize();

@@ -264,6 +264,11 @@ void ParticleGrid::RemoveParticle(int k)
     m_NumParticles--;
 }
 
+// Searches 2x2x2 cells of size 2L (L = particle length): the cell of R and its neighbour towards
+// the nearer half on each axis, so particles within at least L of R along every axis are found.
+// A connection partner's endpoint lies within L of R, but its centre (the stored position) can be
+// up to 2L away, so some candidates between L and 2L are missed. Kept on purpose: a 3x3x3 search
+// would find them all at about 3.4 times the neighbour visits and change every Gibbs result.
 void ParticleGrid::ComputeNeighbors(vnl_vector_fixed<float, 3> &R)
 {
     float xfrac = R[0]*m_GridScale[0];
