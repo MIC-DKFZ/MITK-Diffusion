@@ -15,6 +15,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundleMapper3D.h"
+#include "mitkFiberTubeShader.h"
 
 #include <mitkClippingProperty.h>
 #include <mitkProperties.h>
@@ -30,7 +31,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPropAssembly.h>
 #include <vtkProperty.h>
 #include <vtkRibbonFilter.h>
-#include <vtkTubeFilter.h>
 #include <vtkUnsignedCharArray.h>
 
 namespace
@@ -89,7 +89,7 @@ mitk::FiberBundleMapper3D::FiberBundleMapper3D()
  This method is called once the mapper gets new input,
  for UI rotation or changes in colorcoding this method is NOT called
  */
-void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *renderer, const FiberBundle* fiberBundle, const ShapeParameters& shape)
+void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *renderer, const FiberBundle* fiberBundle, float ribbonWidth)
 {
   LocalStorage3D *localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
 
@@ -99,22 +99,16 @@ void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *rendere
   fiberPolyData->ShallowCopy(fiberBundle->GetFiberPolyData());
   fiberPolyData->GetPointData()->AddArray(fiberBundle->GetFiberColors());
 
-  if (shape.tubeRadius>0.0f)
+  // Ribbons are built on the CPU: the band turns with each fiber's sliding normals
+  // (vtkPolyLine::GenerateSlidingNormals), a pass along the whole fiber that a geometry shader,
+  // seeing one segment, cannot do. The filter gives two points per fiber point.
+  if (ribbonWidth>0.0f)
   {
-    vtkSmartPointer<vtkTubeFilter> tubeFilter = vtkSmartPointer<vtkTubeFilter>::New();
-    tubeFilter->SetInputData(fiberPolyData);
-    tubeFilter->SetNumberOfSides(shape.tubeSides);
-    tubeFilter->SetRadius(shape.tubeRadius);
-    tubeFilter->Update();
-    fiberPolyData = tubeFilter->GetOutput();
-  }
-  else if (shape.ribbonWidth>0.0f)
-  {
-    vtkSmartPointer<vtkRibbonFilter> tubeFilter = vtkSmartPointer<vtkRibbonFilter>::New();
-    tubeFilter->SetInputData(WithoutOnePointLines(fiberPolyData));
-    tubeFilter->SetWidth(shape.ribbonWidth);
-    tubeFilter->Update();
-    fiberPolyData = tubeFilter->GetOutput();
+    vtkSmartPointer<vtkRibbonFilter> ribbonFilter = vtkSmartPointer<vtkRibbonFilter>::New();
+    ribbonFilter->SetInputData(WithoutOnePointLines(fiberPolyData));
+    ribbonFilter->SetWidth(ribbonWidth);
+    ribbonFilter->Update();
+    fiberPolyData = ribbonFilter->GetOutput();
   }
 
   localStorage->m_FiberMapper->SetInputData(fiberPolyData);
@@ -123,10 +117,9 @@ void mitk::FiberBundleMapper3D::InternalGenerateData(mitk::BaseRenderer *rendere
   localStorage->m_FiberMapper->SetScalarModeToUsePointFieldData();
   localStorage->m_FiberActor->SetMapper(localStorage->m_FiberMapper);
   localStorage->m_FiberMapper->SetLookupTable(m_lut);
-  localStorage->m_FiberActor->GetProperty()->SetLineWidth(shape.lineWidth);
   localStorage->m_FiberAssembly->AddPart(localStorage->m_FiberActor);
 
-  localStorage->m_Shape = shape;
+  localStorage->m_RibbonWidth = ribbonWidth;
   localStorage->m_LastUpdateTime.Modified();
 }
 
@@ -181,11 +174,15 @@ void mitk::FiberBundleMapper3D::GenerateDataForRenderer( mitk::BaseRenderer *ren
   if (fiberBundle == nullptr)
     return;
 
-  ShapeParameters shape;
-  node->GetFloatProperty("shape.tuberadius", shape.tubeRadius);
-  node->GetIntProperty("shape.tubesides", shape.tubeSides);
-  node->GetIntProperty("shape.linewidth", shape.lineWidth);
-  node->GetFloatProperty("shape.ribbonwidth", shape.ribbonWidth);
+  float tubeRadius = 0;
+  node->GetFloatProperty("shape.tuberadius", tubeRadius);
+  int lineWidth = 0;
+  node->GetIntProperty("shape.linewidth", lineWidth);
+  float ribbonWidth = 0;
+  node->GetFloatProperty("shape.ribbonwidth", ribbonWidth);
+  // tubes take precedence over ribbons
+  if (tubeRadius>0.0f)
+    ribbonWidth = 0;
 
   float opacity;
   this->GetDataNode()->GetOpacity(opacity, nullptr);
@@ -207,14 +204,21 @@ void mitk::FiberBundleMapper3D::GenerateDataForRenderer( mitk::BaseRenderer *ren
   property->SetLighting(true);
   property->SetOpacity(opacity);
 
-  // rebuilt for changed fibers and changed shape properties
-  if (localStorage->m_LastUpdateTime<fiberBundle->GetUpdateTime3D() || !(localStorage->m_Shape==shape))
+  // rebuilt for changed fibers and changed ribbons
+  if (localStorage->m_LastUpdateTime<fiberBundle->GetUpdateTime3D() || localStorage->m_RibbonWidth!=ribbonWidth)
   {
     // Calculate time step of the input data for the specified renderer (integer value)
     // this method is implemented in mitkMapper
     this->CalculateTimeStep( renderer );
-    this->InternalGenerateData(renderer, fiberBundle, shape);
+    this->InternalGenerateData(renderer, fiberBundle, ribbonWidth);
   }
+
+  // Line width and tubes are settings of the actor: tubes are drawn on the GPU from the lines,
+  // and neither needs a new input. The tube shader sets a line width of its own; a property
+  // changed back and forth on every render would rebuild the shaders each time.
+  if (tubeRadius<=0.0f)
+    property->SetLineWidth(lineWidth);
+  mitk::SetFiberTubeShader(localStorage->m_FiberActor, tubeRadius);
 
   // The clipping plane follows the slice position (the controls view moves it with every slice
   // step); it is a setting of the VTK mapper and needs no rebuild of the lines, tubes or ribbons.

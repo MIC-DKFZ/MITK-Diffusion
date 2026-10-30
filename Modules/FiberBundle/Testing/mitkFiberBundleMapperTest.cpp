@@ -23,6 +23,7 @@ found in the LICENSE file.
 #include <mitkVtkMapper.h>
 
 #include <vtkActor.h>
+#include <vtkCamera.h>
 #include <vtkCellArray.h>
 #include <vtkImageData.h>
 #include <vtkMapper.h>
@@ -36,7 +37,11 @@ found in the LICENSE file.
 #include <vtkPropCollection.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
+#include <vtkShaderProperty.h>
 #include <vtkStringOutputWindow.h>
+#include <vtkTubeFilter.h>
+#include <vtkUniforms.h>
 #include <vtkWindowToImageFilter.h>
 #include <algorithm>
 
@@ -56,7 +61,10 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkFiberBundleMapperTestSuite);
   MITK_TEST(DefaultProperties_NamesAndTypesTheControlsWrite);
   MITK_TEST(Mapper3D_LinesWithOneColourPerPoint);
-  MITK_TEST(Mapper3D_TubesAndRibbonsGiveSurfaces);
+  MITK_TEST(Mapper3D_TubesOnTheGpu_RibbonsAsSurfaces);
+  MITK_TEST(Mapper3D_TubeRadiusChange_NoNewInput);
+  MITK_TEST(Mapper3D_GpuTubes_LookLikeCpuTubes);
+  MITK_TEST(Mapper3D_GpuTubes_PickingOpacityClipping);
   MITK_TEST(Mapper3D_RibbonsWithOnePointFibers_NoWarnings);
   MITK_TEST(Mapper3D_ClippingPlaneFromProperty);
   MITK_TEST(Mapper3D_ClippingPlaneChange_AppliedWithoutRebuild);
@@ -172,22 +180,226 @@ public:
     CPPUNIT_ASSERT_EQUAL(4, colours->GetNumberOfComponents());
   }
 
-  void Mapper3D_TubesAndRibbonsGiveSurfaces()
+  // #46: tubes are drawn on the GPU from the lines (VTK's tube shading with a geometry shader of
+  // a world radius); ribbons are built on the CPU.
+  void Mapper3D_TubesOnTheGpu_RibbonsAsSurfaces()
   {
     m_Node->SetFloatProperty("shape.tuberadius", 0.5f);
-    vtkPolyData *tubes = Input(Render3D());
-    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(0), tubes->GetNumberOfLines());
-    CPPUNIT_ASSERT(tubes->GetNumberOfStrips() + tubes->GetNumberOfPolys() > 0);
+    vtkActor *actor = Render3D();
+    vtkPolyData *tubes = Input(actor);
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(m_Fibers->GetNumFibers()), tubes->GetNumberOfLines());
+    CPPUNIT_ASSERT_EQUAL(m_Fibers->GetFiberPolyData()->GetNumberOfPoints(), tubes->GetNumberOfPoints());
     CPPUNIT_ASSERT(tubes->GetPointData()->GetArray("FIBER_COLORS") != nullptr);
+    CPPUNIT_ASSERT(actor->GetProperty()->GetRenderLinesAsTubes());
+    CPPUNIT_ASSERT(actor->GetShaderProperty()->HasGeometryShaderCode());
+
+    // tubes take precedence over ribbons
+    m_Node->SetFloatProperty("shape.ribbonwidth", 0.5f);
+    CPPUNIT_ASSERT_MESSAGE("still tubes", Input(Render3D()) == tubes);
 
     m_Node->SetFloatProperty("shape.tuberadius", 0.0f);
-    m_Node->SetFloatProperty("shape.ribbonwidth", 0.5f);
-    vtkPolyData *ribbons = Input(Render3D());
+    actor = Render3D();
+    vtkPolyData *ribbons = Input(actor);
     CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(0), ribbons->GetNumberOfLines());
     CPPUNIT_ASSERT(ribbons->GetNumberOfStrips() + ribbons->GetNumberOfPolys() > 0);
+    CPPUNIT_ASSERT(!actor->GetProperty()->GetRenderLinesAsTubes());
+    CPPUNIT_ASSERT(!actor->GetShaderProperty()->HasGeometryShaderCode());
 
     m_Node->SetFloatProperty("shape.ribbonwidth", 0.0f);
-    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(m_Fibers->GetNumFibers()), Input(Render3D())->GetNumberOfLines());
+    actor = Render3D();
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(m_Fibers->GetNumFibers()), Input(actor)->GetNumberOfLines());
+    CPPUNIT_ASSERT_EQUAL(1.0f, actor->GetProperty()->GetLineWidth());
+  }
+
+  // The radius is a uniform of the tube shader: a new radius needs no new input (GPU buffers).
+  void Mapper3D_TubeRadiusChange_NoNewInput()
+  {
+    m_Node->SetFloatProperty("shape.tuberadius", 0.5f);
+    vtkActor *actor = Render3D();
+    const vtkSmartPointer<vtkPolyData> input = Input(actor);
+    const vtkMTimeType mapperTime = actor->GetMapper()->GetMTime();
+    m_Node->SetFloatProperty("shape.tuberadius", 1.5f);
+    actor = Render3D();
+    CPPUNIT_ASSERT(Input(actor) == input);
+    CPPUNIT_ASSERT_EQUAL(mapperTime, actor->GetMapper()->GetMTime());
+    float radius = 0;
+    CPPUNIT_ASSERT(actor->GetShaderProperty()->GetGeometryCustomUniforms()->GetUniformf("fiberTubeRadius", radius));
+    CPPUNIT_ASSERT_EQUAL(1.5f, radius);
+  }
+
+  /** Three gently curved fibers along x, 60 mm long with a point every 0.5 mm, coloured by
+   *  orientation */
+  static mitk::FiberBundle::Pointer CurvedFibers()
+  {
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    auto lines = vtkSmartPointer<vtkCellArray>::New();
+    for (int k = -1; k <= 1; ++k)
+    {
+      std::vector<vtkIdType> ids;
+      for (double x = -30.0; x <= 30.0; x += 0.5)
+        ids.push_back(points->InsertNextPoint(x, 12.0 * k + 4.0 * std::sin(x / 12.0), 6.0 * k * std::cos(x / 10.0)));
+      lines->InsertNextCell(static_cast<vtkIdType>(ids.size()), ids.data());
+    }
+    auto polyData = vtkSmartPointer<vtkPolyData>::New();
+    polyData->SetPoints(points);
+    polyData->SetLines(lines);
+    return mitk::FiberBundle::New(polyData);
+  }
+
+  struct ImageDifference
+  {
+    double overlap = 0;        // pixels drawn in both images / pixels drawn in either
+    double meanDifference = 0; // mean absolute difference of the colour channels where both are drawn
+    int drawnPixels = 0;
+  };
+
+  /** Compares two frames of 3-component pixels; a pixel is drawn where it differs from the
+   *  background (the first pixel) by more than 10 in a channel. */
+  static ImageDifference Compare(const std::vector<unsigned char> &a, const std::vector<unsigned char> &b)
+  {
+    auto drawn = [](const std::vector<unsigned char> &image, std::size_t i) {
+      for (std::size_t c = 0; c < 3; ++c)
+        if (std::abs(static_cast<int>(image[i + c]) - static_cast<int>(image[c])) > 10)
+          return true;
+      return false;
+    };
+    ImageDifference result;
+    int both = 0, either = 0;
+    double sum = 0;
+    for (std::size_t i = 0; i + 2 < a.size(); i += 3)
+    {
+      const bool inA = drawn(a, i), inB = drawn(b, i);
+      result.drawnPixels += inA ? 1 : 0;
+      either += (inA || inB) ? 1 : 0;
+      if (inA && inB)
+      {
+        ++both;
+        for (std::size_t c = 0; c < 3; ++c)
+          sum += std::abs(static_cast<int>(a[i + c]) - static_cast<int>(b[i + c]));
+      }
+    }
+    result.overlap = either > 0 ? static_cast<double>(both) / either : 0.0;
+    result.meanDifference = both > 0 ? sum / (3.0 * both) : 255.0;
+    return result;
+  }
+
+  // #46: the tubes drawn on the GPU cover the same pixels as the vtkTubeFilter tubes the mapper
+  // drew before, with the same colours and similar shading (15 flat sides against a smooth
+  // cylinder). The reference is drawn by the same actor, so camera, lights and material match.
+  void Mapper3D_GpuTubes_LookLikeCpuTubes()
+  {
+    const float radius = 1.5f;
+    mitk::FiberBundle::Pointer fibers = CurvedFibers();
+    m_Node->SetData(fibers);
+    m_RenderingTestHelper.SetMapperIDToRender3D();
+    m_RenderingTestHelper.SetViewDirection(mitk::AnatomicalPlane::Original);
+
+    m_Node->SetFloatProperty("shape.tuberadius", radius);
+    vtkActor *actor = Render3D();
+    const std::vector<unsigned char> gpuTubes = Capture();
+
+    // lines, then the CPU tubes as the input of the line mapper, which keeps an input until the
+    // fibers change
+    m_Node->SetFloatProperty("shape.tuberadius", 0.0f);
+    actor = Render3D();
+    auto lines = vtkSmartPointer<vtkPolyData>::New();
+    lines->ShallowCopy(fibers->GetFiberPolyData());
+    lines->GetPointData()->AddArray(fibers->GetFiberColors());
+    auto tubeFilter = vtkSmartPointer<vtkTubeFilter>::New();
+    tubeFilter->SetInputData(lines);
+    tubeFilter->SetNumberOfSides(15);
+    tubeFilter->SetRadius(radius);
+    tubeFilter->Update();
+    actor->GetMapper()->SetInputDataObject(tubeFilter->GetOutput());
+    actor = Render3D();
+    CPPUNIT_ASSERT_MESSAGE("reference drawn from the CPU tubes", Input(actor) == tubeFilter->GetOutput());
+    const std::vector<unsigned char> cpuTubes = Capture();
+
+    const ImageDifference difference = Compare(gpuTubes, cpuTubes);
+    MITK_INFO << "GPU tubes: " << difference.drawnPixels << " pixels drawn, overlap with the CPU tubes "
+              << difference.overlap << ", mean colour difference " << difference.meanDifference;
+    CPPUNIT_ASSERT_MESSAGE("tubes drawn", difference.drawnPixels > 10000);
+    CPPUNIT_ASSERT_MESSAGE("same pixels as the CPU tubes", difference.overlap > 0.9);
+    CPPUNIT_ASSERT_MESSAGE("same colours as the CPU tubes", difference.meanDifference < 20.0);
+  }
+
+  // Picking in the 3D window: the depth of the tube surface (MITK's world point picking reads the
+  // depth buffer) and the node (MITK's object picking picks the lines with a tolerance of a few
+  // pixels). Opacity and the clipping plane apply to the tubes.
+  void Mapper3D_GpuTubes_PickingOpacityClipping()
+  {
+    const float radius = 1.5f;
+    mitk::FiberBundle::Pointer fibers = CurvedFibers();
+    m_Node->SetData(fibers);
+    m_RenderingTestHelper.SetMapperIDToRender3D();
+    m_RenderingTestHelper.SetViewDirection(mitk::AnatomicalPlane::Original);
+    m_Node->SetFloatProperty("shape.tuberadius", radius);
+    Render3D();
+    const std::vector<unsigned char> opaque = Capture();
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+
+    // the middle point of the middle fiber
+    vtkPoints *points = fibers->GetFiberPolyData()->GetPoints();
+    const vtkIdType pointsPerFiber = points->GetNumberOfPoints() / 3;
+    mitk::Point3D centre;
+    mitk::FillArray(centre, points->GetPoint(pointsPerFiber + pointsPerFiber / 2));
+    mitk::Point2D display;
+    renderer->WorldToDisplay(centre, display);
+    display[0] = std::round(display[0]);
+    display[1] = std::round(display[1]);
+
+    mitk::Point3D picked;
+    renderer->PickWorldPoint(display, picked);
+    double distance = 1e9;
+    for (vtkIdType i = pointsPerFiber; i < 2 * pointsPerFiber; ++i)
+    {
+      mitk::Point3D p;
+      mitk::FillArray(p, points->GetPoint(i));
+      distance = std::min(distance, picked.EuclideanDistanceTo(p));
+    }
+    double cameraPosition[3];
+    renderer->GetVtkRenderer()->GetActiveCamera()->GetPosition(cameraPosition);
+    mitk::Point3D camera;
+    mitk::FillArray(camera, cameraPosition);
+    MITK_INFO << "Picked point " << distance << " mm from the fiber, " << camera.EuclideanDistanceTo(centre) - camera.EuclideanDistanceTo(picked)
+              << " mm nearer to the camera than the fiber";
+    CPPUNIT_ASSERT_MESSAGE("picked on the tube surface", distance > 0.5 * radius && distance < 1.5 * radius);
+    CPPUNIT_ASSERT_MESSAGE("on the side facing the camera", camera.EuclideanDistanceTo(picked) < camera.EuclideanDistanceTo(centre));
+
+    mitk::Point3D objectPosition;
+    CPPUNIT_ASSERT_MESSAGE("the node is picked", renderer->PickObject(display, objectPosition) == m_Node.GetPointer());
+
+    // opacity: the tube is blended with the background
+    const int width = m_RenderingTestHelper.GetVtkRenderWindow()->GetSize()[0];
+    const std::size_t centrePixel = 3 * (static_cast<std::size_t>(display[1]) * width + static_cast<std::size_t>(display[0]));
+    auto brightness = [centrePixel](const std::vector<unsigned char> &image) {
+      int sum = 0;
+      for (std::size_t c = 0; c < 3; ++c)
+        sum += std::abs(static_cast<int>(image[centrePixel + c]) - static_cast<int>(image[c]));
+      return sum;
+    };
+    m_Node->SetOpacity(0.3f);
+    vtkActor *actor = Render3D();
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3, actor->GetProperty()->GetOpacity(), 1e-6);
+    const std::vector<unsigned char> translucent = Capture();
+    MITK_INFO << "Tube centre pixel at opacity 1.0: " << brightness(opaque) << ", at 0.3: " << brightness(translucent);
+    CPPUNIT_ASSERT_MESSAGE("tube drawn", brightness(opaque) > 60);
+    CPPUNIT_ASSERT_MESSAGE("tube blended", brightness(translucent) > 0 && brightness(translucent) < 0.6 * brightness(opaque));
+
+    // clipping at x = 0, keeping x > 0: no tube pixels left of the fiber's middle on screen
+    m_Node->SetOpacity(1.0f);
+    mitk::Point3D origin;
+    origin.Fill(0.0);
+    mitk::Vector3D normal;
+    normal.Fill(0.0);
+    normal[0] = 1.0;
+    m_Node->SetProperty("3DClipping", mitk::ClippingProperty::New(origin, normal));
+    Render3D();
+    const std::vector<unsigned char> clipped = Capture();
+    const ImageDifference all = Compare(opaque, opaque);
+    const ImageDifference half = Compare(clipped, clipped);
+    MITK_INFO << "Tube pixels unclipped: " << all.drawnPixels << ", clipped: " << half.drawnPixels;
+    CPPUNIT_ASSERT_MESSAGE("about half the tubes clipped", half.drawnPixels > 0.3 * all.drawnPixels && half.drawnPixels < 0.7 * all.drawnPixels);
   }
 
   // A bundle keeps one-point fibers as one-point lines (#20); vtkRibbonFilter warned once for each.
@@ -256,7 +468,6 @@ public:
   {
     m_Node->SetFloatProperty("shape.tuberadius", 0.5f);
     vtkPolyData *tubes = Input(Render3D());
-    CPPUNIT_ASSERT(tubes->GetNumberOfStrips() + tubes->GetNumberOfPolys() > 0);
     const auto updateTime3D = m_Fibers->GetUpdateTime3D();
 
     // held, so that a replaced plane is not freed and its address reused
@@ -470,7 +681,7 @@ public:
     // changed shape properties are picked up without touching the bundle's update times
     m_Node->SetFloatProperty("shape.tuberadius", 0.5f);
     m_Node->SetIntProperty("shape.linewidth", 3);
-    CPPUNIT_ASSERT(Input(Render3D())->GetNumberOfStrips() > 0);
+    CPPUNIT_ASSERT(Render3D()->GetProperty()->GetRenderLinesAsTubes());
     CPPUNIT_ASSERT_EQUAL(3.0f, Render2D(mitk::AnatomicalPlane::Coronal)->GetProperty()->GetLineWidth());
     CPPUNIT_ASSERT(updateTime2D == m_Fibers->GetUpdateTime2D());
     CPPUNIT_ASSERT(updateTime3D == m_Fibers->GetUpdateTime3D());
