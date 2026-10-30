@@ -1,4 +1,5 @@
 set(SRC_CPP_FILES
+  QmitkDiffusionPerspectiveLayout.cpp
 )
 
 set(INTERNAL_CPP_FILES

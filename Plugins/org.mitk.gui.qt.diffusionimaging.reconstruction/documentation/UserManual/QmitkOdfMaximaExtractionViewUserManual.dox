@@ -11,7 +11,7 @@ A NIfTI or NRRD file is read as an SH image when "SH Image" is chosen as reader 
 
 For SH images, a peak is dropped if it is below the relative threshold (a fraction of the largest peak of the voxel) or the absolute threshold, or closer than the angular threshold to a larger peak that is kept, so that each fiber direction appears once; at most "Max. Peaks" are kept. Voxels with an isotropic ODF, where no direction stands out, get no peak. For tensor images, the threshold is an FA threshold (voxels with a lower FA get no direction), and only it and the vector normalization act: without normalization the principal eigenvector is scaled by the FA. The other parameters are disabled while a tensor image is selected.
 
-An optional mask (a binary 3D image or a segmentation, whose labels together form the mask) restricts the extraction to its non-zero voxels; it must have the geometry of the input image.
+An optional mask (a binary 3D image or a segmentation, whose labels together form the mask, hidden ones too) restricts the extraction to its non-zero voxels; it must have the geometry of the input image.
 
 The extraction runs in the background: the application stays usable, and the start button is disabled until the peak image appears as a new node below the input image. A running computation cannot be stopped: closing the view lets it run to its end and drops its result, and quitting the application waits until it has ended.
 

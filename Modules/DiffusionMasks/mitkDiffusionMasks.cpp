@@ -19,11 +19,14 @@ found in the LICENSE file.
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateDataType.h>
 #include <mitkNodePredicateDimension.h>
+#include <mitkNodePredicateFunction.h>
 #include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateOr.h>
 #include <mitkNodePredicateProperty.h>
 
 #include <algorithm>
+#include <array>
+#include <optional>
 
 namespace
 {
@@ -32,12 +35,30 @@ namespace
     return mitk::NodePredicateNot::New(mitk::NodePredicateProperty::New("helper object", nullptr)).GetPointer();
   }
 
+  /** The spatial size of a segmentation with one time step, as x, y, z; std::nullopt for other
+   *  segmentations. A segmentation of a single slice has two dimensions when it was initialized
+   *  from a geometry (MITK derives them from its time geometry), three when initialized from a
+   *  3D image; its group images are 3D either way. Shared by the predicate and GetMaskImage, so
+   *  every segmentation the boxes offer can be converted. */
+  std::optional<std::array<unsigned int, 3>> GetSpatialSize(const mitk::MultiLabelSegmentation* segmentation)
+  {
+    const auto& dimensions = segmentation->GetDimensions();
+    if (segmentation->GetTimeSteps() != 1 || dimensions.size() < 2)
+      return std::nullopt;
+    // a fourth dimension of size 1 (a segmentation of a 4D image with one time step) adds no voxels
+    const auto beyondZ = dimensions.begin() + std::min<std::size_t>(3, dimensions.size());
+    if (std::any_of(beyondZ, dimensions.end(), [](unsigned int size) { return size != 1; }))
+      return std::nullopt;
+    return std::array<unsigned int, 3>{dimensions[0], dimensions[1], dimensions.size() >= 3 ? dimensions[2] : 1u};
+  }
+
   template <typename TPixel>
   mitk::Image::Pointer CreateUnionOfLabels(const mitk::MultiLabelSegmentation* segmentation, bool keepLabelValues)
   {
-    const auto& dimensions = segmentation->GetDimensions();
-    if (dimensions.size() < 3)
+    const auto size = GetSpatialSize(segmentation);
+    if (!size)
       mitkThrow() << "The segmentation is not three-dimensional.";
+    const auto& dimensions = *size;
 
     auto mask = mitk::Image::New();
     // Initialize with explicit dimensions: initializing from the segmentation would flatten a
@@ -80,8 +101,14 @@ mitk::NodePredicateBase::Pointer mitk::GetBinaryMaskPredicate()
 
 mitk::NodePredicateBase::Pointer mitk::GetSegmentationMaskPredicate()
 {
-  // MITK's segmentation predicate already excludes helper objects and binary images.
-  return NodePredicateAnd::New(GetMultiLabelSegmentationPredicate(), NodePredicateDimension::New(3)).GetPointer();
+  // MITK's segmentation predicate already excludes helper objects and binary images. The size is
+  // tested on the segmentation itself: NodePredicateDimension derives the dimension of non-image
+  // data from the time geometry, which gives 2 for a single slice.
+  auto isSpatial = NodePredicateFunction::New([](const DataNode* node) {
+    const auto* segmentation = dynamic_cast<const MultiLabelSegmentation*>(node->GetData());
+    return nullptr != segmentation && GetSpatialSize(segmentation).has_value();
+  });
+  return NodePredicateAnd::New(GetMultiLabelSegmentationPredicate(), isSpatial).GetPointer();
 }
 
 mitk::Image::ConstPointer mitk::GetMaskImage(const BaseData* data, bool keepLabelValues)
