@@ -36,7 +36,7 @@ class mitkDiffusionCmdAppsMiscTestSuite : public mitk::TestFixture
   MITK_TEST(CopyGeometry_RotatedReference_TurnsTensors);
   MITK_TEST(CopyGeometry_UnknownInputType_Fails);
   MITK_TEST(CopyGeometry_InputTypeMismatch_Fails);
-  MITK_TEST(CopyGeometry_RotatedReference_TurnsShOdfPeaks);
+  MITK_TEST(CopyGeometry_RotatedReference_TurnsShAndPeaks);
   MITK_TEST(DiffusionDICOMLoader_MissingFolder_Fails);
   MITK_TEST(ShToOdfImage_Odfs);
   MITK_TEST(PeakExtraction_Peaks);
@@ -173,13 +173,14 @@ public:
     CPPUNIT_ASSERT_MESSAGE(output, maxDifference <= 1e-5 * maxValue);
   }
 
-  // SH and peak NIfTI files are read as such only with -t; ODF files by their extension (#22).
-  void CopyGeometry_RotatedReference_TurnsShOdfPeaks()
+  // SH and peak NIfTI files are read as such only with -t (#22). ODF files are chosen by their
+  // extension, as tensor files are; to keep the app tests at about a minute, they are left to the
+  // unit test of ModelDirectionRotation.
+  void CopyGeometry_RotatedReference_TurnsShAndPeaks()
   {
     const auto dir = WorkDir("CopyGeometryModels");
     CheckTurnedByApp<mitk::ShImage>(dir, "sh_image_test.nii.gz", {"-t", "sh"}, {"SH Image"}, "sh.nii.gz");
     CheckTurnedByApp<mitk::PeakImage>(dir, "peak_image_test.nii.gz", {"-t", "peak"}, {"Peak Image"}, "peaks.nii.gz");
-    CheckTurnedByApp<mitk::OdfImage>(dir, "dwi_voxel_b0x3_b1000x192_CSAODF.qbi", {}, {}, "odfs.odf");
   }
 
   // -t sh on a tensor file: the tensor reader wins over the preferred SH reader, and the app
