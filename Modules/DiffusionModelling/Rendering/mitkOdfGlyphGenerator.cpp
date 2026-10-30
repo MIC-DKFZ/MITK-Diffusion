@@ -26,6 +26,7 @@ found in the LICENSE file.
 #include <vtkFloatArray.h>
 #include <vtkIdList.h>
 #include <vtkLookupTable.h>
+#include <vtkMath.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkUnsignedCharArray.h>
@@ -656,6 +657,26 @@ namespace
     }
     return glyphVoxels;
   }
+
+  /** The glyph's size factor of Settings::scaleBy, from its full ODF. */
+  double GetScale(const OdfType &odf, const mitk::OdfGlyphGenerator::Settings &settings)
+  {
+    if (settings.scaleBy == mitk::ODFSB_GFA)
+      return settings.scaling * odf.GetGeneralizedFractionalAnisotropy();
+    if (settings.scaleBy == mitk::ODFSB_PC)
+      return settings.scaling * odf.GetPrincipleCurvature(settings.indexParam1, settings.indexParam2, 0);
+    return settings.scaling;
+  }
+
+  /** The colour of a glyph coloured by direction: its ODF's principal direction as RGB. */
+  std::array<unsigned char, 4> DirectionColour(const OdfType &odf)
+  {
+    std::array<unsigned char, 4> rgba = {0, 0, 0, 255};
+    const vnl_vector_fixed<double, 3> direction = odf.GetPrincipalDiffusionDirection();
+    for (unsigned int c = 0; c < 3; ++c)
+      rgba[c] = static_cast<unsigned char>(static_cast<int>(std::fabs(direction[c]) * 255));
+    return rgba;
+  }
 }
 
 std::optional<mitk::OdfGlyphGenerator::Slice> mitk::OdfGlyphGenerator::GetSlice(const Image &image,
@@ -793,13 +814,7 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
     const float *voxelValues = values + glyphVoxelOffsets[g] * numComponents;
     // The full ODF gives the glyph's size, its range and its direction at every mesh level.
     const OdfType odf = ToOdf(kind, voxelValues, numComponents, shBasis, settings.tensorEllipsoids);
-
-    double scale = settings.scaling;
-    if (settings.scaleBy == ODFSB_GFA)
-      scale = settings.scaling * odf.GetGeneralizedFractionalAnisotropy();
-    else if (settings.scaleBy == ODFSB_PC)
-      scale = settings.scaling * odf.GetPrincipleCurvature(settings.indexParam1, settings.indexParam2, 0);
-
+    const double scale = GetScale(odf, settings);
     const OdfRange range = GetRange(odf);
     if (fullMesh)
     {
@@ -832,12 +847,9 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
     unsigned char *glyphColors = colorData + 4 * first;
     if (settings.colourByDirection)
     {
-      unsigned char rgba[4] = {0, 0, 0, 255};
-      const vnl_vector_fixed<double, 3> direction = odf.GetPrincipalDiffusionDirection();
-      for (unsigned int c = 0; c < 3; ++c)
-        rgba[c] = static_cast<unsigned char>(static_cast<int>(std::fabs(direction[c]) * 255));
+      const auto rgba = DirectionColour(odf);
       for (vtkIdType j = 0; j < numMeshPoints; ++j)
-        std::copy(rgba, rgba + 4, glyphColors + 4 * j);
+        std::copy(rgba.begin(), rgba.end(), glyphColors + 4 * j);
     }
     else
     {
@@ -873,4 +885,147 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   glyphs->GetPointData()->AddArray(colors);
   glyphs->GetPointData()->SetNormals(normals);
   return glyphs;
+}
+
+bool mitk::OdfGlyphGenerator::CanDrawEllipsoidInstances(const Image &image, const Settings &settings)
+{
+  // "Global maximum" normalizes like "Maximum".
+  return dynamic_cast<const TensorImage *>(&image) != nullptr && settings.tensorEllipsoids && settings.colourByDirection &&
+         (settings.normalization == ODFN_MAX || settings.normalization == ODFN_GLOBAL_MAX);
+}
+
+vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::GenerateEllipsoidInstances(const Image &image,
+                                                                                TimeStepType t,
+                                                                                const Slice &slice,
+                                                                                const Window *window,
+                                                                                const Settings &settings)
+{
+  const VoxelFormat format = GetVoxelFormat(image);
+  if (format.kind != VoxelKind::Tensor)
+    mitkThrow() << "No ellipsoids for a " << image.GetNameOfClass() << "; only tensor images have them.";
+
+  auto instances = vtkSmartPointer<vtkPolyData>::New();
+  const GlyphVoxels glyphVoxels = SelectGlyphVoxels(image, t, slice, window, settings);
+  if (glyphVoxels.centers.empty())
+    return instances;
+  const auto numGlyphs = static_cast<vtkIdType>(glyphVoxels.centers.size());
+
+  auto centers = vtkSmartPointer<vtkFloatArray>::New();
+  centers->SetNumberOfComponents(3);
+  centers->SetNumberOfTuples(numGlyphs);
+  float *centerData = centers->GetPointer(0);
+  auto orientations = vtkSmartPointer<vtkFloatArray>::New();
+  orientations->SetName("Orientation");
+  orientations->SetNumberOfComponents(4);
+  orientations->SetNumberOfTuples(numGlyphs);
+  float *orientationData = orientations->GetPointer(0);
+  auto semiAxes = vtkSmartPointer<vtkFloatArray>::New();
+  semiAxes->SetName("Scale");
+  semiAxes->SetNumberOfComponents(3);
+  semiAxes->SetNumberOfTuples(numGlyphs);
+  float *semiAxisData = semiAxes->GetPointer(0);
+  auto colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+  colors->SetName("ODF_COLORS");
+  colors->SetNumberOfComponents(4);
+  colors->SetNumberOfTuples(numGlyphs);
+  unsigned char *colorData = colors->GetPointer(0);
+
+  const ImageReadAccessor access(&image, image.GetVolumeData(t));
+  const auto *values = static_cast<const float *>(access.GetData());
+
+  // The glyphs are independent, so the output is the same at any number of threads.
+#pragma omp parallel for schedule(dynamic, 64)
+  for (vtkIdType g = 0; g < numGlyphs; ++g)
+  {
+    for (unsigned int c = 0; c < 3; ++c)
+      centerData[3 * g + c] = static_cast<float>(glyphVoxels.centers[g][c]);
+
+    const itk::DiffusionTensor3D<float> tensor(values + glyphVoxels.offsets[g] * format.numComponents);
+    // Size and colour come from the ellipsoid's ODF, as those of the glyph meshes.
+    OdfType odf;
+    odf.InitFromEllipsoid(tensor);
+    const auto rgba = DirectionColour(odf);
+    std::copy(rgba.begin(), rgba.end(), colorData + 4 * g);
+
+    float *orientation = orientationData + 4 * g;
+    float *axes = semiAxisData + 3 * g;
+    std::fill(orientation, orientation + 4, 0.0f);
+    orientation[0] = 1;
+    std::fill(axes, axes + 3, 0.0f);
+
+    itk::DiffusionTensor3D<float>::EigenValuesArrayType eigenValues;
+    itk::DiffusionTensor3D<float>::EigenVectorsMatrixType eigenVectors;
+    tensor.ComputeEigenAnalysis(eigenValues, eigenVectors);
+    // A null tensor or one with an eigenvalue <= 0 (or NaN) has no ellipsoid; its glyph mesh has size 0 too.
+    if (!(eigenValues[0] > 0 && eigenValues[1] > 0 && eigenValues[2] > 0))
+      continue;
+
+    // The eigenvectors are the rows of eigenVectors, in ascending order of the eigenvalues.
+    // Flipping one keeps the rotation proper: a reflection would turn the sphere inside out.
+    double rotation[3][3];
+    for (int row = 0; row < 3; ++row)
+    {
+      for (int col = 0; col < 3; ++col)
+        rotation[row][col] = eigenVectors(col, row);
+    }
+    if (vtkMath::Determinant3x3(rotation) < 0)
+    {
+      for (auto &row : rotation)
+        row[0] = -row[0];
+    }
+    double quaternion[4];
+    vtkMath::Matrix3x3ToQuaternion(rotation, quaternion);
+    for (unsigned int c = 0; c < 4; ++c)
+      orientation[c] = static_cast<float>(quaternion[c]);
+
+    const double largest = std::max({double(eigenValues[0]), double(eigenValues[1]), double(eigenValues[2])});
+    const double size = GetScale(odf, settings) * slice.glyphSpacing * 0.5;
+    for (unsigned int c = 0; c < 3; ++c)
+      axes[c] = static_cast<float>(size * eigenValues[c] / largest);
+  }
+
+  auto points = vtkSmartPointer<vtkPoints>::New();
+  points->SetData(centers);
+  instances->SetPoints(points);
+  instances->GetPointData()->AddArray(orientations);
+  instances->GetPointData()->AddArray(semiAxes);
+  instances->GetPointData()->AddArray(colors);
+  return instances;
+}
+
+vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::GetInstanceSphere(const Slice &slice, const Settings &settings)
+{
+  const BaseMesh &mesh = ChooseMesh(slice, settings);
+  const auto numPoints = static_cast<vtkIdType>(mesh.points.size());
+  auto coordinates = vtkSmartPointer<vtkFloatArray>::New();
+  coordinates->SetNumberOfComponents(3);
+  coordinates->SetNumberOfTuples(numPoints);
+  // The sphere's own normals: turned by the instances' inverse transpose they are the exact normals
+  // of the ellipsoid.
+  auto normals = vtkSmartPointer<vtkFloatArray>::New();
+  normals->SetName("Normals");
+  normals->SetNumberOfComponents(3);
+  normals->SetNumberOfTuples(numPoints);
+  for (vtkIdType j = 0; j < numPoints; ++j)
+  {
+    const Direction direction = Normalized(mesh.points[j]);
+    for (unsigned int c = 0; c < 3; ++c)
+    {
+      coordinates->SetTypedComponent(j, c, static_cast<float>(direction[c]));
+      normals->SetTypedComponent(j, c, static_cast<float>(direction[c]));
+    }
+  }
+  auto connectivity = vtkSmartPointer<vtkCellArray::AOSArray32>::New();
+  connectivity->SetNumberOfValues(3 * static_cast<vtkIdType>(mesh.triangles.size()));
+  WriteTriangles(mesh, 0, connectivity->GetPointer(0));
+
+  auto points = vtkSmartPointer<vtkPoints>::New();
+  points->SetData(coordinates);
+  auto polys = vtkSmartPointer<vtkCellArray>::New();
+  polys->SetData(3, connectivity);
+  auto sphere = vtkSmartPointer<vtkPolyData>::New();
+  sphere->SetPoints(points);
+  sphere->SetPolys(polys);
+  sphere->GetPointData()->SetNormals(normals);
+  return sphere;
 }

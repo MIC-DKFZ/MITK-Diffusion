@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkIOUtil.h>
 #include <mitkImagePixelReadAccessor.h>
+#include <mitkImageReadAccessor.h>
 #include <mitkImagePixelWriteAccessor.h>
 #include <mitkITKImageImport.h>
 #include <mitkOdfGlyphGenerator.h>
@@ -34,13 +35,16 @@ found in the LICENSE file.
 #include <vtkCellArray.h>
 #include <vtkIdList.h>
 #include <vtkLookupTable.h>
+#include <vtkMath.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkUnsignedCharArray.h>
 #include <vtkSmartPointer.h>
+#include <vtkTransform.h>
 
+#include <vnl/vnl_det.h>
 #include <vnl/vnl_inverse.h>
 
 #include <algorithm>
@@ -88,6 +92,9 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_CoarseMesh_ShValuesAtItsDirections);
   MITK_TEST(GlyphGenerator_CoarseMesh_OdfValuesOfNearestDirection);
   MITK_TEST(GlyphGenerator_CoarseMesh_NoLargerThanFullGlyph);
+  MITK_TEST(GlyphGenerator_EllipsoidInstances_MatchTheTensors);
+  MITK_TEST(GlyphGenerator_EllipsoidInstances_OnlyForTheirSettings);
+  MITK_TEST(GlyphGenerator_InstanceSphere_MeshOfTheLevel);
   MITK_TEST(OdfMapper_DefaultProperties_KeepExistingValues);
   MITK_TEST(OdfMapper_GenerationRequired);
   CPPUNIT_TEST_SUITE_END();
@@ -1466,6 +1473,283 @@ public:
           CPPUNIT_ASSERT_MESSAGE(name + ": " + std::to_string(largest), largest <= 0.5 + 1e-6);
           if (n == ODF_SAMPLING_SIZE)
             CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(name, 0.5, largest, 1e-6);
+        }
+      }
+    }
+  }
+
+  /** R diag(semi-axes) R^T of instance g: its ellipsoid as a symmetric matrix. */
+  static vnl_matrix_fixed<double, 3, 3> InstanceEllipsoid(vtkPolyData *instances, vtkIdType g)
+  {
+    double quaternion[4];
+    instances->GetPointData()->GetArray("Orientation")->GetTuple(g, quaternion);
+    double rotation[3][3];
+    vtkMath::QuaternionToMatrix3x3(quaternion, rotation);
+    double axes[3];
+    instances->GetPointData()->GetArray("Scale")->GetTuple(g, axes);
+    vnl_matrix_fixed<double, 3, 3> ellipsoid;
+    for (int r = 0; r < 3; ++r)
+    {
+      for (int c = 0; c < 3; ++c)
+        ellipsoid(r, c) = rotation[r][0] * axes[0] * rotation[c][0] + rotation[r][1] * axes[1] * rotation[c][1] + rotation[r][2] * axes[2] * rotation[c][2];
+    }
+    return ellipsoid;
+  }
+
+  /** Hash of the raw bytes of the instances' points and point arrays. */
+  static std::uint64_t InstancesFingerprint(vtkPolyData *instances)
+  {
+    Fingerprint fingerprint;
+    for (vtkDataArray *array : {instances->GetPoints()->GetData(), instances->GetPointData()->GetArray("Orientation"),
+                                instances->GetPointData()->GetArray("Scale"), instances->GetPointData()->GetArray("ODF_COLORS")})
+    {
+      CPPUNIT_ASSERT(array != nullptr);
+      fingerprint.Add(array->GetVoidPointer(0), array->GetNumberOfValues() * array->GetDataTypeSize());
+    }
+    return fingerprint.Get();
+  }
+
+  // The instanced ellipsoids are drawn for the voxels of the glyph meshes, in their colours, each
+  // the exact ellipsoid of its tensor D with the largest radius of the glyph mesh:
+  // R diag(semi-axes) R^T = D x largest radius / largest eigenvalue, semi-axes in ascending order.
+  // This holds for any choice of eigenvectors, also of equal eigenvalues.
+  void GlyphGenerator_EllipsoidInstances_MatchTheTensors()
+  {
+    // Three different eigenvalues fix the eigenvectors up to their signs, about half of which make
+    // a reflection; at scaling 2 and spacing 1 the largest semi-axis is 1.
+    using ItkTensorImageType = mitk::TensorImage::ItkTensorImageType;
+    auto itkImage = ItkTensorImageType::New();
+    ItkTensorImageType::RegionType region;
+    region.SetSize({{16, 1, 1}});
+    itkImage->SetRegions(region);
+    itkImage->Allocate();
+    for (itk::IndexValueType x = 0; x < 16; ++x)
+    {
+      auto transform = vtkSmartPointer<vtkTransform>::New();
+      transform->RotateZ(40.0 * x + 10);
+      transform->RotateX(25.0 * x + 5);
+      transform->RotateY(15.0 * x);
+      ItkTensorImageType::PixelType tensor;
+      for (unsigned int r = 0; r < 3; ++r)
+      {
+        for (unsigned int c = r; c < 3; ++c)
+        {
+          double value = 0;
+          for (unsigned int k = 0; k < 3; ++k)
+            value += transform->GetMatrix()->GetElement(r, k) * (3.0 - k) * transform->GetMatrix()->GetElement(c, k);
+          tensor(r, c) = value;
+        }
+      }
+      itkImage->SetPixel({{x, 0, 0}}, tensor);
+    }
+    auto rotatedTensors = mitk::TensorImage::New();
+    rotatedTensors->InitializeByItk(itkImage.GetPointer());
+    rotatedTensors->SetVolume(itkImage->GetBufferPointer());
+    const auto rotatedSlice = mitk::OdfGlyphGenerator::GetSlice(*rotatedTensors, 0, *Plane(0, 0, 0, 0, 0, 1));
+    CPPUNIT_ASSERT(rotatedSlice.has_value());
+    auto settings = AllGlyphs();
+    settings.tensorEllipsoids = true;
+    settings.colourByDirection = true;
+    settings.scaling = 2;
+    auto rotatedInstances = mitk::OdfGlyphGenerator::GenerateEllipsoidInstances(*rotatedTensors, 0, *rotatedSlice, nullptr, settings);
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(16), rotatedInstances->GetNumberOfPoints());
+    int reflections = 0;
+    for (itk::IndexValueType x = 0; x < 16; ++x)
+    {
+      const auto tensor = itkImage->GetPixel({{x, 0, 0}});
+      ItkTensorImageType::PixelType::EigenValuesArrayType eigenValues;
+      ItkTensorImageType::PixelType::EigenVectorsMatrixType eigenVectors;
+      tensor.ComputeEigenAnalysis(eigenValues, eigenVectors);
+      vnl_matrix_fixed<double, 3, 3> eigenBase;
+      for (int r = 0; r < 3; ++r)
+      {
+        for (int c = 0; c < 3; ++c)
+          eigenBase(r, c) = eigenVectors(c, r);
+      }
+      reflections += vnl_det(eigenBase) < 0 ? 1 : 0;
+      const auto ellipsoid = InstanceEllipsoid(rotatedInstances, x);
+      for (int r = 0; r < 3; ++r)
+      {
+        for (int c = 0; c < 3; ++c)
+          CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("rotated diag(3, 2, 1) " + std::to_string(x), tensor(r, c) / 3, ellipsoid(r, c), 1e-6);
+      }
+    }
+    CPPUNIT_ASSERT(reflections > 0 && reflections < 16);
+
+    auto cases = GlyphCases();
+    std::vector<GlyphCase> instanceCases;
+    for (const auto &glyphCase : cases)
+    {
+      if (glyphCase.name == "tensor ellipsoids" || glyphCase.name == "degenerate tensor ellipsoids")
+        instanceCases.push_back(glyphCase);
+    }
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), instanceCases.size());
+    // The stable random subset of the whole layer.
+    auto random = instanceCases.front();
+    random.name = "tensor ellipsoids, random 300 of the layer";
+    random.window.reset();
+    random.settings.maxGlyphs = 300;
+    random.settings.randomPlacement = true;
+    instanceCases.push_back(random);
+
+    for (const auto &glyphCase : instanceCases)
+    {
+      const mitk::OdfGlyphGenerator::Window *window = glyphCase.window ? &*glyphCase.window : nullptr;
+      CPPUNIT_ASSERT_MESSAGE(glyphCase.name, mitk::OdfGlyphGenerator::CanDrawEllipsoidInstances(*glyphCase.image, glyphCase.settings));
+      auto instances = mitk::OdfGlyphGenerator::GenerateEllipsoidInstances(*glyphCase.image, 0, glyphCase.slice, window, glyphCase.settings);
+      auto glyphs = glyphCase.Generate();
+      const vtkIdType numGlyphs = glyphs->GetNumberOfPoints() / ODF_SAMPLING_SIZE;
+      CPPUNIT_ASSERT_MESSAGE(glyphCase.name, numGlyphs > 0);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(glyphCase.name, numGlyphs, instances->GetNumberOfPoints());
+      auto instanceColours = vtkUnsignedCharArray::SafeDownCast(instances->GetPointData()->GetArray("ODF_COLORS"));
+      auto glyphColours = vtkUnsignedCharArray::SafeDownCast(glyphs->GetPointData()->GetArray("ODF_COLORS"));
+      CPPUNIT_ASSERT(instanceColours != nullptr && glyphColours != nullptr);
+
+      const mitk::ImageReadAccessor access(glyphCase.image, glyphCase.image->GetVolumeData(0));
+      const auto *values = static_cast<const float *>(access.GetData());
+      for (vtkIdType g = 0; g < numGlyphs; ++g)
+      {
+        const std::string name = glyphCase.name + ", glyph " + std::to_string(g);
+        double center[3];
+        instances->GetPoint(g, center);
+        CPPUNIT_ASSERT_MESSAGE(name, Distance(center, GlyphCenter(glyphs, g)) < 1e-3);
+        for (int c = 0; c < 4; ++c)
+          CPPUNIT_ASSERT_EQUAL_MESSAGE(name, glyphColours->GetTypedComponent(g * ODF_SAMPLING_SIZE, c), instanceColours->GetTypedComponent(g, c));
+
+        mitk::Point3D centerPoint;
+        centerPoint[0] = center[0];
+        centerPoint[1] = center[1];
+        centerPoint[2] = center[2];
+        double largestRadius = 0;
+        for (vtkIdType j = g * ODF_SAMPLING_SIZE; j < (g + 1) * ODF_SAMPLING_SIZE; ++j)
+          largestRadius = std::max(largestRadius, Distance(glyphs->GetPoint(j), centerPoint));
+
+        itk::Index<3> index;
+        glyphCase.image->GetGeometry()->WorldToIndex(centerPoint, index);
+        const itk::IndexValueType offset = index[0] + glyphCase.image->GetDimension(0) * (index[1] + glyphCase.image->GetDimension(1) * index[2]);
+        const itk::DiffusionTensor3D<float> tensor(values + 6 * offset);
+        itk::DiffusionTensor3D<float>::EigenValuesArrayType eigenValues;
+        itk::DiffusionTensor3D<float>::EigenVectorsMatrixType eigenVectors;
+        tensor.ComputeEigenAnalysis(eigenValues, eigenVectors);
+        const bool hasEllipsoid = eigenValues[0] > 0 && eigenValues[1] > 0 && eigenValues[2] > 0;
+
+        double axes[3];
+        instances->GetPointData()->GetArray("Scale")->GetTuple(g, axes);
+        CPPUNIT_ASSERT_MESSAGE(name, axes[0] <= axes[1] && axes[1] <= axes[2]);
+        // The glyph mesh's points and the centre are rounded to float.
+        const double tolerance = 1e-4 + 1e-5 * largestRadius;
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(name, hasEllipsoid ? largestRadius : 0.0, axes[2], tolerance);
+        const auto ellipsoid = InstanceEllipsoid(instances, g);
+        for (int r = 0; r < 3; ++r)
+        {
+          for (int c = 0; c < 3; ++c)
+          {
+            const double expected = hasEllipsoid ? tensor(r, c) * largestRadius / eigenValues[2] : 0;
+            CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(name, expected, ellipsoid(r, c), tolerance);
+          }
+        }
+      }
+    }
+
+    // Each instance is computed on its own, so the output does not depend on the number of threads.
+    auto wholeLayer = instanceCases.front();
+    wholeLayer.window.reset();
+    mitk::OmpThreadGuard threads(1);
+    const auto reference = InstancesFingerprint(mitk::OdfGlyphGenerator::GenerateEllipsoidInstances(*wholeLayer.image, 0, wholeLayer.slice, nullptr, wholeLayer.settings));
+    for (const int numThreads : {3, 8})
+    {
+      threads.SetNumberOfThreads(numThreads);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(std::to_string(numThreads) + " threads", reference,
+                                   InstancesFingerprint(mitk::OdfGlyphGenerator::GenerateEllipsoidInstances(*wholeLayer.image, 0, wholeLayer.slice, nullptr, wholeLayer.settings)));
+    }
+  }
+
+  // Colours by value change along a glyph and the other normalizations change its shape: only
+  // tensor ellipsoids coloured by direction and normalized by their maximum are instances.
+  void GlyphGenerator_EllipsoidInstances_OnlyForTheirSettings()
+  {
+    auto tensors = MakeDegenerateTensorImage();
+    auto odfs = MakeOdfImage(2, 1, 1, 1);
+    auto settings = AllGlyphs();
+    settings.tensorEllipsoids = true;
+    settings.colourByDirection = true;
+    settings.normalization = mitk::ODFN_MAX;
+    CPPUNIT_ASSERT(mitk::OdfGlyphGenerator::CanDrawEllipsoidInstances(*tensors, settings));
+    CPPUNIT_ASSERT(!mitk::OdfGlyphGenerator::CanDrawEllipsoidInstances(*odfs, settings));
+    CPPUNIT_ASSERT(!mitk::OdfGlyphGenerator::CanDrawEllipsoidInstances(*LoadShImage(), settings));
+    const std::pair<std::string, std::function<void(mitk::OdfGlyphGenerator::Settings &)>> changes[] = {
+      {"global maximum", [](mitk::OdfGlyphGenerator::Settings &s) { s.normalization = mitk::ODFN_GLOBAL_MAX; }},
+      {"tensor ODFs", [](mitk::OdfGlyphGenerator::Settings &s) { s.tensorEllipsoids = false; }},
+      {"colours by value", [](mitk::OdfGlyphGenerator::Settings &s) { s.colourByDirection = false; }},
+      {"min-max", [](mitk::OdfGlyphGenerator::Settings &s) { s.normalization = mitk::ODFN_MINMAX; }},
+      {"no normalization", [](mitk::OdfGlyphGenerator::Settings &s) { s.normalization = mitk::ODFN_NONE; }}};
+    for (const auto &[name, change] : changes)
+    {
+      auto changed = settings;
+      change(changed);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, name == "global maximum", mitk::OdfGlyphGenerator::CanDrawEllipsoidInstances(*tensors, changed));
+    }
+
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*odfs, 0, *Plane(10, 20, 30, 0, 0, 1));
+    CPPUNIT_ASSERT(slice.has_value());
+    CPPUNIT_ASSERT_THROW(mitk::OdfGlyphGenerator::GenerateEllipsoidInstances(*odfs, 0, *slice, nullptr, settings), mitk::Exception);
+  }
+
+  // The instances' sphere is the mesh of the glyph meshes at the same zoom, on the unit sphere,
+  // with the sphere's normals.
+  void GlyphGenerator_InstanceSphere_MeshOfTheLevel()
+  {
+    auto image = MakeDegenerateTensorImage();
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 0, 0, 0, 1));
+    CPPUNIT_ASSERT(slice.has_value());
+    const std::pair<double, vtkIdType> levels[] = {{0, ODF_SAMPLING_SIZE}, {10, 42}, {30, 162}, {100, ODF_SAMPLING_SIZE}};
+    for (const auto &[width, n] : levels)
+    {
+      const std::string name = std::to_string(width) + " pixels";
+      auto settings = AllGlyphs();
+      settings.tensorEllipsoids = true;
+      settings.pixelsPerMm = PixelsPerMm(*slice, settings.scaling, width);
+      auto sphere = mitk::OdfGlyphGenerator::GetInstanceSphere(*slice, settings);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, n, sphere->GetNumberOfPoints());
+      auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, 3 * n, glyphs->GetNumberOfPoints());
+
+      // The triangles of the first glyph, whose points start at 0.
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, 2 * n - 4, sphere->GetNumberOfPolys());
+      auto sphereIds = vtkSmartPointer<vtkIdList>::New();
+      auto glyphIds = vtkSmartPointer<vtkIdList>::New();
+      for (vtkIdType c = 0; c < sphere->GetNumberOfPolys(); ++c)
+      {
+        sphere->GetPolys()->GetCellAtId(c, sphereIds);
+        glyphs->GetPolys()->GetCellAtId(c, glyphIds);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(name, vtkIdType(3), sphereIds->GetNumberOfIds());
+        for (vtkIdType k = 0; k < 3; ++k)
+          CPPUNIT_ASSERT_EQUAL_MESSAGE(name, glyphIds->GetId(k), sphereIds->GetId(k));
+      }
+
+      vtkDataArray *normals = sphere->GetPointData()->GetNormals();
+      CPPUNIT_ASSERT(normals != nullptr);
+      for (vtkIdType j = 0; j < n; ++j)
+      {
+        double expected[3];
+        if (n == ODF_SAMPLING_SIZE)
+        {
+          OdfType::GetBaseMesh()->GetPoint(j, expected);
+        }
+        else
+        {
+          const auto direction = MeshDirection(static_cast<unsigned int>(n), static_cast<unsigned int>(j));
+          std::copy(direction.begin(), direction.end(), expected);
+        }
+        vtkMath::Normalize(expected);
+        double point[3];
+        sphere->GetPoint(j, point);
+        double normal[3];
+        normals->GetTuple(j, normal);
+        for (int c = 0; c < 3; ++c)
+        {
+          CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(name, expected[c], point[c], 1e-6);
+          CPPUNIT_ASSERT_EQUAL_MESSAGE(name, point[c], normal[c]);
         }
       }
     }

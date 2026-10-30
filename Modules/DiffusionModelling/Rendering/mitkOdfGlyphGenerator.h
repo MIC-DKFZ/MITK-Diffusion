@@ -121,6 +121,39 @@ namespace mitk
                                                  const Slice &slice,
                                                  const Window *window,
                                                  const Settings &settings);
+
+    /**
+     * Whether the glyphs of the image with these settings can be drawn as instances of one sphere
+     * (GenerateEllipsoidInstances): tensor images as ellipsoids, coloured by direction and
+     * normalized by their maximum. Colours by value change along a glyph, and the other
+     * normalizations change its shape, so those glyphs need a mesh of their own (Generate).
+     */
+    static bool CanDrawEllipsoidInstances(const Image &image, const Settings &settings);
+
+    /**
+     * The tensor ellipsoids of Generate as instances of a unit sphere (GetInstanceSphere), for the
+     * same voxels: one point per glyph at its centre, with the point arrays "Orientation" (unit
+     * quaternion w, x, y, z of the rotation that takes the sphere's x, y and z axes to the
+     * eigenvectors in ascending order of their eigenvalues), "Scale" (the semi-axes along them)
+     * and "ODF_COLORS" (RGBA, the colour of the principal direction, as Generate's). A semi-axis is
+     * scaling x (GFA or principal curvature of the ellipsoid's ODF, or 1) x glyph spacing / 2 x
+     * eigenvalue / largest eigenvalue, so the glyph is the exact ellipsoid as long as Generate's
+     * largest radius; all are zero for a null tensor or an eigenvalue <= 0.
+     * \throw mitk::Exception for images other than tensor images of float values.
+     */
+    static vtkSmartPointer<vtkPolyData> GenerateEllipsoidInstances(const Image &image,
+                                                                   TimeStepType t,
+                                                                   const Slice &slice,
+                                                                   const Window *window,
+                                                                   const Settings &settings);
+
+    /**
+     * The unit sphere of the instanced ellipsoids, with its normals: the mesh of Generate's glyphs
+     * for this slice and settings (Settings::pixelsPerMm), so that small instances are as cheap to
+     * draw as small glyph meshes. A new copy at each call; the meshes of different sizes have
+     * different numbers of points.
+     */
+    static vtkSmartPointer<vtkPolyData> GetInstanceSphere(const Slice &slice, const Settings &settings);
   };
 }
 
