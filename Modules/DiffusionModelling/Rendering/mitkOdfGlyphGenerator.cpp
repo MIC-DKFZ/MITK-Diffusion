@@ -35,6 +35,7 @@ found in the LICENSE file.
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <utility>
@@ -103,6 +104,8 @@ namespace
   {
     /** Unit directions, with the values the base mesh's float points hold. */
     std::vector<std::array<double, 3>> points;
+    /** Point ids of the triangles, in the order of the base mesh. */
+    std::vector<std::array<vtkIdType, 3>> triangles;
   };
 
   /** Built on first use from any thread, and never changed. */
@@ -114,23 +117,31 @@ namespace
       result.points.resize(odfMesh->GetNumberOfPoints());
       for (vtkIdType j = 0; j < odfMesh->GetNumberOfPoints(); ++j)
         odfMesh->GetPoint(j, result.points[j].data());
+
+      // The glyphs' cell array has fixed-size offsets, which needs a mesh of triangles only.
+      vtkCellArray *polys = odfMesh->GetPolys();
+      auto ids = vtkSmartPointer<vtkIdList>::New();
+      for (vtkIdType c = 0; c < polys->GetNumberOfCells(); ++c)
+      {
+        polys->GetCellAtId(c, ids);
+        if (ids->GetNumberOfIds() != 3)
+          mitkThrow() << "The ODF base mesh has a cell of " << ids->GetNumberOfIds() << " points.";
+        result.triangles.push_back({ids->GetId(0), ids->GetId(1), ids->GetId(2)});
+      }
       return result;
     }();
     return mesh;
   }
 
-  /** The polygons of the ODF base mesh, as point id lists. */
-  std::vector<std::vector<vtkIdType>> GetBasePolygons()
+  /** The base triangles on the points of the glyph that starts at firstPoint. */
+  template <typename IdType>
+  void WriteTriangles(const BaseMesh &mesh, vtkIdType firstPoint, IdType *connectivity)
   {
-    vtkCellArray *polys = OdfType::GetBaseMesh()->GetPolys();
-    std::vector<std::vector<vtkIdType>> polygons(polys->GetNumberOfCells());
-    auto ids = vtkSmartPointer<vtkIdList>::New();
-    for (vtkIdType c = 0; c < polys->GetNumberOfCells(); ++c)
+    for (const auto &triangle : mesh.triangles)
     {
-      polys->GetCellAtId(c, ids);
-      polygons[c].assign(ids->begin(), ids->end());
+      for (const vtkIdType id : triangle)
+        *connectivity++ = static_cast<IdType>(id + firstPoint);
     }
-    return polygons;
   }
 }
 
@@ -278,15 +289,35 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
 
   const BaseMesh &baseMesh = GetBaseMeshArrays();
   const auto numBasePoints = static_cast<vtkIdType>(baseMesh.points.size());
-  static const auto basePolygons = GetBasePolygons();
+  const auto numBaseTriangles = static_cast<vtkIdType>(baseMesh.triangles.size());
   const vtkIdType numGlyphs = kept->GetNumberOfPoints();
 
   auto pointCoordinates = vtkSmartPointer<vtkFloatArray>::New();
   pointCoordinates->SetNumberOfComponents(3);
   pointCoordinates->SetNumberOfTuples(numGlyphs * numBasePoints);
   float *pointData = pointCoordinates->GetPointer(0);
-  auto polys = vtkSmartPointer<vtkCellArray>::New();
-  polys->AllocateEstimate(numGlyphs * static_cast<vtkIdType>(basePolygons.size()), 3);
+
+  // 32-bit point ids, which halve the memory of the triangles, unless the ids or the offsets
+  // (3 per triangle) exceed them. The offsets are not stored: all cells are triangles.
+  const vtkIdType numConnectivityIds = 3 * numGlyphs * numBaseTriangles;
+  vtkSmartPointer<vtkDataArray> connectivity;
+  vtkTypeInt32 *connectivity32 = nullptr;
+  vtkTypeInt64 *connectivity64 = nullptr;
+  if (numConnectivityIds <= std::numeric_limits<vtkTypeInt32>::max())
+  {
+    auto ids = vtkSmartPointer<vtkCellArray::AOSArray32>::New();
+    ids->SetNumberOfValues(numConnectivityIds);
+    connectivity32 = ids->GetPointer(0);
+    connectivity = ids;
+  }
+  else
+  {
+    auto ids = vtkSmartPointer<vtkCellArray::AOSArray64>::New();
+    ids->SetNumberOfValues(numConnectivityIds);
+    connectivity64 = ids->GetPointer(0);
+    connectivity = ids;
+  }
+
   auto colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   colors->SetNumberOfComponents(4);
   colors->SetNumberOfTuples(numGlyphs * numBasePoints);
@@ -303,7 +334,6 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
 
   const ImageReadAccessor access(&image, image.GetVolumeData(t));
   const auto *values = static_cast<const float *>(access.GetData());
-  std::vector<vtkIdType> polygon;
 
   for (vtkIdType g = 0; g < numGlyphs; ++g)
   {
@@ -362,16 +392,17 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
       lut->MapScalarsThroughTable(colorValues, glyphColors, VTK_RGBA);
     }
 
-    for (const auto &basePolygon : basePolygons)
-    {
-      polygon.resize(basePolygon.size());
-      std::transform(basePolygon.begin(), basePolygon.end(), polygon.begin(), [first](vtkIdType id) { return id + first; });
-      polys->InsertNextCell(static_cast<vtkIdType>(polygon.size()), polygon.data());
-    }
+    const vtkIdType firstId = 3 * g * numBaseTriangles;
+    if (connectivity32 != nullptr)
+      WriteTriangles(baseMesh, first, connectivity32 + firstId);
+    else
+      WriteTriangles(baseMesh, first, connectivity64 + firstId);
   }
 
   auto points = vtkSmartPointer<vtkPoints>::New();
   points->SetData(pointCoordinates);
+  auto polys = vtkSmartPointer<vtkCellArray>::New();
+  polys->SetData(3, connectivity);
   auto glyphs = vtkSmartPointer<vtkPolyData>::New();
   glyphs->SetPoints(points);
   glyphs->SetPolys(polys);
