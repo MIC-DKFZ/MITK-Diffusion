@@ -22,15 +22,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkProperties.h>
 #include <mitkSliceNavigationController.h>
 
-#include <vtkActor.h>
 #include <vtkCellData.h>
 #include <vtkCellPicker.h>
 #include <vtkDataSet.h>
-#include <vtkOpenGLPolyDataMapper.h>
 #include <vtkPlane.h>
-#include <vtkPointData.h>
 #include <vtkPolyData.h>
+#include <vtkPropAssembly.h>
 #include <vtkProperty.h>
+#include <vtkRenderWindow.h>
 #include <vtkUnsignedCharArray.h>
 
 #include <algorithm>
@@ -57,28 +56,73 @@ void mitk::FiberBundleMapper2D::Update(mitk::BaseRenderer * renderer)
     return;
 
   FBXLocalStorage *localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
-  localStorage->m_Actor->GetProperty()->SetLighting(false);
+  vtkProperty *property = localStorage->m_Tiles.GetProperty();
+  property->SetLighting(false);
 
-  // The node's opacity, set on every render as the 3D mapper does; it needs no rebuild of the
-  // slab. VTK multiplies it with the alpha of the fiber colours.
+  // The node's opacity, set on every render as the 3D mapper does; it needs no new tiles. VTK
+  // multiplies it with the alpha of the fiber colours.
   float opacity = 1.0f;
   this->GetDataNode()->GetOpacity(opacity, renderer);
-  localStorage->m_Actor->GetProperty()->SetOpacity(opacity);
+  property->SetOpacity(opacity);
 
-  // line width and slab are settings of the actor and the VTK mapper; they need no new input
+  // line width and slab are settings of the actors and the VTK mappers; they need no new tiles
   int lineWidth = 0;
   this->GetDataNode()->GetIntProperty("shape.linewidth", lineWidth);
-  localStorage->m_Actor->GetProperty()->SetLineWidth(lineWidth);
+  property->SetLineWidth(lineWidth);
   double normal[3];
   double from = 0, to = 0;
   const bool slab = this->UpdateSlab(renderer, localStorage, normal, from, to);
+  const bool fibers = fiberBundle->GetFiberPolyData() != nullptr && this->UpdateFibers(fiberBundle);
+  localStorage->m_Tiles.GetProp()->SetVisibility(slab && fibers);
+  if (!slab || !fibers)
+    return;
 
-  // A new input only for changed fibers or a slab that left the band or turned: the input is
-  // uploaded to the GPU as a whole.
-  const bool inBand = localStorage->m_HasBand && std::equal(normal, normal + 3, localStorage->m_BandNormal) &&
-    from >= localStorage->m_BandFrom && to <= localStorage->m_BandTo;
-  if (localStorage->m_LastUpdateTime<fiberBundle->GetUpdateTime2D() || (slab && !inBand))
-    this->GenerateDataForRenderer( renderer );
+  vtkRenderWindow *window = renderer->GetRenderWindow();
+  if (localStorage->m_IndexVersion != m_IndexVersion)
+  {
+    localStorage->m_Tiles.Clear(window);
+    localStorage->m_IndexVersion = m_IndexVersion;
+    localStorage->m_ColourVersion = m_ColourVersion;
+  }
+  else if (localStorage->m_ColourVersion != m_ColourVersion)
+  {
+    localStorage->m_Tiles.Recolour(m_Colours, m_LowestAlpha);
+    localStorage->m_ColourVersion = m_ColourVersion;
+  }
+  localStorage->m_Tiles.Show(*m_SlabIndex, m_Colours, m_LowestAlpha, normal, from, to, window);
+}
+
+bool mitk::FiberBundleMapper2D::UpdateFibers(mitk::FiberBundle *fiberBundle)
+{
+  // #46: the index holds the geometry only. A new colour (colour by scalar map, the atTRACTive
+  // brush on every stroke) bumps the bundle's 2D update time but keeps its polydata, and gives the
+  // windows' tiles new colours without new geometry or vertex buffers.
+  vtkPolyData *fibers = fiberBundle->GetFiberPolyData();
+  if (!m_SlabIndex || fibers != m_IndexedFibers || fibers->GetMTime() != m_IndexedFibersTime)
+  {
+    m_SlabIndex = std::make_unique<FiberSlabIndex>(fibers);
+    m_IndexedFibers = fibers;
+    m_IndexedFibersTime = fibers->GetMTime();
+    ++m_IndexVersion;
+    m_ColourTime = 0;
+  }
+
+  vtkUnsignedCharArray *colours = fiberBundle->GetFiberColors();
+  if (colours != m_Colours.GetPointer() || m_ColourTime < fiberBundle->GetUpdateTime2D().GetMTime())
+  {
+    m_Colours = colours;
+    m_ColourTime = fiberBundle->GetUpdateTime2D().GetMTime();
+    m_LowestAlpha = 255;
+    if (colours != nullptr && colours->GetNumberOfTuples() > 0)
+    {
+      double alphaRange[2];
+      colours->GetRange(alphaRange, 3);
+      m_LowestAlpha = static_cast<unsigned char>(alphaRange[0]);
+    }
+    ++m_ColourVersion;
+  }
+  return m_Colours != nullptr && m_Colours->GetNumberOfComponents() == 4 &&
+         m_Colours->GetNumberOfTuples() >= fibers->GetNumberOfPoints();
 }
 
 bool mitk::FiberBundleMapper2D::UpdateSlab(mitk::BaseRenderer *renderer, FBXLocalStorage *localStorage, double normal[3], double &from, double &to)
@@ -98,13 +142,16 @@ bool mitk::FiberBundleMapper2D::UpdateSlab(mitk::BaseRenderer *renderer, FBXLoca
     return false;
 
   // the slab of thickness 2d around the plane: two clipping planes facing each other. vtkPlane
-  // marks itself modified only when a value changes, and the plane collection does not take
-  // over the planes' modified time.
+  // marks itself modified only when a value changes, and the plane collections do not take over
+  // the planes' modified time: a new plane collection or input would make VTK rebuild the GPU
+  // buffers of each tile (#46).
   const Vector3D &n = planeNormal;
-  localStorage->m_SlabPlane1->SetOrigin(origin[0]+n[0]*d, origin[1]+n[1]*d, origin[2]+n[2]*d);
-  localStorage->m_SlabPlane1->SetNormal(-n[0], -n[1], -n[2]);
-  localStorage->m_SlabPlane2->SetOrigin(origin[0]-n[0]*d, origin[1]-n[1]*d, origin[2]-n[2]*d);
-  localStorage->m_SlabPlane2->SetNormal(n[0], n[1], n[2]);
+  vtkPlane *plane1 = localStorage->m_Tiles.GetSlabPlane(0);
+  vtkPlane *plane2 = localStorage->m_Tiles.GetSlabPlane(1);
+  plane1->SetOrigin(origin[0]+n[0]*d, origin[1]+n[1]*d, origin[2]+n[2]*d);
+  plane1->SetNormal(-n[0], -n[1], -n[2]);
+  plane2->SetOrigin(origin[0]-n[0]*d, origin[1]-n[1]*d, origin[2]-n[2]*d);
+  plane2->SetNormal(n[0], n[1], n[2]);
 
   // the planes are d times the plane's normal (its length is the slice spacing) off the plane
   double centre = 0;
@@ -118,62 +165,10 @@ bool mitk::FiberBundleMapper2D::UpdateSlab(mitk::BaseRenderer *renderer, FBXLoca
   return true;
 }
 
-// vtkActors and Mappers are feeded here
-void mitk::FiberBundleMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *renderer)
-{
-  mitk::FiberBundle* fiberBundle = this->GetInput();
-
-  //the handler of local storage gets feeded in this method with requested data for related renderwindow
-  FBXLocalStorage *localStorage = m_LocalStorageHandler.GetLocalStorage(renderer);
-
-  mitk::DataNode* node = this->GetDataNode();
-  if (node == nullptr)
-    return;
-
-  if (fiberBundle->GetFiberPolyData() == nullptr)
-    return;
-
-  double normal[3];
-  double from = 0, to = 0;
-  if (this->UpdateSlab(renderer, localStorage, normal, from, to))
-  {
-    // #46: each window holds its own copy of what it draws on the GPU, and a band of the bundle
-    // keeps it small. A new band costs about as much per point as the whole bundle did once (VTK
-    // builds and uploads the buffers), so it reaches a slab width plus 8 mm beyond the slab on
-    // each side, and slice steps within it only move the clipping planes. At 1M fibers this gave
-    // the lowest mean time per slice step of the margins measured (see #46).
-    if (!m_SlabIndex || m_SlabIndexTime < fiberBundle->GetUpdateTime2D())
-    {
-      m_SlabIndex = std::make_unique<FiberSlabIndex>(fiberBundle->GetFiberPolyData(), fiberBundle->GetFiberColors());
-      m_SlabIndexTime.Modified();
-    }
-    const double margin = (to - from) + 8.0;
-    localStorage->m_HasBand = true;
-    std::copy(normal, normal + 3, localStorage->m_BandNormal);
-    localStorage->m_BandFrom = from - margin;
-    localStorage->m_BandTo = to + margin;
-    localStorage->m_Mapper->SetInputData(m_SlabIndex->Band(normal, localStorage->m_BandFrom, localStorage->m_BandTo));
-  }
-  else
-  {
-    // Rendered from a shallow copy: the colour array added for rendering must not change the
-    // bundle's own polydata, which may be saved or processed meanwhile.
-    vtkSmartPointer<vtkPolyData> fiberPolyData = vtkSmartPointer<vtkPolyData>::New();
-    fiberPolyData->ShallowCopy(fiberBundle->GetFiberPolyData());
-    fiberPolyData->GetPointData()->AddArray(fiberBundle->GetFiberColors());
-    localStorage->m_HasBand = false;
-    localStorage->m_Mapper->SetInputData(fiberPolyData);
-  }
-
-  // We have been modified => save this for next Update()
-  localStorage->m_LastUpdateTime.Modified();
-}
-
-
 vtkProp* mitk::FiberBundleMapper2D::GetVtkProp(mitk::BaseRenderer *renderer)
 {
   this->Update(renderer);
-  return m_LocalStorageHandler.GetLocalStorage(renderer)->m_Actor;
+  return m_LocalStorageHandler.GetLocalStorage(renderer)->m_Tiles.GetProp();
 }
 
 vtkIdType mitk::FiberBundleMapper2D::PickedFiber(vtkCellPicker *picker)
@@ -194,19 +189,4 @@ void mitk::FiberBundleMapper2D::SetDefaultProperties(mitk::DataNode* node, mitk:
   Superclass::SetDefaultProperties(node, renderer, overwrite);
   node->AddProperty( "Fiber2DSliceThickness", mitk::FloatProperty::New(1.0f), renderer, overwrite );
   node->AddProperty( "color", mitk::ColorProperty::New(1.0,1.0,1.0), renderer, overwrite);
-}
-
-
-mitk::FiberBundleMapper2D::FBXLocalStorage::FBXLocalStorage()
-{
-  m_Actor = vtkSmartPointer<vtkActor>::New();
-  m_Mapper = vtkSmartPointer<vtkOpenGLPolyDataMapper>::New();
-  m_Mapper->ScalarVisibilityOn();
-  m_Mapper->SetScalarModeToUsePointFieldData();
-  m_Mapper->SelectColorArray("FIBER_COLORS");
-  m_SlabPlane1 = vtkSmartPointer<vtkPlane>::New();
-  m_SlabPlane2 = vtkSmartPointer<vtkPlane>::New();
-  m_Mapper->AddClippingPlane(m_SlabPlane1);
-  m_Mapper->AddClippingPlane(m_SlabPlane2);
-  m_Actor->SetMapper(m_Mapper);
 }

@@ -26,6 +26,7 @@ found in the LICENSE file.
 #include <vtkActor.h>
 #include <vtkCamera.h>
 #include <vtkCellArray.h>
+#include <vtkCellData.h>
 #include <vtkCellPicker.h>
 #include <vtkCoordinate.h>
 #include <vtkIdList.h>
@@ -37,6 +38,7 @@ found in the LICENSE file.
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
 #include <vtkPropAssembly.h>
 #include <vtkPropCollection.h>
 #include <vtkProperty.h>
@@ -49,7 +51,9 @@ found in the LICENSE file.
 #include <vtkWindowToImageFilter.h>
 #include <algorithm>
 
+#include <array>
 #include <cmath>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -75,7 +79,7 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   MITK_TEST(Mapper3D_ClippingPlaneChange_AppliedWithoutRebuild);
   MITK_TEST(Mapper2D_SlabAroundThePlane);
   MITK_TEST(Mapper2D_SliceStep_PlanesMovedInPlace);
-  MITK_TEST(Mapper2D_Band_SameImageAsWholeBundle);
+  MITK_TEST(Mapper2D_Tiles_SameImageAsWholeBundle);
   MITK_TEST(Mapper2D_PickAlongAFiber_GivesItsIndex);
   MITK_TEST(Mapper2D_NodeOpacity_AppliedToTheFibers);
   MITK_TEST(Rendering_LeavesTheBundleUnchanged);
@@ -111,23 +115,47 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
     return actor;
   }
 
-  vtkActor *Render2D(mitk::AnatomicalPlane view)
+  vtkPropAssembly *Render2D(mitk::AnatomicalPlane view)
   {
     m_RenderingTestHelper.SetMapperIDToRender2D();
     m_RenderingTestHelper.SetViewDirection(view);
     return Render2D();
   }
 
-  /** Renders the current 2D slice; the actor of the node's 2D mapper */
-  vtkActor *Render2D()
+  /** Renders the current 2D slice; the node's 2D prop, an assembly of an actor per tile */
+  vtkPropAssembly *Render2D()
   {
     m_RenderingTestHelper.Render();
     auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
     auto mapper = dynamic_cast<mitk::VtkMapper *>(m_Node->GetMapper(mitk::BaseRenderer::Standard2D));
     CPPUNIT_ASSERT(mapper != nullptr);
-    auto actor = vtkActor::SafeDownCast(mapper->GetVtkProp(renderer));
-    CPPUNIT_ASSERT(actor != nullptr && actor->GetMapper() != nullptr);
-    return actor;
+    auto assembly = vtkPropAssembly::SafeDownCast(mapper->GetVtkProp(renderer));
+    CPPUNIT_ASSERT(assembly != nullptr);
+    return assembly;
+  }
+
+  /** The tiles' actors of a 2D prop */
+  static std::vector<vtkActor *> Tiles(vtkPropAssembly *assembly)
+  {
+    std::vector<vtkActor *> tiles;
+    vtkPropCollection *parts = assembly->GetParts();
+    parts->InitTraversal();
+    while (vtkProp *part = parts->GetNextProp())
+    {
+      auto actor = vtkActor::SafeDownCast(part);
+      CPPUNIT_ASSERT(actor != nullptr && actor->GetMapper() != nullptr);
+      tiles.push_back(actor);
+    }
+    return tiles;
+  }
+
+  /** The lines of all tiles of a 2D prop */
+  static vtkIdType NumberOfLines(vtkPropAssembly *assembly)
+  {
+    vtkIdType lines = 0;
+    for (vtkActor *tile : Tiles(assembly))
+      lines += Input(tile)->GetNumberOfLines();
+    return lines;
   }
 
   static vtkPolyData *Input(vtkActor *actor)
@@ -579,14 +607,24 @@ public:
   void Mapper2D_SlabAroundThePlane()
   {
     m_Node->SetFloatProperty("Fiber2DSliceThickness", 2.5f);
-    vtkActor *actor = Render2D(mitk::AnatomicalPlane::Axial);
-    vtkPolyData *input = Input(actor);
-    CPPUNIT_ASSERT(input->GetPointData()->GetArray("FIBER_COLORS") != nullptr);
-    CPPUNIT_ASSERT(input->GetNumberOfLines() > 0);
+    vtkPropAssembly *assembly = Render2D(mitk::AnatomicalPlane::Axial);
+    const std::vector<vtkActor *> tiles = Tiles(assembly);
+    CPPUNIT_ASSERT(!tiles.empty());
+    for (vtkActor *tile : tiles)
+    {
+      CPPUNIT_ASSERT(Input(tile)->GetPointData()->GetArray("FIBER_COLORS") != nullptr);
+      CPPUNIT_ASSERT(Input(tile)->GetNumberOfLines() > 0);
+    }
 
-    vtkPlaneCollection *planes = actor->GetMapper()->GetClippingPlanes();
+    // the tiles share the two planes
+    vtkPlaneCollection *planes = tiles.front()->GetMapper()->GetClippingPlanes();
     CPPUNIT_ASSERT(planes != nullptr);
     CPPUNIT_ASSERT_EQUAL(2, planes->GetNumberOfItems());
+    for (vtkActor *tile : tiles)
+    {
+      vtkPlaneCollection *tilePlanes = tile->GetMapper()->GetClippingPlanes();
+      CPPUNIT_ASSERT(tilePlanes->GetNumberOfItems() == 2 && tilePlanes->GetItem(0) == planes->GetItem(0) && tilePlanes->GetItem(1) == planes->GetItem(1));
+    }
     auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
     const mitk::PlaneGeometry *plane = renderer->GetSliceNavigationController()->GetCurrentPlaneGeometry();
     const mitk::Point3D origin = plane->GetOrigin();
@@ -608,109 +646,284 @@ public:
     }
   }
 
-  // #46: a slice step moves the two slab planes in place. Within the band of fibers the window
-  // holds, it keeps the input: a new plane collection or input changes the VTK mapper's modified
-  // time, and VTK then rebuilds the GPU buffers of what it draws. A step beyond the band gives a
-  // new band.
+  // #46: a slice step moves the two slab planes in place and keeps the tiles the window holds: a
+  // new plane collection or input changes a VTK mapper's modified time, and VTK then rebuilds the
+  // GPU buffers of what it draws. A step far from the tiles gives new tiles with the same planes;
+  // new colours keep the tiles' geometry.
   void Mapper2D_SliceStep_PlanesMovedInPlace()
   {
-    // one fiber in each band: a band reaches 10 mm beyond the slab of the default thickness
-    m_Node->SetData(AxialFibers({-20.0, 0.0, 20.0}));
-    vtkActor *actor = Render2D(mitk::AnatomicalPlane::Axial);
+    // fibers with a point every 0.5 mm, 20 mm apart: the tiles near a slab hold one fiber
+    m_Node->SetData(AxialFibers({-20.0, 0.0, 20.0}, 81));
+    m_Fibers = dynamic_cast<mitk::FiberBundle *>(m_Node->GetData());
+    Render2D(mitk::AnatomicalPlane::Axial);
     auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
     mitk::SliceNavigationController *navigation = renderer->GetSliceNavigationController();
     mitk::Point3D centre;
     centre.Fill(0.0);
     navigation->SelectSliceByPoint(centre);
-    actor = Render2D();
+    vtkPropAssembly *assembly = Render2D();
     const std::vector<unsigned char> atCentre = Capture();
-    MITK_INFO << "Band at the centre: " << Input(actor)->GetNumberOfLines() << " of 3 fibers";
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("the band holds the fiber in the slab only", static_cast<vtkIdType>(1), Input(actor)->GetNumberOfLines());
+    MITK_INFO << "Tiles at the centre: " << Tiles(assembly).size() << " with " << NumberOfLines(assembly) << " lines";
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("the tiles hold the fiber in the slab only", static_cast<vtkIdType>(1), NumberOfLines(assembly));
 
-    vtkMapper *mapper = actor->GetMapper();
     // held, so that replaced objects are not freed and their addresses reused
-    const vtkSmartPointer<vtkPlaneCollection> planes = mapper->GetClippingPlanes();
+    const std::vector<vtkActor *> centreActors = Tiles(assembly);
+    const std::vector<vtkSmartPointer<vtkActor>> tiles(centreActors.begin(), centreActors.end());
+    std::vector<vtkSmartPointer<vtkPolyData>> inputs;
+    std::vector<vtkMTimeType> mapperTimes;
+    for (const auto &tile : tiles)
+    {
+      inputs.push_back(Input(tile));
+      mapperTimes.push_back(tile->GetMapper()->GetMTime());
+    }
+    const vtkSmartPointer<vtkPlaneCollection> planes = tiles.front()->GetMapper()->GetClippingPlanes();
     CPPUNIT_ASSERT(planes != nullptr && planes->GetNumberOfItems() == 2);
     const vtkSmartPointer<vtkPlane> plane1 = planes->GetItem(0);
     const vtkSmartPointer<vtkPlane> plane2 = planes->GetItem(1);
-    const vtkSmartPointer<vtkPolyData> input = Input(actor);
-    const vtkMTimeType mapperTime = mapper->GetMTime();
     double originBefore[3];
     plane1->GetOrigin(originBefore);
 
-    // a step within the band
+    // a step within the tiles
     mitk::Point3D near = centre;
-    near[2] = 2.0;
+    near[2] = 0.5;
     navigation->SelectSliceByPoint(near);
-    actor = Render2D();
+    assembly = Render2D();
     double originAfter[3];
-    mapper->GetClippingPlanes()->GetItem(0)->GetOrigin(originAfter);
-    CPPUNIT_ASSERT_MESSAGE("the slab follows the slice", std::abs(originAfter[2] - originBefore[2]) > 1.0);
-    CPPUNIT_ASSERT(actor->GetMapper() == mapper);
-    CPPUNIT_ASSERT(mapper->GetClippingPlanes() == planes);
-    CPPUNIT_ASSERT(planes->GetItem(0) == plane1 && planes->GetItem(1) == plane2);
-    CPPUNIT_ASSERT_MESSAGE("input kept", Input(actor) == input);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("mapper unchanged", mapperTime, mapper->GetMTime());
+    plane1->GetOrigin(originAfter);
+    CPPUNIT_ASSERT_MESSAGE("the slab follows the slice", std::abs(originAfter[2] - originBefore[2]) > 0.4);
+    const std::vector<vtkActor *> nearTiles = Tiles(assembly);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("tiles kept", tiles.size(), nearTiles.size());
+    for (std::size_t i = 0; i < tiles.size(); ++i)
+    {
+      CPPUNIT_ASSERT(nearTiles[i] == tiles[i]);
+      CPPUNIT_ASSERT(tiles[i]->GetMapper()->GetClippingPlanes()->GetItem(0) == plane1);
+      CPPUNIT_ASSERT(tiles[i]->GetMapper()->GetClippingPlanes()->GetItem(1) == plane2);
+      CPPUNIT_ASSERT_MESSAGE("input kept", Input(tiles[i]) == inputs[i]);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE("mapper unchanged", mapperTimes[i], tiles[i]->GetMapper()->GetMTime());
+    }
 
-    // a step beyond the band: a new band, the same planes
+    // a step far from the tiles: new tiles with the same planes, the old ones dropped
     mitk::Point3D above = centre;
     above[2] = 20.0;
     navigation->SelectSliceByPoint(above);
-    actor = Render2D();
+    assembly = Render2D();
     const std::vector<unsigned char> atAbove = Capture();
     CPPUNIT_ASSERT_MESSAGE("another fiber is shown", atAbove != atCentre);
-    CPPUNIT_ASSERT(planes->GetItem(0) == plane1 && planes->GetItem(1) == plane2);
-    CPPUNIT_ASSERT_MESSAGE("new band", Input(actor) != input);
+    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(1), NumberOfLines(assembly));
+    for (vtkActor *tile : Tiles(assembly))
+    {
+      CPPUNIT_ASSERT_MESSAGE("new tiles", std::find(tiles.begin(), tiles.end(), tile) == tiles.end());
+      CPPUNIT_ASSERT(tile->GetMapper()->GetClippingPlanes()->GetItem(0) == plane1);
+      CPPUNIT_ASSERT(tile->GetMapper()->GetClippingPlanes()->GetItem(1) == plane2);
+    }
 
     navigation->SelectSliceByPoint(centre);
-    actor = Render2D();
+    assembly = Render2D();
     CPPUNIT_ASSERT_MESSAGE("same image back at the first slice", Capture() == atCentre);
 
-    // changed fibers give a new input
-    const vtkSmartPointer<vtkPolyData> band = Input(actor);
-    m_Fibers = dynamic_cast<mitk::FiberBundle *>(m_Node->GetData());
+    // new colours: the same tiles, points and lines, so that VTK uploads only the colours
+    const std::vector<vtkActor *> backActors = Tiles(assembly);
+    const std::vector<vtkSmartPointer<vtkActor>> centreTiles(backActors.begin(), backActors.end());
+    std::vector<vtkSmartPointer<vtkPolyData>> centreInputs;
+    std::vector<vtkSmartPointer<vtkPoints>> centrePoints;
+    std::vector<vtkSmartPointer<vtkDataArray>> centreColours;
+    for (const auto &tile : centreTiles)
+    {
+      centreInputs.push_back(Input(tile));
+      centrePoints.push_back(Input(tile)->GetPoints());
+      centreColours.push_back(Input(tile)->GetPointData()->GetArray("FIBER_COLORS"));
+    }
     m_Fibers->SetFiberColors(255, 0, 0);
-    actor = Render2D();
-    CPPUNIT_ASSERT(Input(actor) != band);
+    assembly = Render2D();
+    const std::vector<vtkActor *> recoloured = Tiles(assembly);
+    CPPUNIT_ASSERT_EQUAL(centreTiles.size(), recoloured.size());
+    for (std::size_t i = 0; i < recoloured.size(); ++i)
+    {
+      CPPUNIT_ASSERT(recoloured[i] == centreTiles[i]);
+      CPPUNIT_ASSERT_MESSAGE("geometry kept", Input(recoloured[i]) == centreInputs[i] && Input(recoloured[i])->GetPoints() == centrePoints[i]);
+      vtkDataArray *colours = Input(recoloured[i])->GetPointData()->GetArray("FIBER_COLORS");
+      CPPUNIT_ASSERT_MESSAGE("new colours", colours != centreColours[i]);
+      CPPUNIT_ASSERT_EQUAL(255.0, colours->GetComponent(0, 0));
+      CPPUNIT_ASSERT_EQUAL(0.0, colours->GetComponent(0, 1));
+    }
     CPPUNIT_ASSERT_MESSAGE("recoloured fibers drawn", Capture() != atCentre);
   }
 
-  // #46: a 2D window holds only the fibers in a band around its slab; drawn with the slab's
-  // clipping planes, the band gives the same image as the whole bundle, for planes along the
-  // world axes and oblique ones.
-  void Mapper2D_Band_SameImageAsWholeBundle()
+  /** The frame of the current slab drawn from the whole bundle instead of the tiles: the tiles'
+   *  actors hidden, and an actor of the whole bundle with their property and planes added to the
+   *  assembly for one render */
+  std::vector<unsigned char> CaptureWholeBundle(vtkPropAssembly *assembly)
   {
-    // a thin slab, so that a band (10 mm beyond the slab) holds part of this small bundle
-    m_Node->SetFloatProperty("Fiber2DSliceThickness", 0.5f);
+    const std::vector<vtkActor *> tiles = Tiles(assembly);
+    CPPUNIT_ASSERT(!tiles.empty());
     auto whole = vtkSmartPointer<vtkPolyData>::New();
     whole->ShallowCopy(m_Fibers->GetFiberPolyData());
     whole->GetPointData()->AddArray(m_Fibers->GetFiberColors());
+    auto mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    mapper->ScalarVisibilityOn();
+    mapper->SetScalarModeToUsePointFieldData();
+    mapper->SelectColorArray("FIBER_COLORS");
+    mapper->SetClippingPlanes(tiles.front()->GetMapper()->GetClippingPlanes());
+    mapper->SetInputData(whole);
+    auto actor = vtkSmartPointer<vtkActor>::New();
+    actor->SetMapper(mapper);
+    actor->SetProperty(tiles.front()->GetProperty());
+    for (vtkActor *tile : tiles)
+      tile->VisibilityOff();
+    assembly->AddPart(actor);
+    const std::vector<unsigned char> frame = Capture();
+    assembly->RemovePart(actor);
+    actor->ReleaseGraphicsResources(m_RenderingTestHelper.GetVtkRenderWindow());
+    for (vtkActor *tile : tiles)
+      tile->VisibilityOn();
+    return frame;
+  }
+
+  /** Checks that the tiles of a 2D prop hold every segment of the bundle that reaches into the
+   *  slab between its clipping planes, each in one tile only; the number of such segments */
+  int CheckTilesHoldTheSlab(vtkPropAssembly *assembly)
+  {
+    const std::vector<vtkActor *> tiles = Tiles(assembly);
+    vtkPlaneCollection *planes = tiles.front()->GetMapper()->GetClippingPlanes();
+    double origin1[3], origin2[3], normal[3];
+    planes->GetItem(0)->GetOrigin(origin1);
+    planes->GetItem(1)->GetOrigin(origin2);
+    // the second plane faces along the slab's normal, the first against it
+    planes->GetItem(1)->GetNormal(normal);
+    auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+    const double from = dot(normal, origin2);
+    const double to = dot(normal, origin1);
+
+    // the tiles' segments: fiber and both points
+    std::map<std::array<double, 7>, int> held;
+    for (vtkActor *tile : tiles)
+    {
+      vtkPolyData *input = Input(tile);
+      vtkDataArray *fiberIds = input->GetCellData()->GetArray("FIBER_IDS");
+      CPPUNIT_ASSERT(fiberIds != nullptr);
+      auto ids = vtkSmartPointer<vtkIdList>::New();
+      for (vtkIdType cell = 0; cell < input->GetNumberOfLines(); ++cell)
+      {
+        input->GetLines()->GetCellAtId(cell, ids);
+        for (vtkIdType i = 0; i + 1 < ids->GetNumberOfIds(); ++i)
+        {
+          std::array<double, 7> key;
+          key[0] = fiberIds->GetTuple1(cell);
+          input->GetPoint(ids->GetId(i), key.data() + 1);
+          input->GetPoint(ids->GetId(i + 1), key.data() + 4);
+          ++held[key];
+        }
+      }
+    }
+    for (const auto &[key, count] : held)
+      CPPUNIT_ASSERT_EQUAL_MESSAGE("a segment in one tile only", 1, count);
+
+    vtkPolyData *fibers = m_Fibers->GetFiberPolyData();
+    auto ids = vtkSmartPointer<vtkIdList>::New();
+    int inSlab = 0;
+    for (vtkIdType cell = 0; cell < fibers->GetNumberOfLines(); ++cell)
+    {
+      fibers->GetLines()->GetCellAtId(cell, ids);
+      for (vtkIdType i = 0; i + 1 < ids->GetNumberOfIds(); ++i)
+      {
+        std::array<double, 7> key;
+        key[0] = static_cast<double>(cell);
+        fibers->GetPoint(ids->GetId(i), key.data() + 1);
+        fibers->GetPoint(ids->GetId(i + 1), key.data() + 4);
+        const double t0 = dot(normal, key.data() + 1), t1 = dot(normal, key.data() + 4);
+        if (std::max(t0, t1) < from - 1e-6 || std::min(t0, t1) > to + 1e-6)
+          continue;
+        ++inSlab;
+        CPPUNIT_ASSERT_MESSAGE("a segment in the slab is in a tile", held.count(key) == 1);
+      }
+    }
+    return inSlab;
+  }
+
+  /** Pixels and largest channel difference between two frames */
+  static std::pair<int, int> FrameDifference(const std::vector<unsigned char> &a, const std::vector<unsigned char> &b, int components)
+  {
+    int pixels = 0, largest = 0;
+    for (std::size_t i = 0; i + components <= a.size(); i += components)
+    {
+      int pixelLargest = 0;
+      for (int c = 0; c < components; ++c)
+        pixelLargest = std::max(pixelLargest, std::abs(static_cast<int>(a[i + c]) - static_cast<int>(b[i + c])));
+      pixels += pixelLargest > 0 ? 1 : 0;
+      largest = std::max(largest, pixelLargest);
+    }
+    return {pixels, largest};
+  }
+
+  // #46: a 2D window holds only the tiles near its slab; drawn with the slab's clipping planes,
+  // they hold every segment of the slab and give the image of the whole bundle: for planes along
+  // the world axes and oblique ones, scrolling across tiles in both directions, and after turning
+  // the plane in steps (which keeps the tiles of the old normal or builds new ones). Translucent
+  // fibers are blended by VTK's order-independent translucency in 2D windows (MITK switches depth
+  // peeling on for 3D windows only), so the tiles' draw order shows at most in rounding.
+  void Mapper2D_Tiles_SameImageAsWholeBundle()
+  {
+    // a thin slab, so that the tiles hold part of this small bundle
+    m_Node->SetFloatProperty("Fiber2DSliceThickness", 0.5f);
     double bounds[6];
-    whole->GetBounds(bounds);
+    m_Fibers->GetFiberPolyData()->GetBounds(bounds);
+    const vtkIdType bundlePoints = m_Fibers->GetFiberPolyData()->GetNumberOfPoints();
     auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
-    vtkIdType smallestBand = whole->GetNumberOfPoints();
+    mitk::SliceNavigationController *navigation = renderer->GetSliceNavigationController();
+    vtkIdType fewestPoints = bundlePoints;
+    int opaqueDiffering = 0, translucentPixels = 0, translucentLargest = 0;
 
-    auto compareWithWholeBundle = [&]() {
-      vtkActor *actor = Render2D();
-      // held: the mapper frees it when it gets the whole bundle below
-      const vtkSmartPointer<vtkPolyData> band = Input(actor);
-      CPPUNIT_ASSERT(band != whole);
-      smallestBand = std::min(smallestBand, band->GetNumberOfPoints());
-      const std::vector<unsigned char> fromBand = Capture();
+    // translucent: the largest difference allowed in a colour channel (out of 255)
+    const int maxTranslucentDifference = 2;
+    auto compareWithWholeBundle = [&](const std::string &where) {
+      vtkPropAssembly *assembly = Render2D();
+      vtkIdType points = 0;
+      for (vtkActor *tile : Tiles(assembly))
+        points += Input(tile)->GetNumberOfPoints();
+      fewestPoints = std::min(fewestPoints, points);
+      int components = 3;
+      const std::vector<unsigned char> fromTiles = Capture(&components);
+      const std::vector<unsigned char> fromWhole = CaptureWholeBundle(assembly);
+      const ImageDifference drawn = Compare(fromWhole, fromWhole);
+      const auto [opaquePixels, opaqueLargest] = FrameDifference(fromTiles, fromWhole, components);
+      const int inSlab = CheckTilesHoldTheSlab(assembly);
+      MITK_INFO << where << ": " << Tiles(assembly).size() << " tiles of " << points << " of " << bundlePoints << " points, "
+                << inSlab << " segments in the slab, " << drawn.drawnPixels << " fiber pixels, " << opaquePixels << " differ by at most "
+                << opaqueLargest;
+      if (opaquePixels > 0)
+      {
+        // where they differ, for the log
+        int shown = 0;
+        for (std::size_t i = 0; i + components <= fromTiles.size() && shown < 8; i += components)
+        {
+          if (std::equal(fromTiles.begin() + i, fromTiles.begin() + i + components, fromWhole.begin() + i))
+            continue;
+          ++shown;
+          const auto pixel = static_cast<int>(i / components);
+          MITK_INFO << "  pixel " << pixel % 640 << ", " << pixel / 640 << ": tiles " << int(fromTiles[i]) << " " << int(fromTiles[i + 1]) << " "
+                    << int(fromTiles[i + 2]) << ", whole " << int(fromWhole[i]) << " " << int(fromWhole[i + 1]) << " " << int(fromWhole[i + 2]);
+        }
+      }
+      CPPUNIT_ASSERT_MESSAGE("fibers drawn", drawn.drawnPixels > 0);
+      // Of fragments of equal depth (segments meeting at a point, or crossing within the depth
+      // buffer's resolution), the one drawn last is shown. The tiles are drawn one after the other,
+      // so such a pixel may show another of the segments than the whole bundle drawn in bundle
+      // order; every segment of the slab is drawn (CheckTilesHoldTheSlab).
+      CPPUNIT_ASSERT_MESSAGE(where + ": the image of the whole bundle", 1000 * opaquePixels <= drawn.drawnPixels);
+      opaqueDiffering = std::max(opaqueDiffering, opaquePixels);
 
-      // the input stays until the fibers change or the slab leaves the band
-      actor->GetMapper()->SetInputDataObject(whole);
-      actor = Render2D();
-      CPPUNIT_ASSERT(Input(actor) == whole.GetPointer());
-      const std::vector<unsigned char> fromWhole = Capture();
-      const ImageDifference difference = Compare(fromWhole, fromWhole);
-      MITK_INFO << "Band of " << band->GetNumberOfPoints() << " of " << whole->GetNumberOfPoints() << " points, "
-                << difference.drawnPixels << " fiber pixels";
-      CPPUNIT_ASSERT_MESSAGE("fibers drawn", difference.drawnPixels > 0);
-      CPPUNIT_ASSERT_MESSAGE("same image from the band and from the whole bundle", fromBand == fromWhole);
-
-      // a new band at the next slice
-      m_Fibers->RequestUpdate2D();
+      // the same slab with translucent fibers (node opacity)
+      m_Node->SetOpacity(0.4f);
+      assembly = Render2D();
+      const std::vector<unsigned char> translucentTiles = Capture();
+      const std::vector<unsigned char> translucentWhole = CaptureWholeBundle(assembly);
+      m_Node->SetOpacity(1.0f);
+      CPPUNIT_ASSERT_MESSAGE("translucent fibers drawn", translucentTiles != fromTiles);
+      const auto [pixels, largest] = FrameDifference(translucentTiles, translucentWhole, components);
+      MITK_INFO << where << ", opacity 0.4: " << pixels << " pixels differ from the whole bundle, by at most " << largest;
+      translucentPixels = std::max(translucentPixels, pixels);
+      translucentLargest = std::max(translucentLargest, largest);
+      CPPUNIT_ASSERT_MESSAGE(where + ": translucent tiles look like the translucent whole bundle", largest <= maxTranslucentDifference);
     };
 
     for (const auto view : {mitk::AnatomicalPlane::Axial, mitk::AnatomicalPlane::Sagittal, mitk::AnatomicalPlane::Coronal})
@@ -721,41 +934,79 @@ public:
         mitk::Point3D point;
         for (int a = 0; a < 3; ++a)
           point[a] = bounds[2 * a] + fraction * (bounds[2 * a + 1] - bounds[2 * a]);
-        renderer->GetSliceNavigationController()->SelectSliceByPoint(point);
-        compareWithWholeBundle();
+        navigation->SelectSliceByPoint(point);
+        compareWithWholeBundle("view " + std::to_string(static_cast<int>(view)) + " at " + std::to_string(fraction));
       }
     }
 
-    // oblique plane through the centre of the bundle
+    // scrolling across several tiles, up and down
     Render2D(mitk::AnatomicalPlane::Axial);
     mitk::Point3D centre;
     for (int a = 0; a < 3; ++a)
       centre[a] = 0.5 * (bounds[2 * a] + bounds[2 * a + 1]);
+    for (const double step : {0.7, -0.7})
+    {
+      for (int i = 0; i <= 8; ++i)
+      {
+        mitk::Point3D point = centre;
+        point[2] += step * (i - 4);
+        navigation->SelectSliceByPoint(point);
+        compareWithWholeBundle("scroll to z = " + std::to_string(point[2]));
+      }
+    }
+
+    // oblique plane through the centre of the bundle, then turned about x in steps
     mitk::Vector3D obliqueNormal;
     obliqueNormal[0] = 0.4;
     obliqueNormal[1] = 0.2;
     obliqueNormal[2] = 1.0;
-    renderer->GetSliceNavigationController()->ReorientSlices(centre, obliqueNormal);
-    compareWithWholeBundle();
+    navigation->ReorientSlices(centre, obliqueNormal);
+    compareWithWholeBundle("oblique");
+    double angle = 0;
+    for (const double turn : {0.5, 1.0, 1.0, 2.0, 4.0, 8.0})
+    {
+      angle += turn;
+      const double radians = angle * 3.14159265358979 / 180.0;
+      mitk::Vector3D turned;
+      turned[0] = 0.0;
+      turned[1] = -std::sin(radians);
+      turned[2] = std::cos(radians);
+      navigation->ReorientSlices(centre, turned);
+      compareWithWholeBundle("turned by " + std::to_string(angle) + " degrees");
+    }
 
-    CPPUNIT_ASSERT_MESSAGE("a band holds part of the bundle", smallestBand < whole->GetNumberOfPoints() / 2);
+    MITK_INFO << "Opaque: at most " << opaqueDiffering << " pixels differ; translucent: at most " << translucentPixels
+              << " pixels differ, by at most " << translucentLargest;
+    CPPUNIT_ASSERT_MESSAGE("the tiles hold part of the bundle", fewestPoints < bundlePoints / 2);
   }
 
   // #46: the atTRACTive brush picks fibers in 2D windows with a vtkCellPicker on the 2D prop. Its
-  // input holds pieces of the fibers near the slab, so the picked cell is a piece; PickedFiber
-  // gives the fiber of the piece.
+  // tiles hold runs of segments of the fibers near the slab, so the picked cell is a run of a
+  // tile; PickedFiber gives the fiber of the run.
   void Mapper2D_PickAlongAFiber_GivesItsIndex()
   {
-    // fiber 1 in the slab, in pieces (a point every 0.5 mm); fibers 0 and 2 far from it
-    m_Node->SetData(AxialFibers({-20.0, 0.0, 20.0}, 81));
+    // fiber 1 in the slab, rising by 1 mm along x, so that it is in two tiles; fibers 0 and 2 far
+    // from it
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    auto lines = vtkSmartPointer<vtkCellArray>::New();
+    for (const double z : {-20.0, 0.0, 20.0})
+    {
+      lines->InsertNextCell(81);
+      for (int i = 0; i <= 80; ++i)
+        lines->InsertCellPoint(points->InsertNextPoint(-20.0 + 0.5 * i, 0.0, z + 0.025 * (-20.0 + 0.5 * i)));
+    }
+    auto polyData = vtkSmartPointer<vtkPolyData>::New();
+    polyData->SetPoints(points);
+    polyData->SetLines(lines);
+    m_Node->SetData(mitk::FiberBundle::New(polyData));
     Render2D(mitk::AnatomicalPlane::Axial);
     auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
     mitk::Point3D centre;
     centre.Fill(0.0);
     renderer->GetSliceNavigationController()->SelectSliceByPoint(centre);
-    vtkActor *actor = Render2D();
-    MITK_INFO << "2D input: " << Input(actor)->GetNumberOfLines() << " lines";
-    CPPUNIT_ASSERT_MESSAGE("the fiber is drawn in pieces", Input(actor)->GetNumberOfLines() > 1);
+    vtkPropAssembly *assembly = Render2D();
+    MITK_INFO << "2D tiles: " << Tiles(assembly).size() << " with " << NumberOfLines(assembly) << " lines";
+    CPPUNIT_ASSERT_MESSAGE("the fiber is drawn in pieces", NumberOfLines(assembly) > 1);
 
     auto mapper = dynamic_cast<mitk::VtkMapper *>(m_Node->GetMapper(mitk::BaseRenderer::Standard2D));
     for (const double x : {-15.0, -5.0, 5.0, 15.0})
@@ -767,7 +1018,7 @@ public:
       picker->PickFromListOn();
       auto coordinate = vtkSmartPointer<vtkCoordinate>::New();
       coordinate->SetCoordinateSystemToWorld();
-      coordinate->SetValue(x, 0.0, 0.0);
+      coordinate->SetValue(x, 0.0, 0.025 * x);
       const double *display = coordinate->GetComputedDoubleDisplayValue(renderer->GetVtkRenderer());
       picker->Pick(display[0], display[1], 0.0, renderer->GetVtkRenderer());
       MITK_INFO << "Pick at x = " << x << ": cell " << picker->GetCellId() << ", fiber " << mitk::FiberBundleMapper2D::PickedFiber(picker);
@@ -845,8 +1096,8 @@ public:
     CPPUNIT_ASSERT_MESSAGE("the fiber in the slice is drawn", opaque > 200);
 
     m_Node->SetOpacity(0.3f);
-    vtkActor *actor = Render2D(mitk::AnatomicalPlane::Axial);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3, actor->GetProperty()->GetOpacity(), 1e-6);
+    for (vtkActor *tile : Tiles(Render2D(mitk::AnatomicalPlane::Axial)))
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3, tile->GetProperty()->GetOpacity(), 1e-6);
     const int translucent = BrightestPixel();
     MITK_INFO << "Brightest fiber pixel at opacity 1.0: " << opaque << ", at 0.3: " << translucent;
     CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("the fiber is blended with opacity 0.3", 0.3 * opaque, static_cast<double>(translucent), 13.0);
@@ -865,7 +1116,8 @@ public:
     m_Node->SetFloatProperty("shape.tuberadius", 0.5f);
     m_Node->SetIntProperty("shape.linewidth", 3);
     CPPUNIT_ASSERT(Render3D()->GetProperty()->GetRenderLinesAsTubes());
-    CPPUNIT_ASSERT_EQUAL(3.0f, Render2D(mitk::AnatomicalPlane::Coronal)->GetProperty()->GetLineWidth());
+    for (vtkActor *tile : Tiles(Render2D(mitk::AnatomicalPlane::Coronal)))
+      CPPUNIT_ASSERT_EQUAL(3.0f, tile->GetProperty()->GetLineWidth());
     CPPUNIT_ASSERT(updateTime2D == m_Fibers->GetUpdateTime2D());
     CPPUNIT_ASSERT(updateTime3D == m_Fibers->GetUpdateTime3D());
     CPPUNIT_ASSERT(polyData.GetPointer() == m_Fibers->GetFiberPolyData().GetPointer());

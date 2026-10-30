@@ -21,15 +21,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <mitkVtkMapper.h>
 #include "mitkFiberSlabIndex.h"
+#include "mitkFiberSlabTiles.h"
 
 #include <vtkSmartPointer.h>
 
 #include <memory>
 
-class vtkActor;
 class vtkCellPicker;
-class vtkOpenGLPolyDataMapper;
-class vtkPlane;
+class vtkPolyData;
+class vtkUnsignedCharArray;
 
 namespace mitk {
 
@@ -37,9 +37,9 @@ namespace mitk {
  * \brief 2D mapper of fiber bundles: the fibers within Fiber2DSliceThickness of the shown plane,
  * as lines of shape.linewidth with the bundle's colours.
  *
- * Each window holds only the fibers in a band around its slab (FiberSlabIndex) and takes a new
- * band when the slab leaves it or turns. Two clipping planes cut out the slab, so the image is the
- * same as from the whole bundle.
+ * Each window holds only the tiles of fibers near its slab (FiberSlabTiles) and takes new tiles
+ * when the slab moves or turns. Two clipping planes cut out the slab, so the image is the same as
+ * from the whole bundle. New colours keep the tiles' geometry.
  */
 class MITKFIBERBUNDLE_EXPORT FiberBundleMapper2D : public VtkMapper
 {
@@ -62,22 +62,10 @@ public:
   class  FBXLocalStorage : public mitk::Mapper::BaseLocalStorage
   {
   public:
-    vtkSmartPointer<vtkActor> m_Actor;
-    vtkSmartPointer<vtkOpenGLPolyDataMapper> m_Mapper;
-    // The two planes of the slab, kept in the mapper's plane collection and only moved on a slice
-    // step: a new collection or input changes the mapper's modified time, and VTK then rebuilds
-    // the GPU buffers of the whole input (#46).
-    vtkSmartPointer<vtkPlane> m_SlabPlane1;
-    vtkSmartPointer<vtkPlane> m_SlabPlane2;
-    // time the input was last built from the bundle
-    itk::TimeStamp m_LastUpdateTime;
-    // the input: the band of points p with m_BandFrom <= m_BandNormal * p <= m_BandTo, or the
-    // whole bundle without a band
-    bool m_HasBand = false;
-    double m_BandNormal[3] = {0, 0, 0};
-    double m_BandFrom = 0;
-    double m_BandTo = 0;
-    FBXLocalStorage();
+    FiberSlabTiles m_Tiles;
+    // the versions of the mapper's index and colours the tiles were built or coloured from
+    unsigned long m_IndexVersion = 0;
+    unsigned long m_ColourVersion = 0;
   };
 
   /** \brief This member holds all three LocalStorages for the three 2D render windows. */
@@ -87,17 +75,25 @@ protected:
   FiberBundleMapper2D() = default;
   ~FiberBundleMapper2D() override = default;
 
-  /** Gives the window the band around its slab, or the whole bundle (see UpdateSlab) */
-  void GenerateDataForRenderer(mitk::BaseRenderer*) override;
   /** Moves the slab planes to the renderer's current plane and Fiber2DSliceThickness; gives the
    *  slab as the points p with from <= normal * p <= to (unit normal). Returns false without a
    *  plane. */
   bool UpdateSlab(mitk::BaseRenderer* renderer, FBXLocalStorage* localStorage, double normal[3], double& from, double& to);
+  /** Rebuilds the index for new fiber geometry and takes new colours; false if the bundle's
+   *  colours do not fit its points */
+  bool UpdateFibers(mitk::FiberBundle* fiberBundle);
 
 private:
-  // shared by the 2D windows, built from the bundle at m_SlabIndexTime
+  // shared by the 2D windows; geometry only, built from m_IndexedFibers at its modified time
   std::unique_ptr<FiberSlabIndex> m_SlabIndex;
-  itk::TimeStamp m_SlabIndexTime;
+  vtkPolyData* m_IndexedFibers = nullptr;
+  vtkMTimeType m_IndexedFibersTime = 0;
+  unsigned long m_IndexVersion = 0;
+  // the bundle's colours (an RGBA tuple per point) as of the bundle's 2D update time m_ColourTime
+  vtkSmartPointer<vtkUnsignedCharArray> m_Colours;
+  unsigned char m_LowestAlpha = 255;
+  itk::ModifiedTimeType m_ColourTime = 0;
+  unsigned long m_ColourVersion = 0;
 };
 
 }
