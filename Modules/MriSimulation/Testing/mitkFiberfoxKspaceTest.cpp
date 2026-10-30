@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <complex>
 #include <functional>
 #include <set>
+#include <string>
 #include <vector>
 #include <mitkFiberfoxParameters.h>
 #include <mitkBallModel.h>
@@ -43,6 +44,8 @@ class mitkFiberfoxKspaceTestSuite : public mitk::TestFixture
   MITK_TEST(Aliasing);
   MITK_TEST(OffResonanceShift);
   MITK_TEST(EddyCurrentsEqualFieldMap);
+  MITK_TEST(TimeSegmentsApproximateExactSum);
+  MITK_TEST(TimeSegmentsHoldForStrongPhase);
   MITK_TEST(NoiseFullFourier);
   MITK_TEST(NoisePartialFourier);
   MITK_TEST(NoiseMultiCoil);
@@ -94,6 +97,9 @@ class mitkFiberfoxKspaceTestSuite : public mitk::TestFixture
     parameters.m_SignalGen.m_ImageOrigin = image->GetOrigin();
     parameters.m_SignalGen.m_ImageDirection = image->GetDirection();
     parameters.m_Misc.m_OutputPath = "";  // no log file
+    // the exact sum of the phase of distortions and eddy currents, the model the cases below check;
+    // TimeSegmentsApproximateExactSum compares the default, the time-segmented phase, with it
+    parameters.m_SignalGen.m_KspaceTimeSegments = 0;
     // the k-space simulation reads T1/T2 of one model per compartment image
     parameters.m_NonFiberModelList.push_back(new mitk::BallModel<double>());
     gradients.resize(image->GetVectorLength());
@@ -384,6 +390,248 @@ public:
     MITK_INFO << "Eddy currents: largest deviation from the field map " << maxError << ", distortion up to " << maxDistortion;
     CPPUNIT_ASSERT(maxDistortion > 100);
     CPPUNIT_ASSERT_MESSAGE("eddy currents = equivalent field map", maxError < 0.05);
+  }
+
+  /** Relative RMS difference of the complex images of all volumes of coil 0. */
+  static double RelativeDifference(const FilterType* test, const FilterType* reference, int nx, int ny, unsigned int numVolumes)
+  {
+    double difference = 0, norm = 0;
+    for (unsigned int g = 0; g < numVolumes; ++g)
+      for (int y = 0; y < ny; ++y)
+        for (int x = 0; x < nx; ++x)
+        {
+          difference += std::norm(Value(test, x, y, 0, g) - Value(reference, x, y, 0, g));
+          norm += std::norm(Value(reference, x, y, 0, g));
+        }
+    return std::sqrt(difference / norm);
+  }
+
+  /**
+   * The time-segmented phase (SignalGenerationParameters::m_KspaceTimeSegments) approximates the exact
+   * sum of a field map and eddy currents: with the automatic segment count (1.25 phase spread + 8) the
+   * complex image differs by less than 0.1 % (relative RMS), with too few segments by far more. Single
+   * shot EPI in both phase directions with ghosts and aliasing, and conventional spin echo.
+   */
+  void TimeSegmentsApproximateExactSum()
+  {
+    const int nx = 40, ny = 40;
+    const Pattern f = [](int x, int y)
+    {
+      const double dx = (x - 20) / 15.0, dy = (y - 21) / 17.0;
+      return dx * dx + dy * dy < 1 ? 400.0 + 6 * x - 4 * y + 150 * std::cos(x / 3.0) : 0.0;
+    };
+    mitk::SignalGenerationParameters::GradientListType gradients(2);
+    gradients[1][0] = 0.6;
+    gradients[1][1] = 0.8;
+    auto image = MakeImage(nx, ny, 1, 2, f);
+    // a field map of about 150 Hz range (6 cycles over the EPI readout of 40 lines) and strong eddy currents
+    auto fmap = FloatImageType::New();
+    fmap->SetRegions(image->GetLargestPossibleRegion());
+    fmap->SetSpacing(image->GetSpacing());
+    fmap->Allocate();
+    for (int y = 0; y < ny; ++y)
+      for (int x = 0; x < nx; ++x)
+        fmap->SetPixel({{x, y, 0}}, 120 * std::exp(-((x - 26) * (x - 26) + (y - 14) * (y - 14)) / 60.0) - 30 + 0.8 * y);
+
+    struct Case { std::string name; mitk::SignalGenerationParameters::AcquisitionType type; bool reverse; bool ghostsAndAliasing; };
+    for (const auto& c : { Case{"EPI", mitk::SignalGenerationParameters::SingleShotEpi, false, false},
+                           Case{"EPI reversed, ghosts, aliasing", mitk::SignalGenerationParameters::SingleShotEpi, true, true},
+                           Case{"spin echo", mitk::SignalGenerationParameters::ConventionalSpinEcho, false, false} })
+    {
+      auto parameters = MakeParameters(image, gradients);
+      parameters.m_SignalGen.m_AcquisitionType = c.type;
+      parameters.m_SignalGen.m_ReversePhase = c.reverse;
+      parameters.m_Misc.m_DoAddDistortions = true;
+      parameters.m_SignalGen.m_FrequencyMap = fmap;
+      parameters.m_Misc.m_DoAddEddyCurrents = true;
+      parameters.m_SignalGen.m_EddyStrength = 0.05;
+      parameters.m_Misc.m_DoAddGhosts = c.ghostsAndAliasing;
+      parameters.m_SignalGen.m_KspaceLineOffset = 0.2;
+      parameters.m_Misc.m_DoAddAliasing = c.ghostsAndAliasing;
+      parameters.m_SignalGen.m_CroppingFactor = 0.9;
+      auto exact = Acquire(image, parameters);
+      const int my = static_cast<int>(exact->GetOutput()->GetLargestPossibleRegion().GetSize(1));
+
+      double distortion = 0, norm = 0;
+      for (int y = 0; y < std::min(ny, my); ++y)
+        for (int x = 0; x < nx; ++x)
+        {
+          distortion += std::norm(Value(exact, x, y, 0, 1) - Complex(f(x, y), 0));
+          norm += f(x, y) * f(x, y);
+        }
+
+      parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+      const double automatic = RelativeDifference(Acquire(image, parameters), exact, nx, my, 2);
+      parameters.m_SignalGen.m_KspaceTimeSegments = 2;
+      const double few = RelativeDifference(Acquire(image, parameters), exact, nx, my, 2);
+      MITK_INFO << "Time segments, " << c.name << ": distortion " << std::sqrt(distortion / norm) << ", error with the automatic count " << automatic << ", with 2 segments " << few;
+      if (c.type == mitk::SignalGenerationParameters::SingleShotEpi && !c.ghostsAndAliasing)
+        CPPUNIT_ASSERT_MESSAGE(c.name + ": the case distorts the image", std::sqrt(distortion / norm) > 0.3);
+      CPPUNIT_ASSERT_MESSAGE(c.name + ": automatic count within 0.1 % of the exact sum", automatic < 1e-3);
+      if (c.type == mitk::SignalGenerationParameters::SingleShotEpi)
+        CPPUNIT_ASSERT_MESSAGE(c.name + ": 2 segments are far off", few > 1e-2);
+    }
+  }
+
+  /** A square slice to acquire with KspaceImageFilter directly: EPI, two or three compartments in an ellipse. */
+  struct PhaseCase
+  {
+    std::string name;
+    double spacing;      ///< mm; with the line time it sets the phase spread
+    float tLine;         ///< ms
+    float eddyStrength;  ///< mT/m along (0.6, 0.8, 0) at b = 1000; 0 without eddy currents
+    Pattern fieldMap;    ///< Hz; empty without distortions
+    bool relaxation;     ///< T2 90 (110) and 2000 ms; without, the compartments share one set of spectra
+    int size = 64;       ///< pixels per side
+    unsigned int compartments = 2;
+  };
+
+  /** Complex k-space of the slice with the given m_KspaceTimeSegments; numSegments is the count used (0: exact sum). */
+  static std::vector<std::complex<float>> AcquireSlice(const PhaseCase& c, int segments, unsigned int& numSegments)
+  {
+    const int n = c.size;
+    mitk::FiberfoxParameters parameters;
+    auto& signalGen = parameters.m_SignalGen;
+    signalGen.m_ImageRegion.SetSize(0, n);
+    signalGen.m_ImageRegion.SetSize(1, n);
+    signalGen.m_ImageRegion.SetSize(2, 1);
+    signalGen.m_CroppedRegion = signalGen.m_ImageRegion;
+    signalGen.m_ImageSpacing.Fill(c.spacing);
+    signalGen.m_tLine = c.tLine;
+    signalGen.m_tEcho = 2 * n * c.tLine;
+    signalGen.m_DoSimulateRelaxation = c.relaxation;
+    signalGen.m_SignalScale = 1;
+    signalGen.m_KspaceTimeSegments = segments;
+    signalGen.m_EddyStrength = c.eddyStrength;
+    parameters.m_Misc.m_DoAddEddyCurrents = c.eddyStrength > 0;
+    parameters.m_Misc.m_DoAddDistortions = static_cast<bool>(c.fieldMap);
+    if (c.fieldMap)
+    {
+      auto fmap = FloatImageType::New();
+      fmap->SetRegions(signalGen.m_ImageRegion);
+      fmap->SetSpacing(signalGen.m_ImageSpacing);
+      fmap->Allocate();
+      for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x)
+          fmap->SetPixel({{x, y, 0}}, static_cast<float>(c.fieldMap(x, y)));
+      signalGen.m_FrequencyMap = fmap;
+    }
+
+    // the patterns are those of a 64x64 slice, stretched to n
+    const std::vector<std::function<double(double, double, double)>> patterns = {
+      [](double xs, double ys, double) { return 300 + 200 * std::cos(0.4 * xs) * std::sin(0.3 * ys); },
+      [](double xs, double ys, double) { return 200 + 100 * std::sin(0.2 * xs + 0.1 * ys); },
+      [](double, double, double r2) { return r2 < 0.15 ? 800.0 : 50.0; } };
+    const std::vector<std::size_t> used = c.compartments == 3 ? std::vector<std::size_t>{0, 1, 2} : std::vector<std::size_t>{0, 2};
+    std::vector<itk::KspaceImageFilter<float>::InputImagePointerType> compartments;
+    std::vector<float> t2, t1;
+    for (const std::size_t i : used)
+    {
+      auto compartment = itk::KspaceImageFilter<float>::InputImageType::New();
+      itk::ImageRegion<2> region;
+      region.SetSize(0, n);
+      region.SetSize(1, n);
+      compartment->SetRegions(region);
+      compartment->Allocate();
+      for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x)
+        {
+          const double dx = (x - 0.5 * n) / (0.4 * n), dy = (y - 0.52 * n) / (0.45 * n);
+          const double r2 = dx * dx + dy * dy;
+          const double value = r2 < 1 ? patterns[i](x * 64.0 / n, y * 64.0 / n, r2) : 0.0;
+          compartment->SetPixel({{x, y}}, static_cast<float>(value));
+        }
+      compartments.push_back(compartment);
+      t2.push_back(std::array<float, 3>{90, 110, 2000}[i]);
+      t1.push_back(std::array<float, 3>{900, 1200, 4000}[i]);
+    }
+
+    auto filter = itk::KspaceImageFilter<float>::New();
+    filter->SetCompartmentImages(compartments);
+    filter->SetT2(t2);
+    filter->SetT1(t1);
+    filter->SetParameters(&parameters);
+    filter->SetZ(0);
+    filter->SetZidx(0);
+    itk::Vector<float, 3> coil;
+    coil.Fill(0);
+    filter->SetCoilPosition(coil);
+    filter->SetMotion(mitk::FiberfoxMotion());
+    itk::Vector<double, 3> gradient;
+    gradient[0] = 0.6;
+    gradient[1] = 0.8;
+    gradient[2] = 0;
+    filter->SetDiffusionGradientDirection(gradient);
+    filter->SetRandSeed(0);
+    filter->Update();
+    numSegments = filter->GetNumSegments();
+    const auto* data = filter->GetOutput()->GetBufferPointer();
+    return std::vector<std::complex<float>>(data, data + filter->GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels());
+  }
+
+  static double RelativeDifference(const std::vector<std::complex<float>>& test, const std::vector<std::complex<float>>& reference)
+  {
+    double difference = 0, norm = 0;
+    for (std::size_t i = 0; i < test.size(); ++i)
+    {
+      difference += std::norm(Complex(test[i]) - Complex(reference[i]));
+      norm += std::norm(Complex(reference[i]));
+    }
+    return std::sqrt(difference / norm);
+  }
+
+  /**
+   * The default, the automatic count of time segments, stays within 0.1 % (relative RMS of the complex
+   * k-space) of the exact sum also where the phase is strong: eddy currents, whose phase changes about
+   * five times faster at the start of the readout than at the echo (an image of 128 mm at 4 mm and a
+   * line time of 2 ms has the phase spread of 256 mm at 2 mm and 1 ms), a field map together with eddy
+   * currents (more than 512 bins of the field histogram), a field map whose values cluster (a linear
+   * field, one value per column, plus a bump), and a field map alone with a phase spread above 128
+   * cycles, also with a fixed count of 200 segments. Where the time segments are used, the case must
+   * test them (the slice must not have taken the exact sum). A field map with a small cluster of
+   * outlying values (3x3 voxels at 400 Hz in a 100 Hz bump, as near a sinus) plus eddy currents leaves
+   * empty bins around the cluster in the two-dimensional histogram; on a 96x96 slice its pixels lie
+   * between those the residual check took before (every fifth), and the error was 0.17 %.
+   */
+  void TimeSegmentsHoldForStrongPhase()
+  {
+    const auto bump = [](double amplitude, double linear, int n = 64)
+    {
+      return Pattern([amplitude, linear, n](int x, int y)
+      {
+        const double dx = x - 0.62 * n, dy = y - 0.3 * n, sigma = 0.12 * n;
+        return amplitude * std::exp(-(dx * dx + dy * dy) / (2 * sigma * sigma)) - 0.2 * amplitude + linear * (x - n / 2) / static_cast<double>(n);
+      });
+    };
+    const Pattern cluster = [bump](int x, int y) { return x >= 30 && x < 33 && y >= 66 && y < 69 ? 400.0 : bump(100, 0, 96)(x, y); };
+    struct Expectation { PhaseCase phase; bool segmented; int fixedSegments; };
+    const std::vector<Expectation> cases = {
+      {{"eddy currents 0.02 mT/m", 4, 2, 0.02f, Pattern(), true}, true, 0},
+      {{"eddy currents 0.05 mT/m", 4, 2, 0.05f, Pattern(), true}, true, 0},
+      {{"field map 200 Hz, eddy currents 0.1 mT/m", 2, 1, 0.1f, bump(200, 0), true}, true, 0},
+      {{"field map 400 Hz, eddy currents 0.05 mT/m", 4, 2, 0.05f, bump(400, 0), true}, false, 0},
+      {{"clustered field map", 2, 1, 0, bump(500, 1500), false}, true, 0},
+      {{"field map, phase spread 140 cycles", 2, 2, 0, bump(400, 1300), true}, false, 200},
+      {{"cluster of field values, eddy currents 0.016 mT/m", 2, 0.7f, 0.016f, cluster, true, 96, 3}, true, 0} };
+    for (const auto& c : cases)
+    {
+      unsigned int numSegments = 0;
+      const auto exact = AcquireSlice(c.phase, 0, numSegments);
+      const auto automatic = AcquireSlice(c.phase, mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, numSegments);
+      const double error = RelativeDifference(automatic, exact);
+      MITK_INFO << "Time segments, " << c.phase.name << ": " << numSegments << " segments, error " << error;
+      CPPUNIT_ASSERT_MESSAGE(c.phase.name + ": automatic count within 0.1 % of the exact sum", error < 1e-3);
+      if (c.segmented)
+        CPPUNIT_ASSERT_MESSAGE(c.phase.name + ": time segments used", numSegments > 0);
+      if (c.fixedSegments > 0)
+      {
+        const auto fixed = AcquireSlice(c.phase, c.fixedSegments, numSegments);
+        const double fixedError = RelativeDifference(fixed, exact);
+        MITK_INFO << "Time segments, " << c.phase.name << ": " << numSegments << " fixed segments, error " << fixedError;
+        CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(c.fixedSegments), numSegments);
+        CPPUNIT_ASSERT_MESSAGE(c.phase.name + ": fixed count within 0.1 % of the exact sum", fixedError < 1e-3);
+      }
+    }
   }
 
   /** Complex Gaussian noise of variance sigma^2 in both image components: Rayleigh magnitude in an empty image. */

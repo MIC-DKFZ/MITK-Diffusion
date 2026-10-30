@@ -24,6 +24,8 @@ found in the LICENSE file.
 #include <functional>
 #include <mitkRawShModel.h>
 #include <mitkAstroStickModel.h>
+#include <mitkBallModel.h>
+#include <cmath>
 
 namespace
 {
@@ -52,6 +54,9 @@ class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
   MITK_TEST(Param1);
   MITK_TEST(Param3);
   MITK_TEST(Param6);
+  MITK_TEST(Param1TimeSegments);
+  MITK_TEST(TimeSegmentsInSliceThreads);
+  MITK_TEST(TimeSegmentsWithinMemoryBudget);
   MITK_TEST(RandomFiberModels);
   MITK_TEST(NoiseModelsFollowSeed);
   MITK_TEST(ExceptionInFiberLoop);
@@ -150,9 +155,150 @@ public:
     }
   }
 
-  void Param1() { CompareAtThreadCounts("param1.ffp"); }
+  /** The exact sum of the k-space phase (eddy currents and distortions of param1), which is not the default. */
+  void Param1()
+  {
+    CompareAtThreadCounts("param1.ffp", [](mitk::FiberfoxParameters& parameters)
+    {
+      parameters.m_SignalGen.m_KspaceTimeSegments = 0;
+    });
+  }
   void Param3() { CompareAtThreadCounts("param3.ffp"); }
+  /** param6 as loaded: distortions with the default, the automatic count of time segments. */
   void Param6() { CompareAtThreadCounts("param6.ffp"); }
+
+  /** The time-segmented k-space phase (eddy currents and distortions of param1), automatic count. */
+  void Param1TimeSegments()
+  {
+    CompareAtThreadCounts("param1.ffp", [](mitk::FiberfoxParameters& parameters)
+    {
+      parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+    });
+  }
+
+  /**
+   * Input-image mode (no fibers): an n x n image of the given slices and volumes with an elliptic object,
+   * a field map and eddy currents (every volume diffusion-weighted along (0.6, 0.8, 0)), automatic count
+   * of time segments.
+   */
+  static mitk::FiberfoxParameters TimeSegmentCase(int n, int slices, int volumes, DwiType::Pointer& image)
+  {
+    image = DwiType::New();
+    itk::ImageRegion<3> region;
+    region.SetSize(0, n);
+    region.SetSize(1, n);
+    region.SetSize(2, slices);
+    image->SetRegions(region);
+    itk::Vector<double, 3> spacing;
+    spacing.Fill(2.0);
+    image->SetSpacing(spacing);
+    image->SetVectorLength(volumes);
+    image->Allocate();
+    auto fmap = itk::Image<float, 3>::New();
+    fmap->SetRegions(region);
+    fmap->SetSpacing(spacing);
+    fmap->Allocate();
+    for (int z = 0; z < slices; ++z)
+      for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x)
+        {
+          const double dx = (x - 0.5 * n) / (0.4 * n), dy = (y - 0.52 * n) / (0.45 * n);
+          DwiType::PixelType pixel(volumes);
+          pixel.Fill(static_cast<short>(dx * dx + dy * dy < 1 ? 300 + 200 * std::cos(0.4 * x) * std::sin(0.3 * y) + 50 * z : 0));
+          image->SetPixel({{x, y, z}}, pixel);
+          const double bx = x - 0.62 * n, by = y - 0.3 * n, sigma = 0.12 * n;
+          fmap->SetPixel({{x, y, z}}, static_cast<float>(150 * std::exp(-(bx * bx + by * by) / (2 * sigma * sigma)) - 30 + 20 * z));
+        }
+
+    mitk::FiberfoxParameters parameters;
+    parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
+    parameters.m_SignalGen.m_SignalScale = 1;
+    parameters.m_SignalGen.m_ImageRegion = region;
+    parameters.m_SignalGen.m_ImageSpacing = spacing;
+    parameters.m_SignalGen.m_ImageOrigin = image->GetOrigin();
+    parameters.m_SignalGen.m_ImageDirection = image->GetDirection();
+    parameters.m_Misc.m_OutputPath = "";  // no log file
+    parameters.m_NonFiberModelList.push_back(new mitk::BallModel<double>());
+    mitk::SignalGenerationParameters::GradientListType gradients(volumes);
+    for (auto& gradient : gradients)
+    {
+      gradient[0] = 0.6;
+      gradient[1] = 0.8;
+    }
+    parameters.SetGradienDirections(gradients);
+    parameters.m_Misc.m_DoAddDistortions = true;
+    parameters.m_SignalGen.m_FrequencyMap = fmap;
+    parameters.m_Misc.m_DoAddEddyCurrents = true;
+    parameters.m_SignalGen.m_EddyStrength = 0.02;
+    parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+    return parameters;
+  }
+
+  /** Acquires the input image at the given OpenMP threads with a constant seed; a memory budget of the time segments if budget > 0. */
+  FilterType::Pointer AcquireInputImage(const mitk::FiberfoxParameters& parameters, DwiType* image, int threads, std::uint64_t budget = 0)
+  {
+    m_Threads->SetNumberOfThreads(threads);
+    auto filter = FilterType::New();
+    filter->SetUseConstantRandSeed(true);
+    filter->SetParameters(parameters);
+    filter->SetInputImage(image);
+    if (budget > 0)
+      filter->SetTimeSegmentMemoryBudget(budget);
+    filter->Update();
+    return filter;
+  }
+
+  /**
+   * With fewer volumes than threads the slice jobs get several work units, and the setup of the time
+   * segments (fit, residual check, interpolators, transforms) runs in them. The other cases have 7
+   * volumes, so up to 8 threads every slice job has one work unit. Here one volume of a 48x48 image of
+   * two slices (input-image mode, no fibers) with a field map and eddy currents is acquired at 1 and at
+   * 8 threads, where its slices get 8 work units each.
+   */
+  void TimeSegmentsInSliceThreads()
+  {
+    DwiType::Pointer image;
+    const auto parameters = TimeSegmentCase(48, 2, 1, image);
+    std::vector<FilterType::Pointer> filters;
+    for (int threads : {1, 8})
+    {
+      auto filter = AcquireInputImage(parameters, image, threads);
+      const std::string log = filter->GetStatusText();
+      CPPUNIT_ASSERT_MESSAGE("time segments used", log.find("exact sum in") == std::string::npos);
+      CPPUNIT_ASSERT_MESSAGE("work units per slice job", log.find("Threads per slice: " + std::to_string(threads)) != std::string::npos);
+      filters.push_back(filter);
+    }
+    const auto& reference = filters[0];
+    const auto& test = filters[1];
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("output at 8 threads equals the 1-thread output", 0ul, CountDifferences<DwiType>(test->GetOutput(), reference->GetOutput()));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("coil image, real part", 0ul, CountDifferences<DoubleDwiType>(test->GetOutputImagesReal()[0], reference->GetOutputImagesReal()[0]));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("coil image, imaginary part", 0ul, CountDifferences<DoubleDwiType>(test->GetOutputImagesImag()[0], reference->GetOutputImagesImag()[0]));
+  }
+
+  /**
+   * The memory of the time segments of all slice jobs together is bounded (TIME_SEGMENT_MEMORY_BUDGET),
+   * and more threads run more slice jobs at once. Whether a slice takes the time segments must not
+   * depend on that: a share of the budget per parallel job sent the slices to the exact sum at more
+   * threads, so the image depended on the thread count (#47, branch review round 3). Now a slice job
+   * waits until the budget holds its time segments. Here eight volumes of a 32x32 slice, whose time
+   * segments need about 0.6 MB each, share a budget of 1 MiB, which holds one of them at a time, at 1
+   * and at 8 threads (eight parallel volumes).
+   */
+  void TimeSegmentsWithinMemoryBudget()
+  {
+    DwiType::Pointer image;
+    const auto parameters = TimeSegmentCase(32, 1, 8, image);
+    const std::uint64_t budget = 1024 * 1024;
+    auto reference = AcquireInputImage(parameters, image, 1, budget);
+    auto test = AcquireInputImage(parameters, image, 8, budget);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("output at 8 threads equals the 1-thread output", 0ul, CountDifferences<DwiType>(test->GetOutput(), reference->GetOutput()));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("coil image, real part", 0ul, CountDifferences<DoubleDwiType>(test->GetOutputImagesReal()[0], reference->GetOutputImagesReal()[0]));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("coil image, imaginary part", 0ul, CountDifferences<DoubleDwiType>(test->GetOutputImagesImag()[0], reference->GetOutputImagesImag()[0]));
+    for (const auto& filter : {reference, test})
+      CPPUNIT_ASSERT_MESSAGE("time segments used", filter->GetStatusText().find("exact sum in") == std::string::npos);
+    // the eight jobs run at once, so they wait for the budget
+    CPPUNIT_ASSERT_MESSAGE("parallel volumes", test->GetStatusText().find("Parallel volumes: 8") != std::string::npos);
+  }
 
   /** Fiber compartments that draw random numbers: prototype kernels and randomized astrosticks. */
   void RandomFiberModels()

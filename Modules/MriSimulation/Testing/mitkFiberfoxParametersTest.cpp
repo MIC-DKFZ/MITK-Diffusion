@@ -67,6 +67,7 @@ class mitkFiberfoxParametersTestSuite : public mitk::TestFixture
   MITK_TEST(GradientsInFile);
   MITK_TEST(MissingDirection);
   MITK_TEST(NoiseModelInFile);
+  MITK_TEST(TimeSegmentsInFile);
   CPPUNIT_TEST_SUITE_END();
 
   /** Parameters whose only models are two counting fiber models and one counting non-fiber model. */
@@ -389,6 +390,35 @@ public:
     mitk::FiberfoxParameters old;
     old.LoadParameters(oldFile, true);
     check(old, 3);
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /**
+   * The k-space time segments are saved and loaded; files without the setting get the default, the
+   * automatic count, also when loaded into parameters that held another count, and are not reported
+   * as incomplete.
+   */
+  void TimeSegmentsInFile()
+  {
+    const std::string earlierFile = mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp");
+    mitk::FiberfoxParameters earlier;
+    earlier.LoadParameters(earlierFile, true);
+    CPPUNIT_ASSERT_EQUAL(mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, earlier.m_SignalGen.m_KspaceTimeSegments);
+    CPPUNIT_ASSERT_EQUAL(mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, mitk::SignalGenerationParameters().m_KspaceTimeSegments);
+    CPPUNIT_ASSERT_MESSAGE(earlier.m_MissingTags, earlier.m_MissingTags.find("kspaceTimeSegments") == std::string::npos);
+
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_segments_XXXXXX");
+    const std::string file = folder + "/segments.ffp";
+    for (int segments : { 0, 12 })
+    {
+      earlier.m_SignalGen.m_KspaceTimeSegments = segments;
+      earlier.SaveParameters(file);
+      mitk::FiberfoxParameters loaded;
+      loaded.LoadParameters(file, true);
+      CPPUNIT_ASSERT_EQUAL(segments, loaded.m_SignalGen.m_KspaceTimeSegments);
+      loaded.LoadParameters(earlierFile, true);
+      CPPUNIT_ASSERT_EQUAL(mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, loaded.m_SignalGen.m_KspaceTimeSegments);
+    }
     itksys::SystemTools::RemoveADirectory(folder);
   }
 };

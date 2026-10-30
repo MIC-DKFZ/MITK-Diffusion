@@ -20,6 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVnlForwardFFTImageFilter.h>
 #include <itkVectorImage.h>
 #include <cmath>
+#include <cstdint>
+#include <atomic>
 #include <mitkFiberfoxParameters.h>
 #include <mitkRawShModel.h>
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
@@ -30,6 +32,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 namespace itk
 {
+
+class TimeSegmentMemoryBudget;
 
 /**
 * \brief Generates artificial diffusion weighted image volume from the input fiberbundle using a generic multicompartment model.
@@ -67,6 +71,8 @@ public:
     itkSetMacro( FiberBundle, FiberBundleType )             ///< Input fiber bundle
     itkSetMacro( InputImage, typename OutputImageType::Pointer )     ///< Input diffusion-weighted image. If no fiber bundle is set, then the acquisition is simulated for this image without a new diffusion simulation.
     itkSetMacro( UseConstantRandSeed, bool )                ///< Seed for random generator.
+    /** Memory of the time segments of all k-space slice jobs together, which they wait for (TimeSegmentMemoryBudget); KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET by default (tests set less). */
+    itkSetMacro( TimeSegmentMemoryBudget, std::uint64_t )
     void SetParameters( mitk::FiberfoxParameters param )  ///< Simulation parameters.
     { m_Parameters = param; }
 
@@ -134,8 +140,10 @@ protected:
       std::vector< itk::Vector<double, 3> > coilPositions;
       std::vector< Spike > spikes;
       int threadsPerSlice;
+      TimeSegmentMemoryBudget* timeSegmentMemory;   ///< memory budget of the time segments of all slice jobs
       bool storeTimings;   ///< the job of volume 0, slice 0 and coil 0 stores the readout timings
       DoubleDwiType::Pointer magnitude;
+      std::atomic<unsigned int>* cappedJobs;   ///< counts the jobs that took the exact sum instead of the time segments asked for
     };
 
     /**
@@ -219,6 +227,7 @@ protected:
 
     // MISC
     bool                                        m_UseConstantRandSeed;
+    std::uint64_t                               m_TimeSegmentMemoryBudget;
     bool                                        m_MaskImageSet;
     std::string                                 m_MotionLog;
     std::string                                 m_SpikeLog;

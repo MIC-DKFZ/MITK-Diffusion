@@ -72,6 +72,7 @@ template< class PixelType >
 TractsToDWIImageFilter< PixelType >::TractsToDWIImageFilter()
   : m_Log(mitk::FiberfoxLog::New())
   , m_UseConstantRandSeed(false)
+  , m_TimeSegmentMemoryBudget(KspaceImageFilter< Float2DImageType::PixelType >::TIME_SEGMENT_MEMORY_BUDGET)
   , m_RandGen(itk::Statistics::MersenneTwisterRandomVariateGenerator::New())
 {
   m_NullDir.Fill(0);
@@ -176,6 +177,8 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
   m_PhaseImage = NewKspaceResultImage(compartment_images.at(0)->GetVectorLength());
   m_KspaceImage = NewKspaceResultImage(m_Parameters.m_SignalGen.m_NumberOfCoils);  // one value per coil
   run.coilPositions = ComputeCoilPositions();
+  std::atomic<unsigned int> cappedJobs(0);
+  run.cappedJobs = &cappedJobs;
 
   auto max_threads = omp_get_max_threads();
   // Volumes in parallel first: the k-space filter prepares each slice in one thread, and the
@@ -183,6 +186,11 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
   // so the split does not change the result.
   int out_threads = std::max(1, std::min(max_threads, num_gradient_volumes));
   run.threadsPerSlice = std::max(1, max_threads/out_threads);
+  // The jobs of the parallel volumes hold the memory of their time segments from one budget and wait
+  // for it, so that it bounds the total; a share per job would make the choice of the time segments,
+  // and so the image, depend on the number of threads.
+  TimeSegmentMemoryBudget timeSegmentMemory(m_TimeSegmentMemoryBudget);
+  run.timeSegmentMemory = &timeSegmentMemory;
   PrintToLog("Parallel volumes: " + boost::lexical_cast<std::string>(out_threads), false, true, true);
   PrintToLog("Threads per slice: " + boost::lexical_cast<std::string>(run.threadsPerSlice), false, true, true);
 
@@ -231,6 +239,11 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
 
   for (const auto& spikeLog : spikeLogs)
     m_SpikeLog += spikeLog;
+
+  if (cappedJobs > 0)
+    PrintToLog("\nPhase of distortions and eddy currents: exact sum in " + boost::lexical_cast<std::string>(cappedJobs.load()) + " of "
+               + boost::lexical_cast<std::string>(static_cast<unsigned int>(num_gradient_volumes)*num_slices*m_Parameters.m_SignalGen.m_NumberOfCoils)
+               + " slice jobs (slice, volume and coil), since their time segments would have taken more time or memory than it", false, true, true);
 
   PrintToLog("\n", false);
   return run.magnitude;
@@ -336,9 +349,12 @@ std::string TractsToDWIImageFilter< PixelType >::SimulateKspaceCoil(const Kspace
   idft->SetDiffusionGradientDirection(m_Parameters.m_SignalGen.GetGradientDirection(g)*m_Parameters.m_SignalGen.GetBvalue()/1000.0);
   idft->SetSpikesPerSlice(numSpikes);
   idft->SetNumberOfWorkUnits(run.threadsPerSlice);
+  idft->SetTimeSegmentMemoryBudget(run.timeSegmentMemory);
   const bool storeTimings = run.storeTimings && g==0 && z==0 && c==0;
   idft->SetStoreTimings(storeTimings);
   idft->Update();
+  if (idft->GetTimeSegmentsCapped())
+    ++(*run.cappedJobs);
 
   std::string spikeLog;
   if (numSpikes>0)
