@@ -54,4 +54,6 @@ if(MODULE_IS_ENABLED)
   add_subdirectory(ImageQuantification)
   add_subdirectory(FiberQuantification)
   add_subdirectory(IVIM)
+  # After the groups: the tests are created for the groups whose apps exist.
+  add_subdirectory(Testing)
 endif()
