@@ -25,11 +25,13 @@ found in the LICENSE file.
 #include <QCheckBox>
 #include <QCommandLinkButton>
 #include <QDoubleSpinBox>
+#include <QProcess>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QSpinBox>
 
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -330,7 +332,8 @@ public:
     Helper::InitializeImage(rescaled);
     auto dwi3000 = AddNode(rescaled, "b_ref 3000");
 
-    auto tracts = Load("StreamlineTractography/ReferenceFibs/Test_Tensor1.fib");
+    const std::string tractsFile = "StreamlineTractography/ReferenceFibs/Test_Tensor1.fib";
+    auto tracts = Load(tractsFile);
     auto *view = ShowView("org.mitk.views.fiberfit", "QmitkFiberFitViewControls");
     ChooseNode(view, "m_TractBox", tracts);
     const auto weights = FittedWeights(view, dwi);
@@ -345,6 +348,37 @@ public:
     }
     CPPUNIT_ASSERT(fitted);
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+
+    // The command line app on the same files, with its defaults, which are the view's (voxel
+    // variance regularization, lambda 1, 20 iterations, one weight per fiber): the same weights.
+    const char *app = std::getenv("MITK_DIFFUSION_UITEST_FIT_APP");
+    if (app == nullptr)
+    {
+      MITK_WARN << "MitkFitFibersToImage is not part of the build: the view is not compared with it.";
+      return;
+    }
+    const std::filesystem::path folder = CreateTempDir();
+    QProcess process;
+    process.setProcessChannelMode(QProcess::MergedChannels);
+    process.start(QString::fromLocal8Bit(app),
+                  {"-i1", QString::fromStdString(mitk::GetDiffusionTestDataFilePath(tractsFile)),
+                   "-i2", QString::fromStdString(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/diffusion_image_v2.nii.gz")),
+                   "-o", QString::fromStdString((folder / "").string())});
+    CPPUNIT_ASSERT_MESSAGE("MitkFitFibersToImage did not end", process.waitForFinished(300000));
+    const auto log = process.readAll().toStdString();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(log, 0, process.exitCode());
+    std::vector<std::filesystem::path> outputs;
+    for (const auto &entry : std::filesystem::directory_iterator(folder))
+    {
+      if (entry.path().string().ends_with("_fitted.fib"))
+        outputs.push_back(entry.path());
+    }
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(log, std::size_t(1), outputs.size());
+    auto fromApp = mitk::IOUtil::Load<mitk::FiberBundle>(outputs.front().string());
+    std::filesystem::remove_all(folder);
+    CPPUNIT_ASSERT_EQUAL(weights.size(), std::size_t(fromApp->GetNumFibers()));
+    for (std::size_t i = 0; i < weights.size(); ++i)
+      CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("fiber " + std::to_string(i), weights[i], fromApp->GetFiberWeight(i), 1e-5 * std::max(1.0f, std::abs(weights[i])));
   }
 };
 

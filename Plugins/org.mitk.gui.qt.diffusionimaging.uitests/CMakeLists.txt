@@ -39,11 +39,15 @@ target_link_libraries(${_test_app} PRIVATE org_blueberry_core_runtime)
 add_dependencies(${_test_app} ${PROJECT_NAME})
 set_target_properties(${_test_app} PROPERTIES NO_INSTALL TRUE)
 
-# The streamline view is compared with the command line app (same input, prior and parameter
-# file); the modules, and so the apps, are configured before the plug-ins.
+# The streamline and Fiber Fit views are compared with the command line apps (same input,
+# prior and parameter file); the modules, and so the apps, are configured before the plug-ins.
 set(_streamline_app ${MITK_MODULE_NAME_PREFIX}StreamlineTractography)
 if(TARGET ${_streamline_app})
   add_dependencies(${_test_app} ${_streamline_app})
+endif()
+set(_fit_app ${MITK_MODULE_NAME_PREFIX}FitFibersToImage)
+if(TARGET ${_fit_app})
+  add_dependencies(${_test_app} ${_fit_app})
 endif()
 
 if(WIN32)
@@ -73,6 +77,9 @@ function(mitk_diffusion_add_ui_test suite plugin)
   set(_environment "QT_QPA_PLATFORM=offscreen;MITK_DIFFUSION_UITEST=${suite};LC_ALL=C.UTF-8")
   if(TARGET ${_streamline_app})
     list(APPEND _environment "MITK_DIFFUSION_UITEST_STREAMLINE_APP=$<TARGET_FILE:${_streamline_app}>")
+  endif()
+  if(TARGET ${_fit_app})
+    list(APPEND _environment "MITK_DIFFUSION_UITEST_FIT_APP=$<TARGET_FILE:${_fit_app}>")
   endif()
   set_tests_properties(mitkDiffusionViewsUiTest_${suite} PROPERTIES
     ENVIRONMENT "${_environment}"
