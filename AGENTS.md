@@ -132,8 +132,9 @@ Facts the layout does not show:
   and wait for workers; the streamline and Fiber Fit views are compared with
   `MitkStreamlineTractography` and `MitkFitFibersToImage` (paths in
   `MITK_DIFFUSION_UITEST_STREAMLINE_APP` and `MITK_DIFFUSION_UITEST_FIT_APP`). The Reconstruction,
-  Tractography and Preprocessing suites end with a case that leaves views, data and runs open for
-  the harness's quit. Setting `MITK_DIFFUSION_UITEST_CASE=<method>` in the shell that runs ctest
+  Tractography, Preprocessing and Fiberfox suites end with a case that leaves views, data and runs
+  open for the harness's quit; Fiberfox runs simulate a small synthetic geometry from fibers built in
+  the test (`ShowFiberfox`, `StraightFibers`). Setting `MITK_DIFFUSION_UITEST_CASE=<method>` in the shell that runs ctest
   runs that case alone. The tests run with `LC_ALL=C.UTF-8` and are skipped (exit code 77) without
   a Qt platform plugin. Offscreen there is no OpenGL: render windows draw nothing, so rendering
   looks stay manual checks (#45).
@@ -257,7 +258,10 @@ Facts the layout does not show:
 - `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
   `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
   `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and
-  `SetGradientsFromImage` stores a DWI's gradients in that form. Noise is complex Gaussian in
+  `SetGradientsFromImage` stores a DWI's gradients in that form. The side files hold unit vectors
+  and rounded b-values, so `LoadParameters` takes the gradients written into the `.ffp` where the
+  side files still give them; save, load and save give the same files
+  (`SaveLoadSaveGivesTheSameFiles`). Noise is complex Gaussian in
   k-space, or a noise model on the magnitude image: Rician or noncentral chi (`.ffp`
   `artifacts.noisetype` `noncentralchi` with `artifacts.noisecoils`; the `chisquare` type of earlier
   files is read as noncentral chi with the file's `numberofcoils`). With relaxation, an inversion
