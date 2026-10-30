@@ -70,6 +70,7 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   MITK_TEST(Mapper3D_ClippingPlaneChange_AppliedWithoutRebuild);
   MITK_TEST(Mapper2D_SlabAroundThePlane);
   MITK_TEST(Mapper2D_SliceStep_PlanesMovedInPlace);
+  MITK_TEST(Mapper2D_Band_SameImageAsWholeBundle);
   MITK_TEST(Mapper2D_NodeOpacity_AppliedToTheFibers);
   MITK_TEST(Rendering_LeavesTheBundleUnchanged);
   CPPUNIT_TEST_SUITE_END();
@@ -539,7 +540,7 @@ public:
     vtkActor *actor = Render2D(mitk::AnatomicalPlane::Axial);
     vtkPolyData *input = Input(actor);
     CPPUNIT_ASSERT(input->GetPointData()->GetArray("FIBER_COLORS") != nullptr);
-    CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(m_Fibers->GetNumFibers()), input->GetNumberOfLines());
+    CPPUNIT_ASSERT(input->GetNumberOfLines() > 0);
 
     vtkPlaneCollection *planes = actor->GetMapper()->GetClippingPlanes();
     CPPUNIT_ASSERT(planes != nullptr);
@@ -565,12 +566,14 @@ public:
     }
   }
 
-  // #46: a slice step moves the two slab planes in place and keeps the input copy. A new plane
-  // collection or input changes the VTK mapper's modified time, and VTK then rebuilds the GPU
-  // buffers of the whole bundle on every step.
+  // #46: a slice step moves the two slab planes in place. Within the band of fibers the window
+  // holds, it keeps the input: a new plane collection or input changes the VTK mapper's modified
+  // time, and VTK then rebuilds the GPU buffers of what it draws. A step beyond the band gives a
+  // new band.
   void Mapper2D_SliceStep_PlanesMovedInPlace()
   {
-    m_Node->SetData(AxialFibers({-6.0, 0.0, 6.0}));
+    // one fiber in each band: a band reaches 10 mm beyond the slab of the default thickness
+    m_Node->SetData(AxialFibers({-20.0, 0.0, 20.0}));
     vtkActor *actor = Render2D(mitk::AnatomicalPlane::Axial);
     auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
     mitk::SliceNavigationController *navigation = renderer->GetSliceNavigationController();
@@ -579,6 +582,8 @@ public:
     navigation->SelectSliceByPoint(centre);
     actor = Render2D();
     const std::vector<unsigned char> atCentre = Capture();
+    MITK_INFO << "Band at the centre: " << Input(actor)->GetNumberOfLines() << " of 3 fibers";
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("the band holds the fiber in the slab only", static_cast<vtkIdType>(1), Input(actor)->GetNumberOfLines());
 
     vtkMapper *mapper = actor->GetMapper();
     // held, so that replaced objects are not freed and their addresses reused
@@ -591,31 +596,107 @@ public:
     double originBefore[3];
     plane1->GetOrigin(originBefore);
 
-    mitk::Point3D above = centre;
-    above[2] = 6.0;
-    navigation->SelectSliceByPoint(above);
+    // a step within the band
+    mitk::Point3D near = centre;
+    near[2] = 2.0;
+    navigation->SelectSliceByPoint(near);
     actor = Render2D();
-    const std::vector<unsigned char> atAbove = Capture();
     double originAfter[3];
     mapper->GetClippingPlanes()->GetItem(0)->GetOrigin(originAfter);
     CPPUNIT_ASSERT_MESSAGE("the slab follows the slice", std::abs(originAfter[2] - originBefore[2]) > 1.0);
-    CPPUNIT_ASSERT_MESSAGE("another fiber is shown", atAbove != atCentre);
     CPPUNIT_ASSERT(actor->GetMapper() == mapper);
     CPPUNIT_ASSERT(mapper->GetClippingPlanes() == planes);
     CPPUNIT_ASSERT(planes->GetItem(0) == plane1 && planes->GetItem(1) == plane2);
-    CPPUNIT_ASSERT_MESSAGE("input copy kept", Input(actor) == input);
+    CPPUNIT_ASSERT_MESSAGE("input kept", Input(actor) == input);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("mapper unchanged", mapperTime, mapper->GetMTime());
 
+    // a step beyond the band: a new band, the same planes
+    mitk::Point3D above = centre;
+    above[2] = 20.0;
+    navigation->SelectSliceByPoint(above);
+    actor = Render2D();
+    const std::vector<unsigned char> atAbove = Capture();
+    CPPUNIT_ASSERT_MESSAGE("another fiber is shown", atAbove != atCentre);
+    CPPUNIT_ASSERT(planes->GetItem(0) == plane1 && planes->GetItem(1) == plane2);
+    CPPUNIT_ASSERT_MESSAGE("new band", Input(actor) != input);
+
     navigation->SelectSliceByPoint(centre);
-    Render2D();
+    actor = Render2D();
     CPPUNIT_ASSERT_MESSAGE("same image back at the first slice", Capture() == atCentre);
 
-    // changed fibers give a new input copy
+    // changed fibers give a new input
+    const vtkSmartPointer<vtkPolyData> band = Input(actor);
     m_Fibers = dynamic_cast<mitk::FiberBundle *>(m_Node->GetData());
     m_Fibers->SetFiberColors(255, 0, 0);
     actor = Render2D();
-    CPPUNIT_ASSERT(Input(actor) != input);
+    CPPUNIT_ASSERT(Input(actor) != band);
     CPPUNIT_ASSERT_MESSAGE("recoloured fibers drawn", Capture() != atCentre);
+  }
+
+  // #46: a 2D window holds only the fibers in a band around its slab; drawn with the slab's
+  // clipping planes, the band gives the same image as the whole bundle, for planes along the
+  // world axes and oblique ones.
+  void Mapper2D_Band_SameImageAsWholeBundle()
+  {
+    // a thin slab, so that a band (10 mm beyond the slab) holds part of this small bundle
+    m_Node->SetFloatProperty("Fiber2DSliceThickness", 0.5f);
+    auto whole = vtkSmartPointer<vtkPolyData>::New();
+    whole->ShallowCopy(m_Fibers->GetFiberPolyData());
+    whole->GetPointData()->AddArray(m_Fibers->GetFiberColors());
+    double bounds[6];
+    whole->GetBounds(bounds);
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+    vtkIdType smallestBand = whole->GetNumberOfPoints();
+
+    auto compareWithWholeBundle = [&]() {
+      vtkActor *actor = Render2D();
+      // held: the mapper frees it when it gets the whole bundle below
+      const vtkSmartPointer<vtkPolyData> band = Input(actor);
+      CPPUNIT_ASSERT(band != whole);
+      smallestBand = std::min(smallestBand, band->GetNumberOfPoints());
+      const std::vector<unsigned char> fromBand = Capture();
+
+      // the input stays until the fibers change or the slab leaves the band
+      actor->GetMapper()->SetInputDataObject(whole);
+      actor = Render2D();
+      CPPUNIT_ASSERT(Input(actor) == whole.GetPointer());
+      const std::vector<unsigned char> fromWhole = Capture();
+      const ImageDifference difference = Compare(fromWhole, fromWhole);
+      MITK_INFO << "Band of " << band->GetNumberOfPoints() << " of " << whole->GetNumberOfPoints() << " points, "
+                << difference.drawnPixels << " fiber pixels";
+      CPPUNIT_ASSERT_MESSAGE("fibers drawn", difference.drawnPixels > 0);
+      CPPUNIT_ASSERT_MESSAGE("same image from the band and from the whole bundle", fromBand == fromWhole);
+
+      // a new band at the next slice
+      m_Fibers->RequestUpdate2D();
+    };
+
+    for (const auto view : {mitk::AnatomicalPlane::Axial, mitk::AnatomicalPlane::Sagittal, mitk::AnatomicalPlane::Coronal})
+    {
+      Render2D(view);
+      for (const double fraction : {0.3, 0.5, 0.7})
+      {
+        mitk::Point3D point;
+        for (int a = 0; a < 3; ++a)
+          point[a] = bounds[2 * a] + fraction * (bounds[2 * a + 1] - bounds[2 * a]);
+        renderer->GetSliceNavigationController()->SelectSliceByPoint(point);
+        compareWithWholeBundle();
+      }
+    }
+
+    // oblique plane through the centre of the bundle
+    Render2D(mitk::AnatomicalPlane::Axial);
+    mitk::Point3D centre;
+    for (int a = 0; a < 3; ++a)
+      centre[a] = 0.5 * (bounds[2 * a] + bounds[2 * a + 1]);
+    mitk::Vector3D obliqueNormal;
+    obliqueNormal[0] = 0.4;
+    obliqueNormal[1] = 0.2;
+    obliqueNormal[2] = 1.0;
+    renderer->GetSliceNavigationController()->ReorientSlices(centre, obliqueNormal);
+    compareWithWholeBundle();
+
+    CPPUNIT_ASSERT_MESSAGE("a band holds part of the bundle", smallestBand < whole->GetNumberOfPoints() / 2);
   }
 
   /** The rendered frame, RGB(A) bytes row by row */
