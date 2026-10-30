@@ -15,6 +15,7 @@ found in the LICENSE file.
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkDiffusionTestData.h>
 #include <mitkFiberBundle.h>
+#include <mitkImageCast.h>
 #include <mitkIOUtil.h>
 #include <mitkPlanarEllipse.h>
 #include <mitkPlanarFigureInteractor.h>
@@ -23,11 +24,17 @@ found in the LICENSE file.
 #include <cppunit/extensions/HelperMacros.h>
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QCommandLinkButton>
 #include <QDoubleSpinBox>
+#include <QLabel>
+#include <QLineEdit>
 #include <QProcess>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QTextEdit>
+
+#include <itkVectorImage.h>
 
 #include <vtkCellArray.h>
 #include <vtkPoints.h>
@@ -44,25 +51,34 @@ using namespace QmitkDiffusionUiTest;
 
 /**
  * \brief UI tests of the Fiberfox plug-in's views (Fiberfox, Fiber Generator, Fieldmap Generator)
- * and of the Fiber Fit view.
+ * and of the Fiber Fit view. Fiberfox runs simulate a small synthetic geometry (ShowFiberfox) from
+ * a few straight fibers, so that most take about a second in Debug.
  */
 class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
 {
   CPPUNIT_TEST_SUITE(QmitkFiberfoxViewsUiTest);
   CPPUNIT_TEST(Fiberfox_ViewClosedWithData_NoCrash);
+  CPPUNIT_TEST(Fiberfox_StickBall_OneRunPerDoubleClickWithProperties);
+  CPPUNIT_TEST(Fiberfox_AbortAndCloseDuringKspaceStep_NoImageNoCrash);
+  CPPUNIT_TEST(Fiberfox_FourCompartmentsAndMultiShellPrototype_MessagesThenRuns);
+  CPPUNIT_TEST(Fiberfox_CompartmentModels_ShownAsSavedAfterLoad);
   CPPUNIT_TEST(Fiberfox_SaveLoadSave_IdenticalParameterFiles);
   CPPUNIT_TEST(Fiberfox_NonXmlParameterFile_Message);
   CPPUNIT_TEST(Generation_RandomPhantomMinAboveMax_MessageForEachRange);
   CPPUNIT_TEST(Generation_Buttons_HaveIcons);
   CPPUNIT_TEST(Generation_Fiducials_FibersOfTheRightBundlePositionKeptViewClosed);
   CPPUNIT_TEST(Fieldmap_TwoSources_FieldmapBelowImage);
+  CPPUNIT_TEST(Quit_WhileSimulationRuns_NoCrash);
   CPPUNIT_TEST_SUITE_END();
 
   static constexpr const char *FiberfoxId = "org.mitk.views.fiberfoxview";
   static constexpr const char *GenerationId = "org.mitk.views.fibergenerationview";
   static constexpr const char *FieldmapId = "org.mitk.views.fieldmapgenerator";
 
+  static constexpr const char *FiberfoxControls = "QmitkFiberfoxViewControls";
+
   std::string m_TempDir;
+  bool m_LeaveForQuit = false;
 
   static std::string Content(const std::string &file)
   {
@@ -77,7 +93,10 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
     return messages.front();
   }
 
-  /** Straight fibers along x at y = 6 to 10 mm and z = 1 mm, from x = -2 to 18 mm. */
+  /**
+   * Straight fibers along x at y = 6 to 10 mm and z = 1 mm, from x = -2 to 18 mm: through the
+   * middle of the small synthetic geometry of ShowFiberfox (8 x 8 voxels of 2 mm).
+   */
   static mitk::FiberBundle::Pointer StraightFibers()
   {
     auto points = vtkSmartPointer<vtkPoints>::New();
@@ -94,6 +113,147 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
     return mitk::FiberBundle::New(polyData);
   }
 
+
+  /**
+   * Opens the Fiberfox view with a small synthetic geometry: 8 x 8 x 2 voxels of 2 mm, one b0 and
+   * six weighted volumes at b = 1000, no relaxation, so that a run without artifacts takes no
+   * k-space step.
+   */
+  static QWidget *ShowFiberfox()
+  {
+    auto *view = ShowView(FiberfoxId, FiberfoxControls);
+    GetChild<QSpinBox>(view, "m_SizeX")->setValue(8);
+    GetChild<QSpinBox>(view, "m_SizeY")->setValue(8);
+    GetChild<QSpinBox>(view, "m_SizeZ")->setValue(2);
+    GetChild<QSpinBox>(view, "m_NumGradientsBox")->setValue(6);
+    GetChild<QCheckBox>(view, "m_RelaxationBox")->setChecked(false);
+    return view;
+  }
+
+  /**
+   * A run long enough to act during its k-space step (several seconds in Debug): 64 x 64 x 4 voxels,
+   * 60 gradient directions, relaxation.
+   */
+  static void SetLongRun(QWidget *view)
+  {
+    GetChild<QSpinBox>(view, "m_SizeX")->setValue(64);
+    GetChild<QSpinBox>(view, "m_SizeY")->setValue(64);
+    GetChild<QSpinBox>(view, "m_SizeZ")->setValue(4);
+    GetChild<QSpinBox>(view, "m_NumGradientsBox")->setValue(60);
+    GetChild<QCheckBox>(view, "m_RelaxationBox")->setChecked(true);
+  }
+
+  static mitk::DataNode::Pointer AddFibers(QWidget *view)
+  {
+    auto fibers = AddNode(StraightFibers(), "Fibers");
+    ChooseNode(view, "m_FiberBundleComboBox", fibers);
+    return fibers;
+  }
+
+  /** "Start Simulation" is hidden while a simulation runs. */
+  static bool Running(QWidget *view)
+  {
+    return GetChild<QCommandLinkButton>(view, "m_GenerateImageButton")->isHidden();
+  }
+
+  static void Start(QWidget *view)
+  {
+    GetChild<QCommandLinkButton>(view, "m_GenerateImageButton")->click();
+  }
+
+  static void WaitForIdle(QWidget *view)
+  {
+    CPPUNIT_ASSERT_MESSAGE("The simulation did not end", WaitFor([view]() { return !Running(view); }, 120000));
+  }
+
+  static QString StatusText(QWidget *view)
+  {
+    return GetChild<QTextEdit>(view, "m_SimulationStatusText")->toPlainText();
+  }
+
+  static unsigned int NumDerived(const mitk::DataNode::Pointer &parent)
+  {
+    return GetDataStorage()->GetDerivations(parent)->Size();
+  }
+
+  /** Starts a simulation and returns its image, which the view adds below parent at the end of the run. */
+  static mitk::DataNode::Pointer Simulate(QWidget *view, const mitk::DataNode::Pointer &parent)
+  {
+    std::vector<mitk::DataNode::Pointer> before;
+    const auto derivedBefore = GetDataStorage()->GetDerivations(parent);
+    for (const auto &node : *derivedBefore)
+      before.push_back(node);
+    Start(view);
+    CPPUNIT_ASSERT_MESSAGE("No simulated image below " + parent->GetName() + "; messages: "
+                             + DialogHandler::Instance().PeekMessages().join(" | ").toStdString(),
+                           WaitFor([&]() { return NumDerived(parent) > before.size(); }, 120000));
+    WaitForIdle(view);
+    const auto derived = GetDataStorage()->GetDerivations(parent);
+    for (const auto &node : *derived)
+    {
+      if (std::find(before.begin(), before.end(), node) == before.end())
+        return node;
+    }
+    CPPUNIT_FAIL("No new node below " + parent->GetName());
+    return nullptr;
+  }
+
+  /** Starts a simulation that ends with a message box and returns its text. */
+  static QString SimulateExpectingMessage(QWidget *view)
+  {
+    Start(view);
+    CPPUNIT_ASSERT_MESSAGE("No message", WaitFor([]() { return !DialogHandler::Instance().PeekMessages().isEmpty(); }, 120000));
+    WaitForIdle(view);
+    return OneMessage();
+  }
+
+  static void SaveParameters(QWidget *view, const std::string &file)
+  {
+    DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
+    GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+  }
+
+  static void LoadParameters(QWidget *view, const std::string &file)
+  {
+    DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
+    GetChild<QCommandLinkButton>(view, "m_LoadParametersButton")->click();
+  }
+
+  static std::string StringProperty(const mitk::DataNode::Pointer &node, const std::string &name)
+  {
+    std::string value;
+    CPPUNIT_ASSERT_MESSAGE("Property " + name, node->GetStringProperty(name.c_str(), value));
+    return value;
+  }
+
+  static mitk::Image *ImageOf(const mitk::DataNode::Pointer &node)
+  {
+    auto *image = dynamic_cast<mitk::Image *>(node->GetData());
+    CPPUNIT_ASSERT(image != nullptr);
+    return image;
+  }
+
+  using ItkDwi = itk::VectorImage<short, 3>;
+
+  static ItkDwi::Pointer ItkImageOf(const mitk::DataNode::Pointer &node)
+  {
+    auto itkImage = ItkDwi::New();
+    mitk::CastToItkImage(ImageOf(node), itkImage);
+    return itkImage;
+  }
+
+  /** The text of the first element of the XML file with this tag; empty for an empty element. */
+  static std::string Element(const std::string &file, const std::string &tag)
+  {
+    const auto text = Content(file);
+    if (text.find("<" + tag + "/>") != std::string::npos)
+      return "";
+    const auto begin = text.find("<" + tag + ">");
+    CPPUNIT_ASSERT_MESSAGE("No <" + tag + "> in " + file, begin != std::string::npos);
+    const auto start = begin + tag.size() + 2;
+    return text.substr(start, text.find("</" + tag + ">", start) - start);
+  }
+
 public:
   void setUp() override
   {
@@ -102,6 +262,8 @@ public:
 
   void tearDown() override
   {
+    if (m_LeaveForQuit)
+      return;
     for (const auto *id : {FiberfoxId, GenerationId, FieldmapId})
       HideView(id);
     ClearDataStorage();
@@ -123,6 +285,156 @@ public:
     ChooseNode(view, "m_TemplateComboBox", image);
     HideView(FiberfoxId);
     CPPUNIT_ASSERT(!IsViewOpen(FiberfoxId));
+  }
+
+  /**
+   * Stick and ball from a tractogram: a double click on "Start Simulation" gives one run, whose
+   * image comes below the tractogram with the run's name and properties; the status text logs the
+   * run with full progress bars to its end.
+   */
+  void Fiberfox_StickBall_OneRunPerDoubleClickWithProperties()
+  {
+    auto *view = ShowFiberfox();
+    auto fibers = AddFibers(view);
+    Start(view);   // the first click of the double click; Simulate clicks the second time
+    auto result = Simulate(view, fibers);
+    Wait(500);
+    CPPUNIT_ASSERT_EQUAL(1u, NumDerived(fibers));
+
+    CPPUNIT_ASSERT_EQUAL(std::string("b1000_StickBall"), result->GetName());
+    auto *image = ImageOf(result);
+    CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(image));
+    CPPUNIT_ASSERT_EQUAL(7u, static_cast<unsigned int>(mitk::DiffusionPropertyHelper::GetGradientContainer(image)->Size()));
+    CPPUNIT_ASSERT_EQUAL(8u, image->GetDimension(0));
+    CPPUNIT_ASSERT_EQUAL(2u, image->GetDimension(2));
+    CPPUNIT_ASSERT_EQUAL(std::string("Stick"), StringProperty(result, "Fiberfox.Compartment1.Model"));
+    CPPUNIT_ASSERT_EQUAL(std::string("Ball"), StringProperty(result, "Fiberfox.Compartment3.Model"));
+    for (const auto *name : {"Fiberfox.Compartment1.D", "Fiberfox.Compartment1.T2", "Fiberfox.Compartment3.D", "Fiberfox.b-value", "Fiberfox.Relaxation"})
+      CPPUNIT_ASSERT_MESSAGE(name, result->GetProperty(name) != nullptr);
+    CPPUNIT_ASSERT(result->GetProperty("Fiberfox.Compartment2.Model") == nullptr);
+
+    const auto status = StatusText(view);
+    CPPUNIT_ASSERT(status.contains("Starting Fiberfox dMRI simulation"));
+    CPPUNIT_ASSERT(status.contains(QString(50, '*')));
+    CPPUNIT_ASSERT(status.contains("Finished simulation"));
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /**
+   * "Abort Simulation" during the k-space step: no image, "Start Simulation" again. Closing the view
+   * during the k-space step of the next run aborts it; the reopened view simulates again.
+   */
+  void Fiberfox_AbortAndCloseDuringKspaceStep_NoImageNoCrash()
+  {
+    auto *view = ShowFiberfox();
+    SetLongRun(view);
+    auto fibers = AddFibers(view);
+    const auto inKspaceStep = [&view]() { return StatusText(view).contains("Simulating k-space acquisition"); };
+
+    Start(view);
+    CPPUNIT_ASSERT(WaitFor(inKspaceStep, 60000));
+    CPPUNIT_ASSERT_MESSAGE("The run ended before the abort", Running(view));
+    GetChild<QCommandLinkButton>(view, "m_AbortSimulationButton")->click();
+    WaitForIdle(view);
+    CPPUNIT_ASSERT(StatusText(view).contains("Simulation aborted"));
+    Wait(200);
+    CPPUNIT_ASSERT_EQUAL(0u, NumDerived(fibers));
+    CPPUNIT_ASSERT(!GetChild<QCommandLinkButton>(view, "m_GenerateImageButton")->isHidden());
+
+    GetChild<QTextEdit>(view, "m_SimulationStatusText")->clear();
+    Start(view);
+    CPPUNIT_ASSERT(WaitFor(inKspaceStep, 60000));
+    CPPUNIT_ASSERT_MESSAGE("The run ended before the view was closed", Running(view));
+    HideView(FiberfoxId);
+    CPPUNIT_ASSERT(!IsViewOpen(FiberfoxId));
+    Wait(200);
+    CPPUNIT_ASSERT_EQUAL(0u, NumDerived(fibers));
+
+    view = ShowFiberfox();
+    ChooseNode(view, "m_FiberBundleComboBox", fibers);
+    Simulate(view, fibers);
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /**
+   * Two non-fiber compartments without volume fraction maps, and a prototype signal of a
+   * multi-shell template: each ends with its message and no image; the next run works.
+   */
+  void Fiberfox_FourCompartmentsAndMultiShellPrototype_MessagesThenRuns()
+  {
+    auto *view = ShowFiberfox();
+    auto fibers = AddFibers(view);
+    auto *compartment1 = GetChild<QComboBox>(view, "m_Compartment1Box");
+    auto *compartment2 = GetChild<QComboBox>(view, "m_Compartment2Box");
+    auto *compartment4 = GetChild<QComboBox>(view, "m_Compartment4Box");
+    compartment2->setCurrentIndex(1);   // stick
+    compartment4->setCurrentIndex(1);   // ball
+    auto message = SimulateExpectingMessage(view);
+    CPPUNIT_ASSERT_MESSAGE(message.toStdString(), message.contains("Simulation failed") && message.contains("volume fraction maps"));
+    CPPUNIT_ASSERT(StatusText(view).contains("Simulation failed"));
+    CPPUNIT_ASSERT_EQUAL(0u, NumDerived(fibers));
+
+    compartment2->setCurrentIndex(0);
+    compartment4->setCurrentIndex(0);
+    auto multiShell = Load("ImageReconstruction/test_multi.dwi");
+    ChooseNode(view, "m_TemplateComboBox", multiShell);
+    compartment1->setCurrentIndex(3);   // prototype signal, sampled from the template
+    auto *prototype = GetChild<QWidget>(view, "m_PrototypeWidget1");
+    GetChild<QDoubleSpinBox>(prototype, "m_MinFaBox")->setValue(0);
+    GetChild<QDoubleSpinBox>(prototype, "m_MaxFaBox")->setValue(1);
+    GetChild<QDoubleSpinBox>(prototype, "m_MaxAdcBox")->setValue(1);
+    // the Q-ball fit of the prototype sampling refuses the template before the run starts
+    Start(view);
+    message = OneMessage();
+    CPPUNIT_ASSERT_MESSAGE(message.toStdString(), message.contains("No image generated") && message.contains("one shell"));
+    CPPUNIT_ASSERT(!Running(view));
+    CPPUNIT_ASSERT_EQUAL(0u, NumDerived(fibers));
+
+    compartment1->setCurrentIndex(0);
+    ChooseNode(view, "m_TemplateComboBox", nullptr);
+    Simulate(view, fibers);
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /**
+   * Zeppelin, tensor, astrosticks and dot, saved and loaded: each compartment box shows its model
+   * with only its parameter widget, compartments 2 and 4 their volume fraction box; saved again,
+   * the file is the same.
+   */
+  void Fiberfox_CompartmentModels_ShownAsSavedAfterLoad()
+  {
+    auto *view = ShowFiberfox();
+    const std::vector<std::pair<const char *, int>> selected = {{"m_Compartment1Box", 1}, {"m_Compartment2Box", 3},
+                                                                {"m_Compartment3Box", 1}, {"m_Compartment4Box", 3}};
+    for (const auto &[box, index] : selected)
+      GetChild<QComboBox>(view, box)->setCurrentIndex(index);
+    auto *zeppelin = GetChild<QWidget>(view, "m_ZeppelinWidget1");
+    GetChild<QDoubleSpinBox>(zeppelin, "m_D1box")->setValue(0.0021);
+    const auto first = m_TempDir + "/compartments.ffp";
+    const auto second = m_TempDir + "/compartments_again.ffp";
+    SaveParameters(view, first);
+
+    for (const auto &[box, index] : selected)
+      GetChild<QComboBox>(view, box)->setCurrentIndex(0);
+    GetChild<QDoubleSpinBox>(zeppelin, "m_D1box")->setValue(0.001);
+    LoadParameters(view, first);
+    for (const auto &[box, index] : selected)
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(box, index, GetChild<QComboBox>(view, box)->currentIndex());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0021, GetChild<QDoubleSpinBox>(zeppelin, "m_D1box")->value(), 1e-9);
+    const std::vector<std::pair<const char *, bool>> shown = {
+      {"m_StickWidget1", false}, {"m_ZeppelinWidget1", true}, {"m_TensorWidget1", false}, {"m_PrototypeWidget1", false},
+      {"m_StickWidget2", false}, {"m_ZeppelinWidget2", false}, {"m_TensorWidget2", true}, {"m_Comp2FractionFrame", true},
+      {"m_BallWidget1", false}, {"m_AstrosticksWidget1", true}, {"m_DotWidget1", false}, {"m_PrototypeWidget3", false},
+      {"m_BallWidget2", false}, {"m_AstrosticksWidget2", false}, {"m_DotWidget2", true}, {"m_PrototypeWidget4", false},
+      {"m_Comp4FractionFrame", true}};
+    for (const auto &[name, visible] : shown)
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, visible, !GetChild<QWidget>(view, name)->isHidden());
+
+    SaveParameters(view, second);
+    CPPUNIT_ASSERT_EQUAL(Content(first), Content(second));
+    GetChild<QComboBox>(view, "m_Compartment2Box")->setCurrentIndex(0);
+    CPPUNIT_ASSERT(GetChild<QWidget>(view, "m_Comp2FractionFrame")->isHidden());
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 
   void Fiberfox_SaveLoadSave_IdenticalParameterFiles()
@@ -266,6 +578,22 @@ public:
     // Another image: the sources stay with theirs.
     ChooseNode(view, "m_SelectedImageBox", other);
     CPPUNIT_ASSERT(GetDataStorage()->GetDerivations(other)->Size() == 0);
+  }
+
+  /**
+   * Quitting the Workbench while a simulation runs in its k-space step, with the view open: the
+   * case leaves everything as it is, and the harness closes the Workbench after it. A crash fails
+   * the suite.
+   */
+  void Quit_WhileSimulationRuns_NoCrash()
+  {
+    m_LeaveForQuit = true;
+    auto *view = ShowFiberfox();
+    SetLongRun(view);
+    AddFibers(view);
+    Start(view);
+    CPPUNIT_ASSERT(WaitFor([view]() { return StatusText(view).contains("Simulating k-space acquisition"); }, 60000));
+    CPPUNIT_ASSERT(Running(view));
   }
 };
 
