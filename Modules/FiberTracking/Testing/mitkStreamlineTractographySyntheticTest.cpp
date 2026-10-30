@@ -23,6 +23,7 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 #include <cstring>
 #include <new>
+#include <mitkOmpThreadGuard.h>
 #include <omp.h>
 
 /**
@@ -58,6 +59,7 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
   static constexpr int SizeYZ = 5;
 
   PeakImgType::Pointer m_StraightField;
+  std::unique_ptr<mitk::OmpThreadGuard> m_Threads;  ///< 1 thread per case, restored in tearDown
 
   /** The same peak (default +x) in every voxel of a 20x5x5 image with 1 mm voxels. */
   static PeakImgType::Pointer MakeStraightPeakField(float dx = 1.0f, float dy = 0.0f, float dz = 0.0f)
@@ -227,11 +229,15 @@ class mitkStreamlineTractographySyntheticTestSuite : public mitk::TestFixture
 public:
   void setUp() override
   {
-    omp_set_num_threads(1);
+    m_Threads = std::make_unique<mitk::OmpThreadGuard>(1);
     m_StraightField = MakeStraightPeakField();
   }
 
-  void tearDown() override { m_StraightField = nullptr; }
+  void tearDown() override
+  {
+    m_StraightField = nullptr;
+    m_Threads.reset();
+  }
 
   /** Constructed on memory that is not zero, so that a member without initializer shows. */
   void Parameters_Defaults()
@@ -342,11 +348,10 @@ public:
     params->m_MinTractLengthMm = 2;
     params->m_PeakJitter = 0.1f;
 
-    omp_set_num_threads(1);
     auto single = mitk::FiberBundle::New(Track(params, seeds, nullptr, field));
-    omp_set_num_threads(4);
+    m_Threads->SetNumberOfThreads(4);
     auto multi = mitk::FiberBundle::New(Track(params, seeds, nullptr, field));
-    omp_set_num_threads(1);
+    m_Threads->SetNumberOfThreads(1);
 
     CPPUNIT_ASSERT(single->GetNumFibers() > 400);
     CPPUNIT_ASSERT_MESSAGE("1 and 4 threads give the same tractogram", single->Equals(multi));

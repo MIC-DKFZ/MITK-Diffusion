@@ -30,6 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkFiberBundle.h>
+#include <mitkOmpThreadGuard.h>
 #include <omp.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkEqual.h>
@@ -81,10 +82,11 @@ public:
   std::shared_ptr<mitk::StreamlineTractographyParameters> params;
 
   itk::StreamlineTrackingFilter::Pointer tracker;
+  std::unique_ptr<mitk::OmpThreadGuard> m_Threads;  ///< 1 thread per case, restored in tearDown
 
   void setUp() override
   {
-    omp_set_num_threads(1);
+    m_Threads = std::make_unique<mitk::OmpThreadGuard>(1);
 
     gfa_threshold = 0.2f;
     odf_threshold = 0.1f;
@@ -185,7 +187,7 @@ public:
 
   void tearDown() override
   {
-
+    m_Threads.reset();
   }
 
   void CheckFibResult(std::string ref_file, mitk::FiberBundle::Pointer test_fib)
@@ -446,14 +448,14 @@ public:
   /** Same as Test_Tensor1 at four threads: the fiber order must not depend on the thread scheduling. */
   void Test_Tensor1_FourThreads()
   {
-    omp_set_num_threads(4);
+    m_Threads->SetNumberOfThreads(4);
     Test_Tensor1();
   }
 
   /** Same as Test_Odf5 at four threads: probabilistic tracking must give the single-threaded result. */
   void Test_Odf5_FourThreads()
   {
-    omp_set_num_threads(4);
+    m_Threads->SetNumberOfThreads(4);
     Test_Odf5();
   }
 

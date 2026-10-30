@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkFiberBundle.h>
+#include <mitkOmpThreadGuard.h>
 #include <omp.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkEqual.h>
@@ -57,10 +58,11 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
 
   OdfVectorImgType::Pointer itk_odf_image;
   MaskImgType::Pointer itk_mask_image;
+  std::unique_ptr<mitk::OmpThreadGuard> m_Threads;  ///< 1 thread per case, restored in tearDown
 
   void setUp() override
   {
-    omp_set_num_threads(1);
+    m_Threads = std::make_unique<mitk::OmpThreadGuard>(1);
 
     mitk::Image::Pointer odf_image = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("qBallImage.qbi"));
     mitk::Image::Pointer mask_image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("diffusionImageMask.nrrd"));
@@ -87,7 +89,7 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
 
   void tearDown() override
   {
-
+    m_Threads.reset();
   }
 
   void CheckFibResult(std::string ref_file, mitk::FiberBundle::Pointer test_fib)
