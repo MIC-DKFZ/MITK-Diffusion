@@ -24,9 +24,11 @@ class mitkDiffusionMasksTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionMasksTestSuite);
   MITK_TEST(BinaryMaskPredicate_BinaryImagesAndSegmentations);
   MITK_TEST(SegmentationMaskPredicate_OnlySegmentations);
+  MITK_TEST(MaskPredicates_SingleSliceSegmentations_OneTimeStepOnly);
   MITK_TEST(GetMaskImage_Image_Unchanged);
   MITK_TEST(GetMaskImage_Segmentation_UnionOfAllLabelsOnItsGrid);
   MITK_TEST(GetMaskImage_SingleSliceSegmentation_ThreeDimensional);
+  MITK_TEST(GetMaskImage_SingleSliceSegmentationFromGeometry_ThreeDimensional);
   MITK_TEST(GetMaskImage_KeepLabelValues_LabelsOfLastGroupWhereOverlapping);
   MITK_TEST(GetMaskImage_OtherData_Null);
   CPPUNIT_TEST_SUITE_END();
@@ -102,6 +104,24 @@ public:
     CPPUNIT_ASSERT(!predicate->CheckNode(CreateNode(CreateImage())));
   }
 
+  /** The predicates offer exactly the segmentations GetMaskImage converts: one time step, also a
+   *  single slice, whose dimension MITK's NodePredicateDimension derives as 2. */
+  void MaskPredicates_SingleSliceSegmentations_OneTimeStepOnly()
+  {
+    auto fromGeometry = mitk::MultiLabelSegmentation::New();
+    fromGeometry->Initialize(CreateImage(1)->GetTimeGeometry());
+    auto twoTimeSteps = mitk::MultiLabelSegmentation::New();
+    twoTimeSteps->Initialize(CreateImage(2, 4));
+
+    for (const auto& predicate : {mitk::GetSegmentationMaskPredicate(), mitk::GetBinaryMaskPredicate()})
+    {
+      CPPUNIT_ASSERT(predicate->CheckNode(CreateNode(CreateSegmentation(1))));
+      CPPUNIT_ASSERT(predicate->CheckNode(CreateNode(fromGeometry)));
+      CPPUNIT_ASSERT(!predicate->CheckNode(CreateNode(twoTimeSteps)));
+    }
+    CPPUNIT_ASSERT_THROW(mitk::GetMaskImage(twoTimeSteps), mitk::Exception);
+  }
+
   void GetMaskImage_Image_Unchanged()
   {
     auto image = CreateImage();
@@ -142,6 +162,24 @@ public:
     mitk::ImagePixelReadAccessor<unsigned char, 3> accessor(mask);
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(1), accessor.GetPixelByIndex({{3, 2, 0}}));
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(0), accessor.GetPixelByIndex({{2, 2, 0}}));
+  }
+
+  void GetMaskImage_SingleSliceSegmentationFromGeometry_ThreeDimensional()
+  {
+    auto segmentation = mitk::MultiLabelSegmentation::New();
+    segmentation->Initialize(CreateImage(1)->GetTimeGeometry());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), segmentation->GetDimensions().size());
+    const auto* label = segmentation->AddLabel("a", mitk::Color(), 0);
+    SetLabel(segmentation, 0, {{3, 2, 0}}, label->GetValue());
+
+    auto mask = mitk::GetMaskImage(segmentation);
+    CPPUNIT_ASSERT_EQUAL(3u, mask->GetDimension());
+    CPPUNIT_ASSERT_EQUAL(4u, mask->GetDimension(0));
+    CPPUNIT_ASSERT_EQUAL(3u, mask->GetDimension(1));
+    CPPUNIT_ASSERT_EQUAL(1u, mask->GetDimension(2));
+    mitk::ImagePixelReadAccessor<unsigned char, 3> accessor(mask);
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(1), accessor.GetPixelByIndex({{3, 2, 0}}));
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned char>(0), accessor.GetPixelByIndex({{0, 0, 0}}));
   }
 
   void GetMaskImage_KeepLabelValues_LabelsOfLastGroupWhereOverlapping()

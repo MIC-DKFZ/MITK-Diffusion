@@ -23,7 +23,8 @@ namespace mitk
 {
   /**
    * \brief The masks the diffusion views offer in their mask selection boxes: 3D binary images
-   * and 3D multi-label segmentations, without helper objects.
+   * and 3D multi-label segmentations, without helper objects. A segmentation counts as 3D when it
+   * has one time step, also when it covers a single slice.
    *
    * A segmentation of current MITK is not an image and has no "binary" property, so a predicate
    * on "binary" alone hides it. GetMaskImage turns a selected node's data into the mask image.
