@@ -42,6 +42,7 @@ found in the LICENSE file.
 #include <vtkPolyData.h>
 #include <vtkSmartPointer.h>
 
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -67,6 +68,11 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Fiberfox_MotionVolumes_WarningsAndMovedVolumes);
   CPPUNIT_TEST(Fiberfox_SegmentationMaskAndRicianNoise_SignalInsideRequestedVariance);
   CPPUNIT_TEST(Fiberfox_OutputFolderWithDot_ImageParametersAndLogOfTheRun);
+  CPPUNIT_TEST(Fiberfox_InversionTimeNotBelowTr_MessageOnlyWithRelaxation);
+  CPPUNIT_TEST(Fiberfox_NoncentralChi_ChannelsRoundTripOldFileAndResult);
+  CPPUNIT_TEST(Fiberfox_KspacePhase_AutomaticByDefaultExactOnRequestRoundTrip);
+  CPPUNIT_TEST(Fiberfox_LineReadoutTime_StopsAtMinimum);
+  CPPUNIT_TEST(Fiberfox_BvalsBvecsFiles_MessagesAndTheDirectionsOfTheFile);
   CPPUNIT_TEST(Fiberfox_SaveLoadSave_IdenticalParameterFiles);
   CPPUNIT_TEST(Fiberfox_NonXmlParameterFile_Message);
   CPPUNIT_TEST(Generation_RandomPhantomMinAboveMax_MessageForEachRange);
@@ -687,6 +693,224 @@ public:
     auto result = Simulate(view, dwi);
     const auto saved = folder + result->GetName() + ".ffp";
     CPPUNIT_ASSERT_EQUAL_MESSAGE(saved, std::string("1"), Element(saved, "signalScale"));
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /** TI not below TR: with relaxation a message names both and no run starts; without relaxation the run works. */
+  void Fiberfox_InversionTimeNotBelowTr_MessageOnlyWithRelaxation()
+  {
+    auto *view = ShowFiberfox();
+    auto fibers = AddFibers(view);
+    auto *inversion = GetChild<QSpinBox>(view, "m_TIbox");
+    CPPUNIT_ASSERT(inversion->toolTip().contains("shorter than TR"));
+    inversion->setValue(5000);
+    GetChild<QCheckBox>(view, "m_RelaxationBox")->setChecked(true);
+    Start(view);
+    const auto message = OneMessage();
+    CPPUNIT_ASSERT_MESSAGE(message.toStdString(), message.contains("No image generated") && message.contains("TI (5000 ms)") && message.contains("TR (4000 ms)"));
+    CPPUNIT_ASSERT(!Running(view));
+    Wait(200);
+    CPPUNIT_ASSERT_EQUAL(0u, NumDerived(fibers));
+
+    GetChild<QCheckBox>(view, "m_RelaxationBox")->setChecked(false);
+    Simulate(view, fibers);
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /**
+   * Noncentral chi noise: offered, its channel count shown only for it; channel count and number of
+   * coils kept through save and load; a file of an earlier version with chi-square noise loads as
+   * noncentral chi with its number of coils; the result's name and properties name it.
+   */
+  void Fiberfox_NoncentralChi_ChannelsRoundTripOldFileAndResult()
+  {
+    auto *view = ShowFiberfox();
+    auto *distribution = GetChild<QComboBox>(view, "m_NoiseDistributionBox");
+    auto *channels = GetChild<QSpinBox>(view, "m_NoiseCoilsBox");
+    auto *channelsLabel = GetChild<QLabel>(view, "m_NoiseCoilsLabel");
+    auto *coils = GetChild<QSpinBox>(view, "m_NumCoilsBox");
+    CPPUNIT_ASSERT_EQUAL(QString("Noncentral chi"), distribution->itemText(2));
+    for (int index : {0, 1, 2, 0})
+    {
+      distribution->setCurrentIndex(index);
+      CPPUNIT_ASSERT_EQUAL(index == 2, !channels->isHidden());
+      CPPUNIT_ASSERT_EQUAL(index == 2, !channelsLabel->isHidden());
+    }
+    GetChild<QCheckBox>(view, "m_AddNoise")->setChecked(true);
+    GetChild<QDoubleSpinBox>(view, "m_NoiseLevel")->setValue(10);
+    distribution->setCurrentIndex(2);
+    channels->setValue(8);
+    coils->setValue(2);
+    const auto first = m_TempDir + "/chi.ffp";
+    SaveParameters(view, first);
+    distribution->setCurrentIndex(0);
+    channels->setValue(1);
+    coils->setValue(1);
+    LoadParameters(view, first);
+    CPPUNIT_ASSERT_EQUAL(2, distribution->currentIndex());
+    CPPUNIT_ASSERT_EQUAL(8, channels->value());
+    CPPUNIT_ASSERT_EQUAL(2, coils->value());
+    const auto second = m_TempDir + "/chi_again.ffp";
+    SaveParameters(view, second);
+    CPPUNIT_ASSERT_EQUAL(std::string("noncentralchi"), Element(second, "noisetype"));
+    CPPUNIT_ASSERT_EQUAL(std::string("8"), Element(second, "noisecoils"));
+    CPPUNIT_ASSERT_EQUAL(std::string("2"), Element(second, "numberofcoils"));
+
+    // chi-square of an earlier version: its noise type, no channel count of its own
+    auto text = Content(second);
+    text.replace(text.find("noncentralchi"), std::string("noncentralchi").size(), "chisquare");
+    const auto begin = text.find("<noisecoils>");
+    text.erase(begin, text.find("</noisecoils>") + std::string("</noisecoils>").size() - begin);
+    const auto old = m_TempDir + "/chisquare.ffp";
+    std::ofstream(old) << text;
+    channels->setValue(5);
+    LoadParameters(view, old);
+    CPPUNIT_ASSERT_EQUAL(2, distribution->currentIndex());
+    CPPUNIT_ASSERT_EQUAL(2, channels->value());
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+
+    auto fibers = AddFibers(view);
+    auto result = Simulate(view, fibers);
+    CPPUNIT_ASSERT_MESSAGE(result->GetName(), result->GetName().find("_NONCENTRAL-CHI-") != std::string::npos);
+    CPPUNIT_ASSERT_EQUAL(std::string("Noncentral chi"), StringProperty(result, "Fiberfox.Noise-Distribution"));
+    int resultChannels = 0;
+    CPPUNIT_ASSERT(result->GetIntProperty("Fiberfox.Noise-Channels", resultChannels));
+    CPPUNIT_ASSERT_EQUAL(2, resultChannels);
+  }
+
+  /**
+   * The k-space phase of distortions and eddy currents: automatic time segments by default, greyed
+   * out without distortions and eddy currents, a segment count only for fixed time segments, the
+   * exact sum on request, as the result property says; each choice saved and loaded, and a file
+   * of an earlier version loads as automatic without a warning about the key.
+   */
+  void Fiberfox_KspacePhase_AutomaticByDefaultExactOnRequestRoundTrip()
+  {
+    auto *view = ShowFiberfox();
+    auto *phase = GetChild<QComboBox>(view, "m_KspacePhaseBox");
+    auto *frame = GetChild<QWidget>(view, "m_KspacePhaseFrame");
+    auto *segments = GetChild<QSpinBox>(view, "m_KspaceTimeSegmentsBox");
+    auto *distortions = GetChild<QCheckBox>(view, "m_AddDistortions");
+    auto *eddy = GetChild<QCheckBox>(view, "m_AddEddy");
+    CPPUNIT_ASSERT_EQUAL(1, phase->currentIndex());
+    CPPUNIT_ASSERT_EQUAL(QString("Time Segments (automatic)"), phase->currentText());
+    CPPUNIT_ASSERT(!frame->isEnabled());
+    CPPUNIT_ASSERT(segments->isHidden());
+    distortions->setChecked(true);
+    CPPUNIT_ASSERT(frame->isEnabled());
+    distortions->setChecked(false);
+    CPPUNIT_ASSERT(!frame->isEnabled());
+    eddy->setChecked(true);
+    CPPUNIT_ASSERT(frame->isEnabled());
+    phase->setCurrentIndex(2);
+    CPPUNIT_ASSERT(!segments->isHidden());
+    CPPUNIT_ASSERT_EQUAL(32, segments->value());
+    CPPUNIT_ASSERT_EQUAL(1, segments->minimum());
+    CPPUNIT_ASSERT_EQUAL(10000, segments->maximum());
+    phase->setCurrentIndex(0);
+    CPPUNIT_ASSERT(segments->isHidden());
+
+    // eddy currents: the result names the phase
+    auto fibers = AddFibers(view);
+    for (const auto &[index, property] : {std::make_pair(1, std::string("Time segments (automatic)")), std::make_pair(0, std::string("Exact"))})
+    {
+      phase->setCurrentIndex(index);
+      auto result = Simulate(view, fibers);
+      CPPUNIT_ASSERT_EQUAL(property, StringProperty(result, "Fiberfox.Distortion-phase"));
+    }
+
+    const auto file = m_TempDir + "/phase.ffp";
+    for (const auto &[index, written] : {std::make_pair(2, std::string("12")), std::make_pair(0, std::string("0")), std::make_pair(1, std::string("-1"))})
+    {
+      phase->setCurrentIndex(index);
+      segments->setValue(12);
+      SaveParameters(view, file);
+      CPPUNIT_ASSERT_EQUAL(written, Element(file, "kspaceTimeSegments"));
+      phase->setCurrentIndex(index == 0 ? 2 : 0);
+      segments->setValue(5);
+      LoadParameters(view, file);
+      CPPUNIT_ASSERT_EQUAL(index, phase->currentIndex());
+      CPPUNIT_ASSERT_EQUAL(index == 2, !segments->isHidden());
+      if (index == 2)
+        CPPUNIT_ASSERT_EQUAL(12, segments->value());
+    }
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+
+    phase->setCurrentIndex(0);
+    SaveParameters(view, file);
+    LoadParameters(view, file);
+    CPPUNIT_ASSERT_EQUAL(0, phase->currentIndex());
+    LoadParameters(view, mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp"));
+    CPPUNIT_ASSERT_EQUAL(1, phase->currentIndex());
+    for (const auto &message : DialogHandler::Instance().TakeMessages())
+      CPPUNIT_ASSERT_MESSAGE(message.toStdString(), !message.contains("kspaceTimeSegments"));
+  }
+
+  /** The line readout time stops at 0.0001 ms; its tooltip gives the bandwidth. */
+  void Fiberfox_LineReadoutTime_StopsAtMinimum()
+  {
+    auto *view = ShowFiberfox();
+    auto *readout = GetChild<QDoubleSpinBox>(view, "m_LineReadoutTimeBox");
+    readout->setValue(0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0001, readout->value(), 1e-12);
+    CPPUNIT_ASSERT(readout->toolTip().startsWith("Bandwidth"));
+  }
+
+  /**
+   * "Use bvals/bvecs files" without files: a message on "Start Simulation" and on "Save
+   * Parameters". A .ffp copied without its .bvals/.bvecs files: the box unchecked and the run
+   * simulates the file's directions; a changed b-value gives the half shell again.
+   */
+  void Fiberfox_BvalsBvecsFiles_MessagesAndTheDirectionsOfTheFile()
+  {
+    auto *view = ShowFiberfox();
+    auto fibers = AddFibers(view);
+    auto *useFiles = GetChild<QCheckBox>(view, "m_UseBvalsBvecsBox");
+    useFiles->setChecked(true);
+    Start(view);
+    CPPUNIT_ASSERT(OneMessage().contains("No image generated"));
+    CPPUNIT_ASSERT(!Running(view));
+    const auto notSaved = m_TempDir + "/not_saved.ffp";
+    SaveParameters(view, notSaved);
+    CPPUNIT_ASSERT(OneMessage().contains("Parameter file not saved"));
+    CPPUNIT_ASSERT(!std::filesystem::exists(notSaved));
+
+    // a file with directions that are no half shell, without .bvals/.bvecs files
+    useFiles->setChecked(false);
+    const auto file = m_TempDir + "/directions.ffp";
+    SaveParameters(view, file);
+    std::filesystem::remove(file + ".bvals");
+    std::filesystem::remove(file + ".bvecs");
+    const std::vector<std::array<double, 3>> directions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.6, 0.8, 0}, {0.6, 0, 0.8}, {0, 0.6, 0.8}};
+    std::string gradients = "<gradients>";
+    for (std::size_t i = 0; i < directions.size(); ++i)
+    {
+      gradients += "<" + std::to_string(i) + "><x>" + std::to_string(directions[i][0]) + "</x><y>" + std::to_string(directions[i][1])
+                   + "</y><z>" + std::to_string(directions[i][2]) + "</z></" + std::to_string(i) + ">";
+    }
+    gradients += "</gradients>";
+    auto text = Content(file);
+    const auto begin = text.find("<gradients>");
+    text.replace(begin, text.find("</gradients>") + std::string("</gradients>").size() - begin, gradients);
+    std::ofstream(file) << text;
+
+    LoadParameters(view, file);
+    CPPUNIT_ASSERT(!useFiles->isChecked());
+    auto *image = ImageOf(Simulate(view, fibers));
+    // FSL bvecs of the identity geometry: the world vectors have x negated
+    auto world = mitk::DiffusionPropertyHelper::GetGradientContainer(image);
+    CPPUNIT_ASSERT_EQUAL(directions.size(), std::size_t(world->Size()));
+    for (std::size_t i = 0; i < directions.size(); ++i)
+    {
+      for (int c = 0; c < 3; ++c)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("gradient " + std::to_string(i), (c == 0 ? -1 : 1) * directions[i][c], world->ElementAt(i)[c], 1e-6);
+    }
+
+    GetChild<QSpinBox>(view, "m_BvalueBox")->setValue(2000);
+    image = ImageOf(Simulate(view, fibers));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2000.0, mitk::DiffusionPropertyHelper::GetReferenceBValue(image), 1e-6);
+    world = mitk::DiffusionPropertyHelper::GetGradientContainer(image);
+    CPPUNIT_ASSERT(std::abs(std::abs(world->ElementAt(1)[0]) - 1) > 1e-3);
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 
