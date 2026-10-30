@@ -35,8 +35,8 @@ set(H_FILES
   SignalModels/mitkDiffusionNoiseModel.h
   SignalModels/mitkRicianNoiseModel.h
   SignalModels/mitkRicianNoiseModel.txx
-  SignalModels/mitkChiSquareNoiseModel.h
-  SignalModels/mitkChiSquareNoiseModel.txx
+  SignalModels/mitkNoncentralChiNoiseModel.h
+  SignalModels/mitkNoncentralChiNoiseModel.txx
 
   Sequences/mitkAcquisitionType.h
   Sequences/mitkSingleShotEpi.h

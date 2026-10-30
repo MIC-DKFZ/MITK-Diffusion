@@ -198,7 +198,11 @@ Facts the layout does not show:
 - `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
   `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
   `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and
-  `SetGradientsFromImage` stores a DWI's gradients in that form. With a constant seed
+  `SetGradientsFromImage` stores a DWI's gradients in that form. Noise is complex Gaussian in
+  k-space, or a noise model on the magnitude image: Rician or noncentral chi (`.ffp`
+  `artifacts.noisetype` `noncentralchi` with `artifacts.noisecoils`; the `chisquare` type of earlier
+  files is read as noncentral chi with the file's `numberofcoils`). An inversion time must be
+  shorter than TR (`CheckInversionTime`). With a constant seed
   (`SetUseConstantRandSeed`, `MitkFiberfox --fix_seed`) a simulation gives the same image at any
   number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`). Fiberfox references in the
   test data depend on the random engines and seeds, so a change there is checked bit for bit

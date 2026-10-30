@@ -49,7 +49,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QFileDialog>
 #include <QMessageBox>
 #include "usModuleRegistry.h"
-#include <mitkChiSquareNoiseModel.h>
+#include <mitkNoncentralChiNoiseModel.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkIOUtil.h>
 #include <QScrollBar>
@@ -909,9 +909,12 @@ void QmitkFiberfoxView::UpdateParametersFromGui()
     {
       if (m_Parameters.m_SignalGen.m_NoiseVariance>0)
       {
-        m_Parameters.m_NoiseModel = std::make_shared< mitk::ChiSquareNoiseModel<mitk::ScalarType> >();
-        m_Parameters.m_Misc.m_ArtifactModelString += "_CHISQUARED-";
-        m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Noise-Distribution", mitk::StringProperty::New("Chi-squared"));
+        // the magnitude noise of the "Number of Channels" coils, without simulating each coil
+        auto chi = std::make_shared< mitk::NoncentralChiNoiseModel<mitk::ScalarType> >();
+        chi->SetNumberOfCoils(m_Parameters.m_SignalGen.m_NumberOfCoils);
+        m_Parameters.m_NoiseModel = chi;
+        m_Parameters.m_Misc.m_ArtifactModelString += "_NONCENTRAL-CHI-";
+        m_Parameters.m_Misc.m_ResultNode->AddProperty("Fiberfox.Noise-Distribution", mitk::StringProperty::New("Noncentral chi"));
         m_Parameters.m_NoiseModel->SetNoiseVariance(m_Parameters.m_SignalGen.m_NoiseVariance);
       }
       break;
@@ -1435,13 +1438,17 @@ void QmitkFiberfoxView::LoadParameters()
     m_LoadedBvalue = m_Parameters.m_SignalGen.GetBvalue();
   }
 
-  // m_NoiseDistributionBox offers 0 "Complex Gaussian" (no noise model) and 1 "Rician"
+  // m_NoiseDistributionBox offers 0 "Complex Gaussian" (no noise model), 1 "Rician" and 2 "Noncentral chi"
   if (m_Parameters.m_NoiseModel!=nullptr)
   {
     m_Controls->m_AddNoise->setChecked(m_Parameters.m_Misc.m_DoAddNoise);
     m_Controls->m_NoiseDistributionBox->setCurrentIndex(1);
-    if (dynamic_cast<mitk::ChiSquareNoiseModel<double>*>(m_Parameters.m_NoiseModel.get()))
-      QMessageBox::information(nullptr, "Noise distribution", "The parameter file uses chi-square noise, which this view does not offer. Rician noise is selected instead.");
+    if (auto chi = dynamic_cast<mitk::NoncentralChiNoiseModel<double>*>(m_Parameters.m_NoiseModel.get()))
+    {
+      // the view takes the coil count of the noise from "Number of Channels"
+      m_Controls->m_NoiseDistributionBox->setCurrentIndex(2);
+      m_Controls->m_NumCoilsBox->setValue(chi->GetNumberOfCoils());
+    }
     m_Controls->m_NoiseLevel->setValue(m_Parameters.m_NoiseModel->GetNoiseVariance());
   }
   else
