@@ -9,6 +9,11 @@ if(TARGET MitkFiberBundle AND TARGET MitkDiffusionModelling)
   if(TARGET ${TESTDRIVER})
     # The apps are built into the folder of the test driver.
     target_compile_definitions(${TESTDRIVER} PRIVATE "MITK_DIFFUSION_CMDAPP_DIR=\"$<TARGET_FILE_DIR:${TESTDRIVER}>\"")
+    # Building the driver builds the apps, so the tests never run stale app binaries.
+    get_property(_cmdapps GLOBAL PROPERTY MITK_DIFFUSION_CMDAPP_TARGETS)
+    if(_cmdapps)
+      add_dependencies(${TESTDRIVER} ${_cmdapps})
+    endif()
     # The driver loads diffusion files (tensor, SH, peaks) without using symbols of every reader's
     # module, as the apps do.
     if(UNIX AND NOT APPLE)

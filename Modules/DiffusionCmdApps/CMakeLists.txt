@@ -43,6 +43,11 @@ function(mitk_diffusion_create_cmdapps)
     if(TARGET ${MITK_MODULE_NAME_PREFIX}${_app_name} AND UNIX AND NOT APPLE)
       target_link_options(${MITK_MODULE_NAME_PREFIX}${_app_name} PRIVATE "LINKER:--no-as-needed")
     endif()
+
+    # The smoke tests in Testing/ run the apps as processes; their driver depends on them.
+    if(TARGET ${MITK_MODULE_NAME_PREFIX}${_app_name})
+      set_property(GLOBAL APPEND PROPERTY MITK_DIFFUSION_CMDAPP_TARGETS ${MITK_MODULE_NAME_PREFIX}${_app_name})
+    endif()
   endforeach()
 endfunction()
 
