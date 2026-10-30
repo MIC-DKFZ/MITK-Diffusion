@@ -10,5 +10,7 @@ MITK_CREATE_MODULE(
 )
 
 add_subdirectory(Testing)
+# Opens a file of every diffusion type without linking a diffusion module, as the Workbench does.
+add_subdirectory(Testing/WorkbenchReaders)
 
 endif()
