@@ -9,6 +9,7 @@ set(MITK_USE_Python3 ON CACHE BOOL "" FORCE)
 set(MITK_USE_pybind11 ON CACHE BOOL "" FORCE)
 
 # modules
+set(BUILD_MODULE_DiffusionMasks ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration ON CACHE BOOL "" FORCE)
