@@ -34,6 +34,7 @@ found in the LICENSE file.
 #include <QSpinBox>
 #include <QTextEdit>
 
+#include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkVectorImage.h>
 
 #include <vtkCellArray.h>
@@ -63,6 +64,8 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Fiberfox_FourCompartmentsAndMultiShellPrototype_MessagesThenRuns);
   CPPUNIT_TEST(Fiberfox_CompartmentModels_ShownAsSavedAfterLoad);
   CPPUNIT_TEST(Fiberfox_PrototypeSignal_SavedSampledAndReused);
+  CPPUNIT_TEST(Fiberfox_MotionVolumes_WarningsAndMovedVolumes);
+  CPPUNIT_TEST(Fiberfox_SegmentationMaskAndRicianNoise_SignalInsideRequestedVariance);
   CPPUNIT_TEST(Fiberfox_SaveLoadSave_IdenticalParameterFiles);
   CPPUNIT_TEST(Fiberfox_NonXmlParameterFile_Message);
   CPPUNIT_TEST(Generation_RandomPhantomMinAboveMax_MessageForEachRange);
@@ -511,6 +514,123 @@ public:
     Start(view);
     CPPUNIT_ASSERT(OneMessage().contains("Prototype signal but no diffusion-weighted image selected"));
     CPPUNIT_ASSERT(!Running(view));
+  }
+
+  /**
+   * Motion volumes: "abc" and "1 -2" give a warning and move nothing; a run lists the volumes it
+   * moved in the parameters saved next to its image, and the head motion log is in the status text.
+   * "random" never moves volume 0.
+   */
+  void Fiberfox_MotionVolumes_WarningsAndMovedVolumes()
+  {
+    auto *view = ShowFiberfox();
+    auto fibers = AddFibers(view);
+    GetChild<QCheckBox>(view, "m_AddMotion")->setChecked(true);
+    auto *volumes = GetChild<QLineEdit>(view, "m_MotionVolumesBox");
+    for (const char *text : {"abc", "1 -2"})
+    {
+      volumes->setText(text);
+      SaveParameters(view, m_TempDir + "/motion.ffp");
+      CPPUNIT_ASSERT_MESSAGE(text, OneMessage().contains("Cannot read the motion volumes"));
+    }
+
+    GetChild<QLineEdit>(view, "m_SavePathEdit")->setText(QString::fromStdString(m_TempDir + "/"));
+    const auto saved = m_TempDir + "/b1000_StickBall_MOTION.ffp";
+    const std::vector<std::pair<const char *, std::string>> expected = {
+      {"0 3 7", "0 3"}, {"-0 -3", "1 2 4 5 6"}, {"", "0 1 2 3 4 5 6"}, {"  ", "0 1 2 3 4 5 6"}};
+    for (const auto &[text, moved] : expected)
+    {
+      volumes->setText(text);
+      auto result = Simulate(view, fibers);
+      CPPUNIT_ASSERT_EQUAL(std::string("b1000_StickBall_MOTION"), result->GetName());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(text, moved, Element(saved, "motionvolumes"));
+      CPPUNIT_ASSERT(StatusText(view).contains("Head motion log"));
+    }
+    volumes->setText("random");
+    for (int run = 0; run < 2; ++run)
+    {
+      Simulate(view, fibers);
+      const auto moved = QString::fromStdString(Element(saved, "motionvolumes")).split(' ', Qt::SkipEmptyParts);
+      // without a moved volume the file switches motion off and keeps "random"
+      if (moved == QStringList{"random"})
+        CPPUNIT_ASSERT_EQUAL(std::string("false"), Element(saved, "doAddMotion"));
+      else
+        CPPUNIT_ASSERT_MESSAGE(Element(saved, "motionvolumes"), !moved.contains("0"));
+    }
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /**
+   * A segmentation with two labels in two groups as tissue mask: offered, also one of one slice;
+   * the signal is simulated inside the union of the labels only. Rician noise: saved and loaded,
+   * and with relaxation (k-space step) the background has the requested variance, not twice it.
+   */
+  void Fiberfox_SegmentationMaskAndRicianNoise_SignalInsideRequestedVariance()
+  {
+    auto *view = ShowFiberfox();
+    auto reference = mitk::Image::New();
+    unsigned int size[] = {16, 16, 2};
+    reference->Initialize(mitk::MakeScalarPixelType<unsigned char>(), 3, size);
+    mitk::Vector3D spacing;
+    spacing.Fill(2.0);
+    reference->SetSpacing(spacing);
+    mitk::Point3D origin;
+    origin.Fill(1.0);
+    reference->SetOrigin(origin);
+    auto tissue = AddNode(CreateSegmentation(reference, {{1, 0, [](const itk::Index<3> &i) { return i[0] < 4; }},
+                                                         {4, 1, [](const itk::Index<3> &i) { return i[0] >= 4 && i[0] < 8; }}}),
+                          "Tissue");
+    unsigned int sliceSize[] = {16, 16, 1};
+    auto slice = mitk::Image::New();
+    slice->Initialize(mitk::MakeScalarPixelType<unsigned char>(), 3, sliceSize);
+    auto oneSlice = AddNode(CreateSegmentation(slice, {{1, 0, [](const itk::Index<3> &i) { return i[0] < 4; }}}), "One slice");
+    CPPUNIT_ASSERT(BoxOffers(view, "m_MaskComboBox", oneSlice));
+    ChooseNode(view, "m_MaskComboBox", tissue);
+    auto fibers = AddFibers(view);
+
+    auto result = Simulate(view, fibers);
+    auto dwi = ItkImageOf(result);
+    CPPUNIT_ASSERT_EQUAL(itk::SizeValueType(16), dwi->GetLargestPossibleRegion().GetSize(0));
+    for (itk::ImageRegionConstIteratorWithIndex<ItkDwi> it(dwi, dwi->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+    {
+      const auto pixel = it.Get();
+      const bool inside = it.GetIndex()[0] < 8;
+      for (unsigned int v = 0; v < pixel.Size(); ++v)
+      {
+        CPPUNIT_ASSERT_MESSAGE("voxel " + std::to_string(it.GetIndex()[0]), inside ? pixel[0] > 0 : pixel[v] == 0);
+      }
+    }
+
+    GetChild<QCheckBox>(view, "m_AddNoise")->setChecked(true);
+    auto *distribution = GetChild<QComboBox>(view, "m_NoiseDistributionBox");
+    auto *level = GetChild<QDoubleSpinBox>(view, "m_NoiseLevel");
+    distribution->setCurrentIndex(1);
+    level->setValue(100);
+    const auto file = m_TempDir + "/rician.ffp";
+    SaveParameters(view, file);
+    distribution->setCurrentIndex(0);
+    level->setValue(5);
+    LoadParameters(view, file);
+    CPPUNIT_ASSERT_EQUAL(1, distribution->currentIndex());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(100.0, level->value(), 1e-9);
+    CPPUNIT_ASSERT_EQUAL(std::string("rice"), Element(file, "noisetype"));
+
+    // The magnitude of complex noise of variance 100 per component: mean square 200 in the
+    // background (columns 12 to 15, outside the mask, beyond the phase-encoding blur of relaxation).
+    GetChild<QCheckBox>(view, "m_RelaxationBox")->setChecked(true);
+    auto noisy = ItkImageOf(Simulate(view, fibers));
+    double sum = 0;
+    unsigned int count = 0;
+    for (itk::ImageRegionConstIteratorWithIndex<ItkDwi> it(noisy, noisy->GetLargestPossibleRegion()); !it.IsAtEnd(); ++it)
+    {
+      if (it.GetIndex()[0] < 12)
+        continue;
+      for (unsigned int v = 0; v < it.Get().Size(); ++v, ++count)
+        sum += double(it.Get()[v]) * it.Get()[v];
+    }
+    CPPUNIT_ASSERT(count > 800);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("mean square " + std::to_string(sum / count), 200.0, sum / count, 40.0);
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 
   void Fiberfox_SaveLoadSave_IdenticalParameterFiles()
