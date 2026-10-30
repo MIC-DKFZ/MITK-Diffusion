@@ -754,7 +754,8 @@ namespace itk {
         m_TimeSegmentsCapped = true;
         return;
       }
-      memoryShare.Resize(memory(numSegments));
+      // the estimate rounded up to whole bytes, which the budget counts in
+      memoryShare.Resize(static_cast<std::uint64_t>(std::ceil(memory(numSegments))));
 
       // segment times: the ticks whose accumulated phase is closest to L values evenly spaced over the readout
       segmentV.clear();

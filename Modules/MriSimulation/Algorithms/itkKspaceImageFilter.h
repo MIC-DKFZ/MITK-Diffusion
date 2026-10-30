@@ -28,6 +28,7 @@ This file is based heavily on a corresponding ITK filter.
 #include <condition_variable>
 #include <algorithm>
 #include <memory>
+#include <cstdint>
 #include <complex>
 #include <array>
 #include <vnl/vnl_matrix.h>
@@ -40,15 +41,18 @@ namespace itk{
 
   /**
    * Memory of the time segments (KspaceImageFilter) shared by the slice jobs of a simulation
-   * (TractsToDWIImageFilter). A job holds the memory its time segments need while it builds them and
-   * waits until that much is free, so the budget bounds the memory of all jobs together. Waiting changes
+   * (TractsToDWIImageFilter). A job holds the estimated memory of its time segments while it builds them
+   * and waits until that much is free, so the budget bounds the memory of the time segments of all jobs
+   * together; the other arrays of a job, built before it asks and kept while it waits, are not counted.
+   * The bytes are whole numbers, so that every release restores the free amount exactly (fractional
+   * amounts drift, and a request of the whole budget would then wait for good). Waiting changes
    * only when a job runs, never its result: whether a slice takes the time segments is decided by a
    * limit per slice (KspaceImageFilter::MAX_TIME_SEGMENT_BYTES), not by the jobs running at the time.
    */
   class TimeSegmentMemoryBudget
   {
   public:
-    explicit TimeSegmentMemoryBudget(double bytes) : m_Total(bytes), m_Free(bytes) {}
+    explicit TimeSegmentMemoryBudget(std::uint64_t bytes) : m_Total(bytes), m_Free(bytes) {}
 
     /** The bytes of a budget one job holds; released when destroyed. Without a budget it holds nothing. */
     class Share
@@ -63,18 +67,18 @@ namespace itk{
        * held so far. These are released before the job waits, so no job waits while holding memory and
        * the jobs cannot block each other for good.
        */
-      void Resize(double bytes)
+      void Resize(std::uint64_t bytes)
       {
         if (m_Budget != nullptr)
           m_Held = m_Budget->Exchange(m_Held, bytes);
       }
     private:
       TimeSegmentMemoryBudget* m_Budget;
-      double m_Held = 0;
+      std::uint64_t m_Held = 0;
     };
 
   private:
-    double Exchange(double held, double bytes)
+    std::uint64_t Exchange(std::uint64_t held, std::uint64_t bytes)
     {
       std::unique_lock<std::mutex> lock(m_Mutex);
       m_Free += held;
@@ -85,8 +89,8 @@ namespace itk{
       return bytes;
     }
 
-    const double m_Total;
-    double m_Free;
+    const std::uint64_t m_Total;
+    std::uint64_t m_Free;
     std::mutex m_Mutex;
     std::condition_variable m_Changed;
   };
@@ -150,7 +154,7 @@ namespace itk{
      */
     static constexpr double MAX_TIME_SEGMENT_BYTES = 256.0*1024*1024;
     /** Memory of the time segments of all slice jobs of a simulation together (TimeSegmentMemoryBudget of TractsToDWIImageFilter). */
-    static constexpr double TIME_SEGMENT_MEMORY_BUDGET = 2.0*1024*1024*1024;
+    static constexpr std::uint64_t TIME_SEGMENT_MEMORY_BUDGET = std::uint64_t(2)*1024*1024*1024;
     /** Memory limit of the time segments of this filter's slice; MAX_TIME_SEGMENT_BYTES by default. */
     itkSetMacro( MaxTimeSegmentBytes, double )
     itkGetConstMacro( MaxTimeSegmentBytes, double )

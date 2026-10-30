@@ -235,7 +235,7 @@ public:
   }
 
   /** Acquires the input image at the given OpenMP threads with a constant seed; a memory budget of the time segments if budget > 0. */
-  FilterType::Pointer AcquireInputImage(const mitk::FiberfoxParameters& parameters, DwiType* image, int threads, double budget = 0)
+  FilterType::Pointer AcquireInputImage(const mitk::FiberfoxParameters& parameters, DwiType* image, int threads, std::uint64_t budget = 0)
   {
     m_Threads->SetNumberOfThreads(threads);
     auto filter = FilterType::New();
@@ -288,7 +288,7 @@ public:
   {
     DwiType::Pointer image;
     const auto parameters = TimeSegmentCase(32, 1, 8, image);
-    const double budget = 1024.0 * 1024;
+    const std::uint64_t budget = 1024 * 1024;
     auto reference = AcquireInputImage(parameters, image, 1, budget);
     auto test = AcquireInputImage(parameters, image, 8, budget);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("output at 8 threads equals the 1-thread output", 0ul, CountDifferences<DwiType>(test->GetOutput(), reference->GetOutput()));

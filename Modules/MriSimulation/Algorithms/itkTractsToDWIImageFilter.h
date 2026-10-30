@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVnlForwardFFTImageFilter.h>
 #include <itkVectorImage.h>
 #include <cmath>
+#include <cstdint>
 #include <atomic>
 #include <mitkFiberfoxParameters.h>
 #include <mitkRawShModel.h>
@@ -71,7 +72,7 @@ public:
     itkSetMacro( InputImage, typename OutputImageType::Pointer )     ///< Input diffusion-weighted image. If no fiber bundle is set, then the acquisition is simulated for this image without a new diffusion simulation.
     itkSetMacro( UseConstantRandSeed, bool )                ///< Seed for random generator.
     /** Memory of the time segments of all k-space slice jobs together, which they wait for (TimeSegmentMemoryBudget); KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET by default (tests set less). */
-    itkSetMacro( TimeSegmentMemoryBudget, double )
+    itkSetMacro( TimeSegmentMemoryBudget, std::uint64_t )
     void SetParameters( mitk::FiberfoxParameters param )  ///< Simulation parameters.
     { m_Parameters = param; }
 
@@ -226,7 +227,7 @@ protected:
 
     // MISC
     bool                                        m_UseConstantRandSeed;
-    double                                      m_TimeSegmentMemoryBudget;
+    std::uint64_t                               m_TimeSegmentMemoryBudget;
     bool                                        m_MaskImageSet;
     std::string                                 m_MotionLog;
     std::string                                 m_SpikeLog;
