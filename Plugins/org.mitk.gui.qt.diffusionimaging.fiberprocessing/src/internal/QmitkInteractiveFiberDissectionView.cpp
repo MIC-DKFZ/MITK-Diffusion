@@ -17,74 +17,21 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 
 // Blueberry
-#include <berryISelectionService.h>
 #include <berryIWorkbenchPart.h>
-#include <berryIWorkbenchWindow.h>
 
 // Qmitk
 #include "QmitkInteractiveFiberDissectionView.h"
-//#include "QmitkStreamlineTrackingView.h"
 
 #include <QMessageBox>
 
-#include <mitkImageCast.h>
-#include <mitkPointSet.h>
-#include <mitkImageAccessByItk.h>
-#include <mitkDataNodeObject.h>
-#include <mitkTensorImage.h>
 #include <mitkNodePredicateDataType.h>
-#include <mitkNodePredicateProperty.h>
-#include <mitkNodePredicateAnd.h>
-#include <mitkNodePredicateNot.h>
-#include <mitkNodePredicateOr.h>
-#include <mitkPlanarCircle.h>
-#include <mitkSurface.h>
-#include <mitkStatisticModel.h>
-#include <vtkSphereSource.h>
-#include <vtkProperty.h>
-#include <vtkPolyDataMapper.h>
-//#include <mitkPlanarFigureInteractor.h>
-//#include <mitkStreamlineFeatureExtractor.h>
-
-#include <mitkInteractionConst.h>
+#include <mitkRenderingManager.h>
+#include <vtkFloatArray.h>
 #include "usModuleRegistry.h"
-//#include <itkFiberCurvatureFilter.h>
 
-
-#include <itkResampleImageFilter.h>
-#include <itkGaussianInterpolateImageFunction.h>
-#include <itkImageRegionIteratorWithIndex.h>
-#include <itkTractsToFiberEndingsImageFilter.h>
-#include <itkTractDensityImageFilter.h>
-#include <itkImageRegion.h>
-#include <itkTractsToRgbaImageFilter.h>
-#include <itkFiberExtractionFilter.h>
-
-#include <mitkInteractionEventObserver.h>
-#include <vtkCellPicker.h>
-
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
-
-#include <vnl/vnl_sparse_matrix.h>
 #include <numeric>
 #include <random>
 #include <stdexcept>
-
-#include <thread>
-
-#include <QmitkStdMultiWidget.h>
-
-#include <mitkBaseRenderer.h>
-#include <mitkRenderingManager.h>
-#include <mitkVtkPropRenderer.h>
-#include <mitkInteractionConst.h>
-#include <mitkInteractionPositionEvent.h>
-#include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
-#include <QFileDialog>
 
 const std::string QmitkInteractiveFiberDissectionView::VIEW_ID = "org.mitk.views.interactivefiberdissection";
 const std::string id_DataManager = "org.mitk.views.datamanager";
@@ -93,10 +40,7 @@ using namespace mitk;
 QmitkInteractiveFiberDissectionView::QmitkInteractiveFiberDissectionView()
   : QmitkAbstractView()
   , m_Controls( 0 )
-  , m_IterationCounter(0)
-  , m_RandomExtractionCounter(0)
   , m_activeCycleCounter(0)
-  , m_createdStreamlineCounter(0)
   , m_prototypecounter(0)
   , m_posOffsetcounter(0)
   , m_init_subset(0)
@@ -320,11 +264,6 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   enable(classifierexist, {m_Controls->m_add_annotations, m_Controls->m_add_annotations_2});
 }
 
-void QmitkInteractiveFiberDissectionView::OnEndInteraction()
-{
-
-}
-
 namespace
 {
   mitk::FiberBundle::Pointer GetBundle(const mitk::DataNode *node)
@@ -408,22 +347,9 @@ void QmitkInteractiveFiberDissectionView::OnSelectionChanged(berry::IWorkbenchPa
 
     m_SelectedFB.clear();
 
-    if (nodes.empty() || nodes.front().IsNull())
-    {
-      m_SelectedImageNode = nullptr;
-    }
-    else
-    {
-      m_SelectedImageNode = nodes.front();
-    }
-
-
-
     for (auto node: nodes)
     {
-      if (dynamic_cast<mitk::Image*>(node->GetData()))
-          m_SelectedImage = dynamic_cast<mitk::Image*>(node->GetData());
-      else if ( dynamic_cast<mitk::FiberBundle*>(node->GetData()) )
+      if ( dynamic_cast<mitk::FiberBundle*>(node->GetData()) )
           m_SelectedFB.push_back(node);
     }
 
@@ -707,7 +633,6 @@ void QmitkInteractiveFiberDissectionView::ExtractRandomFibersFromTractogram()
       this->GetDataStorage()->Add(m_positiveBundleNode);
     }
 
-    m_RandomExtractionCounter++;
     m_Controls->m_BrushButton->setEnabled(true);
     m_Controls->m_BrushButton->setChecked(true);
 
@@ -1030,10 +955,7 @@ void QmitkInteractiveFiberDissectionView::CreateUncertantyMap()
 
 void QmitkInteractiveFiberDissectionView::ResetClassifier()
 {
-    m_IterationCounter = 0;
-    m_RandomExtractionCounter = 0;
     m_activeCycleCounter = 0;
-    m_createdStreamlineCounter = 0;
     m_prototypecounter = 0;
     m_uncCounter = 0;
 
@@ -1101,9 +1023,6 @@ void QmitkInteractiveFiberDissectionView::addGeneralizationBundles(bool reset)
       QMessageBox::warning(nullptr, "Generalization", e.what());
       return;
     }
-    m_negativeGenBundle = GetBundle(m_negativeGenBundleNode);
-    m_positiveGenBundle = GetBundle(m_positiveGenBundleNode);
-
     if (m_PredictionNode.IsNotNull())
       m_PredictionNode->SetVisibility(false);
 
@@ -1209,11 +1128,9 @@ void QmitkInteractiveFiberDissectionView::AddSavedGeneralizationBundle(const mit
 void QmitkInteractiveFiberDissectionView::addGeneralizationSavedPosBundles()
 {
     this->AddSavedGeneralizationBundle(m_Controls->m_posGenBundleBox->GetSelectedNode(), m_positiveGenBundleNode, "+BundleGen", 0, 255, 0);
-    m_positiveGenBundle = GetBundle(m_positiveGenBundleNode);
 }
 
 void QmitkInteractiveFiberDissectionView::addGeneralizationSavedNegBundles()
 {
     this->AddSavedGeneralizationBundle(m_Controls->m_negGenBundleBox->GetSelectedNode(), m_negativeGenBundleNode, "-BundleGen", 255, 0, 0);
-    m_negativeGenBundle = GetBundle(m_negativeGenBundleNode);
 }
