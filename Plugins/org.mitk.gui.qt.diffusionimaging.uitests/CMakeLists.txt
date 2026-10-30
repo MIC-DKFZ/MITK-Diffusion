@@ -77,7 +77,8 @@ function(mitk_diffusion_add_ui_test suite plugin)
   set_tests_properties(mitkDiffusionViewsUiTest_${suite} PROPERTIES
     ENVIRONMENT "${_environment}"
     SKIP_RETURN_CODE 77
-    TIMEOUT 600
+    # The longest suite (Tractography) takes about 100 s in Debug; a hang ends after 300 s.
+    TIMEOUT 300
   )
 endfunction()
 
