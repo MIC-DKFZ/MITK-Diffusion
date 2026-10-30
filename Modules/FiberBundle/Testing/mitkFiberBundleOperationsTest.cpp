@@ -17,6 +17,7 @@ found in the LICENSE file.
 #include <mitkPlanarFigureComposite.h>
 #include <mitkStandaloneDataStorage.h>
 #include <mitkDiffusionTestData.h>
+#include <mitkOmpThreadGuard.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
@@ -41,6 +42,7 @@ found in the LICENSE file.
 #include <map>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -50,15 +52,18 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkFiberBundleOperationsTestSuite);
   MITK_TEST(ExtractFiberIdSubset_NotWithOverlappingChildren_EqualsSetDifference);
   MITK_TEST(RemoveFibersOutside_MaskMissesAllFibers_ReturnsEmptyBundle);
+  MITK_TEST(RemoveFibersOutside_SegmentsCrossingTheMask_CutAtTheMaskBorder);
   MITK_TEST(ExtractFiberSubset_RoiIsNoPlanarFigure_Throws);
   MITK_TEST(Weights_RemovingOrSplittingFibers_FollowTheirFibers);
   MITK_TEST(CompressAndSubtract_EightThreads_EqualOneThread);
+  MITK_TEST(OmpThreadGuard_FailingCase_RestoresThreadCount);
   MITK_TEST(SubsampleFibers_WithoutRandomSeed_IsReproducible);
   MITK_TEST(ResampleToNumPoints_FibersWithoutLength_Terminate);
   MITK_TEST(DerivedBundles_KeepRasFlagAndHeader);
   MITK_TEST(ApplyCurvatureThreshold_KeepsTwoPointFibersAndNoSinglePoints);
   MITK_TEST(TransformFibers_NoTransform_Throws);
   MITK_TEST(SetFiberPolyData_LeavesOldPolyDataAndPointDataBehind);
+  MITK_TEST(SetFiberPolyData_EqualFiberCount_NewFibersGetWeightOne);
   MITK_TEST(SetSingleFiberColor_UsesRgbOrder);
   MITK_TEST(SetFiberColors_ChecksTheArray);
   MITK_TEST(ColorFibersByOrientation_OnePointFibers_GetColours);
@@ -81,6 +86,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ResampleLinear_SyntheticFibers_EqualChordSpacingOnTheFiber);
   MITK_TEST(ResampleSpline_StraightFiber_PointsOnTheLine);
   MITK_TEST(ResampleToNumPoints_StraightFiber_EqualSpacing);
+  MITK_TEST(ResampleToNumPoints_CurvedFibers_EqualArcLengthSpacing);
   MITK_TEST(Compress_SyntheticFibers_RemovesOnlyPointsWithinTheError);
   MITK_TEST(ApplyCurvatureThreshold_CircularArc_RadiusDecides);
   MITK_TEST(ColorFibersByOrientation_ThreePointFiber_SegmentDirections);
@@ -88,7 +94,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(TransformFibers_ItkTransform_MovesEveryPoint);
   MITK_TEST(ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat);
   MITK_TEST(TrackVisHeader_JoinedAndMovedBundles_ContainEveryPoint);
-  MITK_TEST(Weights_OnePointFibersChangingPlace_FollowTheirFibers);
+  MITK_TEST(Weights_OnePointFibers_KeepPlaceAndWeight);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -218,6 +224,80 @@ public:
     CPPUNIT_ASSERT_EQUAL(fib->GetNumFibers(), outside->GetNumFibers());
   }
 
+  /** Points of fiber i of fib */
+  static std::vector<std::array<double, 3>> FiberPoints(mitk::FiberBundle *fib, unsigned int i)
+  {
+    vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+    std::vector<std::array<double, 3>> points;
+    for (vtkIdType j = 0; j < cell->GetNumberOfPoints(); ++j)
+    {
+      double p[3];
+      cell->GetPoints()->GetPoint(j, p);
+      points.push_back({p[0], p[1], p[2]});
+    }
+    return points;
+  }
+
+  static void AssertPiece(mitk::FiberBundle *fib, unsigned int i, const std::array<double, 3> &first, const std::array<double, 3> &last,
+                          std::size_t numPoints, float weight, const std::string &message)
+  {
+    const auto points = FiberPoints(fib, i);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ": number of points", numPoints, points.size());
+    for (int c = 0; c < 3; ++c)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": first point", first[c], points.front()[c], 1e-5);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": last point", last[c], points.back()[c], 1e-5);
+    }
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ": weight", weight, fib->GetFiberWeight(i));
+  }
+
+  // #1: the cut tested only the fiber points, so a segment that crosses the mask without a point
+  // inside it was dropped by "remove outside" and kept whole by "remove inside", and the kept
+  // pieces ended at their last point on the kept side instead of at the mask border.
+  void RemoveFibersOutside_SegmentsCrossingTheMask_CutAtTheMaskBorder()
+  {
+    // 10 x 10 x 10 voxels of 1 mm, origin 0, set where the x index is 4 or 5: x from 3.5 to 5.5 mm
+    auto mask = mitk::FiberBundle::ItkUcharImgType::New();
+    mitk::FiberBundle::ItkUcharImgType::RegionType region;
+    region.SetSize({{10, 10, 10}});
+    mask->SetRegions(region);
+    mask->Allocate();
+    mask->FillBuffer(0);
+    for (itk::IndexValueType y = 0; y < 10; ++y)
+      for (itk::IndexValueType z = 0; z < 10; ++z)
+      {
+        mask->SetPixel({{4, y, z}}, 1);
+        mask->SetPixel({{5, y, z}}, 1);
+      }
+
+    // A: two points, both outside the mask; B: the same line in steps of 0.5 mm; C: inside the
+    // mask, across several voxel borders; D: diagonal in the x-y plane, both points outside.
+    std::vector<std::array<double, 3>> fiberB;
+    for (int j = 0; j <= 18; ++j)
+      fiberB.push_back({0.5 * j, 5, 5});
+    const std::vector<std::array<double, 3>> fiberC = {{3.6, 1, 1}, {4.2, 3.3, 2}, {5.4, 8, 8.7}};
+    auto fib = MakeBundle({{{0, 5, 5}, {9, 5, 5}}, fiberB, fiberC, {{2, 2, 5}, {7, 7, 5}}});
+    for (unsigned int i = 0; i < 4; ++i)
+      fib->SetFiberWeight(i, 2.0f + i);
+
+    auto inside = fib->RemoveFibersOutside(mask);
+    CPPUNIT_ASSERT_EQUAL(4u, inside->GetNumFibers());
+    AssertPiece(inside, 0, {3.5, 5, 5}, {5.5, 5, 5}, 2, 2.0f, "outside removed, A");
+    AssertPiece(inside, 1, {3.5, 5, 5}, {5.5, 5, 5}, 5, 3.0f, "outside removed, B");
+    CPPUNIT_ASSERT_MESSAGE("a fiber inside the mask keeps its points", FiberPoints(inside, 2) == FiberPoints(fib, 2));
+    CPPUNIT_ASSERT_EQUAL(4.0f, inside->GetFiberWeight(2));
+    AssertPiece(inside, 3, {3.5, 3.5, 5}, {5.5, 5.5, 5}, 2, 5.0f, "outside removed, D");
+
+    auto outside = fib->RemoveFibersOutside(mask, true);
+    CPPUNIT_ASSERT_EQUAL(6u, outside->GetNumFibers());
+    AssertPiece(outside, 0, {0, 5, 5}, {3.5, 5, 5}, 2, 2.0f, "inside removed, A before the mask");
+    AssertPiece(outside, 1, {5.5, 5, 5}, {9, 5, 5}, 2, 2.0f, "inside removed, A after the mask");
+    AssertPiece(outside, 2, {0, 5, 5}, {3.5, 5, 5}, 8, 3.0f, "inside removed, B before the mask");
+    AssertPiece(outside, 3, {5.5, 5, 5}, {9, 5, 5}, 8, 3.0f, "inside removed, B after the mask");
+    AssertPiece(outside, 4, {2, 2, 5}, {3.5, 3.5, 5}, 2, 5.0f, "inside removed, D before the mask");
+    AssertPiece(outside, 5, {5.5, 5.5, 5}, {7, 7, 5}, 2, 5.0f, "inside removed, D after the mask");
+  }
+
   void ExtractFiberSubset_RoiIsNoPlanarFigure_Throws()
   {
     auto fib = LoadFibers("FiberProcessing/original.fib");
@@ -273,13 +353,12 @@ public:
     auto shortFibers = source->GetDeepCopy();
     shortFibers->RemoveLongFibers(source->GetMedianFiberLength());
 
-    const int threads = omp_get_max_threads();
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
     auto compressedSingle = source->GetDeepCopy();
     compressedSingle->Compress(0.1f);
     auto subtractedSingle = source->SubtractBundle(shortFibers);
 
-    omp_set_num_threads(8);
+    threads.SetNumberOfThreads(8);
     for (int run = 0; run < 3; ++run)
     {
       auto compressed = source->GetDeepCopy();
@@ -287,7 +366,25 @@ public:
       AssertIdentical(compressedSingle, compressed, "Compress, run " + std::to_string(run));
       AssertIdentical(subtractedSingle, source->SubtractBundle(shortFibers), "SubtractBundle, run " + std::to_string(run));
     }
-    omp_set_num_threads(threads);
+  }
+
+  // #32: the thread count a failing case set stayed for all later cases of the driver.
+  void OmpThreadGuard_FailingCase_RestoresThreadCount()
+  {
+    const int before = omp_get_max_threads();
+    const int other = before == 3 ? 2 : 3;
+    try
+    {
+      mitk::OmpThreadGuard threads(other);
+      CPPUNIT_ASSERT_EQUAL(other, omp_get_max_threads());
+      threads.SetNumberOfThreads(5);
+      CPPUNIT_ASSERT_EQUAL(5, omp_get_max_threads());
+      throw std::runtime_error("a failing assertion");
+    }
+    catch (const std::runtime_error &)
+    {
+    }
+    CPPUNIT_ASSERT_EQUAL(before, omp_get_max_threads());
   }
 
   void SubsampleFibers_WithoutRandomSeed_IsReproducible()
@@ -403,6 +500,22 @@ public:
     CPPUNIT_ASSERT_EQUAL_MESSAGE("The old polydata is not changed", oldNumPoints, oldPolyData->GetNumberOfPoints());
   }
 
+  // #32: with as many new fibers as old ones, the new fibers kept the weights of the old ones.
+  void SetFiberPolyData_EqualFiberCount_NewFibersGetWeightOne()
+  {
+    auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}}, {{0, 1, 0}, {1, 1, 0}}});
+    fib->SetFiberWeight(0, 3.0f);
+    fib->SetFiberWeight(1, 4.0f);
+    auto other = MakeBundle({{{5, 5, 5}, {6, 5, 5}}, {{5, 6, 5}, {6, 6, 5}}});
+    auto oldWeights = fib->GetFiberWeights();
+
+    fib->SetFiberPolyData(other->GetFiberPolyData());
+    CPPUNIT_ASSERT_EQUAL(2u, fib->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL(1.0f, fib->GetFiberWeight(0));
+    CPPUNIT_ASSERT_EQUAL(1.0f, fib->GetFiberWeight(1));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("a weight array taken before is not changed", 4.0f, oldWeights->GetValue(1));
+  }
+
   void SetSingleFiberColor_UsesRgbOrder()
   {
     auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}}, {{0, 5, 0}, {1, 5, 0}, {2, 5, 0}}});
@@ -444,7 +557,7 @@ public:
 
   void ColorFibersByOrientation_OnePointFibers_GetColours()
   {
-    // the one-point fiber becomes a vertex cell; its point is on no line
+    // the point of the one-point fiber has no orientation
     auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}}, {{5, 5, 5}}, {{0, 3, 0}, {0, 4, 0}}});
     auto colours = fib->GetFiberColors();
     CPPUNIT_ASSERT_EQUAL(fib->GetFiberPolyData()->GetNumberOfPoints(), colours->GetNumberOfTuples());
@@ -876,6 +989,82 @@ public:
     }
   }
 
+  /** Arc length along the polyline at which p lies on it, searched from segment *segment on
+   *  (points come in order along the line); -1 if p is not on the polyline. */
+  static double ArcLengthOnPolyline(const double *p, const std::vector<std::array<double, 3>> &line, std::size_t *segment)
+  {
+    double arc = 0;
+    for (std::size_t k = 0; k < *segment; ++k)
+      arc += Distance(line[k].data(), line[k + 1].data());
+    for (std::size_t k = *segment; k + 1 < line.size(); ++k)
+    {
+      const double length = Distance(line[k].data(), line[k + 1].data());
+      if (DistanceToPolyline(p, {line[k], line[k + 1]}) < 1e-4)
+      {
+        *segment = k;
+        return arc + Distance(line[k].data(), p);
+      }
+      arc += length;
+    }
+    return -1;
+  }
+
+  // #16: the points were placed at equal straight-line (chord) distance, which on curved fibers
+  // is not equal arc length, and fibers that already had the requested number of points were
+  // kept with their uneven spacing.
+  void ResampleToNumPoints_CurvedFibers_EqualArcLengthSpacing()
+  {
+    // A half circle of radius 10 mm and two turns of a helix, both with uneven point steps, and a
+    // straight fiber that already has 7 unevenly spaced points.
+    std::vector<std::array<double, 3>> arc, helix;
+    for (int j = 0; j <= 60; ++j)
+    {
+      const double u = j / 60.0;
+      const double phi = itk::Math::pi * u * u;
+      arc.push_back({10 * std::cos(phi), 10 * std::sin(phi), 0});
+    }
+    for (int j = 0; j <= 200; ++j)
+    {
+      const double u = j / 200.0;
+      const double phi = 4 * itk::Math::pi * std::sqrt(u);
+      helix.push_back({5 * std::cos(phi), 5 * std::sin(phi), 20 * std::sqrt(u)});
+    }
+    const std::vector<std::array<double, 3>> line = {{0, 0, 0}, {0.5, 0, 0}, {1, 0, 0}, {5, 0, 0}, {6, 0, 0}, {11, 0, 0}, {12, 0, 0}};
+    const std::vector<std::vector<std::array<double, 3>>> fibers = {arc, helix, line};
+    auto fib = MakeBundle(fibers);
+    for (unsigned int i = 0; i < 3; ++i)
+      fib->SetFiberWeight(i, 1.5f + i);
+    // the input as stored (float), against which the result is measured
+    std::vector<std::vector<std::array<double, 3>>> stored;
+    std::vector<double> lengths;
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      stored.push_back(FiberPoints(fib, i));
+      lengths.push_back(fib->GetFiberLength(i));
+    }
+
+    const unsigned int n = 7;
+    fib->ResampleToNumPoints(n);
+    CPPUNIT_ASSERT_EQUAL(3u, fib->GetNumFibers());
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      const std::string message = "fiber " + std::to_string(i);
+      const auto points = FiberPoints(fib, i);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(message, static_cast<std::size_t>(n), points.size());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ": weight", 1.5f + i, fib->GetFiberWeight(i));
+      for (int c = 0; c < 3; ++c)
+      {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": first point", stored[i].front()[c], points.front()[c], 1e-5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": last point", stored[i].back()[c], points.back()[c], 1e-5);
+      }
+      std::size_t segment = 0;
+      for (unsigned int k = 0; k < n; ++k)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(message + ": arc length of point " + std::to_string(k),
+                                             lengths[i] * k / (n - 1),
+                                             ArcLengthOnPolyline(points[k].data(), stored[i], &segment), 1e-3);
+    }
+  }
+
   void Compress_SyntheticFibers_RemovesOnlyPointsWithinTheError()
   {
     // A point is removed while its distance from the line through its kept neighbours is below
@@ -1098,10 +1287,9 @@ public:
     }
   }
 
-  void Weights_OnePointFibersChangingPlace_FollowTheirFibers()
+  void Weights_OnePointFibers_KeepPlaceAndWeight()
   {
-    // A bundle keeps fibers of one point before all others (vtkCleanPolyData makes them vertices),
-    // so a fiber of one point that an operation puts behind others changes its place.
+    // Fibers of one point keep their place among the others (#20) and their weights.
     auto a = MakeBundle({{{0, 0, 0}, {0, 1, 0}}, {{1, 0, 0}, {1, 1, 0}}});
     a->SetFiberWeight(0, 1.0f);
     a->SetFiberWeight(1, 2.0f);
@@ -1111,6 +1299,8 @@ public:
 
     auto joined = a->AddBundle(b);
     CPPUNIT_ASSERT_EQUAL(4u, joined->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("the one-point fiber of b follows the fibers of a", static_cast<vtkIdType>(1),
+                                 joined->GetFiberPolyData()->GetCell(2)->GetNumberOfPoints());
     AssertWeightsByFirstPoint({a, b}, joined, "AddBundle");
     AssertWeightsByFirstPoint({a, b}, a->AddBundles({b}), "AddBundles");
 

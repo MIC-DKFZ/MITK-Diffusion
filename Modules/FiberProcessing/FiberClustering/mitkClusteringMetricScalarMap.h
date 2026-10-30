@@ -24,6 +24,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImageRegionConstIterator.h>
 #include <itkNumericTraits.h>
 
+#include <cmath>
+#include <memory>
+#include <vector>
+
 namespace mitk
 {
 
@@ -44,73 +48,64 @@ public:
 
   float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
-    float d_direct = 0;
-    float d_flipped = 0;
-    float map_distance = 0;
+    const auto sData = PrepareFiber(s);
+    const auto tData = PrepareFiber(t);
+    return CalculatePreparedDistance(s, t, sData.get(), tData.get(), flipped);
+  }
 
-    vnl_vector<float> dists_d; dists_d.set_size(s.cols());
-    vnl_vector<float> dists_f; dists_f.set_size(s.cols());
+  /** The map values at the points of a fiber: values[i*numMaps+c] of map c at point i */
+  class ValueData : public FiberData
+  {
+  public:
+    std::vector<float> values;
+  };
+
+  std::unique_ptr<FiberData> PrepareFiber(const vnl_matrix<float>& s) const override
+  {
+    auto data = std::make_unique<ValueData>();
+    data->values.reserve(s.cols()*m_Interpolators.size());
+    for (unsigned int i=0; i<s.cols(); ++i)
+    {
+      itk::Point<float, 3> p;
+      p[0] = s[0][i];
+      p[1] = s[1][i];
+      p[2] = s[2][i];
+      for (const auto& interpolator : m_Interpolators)
+        data->values.push_back(mitk::imv::GetImageValue<float>(p, true, interpolator));
+    }
+    return data;
+  }
+
+  float CalculatePreparedDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t,
+                                  const FiberData* sData, const FiberData* tData, bool &flipped) const override
+  {
+    const auto& v1 = dynamic_cast<const ValueData&>(*sData).values;
+    const auto& v2 = dynamic_cast<const ValueData&>(*tData).values;
 
     // Every fourth point; fibers with fewer than four points use every point.
-    const unsigned int inc = s.cols()>=4 ? s.cols()/4 : 1;
-    for (unsigned int i=0; i<s.cols(); i += inc)
-    {
-      d_direct += (s.get_column(i)-t.get_column(i)).magnitude();
-      d_flipped += (s.get_column(i)-t.get_column(s.cols()-i-1)).magnitude();
-    }
+    float d_direct = 0;
+    float d_flipped = 0;
+    const unsigned int n = s.cols();
+    const unsigned int inc = n>=4 ? n/4 : 1;
+    SumPointDistances(s, t, inc, d_direct, d_flipped);
+    flipped = d_direct>d_flipped;
 
-    if (d_direct>d_flipped)
+    // the norm of the difference of the map values at each point, as vnl_vector::magnitude()
+    const std::size_t numMaps = m_Interpolators.size();
+    float map_distance = 0;
+    for (unsigned int i=0; i<n; ++i)
     {
-      flipped = true;
-
-      for (unsigned int i=0; i<s.cols(); ++i)
+      const std::size_t j = flipped ? n-i-1 : i;
+      float sum = 0;
+      for (std::size_t c=0; c<numMaps; ++c)
       {
-        itk::Point<float, 3> p;
-        p[0] = s[0][i];
-        p[1] = s[1][i];
-        p[2] = s[2][i];
-        vnl_vector<float> vals1 = GetImageValuesAtPoint(p);
-
-        p[0] = t[0][s.cols()-i-1];
-        p[1] = t[1][s.cols()-i-1];
-        p[2] = t[2][s.cols()-i-1];
-        vnl_vector<float> vals2 = GetImageValuesAtPoint(p);
-
-        map_distance += (vals1-vals2).magnitude();
+        const float diff = v1[i*numMaps+c]-v2[j*numMaps+c];
+        sum += diff*diff;
       }
-    }
-    else
-    {
-      flipped = false;
-
-      for (unsigned int i=0; i<s.cols(); ++i)
-      {
-        itk::Point<float, 3> p;
-        p[0] = s[0][i];
-        p[1] = s[1][i];
-        p[2] = s[2][i];
-        vnl_vector<float> vals1 = GetImageValuesAtPoint(p);
-
-        p[0] = t[0][i];
-        p[1] = t[1][i];
-        p[2] = t[2][i];
-        vnl_vector<float> vals2 = GetImageValuesAtPoint(p);
-
-        map_distance += (vals1-vals2).magnitude();
-      }
+      map_distance += static_cast<float>(std::sqrt(static_cast<double>(sum)));
     }
 
     return m_Scale*map_distance;
-  }
-
-  vnl_vector<float> GetImageValuesAtPoint(const itk::Point<float, 3>& itkP) const
-  {
-    // CalculateDistance runs in the OpenMP loops of the clustering filter, so the interpolators
-    // are only read here; each map has its own, set up in SetImages.
-    vnl_vector<float> vals; vals.set_size(m_Interpolators.size());
-    for (unsigned int c=0; c<m_Interpolators.size(); ++c)
-      vals[c] = mitk::imv::GetImageValue<float>(itkP, true, m_Interpolators[c]);
-    return vals;
   }
 
   void SetImages(const std::vector<ItkFloatImgType::Pointer> &Parcellations)

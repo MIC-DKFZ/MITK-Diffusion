@@ -109,8 +109,10 @@ namespace mitk
 
       for (auto& registration : m_MimeTypeRegistrations)
         registration.Unregister();
+      m_MimeTypeRegistrations.clear();
       for (auto mimeType : m_MimeTypes)
         delete mimeType;
+      m_MimeTypes.clear();
     }
 
   private:

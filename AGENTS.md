@@ -135,22 +135,35 @@ Facts the layout does not show:
 - SH and peak files: MITK's SH basis (`mitk::sh`, `mrtrix = true`) is MRtrix 0.2's (functions
   with m != 0 are MRtrix 3's divided by sqrt(2)) at world (LPS) directions. `ShImageWriter` writes
   MRtrix 3's orthonormal basis and marks the file `MITK_SH_convention=MRtrix3` (NRRD key, NIfTI
-  descrip); `ShImageReader` converts files so marked or whose descrip starts with
+  descrip); an image in MITK's FSL definition (`ShImage::FSL`) is written unchanged and marked
+  `FSL`. `ShImageReader` converts files so marked or whose descrip starts with
   `MRtrix version: 3`, and reads unmarked files (the 4D SH files of earlier MITK versions) in the
-  legacy basis. Its option "SH convention" forces one; "FSL/Dipy" converts dipy's default basis
-  (`descoteaux07`, legacy) from the FSL bvec frame. Older coefficient files with the coefficients
-  as vector pixels of a 3D image (`qBallImage_SHCoeffs.nrrd`,
-  `StreamlineTractography/qball_image_sh.nii.gz`) are no SH files to MITK and open as plain
-  vector images. NIfTI peak images are written in RAS with the descrip
-  `MITK_peak_convention=RAS` and read back to LPS; NRRD peaks are LPS.
+  legacy basis. For unmarked files its option "SH convention" forces one; "FSL/Dipy" converts
+  dipy's default basis (`descoteaux07`, legacy) from the FSL bvec frame, which is not MITK's FSL
+  definition (taken unchanged). MITK's image reader stays the default for 4D SH NIfTI files
+  (`MimeTypes_Sh4dNifti_ImageReaderIsDefault`); the SH reader ("SH Image") is chosen in the open
+  dialog or with a `PreferenceListReaderOptionsFunctor`. That functor takes the first reader on
+  its list in ascending confidence, not in list order, so a list naming "SH Image" and a
+  `Supported` reader of the same file gets the SH reader. Older coefficient files with the
+  coefficients as vector pixels of a 3D image
+  (`qBallImage_SHCoeffs.nrrd`, `StreamlineTractography/qball_image_sh.nii.gz`) get the SH reader
+  offered too (confidence `PartiallySupported`, NRRD DWIs excluded), which reads them, with
+  "auto", in MITK's FSL definition, the basis of those MITK versions. NIfTI peak images are
+  written in RAS with the descrip `MITK_peak_convention=RAS` and read back to LPS, as are MRtrix
+  peak files (descrip `MRtrix ...`, reader option on by default); NRRD peaks are LPS.
 - Reconstruction: `mitk::pointshell::Directions(n)` holds the ODF sampling directions as data;
   their order is part of the ODF file format (252 values per voxel) and of Fiberfox references.
   The single-shell Q-ball methods take volumes whose b-value rounds to 0 as b0 and need one
-  non-zero shell; the multi-shell method needs b, 2b, 3b. `ReconstructQball` computes the sampled
-  ODFs only when asked (`QballParameters::sampledOdf`). `ctest -R 'ImageReconstruction|DiffusionReconstruction'`
-  runs their tests.
-- `ctest -R 'mitkDiffusionModelling|PeakShImageReader|ImageReconstruction'` runs the
-  `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
+  non-zero shell; the multi-shell method needs b, 2b, 3b. The multi-shell Q-ball and radial
+  multi-shell filters take their shells from the b-value map they are given, without one from
+  `BValueMapProperty::CreateBValueMap`, the DWI's own map. `ReconstructQball` computes the sampled
+  ODFs only when asked (`QballParameters::sampledOdf`). Peak extraction
+  (`itk::OdfMaximaExtractionFilter`) keeps a refined maximum only if it is farther than the
+  angular threshold from every larger one kept, so each axis appears once, and gives no peak
+  where the sampled ODF varies by at most 1e-5 of its maximum (isotropic).
+  `ctest -R 'ImageReconstruction|DiffusionReconstruction'` runs their tests.
+- `ctest -R 'mitkDiffusion(Modelling|Reconstruction)|PeakShImageReader|ImageReconstruction'` runs
+  the `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
   display needed) and is skipped with exit code 77 where no OpenGL context can be created.
 - The netlib L-BFGS-B code behind `vnl_lbfgsb` keeps its working variables in static storage.
   Threaded code holds `mitk::GetLbfgsbMutex()` (`Modules/DiffusionModelling/Algorithms/mitkLbfgsbMutex.h`)
@@ -160,11 +173,20 @@ Facts the layout does not show:
   `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
   give the same result at any number of OpenMP threads; fiber references in the test data
   depend on exact point positions, so a change there is checked bit for bit against the old output.
+  A bundle keeps its fibers in the order of the polydata (file), one-point fibers as one-point
+  lines, and drops fibers without points with a warning; `SetFiberPolyData` gives the new fibers
+  weight 1. The mask cut (`RemoveFibersOutside`) cuts segments at the mask border;
+  `ResamplePolylineToNumPoints` (equal arc length) serves `ResampleToNumPoints` and the
+  clustering filter. The `FiberBundle` and `FiberProcessing` tests that change the OpenMP thread
+  count use `mitk::OmpThreadGuard` (`CMake/mitkOmpThreadGuard.h`, in the include path of each
+  test driver whose `Testing/CMakeLists.txt` includes `mitkDiffusionTestData`).
 - `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter)Test'`
   runs the `FiberProcessing` tests. Its filters read const bundles and give the same result at
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
   set TrackVis header (`mitkDerivedFiberBundle.h`), and the four derived-image filters share one
-  voxel grid (`mitkFiberImageGrid.h`).
+  voxel grid (`mitkFiberImageGrid.h`). The clustering filter prepares each fiber's metric data
+  once (`ClusteringMetric::PrepareFiber`); the metric values equal the former vnl formulation
+  bit for bit (`Metrics_SameValuesAsVnlFormulation`), which the clustering outputs depend on.
 - `ctest -R Tractography` runs the `FiberTracking` tests. Streamline tracking seeds its random
   engines per seed point, so a tractogram with a fixed seed (`--fix_seed`, "Fix Random Seed") is
   the same at any number of OpenMP threads; the handlers take tensors, ODF directions and peaks as

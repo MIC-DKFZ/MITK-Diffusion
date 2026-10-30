@@ -42,6 +42,7 @@ class mitkDiffusionReconstructionMultishellTestSuite : public mitk::TestFixture
   MITK_TEST(SecondUpdate_SameResult);
   MITK_TEST(InvalidInput_Throws);
   MITK_TEST(FunctorSettings_Checked);
+  MITK_TEST(NoBValueMap_ShellsOfDwiMap);
   CPPUNIT_TEST_SUITE_END();
 
   using PropHelper = mitk::DiffusionPropertyHelper;
@@ -280,6 +281,37 @@ public:
     kurtosis->setListOfBValues(twoBValues);
     kurtosis->setTargetBValue(m_BValues.mean());
     CPPUNIT_ASSERT_NO_THROW(run(kurtosis, twoShells));
+  }
+
+  // Without a b-value map the filter takes the shells of the DWI's own map
+  // (BValueMapProperty::CreateBValueMap, b-values rounded to integers), as every caller with a
+  // DWI passes it. With b-values on the shells the result is the same as with the map; a volume
+  // at 0.996 times the smallest shell is a shell of its own, which the three-shell functor
+  // rejects, with and without the map.
+  void NoBValueMap_ShellsOfDwiMap()
+  {
+    auto withMap = AdcFilter(m_Dwi);
+    withMap->Update();
+    auto withoutMap = AdcFilter(m_Dwi);
+    withoutMap->SetOriginalBValueMap(PropHelper::BValueMapType());
+    withoutMap->Update();
+    itk::ImageRegionConstIterator<DwiType> itWith(withMap->GetOutput(), m_Dwi->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<DwiType> itWithout(withoutMap->GetOutput(), m_Dwi->GetLargestPossibleRegion());
+    for (; !itWith.IsAtEnd(); ++itWith, ++itWithout)
+      CPPUNIT_ASSERT(itWith.Get() == itWithout.Get());
+
+    auto offShell = PropHelper::GradientDirectionsContainerType::New();
+    for (unsigned int i = 0; i < m_Gradients->Size(); ++i)
+      offShell->push_back(m_Gradients->ElementAt(i));
+    const unsigned int moved = m_BValueMap.at(static_cast<unsigned int>(m_BValues[0])).front();
+    offShell->ElementAt(moved) *= std::sqrt(0.996);
+    for (const bool passMap : {true, false})
+    {
+      auto filter = AdcFilter(m_Dwi);
+      filter->SetOriginalGradientDirections(offShell.GetPointer());
+      filter->SetOriginalBValueMap(passMap ? mitk::BValueMapProperty::CreateBValueMap(offShell, m_ReferenceBValue) : PropHelper::BValueMapType());
+      CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
+    }
   }
 };
 

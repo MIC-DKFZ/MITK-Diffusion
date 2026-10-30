@@ -69,6 +69,7 @@ namespace itk
 
     void SetOriginalGradientDirections(GradientDirectionContainerType::ConstPointer ptr){m_OriginalGradientDirections = ptr;}
     void SetOriginalBValue(const double & val){m_OriginalBValue = val;}
+    /** Without a map the filter builds the DWI's own map (mitk::BValueMapProperty::CreateBValueMap). */
     void SetOriginalBValueMap(const BValueMap & inp){m_BValueMap = inp;}
     /** The model fitted per voxel and direction; the filter keeps a reference to it. */
     void SetFunctor(DWIVoxelFunctor * functor){m_Functor = functor;}

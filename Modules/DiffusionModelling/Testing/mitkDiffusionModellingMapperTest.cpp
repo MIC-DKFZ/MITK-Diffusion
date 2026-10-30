@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <mitkCompositeMapper.h>
 #include <mitkIOUtil.h>
 #include <mitkOdfImage.h>
+#include <mitkOdfVtkMapper2D.h>
 #include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkSliceNavigationController.h>
@@ -45,9 +46,12 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionModellingMapperTestSuite);
   MITK_TEST(TensorImage_GlyphsOfEachView);
   MITK_TEST(GlyphsSwitchedOff_NoGlyphs);
+  MITK_TEST(OrientationPropertyMissing_NoGlyphs);
+  MITK_TEST(SecondRenderWithoutChange_SameGlyphs);
   MITK_TEST(PeakImage_SlabFollowsPlane);
   MITK_TEST(CompositeMapper_PropAndImageMapperSlot);
   MITK_TEST(ColourMap_NotRebuiltByRendering);
+  MITK_TEST(OdfMapper_GlyphsNotMovedByGeometry);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::RenderingTestHelper m_RenderingTestHelper;
@@ -130,6 +134,26 @@ public:
     CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) == nullptr);
   }
 
+  // Glyphs are drawn only where their orientation is switched on, also without the property.
+  void OrientationPropertyMissing_NoGlyphs()
+  {
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) != nullptr);
+    m_Node->GetPropertyList()->DeleteProperty("VisibleOdfs_T");
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) == nullptr);
+  }
+
+  // Rendering the same view again without a change keeps the glyphs (held, so that regenerated
+  // glyphs cannot get the same address).
+  void SecondRenderWithoutChange_SameGlyphs()
+  {
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    vtkSmartPointer<vtkPolyData> first = this->RenderGlyphs(mitk::AnatomicalPlane::Axial);
+    CPPUNIT_ASSERT(first != nullptr);
+    m_RenderingTestHelper.Render();
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) == first.GetPointer());
+  }
+
   // The 2D peak mapper clips its lines to half the smallest spacing (1.23 / 2) around the plane the
   // renderer shows, with the same two planes moved along.
   void PeakImage_SlabFollowsPlane()
@@ -147,7 +171,9 @@ public:
     auto actor = vtkActor::SafeDownCast(mapper->GetVtkProp(renderer));
     CPPUNIT_ASSERT(actor != nullptr);
     auto peakImage = dynamic_cast<mitk::PeakImage *>(peakNode->GetData());
-    CPPUNIT_ASSERT(actor->GetMapper()->GetInputDataObject(0, 0) == peakImage->GetPolyData().GetPointer());
+    // Held, so that rebuilt lines cannot get the same address.
+    vtkSmartPointer<vtkPolyData> lines = peakImage->GetPolyData();
+    CPPUNIT_ASSERT(actor->GetMapper()->GetInputDataObject(0, 0) == lines.GetPointer());
     vtkPlaneCollection *planes = actor->GetMapper()->GetClippingPlanes();
     CPPUNIT_ASSERT_EQUAL(2, planes->GetNumberOfItems());
     vtkPlane *lower = planes->GetItem(0);
@@ -180,7 +206,8 @@ public:
     }
 
     // The lines are rebuilt when the image was modified, not by rendering.
-    CPPUNIT_ASSERT(actor->GetMapper()->GetInputDataObject(0, 0) == peakImage->GetPolyData().GetPointer());
+    CPPUNIT_ASSERT(actor->GetMapper()->GetInputDataObject(0, 0) == lines.GetPointer());
+    CPPUNIT_ASSERT(peakImage->GetPolyData().GetPointer() == lines.GetPointer());
   }
 
   // MITK's 3D plane mapper takes the colour map's mapper from slot 3 of a "CompositeMapper" node.
@@ -225,6 +252,23 @@ public:
 
     image->Modified();
     CPPUNIT_ASSERT(colourMap != image->GetVtkImageData());
+  }
+
+  // The renderer applies the node geometry to a VtkMapper's prop (UpdateVtkTransform), which the
+  // composite mapper's prop assembly does not take. The glyphs are generated in world coordinates,
+  // so the ODF mapper on its own must leave its actor without that transform.
+  void OdfMapper_GlyphsNotMovedByGeometry()
+  {
+    // DataNode::SetMapper does not grow the mapper slots; GetMapper does.
+    m_Node->GetMapper(mitk::BaseRenderer::Standard2D);
+    auto odfMapper = mitk::OdfVtkMapper2D::New();
+    m_Node->SetMapper(mitk::BaseRenderer::Standard2D, odfMapper);
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) != nullptr);
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+    auto actor = vtkActor::SafeDownCast(odfMapper->GetVtkProp(renderer));
+    CPPUNIT_ASSERT(actor != nullptr);
+    CPPUNIT_ASSERT(actor->GetUserTransform() == nullptr);
   }
 };
 

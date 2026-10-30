@@ -19,6 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkDiffusionIOMimeTypes.h"
 
 #include "itkImageFileReader.h"
+#include "itkImageRegionConstIterator.h"
 #include "itkImageRegionIterator.h"
 #include "itkMetaDataObject.h"
 #include "itkNrrdImageIO.h"
@@ -42,7 +43,7 @@ namespace
   // Constant initialization: the reader is constructed while the library is loaded, possibly
   // before dynamically initialized globals of this file.
   constexpr const char *CONVENTION_OPTION = "SH convention";
-  constexpr const char *AUTO = "auto (file marker, else MITK legacy)";
+  constexpr const char *AUTO = "auto (file marker, else MITK legacy; vector layout: MITK FSL)";
   constexpr const char *MRTRIX3 = "MRtrix 3";
   constexpr const char *MITK_LEGACY = "MITK legacy (MRtrix 0.2)";
   constexpr const char *FSL_DIPY = "FSL/Dipy";
@@ -160,6 +161,16 @@ namespace mitk
 
   ShImageReader::~ShImageReader() = default;
 
+  IFileReader::ConfidenceLevel ShImageReader::GetConfidenceLevel() const
+  {
+    // The vector length alone does not make a 3D vector image an SH image, so MITK's image reader
+    // stays the default for the vector layout; the SH reader reads it when chosen.
+    const auto level = AbstractFileReader::GetConfidenceLevel();
+    if (level == Supported && DiffusionIOMimeTypes::IsShVectorLayout(this->GetInputLocation()))
+      return PartiallySupported;
+    return level;
+  }
+
   template <int shOrder>
   mitk::Image::Pointer ShImageReader::ConvertShImage(ShImage::ShOnDiskType::Pointer img)
   {
@@ -168,9 +179,42 @@ namespace mitk
     importer->SetInputImage(img);
     importer->GenerateData();
 
+    itk::Matrix<double, 3, 3> direction;
+    for (unsigned int r = 0; r < 3; ++r)
+      for (unsigned int c = 0; c < 3; ++c)
+        direction[r][c] = img->GetDirection()[r][c];
+    return TakeCoefficients<shOrder>(importer->GetCoefficientImage(), img->GetMetaDataDictionary(), direction, false);
+  }
+
+  template <int shOrder>
+  mitk::Image::Pointer ShImageReader::ConvertVectorShImage(VectorImageType::Pointer img)
+  {
+    auto coefficients = CoefficientImageType<shOrder>::New();
+    coefficients->SetSpacing(img->GetSpacing());
+    coefficients->SetOrigin(img->GetOrigin());
+    coefficients->SetDirection(img->GetDirection());
+    coefficients->SetRegions(img->GetLargestPossibleRegion());
+    coefficients->Allocate();
+    itk::ImageRegionConstIterator<VectorImageType> itVector(img, img->GetLargestPossibleRegion());
+    itk::ImageRegionIterator<CoefficientImageType<shOrder>> it(coefficients, coefficients->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it, ++itVector)
+    {
+      typename CoefficientImageType<shOrder>::PixelType pixel;
+      for (unsigned int j = 0; j < pixel.Size(); ++j)
+        pixel[j] = itVector.Get()[j];
+      it.Set(pixel);
+    }
+    return TakeCoefficients<shOrder>(coefficients, img->GetMetaDataDictionary(), img->GetDirection(), true);
+  }
+
+  template <int shOrder>
+  mitk::Image::Pointer ShImageReader::TakeCoefficients(CoefficientImageType<shOrder> *coefficients,
+                                                       const itk::MetaDataDictionary &dictionary,
+                                                       const itk::Matrix<double, 3, 3> &direction,
+                                                       bool vectorLayout)
+  {
     mitk::ShImage::Pointer shImage = mitk::ShImage::New();
 
-    const auto &dictionary = img->GetMetaDataDictionary();
     auto basis = MitkMarker(dictionary);
     if (!basis)
     {
@@ -179,6 +223,9 @@ namespace mitk
         basis = FileBasis::Mrtrix3;
       else if (option == FSL_DIPY)
         basis = FileBasis::Dipy;
+      else if (option == AUTO && vectorLayout)
+        // The vector layout comes from MITK versions whose Q-ball filters used MITK's FSL definition.
+        basis = FileBasis::MitkFsl;
       else
         basis = FileBasis::MitkLegacy;
     }
@@ -188,13 +235,8 @@ namespace mitk
 
     if (*basis == FileBasis::Dipy)
     {
-      itk::Matrix<double, 3, 3> direction;
-      for (unsigned int r = 0; r < 3; ++r)
-        for (unsigned int c = 0; c < 3; ++c)
-          direction[r][c] = img->GetDirection()[r][c];
       const vnl_matrix<double> toMitk = DipyToMitkBasis(shOrder, direction);
-      auto coefficients = importer->GetCoefficientImage();
-      itk::ImageRegionIterator<typename ImporterType::CoefficientImageType> it(coefficients, coefficients->GetLargestPossibleRegion());
+      itk::ImageRegionIterator<CoefficientImageType<shOrder>> it(coefficients, coefficients->GetLargestPossibleRegion());
       for (; !it.IsAtEnd(); ++it)
       {
         auto pixel = it.Get();
@@ -212,8 +254,7 @@ namespace mitk
     {
       // MITK's internal basis is MRtrix 0.2's, whose functions with m != 0 are MRtrix 3's divided
       // by sqrt(2); m = 0 sits at index l(l+1)/2 of each even order l.
-      auto coefficients = importer->GetCoefficientImage();
-      itk::ImageRegionIterator<typename ImporterType::CoefficientImageType> it(coefficients, coefficients->GetLargestPossibleRegion());
+      itk::ImageRegionIterator<CoefficientImageType<shOrder>> it(coefficients, coefficients->GetLargestPossibleRegion());
       for (; !it.IsAtEnd(); ++it)
       {
         auto pixel = it.Get();
@@ -227,8 +268,33 @@ namespace mitk
 
     // The SH image takes over the buffer of the coefficient image.
     mitk::Image::Pointer resultImage = dynamic_cast<mitk::Image*>(shImage.GetPointer());
-    mitk::GrabItkImageMemoryChannel(importer->GetCoefficientImage().GetPointer(), nullptr, resultImage.GetPointer(), false);
+    mitk::GrabItkImageMemoryChannel(coefficients, nullptr, resultImage.GetPointer(), false);
     return resultImage;
+  }
+
+  mitk::Image::Pointer ShImageReader::ReadVectorLayout(const std::string &location)
+  {
+    auto reader = itk::ImageFileReader<VectorImageType>::New();
+    reader->SetFileName(location);
+    reader->Update();
+    VectorImageType::Pointer img = reader->GetOutput();
+    switch (img->GetNumberOfComponentsPerPixel())
+    {
+    case 6:
+      return ConvertVectorShImage<2>(img);
+    case 15:
+      return ConvertVectorShImage<4>(img);
+    case 28:
+      return ConvertVectorShImage<6>(img);
+    case 45:
+      return ConvertVectorShImage<8>(img);
+    case 66:
+      return ConvertVectorShImage<10>(img);
+    case 91:
+      return ConvertVectorShImage<12>(img);
+    default:
+      mitkThrow() << "SH order larger 12 not supported";
+    }
   }
 
   std::vector<itk::SmartPointer<BaseData> > ShImageReader::DoRead()
@@ -245,6 +311,12 @@ namespace mitk
     {
       try
       {
+        if (DiffusionIOMimeTypes::IsShVectorLayout(location))
+        {
+          result.push_back(ReadVectorLayout(location).GetPointer());
+          return result;
+        }
+
         std::string ext = itksys::SystemTools::GetFilenameLastExtension(location);
         typedef itk::ImageFileReader< ShImage::ShOnDiskType > FileReaderType;
         FileReaderType::Pointer reader = FileReaderType::New();

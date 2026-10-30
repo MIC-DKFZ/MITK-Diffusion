@@ -19,9 +19,11 @@ found in the LICENSE file.
 #include <vtkParametricFunctionSource.h>
 #include <vtkParametricSpline.h>
 
+#include <algorithm>
 #include <array>
 #include <functional>
 #include <queue>
+#include <vector>
 
 // Resampling, smoothing and compression of the fibers of mitk::FiberBundle; fiber count and
 // weights stay.
@@ -230,6 +232,34 @@ void mitk::FiberBundle::Compress(float error)
   }
 }
 
+std::vector< vnl_vector_fixed<double, 3> > mitk::FiberBundle::ResamplePolylineToNumPoints(const std::vector< vnl_vector_fixed<double, 3> >& points, unsigned int numPoints)
+{
+  if (points.empty())
+    return {};
+  std::vector< vnl_vector_fixed<double, 3> > out(numPoints, points.front());
+  const std::size_t n = points.size();
+  if (n<2)
+    return out;
+
+  std::vector<double> arc(n, 0.0);
+  for (std::size_t j=1; j<n; ++j)
+    arc[j] = arc[j-1] + (points[j]-points[j-1]).magnitude();
+
+  // The clustering filter's results depend on this arithmetic bit for bit; change it only
+  // together with its test.
+  std::size_t seg = 0;
+  for (unsigned int k=0; k<numPoints; ++k)
+  {
+    const double target = numPoints>1 ? arc.back()*k/(numPoints-1) : 0.0;
+    while (seg<n-2 && arc[seg+1]<target)
+      ++seg;
+    const double segLength = arc[seg+1]-arc[seg];
+    const double a = segLength>0 ? std::min(1.0, std::max(0.0, (target-arc[seg])/segLength)) : 0.0;
+    out[k] = points[seg] + a*(points[seg+1]-points[seg]);
+  }
+  return out;
+}
+
 void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
 {
   if (targetPoints<2)
@@ -237,103 +267,23 @@ void mitk::FiberBundle::ResampleToNumPoints(unsigned int targetPoints)
 
   MITK_INFO << "Resampling fibers (number of points " << targetPoints << ")";
 
-  // Each pass resamples every fiber whose point count is still off; a handful of passes is
-  // enough, so a fiber that never converges is an error instead of an endless loop.
-  const int maxPasses = 100;
-  int pass = 0;
+  FiberPolyDataBuilder builder;
   vtkNew<vtkIdList> idBuffer;
-  bool unequal_fibs = true;
-  while (unequal_fibs)
+  std::vector< vnl_vector_fixed<double, 3> > vertices;
+  for (unsigned int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
   {
-    if (++pass > maxPasses)
-      mitkThrow() << "Resampling to " << targetPoints << " points did not converge.";
-    FiberPolyDataBuilder builder;
+    const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
+    vertices.resize(ids.size());
+    for (std::size_t j=0; j<ids.size(); ++j)
+      m_FiberPolyData->GetPoint(ids[j], vertices[j].data_block());
 
-    unequal_fibs = false;
-    for (unsigned int i=0; i<m_FiberPolyData->GetNumberOfCells(); i++)
-    {
-
-      std::vector< vnl_vector_fixed< double, 3 > > vertices;
-      float weight = 1;
-      double seg_len = 0;
-
-      {
-        weight = m_FiberWeights->GetValue(i);
-        const auto ids = FiberBundleDetail::FiberPointIds(m_FiberPolyData, i, idBuffer);
-        if (ids.size()!=targetPoints)
-          seg_len = static_cast<double>(this->GetFiberLength(i)/(targetPoints-1));
-
-        for (const vtkIdType id : ids)
-        {
-          double cand[3];
-          m_FiberPolyData->GetPoint(id, cand);
-          vnl_vector_fixed< double, 3 > candV;
-          candV[0]=cand[0]; candV[1]=cand[1]; candV[2]=cand[2];
-          vertices.push_back(candV);
-        }
-      }
-
-      vnl_vector_fixed< double, 3 > lastV = vertices.at(0);
-
-      // A fiber without length (one point, or all points equal) has no segments to sample;
-      // its position is repeated so that it gets the requested number of points as well.
-      if (vertices.size()!=targetPoints && seg_len<=0.0000001)
-        vertices.assign(targetPoints, lastV);
-
-      builder.AddPoint(lastV.data_block());
-      for (unsigned int j=1; j<vertices.size(); j++)
-      {
-        vnl_vector_fixed< double, 3 > vec = vertices.at(j) - lastV;
-        double new_dist = vec.magnitude();
-
-        if (new_dist >= seg_len && seg_len>0)
-        {
-          vnl_vector_fixed< double, 3 > newV = lastV;
-          if ( new_dist-seg_len <= mitk::eps )
-          {
-            vec.normalize();
-            newV += vec * seg_len;
-          }
-          else
-          {
-            // intersection between sphere (radius 'pointDistance', center 'lastV') and line (direction 'd' and point 'p')
-            vnl_vector_fixed< double, 3 > p = vertices.at(j-1);
-            vnl_vector_fixed< double, 3 > d = vertices.at(j) - p;
-
-            double a = d[0]*d[0] + d[1]*d[1] + d[2]*d[2];
-            double b = 2 * (d[0] * (p[0] - lastV[0]) + d[1] * (p[1] - lastV[1]) + d[2] * (p[2] - lastV[2]));
-            double c = (p[0] - lastV[0])*(p[0] - lastV[0]) + (p[1] - lastV[1])*(p[1] - lastV[1]) + (p[2] - lastV[2])*(p[2] - lastV[2]) - seg_len*seg_len;
-
-            double v1 =(-b + std::sqrt(b*b-4*a*c))/(2*a);
-            double v2 =(-b - std::sqrt(b*b-4*a*c))/(2*a);
-
-            if (v1>0)
-              newV = p + d * v1;
-            else if (v2>0)
-              newV = p + d * v2;
-            else
-              MITK_INFO << "ERROR1 - linear resampling";
-
-            j--;
-          }
-
-          builder.AddPoint(newV.data_block());
-          lastV = newV;
-        }
-        else if ( (j==vertices.size()-1 && new_dist>0.0001) || seg_len<=0.0000001)
-        {
-          builder.AddPoint(vertices.at(j).data_block());
-        }
-      }
-
-      if (builder.GetNumberOfPendingPoints()!=targetPoints)
-        unequal_fibs = true;
-      builder.EndFiber(weight);
-    }
-
-    if (builder.GetNumberOfFibers()>0)
-      builder.ReplaceFibersOf(this);
+    for (const auto& p : ResamplePolylineToNumPoints(vertices, targetPoints))
+      builder.AddPoint(p.data_block());
+    builder.EndFiber(m_FiberWeights->GetValue(i));
   }
+
+  if (builder.GetNumberOfFibers()>0)
+    builder.ReplaceFibersOf(this);
 }
 
 void mitk::FiberBundle::ResampleLinear(double pointDistance)

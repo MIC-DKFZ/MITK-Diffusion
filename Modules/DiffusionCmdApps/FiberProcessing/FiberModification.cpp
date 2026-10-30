@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
   parser.beginGroup("2. Resampling:");
   parser.addArgument("spline_resampling", "", mitkCommandLineParser::Float, "Spline resampling:", "Resample fiber using splines with the given point distance (in mm)");
   parser.addArgument("linear_resampling", "", mitkCommandLineParser::Float, "Linear resampling:", "Resample fiber linearly with the given point distance (in mm)");
-  parser.addArgument("num_resampling", "", mitkCommandLineParser::Int, "Num. fiber points resampling:", "Resample all fibers to the given number of points, at equal chord distance (not arc length); fibers that already have this number of points are kept as they are");
+  parser.addArgument("num_resampling", "", mitkCommandLineParser::Int, "Num. fiber points resampling:", "Resample all fibers to the given number of points, at equal distance along the fiber (arc length), end points included; also fibers that already have this number of points");
   parser.addArgument("compress", "", mitkCommandLineParser::Float, "Compress:", "Compress fiber using the given error threshold (in mm)");
   parser.endGroup();
 
@@ -232,10 +232,9 @@ int main(int argc, char* argv[])
     }
 
     // Cutting at the mask comes before the length filter, so that no piece shorter than
-    // --min_length remains, and before resampling and compression: the cut keeps the fiber
-    // points inside the mask, so on compressed or coarsely resampled fibers it would lose the
-    // in-mask parts between distant points, and --num_resampling gives each output piece its
-    // number of points. Without any fiber left the result is an empty bundle.
+    // --min_length remains, and before resampling and compression: the pieces are cut from the
+    // fibers as given (at the mask border, also between two points), and --num_resampling gives
+    // each output piece its number of points. Without any fiber left the result is an empty bundle.
     if ( mask.IsNotNull() )
     {
       if (remove_outside)
@@ -247,8 +246,9 @@ int main(int argc, char* argv[])
     }
 
     // RemoveShortFibers and RemoveLongFibers refuse to remove every fiber and leave the bundle
-    // unchanged; here that means an empty result.
-    if (minFiberLength>0 && !fib->RemoveShortFibers(minFiberLength))
+    // unchanged; here that means an empty result. An empty bundle (nothing left after the mask
+    // cut) has nothing to filter and gets no second warning.
+    if (minFiberLength>0 && fib->GetNumFibers()>0 && !fib->RemoveShortFibers(minFiberLength))
     {
       MITK_WARN << "Every fiber is shorter than " << minFiberLength << " mm.";
       fib = mitk::FiberBundle::New();

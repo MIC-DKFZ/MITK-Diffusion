@@ -18,6 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "itkRadialMultishellToSingleshellImageFilter.h"
 #include "mitkDiffusionModellingHelperFunctions.h"
+#include <mitkBValueMapProperty.h>
 
 #include <itkImageRegionIterator.h>
 
@@ -47,18 +48,9 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
   if (m_OriginalGradientDirections.IsNull() || m_OriginalGradientDirections->Size() != this->GetInput()->GetNumberOfComponentsPerPixel())
     itkExceptionMacro(<< "The gradient directions do not match the volumes of the input image.");
 
-  // test whether BvalueMap contains all necessary information
-  if(m_BValueMap.size() == 0)
-  {
-    itkWarningMacro(<< "No BValueMap given: create one using GradientDirectionContainer");
-
-    GradientDirectionContainerType::ConstIterator gdcit;
-    for( gdcit = m_OriginalGradientDirections->Begin(); gdcit != m_OriginalGradientDirections->End(); ++gdcit)
-    {
-      double bValueKey = int(((m_OriginalBValue * gdcit.Value().two_norm() * gdcit.Value().two_norm())+7.5)/10)*10;
-      m_BValueMap[bValueKey].push_back(gdcit.Index());
-    }
-  }
+  // Without a map the shells are those of the DWI's own map (DiffusionPropertyHelper).
+  if (m_BValueMap.empty())
+    m_BValueMap = mitk::BValueMapProperty::CreateBValueMap(m_OriginalGradientDirections, m_OriginalBValue);
 
   //# BValueMap contains no bZero --> itkException
   if(m_BValueMap.find(0.0) == m_BValueMap.end())
