@@ -1286,7 +1286,9 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
   if (m_Parameters.m_SignalGen.GetNumVolumes()==0)
     itkExceptionMacro("No gradient directions defined. A parameter file needs its .bvals/.bvecs files or gradients of its own.");
 
-  m_Parameters.m_SignalGen.CheckInversionTime();
+  // a DWI input is simulated without relaxation (InitializeData), so its TI is not used
+  if (m_InputImage.IsNull())
+    m_Parameters.m_SignalGen.CheckInversionTime();
 
   // The prototype (raw-SH) kernels are sampled from one shell and evaluated for the gradient
   // direction only; with several shells every shell would get the same attenuation.

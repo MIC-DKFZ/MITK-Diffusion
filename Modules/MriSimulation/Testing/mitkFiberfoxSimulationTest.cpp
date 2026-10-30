@@ -14,6 +14,7 @@ found in the LICENSE file.
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <vector>
 #include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
 #include <mitkIOUtil.h>
@@ -58,6 +59,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(PrototypeNeedsOneShell);
   MITK_TEST(InversionRecovery);
   MITK_TEST(InversionTimeNotBelowRepetitionTime);
+  MITK_TEST(InversionTimeUnusedWithoutRelaxation);
   MITK_TEST(MotionTransforms);
   MITK_TEST(MotionMovesFibersAndMapsTogether);
   MITK_TEST(RandomPhantom);
@@ -223,6 +225,30 @@ public:
       filter->SetFiberBundle(m_FiberBundle);
       CPPUNIT_ASSERT_THROW(filter->Update(), itk::ExceptionObject);
     }
+  }
+
+  /** TI enters only the T1 relaxation: without relaxation TI >= TR is simulated, and TI changes nothing. */
+  void InversionTimeUnusedWithoutRelaxation()
+  {
+    std::vector<FilterType::OutputImageType::Pointer> outputs;
+    for (double inversion : { 0.0, 5000.0 })
+    {
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+      parameters.m_SignalGen.m_DoSimulateRelaxation = false;
+      parameters.m_SignalGen.m_tRep = 4000;
+      parameters.m_SignalGen.m_tInv = inversion;
+      CPPUNIT_ASSERT_NO_THROW(parameters.m_SignalGen.CheckInversionTime());
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetFiberBundle(m_FiberBundle);
+      CPPUNIT_ASSERT_NO_THROW(filter->Update());
+      outputs.push_back(filter->GetOutput());
+    }
+    const auto n = outputs[0]->GetLargestPossibleRegion().GetNumberOfPixels() * outputs[0]->GetNumberOfComponentsPerPixel();
+    CPPUNIT_ASSERT_EQUAL(n, outputs[1]->GetLargestPossibleRegion().GetNumberOfPixels() * outputs[1]->GetNumberOfComponentsPerPixel());
+    CPPUNIT_ASSERT_MESSAGE("same image with and without TI", std::equal(outputs[0]->GetBufferPointer(), outputs[0]->GetBufferPointer() + n, outputs[1]->GetBufferPointer()));
   }
 
   /** x' = R (x - c) + c + t with R = Rz Ry Rx; the inverse is exact for rotations about all axes. */

@@ -18,6 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 //QT headers
 #include <QWidget>
+#include <memory>
 #include <QString>
 #include "ui_QmitkDotModelParametersWidgetControls.h"
 #include <org_mitk_gui_qt_diffusionimaging_fiberfox_Export.h>
@@ -47,7 +48,7 @@ public slots:
 
 protected:
     // member variables
-    Ui::QmitkDotModelParametersWidgetControls* m_Controls;
+    std::unique_ptr<Ui::QmitkDotModelParametersWidgetControls> m_Controls;
 
 private:
 

@@ -180,9 +180,6 @@
        <widget class="QmitkTensorModelParametersWidget" name="m_TensorWidget2" native="true"/>
       </item>
       <item row="4" column="0">
-       <widget class="QmitkPrototypeSignalParametersWidget" name="m_PrototypeWidget2" native="true"/>
-      </item>
-      <item row="5" column="0">
        <widget class="QFrame" name="m_Comp2FractionFrame">
         <property name="frameShape">
          <enum>QFrame::NoFrame</enum>
@@ -283,7 +280,7 @@
          <item row="8" column="1">
           <widget class="QSpinBox" name="m_TIbox">
            <property name="toolTip">
-            <string>Inversion time (in ms) for inversion recovery sequences, shorter than TR. If 0, no inversion pulse is simulated.</string>
+            <string>Inversion time (in ms) for inversion recovery sequences, shorter than TR. If 0, no inversion pulse is simulated. Used only with signal relaxation.</string>
            </property>
            <property name="minimum">
             <number>0</number>
@@ -2256,6 +2253,29 @@
              <string>Noncentral chi</string>
             </property>
            </item>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="m_NoiseCoilsLabel">
+           <property name="text">
+            <string>Channels:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QSpinBox" name="m_NoiseCoilsBox">
+           <property name="toolTip">
+            <string>Number of receive channels combined by sum of squares whose magnitude noise is added (noncentral chi distribution). Independent of &quot;Number of Channels&quot;, the coils simulated in k-space.</string>
+           </property>
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>128</number>
+           </property>
+           <property name="value">
+            <number>1</number>
+           </property>
           </widget>
          </item>
         </layout>

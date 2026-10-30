@@ -201,8 +201,8 @@ Facts the layout does not show:
   `SetGradientsFromImage` stores a DWI's gradients in that form. Noise is complex Gaussian in
   k-space, or a noise model on the magnitude image: Rician or noncentral chi (`.ffp`
   `artifacts.noisetype` `noncentralchi` with `artifacts.noisecoils`; the `chisquare` type of earlier
-  files is read as noncentral chi with the file's `numberofcoils`). An inversion time must be
-  shorter than TR (`CheckInversionTime`). With a constant seed
+  files is read as noncentral chi with the file's `numberofcoils`). With relaxation, an inversion
+  time must be shorter than TR (`CheckInversionTime`); without, TI is not used. With a constant seed
   (`SetUseConstantRandSeed`, `MitkFiberfox --fix_seed`) a simulation gives the same image at any
   number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`: output, coil, phase and k-space
   images, spike log), and so does a fiber fit (`mitkFiberFitTest`; `--max_iter` counts L-BFGS-B
