@@ -2,7 +2,8 @@
 # input and checks exit codes and outputs. The checks load the outputs, so the driver links the
 # modules of the diffusion file types.
 if(TARGET MitkFiberBundle AND TARGET MitkDiffusionModelling)
-  MITK_CREATE_MODULE_TESTS(DEPENDS MitkFiberBundle MitkDiffusionModelling)
+  # tinyxml2 checks that the --xml descriptions are well-formed.
+  MITK_CREATE_MODULE_TESTS(DEPENDS MitkFiberBundle MitkDiffusionModelling PACKAGE_DEPENDS PRIVATE tinyxml2)
   include(mitkDiffusionTestData)
 
   if(TARGET ${TESTDRIVER})

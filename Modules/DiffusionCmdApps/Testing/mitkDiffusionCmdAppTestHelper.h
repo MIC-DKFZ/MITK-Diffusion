@@ -22,6 +22,7 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 
 #include <itksys/Process.h>
+#include <tinyxml2.h>
 
 #include <filesystem>
 #include <fstream>
@@ -102,7 +103,11 @@ namespace mitk::CmdAppTest
     CPPUNIT_ASSERT_MESSAGE("Mitk" + app + " accepted wrong arguments:\n" + result.output, result.exitCode != 0);
   }
 
-  /** --help and --xml exit with 0; --xml describes the app as a CTK command line module. */
+  /**
+   * --help and --xml exit with 0; --xml describes the app as a CTK command line module, in
+   * well-formed XML: MITK's parser writes the help texts unescaped, so a '<' or '&' in them breaks
+   * the description for the Workbench. Parser warnings printed before the XML are skipped.
+   */
   inline void CheckHelpAndXml(const std::vector<std::string> &apps)
   {
     const std::string dir = WorkDir("help");
@@ -111,7 +116,15 @@ namespace mitk::CmdAppTest
       const auto help = RunOk(app, {"--help"}, dir);
       CPPUNIT_ASSERT_MESSAGE("Mitk" + app + " --help:\n" + help.output, help.output.find("Use --help") != std::string::npos);
       const auto xml = RunOk(app, {"--xml"}, dir);
-      CPPUNIT_ASSERT_MESSAGE("Mitk" + app + " --xml:\n" + xml.output, xml.output.find("<executable>") != std::string::npos);
+      const auto begin = xml.output.find("<executable>");
+      const auto end = xml.output.find("</executable>");
+      CPPUNIT_ASSERT_MESSAGE("Mitk" + app + " --xml:\n" + xml.output, begin != std::string::npos && end != std::string::npos);
+      tinyxml2::XMLDocument document;
+      const std::string description = xml.output.substr(begin, end + std::string("</executable>").size() - begin);
+      CPPUNIT_ASSERT_MESSAGE("Mitk" + app + " --xml is not well-formed:\n" + xml.output, document.Parse(description.c_str()) == tinyxml2::XML_SUCCESS);
+      // tinyxml2 accepts a bare '&' as text, strict XML readers do not; the parser writes no
+      // entities, so the description must hold no '&' at all.
+      CPPUNIT_ASSERT_MESSAGE("Mitk" + app + " --xml contains '&':\n" + xml.output, description.find('&') == std::string::npos);
     }
   }
 

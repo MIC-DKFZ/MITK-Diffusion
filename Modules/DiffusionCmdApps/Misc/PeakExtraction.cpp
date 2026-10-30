@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
   mitkCommandLineParser parser;
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input image", "SH coefficient image; the SH order is read from it", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output root", "writes <root>_PEAKS.nrrd and <root>_NUM_PEAKS.nrrd", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output root", "writes ROOT_PEAKS.nrrd and ROOT_NUM_PEAKS.nrrd", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("mask", "m", mitkCommandLineParser::String, "Mask", "mask image; voxels where it is 0 get no peaks", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("normalization", "n", mitkCommandLineParser::Int, "Normalization", "0=no norm (ODF value), 1=max norm (relative to the largest peak), 2=single vec norm (unit vectors)", 1, true);
   parser.addArgument("numpeaks", "p", mitkCommandLineParser::Int, "Max. number of peaks", "maximum number of extracted peaks per voxel", 2, true);
