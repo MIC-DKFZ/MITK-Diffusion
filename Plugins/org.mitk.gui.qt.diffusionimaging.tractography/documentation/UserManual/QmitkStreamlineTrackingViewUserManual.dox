@@ -56,7 +56,7 @@ Specify various ROI and mask images to constrain the tractography process. Each 
   - At least one EP is required to be located in the target image (command line option MIN_ONE_EP_IN_TARGET)
   - Exactly one EP is required to be located in the target image (command line option ONE_EP_IN_TARGET)
   - No EP is allowed to be located in the target image (command line option NO_EP_IN_TARGET)
-- Target Image: ROI image needed for endpoint constraints. It is ignored with "No constraints on endpoint locations". A segmentation as target image keeps its label values, so the label difference constraint compares labels.
+- Target Image: ROI image needed for endpoint constraints. It is ignored with "No constraints on endpoint locations". A segmentation as target image keeps its label values for the label difference constraint, which compares labels; the other constraints use the union of its labels.
 
 \section StrTrackUserManualParameters Tractography Parameters
 

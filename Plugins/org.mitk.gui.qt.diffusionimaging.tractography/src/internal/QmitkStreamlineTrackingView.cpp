@@ -1128,8 +1128,11 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
       && m_Controls->m_TargetImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    // label values: the "label difference" constraint compares the target values at both ends
-    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_TargetImageSelectionWidget->GetSelectedNode()->GetData(), true), mask);
+    // Label values only for "label difference", which compares the target values at both ends. The
+    // other constraints test the target with a 0.5 threshold on interpolated values, so label values
+    // above 1 would widen the target region; they get the 0/1 union like a binary mask.
+    const bool keepLabelValues = params->m_EpConstraints == itk::StreamlineTrackingFilter::EndpointConstraints::EPS_IN_TARGET_LABELDIFF;
+    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_TargetImageSelectionWidget->GetSelectedNode()->GetData(), keepLabelValues), mask);
     m_Tracker->SetTargetRegions(mask);
   }
 
