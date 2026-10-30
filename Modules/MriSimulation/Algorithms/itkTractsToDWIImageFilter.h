@@ -135,6 +135,7 @@ protected:
       std::vector< itk::Vector<double, 3> > coilPositions;
       std::vector< Spike > spikes;
       int threadsPerSlice;
+      double timeSegmentBytes;   ///< memory limit of the time segments of one slice job
       bool storeTimings;   ///< the job of volume 0, slice 0 and coil 0 stores the readout timings
       DoubleDwiType::Pointer magnitude;
       std::atomic<unsigned int>* cappedJobs;   ///< counts the jobs that took the exact sum instead of the time segments asked for

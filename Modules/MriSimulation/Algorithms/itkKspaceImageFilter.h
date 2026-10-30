@@ -89,8 +89,14 @@ namespace itk{
     itkGetConstMacro( NumSegments, unsigned int )   ///< time segments of the last update; 0 for the exact sum and without distortions and eddy currents
     itkGetConstMacro( TimeSegmentsCapped, bool )    ///< time segments were asked for, but would have cost more than the exact sum, which the last update took
 
-    /** Memory limit of the spectra and interpolators of the time segments of one slice job (one job runs per parallel volume). */
-    static constexpr double MAX_TIME_SEGMENT_BYTES = 256.0*1024*1024;
+    /**
+     * Memory of the time segments of all slice jobs of a simulation together; TractsToDWIImageFilter
+     * gives each of its parallel jobs (one per parallel volume) an equal share (SetMaxTimeSegmentBytes).
+     */
+    static constexpr double TIME_SEGMENT_MEMORY_BUDGET = 2.0*1024*1024*1024;
+    /** Memory limit of the time segments of this filter's slice; above it the slice takes the exact sum. TIME_SEGMENT_MEMORY_BUDGET by default. */
+    itkSetMacro( MaxTimeSegmentBytes, double )
+    itkGetConstMacro( MaxTimeSegmentBytes, double )
 
     void SetParameters( const mitk::FiberfoxParameters* param ){ m_Parameters = param; }
     void SetMotion( const mitk::FiberfoxMotion& motion ){ m_Motion = motion; }  ///< head motion of the volume; moves the frequency map
@@ -199,6 +205,7 @@ namespace itk{
     std::vector< std::vector< std::complex<double> > > m_CompartmentSpectra;
 
     unsigned int                            m_NumSegments;  ///< L of the time segments, 0 for the other two paths
+    double                                  m_MaxTimeSegmentBytes;
     bool                                    m_TimeSegmentsCapped;
 
   private:

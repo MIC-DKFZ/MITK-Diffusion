@@ -185,6 +185,8 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
   // so the split does not change the result.
   int out_threads = std::max(1, std::min(max_threads, num_gradient_volumes));
   run.threadsPerSlice = std::max(1, max_threads/out_threads);
+  // the jobs of the parallel volumes share the memory budget of the time segments, so that it bounds the total
+  run.timeSegmentBytes = KspaceImageFilter< Float2DImageType::PixelType >::TIME_SEGMENT_MEMORY_BUDGET/out_threads;
   PrintToLog("Parallel volumes: " + boost::lexical_cast<std::string>(out_threads), false, true, true);
   PrintToLog("Threads per slice: " + boost::lexical_cast<std::string>(run.threadsPerSlice), false, true, true);
 
@@ -343,6 +345,7 @@ std::string TractsToDWIImageFilter< PixelType >::SimulateKspaceCoil(const Kspace
   idft->SetDiffusionGradientDirection(m_Parameters.m_SignalGen.GetGradientDirection(g)*m_Parameters.m_SignalGen.GetBvalue()/1000.0);
   idft->SetSpikesPerSlice(numSpikes);
   idft->SetNumberOfWorkUnits(run.threadsPerSlice);
+  idft->SetMaxTimeSegmentBytes(run.timeSegmentBytes);
   const bool storeTimings = run.storeTimings && g==0 && z==0 && c==0;
   idft->SetStoreTimings(storeTimings);
   idft->Update();

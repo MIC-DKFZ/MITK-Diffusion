@@ -54,6 +54,7 @@ namespace itk {
     , m_IsBaseline(true)
     , m_StoreTimings(false)
     , m_NumSegments(0)
+    , m_MaxTimeSegmentBytes(TIME_SEGMENT_MEMORY_BUDGET)
     , m_TimeSegmentsCapped(false)
   {
     m_DiffusionGradientDirection.Fill(0.0);
@@ -385,7 +386,7 @@ namespace itk {
    * a quarter until the energy-weighted RMS interpolation residual of the pixels at sampled readout
    * times, estimated from pixels of every bin of the histogram, is below 1e-4. Where the time
    * segments would take longer than the exact sum on one core (estimated before each fit, with the
-   * fits done), or more memory than MAX_TIME_SEGMENT_BYTES, the slice takes the exact sum
+   * fits done), or more memory than m_MaxTimeSegmentBytes, the slice takes the exact sum
    * (GetTimeSegmentsCapped).
    */
   template< class ScalarType >
@@ -743,7 +744,7 @@ namespace itk {
       // (automatic count; 0.8 leaves the close cases to the exact sum, which has no approximation error).
       // Counting the time spent bounds the time a slice can lose to a refinement that ends in the exact sum.
       const double check = requested > 0 ? 0.0 : checkTime(numSegments);
-      if (memory(numSegments) > MAX_TIME_SEGMENT_BYTES ||
+      if (memory(numSegments) > m_MaxTimeSegmentBytes ||
           (requested <= 0 && spentTime + fitTime(numSegments) + check + finalTime(numSegments) > 0.8*exactTime))
       {
         m_TimeSegmentsCapped = true;
