@@ -48,14 +48,14 @@ namespace
 
 std::string mitk::DiffusionDataIOHelper::GetExtension(const std::string& path)
 {
-  const std::string name = ist::LowerCase(ist::GetFilenameName(path));
+  const std::string name = itksys::SystemTools::LowerCase(itksys::SystemTools::GetFilenameName(path));
   std::size_t longest = 0;
   mitk::CoreServicePointer<mitk::IMimeTypeProvider> provider(mitk::CoreServices::GetMimeTypeProvider());
   for (const auto& mimeType : provider->GetMimeTypes())
   {
     for (const auto& extension : mimeType.GetExtensions())
     {
-      const std::string dotted = "." + ist::LowerCase(extension);
+      const std::string dotted = "." + itksys::SystemTools::LowerCase(extension);
       if (!extension.empty() && dotted.size() > longest && name.ends_with(dotted))
         longest = dotted.size();
     }
@@ -70,7 +70,7 @@ std::string mitk::DiffusionDataIOHelper::GetPathWithoutExtension(const std::stri
 
 std::string mitk::DiffusionDataIOHelper::GetNameWithoutExtension(const std::string& path)
 {
-  return ist::GetFilenameName(GetPathWithoutExtension(path));
+  return itksys::SystemTools::GetFilenameName(GetPathWithoutExtension(path));
 }
 
 std::vector< std::string > mitk::DiffusionDataIOHelper::get_file_list(const std::string& path, const std::vector<std::string> extensions)

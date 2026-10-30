@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
   // load_mitk_images skips paths that do not exist; check them before the registration runs.
   for (const auto& file : coreg)
   {
-    if (!ist::FileExists(file))
+    if (!itksys::SystemTools::FileExists(file))
     {
       std::cout << "--coreg: " << file << " does not exist." << std::endl;
       return EXIT_FAILURE;
@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
       mitk::IOUtil::Save(registered_image, o);
 
     // Next to the output; for an output without folder, in the working directory.
-    std::string path = ist::GetFilenamePath(o);
+    std::string path = itksys::SystemTools::GetFilenamePath(o);
     if (!path.empty())
       path += "/";
     std::vector< std::string > file_names;

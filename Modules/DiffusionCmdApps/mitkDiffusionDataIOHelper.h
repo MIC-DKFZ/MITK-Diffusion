@@ -27,8 +27,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkDirectory.h>
 #include <mitkLocaleSwitch.h>
 
-typedef itksys::SystemTools ist;
-
 namespace mitk{
 
 class MITKDIFFUSIONCMDAPPS_EXPORT DiffusionDataIOHelper
@@ -98,80 +96,6 @@ public:
     std::cout.clear();
     MITK_INFO << "Loaded 0 images";
     return nullptr;
-  }
-
-  template< class TYPE >
-  static std::vector< typename TYPE::Pointer > load_itk_images(const std::vector<std::string> files, std::vector<std::string>* filenames=nullptr)
-  {
-    std::cout.setstate(std::ios_base::failbit);
-    std::vector< typename TYPE::Pointer > out;
-
-    try {
-      for (auto f : files)
-      {
-        if (itksys::SystemTools::FileExists(f, true))
-        {
-          mitk::Image::Pointer image = mitk::IOUtil::Load<mitk::Image>(f);
-          if (image.IsNotNull())
-          {
-            typedef mitk::ImageToItk< TYPE > CasterType;
-            typename CasterType::Pointer caster = CasterType::New();
-            caster->SetInput(image);
-            caster->Update();
-            typename TYPE::Pointer itk_image = caster->GetOutput();
-
-            out.push_back(itk_image);
-            if (filenames!=nullptr)
-              filenames->push_back(f);
-          }
-        }
-        else if (itksys::SystemTools::PathExists(f))
-        {
-          if (!f.empty() && f.back() != '/')
-            f += "/";
-
-          auto list = get_file_list(f, {".nrrd",".nii.gz",".nii"});
-          for (auto file : list)
-          {
-            mitk::Image::Pointer image = mitk::IOUtil::Load<mitk::Image>(file);
-            if (image.IsNotNull())
-            {
-              typedef mitk::ImageToItk< TYPE > CasterType;
-              typename CasterType::Pointer caster = CasterType::New();
-              caster->SetInput(image);
-              caster->Update();
-              typename TYPE::Pointer itk_image = caster->GetOutput();
-
-              out.push_back(itk_image);
-              if (filenames!=nullptr)
-                filenames->push_back(file);
-            }
-          }
-        }
-      }
-    }
-    catch (const itk::ExceptionObject& e)
-    {
-      std::cout.clear();
-      std::cout << e.what();
-      return out;
-    }
-    catch (std::exception& e)
-    {
-      std::cout.clear();
-      std::cout << e.what();
-      return out;
-    }
-    catch (...)
-    {
-      std::cout.clear();
-      std::cout << "ERROR!?!";
-      return out;
-    }
-
-    std::cout.clear();
-    MITK_INFO << "Loaded " << out.size() << " images";
-    return out;
   }
 
 };

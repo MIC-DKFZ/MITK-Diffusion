@@ -32,8 +32,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionDataIOHelper.h>
 #include <mitkExceptionMacro.h>
 
-typedef itksys::SystemTools ist;
-
 /*!
 \brief Spatially cluster fibers
 */
