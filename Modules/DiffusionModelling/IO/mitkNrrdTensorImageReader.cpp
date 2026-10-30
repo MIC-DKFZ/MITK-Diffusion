@@ -27,6 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkITKImageImport.h"
 #include "mitkImageDataItem.h"
 #include <mitkLocaleSwitch.h>
+#include <mitkNrrdMeasurementFrame.h>
 #include <mitkIOUtil.h>
 #include <itksys/SystemTools.hxx>
 
@@ -72,38 +73,16 @@ namespace
   /**
    * Returns the rotation M from the measurement frame to world coordinates, so that the world
    * tensor is M * T * M^T. Both the standard NRRD field and MITK's own "measurement frame" key hold
-   * the frame vectors F as rows, and M = F^T, the same convention as for DWI gradients
-   * (modified = MF^T * original). No MITK version wrote a frame into tensor files, so MITK's key
-   * needs no legacy direction. No frame or an all-zero frame gives nothing.
+   * the frame vectors F as rows (mitk::ReadNrrdMeasurementFrame), and M = F^T, the same convention
+   * as for DWI gradients (modified = MF^T * original). No MITK version wrote a frame into tensor
+   * files, so MITK's key needs no legacy direction. No frame or an all-zero frame gives nothing.
    */
   std::optional<FrameType> ReadFrameToWorld(const itk::MetaDataDictionary& dictionary)
   {
-    std::optional<FrameType> frame;
-
-    // ITK stores the standard NRRD field (written by Slicer, DTIPrep, ITK) as a matrix, not as a string.
-    std::vector<std::vector<double>> rows;
-    if (itk::ExposeMetaData(dictionary, "NRRD_measurement frame", rows) && rows.size() == 3 && rows[0].size() == 3 && rows[1].size() == 3 && rows[2].size() == 3)
-    {
-      FrameType standardFrame;
-      for (unsigned int r = 0; r < 3; ++r)
-        for (unsigned int c = 0; c < 3; ++c)
-          standardFrame(r, c) = rows[r][c];
-      frame = standardFrame;
-    }
-
-    std::string value;
-    if (!frame && itk::ExposeMetaData<std::string>(dictionary, "measurement frame", value))
-    {
-      FrameType mitkFrame;
-      if (sscanf(value.c_str(), " ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) ",
-                 &mitkFrame(0, 0), &mitkFrame(0, 1), &mitkFrame(0, 2), &mitkFrame(1, 0), &mitkFrame(1, 1), &mitkFrame(1, 2), &mitkFrame(2, 0), &mitkFrame(2, 1), &mitkFrame(2, 2)) != 9)
-        mitkThrow() << "Invalid measurement frame " << value;
-      frame = mitkFrame;
-    }
-
-    if (!frame || frame->GetVnlMatrix().absolute_value_max() <= 1e-9)
+    const auto frame = mitk::ReadNrrdMeasurementFrame(dictionary).frame;
+    if (!frame)
       return std::nullopt;
-    return FrameType(frame->GetTranspose());
+    return FrameType(frame->transpose());
   }
 
   using TensorImageType = mitk::TensorImage::ItkTensorImageType;
