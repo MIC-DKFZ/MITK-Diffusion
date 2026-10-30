@@ -8,6 +8,7 @@ set(MITK_USE_MatchPoint ON CACHE BOOL "" FORCE)
 set(MITK_USE_OpenCV ON CACHE BOOL "" FORCE)
 
 # modules
+set(BUILD_MODULE_DiffusionMasks ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration ON CACHE BOOL "" FORCE)

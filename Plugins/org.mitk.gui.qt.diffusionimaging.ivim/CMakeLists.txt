@@ -5,5 +5,5 @@ project(org_mitk_gui_qt_diffusionimaging_ivim)
 mitk_create_plugin(
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_IVIM_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkQtWidgetsExt MitkIVIM
+  MODULE_DEPENDS MitkQtWidgetsExt MitkIVIM MitkDiffusionMasks
 )

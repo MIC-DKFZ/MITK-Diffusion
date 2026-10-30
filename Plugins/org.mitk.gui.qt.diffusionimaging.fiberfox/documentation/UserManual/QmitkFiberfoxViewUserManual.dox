@@ -24,7 +24,7 @@ and the restricted diffusion in other cell types (extra-axonal compartment 2) we
 
 A diffusion-weighted image is generated from the fibers by selecting the according fiber bundle in the "Fiber Bundle" combobox and clicking "Start Simulation".
 If some other diffusion-weighted image is selected together with the fiber bundle, Fiberfox directly uses the parameters of the selected image (size, spacing, gradient directions, b-values) for the signal generation process.
-Additionally a binary image can be selected that defines the tissue area. Voxels outside of this mask will contain no signal, only noise and other effects induced by the acquisiton (ghosts etc.).
+Additionally a binary image or a segmentation (all of its labels together) can be selected that defines the tissue area. Voxels outside of this mask will contain no signal, only noise and other effects induced by the acquisiton (ghosts etc.).
 If a save path is specified, the simulated image will be saved at this location, together with the parameters of this run as .ffp file (dots in the image name become underscores) and the log of the simulation as .log file. If no path is specified,
 the simulated image will only appear in the data manager and has to be saved manually, and no log file is written.
 While the simulation runs, the view shows its log: the settings, each simulation step with a progress bar, and at the end the head motion and the spikes (by volume, coil and slice).

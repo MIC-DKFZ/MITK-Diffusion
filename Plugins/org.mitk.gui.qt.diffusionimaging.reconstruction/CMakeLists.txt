@@ -5,5 +5,5 @@ project(org_mitk_gui_qt_diffusionimaging_reconstruction)
 mitk_create_plugin(
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_RECONSTRUCTION_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkQtWidgets MitkDiffusionModelling MitkDiffusionPreprocessing
+  MODULE_DEPENDS MitkQtWidgets MitkDiffusionModelling MitkDiffusionPreprocessing MitkDiffusionMasks
 )

@@ -1,5 +1,6 @@
 set(MITK_MODULES
   DiffusionImage
+  DiffusionMasks
   DiffusionPreprocessing
   DiffusionModelling
   DiffusionRegistration

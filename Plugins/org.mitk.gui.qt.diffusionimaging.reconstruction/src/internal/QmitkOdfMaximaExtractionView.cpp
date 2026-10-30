@@ -18,15 +18,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkReconstructionResults.h"
 
+#include <mitkDiffusionMasks.h>
 #include <mitkDiffusionPeaks.h>
 #include <mitkExceptionMacro.h>
-#include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateDataType.h>
-#include <mitkNodePredicateDimension.h>
-#include <mitkNodePredicateIsDWI.h>
-#include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateOr.h>
-#include <mitkNodePredicateProperty.h>
 
 #include <algorithm>
 #include <initializer_list>
@@ -53,11 +49,7 @@ void QmitkOdfMaximaExtractionView::CreateQtPartControl(QWidget *parent)
   m_Controls->m_MaskBox->SetDataStorage(this->GetDataStorage());
   m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
 
-  auto isNoDwi = mitk::NodePredicateNot::New(mitk::NodePredicateIsDWI::New());
-  auto isNoOdf = mitk::NodePredicateNot::New(mitk::NodePredicateDataType::New("OdfImage"));
-  auto isBinary = mitk::NodePredicateProperty::New("binary", mitk::BoolProperty::New(true));
-  m_Controls->m_MaskBox->SetPredicate(mitk::NodePredicateAnd::New(
-    mitk::NodePredicateAnd::New(mitk::NodePredicateAnd::New(isNoOdf, isNoDwi), mitk::NodePredicateDimension::New(3)), isBinary));
+  m_Controls->m_MaskBox->SetPredicate(mitk::GetBinaryMaskPredicate());
   m_Controls->m_ImageBox->SetPredicate(mitk::NodePredicateOr::New(mitk::TNodePredicateDataType<mitk::TensorImage>::New(),
                                                                   mitk::TNodePredicateDataType<mitk::ShImage>::New()));
   m_Controls->m_MaskBox->SetZeroEntryText("--");
@@ -79,7 +71,8 @@ void QmitkOdfMaximaExtractionView::StartPeakExtraction()
   if (m_Busy || imageNode.IsNull())
     return;
   auto maskNode = m_Controls->m_MaskBox->GetSelectedNode();
-  mitk::Image::ConstPointer mask = maskNode.IsNotNull() ? dynamic_cast<mitk::Image *>(maskNode->GetData()) : nullptr;
+  // A segmentation becomes a mask image in the worker thread, where its errors are reported too.
+  mitk::BaseData::ConstPointer maskData = maskNode.IsNotNull() ? maskNode->GetData() : nullptr;
   const bool outputNumberOfPeaks = m_Controls->m_OutputNumDirectionsBox->isChecked();
   const auto done = [this, imageNode, outputNumberOfPeaks](const char *peaksSuffix, const char *numberSuffix) {
     return [this, imageNode, outputNumberOfPeaks, peaksSuffix, numberSuffix](const mitk::PeakResult &result) {
@@ -96,7 +89,9 @@ void QmitkOdfMaximaExtractionView::StartPeakExtraction()
     const bool normalize = m_Controls->m_NormalizationBox->currentIndex() != 0;
     this->RunInBackground(
       "Peak extraction not possible:",
-      [tensors, faThreshold, normalize, mask]() { return mitk::ExtractTensorPeaks(tensors, faThreshold, normalize, mask); },
+      [tensors, faThreshold, normalize, maskData]() {
+        return mitk::ExtractTensorPeaks(tensors, faThreshold, normalize, mitk::GetMaskImage(maskData));
+      },
       done("_PrincipalDirection", "_NumDirections"));
     return;
   }
@@ -121,7 +116,7 @@ void QmitkOdfMaximaExtractionView::StartPeakExtraction()
 
   this->RunInBackground(
     "Peak extraction not possible:",
-    [shImage, parameters, mask]() { return mitk::ExtractPeaks(shImage, parameters, mask); },
+    [shImage, parameters, maskData]() { return mitk::ExtractPeaks(shImage, parameters, mitk::GetMaskImage(maskData)); },
     done("_PEAKS", "_NUM_DIRECTIONS"));
 }
 

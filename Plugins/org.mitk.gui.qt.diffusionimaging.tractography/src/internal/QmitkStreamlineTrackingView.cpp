@@ -36,9 +36,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
+#include <mitkDiffusionMasks.h>
 #include <mitkNodePredicateDataType.h>
 #include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateAnd.h>
+#include <mitkNodePredicateOr.h>
 #include <mitkNodePredicateProperty.h>
 #include <mitkNodePredicateDimension.h>
 #include <mitkOdfImage.h>
@@ -143,24 +145,27 @@ void QmitkStreamlineTrackingView::CreateQtPartControl( QWidget *parent )
     mitk::NodePredicateNot::Pointer isNotBinaryPredicate = mitk::NodePredicateNot::New( isBinaryPredicate );
     mitk::NodePredicateAnd::Pointer isNotABinaryImagePredicate = mitk::NodePredicateAnd::New( isImagePredicate, isNotBinaryPredicate );
     mitk::NodePredicateDimension::Pointer dimensionPredicate = mitk::NodePredicateDimension::New(3);
+    // seed, mask, stop, target and exclusion regions: any 3D image or a segmentation
+    auto isRegionImage = mitk::NodePredicateOr::New(mitk::NodePredicateAnd::New(isImagePredicate, dimensionPredicate),
+                                                    mitk::GetSegmentationMaskPredicate());
 
     m_Controls->m_FaImageSelectionWidget->SetNodePredicate( mitk::NodePredicateAnd::New(isNotABinaryImagePredicate, dimensionPredicate) );
     m_Controls->m_FaImageSelectionWidget->SetEmptyInfo("--");
     m_Controls->m_FaImageSelectionWidget->SetSelectionIsOptional(true);
 
-    m_Controls->m_SeedImageSelectionWidget->SetNodePredicate( mitk::NodePredicateAnd::New(isImagePredicate, dimensionPredicate) );
+    m_Controls->m_SeedImageSelectionWidget->SetNodePredicate( isRegionImage );
     m_Controls->m_SeedImageSelectionWidget->SetEmptyInfo("--");
     m_Controls->m_SeedImageSelectionWidget->SetSelectionIsOptional(true);
 
-    m_Controls->m_MaskImageSelectionWidget->SetNodePredicate( mitk::NodePredicateAnd::New(isImagePredicate, dimensionPredicate) );
+    m_Controls->m_MaskImageSelectionWidget->SetNodePredicate( isRegionImage );
     m_Controls->m_MaskImageSelectionWidget->SetEmptyInfo("--");
     m_Controls->m_MaskImageSelectionWidget->SetSelectionIsOptional(true);
 
-    m_Controls->m_StopImageSelectionWidget->SetNodePredicate( mitk::NodePredicateAnd::New(isImagePredicate, dimensionPredicate) );
+    m_Controls->m_StopImageSelectionWidget->SetNodePredicate( isRegionImage );
     m_Controls->m_StopImageSelectionWidget->SetEmptyInfo("--");
     m_Controls->m_StopImageSelectionWidget->SetSelectionIsOptional(true);
 
-    m_Controls->m_TargetImageSelectionWidget->SetNodePredicate( mitk::NodePredicateAnd::New(isImagePredicate, dimensionPredicate) );
+    m_Controls->m_TargetImageSelectionWidget->SetNodePredicate( isRegionImage );
     m_Controls->m_TargetImageSelectionWidget->SetEmptyInfo("--");
     m_Controls->m_TargetImageSelectionWidget->SetSelectionIsOptional(true);
 
@@ -168,7 +173,7 @@ void QmitkStreamlineTrackingView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_PriorImageSelectionWidget->SetEmptyInfo("--");
     m_Controls->m_PriorImageSelectionWidget->SetSelectionIsOptional(true);
 
-    m_Controls->m_ExclusionImageSelectionWidget->SetNodePredicate( mitk::NodePredicateAnd::New(isImagePredicate, dimensionPredicate) );
+    m_Controls->m_ExclusionImageSelectionWidget->SetNodePredicate( isRegionImage );
     m_Controls->m_ExclusionImageSelectionWidget->SetEmptyInfo("--");
     m_Controls->m_ExclusionImageSelectionWidget->SetSelectionIsOptional(true);
 
@@ -1099,21 +1104,21 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
   else if (m_Controls->m_SeedImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_SeedImageSelectionWidget->GetSelectedNode()->GetData()), mask);
+    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_SeedImageSelectionWidget->GetSelectedNode()->GetData()), mask);
     m_Tracker->SetSeedImage(mask);
   }
 
   if (m_Controls->m_MaskImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_MaskImageSelectionWidget->GetSelectedNode()->GetData()), mask);
+    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_MaskImageSelectionWidget->GetSelectedNode()->GetData()), mask);
     m_Tracker->SetMaskImage(mask);
   }
 
   if (m_Controls->m_StopImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_StopImageSelectionWidget->GetSelectedNode()->GetData()), mask);
+    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_StopImageSelectionWidget->GetSelectedNode()->GetData()), mask);
     m_Tracker->SetStoppingRegions(mask);
   }
 
@@ -1123,7 +1128,8 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
       && m_Controls->m_TargetImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_TargetImageSelectionWidget->GetSelectedNode()->GetData()), mask);
+    // label values: the "label difference" constraint compares the target values at both ends
+    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_TargetImageSelectionWidget->GetSelectedNode()->GetData(), true), mask);
     m_Tracker->SetTargetRegions(mask);
   }
 
@@ -1160,7 +1166,7 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
   if (m_Controls->m_ExclusionImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_ExclusionImageSelectionWidget->GetSelectedNode()->GetData()), mask);
+    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_ExclusionImageSelectionWidget->GetSelectedNode()->GetData()), mask);
     m_Tracker->SetExclusionRegions(mask);
   }
 

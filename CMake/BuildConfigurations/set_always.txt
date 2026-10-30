@@ -33,6 +33,7 @@ set(MITK_USE_Python3 OFF CACHE BOOL "" FORCE)
 set(MITK_USE_pybind11 OFF CACHE BOOL "" FORCE)
 
 # modules
+set(BUILD_MODULE_DiffusionMasks OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionModelling OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionPreprocessing OFF CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration OFF CACHE BOOL "" FORCE)
