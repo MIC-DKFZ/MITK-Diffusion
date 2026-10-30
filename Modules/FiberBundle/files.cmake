@@ -23,6 +23,9 @@ set(H_FILES
 
   Rendering/mitkFiberBundleMapper2D.h
   Rendering/mitkFiberBundleMapper3D.h
+  Rendering/mitkFiberTubeShader.h
+  Rendering/mitkFiberSlabIndex.h
+  Rendering/mitkFiberSlabTiles.h
 )
 
 set(CPP_FILES
@@ -57,6 +60,9 @@ set(CPP_FILES
 
   Rendering/mitkFiberBundleMapper2D.cpp
   Rendering/mitkFiberBundleMapper3D.cpp
+  Rendering/mitkFiberTubeShader.cpp
+  Rendering/mitkFiberSlabIndex.cpp
+  Rendering/mitkFiberSlabTiles.cpp
 )
 
 set(RESOURCE_FILES
