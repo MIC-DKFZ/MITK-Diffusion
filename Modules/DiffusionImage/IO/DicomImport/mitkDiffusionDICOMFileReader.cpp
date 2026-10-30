@@ -54,13 +54,13 @@ static void PerformHeaderAnalysis( mitk::DiffusionHeaderDICOMFileReader::DICOMHe
             << "  :: \t"<< weighted_images << " b > 0";
 }
 
-/** A DICOM string value without the trailing space or zero byte that pads odd-length values to
- *  even length; gdcm::Scanner returns the values padded, and the series description becomes the
- *  image name. */
+/** A DICOM string value without the trailing spaces that pad odd-length values to even length;
+ *  gdcm::Scanner returns the values padded, and the series description becomes the image name.
+ *  The zero byte that pads UIDs already ends the C string. */
 static std::string TrimDicomPadding(const char* value)
 {
   std::string text(value);
-  const auto end = text.find_last_not_of(std::string(" \0", 2));
+  const auto end = text.find_last_not_of(' ');
   return end == std::string::npos ? std::string() : text.substr(0, end + 1);
 }
 
