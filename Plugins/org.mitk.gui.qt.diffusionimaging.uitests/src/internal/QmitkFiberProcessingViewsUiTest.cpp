@@ -14,9 +14,13 @@ found in the LICENSE file.
 
 #include <mitkDiffusionTestData.h>
 #include <mitkFiberBundle.h>
+#include <mitkImageCast.h>
 #include <mitkImagePixelReadAccessor.h>
 #include <mitkIOUtil.h>
+#include <mitkPlanarCircle.h>
+#include <mitkPlanarPolygon.h>
 #include <mitkPointSet.h>
+#include <mitkSliceNavigationController.h>
 
 #include <QmitkDataStorageComboBox.h>
 
@@ -29,6 +33,16 @@ found in the LICENSE file.
 #include <QLabel>
 #include <QLineEdit>
 #include <QSpinBox>
+
+#include <itkEuler3DTransform.h>
+
+#include <vtkCell.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 using namespace QmitkDiffusionUiTest;
 
@@ -46,6 +60,7 @@ class QmitkFiberProcessingViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Processing_TwoBundlesAndMask_ExtractAndCopy);
   CPPUNIT_TEST(Processing_SelectedBundleDeleted_NotUsed);
   CPPUNIT_TEST(Processing_SegmentationRoi_AsBinaryMaskAlsoOneSlice);
+  CPPUNIT_TEST(Processing_RoiImageOfFigures_ObliqueGridUnionAndExtraction);
   CPPUNIT_TEST(Quantification_EnvelopeEndingsAndReferenceImages);
   CPPUNIT_TEST(Clustering_MissingInputs_MessagesAndClusters);
   CPPUNIT_TEST_SUITE_END();
@@ -271,6 +286,153 @@ public:
     CPPUNIT_ASSERT(fromOneSliceMask->GetNumFibers() > 0);
     CPPUNIT_ASSERT(ExtractPassing(view, fib, oneSliceSegmentation)->Equals(fromOneSliceMask));
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /** Distance of the point from the segment ab. */
+  static double DistanceToSegment(const mitk::Point3D &p, const mitk::Point3D &a, const mitk::Point3D &b)
+  {
+    const mitk::Vector3D ab = b - a;
+    const double lengthSquared = ab.GetSquaredNorm();
+    const double t = lengthSquared > 0 ? std::clamp(((p - a) * ab) / lengthSquared, 0.0, 1.0) : 0.0;
+    return p.EuclideanDistanceTo(a + ab * t);
+  }
+
+  void Processing_RoiImageOfFigures_ObliqueGridUnionAndExtraction()
+  {
+    // An image with anisotropic voxels (2 x 2 x 1 mm), rotated by 20 degrees about x and 10 about
+    // z, centred on the test bundle.
+    auto bundle = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib"));
+    const auto centre = bundle->GetGeometry()->GetCenter();
+    using ItkImage = itk::Image<unsigned char, 3>;
+    auto itkImage = ItkImage::New();
+    ItkImage::SizeType size = {{30, 30, 12}};
+    itkImage->SetRegions(ItkImage::RegionType(size));
+    ItkImage::SpacingType spacing;
+    spacing[0] = 2;
+    spacing[1] = 2;
+    spacing[2] = 1;
+    itkImage->SetSpacing(spacing);
+    auto rotation = itk::Euler3DTransform<double>::New();
+    rotation->SetRotation(20 * itk::Math::pi / 180, 0, 10 * itk::Math::pi / 180);
+    ItkImage::DirectionType direction;
+    direction = rotation->GetMatrix();
+    itkImage->SetDirection(direction);
+    itk::Vector<double, 3> halfExtent;
+    for (unsigned int i = 0; i < 3; ++i)
+      halfExtent[i] = spacing[i] * (size[i] / 2);
+    itkImage->SetOrigin(centre - direction * halfExtent);
+    itkImage->Allocate();
+    itkImage->FillBuffer(0);
+    mitk::Image::Pointer image;
+    mitk::CastToMitkImage(itkImage, image);
+    auto imageNode = AddNode(image, "oblique");
+
+    // A circle and a rectangle on the axial slice of the image through the bundle's centre, as
+    // a render window gives the plane to a figure drawn there.
+    auto controller = mitk::SliceNavigationController::New();
+    controller->SetInputWorldTimeGeometry(image->GetTimeGeometry());
+    controller->Update(mitk::AnatomicalPlane::Axial);
+    controller->SelectSliceByPoint(centre);
+    mitk::PlaneGeometry::Pointer plane = controller->GetCurrentPlaneGeometry()->Clone();
+    mitk::Vector3D u = plane->GetAxisVector(0);
+    mitk::Vector3D v = plane->GetAxisVector(1);
+    u.Normalize();
+    v.Normalize();
+    const mitk::Point3D circleCentre = centre - plane->GetNormal() / plane->GetNormal().GetNorm() * plane->SignedDistanceFromPlane(centre);
+    const double radius = 4;
+    auto circle = mitk::PlanarCircle::New();
+    circle->SetPlaneGeometry(plane);
+    mitk::Point2D point2D;
+    plane->Map(circleCentre, point2D);
+    circle->PlaceFigure(point2D);
+    plane->Map(circleCentre + u * radius, point2D);
+    circle->SetControlPoint(1, point2D);
+    const mitk::Point3D rectangleCentre = circleCentre + u * 9.0;
+    const double halfSide = 3;
+    auto rectangle = mitk::PlanarPolygon::New();
+    rectangle->SetPlaneGeometry(plane);
+    const double corners[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+    for (int k = 0; k < 4; ++k)
+    {
+      plane->Map(rectangleCentre + u * (corners[k][0] * halfSide) + v * (corners[k][1] * halfSide), point2D);
+      if (k == 0)
+        rectangle->PlaceFigure(point2D);
+      else
+        rectangle->AddControlPoint(point2D);
+    }
+    rectangle->SetClosed(true);
+    auto circleNode = AddNode(circle, "Circle1");
+    auto rectangleNode = AddNode(rectangle, "Polygon1");
+
+    // The ROI image of both figures: on the image's grid, both figures filled, nothing else set.
+    auto *view = ShowProcessing();
+    Select({imageNode, circleNode, rectangleNode});
+    auto *generate = GetChild<QCommandLinkButton>(view, "m_GenerateRoiImage");
+    CPPUNIT_ASSERT(generate->isEnabled());
+    generate->click();
+    Wait(50);
+    auto roi = GetDataStorage()->GetNamedNode("Circle1+Polygon1");
+    CPPUNIT_ASSERT(roi != nullptr);
+    auto *roiImage = dynamic_cast<mitk::Image *>(roi->GetData());
+    CPPUNIT_ASSERT(mitk::Equal(*image->GetGeometry(), *roiImage->GetGeometry(), 1e-6, 1e-6, true));
+    std::vector<mitk::Point3D> setVoxels;
+    {
+      mitk::ImagePixelReadAccessor<unsigned char, 3> access(roiImage);
+      itk::Index<3> index;
+      for (index[2] = 0; index[2] < 12; ++index[2])
+        for (index[1] = 0; index[1] < 30; ++index[1])
+          for (index[0] = 0; index[0] < 30; ++index[0])
+          {
+            if (access.GetPixelByIndex(index) == 0)
+              continue;
+            mitk::Point3D world;
+            roiImage->GetGeometry()->IndexToWorld(index, world);
+            setVoxels.push_back(world);
+          }
+      for (const auto &figureCentre : {circleCentre, rectangleCentre})
+      {
+        roiImage->GetGeometry()->WorldToIndex(figureCentre, index);
+        CPPUNIT_ASSERT(access.GetPixelByIndex(index) != 0);
+      }
+    }
+    // A voxel diagonal (3 mm) beyond the figures at most.
+    for (const auto &voxel : setVoxels)
+      CPPUNIT_ASSERT(voxel.EuclideanDistanceTo(circleCentre) <= radius + 3.0 || voxel.EuclideanDistanceTo(rectangleCentre) <= halfSide * std::sqrt(2.0) + 3.0);
+    const auto roiVoxels = setVoxels.size();
+
+    // An AND composite cannot be converted: a message, no image.
+    Select({circleNode, rectangleNode});
+    GetChild<QCommandLinkButton>(view, "PFCompoANDButton")->click();
+    Wait(50);
+    auto andNode = GetDataStorage()->GetNamedNode("AND");
+    CPPUNIT_ASSERT(andNode != nullptr);
+    Select({imageNode, andNode});
+    generate->click();
+    CPPUNIT_ASSERT(OneMessage().contains("AND and NOT composites cannot be converted"));
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), GetNodesOfClass("Image").size());
+
+    // Extraction with the ROI image: the fibers through the figures.
+    auto fib = AddNode(bundle, "bundle");
+    GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(1);
+    GetChild<QComboBox>(view, "m_ExtractionBoxMask")->setCurrentIndex(2); // passing ROI
+    auto passing = ExtractPassing(view, fib, roi);
+    CPPUNIT_ASSERT(passing->GetNumFibers() > 0 && passing->GetNumFibers() < bundle->GetNumFibers());
+    auto *polyData = passing->GetFiberPolyData().GetPointer();
+    for (unsigned int i = 0; i < passing->GetNumFibers(); ++i)
+    {
+      auto *points = polyData->GetCell(i)->GetPoints();
+      double closest = std::numeric_limits<double>::max();
+      for (vtkIdType j = 0; j + 1 < points->GetNumberOfPoints(); ++j)
+      {
+        mitk::Point3D a(points->GetPoint(j));
+        mitk::Point3D b(points->GetPoint(j + 1));
+        for (const auto &voxel : setVoxels)
+          closest = std::min(closest, DistanceToSegment(voxel, a, b));
+      }
+      CPPUNIT_ASSERT_MESSAGE("Fiber " + std::to_string(i) + " passes " + std::to_string(closest) + " mm from the ROI",
+                             closest <= 3.0 + 1e-6);
+    }
+    CPPUNIT_ASSERT(roiVoxels > 0);
   }
 
   void Quantification_EnvelopeEndingsAndReferenceImages()
