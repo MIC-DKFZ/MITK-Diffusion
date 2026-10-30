@@ -39,7 +39,7 @@ namespace mitk::ModelDirectionRotation
    * ODF images hold samples at the 252 directions of mitk::pointshell, which a rotation does not map
    * onto each other; they are turned through an SH fit of order 12, which is exact for the ODFs of
    * the Q-ball reconstructions and of SH images (order 12 or less) and smooths finer detail. A
-   * matrix within 1e-9 of the identity changes nothing.
+   * matrix within 1e-6 of the identity (float rounding of a geometry) changes nothing.
    *
    * \throw mitk::Exception for another image type or a matrix that is not orthogonal (1e-6).
    */

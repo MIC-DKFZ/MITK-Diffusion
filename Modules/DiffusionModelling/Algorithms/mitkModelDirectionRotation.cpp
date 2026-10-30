@@ -114,7 +114,7 @@ namespace
     const std::size_t volume = static_cast<std::size_t>(image->GetDimension(0)) * image->GetDimension(1) * image->GetDimension(2);
     const unsigned int numberOfPeaks = image->GetDimension(3) / 3;
 
-    NumberOfValues(image);
+    NumberOfValues(image); // throws unless the components are float, as the pointer below assumes
     mitk::ImageWriteAccessor accessor(image);
     auto *data = static_cast<float *>(accessor.GetData());
     for (unsigned int peak = 0; peak < numberOfPeaks; ++peak)
@@ -165,7 +165,11 @@ void mitk::ModelDirectionRotation::Rotate(Image *image, const MatrixType &rotati
   if ((rotation * rotation.transpose() - identity).absolute_value_max() > 1e-6)
     mitkThrow() << "The matrix is not orthogonal.";
   // Without a rotation the ODF fit below would still smooth the ODFs; the image stays as it is.
-  if ((rotation - identity).absolute_value_max() < 1e-9)
+  // Geometries that differ only by float rounding (NIfTI stores qform and sform as float) give
+  // about 1e-7, so a matrix within 1e-6 of the identity counts as none, the bound the
+  // orthogonality check above allows for rounding. Skipping it moves directions by at most about
+  // 1e-6 rad, below the error of the ODF fit on sharp ODFs (about 2e-6 of the maximum).
+  if ((rotation - identity).absolute_value_max() < 1e-6)
     return;
 
   if (dynamic_cast<TensorImage *>(image) != nullptr)

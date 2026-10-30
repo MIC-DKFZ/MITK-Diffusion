@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
   parser.addArgument("", "m", mitkCommandLineParser::String, "Moving:", "moving image", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("resample", "", mitkCommandLineParser::Bool, "Resample:", "resample moving image", false);
-  parser.addArgument("coreg", "", mitkCommandLineParser::StringList, "", "additionally apply transform to these images", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("coreg", "", mitkCommandLineParser::StringList, "", "additionally apply transform to these images (files or folders); written next to the output as NAME_registered.EXT", us::Any(), true, false, false, mitkCommandLineParser::Input);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
