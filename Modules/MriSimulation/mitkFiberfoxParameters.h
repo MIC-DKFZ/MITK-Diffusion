@@ -156,11 +156,14 @@ namespace mitk
      * time segments, a few transforms per slice instead of the full sum
      * (itk::KspaceImageFilter::ComputeTimeSegmentation); AUTOMATIC_TIME_SEGMENTS, the default and the
      * value for parameter files without the setting (the user's decision in #47), chooses L per slice
-     * so that the relative RMS error stays below 0.1 % (measured: 1.6e-5 at most), far below simulated
+     * so that the relative RMS error stays below 0.1 % (the residual check passes below an estimated
+     * 1e-4; measured: 4.9e-5 at most), far below simulated
      * noise; on a 128x128 slice it was 2.2 to 127 times faster than the exact sum on one core, the less
      * the stronger the field. A slice takes the exact sum where the automatic count would take longer
-     * than it on one core (so the choice does not depend on the threads), and for any L where the
-     * segments would need more than the slice job's share of KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET.
+     * than it on one core, and for any L where the segments would need more than
+     * KspaceImageFilter::MAX_TIME_SEGMENT_BYTES (256 MiB); so the choice, and the image, does not depend
+     * on the threads. Slice jobs running at the same time wait for memory beyond
+     * KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET (2 GiB together), which changes only the run time.
      */
     int                                 m_KspaceTimeSegments;
     static constexpr int                AUTOMATIC_TIME_SEGMENTS = -1;
