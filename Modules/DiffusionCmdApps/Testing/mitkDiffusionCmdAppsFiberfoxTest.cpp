@@ -23,6 +23,7 @@ class mitkDiffusionCmdAppsFiberfoxTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionCmdAppsFiberfoxTestSuite);
   MITK_TEST(HelpAndXml);
   MITK_TEST(Fiberfox_ArtifactsOnDwi_DottedPrefix);
+  MITK_TEST(Fiberfox_EddyOnDwi_FastKspace);
   MITK_TEST(Fiberfox_MissingParameters_Fails);
   MITK_TEST(RandomFiberPhantom_Bundles);
   CPPUNIT_TEST_SUITE_END();
@@ -40,6 +41,23 @@ public:
     auto dwi = Load<mitk::Image>(dir, "sim.01.nii.gz");
     CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi));
     CheckSize(dwi, 64, 64, 3);
+  }
+
+  // Eddy currents (BrainSlice_4) with the time-segmented k-space phase, which the log names; the
+  // exact sum would take about half a minute here in Debug. Contradicting phase options are refused.
+  void Fiberfox_EddyOnDwi_FastKspace()
+  {
+    const auto dir = WorkDir("FiberfoxFastKspace");
+    const auto input = Data("StreamlineTractography/diffusion_image.nii.gz");
+    const auto parameters = Data("Fiberfox/params/BrainSlice_4.ffp");
+    const auto result = RunOk("Fiberfox", {"-i", input, "-p", parameters, "-o", Path(dir, "sim.nii.gz"), "--fix_seed", "--fast_kspace"}, dir);
+    CPPUNIT_ASSERT_MESSAGE(result.output, result.output.find("time segments, count per slice from the phase spread") != std::string::npos);
+    auto dwi = Load<mitk::Image>(dir, "sim.nii.gz");
+    CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi));
+    CheckSize(dwi, 64, 64, 3);
+
+    RunFails("Fiberfox", {"-i", input, "-p", parameters, "-o", Path(dir, "both.nii.gz"), "--fast_kspace", "--exact_kspace"}, dir);
+    RunFails("Fiberfox", {"-i", input, "-p", parameters, "-o", Path(dir, "negative.nii.gz"), "--time_segments", "-3"}, dir);
   }
 
   void Fiberfox_MissingParameters_Fails()
