@@ -66,6 +66,7 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Fiberfox_PrototypeSignal_SavedSampledAndReused);
   CPPUNIT_TEST(Fiberfox_MotionVolumes_WarningsAndMovedVolumes);
   CPPUNIT_TEST(Fiberfox_SegmentationMaskAndRicianNoise_SignalInsideRequestedVariance);
+  CPPUNIT_TEST(Fiberfox_OutputFolderWithDot_ImageParametersAndLogOfTheRun);
   CPPUNIT_TEST(Fiberfox_SaveLoadSave_IdenticalParameterFiles);
   CPPUNIT_TEST(Fiberfox_NonXmlParameterFile_Message);
   CPPUNIT_TEST(Generation_RandomPhantomMinAboveMax_MessageForEachRange);
@@ -630,6 +631,62 @@ public:
     }
     CPPUNIT_ASSERT(count > 800);
     CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("mean square " + std::to_string(sum / count), 200.0, sum / count, 40.0);
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /**
+   * Output folder with a dot in its name: image, parameters and log of the run there under the
+   * image's name (dots of the result name become underscores); the parameters are the run's, also
+   * when the view changes during the run; the log file holds the status text. No log file without
+   * output folder. Artifacts added to a DWI are saved with signal scale 1.
+   */
+  void Fiberfox_OutputFolderWithDot_ImageParametersAndLogOfTheRun()
+  {
+    auto *view = ShowFiberfox();
+    auto fibers = AddFibers(view);
+    // Rician noise of variance 0.5 puts a dot into the result name
+    GetChild<QCheckBox>(view, "m_AddNoise")->setChecked(true);
+    GetChild<QComboBox>(view, "m_NoiseDistributionBox")->setCurrentIndex(1);
+    GetChild<QDoubleSpinBox>(view, "m_NoiseLevel")->setValue(0.5);
+    const auto folder = m_TempDir + "/out.put/";
+    std::filesystem::create_directories(folder);
+    GetChild<QLineEdit>(view, "m_SavePathEdit")->setText(QString::fromStdString(folder));
+    Start(view);
+    GetChild<QSpinBox>(view, "m_BvalueBox")->setValue(2000);   // during the run
+    CPPUNIT_ASSERT(WaitFor([&fibers]() { return NumDerived(fibers) == 1; }, 120000));
+    WaitForIdle(view);
+    CPPUNIT_ASSERT_EQUAL(std::string("b1000_StickBall_RICIAN-0.5"), GetDataStorage()->GetDerivations(fibers)->front()->GetName());
+    const auto base = folder + "b1000_StickBall_RICIAN-0_5";
+    for (const auto *extension : {".dwi", ".ffp", ".log"})
+      CPPUNIT_ASSERT_MESSAGE(base + extension, std::filesystem::exists(base + extension));
+    CPPUNIT_ASSERT_EQUAL(std::string("1000"), Element(base + ".ffp", "bvalue"));
+    const auto lines = [](const QString &text) {
+      QStringList result;
+      for (const auto &line : text.split('\n'))
+        if (!line.trimmed().isEmpty())
+          result.push_back(line.trimmed());
+      return result;
+    };
+    const auto log = lines(QString::fromStdString(Content(base + ".log")));
+    CPPUNIT_ASSERT(log.join(QChar(10)).contains("Finished simulation"));
+    // the status text has the simulation's log from the line naming the file, then the view's lines on saving
+    CPPUNIT_ASSERT(log.front().startsWith("Logfile: "));
+    CPPUNIT_ASSERT_MESSAGE(log.join('\n').toStdString(), lines(StatusText(view)).join('\n').contains(log.join('\n')));
+
+    GetChild<QLineEdit>(view, "m_SavePathEdit")->setText("-");
+    const auto filesBefore = std::distance(std::filesystem::directory_iterator(folder), std::filesystem::directory_iterator());
+    Simulate(view, fibers);
+    CPPUNIT_ASSERT_EQUAL(filesBefore, std::distance(std::filesystem::directory_iterator(folder), std::filesystem::directory_iterator()));
+
+    // artifacts added to a DWI
+    GetChild<QLineEdit>(view, "m_SavePathEdit")->setText(QString::fromStdString(folder));
+    GetChild<QCheckBox>(view, "m_AddNoise")->setChecked(false);
+    ChooseNode(view, "m_FiberBundleComboBox", nullptr);
+    auto dwi = Load("ImageReconstruction/test.dwi");
+    ChooseNode(view, "m_TemplateComboBox", dwi);
+    auto result = Simulate(view, dwi);
+    const auto saved = folder + result->GetName() + ".ffp";
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(saved, std::string("1"), Element(saved, "signalScale"));
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 

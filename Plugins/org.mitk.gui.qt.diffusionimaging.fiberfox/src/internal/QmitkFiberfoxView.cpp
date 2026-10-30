@@ -680,6 +680,9 @@ void QmitkFiberfoxView::ReadOutputSettings()
   m_Parameters.m_Misc.m_CheckAdvancedSignalOptionsBox = m_Controls->m_AdvancedOptionsBox_2->isChecked();
   m_Parameters.m_Misc.m_OutputAdditionalImages = m_Controls->m_VolumeFractionsBox->isChecked();
 
+  // the log file is named by the result, like the image and parameters saved with it; the prefix
+  // names the output of MitkFiberfox
+  m_Parameters.m_Misc.m_OutputPrefix = "";
   std::string outputPath = m_Controls->m_SavePathEdit->text().toStdString();
   // "-" or an emptied box: no automatic save (an empty path plus "/" would be the root folder)
   if (!outputPath.empty() && outputPath.compare("-")!=0)
