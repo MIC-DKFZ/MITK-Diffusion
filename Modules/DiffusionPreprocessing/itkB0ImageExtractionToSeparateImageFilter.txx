@@ -21,7 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionIterator.h>
-#include <mitkB0Indices.h>
+#include <mitkDiffusionPropertyHelper.h>
 
 #include <cmath>
 
@@ -39,7 +39,7 @@ std::vector<unsigned int> itk::B0ImageExtractionToSeparateImageFilter<TInputImag
   if (std::isnan(m_ReferenceBValue))
     itkExceptionMacro("The reference b-value is not set.");
 
-  std::vector<unsigned int> indices = mitk::GetB0Indices(m_Directions, m_ReferenceBValue);
+  std::vector<unsigned int> indices = mitk::DiffusionPropertyHelper::GetB0Indices(m_Directions, m_ReferenceBValue);
   // Without a b0 volume the output would silently have no time steps.
   if (indices.empty())
     itkExceptionMacro("The image has no b0 volume (no b-value rounds to 0).");

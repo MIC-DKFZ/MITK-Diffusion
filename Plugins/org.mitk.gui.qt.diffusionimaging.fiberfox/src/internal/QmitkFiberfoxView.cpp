@@ -1368,11 +1368,17 @@ bool QmitkFiberfoxView::SamplePrototypeKernels(mitk::Image::Pointer diffImg, con
   mitk::CastToItkImage(diffImg, itkVectorImagePointer);
   const double bValue = mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg);
 
+  // ITK takes only exact zero vectors as b0 volumes and fits every other volume at the reference
+  // b-value, so it gets a copy in which the b0 volumes of MITK's rule are zero vectors, as the
+  // Q-ball and ADC filters below and RawShModel::SampleKernels take them.
+  auto gradientsForItk = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+  for (const auto& g : *mitk::DiffusionPropertyHelper::GetGradientContainer(diffImg))
+    gradientsForItk->push_back(mitk::DiffusionPropertyHelper::IsB0(g, bValue) ? mitk::DiffusionPropertyHelper::GradientDirectionType(0.0) : g);
+
   typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, double > TensorReconstructionImageFilterType;
   TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
   filter->SetBValue(bValue);
-  filter->SetGradientImage(dynamic_cast<mitk::GradientDirectionsProperty *>(diffImg->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(),
-                           itkVectorImagePointer );
+  filter->SetGradientImage(gradientsForItk, itkVectorImagePointer);
   filter->Update();
 
   typedef mitk::RawShModel<>::QballFilterType QballFilterType;

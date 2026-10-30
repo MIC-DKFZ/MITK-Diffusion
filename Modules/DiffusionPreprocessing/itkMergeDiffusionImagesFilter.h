@@ -45,7 +45,7 @@ namespace itk
  *
  * The images must share their geometry (within ITK's default tolerances) and each needs as many
  * gradients as volumes. The output gradients are rescaled to the largest reference b-value; b0
- * volumes (mitk::IsB0) get the zero vector.
+ * volumes (mitk::DiffusionPropertyHelper::IsB0) get the zero vector.
  */
 template <class TScalarType>
 class MergeDiffusionImagesFilter

@@ -55,17 +55,18 @@ AdcImageFilter< TInPixelType, TOutPixelType>
   if (m_GradientDirections.IsNull() || m_GradientDirections->Size() != input->GetVectorLength())
     mitkThrow() << "Number of gradient directions does not match the number of image volumes!";
 
-  // Volumes with b <= 1 s/mm^2 are unweighted; both modes classify by this b-value.
+  // The b0 volumes (mitk::DiffusionPropertyHelper::IsB0) get b = 0 and are the unweighted ones of
+  // both modes; every other volume has b >= 0.5 s/mm^2.
   m_B_values.set_size(m_GradientDirections->Size());
   int nonzero = 0;
   for (unsigned int i=0; i<m_GradientDirections->Size(); i++)
   {
     GradientDirectionType g = m_GradientDirections->GetElement(i);
     double twonorm = g.two_norm();
-    double b = m_B_value*twonorm*twonorm;
+    double b = mitk::DiffusionPropertyHelper::IsB0(g, m_B_value) ? 0 : m_B_value*twonorm*twonorm;
     m_B_values[i] = b;
 
-    if (b>1)
+    if (b>0)
       nonzero++;
   }
 
@@ -73,7 +74,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>
   nonzero = 0;
   for (unsigned int i=0; i<m_B_values.size(); i++)
   {
-    if (m_B_values[i]>1)
+    if (m_B_values[i]>0)
     {
       m_Nonzero_B_values[nonzero] = m_B_values[i];
       nonzero++;
@@ -99,7 +100,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>::FitSingleVoxel( const typename Inp
   vnl_vector<double> m; m.set_size(m_Nonzero_B_values.size());
   for (unsigned int i=0; i<m_B_values.size(); i++)
   {
-    if (m_B_values[i]>1)
+    if (m_B_values[i]>0)
     {
       m[nonzero] = input[i];
       nonzero++;
@@ -155,7 +156,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>
       int c = 0;
       for (unsigned int i=0; i<inputImagePointer->GetVectorLength(); i++)
       {
-        if (m_B_values[i]<=1)
+        if (m_B_values[i]==0)
         {
           if (pix[i]>0)
           {
@@ -173,7 +174,7 @@ AdcImageFilter< TInPixelType, TOutPixelType>
         for (unsigned int i=0; i<inputImagePointer->GetVectorLength(); i++)
         {
           const double b = m_B_values[i];
-          if (b>1)
+          if (b>0)
           {
             double S = pix[i];
             if (S>0 && S0>0)

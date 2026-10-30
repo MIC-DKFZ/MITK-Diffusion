@@ -19,6 +19,7 @@ found in the LICENSE file.
 #include <mitkFileReaderSelector.h>
 #include <mitkIOUtil.h>
 #include <mitkImageCast.h>
+#include <mitkNrrdMeasurementFrame.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
 #include <itkImageFileReader.h>
@@ -42,6 +43,11 @@ class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
   MITK_TEST(NrrdReader_LegacyMitkFileWithRotation_AppliesRotationAndFrame);
   MITK_TEST(NrrdReader_StandardFileWithRotation_AppliesFrameOnly);
   MITK_TEST(NrrdReader_BothFrameKinds_ReadsIdentity);
+  MITK_TEST(NrrdReader_DifferentFrameKinds_StandardFieldWins);
+  MITK_TEST(NrrdReader_UnparsableMitkKeyNextToStandardField_ReadsStandardFrame);
+  MITK_TEST(NrrdReader_UnparsableMitkKeyAlone_Throws);
+  MITK_TEST(NrrdReader_AllZeroMitkFrame_ReadsIdentityAsLegacy);
+  MITK_TEST(NrrdFrame_AllZero_NoFrame);
   MITK_TEST(NrrdReader_GradientCountMismatch_Throws);
   MITK_TEST(NrrdReader_MissingBValue_Throws);
   MITK_TEST(NrrdReader_DetachedHeader_Reads);
@@ -142,6 +148,34 @@ class mitkDiffusionImageIOTestSuite : public mitk::TestFixture
     writer->SetFileName(path);
     writer->Update();
     return path;
+  }
+
+  /** MITK's key/value pair "measurement frame" with the rows of the frame. */
+  static void AddMitkFrameKey(itk::MetaDataDictionary& dictionary, const PropHelper::MeasurementFrameType& mf)
+  {
+    itk::EncapsulateMetaData<std::string>(dictionary, "measurement frame",
+      std::format(" ({},{},{}) ({},{},{}) ({},{},{})", mf(0,0), mf(0,1), mf(0,2), mf(1,0), mf(1,1), mf(1,2), mf(2,0), mf(2,1), mf(2,2)));
+  }
+
+  /** The standard NRRD field "measurement frame", as ITK's NRRD IO holds it: the frame vectors as rows. */
+  static void AddStandardFrameField(itk::MetaDataDictionary& dictionary, const PropHelper::MeasurementFrameType& mf)
+  {
+    const std::vector<std::vector<double>> rows = {{mf(0,0), mf(0,1), mf(0,2)}, {mf(1,0), mf(1,1), mf(1,2)}, {mf(2,0), mf(2,1), mf(2,2)}};
+    itk::EncapsulateMetaData<std::vector<std::vector<double>>>(dictionary, "NRRD_measurement frame", rows);
+  }
+
+  static PropHelper::MeasurementFrameType Permutation()
+  {
+    PropHelper::MeasurementFrameType frame;
+    frame.set_row(0, std::vector<double>{0, 1, 0}.data());
+    frame.set_row(1, std::vector<double>{-1, 0, 0}.data());
+    frame.set_row(2, std::vector<double>{0, 0, 1}.data());
+    return frame;
+  }
+
+  static double MaxDifference(const PropHelper::MeasurementFrameType& a, const PropHelper::MeasurementFrameType& b)
+  {
+    return (a - b).absolute_value_max();
   }
 
   /** modality, b-value and the first count gradients of m_Dwi. */
@@ -267,6 +301,71 @@ public:
     auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("FWE/InputDiffusionWeightedImage.dwi"));
     CPPUNIT_ASSERT(PropHelper::IsDiffusionWeightedImage(image));
     CPPUNIT_ASSERT(PropHelper::GetMeasurementFrame(image) == Identity());
+  }
+
+  void NrrdReader_DifferentFrameKinds_StandardFieldWins()
+  {
+    // The standard field is the frame; the file is not read as one of an earlier MITK version, so
+    // the image matrix does not rotate the gradients.
+    auto dictionary = DiffusionKeys(31);
+    AddStandardFrameField(dictionary, RotationZ40());
+    AddMitkFrameKey(dictionary, Permutation());
+    auto image = mitk::IOUtil::Load<mitk::Image>(WriteNrrd("both_frames.dwi", dictionary, RotationX30()));
+
+    CPPUNIT_ASSERT(MaxDifference(RotationZ40(), PropHelper::GetMeasurementFrame(image)) < 1e-12);
+    auto expected = Transformed(PropHelper::GetOriginalGradientContainer(m_Dwi), Identity(), RotationZ40());
+    CPPUNIT_ASSERT(MaxDifference(expected, PropHelper::GetGradientContainer(image)) < 1e-12);
+  }
+
+  void NrrdReader_UnparsableMitkKeyNextToStandardField_ReadsStandardFrame()
+  {
+    // MITK's key is not read when the standard field is present.
+    auto dictionary = DiffusionKeys(31);
+    AddStandardFrameField(dictionary, RotationZ40());
+    itk::EncapsulateMetaData<std::string>(dictionary, "measurement frame", "not a frame");
+    auto image = mitk::IOUtil::Load<mitk::Image>(WriteNrrd("unparsable_key_and_field.dwi", dictionary));
+    CPPUNIT_ASSERT(MaxDifference(RotationZ40(), PropHelper::GetMeasurementFrame(image)) < 1e-12);
+  }
+
+  void NrrdReader_UnparsableMitkKeyAlone_Throws()
+  {
+    auto dictionary = DiffusionKeys(31);
+    itk::EncapsulateMetaData<std::string>(dictionary, "measurement frame", "not a frame");
+    const auto path = WriteNrrd("unparsable_key.dwi", dictionary);
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Load<mitk::Image>(path), mitk::Exception);
+  }
+
+  void NrrdReader_AllZeroMitkFrame_ReadsIdentityAsLegacy()
+  {
+    // Earlier MITK versions wrote an all-zero frame for "no frame": identity, and the image matrix
+    // rotates the gradients as in every file with only MITK's key.
+    auto dictionary = DiffusionKeys(31);
+    PropHelper::MeasurementFrameType zero;
+    zero.fill(0);
+    AddMitkFrameKey(dictionary, zero);
+    auto image = mitk::IOUtil::Load<mitk::Image>(WriteNrrd("zero_frame.dwi", dictionary, RotationX30()));
+
+    CPPUNIT_ASSERT(PropHelper::GetMeasurementFrame(image) == Identity());
+    auto expected = Transformed(PropHelper::GetOriginalGradientContainer(m_Dwi), RotationX30(), Identity());
+    CPPUNIT_ASSERT(MaxDifference(expected, PropHelper::GetGradientContainer(image)) < 1e-12);
+  }
+
+  void NrrdFrame_AllZero_NoFrame()
+  {
+    PropHelper::MeasurementFrameType zero;
+    zero.fill(0);
+
+    itk::MetaDataDictionary standard;
+    AddStandardFrameField(standard, zero);
+    const auto fromStandard = mitk::ReadNrrdMeasurementFrame(standard);
+    CPPUNIT_ASSERT(!fromStandard.frame);
+    CPPUNIT_ASSERT(!fromStandard.onlyMitkKey);
+
+    itk::MetaDataDictionary mitkKey;
+    AddMitkFrameKey(mitkKey, zero);
+    const auto fromMitkKey = mitk::ReadNrrdMeasurementFrame(mitkKey);
+    CPPUNIT_ASSERT(!fromMitkKey.frame);
+    CPPUNIT_ASSERT(fromMitkKey.onlyMitkKey);
   }
 
   void NrrdReader_GradientCountMismatch_Throws()

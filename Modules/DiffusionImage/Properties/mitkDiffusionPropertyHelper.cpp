@@ -284,6 +284,20 @@ bool mitk::DiffusionPropertyHelper::AreAlike(GradientDirectionType g1, GradientD
   return diff.two_norm() < precision || diff2.two_norm() < precision;
 }
 
+bool mitk::DiffusionPropertyHelper::IsB0(const GradientDirectionType& gradient, double referenceBValue)
+{
+  return BValueMapProperty::GetBValue(gradient, referenceBValue) == 0;
+}
+
+std::vector<unsigned int> mitk::DiffusionPropertyHelper::GetB0Indices(const GradientDirectionsContainerType* gradients, double referenceBValue)
+{
+  std::vector<unsigned int> indices;
+  for (unsigned int i = 0; i < gradients->Size(); ++i)
+    if (IsB0(gradients->ElementAt(i), referenceBValue))
+      indices.push_back(i);
+  return indices;
+}
+
 void mitk::DiffusionPropertyHelper::CopyProperties(const BaseData *source, BaseData *target, bool ignore_original_gradients)
 {
   mitk::PropertyList::Pointer props = source->GetPropertyList()->Clone();

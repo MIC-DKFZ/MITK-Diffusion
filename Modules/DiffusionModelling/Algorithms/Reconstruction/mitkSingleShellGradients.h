@@ -14,6 +14,7 @@ found in the LICENSE file.
 #define mitkSingleShellGradients_h
 
 #include <mitkBValueMapProperty.h>
+#include <mitkDiffusionPropertyHelper.h>
 
 #include <itkMacro.h>
 
@@ -39,7 +40,7 @@ namespace mitk
    * \brief Splits the gradients of a DWI into b0 and diffusion-weighted volumes and checks that the
    * diffusion-weighted volumes form one shell.
    *
-   * A volume is a b0 volume when its b-value rounds to 0 (BValueMapProperty::GetBValue), as in the
+   * A volume is a b0 volume when its b-value rounds to 0 (DiffusionPropertyHelper::IsB0), as in the
    * b-value map the views show. The single-shell models normalize the gradients and use one
    * b-value, so a second shell would be fitted with the wrong b-value.
    *
@@ -54,8 +55,7 @@ namespace mitk
     for (unsigned int i = 0; i < gradients->Size(); ++i)
     {
       const auto &g = gradients->ElementAt(i);
-      const double b = BValueMapProperty::GetBValue(g, referenceBValue);
-      if (b == 0)
+      if (DiffusionPropertyHelper::IsB0(g, referenceBValue))
       {
         result.baselineIndices.push_back(i);
       }
@@ -63,7 +63,7 @@ namespace mitk
       {
         result.diffusionWeightedIndices.push_back(i);
         result.directions.push_back(g / g.two_norm());
-        shells.insert(b);
+        shells.insert(BValueMapProperty::GetBValue(g, referenceBValue));
       }
     }
 

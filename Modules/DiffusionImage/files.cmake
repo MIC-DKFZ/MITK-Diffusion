@@ -10,6 +10,7 @@ set(H_FILES
     IO/mitkDiffusionImageNrrdWriter.h
     IO/mitkDiffusionImageNiftiReader.h
     IO/mitkDiffusionImageNiftiWriter.h
+    IO/mitkNrrdMeasurementFrame.h
 
     # DicomImport
     IO/DicomImport/mitkDiffusionDICOMFileReader.h
@@ -42,6 +43,7 @@ set(CPP_FILES
     IO/mitkDiffusionImageNrrdWriter.cpp
     IO/mitkDiffusionImageNiftiReader.cpp
     IO/mitkDiffusionImageNiftiWriter.cpp
+    IO/mitkNrrdMeasurementFrame.cpp
 
     # DicomImport
     IO/DicomImport/mitkDiffusionDICOMFileReader.cpp

@@ -30,6 +30,14 @@ namespace
   private:
     int m_MaxIterations;
   };
+
+  /** The b0 volumes of the fitted DWI (mitk::DiffusionPropertyHelper::IsB0) are left out of the
+      mean signal that the fit subtracts. */
+  bool IsB0Volume(mitk::DiffusionSignalModel<>* model, int volume)
+  {
+    const auto g = model->GetGradientDirection(volume);
+    return mitk::DiffusionPropertyHelper::IsB0(mitk::DiffusionPropertyHelper::GradientDirectionType(g[0], g[1], g[2]), model->GetBvalue());
+  }
 }
 
 namespace itk{
@@ -177,7 +185,7 @@ void FitFibersToImageFilter::CreateDiffSystem()
     int num_nonzero_g = 0;
     for (int g=0; g<dim_four_size; ++g)
     {
-      if( m_SignalModel->GetGradientDirection(g).GetNorm()<mitk::eps )
+      if( IsB0Volume(m_SignalModel, g) )
         continue;
       simulated_mean += simulated_pixel[g];
       measured_mean += (double)measured_pixel[g];
@@ -603,7 +611,7 @@ void FitFibersToImageFilter::GenerateOutputDiffImages()
     double original_mean = 0;
     for (int g=0; g<dim_four_size; ++g)
     {
-      if( m_SignalModel->GetGradientDirection(g).GetNorm()>=mitk::eps )
+      if( !IsB0Volume(m_SignalModel, g) )
       {
         original_mean += original_pix[g];
         ++num_nonzero_g;

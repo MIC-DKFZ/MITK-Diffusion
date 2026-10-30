@@ -39,6 +39,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkCustomMimeType.h"
 #include "mitkDiffusionImageMimeTypes.h"
+#include "mitkNrrdMeasurementFrame.h"
 
 #include <mitkITKImageImport.h>
 #include <mitkImageWriteAccessor.h>
@@ -47,19 +48,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLocaleSwitch.h>
 
 #include <charconv>
-#include <optional>
 
 namespace
 {
   using GradientDirectionType = mitk::DiffusionPropertyHelper::GradientDirectionType;
   using MeasurementFrameType = mitk::DiffusionPropertyHelper::MeasurementFrameType;
   using GradientDirectionContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
-
-  /** Frames whose entries are all zero mean "no frame" in old MITK files. */
-  bool IsZero(const MeasurementFrameType& frame)
-  {
-    return frame.absolute_value_max() <= 1e-9;
-  }
 
   /**
    * Reads gradients, reference b-value and measurement frame from the NRRD key/value pairs.
@@ -74,28 +68,10 @@ namespace
   {
     const std::string gradientPrefix = "DWMRI_gradient_";
     std::map<unsigned int, GradientDirectionType> gradientsByIndex;
-    std::optional<MeasurementFrameType> standardFrame;
-    std::optional<MeasurementFrameType> mitkFrame;
     bool hasBValue = false;
 
     for (const auto& key : dictionary.GetKeys())
     {
-      // ITK stores the standard NRRD field "measurement frame" (written by Slicer, DTIPrep, ITK) as
-      // a matrix whose rows are the frame vectors, not as a string.
-      if (key == "NRRD_measurement frame")
-      {
-        std::vector<std::vector<double>> rows;
-        if (itk::ExposeMetaData(dictionary, key, rows) && rows.size() == 3 && rows[0].size() == 3 && rows[1].size() == 3 && rows[2].size() == 3)
-        {
-          MeasurementFrameType frame;
-          for (unsigned int r = 0; r < 3; ++r)
-            for (unsigned int c = 0; c < 3; ++c)
-              frame(r, c) = rows[r][c];
-          standardFrame = frame;
-        }
-        continue;
-      }
-
       std::string value;
       if (!itk::ExposeMetaData<std::string>(dictionary, key, value))
         continue;
@@ -126,15 +102,6 @@ namespace
       {
         mitkThrow() << "DWMRI_NEX keys (repeated gradients) are not supported";
       }
-      else if (key == "measurement frame")
-      {
-        // MITK's own key/value pair, written by the DWI NRRD writer.
-        MeasurementFrameType frame;
-        if (sscanf(value.c_str(), " ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) ",
-                   &frame(0, 0), &frame(0, 1), &frame(0, 2), &frame(1, 0), &frame(1, 1), &frame(1, 2), &frame(2, 0), &frame(2, 1), &frame(2, 2)) != 9)
-          mitkThrow() << "Invalid measurement frame " << value;
-        mitkFrame = frame;
-      }
     }
 
     if (!hasBValue)
@@ -144,12 +111,10 @@ namespace
     for (const auto& [index, g] : gradientsByIndex)
       gradients->InsertElement(index, g);
 
-    // Earlier MITK versions wrote only their own key. Current MITK writes both, with identical values.
-    const bool legacyMitkFile = mitkFrame && !standardFrame;
-    const auto& frame = legacyMitkFile ? mitkFrame : standardFrame;
-    if (frame && !IsZero(*frame))
-      measurementFrame = *frame;
-    return legacyMitkFile;
+    const auto frame = mitk::ReadNrrdMeasurementFrame(dictionary);
+    if (frame.frame)
+      measurementFrame = *frame.frame;
+    return frame.onlyMitkKey;
   }
 }
 

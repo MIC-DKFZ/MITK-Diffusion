@@ -43,7 +43,7 @@ namespace itk{
  * \endcode
  * Note that this method is used to specify both the reference and gradient images.
  * The b-value of a component is BValue * |g|^2. The reference images are the components
- * whose b-value rounds to 0 (BValueMapProperty::GetBValue, as in the b-value map), so
+ * whose b-value rounds to 0 (mitk::DiffusionPropertyHelper::IsB0, as in the b-value map), so
  * also short non-zero gradient vectors; they are averaged per voxel. All other components
  * must have one b-value (mitk::GetSingleShellGradients).
  *
