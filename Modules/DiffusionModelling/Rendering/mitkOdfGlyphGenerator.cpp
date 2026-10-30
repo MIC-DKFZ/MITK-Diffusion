@@ -558,6 +558,104 @@ namespace
         *connectivity++ = static_cast<IdType>(id + firstPoint);
     }
   }
+
+  /** How the voxels of an image are turned into ODFs. */
+  struct VoxelFormat
+  {
+    VoxelKind kind = VoxelKind::Odf;
+    unsigned int numComponents = 0;
+    /** SH convention of SH images. */
+    bool mrtrix = true;
+  };
+
+  /** \throw mitk::Exception for images other than tensor, ODF and SH images of float values. */
+  VoxelFormat GetVoxelFormat(const mitk::Image &image)
+  {
+    VoxelFormat format;
+    format.numComponents = image.GetPixelType().GetNumberOfComponents();
+    if (dynamic_cast<const mitk::TensorImage *>(&image) != nullptr && format.numComponents == 6)
+    {
+      format.kind = VoxelKind::Tensor;
+    }
+    else if (dynamic_cast<const mitk::OdfImage *>(&image) != nullptr && format.numComponents == ODF_SAMPLING_SIZE)
+    {
+      format.kind = VoxelKind::Odf;
+    }
+    else if (auto shImage = dynamic_cast<const mitk::ShImage *>(&image); shImage != nullptr && format.numComponents <= 91)
+    {
+      format.kind = VoxelKind::Sh;
+      format.mrtrix = shImage->GetShConvention() == mitk::ShImage::MRTRIX;
+      mitk::sh::ShOrder(static_cast<int>(format.numComponents)); // throws for counts that belong to no SH order
+    }
+    else
+    {
+      mitkThrow() << "No ODF glyphs for a " << image.GetNameOfClass() << " with " << format.numComponents
+                  << " components per voxel.";
+    }
+    if (image.GetPixelType().GetComponentType() != itk::IOComponentEnum::FLOAT)
+      mitkThrow() << "No ODF glyphs for images with other than float values.";
+    return format;
+  }
+
+  /** The voxels of a slice that get a glyph, in row order. */
+  struct GlyphVoxels
+  {
+    /** Glyph centres on the plane, in world coordinates. */
+    std::vector<std::array<double, 3>> centers;
+    /** Buffer offsets of the voxels. */
+    std::vector<vtkIdType> offsets;
+  };
+
+  /** The voxels of the slice inside the window (all without one) that get a glyph, at most settings.maxGlyphs. */
+  GlyphVoxels SelectGlyphVoxels(const mitk::Image &image,
+                                mitk::TimeStepType t,
+                                const mitk::OdfGlyphGenerator::Slice &slice,
+                                const mitk::OdfGlyphGenerator::Window *window,
+                                const mitk::OdfGlyphGenerator::Settings &settings)
+  {
+    GlyphVoxels glyphVoxels;
+    if (settings.maxGlyphs <= 0)
+      return glyphVoxels;
+
+    const mitk::BaseGeometry *geometry = image.GetGeometry(t);
+    const itk::IndexValueType dims[3] = {image.GetDimension(0), image.GetDimension(1), image.GetDimension(2)};
+    const unsigned int axis1 = slice.normalAxis == 0 ? 1 : 0;
+    const unsigned int axis2 = slice.normalAxis == 2 ? 1 : 2;
+
+    // Candidate glyph centres on the plane, row by row, with the buffer offsets of their voxels.
+    GlyphVoxels candidates;
+    itk::IndexValueType voxel[3];
+    voxel[slice.normalAxis] = slice.index;
+    mitk::Point3D continuousIndex;
+    continuousIndex[slice.normalAxis] = slice.planeIndex;
+    for (voxel[axis2] = 0; voxel[axis2] < dims[axis2]; ++voxel[axis2])
+    {
+      for (voxel[axis1] = 0; voxel[axis1] < dims[axis1]; ++voxel[axis1])
+      {
+        continuousIndex[axis1] = voxel[axis1];
+        continuousIndex[axis2] = voxel[axis2];
+        mitk::Point3D center;
+        geometry->IndexToWorld(continuousIndex, center);
+        if (window != nullptr)
+        {
+          const mitk::Vector3D offset = center - window->center;
+          if (std::fabs(offset * window->axis1) > window->halfSize1 || std::fabs(offset * window->axis2) > window->halfSize2)
+            continue;
+        }
+        candidates.centers.push_back({center[0], center[1], center[2]});
+        candidates.offsets.push_back(voxel[0] + dims[0] * (voxel[1] + dims[1] * voxel[2]));
+      }
+    }
+    if (candidates.centers.empty())
+      return glyphVoxels;
+
+    for (const std::size_t i : SelectGlyphs(candidates.offsets, static_cast<std::size_t>(settings.maxGlyphs), settings.randomPlacement))
+    {
+      glyphVoxels.centers.push_back(candidates.centers[i]);
+      glyphVoxels.offsets.push_back(candidates.offsets[i]);
+    }
+    return glyphVoxels;
+  }
 }
 
 std::optional<mitk::OdfGlyphGenerator::Slice> mitk::OdfGlyphGenerator::GetSlice(const Image &image,
@@ -621,86 +719,26 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
                                                               const Window *window,
                                                               const Settings &settings)
 {
-  const unsigned int numComponents = image.GetPixelType().GetNumberOfComponents();
-  VoxelKind kind;
-  bool mrtrix = true;
-  if (dynamic_cast<const TensorImage *>(&image) != nullptr && numComponents == 6)
-  {
-    kind = VoxelKind::Tensor;
-  }
-  else if (dynamic_cast<const OdfImage *>(&image) != nullptr && numComponents == ODF_SAMPLING_SIZE)
-  {
-    kind = VoxelKind::Odf;
-  }
-  else if (auto shImage = dynamic_cast<const ShImage *>(&image); shImage != nullptr && numComponents <= 91)
-  {
-    kind = VoxelKind::Sh;
-    mrtrix = shImage->GetShConvention() == ShImage::MRTRIX;
-    sh::ShOrder(static_cast<int>(numComponents)); // throws for counts that belong to no SH order
-  }
-  else
-  {
-    mitkThrow() << "No ODF glyphs for a " << image.GetNameOfClass() << " with " << numComponents
-                << " components per voxel.";
-  }
-  if (image.GetPixelType().GetComponentType() != itk::IOComponentEnum::FLOAT)
-    mitkThrow() << "No ODF glyphs for images with other than float values.";
+  const VoxelFormat format = GetVoxelFormat(image);
+  const VoxelKind kind = format.kind;
+  const unsigned int numComponents = format.numComponents;
 
   auto result = vtkSmartPointer<vtkPolyData>::New();
-  if (settings.maxGlyphs <= 0)
-    return result;
-
-  const BaseGeometry *geometry = image.GetGeometry(t);
-  const itk::IndexValueType dims[3] = {image.GetDimension(0), image.GetDimension(1), image.GetDimension(2)};
-  const unsigned int axis1 = slice.normalAxis == 0 ? 1 : 0;
-  const unsigned int axis2 = slice.normalAxis == 2 ? 1 : 2;
-
-  // Candidate glyph centres on the plane, row by row, with the buffer offsets of their voxels.
-  std::vector<std::array<double, 3>> candidateCenters;
-  std::vector<vtkIdType> candidateOffsets;
-  itk::IndexValueType voxel[3];
-  voxel[slice.normalAxis] = slice.index;
-  Point3D continuousIndex;
-  continuousIndex[slice.normalAxis] = slice.planeIndex;
-  for (voxel[axis2] = 0; voxel[axis2] < dims[axis2]; ++voxel[axis2])
-  {
-    for (voxel[axis1] = 0; voxel[axis1] < dims[axis1]; ++voxel[axis1])
-    {
-      continuousIndex[axis1] = voxel[axis1];
-      continuousIndex[axis2] = voxel[axis2];
-      Point3D center;
-      geometry->IndexToWorld(continuousIndex, center);
-      if (window != nullptr)
-      {
-        const Vector3D offset = center - window->center;
-        if (std::fabs(offset * window->axis1) > window->halfSize1 || std::fabs(offset * window->axis2) > window->halfSize2)
-          continue;
-      }
-      candidateCenters.push_back({center[0], center[1], center[2]});
-      candidateOffsets.push_back(voxel[0] + dims[0] * (voxel[1] + dims[1] * voxel[2]));
-    }
-  }
-  if (candidateCenters.empty())
-    return result;
-
-  const auto selected = SelectGlyphs(candidateOffsets, static_cast<std::size_t>(settings.maxGlyphs), settings.randomPlacement);
-  const auto numGlyphs = static_cast<vtkIdType>(selected.size());
-
   // Everything the glyph loop reads is fetched before it: the loop runs in parallel, and
   // GetShBasis locks a mutex.
-  std::vector<std::array<double, 3>> glyphCenters(numGlyphs);
-  std::vector<vtkIdType> glyphVoxelOffsets(numGlyphs);
-  for (vtkIdType g = 0; g < numGlyphs; ++g)
-  {
-    glyphCenters[g] = candidateCenters[selected[g]];
-    glyphVoxelOffsets[g] = candidateOffsets[selected[g]];
-  }
+  const GlyphVoxels glyphVoxels = SelectGlyphVoxels(image, t, slice, window, settings);
+  if (glyphVoxels.centers.empty())
+    return result;
+  const auto numGlyphs = static_cast<vtkIdType>(glyphVoxels.centers.size());
+  const auto &glyphCenters = glyphVoxels.centers;
+  const auto &glyphVoxelOffsets = glyphVoxels.offsets;
+
   const BaseMesh &mesh = ChooseMesh(slice, settings);
   const bool fullMesh = &mesh == &GetBaseMeshArrays();
   const auto numMeshPoints = static_cast<vtkIdType>(mesh.points.size());
   const auto numMeshTriangles = static_cast<vtkIdType>(mesh.triangles.size());
-  const vnl_matrix<float> *shBasis = kind == VoxelKind::Sh ? &GetShBasis(numComponents, mrtrix, ODF_SAMPLING_SIZE) : nullptr;
-  const vnl_matrix<float> *meshShBasis = kind == VoxelKind::Sh && !fullMesh ? &GetShBasis(numComponents, mrtrix, mesh.points.size()) : nullptr;
+  const vnl_matrix<float> *shBasis = kind == VoxelKind::Sh ? &GetShBasis(numComponents, format.mrtrix, ODF_SAMPLING_SIZE) : nullptr;
+  const vnl_matrix<float> *meshShBasis = kind == VoxelKind::Sh && !fullMesh ? &GetShBasis(numComponents, format.mrtrix, mesh.points.size()) : nullptr;
 
   auto pointCoordinates = vtkSmartPointer<vtkFloatArray>::New();
   pointCoordinates->SetNumberOfComponents(3);
