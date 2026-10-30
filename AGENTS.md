@@ -189,6 +189,20 @@ Facts the layout does not show:
   while `minimize` runs; the cost function may release it during its evaluation.
 - `ctest -R mitkFiberBundle` runs the `FiberBundle` tests; `mitkFiberBundleMapperTest` renders
   offscreen (EGL) and is skipped with exit code 77 where no OpenGL context can be created.
+  The 3D fiber mapper draws tubes on the GPU from the lines (`Rendering/mitkFiberTubeShader.h`:
+  VTK's tube shading with a geometry shader of the radius in mm; while tubes are on, the input
+  carries a per-point direction so that the quads of neighbouring segments share their edge) and
+  ribbons on the CPU. Each 2D window holds only the tiles of 1 mm along its plane normal near its
+  slab (`Rendering/mitkFiberSlabTiles.h`, an actor per tile, each segment in one tile; the index
+  `mitkFiberSlabIndex.h` holds the geometry only, so new colours keep the tiles): a slice or
+  rotation step uploads only the tiles it newly needs. The image is the whole bundle's except
+  where two fibers lie within about 0.05 mm in depth, the depth resolution of MITK's 2D camera
+  (900 000 mm from the plane, clipping range 0.1-1e6 mm): there the tiles' draw order decides
+  (about 0.5 % of the fiber pixels of a dense whole-brain tractogram), so the mapper test compares
+  at a narrow clipping range. A cell picked on the 2D prop is a run of a tile;
+  `FiberBundleMapper2D::PickedFiber` gives its fiber. Both fiber mappers keep their inputs and
+  clipping planes and only move the planes: a new input or plane collection makes VTK rebuild the
+  GPU buffers of that input.
   `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
   give the same result at any number of OpenMP threads; fiber references in the test data
   depend on exact point positions, so a change there is checked bit for bit against the old output.
