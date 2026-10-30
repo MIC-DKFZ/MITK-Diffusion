@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionImageMapping.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkModelDirectionRotation.h>
+#include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <vnl/vnl_inverse.h>
 
 /*!
@@ -43,6 +44,7 @@ int main(int argc, char* argv[])
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("ref", "r", mitkCommandLineParser::String, "Reference:", "reference image", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("alignCentroid", "a", mitkCommandLineParser::Bool, "align centroids", "align centroids", us::Any(), true);
+  parser.addArgument("input_type", "t", mitkCommandLineParser::String, "Input type:", "read the input as 'sh' or 'peak' image; 4D NIfTI files are otherwise read as plain images, whose values do not turn", us::Any(), true);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -60,10 +62,29 @@ int main(int argc, char* argv[])
     originOnly = true;
   }
 
+  // A 4D SH or peak NIfTI file cannot be told from other 4D images by its content, so MITK's image
+  // reader is its default reader; only the named reader turns its directions.
+  std::string inputType;
+  if (parsedArgs.count("input_type"))
+    inputType = us::any_cast<std::string>(parsedArgs["input_type"]);
+  std::vector<std::string> readers;
+  if (inputType == "sh")
+    readers = {"SH Image"};
+  else if (inputType == "peak")
+    readers = {"Peak Image"};
+  else if (!inputType.empty())
+  {
+    std::cout << "Unknown input type " << inputType << "; use 'sh' or 'peak'.";
+    return EXIT_FAILURE;
+  }
+
   try
   {
     mitk::Image::Pointer source = mitk::IOUtil::Load<mitk::Image>(refImage);
-    mitk::Image::Pointer target = mitk::IOUtil::Load<mitk::Image>(imageName);
+    mitk::PreferenceListReaderOptionsFunctor functor(readers, std::vector<std::string>());
+    mitk::Image::Pointer target = mitk::IOUtil::Load<mitk::Image>(imageName, &functor);
+    if (!readers.empty() && !mitk::ModelDirectionRotation::HasModelDirections(target))
+      mitkThrow() << "The input cannot be read as " << inputType << " image.";
     if (originOnly)
     {
       // Shift the target so that the world centres of both voxel grids coincide.
