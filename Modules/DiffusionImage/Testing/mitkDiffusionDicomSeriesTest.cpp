@@ -106,6 +106,22 @@ class mitkDiffusionDicomSeriesTestSuite : public mitk::TestFixture
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, spacing[0], 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, spacing[1], 1e-6);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.5, spacing[2], 1e-6);
+    // All series have identity orientation (ImageOrientationPatient 1\0\0\0\1\0, slices along +z).
+    const auto direction = itkImage->GetDirection();
+    for (unsigned int r = 0; r < 3; ++r)
+      for (unsigned int c = 0; c < 3; ++c)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(folder + " direction", r == c ? 1.0 : 0.0, direction[r][c], 1e-6);
+    // The first slice's ImagePositionPatient is (0, 0, 0). A Siemens mosaic's position belongs to
+    // the whole mosaic frame, so its first slice lies half the unused mosaic area further along
+    // the rows and columns; the reader takes the mosaic position unchanged
+    // (mitkDiffusionDICOMFileReaderHelper.h, FIXME at SetOrigin) and the synthetic mosaic was
+    // written to match, so its origin is not checked rather than pinned to a known-wrong value.
+    if (folder != "SiemensMosaic")
+    {
+      const auto origin = itkImage->GetOrigin();
+      for (unsigned int k = 0; k < 3; ++k)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(folder + " origin", 0.0, origin[k], 1e-6);
+    }
 
     for (unsigned int z = 0; z < numSlices; ++z)
       for (unsigned int y = 0; y < 2; ++y)
