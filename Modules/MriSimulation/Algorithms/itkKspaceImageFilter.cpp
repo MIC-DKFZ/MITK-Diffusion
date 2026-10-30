@@ -248,8 +248,6 @@ namespace itk {
     }
 
     m_CompartmentSpectra.clear();
-    m_SegmentWeights.clear();
-    m_SegmentWeightIndex.clear();
     m_NumSegments = 0;
     m_TimeSegmentsCapped = false;
     const bool eddyCurrents = m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline;
@@ -562,7 +560,7 @@ namespace itk {
     }
     // the distinct v in readout order; ticks with the same v share their interpolators (spin echo lines)
     std::vector< std::size_t > distinct;
-    m_SegmentWeightIndex.assign(numTicks, 0);
+    std::vector< std::size_t > weightIndex(numTicks, 0);
     {
       std::map< std::array<double, 2>, std::size_t > seen;
       for (const std::size_t tick : order)
@@ -570,7 +568,7 @@ namespace itk {
         const auto [found, inserted] = seen.emplace(v[tick], distinct.size());
         if (inserted)
           distinct.push_back(tick);
-        m_SegmentWeightIndex[tick] = found->second;
+        weightIndex[tick] = found->second;
       }
     }
 
@@ -609,7 +607,10 @@ namespace itk {
     const auto withinCap = [&](unsigned int numSegments)
     {
       const double L = numSegments;
-      const double bytes = sizeof(std::complex<double>)*L*(numGroups*numTicks + distinct.size() + numBins + checkPixels.size());
+      // interpolators, the matrices of the fit (basis, SVD, pseudo-inverse), the check's phase factors,
+      // the folded spectra and the buffers of the transforms
+      const double bytes = sizeof(std::complex<double>)*(L*(distinct.size() + 4.0*numBins + checkPixels.size())
+                                                         + numGroups*numTicks + parities*(nx + ny)*nkx + 2.0*numPixels);
       if (bytes > MAX_TIME_SEGMENT_BYTES)
         return false;
       if (requested > 0)
@@ -634,14 +635,27 @@ namespace itk {
     unsigned int numSegments = requested > 0 ? static_cast<unsigned int>(requested) :
                                                phaseSpread > 0 ? static_cast<unsigned int>(std::ceil(1.25*phaseSpread)) + 8 : 1;
     std::vector< std::array<double, 2> > segmentV;
-    vnl_matrix< std::complex<double> > pseudoInverse;
+    // the pseudo-inverse of the fit (L x bins), real and imaginary parts apart for SolveSegmentWeights
+    std::vector< double > pinvRe, pinvIm;
+    // interpolators at the given v, a[l*count + i] for count v, in blocks in parallel
+    const auto solveWeights = [&](const std::vector< std::array<double, 2> >& vs, std::vector< std::complex<double> >& a)
+    {
+      const std::size_t count = vs.size();
+      a.assign(numSegments*count, std::complex<double>(0, 0));
+      if (numBins == 0)
+        return;
+      parallelFor((count + SEGMENT_WEIGHT_BLOCK - 1)/SEGMENT_WEIGHT_BLOCK, [&](std::size_t block)
+      {
+        const std::size_t first = block*SEGMENT_WEIGHT_BLOCK;
+        SolveSegmentWeights(pinvRe, pinvIm, binU, binWeight, &vs[first], std::min(SEGMENT_WEIGHT_BLOCK, count - first), &a[first], count);
+      });
+    };
     for (;;)
     {
       if (!withinCap(numSegments))
       {
         // the exact sum in DynamicThreadedGenerateData
         m_TimeSegmentsCapped = true;
-        m_SegmentWeightIndex.clear();
         return;
       }
 
@@ -665,7 +679,15 @@ namespace itk {
           basis(static_cast<unsigned int>(b), l) = binWeight[b]*std::polar(1.0, itk::Math::twopi*(binU[b][0]*segmentV[l][0] + binU[b][1]*segmentV[l][1]));
       // nearly equal segment phases (a weak field) make the basis ill-conditioned; drop those directions
       vnl_svd< std::complex<double> > svd(basis, -1e-8);
-      pseudoInverse = svd.pinverse();
+      const vnl_matrix< std::complex<double> > pseudoInverse = svd.pinverse();
+      pinvRe.resize(numSegments*numBins);
+      pinvIm.resize(numSegments*numBins);
+      for (unsigned int l=0; l<numSegments; ++l)
+        for (std::size_t b=0; b<numBins; ++b)
+        {
+          pinvRe[l*numBins + b] = pseudoInverse(l, static_cast<unsigned int>(b)).real();
+          pinvIm[l*numBins + b] = pseudoInverse(l, static_cast<unsigned int>(b)).imag();
+        }
 
       if (requested > 0)
         break;
@@ -679,13 +701,15 @@ namespace itk {
           segmentPhase[i*numSegments + l] = std::polar(1.0, itk::Math::twopi*(ur[0]*segmentV[l][0] + ur[1]*segmentV[l][1]));
       });
       const std::size_t numResidualSamples = residualSamples(numSegments);
+      std::vector< std::array<double, 2> > sampleV(numResidualSamples);
+      for (std::size_t s=0; s<numResidualSamples; ++s)
+        sampleV[s] = v[distinct[numResidualSamples==1 ? 0 : s*(distinct.size()-1)/(numResidualSamples-1)]];
+      std::vector< std::complex<double> > sampleWeights;
+      solveWeights(sampleV, sampleWeights);
       std::vector< double > residual(numResidualSamples, 0.0);
       parallelFor(numResidualSamples, [&](std::size_t s)
       {
-        const std::size_t index = numResidualSamples==1 ? 0 : s*(distinct.size()-1)/(numResidualSamples-1);
-        const auto& vt = v[distinct[index]];
-        std::vector< std::complex<double> > target(numBins), a(numSegments);
-        SolveSegmentWeights(pseudoInverse, binU, binWeight, vt, target, a);
+        const auto& vt = sampleV[s];
         double sum = 0;
         for (std::size_t i=0; i<checkPixels.size(); ++i)
         {
@@ -693,7 +717,7 @@ namespace itk {
           const std::complex<double>* phase = &segmentPhase[i*numSegments];
           std::complex<double> fitted(0, 0);
           for (unsigned int l=0; l<numSegments; ++l)
-            fitted += a[l]*phase[l];
+            fitted += sampleWeights[l*numResidualSamples + s]*phase[l];
           sum += energy[checkPixels[i]]*std::norm(std::polar(1.0, itk::Math::twopi*(ur[0]*vt[0] + ur[1]*vt[1])) - fitted);
         }
         residual[s] = sum;
@@ -703,75 +727,150 @@ namespace itk {
       numSegments = static_cast<unsigned int>(std::ceil(1.25*numSegments));
     }
 
-    // least-squares interpolators a(v) of every distinct v
-    m_SegmentWeights.assign(distinct.size()*numSegments, std::complex<double>(0, 0));
-    if (numBins > 0)
-      parallelFor(distinct.size(), [&](std::size_t i)
-      {
-        std::vector< std::complex<double> > target(numBins), a(numSegments);
-        SolveSegmentWeights(pseudoInverse, binU, binWeight, v[distinct[i]], target, a);
-        std::copy(a.begin(), a.end(), m_SegmentWeights.begin() + static_cast<std::ptrdiff_t>(i*numSegments));
-      });
+    // least-squares interpolators a(v) of every distinct v, a[l*numDistinct + i]
+    const std::size_t numDistinct = distinct.size();
+    std::vector< std::array<double, 2> > distinctV(numDistinct);
+    for (std::size_t i=0; i<numDistinct; ++i)
+      distinctV[i] = v[distinct[i]];
+    std::vector< std::complex<double> > weights;
+    solveWeights(distinctV, weights);
 
-    // spectra of every group times the phase factor at every segment time
-    m_CompartmentSpectra.assign(numGroups*numSegments, std::vector< std::complex<double> >());
-    parallelFor(numSegments, [&](std::size_t l)
+    // the interpolators of every k-space sample: the tick as in DynamicThreadedGenerateData
+    std::vector< std::size_t > weightOfSample(numTicks, 0);
+    for (std::size_t tick=0; tick<numTicks; ++tick)
     {
-      std::vector< std::complex<double> > phase(numPixels);
-      for (std::size_t r=0; r<numPixels; ++r)
-        phase[r] = std::polar(1.0, itk::Math::twopi*(u[r][0]*segmentV[l][0] + u[r][1]*segmentV[l][1]));
-      std::vector< std::complex<double> > input(numPixels);
-      std::vector< std::complex<double> > rows(parities*ny*nkx);
+      const auto kIdx = m_ReadoutScheme->GetActualKspaceIndex(static_cast<int>(tick));
+      std::size_t timeTick = tick;
+      if (nky%2 == 0 && !m_Parameters->m_SignalGen.m_ReversePhase)
+        timeTick = (tick + nkx)%numTicks;
+      weightOfSample[static_cast<std::size_t>(kIdx[1])*nkx + static_cast<std::size_t>(kIdx[0])] = weightIndex[timeTick];
+    }
+
+    // The spectra of every group times the phase factor at every segment time, folded with the
+    // interpolators as they are computed: m_CompartmentSpectra[g][k] = sum_l a_l(k) S_gl(k), summed in
+    // segment order, so a sample needs no sum over segments and only one spectrum per group is kept
+    // (with L spectra per group, slices of 256x256 with relaxation took the exact sum above about 60
+    // segments for memory). The x factors are transposed (kx innermost) and real and imaginary parts
+    // kept apart, so that the transforms run over kx with independent sums, which the compiler
+    // vectorizes; the sums over x, y and l keep their order, so the result is that of the complex
+    // arithmetic of the separable transform.
+    std::vector< double > factorsXRe(parities*nx*nkx), factorsXIm(parities*nx*nkx);
+    for (std::size_t p=0; p<parities; ++p)
+      for (std::size_t kx=0; kx<nkx; ++kx)
+        for (std::size_t x=0; x<nx; ++x)
+        {
+          factorsXRe[(p*nx + x)*nkx + kx] = factorsX[(p*nkx + kx)*nx + x].real();
+          factorsXIm[(p*nx + x)*nkx + kx] = factorsX[(p*nkx + kx)*nx + x].imag();
+        }
+    m_CompartmentSpectra.assign(numGroups, std::vector< std::complex<double> >(numTicks, std::complex<double>(0, 0)));
+    std::vector< double > phaseRe(numPixels), phaseIm(numPixels), rowsRe(parities*ny*nkx), rowsIm(parities*ny*nkx);
+    for (unsigned int l=0; l<numSegments; ++l)
+    {
+      parallelFor(ny, [&](std::size_t y)
+      {
+        for (std::size_t r=y*nx; r<(y+1)*nx; ++r)
+        {
+          const std::complex<double> phase = std::polar(1.0, itk::Math::twopi*(u[r][0]*segmentV[l][0] + u[r][1]*segmentV[l][1]));
+          phaseRe[r] = phase.real();
+          phaseIm[r] = phase.imag();
+        }
+      });
       for (std::size_t g=0; g<numGroups; ++g)
       {
-        for (std::size_t r=0; r<numPixels; ++r)
-          input[r] = (groups[g][r]*weight[r]) * phase[r];
-
-        for (std::size_t p=0; p<parities; ++p)
-          for (std::size_t y=0; y<ny; ++y)
+        // along x for every row and parity
+        parallelFor(parities*ny, [&](std::size_t row)
+        {
+          const std::size_t p = row/ny;
+          const std::size_t y = row%ny;
+          double* sumRe = &rowsRe[row*nkx];
+          double* sumIm = &rowsIm[row*nkx];
+          std::fill(sumRe, sumRe + nkx, 0.0);
+          std::fill(sumIm, sumIm + nkx, 0.0);
+          for (std::size_t x=0; x<nx; ++x)
+          {
+            const std::size_t r = y*nx + x;
+            const double scale = groups[g][r]*weight[r];
+            const double inRe = scale*phaseRe[r];
+            const double inIm = scale*phaseIm[r];
+            const double* fRe = &factorsXRe[(p*nx + x)*nkx];
+            const double* fIm = &factorsXIm[(p*nx + x)*nkx];
             for (std::size_t kx=0; kx<nkx; ++kx)
             {
-              std::complex<double> sum(0, 0);
-              const std::complex<double>* factors = &factorsX[(p*nkx + kx)*nx];
-              const std::complex<double>* line = &input[y*nx];
-              for (std::size_t x=0; x<nx; ++x)
-                sum += line[x] * factors[x];
-              rows[(p*ny + y)*nkx + kx] = sum;
+              sumRe[kx] += inRe*fRe[kx] - inIm*fIm[kx];
+              sumIm[kx] += inRe*fIm[kx] + inIm*fRe[kx];
             }
-
-        std::vector< std::complex<double> > spectrum(nkx*nky);
-        for (std::size_t ky=0; ky<nky; ++ky)
+          }
+        });
+        // along y, then folded into the group's spectrum
+        parallelFor(nky, [&](std::size_t ky)
         {
           const std::size_t p = ghosts ? ky%2 : 0;
+          std::vector< double > sumRe(nkx, 0.0), sumIm(nkx, 0.0);
+          for (std::size_t y=0; y<ny; ++y)
+          {
+            const double fRe = factorsY[ky*ny + y].real();
+            const double fIm = factorsY[ky*ny + y].imag();
+            const double* rRe = &rowsRe[(p*ny + y)*nkx];
+            const double* rIm = &rowsIm[(p*ny + y)*nkx];
+            for (std::size_t kx=0; kx<nkx; ++kx)
+            {
+              sumRe[kx] += fRe*rRe[kx] - fIm*rIm[kx];
+              sumIm[kx] += fRe*rIm[kx] + fIm*rRe[kx];
+            }
+          }
+          std::complex<double>* folded = &m_CompartmentSpectra[g][ky*nkx];
           for (std::size_t kx=0; kx<nkx; ++kx)
           {
-            std::complex<double> sum(0, 0);
-            for (std::size_t y=0; y<ny; ++y)
-              sum += factorsY[ky*ny + y] * rows[(p*ny + y)*nkx + kx];
-            spectrum[ky*nkx + kx] = sum;
+            const std::complex<double> a = weights[l*numDistinct + weightOfSample[ky*nkx + kx]];
+            folded[kx] += std::complex<double>(a.real()*sumRe[kx] - a.imag()*sumIm[kx], a.real()*sumIm[kx] + a.imag()*sumRe[kx]);
           }
-        }
-        m_CompartmentSpectra[g*numSegments + l] = std::move(spectrum);
+        });
       }
-    });
+    }
     m_NumSegments = numSegments;
   }
 
   template< class ScalarType >
-  void KspaceImageFilter< ScalarType >::SolveSegmentWeights(const vnl_matrix< std::complex<double> >& pseudoInverse, const std::vector< std::array<double, 2> >& binU,
-                                                           const std::vector< double >& binWeight, const std::array<double, 2>& v,
-                                                           std::vector< std::complex<double> >& target, std::vector< std::complex<double> >& a)
+  void KspaceImageFilter< ScalarType >::SolveSegmentWeights(const std::vector< double >& pinvRe, const std::vector< double >& pinvIm,
+                                                           const std::vector< std::array<double, 2> >& binU, const std::vector< double >& binWeight,
+                                                           const std::array<double, 2>* v, std::size_t count, std::complex<double>* a, std::size_t stride)
   {
+    // The sums of a block of v are independent, so the innermost loop runs over the block and the
+    // compiler vectorizes it (more than twice as fast as one v at a time). A whole block is computed
+    // also for fewer v, so every v gets the same arithmetic, whatever the blocks.
+    constexpr std::size_t block = SEGMENT_WEIGHT_BLOCK;
     const std::size_t numBins = binU.size();
+    const std::size_t numSegments = pinvRe.size()/numBins;
+    std::vector< double > targetRe(numBins*block), targetIm(numBins*block);
     for (std::size_t b=0; b<numBins; ++b)
-      target[b] = binWeight[b]*std::polar(1.0, itk::Math::twopi*(binU[b][0]*v[0] + binU[b][1]*v[1]));
-    for (std::size_t l=0; l<a.size(); ++l)
+      for (std::size_t j=0; j<block; ++j)
+      {
+        const auto& vj = v[std::min(j, count-1)];
+        const std::complex<double> phase = std::polar(1.0, itk::Math::twopi*(binU[b][0]*vj[0] + binU[b][1]*vj[1]));
+        targetRe[b*block + j] = binWeight[b]*phase.real();
+        targetIm[b*block + j] = binWeight[b]*phase.imag();
+      }
+    std::array< double, block > sumRe, sumIm;
+    for (std::size_t l=0; l<numSegments; ++l)
     {
-      const std::complex<double>* row = pseudoInverse[static_cast<unsigned int>(l)];
-      std::complex<double> sum(0, 0);
+      sumRe.fill(0.0);
+      sumIm.fill(0.0);
+      const double* rowRe = &pinvRe[l*numBins];
+      const double* rowIm = &pinvIm[l*numBins];
       for (std::size_t b=0; b<numBins; ++b)
-        sum += row[b]*target[b];
-      a[l] = sum;
+      {
+        const double pRe = rowRe[b];
+        const double pIm = rowIm[b];
+        const double* tRe = &targetRe[b*block];
+        const double* tIm = &targetIm[b*block];
+        for (std::size_t j=0; j<block; ++j)
+        {
+          sumRe[j] += pRe*tRe[j] - pIm*tIm[j];
+          sumIm[j] += pRe*tIm[j] + pIm*tRe[j];
+        }
+      }
+      for (std::size_t j=0; j<count; ++j)
+        a[l*stride + j] = std::complex<double>(sumRe[j], sumIm[j]);
     }
   }
 
@@ -870,7 +969,8 @@ namespace itk {
     long spikeTick = -1;
 
     std::complex<ScalarType> zero = std::complex<ScalarType>(0, 0);
-    const bool precomputed = m_NumSegments==0 && !m_CompartmentSpectra.empty();
+    // the spectra of the compartments, or with time segments of the groups, folded (ComputeTimeSegmentation)
+    const bool precomputed = !m_CompartmentSpectra.empty();
     // per work unit, not per sample
     std::vector< float > relaxFactor(m_CompartmentImages.size(), 1.0f);
     std::vector< const ScalarType* > compartmentSignals;
@@ -950,23 +1050,6 @@ namespace itk {
         std::complex<double> sum(0, 0);
         for (std::size_t i=0; i<m_CompartmentSpectra.size(); ++i)
           sum += static_cast<double>(relaxFactor[i]) * m_CompartmentSpectra[i][k];
-        s = std::complex<ScalarType>(sum / static_cast<double>(numPix));
-      }
-      else if (m_NumSegments>0)
-      {
-        // time-segmented approximation of the phase, see ComputeTimeSegmentation
-        const std::size_t k = static_cast<std::size_t>(kIdx[1])*static_cast<std::size_t>(kxMax) + static_cast<std::size_t>(kIdx[0]);
-        const std::complex<double>* a = &m_SegmentWeights[m_SegmentWeightIndex[static_cast<std::size_t>(tick)]*m_NumSegments];
-        const std::size_t numGroups = m_CompartmentSpectra.size()/m_NumSegments;
-        std::complex<double> sum(0, 0);
-        for (std::size_t g=0; g<numGroups; ++g)
-        {
-          std::complex<double> group(0, 0);
-          for (unsigned int l=0; l<m_NumSegments; ++l)
-            group += a[l] * m_CompartmentSpectra[g*m_NumSegments + l][k];
-          // without relaxation one group holds all compartments and relaxFactor[0] stays 1
-          sum += static_cast<double>(relaxFactor[g]) * group;
-        }
         s = std::complex<ScalarType>(sum / static_cast<double>(numPix));
       }
       else

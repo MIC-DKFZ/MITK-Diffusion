@@ -125,12 +125,18 @@ namespace itk{
      * y with aliasing) and the signal scale times coil sensitivity of every pixel (weight).
      */
     void ComputeDftFactors(std::vector< std::complex<double> >& factorsX, std::vector< std::complex<double> >& factorsY, std::vector< double >& weight) const;
-    /** Fills m_CompartmentSpectra and m_SegmentWeights for the time-segmented approximation; see there. */
+    /** Fills m_CompartmentSpectra for the time-segmented approximation; see there. */
     void ComputeTimeSegmentation(bool eddyCurrents, bool distortions);
-    /** Least-squares interpolators a of the time segments at v (see ComputeTimeSegmentation); target holds the weighted phase factors of the bins. */
-    static void SolveSegmentWeights(const vnl_matrix< std::complex<double> >& pseudoInverse, const std::vector< std::array<double, 2> >& binU,
-                                    const std::vector< double >& binWeight, const std::array<double, 2>& v,
-                                    std::vector< std::complex<double> >& target, std::vector< std::complex<double> >& a);
+    /** Number of v whose interpolators SolveSegmentWeights computes together. */
+    static constexpr std::size_t SEGMENT_WEIGHT_BLOCK = 32;
+    /**
+     * Least-squares interpolators of the time segments (see ComputeTimeSegmentation) at count v, at most
+     * SEGMENT_WEIGHT_BLOCK, written to a[l*stride + i]. pinvRe and pinvIm hold the pseudo-inverse of the
+     * fit (L x bins, row by row), binU and binWeight the mean u and the square root of the weight of the bins.
+     */
+    static void SolveSegmentWeights(const std::vector< double >& pinvRe, const std::vector< double >& pinvIm,
+                                    const std::vector< std::array<double, 2> >& binU, const std::vector< double >& binWeight,
+                                    const std::array<double, 2>* v, std::size_t count, std::complex<double>* a, std::size_t stride);
 
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
@@ -181,23 +187,18 @@ namespace itk{
      * Without eddy currents and distortions the phase of a k-space sample does not depend on its
      * readout time: s(k) = sum_i relaxation_i(t(k)) F_i(k) / numPix, with F_i the spectrum of
      * compartment i (signal scale and coil sensitivity included; ghost offset and aliasing in the
-     * DFT factors). Then m_CompartmentSpectra holds F_i at index ky*kxMax + kx; otherwise it is
-     * empty and every sample sums over all pixels.
+     * DFT factors). Then m_CompartmentSpectra holds F_i at index ky*kxMax + kx.
+     *
+     * With eddy currents or distortions and m_KspaceTimeSegments != 0, the phase factor of every pixel
+     * is approximated by L time segments (L = m_KspaceTimeSegments, or chosen from the phase spread):
+     * exp(i 2 pi phi(r, t)) ~ sum_l a_l(t) exp(i 2 pi phi(r, t_l)). Then m_CompartmentSpectra holds,
+     * for every compartment (or for their sum without relaxation), sum_l a_l(t(k)) S_l(k), with S_l
+     * the spectrum of the compartment times the phase factor at the segment time t_l, and is used as
+     * above (ComputeTimeSegmentation). Otherwise it is empty and every sample sums over all pixels.
      */
     std::vector< std::vector< std::complex<double> > > m_CompartmentSpectra;
 
-    /**
-     * With eddy currents or distortions and m_KspaceTimeSegments != 0, the phase factor of every pixel
-     * is approximated by L time segments (L = m_KspaceTimeSegments, or chosen from the phase spread):
-     * exp(i 2 pi phi(r, t)) ~ sum_l a_l(t) exp(i 2 pi phi(r, t_l)).
-     * Then m_CompartmentSpectra holds, at index g*L + l, the spectrum of compartment g (or of their sum
-     * without relaxation) times the phase factor at the segment time t_l, and m_SegmentWeights holds
-     * a_l(t) at index tick*L + l (tick as in DynamicThreadedGenerateData). m_NumSegments is L, or 0 for
-     * the other two paths.
-     */
-    std::vector< std::complex<double> >     m_SegmentWeights;
-    std::vector< std::size_t >              m_SegmentWeightIndex;
-    unsigned int                            m_NumSegments;
+    unsigned int                            m_NumSegments;  ///< L of the time segments, 0 for the other two paths
     bool                                    m_TimeSegmentsCapped;
 
   private:
