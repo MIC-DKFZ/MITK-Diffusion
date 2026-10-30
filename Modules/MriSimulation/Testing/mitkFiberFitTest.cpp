@@ -215,6 +215,13 @@ public:
   /** Fiber weights and output images of a fit do not depend on the number of OpenMP threads, bit for bit. */
   void SameAtThreadCounts()
   {
+    // restores the OpenMP thread count for the later cases, also when an assertion throws
+    struct ThreadCountGuard
+    {
+      int threads = omp_get_max_threads();
+      ~ThreadCountGuard() { omp_set_num_threads(threads); }
+    } threadCountGuard;
+
     auto fit = [this](int threads)
     {
       omp_set_num_threads(threads);
