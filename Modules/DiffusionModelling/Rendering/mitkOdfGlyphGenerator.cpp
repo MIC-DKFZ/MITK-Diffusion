@@ -22,6 +22,7 @@ found in the LICENSE file.
 #include <itkOrientationDistributionFunction.h>
 
 #include <vtkCellArray.h>
+#include <vtkFloatArray.h>
 #include <vtkIdList.h>
 #include <vtkIdTypeArray.h>
 #include <vtkLookupTable.h>
@@ -32,6 +33,7 @@ found in the LICENSE file.
 #include <vtkUnsignedCharArray.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <map>
 #include <mutex>
@@ -94,6 +96,27 @@ namespace
       }
     }
     return odf;
+  }
+
+  /** The ODF base mesh as plain arrays. */
+  struct BaseMesh
+  {
+    /** Unit directions, with the values the base mesh's float points hold. */
+    std::vector<std::array<double, 3>> points;
+  };
+
+  /** Built on first use from any thread, and never changed. */
+  const BaseMesh &GetBaseMeshArrays()
+  {
+    static const BaseMesh mesh = [] {
+      vtkPolyData *odfMesh = OdfType::GetBaseMesh();
+      BaseMesh result;
+      result.points.resize(odfMesh->GetNumberOfPoints());
+      for (vtkIdType j = 0; j < odfMesh->GetNumberOfPoints(); ++j)
+        odfMesh->GetPoint(j, result.points[j].data());
+      return result;
+    }();
+    return mesh;
   }
 
   /** The polygons of the ODF base mesh, as point id lists. */
@@ -253,13 +276,15 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   vtkPolyData *kept = mask->GetOutput();
   auto keptOffsets = vtkIdTypeArray::SafeDownCast(kept->GetPointData()->GetArray("VoxelOffsets"));
 
-  vtkPoints *basePoints = OdfType::GetBaseMesh()->GetPoints();
-  const vtkIdType numBasePoints = basePoints->GetNumberOfPoints();
+  const BaseMesh &baseMesh = GetBaseMeshArrays();
+  const auto numBasePoints = static_cast<vtkIdType>(baseMesh.points.size());
   static const auto basePolygons = GetBasePolygons();
   const vtkIdType numGlyphs = kept->GetNumberOfPoints();
 
-  auto points = vtkSmartPointer<vtkPoints>::New();
-  points->SetNumberOfPoints(numGlyphs * numBasePoints);
+  auto pointCoordinates = vtkSmartPointer<vtkFloatArray>::New();
+  pointCoordinates->SetNumberOfComponents(3);
+  pointCoordinates->SetNumberOfTuples(numGlyphs * numBasePoints);
+  float *pointData = pointCoordinates->GetPointer(0);
   auto polys = vtkSmartPointer<vtkCellArray>::New();
   polys->AllocateEstimate(numGlyphs * static_cast<vtkIdType>(basePolygons.size()), 3);
   auto colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
@@ -314,15 +339,13 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
     double center[3];
     kept->GetPoint(g, center);
     const vtkIdType first = g * numBasePoints;
+    float *glyphPoints = pointData + 3 * first;
     for (vtkIdType j = 0; j < numBasePoints; ++j)
     {
-      double p[3];
-      basePoints->GetPoint(j, p);
       const double factor = static_cast<double>(shapeOdf.GetElement(j)) * scale * slice.glyphSpacing * 0.5;
       // Scaled in float and then moved, as the glyph source and transform of the mapper did.
       for (unsigned int c = 0; c < 3; ++c)
-        p[c] = static_cast<double>(static_cast<float>(p[c] * factor)) + center[c];
-      points->SetPoint(first + j, p);
+        glyphPoints[3 * j + c] = static_cast<float>(static_cast<double>(static_cast<float>(baseMesh.points[j][c] * factor)) + center[c]);
 
       if (!settings.colourByDirection)
       {
@@ -342,6 +365,8 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
     }
   }
 
+  auto points = vtkSmartPointer<vtkPoints>::New();
+  points->SetData(pointCoordinates);
   auto glyphs = vtkSmartPointer<vtkPolyData>::New();
   glyphs->SetPoints(points);
   glyphs->SetPolys(polys);
