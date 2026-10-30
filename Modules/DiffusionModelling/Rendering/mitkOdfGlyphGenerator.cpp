@@ -291,11 +291,15 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   colors->SetNumberOfComponents(4);
   colors->SetNumberOfTuples(numGlyphs * numBasePoints);
   colors->SetName("ODF_COLORS");
+  unsigned char *colorData = colors->GetPointer(0);
 
-  // Maps normalized ODF values to colours, 1 red to 0 blue.
+  // Maps normalized ODF values to colours, 1 red to 0 blue. Its RGBA bytes are those of
+  // vtkLookupTable::GetColor times 255: 255 * (b / 255.0) truncates to b for every byte b.
   auto lut = vtkSmartPointer<vtkLookupTable>::New();
   lut->SetRange(0, 1);
   lut->Build();
+  auto colorValues = vtkSmartPointer<vtkFloatArray>::New();
+  colorValues->SetNumberOfValues(numBasePoints);
 
   const ImageReadAccessor access(&image, image.GetVolumeData(t));
   const auto *values = static_cast<const float *>(access.GetData());
@@ -328,14 +332,6 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
         colorOdf = shapeOdf;
     }
 
-    unsigned char rgba[4] = {0, 0, 0, 255};
-    if (settings.colourByDirection)
-    {
-      const vnl_vector_fixed<double, 3> direction = odf.GetPrincipalDiffusionDirection();
-      for (unsigned int c = 0; c < 3; ++c)
-        rgba[c] = static_cast<unsigned char>(static_cast<int>(std::fabs(direction[c]) * 255));
-    }
-
     double center[3];
     kept->GetPoint(g, center);
     const vtkIdType first = g * numBasePoints;
@@ -346,15 +342,24 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
       // Scaled in float and then moved, as the glyph source and transform of the mapper did.
       for (unsigned int c = 0; c < 3; ++c)
         glyphPoints[3 * j + c] = static_cast<float>(static_cast<double>(static_cast<float>(baseMesh.points[j][c] * factor)) + center[c]);
+    }
 
-      if (!settings.colourByDirection)
-      {
-        double rgb[3];
-        lut->GetColor(1 - colorOdf.GetElement(j), rgb);
-        for (unsigned int c = 0; c < 3; ++c)
-          rgba[c] = static_cast<unsigned char>(255.0 * rgb[c]);
-      }
-      colors->SetTypedTuple(first + j, rgba);
+    unsigned char *glyphColors = colorData + 4 * first;
+    if (settings.colourByDirection)
+    {
+      unsigned char rgba[4] = {0, 0, 0, 255};
+      const vnl_vector_fixed<double, 3> direction = odf.GetPrincipalDiffusionDirection();
+      for (unsigned int c = 0; c < 3; ++c)
+        rgba[c] = static_cast<unsigned char>(static_cast<int>(std::fabs(direction[c]) * 255));
+      for (vtkIdType j = 0; j < numBasePoints; ++j)
+        std::copy(rgba, rgba + 4, glyphColors + 4 * j);
+    }
+    else
+    {
+      float *colorValueData = colorValues->GetPointer(0);
+      for (vtkIdType j = 0; j < numBasePoints; ++j)
+        colorValueData[j] = 1 - colorOdf.GetElement(j);
+      lut->MapScalarsThroughTable(colorValues, glyphColors, VTK_RGBA);
     }
 
     for (const auto &basePolygon : basePolygons)
