@@ -12,6 +12,7 @@ found in the LICENSE file.
 
 #include "QmitkDiffusionUiTestUtil.h"
 
+#include <mitkDiffusionPropertyHelper.h>
 #include <mitkDiffusionTestData.h>
 #include <mitkFiberBundle.h>
 #include <mitkIOUtil.h>
@@ -254,7 +255,29 @@ class QmitkFiberFitViewUiTest : public CppUnit::TestFixture
 {
   CPPUNIT_TEST_SUITE(QmitkFiberFitViewUiTest);
   CPPUNIT_TEST(FiberFit_PeakImageAndTractogram_FittedTractogram);
+  CPPUNIT_TEST(FiberFit_DwiWithReferenceBValue3000_FitOfTheSameBValues);
   CPPUNIT_TEST_SUITE_END();
+
+  /** The fiber weights of the tractogram fitted to the image (the "Fitted" node below it). */
+  static std::vector<float> FittedWeights(QWidget *view, const mitk::DataNode::Pointer &image)
+  {
+    ChooseNode(view, "m_ImageBox", image);
+    GetChild<QCommandLinkButton>(view, "m_StartButton")->click();
+    Wait(50);
+    const auto derived = GetDataStorage()->GetDerivations(image);
+    for (const auto &node : *derived)
+    {
+      if (node->GetName() != "Fitted")
+        continue;
+      auto *fibers = dynamic_cast<mitk::FiberBundle *>(node->GetData());
+      std::vector<float> weights;
+      for (unsigned int i = 0; i < fibers->GetNumFibers(); ++i)
+        weights.push_back(fibers->GetFiberWeight(i));
+      return weights;
+    }
+    CPPUNIT_FAIL("No fitted tractogram below " + image->GetName());
+    return {};
+  }
 
 public:
   void tearDown() override
@@ -284,6 +307,43 @@ public:
     auto has = [&names](const std::string &entry) { return std::find(names.begin(), names.end(), entry) != names.end(); };
     CPPUNIT_ASSERT(has("Fitted:FiberBundle"));
     CPPUNIT_ASSERT(has("Residual:PeakImage") || has("Residual:Image"));
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  void FiberFit_DwiWithReferenceBValue3000_FitOfTheSameBValues()
+  {
+    // The test DWI (b = 1000) and the same signal with reference b-value 3000 and gradients
+    // scaled by sqrt(1000 / 3000): the same b-values, so the same fit.
+    using Helper = mitk::DiffusionPropertyHelper;
+    auto dwi = Load("StreamlineTractography/diffusion_image_v2.nii.gz");
+    auto *image = dynamic_cast<mitk::Image *>(dwi->GetData());
+    CPPUNIT_ASSERT(Helper::IsDiffusionWeightedImage(image));
+    const double referenceBValue = Helper::GetReferenceBValue(image);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1000.0, referenceBValue, 1e-3);
+    auto rescaled = image->Clone();
+    auto original = Helper::GetOriginalGradientContainer(image);
+    auto scaled = Helper::GradientDirectionsContainerType::New();
+    for (unsigned int i = 0; i < original->Size(); ++i)
+      scaled->InsertElement(i, original->GetElement(i) * std::sqrt(referenceBValue / 3000.0));
+    Helper::SetOriginalGradientContainer(rescaled, scaled);
+    Helper::SetReferenceBValue(rescaled, 3000.0f);
+    Helper::InitializeImage(rescaled);
+    auto dwi3000 = AddNode(rescaled, "b_ref 3000");
+
+    auto tracts = Load("StreamlineTractography/ReferenceFibs/Test_Tensor1.fib");
+    auto *view = ShowView("org.mitk.views.fiberfit", "QmitkFiberFitViewControls");
+    ChooseNode(view, "m_TractBox", tracts);
+    const auto weights = FittedWeights(view, dwi);
+    const auto weights3000 = FittedWeights(view, dwi3000);
+    CPPUNIT_ASSERT_EQUAL(weights.size(), weights3000.size());
+    CPPUNIT_ASSERT(!weights.empty());
+    bool fitted = false;
+    for (std::size_t i = 0; i < weights.size(); ++i)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("fiber " + std::to_string(i), weights[i], weights3000[i], 1e-3 * std::max(1.0f, std::abs(weights[i])));
+      fitted = fitted || weights[i] != 1.0f;
+    }
+    CPPUNIT_ASSERT(fitted);
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
 };

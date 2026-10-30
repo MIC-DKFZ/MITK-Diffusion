@@ -35,6 +35,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateDimension.h>
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateOr.h>
+#include <mitkNodePredicateIsDWI.h>
 #include <QMessageBox>
 
 const std::string QmitkFiberFitView::VIEW_ID = "org.mitk.views.fiberfit";
@@ -76,7 +77,10 @@ void QmitkFiberFitView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_TractBox->SetPredicate(isFib);
 
     m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
-    m_Controls->m_ImageBox->SetPredicate( mitk::NodePredicateOr::New( mitk::NodePredicateAnd::New(isImage, is3D), mitk::TNodePredicateDataType<mitk::PeakImage>::New()) );
+    // scalar images, peak images and DWIs (StartFit); the dimension predicate takes only images
+    // with one component, so DWIs need their own predicate
+    auto isScalarOrPeakImage = mitk::NodePredicateOr::New(mitk::NodePredicateAnd::New(isImage, is3D), mitk::TNodePredicateDataType<mitk::PeakImage>::New());
+    m_Controls->m_ImageBox->SetPredicate( mitk::NodePredicateOr::New(isScalarOrPeakImage, mitk::NodePredicateIsDWI::New()) );
 
     DataSelectionChanged();
   }
