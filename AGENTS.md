@@ -194,7 +194,8 @@ Facts the layout does not show:
   labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
   without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
   so fiber count and weights stay consistent; labeled fibers are found in the classifier's pool
-  by their exact geometry.
+  by their exact geometry. The module depends only on `FiberBundle` and OpenCV (`opencv_ml`);
+  its one user is the atTRACTive plugin.
 
 ## Porting state
 
@@ -210,6 +211,8 @@ Remove an item once it is fixed.
   `mitk/Modules/QtWidgets/test/CMakeLists.txt:108` configures a test driver that does not exist.
   With Qt off (`DiffusionCmdApps`), the same happens there and in
   `mitk/Modules/RESTAPI/test/CMakeLists.txt:5-13` and `mitk/Modules/Agent/test/CMakeLists.txt:4`.
+  A throwaway tree of `configure-worktree-build.sh` reuses `debug/ep`, which has no Python, so
+  `Tractography`, `Fiberfox` and `IVIM` stop there earlier, at `FindPython3` (NumPy missing).
 - MITK's `org.mitk.gui.qt.segmentation` does not compile with Python off: `MakeError` in
   `mitk/Plugins/org.mitk.gui.qt.segmentation/src/internal/QmitkSegmentationRestRoutes.cpp:465`
   is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.
