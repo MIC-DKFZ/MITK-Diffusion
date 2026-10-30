@@ -39,7 +39,6 @@ public:
 
 
   void InitForTracking() override;     ///< calls InputDataValidForTracking() and creates feature images
-  vnl_vector_fixed<float,3> ProposeDirection(const itk::Point<float, 3>& pos, std::deque< vnl_vector_fixed<float,3> >& olddirs, itk::Index<3>& oldIndex) override;  ///< predicts next progression direction at the given position
   bool WorldToIndex(itk::Point<float, 3>& pos, itk::Index<3>& index) override;
 
   void SetPeakImage( PeakImgType::Pointer image ){ m_PeakImage = image; DataModified(); }
@@ -50,6 +49,8 @@ public:
   itk::ImageRegion<3> GetLargestPossibleRegion() override{ return imageRegion3; }
 
 protected:
+
+  TrackingDirectionType ProposeDataDirection(const itk::Point<float, 3>& pos, const TrackingDirectionType& oldDir) override;
 
   vnl_vector_fixed<float,3> GetDirection(itk::Point<float, 3> itkP, bool interpolate, vnl_vector_fixed<float,3> oldDir);
   vnl_vector_fixed<float,3> GetMatchingDirection(itk::Index<3> idx3, vnl_vector_fixed<float,3>& oldDir);

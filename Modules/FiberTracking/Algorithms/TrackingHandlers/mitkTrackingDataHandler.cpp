@@ -26,6 +26,38 @@ TrackingDataHandler::TrackingDataHandler()
 
 }
 
+TrackingDataHandler::TrackingDirectionType TrackingDataHandler::ProposeDirection(const itk::Point<float, 3> &pos,
+                                                                                std::deque<TrackingDirectionType> &olddirs,
+                                                                                itk::Index<3> &oldIndex)
+{
+  TrackingDirectionType output_direction;
+  output_direction.fill(0);
+
+  itk::Point<float, 3> point = pos;
+  itk::Index<3> index;
+  if (!this->WorldToIndex(point, index))
+    return output_direction;
+
+  if (!this->PassesCutoff(pos))
+    return output_direction;
+
+  TrackingDirectionType oldDir;
+  oldDir.fill(0.0);
+  if (!olddirs.empty())
+    oldDir = olddirs.back();
+
+  // same voxel without interpolation: keep the previous direction, still in the tracking frame
+  if (!m_Parameters->m_InterpolateTractographyData && oldIndex == index)
+    return oldDir;
+
+  // The data directions are in the data frame; a flip is its own inverse, so the same call maps
+  // the previous direction there and the proposal back.
+  FlipDirection(oldDir);
+  output_direction = this->ProposeDataDirection(pos, oldDir);
+  FlipDirection(output_direction);
+  return output_direction;
+}
+
 void TrackingDataHandler::InitThreadRandomEngines(int numThreads)
 {
   m_ThreadRngItk.resize(numThreads);

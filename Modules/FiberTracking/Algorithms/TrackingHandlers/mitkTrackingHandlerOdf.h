@@ -42,7 +42,6 @@ public:
 
 
   void InitForTracking() override;     ///< calls InputDataValidForTracking() and creates feature images
-  vnl_vector_fixed<float,3> ProposeDirection(const itk::Point<float, 3>& pos, std::deque< vnl_vector_fixed<float,3> >& olddirs, itk::Index<3>& oldIndex) override;  ///< predicts next progression direction at the given position
   bool WorldToIndex(itk::Point<float, 3>& pos, itk::Index<3>& index) override;
 
   void SetOdfImage( ItkOdfImageType::Pointer img ){ m_OdfImage = img; DataModified(); }
@@ -59,6 +58,9 @@ public:
   void SetIsOdfFromTensor(bool OdfFromTensor);
 
 protected:
+
+  bool PassesCutoff(const itk::Point<float, 3>& pos) override;  ///< GFA at pos >= cutoff
+  TrackingDirectionType ProposeDataDirection(const itk::Point<float, 3>& pos, const TrackingDirectionType& oldDir) override;
 
   int SampleOdf(vnl_vector< float >& probs, vnl_vector< float >& angles);
 
