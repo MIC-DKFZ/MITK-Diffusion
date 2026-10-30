@@ -20,6 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkFiberFitView.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <mitkNodePredicateDataType.h>
 #include <mitkImageCast.h>
 #include <mitkImageAccessByItk.h>
@@ -58,6 +60,7 @@ void QmitkFiberFitView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkFiberFitViewControls;
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     connect( m_Controls->m_StartButton, SIGNAL(clicked()), this, SLOT(StartFit()) );

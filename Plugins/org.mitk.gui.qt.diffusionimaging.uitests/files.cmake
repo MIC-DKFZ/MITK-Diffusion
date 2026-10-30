@@ -12,6 +12,7 @@ set(INTERNAL_CPP_FILES
   QmitkIvimViewUiTest.cpp
   QmitkTractographyViewsUiTest.cpp
   QmitkFiberProcessingViewsUiTest.cpp
+  QmitkFiberfoxViewsUiTest.cpp
 )
 
 set(MOC_H_FILES
