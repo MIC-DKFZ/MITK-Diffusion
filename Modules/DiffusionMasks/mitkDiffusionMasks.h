@@ -43,7 +43,8 @@ namespace mitk
    *
    * An image is returned unchanged. A multi-label segmentation becomes an unsigned char image
    * on the segmentation's geometry that is 1 where any label of any group is set (the union of
-   * all labels) and 0 elsewhere. With keepLabelValues, the image has the label pixel type and
+   * all labels, including labels hidden in the Segmentation view: visibility is a display
+   * setting) and 0 elsewhere. With keepLabelValues, the image has the label pixel type and
    * the label values instead of 1, for label images such as the target regions of streamline
    * tracking's "label difference" constraint; where labels of several groups overlap, the label
    * of the last group is kept. For other data, nullptr is returned.

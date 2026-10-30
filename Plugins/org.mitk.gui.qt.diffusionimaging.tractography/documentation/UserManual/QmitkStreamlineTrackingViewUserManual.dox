@@ -43,7 +43,7 @@ Parameters for both seeding modes:
 
 \section StrTrackUserManualConstraints ROI Constraints
 
-Specify various ROI and mask images to constrain the tractography process. Each of them can be a 3D image or a segmentation; a segmentation counts as 1 inside its labels (all labels together) and 0 elsewhere.
+Specify various ROI and mask images to constrain the tractography process. Each of them can be a 3D image or a segmentation; a segmentation counts as 1 inside its labels (all labels together, also those hidden in the Segmentation view) and 0 elsewhere.
 
 - Mask Image: ROI image used to constrain the generated streamlines, typically a brain mask. Streamlines that leave the regions defined in this image will stop immediately. Without a mask, streamlines stop at the border of the input image (their last point is the first one outside it).
 - Stop ROI Image: ROI image used to define stopping regions. Streamlines that enter the regions defined in this image will stop immediately.
