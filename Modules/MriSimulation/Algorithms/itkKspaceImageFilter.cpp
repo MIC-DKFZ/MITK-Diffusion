@@ -383,8 +383,9 @@ namespace itk {
    * there (issue #47, review). The error falls steeply once L exceeds the accumulated phase S in
    * cycles (the time-bandwidth product of the fit), hence the automatic count 1.25 S + 8; it grows by
    * a quarter until the energy-weighted RMS interpolation residual of the pixels at sampled readout
-   * times is below 1e-4. Where the time segments would cost more than the exact sum, or more memory
-   * than MAX_TIME_SEGMENT_BYTES, the slice takes the exact sum (GetTimeSegmentsCapped).
+   * times is below 1e-4. Where the time segments would take longer than the exact sum on one core
+   * (estimated before each fit, with the fits done), or more memory than MAX_TIME_SEGMENT_BYTES, the
+   * slice takes the exact sum (GetTimeSegmentsCapped).
    */
   template< class ScalarType >
   void KspaceImageFilter< ScalarType >::ComputeTimeSegmentation(bool eddyCurrents, bool distortions)
@@ -506,6 +507,37 @@ namespace itk {
       accumulated[i] = accumulated[i-1] + step;
     }
     const double phaseSpread = accumulated.back();
+    const int requested = m_Parameters->m_SignalGen.m_KspaceTimeSegments;
+    const std::size_t numGroups = groups.size();
+    unsigned int numSegments = requested > 0 ? static_cast<unsigned int>(requested) :
+                                               phaseSpread > 0 ? static_cast<unsigned int>(std::ceil(1.25*phaseSpread)) + 8 : 1;
+
+    // Estimated times in ns on one core at -O3 (measured, issue #47; only their ratios matter): the
+    // exact sum takes about 35 ns per pixel and sample, a complex multiply-add of the vectorized fit and
+    // transforms about 0.4 ns, a complex exponential about 15 ns, the SVD about 7 ns per bin and squared
+    // segment count. The choice between time segments and the exact sum uses the times on one core, so
+    // that it, and with it the result, does not depend on the work units of the job.
+    const double exactTime = 35.0*numTicks*numPixels;
+    // In parallel when the slice job has more than one work unit (with few volumes the setup took longer
+    // than the exact sum in all work units); each index writes its own result, so the result does not
+    // depend on the threads. Running the small calls serially made larger slices slower.
+    const auto parallelFor = [this](std::size_t count, const std::function<void(std::size_t)>& function)
+    {
+      if (this->GetNumberOfWorkUnits() > 1)
+        this->GetMultiThreader()->ParallelizeArray(0, count, [&function](SizeValueType i) { function(i); }, nullptr);
+      else
+        for (std::size_t i=0; i<count; ++i)
+          function(i);
+    };
+    // per segment: phase factors of the pixels, transforms along x and y, folding
+    const double segmentTime = 15.0*numPixels + numGroups*(0.47*nkx*ny*(parities*nx + nky) + 3.0*numTicks);
+    // Where already the transforms of the first count take longer than the exact sum (see below), the
+    // slice takes it before the histogram and the fit are set up.
+    if (requested <= 0 && numSegments*segmentTime > 0.8*exactTime)
+    {
+      m_TimeSegmentsCapped = true;
+      return;
+    }
 
     // Histogram of u weighted by signal energy. The interpolators fitted at the bins hold for the
     // pixels between them if the bins sample the phase finely: 4 bins per cycle of phase spread along
@@ -598,42 +630,27 @@ namespace itk {
     }
     const auto residualSamples = [&distinct](unsigned int numSegments) { return std::min<std::size_t>({256, 16*std::size_t(numSegments), distinct.size()}); };
 
-    const int requested = m_Parameters->m_SignalGen.m_KspaceTimeSegments;
-    const std::size_t numGroups = groups.size();
-    // Operation counts in complex multiply-adds. The exact sum takes one complex exponential and a few
-    // products per pixel and sample, 25 to 35 multiply-adds' time at -O3 (issue #47, measured); 20
-    // leaves the close cases to the exact sum, which has no approximation error.
-    const double exactCost = 20.0*numTicks*numPixels;
-    const auto withinCap = [&](unsigned int numSegments)
+    // memory of the interpolators, the matrices of the fit (basis, SVD, pseudo-inverse), the check's
+    // phase factors, the folded spectra and the buffers of the transforms
+    const auto memory = [&](double L)
+    {
+      return sizeof(std::complex<double>)*(L*(distinct.size() + 4.0*numBins + checkPixels.size()) + numGroups*numTicks + parities*(nx + ny)*nkx + 2.0*numPixels);
+    };
+    // time of the interpolators of one block of readout times, of the SVD, of the residual check and of
+    // the interpolators and transforms after it
+    const auto blockTime = [&](double L) { return SEGMENT_WEIGHT_BLOCK*numBins*(0.36*L + 10.4); };
+    const auto blocks = [](double count) { return std::ceil(count/SEGMENT_WEIGHT_BLOCK); };
+    const auto fitTime = [&](double L) { return 7.0*numBins*L*std::min<double>(numBins, L); };
+    const auto checkTime = [&](unsigned int numSegments)
     {
       const double L = numSegments;
-      // interpolators, the matrices of the fit (basis, SVD, pseudo-inverse), the check's phase factors,
-      // the folded spectra and the buffers of the transforms
-      const double bytes = sizeof(std::complex<double>)*(L*(distinct.size() + 4.0*numBins + checkPixels.size())
-                                                         + numGroups*numTicks + parities*(nx + ny)*nkx + 2.0*numPixels);
-      if (bytes > MAX_TIME_SEGMENT_BYTES)
-        return false;
-      if (requested > 0)
-        return true;
-      const double transforms = numGroups*L*(parities*ny*nkx*nx + nky*nkx*ny) + 10*L*numPixels;
-      const double fit = 8*numBins*L*L + distinct.size()*numBins*L + residualSamples(numSegments)*checkPixels.size()*(L + 10);
-      return transforms + fit + numGroups*L*numTicks < exactCost;
+      const double samples = residualSamples(numSegments);
+      return checkPixels.size()*15.0*L + blocks(samples)*blockTime(L) + samples*checkPixels.size()*(1.36*L + 25);
     };
+    const auto finalTime = [&](double L) { return blocks(distinct.size())*blockTime(L) + L*segmentTime; };
+    // estimated time of the fits and checks done so far
+    double spentTime = 0;
 
-    // In parallel when the slice job has more than one work unit (with few volumes the setup took longer
-    // than the exact sum in all work units); each index writes its own result, so the result does not
-    // depend on the threads.
-    const auto parallelFor = [this](std::size_t count, const std::function<void(std::size_t)>& function)
-    {
-      if (this->GetNumberOfWorkUnits() > 1)
-        this->GetMultiThreader()->ParallelizeArray(0, count, [&function](SizeValueType i) { function(i); }, nullptr);
-      else
-        for (std::size_t i=0; i<count; ++i)
-          function(i);
-    };
-
-    unsigned int numSegments = requested > 0 ? static_cast<unsigned int>(requested) :
-                                               phaseSpread > 0 ? static_cast<unsigned int>(std::ceil(1.25*phaseSpread)) + 8 : 1;
     std::vector< std::array<double, 2> > segmentV;
     // the pseudo-inverse of the fit (L x bins), real and imaginary parts apart for SolveSegmentWeights
     std::vector< double > pinvRe, pinvIm;
@@ -652,9 +669,14 @@ namespace itk {
     };
     for (;;)
     {
-      if (!withinCap(numSegments))
+      // The exact sum (in DynamicThreadedGenerateData) where the time segments would need more memory
+      // than allowed (any count), or where they would take longer, with the fits and checks done so far
+      // (automatic count; 0.8 leaves the close cases to the exact sum, which has no approximation error).
+      // Counting the time spent bounds the time a slice can lose to a refinement that ends in the exact sum.
+      const double check = requested > 0 ? 0.0 : checkTime(numSegments);
+      if (memory(numSegments) > MAX_TIME_SEGMENT_BYTES ||
+          (requested <= 0 && spentTime + fitTime(numSegments) + check + finalTime(numSegments) > 0.8*exactTime))
       {
-        // the exact sum in DynamicThreadedGenerateData
         m_TimeSegmentsCapped = true;
         return;
       }
@@ -724,6 +746,7 @@ namespace itk {
       });
       if (std::accumulate(residual.begin(), residual.end(), 0.0) <= 1e-8*checkEnergy*numResidualSamples)
         break;
+      spentTime += fitTime(numSegments) + check;
       numSegments = static_cast<unsigned int>(std::ceil(1.25*numSegments));
     }
 
