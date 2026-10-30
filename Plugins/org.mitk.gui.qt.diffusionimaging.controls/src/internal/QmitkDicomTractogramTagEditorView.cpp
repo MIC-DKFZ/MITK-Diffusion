@@ -84,9 +84,9 @@ void QmitkDicomTractogramTagEditorView::CreateQtPartControl( QWidget *parent )
 
     m_Controls->m_CopyPropsButton->setEnabled(false);
 
-    connect( (QObject*)(m_Controls->m_TractogramBox), SIGNAL(OnSelectionChanged(const mitk::DataNode*)), this, SLOT(OnTractSelectionChanged()) );
-    connect( (QObject*)(m_Controls->m_TagTable), SIGNAL(itemChanged(QTableWidgetItem*)), this, SLOT(OnItemChanged(QTableWidgetItem*)) );
-    connect( m_Controls->m_CopyPropsButton, SIGNAL(clicked()), this, SLOT(CopyProperties()));
+    connect( m_Controls->m_TractogramBox, &QmitkDataStorageComboBox::OnSelectionChanged, this, &QmitkDicomTractogramTagEditorView::OnTractSelectionChanged );
+    connect( m_Controls->m_TagTable, &QTableWidget::itemChanged, this, &QmitkDicomTractogramTagEditorView::OnItemChanged );
+    connect( m_Controls->m_CopyPropsButton, &QAbstractButton::clicked, this, &QmitkDicomTractogramTagEditorView::CopyProperties );
 
     UpdateGui();
   }
