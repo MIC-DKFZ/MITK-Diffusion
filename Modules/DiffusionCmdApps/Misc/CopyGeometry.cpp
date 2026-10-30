@@ -20,10 +20,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkCommandLineParser.h"
 #include <mitkDiffusionImageMapping.h>
 #include <mitkDiffusionPropertyHelper.h>
+#include <mitkModelDirectionRotation.h>
 #include <vnl/vnl_inverse.h>
 
 /*!
 \brief Copies transformation matrix of one image to another
+
+The directions of a DWI (gradients) and of tensor, SH, ODF and peak images are world vectors, so
+they are turned by the rotation between the old and the new geometry.
 */
 int main(int argc, char* argv[])
 {
@@ -31,7 +35,7 @@ int main(int argc, char* argv[])
 
   parser.setTitle("Copy Geometry");
   parser.setCategory("Preprocessing Tools");
-  parser.setDescription("Copies transformation matrix of one image to another");
+  parser.setDescription("Copies transformation matrix of one image to another. The directions of a DWI (gradients) and of tensor, SH, ODF and peak images turn with the image.");
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
@@ -76,12 +80,14 @@ int main(int argc, char* argv[])
       t_geom->SetIndexToWorldTransform(s_geom->GetIndexToWorldTransform());
       target->SetGeometry(t_geom);
 
-      // The world gradients of a DWI follow the anatomy, so they turn with the image, as in DReg.
+      // The world gradients of a DWI and the world directions of the model images follow the
+      // anatomy, so they turn with the image, as in DReg.
+      const mitk::DiffusionImageMapping::MatrixType newMatrix = s_geom->GetIndexToWorldTransform()->GetMatrix().GetVnlMatrix();
+      const mitk::DiffusionImageMapping::MatrixType change = newMatrix * vnl_inverse(oldMatrix);
       if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(target))
-      {
-        const mitk::DiffusionImageMapping::MatrixType newMatrix = s_geom->GetIndexToWorldTransform()->GetMatrix().GetVnlMatrix();
-        mitk::DiffusionImageMapping::RotateGradients(target, newMatrix * vnl_inverse(oldMatrix));
-      }
+        mitk::DiffusionImageMapping::RotateGradients(target, change);
+      else if (mitk::ModelDirectionRotation::HasModelDirections(target))
+        mitk::ModelDirectionRotation::Rotate(target, mitk::DiffusionImageMapping::RotationComponent(change));
     }
     mitk::IOUtil::Save(target, outImage);
   }
