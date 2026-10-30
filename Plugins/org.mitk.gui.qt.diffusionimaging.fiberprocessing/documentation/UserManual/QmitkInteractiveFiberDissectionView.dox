@@ -6,7 +6,7 @@ Interactively train a classifier for tract dissection. The workflow implemented 
 \section SecDissectionInput Input Data
 
 - Selected Fiber Bundle: Currently selected fiber bundle (can be necessary for operations not belonging to ATTRACTIVE).
-- Training Fiber Bundle: Fibers belonging to that bundle are chosen to be annotated, and the model predicts on all streamlines from that bundle. It is possible to switch the bundle during the iterations, e.g., train first with Tractogram 1 and once the prediction is accurate, switch to Tractogram 2 and predict on its data.
+- Training Fiber Bundle: Fibers belonging to that bundle are chosen to be annotated, and the model predicts on all streamlines from that bundle. It is possible to switch the bundle during the iterations, e.g., train first with Tractogram 1 and once the prediction is accurate, switch to Tractogram 2 and predict on its data. The prototypes (see "Number of prototypes") stay those of the first tractogram after the switch, so the features of both tractograms are comparable; the annotations of both are used for training.
 
 \section SecDissectionPreprocessing Preprocessing
 
@@ -30,7 +30,7 @@ Once annotation is complete, click "Train classifier." Features are calculated, 
 If the classifier's prediction is not accurate, more fibers need to be annotated by the human expert. Simply click the "Add" button, and new fibers are presented for annotation. These fibers are selected depending on the uncertainty and dissimilarity. Repeat until the prediction of the classifier is satisfactory. If a small number of false positive streamlines are presented, you can exclude these fibers manually.
 
 3. Outlier Exclusion:
-If the prediction is almost correct, but some single outliers exist, it is possible to exclude those in the same manner as annotating fibers not belonging to the bundle. Afterwards, it is possible to save the bundle and continue with the next subject.
+If the prediction is almost correct, but some single outliers exist, it is possible to exclude those with the labeling brush of the prediction: Shift removes a fiber from the prediction without adding it to -Bundle, Alt moves it to +Bundle. Afterwards, it is possible to save the bundle and continue with the next subject.
 
 Reset Classifier:
 To delete all annotated fibers and start dissection from scratch, it is possible to reset the classifier. Resetting stops the annotation tools; the last prediction stays in the Data Manager. However, it is possible to use the ability of the classifier to generalize and to use the already annotated fibers, so the already achieved knowledge, to segment the same white matter tract for a different subject.
