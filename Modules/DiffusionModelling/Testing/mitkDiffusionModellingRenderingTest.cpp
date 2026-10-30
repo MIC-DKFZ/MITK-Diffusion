@@ -12,6 +12,7 @@ found in the LICENSE file.
 
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkIOUtil.h>
+#include <mitkImagePixelReadAccessor.h>
 #include <mitkImagePixelWriteAccessor.h>
 #include <mitkITKImageImport.h>
 #include <mitkOdfGlyphGenerator.h>
@@ -25,19 +26,31 @@ found in the LICENSE file.
 #include <mitkSlicedGeometry3D.h>
 #include <mitkTensorImage.h>
 #include <mitkDiffusionTestData.h>
+#include <mitkOmpThreadGuard.h>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 
+#include <vtkCellArray.h>
+#include <vtkIdList.h>
+#include <vtkLookupTable.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
+#include <vtkPolyDataNormals.h>
 #include <vtkUnsignedCharArray.h>
 #include <vtkSmartPointer.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <functional>
+#include <limits>
+#include <map>
 #include <optional>
+#include <sstream>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -61,6 +74,9 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_TensorOdfs_MatchOdfImage);
   MITK_TEST(GlyphGenerator_TensorEllipsoid_Semiaxes);
   MITK_TEST(GlyphGenerator_UnsupportedImage_Throws);
+  MITK_TEST(GlyphGenerator_FullMesh_RecordedOutput);
+  MITK_TEST(GlyphGenerator_ValueColours_FromLookupTable);
+  MITK_TEST(GlyphGenerator_ThreadCount_SameOutput);
   MITK_TEST(OdfMapper_DefaultProperties_KeepExistingValues);
   CPPUNIT_TEST_SUITE_END();
 
@@ -519,6 +535,471 @@ public:
     const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 0, 0, 0, 1));
     CPPUNIT_ASSERT(slice.has_value());
     CPPUNIT_ASSERT_THROW(mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, AllGlyphs()), mitk::Exception);
+  }
+
+  using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
+
+  /** FNV-1a hash of raw bytes. */
+  class Fingerprint
+  {
+  public:
+    void Add(const void *data, std::size_t size)
+    {
+      const auto *bytes = static_cast<const unsigned char *>(data);
+      for (std::size_t i = 0; i < size; ++i)
+      {
+        m_Hash ^= bytes[i];
+        m_Hash *= 1099511628211ull;
+      }
+    }
+
+    std::uint64_t Get() const { return m_Hash; }
+
+  private:
+    std::uint64_t m_Hash = 14695981039346656037ull;
+  };
+
+  /** Hashes of the float bits of the points, of the point ids of the triangles and of the RGBA colours. */
+  struct GlyphFingerprints
+  {
+    std::uint64_t points = 0;
+    std::uint64_t triangles = 0;
+    std::uint64_t colours = 0;
+
+    bool operator==(const GlyphFingerprints &) const = default;
+  };
+
+  static GlyphFingerprints Fingerprints(vtkPolyData *glyphs)
+  {
+    Fingerprint points;
+    for (vtkIdType i = 0; i < glyphs->GetNumberOfPoints(); ++i)
+    {
+      double p[3];
+      glyphs->GetPoint(i, p);
+      const float coordinates[3] = {static_cast<float>(p[0]), static_cast<float>(p[1]), static_cast<float>(p[2])};
+      points.Add(coordinates, sizeof(coordinates));
+    }
+
+    Fingerprint triangles;
+    auto ids = vtkSmartPointer<vtkIdList>::New();
+    vtkCellArray *polys = glyphs->GetPolys();
+    for (vtkIdType c = 0; c < polys->GetNumberOfCells(); ++c)
+    {
+      polys->GetCellAtId(c, ids);
+      for (vtkIdType k = 0; k < ids->GetNumberOfIds(); ++k)
+      {
+        const std::int64_t id = ids->GetId(k);
+        triangles.Add(&id, sizeof(id));
+      }
+    }
+
+    Fingerprint colours;
+    auto rgba = vtkUnsignedCharArray::SafeDownCast(glyphs->GetPointData()->GetArray("ODF_COLORS"));
+    CPPUNIT_ASSERT(rgba != nullptr);
+    CPPUNIT_ASSERT_EQUAL(4, rgba->GetNumberOfComponents());
+    CPPUNIT_ASSERT_EQUAL(glyphs->GetNumberOfPoints(), rgba->GetNumberOfTuples());
+    for (vtkIdType i = 0; i < rgba->GetNumberOfTuples(); ++i)
+    {
+      for (int c = 0; c < 4; ++c)
+      {
+        const unsigned char value = rgba->GetTypedComponent(i, c);
+        colours.Add(&value, 1);
+      }
+    }
+    return {points.Get(), triangles.Get(), colours.Get()};
+  }
+
+  static std::uint64_t NormalsFingerprint(vtkPolyData *glyphs)
+  {
+    vtkDataArray *normals = glyphs->GetPointData()->GetNormals();
+    CPPUNIT_ASSERT(normals != nullptr);
+    Fingerprint fingerprint;
+    for (vtkIdType i = 0; i < normals->GetNumberOfTuples(); ++i)
+    {
+      for (int c = 0; c < 3; ++c)
+      {
+        const auto value = static_cast<float>(normals->GetComponent(i, c));
+        fingerprint.Add(&value, sizeof(value));
+      }
+    }
+    return fingerprint.Get();
+  }
+
+  /** Every glyph is the ODF base mesh: its triangles are the base triangles on its own points. */
+  static void CheckTopology(vtkPolyData *glyphs, const std::string &name)
+  {
+    vtkCellArray *baseTriangles = OdfType::GetBaseMesh()->GetPolys();
+    const vtkIdType numBaseTriangles = baseTriangles->GetNumberOfCells();
+    const vtkIdType numGlyphs = glyphs->GetNumberOfPoints() / ODF_SAMPLING_SIZE;
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(name, numGlyphs * ODF_SAMPLING_SIZE, glyphs->GetNumberOfPoints());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(name, numGlyphs * numBaseTriangles, glyphs->GetNumberOfPolys());
+    auto baseIds = vtkSmartPointer<vtkIdList>::New();
+    auto ids = vtkSmartPointer<vtkIdList>::New();
+    vtkIdType mismatches = 0;
+    for (vtkIdType g = 0; g < numGlyphs; ++g)
+    {
+      for (vtkIdType t = 0; t < numBaseTriangles; ++t)
+      {
+        baseTriangles->GetCellAtId(t, baseIds);
+        glyphs->GetPolys()->GetCellAtId(g * numBaseTriangles + t, ids);
+        if (ids->GetNumberOfIds() != 3 || baseIds->GetNumberOfIds() != 3)
+        {
+          ++mismatches;
+          continue;
+        }
+        for (vtkIdType k = 0; k < 3; ++k)
+        {
+          if (ids->GetId(k) != baseIds->GetId(k) + g * ODF_SAMPLING_SIZE)
+            ++mismatches;
+        }
+      }
+    }
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(name, vtkIdType(0), mismatches);
+  }
+
+  /**
+   * Largest difference between the point normals of the glyphs and those vtkPolyDataNormals
+   * computes on their points and triangles, set up as the generator once used it. Infinite where
+   * only one of the two is NaN.
+   */
+  static double NormalsDeviation(vtkPolyData *glyphs)
+  {
+    vtkDataArray *normals = glyphs->GetPointData()->GetNormals();
+    CPPUNIT_ASSERT(normals != nullptr);
+    CPPUNIT_ASSERT_EQUAL(std::string("Normals"), std::string(normals->GetName()));
+    CPPUNIT_ASSERT_EQUAL(3, normals->GetNumberOfComponents());
+
+    // Points and triangles only: vtkPolyDataNormals keeps normals its input already has.
+    auto mesh = vtkSmartPointer<vtkPolyData>::New();
+    mesh->SetPoints(glyphs->GetPoints());
+    mesh->SetPolys(glyphs->GetPolys());
+    auto filter = vtkSmartPointer<vtkPolyDataNormals>::New();
+    filter->SetInputData(mesh);
+    filter->SplittingOff();
+    filter->ConsistencyOff();
+    filter->AutoOrientNormalsOff();
+    filter->ComputePointNormalsOn();
+    filter->ComputeCellNormalsOff();
+    filter->FlipNormalsOff();
+    filter->NonManifoldTraversalOff();
+    filter->Update();
+    vtkDataArray *expected = filter->GetOutput()->GetPointData()->GetNormals();
+    CPPUNIT_ASSERT_EQUAL(expected->GetNumberOfTuples(), normals->GetNumberOfTuples());
+
+    double deviation = 0;
+    for (vtkIdType i = 0; i < normals->GetNumberOfTuples(); ++i)
+    {
+      for (int c = 0; c < 3; ++c)
+      {
+        const double actual = normals->GetComponent(i, c);
+        const double reference = expected->GetComponent(i, c);
+        if (std::isnan(actual) || std::isnan(reference))
+        {
+          if (!(std::isnan(actual) && std::isnan(reference)))
+            deviation = std::numeric_limits<double>::infinity();
+        }
+        else
+        {
+          deviation = std::max(deviation, std::fabs(actual - reference));
+        }
+      }
+    }
+    return deviation;
+  }
+
+  struct GlyphCase
+  {
+    std::string name;
+    mitk::Image::Pointer image;
+    mitk::OdfGlyphGenerator::Slice slice;
+    std::optional<mitk::OdfGlyphGenerator::Window> window;
+    mitk::OdfGlyphGenerator::Settings settings;
+
+    vtkSmartPointer<vtkPolyData> Generate() const
+    {
+      return mitk::OdfGlyphGenerator::Generate(*image, 0, slice, window ? &*window : nullptr, settings);
+    }
+  };
+
+  /** ODF image of three voxels along x: a zero ODF, a constant ODF and one with negative values. */
+  static mitk::OdfImage::Pointer MakeDegenerateOdfImage()
+  {
+    auto image = MakeOdfImage(3, 1, 1, 0);
+    {
+      mitk::ImagePixelWriteAccessor<itk::Vector<float, ODF_SAMPLING_SIZE>, 3> access(image);
+      itk::Vector<float, ODF_SAMPLING_SIZE> odf;
+      odf.Fill(2);
+      access.SetPixelByIndex({{1, 0, 0}}, odf);
+      for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+        odf[i] = static_cast<float>(1.5 * OdfType::GetDirection(i)[0] - 0.5);
+      access.SetPixelByIndex({{2, 0, 0}}, odf);
+    }
+    return image;
+  }
+
+  /** Tensor image of three voxels along x: a null tensor, one with a negative eigenvalue and a rotated diag(3, 1, 1). */
+  static mitk::TensorImage::Pointer MakeDegenerateTensorImage()
+  {
+    using ItkTensorImageType = mitk::TensorImage::ItkTensorImageType;
+    auto itkImage = ItkTensorImageType::New();
+    ItkTensorImageType::RegionType region;
+    region.SetSize({{3, 1, 1}});
+    itkImage->SetRegions(region);
+    itkImage->Allocate();
+    ItkTensorImageType::PixelType tensor;
+    tensor.Fill(0);
+    itkImage->FillBuffer(tensor);
+    tensor(0, 0) = 1;
+    tensor(1, 1) = 1;
+    tensor(2, 2) = -1;
+    itkImage->SetPixel({{1, 0, 0}}, tensor);
+    // diag(3, 1, 1) rotated by 30 degrees about z.
+    const double c = std::cos(itk::Math::pi / 6);
+    const double s = std::sin(itk::Math::pi / 6);
+    tensor.Fill(0);
+    tensor(0, 0) = 3 * c * c + s * s;
+    tensor(0, 1) = 2 * c * s;
+    tensor(1, 1) = 3 * s * s + c * c;
+    tensor(2, 2) = 1;
+    itkImage->SetPixel({{2, 0, 0}}, tensor);
+    auto image = mitk::TensorImage::New();
+    image->InitializeByItk(itkImage.GetPointer());
+    image->SetVolume(itkImage->GetBufferPointer());
+    return image;
+  }
+
+  /**
+   * One slice of each kind of glyph: tensors as ellipsoids and as tensor ODFs coloured by
+   * direction, ODFs with value colours at each normalization and scale mode, SH in both
+   * conventions, and glyphs that collapse to their centre (zero, constant, null, non-positive).
+   * tensorImage.dti and qBallImage.qbi (64x64x3, spacing 3) through a window of 16x16 voxels of
+   * layer 1, which holds both isotropic and directed voxels.
+   */
+  static std::vector<GlyphCase> GlyphCases()
+  {
+    std::vector<GlyphCase> cases;
+    const auto add = [&cases](const std::string &name, mitk::Image *image, const mitk::PlaneGeometry &plane, const std::optional<mitk::OdfGlyphGenerator::Window> &window, const std::function<void(mitk::OdfGlyphGenerator::Settings &)> &set) {
+      const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, plane);
+      CPPUNIT_ASSERT_MESSAGE(name, slice.has_value());
+      auto settings = AllGlyphs();
+      set(settings);
+      cases.push_back({name, image, *slice, window, settings});
+    };
+
+    mitk::OdfGlyphGenerator::Window window;
+    window.center[0] = 94.5;
+    window.center[1] = 94.5;
+    window.center[2] = 3;
+    window.axis1[0] = 1;
+    window.axis1[1] = 0;
+    window.axis1[2] = 0;
+    window.axis2[0] = 0;
+    window.axis2[1] = 1;
+    window.axis2[2] = 0;
+    window.halfSize1 = 24;
+    window.halfSize2 = 24;
+    const auto layer1 = Plane(0, 0, 3, 0, 0, 1);
+
+    mitk::Image::Pointer tensors = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("tensorImage.dti")).GetPointer();
+    for (const bool ellipsoids : {true, false})
+    {
+      add(ellipsoids ? "tensor ellipsoids" : "tensor ODFs", tensors, *layer1, window, [ellipsoids](mitk::OdfGlyphGenerator::Settings &settings) {
+        settings.tensorEllipsoids = ellipsoids;
+        settings.colourByDirection = true;
+        settings.scaling = 3;
+        settings.scaleBy = mitk::ODFSB_GFA;
+      });
+    }
+
+    mitk::Image::Pointer odfs = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("qBallImage.qbi")).GetPointer();
+    const std::pair<int, std::string> normalizations[] = {
+      {mitk::ODFN_MINMAX, "min-max"}, {mitk::ODFN_MAX, "max"}, {mitk::ODFN_NONE, "none"}, {mitk::ODFN_GLOBAL_MAX, "global max"}};
+    const std::pair<int, std::string> scaleModes[] = {{mitk::ODFSB_NONE, "unscaled"}, {mitk::ODFSB_GFA, "GFA"}, {mitk::ODFSB_PC, "PC"}};
+    for (const auto &[normalization, normalizationName] : normalizations)
+    {
+      for (const auto &[scaleBy, scaleName] : scaleModes)
+      {
+        add("ODFs " + normalizationName + " " + scaleName, odfs, *layer1, window, [normalization, scaleBy](mitk::OdfGlyphGenerator::Settings &settings) {
+          settings.scaling = 1.5;
+          settings.normalization = normalization;
+          settings.scaleBy = scaleBy;
+          // The mapper's default angles (2, 1) give an empty range and a curvature of 0 everywhere.
+          settings.indexParam1 = 0;
+          settings.indexParam2 = 30;
+        });
+      }
+    }
+
+    for (const auto convention : {mitk::ShImage::MRTRIX, mitk::ShImage::FSL})
+    {
+      auto sh = LoadShImage();
+      sh->SetShConvention(convention);
+      mitk::Point3D layer1Index;
+      layer1Index.Fill(0);
+      layer1Index[2] = 1;
+      mitk::Point3D origin;
+      sh->GetGeometry()->IndexToWorld(layer1Index, origin);
+      add(convention == mitk::ShImage::MRTRIX ? "SH MRtrix" : "SH FSL", sh.GetPointer(), *Plane(origin[0], origin[1], origin[2], 0, 0, 1), std::nullopt, [](mitk::OdfGlyphGenerator::Settings &settings) {
+        settings.scaling = 1.5;
+        settings.scaleBy = mitk::ODFSB_GFA;
+      });
+    }
+
+    mitk::Image::Pointer degenerateOdfs = MakeDegenerateOdfImage().GetPointer();
+    for (const auto &[normalization, normalizationName] : normalizations)
+    {
+      add("degenerate ODFs " + normalizationName, degenerateOdfs, *Plane(0, 0, 30, 0, 0, 1), std::nullopt, [normalization](mitk::OdfGlyphGenerator::Settings &settings) {
+        settings.normalization = normalization;
+      });
+    }
+    mitk::Image::Pointer degenerateTensors = MakeDegenerateTensorImage().GetPointer();
+    for (const bool ellipsoids : {true, false})
+    {
+      add(ellipsoids ? "degenerate tensor ellipsoids" : "degenerate tensor ODFs", degenerateTensors, *Plane(0, 0, 0, 0, 0, 1), std::nullopt, [ellipsoids](mitk::OdfGlyphGenerator::Settings &settings) {
+        settings.tensorEllipsoids = ellipsoids;
+        settings.colourByDirection = true;
+      });
+    }
+    return cases;
+  }
+
+  // The full-mesh output as the generator computed it with per-point VTK calls and
+  // vtkPolyDataNormals (develop ea962a7): points bit for bit, the same triangles and colours,
+  // normals within 1e-5 of vtkPolyDataNormals on the same points and triangles.
+  void GlyphGenerator_FullMesh_RecordedOutput()
+  {
+    const std::map<std::string, GlyphFingerprints> recorded = {
+      {"tensor ellipsoids", {17034852577485430665ull, 1096128973618458029ull, 490934932846469741ull}},
+      {"tensor ODFs", {12851842336964751317ull, 1096128973618458029ull, 2635710187966396005ull}},
+      {"ODFs min-max unscaled", {14189319946489299714ull, 1096128973618458029ull, 7742319593747850464ull}},
+      {"ODFs min-max GFA", {17668013067538098052ull, 1096128973618458029ull, 7742319593747850464ull}},
+      {"ODFs min-max PC", {16332114341006182612ull, 1096128973618458029ull, 7742319593747850464ull}},
+      {"ODFs max unscaled", {9345829136554767028ull, 1096128973618458029ull, 9733053046497571580ull}},
+      {"ODFs max GFA", {4520074477892272862ull, 1096128973618458029ull, 9733053046497571580ull}},
+      {"ODFs max PC", {8738574457543285195ull, 1096128973618458029ull, 9733053046497571580ull}},
+      {"ODFs none unscaled", {9333783507626493847ull, 1096128973618458029ull, 9733053046497571580ull}},
+      {"ODFs none GFA", {6025879742403316006ull, 1096128973618458029ull, 9733053046497571580ull}},
+      {"ODFs none PC", {12122150632538098043ull, 1096128973618458029ull, 9733053046497571580ull}},
+      {"ODFs global max unscaled", {9345829136554767028ull, 1096128973618458029ull, 9733053046497571580ull}},
+      {"ODFs global max GFA", {4520074477892272862ull, 1096128973618458029ull, 9733053046497571580ull}},
+      {"ODFs global max PC", {8738574457543285195ull, 1096128973618458029ull, 9733053046497571580ull}},
+      {"SH MRtrix", {12865566614912398697ull, 4467218837662528689ull, 1804916545293251655ull}},
+      {"SH FSL", {10487421149490399071ull, 4467218837662528689ull, 4990161006980516369ull}},
+      {"degenerate ODFs min-max", {5204507226439308963ull, 5386312073842232526ull, 17532495340253511400ull}},
+      {"degenerate ODFs max", {17697105185732528215ull, 5386312073842232526ull, 16719975996596679099ull}},
+      {"degenerate ODFs none", {8926904338823488585ull, 5386312073842232526ull, 16719975996596679099ull}},
+      {"degenerate ODFs global max", {17697105185732528215ull, 5386312073842232526ull, 16719975996596679099ull}},
+      {"degenerate tensor ellipsoids", {7152420504689445845ull, 5386312073842232526ull, 3723008392808557773ull}},
+      {"degenerate tensor ODFs", {13356892293473713405ull, 5386312073842232526ull, 2899782707417845261ull}},
+    };
+    std::ostringstream mismatches;
+    for (const auto &glyphCase : GlyphCases())
+    {
+      auto glyphs = glyphCase.Generate();
+      CPPUNIT_ASSERT_MESSAGE(glyphCase.name, glyphs->GetNumberOfPoints() > 0);
+      CheckTopology(glyphs, glyphCase.name);
+      const double deviation = NormalsDeviation(glyphs);
+      CPPUNIT_ASSERT_MESSAGE(glyphCase.name + " normals deviate by " + std::to_string(deviation), deviation <= 1e-5);
+      const auto fingerprints = Fingerprints(glyphs);
+      const auto expected = recorded.find(glyphCase.name);
+      if (expected == recorded.end() || !(expected->second == fingerprints))
+      {
+        mismatches << "\n{\"" << glyphCase.name << "\", {" << fingerprints.points << "ull, " << fingerprints.triangles
+                   << "ull, " << fingerprints.colours << "ull}},";
+      }
+    }
+    CPPUNIT_ASSERT_MESSAGE("Glyphs that differ from the recorded output:" + mismatches.str(), mismatches.str().empty());
+  }
+
+  // Value colours are the colours of vtkLookupTable::GetColor for 1 - the normalized value,
+  // converted with 255 * colour; values outside [0, 1] get the colour of the nearer end.
+  void GlyphGenerator_ValueColours_FromLookupTable()
+  {
+    auto lut = vtkSmartPointer<vtkLookupTable>::New();
+    lut->SetRange(0, 1);
+    lut->Build();
+    const auto expectedColour = [&lut](float normalizedValue) {
+      double rgb[3];
+      lut->GetColor(1 - normalizedValue, rgb);
+      std::array<int, 4> rgba = {0, 0, 0, 255};
+      for (unsigned int c = 0; c < 3; ++c)
+        rgba[c] = static_cast<unsigned char>(255.0 * rgb[c]);
+      return rgba;
+    };
+    const auto checkColours = [&expectedColour](vtkPolyData *glyphs, vtkIdType glyph, const OdfType &colourOdf, const std::string &name) {
+      auto colours = vtkUnsignedCharArray::SafeDownCast(glyphs->GetPointData()->GetArray("ODF_COLORS"));
+      CPPUNIT_ASSERT(colours != nullptr);
+      for (vtkIdType j = 0; j < ODF_SAMPLING_SIZE; ++j)
+      {
+        const auto rgba = expectedColour(colourOdf[j]);
+        for (int c = 0; c < 4; ++c)
+          CPPUNIT_ASSERT_EQUAL_MESSAGE(name + " point " + std::to_string(j), rgba[c], int(colours->GetTypedComponent(glyph * ODF_SAMPLING_SIZE + j, c)));
+      }
+    };
+    // Min-max colours the normalized values; the other normalizations colour the values divided by the maximum.
+    const auto colourOdf = [](const OdfType &odf, int normalization) {
+      return normalization == mitk::ODFN_MINMAX ? odf.MinMaxNormalize() : odf.MaxNormalize();
+    };
+
+    // Values from -2 to 1: below 0 after division by the maximum.
+    auto image = MakeDegenerateOdfImage();
+    OdfType odf;
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      odf[i] = static_cast<float>(1.5 * OdfType::GetDirection(i)[0] - 0.5);
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 30, 0, 0, 1));
+    for (const int normalization : {mitk::ODFN_MINMAX, mitk::ODFN_MAX, mitk::ODFN_NONE, mitk::ODFN_GLOBAL_MAX})
+    {
+      auto settings = AllGlyphs();
+      settings.normalization = normalization;
+      auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+      CPPUNIT_ASSERT_EQUAL(vtkIdType(3 * ODF_SAMPLING_SIZE), glyphs->GetNumberOfPoints());
+      checkColours(glyphs, 2, colourOdf(odf, normalization), "synthetic, normalization " + std::to_string(normalization));
+    }
+
+    // The 16x16 voxels of qBallImage.qbi around the centre of layer 1, row by row.
+    auto odfs = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("qBallImage.qbi"));
+    const auto cases = GlyphCases();
+    const auto odfCase = std::find_if(cases.begin(), cases.end(), [](const GlyphCase &c) { return c.name == "ODFs min-max unscaled"; });
+    CPPUNIT_ASSERT(odfCase != cases.end());
+    mitk::ImagePixelReadAccessor<itk::Vector<float, ODF_SAMPLING_SIZE>, 3> access(odfs.GetPointer());
+    for (const int normalization : {mitk::ODFN_MINMAX, mitk::ODFN_MAX})
+    {
+      auto glyphCase = *odfCase;
+      glyphCase.settings.normalization = normalization;
+      auto glyphs = glyphCase.Generate();
+      CPPUNIT_ASSERT_EQUAL(vtkIdType(256 * ODF_SAMPLING_SIZE), glyphs->GetNumberOfPoints());
+      for (vtkIdType g = 0; g < 256; ++g)
+      {
+        const auto values = access.GetPixelByIndex({{static_cast<itk::IndexValueType>(24 + g % 16), static_cast<itk::IndexValueType>(24 + g / 16), 1}});
+        for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+          odf[i] = values[i];
+        checkColours(glyphs, g, colourOdf(odf, normalization), "qBallImage glyph " + std::to_string(g));
+      }
+    }
+  }
+
+  // Each glyph is computed on its own, so the output does not depend on the number of threads.
+  void GlyphGenerator_ThreadCount_SameOutput()
+  {
+    auto cases = GlyphCases();
+    // The whole layer, more glyphs than threads by far.
+    cases.front().window.reset();
+    mitk::OmpThreadGuard threads(1);
+    for (const auto &glyphCase : cases)
+    {
+      threads.SetNumberOfThreads(1);
+      auto reference = glyphCase.Generate();
+      const auto referenceFingerprints = Fingerprints(reference);
+      const auto referenceNormals = NormalsFingerprint(reference);
+      for (const int numThreads : {3, 8})
+      {
+        threads.SetNumberOfThreads(numThreads);
+        auto glyphs = glyphCase.Generate();
+        const std::string name = glyphCase.name + ", " + std::to_string(numThreads) + " threads";
+        CPPUNIT_ASSERT_MESSAGE(name, referenceFingerprints == Fingerprints(glyphs));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(name, referenceNormals, NormalsFingerprint(glyphs));
+      }
+    }
   }
 
   // Defaults no longer overwrite what the node already has, unless asked to.
