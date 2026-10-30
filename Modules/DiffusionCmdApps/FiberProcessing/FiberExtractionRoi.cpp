@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
 
   parser.beginGroup("1. Mandatory arguments:");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.dcm)", us::Any(), false);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output root", us::Any(), false);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram (.trk if the name has no extension of a known file type); with labels, _LABEL is inserted before the extension", us::Any(), false);
   parser.addArgument("rois", "", mitkCommandLineParser::StringList, "ROI images:", "ROI images", us::Any(), false);
   parser.endGroup();
 

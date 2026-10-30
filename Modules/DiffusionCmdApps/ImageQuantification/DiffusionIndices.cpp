@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
 
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input image (tensor, ODF or SH-coefficient image)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image; .nii.gz is appended if the name has no extension of a known file type", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("index", "idx", mitkCommandLineParser::String, "Index:", "index (fa, gfa, ra, ad, rd, ca, l2, l3, md, adc). For a DWI, md is the mean of the ADCs -ln(S/S0)/b of the diffusion-weighted volumes, which equals the tensor MD only for evenly spread directions and mono-exponential decay, and adc the fit of S0 exp(-b ADC) to them; S0 is the mean of the positive b=0 values", us::Any(), false);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
