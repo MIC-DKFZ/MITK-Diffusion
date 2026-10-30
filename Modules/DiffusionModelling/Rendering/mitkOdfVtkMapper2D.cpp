@@ -23,6 +23,7 @@ found in the LICENSE file.
 #include <vtkProperty.h>
 
 #include <algorithm>
+#include <cmath>
 
 mitk::OdfVtkMapper2D::LocalStorage::LocalStorage()
   : m_Actor(vtkSmartPointer<vtkActor>::New()), m_Mapper(vtkSmartPointer<vtkPolyDataMapper>::New())
@@ -94,7 +95,7 @@ bool mitk::OdfVtkMapper2D::IsGenerationRequired(const std::optional<GlyphView> &
     return true;
   // Generating and uploading thousands of glyphs at every mouse step of a pan or zoom made the
   // view lag; the glyphs in place are still right, only the area they cover is out of date.
-  return lod > 0 && !SameWindow(generated->window, current.window);
+  return lod > 0 && (!SameWindow(generated->window, current.window) || generated->pixelsPerMm != current.pixelsPerMm);
 }
 
 bool mitk::OdfVtkMapper2D::IsLODEnabled(BaseRenderer *renderer) const
@@ -140,6 +141,12 @@ std::optional<mitk::OdfVtkMapper2D::GlyphView> mitk::OdfVtkMapper2D::GetVisibleV
   view.window.axis2.Normalize();
   view.window.halfSize1 = viewportSize[0] / 2;
   view.window.halfSize2 = viewportSize[1] / 2;
+
+  // Pixels of the vtkRenderWindow, which are device pixels on HiDPI screens: the Qt render
+  // window sizes it by the device pixel ratio. The coarse glyph meshes depend on what the screen
+  // resolves.
+  const double mmPerPixel = renderer->GetScaleFactorMMPerDisplayUnit();
+  view.pixelsPerMm = mmPerPixel > 0 && std::isfinite(mmPerPixel) ? 1 / mmPerPixel : 0;
   return view;
 }
 
@@ -172,7 +179,9 @@ void mitk::OdfVtkMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
   try
   {
     const auto *image = static_cast<const Image *>(node->GetData());
-    localStorage->m_Mapper->SetInputData(OdfGlyphGenerator::Generate(*image, this->GetTimestep(), view->slice, &view->window, this->GetSettings()));
+    auto settings = this->GetSettings();
+    settings.pixelsPerMm = view->pixelsPerMm;
+    localStorage->m_Mapper->SetInputData(OdfGlyphGenerator::Generate(*image, this->GetTimestep(), view->slice, &view->window, settings));
     localStorage->m_Actor->VisibilityOn();
   }
   catch (const Exception &e)

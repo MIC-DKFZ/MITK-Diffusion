@@ -71,12 +71,14 @@ namespace mitk
       Vector3D planeAxis1;
       /** The part of the plane in view. */
       OdfGlyphGenerator::Window window;
+      /** Zoom of the view, which chooses the glyph mesh (OdfGlyphGenerator::Settings). */
+      double pixelsPerMm = 0;
     };
 
     /**
      * Whether the glyphs of a renderer have to be generated again: for new data, new node
      * properties or another time step (contentChanged), and for another slice or plane at any
-     * level of detail; for a pan or zoom (another window) only at LOD 1 and higher.
+     * level of detail; for a pan or zoom (another window or pixelsPerMm) only at LOD 1 and higher.
      * \param generated the view the current glyphs were generated for; none if there are none
      * \param lod the level of detail of the render, RenderingManager::GetNextLOD
      */

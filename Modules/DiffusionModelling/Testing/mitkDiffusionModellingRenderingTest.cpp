@@ -1515,6 +1515,7 @@ public:
     view.window.axis2[1] = 1;
     view.window.halfSize1 = 10;
     view.window.halfSize2 = 5;
+    view.pixelsPerMm = 2;
     return view;
   }
 
@@ -1542,7 +1543,8 @@ public:
     const std::pair<std::string, std::function<void(GlyphView &)>> viewChanges[] = {
       {"pan", [](GlyphView &v) { v.window.center[0] += 0.5; }},
       {"zoom", [](GlyphView &v) { v.window.halfSize1 *= 1.1; v.window.halfSize2 *= 1.1; }},
-      {"window axes", [](GlyphView &v) { std::swap(v.window.axis1, v.window.axis2); }}};
+      {"window axes", [](GlyphView &v) { std::swap(v.window.axis1, v.window.axis2); }},
+      {"pixels per mm", [](GlyphView &v) { v.pixelsPerMm *= 2; }}};
     for (const int lod : {0, 1})
     {
       for (const auto &[name, change] : sliceChanges)

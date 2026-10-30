@@ -40,6 +40,7 @@ found in the LICENSE file.
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <set>
 #include <string>
 
 /**
@@ -60,6 +61,7 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   MITK_TEST(PanAndZoom_GlyphsKeptUntilLod1);
   MITK_TEST(SliceChange_GlyphsGeneratedAtOnce);
   MITK_TEST(LodEnabled_OnlyWhileGlyphsShown);
+  MITK_TEST(Zoom_MeshLevelFollowsGlyphWidth);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::RenderingTestHelper m_RenderingTestHelper;
@@ -95,6 +97,26 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
     auto mapper = dynamic_cast<mitk::VtkMapper *>(m_Node->GetMapper(mitk::BaseRenderer::Standard2D));
     CPPUNIT_ASSERT(mapper != nullptr);
     return FindGlyphs(mapper->GetVtkProp(this->Renderer()));
+  }
+
+  /** Number of glyphs of a glyph mesh: each of n points has 2 n - 4 triangles. */
+  static vtkIdType NumberOfGlyphs(vtkPolyData *glyphs)
+  {
+    return (2 * glyphs->GetNumberOfPoints() - glyphs->GetNumberOfPolys()) / 4;
+  }
+
+  static vtkIdType PointsPerGlyph(vtkPolyData *glyphs) { return glyphs->GetNumberOfPoints() / NumberOfGlyphs(glyphs); }
+
+  /**
+   * Points per glyph of the mesh for the renderer's zoom: tensorImage.dti's glyphs are at most
+   * "Scaling" x 3 mm wide; below 16 pixels 42 points, below 40 pixels 162.
+   */
+  vtkIdType ExpectedPointsPerGlyph()
+  {
+    float scaling = 0;
+    CPPUNIT_ASSERT(m_Node->GetFloatProperty("Scaling", scaling));
+    const double width = scaling * 3 / this->Renderer()->GetScaleFactorMMPerDisplayUnit();
+    return width < 16 ? 42 : (width < 40 ? 162 : ODF_SAMPLING_SIZE);
   }
 
   vtkPolyData *RenderGlyphs(mitk::AnatomicalPlane view)
@@ -135,7 +157,7 @@ public:
       m_Node->SetBoolProperty(property.c_str(), true);
       vtkPolyData *glyphs = this->RenderGlyphs(view);
       CPPUNIT_ASSERT_MESSAGE(property, glyphs != nullptr);
-      CPPUNIT_ASSERT_EQUAL_MESSAGE(property, numGlyphs * vtkIdType(ODF_SAMPLING_SIZE), glyphs->GetNumberOfPoints());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(property, numGlyphs * this->ExpectedPointsPerGlyph(), glyphs->GetNumberOfPoints());
     }
   }
 
@@ -295,7 +317,7 @@ public:
     m_Node->SetBoolProperty("VisibleOdfs_T", true);
     vtkSmartPointer<vtkPolyData> glyphs = this->RenderGlyphs(mitk::AnatomicalPlane::Axial);
     CPPUNIT_ASSERT(glyphs != nullptr);
-    CPPUNIT_ASSERT_EQUAL(vtkIdType(64 * 64 * ODF_SAMPLING_SIZE), glyphs->GetNumberOfPoints());
+    CPPUNIT_ASSERT_EQUAL(64 * 64 * this->ExpectedPointsPerGlyph(), glyphs->GetNumberOfPoints());
     mitk::BaseRenderer *renderer = this->Renderer();
     mitk::RenderingManager *renderingManager = mitk::RenderingManager::GetInstance();
     CPPUNIT_ASSERT_EQUAL(0, renderingManager->GetNextLOD(renderer));
@@ -325,7 +347,8 @@ public:
       regenerated->GetBounds(newBounds);
       CPPUNIT_ASSERT_MESSAGE(name + ": glyphs of the new view", !std::equal(bounds, bounds + 6, newBounds));
       // Zoomed in by 2, a quarter of the slice is in view.
-      CPPUNIT_ASSERT_MESSAGE(name, regenerated->GetNumberOfPoints() < 64 * 64 * ODF_SAMPLING_SIZE / 2);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, this->ExpectedPointsPerGlyph(), PointsPerGlyph(regenerated));
+      CPPUNIT_ASSERT_MESSAGE(name, NumberOfGlyphs(regenerated) < 64 * 64 / 2);
       glyphs = regenerated;
     }
   }
@@ -361,6 +384,31 @@ public:
     m_RenderingTestHelper.Render();
     CPPUNIT_ASSERT(this->Glyphs() == nullptr);
     CPPUNIT_ASSERT_EQUAL(0u, renderer->GetNumberOfVisibleLODEnabledMappers());
+  }
+
+  // The glyph mesh follows the glyphs' width on screen, so a zoom changes it, at the render of
+  // LOD 1 as any zoom.
+  void Zoom_MeshLevelFollowsGlyphWidth()
+  {
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    // Glyphs at most 3 mm wide: 42 points at the fitted zoom of 2.5 pixels per mm.
+    m_Node->SetFloatProperty("Scaling", 1);
+    vtkSmartPointer<vtkPolyData> glyphs = this->RenderGlyphs(mitk::AnatomicalPlane::Axial);
+    mitk::CameraController *camera = this->Renderer()->GetCameraController();
+    std::set<vtkIdType> levels;
+    for (int step = 0; step < 3; ++step)
+    {
+      CPPUNIT_ASSERT(glyphs != nullptr);
+      CPPUNIT_ASSERT_EQUAL(this->ExpectedPointsPerGlyph(), PointsPerGlyph(glyphs));
+      levels.insert(PointsPerGlyph(glyphs));
+      camera->Zoom(2.5, camera->GetCameraPositionOnPlane());
+      m_RenderingTestHelper.Render();
+      CPPUNIT_ASSERT(this->Glyphs() == glyphs.GetPointer());
+      mitk::RenderingManager::GetInstance()->ExecutePendingHighResRenderingRequest();
+      m_RenderingTestHelper.Render();
+      glyphs = this->Glyphs();
+    }
+    CPPUNIT_ASSERT(levels == std::set<vtkIdType>({42, 162, ODF_SAMPLING_SIZE}));
   }
 };
 
