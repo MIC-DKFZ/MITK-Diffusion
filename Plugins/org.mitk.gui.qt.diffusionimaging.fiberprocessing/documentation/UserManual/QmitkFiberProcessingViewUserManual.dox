@@ -11,5 +11,6 @@ Among others, fibers can be removed by direction: a fiber is removed if any of i
 
 <b>Generate ROI Image:</b>
 Converts the selected planar figures into a binary image on the grid of the selected fiber bundle or image. The image is the union of the figures; OR composites are converted as well, AND and NOT composites are refused.
+A figure sets every voxel that its plane passes through and whose centre, projected onto the plane, lies inside the figure. For a figure drawn on a slice of the image these are the voxels of that slice whose centres lie inside the figure; for a figure on a plane oblique to the image grid, every voxel the plane cuts there, so the figure has no holes in the view it was drawn in.
 
 */

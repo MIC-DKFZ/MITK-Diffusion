@@ -25,21 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImage.h>
 #include <mitkSurface.h>
 
-#include <itkCastImageFilter.h>
-#include <itkVTKImageImport.h>
-#include <itkVTKImageExport.h>
-#include <itkRegionOfInterestImageFilter.h>
-
-#include <vtkLinearExtrusionFilter.h>
-#include <vtkPolyDataToImageStencil.h>
-#include <vtkSelectEnclosedPoints.h>
-#include <vtkImageImport.h>
-#include <vtkImageExport.h>
-#include <vtkImageStencil.h>
 #include <vtkSmartPointer.h>
-#include <vtkSelection.h>
-#include <vtkSelectionNode.h>
-#include <vtkFloatArray.h>
 
 /*!
 \brief View to process fiber bundles. Supplies methods to extract fibers from the bundle, fiber resampling, mirroring, join and subtract bundles and much more.
@@ -117,65 +103,12 @@ protected:
 
   Ui::QmitkFiberProcessingViewControls* m_Controls;
 
-  /** Connection from VTK to ITK */
-  template <typename VTK_Exporter, typename ITK_Importer>
-      void ConnectPipelines(VTK_Exporter* exporter, ITK_Importer importer)
-  {
-    importer->SetUpdateInformationCallback(exporter->GetUpdateInformationCallback());
-
-    importer->SetPipelineModifiedCallback(exporter->GetPipelineModifiedCallback());
-    importer->SetWholeExtentCallback(exporter->GetWholeExtentCallback());
-    importer->SetSpacingCallback(exporter->GetSpacingCallback());
-    importer->SetOriginCallback(exporter->GetOriginCallback());
-    importer->SetScalarTypeCallback(exporter->GetScalarTypeCallback());
-
-    importer->SetNumberOfComponentsCallback(exporter->GetNumberOfComponentsCallback());
-
-    importer->SetPropagateUpdateExtentCallback(exporter->GetPropagateUpdateExtentCallback());
-    importer->SetUpdateDataCallback(exporter->GetUpdateDataCallback());
-    importer->SetDataExtentCallback(exporter->GetDataExtentCallback());
-    importer->SetBufferPointerCallback(exporter->GetBufferPointerCallback());
-    importer->SetCallbackUserData(exporter->GetCallbackUserData());
-  }
-
-  template <typename ITK_Exporter, typename VTK_Importer>
-      void ConnectPipelines(ITK_Exporter exporter, VTK_Importer* importer)
-  {
-    importer->SetUpdateInformationCallback(exporter->GetUpdateInformationCallback());
-
-    importer->SetPipelineModifiedCallback(exporter->GetPipelineModifiedCallback());
-    importer->SetWholeExtentCallback(exporter->GetWholeExtentCallback());
-    importer->SetSpacingCallback(exporter->GetSpacingCallback());
-    importer->SetOriginCallback(exporter->GetOriginCallback());
-    importer->SetScalarTypeCallback(exporter->GetScalarTypeCallback());
-
-    importer->SetNumberOfComponentsCallback(exporter->GetNumberOfComponentsCallback());
-
-    importer->SetPropagateUpdateExtentCallback(exporter->GetPropagateUpdateExtentCallback());
-    importer->SetUpdateDataCallback(exporter->GetUpdateDataCallback());
-    importer->SetDataExtentCallback(exporter->GetDataExtentCallback());
-    importer->SetBufferPointerCallback(exporter->GetBufferPointerCallback());
-    importer->SetCallbackUserData(exporter->GetCallbackUserData());
-  }
-
-  template < typename TPixel, unsigned int VImageDimension >
-      void InternalCalculateMaskFromPlanarFigure(
-          itk::Image< TPixel, VImageDimension > *image, unsigned int axis, std::string nodeName );
-
-  template < typename TPixel, unsigned int VImageDimension >
-      void InternalReorientImagePlane(
-        const itk::Image< TPixel, VImageDimension > *image, mitk::BaseGeometry* planegeo3D, int additionalIndex );
-
   int m_CircleCounter;                                      ///< used for data node naming
   int m_PolygonCounter;                                     ///< used for data node naming
   std::vector<mitk::DataNode::Pointer>  m_SelectedFB;       ///< selected fiber bundle nodes
   std::vector<mitk::DataNode::Pointer>  m_SelectedPF;       ///< selected planar figure nodes
   std::vector<mitk::Surface::Pointer>   m_SelectedSurfaces;
   mitk::Image::Pointer                  m_SelectedImage;
-  mitk::Image::Pointer                  m_InternalImage;
-  mitk::PlanarFigure::Pointer           m_PlanarFigure;
-  ItkUCharImageType::Pointer            m_InternalImageMask3D;
-  ItkUCharImageType::Pointer            m_PlanarFigureImage;
   float                                 m_UpsamplingFactor; ///< upsampling factor for all image generations
   mitk::DataNode::Pointer               m_RoiImageNode;
 
@@ -185,7 +118,8 @@ protected:
 
   void AddCompositeToDatastorage(mitk::DataNode::Pointer pfc, std::vector<mitk::DataNode::Pointer> children, mitk::DataNode::Pointer parentNode=nullptr);
   void debugPFComposition(mitk::PlanarFigureComposite::Pointer , int );
-  void WritePfToImage(mitk::DataNode::Pointer node, mitk::Image* image);
+  /** Adds the planar figures of the node (a figure or an OR composite) to the ROI image */
+  void WritePfToImage(mitk::DataNode::Pointer node, ItkUCharImageType& image);
   mitk::DataNode::Pointer GenerateTractDensityImage(mitk::FiberBundle::Pointer fib, bool binary, bool absolute);
   mitk::DataNode::Pointer GenerateColorHeatmap(mitk::FiberBundle::Pointer fib);
   mitk::DataNode::Pointer GenerateFiberEndingsImage(mitk::FiberBundle::Pointer fib);
