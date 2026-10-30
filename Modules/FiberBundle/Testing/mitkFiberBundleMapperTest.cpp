@@ -28,6 +28,7 @@ found in the LICENSE file.
 #include <vtkCellArray.h>
 #include <vtkCellPicker.h>
 #include <vtkCoordinate.h>
+#include <vtkIdList.h>
 #include <vtkImageData.h>
 #include <vtkMapper.h>
 #include <vtkOutputWindow.h>
@@ -68,6 +69,7 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   MITK_TEST(Mapper3D_TubeRadiusChange_NoNewInput);
   MITK_TEST(Mapper3D_GpuTubes_LookLikeCpuTubes);
   MITK_TEST(Mapper3D_GpuTubes_PickingOpacityClipping);
+  MITK_TEST(Mapper3D_TubeDirections_SharedPointTakesTheLastFiber);
   MITK_TEST(Mapper3D_RibbonsWithOnePointFibers_NoWarnings);
   MITK_TEST(Mapper3D_ClippingPlaneFromProperty);
   MITK_TEST(Mapper3D_ClippingPlaneChange_AppliedWithoutRebuild);
@@ -431,6 +433,42 @@ public:
   }
 
   // A bundle keeps one-point fibers as one-point lines (#20); vtkRibbonFilter warned once for each.
+  // #46: the tube direction at a point of several fibers is that of the fiber of the highest
+  // index, whatever the threads of vtkSMPTools do: many straight fibers through one shared point.
+  void Mapper3D_TubeDirections_SharedPointTakesTheLastFiber()
+  {
+    const int numFibers = 4096;
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    auto lines = vtkSmartPointer<vtkCellArray>::New();
+    const vtkIdType centre = points->InsertNextPoint(0.0, 0.0, 0.0);
+    for (int i = 0; i < numFibers; ++i)
+    {
+      const double angle = 3.0 * i / numFibers;
+      const double d[3] = {std::cos(angle), std::sin(angle), 0.5};
+      const vtkIdType ids[3] = {points->InsertNextPoint(-d[0], -d[1], -d[2]), centre, points->InsertNextPoint(d[0], d[1], d[2])};
+      lines->InsertNextCell(3, ids);
+    }
+    auto polyData = vtkSmartPointer<vtkPolyData>::New();
+    polyData->SetPoints(points);
+    polyData->SetLines(lines);
+    m_Fibers = mitk::FiberBundle::New(polyData);
+    m_Node->SetData(m_Fibers);
+    m_Node->SetFloatProperty("shape.tuberadius", 0.1f);
+
+    vtkPolyData *input = Input(Render3D());
+    vtkDataArray *tangents = input->GetPointData()->GetArray("FIBER_TUBE_TANGENTS");
+    CPPUNIT_ASSERT(tangents != nullptr);
+    auto ids = vtkSmartPointer<vtkIdList>::New();
+    input->GetLines()->GetCellAtId(0, ids);
+    const double first = tangents->GetTuple1(ids->GetId(0));
+    const vtkIdType shared = ids->GetId(1);
+    input->GetLines()->GetCellAtId(numFibers - 1, ids);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("the point is shared", shared, ids->GetId(1));
+    const double last = tangents->GetTuple1(ids->GetId(0));
+    CPPUNIT_ASSERT_MESSAGE("the fibers have other directions", first != last);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("the shared point has the last fiber's direction", last, tangents->GetTuple1(ids->GetId(1)));
+  }
+
   void Mapper3D_RibbonsWithOnePointFibers_NoWarnings()
   {
     auto points = vtkSmartPointer<vtkPoints>::New();

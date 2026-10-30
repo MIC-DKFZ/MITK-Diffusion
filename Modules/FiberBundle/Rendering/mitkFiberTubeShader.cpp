@@ -14,6 +14,7 @@ found in the LICENSE file.
 
 #include <vtkActor.h>
 #include <vtkCellArray.h>
+#include <vtkDataArrayRange.h>
 #include <vtkFloatArray.h>
 #include <vtkIdList.h>
 #include <vtkOpenGLPolyDataMapper.h>
@@ -25,6 +26,7 @@ found in the LICENSE file.
 #include <vtkUniforms.h>
 
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <vector>
 
@@ -62,12 +64,33 @@ namespace
     return static_cast<float>(qu * 4096 + qv);
   }
 
+  /** True if the lines use each point at most once, numbered in line order (connectivity entry i
+   *  is point i): the layout of fiber bundles whose fibers share no point (CleanFiberPolyData
+   *  numbers the points in the order of first use). */
+  bool PointsOwnedInLineOrder(vtkCellArray *cells)
+  {
+    std::atomic<bool> inOrder = true;
+    cells->Dispatch([&](auto *, auto *connectivity) {
+      const auto ids = vtk::DataArrayValueRange<1>(connectivity);
+      vtkSMPTools::For(0, static_cast<vtkIdType>(ids.size()), [&](vtkIdType begin, vtkIdType end) {
+        for (vtkIdType i = begin; i < end && inOrder.load(std::memory_order_relaxed); ++i)
+        {
+          if (static_cast<vtkIdType>(ids[i]) != i)
+            inOrder.store(false, std::memory_order_relaxed);
+        }
+      });
+    });
+    return inOrder;
+  }
+
   /**
    * The fiber's direction at each point, for the edge shared by the quads of the segments before
    * and after it: the sum of the unit directions of both segments (the bisector), skipping
    * segments of zero length, which the geometry shader does not draw. Fiber ends take the
-   * direction of their segment. A point of several lines gets the direction in the last of them;
-   * fiber bundles have points of their own per fiber.
+   * direction of their segment. A point of several lines gets the direction in the line of the
+   * highest index: such lines are processed one after the other in line order, since in parallel
+   * the thread schedule would decide. Fiber bundles normally have points of their own per fiber
+   * and are processed in parallel.
    */
   vtkSmartPointer<vtkFloatArray> FiberTangents(vtkPolyData *lines)
   {
@@ -84,7 +107,7 @@ namespace
     if (points == nullptr || cells == nullptr)
       return tangents;
 
-    vtkSMPTools::For(0, cells->GetNumberOfCells(), [&](vtkIdType begin, vtkIdType end) {
+    auto tangentsOfLines = [&](vtkIdType begin, vtkIdType end) {
       auto ids = vtkSmartPointer<vtkIdList>::New();
       std::vector<Vector> directions;
       std::vector<Vector> before;
@@ -128,7 +151,11 @@ namespace
             tangents->SetValue(ids->GetId(i), EncodeDirection(tangent));
         }
       }
-    });
+    };
+    if (PointsOwnedInLineOrder(cells))
+      vtkSMPTools::For(0, cells->GetNumberOfCells(), tangentsOfLines);
+    else
+      tangentsOfLines(0, cells->GetNumberOfCells());
     return tangents;
   }
 
