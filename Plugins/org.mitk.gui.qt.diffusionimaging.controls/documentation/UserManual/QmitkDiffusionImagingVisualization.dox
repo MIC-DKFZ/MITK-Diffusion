@@ -1,13 +1,13 @@
 /**
 \page org_mitk_views_controlvisualizationpropertiesview Visualization Control Panel
 
-This view configures how diffusion images, peak images and tractograms are shown. The controls depend on the data selected in the Data Manager. With several nodes selected, the controls show the values of the last selected node of each kind, and a change applies to all selected nodes of that kind.
+This view configures how diffusion images, peak images and tractograms are shown. The controls depend on the data selected in the Data Manager. With several nodes selected, the controls show the values of the last selected node of each kind, and a change applies to all selected nodes of that kind; the glyph buttons (T, S, C) apply to the last selected tensor, ODF or SH image only.
 
 \section QmitkDiffusionImagingVisualizationSettings ODF and Tensor Glyphs
 
 For tensor, ODF and spherical-harmonic images, the visibility of glyphs in (T)ransversal, (S)agittal and (C)oronal slices can be switched here; it applies to every 2D render window that shows a slice of that orientation (the image axis nearest to the slice normal). The maximal number of glyphs to display (\#Glyphs) keeps the system response time during rendering feasible. The other options configure the normalization (Min-Max, Max or None; not offered for tensors; a scene file with the former "Global Maximum" shows "Max", which draws the same), the scaling of the glyphs (None, FA/GFA or Principal Curvature), an additional scaling factor, and the colouring by ODF value or by principal direction.
 
-A diffusion-weighted image that is loaded while this view is open shows its first b=0 volume instead of volume 0.
+A diffusion-weighted image that is loaded while this view is open shows its first b=0 volume instead of volume 0, unless it already shows another volume, e.g. one restored from a scene file.
 
 This is how a visualization with activated glyphs should look like:
 
@@ -23,7 +23,7 @@ For images, the thick-slice menu sets a maximum, sum or weighted intensity proje
 
 If a tractogram is selected in the data manager, this view enables to visualize the fibers as tubes (tube radius) or ribbons (ribbon width) and to clip the fibers in 2D and 3D. In the 2D render windows, a tractogram shows the fibers within the given distance (2D clipping) from the displayed plane. The 3D clipping cuts a tractogram at the current axial, sagittal or coronal plane, optionally on the other side ("Flip Clipping Direction"), and follows the plane when the slice is changed. It works per tractogram individually, which enables nice visualization of e.g. a CST tract extending upwards out of the bottom half of a whole brain tractogram.
 
-The colour button opens one colour dialog and colours all selected tractograms and peak images with the chosen colour; a tractogram whose node colour is changed elsewhere (e.g. in the Data Manager) while it is selected takes the new colour as well. The reset button restores the colouring by fiber orientation.
+The colour button opens one colour dialog and colours all selected tractograms and peak images with the chosen colour; a tractogram or peak image whose node colour is changed elsewhere (e.g. in the Data Manager) while it is selected takes the new colour as well. The reset button restores the colouring by fiber orientation.
 
 \imageMacro{tract_visualization.png,"CST tube visualization with sagittal 3D clipping of the whole-brain tractogram.",1}
 
