@@ -176,6 +176,10 @@ Facts the layout does not show:
   while `minimize` runs; the cost function may release it during its evaluation.
 - `ctest -R mitkFiberBundle` runs the `FiberBundle` tests; `mitkFiberBundleMapperTest` renders
   offscreen (EGL) and is skipped with exit code 77 where no OpenGL context can be created.
+  The 3D fiber mapper draws tubes on the GPU from the lines (`Rendering/mitkFiberTubeShader.h`:
+  VTK's tube shading with a geometry shader of the radius in mm) and ribbons on the CPU. Both
+  fiber mappers keep their input and clipping planes and only move the planes: a new input or
+  plane collection makes VTK rebuild the GPU buffers of the whole bundle.
   `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
   give the same result at any number of OpenMP threads; fiber references in the test data
   depend on exact point positions, so a change there is checked bit for bit against the old output.
