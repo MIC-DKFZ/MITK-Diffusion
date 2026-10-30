@@ -107,7 +107,7 @@ void mitk::FiberBundle::ColorFibersByOrientation()
   m_FiberColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
   m_FiberColors->SetNumberOfComponents(4);
   m_FiberColors->SetName("FIBER_COLORS");
-  // Points on no line (vertices of one-point fibers) are white instead of uninitialised.
+  // Points of one-point fibers have no orientation and are white instead of uninitialised.
   m_FiberColors->SetNumberOfTuples(numOfPoints);
   const unsigned char white[4] = {255, 255, 255, 255};
   for (vtkIdType i=0; i<numOfPoints; ++i)

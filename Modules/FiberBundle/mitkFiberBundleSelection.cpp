@@ -14,6 +14,8 @@ found in the LICENSE file.
 #include "mitkFiberPolyDataBuilder.h"
 
 #include <boost/timer/progress_display.hpp>
+#include <itkContinuousIndex.h>
+#include <itkMath.h>
 #include <mitkDiffusionImageHelperFunctions.h>
 #include <vtkNew.h>
 
@@ -38,7 +40,6 @@ vtkSmartPointer<vtkPolyData> mitk::FiberBundle::GeneratePolyDataByIds(const std:
     builder.AddFiber(m_FiberPolyData, id, this->GetFiberWeight(id));
   }
 
-  // in the order of a bundle made of the polydata, which may differ from that of fiberIds
   const auto fibers = builder.GetFibers();
   weights->SetNumberOfValues(fibers.weights->GetNumberOfValues());
   for (vtkIdType i=0; i<fibers.weights->GetNumberOfValues(); ++i)
@@ -138,7 +139,7 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(const mitk::FiberBu
 
   MITK_INFO << "Subtracting fibers";
 
-  // End points of every fiber; a bundle has no fiber without points (vtkCleanPolyData in
+  // End points of every fiber; a bundle has no fiber without points (CleanFiberPolyData in
   // UpdateFiberGeometry removes empty cells), so the index is the fiber id.
   using EndPoints = std::array< itk::Point<float, 3>, 2 >;
   auto endPoints = [](vtkPolyData* polyData, unsigned int numFibers)
@@ -272,15 +273,78 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::SubtractBundle(const mitk::FiberBu
   return builder.CreateBundle(this);
 }
 
+namespace
+{
+  using MaskType = mitk::FiberBundle::ItkUcharImgType;
+  using MaskIndex = itk::ContinuousIndex<double, 3>;
+
+  /** Whether the voxel containing the continuous index ci is set; the index is rounded as
+   *  ImageBase::TransformPhysicalPointToIndex rounds it, outside the image nothing is set. */
+  bool IsInMask(const MaskType* mask, const MaskIndex& ci)
+  {
+    MaskType::IndexType idx;
+    for (unsigned int d=0; d<3; ++d)
+      idx[d] = itk::Math::RoundHalfIntegerUp<itk::IndexValueType>(ci[d]);
+    return mask->GetLargestPossibleRegion().IsInside(idx) && mask->GetPixel(idx)>0;
+  }
+
+  /**
+   * The parameters t in (0, 1), ascending, at which the segment from a to b (continuous indices)
+   * crosses a voxel border, i.e. a plane where an index coordinate is k + 0.5. Only borders of
+   * the image region and between its voxels count: beyond the region every voxel is outside the
+   * mask. Crossings closer than 1e-6 voxels to the previous one or to the segment ends are
+   * skipped; their points would coincide in float precision with another point of the piece.
+   */
+  std::vector<double> VoxelBorderCrossings(const MaskIndex& a, const MaskIndex& b, const MaskType::RegionType& region)
+  {
+    std::vector<double> crossings;
+    double length = 0;
+    for (unsigned int d=0; d<3; ++d)
+    {
+      const double delta = b[d]-a[d];
+      length += delta*delta;
+      if (delta==0 || !std::isfinite(delta))
+        continue;
+      const double regionLow = static_cast<double>(region.GetIndex(d)) - 0.5;
+      const double regionHigh = regionLow + static_cast<double>(region.GetSize(d));
+      const double low = std::max(std::min(a[d], b[d]), regionLow);
+      const double high = std::min(std::max(a[d], b[d]), regionHigh);
+      for (auto k = static_cast<long long>(std::ceil(low-0.5)); static_cast<double>(k)+0.5<=high; ++k)
+        crossings.push_back((static_cast<double>(k)+0.5-a[d])/delta);
+    }
+    std::sort(crossings.begin(), crossings.end());
+
+    const double minStep = 1e-6/std::sqrt(length);
+    std::vector<double> result;
+    double last = 0;
+    for (const double t : crossings)
+      if (t-last>=minStep && 1-t>=minStep)
+      {
+        result.push_back(t);
+        last = t;
+      }
+    return result;
+  }
+}
+
 mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(const ItkUcharImgType* mask, bool invert) const
 {
   // The fiber processing view and FiberModification continue with the result, so "no fiber
   // left" is an empty bundle, never nullptr. The pieces of a fiber inside the mask keep its weight.
+  //
+  // Each segment between two fiber points is split at the voxel borders it crosses, and each
+  // part is inside or outside by the voxel of its midpoint. A piece ends exactly where the fiber
+  // crosses the mask border, also between two fiber points, so the result does not depend on the
+  // point spacing (#1). Borders between two kept voxels add no point: a fiber that stays on the
+  // kept side keeps exactly its points.
   FiberPolyDataBuilder builder;
+  const auto& region = mask->GetLargestPossibleRegion();
 
   MITK_INFO << "Cutting fibers";
   boost::timer::progress_display disp(m_NumFibers);
   vtkNew<vtkIdList> idBuffer;
+  std::vector<double> breaks;
+  std::vector<char> keep;
   for (unsigned int i=0; i<m_NumFibers; i++)
   {
     ++disp;
@@ -289,30 +353,69 @@ mitk::FiberBundle::Pointer mitk::FiberBundle::RemoveFibersOutside(const ItkUchar
     if (ids.size()<=1)
       continue;
 
-    for (const vtkIdType id : ids)
+    const float weight = this->GetFiberWeight(i);
+    auto endPiece = [&builder, weight]()
     {
-      double p[3];
-      m_FiberPolyData->GetPoint(id, p);
-      itk::Point<float, 3> itkP = mitk::imv::GetItkPoint(p);
-      itk::Index<3> idx;
-
-      bool inside = mask->TransformPhysicalPointToIndex(itkP, idx);
-
-      if (inside && mask->GetPixel(idx) <= 0)
-        inside = false;
-
-      if (inside != invert)
-        builder.AddPoint(itkP.GetDataPointer());
-      else if (builder.GetNumberOfPendingPoints()>1)
-        builder.EndFiber(this->GetFiberWeight(i));
+      if (builder.GetNumberOfPendingPoints()>1)
+        builder.EndFiber(weight);
       else
         builder.DiscardFiber();
-    }
+    };
 
-    if (builder.GetNumberOfPendingPoints()>1)
-      builder.EndFiber(this->GetFiberWeight(i));
-    else
-      builder.DiscardFiber();
+    itk::Point<double, 3> p0, p1;
+    m_FiberPolyData->GetPoint(ids[0], p0.GetDataPointer());
+    MaskIndex c0 = mask->TransformPhysicalPointToContinuousIndex<double>(p0);
+    for (std::size_t j=1; j<ids.size(); ++j)
+    {
+      m_FiberPolyData->GetPoint(ids[j], p1.GetDataPointer());
+      const MaskIndex c1 = mask->TransformPhysicalPointToContinuousIndex<double>(p1);
+
+      // The fiber points themselves at t = 0 and t = 1, so that kept points stay bit for bit.
+      auto pointAt = [&p0, &p1](double t)
+      {
+        if (t<=0)
+          return p0;
+        if (t>=1)
+          return p1;
+        itk::Point<double, 3> p;
+        for (unsigned int d=0; d<3; ++d)
+          p[d] = (1-t)*p0[d] + t*p1[d];
+        return p;
+      };
+
+      breaks = VoxelBorderCrossings(c0, c1, region);
+      breaks.push_back(1);
+      keep.resize(breaks.size());
+      double tStart = 0;
+      for (std::size_t k=0; k<breaks.size(); ++k)
+      {
+        const double tMid = (tStart+breaks[k])/2;
+        MaskIndex mid;
+        for (unsigned int d=0; d<3; ++d)
+          mid[d] = (1-tMid)*c0[d] + tMid*c1[d];
+        keep[k] = IsInMask(mask, mid) != invert;
+        tStart = breaks[k];
+      }
+
+      tStart = 0;
+      for (std::size_t k=0; k<breaks.size(); ++k)
+      {
+        if (!keep[k])
+          endPiece();
+        else
+        {
+          if (builder.GetNumberOfPendingPoints()==0)
+            builder.AddPoint(pointAt(tStart).GetDataPointer());
+          if (k+1==breaks.size() || !keep[k+1])
+            builder.AddPoint(pointAt(breaks[k]).GetDataPointer());
+        }
+        tStart = breaks[k];
+      }
+
+      p0 = p1;
+      c0 = c1;
+    }
+    endPiece();
   }
 
   return builder.CreateBundle(this);
@@ -421,7 +524,7 @@ bool mitk::FiberBundle::ApplyCurvatureThreshold(float minRadius, bool deleteFibe
       if (r<minRadius)
       {
         j += 2;
-        // a single point is no fiber (it would become a vertex cell)
+        // a single point is no fiber
         if (builder.GetNumberOfPendingPoints()>1)
           builder.EndFiber(weight);
         else

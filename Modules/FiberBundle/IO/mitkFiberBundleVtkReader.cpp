@@ -164,8 +164,8 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
   FiberBundle::Pointer fiberBundle = FiberBundle::New(fiberPolyData);
   fiberBundle->setIsRAS(ras);
 
-  // The arrays are taken from the bundle's own polydata: vtkCleanPolyData in the constructor drops
-  // unused points and moves single-point fibers first, and carries the arrays along.
+  // The arrays are taken from the bundle's own polydata: the constructor drops unused points and
+  // fibers without points, and carries the arrays along.
   vtkPolyData* cleaned = fiberBundle->GetFiberPolyData();
 
   vtkFloatArray* fileWeights = vtkFloatArray::SafeDownCast(cleaned->GetCellData()->GetArray("FIBER_WEIGHTS"));
