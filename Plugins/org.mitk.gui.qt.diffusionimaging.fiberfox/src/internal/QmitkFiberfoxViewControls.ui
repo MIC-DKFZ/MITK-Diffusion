@@ -2163,7 +2163,7 @@
          <item row="0" column="1">
           <widget class="QComboBox" name="m_KspacePhaseBox">
            <property name="toolTip">
-            <string>How the k-space simulation computes the phase of distortions and eddy currents. Exact: sums the phase of every pixel for every k-space sample (slow). Time segments: approximates the phase by a few transforms per slice; the automatic count stays below 0.1 % relative error (far below typical noise) and was 1.5 to 45 times faster on a 128x128 slice, the less the stronger the field; slices where the exact sum is faster take it.</string>
+            <string>How the k-space simulation computes the phase of distortions and eddy currents. Exact: sums the phase of every pixel for every k-space sample (slow). Time segments: approximates the phase by a few transforms per slice; the automatic count stays below 0.1 % relative error (far below typical noise) and was 1.7 to 54 times faster on a 128x128 slice, the less the stronger the field; slices where the exact sum is faster take it.</string>
            </property>
            <item>
             <property name="text">
