@@ -22,7 +22,7 @@ mitk_create_plugin(
 )
 
 # QmitkAbstractView (the test selection view) without Require-Plugin, see manifest_headers.cmake.
-target_link_libraries(${PROJECT_NAME} PRIVATE org_mitk_gui_qt_common)
+target_link_libraries(${PROJECT_NAME} PRIVATE org_mitk_gui_qt_common org_mitk_gui_common)
 
 set(TESTDRIVER ${PROJECT_NAME})
 set(MODULE_IS_ENABLED TRUE)
@@ -70,4 +70,5 @@ endfunction()
 if(BUILD_TESTING)
   mitk_diffusion_add_ui_test(Controls org.mitk.gui.qt.diffusionimaging.controls)
   mitk_diffusion_add_ui_test(Reconstruction org.mitk.gui.qt.diffusionimaging.reconstruction)
+  mitk_diffusion_add_ui_test(Ivim org.mitk.gui.qt.diffusionimaging.ivim)
 endif()

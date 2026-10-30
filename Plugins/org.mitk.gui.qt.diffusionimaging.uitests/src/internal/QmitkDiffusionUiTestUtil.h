@@ -81,6 +81,12 @@ namespace QmitkDiffusionUiTest
   /** Selects the nodes as the Data Manager does (workbench selection service). */
   void Select(const QList<mitk::DataNode::Pointer> &nodes);
 
+  /** Fits the render windows to the data, as the Workbench does after loading a file. */
+  void InitializeViews();
+
+  /** Moves the crosshair (the selected position of the render windows) to the world point. */
+  void SetCrosshair(const mitk::Point3D &position);
+
   /** Processes events until the condition holds; false after the timeout. */
   bool WaitFor(const std::function<bool()> &condition, int timeoutMs = 120000);
 

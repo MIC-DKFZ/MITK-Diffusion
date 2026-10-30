@@ -22,6 +22,8 @@ found in the LICENSE file.
 #include <mitkIDataStorageService.h>
 #include <mitkIOUtil.h>
 #include <mitkLog.h>
+#include <mitkRenderingManager.h>
+#include <mitkWorkbenchUtil.h>
 
 #include <QAbstractButton>
 #include <QApplication>
@@ -139,6 +141,20 @@ void QmitkDiffusionUiTest::Select(const QList<mitk::DataNode::Pointer> &nodes)
   if (previous.IsNotNull() && previous != part)
     page->Activate(previous);
   Wait(20);
+}
+
+void QmitkDiffusionUiTest::InitializeViews()
+{
+  mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(GetDataStorage());
+  Wait(50);
+}
+
+void QmitkDiffusionUiTest::SetCrosshair(const mitk::Point3D &position)
+{
+  auto *renderWindowPart = mitk::WorkbenchUtil::GetRenderWindowPart(GetPage(), mitk::WorkbenchUtil::OPEN);
+  CPPUNIT_ASSERT_MESSAGE("No render window part", renderWindowPart != nullptr);
+  renderWindowPart->SetSelectedPosition(position);
+  Wait(100);
 }
 
 bool QmitkDiffusionUiTest::WaitFor(const std::function<bool()> &condition, int timeoutMs)
