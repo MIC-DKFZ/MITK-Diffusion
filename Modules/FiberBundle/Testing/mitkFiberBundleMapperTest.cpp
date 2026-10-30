@@ -858,9 +858,10 @@ public:
   // #46: a 2D window holds only the tiles near its slab; drawn with the slab's clipping planes,
   // they hold every segment of the slab and give the image of the whole bundle: for planes along
   // the world axes and oblique ones, scrolling across tiles in both directions, and after turning
-  // the plane in steps (which keeps the tiles of the old normal or builds new ones). Translucent
-  // fibers are blended by VTK's order-independent translucency in 2D windows (MITK switches depth
-  // peeling on for 3D windows only), so the tiles' draw order shows at most in rounding.
+  // the plane in steps (which keeps the tiles of the old normal or builds new ones), and after a
+  // change of the fibers. Translucent fibers are blended by VTK's order-independent translucency
+  // in 2D windows (MITK switches depth peeling on for 3D windows only), so the tiles' draw order
+  // shows at most in rounding.
   void Mapper2D_Tiles_SameImageAsWholeBundle()
   {
     // a thin slab, so that the tiles hold part of this small bundle
@@ -871,7 +872,7 @@ public:
     auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
     mitk::SliceNavigationController *navigation = renderer->GetSliceNavigationController();
     vtkIdType fewestPoints = bundlePoints;
-    int opaqueDiffering = 0, translucentPixels = 0, translucentLargest = 0;
+    int tiesAtMitkRange = 0, translucentPixels = 0, translucentLargest = 0;
 
     // translucent: the largest difference allowed in a colour channel (out of 255)
     const int maxTranslucentDifference = 2;
@@ -881,15 +882,31 @@ public:
       for (vtkActor *tile : Tiles(assembly))
         points += Input(tile)->GetNumberOfPoints();
       fewestPoints = std::min(fewestPoints, points);
+
+      // MITK's 2D camera stands 900 000 mm from the plane with the clipping range 0.1-1e6 mm
+      // (CameraController::Fit), so the depth buffer resolves depth only to about 0.05 mm, and of
+      // fragments of equal stored depth VTK's depth test (GL_LEQUAL) keeps the one drawn last. The
+      // tiles are drawn tile by tile, the whole bundle in bundle order, so where two fibers cross
+      // within about 0.05 mm in depth either may be on top: logged at MITK's range. The images are
+      // compared at a range of 1000 mm around the plane, which resolves about 6e-5 mm.
       int components = 3;
+      const std::vector<unsigned char> tilesAtMitkRange = Capture(&components);
+      const int ties = FrameDifference(tilesAtMitkRange, CaptureWholeBundle(assembly), components).first;
+      tiesAtMitkRange = std::max(tiesAtMitkRange, ties);
+      vtkCamera *camera = renderer->GetVtkRenderer()->GetActiveCamera();
+      double mitkRange[2];
+      camera->GetClippingRange(mitkRange);
+      camera->SetClippingRange(camera->GetDistance() - 500.0, camera->GetDistance() + 500.0);
+
       const std::vector<unsigned char> fromTiles = Capture(&components);
       const std::vector<unsigned char> fromWhole = CaptureWholeBundle(assembly);
       const ImageDifference drawn = Compare(fromWhole, fromWhole);
       const auto [opaquePixels, opaqueLargest] = FrameDifference(fromTiles, fromWhole, components);
       const int inSlab = CheckTilesHoldTheSlab(assembly);
-      MITK_INFO << where << ": " << Tiles(assembly).size() << " tiles of " << points << " of " << bundlePoints << " points, "
-                << inSlab << " segments in the slab, " << drawn.drawnPixels << " fiber pixels, " << opaquePixels << " differ by at most "
-                << opaqueLargest;
+      MITK_INFO << where << ": " << Tiles(assembly).size() << " tiles of " << points << " of "
+                << m_Fibers->GetFiberPolyData()->GetNumberOfPoints() << " points, " << inSlab << " segments in the slab, "
+                << drawn.drawnPixels << " fiber pixels, " << ties << " differ at MITK's clipping range, " << opaquePixels
+                << " at 1000 mm, by at most " << opaqueLargest;
       if (opaquePixels > 0)
       {
         // where they differ, for the log
@@ -905,12 +922,7 @@ public:
         }
       }
       CPPUNIT_ASSERT_MESSAGE("fibers drawn", drawn.drawnPixels > 0);
-      // Of fragments of equal depth (segments meeting at a point, or crossing within the depth
-      // buffer's resolution), the one drawn last is shown. The tiles are drawn one after the other,
-      // so such a pixel may show another of the segments than the whole bundle drawn in bundle
-      // order; every segment of the slab is drawn (CheckTilesHoldTheSlab).
-      CPPUNIT_ASSERT_MESSAGE(where + ": the image of the whole bundle", 1000 * opaquePixels <= drawn.drawnPixels);
-      opaqueDiffering = std::max(opaqueDiffering, opaquePixels);
+      CPPUNIT_ASSERT_MESSAGE(where + ": the image of the whole bundle", fromTiles == fromWhole);
 
       // the same slab with translucent fibers (node opacity)
       m_Node->SetOpacity(0.4f);
@@ -924,6 +936,7 @@ public:
       translucentPixels = std::max(translucentPixels, pixels);
       translucentLargest = std::max(translucentLargest, largest);
       CPPUNIT_ASSERT_MESSAGE(where + ": translucent tiles look like the translucent whole bundle", largest <= maxTranslucentDifference);
+      camera->SetClippingRange(mitkRange);
     };
 
     for (const auto view : {mitk::AnatomicalPlane::Axial, mitk::AnatomicalPlane::Sagittal, mitk::AnatomicalPlane::Coronal})
@@ -975,7 +988,44 @@ public:
       compareWithWholeBundle("turned by " + std::to_string(angle) + " degrees");
     }
 
-    MITK_INFO << "Opaque: at most " << opaqueDiffering << " pixels differ; translucent: at most " << translucentPixels
+    // new geometry while the window shows tiles of the old one: the points moved in place (the same
+    // polydata, a new modified time), then new polydata whose added fiber has a segment above the
+    // 64 mm cap of the short segment length. That segment crosses the axial slab 45 mm from its
+    // midpoint, so only the tile of the long segments holds it, which every slab draws.
+    Render2D(mitk::AnatomicalPlane::Axial);
+    navigation->SelectSliceByPoint(centre);
+    compareWithWholeBundle("axial at the centre");
+    vtkPoints *fiberPoints = m_Fibers->GetFiberPolyData()->GetPoints();
+    for (vtkIdType i = 0; i < fiberPoints->GetNumberOfPoints(); ++i)
+    {
+      double p[3];
+      fiberPoints->GetPoint(i, p);
+      p[2] += 1.3;
+      fiberPoints->SetPoint(i, p);
+    }
+    fiberPoints->Modified();
+    compareWithWholeBundle("fibers moved by 1.3 mm in place");
+    const unsigned int numFibers = m_Fibers->GetNumFibers();
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    points->DeepCopy(fiberPoints);
+    auto lines = vtkSmartPointer<vtkCellArray>::New();
+    lines->DeepCopy(m_Fibers->GetFiberPolyData()->GetLines());
+    const vtkIdType start = points->InsertNextPoint(centre[0], centre[1], centre[2] - 5.0);
+    const vtkIdType end = points->InsertNextPoint(centre[0] + 10.0, centre[1] + 10.0, centre[2] + 95.0);
+    const vtkIdType longSegment[2] = {start, end};
+    lines->InsertNextCell(2, longSegment);
+    auto withLongSegment = vtkSmartPointer<vtkPolyData>::New();
+    withLongSegment->SetPoints(points);
+    withLongSegment->SetLines(lines);
+    m_Fibers->SetFiberPolyData(withLongSegment);
+    CPPUNIT_ASSERT_EQUAL(numFibers + 1, m_Fibers->GetNumFibers());
+    compareWithWholeBundle("a fiber with a 101 mm segment added");
+    mitk::Point3D above = centre;
+    above[2] += 0.7;
+    navigation->SelectSliceByPoint(above);
+    compareWithWholeBundle("with the long segment, scroll to z = " + std::to_string(above[2]));
+
+    MITK_INFO << "At MITK's clipping range at most " << tiesAtMitkRange << " pixels differ; translucent: at most " << translucentPixels
               << " pixels differ, by at most " << translucentLargest;
     CPPUNIT_ASSERT_MESSAGE("the tiles hold part of the bundle", fewestPoints < bundlePoints / 2);
   }
