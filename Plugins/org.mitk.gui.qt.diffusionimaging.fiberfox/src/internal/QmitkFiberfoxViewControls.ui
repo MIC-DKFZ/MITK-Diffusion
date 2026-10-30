@@ -2126,6 +2126,88 @@
         </layout>
        </widget>
       </item>
+      <item row="24" column="0">
+       <widget class="QFrame" name="m_KspacePhaseFrame">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <layout class="QFormLayout" name="m_KspacePhaseLayout">
+         <property name="horizontalSpacing">
+          <number>6</number>
+         </property>
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="m_KspacePhaseLabel">
+           <property name="text">
+            <string>Distortion Phase:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="m_KspacePhaseBox">
+           <property name="toolTip">
+            <string>How the k-space simulation computes the phase of distortions and eddy currents. Exact: sums the phase of every pixel for every k-space sample (slow). Time segments: approximates the phase by a few transforms per slice; the automatic count stays below 0.1 % relative error (far below typical noise) and is typically 5 to 100 times faster.</string>
+           </property>
+           <item>
+            <property name="text">
+             <string>Exact</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Time Segments (automatic)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Time Segments (fixed)</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="m_KspaceTimeSegmentsLabel">
+           <property name="text">
+            <string>Segments:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QSpinBox" name="m_KspaceTimeSegmentsBox">
+           <property name="toolTip">
+            <string>Fixed number of time segments per slice. The count needed grows with the frequency range of the field map times the readout time; too few segments give large errors, so the automatic count is recommended.</string>
+           </property>
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>10000</number>
+           </property>
+           <property name="value">
+            <number>32</number>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
       <item row="11" column="0">
        <widget class="Line" name="line_6">
         <property name="orientation">
@@ -2390,7 +2472,7 @@
         </property>
        </widget>
       </item>
-      <item row="25" column="0">
+      <item row="26" column="0">
        <widget class="QCheckBox" name="m_AddGibbsRinging">
         <property name="toolTip">
          <string>Add ringing artifacts occuring at strong edges in the image.</string>
@@ -2420,7 +2502,7 @@
         </property>
        </widget>
       </item>
-      <item row="24" column="0">
+      <item row="25" column="0">
        <widget class="Line" name="line">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -2437,7 +2519,7 @@
         </property>
        </widget>
       </item>
-      <item row="26" column="0">
+      <item row="27" column="0">
        <widget class="QSpinBox" name="m_ZeroRinging">
         <property name="toolTip">
          <string>If &gt; 0, ringing is simulated by by setting the defined percentage of higher frequencies to 0 in k-space. Otherwise, the input to the k-space simulation is generated with twice the resolution and cropped during k-space simulation (much slower).</string>
@@ -2909,6 +2991,8 @@
   <tabstop>m_MaxTranslationBoxZ</tabstop>
   <tabstop>m_AddEddy</tabstop>
   <tabstop>m_EddyGradientStrength</tabstop>
+  <tabstop>m_KspacePhaseBox</tabstop>
+  <tabstop>m_KspaceTimeSegmentsBox</tabstop>
   <tabstop>m_AddGibbsRinging</tabstop>
   <tabstop>m_ZeroRinging</tabstop>
  </tabstops>

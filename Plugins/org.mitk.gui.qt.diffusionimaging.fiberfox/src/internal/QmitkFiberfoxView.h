@@ -151,6 +151,9 @@ protected:
     void ReadCompartments();         ///< signal model and volume fraction map of each compartment
     void SetResultProperties();      ///< "Fiberfox.*" properties of the result node, from the parameters read
     void SetGradientsFromGui();      ///< bvals/bvecs files, loaded gradients or a generated half shell
+    /** Shows SignalGenerationParameters::m_KspaceTimeSegments: exact (0), automatic (negative) or a fixed count. */
+    void ShowKspaceTimeSegments(int segments);
+    void EnableKspacePhase();        ///< the k-space phase option applies only with distortions or eddy currents
 
     /** Signal model types the compartment boxes offer. */
     enum class CompartmentModel { None, Stick, Zeppelin, Tensor, Ball, Astrosticks, Dot, Prototype };
