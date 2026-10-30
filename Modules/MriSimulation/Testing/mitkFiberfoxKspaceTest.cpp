@@ -473,7 +473,7 @@ public:
     }
   }
 
-  /** A 64x64 slice to acquire with KspaceImageFilter directly: EPI, two compartments in an ellipse. */
+  /** A square slice to acquire with KspaceImageFilter directly: EPI, two or three compartments in an ellipse. */
   struct PhaseCase
   {
     std::string name;
@@ -481,13 +481,15 @@ public:
     float tLine;         ///< ms
     float eddyStrength;  ///< mT/m along (0.6, 0.8, 0) at b = 1000; 0 without eddy currents
     Pattern fieldMap;    ///< Hz; empty without distortions
-    bool relaxation;     ///< T2 90 and 2000 ms; without, the compartments share one set of spectra
+    bool relaxation;     ///< T2 90 (110) and 2000 ms; without, the compartments share one set of spectra
+    int size = 64;       ///< pixels per side
+    unsigned int compartments = 2;
   };
 
   /** Complex k-space of the slice with the given m_KspaceTimeSegments; numSegments is the count used (0: exact sum). */
   static std::vector<std::complex<float>> AcquireSlice(const PhaseCase& c, int segments, unsigned int& numSegments)
   {
-    const int n = 64;
+    const int n = c.size;
     mitk::FiberfoxParameters parameters;
     auto& signalGen = parameters.m_SignalGen;
     signalGen.m_ImageRegion.SetSize(0, n);
@@ -515,8 +517,15 @@ public:
       signalGen.m_FrequencyMap = fmap;
     }
 
+    // the patterns are those of a 64x64 slice, stretched to n
+    const std::vector<std::function<double(double, double, double)>> patterns = {
+      [](double xs, double ys, double) { return 300 + 200 * std::cos(0.4 * xs) * std::sin(0.3 * ys); },
+      [](double xs, double ys, double) { return 200 + 100 * std::sin(0.2 * xs + 0.1 * ys); },
+      [](double, double, double r2) { return r2 < 0.15 ? 800.0 : 50.0; } };
+    const std::vector<std::size_t> used = c.compartments == 3 ? std::vector<std::size_t>{0, 1, 2} : std::vector<std::size_t>{0, 2};
     std::vector<itk::KspaceImageFilter<float>::InputImagePointerType> compartments;
-    for (int i = 0; i < 2; ++i)
+    std::vector<float> t2, t1;
+    for (const std::size_t i : used)
     {
       auto compartment = itk::KspaceImageFilter<float>::InputImageType::New();
       itk::ImageRegion<2> region;
@@ -529,18 +538,18 @@ public:
         {
           const double dx = (x - 0.5 * n) / (0.4 * n), dy = (y - 0.52 * n) / (0.45 * n);
           const double r2 = dx * dx + dy * dy;
-          double value = 0;
-          if (r2 < 1)
-            value = i == 0 ? 300 + 200 * std::cos(0.4 * x) * std::sin(0.3 * y) : (r2 < 0.15 ? 800 : 50);
+          const double value = r2 < 1 ? patterns[i](x * 64.0 / n, y * 64.0 / n, r2) : 0.0;
           compartment->SetPixel({{x, y}}, static_cast<float>(value));
         }
       compartments.push_back(compartment);
+      t2.push_back(std::array<float, 3>{90, 110, 2000}[i]);
+      t1.push_back(std::array<float, 3>{900, 1200, 4000}[i]);
     }
 
     auto filter = itk::KspaceImageFilter<float>::New();
     filter->SetCompartmentImages(compartments);
-    filter->SetT2({90, 2000});
-    filter->SetT1({900, 4000});
+    filter->SetT2(t2);
+    filter->SetT1(t1);
     filter->SetParameters(&parameters);
     filter->SetZ(0);
     filter->SetZidx(0);
@@ -579,18 +588,22 @@ public:
    * currents (more than 512 bins of the field histogram), a field map whose values cluster (a linear
    * field, one value per column, plus a bump), and a field map alone with a phase spread above 128
    * cycles, also with a fixed count of 200 segments. Where the time segments are used, the case must
-   * test them (the slice must not have taken the exact sum).
+   * test them (the slice must not have taken the exact sum). A field map with a small cluster of
+   * outlying values (3x3 voxels at 400 Hz in a 100 Hz bump, as near a sinus) plus eddy currents leaves
+   * empty bins around the cluster in the two-dimensional histogram; on a 96x96 slice its pixels lie
+   * between those the residual check took before (every fifth), and the error was 0.17 %.
    */
   void TimeSegmentsHoldForStrongPhase()
   {
-    const auto bump = [](double amplitude, double linear)
+    const auto bump = [](double amplitude, double linear, int n = 64)
     {
-      return Pattern([amplitude, linear](int x, int y)
+      return Pattern([amplitude, linear, n](int x, int y)
       {
-        const double dx = x - 0.62 * 64, dy = y - 0.3 * 64, sigma = 0.12 * 64;
-        return amplitude * std::exp(-(dx * dx + dy * dy) / (2 * sigma * sigma)) - 0.2 * amplitude + linear * (x - 32) / 64.0;
+        const double dx = x - 0.62 * n, dy = y - 0.3 * n, sigma = 0.12 * n;
+        return amplitude * std::exp(-(dx * dx + dy * dy) / (2 * sigma * sigma)) - 0.2 * amplitude + linear * (x - n / 2) / static_cast<double>(n);
       });
     };
+    const Pattern cluster = [bump](int x, int y) { return x >= 30 && x < 33 && y >= 66 && y < 69 ? 400.0 : bump(100, 0, 96)(x, y); };
     struct Expectation { PhaseCase phase; bool segmented; int fixedSegments; };
     const std::vector<Expectation> cases = {
       {{"eddy currents 0.02 mT/m", 4, 2, 0.02f, Pattern(), true}, true, 0},
@@ -598,7 +611,8 @@ public:
       {{"field map 200 Hz, eddy currents 0.1 mT/m", 2, 1, 0.1f, bump(200, 0), true}, true, 0},
       {{"field map 400 Hz, eddy currents 0.05 mT/m", 4, 2, 0.05f, bump(400, 0), true}, false, 0},
       {{"clustered field map", 2, 1, 0, bump(500, 1500), false}, true, 0},
-      {{"field map, phase spread 140 cycles", 2, 2, 0, bump(400, 1300), true}, false, 200} };
+      {{"field map, phase spread 140 cycles", 2, 2, 0, bump(400, 1300), true}, false, 200},
+      {{"cluster of field values, eddy currents 0.016 mT/m", 2, 0.7f, 0.016f, cluster, true, 96, 3}, true, 0} };
     for (const auto& c : cases)
     {
       unsigned int numSegments = 0;
