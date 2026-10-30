@@ -26,22 +26,41 @@ found in the LICENSE file.
 #include <mitkTestingMacros.h>
 #include <mitkVtkMapper.h>
 
+#include <itkOrientationDistributionFunction.h>
+
 #include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkCellArray.h>
+#include <vtkFloatArray.h>
+#include <vtkGlyph3DMapper.h>
 #include <vtkImageData.h>
 #include <vtkMapper.h>
+#include <vtkMath.h>
+#include <vtkMatrix4x4.h>
 #include <vtkPlane.h>
 #include <vtkPlaneCollection.h>
 #include <vtkPointData.h>
+#include <vtkPoints.h>
 #include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
 #include <vtkPropAssembly.h>
 #include <vtkPropCollection.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
+#include <vtkTransform.h>
+#include <vtkTransformFilter.h>
+#include <vtkUnsignedCharArray.h>
+#include <vtkWindowToImageFilter.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
 #include <set>
 #include <string>
+#include <vector>
 
 /**
  * The 2D mapper of tensor images in an offscreen render window: which glyphs it hands to VTK.
@@ -62,6 +81,7 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   MITK_TEST(SliceChange_GlyphsGeneratedAtOnce);
   MITK_TEST(LodEnabled_OnlyWhileGlyphsShown);
   MITK_TEST(Zoom_MeshLevelFollowsGlyphWidth);
+  MITK_TEST(InstancedEllipsoid_ScaledThenRotated);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::RenderingTestHelper m_RenderingTestHelper;
@@ -409,6 +429,240 @@ public:
       glyphs = this->Glyphs();
     }
     CPPUNIT_ASSERT(levels == std::set<vtkIdType>({42, 162, ODF_SAMPLING_SIZE}));
+  }
+
+  /** RGB pixels of a render window, row by row from the bottom. */
+  struct Picture
+  {
+    int width = 0;
+    int height = 0;
+    std::vector<unsigned char> rgb;
+
+    bool Drawn(int x, int y) const
+    {
+      const unsigned char *pixel = &rgb[3 * (y * width + x)];
+      return pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0;
+    }
+
+    int Grey(int x, int y) const
+    {
+      const unsigned char *pixel = &rgb[3 * (y * width + x)];
+      return (pixel[0] + pixel[1] + pixel[2]) / 3;
+    }
+
+    /** Smallest rectangle around the drawn pixels: first and last column, first and last row. */
+    std::array<int, 4> DrawnExtents() const
+    {
+      std::array<int, 4> extents = {width, -1, height, -1};
+      for (int y = 0; y < height; ++y)
+      {
+        for (int x = 0; x < width; ++x)
+        {
+          if (this->Drawn(x, y))
+            extents = {std::min(extents[0], x), std::max(extents[1], x), std::min(extents[2], y), std::max(extents[3], y)};
+        }
+      }
+      return extents;
+    }
+  };
+
+  /**
+   * The actor alone in the renderer, in a parallel view of 2.4 units along a world axis: along z
+   * (x to the right, y up) or along x (y to the right, z up).
+   */
+  static Picture Photograph(vtkRenderWindow *window, vtkRenderer *renderer, vtkActor *actor, int viewAxis)
+  {
+    renderer->RemoveAllViewProps();
+    renderer->AddActor(actor);
+    vtkCamera *camera = renderer->GetActiveCamera();
+    camera->ParallelProjectionOn();
+    camera->SetFocalPoint(0, 0, 0);
+    camera->SetPosition(viewAxis == 0 ? 10 : 0, 0, viewAxis == 0 ? 0 : 10);
+    camera->SetViewUp(0, viewAxis == 0 ? 0 : 1, viewAxis == 0 ? 1 : 0);
+    camera->SetParallelScale(1.2);
+    camera->SetClippingRange(1, 20);
+    window->Render();
+    window->WaitForCompletion();
+    auto grabber = vtkSmartPointer<vtkWindowToImageFilter>::New();
+    grabber->SetInput(window);
+    grabber->ShouldRerenderOff();
+    grabber->ReadFrontBufferOff();
+    grabber->SetInputBufferTypeToRGB();
+    grabber->Update();
+    Picture picture;
+    const int *dimensions = grabber->GetOutput()->GetDimensions();
+    picture.width = dimensions[0];
+    picture.height = dimensions[1];
+    const auto *pixels = static_cast<const unsigned char *>(grabber->GetOutput()->GetScalarPointer());
+    picture.rgb.assign(pixels, pixels + 3 * picture.width * picture.height);
+    return picture;
+  }
+
+  static vtkSmartPointer<vtkUnsignedCharArray> WhiteColours(vtkIdType numberOfPoints)
+  {
+    auto colours = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    colours->SetName("ODF_COLORS");
+    colours->SetNumberOfComponents(4);
+    colours->SetNumberOfTuples(numberOfPoints);
+    colours->FillValue(255);
+    return colours;
+  }
+
+  /** Lit by the headlight only, without ambient and specular light, coloured by "ODF_COLORS". */
+  static vtkSmartPointer<vtkActor> MatteActor(vtkMapper *mapper)
+  {
+    mapper->ScalarVisibilityOn();
+    mapper->SetScalarModeToUsePointFieldData();
+    mapper->SelectColorArray("ODF_COLORS");
+    auto actor = vtkSmartPointer<vtkActor>::New();
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetAmbient(0);
+    actor->GetProperty()->SetDiffuse(1);
+    actor->GetProperty()->SetSpecular(0);
+    actor->GetProperty()->SetInterpolationToGouraud();
+    return actor;
+  }
+
+  // vtkGlyph3DMapper with quaternion orientation and scaling by vector components draws an
+  // instance as the unit sphere scaled along its axes and then rotated, with the normals turned by
+  // the inverse transpose: the picture of the sphere transformed on the CPU, and within 2 % of the
+  // extents of the exact ellipsoid. The rotations about two axes change the extents when the
+  // rotation is transposed; with light on the front faces only, inverted normals would draw the
+  // glyph dark.
+  void InstancedEllipsoid_ScaledThenRotated()
+  {
+    using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
+    auto window = vtkSmartPointer<vtkRenderWindow>::New();
+    window->SetOffScreenRendering(1);
+    window->SetSize(800, 800);
+    window->SwapBuffersOff();
+    auto renderer = vtkSmartPointer<vtkRenderer>::New();
+    renderer->SetBackground(0, 0, 0);
+    renderer->TwoSidedLightingOff();
+    window->AddRenderer(renderer);
+    const double pixelsPerUnit = 800 / 2.4;
+
+    // The ODF directions as a unit sphere with the sphere's normals.
+    vtkPolyData *baseMesh = OdfType::GetBaseMesh();
+    auto sphere = vtkSmartPointer<vtkPolyData>::New();
+    auto spherePoints = vtkSmartPointer<vtkPoints>::New();
+    auto sphereNormals = vtkSmartPointer<vtkFloatArray>::New();
+    sphereNormals->SetNumberOfComponents(3);
+    for (vtkIdType i = 0; i < baseMesh->GetNumberOfPoints(); ++i)
+    {
+      double direction[3];
+      baseMesh->GetPoint(i, direction);
+      vtkMath::Normalize(direction);
+      spherePoints->InsertNextPoint(direction);
+      sphereNormals->InsertNextTuple(direction);
+    }
+    sphere->SetPoints(spherePoints);
+    auto sphereTriangles = vtkSmartPointer<vtkCellArray>::New();
+    sphereTriangles->DeepCopy(baseMesh->GetPolys());
+    sphere->SetPolys(sphereTriangles);
+    sphere->GetPointData()->SetNormals(sphereNormals);
+
+    const auto rotation = [](double degreesZ, double degreesX) {
+      auto transform = vtkSmartPointer<vtkTransform>::New();
+      transform->RotateZ(degreesZ);
+      transform->RotateX(degreesX);
+      return transform;
+    };
+    const std::tuple<std::string, std::array<double, 3>, vtkSmartPointer<vtkTransform>> cases[] = {
+      {"diag(3, 1, 1) rotated by +30 degrees", {1, 1.0 / 3, 1.0 / 3}, rotation(30, 30)},
+      {"diag(3, 1, 1) rotated by -30 degrees", {1, 1.0 / 3, 1.0 / 3}, rotation(-30, -30)},
+      {"diag(3, 2, 1) rotated by +30 degrees", {1, 2.0 / 3, 1.0 / 3}, rotation(30, 30)}};
+    for (const auto &[name, scale, transform] : cases)
+    {
+      double r[3][3];
+      for (int i = 0; i < 3; ++i)
+      {
+        for (int j = 0; j < 3; ++j)
+          r[i][j] = transform->GetMatrix()->GetElement(i, j);
+      }
+
+      auto instances = vtkSmartPointer<vtkPolyData>::New();
+      auto centre = vtkSmartPointer<vtkPoints>::New();
+      centre->InsertNextPoint(0, 0, 0);
+      instances->SetPoints(centre);
+      double quaternion[4];
+      vtkMath::Matrix3x3ToQuaternion(r, quaternion);
+      auto orientation = vtkSmartPointer<vtkFloatArray>::New();
+      orientation->SetName("Orientation");
+      orientation->SetNumberOfComponents(4);
+      orientation->InsertNextTuple(quaternion);
+      auto scaleArray = vtkSmartPointer<vtkFloatArray>::New();
+      scaleArray->SetName("Scale");
+      scaleArray->SetNumberOfComponents(3);
+      scaleArray->InsertNextTuple(scale.data());
+      instances->GetPointData()->AddArray(orientation);
+      instances->GetPointData()->AddArray(scaleArray);
+      instances->GetPointData()->AddArray(WhiteColours(1));
+      auto instanceMapper = vtkSmartPointer<vtkGlyph3DMapper>::New();
+      instanceMapper->SetInputData(instances);
+      instanceMapper->SetSourceData(sphere);
+      instanceMapper->SetOrientationModeToQuaternion();
+      instanceMapper->SetOrientationArray("Orientation");
+      instanceMapper->SetScaleModeToScaleByVectorComponents();
+      instanceMapper->SetScaleArray("Scale");
+      auto instanceActor = MatteActor(instanceMapper);
+
+      // The reference: the sphere scaled and rotated on the CPU, its normals by the inverse transpose.
+      auto scaleAndRotation = vtkSmartPointer<vtkTransform>::New();
+      scaleAndRotation->SetMatrix(transform->GetMatrix());
+      scaleAndRotation->Scale(scale.data());
+      auto transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
+      transformFilter->SetInputData(sphere);
+      transformFilter->SetTransform(scaleAndRotation);
+      transformFilter->Update();
+      auto ellipsoid = vtkSmartPointer<vtkPolyData>::New();
+      ellipsoid->DeepCopy(transformFilter->GetOutput());
+      ellipsoid->GetPointData()->AddArray(WhiteColours(ellipsoid->GetNumberOfPoints()));
+      auto ellipsoidMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+      ellipsoidMapper->SetInputData(ellipsoid);
+      auto ellipsoidActor = MatteActor(ellipsoidMapper);
+
+      for (const int viewAxis : {2, 0})
+      {
+        const std::string message = name + ", view along axis " + std::to_string(viewAxis);
+        const Picture instance = Photograph(window, renderer, instanceActor, viewAxis);
+        const Picture reference = Photograph(window, renderer, ellipsoidActor, viewAxis);
+        const auto instanceExtents = instance.DrawnExtents();
+        const auto referenceExtents = reference.DrawnExtents();
+        const int worldAxes[2] = {viewAxis == 0 ? 1 : 0, viewAxis == 0 ? 2 : 1};
+        for (int k = 0; k < 2; ++k)
+        {
+          const int instanceWidth = instanceExtents[2 * k + 1] - instanceExtents[2 * k] + 1;
+          const int referenceWidth = referenceExtents[2 * k + 1] - referenceExtents[2 * k] + 1;
+          CPPUNIT_ASSERT_MESSAGE(message, std::abs(instanceWidth - referenceWidth) <= 1);
+          // The exact ellipsoid R diag(scale) extends sqrt(sum_k (R_ik scale_k)^2) to each side.
+          double halfExtent = 0;
+          for (int c = 0; c < 3; ++c)
+            halfExtent += r[worldAxes[k]][c] * r[worldAxes[k]][c] * scale[c] * scale[c];
+          const double exactWidth = 2 * std::sqrt(halfExtent) * pixelsPerUnit;
+          CPPUNIT_ASSERT_MESSAGE(message + ": " + std::to_string(instanceWidth) + " pixels, exact " + std::to_string(exactWidth),
+                                 std::fabs(instanceWidth - exactWidth) <= 0.02 * exactWidth);
+        }
+
+        double sumOfDifferences = 0;
+        int numberOfPixels = 0;
+        for (int y = 0; y < instance.height; ++y)
+        {
+          for (int x = 0; x < instance.width; ++x)
+          {
+            if (instance.Drawn(x, y) && reference.Drawn(x, y))
+            {
+              sumOfDifferences += std::abs(instance.Grey(x, y) - reference.Grey(x, y));
+              ++numberOfPixels;
+            }
+          }
+        }
+        CPPUNIT_ASSERT_MESSAGE(message + ": mean grey difference " + std::to_string(sumOfDifferences / numberOfPixels),
+                               sumOfDifferences / numberOfPixels <= 1.5);
+        const int centreGrey = instance.Grey(instance.width / 2, instance.height / 2);
+        CPPUNIT_ASSERT_MESSAGE(message + ": centre grey " + std::to_string(centreGrey), centreGrey > 100);
+      }
+    }
   }
 };
 
