@@ -61,6 +61,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <complex>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <mitkBValueMapProperty.h>
 
 namespace itk
@@ -1817,7 +1818,14 @@ void TractsToDWIImageFilter< PixelType >::CheckPrototypeShells(mitk::DiffusionSi
       shells.insert(b);
   }
   if (shells.size()>1)
-    itkExceptionMacro("The prototype signal model has kernels of one shell, but the gradients have " << shells.size() << " non-zero b-values. Use one shell or another signal model.");
+  {
+    // jittered b-values of a measured single-shell image (e.g. 995/1000/1005) end up here too
+    std::ostringstream values;
+    for (const double b : shells)
+      values << " " << b;
+    itkExceptionMacro("The prototype signal model has kernels of one shell, but the gradients have " << shells.size() << " non-zero b-values:" << values.str()
+                      << ". Use one shell (round the b-values of a single-shell image to one value) or another signal model.");
+  }
 }
 
 template< class PixelType >

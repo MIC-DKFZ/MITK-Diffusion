@@ -126,14 +126,16 @@ public:
     caster->SetInput(mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("FiberFit/out/" + name)));
     caster->Update();
     mitk::PeakImage::ItkPeakImageType::Pointer refImage = caster->GetOutput();
-
+    CPPUNIT_ASSERT_MESSAGE("Peak image size should equal the size of " + name,
+                           testImage->GetLargestPossibleRegion().GetSize() == refImage->GetLargestPossibleRegion().GetSize());
 
     itk::ImageRegionConstIterator< mitk::PeakImage::ItkPeakImageType > it1(testImage, testImage->GetLargestPossibleRegion());
     itk::ImageRegionConstIterator< mitk::PeakImage::ItkPeakImageType > it2(refImage, refImage->GetLargestPossibleRegion());
 
+    // peak components (and the residual, over- and underexplained images) are negative as often as positive
     while(!it1.IsAtEnd())
     {
-      if (it2.Get()>0.0001)
+      if (fabs(it2.Get())>0.0001)
       {
         if (fabs( it1.Get()/it2.Get()-1 )>0.01)
         {
@@ -147,7 +149,7 @@ public:
           CPPUNIT_ASSERT_MESSAGE("Peak images should be equal 1", false);
         }
       }
-      else if (it1.Get()>0.0001)
+      else if (fabs(it1.Get())>0.0001)
       {
         itk::ImageFileWriter< mitk::PeakImage::ItkPeakImageType >::Pointer writer = itk::ImageFileWriter< mitk::PeakImage::ItkPeakImageType >::New();
         writer->SetInput(testImage);
@@ -223,8 +225,8 @@ public:
     CompareFibs(test, ref, "NONE_fitted.fib");
     CompareImages(fitter->GetFittedImage(), "NONE_fitted_image_v2.nrrd");
     CompareImages(fitter->GetResidualImage(), "NONE_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "NONE_underexplained_image_v2.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "NONE_overexplained_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "NONE_overexplained_image_v3.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "NONE_underexplained_image_v3.nrrd");
   }
 
   void Fit2()
@@ -242,8 +244,8 @@ public:
     CompareFibs(test, ref, "MSM_fitted.fib");
     CompareImages(fitter->GetFittedImage(), "MSM_fitted_image_v2.nrrd");
     CompareImages(fitter->GetResidualImage(), "MSM_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "MSM_underexplained_image_v2.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "MSM_overexplained_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "MSM_overexplained_image_v3.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "MSM_underexplained_image_v3.nrrd");
   }
 
   void Fit3()
@@ -261,8 +263,8 @@ public:
     CompareFibs(test, ref, "MSE_fitted.fib");
     CompareImages(fitter->GetFittedImage(), "MSE_fitted_image_v3.nrrd");
     CompareImages(fitter->GetResidualImage(), "MSE_residual_image_v3.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "MSE_underexplained_image_v3.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "MSE_overexplained_image_v3.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "MSE_overexplained_image_v4.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "MSE_underexplained_image_v4.nrrd");
   }
 
   void Fit4()
@@ -280,8 +282,8 @@ public:
     CompareFibs(test, ref, "LocalMSE_fitted.fib");
     CompareImages(fitter->GetFittedImage(), "LocalMSE_fitted_image_v2.nrrd");
     CompareImages(fitter->GetResidualImage(), "LocalMSE_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "LocalMSE_underexplained_image_v2.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "LocalMSE_overexplained_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "LocalMSE_overexplained_image_v3.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "LocalMSE_underexplained_image_v3.nrrd");
   }
 
   void Fit5()
@@ -298,8 +300,8 @@ public:
     CompareFibs(test, ref, "GroupMSE_fitted.fib");
     CompareImages(fitter->GetFittedImage(), "GroupMSE_fitted_image_v2.nrrd");
     CompareImages(fitter->GetResidualImage(), "GroupMSE_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "GroupMSE_underexplained_image_v2.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "GroupMSE_overexplained_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "GroupMSE_overexplained_image_v3.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "GroupMSE_underexplained_image_v3.nrrd");
   }
 
   void Fit6()
@@ -317,8 +319,8 @@ public:
     CompareFibs(test, ref, "GroupLasso_fitted.fib");
     CompareImages(fitter->GetFittedImage(), "GroupLasso_fitted_image_v2.nrrd");
     CompareImages(fitter->GetResidualImage(), "GroupLasso_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "GroupLasso_underexplained_image_v2.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "GroupLasso_overexplained_image_v2.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "GroupLasso_overexplained_image_v3.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "GroupLasso_underexplained_image_v3.nrrd");
   }
 
 };

@@ -86,6 +86,14 @@ public:
   {
     bool out = true;
     typedef itk::VectorImage< short, 3 > DwiImageType;
+    // the iterators below walk both images in step
+    if (dwi1->GetLargestPossibleRegion().GetSize() != dwi2->GetLargestPossibleRegion().GetSize()
+        || dwi1->GetVectorLength() != dwi2->GetVectorLength())
+    {
+      MITK_INFO << "Image size " << dwi1->GetLargestPossibleRegion().GetSize() << " x " << dwi1->GetVectorLength()
+                << " differs from the reference size " << dwi2->GetLargestPossibleRegion().GetSize() << " x " << dwi2->GetVectorLength();
+      return false;
+    }
     try{
       itk::ImageRegionIterator< DwiImageType > it1(dwi1, dwi1->GetLargestPossibleRegion());
       itk::ImageRegionIterator< DwiImageType > it2(dwi2, dwi2->GetLargestPossibleRegion());
@@ -136,7 +144,7 @@ public:
 
     if (refImage.IsNotNull())
     {
-      if(mitk::DiffusionPropertyHelper::GetGradientContainer(refImage).IsNotNull() )
+      CPPUNIT_ASSERT_MESSAGE("Reference should be a diffusion-weighted image", mitk::DiffusionPropertyHelper::GetGradientContainer(refImage).IsNotNull());
       {
         ItkDwiType::Pointer itkTestImagePointer = ItkDwiType::New();
         mitk::CastToItkImage(testImage, itkTestImagePointer);
