@@ -94,6 +94,7 @@ namespace mitk
       , m_Drift(0.06)
       , m_DoAddGibbsRinging(false)
       , m_ZeroRinging(0)
+      , m_KspaceTimeSegments(0)
       , m_DoSimulateRelaxation(true)
       , m_DoAddMotion(false)
       , m_DoRandomizeMotion(true)
@@ -149,6 +150,15 @@ namespace mitk
     float                               m_Drift;                    ///< Global signal decrease by the end of the acquisition.
     bool                                m_DoAddGibbsRinging;        ///< Add Gibbs ringing artifact
     int                                 m_ZeroRinging;              ///< If > 0, ringing is simulated by by setting the defined percentage of higher frequencies to 0 in k-space. Otherwise, the input to the k-space simulation is generated with twice the resolution and cropped during k-space simulation (much slower).
+    /**
+     * How the k-space simulation sums the phase of distortions (field map) and eddy currents: 0, the
+     * default and the value for parameter files without the setting, sums the exact phase of every
+     * pixel for every k-space sample; a number L > 0 approximates the phase by L time segments, a few
+     * transforms per slice instead of the full sum (itk::KspaceImageFilter::ComputeTimeSegmentation);
+     * AUTOMATIC_TIME_SEGMENTS chooses L per slice from the phase spread, with the error bound stated there.
+     */
+    int                                 m_KspaceTimeSegments;
+    static constexpr int                AUTOMATIC_TIME_SEGMENTS = -1;
     bool                                m_DoSimulateRelaxation;     ///< Add T2 relaxation effects
     bool                                m_DoAddMotion;              ///< Enable motion artifacts.
     bool                                m_DoRandomizeMotion;        ///< Toggles between random and linear motion.

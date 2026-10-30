@@ -26,6 +26,7 @@ This file is based heavily on a corresponding ITK filter.
 #include <vector>
 #include <mutex>
 #include <memory>
+#include <complex>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkFiberfoxParameters.h>
 #include <mitkFiberfoxMotion.h>
@@ -112,6 +113,13 @@ namespace itk{
     float CoilSensitivity(VectorType& pos) const;
     /** Fills m_CompartmentSpectra; see there. */
     void ComputeCompartmentSpectra();
+    /**
+     * Factors of the separable DFT of a slice (factorsX: kx along x per line parity, factorsY: ky along
+     * y with aliasing) and the signal scale times coil sensitivity of every pixel (weight).
+     */
+    void ComputeDftFactors(std::vector< std::complex<double> >& factorsX, std::vector< std::complex<double> >& factorsY, std::vector< double >& weight) const;
+    /** Fills m_CompartmentSpectra and m_SegmentWeights for the time-segmented approximation; see there. */
+    void ComputeTimeSegmentation(bool eddyCurrents, bool distortions);
 
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
@@ -166,6 +174,18 @@ namespace itk{
      * empty and every sample sums over all pixels.
      */
     std::vector< std::vector< std::complex<double> > > m_CompartmentSpectra;
+
+    /**
+     * With eddy currents or distortions and m_KspaceTimeSegments != 0, the phase factor of every pixel
+     * is approximated by L time segments (L = m_KspaceTimeSegments, or chosen from the phase spread):
+     * exp(i 2 pi phi(r, t)) ~ sum_l a_l(t) exp(i 2 pi phi(r, t_l)).
+     * Then m_CompartmentSpectra holds, at index g*L + l, the spectrum of compartment g (or of their sum
+     * without relaxation) times the phase factor at the segment time t_l, and m_SegmentWeights holds
+     * a_l(t) at index tick*L + l (tick as in DynamicThreadedGenerateData). m_NumSegments is L, or 0 for
+     * the other two paths.
+     */
+    std::vector< std::complex<double> >     m_SegmentWeights;
+    unsigned int                            m_NumSegments;
 
   private:
 

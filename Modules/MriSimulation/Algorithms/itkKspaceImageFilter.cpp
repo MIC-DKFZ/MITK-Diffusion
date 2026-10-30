@@ -36,6 +36,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkImageFileWriter.h>
 #include <limits>
 #include <boost/lexical_cast.hpp>
+#include <array>
+#include <map>
+#include <vnl/vnl_matrix.h>
+#include <vnl/vnl_vector.h>
+#include <vnl/algo/vnl_svd.h>
 
 namespace itk {
 
@@ -46,6 +51,7 @@ namespace itk {
     , m_SpikesPerSlice(0)
     , m_IsBaseline(true)
     , m_StoreTimings(false)
+    , m_NumSegments(0)
   {
     m_DiffusionGradientDirection.Fill(0.0);
     m_CoilPosition.Fill(0.0);
@@ -239,14 +245,18 @@ namespace itk {
     }
 
     m_CompartmentSpectra.clear();
+    m_SegmentWeights.clear();
+    m_NumSegments = 0;
     const bool eddyCurrents = m_Parameters->m_Misc.m_DoAddEddyCurrents && m_Parameters->m_SignalGen.m_EddyStrength>0 && !m_IsBaseline;
     const bool distortions = m_Parameters->m_Misc.m_DoAddDistortions && (m_MovedFmap.IsNotNull() || m_Parameters->m_SignalGen.m_FrequencyMap.IsNotNull());
     if (!eddyCurrents && !distortions)
       ComputeCompartmentSpectra();
+    else if (m_Parameters->m_SignalGen.m_KspaceTimeSegments != 0)
+      ComputeTimeSegmentation(eddyCurrents, distortions);
   }
 
   template< class ScalarType >
-  void KspaceImageFilter< ScalarType >::ComputeCompartmentSpectra()
+  void KspaceImageFilter< ScalarType >::ComputeDftFactors(std::vector< std::complex<double> >& factorsX, std::vector< std::complex<double> >& factorsY, std::vector< double >& weight) const
   {
     const std::size_t nx = static_cast<std::size_t>(xMax);
     const std::size_t ny = static_cast<std::size_t>(yMax);
@@ -261,7 +271,7 @@ namespace itk {
     const std::size_t parities = ghosts ? 2 : 1;
 
     // factors along x per line parity (the ghost offset shifts kx of odd and even lines apart)
-    std::vector< std::complex<double> > factorsX(parities*nkx*nx);
+    factorsX.assign(parities*nkx*nx, std::complex<double>(0, 0));
     for (std::size_t p=0; p<parities; ++p)
       for (std::size_t kx=0; kx<nkx; ++kx)
       {
@@ -274,7 +284,7 @@ namespace itk {
       }
 
     // factors along y; signal from outside the FOV is wrapped back (aliasing)
-    std::vector< std::complex<double> > factorsY(nky*ny);
+    factorsY.assign(nky*ny, std::complex<double>(0, 0));
     for (std::size_t y=0; y<ny; ++y)
     {
       double position = static_cast<double>(y) - yShift;
@@ -290,7 +300,7 @@ namespace itk {
     }
 
     // signal scale and coil sensitivity depend on the position only
-    std::vector< double > weight(nx*ny, m_Parameters->m_SignalGen.m_SignalScale);
+    weight.assign(nx*ny, m_Parameters->m_SignalGen.m_SignalScale);
     if (m_Parameters->m_SignalGen.m_CoilSensitivityProfile!=mitk::SignalGenerationParameters::COIL_CONSTANT)
       for (std::size_t y=0; y<ny; ++y)
         for (std::size_t x=0; x<nx; ++x)
@@ -302,6 +312,20 @@ namespace itk {
           pos = m_Transform*pos;
           weight[y*nx + x] *= CoilSensitivity(pos);
         }
+  }
+
+  template< class ScalarType >
+  void KspaceImageFilter< ScalarType >::ComputeCompartmentSpectra()
+  {
+    const std::size_t nx = static_cast<std::size_t>(xMax);
+    const std::size_t ny = static_cast<std::size_t>(yMax);
+    const std::size_t nkx = static_cast<std::size_t>(kxMax);
+    const std::size_t nky = static_cast<std::size_t>(kyMax);
+    const bool ghosts = m_Parameters->m_Misc.m_DoAddGhosts;
+    const std::size_t parities = ghosts ? 2 : 1;
+    std::vector< std::complex<double> > factorsX, factorsY;
+    std::vector< double > weight;
+    ComputeDftFactors(factorsX, factorsY, weight);
 
     std::vector< std::complex<double> > rows(parities*ny*nkx);
     for (const auto& compartment : m_CompartmentImages)
@@ -335,6 +359,253 @@ namespace itk {
       }
       m_CompartmentSpectra.push_back(std::move(spectrum));
     }
+  }
+
+  /*
+   * Time segmentation with least-squares interpolators, as in Sutton, Noll and Fessler, "Fast,
+   * iterative image reconstruction for MRI in the presence of field inhomogeneities", IEEE TMI
+   * 22(2):178-188, 2003 (section II-C), here in the forward direction. The phase of pixel r at the
+   * readout time of tick j is phi(r, j) = u(r) . v(j) with u = (field map in Hz, eddy-current field
+   * G . pos(r) in Hz) and v = (t in s, eddy factor exp(-tRead/tau) t in s), as in the exact sum. With L
+   * segment times t_l (ticks evenly spaced in t),
+   *   exp(i 2 pi phi(r, j)) ~ sum_l a_l(j) exp(i 2 pi phi(r, t_l)),
+   * so s(k_j) ~ sum_l a_l(j) S_l(k_j), where S_l is the spectrum of the signal times the phase factor
+   * at t_l: L separable DFTs per compartment instead of a sum over all pixels per sample. a(j) is the
+   * least-squares fit over the pixels' values of u, binned to a histogram weighted by signal energy:
+   * minimise sum_b w_b |exp(i 2 pi u_b . v(j)) - sum_l a_l exp(i 2 pi u_b . v_l)|^2. The error falls
+   * steeply once L exceeds the phase spread range(u) . range(v) in cycles (the time-bandwidth product
+   * of the fit), hence the automatic count below.
+   */
+  template< class ScalarType >
+  void KspaceImageFilter< ScalarType >::ComputeTimeSegmentation(bool eddyCurrents, bool distortions)
+  {
+    const std::size_t nx = static_cast<std::size_t>(xMax);
+    const std::size_t ny = static_cast<std::size_t>(yMax);
+    const std::size_t nkx = static_cast<std::size_t>(kxMax);
+    const std::size_t nky = static_cast<std::size_t>(kyMax);
+    const std::size_t numPixels = nx*ny;
+    const std::size_t numTicks = nkx*nky;
+    const bool ghosts = m_Parameters->m_Misc.m_DoAddGhosts;
+    const std::size_t parities = ghosts ? 2 : 1;
+
+    // v(tick) with the same float arithmetic as the exact sum in DynamicThreadedGenerateData
+    std::vector< float > echoTime(numTicks);
+    std::vector< std::array<double, 2> > v(numTicks);
+    for (std::size_t tick=0; tick<numTicks; ++tick)
+    {
+      const float t = m_ReadoutScheme->GetTimeFromMaxEcho(static_cast<int>(tick));
+      float eddyDecay = 0;
+      if (eddyCurrents)
+      {
+        const float tRead = m_ReadoutScheme->GetTimeFromLastDiffusionGradient(static_cast<int>(tick));
+        eddyDecay = std::exp(-tRead/m_Parameters->m_SignalGen.m_Tau ) * t/1000;
+      }
+      echoTime[tick] = t;
+      v[tick] = { distortions ? static_cast<double>(t/1000) : 0.0, static_cast<double>(eddyDecay) };
+    }
+
+    // u(r) as in the exact sum
+    const float xShift = static_cast<float>(nx/2);
+    const float yShift = static_cast<float>(ny/2);
+    std::vector< std::array<double, 2> > u(numPixels, {0.0, 0.0});
+    for (std::size_t y=0; y<ny; ++y)
+      for (std::size_t x=0; x<nx; ++x)
+      {
+        typename InputImageType::IndexType index;
+        index[0] = static_cast<itk::IndexValueType>(x);
+        index[1] = static_cast<itk::IndexValueType>(y);
+        auto& pixel = u[y*nx + x];
+        if (distortions)
+        {
+          if (m_MovedFmap.IsNotNull())
+            pixel[0] = m_MovedFmap->GetPixel(index);
+          else
+          {
+            itk::Image<float, 3>::IndexType index3D; index3D[0] = index[0]; index3D[1] = index[1]; index3D[2] = m_Zidx;
+            pixel[0] = m_Parameters->m_SignalGen.m_FrequencyMap->GetPixel(index3D);
+          }
+        }
+        if (eddyCurrents)
+        {
+          VectorType pos;
+          pos[0] = static_cast<float>(x) - xShift; pos[1] = static_cast<float>(y) - yShift; pos[2] = m_Z;
+          pos = m_Transform*pos;
+          pixel[1] = m_EddyFieldGradient[0]*pos[0]+m_EddyFieldGradient[1]*pos[1]+m_EddyFieldGradient[2]*pos[2];
+        }
+      }
+
+    std::vector< std::complex<double> > factorsX, factorsY;
+    std::vector< double > weight;
+    ComputeDftFactors(factorsX, factorsY, weight);
+
+    // signal per spectrum group: every compartment with relaxation (its factor depends on the tick), their sum without
+    std::vector< std::vector< double > > groups;
+    for (const auto& compartment : m_CompartmentImages)
+    {
+      itkAssertOrThrowMacro(compartment->GetBufferedRegion() == compartment->GetLargestPossibleRegion(), "The compartment slices must be buffered whole.");
+      const ScalarType* signal = compartment->GetBufferPointer();
+      if (groups.empty() || m_Parameters->m_SignalGen.m_DoSimulateRelaxation)
+        groups.emplace_back(numPixels, 0.0);
+      for (std::size_t r=0; r<numPixels; ++r)
+        groups.back()[r] += signal[r];
+    }
+
+    std::array<double, 2> span = {0.0, 0.0};
+    for (unsigned int d=0; d<2; ++d)
+    {
+      double lo = v[0][d], hi = v[0][d];
+      for (const auto& vt : v) { lo = std::min(lo, vt[d]); hi = std::max(hi, vt[d]); }
+      span[d] = hi - lo;
+    }
+    std::vector< double > energy(numPixels, 0.0);
+    for (std::size_t r=0; r<numPixels; ++r)
+    {
+      double magnitude = 0;
+      for (const auto& group : groups)
+        magnitude += std::fabs(group[r]);
+      energy[r] = magnitude*weight[r]*magnitude*weight[r];
+    }
+
+    // Phase spread: the largest phase difference (cycles) between two pixels with signal over the
+    // readout. The automatic count is the spread plus 8; the k-space test and the measurements of
+    // issue #47 found a relative RMS error below 0.1 % of the image with it.
+    std::array<double, 2> lowU = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
+    std::array<double, 2> highU = {std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest()};
+    for (std::size_t r=0; r<numPixels; ++r)
+      if (energy[r] > 0)
+        for (unsigned int d=0; d<2; ++d)
+        {
+          lowU[d] = std::min(lowU[d], u[r][d]);
+          highU[d] = std::max(highU[d], u[r][d]);
+        }
+    double phaseSpread = 0;
+    for (unsigned int d=0; d<2; ++d)
+      if (highU[d] >= lowU[d])
+        phaseSpread += (highU[d]-lowU[d])*span[d];
+    const unsigned int numSegments = m_Parameters->m_SignalGen.m_KspaceTimeSegments > 0 ?
+          static_cast<unsigned int>(m_Parameters->m_SignalGen.m_KspaceTimeSegments) : static_cast<unsigned int>(std::ceil(phaseSpread)) + 8;
+
+    // segment times: ticks whose readout time is closest to L times evenly spaced over the readout
+    const auto [minTime, maxTime] = std::minmax_element(echoTime.begin(), echoTime.end());
+    std::vector< std::array<double, 2> > segmentV;
+    for (unsigned int l=0; l<numSegments; ++l)
+    {
+      const double target = numSegments==1 ? 0.5*(*minTime + *maxTime) : *minTime + (*maxTime - *minTime)*l/(numSegments-1.0);
+      std::size_t best = 0;
+      for (std::size_t tick=1; tick<numTicks; ++tick)
+        if (std::fabs(echoTime[tick] - target) < std::fabs(echoTime[best] - target))
+          best = tick;
+      segmentV.push_back(v[best]);
+    }
+
+    // Histogram of u weighted by signal energy. The interpolators fitted at the bins hold for the
+    // pixels between them if the bins sample the phase finely: at least 8 bins per cycle of phase
+    // spread and 16 over the range of u along each axis (coarser if that gives more than maxBins bins).
+    const std::size_t maxBins = 512;
+    std::map< std::array<long long, 2>, std::array<double, 3> > histogram;
+    for (double coarsening = 1; ; coarsening *= 2)
+    {
+      std::array<double, 2> binWidth = {0.0, 0.0};
+      bool single = true;
+      for (unsigned int d=0; d<2; ++d)
+        if (highU[d] > lowU[d] && span[d] > 0)
+        {
+          const double numBins = std::ceil(std::max(8*(highU[d]-lowU[d])*span[d], 16.0)/coarsening);
+          binWidth[d] = (highU[d]-lowU[d])/numBins;
+          single = single && numBins <= 1;
+        }
+      histogram.clear();
+      for (std::size_t r=0; r<numPixels; ++r)
+      {
+        if (energy[r] <= 0)
+          continue;
+        std::array<long long, 2> key = {0, 0};
+        for (unsigned int d=0; d<2; ++d)
+          if (binWidth[d] > 0)
+            key[d] = static_cast<long long>(std::floor((u[r][d]-lowU[d])/binWidth[d]));
+        auto& bin = histogram[key];
+        bin[0] += energy[r];
+        bin[1] += energy[r]*u[r][0];
+        bin[2] += energy[r]*u[r][1];
+      }
+      if (histogram.size() <= maxBins || single)
+        break;
+    }
+
+    // least-squares interpolators a(tick), the same for ticks with the same v (spin echo lines)
+    m_SegmentWeights.assign(numTicks*numSegments, std::complex<double>(0, 0));
+    if (!histogram.empty())
+    {
+      const std::size_t numBins = histogram.size();
+      std::vector< std::array<double, 2> > binU;
+      vnl_vector< double > binWeight(static_cast<unsigned int>(numBins));
+      for (const auto& [key, bin] : histogram)
+      {
+        binWeight[static_cast<unsigned int>(binU.size())] = std::sqrt(bin[0]);
+        binU.push_back({bin[1]/bin[0], bin[2]/bin[0]});
+      }
+      vnl_matrix< std::complex<double> > basis(static_cast<unsigned int>(numBins), numSegments);
+      for (std::size_t b=0; b<numBins; ++b)
+        for (unsigned int l=0; l<numSegments; ++l)
+          basis(static_cast<unsigned int>(b), l) = binWeight[static_cast<unsigned int>(b)]*std::polar(1.0, itk::Math::twopi*(binU[b][0]*segmentV[l][0] + binU[b][1]*segmentV[l][1]));
+      // nearly equal segment phases (a weak field) make the basis ill-conditioned; drop those directions
+      vnl_svd< std::complex<double> > svd(basis, -1e-8);
+      const vnl_matrix< std::complex<double> > pseudoInverse = svd.pinverse();
+
+      std::map< std::array<double, 2>, std::size_t > solved;
+      vnl_vector< std::complex<double> > target(static_cast<unsigned int>(numBins));
+      for (std::size_t tick=0; tick<numTicks; ++tick)
+      {
+        const auto found = solved.find(v[tick]);
+        if (found != solved.end())
+        {
+          std::copy_n(&m_SegmentWeights[found->second*numSegments], numSegments, &m_SegmentWeights[tick*numSegments]);
+          continue;
+        }
+        for (std::size_t b=0; b<numBins; ++b)
+          target[static_cast<unsigned int>(b)] = binWeight[static_cast<unsigned int>(b)]*std::polar(1.0, itk::Math::twopi*(binU[b][0]*v[tick][0] + binU[b][1]*v[tick][1]));
+        const vnl_vector< std::complex<double> > a = pseudoInverse*target;
+        std::copy_n(a.data_block(), numSegments, &m_SegmentWeights[tick*numSegments]);
+        solved.emplace(v[tick], tick);
+      }
+    }
+
+    // spectra of every group times the phase factor at every segment time
+    std::vector< std::complex<double> > input(numPixels);
+    std::vector< std::complex<double> > rows(parities*ny*nkx);
+    for (const auto& group : groups)
+      for (unsigned int l=0; l<numSegments; ++l)
+      {
+        for (std::size_t r=0; r<numPixels; ++r)
+          input[r] = (group[r]*weight[r]) * std::polar(1.0, itk::Math::twopi*(u[r][0]*segmentV[l][0] + u[r][1]*segmentV[l][1]));
+
+        for (std::size_t p=0; p<parities; ++p)
+          for (std::size_t y=0; y<ny; ++y)
+            for (std::size_t kx=0; kx<nkx; ++kx)
+            {
+              std::complex<double> sum(0, 0);
+              const std::complex<double>* factors = &factorsX[(p*nkx + kx)*nx];
+              const std::complex<double>* line = &input[y*nx];
+              for (std::size_t x=0; x<nx; ++x)
+                sum += line[x] * factors[x];
+              rows[(p*ny + y)*nkx + kx] = sum;
+            }
+
+        std::vector< std::complex<double> > spectrum(nkx*nky);
+        for (std::size_t ky=0; ky<nky; ++ky)
+        {
+          const std::size_t p = ghosts ? ky%2 : 0;
+          for (std::size_t kx=0; kx<nkx; ++kx)
+          {
+            std::complex<double> sum(0, 0);
+            for (std::size_t y=0; y<ny; ++y)
+              sum += factorsY[ky*ny + y] * rows[(p*ny + y)*nkx + kx];
+            spectrum[ky*nkx + kx] = sum;
+          }
+        }
+        m_CompartmentSpectra.push_back(std::move(spectrum));
+      }
+    m_NumSegments = numSegments;
   }
 
   template< class ScalarType >
@@ -432,7 +703,7 @@ namespace itk {
     long spikeTick = -1;
 
     std::complex<ScalarType> zero = std::complex<ScalarType>(0, 0);
-    const bool precomputed = !m_CompartmentSpectra.empty();
+    const bool precomputed = m_NumSegments==0 && !m_CompartmentSpectra.empty();
     // per work unit, not per sample
     std::vector< float > relaxFactor(m_CompartmentImages.size(), 1.0f);
     std::vector< const ScalarType* > compartmentSignals;
@@ -512,6 +783,23 @@ namespace itk {
         std::complex<double> sum(0, 0);
         for (std::size_t i=0; i<m_CompartmentSpectra.size(); ++i)
           sum += static_cast<double>(relaxFactor[i]) * m_CompartmentSpectra[i][k];
+        s = std::complex<ScalarType>(sum / static_cast<double>(numPix));
+      }
+      else if (m_NumSegments>0)
+      {
+        // time-segmented approximation of the phase, see ComputeTimeSegmentation
+        const std::size_t k = static_cast<std::size_t>(kIdx[1])*static_cast<std::size_t>(kxMax) + static_cast<std::size_t>(kIdx[0]);
+        const std::complex<double>* a = &m_SegmentWeights[static_cast<std::size_t>(tick)*m_NumSegments];
+        const std::size_t numGroups = m_CompartmentSpectra.size()/m_NumSegments;
+        std::complex<double> sum(0, 0);
+        for (std::size_t g=0; g<numGroups; ++g)
+        {
+          std::complex<double> group(0, 0);
+          for (unsigned int l=0; l<m_NumSegments; ++l)
+            group += a[l] * m_CompartmentSpectra[g*m_NumSegments + l][k];
+          // without relaxation one group holds all compartments and relaxFactor[0] stays 1
+          sum += static_cast<double>(relaxFactor[g]) * group;
+        }
         s = std::complex<ScalarType>(sum / static_cast<double>(numPix));
       }
       else
