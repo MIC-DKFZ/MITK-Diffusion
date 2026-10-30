@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include "mitkFiberSlabIndex.h"
 
 #include <vtkCellArray.h>
+#include <vtkCellData.h>
 #include <vtkIdList.h>
 #include <vtkIdTypeArray.h>
 #include <vtkPointData.h>
@@ -167,6 +168,10 @@ vtkSmartPointer<vtkPolyData> mitk::FiberSlabIndex::Band(const double normal[3], 
   std::copy(firstPoint.begin(), firstPoint.end(), offsets->GetPointer(0));
   auto connectivity = vtkSmartPointer<vtkIdTypeArray>::New();
   connectivity->SetNumberOfValues(numPoints);
+  // a picked cell is a piece; pickers map it to its fiber through this array
+  auto fiberIds = vtkSmartPointer<vtkIdTypeArray>::New();
+  fiberIds->SetName(FiberIdArray);
+  fiberIds->SetNumberOfValues(numHits);
 
   vtkSMPThreadLocalObject<vtkIdList> threadIds;
   vtkSMPTools::For(0, numHits, [&](vtkIdType begin, vtkIdType end) {
@@ -174,6 +179,7 @@ vtkSmartPointer<vtkPolyData> mitk::FiberSlabIndex::Band(const double normal[3], 
     for (vtkIdType hit = begin; hit < end; ++hit)
     {
       const Piece &piece = m_Pieces[hits[hit]];
+      fiberIds->SetValue(hit, piece.cell);
       cells->GetCellAtId(piece.cell, ids);
       for (vtkIdType out = firstPoint[hit]; out < firstPoint[hit + 1]; ++out)
       {
@@ -192,5 +198,6 @@ vtkSmartPointer<vtkPolyData> mitk::FiberSlabIndex::Band(const double normal[3], 
   band->SetPoints(points);
   band->SetLines(lines);
   band->GetPointData()->AddArray(colours);
+  band->GetCellData()->AddArray(fiberIds);
   return band;
 }

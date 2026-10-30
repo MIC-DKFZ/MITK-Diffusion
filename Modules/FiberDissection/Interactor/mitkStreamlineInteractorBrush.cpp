@@ -11,7 +11,8 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include "mitkStreamlineInteractorBrush.h"
-//#include "mitkStreamlineMapper2D.h"
+
+#include <mitkFiberBundleMapper2D.h>
 
 // MITK includes
 #include <mitkInteractionConst.h>
@@ -207,7 +208,8 @@ void mitk::StreamlineInteractorBrush::SelectStreamline(StateMachineAction *, Int
         picker->Pick(displayPosition[0], displayPosition[1], 0, positionEvent->GetSender()->GetVtkRenderer());
         if (m_predlabeling==false)
             {
-        vtkIdType pickedCellID = picker->GetCellId();
+        // the 2D input holds pieces of fibers: the picked cell is not the fiber index
+        vtkIdType pickedCellID = FiberBundleMapper2D::PickedFiber(picker);
         m_manStreamline->SetSingleFiberColor(255 * m_ColorForHighlight[0], 255 * m_ColorForHighlight[1], 255 * m_ColorForHighlight[2], pickedCellID);
 
         }
@@ -265,7 +267,7 @@ vtkIdType mitk::StreamlineInteractorBrush::PickFiber(const InteractionEvent *int
 
     auto displayPosition = positionEvent->GetPointerPositionOnScreen();
     picker->Pick(displayPosition[0], displayPosition[1], 0, renderer->GetVtkRenderer());
-    return picker->GetCellId();
+    return FiberBundleMapper2D::PickedFiber(picker);
 }
 
 void mitk::StreamlineInteractorBrush::MoveFiber(FiberBundle *source, FiberBundle *target, unsigned int fiberId)

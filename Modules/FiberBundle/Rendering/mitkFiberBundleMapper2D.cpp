@@ -23,6 +23,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkSliceNavigationController.h>
 
 #include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkCellPicker.h>
+#include <vtkDataSet.h>
 #include <vtkOpenGLPolyDataMapper.h>
 #include <vtkPlane.h>
 #include <vtkPointData.h>
@@ -171,6 +174,18 @@ vtkProp* mitk::FiberBundleMapper2D::GetVtkProp(mitk::BaseRenderer *renderer)
 {
   this->Update(renderer);
   return m_LocalStorageHandler.GetLocalStorage(renderer)->m_Actor;
+}
+
+vtkIdType mitk::FiberBundleMapper2D::PickedFiber(vtkCellPicker *picker)
+{
+  const vtkIdType cell = picker->GetCellId();
+  vtkDataSet *picked = picker->GetDataSet();
+  if (cell < 0 || picked == nullptr)
+    return -1;
+  vtkDataArray *fiberIds = picked->GetCellData()->GetArray(FiberSlabIndex::FiberIdArray);
+  if (fiberIds == nullptr)
+    return cell;
+  return cell < fiberIds->GetNumberOfTuples() ? static_cast<vtkIdType>(fiberIds->GetTuple1(cell)) : -1;
 }
 
 

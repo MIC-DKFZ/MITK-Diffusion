@@ -12,6 +12,7 @@ found in the LICENSE file.
 
 #include <mitkClippingProperty.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleMapper2D.h>
 #include <mitkIOUtil.h>
 #include <mitkPlaneGeometry.h>
 #include <mitkProperties.h>
@@ -25,6 +26,8 @@ found in the LICENSE file.
 #include <vtkActor.h>
 #include <vtkCamera.h>
 #include <vtkCellArray.h>
+#include <vtkCellPicker.h>
+#include <vtkCoordinate.h>
 #include <vtkImageData.h>
 #include <vtkMapper.h>
 #include <vtkOutputWindow.h>
@@ -71,6 +74,7 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   MITK_TEST(Mapper2D_SlabAroundThePlane);
   MITK_TEST(Mapper2D_SliceStep_PlanesMovedInPlace);
   MITK_TEST(Mapper2D_Band_SameImageAsWholeBundle);
+  MITK_TEST(Mapper2D_PickAlongAFiber_GivesItsIndex);
   MITK_TEST(Mapper2D_NodeOpacity_AppliedToTheFibers);
   MITK_TEST(Rendering_LeavesTheBundleUnchanged);
   CPPUNIT_TEST_SUITE_END();
@@ -699,6 +703,41 @@ public:
     CPPUNIT_ASSERT_MESSAGE("a band holds part of the bundle", smallestBand < whole->GetNumberOfPoints() / 2);
   }
 
+  // #46: the atTRACTive brush picks fibers in 2D windows with a vtkCellPicker on the 2D prop. Its
+  // input holds pieces of the fibers near the slab, so the picked cell is a piece; PickedFiber
+  // gives the fiber of the piece.
+  void Mapper2D_PickAlongAFiber_GivesItsIndex()
+  {
+    // fiber 1 in the slab, in pieces (a point every 0.5 mm); fibers 0 and 2 far from it
+    m_Node->SetData(AxialFibers({-20.0, 0.0, 20.0}, 81));
+    Render2D(mitk::AnatomicalPlane::Axial);
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+    mitk::Point3D centre;
+    centre.Fill(0.0);
+    renderer->GetSliceNavigationController()->SelectSliceByPoint(centre);
+    vtkActor *actor = Render2D();
+    MITK_INFO << "2D input: " << Input(actor)->GetNumberOfLines() << " lines";
+    CPPUNIT_ASSERT_MESSAGE("the fiber is drawn in pieces", Input(actor)->GetNumberOfLines() > 1);
+
+    auto mapper = dynamic_cast<mitk::VtkMapper *>(m_Node->GetMapper(mitk::BaseRenderer::Standard2D));
+    for (const double x : {-15.0, -5.0, 5.0, 15.0})
+    {
+      // as StreamlineInteractorBrush picks
+      auto picker = vtkSmartPointer<vtkCellPicker>::New();
+      picker->SetTolerance(0.01);
+      picker->AddPickList(mapper->GetVtkProp(renderer));
+      picker->PickFromListOn();
+      auto coordinate = vtkSmartPointer<vtkCoordinate>::New();
+      coordinate->SetCoordinateSystemToWorld();
+      coordinate->SetValue(x, 0.0, 0.0);
+      const double *display = coordinate->GetComputedDoubleDisplayValue(renderer->GetVtkRenderer());
+      picker->Pick(display[0], display[1], 0.0, renderer->GetVtkRenderer());
+      MITK_INFO << "Pick at x = " << x << ": cell " << picker->GetCellId() << ", fiber " << mitk::FiberBundleMapper2D::PickedFiber(picker);
+      CPPUNIT_ASSERT_MESSAGE("a cell is picked", picker->GetCellId() >= 0);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE("the picked fiber", static_cast<vtkIdType>(1), mitk::FiberBundleMapper2D::PickedFiber(picker));
+    }
+  }
+
   /** The rendered frame, RGB(A) bytes row by row */
   std::vector<unsigned char> Capture(int *components = nullptr)
   {
@@ -735,15 +774,17 @@ public:
     return brightest;
   }
 
-  /** White straight fibers along x, one in each axial plane z of zs, at y = 0.5 * z */
-  static mitk::FiberBundle::Pointer AxialFibers(const std::vector<double> &zs)
+  /** White straight fibers from x = -20 to 20, one in each axial plane z of zs, at y = 0.5 * z,
+   *  with numPoints points each */
+  static mitk::FiberBundle::Pointer AxialFibers(const std::vector<double> &zs, int numPoints = 2)
   {
     auto points = vtkSmartPointer<vtkPoints>::New();
     auto lines = vtkSmartPointer<vtkCellArray>::New();
     for (const double z : zs)
     {
-      const vtkIdType ids[2] = {points->InsertNextPoint(-20, 0.5 * z, z), points->InsertNextPoint(20, 0.5 * z, z)};
-      lines->InsertNextCell(2, ids);
+      lines->InsertNextCell(numPoints);
+      for (int i = 0; i < numPoints; ++i)
+        lines->InsertCellPoint(points->InsertNextPoint(-20 + 40.0 * i / (numPoints - 1), 0.5 * z, z));
     }
     auto polyData = vtkSmartPointer<vtkPolyData>::New();
     polyData->SetPoints(points);

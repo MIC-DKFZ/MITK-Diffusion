@@ -27,6 +27,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <memory>
 
 class vtkActor;
+class vtkCellPicker;
 class vtkOpenGLPolyDataMapper;
 class vtkPlane;
 
@@ -52,6 +53,11 @@ public:
   void Update(mitk::BaseRenderer * renderer) override;
   static void SetDefaultProperties(DataNode* node, BaseRenderer* renderer = nullptr, bool overwrite = false );
   vtkProp* GetVtkProp(mitk::BaseRenderer* renderer) override;
+
+  /** The index of the fiber whose cell the picker picked on a fiber mapper's prop, -1 if none.
+   *  The cells of the 2D input are pieces of fibers, so the picked cell id is not the fiber
+   *  index there; the 3D input holds the bundle's lines, whose cell id is the fiber index. */
+  static vtkIdType PickedFiber(vtkCellPicker* picker);
 
   class  FBXLocalStorage : public mitk::Mapper::BaseLocalStorage
   {

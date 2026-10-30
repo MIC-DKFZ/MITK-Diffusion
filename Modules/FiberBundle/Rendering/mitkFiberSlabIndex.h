@@ -42,9 +42,12 @@ namespace mitk
 
     /** The pieces whose bounding box reaches into the band of points p with from <= n * p <= to
      *  (n: the unit normal), as lines with the points and the colour array FIBER_COLORS of the
-     *  bundle; two further points of no line hold the bundle's coordinate range (see the
-     *  implementation) */
+     *  bundle and the cell array FiberIdArray, the index of each piece's fiber; two further points
+     *  of no line hold the bundle's coordinate range (see the implementation) */
     vtkSmartPointer<vtkPolyData> Band(const double normal[3], double from, double to) const;
+
+    /** Name of the cell array of Band() with the fiber index of each piece */
+    static constexpr char FiberIdArray[] = "FIBER_IDS";
 
   private:
     struct Piece
