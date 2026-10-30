@@ -179,7 +179,7 @@
       <item row="3" column="0">
        <widget class="QmitkTensorModelParametersWidget" name="m_TensorWidget2" native="true"/>
       </item>
-      <item row="5" column="0">
+      <item row="4" column="0">
        <widget class="QFrame" name="m_Comp2FractionFrame">
         <property name="frameShape">
          <enum>QFrame::NoFrame</enum>
