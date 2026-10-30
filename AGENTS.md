@@ -135,26 +135,35 @@ Facts the layout does not show:
 - SH and peak files: MITK's SH basis (`mitk::sh`, `mrtrix = true`) is MRtrix 0.2's (functions
   with m != 0 are MRtrix 3's divided by sqrt(2)) at world (LPS) directions. `ShImageWriter` writes
   MRtrix 3's orthonormal basis and marks the file `MITK_SH_convention=MRtrix3` (NRRD key, NIfTI
-  descrip); `ShImageReader` converts files so marked or whose descrip starts with
+  descrip); an image in MITK's FSL definition (`ShImage::FSL`) is written unchanged and marked
+  `FSL`. `ShImageReader` converts files so marked or whose descrip starts with
   `MRtrix version: 3`, and reads unmarked files (the 4D SH files of earlier MITK versions) in the
-  legacy basis. Its option "SH convention" forces one; "FSL/Dipy" converts dipy's default basis
-  (`descoteaux07`, legacy) from the FSL bvec frame. Older coefficient files with the coefficients
-  as vector pixels of a 3D image (`qBallImage_SHCoeffs.nrrd`,
-  `StreamlineTractography/qball_image_sh.nii.gz`) open as plain vector images by default; the SH
-  reader is offered for them (confidence `PartiallySupported`, NRRD DWIs excluded) and reads them,
-  with "auto", in MITK's FSL definition (`ShImage::FSL`), the basis of those MITK versions. NIfTI peak images are written in RAS with the descrip
-  `MITK_peak_convention=RAS` and read back to LPS; NRRD peaks are LPS.
+  legacy basis. For unmarked files its option "SH convention" forces one; "FSL/Dipy" converts
+  dipy's default basis (`descoteaux07`, legacy) from the FSL bvec frame, which is not MITK's FSL
+  definition (taken unchanged). MITK's image reader stays the default for 4D SH NIfTI files
+  (`MimeTypes_Sh4dNifti_ImageReaderIsDefault`); the SH reader ("SH Image") is chosen in the open
+  dialog or with a `PreferenceListReaderOptionsFunctor`. That functor takes the first reader on
+  its list in ascending confidence, not in list order, so a list naming "SH Image" and a
+  `Supported` reader of the same file gets the SH reader. Older coefficient files with the
+  coefficients as vector pixels of a 3D image
+  (`qBallImage_SHCoeffs.nrrd`, `StreamlineTractography/qball_image_sh.nii.gz`) get the SH reader
+  offered too (confidence `PartiallySupported`, NRRD DWIs excluded), which reads them, with
+  "auto", in MITK's FSL definition, the basis of those MITK versions. NIfTI peak images are
+  written in RAS with the descrip `MITK_peak_convention=RAS` and read back to LPS, as are MRtrix
+  peak files (descrip `MRtrix ...`, reader option on by default); NRRD peaks are LPS.
 - Reconstruction: `mitk::pointshell::Directions(n)` holds the ODF sampling directions as data;
   their order is part of the ODF file format (252 values per voxel) and of Fiberfox references.
   The single-shell Q-ball methods take volumes whose b-value rounds to 0 as b0 and need one
-  non-zero shell; the multi-shell method needs b, 2b, 3b. `ReconstructQball` computes the sampled
+  non-zero shell; the multi-shell method needs b, 2b, 3b. The multi-shell Q-ball and radial
+  multi-shell filters take their shells from the b-value map they are given, without one from
+  `BValueMapProperty::CreateBValueMap`, the DWI's own map. `ReconstructQball` computes the sampled
   ODFs only when asked (`QballParameters::sampledOdf`). Peak extraction
   (`itk::OdfMaximaExtractionFilter`) keeps a refined maximum only if it is farther than the
   angular threshold from every larger one kept, so each axis appears once, and gives no peak
   where the sampled ODF varies by at most 1e-5 of its maximum (isotropic).
   `ctest -R 'ImageReconstruction|DiffusionReconstruction'` runs their tests.
-- `ctest -R 'mitkDiffusionModelling|PeakShImageReader|ImageReconstruction'` runs the
-  `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
+- `ctest -R 'mitkDiffusion(Modelling|Reconstruction)|PeakShImageReader|ImageReconstruction'` runs
+  the `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
   display needed) and is skipped with exit code 77 where no OpenGL context can be created.
 - The netlib L-BFGS-B code behind `vnl_lbfgsb` keeps its working variables in static storage.
   Threaded code holds `mitk::GetLbfgsbMutex()` (`Modules/DiffusionModelling/Algorithms/mitkLbfgsbMutex.h`)

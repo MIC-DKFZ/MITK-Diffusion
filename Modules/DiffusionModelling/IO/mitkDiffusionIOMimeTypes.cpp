@@ -119,7 +119,7 @@ namespace
     return header;
   }
 
-  /** Number of coefficients of an SH order from 2 to 12. */
+  /** Whether count is the coefficient count of an even SH order from 2 to 12 (6, 15, 28, 45, 66, 91). */
   bool IsShCoefficientCount(unsigned int count)
   {
     for (unsigned int order = 2; order <= 12; order += 2)
