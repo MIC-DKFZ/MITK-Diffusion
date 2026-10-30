@@ -67,7 +67,10 @@ function(mitk_diffusion_add_ui_test suite plugin)
   add_test(NAME mitkDiffusionViewsUiTest_${suite}
     COMMAND ${_test_app} --MITK.no-crash-dumps
   )
-  set(_environment "QT_QPA_PLATFORM=offscreen;MITK_DIFFUSION_UITEST=${suite}")
+  # The C locale, whatever the shell's: number parsing the code does not pin itself (tinyxml2 and
+  # sscanf/strtod for the views' parameter files) follows the process locale, and a decimal comma
+  # would change what the suites read.
+  set(_environment "QT_QPA_PLATFORM=offscreen;MITK_DIFFUSION_UITEST=${suite};LC_ALL=C.UTF-8")
   if(TARGET ${_streamline_app})
     list(APPEND _environment "MITK_DIFFUSION_UITEST_STREAMLINE_APP=$<TARGET_FILE:${_streamline_app}>")
   endif()
