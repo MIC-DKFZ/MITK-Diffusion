@@ -35,7 +35,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkMergeDiffusionImagesFilter.h"
 
 #include <itkImageToImageFilterCommon.h>
-#include <mitkB0Indices.h>
+#include <mitkDiffusionPropertyHelper.h>
 
 namespace itk
 {
@@ -134,7 +134,7 @@ MergeDiffusionImagesFilter<TScalarType>
         for (const auto& input : m_GradientLists.at(i)->CastToSTLConstContainer())
         {
             GradientType g = input;
-            if (!mitk::IsB0(g, m_BValues.at(i)))
+            if (!mitk::DiffusionPropertyHelper::IsB0(g, m_BValues.at(i)))
             {
                 double mag = g.two_norm();
                 double frac = m_BValues.at(i)*mag*mag/m_BValue;

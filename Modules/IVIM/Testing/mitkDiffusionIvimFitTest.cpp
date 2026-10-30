@@ -277,6 +277,7 @@ public:
       if (kurtosisBValues[i] == 0)
         kurtosisBaselines.push_back(i);
     CPPUNIT_ASSERT(kurtosisBaselines == expected);
+    CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::GetB0Indices(gradients, 1000) == expected);
   }
 
   void Baselines_Mean_NotTruncated()

@@ -39,7 +39,7 @@ namespace mitk
    * b-matrix of each volume, as FSL dtifit and MRtrix dwi2tensor do. Unlike those, which also fit
    * ln S0, both fits fix S0 to the mean b0 of the voxel (as ITK's filter does).
    *
-   * b0 volumes are those whose b-value rounds to 0 (BValueMapProperty::GetBValue); they are
+   * b0 volumes are those whose b-value rounds to 0 (DiffusionPropertyHelper::IsB0); they are
    * averaged per voxel. Voxels whose mean b0 is 0 or below b0Threshold get the zero tensor. A
    * diffusion-weighted signal of 0 or below counts as unattenuated, as in ITK's filter.
    *

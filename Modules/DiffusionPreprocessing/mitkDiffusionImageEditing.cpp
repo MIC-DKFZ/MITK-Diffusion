@@ -388,8 +388,8 @@ mitk::DiffusionImageEditing::RoundedBValues mitk::DiffusionImageEditing::RoundBV
     return rounded;
   };
 
-  // A volume whose b-value rounds to 0 is a b0 volume, as in the b-value map (mitk::IsB0), here
-  // with the given rounding value.
+  // A volume whose b-value rounds to 0 is a b0 volume, as in the b-value map
+  // (mitk::DiffusionPropertyHelper::IsB0), here with the given rounding value.
   RoundedBValues result;
   result.referenceBValue = std::numeric_limits<double>::max();
   for (const auto& g : gradients->CastToSTLConstContainer())

@@ -61,7 +61,7 @@ namespace mitk::kurtosis
   };
 
   /** b = reference b-value * |g|^2 of each gradient, and exactly 0 for the gradients the b-value map
-      of the DWI counts as b=0 (b rounds to 0, BValueMapProperty::GetBValue). Throws mitk::Exception
+      of the DWI counts as b=0 (DiffusionPropertyHelper::IsB0). Throws mitk::Exception
       for an empty container. */
   MITKIVIM_EXPORT vnl_vector<double> GetBValues(const DiffusionPropertyHelper::GradientDirectionsContainerType* gradients,
                                                 double referenceBValue);

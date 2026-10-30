@@ -21,7 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionIterator.h>
-#include <mitkB0Indices.h>
+#include <mitkDiffusionPropertyHelper.h>
 
 #include <cmath>
 #include <type_traits>
@@ -42,7 +42,7 @@ namespace itk
     if (std::isnan(m_ReferenceBValue))
       itkExceptionMacro("The reference b-value is not set.");
 
-    const std::vector<unsigned int> indices = mitk::GetB0Indices(m_Directions, m_ReferenceBValue);
+    const std::vector<unsigned int> indices = mitk::DiffusionPropertyHelper::GetB0Indices(m_Directions, m_ReferenceBValue);
     // Without a b0 volume the average would silently be an all-zero image.
     if (indices.empty())
       itkExceptionMacro("The image has no b0 volume (no b-value rounds to 0).");

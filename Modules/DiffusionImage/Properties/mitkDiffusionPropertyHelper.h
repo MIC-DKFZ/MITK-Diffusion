@@ -83,6 +83,19 @@ namespace mitk
      */
     static void InitializeImage(mitk::Image* image, GradientDirectionsContainerType::ConstPointer originalGradients, float referenceBValue, const MeasurementFrameType& measurementFrame, bool applyImageRotation);
 
+    /**
+     * \brief Whether a volume is a b0 (baseline) volume: its b-value, the reference b-value times the
+     * squared gradient length, is below 0.5 s/mm^2, so it rounds to 0 in the b-value map
+     * (BValueMapProperty::GetBValue).
+     *
+     * The one b0 rule of the diffusion filters, so that a DWI has the same baselines in every map
+     * and in the shells the views show. MRtrix (-bzero_threshold, default 10) and dipy (b0_threshold,
+     * default 50) also count low non-zero b-values as b0; here such a volume is a shell of its own.
+     */
+    static bool IsB0(const GradientDirectionType& gradient, double referenceBValue);
+    /** \brief Indices of the b0 volumes (see IsB0), in ascending order. */
+    static std::vector<unsigned int> GetB0Indices(const GradientDirectionsContainerType* gradients, double referenceBValue);
+
     static GradientDirectionsContainerType::Pointer CalcAveragedDirectionSet(double precision, GradientDirectionsContainerType::ConstPointer directions);
 
     static void SetupProperties(); // called in DiffusionCoreIOActivator

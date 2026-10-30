@@ -377,16 +377,20 @@ namespace
 mitk::ivim::Protocol mitk::ivim::MakeProtocol(const DiffusionPropertyHelper::GradientDirectionsContainerType* gradients,
                                               double referenceBValue)
 {
-  // The baselines are the volumes of the lowest b-value, rounded as in the b-value map of the DWI,
-  // so that without b=0 volumes all directions of the lowest shell are baselines.
+  // The baselines are the b0 volumes (DiffusionPropertyHelper::IsB0); without any, all directions
+  // of the lowest shell, rounded as in the b-value map of the DWI.
+  auto shell = [referenceBValue](const DiffusionPropertyHelper::GradientDirectionType& g)
+  {
+    return DiffusionPropertyHelper::IsB0(g, referenceBValue) ? 0.0 : BValueMapProperty::GetBValue(g, referenceBValue);
+  };
   double minB = std::numeric_limits<double>::max();
   for (const auto& g : *gradients)
-    minB = std::min(minB, BValueMapProperty::GetBValue(g, referenceBValue));
+    minB = std::min(minB, shell(g));
 
   Protocol protocol;
   for (unsigned int i = 0; i < gradients->Size(); ++i)
   {
-    if (BValueMapProperty::GetBValue(gradients->ElementAt(i), referenceBValue) <= minB)
+    if (shell(gradients->ElementAt(i)) <= minB)
       protocol.baselineIndices.push_back(i);
     else
       protocol.weightedIndices.push_back(i);
