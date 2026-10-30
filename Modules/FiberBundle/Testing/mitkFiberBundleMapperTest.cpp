@@ -61,6 +61,7 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   MITK_TEST(Mapper3D_ClippingPlaneFromProperty);
   MITK_TEST(Mapper3D_ClippingPlaneChange_AppliedWithoutRebuild);
   MITK_TEST(Mapper2D_SlabAroundThePlane);
+  MITK_TEST(Mapper2D_SliceStep_PlanesMovedInPlace);
   MITK_TEST(Mapper2D_NodeOpacity_AppliedToTheFibers);
   MITK_TEST(Rendering_LeavesTheBundleUnchanged);
   CPPUNIT_TEST_SUITE_END();
@@ -99,6 +100,12 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   {
     m_RenderingTestHelper.SetMapperIDToRender2D();
     m_RenderingTestHelper.SetViewDirection(view);
+    return Render2D();
+  }
+
+  /** Renders the current 2D slice; the actor of the node's 2D mapper */
+  vtkActor *Render2D()
+  {
     m_RenderingTestHelper.Render();
     auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
     auto mapper = dynamic_cast<mitk::VtkMapper *>(m_Node->GetMapper(mitk::BaseRenderer::Standard2D));
@@ -252,6 +259,9 @@ public:
     CPPUNIT_ASSERT(tubes->GetNumberOfStrips() + tubes->GetNumberOfPolys() > 0);
     const auto updateTime3D = m_Fibers->GetUpdateTime3D();
 
+    // held, so that a replaced plane is not freed and its address reused
+    vtkSmartPointer<vtkPlane> plane;
+    vtkMTimeType mapperTime = 0;
     for (double z : {1.0, 2.0})
     {
       mitk::Point3D origin;
@@ -266,6 +276,15 @@ public:
       actor->GetMapper()->GetClippingPlanes()->GetItem(0)->GetOrigin(planeOrigin);
       CPPUNIT_ASSERT_DOUBLES_EQUAL(z, planeOrigin[2], 1e-9);
       CPPUNIT_ASSERT_MESSAGE("tubes not rebuilt", Input(actor) == tubes);
+      // #46: a new plane changes the mapper's modified time, and VTK then rebuilds its GPU
+      // buffers of the whole bundle; the plane is moved in place instead
+      if (plane == nullptr)
+      {
+        plane = actor->GetMapper()->GetClippingPlanes()->GetItem(0);
+        mapperTime = actor->GetMapper()->GetMTime();
+      }
+      CPPUNIT_ASSERT_MESSAGE("plane moved in place", actor->GetMapper()->GetClippingPlanes()->GetItem(0) == plane);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE("mapper unchanged", mapperTime, actor->GetMapper()->GetMTime());
     }
 
     // a zero normal removes the plane
@@ -312,9 +331,61 @@ public:
     }
   }
 
-  /** Largest difference of any pixel and colour channel of the rendered frame from the first
-   *  pixel (the background) */
-  int BrightestPixel()
+  // #46: a slice step moves the two slab planes in place and keeps the input copy. A new plane
+  // collection or input changes the VTK mapper's modified time, and VTK then rebuilds the GPU
+  // buffers of the whole bundle on every step.
+  void Mapper2D_SliceStep_PlanesMovedInPlace()
+  {
+    m_Node->SetData(AxialFibers({-6.0, 0.0, 6.0}));
+    vtkActor *actor = Render2D(mitk::AnatomicalPlane::Axial);
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+    mitk::SliceNavigationController *navigation = renderer->GetSliceNavigationController();
+    mitk::Point3D centre;
+    centre.Fill(0.0);
+    navigation->SelectSliceByPoint(centre);
+    actor = Render2D();
+    const std::vector<unsigned char> atCentre = Capture();
+
+    vtkMapper *mapper = actor->GetMapper();
+    // held, so that replaced objects are not freed and their addresses reused
+    const vtkSmartPointer<vtkPlaneCollection> planes = mapper->GetClippingPlanes();
+    CPPUNIT_ASSERT(planes != nullptr && planes->GetNumberOfItems() == 2);
+    const vtkSmartPointer<vtkPlane> plane1 = planes->GetItem(0);
+    const vtkSmartPointer<vtkPlane> plane2 = planes->GetItem(1);
+    const vtkSmartPointer<vtkPolyData> input = Input(actor);
+    const vtkMTimeType mapperTime = mapper->GetMTime();
+    double originBefore[3];
+    plane1->GetOrigin(originBefore);
+
+    mitk::Point3D above = centre;
+    above[2] = 6.0;
+    navigation->SelectSliceByPoint(above);
+    actor = Render2D();
+    const std::vector<unsigned char> atAbove = Capture();
+    double originAfter[3];
+    mapper->GetClippingPlanes()->GetItem(0)->GetOrigin(originAfter);
+    CPPUNIT_ASSERT_MESSAGE("the slab follows the slice", std::abs(originAfter[2] - originBefore[2]) > 1.0);
+    CPPUNIT_ASSERT_MESSAGE("another fiber is shown", atAbove != atCentre);
+    CPPUNIT_ASSERT(actor->GetMapper() == mapper);
+    CPPUNIT_ASSERT(mapper->GetClippingPlanes() == planes);
+    CPPUNIT_ASSERT(planes->GetItem(0) == plane1 && planes->GetItem(1) == plane2);
+    CPPUNIT_ASSERT_MESSAGE("input copy kept", Input(actor) == input);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("mapper unchanged", mapperTime, mapper->GetMTime());
+
+    navigation->SelectSliceByPoint(centre);
+    Render2D();
+    CPPUNIT_ASSERT_MESSAGE("same image back at the first slice", Capture() == atCentre);
+
+    // changed fibers give a new input copy
+    m_Fibers = dynamic_cast<mitk::FiberBundle *>(m_Node->GetData());
+    m_Fibers->SetFiberColors(255, 0, 0);
+    actor = Render2D();
+    CPPUNIT_ASSERT(Input(actor) != input);
+    CPPUNIT_ASSERT_MESSAGE("recoloured fibers drawn", Capture() != atCentre);
+  }
+
+  /** The rendered frame, RGB(A) bytes row by row */
+  std::vector<unsigned char> Capture(int *components = nullptr)
   {
     vtkRenderWindow *renderWindow = m_RenderingTestHelper.GetVtkRenderWindow();
     const auto swapBuffers = renderWindow->GetSwapBuffers();
@@ -330,25 +401,33 @@ public:
     vtkImageData *capture = grabber->GetOutput();
     int dimensions[3];
     capture->GetDimensions(dimensions);
-    const int components = capture->GetNumberOfScalarComponents();
+    if (components != nullptr)
+      *components = capture->GetNumberOfScalarComponents();
     const auto *pixels = static_cast<const unsigned char *>(capture->GetScalarPointer());
-    const vtkIdType numValues = static_cast<vtkIdType>(dimensions[0]) * dimensions[1] * components;
+    const vtkIdType numValues = static_cast<vtkIdType>(dimensions[0]) * dimensions[1] * capture->GetNumberOfScalarComponents();
+    return std::vector<unsigned char>(pixels, pixels + numValues);
+  }
+
+  /** Largest difference of any pixel and colour channel of the rendered frame from the first
+   *  pixel (the background) */
+  int BrightestPixel()
+  {
+    int components = 1;
+    const std::vector<unsigned char> pixels = Capture(&components);
     int brightest = 0;
-    for (vtkIdType i = 0; i < numValues; ++i)
+    for (std::size_t i = 0; i < pixels.size(); ++i)
       brightest = std::max(brightest, std::abs(static_cast<int>(pixels[i]) - static_cast<int>(pixels[i % components])));
     return brightest;
   }
 
-  // #4: since the VTK 9 port the 2D mapper drew the fibers opaque whatever the node's opacity.
-  void Mapper2D_NodeOpacity_AppliedToTheFibers()
+  /** White straight fibers along x, one in each axial plane z of zs, at y = 0.5 * z */
+  static mitk::FiberBundle::Pointer AxialFibers(const std::vector<double> &zs)
   {
-    // A white fiber in the axial slice through the centre of the bundle and two 10 mm above and
-    // below it, outside the slab; one fiber in the slab, so no fibers overlap in the image.
     auto points = vtkSmartPointer<vtkPoints>::New();
     auto lines = vtkSmartPointer<vtkCellArray>::New();
-    for (const double z : {0.0, -10.0, 10.0})
+    for (const double z : zs)
     {
-      const vtkIdType ids[2] = {points->InsertNextPoint(-20, 5 + z, z), points->InsertNextPoint(20, 5 + z, z)};
+      const vtkIdType ids[2] = {points->InsertNextPoint(-20, 0.5 * z, z), points->InsertNextPoint(20, 0.5 * z, z)};
       lines->InsertNextCell(2, ids);
     }
     auto polyData = vtkSmartPointer<vtkPolyData>::New();
@@ -356,7 +435,15 @@ public:
     polyData->SetLines(lines);
     auto fib = mitk::FiberBundle::New(polyData);
     fib->SetFiberColors(255, 255, 255);
-    m_Node->SetData(fib);
+    return fib;
+  }
+
+  // #4: since the VTK 9 port the 2D mapper drew the fibers opaque whatever the node's opacity.
+  void Mapper2D_NodeOpacity_AppliedToTheFibers()
+  {
+    // A white fiber in the axial slice through the centre of the bundle and two 10 mm above and
+    // below it, outside the slab; one fiber in the slab, so no fibers overlap in the image.
+    m_Node->SetData(AxialFibers({0.0, -10.0, 10.0}));
 
     m_Node->SetOpacity(1.0f);
     Render2D(mitk::AnatomicalPlane::Axial);

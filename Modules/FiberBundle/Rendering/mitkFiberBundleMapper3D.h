@@ -24,11 +24,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <vtkSmartPointer.h>
 
-#include <array>
-
 class vtkActor;
 class vtkLookupTable;
 class vtkOpenGLPolyDataMapper;
+class vtkPlane;
 class vtkPropAssembly;
 
 namespace mitk {
@@ -70,9 +69,10 @@ public:
     itk::TimeStamp m_LastUpdateTime;
     // shape of the last update; each render window builds its own
     ShapeParameters m_Shape;
-    // origin and normal of the clipping plane last applied to m_FiberMapper
-    std::array<double, 6> m_ClippingPlane = {};
-    bool m_ClippingPlaneApplied = false;
+    // The plane of 3DClipping, in the fiber mapper's plane collection while its normal is not
+    // zero, and moved in place: a new plane changes the mapper's modified time, and VTK then
+    // rebuilds the GPU buffers of the whole bundle (#46).
+    vtkSmartPointer<vtkPlane> m_ClippingPlane;
     LocalStorage3D();
   };
 

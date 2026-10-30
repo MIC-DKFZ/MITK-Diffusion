@@ -25,6 +25,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 class vtkActor;
 class vtkOpenGLPolyDataMapper;
+class vtkPlane;
 
 namespace mitk {
 
@@ -50,9 +51,13 @@ public:
   public:
     vtkSmartPointer<vtkActor> m_Actor;
     vtkSmartPointer<vtkOpenGLPolyDataMapper> m_Mapper;
+    // The two planes of the slab, kept in the mapper's plane collection and only moved on a slice
+    // step: a new collection or input changes the mapper's modified time, and VTK then rebuilds
+    // the GPU buffers of the whole bundle (#46).
+    vtkSmartPointer<vtkPlane> m_SlabPlane1;
+    vtkSmartPointer<vtkPlane> m_SlabPlane2;
+    // time the input copy was last built from the bundle
     itk::TimeStamp m_LastUpdateTime;
-    // line width of the last update; the actor of each render window has its own
-    int m_LineWidth = -1;
     FBXLocalStorage();
   };
 
@@ -64,6 +69,8 @@ protected:
   ~FiberBundleMapper2D() override = default;
 
   void GenerateDataForRenderer(mitk::BaseRenderer*) override;
+  /** Moves the slab planes to the renderer's current plane and Fiber2DSliceThickness. */
+  void UpdateSlab(mitk::BaseRenderer* renderer, FBXLocalStorage* localStorage);
 };
 
 }

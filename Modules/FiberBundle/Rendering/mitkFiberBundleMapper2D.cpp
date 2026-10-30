@@ -25,7 +25,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkActor.h>
 #include <vtkOpenGLPolyDataMapper.h>
 #include <vtkPlane.h>
-#include <vtkPlaneCollection.h>
 #include <vtkPointData.h>
 #include <vtkPolyData.h>
 #include <vtkProperty.h>
@@ -60,14 +59,36 @@ void mitk::FiberBundleMapper2D::Update(mitk::BaseRenderer * renderer)
   this->GetDataNode()->GetOpacity(opacity, renderer);
   localStorage->m_Actor->GetProperty()->SetOpacity(opacity);
 
+  // line width and slab are settings of the actor and the VTK mapper; they need no new input
   int lineWidth = 0;
   this->GetDataNode()->GetIntProperty("shape.linewidth", lineWidth);
+  localStorage->m_Actor->GetProperty()->SetLineWidth(lineWidth);
+  this->UpdateSlab(renderer, localStorage);
 
-  // new plane, changed fibers or line width
-  if ( localStorage->m_LastUpdateTime<renderer->GetCurrentWorldPlaneGeometryUpdateTime()
-       || localStorage->m_LastUpdateTime<fiberBundle->GetUpdateTime2D()
-       || localStorage->m_LineWidth!=lineWidth )
+  if (localStorage->m_LastUpdateTime<fiberBundle->GetUpdateTime2D())
     this->GenerateDataForRenderer( renderer );
+}
+
+void mitk::FiberBundleMapper2D::UpdateSlab(mitk::BaseRenderer *renderer, FBXLocalStorage *localStorage)
+{
+  float d = 1.0;
+  this->GetDataNode()->GetFloatProperty("Fiber2DSliceThickness", d);
+
+  mitk::SliceNavigationController::Pointer sliceContr = renderer->GetSliceNavigationController();
+  mitk::PlaneGeometry::ConstPointer planeGeo = sliceContr->GetCurrentPlaneGeometry();
+  if (planeGeo.IsNull())
+    return;
+
+  const Point3D &origin = planeGeo->GetOrigin();
+  const Vector3D &normal = planeGeo->GetNormal();
+
+  // the slab of thickness 2d around the plane: two clipping planes facing each other. vtkPlane
+  // marks itself modified only when a value changes, and the plane collection does not take
+  // over the planes' modified time.
+  localStorage->m_SlabPlane1->SetOrigin(origin[0]+normal[0]*d, origin[1]+normal[1]*d, origin[2]+normal[2]*d);
+  localStorage->m_SlabPlane1->SetNormal(-normal[0], -normal[1], -normal[2]);
+  localStorage->m_SlabPlane2->SetOrigin(origin[0]-normal[0]*d, origin[1]-normal[1]*d, origin[2]-normal[2]*d);
+  localStorage->m_SlabPlane2->SetNormal(normal[0], normal[1], normal[2]);
 }
 
 // vtkActors and Mappers are feeded here
@@ -90,41 +111,7 @@ void mitk::FiberBundleMapper2D::GenerateDataForRenderer(mitk::BaseRenderer *rend
   fiberPolyData->ShallowCopy(fiberBundle->GetFiberPolyData());
 
   fiberPolyData->GetPointData()->AddArray(fiberBundle->GetFiberColors());
-  localStorage->m_Mapper->ScalarVisibilityOn();
-  localStorage->m_Mapper->SetScalarModeToUsePointFieldData();
-  localStorage->m_Mapper->SelectColorArray("FIBER_COLORS");
   localStorage->m_Mapper->SetInputData(fiberPolyData);
-
-  float d = 1.0;
-  node->GetFloatProperty("Fiber2DSliceThickness", d);
-
-  mitk::SliceNavigationController::Pointer sliceContr = renderer->GetSliceNavigationController();
-  mitk::PlaneGeometry::ConstPointer planeGeo = sliceContr->GetCurrentPlaneGeometry();
-
-  const Point3D &origin = planeGeo->GetOrigin();
-  const Vector3D &normal = planeGeo->GetNormal();
-
-  // the slab of thickness 2d around the plane: two clipping planes facing each other
-  vtkSmartPointer<vtkPlane> plane1 = vtkSmartPointer<vtkPlane>::New();
-  plane1->SetOrigin(origin[0]+normal[0]*d, origin[1]+normal[1]*d, origin[2]+normal[2]*d);
-  plane1->SetNormal(-normal[0], -normal[1], -normal[2]);
-
-  vtkSmartPointer<vtkPlane> plane2 = vtkSmartPointer<vtkPlane>::New();
-  plane2->SetOrigin(origin[0]-normal[0]*d, origin[1]-normal[1]*d, origin[2]-normal[2]*d);
-  plane2->SetNormal(normal[0], normal[1], normal[2]);
-
-  vtkSmartPointer<vtkPlaneCollection> planes = vtkSmartPointer<vtkPlaneCollection>::New();
-  planes->AddItem(plane1);
-  planes->AddItem(plane2);
-
-  localStorage->m_Mapper->SetClippingPlanes(planes);
-
-  localStorage->m_Actor->SetMapper(localStorage->m_Mapper);
-
-  int lineWidth = 0;
-  node->GetIntProperty("shape.linewidth", lineWidth);
-  localStorage->m_LineWidth = lineWidth;
-  localStorage->m_Actor->GetProperty()->SetLineWidth(lineWidth);
 
   // We have been modified => save this for next Update()
   localStorage->m_LastUpdateTime.Modified();
@@ -150,4 +137,12 @@ mitk::FiberBundleMapper2D::FBXLocalStorage::FBXLocalStorage()
 {
   m_Actor = vtkSmartPointer<vtkActor>::New();
   m_Mapper = vtkSmartPointer<vtkOpenGLPolyDataMapper>::New();
+  m_Mapper->ScalarVisibilityOn();
+  m_Mapper->SetScalarModeToUsePointFieldData();
+  m_Mapper->SelectColorArray("FIBER_COLORS");
+  m_SlabPlane1 = vtkSmartPointer<vtkPlane>::New();
+  m_SlabPlane2 = vtkSmartPointer<vtkPlane>::New();
+  m_Mapper->AddClippingPlane(m_SlabPlane1);
+  m_Mapper->AddClippingPlane(m_SlabPlane2);
+  m_Actor->SetMapper(m_Mapper);
 }

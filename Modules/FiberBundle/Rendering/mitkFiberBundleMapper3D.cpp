@@ -148,20 +148,21 @@ void mitk::FiberBundleMapper3D::UpdateClippingPlane(LocalStorage3D* localStorage
   if (flip)
     plane_normal *= -1;
 
-  const std::array<double, 6> clippingPlane = {plane_origin[0], plane_origin[1], plane_origin[2], plane_normal[0], plane_normal[1], plane_normal[2]};
-  if (localStorage->m_ClippingPlaneApplied && localStorage->m_ClippingPlane==clippingPlane)
+  vtkOpenGLPolyDataMapper* mapper = localStorage->m_FiberMapper;
+  vtkPlane* plane = localStorage->m_ClippingPlane;
+  const bool clip = plane_normal.GetNorm() > 0.0;
+  const bool inMapper = mapper->GetNumberOfClippingPlanes() > 0;
+  if (!clip)
+  {
+    if (inMapper)
+      mapper->RemoveAllClippingPlanes();
     return;
+  }
 
-  vtkSmartPointer<vtkPlane> plane = vtkSmartPointer<vtkPlane>::New();
-  plane->SetOrigin(clippingPlane[0], clippingPlane[1], clippingPlane[2]);
-  plane->SetNormal(clippingPlane[3], clippingPlane[4], clippingPlane[5]);
-
-  localStorage->m_FiberMapper->RemoveAllClippingPlanes();
-  if (plane_normal.GetNorm() > 0.0)
-    localStorage->m_FiberMapper->AddClippingPlane(plane);
-
-  localStorage->m_ClippingPlane = clippingPlane;
-  localStorage->m_ClippingPlaneApplied = true;
+  plane->SetOrigin(plane_origin[0], plane_origin[1], plane_origin[2]);
+  plane->SetNormal(plane_normal[0], plane_normal[1], plane_normal[2]);
+  if (!inMapper)
+    mapper->AddClippingPlane(plane);
 }
 
 
@@ -259,4 +260,5 @@ mitk::FiberBundleMapper3D::LocalStorage3D::LocalStorage3D()
   m_FiberActor = vtkSmartPointer<vtkActor>::New();
   m_FiberMapper = vtkSmartPointer<vtkOpenGLPolyDataMapper>::New();
   m_FiberAssembly = vtkSmartPointer<vtkPropAssembly>::New();
+  m_ClippingPlane = vtkSmartPointer<vtkPlane>::New();
 }
