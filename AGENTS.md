@@ -127,8 +127,11 @@ Facts the layout does not show:
   profile of its own and `MITK_DIFFUSION_UITEST=<suite>`; the plugin's BlueBerry test harness
   runs the CppUnit suite of that name in the GUI thread once the window is open. The suites open
   views, find widgets by their `.ui` object names, select nodes through the selection service
-  (`QmitkDiffusionUiTestUtil.h`), answer dialogs and wait for workers. Offscreen there is no
-  OpenGL: render windows draw nothing, so rendering looks stay manual checks (#45).
+  (`QmitkDiffusionUiTestUtil.h`, also segmentations and masks on a reference grid), answer dialogs
+  and wait for workers; the Tractography suite compares the streamline view with
+  `MitkStreamlineTractography` (path in `MITK_DIFFUSION_UITEST_STREAMLINE_APP`). Setting
+  `MITK_DIFFUSION_UITEST_CASE=<method>` in the shell that runs ctest runs that case alone. Offscreen
+  there is no OpenGL: render windows draw nothing, so rendering looks stay manual checks (#45).
 - Test data: module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each
   `Testing/` folder and read their input and references from a checkout of
   https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion-test-data (branch `main`; paths as
