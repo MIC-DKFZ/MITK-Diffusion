@@ -525,6 +525,11 @@ public:
     // Tags the image has no value for are listed in a message and keep their value.
     CPPUNIT_ASSERT(fibers->GetPropertyList()->GetStringProperty(mitk::FiberBundleDicomTags::AnatomyMeaning, value));
     CPPUNIT_ASSERT_EQUAL(std::string("Corpus callosum"), value);
+
+    // Closed with the tractogram in its box: the box's destructor reaches OnTractSelectionChanged,
+    // which touches only widgets created after the box, so the view needs no controls guard.
+    HideView(TagEditorId);
+    CPPUNIT_ASSERT(!IsViewOpen(TagEditorId));
   }
 
   void Perspectives_EachDiffusionPerspective_OpensWithItsViews()
