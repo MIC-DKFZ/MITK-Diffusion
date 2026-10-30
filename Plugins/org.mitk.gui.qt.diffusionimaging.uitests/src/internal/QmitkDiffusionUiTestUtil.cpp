@@ -217,26 +217,23 @@ void QmitkDiffusionUiTest::DialogHandler::AnswerFileDialog(const QString &path)
       return false;
 
     // The dialog's file system model loads folders asynchronously and may replace a selection
-    // made before; the answer waits until the dialog reports the path. A folder is entered and
+    // made before, and selectFile() leaves the name box alone while it has the focus; the answer
+    // enters the folder, types the name and waits until the dialog reports the path. A folder is
     // chosen with an empty name, which the dialog takes as its current folder.
-    const QStringList expected = {QFileInfo(path).absoluteFilePath()};
-    const bool isFolder = dialog->fileMode() == QFileDialog::Directory && QFileInfo(path).isDir();
-    auto select = [dialog, &path, isFolder]() {
-      if (isFolder)
-      {
-        dialog->setDirectory(path);
-        if (auto *nameEdit = dialog->findChild<QLineEdit *>("fileNameEdit"))
-          nameEdit->clear();
-      }
-      else
-      {
-        dialog->selectFile(path);
-      }
+    const QFileInfo info(path);
+    const QStringList expected = {info.absoluteFilePath()};
+    const bool isFolder = dialog->fileMode() == QFileDialog::Directory && info.isDir();
+    auto *nameEdit = dialog->findChild<QLineEdit *>("fileNameEdit");
+    auto select = [dialog, nameEdit, &info, isFolder]() {
+      dialog->setDirectory(isFolder ? info.absoluteFilePath() : info.absolutePath());
+      if (nameEdit != nullptr)
+        nameEdit->setText(isFolder ? QString() : info.fileName());
     };
     select();
     if (!QTest::qWaitFor([&]() { select(); return dialog->selectedFiles() == expected; }, 5000))
     {
-      MITK_ERROR << "Diffusion UI test could not choose " << path.toStdString() << " in the file dialog";
+      MITK_ERROR << "Diffusion UI test could not choose " << path.toStdString() << " in the file dialog (it has "
+                 << dialog->selectedFiles().join(", ").toStdString() << ")";
       dialog->reject();
       return true;
     }
