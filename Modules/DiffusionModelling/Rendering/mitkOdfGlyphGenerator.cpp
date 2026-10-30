@@ -68,7 +68,8 @@ namespace
     return basis->second;
   }
 
-  OdfType ToOdf(VoxelKind kind, const float *values, unsigned int numComponents, bool mrtrix, bool tensorEllipsoids)
+  /** \param shBasis the SH basis of the image's coefficient count and convention, for SH images */
+  OdfType ToOdf(VoxelKind kind, const float *values, unsigned int numComponents, const vnl_matrix<float> *shBasis, bool tensorEllipsoids)
   {
     OdfType odf;
     switch (kind)
@@ -89,7 +90,7 @@ namespace
       case VoxelKind::Sh:
       {
         const vnl_vector<float> coefficients(values, numComponents);
-        const vnl_vector<float> odfValues = GetShBasis(numComponents, mrtrix) * coefficients;
+        const vnl_vector<float> odfValues = *shBasis * coefficients;
         for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
           odf[i] = odfValues[i];
         break;
@@ -348,11 +349,21 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   mask->Update();
   vtkPolyData *kept = mask->GetOutput();
   auto keptOffsets = vtkIdTypeArray::SafeDownCast(kept->GetPointData()->GetArray("VoxelOffsets"));
+  const vtkIdType numGlyphs = kept->GetNumberOfPoints();
 
+  // Everything the glyph loop reads is fetched before it: the loop runs in parallel, and
+  // GetShBasis locks a mutex.
+  std::vector<std::array<double, 3>> glyphCenters(numGlyphs);
+  std::vector<vtkIdType> glyphVoxelOffsets(numGlyphs);
+  for (vtkIdType g = 0; g < numGlyphs; ++g)
+  {
+    kept->GetPoint(g, glyphCenters[g].data());
+    glyphVoxelOffsets[g] = keptOffsets->GetValue(g);
+  }
+  const vnl_matrix<float> *shBasis = kind == VoxelKind::Sh ? &GetShBasis(numComponents, mrtrix) : nullptr;
   const BaseMesh &baseMesh = GetBaseMeshArrays();
   const auto numBasePoints = static_cast<vtkIdType>(baseMesh.points.size());
   const auto numBaseTriangles = static_cast<vtkIdType>(baseMesh.triangles.size());
-  const vtkIdType numGlyphs = kept->GetNumberOfPoints();
 
   auto pointCoordinates = vtkSmartPointer<vtkFloatArray>::New();
   pointCoordinates->SetNumberOfComponents(3);
@@ -363,7 +374,6 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   normals->SetNumberOfComponents(3);
   normals->SetNumberOfTuples(numGlyphs * numBasePoints);
   float *normalData = normals->GetPointer(0);
-  std::vector<float> triangleNormals(3 * numBaseTriangles);
 
   // 32-bit point ids, which halve the memory of the triangles, unless the ids or the offsets
   // (3 per triangle) exceed them. The offsets are not stored: all cells are triangles.
@@ -394,18 +404,18 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
 
   // Maps normalized ODF values to colours, 1 red to 0 blue. Its RGBA bytes are those of
   // vtkLookupTable::GetColor times 255: 255 * (b / 255.0) truncates to b for every byte b.
+  // MapScalarsThroughTable only reads the built table, so the threads share it.
   auto lut = vtkSmartPointer<vtkLookupTable>::New();
   lut->SetRange(0, 1);
   lut->Build();
-  auto colorValues = vtkSmartPointer<vtkFloatArray>::New();
-  colorValues->SetNumberOfValues(numBasePoints);
 
   const ImageReadAccessor access(&image, image.GetVolumeData(t));
   const auto *values = static_cast<const float *>(access.GetData());
 
-  for (vtkIdType g = 0; g < numGlyphs; ++g)
-  {
-    const OdfType odf = ToOdf(kind, values + keptOffsets->GetValue(g) * numComponents, numComponents, mrtrix, settings.tensorEllipsoids);
+  // Writes only the glyph's own ranges of the output arrays. colorValues and triangleNormals are
+  // the scratch space of the calling thread.
+  const auto writeGlyph = [&](vtkIdType g, vtkFloatArray *colorValues, float *triangleNormals) {
+    const OdfType odf = ToOdf(kind, values + glyphVoxelOffsets[g] * numComponents, numComponents, shBasis, settings.tensorEllipsoids);
 
     double scale = settings.scaling;
     if (settings.scaleBy == ODFSB_GFA)
@@ -430,8 +440,7 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
         colorOdf = shapeOdf;
     }
 
-    double center[3];
-    kept->GetPoint(g, center);
+    const double *center = glyphCenters[g].data();
     const vtkIdType first = g * numBasePoints;
     float *glyphPoints = pointData + 3 * first;
     for (vtkIdType j = 0; j < numBasePoints; ++j)
@@ -441,7 +450,7 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
       for (unsigned int c = 0; c < 3; ++c)
         glyphPoints[3 * j + c] = static_cast<float>(static_cast<double>(static_cast<float>(baseMesh.points[j][c] * factor)) + center[c]);
     }
-    ComputeGlyphNormals(baseMesh, glyphPoints, triangleNormals.data(), normalData + 3 * first);
+    ComputeGlyphNormals(baseMesh, glyphPoints, triangleNormals, normalData + 3 * first);
 
     unsigned char *glyphColors = colorData + 4 * first;
     if (settings.colourByDirection)
@@ -466,6 +475,17 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
       WriteTriangles(baseMesh, first, connectivity32 + firstId);
     else
       WriteTriangles(baseMesh, first, connectivity64 + firstId);
+  };
+
+  // The glyphs are independent, so the output is the same at any number of threads.
+#pragma omp parallel
+  {
+    auto colorValues = vtkSmartPointer<vtkFloatArray>::New();
+    colorValues->SetNumberOfValues(numBasePoints);
+    std::vector<float> triangleNormals(3 * numBaseTriangles);
+#pragma omp for schedule(dynamic, 16)
+    for (vtkIdType g = 0; g < numGlyphs; ++g)
+      writeGlyph(g, colorValues, triangleNormals.data());
   }
 
   auto points = vtkSmartPointer<vtkPoints>::New();
