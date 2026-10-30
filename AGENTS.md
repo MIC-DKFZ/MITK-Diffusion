@@ -129,7 +129,11 @@ Facts the layout does not show:
   without the image rotation. NIfTI bvals/bvecs follow FSL, as MRtrix does (voxel frame, x negated
   when the image matrix has a positive determinant); NRRD uses the standard `measurement frame`
   field. NRRD files of earlier MITK versions (only MITK's `measurement frame:=` key) are read as
-  before, with the image rotation applied. DICOM import is unchanged;
+  before, with the image rotation applied; the DWI and tensor NRRD readers share the frame parsing
+  (`IO/mitkNrrdMeasurementFrame.h`). A volume is b0 when its b-value rounds to 0 (b < 0.5,
+  `DiffusionPropertyHelper::IsB0`/`GetB0Indices`, shell 0 of the b-value map); every filter that
+  takes b0 volumes asks it (MRtrix's default `bzero_threshold` is 10, dipy's `b0_threshold` 50).
+  Fiberfox simulates its protocol's gradients as given. DICOM import is unchanged;
   `mitkDiffusionDicomSeriesTest` reads synthetic series of each vendor parser (`DicomDwi/`:
   Siemens mosaic and non-mosaic CSA2, GE, Philips; identity orientation; values in that
   folder's README). Untested: the gradient frame of oblique scans (all vendors), Siemens CSA1
@@ -159,7 +163,7 @@ Facts the layout does not show:
   peak files (descrip `MRtrix ...`, reader option on by default); NRRD peaks are LPS.
 - Reconstruction: `mitk::pointshell::Directions(n)` holds the ODF sampling directions as data;
   their order is part of the ODF file format (252 values per voxel) and of Fiberfox references.
-  The single-shell Q-ball methods take volumes whose b-value rounds to 0 as b0 and need one
+  The single-shell Q-ball methods take the b0 volumes (`IsB0`) and need one
   non-zero shell; the multi-shell method needs b, 2b, 3b. The multi-shell Q-ball and radial
   multi-shell filters take their shells from the b-value map they are given, without one from
   `BValueMapProperty::CreateBValueMap`, the DWI's own map. `ReconstructQball` computes the sampled
