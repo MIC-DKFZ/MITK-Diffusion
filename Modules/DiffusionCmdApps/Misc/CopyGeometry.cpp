@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
     readers = {"Peak Image"};
   else if (!inputType.empty())
   {
-    std::cout << "Unknown input type " << inputType << "; use 'sh' or 'peak'.";
+    std::cout << "Unknown input type " << inputType << "; use 'sh' or 'peak'." << std::endl;
     return EXIT_FAILURE;
   }
 
