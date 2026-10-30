@@ -134,9 +134,9 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
     if( isBaseline[i] )
       continue;
 
-    // normalize vector so the following computations work
     const double twonorm = g.two_norm();
 
+    // normalize vector so the following computations work
     GradientType gn = g.normalize();
 
     InputPixelType &S = outerProducts[i];

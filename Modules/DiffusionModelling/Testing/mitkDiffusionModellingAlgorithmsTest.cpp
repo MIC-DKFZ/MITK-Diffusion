@@ -280,8 +280,7 @@ public:
   }
 
   // b = 0.8 s/mm^2 rounds to 1, a shell of its own in the b-value map, so a DWI whose lowest b-value
-  // is 0.8 has no b0 volume, as for the tensor and Q-ball reconstructions. The filter counted every
-  // b <= 1 as unweighted.
+  // is 0.8 has no b0 volume, as for the tensor and Q-ball reconstructions, and the filter throws.
   void Adc_BValueRoundingToOne_IsWeighted()
   {
     const double g[7][3] = {{std::sqrt(0.0008), 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.7071068, 0.7071068, 0}, {0.7071068, 0, 0.7071068}, {0, 0.7071068, 0.7071068}};
@@ -632,8 +631,8 @@ public:
     }
   }
 
-  // b = 0.3 s/mm^2 rounds to 0, a b0 volume of the b-value map, so its signal is the baseline. The
-  // filter attenuated every gradient longer than machine epsilon.
+  // b = 0.3 s/mm^2 rounds to 0, a b0 volume of the b-value map, so its signal is the baseline, not
+  // the attenuated S0 exp(-b g^T D g).
   void TensorToDwi_BValueRoundingToZero_GetsBaseline()
   {
     auto tensors = TensorImageType::New();
