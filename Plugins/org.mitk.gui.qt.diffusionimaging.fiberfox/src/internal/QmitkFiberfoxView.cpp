@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkFiberfoxView.h"
+#include <QmitkDiffusionViewControlsGuard.h>
 
 // MITK
 #include <mitkDiffusionMasks.h>
@@ -384,6 +385,8 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkFiberfoxViewControls;
+    // the selection slots of its boxes update other widgets (UpdateGui)
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     m_Controls->m_StickWidget1->setVisible(true);

@@ -30,6 +30,11 @@ found in the LICENSE file.
 #include <QRegularExpression>
 #include <QSpinBox>
 
+#include <vtkCellArray.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkSmartPointer.h>
+
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -39,13 +44,13 @@ found in the LICENSE file.
 using namespace QmitkDiffusionUiTest;
 
 /**
- * \brief UI tests of the Fiberfox plug-in's views (Fiberfox parameters, Fiber Generator,
- * Fieldmap Generator) and of the Fiber Fit view. The Fiberfox view itself is used only without
- * data here: its source belongs to the k-space change that runs in parallel (see the findings).
+ * \brief UI tests of the Fiberfox plug-in's views (Fiberfox, Fiber Generator, Fieldmap Generator)
+ * and of the Fiber Fit view.
  */
 class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
 {
   CPPUNIT_TEST_SUITE(QmitkFiberfoxViewsUiTest);
+  CPPUNIT_TEST(Fiberfox_ViewClosedWithData_NoCrash);
   CPPUNIT_TEST(Fiberfox_SaveLoadSave_IdenticalParameterFiles);
   CPPUNIT_TEST(Fiberfox_NonXmlParameterFile_Message);
   CPPUNIT_TEST(Generation_RandomPhantomMinAboveMax_MessageForEachRange);
@@ -73,6 +78,23 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
     return messages.front();
   }
 
+  /** Straight fibers along x at y = 6 to 10 mm and z = 1 mm, from x = -2 to 18 mm. */
+  static mitk::FiberBundle::Pointer StraightFibers()
+  {
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    auto lines = vtkSmartPointer<vtkCellArray>::New();
+    for (const double y : {6.0, 7.0, 8.0, 9.0, 10.0})
+    {
+      lines->InsertNextCell(21);
+      for (int i = 0; i <= 20; ++i)
+        lines->InsertCellPoint(points->InsertNextPoint(-2.0 + i, y, 1.0));
+    }
+    auto polyData = vtkSmartPointer<vtkPolyData>::New();
+    polyData->SetPoints(points);
+    polyData->SetLines(lines);
+    return mitk::FiberBundle::New(polyData);
+  }
+
 public:
   void setUp() override
   {
@@ -86,6 +108,22 @@ public:
     ClearDataStorage();
     DialogHandler::Instance().TakeMessages();
     std::filesystem::remove_all(m_TempDir);
+  }
+
+  /**
+   * Closing the Fiberfox view with a tractogram and a template image in its boxes: MITK's data
+   * storage boxes empty themselves in their destructors, and the view's selection slots then ran
+   * on widgets already deleted.
+   */
+  void Fiberfox_ViewClosedWithData_NoCrash()
+  {
+    auto *view = ShowView(FiberfoxId, "QmitkFiberfoxViewControls");
+    auto fibers = AddNode(StraightFibers(), "Fibers");
+    auto image = Load("tensorImage_FA.nrrd");
+    ChooseNode(view, "m_FiberBundleComboBox", fibers);
+    ChooseNode(view, "m_TemplateComboBox", image);
+    HideView(FiberfoxId);
+    CPPUNIT_ASSERT(!IsViewOpen(FiberfoxId));
   }
 
   void Fiberfox_SaveLoadSave_IdenticalParameterFiles()
