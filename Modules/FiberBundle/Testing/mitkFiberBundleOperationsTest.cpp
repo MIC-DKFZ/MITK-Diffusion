@@ -40,6 +40,7 @@ found in the LICENSE file.
 #include <cmath>
 #include <limits>
 #include <map>
+#include <random>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -96,6 +97,8 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat);
   MITK_TEST(TrackVisHeader_JoinedAndMovedBundles_ContainEveryPoint);
   MITK_TEST(Weights_OnePointFibers_KeepPlaceAndWeight);
+  MITK_TEST(SubtractBundle_EndPointsAcrossBinBorders_MatchByDistance);
+  MITK_TEST(SubtractBundle_RandomPerturbations_RemoveExactlyTheCloseCopies);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -1144,6 +1147,129 @@ public:
                                worst <= error * (1 + 1e-6));
       }
     }
+  }
+
+  /** Fiber from first to last end point through a middle point off the line; SubtractBundle compares end points only. */
+  static std::vector<std::array<double, 3>> FiberBetween(const std::array<double, 3> &first, const std::array<double, 3> &last, double bend)
+  {
+    return {first, {(first[0] + last[0]) / 2 + bend, (first[1] + last[1]) / 2, (first[2] + last[2]) / 2}, last};
+  }
+
+  /** Fibers of result, in order, as indices of fibers of source with the same first point and weight. */
+  static std::vector<unsigned int> SourceIds(mitk::FiberBundle *source, mitk::FiberBundle *result)
+  {
+    std::vector<unsigned int> ids;
+    for (unsigned int k = 0; k < result->GetNumFibers(); ++k)
+    {
+      const PointKey key = Key(result->GetFiberPolyData()->GetCell(k)->GetPoints()->GetPoint(0));
+      unsigned int found = source->GetNumFibers();
+      for (unsigned int i = 0; i < source->GetNumFibers(); ++i)
+        if (Key(source->GetFiberPolyData()->GetCell(i)->GetPoints()->GetPoint(0)) == key)
+          found = i;
+      CPPUNIT_ASSERT_MESSAGE("result fiber " + std::to_string(k) + " is a fiber of the source", found < source->GetNumFibers());
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(source->GetFiberWeight(found), result->GetFiberWeight(k), 0.0);
+      ids.push_back(found);
+    }
+    return ids;
+  }
+
+  void SubtractBundle_EndPointsAcrossBinBorders_MatchByDistance()
+  {
+    // SubtractBundle bins the subtrahend's fibers by their first end point (0.01 mm cells) and
+    // removes a fiber when the mean squared distance of the two end points, in either order, is
+    // below 1e-6 mm^2. Fibers whose end points lie in neighbouring cells, at negative
+    // coordinates, far from the origin or reversed must match like any other pair.
+    std::vector<std::vector<std::array<double, 3>>> own, other;
+    // 0: first point in the next x cell (0.0095 -> 0.0105), mean 5e-7: removed
+    own.push_back(FiberBetween({0.0095, 1, 2}, {10, 1, 2}, 0));
+    other.push_back(FiberBetween({0.0105, 1, 2}, {10, 1, 2}, 0));
+    // 1: reversed, other middle point, first point in the next z cell (5.0095 -> 5.0105): removed
+    own.push_back(FiberBetween({3, 4, 5}, {6, 9, 5.0095}, 0));
+    other.push_back(FiberBetween({6, 9, 5.0105}, {3, 4, 5}, 2));
+    // 2: across zero in x and z, mean 6.4e-7: removed
+    own.push_back(FiberBetween({-0.0004, -5, -0.0004}, {-7, -5, -3}, 0));
+    other.push_back(FiberBetween({0.0004, -5, 0.0004}, {-7, -5, -3}, 0));
+    // 3: both end points 0.0011 off in x, mean 1.21e-6: kept
+    own.push_back(FiberBetween({20, 20, 20}, {30, 20, 20}, 0));
+    other.push_back(FiberBetween({20.0011, 20, 20}, {30.0011, 20, 20}, 0));
+    // 4: first end point 0.0015 off in y, mean 1.125e-6: kept
+    own.push_back(FiberBetween({-20, -20, 20}, {-30, -20, 20}, 0));
+    other.push_back(FiberBetween({-20, -19.9985, 20}, {-30, -20, 20}, 0));
+    // 5: far from the origin, first point in the next x cell, mean 8.45e-7: removed
+    own.push_back(FiberBetween({100.0093, 50, 60}, {110, 50, 60}, 0));
+    other.push_back(FiberBetween({100.0106, 50, 60}, {110, 50, 60}, 0));
+    // 6: no counterpart: kept
+    own.push_back(FiberBetween({40, 40, 40}, {40, 50, 40}, 0));
+
+    auto fib = MakeBundle(own);
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      fib->SetFiberWeight(i, 1.0f + i);
+    auto subtracted = fib->SubtractBundle(MakeBundle(other));
+    CPPUNIT_ASSERT((SourceIds(fib, subtracted) == std::vector<unsigned int>{3, 4, 6}));
+  }
+
+  void SubtractBundle_RandomPerturbations_RemoveExactlyTheCloseCopies()
+  {
+    // Copies of fibers with end points moved by a known mean squared distance, many of them into
+    // a neighbouring 0.01 mm cell: below 0.9e-6 mm^2 they remove their fiber, above 1.1e-6 they
+    // do not. Unrelated fibers are millimetres apart. The expected result is known from the
+    // construction, independently of the binning.
+    std::mt19937 rng(42);
+    std::uniform_real_distribution<double> coordinate(-2.0, 2.0);
+    std::uniform_real_distribution<double> unit(0.0, 1.0);
+    std::normal_distribution<double> gauss(0.0, 1.0);
+    auto randomOffset = [&](double length)
+    {
+      std::array<double, 3> d{gauss(rng), gauss(rng), gauss(rng)};
+      const double norm = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+      for (auto &c : d)
+        c *= length / norm;
+      return d;
+    };
+    auto moved = [](const std::array<double, 3> &p, const std::array<double, 3> &d)
+    {
+      return std::array<double, 3>{p[0] + d[0], p[1] + d[1], p[2] + d[2]};
+    };
+    auto cell = [](const std::array<double, 3> &p)
+    {
+      return std::array<long long, 3>{static_cast<long long>(std::floor(p[0] / 0.01)), static_cast<long long>(std::floor(p[1] / 0.01)),
+                                      static_cast<long long>(std::floor(p[2] / 0.01))};
+    };
+
+    // end points on a 0.5 mm grid with a small jitter, so that unrelated fibers never match
+    std::vector<std::vector<std::array<double, 3>>> own, other;
+    std::vector<unsigned int> expected;
+    unsigned int removedAcrossCells = 0;
+    for (unsigned int i = 0; i < 400; ++i)
+    {
+      const std::array<double, 3> first{0.5 * (i % 8) + 0.1 * unit(rng), 0.5 * (i / 8 % 8) + 0.1 * unit(rng), 0.5 * (i / 64) + 0.1 * unit(rng)};
+      const std::array<double, 3> last{coordinate(rng) + 10, coordinate(rng), coordinate(rng)};
+      own.push_back(FiberBetween(first, last, 0.3));
+
+      const unsigned int kind = i % 4; // 0: no copy, 1: close copy, 2: close reversed copy, 3: distant copy
+      if (kind == 0)
+      {
+        expected.push_back(i);
+        continue;
+      }
+      // mean squared distance m, shared out between the two end points: |d1|^2 + |d2|^2 = 2m
+      const double m = kind == 3 ? 1.1e-6 + 2e-6 * unit(rng) : 0.9e-6 * unit(rng);
+      const double share = unit(rng);
+      const auto first2 = moved(first, randomOffset(std::sqrt(2 * m * share)));
+      const auto last2 = moved(last, randomOffset(std::sqrt(2 * m * (1 - share))));
+      other.push_back(kind == 2 ? FiberBetween(last2, first2, -0.2) : FiberBetween(first2, last2, -0.2));
+      if (kind == 3)
+        expected.push_back(i);
+      else if (cell(first2) != cell(first) || cell(last2) != cell(last))
+        ++removedAcrossCells;
+    }
+    CPPUNIT_ASSERT_MESSAGE("removed fibers with an end point in another cell: " + std::to_string(removedAcrossCells), removedAcrossCells >= 20);
+
+    auto fib = MakeBundle(own);
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      fib->SetFiberWeight(i, 1.0f + 0.01f * i);
+    auto subtracted = fib->SubtractBundle(MakeBundle(other));
+    CPPUNIT_ASSERT((SourceIds(fib, subtracted) == expected));
   }
 
   void ApplyCurvatureThreshold_CircularArc_RadiusDecides()
