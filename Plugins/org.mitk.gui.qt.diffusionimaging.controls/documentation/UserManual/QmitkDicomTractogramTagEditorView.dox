@@ -5,6 +5,6 @@ Tractograms saved as DICOM tractography results (supplement 181 of the DICOM sta
 
 A value is edited by double-clicking it in the table. "Copy Properties From Image" copies the reference tags (patient, study, series, SOP instance and class, frame of reference) from the image selected in the Data Manager, e.g. the diffusion-weighted image the tractogram was computed from. Tags the image does not have keep their value and are listed in a message.
 
-When the tractogram is saved as DICOM, the writer uses these tags; the tractogram itself gets new series and SOP instance UIDs. Tags that are still missing are written as "0", and missing study and frame of reference UIDs are generated with a warning.
+When the tractogram is saved as DICOM, the writer uses these tags; the tractogram itself gets new series and SOP instance UIDs. Tags that are still missing are written as "0", a missing SOP class UID as MR Image Storage, and missing study and frame of reference UIDs are generated with a warning.
 
 */

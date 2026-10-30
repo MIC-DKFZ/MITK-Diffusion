@@ -288,8 +288,16 @@ void QmitkControlVisualizationPropertiesView::SetColor()
   rgb[2] = static_cast<float>(c.blueF());
   ForSelected(IsFiberBundleOrPeakImage, [&rgb](mitk::DataNode* node)
   {
+    // A selected node's ColorObserver recolours it when its colour property changes. Recolouring a
+    // tractogram of millions of points takes noticeable time, so it is done here only when setting
+    // the colour changed no existing property: same colour (e.g. after colouring by orientation) or
+    // a new property.
+    const mitk::BaseProperty* colorBefore = node->GetProperty("color", nullptr, false);
+    const auto modifiedBefore = colorBefore != nullptr ? colorBefore->GetMTime() : 0;
     node->SetColor(rgb);
-    ApplyNodeColor(node);
+    if (colorBefore == nullptr || node->GetProperty("color", nullptr, false) != colorBefore
+        || colorBefore->GetMTime() == modifiedBefore)
+      ApplyNodeColor(node);
   });
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
@@ -320,7 +328,13 @@ void QmitkControlVisualizationPropertiesView::NodeAdded(const mitk::DataNode *no
     mitk::Image::Pointer dimg = dynamic_cast<mitk::Image*>(notConst->GetData());
 
     // Show the first b0 volume. MITK's image mapper shows the volume named by
-    // "Image.Displayed Component" (volume 0 without it).
+    // "Image.Displayed Component" and sets it to 0 by default. Another value was chosen by the user
+    // and restored from a scene file, whose properties MITK's scene reader sets before the node is
+    // added; it is kept.
+    int displayedComponent = 0;
+    if (notConst->GetIntProperty("Image.Displayed Component", displayedComponent) && displayedComponent != 0)
+      return;
+
     int displayChannelPropertyValue = 0;
     const auto& map = mitk::DiffusionPropertyHelper::GetBValueMap(dimg);
     const auto b0 = map.find(0);
@@ -502,7 +516,7 @@ void QmitkControlVisualizationPropertiesView::CreateThickSliceMenu()
 {
   m_TSSlider = new QSlider(Qt::Horizontal, m_MyMenu);
   m_TSSlider->setMinimum(0);
-  connect( m_TSSlider, SIGNAL( valueChanged(int) ), this, SLOT( OnTSNumChanged(int) ) );
+  connect( m_TSSlider, &QSlider::valueChanged, this, &QmitkControlVisualizationPropertiesView::OnTSNumChanged );
 
   QHBoxLayout* tsLayout = new QHBoxLayout;
   tsLayout->setContentsMargins(4,4,4,4);
@@ -530,7 +544,7 @@ void QmitkControlVisualizationPropertiesView::CreateThickSliceMenu()
     action->setData(mode.second);
     m_MyMenu->addAction(action);
   }
-  connect( m_ThickSliceModeGroup, SIGNAL(triggered(QAction*)), this, SLOT(OnThickSlicesModeSelected(QAction*)) );
+  connect( m_ThickSliceModeGroup, &QActionGroup::triggered, this, &QmitkControlVisualizationPropertiesView::OnThickSlicesModeSelected );
 }
 
 void QmitkControlVisualizationPropertiesView::UpdateThickSliceMenu(const QList<mitk::DataNode::Pointer>& nodes)
