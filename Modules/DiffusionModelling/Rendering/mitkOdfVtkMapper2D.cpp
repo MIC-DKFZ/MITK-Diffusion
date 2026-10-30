@@ -16,6 +16,7 @@ found in the LICENSE file.
 #include <mitkOdfNormalizationMethodProperty.h>
 #include <mitkOdfScaleByProperty.h>
 #include <mitkProperties.h>
+#include <mitkRenderingManager.h>
 #include <mitkTensorImage.h>
 
 #include <vtkLookupTable.h>
@@ -81,7 +82,7 @@ namespace
   }
 }
 
-bool mitk::OdfVtkMapper2D::IsGenerationRequired(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged)
+bool mitk::OdfVtkMapper2D::IsGenerationRequired(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged, int lod)
 {
   if (!generated || contentChanged)
     return true;
@@ -89,7 +90,16 @@ bool mitk::OdfVtkMapper2D::IsGenerationRequired(const std::optional<GlyphView> &
                             generated->slice.index != current.slice.index ||
                             generated->slice.planeIndex != current.slice.planeIndex ||
                             generated->planeAxis0 != current.planeAxis0 || generated->planeAxis1 != current.planeAxis1;
-  return sliceChanged || !SameWindow(generated->window, current.window);
+  if (sliceChanged)
+    return true;
+  // Generating and uploading thousands of glyphs at every mouse step of a pan or zoom made the
+  // view lag; the glyphs in place are still right, only the area they cover is out of date.
+  return lod > 0 && !SameWindow(generated->window, current.window);
+}
+
+bool mitk::OdfVtkMapper2D::IsLODEnabled(BaseRenderer *renderer) const
+{
+  return this->GetVisibleView(renderer).has_value();
 }
 
 std::optional<mitk::OdfVtkMapper2D::GlyphView> mitk::OdfVtkMapper2D::GetVisibleView(BaseRenderer *renderer) const
@@ -153,7 +163,7 @@ void mitk::OdfVtkMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
     }
     return;
   }
-  if (!IsGenerationRequired(localStorage->m_GeneratedView, *view, contentChanged))
+  if (!IsGenerationRequired(localStorage->m_GeneratedView, *view, contentChanged, RenderingManager::GetInstance()->GetNextLOD(renderer)))
     return;
 
   localStorage->UpdateGenerateDataTime();

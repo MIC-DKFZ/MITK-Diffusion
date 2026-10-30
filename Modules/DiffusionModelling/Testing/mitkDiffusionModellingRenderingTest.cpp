@@ -1050,30 +1050,45 @@ public:
     return view;
   }
 
-  // The rule of the 2D mapper: glyphs are generated the first time, for new content and for a
-  // change of the slice, the plane axes or the part of the plane in view.
+  // The rule of the 2D mapper: glyphs are generated the first time, for new content and for
+  // another slice or plane at once; for a pan or zoom only at the render of LOD 1 that follows
+  // an interaction. A render at LOD 1 without a change keeps them.
   void OdfMapper_GenerationRequired()
   {
     using GlyphView = mitk::OdfVtkMapper2D::GlyphView;
     const GlyphView generated = MakeGlyphView();
-    CPPUNIT_ASSERT(mitk::OdfVtkMapper2D::IsGenerationRequired(std::nullopt, generated, false));
-    CPPUNIT_ASSERT(!mitk::OdfVtkMapper2D::IsGenerationRequired(generated, generated, false));
-    CPPUNIT_ASSERT(mitk::OdfVtkMapper2D::IsGenerationRequired(generated, generated, true));
+    for (const int lod : {0, 1})
+    {
+      const std::string level = ", LOD " + std::to_string(lod);
+      CPPUNIT_ASSERT_MESSAGE("first" + level, mitk::OdfVtkMapper2D::IsGenerationRequired(std::nullopt, generated, false, lod));
+      CPPUNIT_ASSERT_MESSAGE("unchanged" + level, !mitk::OdfVtkMapper2D::IsGenerationRequired(generated, generated, false, lod));
+      CPPUNIT_ASSERT_MESSAGE("content" + level, mitk::OdfVtkMapper2D::IsGenerationRequired(generated, generated, true, lod));
+    }
 
-    const std::pair<std::string, std::function<void(GlyphView &)>> changes[] = {
+    const std::pair<std::string, std::function<void(GlyphView &)>> sliceChanges[] = {
       {"normal axis", [](GlyphView &v) { v.slice.normalAxis = 1; }},
       {"slice index", [](GlyphView &v) { v.slice.index = 2; }},
       {"plane index", [](GlyphView &v) { v.slice.planeIndex = 1.2; }},
       {"plane axis 0", [](GlyphView &v) { v.planeAxis0[1] = 1; }},
-      {"plane axis 1", [](GlyphView &v) { v.planeAxis1[0] = 1; }},
+      {"plane axis 1", [](GlyphView &v) { v.planeAxis1[0] = 1; }}};
+    const std::pair<std::string, std::function<void(GlyphView &)>> viewChanges[] = {
       {"pan", [](GlyphView &v) { v.window.center[0] += 0.5; }},
       {"zoom", [](GlyphView &v) { v.window.halfSize1 *= 1.1; v.window.halfSize2 *= 1.1; }},
       {"window axes", [](GlyphView &v) { std::swap(v.window.axis1, v.window.axis2); }}};
-    for (const auto &[name, change] : changes)
+    for (const int lod : {0, 1})
     {
-      GlyphView current = generated;
-      change(current);
-      CPPUNIT_ASSERT_MESSAGE(name, mitk::OdfVtkMapper2D::IsGenerationRequired(generated, current, false));
+      for (const auto &[name, change] : sliceChanges)
+      {
+        GlyphView current = generated;
+        change(current);
+        CPPUNIT_ASSERT_MESSAGE(name + ", LOD " + std::to_string(lod), mitk::OdfVtkMapper2D::IsGenerationRequired(generated, current, false, lod));
+      }
+      for (const auto &[name, change] : viewChanges)
+      {
+        GlyphView current = generated;
+        change(current);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(name + ", LOD " + std::to_string(lod), lod > 0, mitk::OdfVtkMapper2D::IsGenerationRequired(generated, current, false, lod));
+      }
     }
   }
 };

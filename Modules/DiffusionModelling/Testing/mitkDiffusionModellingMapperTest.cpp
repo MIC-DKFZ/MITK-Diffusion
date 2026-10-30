@@ -10,12 +10,14 @@ found in the LICENSE file.
 
 ============================================================================*/
 
+#include <mitkCameraController.h>
 #include <mitkCompositeMapper.h>
 #include <mitkIOUtil.h>
 #include <mitkOdfImage.h>
 #include <mitkOdfVtkMapper2D.h>
 #include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkRenderingManager.h>
 #include <mitkSliceNavigationController.h>
 #include <mitkRenderingTestHelper.h>
 #include <mitkTensorImage.h>
@@ -35,7 +37,10 @@ found in the LICENSE file.
 #include <vtkPropCollection.h>
 #include <vtkSmartPointer.h>
 
+#include <algorithm>
 #include <cmath>
+#include <functional>
+#include <string>
 
 /**
  * The 2D mapper of tensor images in an offscreen render window: which glyphs it hands to VTK.
@@ -52,6 +57,9 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   MITK_TEST(CompositeMapper_PropAndImageMapperSlot);
   MITK_TEST(ColourMap_NotRebuiltByRendering);
   MITK_TEST(OdfMapper_GlyphsNotMovedByGeometry);
+  MITK_TEST(PanAndZoom_GlyphsKeptUntilLod1);
+  MITK_TEST(SliceChange_GlyphsGeneratedAtOnce);
+  MITK_TEST(LodEnabled_OnlyWhileGlyphsShown);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::RenderingTestHelper m_RenderingTestHelper;
@@ -79,14 +87,21 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
     return nullptr;
   }
 
+  mitk::BaseRenderer *Renderer() { return mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow()); }
+
+  /** The glyphs the node's 2D mapper currently hands to VTK, or nullptr. */
+  vtkPolyData *Glyphs()
+  {
+    auto mapper = dynamic_cast<mitk::VtkMapper *>(m_Node->GetMapper(mitk::BaseRenderer::Standard2D));
+    CPPUNIT_ASSERT(mapper != nullptr);
+    return FindGlyphs(mapper->GetVtkProp(this->Renderer()));
+  }
+
   vtkPolyData *RenderGlyphs(mitk::AnatomicalPlane view)
   {
     m_RenderingTestHelper.SetViewDirection(view);
     m_RenderingTestHelper.Render();
-    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
-    auto mapper = dynamic_cast<mitk::VtkMapper *>(m_Node->GetMapper(mitk::BaseRenderer::Standard2D));
-    CPPUNIT_ASSERT(mapper != nullptr);
-    return FindGlyphs(mapper->GetVtkProp(renderer));
+    return this->Glyphs();
   }
 
 public:
@@ -269,6 +284,83 @@ public:
     auto actor = vtkActor::SafeDownCast(odfMapper->GetVtkProp(renderer));
     CPPUNIT_ASSERT(actor != nullptr);
     CPPUNIT_ASSERT(actor->GetUserTransform() == nullptr);
+  }
+
+  // MITK renders at LOD 0 while the view moves and once at LOD 1 about 200 ms after the last
+  // render of a window with LOD enabled (QmitkRenderingManager's timer, whose callback the test
+  // calls). A pan or zoom keeps the glyphs at LOD 0, which are in world coordinates and still in
+  // place; the render at LOD 1 generates them for the new view, and resets the LOD to 0.
+  void PanAndZoom_GlyphsKeptUntilLod1()
+  {
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    vtkSmartPointer<vtkPolyData> glyphs = this->RenderGlyphs(mitk::AnatomicalPlane::Axial);
+    CPPUNIT_ASSERT(glyphs != nullptr);
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(64 * 64 * ODF_SAMPLING_SIZE), glyphs->GetNumberOfPoints());
+    mitk::BaseRenderer *renderer = this->Renderer();
+    mitk::RenderingManager *renderingManager = mitk::RenderingManager::GetInstance();
+    CPPUNIT_ASSERT_EQUAL(0, renderingManager->GetNextLOD(renderer));
+
+    mitk::CameraController *camera = renderer->GetCameraController();
+    mitk::Vector2D move;
+    move[0] = 30;
+    move[1] = 20;
+    const std::pair<std::string, std::function<void()>> interactions[] = {
+      {"zoom", [camera]() { camera->Zoom(2, camera->GetCameraPositionOnPlane()); }},
+      {"pan", [camera, move]() { camera->MoveBy(move); }}};
+    for (const auto &[name, interact] : interactions)
+    {
+      double bounds[6];
+      glyphs->GetBounds(bounds);
+      interact();
+      m_RenderingTestHelper.Render();
+      CPPUNIT_ASSERT_MESSAGE(name + " at LOD 0", this->Glyphs() == glyphs.GetPointer());
+
+      renderingManager->ExecutePendingHighResRenderingRequest();
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, 1, renderingManager->GetNextLOD(renderer));
+      m_RenderingTestHelper.Render();
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, 0, renderingManager->GetNextLOD(renderer));
+      vtkSmartPointer<vtkPolyData> regenerated = this->Glyphs();
+      CPPUNIT_ASSERT_MESSAGE(name + " at LOD 1", regenerated != nullptr && regenerated != glyphs);
+      double newBounds[6];
+      regenerated->GetBounds(newBounds);
+      CPPUNIT_ASSERT_MESSAGE(name + ": glyphs of the new view", !std::equal(bounds, bounds + 6, newBounds));
+      // Zoomed in by 2, a quarter of the slice is in view.
+      CPPUNIT_ASSERT_MESSAGE(name, regenerated->GetNumberOfPoints() < 64 * 64 * ODF_SAMPLING_SIZE / 2);
+      glyphs = regenerated;
+    }
+  }
+
+  // A new slice is drawn at once, at LOD 0.
+  void SliceChange_GlyphsGeneratedAtOnce()
+  {
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    vtkSmartPointer<vtkPolyData> glyphs = this->RenderGlyphs(mitk::AnatomicalPlane::Axial);
+    CPPUNIT_ASSERT(glyphs != nullptr);
+    mitk::BaseRenderer *renderer = this->Renderer();
+    renderer->GetSliceNavigationController()->GetStepper()->Next();
+    m_RenderingTestHelper.Render();
+    CPPUNIT_ASSERT_EQUAL(0, mitk::RenderingManager::GetInstance()->GetNextLOD(renderer));
+    vtkPolyData *next = this->Glyphs();
+    CPPUNIT_ASSERT(next != nullptr && next != glyphs.GetPointer());
+    // The glyphs are centred on the plane, one voxel layer (3 mm) further.
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, std::fabs(next->GetCenter()[2] - glyphs->GetCenter()[2]), 1e-3);
+  }
+
+  // Only a renderer that shows glyphs gets the extra render at LOD 1.
+  void LodEnabled_OnlyWhileGlyphsShown()
+  {
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) == nullptr);
+    mitk::BaseRenderer *renderer = this->Renderer();
+    CPPUNIT_ASSERT_EQUAL(0u, renderer->GetNumberOfVisibleLODEnabledMappers());
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    m_RenderingTestHelper.Render();
+    CPPUNIT_ASSERT(this->Glyphs() != nullptr);
+    CPPUNIT_ASSERT_EQUAL(1u, renderer->GetNumberOfVisibleLODEnabledMappers());
+    m_Node->SetBoolProperty("VisibleOdfs_S", true);
+    m_Node->SetBoolProperty("VisibleOdfs_T", false);
+    m_RenderingTestHelper.Render();
+    CPPUNIT_ASSERT(this->Glyphs() == nullptr);
+    CPPUNIT_ASSERT_EQUAL(0u, renderer->GetNumberOfVisibleLODEnabledMappers());
   }
 };
 

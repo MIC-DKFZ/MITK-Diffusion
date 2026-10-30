@@ -34,6 +34,11 @@ namespace mitk
    * the node property "VisibleOdfs_T", "_S" or "_C" of the plane's orientation is on. The glyphs
    * themselves come from OdfGlyphGenerator; the node properties set in SetDefaultProperties
    * control them.
+   *
+   * The glyphs are in world coordinates, so a pan or zoom leaves them in place: while the view
+   * moves, the mapper keeps them, and fills the new view at the render of level of detail 1 that
+   * MITK's RenderingManager runs about 200 ms after the last render of a renderer with LOD
+   * enabled (IsLODEnabled). A new slice, new data or new properties are drawn at once.
    */
   class MITKDIFFUSIONMODELLING_EXPORT OdfVtkMapper2D : public VtkMapper
   {
@@ -46,6 +51,12 @@ namespace mitk
 
     /** The glyphs are already in world coordinates; the image geometry must not move them again. */
     void UpdateVtkTransform(BaseRenderer *) override {}
+
+    /**
+     * True while the renderer shows glyphs of the node, so that the RenderingManager renders it
+     * once more at LOD 1 after an interaction, and only then.
+     */
+    bool IsLODEnabled(BaseRenderer *renderer) const override;
 
     static void SetDefaultProperties(DataNode *node, BaseRenderer *renderer = nullptr, bool overwrite = false);
 
@@ -64,10 +75,12 @@ namespace mitk
 
     /**
      * Whether the glyphs of a renderer have to be generated again: for new data, new node
-     * properties or another time step (contentChanged), and for any change of the view.
+     * properties or another time step (contentChanged), and for another slice or plane at any
+     * level of detail; for a pan or zoom (another window) only at LOD 1 and higher.
      * \param generated the view the current glyphs were generated for; none if there are none
+     * \param lod the level of detail of the render, RenderingManager::GetNextLOD
      */
-    static bool IsGenerationRequired(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged);
+    static bool IsGenerationRequired(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged, int lod);
 
     class LocalStorage : public Mapper::BaseLocalStorage
     {
