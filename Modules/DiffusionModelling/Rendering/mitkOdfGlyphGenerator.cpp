@@ -29,7 +29,6 @@ found in the LICENSE file.
 #include <vtkMaskPoints.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
-#include <vtkPolyDataNormals.h>
 #include <vtkUnsignedCharArray.h>
 
 #include <algorithm>
@@ -106,6 +105,8 @@ namespace
     std::vector<std::array<double, 3>> points;
     /** Point ids of the triangles, in the order of the base mesh. */
     std::vector<std::array<vtkIdType, 3>> triangles;
+    /** Per point, the triangles that contain it, in ascending order. */
+    std::vector<std::vector<vtkIdType>> pointTriangles;
   };
 
   /** Built on first use from any thread, and never changed. */
@@ -128,9 +129,70 @@ namespace
           mitkThrow() << "The ODF base mesh has a cell of " << ids->GetNumberOfIds() << " points.";
         result.triangles.push_back({ids->GetId(0), ids->GetId(1), ids->GetId(2)});
       }
+
+      result.pointTriangles.resize(result.points.size());
+      for (std::size_t t = 0; t < result.triangles.size(); ++t)
+      {
+        for (const vtkIdType id : result.triangles[t])
+          result.pointTriangles[id].push_back(static_cast<vtkIdType>(t));
+      }
       return result;
     }();
     return mesh;
+  }
+
+  /**
+   * Point normals of one glyph as vtkPolyDataNormals computes them without splitting and
+   * reorientation, with the same arithmetic in the same order (VTK 9.7): per triangle the unit
+   * normal of vtkPolygon::ComputeNormal, stored as float; per point the float sum of the normals
+   * of its triangles in ascending order, normalized. The glyphs share no points, so these are the
+   * normals of the whole mesh.
+   * \param triangleNormals space for 3 floats per base triangle
+   */
+  void ComputeGlyphNormals(const BaseMesh &mesh, const float *points, float *triangleNormals, float *normals)
+  {
+    for (std::size_t t = 0; t < mesh.triangles.size(); ++t)
+    {
+      const float *a = points + 3 * mesh.triangles[t][0];
+      const float *b = points + 3 * mesh.triangles[t][1];
+      const float *c = points + 3 * mesh.triangles[t][2];
+      double normal[3] = {0, 0, 0};
+      const double ab[3] = {b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+      // A triangle whose first edge has no length gets a zero normal.
+      if (ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2] > 0)
+      {
+        const double ac[3] = {c[0] - a[0], c[1] - a[1], c[2] - a[2]};
+        const double cross[3] = {ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]};
+        for (int i = 0; i < 3; ++i)
+          normal[i] += cross[i];
+        const double length = std::sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+        if (length != 0.0)
+        {
+          for (int i = 0; i < 3; ++i)
+            normal[i] /= length;
+        }
+      }
+      for (int i = 0; i < 3; ++i)
+        triangleNormals[3 * t + i] = static_cast<float>(normal[i]);
+    }
+
+    for (std::size_t j = 0; j < mesh.pointTriangles.size(); ++j)
+    {
+      float sum[3] = {0, 0, 0};
+      for (const vtkIdType t : mesh.pointTriangles[j])
+      {
+        for (int i = 0; i < 3; ++i)
+          sum[i] = sum[i] + triangleNormals[3 * t + i];
+      }
+      const float length = std::sqrt(sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2]);
+      if (length != 0)
+      {
+        const auto inverse = static_cast<float>(1.0 / length);
+        for (int i = 0; i < 3; ++i)
+          sum[i] *= inverse;
+      }
+      std::copy(sum, sum + 3, normals + 3 * j);
+    }
   }
 
   /** The base triangles on the points of the glyph that starts at firstPoint. */
@@ -296,6 +358,12 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   pointCoordinates->SetNumberOfComponents(3);
   pointCoordinates->SetNumberOfTuples(numGlyphs * numBasePoints);
   float *pointData = pointCoordinates->GetPointer(0);
+  auto normals = vtkSmartPointer<vtkFloatArray>::New();
+  normals->SetName("Normals");
+  normals->SetNumberOfComponents(3);
+  normals->SetNumberOfTuples(numGlyphs * numBasePoints);
+  float *normalData = normals->GetPointer(0);
+  std::vector<float> triangleNormals(3 * numBaseTriangles);
 
   // 32-bit point ids, which halve the memory of the triangles, unless the ids or the offsets
   // (3 per triangle) exceed them. The offsets are not stored: all cells are triangles.
@@ -373,6 +441,7 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
       for (unsigned int c = 0; c < 3; ++c)
         glyphPoints[3 * j + c] = static_cast<float>(static_cast<double>(static_cast<float>(baseMesh.points[j][c] * factor)) + center[c]);
     }
+    ComputeGlyphNormals(baseMesh, glyphPoints, triangleNormals.data(), normalData + 3 * first);
 
     unsigned char *glyphColors = colorData + 4 * first;
     if (settings.colourByDirection)
@@ -407,18 +476,6 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   glyphs->SetPoints(points);
   glyphs->SetPolys(polys);
   glyphs->GetPointData()->AddArray(colors);
-
-  // The glyphs share no points, so normals of the whole mesh equal those of each glyph.
-  auto normals = vtkSmartPointer<vtkPolyDataNormals>::New();
-  normals->SetInputData(glyphs);
-  normals->SplittingOff();
-  normals->ConsistencyOff();
-  normals->AutoOrientNormalsOff();
-  normals->ComputePointNormalsOn();
-  normals->ComputeCellNormalsOff();
-  normals->FlipNormalsOff();
-  normals->NonManifoldTraversalOff();
-  normals->Update();
-  result = normals->GetOutput();
-  return result;
+  glyphs->GetPointData()->SetNormals(normals);
+  return glyphs;
 }
