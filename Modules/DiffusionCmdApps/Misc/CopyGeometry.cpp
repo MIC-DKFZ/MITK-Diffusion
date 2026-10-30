@@ -21,7 +21,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionImageMapping.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkModelDirectionRotation.h>
+#include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkShImage.h>
 #include <vnl/vnl_inverse.h>
 
 /*!
@@ -83,7 +85,12 @@ int main(int argc, char* argv[])
     mitk::Image::Pointer source = mitk::IOUtil::Load<mitk::Image>(refImage);
     mitk::PreferenceListReaderOptionsFunctor functor(readers, std::vector<std::string>());
     mitk::Image::Pointer target = mitk::IOUtil::Load<mitk::Image>(imageName, &functor);
-    if (!readers.empty() && !mitk::ModelDirectionRotation::HasModelDirections(target))
+    // The reader list only prefers the named reader; another one (e.g. the tensor reader of a .dti
+    // file) can still win, so the loaded type is checked against the requested one.
+    const bool typeMatches = inputType.empty() ||
+      (inputType == "sh" && dynamic_cast<mitk::ShImage*>(target.GetPointer()) != nullptr) ||
+      (inputType == "peak" && dynamic_cast<mitk::PeakImage*>(target.GetPointer()) != nullptr);
+    if (!typeMatches)
       mitkThrow() << "The input cannot be read as " << inputType << " image.";
     if (originOnly)
     {

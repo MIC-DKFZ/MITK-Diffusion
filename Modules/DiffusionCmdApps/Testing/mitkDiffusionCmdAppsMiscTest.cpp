@@ -32,6 +32,7 @@ class mitkDiffusionCmdAppsMiscTestSuite : public mitk::TestFixture
   MITK_TEST(ImageResampler_Spacing);
   MITK_TEST(CopyGeometry_RotatedReference_TurnsTensors);
   MITK_TEST(CopyGeometry_UnknownInputType_Fails);
+  MITK_TEST(CopyGeometry_InputTypeMismatch_Fails);
   MITK_TEST(DiffusionDICOMLoader_MissingFolder_Fails);
   MITK_TEST(ShToOdfImage_Odfs);
   MITK_TEST(PeakExtraction_Peaks);
@@ -116,6 +117,15 @@ public:
   {
     const auto dir = WorkDir("CopyGeometryFails");
     RunFails("CopyGeometry", {"-i", Data("sh_image_test.nii.gz"), "-r", Data("sh_image_test.nii.gz"), "-o", "out.nii.gz", "-t", "tensor"}, dir);
+  }
+
+  // -t sh on a tensor file: the tensor reader wins over the preferred SH reader, and the app
+  // refuses the input instead of turning it as a tensor image.
+  void CopyGeometry_InputTypeMismatch_Fails()
+  {
+    const auto dir = WorkDir("CopyGeometryMismatch");
+    RunFails("CopyGeometry", {"-i", Data("tensorImage.dti"), "-r", Data("tensorImage.dti"), "-o", "out.dti", "-t", "sh"}, dir);
+    CPPUNIT_ASSERT(!std::filesystem::exists(Path(dir, "out.dti")));
   }
 
   // No DICOM DWI in the test data: only the error path.
