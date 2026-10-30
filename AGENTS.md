@@ -177,10 +177,13 @@ Facts the layout does not show:
   lines, and drops fibers without points with a warning; `SetFiberPolyData` gives the new fibers
   weight 1. The mask cut (`RemoveFibersOutside`) cuts segments at the mask border;
   `ResamplePolylineToNumPoints` (equal arc length) serves `ResampleToNumPoints` and the
-  clustering filter. Tests that change the OpenMP thread count (`FiberBundle`, `FiberProcessing`,
-  `FiberTracking`, `MriSimulation`, `mitkDiffusionModellingAlgorithmsTest`) use
-  `mitk::OmpThreadGuard` (`CMake/mitkOmpThreadGuard.h`, in the include path of each test driver
-  whose `Testing/CMakeLists.txt` includes `mitkDiffusionTestData`).
+  clustering filter. `Compress(error)` keeps every original point within `error` of the
+  compressed fiber. A bundle is copied with `Clone()`. The module needs no MITK DICOM module or
+  ITK IO of its own; `MitkDICOM` reaches its dependents through `MitkDiffusionImage`. Tests that
+  change the OpenMP thread count (`FiberBundle`, `FiberProcessing`, `FiberTracking`,
+  `MriSimulation`, `mitkDiffusionModellingAlgorithmsTest`) use `mitk::OmpThreadGuard`
+  (`CMake/mitkOmpThreadGuard.h`, in the include path of each test driver whose
+  `Testing/CMakeLists.txt` includes `mitkDiffusionTestData`).
 - `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter|RoiImage)Test'`
   runs the `FiberProcessing` tests. Its filters read const bundles and give the same result at
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
@@ -196,7 +199,8 @@ Facts the layout does not show:
   references in the test data (`StreamlineTractography/ReferenceFibs/`, `gibbsTractogram_v3.fib`)
   depend on the exact random engines and seeds, so a change there is checked bit for bit against
   the old output. The streamline inputs (`tensor_image.dti`, `qball_*`) follow the phantom's
-  bundles: they are fits of `StreamlineTractography/diffusion_image_v2` (FSL bvecs);
+  bundles and match fits of `StreamlineTractography/diffusion_image_v2` (FSL bvecs;
+  `tensor_image.dti` in value, `qball_*` in direction only);
   `diffusion_image.bvecs` has x not negated, as earlier MITK versions wrote bvecs, and read as
   FSL bvecs gives directions mirrored in x (`TensorInput_FollowsAFitOfTheTestDwi`).
 - `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
