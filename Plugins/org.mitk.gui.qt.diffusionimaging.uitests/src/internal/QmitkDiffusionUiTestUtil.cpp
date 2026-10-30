@@ -73,9 +73,15 @@ QWidget *QmitkDiffusionUiTest::ShowView(const QString &viewId, const QString &co
 void QmitkDiffusionUiTest::HideView(const QString &viewId)
 {
   auto page = GetPage();
-  auto part = page->FindView(viewId);
-  if (part.IsNotNull())
-    page->HideView(part);
+  // The part is released before events are processed: BlueBerry holds a closed view only until
+  // HideView returns, so in the Workbench the view goes right after its widgets. Held across the
+  // wait, the helper alone would keep a view without widgets alive while timers and queued
+  // signals run.
+  {
+    auto part = page->FindView(viewId);
+    if (part.IsNotNull())
+      page->HideView(part);
+  }
   Wait(50);
 }
 
