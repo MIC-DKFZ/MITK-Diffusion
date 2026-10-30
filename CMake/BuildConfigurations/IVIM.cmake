@@ -7,14 +7,19 @@ message(STATUS "Configuring MITK IVIM Build")
 set(MITK_USE_Python3 ON CACHE BOOL "" FORCE)
 set(MITK_USE_pybind11 ON CACHE BOOL "" FORCE)
 
-# modules
+# modules; DiffusionModelling, FiberBundle and FiberProcessing for the fiber processing views
+set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_IVIM ON CACHE BOOL "" FORCE)
 
 # cmdapps
 set(BUILD_DiffusionIVIMCmdApps ON CACHE BOOL "" FORCE)
 
 # plugins
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.controls" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.fiberprocessing" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.ivim" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.preprocessing" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.segmentation" ON CACHE BOOL "" FORCE)
