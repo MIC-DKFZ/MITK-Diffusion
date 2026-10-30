@@ -17,6 +17,12 @@ foreach(_group_app
   endif()
 endforeach()
 
+# Renders offscreen; skipped (exit code 77) where no OpenGL context can be created.
+set(MODULE_RENDERING_TESTS)
+if(TARGET MitkFiberScreenshot)
+  list(APPEND MODULE_RENDERING_TESTS mitkDiffusionCmdAppsFiberScreenshotTest.cpp)
+endif()
+
 set(H_FILES
   mitkDiffusionCmdAppTestHelper.h
 )

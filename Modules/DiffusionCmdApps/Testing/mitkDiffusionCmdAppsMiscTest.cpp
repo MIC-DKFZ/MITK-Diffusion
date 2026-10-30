@@ -23,7 +23,7 @@ found in the LICENSE file.
 
 using namespace mitk::CmdAppTest;
 
-/** Smoke tests of the apps in Modules/DiffusionCmdApps/Misc. */
+/** Smoke tests of the apps in Modules/DiffusionCmdApps/Misc; FiberScreenshot renders and has a test of its own. */
 class mitkDiffusionCmdAppsMiscTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionCmdAppsMiscTestSuite);
@@ -37,7 +37,6 @@ class mitkDiffusionCmdAppsMiscTestSuite : public mitk::TestFixture
   MITK_TEST(ShToOdfImage_Odfs);
   MITK_TEST(PeakExtraction_Peaks);
   MITK_TEST(DReg_SameImage_KeepsGrid);
-  MITK_TEST(FiberScreenshot_Png);
   CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -158,13 +157,6 @@ public:
     const auto gfa = Data("StreamlineTractography/gfa_image.nii.gz");
     RunOk("DReg", {"-f", gfa, "-m", gfa, "-o", "registered.nii.gz"}, dir);
     CheckSize(Load<mitk::Image>(dir, "registered.nii.gz"), 64, 64, 3);
-  }
-
-  void FiberScreenshot_Png()
-  {
-    const auto dir = WorkDir("FiberScreenshot");
-    RunOk("FiberScreenshot", {"-i", Data("fiberBundleX.fib"), "-o", "shot.png"}, dir);
-    CPPUNIT_ASSERT(std::filesystem::file_size(Path(dir, "shot.png")) > 0);
   }
 };
 
