@@ -50,6 +50,7 @@ class QmitkReconstructionViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Tensor_Reconstruct_ButtonsDisabledWhileRunningThenTensorNode);
   CPPUNIT_TEST(Tensor_ThresholdPreview_OverlayUntilDeactivated);
   CPPUNIT_TEST(Tensor_TensorsToDwiAndOdf_GiveDwiAndOdfNodes);
+  CPPUNIT_TEST(Tensor_ViewClosedWhileRunning_ResultDropped);
   CPPUNIT_TEST(Qball_ShellBoxesAndSingleShellMethodOnMultiShell_Refused);
   CPPUNIT_TEST(Qball_StandardOnSingleShell_GivesShAndSampledOdf);
   CPPUNIT_TEST(Qball_MultiShellWithoutShells_Refused);
@@ -177,6 +178,23 @@ public:
     toOdf->click();
     auto odfs = WaitForNode("tensorImage_Odf");
     CPPUNIT_ASSERT_EQUAL(std::string("OdfImage"), std::string(odfs->GetData()->GetNameOfClass()));
+  }
+
+  void Tensor_ViewClosedWhileRunning_ResultDropped()
+  {
+    auto dwi = Load("ImageReconstruction/test.dwi");
+    auto *view = ShowView(TensorId, "QmitkTensorReconstructionViewControls");
+    Choose(view, "m_DwiBox", dwi);
+    GetChild<QCommandLinkButton>(view, "m_StartReconstruction")->click();
+    HideView(TensorId);
+
+    // The worker ends on its own; with the view gone its result is dropped, without a crash.
+    Wait(2000);
+    CPPUNIT_ASSERT(GetNodesOfClass("TensorImage").empty());
+    view = ShowView(TensorId, "QmitkTensorReconstructionViewControls");
+    Choose(view, "m_DwiBox", dwi);
+    GetChild<QCommandLinkButton>(view, "m_StartReconstruction")->click();
+    WaitForNode("test_LinearLeastSquares_DT");
   }
 
   void Qball_ShellBoxesAndSingleShellMethodOnMultiShell_Refused()

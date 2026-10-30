@@ -137,7 +137,7 @@ template <typename Work>
 void QmitkDiffusionQuantificationView::RunInBackground(Work work, mitk::DataNode::Pointer node, const std::string &suffix, double level, double window)
 {
   QmitkReconstructionResults::RunInBackground(
-    this, m_Busy, [this]() { this->UpdateGui(); }, "Computation not possible:", std::move(work),
+    m_Controls->m_ImageBox, m_Busy, [this]() { this->UpdateGui(); }, "Computation not possible:", std::move(work),
     [this, node, suffix, level, window](mitk::Image::Pointer image) {
       auto result = ResultNode(image, node, suffix);
       ShowAsIndexMap(result, level, window);

@@ -94,7 +94,7 @@ void QmitkQBallReconstructionView::CreateConnections()
 template <typename Work, typename Done>
 void QmitkQBallReconstructionView::RunInBackground(const char *title, Work work, Done done)
 {
-  QmitkReconstructionResults::RunInBackground(this, m_Busy, [this]() { this->UpdateGui(); }, title, std::move(work), std::move(done));
+  QmitkReconstructionResults::RunInBackground(m_Controls->m_ImageBox, m_Busy, [this]() { this->UpdateGui(); }, title, std::move(work), std::move(done));
 }
 
 void QmitkQBallReconstructionView::ConvertShImage()

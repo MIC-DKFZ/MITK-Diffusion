@@ -24,6 +24,7 @@ found in the LICENSE file.
 #include <QFutureWatcher>
 #include <QMessageBox>
 #include <QtConcurrentRun>
+#include <QWidget>
 
 #include <exception>
 #include <string>
@@ -93,13 +94,14 @@ namespace QmitkReconstructionResults
    * the start buttons. work must neither touch widgets nor the data storage, and holds its own
    * (const) smart pointers to its input, since nodes may be removed while it runs; reading through
    * a const image takes a read accessor, which does not block rendering. The watcher is a child of
-   * context: once the view is gone, nothing else is called and the result is dropped. Nothing
+   * context, a widget of the view: BlueBerry deletes the widgets of a closed view before the view,
+   * so once they are gone, nothing else is called and the result is dropped. Nothing
    * cancels work (the filters cannot be interrupted): it keeps its pool thread busy until it ends,
    * also after the view was closed, and quitting the application waits for it, because Qt waits
    * for its global thread pool on exit.
    */
   template <typename Update, typename Work, typename Done>
-  void RunInBackground(QObject *context, bool &busy, Update update, const char *title, Work work, Done done)
+  void RunInBackground(QWidget *context, bool &busy, Update update, const char *title, Work work, Done done)
   {
     using Result = std::invoke_result_t<Work &>;
     struct Outcome

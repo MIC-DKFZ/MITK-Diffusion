@@ -65,7 +65,7 @@ void QmitkOdfMaximaExtractionView::CreateQtPartControl(QWidget *parent)
 template <typename Work, typename Done>
 void QmitkOdfMaximaExtractionView::RunInBackground(const char *title, Work work, Done done)
 {
-  QmitkReconstructionResults::RunInBackground(this, m_Busy, [this]() { this->OnImageSelectionChanged(); }, title, std::move(work), std::move(done));
+  QmitkReconstructionResults::RunInBackground(m_Controls->m_ImageBox, m_Busy, [this]() { this->OnImageSelectionChanged(); }, title, std::move(work), std::move(done));
 }
 
 void QmitkOdfMaximaExtractionView::StartPeakExtraction()
