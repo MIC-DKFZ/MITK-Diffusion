@@ -18,6 +18,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkReconstructionResults.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <QCheckBox>
 
 #include <mitkDiffusionModellingHelperFunctions.h>
@@ -61,6 +63,7 @@ void QmitkQBallReconstructionView::CreateQtPartControl(QWidget *parent)
   if (!m_Controls)
   {
     m_Controls = new Ui::QmitkQBallReconstructionViewControls;
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi(parent);
     this->CreateConnections();
 

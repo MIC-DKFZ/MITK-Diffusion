@@ -112,6 +112,9 @@ namespace QmitkDiffusionUiTest
     /** Texts (title and text) of the message boxes closed since the last call. */
     QStringList TakeMessages();
 
+    /** The same, without clearing them. */
+    QStringList PeekMessages() const;
+
   private:
     DialogHandler() = default;
     void HandleModalWidget();

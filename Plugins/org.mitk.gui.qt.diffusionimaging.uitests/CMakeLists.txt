@@ -69,4 +69,5 @@ endfunction()
 
 if(BUILD_TESTING)
   mitk_diffusion_add_ui_test(Controls org.mitk.gui.qt.diffusionimaging.controls)
+  mitk_diffusion_add_ui_test(Reconstruction org.mitk.gui.qt.diffusionimaging.reconstruction)
 endif()

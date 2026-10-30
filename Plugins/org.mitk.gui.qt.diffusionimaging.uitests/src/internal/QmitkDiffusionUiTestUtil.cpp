@@ -249,6 +249,11 @@ QStringList QmitkDiffusionUiTest::DialogHandler::TakeMessages()
   return messages;
 }
 
+QStringList QmitkDiffusionUiTest::DialogHandler::PeekMessages() const
+{
+  return m_Messages;
+}
+
 void QmitkDiffusionUiTest::DialogHandler::HandleModalWidget()
 {
   // An answer may process events (file dialog), which runs this timer again.

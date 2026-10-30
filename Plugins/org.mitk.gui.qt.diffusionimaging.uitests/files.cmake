@@ -8,6 +8,7 @@ set(INTERNAL_CPP_FILES
   QmitkDiffusionUiTestUtil.cpp
 
   QmitkControlsViewsUiTest.cpp
+  QmitkReconstructionViewsUiTest.cpp
 )
 
 set(MOC_H_FILES
