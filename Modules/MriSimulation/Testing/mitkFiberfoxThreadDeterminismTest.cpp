@@ -24,6 +24,8 @@ found in the LICENSE file.
 #include <functional>
 #include <mitkRawShModel.h>
 #include <mitkAstroStickModel.h>
+#include <mitkBallModel.h>
+#include <cmath>
 
 namespace
 {
@@ -53,6 +55,7 @@ class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
   MITK_TEST(Param3);
   MITK_TEST(Param6);
   MITK_TEST(Param1TimeSegments);
+  MITK_TEST(TimeSegmentsInSliceThreads);
   MITK_TEST(RandomFiberModels);
   MITK_TEST(NoiseModelsFollowSeed);
   MITK_TEST(ExceptionInFiberLoop);
@@ -170,6 +173,83 @@ public:
     {
       parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
     });
+  }
+
+  /**
+   * With fewer volumes than threads the slice jobs get several work units, and the setup of the time
+   * segments (fit, residual check, interpolators, transforms) runs in them. The other cases have 7
+   * volumes, so up to 8 threads every slice job has one work unit. Here one volume of a 48x48 image of
+   * two slices (input-image mode, no fibers) with a field map and eddy currents is acquired at 1 and at
+   * 8 threads, where its slices get 8 work units each.
+   */
+  void TimeSegmentsInSliceThreads()
+  {
+    const int n = 48;
+    auto image = DwiType::New();
+    itk::ImageRegion<3> region;
+    region.SetSize(0, n);
+    region.SetSize(1, n);
+    region.SetSize(2, 2);
+    image->SetRegions(region);
+    itk::Vector<double, 3> spacing;
+    spacing.Fill(2.0);
+    image->SetSpacing(spacing);
+    image->SetVectorLength(1);
+    image->Allocate();
+    auto fmap = itk::Image<float, 3>::New();
+    fmap->SetRegions(region);
+    fmap->SetSpacing(spacing);
+    fmap->Allocate();
+    for (int z = 0; z < 2; ++z)
+      for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x)
+        {
+          const double dx = (x - 0.5 * n) / (0.4 * n), dy = (y - 0.52 * n) / (0.45 * n);
+          DwiType::PixelType pixel(1);
+          pixel[0] = static_cast<short>(dx * dx + dy * dy < 1 ? 300 + 200 * std::cos(0.4 * x) * std::sin(0.3 * y) + 50 * z : 0);
+          image->SetPixel({{x, y, z}}, pixel);
+          const double bx = x - 0.62 * n, by = y - 0.3 * n, sigma = 0.12 * n;
+          fmap->SetPixel({{x, y, z}}, static_cast<float>(150 * std::exp(-(bx * bx + by * by) / (2 * sigma * sigma)) - 30 + 20 * z));
+        }
+
+    mitk::FiberfoxParameters parameters;
+    parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
+    parameters.m_SignalGen.m_SignalScale = 1;
+    parameters.m_SignalGen.m_ImageRegion = region;
+    parameters.m_SignalGen.m_ImageSpacing = spacing;
+    parameters.m_SignalGen.m_ImageOrigin = image->GetOrigin();
+    parameters.m_SignalGen.m_ImageDirection = image->GetDirection();
+    parameters.m_Misc.m_OutputPath = "";  // no log file
+    parameters.m_NonFiberModelList.push_back(new mitk::BallModel<double>());
+    mitk::SignalGenerationParameters::GradientListType gradients(1);
+    gradients[0][0] = 0.6;
+    gradients[0][1] = 0.8;
+    parameters.SetGradienDirections(gradients);
+    parameters.m_Misc.m_DoAddDistortions = true;
+    parameters.m_SignalGen.m_FrequencyMap = fmap;
+    parameters.m_Misc.m_DoAddEddyCurrents = true;
+    parameters.m_SignalGen.m_EddyStrength = 0.02;
+    parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+
+    std::vector<FilterType::Pointer> filters;
+    for (int threads : {1, 8})
+    {
+      m_Threads->SetNumberOfThreads(threads);
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetInputImage(image);
+      filter->Update();
+      const std::string log = filter->GetStatusText();
+      CPPUNIT_ASSERT_MESSAGE("time segments used", log.find("exact sum in") == std::string::npos);
+      CPPUNIT_ASSERT_MESSAGE("work units per slice job", log.find("Threads per slice: " + std::to_string(threads)) != std::string::npos);
+      filters.push_back(filter);
+    }
+    const auto& reference = filters[0];
+    const auto& test = filters[1];
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("output at 8 threads equals the 1-thread output", 0ul, CountDifferences<DwiType>(test->GetOutput(), reference->GetOutput()));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("coil image, real part", 0ul, CountDifferences<DoubleDwiType>(test->GetOutputImagesReal()[0], reference->GetOutputImagesReal()[0]));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("coil image, imaginary part", 0ul, CountDifferences<DoubleDwiType>(test->GetOutputImagesImag()[0], reference->GetOutputImagesImag()[0]));
   }
 
   /** Fiber compartments that draw random numbers: prototype kernels and randomized astrosticks. */
