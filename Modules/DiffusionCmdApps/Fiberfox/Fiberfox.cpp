@@ -92,6 +92,17 @@ static int RunFiberfox(int argc, char* argv[])
     }
     parameters.m_SignalGen.m_KspaceTimeSegments = segments;
   }
+  // the parameter file can choose the approximation without a flag, so name the k-space path in the log
+  if (parameters.m_SignalGen.m_SimulateKspaceAcquisition && (parameters.m_Misc.m_DoAddDistortions || parameters.m_Misc.m_DoAddEddyCurrents))
+  {
+    const int segments = parameters.m_SignalGen.m_KspaceTimeSegments;
+    if (segments == 0)
+      MITK_INFO << "Phase of distortions and eddy currents: exact sum (--fast_kspace approximates it much faster)";
+    else if (segments < 0)
+      MITK_INFO << "Phase of distortions and eddy currents: time segments, count per slice from the phase spread";
+    else
+      MITK_INFO << "Phase of distortions and eddy currents: " << segments << " time segments";
+  }
   // refuse TI >= TR before the fibers are loaded
   parameters.m_SignalGen.CheckInversionTime();
 
