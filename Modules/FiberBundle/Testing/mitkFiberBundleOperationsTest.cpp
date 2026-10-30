@@ -1068,8 +1068,9 @@ public:
 
   void Compress_SyntheticFibers_RemovesOnlyPointsWithinTheError()
   {
-    // A point is removed while its distance from the line through its kept neighbours is below
-    // the error: collinear points and a 0.05 mm wobble go, corners and a 1 mm zigzag stay.
+    // A point is removed while it and the points removed between its kept neighbours stay below
+    // the error from the segment joining them: collinear points and a 0.05 mm wobble go, corners
+    // and a 1 mm zigzag stay.
     auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}, {4, 0, 0}, {5, 0, 0}},
                            {{0, 5, 0}, {1, 5, 0}, {2, 5, 0}, {2, 6, 0}, {2, 7, 0}, {2, 8, 0}},
                            {{0, 10, 0}, {1, 11, 0}, {2, 10, 0}, {3, 11, 0}, {4, 10, 0}},

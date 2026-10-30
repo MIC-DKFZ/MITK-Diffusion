@@ -137,11 +137,12 @@ void mitk::FiberBundle::Compress(float error)
         vertices.push_back(candV);
       }
 
-      // Removes, one at a time, the inner point whose distance to the segment between its kept
-      // neighbours is smallest (the lowest index among equal distances), until no distance is below
-      // the error. Kept points form a linked list, and the candidates wait in a heap ordered by
-      // (distance, index): a removal changes only the distances of its two neighbours, so each
-      // removal costs O(log n) instead of a scan of the whole fiber.
+      // Removes, one at a time, the inner point whose removal costs least (the lowest index among
+      // equal costs), until every cost is at least the error. The cost of a point is the largest
+      // distance of the original points between its kept neighbours (itself and those removed
+      // before) from the segment joining the neighbours, so every original point stays within the
+      // error of the compressed fiber. Kept points form a linked list, and the candidates wait in a
+      // heap ordered by (cost, index): a removal changes only the costs of its two neighbours.
       const std::size_t numPoints = vertices.size();
       std::vector< std::size_t > prev(numPoints), next(numPoints);
       for (std::size_t j=0; j<numPoints; ++j)
@@ -152,17 +153,20 @@ void mitk::FiberBundle::Compress(float error)
       std::vector< bool > removed(numPoints, false);
       std::vector< unsigned int > version(numPoints, 0);
 
-      // height of the triangle (pred, cand, succ) over the side pred-succ (Heron's formula)
       auto distanceToChord = [&](std::size_t j)
       {
-        const vnl_vector_fixed< double, 3 >& candV = vertices[j];
         const vnl_vector_fixed< double, 3 >& pred = vertices[prev[j]];
         const vnl_vector_fixed< double, 3 >& succ = vertices[next[j]];
-        double a = (candV-pred).magnitude();
-        double b = (candV-succ).magnitude();
-        double c = (pred-succ).magnitude();
-        double s=0.5*(a+b+c);
-        return (2.0/c)*sqrt(fabs(s*(s-a)*(s-b)*(s-c)));
+        const vnl_vector_fixed< double, 3 > chord = succ-pred;
+        const double length2 = chord.squared_magnitude();
+        double largest = 0;
+        for (std::size_t k=prev[j]+1; k<next[j]; ++k)
+        {
+          const vnl_vector_fixed< double, 3 > offset = vertices[k]-pred;
+          const double t = length2>0 ? std::clamp(dot_product(offset, chord)/length2, 0.0, 1.0) : 0.0;
+          largest = std::max(largest, (offset-t*chord).magnitude());
+        }
+        return largest;
       };
 
       struct Candidate
@@ -176,7 +180,7 @@ void mitk::FiberBundle::Compress(float error)
         }
       };
       std::priority_queue< Candidate, std::vector<Candidate>, std::greater<Candidate> > candidates;
-      // NaN (coinciding neighbours) and distances from the error on are never removed.
+      // Costs from the error on are never removed.
       auto pushIfBelowError = [&](std::size_t j)
       {
         const double hc = distanceToChord(j);

@@ -172,7 +172,8 @@ public:
 
         mitk::FiberBundle::Pointer fib = original->Clone();
         fib->Compress(0.1f);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/modify_compress.fib"));
+        // _v2: Compress bounds every removed point, not only each point at its removal.
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/modify_compress_v2.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
