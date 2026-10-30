@@ -81,7 +81,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(FilterByWeights_BothDirections_SplitAtThreshold);
   MITK_TEST(AddBundles_EqualsRepeatedAddBundle);
   MITK_TEST(RotateAroundAxis_EqualsTransformFibersWithoutTranslation);
-  MITK_TEST(GetDeepCopy_KeepsDataAndIsIndependent);
+  MITK_TEST(Clone_KeepsDataAndIsIndependent);
   MITK_TEST(EmptyBundle_EveryOperation_StaysEmpty);
   MITK_TEST(ResampleLinear_SyntheticFibers_EqualChordSpacingOnTheFiber);
   MITK_TEST(ResampleSpline_StraightFiber_PointsOnTheLine);
@@ -313,26 +313,26 @@ public:
     auto source = LoadWeightedFibers();
     const float medianLength = source->GetMedianFiberLength();
 
-    auto fib = source->GetDeepCopy();
+    auto fib = source->Clone();
     CPPUNIT_ASSERT(fib->RemoveShortFibers(medianLength));
     CPPUNIT_ASSERT(fib->GetNumFibers() < source->GetNumFibers());
     AssertWeightsFollowFibers(source, fib, "RemoveShortFibers");
 
-    fib = source->GetDeepCopy();
+    fib = source->Clone();
     CPPUNIT_ASSERT(fib->RemoveLongFibers(medianLength));
     CPPUNIT_ASSERT(fib->GetNumFibers() < source->GetNumFibers());
     AssertWeightsFollowFibers(source, fib, "RemoveLongFibers");
 
-    fib = source->GetDeepCopy();
+    fib = source->Clone();
     vnl_vector_fixed<double, 3> dir(0.0, 1.0, 0.0);
     fib->RemoveDir(dir, std::cos(5.0 * itk::Math::pi / 180));
     AssertWeightsFollowFibers(source, fib, "RemoveDir");
 
-    fib = source->GetDeepCopy();
+    fib = source->Clone();
     CPPUNIT_ASSERT(fib->ApplyCurvatureThreshold(5.0f, false));
     AssertWeightsFollowFibers(source, fib, "ApplyCurvatureThreshold");
 
-    auto shortFibers = source->GetDeepCopy();
+    auto shortFibers = source->Clone();
     shortFibers->RemoveLongFibers(medianLength);
     auto subtracted = source->SubtractBundle(shortFibers);
     CPPUNIT_ASSERT(subtracted->GetNumFibers() < source->GetNumFibers());
@@ -350,18 +350,18 @@ public:
   void CompressAndSubtract_EightThreads_EqualOneThread()
   {
     auto source = LoadWeightedFibers();
-    auto shortFibers = source->GetDeepCopy();
+    auto shortFibers = source->Clone();
     shortFibers->RemoveLongFibers(source->GetMedianFiberLength());
 
     mitk::OmpThreadGuard threads(1);
-    auto compressedSingle = source->GetDeepCopy();
+    auto compressedSingle = source->Clone();
     compressedSingle->Compress(0.1f);
     auto subtractedSingle = source->SubtractBundle(shortFibers);
 
     threads.SetNumberOfThreads(8);
     for (int run = 0; run < 3; ++run)
     {
-      auto compressed = source->GetDeepCopy();
+      auto compressed = source->Clone();
       compressed->Compress(0.1f);
       AssertIdentical(compressedSingle, compressed, "Compress, run " + std::to_string(run));
       AssertIdentical(subtractedSingle, source->SubtractBundle(shortFibers), "SubtractBundle, run " + std::to_string(run));
@@ -427,7 +427,7 @@ public:
     header.voxel_size[0] = 1.25f;
     source->SetTrackVisHeader(header);
     auto other = LoadWeightedFibers();
-    auto shortFibers = source->GetDeepCopy();
+    auto shortFibers = source->Clone();
     shortFibers->RemoveLongFibers(source->GetMedianFiberLength());
 
     auto check = [](mitk::FiberBundle *fib, const std::string &operation)
@@ -436,7 +436,7 @@ public:
       CPPUNIT_ASSERT_EQUAL_MESSAGE(operation, 77, static_cast<int>(fib->GetTrackVisHeader().dim[0]));
       CPPUNIT_ASSERT_EQUAL_MESSAGE(operation, 1.25f, fib->GetTrackVisHeader().voxel_size[0]);
     };
-    check(source->GetDeepCopy(), "GetDeepCopy");
+    check(source->Clone(), "Clone");
     check(source->AddBundle(other), "AddBundle");
     check(source->AddBundles({other}), "AddBundles");
     check(source->SubtractBundle(shortFibers), "SubtractBundle");
@@ -574,7 +574,7 @@ public:
     }
     CPPUNIT_ASSERT(found);
     // a copy can take the colours over
-    CPPUNIT_ASSERT(fib->GetDeepCopy().IsNotNull());
+    CPPUNIT_ASSERT(fib->Clone().IsNotNull());
   }
 
   void ColorFibersByCurvature_UsesFirstSegment()
@@ -594,7 +594,7 @@ public:
   void ResampleLinear_NoStep_LeavesFibersUnchanged()
   {
     auto fib = LoadFibers("FiberProcessing/original.fib");
-    auto copy = fib->GetDeepCopy();
+    auto copy = fib->Clone();
     fib->ResampleLinear(0.0);
     CPPUNIT_ASSERT(copy->Equals(fib, 0.0));
   }
@@ -746,7 +746,7 @@ public:
   void ResampleToNumPoints_RealFibers_GiveNPointsAndKeepEndpoints()
   {
     auto source = LoadWeightedFibers();
-    auto fib = source->GetDeepCopy();
+    auto fib = source->Clone();
     fib->ResampleToNumPoints(12);
     CPPUNIT_ASSERT_EQUAL(source->GetNumFibers(), fib->GetNumFibers());
     for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
@@ -797,7 +797,7 @@ public:
   void RotateAroundAxis_EqualsTransformFibersWithoutTranslation()
   {
     auto rotated = LoadWeightedFibers();
-    auto transformed = rotated->GetDeepCopy();
+    auto transformed = rotated->Clone();
     const auto colours = rotated->GetFiberColors();
     std::vector<unsigned char> before(colours->GetPointer(0), colours->GetPointer(0) + colours->GetNumberOfValues());
     rotated->RotateAroundAxis(10, 20, 30);
@@ -812,7 +812,7 @@ public:
       CPPUNIT_ASSERT_EQUAL(before[i], after->GetValue(i));
   }
 
-  void GetDeepCopy_KeepsDataAndIsIndependent()
+  void Clone_KeepsDataAndIsIndependent()
   {
     auto fib = LoadWeightedFibers();
     fib->ColorFibersByLength(false, false, mitk::LookupTable::JET);
@@ -821,9 +821,9 @@ public:
     header.dim[1] = 55;
     fib->SetTrackVisHeader(header);
 
-    auto copy = fib->GetDeepCopy();
+    auto copy = fib->Clone();
     CPPUNIT_ASSERT(copy->GetFiberPolyData().GetPointer() != fib->GetFiberPolyData().GetPointer());
-    AssertIdentical(fib, copy, "GetDeepCopy");
+    AssertIdentical(fib, copy, "Clone");
     CPPUNIT_ASSERT_EQUAL(fib->GetFiberColors()->GetNumberOfValues(), copy->GetFiberColors()->GetNumberOfValues());
     for (vtkIdType i = 0; i < fib->GetFiberColors()->GetNumberOfValues(); ++i)
       CPPUNIT_ASSERT_EQUAL(fib->GetFiberColors()->GetValue(i), copy->GetFiberColors()->GetValue(i));
@@ -872,7 +872,7 @@ public:
     check(fib->AddBundle(empty()), "AddBundle");
     check(fib->AddBundles({empty(), empty()}), "AddBundles");
     check(fib->SubtractBundle(empty()), "SubtractBundle");
-    check(fib->GetDeepCopy(), "GetDeepCopy");
+    check(fib->Clone(), "Clone");
     fib->ColorFibersByLength(true, true, mitk::LookupTable::JET);
     fib->ColorFibersByCurvature(true, true, mitk::LookupTable::JET);
     fib->ColorFibersByFiberWeights(true, mitk::LookupTable::JET);
@@ -1164,7 +1164,7 @@ public:
   void ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat()
   {
     auto fromShort = MakeBundle({{{0.5, 0, 0}, {1.0, 0, 0}, {1.5, 0, 0}}});
-    auto fromFloat = fromShort->GetDeepCopy();
+    auto fromFloat = fromShort->Clone();
     fromShort->ColorFibersByScalarMap(EdgeImage<short>(), true, true, mitk::LookupTable::JET, 1.0, true);
     fromFloat->ColorFibersByScalarMap(EdgeImage<float>(), true, true, mitk::LookupTable::JET, 1.0, true);
 
@@ -1182,7 +1182,7 @@ public:
   void TransformFibers_ItkTransform_MovesEveryPoint()
   {
     auto source = LoadWeightedFibers();
-    auto fib = source->GetDeepCopy();
+    auto fib = source->Clone();
     auto transform = itk::ScalableAffineTransform<mitk::ScalarType>::New();
     itk::ScalableAffineTransform<mitk::ScalarType>::OutputVectorType axis;
     axis[0] = 0.2;
@@ -1250,14 +1250,14 @@ public:
     AssertHeaderContainsAllPoints(a->AddBundle(b), "AddBundle");
     AssertHeaderContainsAllPoints(b->AddBundles({a}), "AddBundles");
 
-    auto moved = a->GetDeepCopy();
+    auto moved = a->Clone();
     moved->TranslateFibers(100, 0, 0);
     AssertHeaderContainsAllPoints(moved, "TranslateFibers");
     moved->RotateAroundAxis(0, 0, 90);
     AssertHeaderContainsAllPoints(moved, "RotateAroundAxis");
 
     // The first bundle with fibers gives the join its coordinate convention and a set header
-    auto withReference = a->GetDeepCopy();
+    auto withReference = a->Clone();
     withReference->setIsRAS(true);
     auto header = withReference->GetTrackVisHeader();
     header.dim[0] = 77;
@@ -1317,7 +1317,7 @@ public:
     auto resampled = MakeBundle({{{0, 0, 0}, {0, 3, 0}}, {{7, 7, 7}, {7, 7, 7}}});
     resampled->SetFiberWeight(0, 5.0f);
     resampled->SetFiberWeight(1, 6.0f);
-    auto source = resampled->GetDeepCopy();
+    auto source = resampled->Clone();
     resampled->ResampleLinear(1);
     AssertWeightsByFirstPoint({source}, resampled, "ResampleLinear");
   }

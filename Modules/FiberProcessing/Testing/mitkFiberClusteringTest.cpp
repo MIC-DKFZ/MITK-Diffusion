@@ -613,7 +613,7 @@ public:
     using namespace mitk::FiberProcessingTestHelper;
     auto plain = TwoGroups();
     plain = plain->AddBundle(CreateBundle({Line({0, 200, 0}, {50, 200, 0}, 20)}));
-    auto withMetadata = plain->GetDeepCopy();
+    auto withMetadata = plain->Clone();
     SetMetadata(withMetadata);
     auto centroids = CreateBundle({Line({0, 40.5, 0}, {50, 40.5, 0}, 12), Line({50, 0.5, 0}, {0, 0.5, 0}, 12)});
 
