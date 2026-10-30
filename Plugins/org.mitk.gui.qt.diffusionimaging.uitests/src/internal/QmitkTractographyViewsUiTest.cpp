@@ -84,12 +84,15 @@ class QmitkTractographyViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Gibbs_ProbabilityMapAndSegmentation_OfferedAndUsedAsMask);
   CPPUNIT_TEST(Gibbs_StopDuringWeightEstimation_RunEnds);
   CPPUNIT_TEST(Gibbs_ParameterFileNoFibersReadOnlyFolder_LabelsAndMessages);
+  // Last: it leaves its views, data and runs to the harness, which then quits the Workbench.
+  CPPUNIT_TEST(Quit_WhileTrackingRuns_NoCrash);
   CPPUNIT_TEST_SUITE_END();
 
   static constexpr const char *StreamlineId = "org.mitk.views.streamlinetracking";
   static constexpr const char *GibbsId = "org.mitk.views.gibbstracking";
 
   std::string m_TempDir;
+  bool m_LeaveForQuit = false;
 
   static mitk::DataNode::Pointer LoadWithReader(const std::string &file, const std::string &reader)
   {
@@ -253,10 +256,13 @@ public:
 
   void tearDown() override
   {
-    HideView(StreamlineId);
-    HideView(GibbsId);
-    ClearDataStorage();
-    DialogHandler::Instance().TakeMessages();
+    if (!m_LeaveForQuit)
+    {
+      HideView(StreamlineId);
+      HideView(GibbsId);
+      ClearDataStorage();
+      DialogHandler::Instance().TakeMessages();
+    }
     std::filesystem::remove_all(m_TempDir);
   }
 
@@ -1009,6 +1015,35 @@ public:
     std::filesystem::permissions(readOnly, std::filesystem::perms::owner_all);
     messages = DialogHandler::Instance().TakeMessages();
     CPPUNIT_ASSERT(messages.size() == 1 && messages.front().contains("Could not save the parameters"));
+  }
+
+  /**
+   * Quitting the Workbench while Gibbs and streamline tracking run, with their views open and
+   * their input loaded: the case leaves everything as it is, and the harness closes the
+   * Workbench after it (IWorkbench::Close, as File > Exit does). The Gibbs run is past its first
+   * monitor update. A crash fails the suite.
+   */
+  void Quit_WhileTrackingRuns_NoCrash()
+  {
+    m_LeaveForQuit = true;
+    auto odfs = Load("StreamlineTractography/qball_image.qbi");
+    auto tensors = Load("StreamlineTractography/tensor_image.dti");
+    auto *gibbs = ShowGibbs();
+    GetChild<QLineEdit>(gibbs, "m_IterationsBox")->setText("100000000");
+    // A fixed particle weight spares the estimation, so the tracking itself runs.
+    GetChild<QSlider>(gibbs, "m_ParticleWeightSlider")->setValue(3);
+    ChooseNode(gibbs, "m_InputImageBox", odfs);
+    GetChild<QCommandLinkButton>(gibbs, "m_TrackingStart")->click();
+    Wait(1500);
+
+    auto *streamline = ShowStreamline();
+    Select({tensors});
+    GetChild<QComboBox>(streamline, "m_ModeBox")->setCurrentIndex(1);
+    GetChild<QSpinBox>(streamline, "m_SeedsPerVoxelBox")->setValue(20);
+    GetChild<QSpinBox>(streamline, "m_NumFibersBox")->setValue(-1);
+    auto *streamlineStart = GetChild<QCommandLinkButton>(streamline, "commandLinkButton");
+    streamlineStart->click();
+    CPPUNIT_ASSERT(GetChild<QCommandLinkButton>(gibbs, "m_TrackingStop")->isEnabled() && streamlineStart->isHidden());
   }
 };
 

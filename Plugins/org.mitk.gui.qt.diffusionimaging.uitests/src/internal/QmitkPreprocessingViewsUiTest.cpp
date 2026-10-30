@@ -42,6 +42,8 @@ class QmitkPreprocessingViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Preprocessing_HeaderOfTimeSeries_EveryTimeStep);
   CPPUNIT_TEST(HeadMotion_ViewClosedWhileRunning_NoCrash);
   CPPUNIT_TEST(SimpleRegistration_Rigid_RegisteredImage);
+  // Last: it leaves its views, data and runs to the harness, which then quits the Workbench.
+  CPPUNIT_TEST(Quit_WhileCorrectionAndDenoisingRun_NoCrash);
   CPPUNIT_TEST_SUITE_END();
 
   static constexpr const char *DenoisingId = "org.mitk.views.denoisingview";
@@ -55,9 +57,13 @@ class QmitkPreprocessingViewsUiTest : public CppUnit::TestFixture
                            WaitFor([&node, count]() { return GetDataStorage()->GetDerivations(node)->Size() >= count; }, 300000));
   }
 
+  bool m_LeaveForQuit = false;
+
 public:
   void tearDown() override
   {
+    if (m_LeaveForQuit)
+      return;
     for (const auto *id : {DenoisingId, PreprocessingId, HeadMotionId, RegistrationId})
       HideView(id);
     ClearDataStorage();
@@ -196,6 +202,26 @@ public:
       return GetDataStorage()->GetNamedNode(moving->GetName() + "_registered (rigid)") != nullptr
           || GetDataStorage()->GetNamedNode(moving->GetName() + "_registered (affine)") != nullptr;
     }, 300000));
+  }
+
+  /**
+   * Quitting the Workbench while the head-motion correction and the denoising run, with their
+   * views open and the DWI in their boxes: the case leaves everything as it is, and the harness
+   * closes the Workbench after it (IWorkbench::Close, as File > Exit does). A crash fails the
+   * suite.
+   */
+  void Quit_WhileCorrectionAndDenoisingRun_NoCrash()
+  {
+    m_LeaveForQuit = true;
+    auto dwi = Load("StreamlineTractography/diffusion_image_v2.nii.gz");
+    auto *denoising = ShowView(DenoisingId, "QmitkDenoisingViewControls");
+    ChooseNode(denoising, "m_InputImageBox", dwi);
+    GetChild<QCommandLinkButton>(denoising, "m_ApplyButton")->click();
+    auto *headMotion = ShowView(HeadMotionId, "QmitkHeadMotionCorrectionViewControls");
+    ChooseNode(headMotion, "m_ImageBox", dwi);
+    auto *start = GetChild<QCommandLinkButton>(headMotion, "m_RegistrationStartButton");
+    start->click();
+    CPPUNIT_ASSERT(!start->isEnabled());
   }
 };
 

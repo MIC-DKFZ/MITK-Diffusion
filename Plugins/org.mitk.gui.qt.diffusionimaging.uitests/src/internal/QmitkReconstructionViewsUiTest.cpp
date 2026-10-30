@@ -19,6 +19,7 @@ found in the LICENSE file.
 #include <mitkDiffusionTestData.h>
 #include <mitkIOUtil.h>
 #include <mitkImageReadAccessor.h>
+#include <mitkImageWriteAccessor.h>
 #include <mitkLevelWindowProperty.h>
 #include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
@@ -35,6 +36,7 @@ found in the LICENSE file.
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 using namespace QmitkDiffusionUiTest;
 
@@ -58,6 +60,8 @@ class QmitkReconstructionViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Quantification_TensorIndices_LevelWindowsFollowScale);
   CPPUNIT_TEST(Peaks_ShImage_NoBackgroundPeaksOnePeakAtVoxel);
   CPPUNIT_TEST(Peaks_SegmentationMask_AsBinaryUnionOtherGridMessage);
+  // Last: it leaves its views, data and runs to the harness, which then quits the Workbench.
+  CPPUNIT_TEST(Quit_WhileTensorReconstructionRuns_NoCrash);
   CPPUNIT_TEST_SUITE_END();
 
   static constexpr const char *TensorId = "org.mitk.views.tensorreconstruction";
@@ -91,6 +95,36 @@ class QmitkReconstructionViewsUiTest : public CppUnit::TestFixture
     return nodes->front();
   }
 
+  /**
+   * \brief A DWI with the gradients of dwi and its voxels repeated factor times along each axis,
+   * so that a reconstruction of it runs long enough (seconds in Debug) to be still running when
+   * the Workbench closes.
+   */
+  static mitk::DataNode::Pointer AddTiledDwi(const mitk::DataNode::Pointer &node, unsigned int factor)
+  {
+    auto *dwi = dynamic_cast<mitk::Image *>(node->GetData());
+    const unsigned int n[] = {dwi->GetDimension(0), dwi->GetDimension(1), dwi->GetDimension(2)};
+    unsigned int size[] = {n[0] * factor, n[1] * factor, n[2] * factor};
+    auto tiled = mitk::Image::New();
+    tiled->Initialize(dwi->GetPixelType(), 3, size);
+    tiled->GetGeometry()->SetSpacing(dwi->GetGeometry()->GetSpacing());
+    const std::size_t voxelBytes = dwi->GetPixelType().GetSize();
+    {
+      mitk::ImageReadAccessor inputAccess(dwi);
+      mitk::ImageWriteAccessor outputAccess(tiled);
+      auto *input = static_cast<const char *>(inputAccess.GetData());
+      auto *output = static_cast<char *>(outputAccess.GetData());
+      std::size_t v = 0;
+      for (unsigned int z = 0; z < size[2]; ++z)
+        for (unsigned int y = 0; y < size[1]; ++y)
+          for (unsigned int x = 0; x < size[0]; ++x, ++v)
+            std::memcpy(output + v * voxelBytes, input + (x % n[0] + n[0] * (y % n[1] + n[1] * (z % n[2]))) * voxelBytes, voxelBytes);
+    }
+    mitk::DiffusionPropertyHelper::CopyProperties(dwi, tiled);
+    mitk::DiffusionPropertyHelper::InitializeImage(tiled);
+    return AddNode(tiled, node->GetName() + "_tiled");
+  }
+
   static void CheckLevelWindow(const mitk::DataNode::Pointer &node, double lower, double upper)
   {
     mitk::LevelWindow levelWindow;
@@ -99,9 +133,13 @@ class QmitkReconstructionViewsUiTest : public CppUnit::TestFixture
     CPPUNIT_ASSERT_DOUBLES_EQUAL(upper, levelWindow.GetUpperWindowBound(), 1e-9);
   }
 
+  bool m_LeaveForQuit = false;
+
 public:
   void tearDown() override
   {
+    if (m_LeaveForQuit)
+      return;
     for (const auto *id : {TensorId, QballId, QuantificationId, PeaksId})
       HideView(id);
     ClearDataStorage();
@@ -369,6 +407,25 @@ public:
     Wait(200);
     CPPUNIT_ASSERT_EQUAL(qsizetype(1), DialogHandler::Instance().TakeMessages().size());
     CPPUNIT_ASSERT(GetNodesOfClass("PeakImage").empty());
+  }
+
+  /**
+   * Quitting the Workbench while the tensor reconstruction runs, with the tensor and Q-ball views
+   * open and a DWI in their boxes: the case leaves everything as it is, and the harness closes
+   * the Workbench after it (IWorkbench::Close, as File > Exit does). A crash fails the suite.
+   * The fit of the tiled DWI still runs when the Workbench closes; quitting waits for it.
+   */
+  void Quit_WhileTensorReconstructionRuns_NoCrash()
+  {
+    m_LeaveForQuit = true;
+    auto dwi = AddTiledDwi(Load("StreamlineTractography/diffusion_image_v2.nii.gz"), 3);
+    auto *qball = ShowView(QballId, "QmitkQBallReconstructionViewControls");
+    Choose(qball, "m_ImageBox", dwi);
+    auto *tensor = ShowView(TensorId, "QmitkTensorReconstructionViewControls");
+    Choose(tensor, "m_DwiBox", dwi);
+    auto *start = GetChild<QCommandLinkButton>(tensor, "m_StartReconstruction");
+    start->click();
+    CPPUNIT_ASSERT(!start->isEnabled());
   }
 };
 
