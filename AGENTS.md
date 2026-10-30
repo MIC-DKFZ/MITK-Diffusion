@@ -220,7 +220,7 @@ Facts the layout does not show:
 ## Porting state
 
 In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
-line apps, plugins, user manuals) compile and link without warnings, and all 58 diffusion tests
+line apps, plugins, user manuals) compile and link without warnings, and all 67 diffusion tests
 pass. `DiffusionRelease` is built less often; its last full build stopped at the GCC 13 warning
 named under "Facts", which is fixed but not rebuilt there. The Workbench has not been started.
 Remove an item once it is fixed.
@@ -252,7 +252,7 @@ Run from the workspace root. Both superbuild trees use Unix Makefiles; for Relea
 | `cmake debug/MITK-build` | Re-configure the inner build after editing CMake files in `mitk-diffusion/`. |
 | `cmake -DMITK_DIFFUSION_DATA_DIR=$PWD/mitk-diffusion-test-data debug` | Let the superbuild pass the workspace clone of the test data instead of cloning its own; the inner build gets it at the next superbuild, or at once with the same `-D` on `debug/MITK-build`. |
 | `ctest --test-dir debug/MITK-build -R Fiber` | Run tests matching a pattern; `-N` lists without running. Never call a test driver directly. |
-| `ctest --test-dir debug/MITK-build -R mitkDiffusionCmdApps` | Smoke tests of the command line apps, one per app group (`Modules/DiffusionCmdApps/Testing`): each app runs as a process on test-data input with output checks, a wrong call per group, and `--help` and well-formed `--xml` of every app; about a minute in Debug. |
+| `ctest --test-dir debug/MITK-build -R mitkDiffusionCmdApps` | Smoke tests of the command line apps, one per app group (`Modules/DiffusionCmdApps/Testing`): each app runs as a process on test-data input with output checks, a wrong call per group, and `--help` and well-formed `--xml` of every app; about a minute in Debug. FiberScreenshot has a test of its own, skipped (exit code 77) without an OpenGL context. Building the test driver builds the apps; each test case works in its own folder below `$TMPDIR/mitkDiffusionCmdAppTests`, so the group tests can run in parallel. |
 | `debug/MITK-build/bin/MitkWorkbench` | Start the Workbench with the diffusion plugins; command line apps are in the same `bin/`. |
 | `mitk-diffusion/.claude/scripts/configure-worktree-build.sh mitk-diffusion/.worktrees/<name> wt-build/<name>` | Configure a worktree's own build tree (about 20 s), and re-configure it after editing CMake files. Extra arguments override the initial cache, e.g. `-DMITK_BUILD_CONFIGURATION=Fiberfox` in a throwaway tree to check another configuration. Build it like `debug/MITK-build`. |
 | `mkdir -p wt-build/<name>/tmp && TMPDIR=wt-build/<name>/tmp ctest --test-dir wt-build/<name> -R Fiber` | Tests in a worktree's tree. Failing tests write to the system temp folder; a `TMPDIR` per tree keeps parallel sessions apart. |
