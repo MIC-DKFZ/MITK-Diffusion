@@ -88,6 +88,7 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ResampleToNumPoints_StraightFiber_EqualSpacing);
   MITK_TEST(ResampleToNumPoints_CurvedFibers_EqualArcLengthSpacing);
   MITK_TEST(Compress_SyntheticFibers_RemovesOnlyPointsWithinTheError);
+  MITK_TEST(Compress_Arcs_EveryPointWithinTheError);
   MITK_TEST(ApplyCurvatureThreshold_CircularArc_RadiusDecides);
   MITK_TEST(ColorFibersByOrientation_ThreePointFiber_SegmentDirections);
   MITK_TEST(ColorFibersByScalarMap_Mask_ColoursAndWeightsFromTheMask);
@@ -1085,6 +1086,63 @@ public:
     CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(3), pointsByFirstY[5]);
     CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(5), pointsByFirstY[10]);
     CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(2), pointsByFirstY[15]);
+  }
+
+  /** Distance of p from the polyline of the cell. */
+  static double DistanceToPolyline(const std::array<double, 3> &p, vtkCell *cell)
+  {
+    double best = std::numeric_limits<double>::max();
+    for (vtkIdType k = 0; k + 1 < cell->GetNumberOfPoints(); ++k)
+    {
+      double a[3], b[3];
+      cell->GetPoints()->GetPoint(k, a);
+      cell->GetPoints()->GetPoint(k + 1, b);
+      double ab[3] = {b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+      double ap[3] = {p[0] - a[0], p[1] - a[1], p[2] - a[2]};
+      const double len2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+      const double t = len2 > 0 ? std::clamp((ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / len2, 0.0, 1.0) : 0.0;
+      double d2 = 0;
+      for (int c = 0; c < 3; ++c)
+        d2 += (ap[c] - t * ab[c]) * (ap[c] - t * ab[c]);
+      best = std::min(best, std::sqrt(d2));
+    }
+    return best;
+  }
+
+  void Compress_Arcs_EveryPointWithinTheError()
+  {
+    // Arcs sampled densely, unevenly and with a spiral, so that points removed early lie between
+    // kept points that are removed later: the error bounds every original point, not only each
+    // point at its own removal.
+    std::vector<std::vector<std::array<double, 3>>> fibers;
+    for (double radius : {3.0, 10.0, 40.0})
+    {
+      std::vector<std::array<double, 3>> arc;
+      double angle = 0;
+      for (int k = 0; angle < 180; ++k)
+      {
+        arc.push_back({radius * std::cos(angle * itk::Math::pi / 180), radius * std::sin(angle * itk::Math::pi / 180), 0.02 * angle});
+        angle += (k % 3 == 0) ? 0.3 : 2.0;
+      }
+      fibers.push_back(arc);
+    }
+    auto original = MakeBundle(fibers);
+    for (float error : {0.05f, 0.1f, 0.5f})
+    {
+      auto fib = original->Clone();
+      fib->Compress(error);
+      CPPUNIT_ASSERT_EQUAL(original->GetNumFibers(), fib->GetNumFibers());
+      for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      {
+        vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+        CPPUNIT_ASSERT(cell->GetNumberOfPoints() < static_cast<vtkIdType>(fibers[i].size()));
+        double worst = 0;
+        for (const auto &p : fibers[i])
+          worst = std::max(worst, DistanceToPolyline(p, cell));
+        CPPUNIT_ASSERT_MESSAGE("error " + std::to_string(error) + ", fiber " + std::to_string(i) + ": largest distance " + std::to_string(worst),
+                               worst <= error * (1 + 1e-6));
+      }
+    }
   }
 
   void ApplyCurvatureThreshold_CircularArc_RadiusDecides()
