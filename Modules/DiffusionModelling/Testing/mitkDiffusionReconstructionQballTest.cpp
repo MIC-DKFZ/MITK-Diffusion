@@ -52,6 +52,7 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
   MITK_TEST(SingleShellFilters_ShortB0Vector_IsB0);
   MITK_TEST(AdcProfile_ShellBelowReference_GivesAdc);
   MITK_TEST(MultiShell_UnsupportedShells_Throw);
+  MITK_TEST(MultiShell_NoBValueMap_ShellsOfDwiMap);
   MITK_TEST(MultiShell_SecondUpdate_SameResult);
   MITK_TEST(MultiShell_WithoutOdf_SameCoefficients);
   MITK_TEST(MultiShell_DuplicateGradients_Warn);
@@ -154,6 +155,16 @@ class mitkDiffusionReconstructionQballTestSuite : public mitk::TestFixture
     filter->SetNormalizationMethod(AnalyticalFilterType::QBAR_STANDARD);
     filter->SetLambda(0.006);
     return filter;
+  }
+
+  /**
+   * The DWI's b-value map, as DiffusionPropertyHelper builds it, and the DWI, as the production
+   * callers (ReconstructQball, the views and apps) give them to the multi-shell filter.
+   */
+  static void SetMultiShellInput(MultiShellFilterType *filter, const Dwi &dwi, double referenceBValue)
+  {
+    filter->SetBValueMap(mitk::BValueMapProperty::CreateBValueMap(dwi.gradients, referenceBValue));
+    filter->SetGradientImage(dwi.gradients, dwi.image, referenceBValue);
   }
 
   /** The description of the exception the filter's Update() throws, empty if none. */
@@ -448,7 +459,7 @@ public:
   {
     auto dwi = Simulate(Shells(bValues));
     auto filter = MultiShellFilterType::New();
-    filter->SetGradientImage(dwi.gradients, dwi.image, ReferenceBValue);
+    SetMultiShellInput(filter, dwi, ReferenceBValue);
     filter->SetLambda(0.006);
     return UpdateError(filter.GetPointer());
   }
@@ -463,18 +474,50 @@ public:
     CPPUNIT_ASSERT_EQUAL(std::string(), MultiShellError({1000, 2000, 3000}));
   }
 
+  // Without a b-value map the filter takes the shells of the DWI's own map
+  // (BValueMapProperty::CreateBValueMap, b-values rounded to integers) instead of rounding to tens
+  // of its own. On the shells the result is the same as with the map; a volume at b = 996 next to
+  // the shells 1000, 2000 and 3000 is a fourth shell, which the method rejects with and without it.
+  void MultiShell_NoBValueMap_ShellsOfDwiMap()
+  {
+    auto gradients = Shells({1000, 2000, 3000});
+    auto onShells = Simulate(gradients);
+    auto withMap = MultiShellFilterType::New();
+    SetMultiShellInput(withMap, onShells, ReferenceBValue);
+    withMap->SetLambda(0.006);
+    withMap->Update();
+    auto withoutMap = MultiShellFilterType::New();
+    withoutMap->SetGradientImage(onShells.gradients, onShells.image, ReferenceBValue);
+    withoutMap->SetLambda(0.006);
+    withoutMap->Update();
+    CheckEqual(withMap->GetCoefficientImage().GetPointer(), withoutMap->GetCoefficientImage().GetPointer());
+
+    gradients[1] *= std::sqrt(0.996);
+    auto offShell = Simulate(gradients);
+    for (const bool passMap : {true, false})
+    {
+      auto filter = MultiShellFilterType::New();
+      if (passMap)
+        SetMultiShellInput(filter, offShell, ReferenceBValue);
+      else
+        filter->SetGradientImage(offShell.gradients, offShell.image, ReferenceBValue);
+      filter->SetLambda(0.006);
+      CPPUNIT_ASSERT_MESSAGE(passMap ? "with map" : "without map", !UpdateError(filter.GetPointer()).empty());
+    }
+  }
+
   // The first execution normalizes the filter's copy of the gradients in place and every execution
   // decides anew whether the shells need interpolation; a second Update() must take the same path.
   void MultiShell_SecondUpdate_SameResult()
   {
     auto dwi = Simulate(Shells({1000, 2000, 3000}, 3000), 3000);
     auto fresh = MultiShellFilterType::New();
-    fresh->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    SetMultiShellInput(fresh, dwi, 3000);
     fresh->SetLambda(0.006);
     fresh->Update();
 
     auto reused = MultiShellFilterType::New();
-    reused->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    SetMultiShellInput(reused, dwi, 3000);
     reused->SetLambda(0.006);
     reused->Update();
     reused->Modified();
@@ -492,7 +535,7 @@ public:
     for (bool computeOdf : {true, false})
     {
       auto filter = MultiShellFilterType::New();
-      filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+      SetMultiShellInput(filter, dwi, 3000);
       filter->SetLambda(0.006);
       filter->SetComputeOdf(computeOdf);
       filter->Update();
@@ -530,7 +573,7 @@ public:
     auto recorder = WarningRecorder::New();
     itk::OutputWindow::SetInstance(recorder);
     auto filter = MultiShellFilterType::New();
-    filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    SetMultiShellInput(filter, dwi, 3000);
     filter->SetLambda(0.006);
     const std::string error = UpdateError(filter.GetPointer());
     itk::OutputWindow::SetInstance(previous);
@@ -558,7 +601,7 @@ public:
     for (const auto &dwi : {oneB0, threeB0})
     {
       auto filter = MultiShellFilterType::New();
-      filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+      SetMultiShellInput(filter, dwi, 3000);
       filter->SetLambda(0.006);
       filter->Update();
       filters.push_back(filter);
@@ -674,7 +717,7 @@ public:
 
     auto coefficients = [](const Dwi &input) {
       auto filter = MultiShellFilterType::New();
-      filter->SetGradientImage(input.gradients, input.image, 3000);
+      SetMultiShellInput(filter, input, 3000);
       filter->SetLambda(0.006);
       filter->Update();
       const auto pixel = filter->GetCoefficientImage()->GetPixel({{0, 0, 0}});
@@ -856,7 +899,7 @@ public:
       it.Set(pixel);
     }
     auto filter = MultiShellFilterType::New();
-    filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    SetMultiShellInput(filter, dwi, 3000);
     filter->SetLambda(0.006);
     filter->Update();
     CheckFingerprint("Multi-shell coefficients", ComputeFingerprint(filter->GetCoefficientImage().GetPointer()), expectedCoefficients, 8);
@@ -906,7 +949,7 @@ public:
       it.Set(pixel);
     }
     auto filter = MultiShellFilterType::New();
-    filter->SetGradientImage(dwi.gradients, dwi.image, 3000);
+    SetMultiShellInput(filter, dwi, 3000);
     filter->SetLambda(0.006);
     filter->Update();
     CheckFingerprint("Multi-shell interpolated coefficients", ComputeFingerprint(filter->GetCoefficientImage().GetPointer()), expectedCoefficients, 8);

@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <optional>
 #include <vnl/vnl_sse.h>
 #include <mitkPointShell.h>
+#include <mitkBValueMapProperty.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include "mitkShRegularization.h"
 
@@ -67,17 +68,9 @@ void DiffusionMultiShellQballReconstructionImageFilter<T,TG,TO,L,NODF>
   }
 
 
-  if(m_BValueMap.size() == 0){
-    itkWarningMacro(<< "DiffusionMultiShellQballReconstructionImageFilter.cpp : no GradientIndexMapAvalible");
-
-    GradientDirectionContainerType::ConstIterator gdcit;
-    for( gdcit = m_GradientDirectionContainer->Begin(); gdcit != m_GradientDirectionContainer->End(); ++gdcit)
-    {
-      double bValueKey = int(((m_BValue * gdcit.Value().two_norm() * gdcit.Value().two_norm())+7.5)/10)*10;
-      m_BValueMap[bValueKey].push_back(gdcit.Index());
-    }
-
-  }
+  // Without a map the shells are those of the DWI's own map (DiffusionPropertyHelper).
+  if (m_BValueMap.empty())
+    m_BValueMap = mitk::BValueMapProperty::CreateBValueMap(m_GradientDirectionContainer, m_BValue);
   if(m_BValueMap.find(0) == m_BValueMap.end())
   {
     itkExceptionMacro(<< "DiffusionMultiShellQballReconstructionImageFilter.cpp : GradientIndxMap with no b-Zero indecies found: check input BValueMap");

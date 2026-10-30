@@ -159,6 +159,25 @@ class mitkDiffusionReconstructionTestSuite : public mitk::TestFixture
     return expected->GetLargestPossibleRegion() == actual->GetLargestPossibleRegion();
   }
 
+  /** Largest difference of two ODF images, each relative to the largest absolute value of the reference ODF in its voxel. */
+  static double LargestRelativeOdfDifference(mitk::OdfImage *actual, mitk::OdfImage *reference)
+  {
+    auto a = mitk::convert::GetItkOdfFromOdfImage(actual);
+    auto b = mitk::convert::GetItkOdfFromOdfImage(reference);
+    double largest = 0;
+    itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> itA(a, a->GetLargestPossibleRegion());
+    itk::ImageRegionConstIterator<mitk::OdfImage::ItkOdfImageType> itB(b, b->GetLargestPossibleRegion());
+    for (; !itB.IsAtEnd(); ++itA, ++itB)
+    {
+      double scale = 0;
+      for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+        scale = std::max(scale, std::abs(static_cast<double>(itB.Get()[i])));
+      for (unsigned int i = 0; i < ODF_SAMPLING_SIZE && scale > 0; ++i)
+        largest = std::max(largest, std::abs(static_cast<double>(itA.Get()[i]) - itB.Get()[i]) / scale);
+    }
+    return largest;
+  }
+
 public:
   void setUp() override
   {
@@ -184,6 +203,8 @@ public:
       auto reference = mitk::IOUtil::Load<mitk::OdfImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/" + file));
       CPPUNIT_ASSERT_MESSAGE(file, result.odf.IsNotNull());
       CPPUNIT_ASSERT_MESSAGE(file, mitk::Equal(*result.odf, *reference, tolerance, true));
+      // The absolute tolerances are percents of an ODF value (about 1/252); the ODFs agree to float rounding.
+      CPPUNIT_ASSERT_MESSAGE(file, LargestRelativeOdfDifference(result.odf, reference) < 1e-5);
       CPPUNIT_ASSERT_EQUAL_MESSAGE(file, method != mitk::QballMethod::Numerical, result.sh.IsNotNull());
     }
   }
