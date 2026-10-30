@@ -1444,7 +1444,7 @@ public:
   {
     // Written by nibabel (TrackVis version 2, image axes rotated by 10 degrees about z, without
     // the header fingerprint of old MITK files), by dipy against an LAS reference image and by
-    // MRtrix tckconvert; ThirdPartyTractograms/README.md describes how. All hold these fibers,
+    // MRtrix tckconvert; ThirdPartyTractograms/README_v2.md describes how. All hold these fibers,
     // given in RAS millimetres.
     const std::vector<Fiber> rasFibers = {{{1.5, 2.0, 3.0}, {4.0, 5.25, 5.0}, {7.0, 8.0, 6.5}},
                                           {{-1.0, -2.0, -3.0}, {-4.0, -5.0, 0.5}},

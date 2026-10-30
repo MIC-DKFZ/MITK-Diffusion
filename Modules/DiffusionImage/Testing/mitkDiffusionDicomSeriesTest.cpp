@@ -28,8 +28,9 @@ found in the LICENSE file.
 
 /**
  * Reads the synthetic DWI DICOM series of mitk-diffusion-test-data (DicomDwi/, one per vendor
- * parser; DicomDwi/README.md describes how they were made) with the DWI DICOM reader and checks
- * b-values, gradients, geometry and pixel values against the values written into the headers.
+ * parser; DicomDwi/README_v2.md and make_dicom_dwi.py there describe how they were made) with
+ * the DWI DICOM reader and checks b-values, gradients, geometry and pixel values against the
+ * values written into the headers.
  */
 class mitkDiffusionDicomSeriesTestSuite : public mitk::TestFixture
 {
