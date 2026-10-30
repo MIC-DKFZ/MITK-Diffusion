@@ -16,6 +16,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkHeadMotionCorrectionView.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <mitkDWIHeadMotionCorrectionFilter.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkNodePredicateIsDWI.h>
@@ -42,6 +44,9 @@ void QmitkHeadMotionCorrectionView::CreateQtPartControl( QWidget *parent )
     return;
 
   m_Controls = std::make_unique<Ui::QmitkHeadMotionCorrectionViewControls>();
+  // The view outlives its widgets: the result of a correction that ends after they are gone is
+  // dropped (the destructor waits for it).
+  QmitkDiffusionViewControlsGuard::Install(parent, this, [this]() { m_Watcher.disconnect(this); });
   m_Controls->setupUi(parent);
   connect(m_Controls->m_ImageBox, &QComboBox::currentIndexChanged, this, &QmitkHeadMotionCorrectionView::UpdateGUI);
   connect(m_Controls->m_RegistrationStartButton, &QAbstractButton::clicked, this, &QmitkHeadMotionCorrectionView::StartCorrection);
