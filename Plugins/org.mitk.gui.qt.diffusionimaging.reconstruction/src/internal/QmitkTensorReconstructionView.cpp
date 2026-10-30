@@ -107,7 +107,7 @@ void QmitkTensorReconstructionView::Deactivated()
 template <typename Work, typename Done>
 void QmitkTensorReconstructionView::RunInBackground(const char *title, Work work, Done done)
 {
-  QmitkReconstructionResults::RunInBackground(m_Controls->m_DwiBox, m_Busy, [this]() { this->UpdateGui(); }, title, std::move(work), std::move(done));
+  QmitkReconstructionResults::RunInBackground(this, m_Busy, [this]() { this->UpdateGui(); }, title, std::move(work), std::move(done));
 }
 
 void QmitkTensorReconstructionView::Reconstruct()
