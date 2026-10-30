@@ -22,6 +22,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 // Qmitk
 #include "QmitkGibbsTrackingView.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 // Qt
 #include <QMessageBox>
 #include <QFileDialog>
@@ -206,6 +208,16 @@ void QmitkGibbsTrackingView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkGibbsTrackingViewControls;
+    QmitkDiffusionViewControlsGuard::Install(parent, this, [this]() {
+      // The view outlives its widgets: a running tracking is aborted, and neither the monitor
+      // timer nor the end of the thread reaches the widgets any more. The destructor waits for
+      // the thread.
+      m_MonitorTimer.stop();
+      m_MonitorTimer.disconnect(this);
+      m_TrackingThread.disconnect(this);
+      if (m_TrackingThread.isRunning())
+        m_GlobalTracker->SetAbortTracking(true);
+    });
     m_Controls->setupUi( parent );
 
     AdvancedSettings();

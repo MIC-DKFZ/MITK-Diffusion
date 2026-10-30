@@ -10,6 +10,7 @@ set(INTERNAL_CPP_FILES
   QmitkControlsViewsUiTest.cpp
   QmitkReconstructionViewsUiTest.cpp
   QmitkIvimViewUiTest.cpp
+  QmitkTractographyViewsUiTest.cpp
 )
 
 set(MOC_H_FILES

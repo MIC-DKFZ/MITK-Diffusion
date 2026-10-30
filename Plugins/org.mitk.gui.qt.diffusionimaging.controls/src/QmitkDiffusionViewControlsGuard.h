@@ -16,6 +16,8 @@ found in the LICENSE file.
 #include <QObject>
 #include <QWidget>
 
+#include <functional>
+
 /**
  * \brief Disconnects a view from its widgets before they are deleted.
  *
@@ -33,12 +35,15 @@ namespace QmitkDiffusionViewControlsGuard
    *
    * Call it in CreateQtPartControl() with its parent before setupUi(parent): the guard is then
    * the first child of parent, and Qt deletes children in the order they were created, so the
-   * guard goes while all widgets still exist.
+   * guard goes while all widgets still exist. A view whose timers or worker threads touch its
+   * widgets passes beforeDestruction, which runs then too and stops them.
    */
-  inline void Install(QWidget *parent, QObject *view)
+  inline void Install(QWidget *parent, QObject *view, std::function<void()> beforeDestruction = {})
   {
     auto *guard = new QObject(parent);
-    QObject::connect(guard, &QObject::destroyed, view, [parent, view]() {
+    QObject::connect(guard, &QObject::destroyed, view, [parent, view, beforeDestruction]() {
+      if (beforeDestruction)
+        beforeDestruction();
       // While parent deletes its children, the entry of the child being deleted (the guard) is
       // null, so the list is walked by hand.
       for (auto *child : parent->children())
