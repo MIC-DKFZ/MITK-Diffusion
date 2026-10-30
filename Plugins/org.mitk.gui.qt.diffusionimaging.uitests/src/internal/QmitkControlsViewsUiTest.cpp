@@ -26,7 +26,11 @@ found in the LICENSE file.
 #include <mitkImageReadAccessor.h>
 #include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkResliceMethodProperty.h>
 #include <mitkSceneIO.h>
+#include <mitkWorkbenchUtil.h>
+
+#include <QmitkRenderWindow.h>
 
 #include <cppunit/extensions/HelperMacros.h>
 
@@ -39,12 +43,18 @@ found in the LICENSE file.
 #include <QFrame>
 #include <QGroupBox>
 #include <QLineEdit>
+#include <QLabel>
 #include <QListWidget>
+#include <QMenu>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QSpinBox>
 #include <QTableWidget>
+#include <QSlider>
 #include <QToolButton>
+#include <QWidgetAction>
+
+#include <algorithm>
 
 #include <filesystem>
 #include <set>
@@ -66,6 +76,7 @@ class QmitkControlsViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Visualization_DwiFirstVolumeNotB0_ShowsFirstB0);
   CPPUNIT_TEST(Visualization_SceneWithDisplayedVolume_KeepsVolume);
   CPPUNIT_TEST(Visualization_SelectedNodeRemoved_ControlsStillWork);
+  CPPUNIT_TEST(Visualization_ThickSliceMenu_SetsEveryPlaneAndShowsItsState);
   CPPUNIT_TEST(DicomImport_SeriesFolder_GivesDwi);
   CPPUNIT_TEST(DicomImport_RecursiveWithPrefix_ReadsMatchingSubfolders);
   CPPUNIT_TEST(TagEditor_EditAndCopyFromDicomDwi_SetsTractogramTags);
@@ -326,6 +337,87 @@ public:
     float rgb[3] = {0, 0, 0};
     second->GetColor(rgb);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, rgb[1], 1e-6);
+  }
+
+  /** The plane node of the 2D render window, which holds its thick-slice properties. */
+  static mitk::DataNode *PlaneNode(mitk::AnatomicalPlane plane)
+  {
+    auto *part = mitk::WorkbenchUtil::GetRenderWindowPart(GetPage(), mitk::WorkbenchUtil::OPEN);
+    CPPUNIT_ASSERT(part != nullptr && part->GetQmitkRenderWindow(plane) != nullptr);
+    auto *node = part->GetQmitkRenderWindow(plane)->GetRenderer()->GetCurrentWorldPlaneGeometryNode();
+    CPPUNIT_ASSERT(node != nullptr);
+    return node;
+  }
+
+  /** Thick slices of every 2D render window: number of slices on each side, mode (0: off), area shown. */
+  static void CheckThickSlices(int num, int mode)
+  {
+    for (auto plane : {mitk::AnatomicalPlane::Axial, mitk::AnatomicalPlane::Sagittal, mitk::AnatomicalPlane::Coronal})
+    {
+      auto *node = PlaneNode(plane);
+      int value = -1;
+      CPPUNIT_ASSERT(node->GetIntProperty("reslice.thickslices.num", value));
+      CPPUNIT_ASSERT_EQUAL(num, value);
+      auto *method = dynamic_cast<mitk::ResliceMethodProperty *>(node->GetProperty("reslice.thickslices"));
+      CPPUNIT_ASSERT(method != nullptr);
+      CPPUNIT_ASSERT_EQUAL(mode, static_cast<int>(method->GetValueAsId()));
+      bool showArea = !(mode > 0);
+      CPPUNIT_ASSERT(node->GetBoolProperty("reslice.thickslices.showarea", showArea));
+      CPPUNIT_ASSERT_EQUAL(mode > 0, showArea);
+    }
+  }
+
+  void Visualization_ThickSliceMenu_SetsEveryPlaneAndShowsItsState()
+  {
+    auto fa = Load("tensorImage_FA.nrrd");
+    auto md = Load("tensorImage_MD.nrrd");
+    InitializeViews();
+    Select({fa});
+
+    // The menu of the "Multislice Projection" button: the slider, then the three modes.
+    auto *button = GetChild<QToolButton>(m_View, "m_TSMenu");
+    CPPUNIT_ASSERT(button->menu() != nullptr);
+    const auto actions = button->menu()->actions();
+    CPPUNIT_ASSERT_EQUAL(qsizetype(4), actions.size());
+    auto *sliderAction = qobject_cast<QWidgetAction *>(actions[0]);
+    CPPUNIT_ASSERT(sliderAction != nullptr && sliderAction->defaultWidget() != nullptr);
+    auto *slider = sliderAction->defaultWidget()->findChild<QSlider *>();
+    auto *label = sliderAction->defaultWidget()->findChild<QLabel *>();
+    CPPUNIT_ASSERT(slider != nullptr && label != nullptr);
+    auto *image = dynamic_cast<mitk::Image *>(fa->GetData());
+    const int largest = static_cast<int>(std::max({image->GetDimension(0), image->GetDimension(1), image->GetDimension(2), 30u}));
+    CPPUNIT_ASSERT_EQUAL(largest / 2 - 1, slider->maximum());
+    auto mode = [&actions](int id) {
+      for (auto *action : actions)
+      {
+        if (action->data().toInt() == id && action->isCheckable())
+          return action;
+      }
+      CPPUNIT_FAIL("No thick-slice mode " + std::to_string(id));
+      return static_cast<QAction *>(nullptr);
+    };
+
+    // Two slices on each side, maximum intensity projection by default, in every 2D window.
+    slider->setValue(2);
+    CPPUNIT_ASSERT_EQUAL(QString("5"), label->text());
+    CheckThickSlices(2, 1);
+    mode(2)->trigger();
+    CPPUNIT_ASSERT_EQUAL(QString("SUM"), button->text());
+    CheckThickSlices(2, 2);
+    slider->setValue(0);
+    CheckThickSlices(0, 0);
+
+    // Another selection shows the state of the render windows.
+    slider->setValue(3);
+    mode(3)->trigger();
+    CPPUNIT_ASSERT_EQUAL(QString("WEIGH"), button->text());
+    CheckThickSlices(3, 3);
+    slider->setValue(1);
+    PlaneNode(mitk::AnatomicalPlane::Axial)->SetIntProperty("reslice.thickslices.num", 3);
+    Select({md});
+    CPPUNIT_ASSERT_EQUAL(3, slider->value());
+    CPPUNIT_ASSERT_EQUAL(QString("7"), label->text());
+    CPPUNIT_ASSERT(mode(3)->isChecked() && !mode(1)->isChecked() && !mode(2)->isChecked());
   }
 
   /** Adds a folder with the import view's folder dialog and starts the import. */
