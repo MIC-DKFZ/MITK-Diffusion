@@ -18,6 +18,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkReconstructionResults.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkNodePredicateDataType.h>
 #include <mitkNodePredicateIsDWI.h>
@@ -77,6 +79,7 @@ void QmitkDiffusionQuantificationView::CreateQtPartControl(QWidget *parent)
     return;
 
   m_Controls = new Ui::QmitkDiffusionQuantificationViewControls;
+  QmitkDiffusionViewControlsGuard::Install(parent, this);
   m_Controls->setupUi(parent);
 
   connect(m_Controls->m_GFAButton, &QAbstractButton::clicked, this, [this]() { ComputeGfa(); });

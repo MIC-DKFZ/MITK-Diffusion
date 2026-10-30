@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkFiberfoxView.h"
+#include <QmitkDiffusionViewControlsGuard.h>
 
 // MITK
 #include <mitkDiffusionMasks.h>
@@ -384,6 +385,8 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkFiberfoxViewControls;
+    // the selection slots of its boxes update other widgets (UpdateGui)
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     m_Controls->m_StickWidget1->setVisible(true);
@@ -634,17 +637,17 @@ mitk::RawShModel<>* QmitkFiberfoxView::NewPrototypeModel(QmitkPrototypeSignalPar
 
 void QmitkFiberfoxView::SetGradientsFromGui()
 {
-  if (m_Controls->m_UseBvalsBvecsBox->isChecked())
+  if (!m_LoadedGradients.empty())
+  {
+    // the gradients of a loaded .ffp, until a gradient setting is changed
+    m_Parameters.SetGradienDirections(m_LoadedGradients);
+    m_Parameters.SetBvalue(m_LoadedBvalue);
+  }
+  else if (m_Controls->m_UseBvalsBvecsBox->isChecked())
   {
     double bval;
     m_Parameters.SetGradienDirections( mitk::gradients::ReadBvalsBvecs(m_Controls->m_LoadBvalsEdit->text().toStdString(), m_Controls->m_LoadBvecsEdit->text().toStdString(), bval) );
     m_Parameters.SetBvalue(bval);
-  }
-  else if (!m_LoadedGradients.empty())
-  {
-    // the gradients of a loaded .ffp without .bvals/.bvecs files, until count or b-value is changed
-    m_Parameters.SetGradienDirections(m_LoadedGradients);
-    m_Parameters.SetBvalue(m_LoadedBvalue);
   }
   else
   {
@@ -677,6 +680,9 @@ void QmitkFiberfoxView::ReadOutputSettings()
   m_Parameters.m_Misc.m_CheckAdvancedSignalOptionsBox = m_Controls->m_AdvancedOptionsBox_2->isChecked();
   m_Parameters.m_Misc.m_OutputAdditionalImages = m_Controls->m_VolumeFractionsBox->isChecked();
 
+  // the log file is named by the result, like the image and parameters saved with it; the prefix
+  // names the output of MitkFiberfox
+  m_Parameters.m_Misc.m_OutputPrefix = "";
   std::string outputPath = m_Controls->m_SavePathEdit->text().toStdString();
   // "-" or an emptied box: no automatic save (an empty path plus "/" would be the root folder)
   if (!outputPath.empty() && outputPath.compare("-")!=0)
@@ -1550,15 +1556,14 @@ void QmitkFiberfoxView::LoadParameters()
   else
     m_Controls->m_LoadBvecsEdit->setText("-");
 
-  // Without side files the gradients come from the .ffp itself; the boxes show only their count
-  // and b-value, so the view keeps them (set after the boxes, whose changes discard them).
-  m_LoadedGradients.clear();
+  // The view keeps the gradients as loaded (set after the boxes, whose changes discard them): without
+  // side files they come from the .ffp itself and the boxes show only their count and b-value; with
+  // them, reading the side files again would give them rounded (FiberfoxParameters::LoadParameters),
+  // and saving would change the file.
   if (m_Parameters.m_Misc.m_BvalsFile.empty() || m_Parameters.m_Misc.m_BvecsFile.empty())
-  {
     m_Controls->m_UseBvalsBvecsBox->setChecked(false);
-    m_LoadedGradients = m_Parameters.m_SignalGen.GetGradientDirections();
-    m_LoadedBvalue = m_Parameters.m_SignalGen.GetBvalue();
-  }
+  m_LoadedGradients = m_Parameters.m_SignalGen.GetGradientDirections();
+  m_LoadedBvalue = m_Parameters.m_SignalGen.GetBvalue();
 
   // m_NoiseDistributionBox offers 0 "Complex Gaussian" (no noise model), 1 "Rician" and 2 "Noncentral chi"
   if (m_Parameters.m_NoiseModel!=nullptr)

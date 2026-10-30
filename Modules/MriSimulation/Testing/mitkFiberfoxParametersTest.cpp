@@ -24,6 +24,10 @@ found in the LICENSE file.
 #include <vnl/vnl_rotation_matrix.h>
 #include <fstream>
 #include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <limits>
+#include <sstream>
 
 namespace
 {
@@ -68,6 +72,10 @@ class mitkFiberfoxParametersTestSuite : public mitk::TestFixture
   MITK_TEST(MissingDirection);
   MITK_TEST(NoiseModelInFile);
   MITK_TEST(TimeSegmentsInFile);
+  MITK_TEST(SaveLoadSaveGivesTheSameFiles);
+  MITK_TEST(MatchingSideFilesGiveTheFileGradients);
+  MITK_TEST(EditedSideFilesAreTaken);
+  MITK_TEST(OneGradientSourceLoadsAsBefore);
   CPPUNIT_TEST_SUITE_END();
 
   /** Parameters whose only models are two counting fiber models and one counting non-fiber model. */
@@ -418,6 +426,244 @@ public:
       CPPUNIT_ASSERT_EQUAL(segments, loaded.m_SignalGen.m_KspaceTimeSegments);
       loaded.LoadParameters(earlierFile, true);
       CPPUNIT_ASSERT_EQUAL(mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, loaded.m_SignalGen.m_KspaceTimeSegments);
+    }
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+  /**
+   * Saving, loading and saving again gives the same files, as the Fiberfox view's "Save Parameters"
+   * and "Load Parameters" do: the view's half-shell protocol and a test-data file with .bvals/.bvecs
+   * files. Those files hold the gradients as unit vectors with b-values rounded to 1e-6 s/mm^2, and
+   * a gradient normalized once more can change in its last bits.
+   */
+  void SaveLoadSaveGivesTheSameFiles()
+  {
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_roundtrip_XXXXXX");
+    const auto content = [](const std::string& file)
+    {
+      std::ifstream in(file);
+      CPPUNIT_ASSERT_MESSAGE(file, in.good());
+      return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    };
+    const auto roundTrip = [&](mitk::FiberfoxParameters& parameters, const std::string& name)
+    {
+      const std::string first = folder + "/" + name + "_first.ffp";
+      const std::string second = folder + "/" + name + "_second.ffp";
+      parameters.SaveParameters(first);
+      mitk::FiberfoxParameters loaded;
+      loaded.LoadParameters(first, true);
+      CPPUNIT_ASSERT_MESSAGE(loaded.m_MissingTags, loaded.m_MissingTags.empty());
+      loaded.SaveParameters(second);
+      for (const std::string extension : { "", ".bvals", ".bvecs" })
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(name + extension, content(first + extension), content(second + extension));
+    };
+
+    mitk::FiberfoxParameters generated;   // the view's default protocol
+    generated.SetBvalue(1000);
+    generated.SetNumWeightedVolumes(30);
+    roundTrip(generated, "halfshell");
+
+    mitk::FiberfoxParameters fromFile;
+    fromFile.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_1.ffp"), true);
+    roundTrip(fromFile, "brainslice");
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  using GradientList = mitk::SignalGenerationParameters::GradientListType;
+
+  /**
+   * A protocol whose .bvals/.bvecs files give its gradients only to rounding (in their last bits):
+   * b0 and b-values of 0.3, 999.9995, 500, 1000 and 1000 s/mm^2 at the reference b-value 1000.
+   */
+  static void SetRoundedProtocol(mitk::FiberfoxParameters& parameters)
+  {
+    const auto gradient = [](double x, double y, double z, double length)
+    {
+      mitk::SignalGenerationParameters::GradientType g;
+      g[0] = x;
+      g[1] = y;
+      g[2] = z;
+      if (length > 0)
+      {
+        g.Normalize();
+        g *= length;
+      }
+      return g;
+    };
+    parameters.SetBvalue(1000);
+    parameters.SetGradienDirections(GradientList{ gradient(0, 0, 0, 0), gradient(1, 0, 0, std::sqrt(0.3 / 1000)),
+      gradient(0.48, -0.6, 0.64, std::sqrt(0.9999995)), gradient(0, 1, 0, std::sqrt(0.5)),
+      gradient(0.267, 0.534, -0.802, 1), gradient(1, 0, 0, 1) });
+  }
+
+  static std::string ReadText(const std::string& file)
+  {
+    std::ifstream in(file);
+    CPPUNIT_ASSERT_MESSAGE(file, in.good());
+    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  }
+
+  /** Sets one value of a .bvals file (row 0) or .bvecs file (rows 0 to 2), one column per volume. */
+  static void SetSideFileValue(const std::string& file, std::size_t row, std::size_t column, double value)
+  {
+    std::istringstream in(ReadText(file));
+    std::vector<std::vector<std::string>> rows;
+    for (std::string line; std::getline(in, line);)
+    {
+      std::istringstream values(line);
+      std::vector<std::string> entries((std::istream_iterator<std::string>(values)), std::istream_iterator<std::string>());
+      if (!entries.empty())
+        rows.push_back(entries);
+    }
+    CPPUNIT_ASSERT_MESSAGE(file, row < rows.size() && column < rows[row].size());
+    std::ostringstream text;
+    text.precision(std::numeric_limits<double>::max_digits10);
+    text << value;
+    rows[row][column] = text.str();
+    std::ofstream out(file);
+    for (const auto& entries : rows)
+    {
+      for (const auto& entry : entries)
+        out << entry << " ";
+      out << "\n";
+    }
+  }
+
+  /** The b-value and gradients of the .bvals/.bvecs files of an .ffp, as ReadBvalsBvecs gives them. */
+  static GradientList SideFileGradients(const std::string& ffp, double& bValue)
+  {
+    const auto container = mitk::gradients::ReadBvalsBvecs(ffp + ".bvals", ffp + ".bvecs", bValue);
+    GradientList gradients;
+    for (unsigned int i = 0; i < container->Size(); ++i)
+    {
+      mitk::SignalGenerationParameters::GradientType g;
+      for (unsigned int c = 0; c < 3; ++c)
+        g[c] = container->ElementAt(i)[c];
+      gradients.push_back(g);
+    }
+    return gradients;
+  }
+
+  static bool SameGradients(const GradientList& a, const GradientList& b)
+  {
+    if (a.size() != b.size())
+      return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+      for (unsigned int c = 0; c < 3; ++c)
+        if (a[i][c] != b[i][c])
+          return false;
+    return true;
+  }
+
+  /** Loaded parameters hold exactly the expected b-value and gradients. */
+  static void AssertGradients(const std::string& message, double bValue, const GradientList& expected, mitk::FiberfoxParameters& loaded)
+  {
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ": b-value", bValue, loaded.m_SignalGen.GetBvalue());
+    const auto gradients = loaded.m_SignalGen.GetGradientDirections();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ": volumes", expected.size(), gradients.size());
+    for (std::size_t i = 0; i < expected.size(); ++i)
+      for (unsigned int c = 0; c < 3; ++c)
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(message + ": volume " + std::to_string(i), expected[i][c], gradients[i][c]);
+  }
+
+  /**
+   * .bvals/.bvecs files that still give the gradients written into the .ffp itself (as saved): the
+   * .ffp's own b-value and gradients are taken bit for bit, not the side files' rounded ones.
+   */
+  void MatchingSideFilesGiveTheFileGradients()
+  {
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_sidefiles_XXXXXX");
+    mitk::FiberfoxParameters original;
+    SetRoundedProtocol(original);
+    const std::string file = folder + "/saved.ffp";
+    original.SaveParameters(file);
+
+    double sideBvalue = 0;
+    const auto side = SideFileGradients(file, sideBvalue);
+    CPPUNIT_ASSERT_EQUAL(1000.0, sideBvalue);
+    CPPUNIT_ASSERT_MESSAGE("the side files give the gradients only to rounding, else this case shows nothing",
+      !SameGradients(side, original.m_SignalGen.GetGradientDirections()));
+
+    mitk::FiberfoxParameters loaded;
+    loaded.LoadParameters(file, true);
+    AssertGradients("matching side files", 1000, original.m_SignalGen.GetGradientDirections(), loaded);
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /**
+   * Edited .bvals/.bvecs files win over the gradients written into the .ffp, exactly as
+   * ReadBvalsBvecs gives them: the x component of one volume negated in the .bvecs file, and
+   * separately the b-value of one volume halved in the .bvals file.
+   */
+  void EditedSideFilesAreTaken()
+  {
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_sidefiles_XXXXXX");
+    mitk::FiberfoxParameters original;
+    SetRoundedProtocol(original);
+    const auto written = original.m_SignalGen.GetGradientDirections();
+
+    const std::string negated = folder + "/negated.ffp";
+    original.SaveParameters(negated);
+    SetSideFileValue(negated + ".bvecs", 0, 4, -written[4][0]);
+    double bValue = 0;
+    auto side = SideFileGradients(negated, bValue);
+    mitk::FiberfoxParameters loaded;
+    loaded.LoadParameters(negated, true);
+    AssertGradients("x negated", bValue, side, loaded);
+    CPPUNIT_ASSERT_EQUAL(1000.0, bValue);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-written[4][0], loaded.m_SignalGen.GetGradientDirection(4)[0], 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(written[4][1], loaded.m_SignalGen.GetGradientDirection(4)[1], 1e-12);
+
+    const std::string halved = folder + "/halved.ffp";
+    original.SaveParameters(halved);
+    SetSideFileValue(halved + ".bvals", 0, 5, 500);
+    side = SideFileGradients(halved, bValue);
+    loaded.LoadParameters(halved, true);
+    AssertGradients("b-value changed", bValue, side, loaded);
+    CPPUNIT_ASSERT_EQUAL(1000.0, bValue);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, loaded.m_SignalGen.GetGradientDirection(5).GetSquaredNorm(), 1e-12);
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /**
+   * An .ffp with gradients and no .bvals/.bvecs files takes its own gradients bit for bit; one with
+   * .bvals/.bvecs files and no gradients in it (as earlier MITK versions wrote them, e.g. the
+   * BrainSlice files) takes the side files' gradients, as ReadBvalsBvecs gives them.
+   */
+  void OneGradientSourceLoadsAsBefore()
+  {
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_sidefiles_XXXXXX");
+    mitk::FiberfoxParameters original;
+    SetRoundedProtocol(original);
+
+    const std::string inFileOnly = folder + "/infile.ffp";
+    original.SaveParameters(inFileOnly);
+    CPPUNIT_ASSERT(itksys::SystemTools::RemoveFile(inFileOnly + ".bvals"));
+    CPPUNIT_ASSERT(itksys::SystemTools::RemoveFile(inFileOnly + ".bvecs"));
+    mitk::FiberfoxParameters loaded;
+    loaded.LoadParameters(inFileOnly, true);
+    AssertGradients("no side files", 1000, original.m_SignalGen.GetGradientDirections(), loaded);
+
+    const std::string sideFilesOnly = folder + "/sidefiles.ffp";
+    original.SaveParameters(sideFilesOnly);
+    std::string text = ReadText(sideFilesOnly);
+    for (const std::string tag : { "bvalue", "gradients" })
+    {
+      const auto begin = text.find("<" + tag + ">");
+      const auto end = text.find("</" + tag + ">");
+      CPPUNIT_ASSERT_MESSAGE(tag, begin != std::string::npos && end != std::string::npos);
+      text.erase(begin, end + tag.size() + 3 - begin);
+    }
+    std::ofstream(sideFilesOnly) << text;
+
+    const std::string brainSlice = mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_1.ffp");
+    CPPUNIT_ASSERT(ReadText(brainSlice).find("<gradients>") == std::string::npos);
+    for (const auto& file : { sideFilesOnly, brainSlice })
+    {
+      double bValue = 0;
+      const auto side = SideFileGradients(file, bValue);
+      mitk::FiberfoxParameters fromSideFiles;
+      fromSideFiles.LoadParameters(file, true);
+      AssertGradients(file, bValue, side, fromSideFiles);
     }
     itksys::SystemTools::RemoveADirectory(folder);
   }

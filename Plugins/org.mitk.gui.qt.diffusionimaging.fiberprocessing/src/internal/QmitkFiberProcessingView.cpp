@@ -609,6 +609,7 @@ void QmitkFiberProcessingView::ExtractWithMask(bool onlyEnds, bool invert, bool 
           name = "passing-" + name;
       }
 
+      newNode->SetName(name);
       float currentThickness = 0;
       node->GetFloatProperty("Fiber2DSliceThickness", currentThickness);
       newNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(currentThickness));
@@ -647,14 +648,16 @@ void QmitkFiberProcessingView::GenerateRoiImage()
     }
   }
 
+  // A selected image gives the grid. m_SelectedFB is filled with the topmost bundle whenever none
+  // is selected (SelectTopmostIfEmpty), so the bundle's grid is taken only without an image.
   mitk::BaseGeometry::Pointer geometry;
-  if (!m_SelectedFB.empty())
+  if (m_SelectedImage)
+    geometry = m_SelectedImage->GetGeometry();
+  else if (!m_SelectedFB.empty())
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.front()->GetData());
     geometry = fib->GetGeometry();
   }
-  else if (m_SelectedImage)
-    geometry = m_SelectedImage->GetGeometry();
   else
     return;
 

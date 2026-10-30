@@ -18,6 +18,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkReconstructionResults.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <mitkDiffusionMasks.h>
 #include <mitkDiffusionPeaks.h>
 #include <mitkExceptionMacro.h>
@@ -42,6 +44,7 @@ void QmitkOdfMaximaExtractionView::CreateQtPartControl(QWidget *parent)
     return;
 
   m_Controls = new Ui::QmitkOdfMaximaExtractionViewControls;
+  QmitkDiffusionViewControlsGuard::Install(parent, this);
   m_Controls->setupUi(parent);
 
   connect(m_Controls->m_StartPeakExtractionButton, &QAbstractButton::clicked, this, &QmitkOdfMaximaExtractionView::StartPeakExtraction);

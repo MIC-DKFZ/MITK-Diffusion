@@ -22,6 +22,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 // Qmitk
 #include "QmitkGibbsTrackingView.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 // Qt
 #include <QMessageBox>
 #include <QFileDialog>
@@ -206,6 +208,7 @@ void QmitkGibbsTrackingView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkGibbsTrackingViewControls;
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     AdvancedSettings();

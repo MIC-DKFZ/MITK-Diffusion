@@ -16,6 +16,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkPreprocessingView.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <QFontDatabase>
 #include <QMessageBox>
 #include <QTableWidget>
@@ -139,6 +141,7 @@ void QmitkPreprocessingView::CreateQtPartControl(QWidget *parent)
     return;
 
   m_Controls = std::make_unique<Ui::QmitkPreprocessingViewControls>();
+  QmitkDiffusionViewControlsGuard::Install(parent, this);
   m_Controls->setupUi(parent);
   this->CreateConnections();
 

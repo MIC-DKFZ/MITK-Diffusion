@@ -16,6 +16,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkSimpleRegistrationView.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <mitkNodePredicateDataType.h>
 #include <mitkDiffusionPropertyHelper.h>
 // MatchPoint's ITKInitializedMultiResImageRegistrationAlgorithm::doSetProperty() assigns a bool
@@ -189,6 +191,7 @@ void QmitkSimpleRegistrationView::CreateQtPartControl( QWidget *parent )
   if ( !m_Controls )
   {
     m_Controls = std::make_unique<Ui::QmitkSimpleRegistrationViewControls>();
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     m_Controls->m_FixedImageBox->SetDataStorage(this->GetDataStorage());

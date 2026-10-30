@@ -938,15 +938,10 @@ bool TractsToDWIImageFilter< PixelType >::PrepareLogFile()
   else
     return false;
 
-  // Get file name:
-  if( ! m_Parameters.m_Misc.m_ResultNode->GetName().empty() )
-  {
-    fileName = m_Parameters.m_Misc.m_ResultNode->GetName();
-  }
-  else
-  {
-    fileName = "";
-  }
+  // Get file name: the result node's name with its dots as underscores, as the Fiberfox view names
+  // the image and parameters it saves next to the log
+  fileName = m_Parameters.m_Misc.m_ResultNode->GetName();
+  std::replace(fileName.begin(), fileName.end(), '.', '_');
 
   if( ! m_Parameters.m_Misc.m_OutputPrefix.empty() )
   {

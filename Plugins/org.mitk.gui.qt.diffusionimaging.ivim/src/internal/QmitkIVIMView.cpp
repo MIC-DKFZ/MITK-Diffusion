@@ -31,6 +31,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkLookupTable.h"
 #include "mitkLookupTableProperty.h"
 #include <mitkSliceNavigationController.h>
+#include <QmitkDiffusionViewControlsGuard.h>
 #include <QmitkRenderWindow.h>
 
 // itk
@@ -60,6 +61,7 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = std::make_unique<Ui::QmitkIVIMViewControls>();
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     connect( m_Controls->m_ButtonStart, &QAbstractButton::clicked, this, &QmitkIVIMView::FittIVIMStart );

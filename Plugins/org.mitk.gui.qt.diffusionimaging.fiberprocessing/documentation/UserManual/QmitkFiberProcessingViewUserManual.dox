@@ -10,7 +10,7 @@ Place ROIs in the 2D render widgets (cricles or polygons) and extract fibers fro
 Among others, fibers can be removed by direction: a fiber is removed if any of its segments deviates less than the given angle from the given direction (components from -1 to 1; length and sign do not matter), and by length (minimum and maximum length in mm; the bundle stays unchanged if no fiber would be left). "Remove fiber parts outside mask" and "Remove fiber parts inside mask" cut each fiber where it crosses the border of the binary mask, also between two of its points, so the pieces end at the mask border whatever the point spacing; each piece keeps the weight of its fiber.
 
 <b>Generate ROI Image:</b>
-Converts the selected planar figures into a binary image on the grid of the selected fiber bundle or image. The image is the union of the figures; OR composites are converted as well, AND and NOT composites are refused.
+Converts the selected planar figures into a binary image on the grid of the selected image. Without a selected image it uses the grid of the fiber bundle: the selected one or, if none is selected, the topmost bundle, which the view then selects on its own. The image is the union of the figures; OR composites are converted as well, AND and NOT composites are refused.
 A figure sets every voxel that its plane passes through and whose centre, projected onto the plane, lies inside the figure. For a figure drawn on a slice of the image these are the voxels of that slice whose centres lie inside the figure; for a figure on a plane oblique to the image grid, every voxel the plane cuts there, so the figure has no holes in the view it was drawn in.
 
 */

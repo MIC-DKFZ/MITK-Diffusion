@@ -260,6 +260,9 @@ void QmitkInteractiveFiberDissectionView::UpdateGui()
   enable(uncertaintySelected, {m_Controls->m_unclabelingBrush, m_Controls->m_unclabelingBrushGen});
   enable(distanceuncertanySelected, {m_Controls->m_distlabelingBrush, m_Controls->m_distlabelingBrushGen});
   enable(predictionSelected, {m_Controls->m_predlabelingBrush, m_Controls->m_predlabelingBrushGen});
+  // The labeling brush works on the sampled streamlines ("ToLabel"); sampling switches it on, and
+  // while they exist it can be switched off and on again.
+  enable(this->GetDataStorage()->Exists(m_newfibersBundleNode), {m_Controls->m_BrushButton});
   enable(predictionSelected && indexSelected, {m_Controls->m_CreateUncertantyMap, m_Controls->m_CreateUncertantyManGen});
   enable(classifierexist, {m_Controls->m_add_annotations, m_Controls->m_add_annotations_2});
 }
