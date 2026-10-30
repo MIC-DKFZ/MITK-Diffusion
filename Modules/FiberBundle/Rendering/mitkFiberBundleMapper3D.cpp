@@ -241,7 +241,6 @@ void mitk::FiberBundleMapper3D::SetDefaultProperties(mitk::DataNode* node, mitk:
 
   node->AddProperty( "shape.linewidth", mitk::IntProperty::New( 1 ), renderer, overwrite );
   node->AddProperty( "shape.tuberadius",mitk::FloatProperty::New( 0.0 ), renderer, overwrite);
-  node->AddProperty( "shape.tubesides",mitk::IntProperty::New( 15 ), renderer, overwrite);
   node->AddProperty( "shape.ribbonwidth", mitk::FloatProperty::New( 0.0 ), renderer, overwrite);
 
   node->AddProperty( "light.ambient", mitk::FloatProperty::New( 0.05 ), renderer, overwrite);

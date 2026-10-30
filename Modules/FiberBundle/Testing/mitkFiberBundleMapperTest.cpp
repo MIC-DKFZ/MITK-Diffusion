@@ -154,7 +154,6 @@ public:
   {
     CPPUNIT_ASSERT(dynamic_cast<mitk::IntProperty *>(m_Node->GetProperty("shape.linewidth")) != nullptr);
     CPPUNIT_ASSERT(dynamic_cast<mitk::FloatProperty *>(m_Node->GetProperty("shape.tuberadius")) != nullptr);
-    CPPUNIT_ASSERT(dynamic_cast<mitk::IntProperty *>(m_Node->GetProperty("shape.tubesides")) != nullptr);
     CPPUNIT_ASSERT(dynamic_cast<mitk::FloatProperty *>(m_Node->GetProperty("shape.ribbonwidth")) != nullptr);
     CPPUNIT_ASSERT(dynamic_cast<mitk::FloatProperty *>(m_Node->GetProperty("Fiber2DSliceThickness")) != nullptr);
     CPPUNIT_ASSERT(dynamic_cast<mitk::ClippingProperty *>(m_Node->GetProperty("3DClipping")) != nullptr);
