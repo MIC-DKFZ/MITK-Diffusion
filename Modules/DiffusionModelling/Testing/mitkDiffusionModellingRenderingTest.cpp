@@ -1079,15 +1079,18 @@ public:
     auto cases = GlyphCases();
     // The whole layer, more glyphs than threads by far.
     cases.front().window.reset();
-    // The cases of tensors and SH at the coarse mesh too.
+    // The cases of tensors and SH at the coarse meshes too.
     for (std::size_t i = 0, numCases = cases.size(); i < numCases; ++i)
     {
       if (dynamic_cast<mitk::OdfImage *>(cases[i].image.GetPointer()) != nullptr)
         continue;
-      auto coarse = cases[i];
-      coarse.name += ", coarse";
-      coarse.settings.pixelsPerMm = PixelsPerMm(coarse.slice, coarse.settings.scaling, 30);
-      cases.push_back(coarse);
+      for (const auto &[width, n] : coarseLevels)
+      {
+        auto coarse = cases[i];
+        coarse.name += ", " + std::to_string(n) + " points";
+        coarse.settings.pixelsPerMm = PixelsPerMm(coarse.slice, coarse.settings.scaling, width);
+        cases.push_back(coarse);
+      }
     }
     mitk::OmpThreadGuard threads(1);
     for (const auto &glyphCase : cases)
@@ -1120,14 +1123,15 @@ public:
     return vnl_vector_fixed<double, 3>(directions(0, j), directions(1, j), directions(2, j));
   }
 
-  // Glyphs narrower than 40 pixels on screen (scaling x glyph spacing x pixels per mm) are
-  // geodesic spheres of 162 directions; pixels per mm 0 and ODF images keep the full mesh.
+  // Glyphs narrower than 16 and 40 pixels on screen (scaling x glyph spacing x pixels per mm)
+  // are geodesic spheres of 42 and 162 directions; pixels per mm 0 and ODF images keep the full mesh.
   void GlyphGenerator_MeshLevel_ByGlyphWidth()
   {
     std::vector<std::pair<std::string, mitk::Image::Pointer>> images = {
       {"tensor", MakeDegenerateTensorImage().GetPointer()}, {"SH", LoadShImage().GetPointer()}};
     const std::tuple<double, double, vtkIdType> cases[] = {
-      {1, 0, ODF_SAMPLING_SIZE}, {1, 39.9, 162}, {1, 40.1, ODF_SAMPLING_SIZE}, {2.5, 39.9, 162}, {2.5, 40.1, ODF_SAMPLING_SIZE}, {1, 0.01, 162}};
+      {1, 0, ODF_SAMPLING_SIZE}, {1, 0.01, 42}, {1, 15.9, 42}, {1, 16.1, 162}, {1, 39.9, 162}, {1, 40.1, ODF_SAMPLING_SIZE},
+      {2.5, 15.9, 42}, {2.5, 16.1, 162}, {2.5, 39.9, 162}, {2.5, 40.1, ODF_SAMPLING_SIZE}};
     for (const auto &[name, image] : images)
     {
       mitk::Point3D layer1;
@@ -1156,21 +1160,25 @@ public:
     CPPUNIT_ASSERT_EQUAL(vtkIdType(2 * ODF_SAMPLING_SIZE), mitk::OdfGlyphGenerator::Generate(*odfs, 0, *slice, nullptr, settings)->GetNumberOfPoints());
   }
 
-  // A coarse glyph is a closed surface on the 162 directions of mitk::pointshell, in their order,
-  // with triangles counterclockwise seen from outside and the normals of vtkPolyDataNormals.
+  /** Glyph widths in pixels that give the coarse meshes, and their numbers of points. */
+  static constexpr std::pair<double, vtkIdType> coarseLevels[] = {{10, 42}, {30, 162}};
+
+  // A coarse glyph is a closed surface on the 42 or 162 directions of mitk::pointshell, in their
+  // order, with triangles counterclockwise seen from outside and the normals of vtkPolyDataNormals.
   void GlyphGenerator_CoarseMesh_ClosedSurface()
   {
     auto image = MakeDegenerateTensorImage();
     const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 0, 0, 0, 1));
+    for (const auto &[width, n] : coarseLevels)
     for (const bool ellipsoids : {true, false})
     {
       auto settings = AllGlyphs();
       settings.tensorEllipsoids = ellipsoids;
-      settings.pixelsPerMm = PixelsPerMm(*slice, 1, 30);
+      settings.pixelsPerMm = PixelsPerMm(*slice, 1, width);
       auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
-      const vtkIdType n = 162;
+      const vtkIdType numTriangles = 2 * n - 4;
       CPPUNIT_ASSERT_EQUAL(3 * n, glyphs->GetNumberOfPoints());
-      CPPUNIT_ASSERT_EQUAL(3 * 320, static_cast<int>(glyphs->GetNumberOfPolys()));
+      CPPUNIT_ASSERT_EQUAL(3 * numTriangles, glyphs->GetNumberOfPolys());
       CPPUNIT_ASSERT(NormalsDeviation(glyphs) <= 1e-5);
 
       // Glyph 2, the rotated diag(3, 1, 1), has positive values in every direction.
@@ -1186,7 +1194,7 @@ public:
 
       std::map<std::pair<vtkIdType, vtkIdType>, int> directedEdges;
       auto ids = vtkSmartPointer<vtkIdList>::New();
-      for (vtkIdType t = 2 * 320; t < 3 * 320; ++t)
+      for (vtkIdType t = 2 * numTriangles; t < 3 * numTriangles; ++t)
       {
         glyphs->GetPolys()->GetCellAtId(t, ids);
         CPPUNIT_ASSERT_EQUAL(vtkIdType(3), ids->GetNumberOfIds());
@@ -1207,7 +1215,7 @@ public:
         CPPUNIT_ASSERT(outward > 0);
       }
       // Closed and consistently oriented: every edge once in each direction.
-      CPPUNIT_ASSERT_EQUAL(std::size_t(3 * 320), directedEdges.size());
+      CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(3 * numTriangles), directedEdges.size());
       for (const auto &[edge, count] : directedEdges)
       {
         CPPUNIT_ASSERT_EQUAL(1, count);
@@ -1237,6 +1245,7 @@ public:
       return ellipsoids ? 1 / std::sqrt(dot_product(u, inverseSquared * u)) : dot_product(u, tensor * u);
     };
 
+    for (const auto &[width, n] : coarseLevels)
     for (const bool ellipsoids : {true, false})
     {
       double largest = 0;
@@ -1247,9 +1256,8 @@ public:
       settings.tensorEllipsoids = ellipsoids;
       settings.colourByDirection = true;
       auto full = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
-      settings.pixelsPerMm = PixelsPerMm(*slice, 1, 30);
+      settings.pixelsPerMm = PixelsPerMm(*slice, 1, width);
       auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
-      const vtkIdType n = 162;
       CPPUNIT_ASSERT_EQUAL(3 * n, glyphs->GetNumberOfPoints());
       for (vtkIdType j = 0; j < n; ++j)
       {
@@ -1304,6 +1312,7 @@ public:
 
     mitk::ImageReadAccessor access(shImage.GetPointer(), shImage->GetVolumeData(0));
     const auto *values = static_cast<const float *>(access.GetData());
+    for (const auto &[width, n] : coarseLevels)
     for (const auto convention : {mitk::ShImage::MRTRIX, mitk::ShImage::FSL})
     {
       shImage->SetShConvention(convention);
@@ -1311,9 +1320,8 @@ public:
       auto settings = AllGlyphs();
       settings.scaling = 1.5;
       settings.scaleBy = mitk::ODFSB_GFA;
-      settings.pixelsPerMm = PixelsPerMm(*slice, settings.scaling, 30);
+      settings.pixelsPerMm = PixelsPerMm(*slice, settings.scaling, width);
       auto glyphs = mitk::OdfGlyphGenerator::Generate(*shImage, 0, *slice, nullptr, settings);
-      const vtkIdType n = 162;
       CPPUNIT_ASSERT_EQUAL(100 * n, glyphs->GetNumberOfPoints());
       auto colours = vtkUnsignedCharArray::SafeDownCast(glyphs->GetPointData()->GetArray("ODF_COLORS"));
       int checkedGlyphs = 0;

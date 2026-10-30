@@ -273,6 +273,8 @@ namespace
     if (kind != VoxelKind::Odf && settings.pixelsPerMm > 0)
     {
       const double widthInPixels = settings.scaling * slice.glyphSpacing * settings.pixelsPerMm;
+      if (widthInPixels < 16)
+        return GetGeodesicMesh<2>();
       if (widthInPixels < 40)
         return GetGeodesicMesh<4>();
     }
