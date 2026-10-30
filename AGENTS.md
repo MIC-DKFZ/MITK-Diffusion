@@ -194,7 +194,10 @@ Facts the layout does not show:
   particle in the image-axis frame and looks it up at the world direction. Tractography
   references in the test data (`StreamlineTractography/ReferenceFibs/`, `gibbsTractogram_v3.fib`)
   depend on the exact random engines and seeds, so a change there is checked bit for bit against
-  the old output.
+  the old output. The streamline inputs (`tensor_image.dti`, `qball_*`) follow the phantom's
+  bundles: they are fits of `StreamlineTractography/diffusion_image_v2` (FSL bvecs);
+  `diffusion_image.bvecs` has x not negated, as earlier MITK versions wrote bvecs, and read as
+  FSL bvecs gives directions mirrored in x (`TensorInput_FollowsAFitOfTheTestDwi`).
 - `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
   `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
   `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and
