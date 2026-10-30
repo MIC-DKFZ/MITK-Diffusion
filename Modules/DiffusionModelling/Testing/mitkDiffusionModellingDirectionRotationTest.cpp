@@ -24,6 +24,8 @@ found in the LICENSE file.
 
 #include <itkOrientationDistributionFunction.h>
 
+#include <vnl/algo/vnl_svd.h>
+#include <vnl/vnl_inverse.h>
 #include <vnl/vnl_rotation_matrix.h>
 
 #include <cmath>
@@ -41,6 +43,8 @@ class mitkDiffusionModellingDirectionRotationTestSuite : public mitk::TestFixtur
   MITK_TEST(Odf_BandLimited_ValuesAtTurnedDirections);
   MITK_TEST(Odf_TensorOdf_PrincipalDirectionTurned);
   MITK_TEST(Odf_Identity_Unchanged);
+  MITK_TEST(Odf_FloatRoundedGeometry_Unchanged);
+  MITK_TEST(Tensor_RotationAboveRounding_Applied);
   MITK_TEST(Rotate_NotOrthogonal_Throws);
   MITK_TEST(Rotate_PlainImage_Throws);
   CPPUNIT_TEST_SUITE_END();
@@ -288,6 +292,49 @@ public:
     identity.set_identity();
     mitk::ModelDirectionRotation::Rotate(image, identity);
     CPPUNIT_ASSERT(Values(image, ODF_SAMPLING_SIZE) == values);
+  }
+
+  // A reference whose matrix equals the input's up to float rounding (as NIfTI stores it) gives a
+  // "rotation" of about 1e-7; the ODFs stay as they are instead of going through the SH fit.
+  void Odf_FloatRoundedGeometry_Unchanged()
+  {
+    MatrixType oldMatrix = Oblique();
+    for (unsigned int c = 0; c < 3; ++c)
+      oldMatrix.set_column(c, oldMatrix.get_column(c) * (1.7 + 0.3 * c)); // anisotropic spacing
+    MatrixType newMatrix;
+    for (unsigned int r = 0; r < 3; ++r)
+      for (unsigned int c = 0; c < 3; ++c)
+        newMatrix(r, c) = static_cast<float>(oldMatrix(r, c));
+    // Rotation part (polar decomposition) of the change, as CopyGeometry computes it.
+    const vnl_svd<double> svd((newMatrix * vnl_inverse(oldMatrix)).as_matrix());
+    const MatrixType rounding = svd.U() * svd.V().transpose();
+    MatrixType identity;
+    identity.set_identity();
+    const double deviation = (rounding - identity).absolute_value_max();
+    MITK_INFO << "Rotation from float rounding of the geometry: " << deviation;
+    CPPUNIT_ASSERT(deviation > 0);
+
+    mitk::OdfImage::PixelType pixel;
+    const auto values = RandomCoefficients(ODF_SAMPLING_SIZE);
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      pixel[i] = values[i];
+    auto image = OneVoxelImage<mitk::OdfImage>(pixel);
+    mitk::ModelDirectionRotation::Rotate(image, rounding);
+    CPPUNIT_ASSERT(Values(image, ODF_SAMPLING_SIZE) == values);
+  }
+
+  // A rotation just above the rounding bound (1e-5 rad) is still applied.
+  void Tensor_RotationAboveRounding_Applied()
+  {
+    MatrixType d(0.0);
+    d(0, 0) = 3;
+    d(1, 1) = 1;
+    d(2, 2) = 1;
+    auto image = TensorImage(d);
+    const MatrixType rotation = vnl_rotation_matrix(Vector3(0, 0, 1e-5));
+    mitk::ModelDirectionRotation::Rotate(image, rotation);
+    // D_xy of R D R^T is (3 - 1) sin(a) cos(a), about 2e-5.
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2e-5, Values(image, 6)[1], 1e-7);
   }
 
   void Rotate_NotOrthogonal_Throws()
