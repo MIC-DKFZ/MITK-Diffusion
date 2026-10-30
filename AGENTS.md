@@ -184,10 +184,14 @@ Facts the layout does not show:
   The 3D fiber mapper draws tubes on the GPU from the lines (`Rendering/mitkFiberTubeShader.h`:
   VTK's tube shading with a geometry shader of the radius in mm; while tubes are on, the input
   carries a per-point direction so that the quads of neighbouring segments share their edge) and
-  ribbons on the CPU. Each 2D window gets only a band of fibers around its slab
-  (`Rendering/mitkFiberSlabIndex.h`, the same image as the whole bundle) and a new band when the
-  slab leaves it. Both fiber mappers keep their input and clipping planes and only move the
-  planes: a new input or plane collection makes VTK rebuild the GPU buffers of the whole input.
+  ribbons on the CPU. Each 2D window holds only the tiles of 1 mm along its plane normal near its
+  slab (`Rendering/mitkFiberSlabTiles.h`, an actor per tile, each segment in one tile; the index
+  `mitkFiberSlabIndex.h` holds the geometry only, so new colours keep the tiles): a slice or
+  rotation step uploads only the tiles it newly needs. The image is the whole bundle's except at
+  pixels of equal depth, where the tiles' draw order shows. A cell picked on the 2D prop is a run
+  of a tile; `FiberBundleMapper2D::PickedFiber` gives its fiber. Both fiber mappers keep their
+  inputs and clipping planes and only move the planes: a new input or plane collection makes VTK
+  rebuild the GPU buffers of that input.
   `FiberBundle` operations that keep, split or move fibers carry each fiber's weight along and
   give the same result at any number of OpenMP threads; fiber references in the test data
   depend on exact point positions, so a change there is checked bit for bit against the old output.
