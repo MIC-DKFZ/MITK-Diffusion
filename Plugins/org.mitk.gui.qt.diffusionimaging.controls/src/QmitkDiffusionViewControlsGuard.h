@@ -23,8 +23,10 @@ found in the LICENSE file.
  * QmitkDataStorageComboBox empties itself in its destructor and so emits currentIndexChanged and
  * OnSelectionChanged; a view slot connected to them then runs while the view's other widgets
  * are being deleted, and touching one that is already gone crashes the Workbench (closing the
- * view, or quitting, with data loaded). Which widgets are gone depends on their order in the
- * .ui file.
+ * view with data loaded). Which widgets are gone depends on their order in the .ui file.
+ * Quitting the Workbench destroys the views before their widgets, so it is not affected. The
+ * view itself goes right after its widgets, with no events processed in between, so its timers
+ * and worker results never reach deleted widgets.
  */
 namespace QmitkDiffusionViewControlsGuard
 {
