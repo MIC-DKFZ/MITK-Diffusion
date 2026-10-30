@@ -20,6 +20,7 @@ found in the LICENSE file.
 #include <cppunit/extensions/HelperMacros.h>
 
 #include <QPushButton>
+#include <QSpinBox>
 
 #include <vtkCell.h>
 #include <vtkPolyData.h>
@@ -37,6 +38,7 @@ class QmitkAttractiveViewUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Views_FiberProcessingCategory_AllFourViews);
   CPPUNIT_TEST(Resample_Bundle_FortyPointsPerStreamline);
   CPPUNIT_TEST(Brush_ViewClosedWhileActive_NoCrash);
+  CPPUNIT_TEST(Brush_SampleResetAndToggle_NoBrushOnTheOldSession);
   CPPUNIT_TEST_SUITE_END();
 
   static constexpr const char *AttractiveId = "org.mitk.views.interactivefiberdissection";
@@ -91,6 +93,51 @@ public:
       brush->setChecked(true);
     HideView(AttractiveId);
     Wait(200);
+  }
+
+  void Brush_SampleResetAndToggle_NoBrushOnTheOldSession()
+  {
+    // The labeling works on tractograms resampled to 40 points per streamline.
+    auto bundle = Load("fiberBundleX.fib");
+    auto *view = ShowView(AttractiveId, "QmitkInteractiveFiberDissectionViewControls");
+    ChooseNode(view, "m_TestBundleBox", bundle);
+    GetChild<QPushButton>(view, "m_ResampleButton")->click();
+    Wait(50);
+    ChooseNode(view, "m_TestBundleBox", GetDataStorage()->GetNamedNode(bundle->GetName() + "_40"));
+    GetChild<QSpinBox>(view, "m_NumRandomFibers")->setValue(10);
+    auto *brush = GetChild<QPushButton>(view, "m_BrushButton");
+    auto *sample = GetChild<QPushButton>(view, "m_AddRandomFibers");
+    const char *sessionNodes[] = {"ToLabel", "+Bundle", "-Bundle"};
+
+    // Sampling streamlines to label switches the labeling brush on; it can be switched off and on.
+    sample->click();
+    Wait(50);
+    for (const auto *name : sessionNodes)
+      CPPUNIT_ASSERT_MESSAGE(name, GetDataStorage()->GetNamedNode(name) != nullptr);
+    CPPUNIT_ASSERT(brush->isEnabled() && brush->isChecked());
+    brush->click();
+    CPPUNIT_ASSERT(!brush->isChecked());
+    brush->click();
+    CPPUNIT_ASSERT(brush->isChecked());
+
+    // Reset: the session's bundles go, every brush is off and cannot be switched on.
+    GetChild<QPushButton>(view, "m_resetClassifier")->click();
+    Wait(50);
+    for (const auto *name : sessionNodes)
+      CPPUNIT_ASSERT_MESSAGE(name, GetDataStorage()->GetNamedNode(name) == nullptr);
+    for (const auto *name : {"m_BrushButton", "m_unclabelingBrush", "m_unclabelingBrushGen", "m_predlabelingBrush",
+                             "m_predlabelingBrushGen", "m_distlabelingBrush", "m_distlabelingBrushGen"})
+    {
+      auto *button = GetChild<QPushButton>(view, name);
+      button->click();
+      CPPUNIT_ASSERT_MESSAGE(name, !button->isEnabled() && !button->isChecked());
+    }
+
+    // A new session labels again.
+    sample->click();
+    Wait(50);
+    CPPUNIT_ASSERT(brush->isEnabled() && brush->isChecked());
+    CPPUNIT_ASSERT(GetDataStorage()->GetNamedNode("ToLabel") != nullptr);
   }
 };
 
