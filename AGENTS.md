@@ -177,9 +177,10 @@ Facts the layout does not show:
   lines, and drops fibers without points with a warning; `SetFiberPolyData` gives the new fibers
   weight 1. The mask cut (`RemoveFibersOutside`) cuts segments at the mask border;
   `ResamplePolylineToNumPoints` (equal arc length) serves `ResampleToNumPoints` and the
-  clustering filter. The `FiberBundle` and `FiberProcessing` tests that change the OpenMP thread
-  count use `mitk::OmpThreadGuard` (`CMake/mitkOmpThreadGuard.h`, in the include path of each
-  test driver whose `Testing/CMakeLists.txt` includes `mitkDiffusionTestData`).
+  clustering filter. Tests that change the OpenMP thread count (`FiberBundle`, `FiberProcessing`,
+  `FiberTracking`, `MriSimulation`, `mitkDiffusionModellingAlgorithmsTest`) use
+  `mitk::OmpThreadGuard` (`CMake/mitkOmpThreadGuard.h`, in the include path of each test driver
+  whose `Testing/CMakeLists.txt` includes `mitkDiffusionTestData`).
 - `ctest -R 'mitkFiber(Transformation|Extraction|Processing|WeightsFile|DerivedImages|Clustering|ModificationFilter|ExtractionFilter|RoiImage)Test'`
   runs the `FiberProcessing` tests. Its filters read const bundles and give the same result at
   any number of OpenMP threads; bundles they derive keep the fiber weights, the RAS flag and a
