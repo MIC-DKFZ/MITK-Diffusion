@@ -247,7 +247,7 @@ Facts the layout does not show:
 ## Porting state
 
 In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
-line apps, plugins, user manuals) compile and link without warnings, and all 69 diffusion tests
+line apps, plugins, user manuals) compile and link without warnings, and all 70 diffusion tests
 pass. `DiffusionRelease` is built less often; its last full build stopped at the GCC 13 warning
 named under "Facts", which is fixed but not rebuilt there. The Workbench has not been started.
 Remove an item once it is fixed.
