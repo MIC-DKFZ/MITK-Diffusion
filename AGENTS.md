@@ -204,7 +204,10 @@ Facts the layout does not show:
   files is read as noncentral chi with the file's `numberofcoils`). An inversion time must be
   shorter than TR (`CheckInversionTime`). With a constant seed
   (`SetUseConstantRandSeed`, `MitkFiberfox --fix_seed`) a simulation gives the same image at any
-  number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`). Fiberfox references in the
+  number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`: output, coil, phase and k-space
+  images, spike log), and so does a fiber fit (`mitkFiberFitTest`; `--max_iter` counts L-BFGS-B
+  iterations). The simulation log (status text, log file, progress) is `mitk::FiberfoxLog`, which
+  reports progress through `itk::ProgressEvent`. Fiberfox references in the
   test data depend on the random engines and seeds, so a change there is checked bit for bit
   against the old output.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the

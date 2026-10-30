@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkTestingConfig.h>
 #include <mitkIOUtil.h>
 #include <omp.h>
+#include <cstring>
 #include <itkFitFibersToImageFilter.h>
 #include <mitkDiffusionTestData.h>
 #include <mitkTestFixture.h>
@@ -43,6 +44,7 @@ class mitkFiberFitTestSuite : public mitk::TestFixture
   MITK_TEST(Fit5);
   MITK_TEST(Fit6);
   MITK_TEST(RegularizationGradients);
+  MITK_TEST(SameAtThreadCounts);
   CPPUNIT_TEST_SUITE_END();
 
   typedef itk::Image<float, 3> ItkFloatImgType;
@@ -210,6 +212,38 @@ public:
     }
   }
 
+  /** Fiber weights and output images of a fit do not depend on the number of OpenMP threads, bit for bit. */
+  void SameAtThreadCounts()
+  {
+    auto fit = [this](int threads)
+    {
+      omp_set_num_threads(threads);
+      setUp();   // fresh tractograms: the fit writes its weights into them
+      fitter->SetRegularization(VnlCostFunction::VOXEL_VARIANCE);
+      fitter->Update();
+      return fitter;
+    };
+    FitterType::Pointer reference = fit(1);
+    FitterType::Pointer test = fit(8);
+
+    const auto referenceTracts = reference->GetTractograms();
+    const auto testTracts = test->GetTractograms();
+    CPPUNIT_ASSERT_EQUAL(referenceTracts.size(), testTracts.size());
+    for (std::size_t t = 0; t < testTracts.size(); ++t)
+      for (unsigned int i = 0; i < testTracts[t]->GetNumFibers(); ++i)
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("weight of fiber " + std::to_string(i) + " of bundle " + std::to_string(t),
+                                     referenceTracts[t]->GetFiberWeight(i), testTracts[t]->GetFiberWeight(i));
+
+    for (auto getter : {&FitterType::GetFittedImage, &FitterType::GetResidualImage, &FitterType::GetOverexplainedImage, &FitterType::GetUnderexplainedImage})
+    {
+      auto a = ((*reference).*getter)();
+      auto b = ((*test).*getter)();
+      CPPUNIT_ASSERT(a->GetLargestPossibleRegion() == b->GetLargestPossibleRegion());
+      const auto n = a->GetLargestPossibleRegion().GetNumberOfPixels();
+      CPPUNIT_ASSERT_MESSAGE("output image", std::memcmp(a->GetBufferPointer(), b->GetBufferPointer(), n*sizeof(*a->GetBufferPointer())) == 0);
+    }
+  }
+
   void Fit1()
   {
     omp_set_num_threads(1);
@@ -221,12 +255,12 @@ public:
     std::vector< mitk::FiberBundle::Pointer > output_tracts = fitter->GetTractograms();
     mitk::FiberBundle::Pointer test = mitk::FiberBundle::New();
     test = test->AddBundles(output_tracts);
-    mitk::FiberBundle::Pointer ref = LoadFib("out/NONE_fitted.fib");
+    mitk::FiberBundle::Pointer ref = LoadFib("out/NONE_fitted_v2.fib");
     CompareFibs(test, ref, "NONE_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "NONE_fitted_image_v2.nrrd");
-    CompareImages(fitter->GetResidualImage(), "NONE_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "NONE_overexplained_image_v3.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "NONE_underexplained_image_v3.nrrd");
+    CompareImages(fitter->GetFittedImage(), "NONE_fitted_image_v3.nrrd");
+    CompareImages(fitter->GetResidualImage(), "NONE_residual_image_v3.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "NONE_overexplained_image_v4.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "NONE_underexplained_image_v4.nrrd");
   }
 
   void Fit2()
@@ -240,12 +274,12 @@ public:
     std::vector< mitk::FiberBundle::Pointer > output_tracts = fitter->GetTractograms();
     mitk::FiberBundle::Pointer test = mitk::FiberBundle::New();
     test = test->AddBundles(output_tracts);
-    mitk::FiberBundle::Pointer ref = LoadFib("out/MSM_fitted.fib");
+    mitk::FiberBundle::Pointer ref = LoadFib("out/MSM_fitted_v2.fib");
     CompareFibs(test, ref, "MSM_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "MSM_fitted_image_v2.nrrd");
-    CompareImages(fitter->GetResidualImage(), "MSM_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "MSM_overexplained_image_v3.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "MSM_underexplained_image_v3.nrrd");
+    CompareImages(fitter->GetFittedImage(), "MSM_fitted_image_v3.nrrd");
+    CompareImages(fitter->GetResidualImage(), "MSM_residual_image_v3.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "MSM_overexplained_image_v4.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "MSM_underexplained_image_v4.nrrd");
   }
 
   void Fit3()
@@ -259,12 +293,12 @@ public:
     std::vector< mitk::FiberBundle::Pointer > output_tracts = fitter->GetTractograms();
     mitk::FiberBundle::Pointer test = mitk::FiberBundle::New();
     test = test->AddBundles(output_tracts);
-    mitk::FiberBundle::Pointer ref = LoadFib("out/MSE_fitted.fib");
+    mitk::FiberBundle::Pointer ref = LoadFib("out/MSE_fitted_v2.fib");
     CompareFibs(test, ref, "MSE_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "MSE_fitted_image_v3.nrrd");
-    CompareImages(fitter->GetResidualImage(), "MSE_residual_image_v3.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "MSE_overexplained_image_v4.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "MSE_underexplained_image_v4.nrrd");
+    CompareImages(fitter->GetFittedImage(), "MSE_fitted_image_v4.nrrd");
+    CompareImages(fitter->GetResidualImage(), "MSE_residual_image_v4.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "MSE_overexplained_image_v5.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "MSE_underexplained_image_v5.nrrd");
   }
 
   void Fit4()
@@ -278,12 +312,12 @@ public:
     std::vector< mitk::FiberBundle::Pointer > output_tracts = fitter->GetTractograms();
     mitk::FiberBundle::Pointer test = mitk::FiberBundle::New();
     test = test->AddBundles(output_tracts);
-    mitk::FiberBundle::Pointer ref = LoadFib("out/LocalMSE_fitted.fib");
+    mitk::FiberBundle::Pointer ref = LoadFib("out/LocalMSE_fitted_v2.fib");
     CompareFibs(test, ref, "LocalMSE_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "LocalMSE_fitted_image_v2.nrrd");
-    CompareImages(fitter->GetResidualImage(), "LocalMSE_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "LocalMSE_overexplained_image_v3.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "LocalMSE_underexplained_image_v3.nrrd");
+    CompareImages(fitter->GetFittedImage(), "LocalMSE_fitted_image_v3.nrrd");
+    CompareImages(fitter->GetResidualImage(), "LocalMSE_residual_image_v3.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "LocalMSE_overexplained_image_v4.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "LocalMSE_underexplained_image_v4.nrrd");
   }
 
   void Fit5()
@@ -296,12 +330,12 @@ public:
     std::vector< mitk::FiberBundle::Pointer > output_tracts = fitter->GetTractograms();
     mitk::FiberBundle::Pointer test = mitk::FiberBundle::New();
     test = test->AddBundles(output_tracts);
-    mitk::FiberBundle::Pointer ref = LoadFib("out/GroupMSE_fitted.fib");
+    mitk::FiberBundle::Pointer ref = LoadFib("out/GroupMSE_fitted_v2.fib");
     CompareFibs(test, ref, "GroupMSE_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "GroupMSE_fitted_image_v2.nrrd");
-    CompareImages(fitter->GetResidualImage(), "GroupMSE_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "GroupMSE_overexplained_image_v3.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "GroupMSE_underexplained_image_v3.nrrd");
+    CompareImages(fitter->GetFittedImage(), "GroupMSE_fitted_image_v3.nrrd");
+    CompareImages(fitter->GetResidualImage(), "GroupMSE_residual_image_v3.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "GroupMSE_overexplained_image_v4.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "GroupMSE_underexplained_image_v4.nrrd");
   }
 
   void Fit6()
@@ -315,12 +349,12 @@ public:
     std::vector< mitk::FiberBundle::Pointer > output_tracts = fitter->GetTractograms();
     mitk::FiberBundle::Pointer test = mitk::FiberBundle::New();
     test = test->AddBundles(output_tracts);
-    mitk::FiberBundle::Pointer ref = LoadFib("out/GroupLasso_fitted.fib");
+    mitk::FiberBundle::Pointer ref = LoadFib("out/GroupLasso_fitted_v2.fib");
     CompareFibs(test, ref, "GroupLasso_fitted.fib");
-    CompareImages(fitter->GetFittedImage(), "GroupLasso_fitted_image_v2.nrrd");
-    CompareImages(fitter->GetResidualImage(), "GroupLasso_residual_image_v2.nrrd");
-    CompareImages(fitter->GetOverexplainedImage(), "GroupLasso_overexplained_image_v3.nrrd");
-    CompareImages(fitter->GetUnderexplainedImage(), "GroupLasso_underexplained_image_v3.nrrd");
+    CompareImages(fitter->GetFittedImage(), "GroupLasso_fitted_image_v3.nrrd");
+    CompareImages(fitter->GetResidualImage(), "GroupLasso_residual_image_v3.nrrd");
+    CompareImages(fitter->GetOverexplainedImage(), "GroupLasso_overexplained_image_v4.nrrd");
+    CompareImages(fitter->GetUnderexplainedImage(), "GroupLasso_underexplained_image_v4.nrrd");
   }
 
 };

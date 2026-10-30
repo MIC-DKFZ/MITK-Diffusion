@@ -24,6 +24,7 @@ found in the LICENSE file.
 #include <mitkFiberfoxMotion.h>
 #include <itkRandomPhantomFilter.h>
 #include <itkKspaceImageFilter.h>
+#include <mitkFiberfoxLog.h>
 
 namespace
 {
@@ -61,6 +62,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(MotionMovesFibersAndMapsTogether);
   MITK_TEST(RandomPhantom);
   MITK_TEST(PartialFourierLines);
+  MITK_TEST(LogReportsProgress);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -407,6 +409,31 @@ public:
         CPPUNIT_ASSERT_EQUAL_MESSAGE("lines in reversed phase direction", expected, acquired[1]);
       }
     }
+  }
+
+  /** The log of a simulation (k-space steps run in parallel) reports each step's progress bar
+   * through itk::ProgressEvent, from 0 to 1, and keeps the whole text. */
+  void LogReportsProgress()
+  {
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+    auto filter = FilterType::New();
+    filter->SetUseConstantRandSeed(true);
+    filter->SetParameters(parameters);
+    filter->SetFiberBundle(m_FiberBundle);
+
+    mitk::FiberfoxLog* log = filter->GetLog();
+    std::vector<double> progress;
+    log->AddObserver(itk::ProgressEvent(), [&](const itk::EventObject&) { progress.push_back(log->GetProgress()); });
+    filter->Update();
+
+    CPPUNIT_ASSERT_MESSAGE("progress events", !progress.empty());
+    for (double p : progress)
+      CPPUNIT_ASSERT_MESSAGE("progress in (0, 1]", p > 0 && p <= 1);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("last step complete", 1.0, progress.back());
+    const std::string text = filter->GetStatusText();
+    CPPUNIT_ASSERT_MESSAGE("status text", text.find("Finished simulation") != std::string::npos);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("status text of filter and log", log->GetStatusText(), text);
   }
 };
 

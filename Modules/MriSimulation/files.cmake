@@ -5,6 +5,7 @@ set(CPP_FILES
   Algorithms/itkFitFibersToImageFilter.cpp
   Algorithms/itkFibersFromPlanarFiguresFilter.cpp
   Algorithms/itkRandomPhantomFilter.cpp
+  Algorithms/mitkFiberfoxLog.cpp
 )
 
 set(H_FILES
@@ -18,6 +19,7 @@ set(H_FILES
   Algorithms/itkFieldmapGeneratorFilter.h
   Algorithms/itkRandomPhantomFilter.h
   Algorithms/mitkFiberfoxMotion.h
+  Algorithms/mitkFiberfoxLog.h
 
   SignalModels/mitkDiffusionSignalModel.h
   SignalModels/mitkTensorModel.h

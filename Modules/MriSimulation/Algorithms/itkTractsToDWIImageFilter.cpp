@@ -70,7 +70,7 @@ namespace itk
 
 template< class PixelType >
 TractsToDWIImageFilter< PixelType >::TractsToDWIImageFilter()
-  : m_StatusText("")
+  : m_Log(mitk::FiberfoxLog::New())
   , m_UseConstantRandSeed(false)
   , m_RandGen(itk::Statistics::MersenneTwisterRandomVariateGenerator::New())
 {
@@ -84,54 +84,32 @@ TractsToDWIImageFilter< PixelType >::~TractsToDWIImageFilter()
 }
 
 template< class PixelType >
-TractsToDWIImageFilter< PixelType >::DoubleDwiType::Pointer TractsToDWIImageFilter< PixelType >::
-SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_images )
+double& TractsToDWIImageFilter< PixelType >::Component(DoubleDwiType* image, const DoubleDwiType::IndexType& index, unsigned int k)
 {
-  unsigned int numFiberCompartments = m_Parameters.m_FiberModelList.size();
-  // create slice object
-  ImageRegion<2> sliceRegion;
-  sliceRegion.SetSize(0, m_WorkingImageRegion.GetSize()[0]);
-  sliceRegion.SetSize(1, m_WorkingImageRegion.GetSize()[1]);
-  Vector< double, 2 > sliceSpacing;
-  sliceSpacing[0] = m_WorkingSpacing[0];
-  sliceSpacing[1] = m_WorkingSpacing[1];
+  return image->GetBufferPointer()[image->ComputeOffset(index)*image->GetNumberOfComponentsPerPixel() + k];
+}
 
-  DoubleDwiType::PixelType nullPix; nullPix.SetSize(compartment_images.at(0)->GetVectorLength()); nullPix.Fill(0.0);
-  auto magnitudeDwiImage = DoubleDwiType::New();
-  magnitudeDwiImage->SetSpacing( m_Parameters.m_SignalGen.m_ImageSpacing );
-  magnitudeDwiImage->SetOrigin( m_Parameters.m_SignalGen.m_ImageOrigin );
-  magnitudeDwiImage->SetDirection( m_Parameters.m_SignalGen.m_ImageDirection );
-  magnitudeDwiImage->SetLargestPossibleRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
-  magnitudeDwiImage->SetBufferedRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
-  magnitudeDwiImage->SetRequestedRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
-  magnitudeDwiImage->SetVectorLength( compartment_images.at(0)->GetVectorLength() );
-  magnitudeDwiImage->Allocate();
-  magnitudeDwiImage->FillBuffer(nullPix);
+template< class PixelType >
+TractsToDWIImageFilter< PixelType >::DoubleDwiType::Pointer TractsToDWIImageFilter< PixelType >::
+NewKspaceResultImage(unsigned int components) const
+{
+  DoubleDwiType::PixelType nullPix; nullPix.SetSize(components); nullPix.Fill(0.0);
+  auto image = DoubleDwiType::New();
+  image->SetSpacing( m_Parameters.m_SignalGen.m_ImageSpacing );
+  image->SetOrigin( m_Parameters.m_SignalGen.m_ImageOrigin );
+  image->SetDirection( m_Parameters.m_SignalGen.m_ImageDirection );
+  image->SetLargestPossibleRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
+  image->SetBufferedRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
+  image->SetRequestedRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
+  image->SetVectorLength( components );
+  image->Allocate();
+  image->FillBuffer(nullPix);
+  return image;
+}
 
-  m_PhaseImage = DoubleDwiType::New();
-  m_PhaseImage->SetSpacing( m_Parameters.m_SignalGen.m_ImageSpacing );
-  m_PhaseImage->SetOrigin( m_Parameters.m_SignalGen.m_ImageOrigin );
-  m_PhaseImage->SetDirection( m_Parameters.m_SignalGen.m_ImageDirection );
-  m_PhaseImage->SetLargestPossibleRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
-  m_PhaseImage->SetBufferedRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
-  m_PhaseImage->SetRequestedRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
-  m_PhaseImage->SetVectorLength( compartment_images.at(0)->GetVectorLength() );
-  m_PhaseImage->Allocate();
-  m_PhaseImage->FillBuffer(nullPix);
-
-  m_KspaceImage = DoubleDwiType::New();
-  m_KspaceImage->SetSpacing( m_Parameters.m_SignalGen.m_ImageSpacing );
-  m_KspaceImage->SetOrigin( m_Parameters.m_SignalGen.m_ImageOrigin );
-  m_KspaceImage->SetDirection( m_Parameters.m_SignalGen.m_ImageDirection );
-  m_KspaceImage->SetLargestPossibleRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
-  m_KspaceImage->SetBufferedRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
-  m_KspaceImage->SetRequestedRegion( m_Parameters.m_SignalGen.m_CroppedRegion );
-  m_KspaceImage->SetVectorLength( m_Parameters.m_SignalGen.m_NumberOfCoils );
-  m_KspaceImage->Allocate();
-  DoubleDwiType::PixelType nullCoilPix; nullCoilPix.SetSize(m_Parameters.m_SignalGen.m_NumberOfCoils); nullCoilPix.Fill(0.0);  // one value per coil
-  m_KspaceImage->FillBuffer(nullCoilPix);
-
-  // calculate coil positions
+template< class PixelType >
+std::vector< itk::Vector<double, 3> > TractsToDWIImageFilter< PixelType >::ComputeCoilPositions()
+{
   double a = m_Parameters.m_SignalGen.m_ImageRegion.GetSize(0)*m_Parameters.m_SignalGen.m_ImageSpacing[0];
   double b = m_Parameters.m_SignalGen.m_ImageRegion.GetSize(1)*m_Parameters.m_SignalGen.m_ImageSpacing[1];
   double c = m_Parameters.m_SignalGen.m_ImageRegion.GetSize(2)*m_Parameters.m_SignalGen.m_ImageSpacing[2];
@@ -163,31 +141,54 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
 
     pos.SetVnlVector(rotZ*pos.GetVnlVector());
   }
+  return coilPositions;
+}
 
-  auto num_slices = compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2);
-  auto num_gradient_volumes = static_cast<int>(compartment_images.at(0)->GetVectorLength());
+template< class PixelType >
+std::vector< typename TractsToDWIImageFilter< PixelType >::Spike > TractsToDWIImageFilter< PixelType >::
+DrawSpikes(unsigned int numVolumes, unsigned int numSlices)
+{
+  std::vector< Spike > spikes;
+  if (m_Parameters.m_Misc.m_DoAddSpikes)
+    for (unsigned int i=0; i<m_Parameters.m_SignalGen.m_Spikes; i++)
+    {
+      // One statement per draw, coil first: the references were made with the three draws as
+      // arguments of one constructor call, which GCC evaluates from right to left.
+      Spike spike;
+      spike.coil = m_RandGen->GetIntegerVariate()%m_Parameters.m_SignalGen.m_NumberOfCoils;
+      spike.slice = m_RandGen->GetIntegerVariate()%numSlices;
+      spike.volume = m_RandGen->GetIntegerVariate()%numVolumes;
+      spikes.push_back(spike);
+    }
+  return spikes;
+}
+
+template< class PixelType >
+TractsToDWIImageFilter< PixelType >::DoubleDwiType::Pointer TractsToDWIImageFilter< PixelType >::
+SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_images )
+{
+  const auto num_slices = static_cast<unsigned int>(compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2));
+  const auto num_gradient_volumes = static_cast<int>(compartment_images.at(0)->GetVectorLength());
+
+  KspaceRun run;
+  run.compartmentImages = &compartment_images;
+  run.magnitude = NewKspaceResultImage(compartment_images.at(0)->GetVectorLength());
+  m_PhaseImage = NewKspaceResultImage(compartment_images.at(0)->GetVectorLength());
+  m_KspaceImage = NewKspaceResultImage(m_Parameters.m_SignalGen.m_NumberOfCoils);  // one value per coil
+  run.coilPositions = ComputeCoilPositions();
+
   auto max_threads = omp_get_max_threads();
   // Volumes in parallel first: the k-space filter prepares each slice in one thread, and the
   // threads left over work on the slices of fewer volumes. The seeds are per volume, slice and coil,
   // so the split does not change the result.
   int out_threads = std::max(1, std::min(max_threads, num_gradient_volumes));
-  int in_threads = std::max(1, max_threads/out_threads);
+  run.threadsPerSlice = std::max(1, max_threads/out_threads);
   PrintToLog("Parallel volumes: " + boost::lexical_cast<std::string>(out_threads), false, true, true);
-  PrintToLog("Threads per slice: " + boost::lexical_cast<std::string>(in_threads), false, true, true);
+  PrintToLog("Threads per slice: " + boost::lexical_cast<std::string>(run.threadsPerSlice), false, true, true);
 
-  std::list< std::tuple<unsigned int, unsigned int, unsigned int> > spikes;
-  if (m_Parameters.m_Misc.m_DoAddSpikes)
-    for (unsigned int i=0; i<m_Parameters.m_SignalGen.m_Spikes; i++)
-    {
-      // gradient volume and slice index
-      auto spike = std::tuple<unsigned int, unsigned int, unsigned int>(
-            m_RandGen->GetIntegerVariate()%num_gradient_volumes,
-            m_RandGen->GetIntegerVariate()%num_slices,
-            m_RandGen->GetIntegerVariate()%m_Parameters.m_SignalGen.m_NumberOfCoils);
-      spikes.push_back(spike);
-    }
-
-  bool output_timing = m_Parameters.m_Misc.m_OutputAdditionalImages;
+  run.spikes = DrawSpikes(num_gradient_volumes, num_slices);
+  // the timings are the same in every slice, so one fixed job stores them
+  run.storeTimings = m_Parameters.m_Misc.m_OutputAdditionalImages;
 
   // All slices read the echo time, so it is raised to the readout's minimum once, before the
   // parallel loop, instead of by each k-space filter.
@@ -199,17 +200,10 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
     m_Parameters.m_Misc.m_AfterSimulationMessage += "Echo time was chosen too short! Time not sufficient to read slice. Internally adjusted to " + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_tEcho) + " ms\n";
   }
 
-  StartProgress(static_cast<unsigned long>(num_gradient_volumes)*compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2));
+  StartProgress(static_cast<unsigned long>(num_gradient_volumes)*num_slices);
 
-  // The volumes are simulated in parallel, and every voxel vector holds one component per volume
-  // (per coil for the k-space image). GetPixel/SetPixel of an itk::VectorImage copy the whole voxel
-  // vector, so a write-back that way overwrites the components other threads store at the same time
-  // (lost updates, seen as zeros in the output). Each thread therefore writes only its own component.
-  auto component = [](DoubleDwiType* image, const DoubleDwiType::IndexType& index, unsigned int k) -> double&
-  {
-    return image->GetBufferPointer()[image->ComputeOffset(index)*image->GetNumberOfComponentsPerPixel() + k];
-  };
-
+  // one spike log per volume, joined in volume order, so the log does not depend on the threads
+  std::vector< std::string > spikeLogs(num_gradient_volumes);
   std::atomic<bool> loopFailed(false);
   std::exception_ptr loopException;
 #pragma omp parallel for num_threads(out_threads)
@@ -220,159 +214,7 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
 
     try
     {
-      std::list< std::tuple<unsigned int, unsigned int> > spikeSlice;
-#pragma omp critical
-      {
-
-        for (auto spike : spikes)
-          if (std::get<0>(spike) == static_cast<unsigned int>(g))
-            spikeSlice.push_back(std::tuple<unsigned int, unsigned int>(std::get<1>(spike), std::get<2>(spike)));
-      }
-
-      for (unsigned int z=0; z<num_slices; z++)
-      {
-        std::vector< Float2DImageType::Pointer > compartment_slices;
-        std::vector< float > t2Vector;
-        std::vector< float > t1Vector;
-
-        for (unsigned int i=0; i<compartment_images.size(); i++)
-        {
-          mitk::DiffusionSignalModel<double>* signalModel;
-          if (i<numFiberCompartments)
-            signalModel = m_Parameters.m_FiberModelList.at(i);
-          else
-            signalModel = m_Parameters.m_NonFiberModelList.at(i-numFiberCompartments);
-
-          auto slice = Float2DImageType::New();
-          slice->SetLargestPossibleRegion( sliceRegion );
-          slice->SetBufferedRegion( sliceRegion );
-          slice->SetRequestedRegion( sliceRegion );
-          slice->SetSpacing(sliceSpacing);
-          slice->Allocate();
-          slice->FillBuffer(0.0);
-
-          // extract slice from channel g
-          for (unsigned int y=0; y<compartment_images.at(0)->GetLargestPossibleRegion().GetSize(1); y++)
-            for (unsigned int x=0; x<compartment_images.at(0)->GetLargestPossibleRegion().GetSize(0); x++)
-            {
-              Float2DImageType::IndexType index2D; index2D[0]=x; index2D[1]=y;
-              DoubleDwiType::IndexType index3D; index3D[0]=x; index3D[1]=y; index3D[2]=z;
-
-              slice->SetPixel(index2D, compartment_images.at(i)->GetPixel(index3D)[g]);
-            }
-
-          compartment_slices.push_back(slice);
-          t2Vector.push_back(signalModel->GetT2());
-          t1Vector.push_back(signalModel->GetT1());
-        }
-
-        if (this->GetAbortGenerateData())
-          continue;
-
-        for (unsigned int c=0; c<m_Parameters.m_SignalGen.m_NumberOfCoils; c++)
-        {
-          int numSpikes = 0;
-          for (auto ss : spikeSlice)
-            if (std::get<0>(ss) == z && std::get<1>(ss) == c)
-              ++numSpikes;
-
-          // create k-sapce (inverse fourier transform slices)
-          auto idft = itk::KspaceImageFilter< Float2DImageType::PixelType >::New();
-          idft->SetCompartmentImages(compartment_slices);
-          idft->SetT2(t2Vector);
-          idft->SetT1(t1Vector);
-          if (m_UseConstantRandSeed)
-          {
-            int linear_seed = g + num_gradient_volumes*z + num_gradient_volumes*compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2)*c;
-            idft->SetRandSeed(linear_seed);
-          }
-          idft->SetParameters(&m_Parameters);
-          idft->SetZ((float)z-(float)( compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2)
-                                       -compartment_images.at(0)->GetLargestPossibleRegion().GetSize(2)%2 ) / 2.0);
-          idft->SetZidx(z);
-          idft->SetCoilPosition(coilPositions.at(c));
-          idft->SetMotion(m_Motion.at(g));
-          idft->SetDiffusionGradientDirection(m_Parameters.m_SignalGen.GetGradientDirection(g)*m_Parameters.m_SignalGen.GetBvalue()/1000.0);
-          idft->SetSpikesPerSlice(numSpikes);
-          idft->SetNumberOfWorkUnits(in_threads);
-#pragma omp critical
-          if (output_timing)
-          {
-              idft->SetStoreTimings(true);
-              output_timing = false;
-          }
-          idft->Update();
-
-#pragma omp critical
-          if (numSpikes>0)
-          {
-            m_SpikeLog += "Volume " + boost::lexical_cast<std::string>(g) + " Coil " + boost::lexical_cast<std::string>(c) + "\n";
-            m_SpikeLog += idft->GetSpikeLog();
-          }
-
-          Complex2DImageType::Pointer fSlice;
-          fSlice = idft->GetOutput();
-
-          if (idft->GetTickImage().IsNotNull())
-              m_TickImage = idft->GetTickImage();
-          if (idft->GetRfImage().IsNotNull())
-              m_RfImage = idft->GetRfImage();
-
-          // fourier transform slice
-          Complex2DImageType::Pointer newSlice;
-          auto dft = itk::DftImageFilter< Float2DImageType::PixelType >::New();
-          dft->SetInput(fSlice);
-          dft->SetNumberOfWorkUnits(in_threads);
-          dft->Update();
-          newSlice = dft->GetOutput();
-
-          // put slice back into channel g
-          for (unsigned int y=0; y<fSlice->GetLargestPossibleRegion().GetSize(1); y++)
-            for (unsigned int x=0; x<fSlice->GetLargestPossibleRegion().GetSize(0); x++)
-            {
-              DoubleDwiType::IndexType index3D; index3D[0]=x; index3D[1]=y; index3D[2]=z;
-              Complex2DImageType::IndexType index2D; index2D[0]=x; index2D[1]=y;
-
-              Complex2DImageType::PixelType cPix = newSlice->GetPixel(index2D);
-              double magn = sqrt(cPix.real()*cPix.real()+cPix.imag()*cPix.imag());
-              // in (-pi, pi]; atan(imag/real) lost the quadrant
-              double phase = std::arg(cPix);
-
-              component(m_OutputImagesReal.at(c), index3D, g) = cPix.real();
-              component(m_OutputImagesImag.at(c), index3D, g) = cPix.imag();
-
-              if (m_Parameters.m_SignalGen.m_NumberOfCoils>1)
-              {
-                component(magnitudeDwiImage, index3D, g) += magn*magn;
-                component(m_PhaseImage, index3D, g) += phase*phase;
-              }
-              else
-              {
-                component(magnitudeDwiImage, index3D, g) = magn;
-                component(m_PhaseImage, index3D, g) = phase;
-              }
-
-              // k-space image
-              if (g==0)
-                component(m_KspaceImage, index3D, c) = idft->GetKSpaceImage()->GetPixel(index2D);
-            }
-        }
-
-        if (m_Parameters.m_SignalGen.m_NumberOfCoils>1)
-        {
-          for (int y=0; y<static_cast<int>(magnitudeDwiImage->GetLargestPossibleRegion().GetSize(1)); y++)
-            for (int x=0; x<static_cast<int>(magnitudeDwiImage->GetLargestPossibleRegion().GetSize(0)); x++)
-            {
-              DoubleDwiType::IndexType index3D; index3D[0]=x; index3D[1]=y; index3D[2]=z;
-              double& magnitude = component(magnitudeDwiImage, index3D, g);
-              magnitude = sqrt(magnitude/m_Parameters.m_SignalGen.m_NumberOfCoils);
-              double& phase = component(m_PhaseImage, index3D, g);
-              phase = sqrt(phase/m_Parameters.m_SignalGen.m_NumberOfCoils);
-            }
-        }
-
-        AdvanceProgress();
-      }
+      spikeLogs[g] = SimulateKspaceVolume(run, g);
     }
     catch (...)
     {
@@ -384,12 +226,187 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
     }
   }
 
-
   if (loopException)
     std::rethrow_exception(loopException);
 
+  for (const auto& spikeLog : spikeLogs)
+    m_SpikeLog += spikeLog;
+
   PrintToLog("\n", false);
-  return magnitudeDwiImage;
+  return run.magnitude;
+}
+
+template< class PixelType >
+std::string TractsToDWIImageFilter< PixelType >::SimulateKspaceVolume(const KspaceRun& run, unsigned int g)
+{
+  std::string spikeLog;
+  const auto num_slices = run.compartmentImages->at(0)->GetLargestPossibleRegion().GetSize(2);
+  for (unsigned int z=0; z<num_slices; z++)
+  {
+    std::vector< Float2DImageType::Pointer > compartment_slices;
+    std::vector< float > t2Vector;
+    std::vector< float > t1Vector;
+    ExtractCompartmentSlices(*run.compartmentImages, g, z, compartment_slices, t1Vector, t2Vector);
+
+    if (this->GetAbortGenerateData())
+      return spikeLog;
+
+    for (unsigned int c=0; c<m_Parameters.m_SignalGen.m_NumberOfCoils; c++)
+      spikeLog += SimulateKspaceCoil(run, g, z, c, compartment_slices, t1Vector, t2Vector);
+
+    if (m_Parameters.m_SignalGen.m_NumberOfCoils>1)
+      CombineCoils(run.magnitude, g, z);
+
+    AdvanceProgress();
+  }
+  return spikeLog;
+}
+
+template< class PixelType >
+void TractsToDWIImageFilter< PixelType >::ExtractCompartmentSlices(const std::vector< DoubleDwiType::Pointer >& images, unsigned int g, unsigned int z,
+                                                                   std::vector< Float2DImageType::Pointer >& slices, std::vector< float >& t1, std::vector< float >& t2) const
+{
+  const unsigned int numFiberCompartments = m_Parameters.m_FiberModelList.size();
+  ImageRegion<2> sliceRegion;
+  sliceRegion.SetSize(0, m_WorkingImageRegion.GetSize()[0]);
+  sliceRegion.SetSize(1, m_WorkingImageRegion.GetSize()[1]);
+  Vector< double, 2 > sliceSpacing;
+  sliceSpacing[0] = m_WorkingSpacing[0];
+  sliceSpacing[1] = m_WorkingSpacing[1];
+
+  for (unsigned int i=0; i<images.size(); i++)
+  {
+    mitk::DiffusionSignalModel<double>* signalModel;
+    if (i<numFiberCompartments)
+      signalModel = m_Parameters.m_FiberModelList.at(i);
+    else
+      signalModel = m_Parameters.m_NonFiberModelList.at(i-numFiberCompartments);
+
+    auto slice = Float2DImageType::New();
+    slice->SetLargestPossibleRegion( sliceRegion );
+    slice->SetBufferedRegion( sliceRegion );
+    slice->SetRequestedRegion( sliceRegion );
+    slice->SetSpacing(sliceSpacing);
+    slice->Allocate();
+    slice->FillBuffer(0.0);
+
+    // extract slice from channel g
+    for (unsigned int y=0; y<images.at(0)->GetLargestPossibleRegion().GetSize(1); y++)
+      for (unsigned int x=0; x<images.at(0)->GetLargestPossibleRegion().GetSize(0); x++)
+      {
+        Float2DImageType::IndexType index2D; index2D[0]=x; index2D[1]=y;
+        DoubleDwiType::IndexType index3D; index3D[0]=x; index3D[1]=y; index3D[2]=z;
+
+        slice->SetPixel(index2D, images.at(i)->GetPixel(index3D)[g]);
+      }
+
+    slices.push_back(slice);
+    t2.push_back(signalModel->GetT2());
+    t1.push_back(signalModel->GetT1());
+  }
+}
+
+template< class PixelType >
+std::string TractsToDWIImageFilter< PixelType >::SimulateKspaceCoil(const KspaceRun& run, unsigned int g, unsigned int z, unsigned int c,
+                                                                    const std::vector< Float2DImageType::Pointer >& slices, const std::vector< float >& t1, const std::vector< float >& t2)
+{
+  const auto num_gradient_volumes = run.compartmentImages->at(0)->GetVectorLength();
+  const auto num_slices = run.compartmentImages->at(0)->GetLargestPossibleRegion().GetSize(2);
+
+  int numSpikes = 0;
+  for (const auto& spike : run.spikes)
+    if (spike.volume == g && spike.slice == z && spike.coil == c)
+      ++numSpikes;
+
+  // create k-space (inverse fourier transform slices)
+  auto idft = itk::KspaceImageFilter< Float2DImageType::PixelType >::New();
+  idft->SetCompartmentImages(slices);
+  idft->SetT2(t2);
+  idft->SetT1(t1);
+  if (m_UseConstantRandSeed)
+  {
+    int linear_seed = g + num_gradient_volumes*z + num_gradient_volumes*num_slices*c;
+    idft->SetRandSeed(linear_seed);
+  }
+  idft->SetParameters(&m_Parameters);
+  idft->SetZ((float)z-(float)( num_slices - num_slices%2 ) / 2.0);
+  idft->SetZidx(z);
+  idft->SetCoilPosition(run.coilPositions.at(c));
+  idft->SetMotion(m_Motion.at(g));
+  idft->SetDiffusionGradientDirection(m_Parameters.m_SignalGen.GetGradientDirection(g)*m_Parameters.m_SignalGen.GetBvalue()/1000.0);
+  idft->SetSpikesPerSlice(numSpikes);
+  idft->SetNumberOfWorkUnits(run.threadsPerSlice);
+  const bool storeTimings = run.storeTimings && g==0 && z==0 && c==0;
+  idft->SetStoreTimings(storeTimings);
+  idft->Update();
+
+  std::string spikeLog;
+  if (numSpikes>0)
+    spikeLog = "Volume " + boost::lexical_cast<std::string>(g) + " Coil " + boost::lexical_cast<std::string>(c) + "\n" + idft->GetSpikeLog();
+
+  Complex2DImageType::Pointer fSlice;
+  fSlice = idft->GetOutput();
+
+  // only this job writes them
+  if (storeTimings)
+  {
+    m_TickImage = idft->GetTickImage();
+    m_RfImage = idft->GetRfImage();
+  }
+
+  // fourier transform slice
+  Complex2DImageType::Pointer newSlice;
+  auto dft = itk::DftImageFilter< Float2DImageType::PixelType >::New();
+  dft->SetInput(fSlice);
+  dft->SetNumberOfWorkUnits(run.threadsPerSlice);
+  dft->Update();
+  newSlice = dft->GetOutput();
+
+  // put slice back into channel g
+  for (unsigned int y=0; y<fSlice->GetLargestPossibleRegion().GetSize(1); y++)
+    for (unsigned int x=0; x<fSlice->GetLargestPossibleRegion().GetSize(0); x++)
+    {
+      DoubleDwiType::IndexType index3D; index3D[0]=x; index3D[1]=y; index3D[2]=z;
+      Complex2DImageType::IndexType index2D; index2D[0]=x; index2D[1]=y;
+
+      Complex2DImageType::PixelType cPix = newSlice->GetPixel(index2D);
+      double magn = sqrt(cPix.real()*cPix.real()+cPix.imag()*cPix.imag());
+      // in (-pi, pi]; atan(imag/real) lost the quadrant
+      double phase = std::arg(cPix);
+
+      Component(m_OutputImagesReal.at(c), index3D, g) = cPix.real();
+      Component(m_OutputImagesImag.at(c), index3D, g) = cPix.imag();
+
+      if (m_Parameters.m_SignalGen.m_NumberOfCoils>1)
+      {
+        Component(run.magnitude, index3D, g) += magn*magn;
+        Component(m_PhaseImage, index3D, g) += phase*phase;
+      }
+      else
+      {
+        Component(run.magnitude, index3D, g) = magn;
+        Component(m_PhaseImage, index3D, g) = phase;
+      }
+
+      // k-space image
+      if (g==0)
+        Component(m_KspaceImage, index3D, c) = idft->GetKSpaceImage()->GetPixel(index2D);
+    }
+  return spikeLog;
+}
+
+template< class PixelType >
+void TractsToDWIImageFilter< PixelType >::CombineCoils(DoubleDwiType* magnitudeImage, unsigned int g, unsigned int z)
+{
+  for (int y=0; y<static_cast<int>(magnitudeImage->GetLargestPossibleRegion().GetSize(1)); y++)
+    for (int x=0; x<static_cast<int>(magnitudeImage->GetLargestPossibleRegion().GetSize(0)); x++)
+    {
+      DoubleDwiType::IndexType index3D; index3D[0]=x; index3D[1]=y; index3D[2]=z;
+      double& magnitude = Component(magnitudeImage, index3D, g);
+      magnitude = sqrt(magnitude/m_Parameters.m_SignalGen.m_NumberOfCoils);
+      double& phase = Component(m_PhaseImage, index3D, g);
+      phase = sqrt(phase/m_Parameters.m_SignalGen.m_NumberOfCoils);
+    }
 }
 
 template< class PixelType >
@@ -888,8 +905,7 @@ void TractsToDWIImageFilter< PixelType >::InitializeFiberData()
 template< class PixelType >
 bool TractsToDWIImageFilter< PixelType >::PrepareLogFile()
 {
-  if(m_Logfile.is_open())
-    m_Logfile.close();
+  m_Log->CloseFile();
 
   std::string filePath;
   std::string fileName;
@@ -921,18 +937,7 @@ bool TractsToDWIImageFilter< PixelType >::PrepareLogFile()
     fileName = m_Parameters.m_Misc.m_OutputPrefix + fileName;
   }
 
-  try
-  {
-    m_Logfile.open( ( filePath + '/' + fileName + ".log" ).c_str() );
-  }
-  catch (const std::ios_base::failure &fail)
-  {
-    MITK_ERROR << "itkTractsToDWIImageFilter.cpp: Exception " << fail.what()
-               << " while trying to open file" << filePath << '/' << fileName << ".log";
-    return false;
-  }
-
-  if ( m_Logfile.is_open() )
+  if ( m_Log->OpenFile( filePath + '/' + fileName + ".log" ) )
   {
     PrintToLog( "Logfile: " + filePath + '/' + fileName + ".log", false );
     return true;
@@ -1264,7 +1269,7 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
   PrepareLogFile();
   PrintToLog("Starting Fiberfox dMRI simulation");
 
-  m_TimeProbe.Start();
+  m_Log->StartTimer();
 
   // check input data
   if (m_FiberBundle.IsNull() && m_InputImage.IsNull())
@@ -1517,7 +1522,6 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
 
   PrintToLog("\n", false);
   PrintToLog("Finished simulation");
-  m_TimeProbe.Stop();
 
   if (m_Parameters.m_SignalGen.m_DoAddMotion)
   {
@@ -1531,81 +1535,9 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     PrintToLog(m_SpikeLog, false, false);
   }
 
-  if (m_Logfile.is_open())
-    m_Logfile.close();
+  m_Log->CloseFile();
 }
 
-
-template< class PixelType >
-std::string TractsToDWIImageFilter< PixelType >::GetStatusText() const
-{
-  std::lock_guard<std::mutex> lock(m_LogMutex);
-  return m_StatusText;
-}
-
-template< class PixelType >
-void TractsToDWIImageFilter< PixelType >::StartProgress(unsigned long total)
-{
-  {
-    std::lock_guard<std::mutex> lock(m_ProgressMutex);
-    m_ProgressTotal = std::max(total, 1ul);
-    m_ProgressCount = 0;
-    m_ProgressStars = 0;
-  }
-  PrintToLog("0%   10   20   30   40   50   60   70   80   90   100%", false, true, true);
-  PrintToLog("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, true);
-}
-
-template< class PixelType >
-void TractsToDWIImageFilter< PixelType >::AdvanceProgress()
-{
-  unsigned long newStars = 0;
-  {
-    std::lock_guard<std::mutex> lock(m_ProgressMutex);
-    ++m_ProgressCount;
-    const unsigned long stars = 50*std::min(m_ProgressCount, m_ProgressTotal)/m_ProgressTotal;
-    newStars = stars - m_ProgressStars;
-    m_ProgressStars = stars;
-  }
-  if (newStars>0)
-    PrintToLog(std::string(newStars, '*'), false, false, true);
-}
-
-template< class PixelType >
-void TractsToDWIImageFilter< PixelType >::PrintToLog(std::string m, bool addTime, bool linebreak, bool stdOut)
-{
-  // called from the parallel loops, and the Fiberfox view reads the status text from the GUI thread
-  std::lock_guard<std::mutex> lock(m_LogMutex);
-
-  // timestamp
-  if (addTime)
-  {
-    if ( m_Logfile.is_open() )
-      m_Logfile << this->GetTime() << " > ";
-    m_StatusText += this->GetTime() + " > ";
-    if (stdOut)
-      std::cout << this->GetTime() << " > ";
-  }
-
-  // message
-  if (m_Logfile.is_open())
-    m_Logfile << m;
-  m_StatusText += m;
-  if (stdOut)
-    std::cout << m;
-
-  // new line
-  if (linebreak)
-  {
-    if (m_Logfile.is_open())
-      m_Logfile << "\n";
-    m_StatusText += "\n";
-    if (stdOut)
-      std::cout << "\n";
-  }
-  if ( m_Logfile.is_open() )
-    m_Logfile.flush();
-}
 
 template< class PixelType >
 void TractsToDWIImageFilter< PixelType >::SimulateMotion(int g)
@@ -1929,27 +1861,5 @@ vnl_vector_fixed<double, 3> TractsToDWIImageFilter< PixelType >::GetVnlVector(Ve
   return vnlVector;
 }
 
-template< class PixelType >
-double TractsToDWIImageFilter< PixelType >::RoundToNearest(double num) {
-  return (num > 0.0) ? floor(num + 0.5) : ceil(num - 0.5);
-}
-
-template< class PixelType >
-std::string TractsToDWIImageFilter< PixelType >::GetTime()
-{
-  m_TimeProbe.Stop();
-  unsigned long total = RoundToNearest(m_TimeProbe.GetTotal());
-  unsigned long hours = total/3600;
-  unsigned long minutes = (total%3600)/60;
-  unsigned long seconds = total%60;
-  std::string out = "";
-  out.append(boost::lexical_cast<std::string>(hours));
-  out.append(":");
-  out.append(boost::lexical_cast<std::string>(minutes));
-  out.append(":");
-  out.append(boost::lexical_cast<std::string>(seconds));
-  m_TimeProbe.Start();
-  return out;
-}
 
 }
