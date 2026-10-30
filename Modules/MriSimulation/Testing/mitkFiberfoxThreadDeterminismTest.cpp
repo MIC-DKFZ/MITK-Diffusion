@@ -52,6 +52,7 @@ class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
   MITK_TEST(Param1);
   MITK_TEST(Param3);
   MITK_TEST(Param6);
+  MITK_TEST(Param1TimeSegments);
   MITK_TEST(RandomFiberModels);
   MITK_TEST(NoiseModelsFollowSeed);
   MITK_TEST(ExceptionInFiberLoop);
@@ -153,6 +154,15 @@ public:
   void Param1() { CompareAtThreadCounts("param1.ffp"); }
   void Param3() { CompareAtThreadCounts("param3.ffp"); }
   void Param6() { CompareAtThreadCounts("param6.ffp"); }
+
+  /** The time-segmented k-space phase (eddy currents and distortions of param1), automatic count. */
+  void Param1TimeSegments()
+  {
+    CompareAtThreadCounts("param1.ffp", [](mitk::FiberfoxParameters& parameters)
+    {
+      parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+    });
+  }
 
   /** Fiber compartments that draw random numbers: prototype kernels and randomized astrosticks. */
   void RandomFiberModels()

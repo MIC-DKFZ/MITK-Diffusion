@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <complex>
 #include <functional>
 #include <set>
+#include <string>
 #include <vector>
 #include <mitkFiberfoxParameters.h>
 #include <mitkBallModel.h>
@@ -43,6 +44,7 @@ class mitkFiberfoxKspaceTestSuite : public mitk::TestFixture
   MITK_TEST(Aliasing);
   MITK_TEST(OffResonanceShift);
   MITK_TEST(EddyCurrentsEqualFieldMap);
+  MITK_TEST(TimeSegmentsApproximateExactSum);
   MITK_TEST(NoiseFullFourier);
   MITK_TEST(NoisePartialFourier);
   MITK_TEST(NoiseMultiCoil);
@@ -384,6 +386,87 @@ public:
     MITK_INFO << "Eddy currents: largest deviation from the field map " << maxError << ", distortion up to " << maxDistortion;
     CPPUNIT_ASSERT(maxDistortion > 100);
     CPPUNIT_ASSERT_MESSAGE("eddy currents = equivalent field map", maxError < 0.05);
+  }
+
+  /** Relative RMS difference of the complex images of all volumes of coil 0. */
+  static double RelativeDifference(const FilterType* test, const FilterType* reference, int nx, int ny, unsigned int numVolumes)
+  {
+    double difference = 0, norm = 0;
+    for (unsigned int g = 0; g < numVolumes; ++g)
+      for (int y = 0; y < ny; ++y)
+        for (int x = 0; x < nx; ++x)
+        {
+          difference += std::norm(Value(test, x, y, 0, g) - Value(reference, x, y, 0, g));
+          norm += std::norm(Value(reference, x, y, 0, g));
+        }
+    return std::sqrt(difference / norm);
+  }
+
+  /**
+   * The time-segmented phase (SignalGenerationParameters::m_KspaceTimeSegments) approximates the exact
+   * sum of a field map and eddy currents: with the automatic segment count (phase spread + 8) the
+   * complex image differs by less than 0.1 % (relative RMS), with too few segments by far more. Single
+   * shot EPI in both phase directions with ghosts and aliasing, and conventional spin echo.
+   */
+  void TimeSegmentsApproximateExactSum()
+  {
+    const int nx = 40, ny = 40;
+    const Pattern f = [](int x, int y)
+    {
+      const double dx = (x - 20) / 15.0, dy = (y - 21) / 17.0;
+      return dx * dx + dy * dy < 1 ? 400.0 + 6 * x - 4 * y + 150 * std::cos(x / 3.0) : 0.0;
+    };
+    mitk::SignalGenerationParameters::GradientListType gradients(2);
+    gradients[1][0] = 0.6;
+    gradients[1][1] = 0.8;
+    auto image = MakeImage(nx, ny, 1, 2, f);
+    // a field map of about 150 Hz range (6 cycles over the EPI readout of 40 lines) and strong eddy currents
+    auto fmap = FloatImageType::New();
+    fmap->SetRegions(image->GetLargestPossibleRegion());
+    fmap->SetSpacing(image->GetSpacing());
+    fmap->Allocate();
+    for (int y = 0; y < ny; ++y)
+      for (int x = 0; x < nx; ++x)
+        fmap->SetPixel({{x, y, 0}}, 120 * std::exp(-((x - 26) * (x - 26) + (y - 14) * (y - 14)) / 60.0) - 30 + 0.8 * y);
+
+    struct Case { std::string name; mitk::SignalGenerationParameters::AcquisitionType type; bool reverse; bool ghostsAndAliasing; };
+    for (const auto& c : { Case{"EPI", mitk::SignalGenerationParameters::SingleShotEpi, false, false},
+                           Case{"EPI reversed, ghosts, aliasing", mitk::SignalGenerationParameters::SingleShotEpi, true, true},
+                           Case{"spin echo", mitk::SignalGenerationParameters::ConventionalSpinEcho, false, false} })
+    {
+      auto parameters = MakeParameters(image, gradients);
+      parameters.m_SignalGen.m_AcquisitionType = c.type;
+      parameters.m_SignalGen.m_ReversePhase = c.reverse;
+      parameters.m_Misc.m_DoAddDistortions = true;
+      parameters.m_SignalGen.m_FrequencyMap = fmap;
+      parameters.m_Misc.m_DoAddEddyCurrents = true;
+      parameters.m_SignalGen.m_EddyStrength = 0.05;
+      parameters.m_Misc.m_DoAddGhosts = c.ghostsAndAliasing;
+      parameters.m_SignalGen.m_KspaceLineOffset = 0.2;
+      parameters.m_Misc.m_DoAddAliasing = c.ghostsAndAliasing;
+      parameters.m_SignalGen.m_CroppingFactor = 0.9;
+      auto exact = Acquire(image, parameters);
+      const int my = static_cast<int>(exact->GetOutput()->GetLargestPossibleRegion().GetSize(1));
+
+      double distortion = 0, norm = 0;
+      for (int y = 0; y < std::min(ny, my); ++y)
+        for (int x = 0; x < nx; ++x)
+        {
+          distortion += std::norm(Value(exact, x, y, 0, 1) - Complex(f(x, y), 0));
+          norm += f(x, y) * f(x, y);
+        }
+
+      parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+      const double automatic = RelativeDifference(Acquire(image, parameters), exact, nx, my, 2);
+      parameters.m_SignalGen.m_KspaceTimeSegments = 2;
+      const double few = RelativeDifference(Acquire(image, parameters), exact, nx, my, 2);
+      MITK_INFO << "Time segments, " << c.name << ": distortion " << std::sqrt(distortion / norm) << ", error with the automatic count " << automatic << ", with 2 segments " << few;
+      if (c.type == mitk::SignalGenerationParameters::SingleShotEpi && !c.ghostsAndAliasing)
+        CPPUNIT_ASSERT_MESSAGE(c.name + ": the case distorts the image", std::sqrt(distortion / norm) > 0.3);
+      CPPUNIT_ASSERT_MESSAGE(c.name + ": automatic count within 0.1 % of the exact sum", automatic < 1e-3);
+      if (c.type == mitk::SignalGenerationParameters::SingleShotEpi)
+        CPPUNIT_ASSERT_MESSAGE(c.name + ": 2 segments are far off", few > 1e-2);
+    }
   }
 
   /** Complex Gaussian noise of variance sigma^2 in both image components: Rayleigh magnitude in an empty image. */

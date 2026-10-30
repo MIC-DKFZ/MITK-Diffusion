@@ -67,6 +67,7 @@ class mitkFiberfoxParametersTestSuite : public mitk::TestFixture
   MITK_TEST(GradientsInFile);
   MITK_TEST(MissingDirection);
   MITK_TEST(NoiseModelInFile);
+  MITK_TEST(TimeSegmentsInFile);
   CPPUNIT_TEST_SUITE_END();
 
   /** Parameters whose only models are two counting fiber models and one counting non-fiber model. */
@@ -389,6 +390,26 @@ public:
     mitk::FiberfoxParameters old;
     old.LoadParameters(oldFile, true);
     check(old, 3);
+    itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /** The k-space time segments are saved and loaded; files without the setting keep the exact sum (0). */
+  void TimeSegmentsInFile()
+  {
+    mitk::FiberfoxParameters earlier;
+    earlier.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp"), true);
+    CPPUNIT_ASSERT_EQUAL(0, earlier.m_SignalGen.m_KspaceTimeSegments);
+
+    const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_segments_XXXXXX");
+    const std::string file = folder + "/segments.ffp";
+    for (int segments : { mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, 12 })
+    {
+      earlier.m_SignalGen.m_KspaceTimeSegments = segments;
+      earlier.SaveParameters(file);
+      mitk::FiberfoxParameters loaded;
+      loaded.LoadParameters(file, true);
+      CPPUNIT_ASSERT_EQUAL(segments, loaded.m_SignalGen.m_KspaceTimeSegments);
+    }
     itksys::SystemTools::RemoveADirectory(folder);
   }
 };
