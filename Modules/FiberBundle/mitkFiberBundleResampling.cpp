@@ -142,7 +142,9 @@ void mitk::FiberBundle::Compress(float error)
       // distance of the original points between its kept neighbours (itself and those removed
       // before) from the segment joining the neighbours, so every original point stays within the
       // error of the compressed fiber. Kept points form a linked list, and the candidates wait in a
-      // heap ordered by (cost, index): a removal changes only the costs of its two neighbours.
+      // heap ordered by (cost, index): a removal changes only the costs of its two neighbours. A
+      // cost visits every point of its span, so a long straight stretch takes time quadratic in its
+      // number of points.
       const std::size_t numPoints = vertices.size();
       std::vector< std::size_t > prev(numPoints), next(numPoints);
       for (std::size_t j=0; j<numPoints; ++j)
@@ -153,7 +155,7 @@ void mitk::FiberBundle::Compress(float error)
       std::vector< bool > removed(numPoints, false);
       std::vector< unsigned int > version(numPoints, 0);
 
-      auto distanceToChord = [&](std::size_t j)
+      auto removalCost = [&](std::size_t j)
       {
         const vnl_vector_fixed< double, 3 >& pred = vertices[prev[j]];
         const vnl_vector_fixed< double, 3 >& succ = vertices[next[j]];
@@ -171,21 +173,21 @@ void mitk::FiberBundle::Compress(float error)
 
       struct Candidate
       {
-        double distance;
+        double cost;
         std::size_t index;
         unsigned int version;
         bool operator>(const Candidate& other) const
         {
-          return distance!=other.distance ? distance>other.distance : index>other.index;
+          return cost!=other.cost ? cost>other.cost : index>other.index;
         }
       };
       std::priority_queue< Candidate, std::vector<Candidate>, std::greater<Candidate> > candidates;
-      // Costs from the error on are never removed.
+      // Points whose cost is at least the error are never removed.
       auto pushIfBelowError = [&](std::size_t j)
       {
-        const double hc = distanceToChord(j);
-        if (hc<static_cast<double>(error))
-          candidates.push({hc, j, version[j]});
+        const double cost = removalCost(j);
+        if (cost<static_cast<double>(error))
+          candidates.push({cost, j, version[j]});
       };
       for (std::size_t j=1; j+1<numPoints; ++j)
         pushIfBelowError(j);
