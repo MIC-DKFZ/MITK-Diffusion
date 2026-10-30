@@ -13,7 +13,6 @@ set(H_FILES
   itkRemoveDwiChannelFilter.txx
   itkResampleDwiImageFilter.h
   itkResampleDwiImageFilter.txx
-  mitkB0Indices.h
   mitkDiffusionImageDenoising.h
   mitkDiffusionImageEditing.h
 )

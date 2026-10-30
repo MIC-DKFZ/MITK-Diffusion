@@ -17,6 +17,7 @@ found in the LICENSE file.
 #include <itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h>
 #include <mitkDiffusionSignalSampling.h>
 #include <mitkException.h>
+#include <mitkKurtosisFit.h>
 
 #include "mitkIvimTestHelpers.h"
 
@@ -36,6 +37,7 @@ class mitkDiffusionIvimFitTestSuite : public mitk::TestFixture
   MITK_TEST(FitParameters_Default_AppDefaults);
   MITK_TEST(Update_ReferenceBValueNotSet_Throws);
   MITK_TEST(Baselines_NoBZero_AllDirectionsOfLowestShell);
+  MITK_TEST(Baselines_BValuesAroundTheB0Rule_SameAsKurtosis);
   MITK_TEST(Baselines_Mean_NotTruncated);
   MITK_TEST(Fit_NoBZero_RecoversFractionAtBZero);
   MITK_TEST(DThenDStar_DStarBetweenGridValues_Refined);
@@ -255,6 +257,27 @@ public:
     const auto protocol = mitk::ivim::MakeProtocol(gradients, 1000);
     CPPUNIT_ASSERT(protocol.baselineIndices == std::vector<unsigned int>({0, 1, 2}));
     CPPUNIT_ASSERT_EQUAL(std::size_t(6), protocol.weightedIndices.size());
+  }
+
+  // b-values between the b0 rule (rounds to 0) and those of MRtrix (b <= 10) and dipy (b <= 50):
+  // only b = 0 and 0.3 are baselines, for the IVIM and the kurtosis fit alike.
+  void Baselines_BValuesAroundTheB0Rule_SameAsKurtosis()
+  {
+    const std::vector<double> bValues = {0, 0.3, 0.8, 5, 20, 49, 100, 400, 800, 1000};
+    auto gradients = MakeGradients(bValues, 1000);
+    const std::vector<unsigned int> expected = {0, 1};
+
+    const auto protocol = mitk::ivim::MakeProtocol(gradients, 1000);
+    CPPUNIT_ASSERT(protocol.baselineIndices == expected);
+    CPPUNIT_ASSERT_EQUAL(0.0, protocol.baselineBValue);
+
+    const auto kurtosisBValues = mitk::kurtosis::GetBValues(gradients, 1000);
+    std::vector<unsigned int> kurtosisBaselines;
+    for (unsigned int i = 0; i < kurtosisBValues.size(); ++i)
+      if (kurtosisBValues[i] == 0)
+        kurtosisBaselines.push_back(i);
+    CPPUNIT_ASSERT(kurtosisBaselines == expected);
+    CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::GetB0Indices(gradients, 1000) == expected);
   }
 
   void Baselines_Mean_NotTruncated()

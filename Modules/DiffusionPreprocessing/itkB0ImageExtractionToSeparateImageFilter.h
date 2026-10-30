@@ -29,7 +29,7 @@ namespace itk
   /** \class B0ImageExtractionToSeparateImageFilter
    * \brief Copies the b0 volumes of a DWI, in their order, into the time steps of a 3D+t image.
    *
-   * A b0 volume is one whose b-value rounds to 0 (mitk::IsB0), as for
+   * A b0 volume is one whose b-value rounds to 0 (mitk::DiffusionPropertyHelper::IsB0), as for
    * B0ImageExtractionImageFilter, which averages them instead. Throws if the image has no b0
    * volume.
    */

@@ -130,10 +130,10 @@ namespace mitk
     /** \brief The DWI without the given volumes; an index listed twice counts once. */
     MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer RemoveVolumes(const Image* dwi, const std::vector<unsigned int>& indices);
 
-    /** \brief The average of the b0 volumes (see mitk::IsB0) as a 3D image without properties. */
+    /** \brief The average of the b0 volumes (see mitk::DiffusionPropertyHelper::IsB0) as a 3D image without properties. */
     MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer ExtractB0(const Image* dwi);
 
-    /** \brief The b0 volumes (see mitk::IsB0) as the time steps of a 3D+t image without properties. */
+    /** \brief The b0 volumes (see mitk::DiffusionPropertyHelper::IsB0) as the time steps of a 3D+t image without properties. */
     MITKDIFFUSIONPREPROCESSING_EXPORT Image::Pointer ExtractB0Volumes(const Image* dwi);
 
     /** \brief Negates the selected world (LPS) components of every gradient. */

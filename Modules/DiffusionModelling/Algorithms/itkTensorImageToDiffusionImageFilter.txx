@@ -37,6 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkRescaleIntensityImageFilter.h"
 #include <itkImageRegionIterator.h>
 #include <itkImageRegionConstIterator.h>
+#include <mitkDiffusionPropertyHelper.h>
 
 namespace itk
 {
@@ -127,12 +128,15 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
   {
     GradientType g = m_GradientList->at(i);
 
-    // normalize vector so the following computations work
-    const double twonorm = g.two_norm();
-    isBaseline[i] = twonorm < vnl_math::eps;
+    // The b0 volumes (mitk::DiffusionPropertyHelper::IsB0) get the baseline signal, so that the
+    // reconstructions take them as b0 again.
+    isBaseline[i] = mitk::DiffusionPropertyHelper::IsB0(g, m_BValue);
     if( isBaseline[i] )
       continue;
 
+    const double twonorm = g.two_norm();
+
+    // normalize vector so the following computations work
     GradientType gn = g.normalize();
 
     InputPixelType &S = outerProducts[i];

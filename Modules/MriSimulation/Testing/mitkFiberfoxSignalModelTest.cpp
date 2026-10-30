@@ -20,6 +20,8 @@ found in the LICENSE file.
 #include <cmath>
 #include <mitkDiffusionImageHelperFunctions.h>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkDiffusionPropertyHelper.h>
+#include <mitkITKImageImport.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <itksys/SystemTools.hxx>
 #include <boost/property_tree/xml_parser.hpp>
@@ -38,6 +40,8 @@ class mitkFiberfoxSignalModelTestSuite : public mitk::TestFixture
   MITK_TEST(PrototypeDirectionFromCoefficients);
   MITK_TEST(PrototypeSurvivesCopy);
   MITK_TEST(PrototypeSaveLoad);
+  MITK_TEST(SampleKernels_B0WithShortVector_TensorFitTakesItAsB0);
+  MITK_TEST(SampleKernels_FirstB0ByTheRule_NormalizesKernels);
   MITK_TEST(AstroSticksVector);
   MITK_TEST(NoncentralChiNoiseMoments);
   CPPUNIT_TEST_SUITE_END();
@@ -138,6 +142,57 @@ public:
     }
   }
 
+  /**
+   * One-voxel DWI, reference b-value 1000, of a tensor with eigenvalues 1.7e-3, 0.3e-3, 0.3e-3
+   * along x (FA 0.80): S_i = s0[i] exp(-1000 g_i^T D g_i), rounded to short.
+   */
+  static mitk::Image::Pointer TensorDwi(const std::vector<mitk::DiffusionPropertyHelper::GradientDirectionType>& gradients, const std::vector<double>& s0)
+  {
+    auto container = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+    auto dwi = mitk::DiffusionPropertyHelper::ImageType::New();
+    mitk::DiffusionPropertyHelper::ImageType::RegionType region;
+    region.SetSize({{1, 1, 1}});
+    dwi->SetRegions(region);
+    dwi->SetVectorLength(gradients.size());
+    dwi->Allocate();
+    mitk::DiffusionPropertyHelper::ImageType::PixelType pixel(gradients.size());
+    for (unsigned int i = 0; i < gradients.size(); ++i)
+    {
+      const auto& g = gradients[i];
+      container->push_back(g);
+      const double gDg = 1.7e-3 * g[0] * g[0] + 0.3e-3 * (g[1] * g[1] + g[2] * g[2]);
+      pixel[i] = static_cast<short>(std::round(s0[i] * std::exp(-1000 * gDg)));
+    }
+    dwi->SetPixel({{0, 0, 0}}, pixel);
+    auto image = mitk::GrabItkImageMemory(dwi.GetPointer());
+    mitk::DiffusionPropertyHelper::MeasurementFrameType identity;
+    identity.set_identity();
+    mitk::DiffusionPropertyHelper::InitializeImage(image, container.GetPointer(), 1000, identity, false);
+    return image;
+  }
+
+  /** Six unit directions, x and y and z first. */
+  static std::vector<mitk::DiffusionPropertyHelper::GradientDirectionType> SixDirections()
+  {
+    const double s = std::sqrt(0.5);
+    return { {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {s, s, 0}, {s, 0, s}, {0, s, s} };
+  }
+
+  /** A b0 volume by MITK's rule: b = 1000 * |g|^2 = 0.3 rounds to 0. Along x, the fiber direction. */
+  static mitk::DiffusionPropertyHelper::GradientDirectionType ShortB0Vector()
+  {
+    return { std::sqrt(0.0003), 0, 0 };
+  }
+
+  /** Samples the kernels of the DWI with FA and ADC ranges around the tensor's (FA 0.80, ADC 0.77e-3). */
+  static unsigned int SampledKernels(mitk::Image::Pointer dwi, ModelType& model)
+  {
+    model.SetFaRange(0.7, 0.9);
+    model.SetAdcRange(0.0005, 0.001);
+    model.SampleKernels(dwi, nullptr);
+    return model.GetNumberOfKernels();
+  }
+
   /** Parameters with a prototype fiber compartment of two kernels. */
   mitk::FiberfoxParameters PrototypeParameters()
   {
@@ -197,6 +252,39 @@ public:
       CPPUNIT_ASSERT_DOUBLES_EQUAL(0.95, model->GetBaselineSignal(1), 1e-12);
     }
     itksys::SystemTools::RemoveADirectory(folder);
+  }
+
+  /**
+   * The tensor that selects prototype voxels by FA treats the b = 0.3 volume as b0, as the b0
+   * normalization, the Q-ball and the ADC fit do. ITK's tensor fit would take the short vector
+   * as a volume at the full b-value with no attenuation along x, and the FA would leave the range.
+   */
+  void SampleKernels_B0WithShortVector_TensorFitTakesItAsB0()
+  {
+    auto gradients = SixDirections();
+    gradients.insert(gradients.begin(), ShortB0Vector());
+    gradients.insert(gradients.begin(), mitk::DiffusionPropertyHelper::GradientDirectionType(0.0));
+    ModelType model;
+    CPPUNIT_ASSERT_EQUAL(1u, SampledKernels(TensorDwi(gradients, std::vector<double>(gradients.size(), 1000)), model));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, std::fabs(model.GetPrototypeDirection(0) * Direction(1, 0, 0)), 1e-3);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, model.GetBaselineSignal(0), 1e-12);
+  }
+
+  /**
+   * The first b0 volume by MITK's rule (here the b = 0.3 volume, index 0) normalizes the kernels; a
+   * voxel with a volume above it is skipped. The exact zero vector at index 1 carries a lower
+   * baseline (noise), so taking it as the reference would skip the only voxel.
+   */
+  void SampleKernels_FirstB0ByTheRule_NormalizesKernels()
+  {
+    auto gradients = SixDirections();
+    gradients.insert(gradients.begin(), mitk::DiffusionPropertyHelper::GradientDirectionType(0.0));
+    gradients.insert(gradients.begin(), ShortB0Vector());
+    std::vector<double> s0(gradients.size(), 1000);
+    s0[1] = 990;
+    ModelType model;
+    CPPUNIT_ASSERT_EQUAL(1u, SampledKernels(TensorDwi(gradients, s0), model));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, model.GetBaselineSignal(0), 1e-12);
   }
 
   /** The vector overload of the astrosticks model equals the per-direction one (it summed into uninitialized memory). */

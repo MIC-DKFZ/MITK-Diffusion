@@ -84,9 +84,18 @@ bool mitk::RawShModel< ScalarType >::SampleKernels(Image::Pointer diffImg, ItkUc
   {
     typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, double > TensorReconstructionImageFilterType;
 
+    // ITK takes only exact zero vectors as b0 volumes and fits every other volume at the reference
+    // b-value, so it gets a copy in which the b0 volumes of MITK's rule are zero vectors, as the
+    // Q-ball and ADC filters below and the b0 normalization take them.
+    const auto gradients = mitk::DiffusionPropertyHelper::GetGradientContainer(diffImg);
+    const double referenceBValue = mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg);
+    auto gradientsForItk = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
+    for (const auto& g : *gradients)
+      gradientsForItk->push_back(mitk::DiffusionPropertyHelper::IsB0(g, referenceBValue) ? mitk::DiffusionPropertyHelper::GradientDirectionType(0.0) : g);
+
     TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
-    filter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg));
-    filter->SetGradientImage(dynamic_cast<mitk::GradientDirectionsProperty *>(diffImg->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
+    filter->SetBValue(referenceBValue);
+    filter->SetGradientImage(gradientsForItk, itkVectorImagePointer );
     filter->Update();
     tensorImage = filter->GetOutput();
   }
@@ -113,13 +122,11 @@ bool mitk::RawShModel< ScalarType >::SampleKernels(Image::Pointer diffImg, ItkUc
     adcImage = adcFilter->GetOutput();
   }
 
+  // The first b0 volume (mitk::DiffusionPropertyHelper::IsB0) normalizes the kernels.
   int b0Index = 0;
-  for (unsigned int i=0; i<mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(diffImg)->Size(); i++)
-    if (mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(diffImg)->GetElement(i).magnitude()<0.001 )
-    {
-      b0Index = i;
-      break;
-    }
+  const auto b0Indices = mitk::DiffusionPropertyHelper::GetB0Indices(mitk::DiffusionPropertyHelper::GetGradientContainer(diffImg), mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg));
+  if (!b0Indices.empty())
+    b0Index = b0Indices.front();
 
   double max = 0;
   {

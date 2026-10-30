@@ -30,6 +30,7 @@ class mitkDiffusionPropertyHelperTestSuite : public mitk::TestFixture
   MITK_TEST(InitializeImage_RotationAndFrame_DerivesOriginalGradientsExactly);
   MITK_TEST(InitializeImage_Flags_SelectRotationAndFrame);
   MITK_TEST(InitializeImage_Gradients_BValueMapByRoundedBValue);
+  MITK_TEST(IsB0_BValuesAroundTheRule_SameAsBValueMap);
   MITK_TEST(IsDiffusionWeightedImage_IncompleteImages_False);
   MITK_TEST(CopyProperties_IgnoreOriginal_RemovesOriginalGradients);
   MITK_TEST(CalcAveragedDirectionSet_AntipodalAndClose_Merged);
@@ -204,6 +205,22 @@ public:
     // 1000 * 0.4999 rounds to 500, like 1000 * 0.5.
     CPPUNIT_ASSERT(map.at(500) == std::vector<unsigned int>({2, 3}));
     CPPUNIT_ASSERT(map.at(1000) == std::vector<unsigned int>({1, 4}));
+  }
+
+  // b = 0, 0.3 and 0.4999 are b0 volumes; 0.5001, 0.8 and the MRtrix and dipy b0 b-values 5, 20, 49
+  // are not. The b0 volumes are the shell 0 of the b-value map.
+  void IsB0_BValuesAroundTheRule_SameAsBValueMap()
+  {
+    const std::vector<double> bValues = {0, 0.3, 0.4999, 0.5001, 0.8, 5, 20, 49, 1000};
+    auto gradients = PropHelper::GradientDirectionsContainerType::New();
+    for (double b : bValues)
+      gradients->push_back(Vec(0, std::sqrt(b / 1000), 0));
+
+    const std::vector<unsigned int> expected = {0, 1, 2};
+    CPPUNIT_ASSERT(PropHelper::GetB0Indices(gradients, 1000) == expected);
+    for (unsigned int i = 0; i < bValues.size(); ++i)
+      CPPUNIT_ASSERT_EQUAL(i < 3, PropHelper::IsB0(gradients->ElementAt(i), 1000));
+    CPPUNIT_ASSERT(mitk::BValueMapProperty::CreateBValueMap(gradients, 1000).at(0) == expected);
   }
 
   void IsDiffusionWeightedImage_IncompleteImages_False()
