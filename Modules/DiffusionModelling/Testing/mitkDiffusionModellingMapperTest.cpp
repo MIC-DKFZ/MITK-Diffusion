@@ -13,6 +13,7 @@ found in the LICENSE file.
 #include <mitkCompositeMapper.h>
 #include <mitkIOUtil.h>
 #include <mitkOdfImage.h>
+#include <mitkOdfVtkMapper2D.h>
 #include <mitkPeakImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkSliceNavigationController.h>
@@ -50,6 +51,7 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   MITK_TEST(PeakImage_SlabFollowsPlane);
   MITK_TEST(CompositeMapper_PropAndImageMapperSlot);
   MITK_TEST(ColourMap_NotRebuiltByRendering);
+  MITK_TEST(OdfMapper_GlyphsNotMovedByGeometry);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::RenderingTestHelper m_RenderingTestHelper;
@@ -250,6 +252,23 @@ public:
 
     image->Modified();
     CPPUNIT_ASSERT(colourMap != image->GetVtkImageData());
+  }
+
+  // The renderer applies the node geometry to a VtkMapper's prop (UpdateVtkTransform), which the
+  // composite mapper's prop assembly does not take. The glyphs are generated in world coordinates,
+  // so the ODF mapper on its own must leave its actor without that transform.
+  void OdfMapper_GlyphsNotMovedByGeometry()
+  {
+    // DataNode::SetMapper does not grow the mapper slots; GetMapper does.
+    m_Node->GetMapper(mitk::BaseRenderer::Standard2D);
+    auto odfMapper = mitk::OdfVtkMapper2D::New();
+    m_Node->SetMapper(mitk::BaseRenderer::Standard2D, odfMapper);
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    CPPUNIT_ASSERT(this->RenderGlyphs(mitk::AnatomicalPlane::Axial) != nullptr);
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+    auto actor = vtkActor::SafeDownCast(odfMapper->GetVtkProp(renderer));
+    CPPUNIT_ASSERT(actor != nullptr);
+    CPPUNIT_ASSERT(actor->GetUserTransform() == nullptr);
   }
 };
 
