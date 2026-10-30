@@ -38,6 +38,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <boost/lexical_cast.hpp>
 #include <array>
 #include <map>
+#include <numeric>
 #include <vnl/vnl_matrix.h>
 #include <vnl/vnl_vector.h>
 #include <vnl/algo/vnl_svd.h>
@@ -367,14 +368,17 @@ namespace itk {
    * 22(2):178-188, 2003 (section II-C), here in the forward direction. The phase of pixel r at the
    * readout time of tick j is phi(r, j) = u(r) . v(j) with u = (field map in Hz, eddy-current field
    * G . pos(r) in Hz) and v = (t in s, eddy factor exp(-tRead/tau) t in s), as in the exact sum. With L
-   * segment times t_l (ticks evenly spaced in t),
+   * segment times t_l,
    *   exp(i 2 pi phi(r, j)) ~ sum_l a_l(j) exp(i 2 pi phi(r, t_l)),
    * so s(k_j) ~ sum_l a_l(j) S_l(k_j), where S_l is the spectrum of the signal times the phase factor
    * at t_l: L separable DFTs per compartment instead of a sum over all pixels per sample. a(j) is the
    * least-squares fit over the pixels' values of u, binned to a histogram weighted by signal energy:
-   * minimise sum_b w_b |exp(i 2 pi u_b . v(j)) - sum_l a_l exp(i 2 pi u_b . v_l)|^2. The error falls
-   * steeply once L exceeds the phase spread range(u) . range(v) in cycles (the time-bandwidth product
-   * of the fit), hence the automatic count below.
+   * minimise sum_b w_b |exp(i 2 pi u_b . v(j)) - sum_l a_l exp(i 2 pi u_b . v_l)|^2. The segment times
+   * are spaced evenly in accumulated phase, the largest phase change between two pixels with signal
+   * summed along the readout: the eddy factor changes about five times faster at the start of an EPI
+   * readout than at the echo, and segments evenly in time missed the 0.1 % bound there (issue #47,
+   * review). The error falls steeply once L exceeds the accumulated phase in cycles (the
+   * time-bandwidth product of the fit), hence the automatic count below.
    */
   template< class ScalarType >
   void KspaceImageFilter< ScalarType >::ComputeTimeSegmentation(bool eddyCurrents, bool distortions)
@@ -466,10 +470,7 @@ namespace itk {
       energy[r] = magnitude*weight[r]*magnitude*weight[r];
     }
 
-    // Phase spread S: the largest phase difference (cycles) between two pixels with signal over the
-    // readout. The automatic count is 1.25 S + 8: issue #47 measured a relative RMS error of 1e-5 or
-    // less with it at S from 0 to 62 (S + 8 gave 4e-4 at S = 31 and 1e-3 at S = 62); the stated bound
-    // is 0.1 %.
+    // range of u over the pixels with signal
     std::array<double, 2> lowU = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
     std::array<double, 2> highU = {std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest()};
     for (std::size_t r=0; r<numPixels; ++r)
@@ -479,24 +480,44 @@ namespace itk {
           lowU[d] = std::min(lowU[d], u[r][d]);
           highU[d] = std::max(highU[d], u[r][d]);
         }
-    double phaseSpread = 0;
+    // range(u) . range(v) per axis, for the histogram
+    double spanSpread = 0;
     for (unsigned int d=0; d<2; ++d)
       if (highU[d] >= lowU[d])
-        phaseSpread += (highU[d]-lowU[d])*span[d];
+        spanSpread += (highU[d]-lowU[d])*span[d];
+
+    // Ticks in the order of their readout time (v is a function of it in every readout scheme) and the
+    // phase accumulated up to each: the largest phase change (cycles) between two pixels with signal.
+    std::vector< std::size_t > order(numTicks);
+    std::iota(order.begin(), order.end(), std::size_t(0));
+    std::stable_sort(order.begin(), order.end(), [&echoTime](std::size_t a, std::size_t b) { return echoTime[a] < echoTime[b]; });
+    std::vector< double > accumulated(numTicks, 0.0);
+    for (std::size_t i=1; i<numTicks; ++i)
+    {
+      double step = 0;
+      for (unsigned int d=0; d<2; ++d)
+        if (highU[d] > lowU[d])
+          step += (highU[d]-lowU[d])*std::fabs(v[order[i]][d] - v[order[i-1]][d]);
+      accumulated[i] = accumulated[i-1] + step;
+    }
+
+    // Phase spread S: the phase accumulated over the readout, range(u) . range(v) for v monotone in
+    // time. The automatic count is 1.25 S + 8: issue #47 measured a relative RMS error of 1e-5 or
+    // less with it at S from 0 to 62 (S + 8 gave 4e-4 at S = 31 and 1e-3 at S = 62); the stated bound
+    // is 0.1 %.
+    const double phaseSpread = accumulated.back();
     const unsigned int numSegments = m_Parameters->m_SignalGen.m_KspaceTimeSegments > 0 ?
           static_cast<unsigned int>(m_Parameters->m_SignalGen.m_KspaceTimeSegments) : static_cast<unsigned int>(std::ceil(1.25*phaseSpread)) + 8;
 
-    // segment times: ticks whose readout time is closest to L times evenly spaced over the readout
-    const auto [minTime, maxTime] = std::minmax_element(echoTime.begin(), echoTime.end());
+    // segment times: the ticks whose accumulated phase is closest to L values evenly spaced over the readout
     std::vector< std::array<double, 2> > segmentV;
     for (unsigned int l=0; l<numSegments; ++l)
     {
-      const double target = numSegments==1 ? 0.5*(*minTime + *maxTime) : *minTime + (*maxTime - *minTime)*l/(numSegments-1.0);
-      std::size_t best = 0;
-      for (std::size_t tick=1; tick<numTicks; ++tick)
-        if (std::fabs(echoTime[tick] - target) < std::fabs(echoTime[best] - target))
-          best = tick;
-      segmentV.push_back(v[best]);
+      const double target = numSegments==1 ? 0.5*phaseSpread : phaseSpread*l/(numSegments-1.0);
+      auto next = std::lower_bound(accumulated.begin(), accumulated.end(), target);
+      if (next == accumulated.end() || (next != accumulated.begin() && target - *(next-1) <= *next - target))
+        --next;
+      segmentV.push_back(v[order[static_cast<std::size_t>(next - accumulated.begin())]]);
     }
 
     // Histogram of u weighted by signal energy. The interpolators fitted at the bins hold for the
@@ -512,7 +533,7 @@ namespace itk {
         if (highU[d] > lowU[d] && span[d] > 0)
         {
           const double axisSpread = (highU[d]-lowU[d])*span[d];
-          const double numBins = std::ceil(std::max(4*axisSpread, 16*axisSpread/phaseSpread)/coarsening);
+          const double numBins = std::ceil(std::max(4*axisSpread, 16*axisSpread/spanSpread)/coarsening);
           binWidth[d] = (highU[d]-lowU[d])/numBins;
           single = single && numBins <= 1;
         }
