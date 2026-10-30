@@ -25,6 +25,10 @@ found in the LICENSE file.
 #include <mitkImageWriteAccessor.h>
 
 #include <QmitkDataStorageComboBox.h>
+#include <QmitkPlotWidget.h>
+
+#include <qwt_plot.h>
+#include <qwt_plot_curve.h>
 
 #include <cppunit/extensions/HelperMacros.h>
 
@@ -39,6 +43,9 @@ found in the LICENSE file.
 #include <QScrollBar>
 #include <QTabWidget>
 #include <QToolButton>
+
+#include <algorithm>
+#include <filesystem>
 
 using namespace QmitkDiffusionUiTest;
 
@@ -57,6 +64,8 @@ class QmitkIvimViewUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Mask_RoiPreviewAndMapsInsideOnly);
   CPPUNIT_TEST(Mask_TwoLabelSegmentation_UnionOfLabelsOtherGridMessage);
   CPPUNIT_TEST(Mask_OneSliceSegmentation_OfferedAndUsed);
+  CPPUNIT_TEST(Kurtosis_OmitBZero_PlotWithoutBZeroPoints);
+  CPPUNIT_TEST(SavePlot_FileDialog_WritesImage);
   CPPUNIT_TEST_SUITE_END();
 
   static constexpr const char *IvimId = "org.mitk.views.ivim";
@@ -341,6 +350,66 @@ public:
     const auto method = std::to_string(GetChild<QComboBox>(m_View, "m_MethodCombo")->currentIndex() + 1);
     CPPUNIT_ASSERT(Voxel(dynamic_cast<mitk::Image *>(Map("D Fit-" + method)->GetData()), 0, 0, 0) != 0.0);
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /** The b-values of the points of the plot's curve with this title. */
+  std::vector<double> CurveX(const QString &title)
+  {
+    auto *plot = GetChild<QmitkPlotWidget>(m_View, "m_ChartWidget")->GetPlot();
+    for (auto *item : plot->itemList(QwtPlotItem::Rtti_PlotCurve))
+    {
+      if (item->title().text() != title)
+        continue;
+      auto *curve = static_cast<QwtPlotCurve *>(item);
+      std::vector<double> x;
+      for (std::size_t i = 0; i < curve->dataSize(); ++i)
+        x.push_back(curve->sample(i).x());
+      return x;
+    }
+    CPPUNIT_FAIL("No curve " + title.toStdString());
+    return {};
+  }
+
+  void Kurtosis_OmitBZero_PlotWithoutBZeroPoints()
+  {
+    auto dwi = Load(DwiFile);
+    auto *image = dynamic_cast<mitk::Image *>(dwi->GetData());
+    using Helper = mitk::DiffusionPropertyHelper;
+    const auto b0Count = Helper::GetB0Indices(Helper::GetGradientContainer(image), Helper::GetReferenceBValue(image)).size();
+    const auto volumes = Helper::GetGradientContainer(image)->Size();
+    CPPUNIT_ASSERT(b0Count > 0);
+    SelectDwi(dwi);
+    InitializeViews();
+    GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(1);
+    auto *omit = GetChild<QCheckBox>(m_View, "m_OmitBZeroCB");
+    auto zeros = [](const std::vector<double> &x) { return static_cast<std::size_t>(std::count(x.begin(), x.end(), 0.0)); };
+
+    omit->setChecked(false);
+    SetCrosshair(VoxelCenter(image, 5, 5, 5));
+    auto x = CurveX("signal values");
+    CPPUNIT_ASSERT_EQUAL(std::size_t(volumes), x.size());
+    CPPUNIT_ASSERT_EQUAL(b0Count, zeros(x));
+
+    omit->setChecked(true);
+    Wait(50);
+    x = CurveX("signal values");
+    CPPUNIT_ASSERT_EQUAL(std::size_t(volumes - b0Count), x.size());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(0), zeros(x));
+  }
+
+  void SavePlot_FileDialog_WritesImage()
+  {
+    auto dwi = Load(DwiFile);
+    SelectDwi(dwi);
+    InitializeViews();
+    SetCrosshair(VoxelCenter(dynamic_cast<mitk::Image *>(dwi->GetData()), 5, 5, 5));
+    const auto folder = CreateTempDir();
+    const auto file = folder + "/plot.png";
+    DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
+    GetChild<QAbstractButton>(m_View, "m_SavePlot")->click();
+    const bool written = std::filesystem::exists(file) && std::filesystem::file_size(file) > 0;
+    std::filesystem::remove_all(folder);
+    CPPUNIT_ASSERT(written);
   }
 };
 
