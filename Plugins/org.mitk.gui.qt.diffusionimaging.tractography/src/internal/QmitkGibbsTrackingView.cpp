@@ -29,6 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QTimer>
 
 // MITK
+#include <mitkDiffusionMasks.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <mitkImageAccessByItk.h>
@@ -233,12 +234,12 @@ void QmitkGibbsTrackingView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_MaskImageBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_MaskImageBox->SetZeroEntryText("--");
     // any 3D scalar image: the mask values weight the particle density (e.g. a white-matter
-    // probability map), voxels above 0.5 are seeded
+    // probability map), voxels above 0.5 are seeded; a segmentation counts as 1 inside its labels
     auto isScalar3dImage = mitk::NodePredicateFunction::New([](const mitk::DataNode *node) {
       auto image = dynamic_cast<const mitk::Image*>(node->GetData());
       return image != nullptr && image->GetDimension() == 3 && image->GetPixelType().GetNumberOfComponents() == 1;
     });
-    m_Controls->m_MaskImageBox->SetPredicate(isScalar3dImage);
+    m_Controls->m_MaskImageBox->SetPredicate(mitk::NodePredicateOr::New(isScalar3dImage, mitk::GetSegmentationMaskPredicate()));
 
     connect( (QObject*)(m_Controls->m_MaskImageBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGUI()));
     connect( (QObject*)(m_Controls->m_InputImageBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGUI()));
@@ -457,8 +458,8 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
     if(m_Controls->m_MaskImageBox->GetSelectedNode().IsNotNull())
     {
       m_MaskImageNode = m_Controls->m_MaskImageBox->GetSelectedNode();
-      if (dynamic_cast<mitk::Image*>(m_MaskImageNode->GetData()))
-        mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_MaskImageNode->GetData()), m_MaskImage);
+      if (auto mask = mitk::GetMaskImage(m_MaskImageNode->GetData()); mask.IsNotNull())
+        mitk::CastToItkImage(mask, m_MaskImage);
     }
   }
   catch (const std::exception &e)

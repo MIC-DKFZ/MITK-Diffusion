@@ -29,6 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkNodePredicateFunction.h>
 #include <mitkNodePredicateProperty.h>
+#include <mitkDiffusionMasks.h>
 #include <mitkImageCast.h>
 #include <mitkPointSet.h>
 #include <mitkPlanarCircle.h>
@@ -477,7 +478,7 @@ void QmitkFiberProcessingView::RemoveWithMask(bool removeInside)
   if (m_RoiImageNode.IsNull())
     return;
 
-  mitk::Image::Pointer mitkMask = dynamic_cast<mitk::Image*>(m_RoiImageNode->GetData());
+  mitk::Image::ConstPointer mitkMask = mitk::GetMaskImage(m_RoiImageNode->GetData());
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
@@ -504,7 +505,8 @@ void QmitkFiberProcessingView::ExtractWithMask(bool onlyEnds, bool invert, bool 
   if (roiNode.IsNull())
     return;
 
-  mitk::Image::Pointer mitkMask = dynamic_cast<mitk::Image*>(roiNode->GetData());
+  // A segmentation keeps its label values for the label map extraction.
+  mitk::Image::ConstPointer mitkMask = mitk::GetMaskImage(roiNode->GetData(), labelmap);
   const std::string roi_name = roiNode->GetName();
   for (auto node : bundleNodes)
   {
@@ -991,6 +993,8 @@ void QmitkFiberProcessingView::OnSelectionChanged(berry::IWorkbenchPart::Pointer
       if (m_SelectedImage->GetDimension()==3)
         m_RoiImageNode = node;
     }
+    else if (mitk::GetSegmentationMaskPredicate()->CheckNode(node))
+      m_RoiImageNode = node;
     else if (dynamic_cast<mitk::Surface*>(node->GetData()))
       m_SelectedSurfaces.push_back(dynamic_cast<mitk::Surface*>(node->GetData()));
   }

@@ -38,13 +38,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVectorIndexSelectionCastImageFilter.h>
 
 // itk/mitk
+#include <mitkDiffusionMasks.h>
 #include <mitkDiffusionSignalSampling.h>
 #include <mitkImageStatisticsHolder.h>
 #include <mitkNodePredicateIsDWI.h>
-#include <mitkNodePredicateDimension.h>
-#include <mitkNodePredicateProperty.h>
-#include <mitkNodePredicateAnd.h>
-#include <mitkNodePredicateDataType.h>
 #include <mitkLevelWindowProperty.h>
 
 const std::string QmitkIVIMView::VIEW_ID = "org.mitk.views.ivim";
@@ -94,10 +91,7 @@ void QmitkIVIMView::CreateQtPartControl( QWidget *parent )
 
     m_Controls->m_MaskBox->SetDataStorage(this->GetDataStorage());
     m_Controls->m_MaskBox->SetZeroEntryText("--");
-    mitk::TNodePredicateDataType<mitk::Image>::Pointer isImagePredicate = mitk::TNodePredicateDataType<mitk::Image>::New();
-    mitk::NodePredicateProperty::Pointer isBinaryPredicate = mitk::NodePredicateProperty::New("binary", mitk::BoolProperty::New(true));
-    mitk::NodePredicateDimension::Pointer is3D = mitk::NodePredicateDimension::New(3);
-    m_Controls->m_MaskBox->SetPredicate( mitk::NodePredicateAnd::New(isBinaryPredicate, mitk::NodePredicateAnd::New(isImagePredicate, is3D)) );
+    m_Controls->m_MaskBox->SetPredicate( mitk::GetBinaryMaskPredicate() );
     connect( m_Controls->m_MaskBox, &QComboBox::currentIndexChanged, this, &QmitkIVIMView::UpdateGui );
 
     connect( m_Controls->m_ModelTabSelectionWidget, &QTabWidget::currentChanged, this, &QmitkIVIMView::OnModelTabChanged );
@@ -365,12 +359,12 @@ void QmitkIVIMView::FittIVIMStart()
   }
   const auto* dwi = dynamic_cast<mitk::Image*>(dwiNode->GetData());
 
-  const mitk::Image* mask = nullptr;
-  if (m_Controls->m_MaskBox->GetSelectedNode().IsNotNull())
-    mask = dynamic_cast<mitk::Image*>(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
-
   try
   {
+    mitk::Image::ConstPointer mask;
+    if (m_Controls->m_MaskBox->GetSelectedNode().IsNotNull())
+      mask = mitk::GetMaskImage(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
+
     if( m_Controls->m_ModelTabSelectionWidget->currentIndex() )
     {
       const auto maps = mitk::kurtosis::ComputeMaps(dwi, mask, this->GetKurtosisFitConfiguration(), m_Controls->m_SigmaSpinBox->value());
@@ -430,9 +424,9 @@ void QmitkIVIMView::OnSliceChanged()
     return;
 
   mitk::Image::Pointer diffusionImg = dynamic_cast<mitk::Image*>(m_Controls->m_DwiBox->GetSelectedNode()->GetData());
-  mitk::Image::Pointer maskImg = nullptr;
+  mitk::Image::ConstPointer maskImg;
   if (m_Controls->m_MaskBox->GetSelectedNode().IsNotNull())
-    maskImg = dynamic_cast<mitk::Image*>(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
+    maskImg = mitk::GetMaskImage(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
 
   if (!this->GetRenderWindowPart())
     return;

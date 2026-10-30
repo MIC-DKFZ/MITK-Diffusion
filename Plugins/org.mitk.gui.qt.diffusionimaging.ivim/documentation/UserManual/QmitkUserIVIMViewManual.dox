@@ -6,7 +6,7 @@ This view fits the "intra-voxel incoherent motion" (IVIM) model and the diffusio
 \section QmitkIVIMViewInput Input and preview
 
 \li <b>Raw DWI</b>: the diffusion-weighted image.
-\li <b>ROI</b> (optional): a binary 3D image.
+\li <b>ROI</b> (optional): a binary 3D image or a segmentation; all labels of a segmentation together form the ROI.
 
 The plot shows the fit of the model selected by the tab (IVIM or Kurtosis) to the signal at the crosshair position; click around in the image to explore it. The fitted parameters are shown above the plot. With a ROI selected, the plot shows the fit to the mean signal of all image voxels whose centres lie inside the ROI instead, and the view reports how many voxels were averaged; it then no longer follows the crosshair. The preview fits the unsmoothed signal.
 

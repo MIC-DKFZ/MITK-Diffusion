@@ -6,6 +6,7 @@ message(STATUS "Configuring MITK atTRACTive Build")
 set(MITK_USE_OpenCV ON CACHE BOOL "" FORCE)
 
 # modules
+set(BUILD_MODULE_DiffusionMasks ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberDissection ON CACHE BOOL "" FORCE)
