@@ -32,9 +32,9 @@ found in the LICENSE file.
  * autoload/IO modules. The test driver of a diffusion module links the module and would find the
  * readers without that, hence this driver of its own.
  *
- * Each case checks that the reader is offered for the file and that the file, opened with it as
- * a user chooses it in the open dialog, gives the expected data type. Formats the test data has
- * no file of are written first by the diffusion writers from one it has.
+ * Each case checks that the reader is offered for the file once and that the file, opened with
+ * it as a user chooses it in the open dialog, gives the expected data type. Formats the test
+ * data has no file of are written first by the diffusion writers from one it has.
  */
 class mitkDiffusionWorkbenchReadersTestSuite : public mitk::TestFixture
 {
@@ -51,10 +51,10 @@ class mitkDiffusionWorkbenchReadersTestSuite : public mitk::TestFixture
 private:
   std::string m_TempDir;
 
-  /** The reader descriptions offered for the file. */
-  static std::set<std::string> OfferedReaders(const std::string &path)
+  /** The reader descriptions offered for the file; a reader registered twice is there twice. */
+  static std::multiset<std::string> OfferedReaders(const std::string &path)
   {
-    std::set<std::string> descriptions;
+    std::multiset<std::string> descriptions;
     for (const auto &item : mitk::FileReaderSelector(path).Get())
       descriptions.insert(item.GetDescription());
     return descriptions;
@@ -63,7 +63,9 @@ private:
   /** Opens the file with the named reader and checks that it gives one object of the class. */
   static mitk::BaseData::Pointer Load(const std::string &path, const std::string &reader, const std::string &className)
   {
-    CPPUNIT_ASSERT_MESSAGE("No reader \"" + reader + "\" for " + path, OfferedReaders(path).count(reader) == 1);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("Reader \"" + reader + "\" offered for " + path,
+                                 std::size_t(1),
+                                 OfferedReaders(path).count(reader));
 
     mitk::PreferenceListReaderOptionsFunctor functor(mitk::PreferenceListReaderOptionsFunctor::ListType({reader}),
                                                      mitk::PreferenceListReaderOptionsFunctor::ListType());
@@ -150,10 +152,15 @@ public:
 
   void Tractograms_FibVtkTrkTckDicom_ReadAsFiberBundle()
   {
-    auto fibers = Load(mitk::GetDiffusionTestDataFilePath("fiberBundleX.fib"), "VTK Fiber Bundle Reader", "FiberBundle");
-    Load(Copy("fiberBundleX.fib", "fibers.vtk"), "VTK Fiber Bundle Reader", "FiberBundle");
-    Load(mitk::GetDiffusionTestDataFilePath("ThirdPartyTractograms/dipy_las.trk"), "TrackVis Fiber Bundle Reader", "FiberBundle");
-    Load(mitk::GetDiffusionTestDataFilePath("ThirdPartyTractograms/mrtrix.tck"), "tck Fiber Bundle Reader (MRtrix format)", "FiberBundle");
+    const std::string vtkReader = "VTK Fiber Bundle Reader";
+    auto fibers = Load(mitk::GetDiffusionTestDataFilePath("fiberBundleX.fib"), vtkReader, "FiberBundle");
+    Load(Copy("fiberBundleX.fib", "fibers.vtk"), vtkReader, "FiberBundle");
+    Load(mitk::GetDiffusionTestDataFilePath("ThirdPartyTractograms/dipy_las.trk"),
+         "TrackVis Fiber Bundle Reader",
+         "FiberBundle");
+    Load(mitk::GetDiffusionTestDataFilePath("ThirdPartyTractograms/mrtrix.tck"),
+         "tck Fiber Bundle Reader (MRtrix format)",
+         "FiberBundle");
     const std::string dicom = m_TempDir + "/tractogram.dcm";
     mitk::IOUtil::Save(fibers, mitk::IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.dcm", dicom);
     Load(dicom, "DICOM Fiber Bundle Reader", "FiberBundle");
