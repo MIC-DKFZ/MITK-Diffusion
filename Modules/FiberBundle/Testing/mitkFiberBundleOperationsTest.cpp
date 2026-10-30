@@ -40,6 +40,7 @@ found in the LICENSE file.
 #include <cmath>
 #include <limits>
 #include <map>
+#include <random>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -81,13 +82,14 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(FilterByWeights_BothDirections_SplitAtThreshold);
   MITK_TEST(AddBundles_EqualsRepeatedAddBundle);
   MITK_TEST(RotateAroundAxis_EqualsTransformFibersWithoutTranslation);
-  MITK_TEST(GetDeepCopy_KeepsDataAndIsIndependent);
+  MITK_TEST(Clone_KeepsDataAndIsIndependent);
   MITK_TEST(EmptyBundle_EveryOperation_StaysEmpty);
   MITK_TEST(ResampleLinear_SyntheticFibers_EqualChordSpacingOnTheFiber);
   MITK_TEST(ResampleSpline_StraightFiber_PointsOnTheLine);
   MITK_TEST(ResampleToNumPoints_StraightFiber_EqualSpacing);
   MITK_TEST(ResampleToNumPoints_CurvedFibers_EqualArcLengthSpacing);
   MITK_TEST(Compress_SyntheticFibers_RemovesOnlyPointsWithinTheError);
+  MITK_TEST(Compress_Arcs_EveryPointWithinTheError);
   MITK_TEST(ApplyCurvatureThreshold_CircularArc_RadiusDecides);
   MITK_TEST(ColorFibersByOrientation_ThreePointFiber_SegmentDirections);
   MITK_TEST(ColorFibersByScalarMap_Mask_ColoursAndWeightsFromTheMask);
@@ -95,6 +97,8 @@ class mitkFiberBundleOperationsTestSuite : public mitk::TestFixture
   MITK_TEST(ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat);
   MITK_TEST(TrackVisHeader_JoinedAndMovedBundles_ContainEveryPoint);
   MITK_TEST(Weights_OnePointFibers_KeepPlaceAndWeight);
+  MITK_TEST(SubtractBundle_EndPointsAcrossBinBorders_MatchByDistance);
+  MITK_TEST(SubtractBundle_RandomPerturbations_RemoveExactlyTheCloseCopies);
   CPPUNIT_TEST_SUITE_END();
 
   mitk::FiberBundle::Pointer LoadFibers(const std::string &relativePath)
@@ -313,26 +317,26 @@ public:
     auto source = LoadWeightedFibers();
     const float medianLength = source->GetMedianFiberLength();
 
-    auto fib = source->GetDeepCopy();
+    auto fib = source->Clone();
     CPPUNIT_ASSERT(fib->RemoveShortFibers(medianLength));
     CPPUNIT_ASSERT(fib->GetNumFibers() < source->GetNumFibers());
     AssertWeightsFollowFibers(source, fib, "RemoveShortFibers");
 
-    fib = source->GetDeepCopy();
+    fib = source->Clone();
     CPPUNIT_ASSERT(fib->RemoveLongFibers(medianLength));
     CPPUNIT_ASSERT(fib->GetNumFibers() < source->GetNumFibers());
     AssertWeightsFollowFibers(source, fib, "RemoveLongFibers");
 
-    fib = source->GetDeepCopy();
+    fib = source->Clone();
     vnl_vector_fixed<double, 3> dir(0.0, 1.0, 0.0);
     fib->RemoveDir(dir, std::cos(5.0 * itk::Math::pi / 180));
     AssertWeightsFollowFibers(source, fib, "RemoveDir");
 
-    fib = source->GetDeepCopy();
+    fib = source->Clone();
     CPPUNIT_ASSERT(fib->ApplyCurvatureThreshold(5.0f, false));
     AssertWeightsFollowFibers(source, fib, "ApplyCurvatureThreshold");
 
-    auto shortFibers = source->GetDeepCopy();
+    auto shortFibers = source->Clone();
     shortFibers->RemoveLongFibers(medianLength);
     auto subtracted = source->SubtractBundle(shortFibers);
     CPPUNIT_ASSERT(subtracted->GetNumFibers() < source->GetNumFibers());
@@ -350,18 +354,18 @@ public:
   void CompressAndSubtract_EightThreads_EqualOneThread()
   {
     auto source = LoadWeightedFibers();
-    auto shortFibers = source->GetDeepCopy();
+    auto shortFibers = source->Clone();
     shortFibers->RemoveLongFibers(source->GetMedianFiberLength());
 
     mitk::OmpThreadGuard threads(1);
-    auto compressedSingle = source->GetDeepCopy();
+    auto compressedSingle = source->Clone();
     compressedSingle->Compress(0.1f);
     auto subtractedSingle = source->SubtractBundle(shortFibers);
 
     threads.SetNumberOfThreads(8);
     for (int run = 0; run < 3; ++run)
     {
-      auto compressed = source->GetDeepCopy();
+      auto compressed = source->Clone();
       compressed->Compress(0.1f);
       AssertIdentical(compressedSingle, compressed, "Compress, run " + std::to_string(run));
       AssertIdentical(subtractedSingle, source->SubtractBundle(shortFibers), "SubtractBundle, run " + std::to_string(run));
@@ -427,7 +431,7 @@ public:
     header.voxel_size[0] = 1.25f;
     source->SetTrackVisHeader(header);
     auto other = LoadWeightedFibers();
-    auto shortFibers = source->GetDeepCopy();
+    auto shortFibers = source->Clone();
     shortFibers->RemoveLongFibers(source->GetMedianFiberLength());
 
     auto check = [](mitk::FiberBundle *fib, const std::string &operation)
@@ -436,7 +440,7 @@ public:
       CPPUNIT_ASSERT_EQUAL_MESSAGE(operation, 77, static_cast<int>(fib->GetTrackVisHeader().dim[0]));
       CPPUNIT_ASSERT_EQUAL_MESSAGE(operation, 1.25f, fib->GetTrackVisHeader().voxel_size[0]);
     };
-    check(source->GetDeepCopy(), "GetDeepCopy");
+    check(source->Clone(), "Clone");
     check(source->AddBundle(other), "AddBundle");
     check(source->AddBundles({other}), "AddBundles");
     check(source->SubtractBundle(shortFibers), "SubtractBundle");
@@ -574,7 +578,7 @@ public:
     }
     CPPUNIT_ASSERT(found);
     // a copy can take the colours over
-    CPPUNIT_ASSERT(fib->GetDeepCopy().IsNotNull());
+    CPPUNIT_ASSERT(fib->Clone().IsNotNull());
   }
 
   void ColorFibersByCurvature_UsesFirstSegment()
@@ -594,7 +598,7 @@ public:
   void ResampleLinear_NoStep_LeavesFibersUnchanged()
   {
     auto fib = LoadFibers("FiberProcessing/original.fib");
-    auto copy = fib->GetDeepCopy();
+    auto copy = fib->Clone();
     fib->ResampleLinear(0.0);
     CPPUNIT_ASSERT(copy->Equals(fib, 0.0));
   }
@@ -746,7 +750,7 @@ public:
   void ResampleToNumPoints_RealFibers_GiveNPointsAndKeepEndpoints()
   {
     auto source = LoadWeightedFibers();
-    auto fib = source->GetDeepCopy();
+    auto fib = source->Clone();
     fib->ResampleToNumPoints(12);
     CPPUNIT_ASSERT_EQUAL(source->GetNumFibers(), fib->GetNumFibers());
     for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
@@ -797,7 +801,7 @@ public:
   void RotateAroundAxis_EqualsTransformFibersWithoutTranslation()
   {
     auto rotated = LoadWeightedFibers();
-    auto transformed = rotated->GetDeepCopy();
+    auto transformed = rotated->Clone();
     const auto colours = rotated->GetFiberColors();
     std::vector<unsigned char> before(colours->GetPointer(0), colours->GetPointer(0) + colours->GetNumberOfValues());
     rotated->RotateAroundAxis(10, 20, 30);
@@ -812,7 +816,7 @@ public:
       CPPUNIT_ASSERT_EQUAL(before[i], after->GetValue(i));
   }
 
-  void GetDeepCopy_KeepsDataAndIsIndependent()
+  void Clone_KeepsDataAndIsIndependent()
   {
     auto fib = LoadWeightedFibers();
     fib->ColorFibersByLength(false, false, mitk::LookupTable::JET);
@@ -821,9 +825,9 @@ public:
     header.dim[1] = 55;
     fib->SetTrackVisHeader(header);
 
-    auto copy = fib->GetDeepCopy();
+    auto copy = fib->Clone();
     CPPUNIT_ASSERT(copy->GetFiberPolyData().GetPointer() != fib->GetFiberPolyData().GetPointer());
-    AssertIdentical(fib, copy, "GetDeepCopy");
+    AssertIdentical(fib, copy, "Clone");
     CPPUNIT_ASSERT_EQUAL(fib->GetFiberColors()->GetNumberOfValues(), copy->GetFiberColors()->GetNumberOfValues());
     for (vtkIdType i = 0; i < fib->GetFiberColors()->GetNumberOfValues(); ++i)
       CPPUNIT_ASSERT_EQUAL(fib->GetFiberColors()->GetValue(i), copy->GetFiberColors()->GetValue(i));
@@ -872,7 +876,7 @@ public:
     check(fib->AddBundle(empty()), "AddBundle");
     check(fib->AddBundles({empty(), empty()}), "AddBundles");
     check(fib->SubtractBundle(empty()), "SubtractBundle");
-    check(fib->GetDeepCopy(), "GetDeepCopy");
+    check(fib->Clone(), "Clone");
     fib->ColorFibersByLength(true, true, mitk::LookupTable::JET);
     fib->ColorFibersByCurvature(true, true, mitk::LookupTable::JET);
     fib->ColorFibersByFiberWeights(true, mitk::LookupTable::JET);
@@ -1067,8 +1071,9 @@ public:
 
   void Compress_SyntheticFibers_RemovesOnlyPointsWithinTheError()
   {
-    // A point is removed while its distance from the line through its kept neighbours is below
-    // the error: collinear points and a 0.05 mm wobble go, corners and a 1 mm zigzag stay.
+    // A point is removed while it and the points removed between its kept neighbours stay below
+    // the error from the segment joining them: collinear points and a 0.05 mm wobble go, corners
+    // and a 1 mm zigzag stay.
     auto fib = MakeBundle({{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}, {4, 0, 0}, {5, 0, 0}},
                            {{0, 5, 0}, {1, 5, 0}, {2, 5, 0}, {2, 6, 0}, {2, 7, 0}, {2, 8, 0}},
                            {{0, 10, 0}, {1, 11, 0}, {2, 10, 0}, {3, 11, 0}, {4, 10, 0}},
@@ -1085,6 +1090,186 @@ public:
     CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(3), pointsByFirstY[5]);
     CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(5), pointsByFirstY[10]);
     CPPUNIT_ASSERT_EQUAL(static_cast<vtkIdType>(2), pointsByFirstY[15]);
+  }
+
+  /** Distance of p from the polyline of the cell. */
+  static double DistanceToPolyline(const std::array<double, 3> &p, vtkCell *cell)
+  {
+    double best = std::numeric_limits<double>::max();
+    for (vtkIdType k = 0; k + 1 < cell->GetNumberOfPoints(); ++k)
+    {
+      double a[3], b[3];
+      cell->GetPoints()->GetPoint(k, a);
+      cell->GetPoints()->GetPoint(k + 1, b);
+      double ab[3] = {b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+      double ap[3] = {p[0] - a[0], p[1] - a[1], p[2] - a[2]};
+      const double len2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+      const double t = len2 > 0 ? std::clamp((ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / len2, 0.0, 1.0) : 0.0;
+      double d2 = 0;
+      for (int c = 0; c < 3; ++c)
+        d2 += (ap[c] - t * ab[c]) * (ap[c] - t * ab[c]);
+      best = std::min(best, std::sqrt(d2));
+    }
+    return best;
+  }
+
+  void Compress_Arcs_EveryPointWithinTheError()
+  {
+    // Arcs sampled densely, unevenly and with a spiral, so that points removed early lie between
+    // kept points that are removed later: the error bounds every original point, not only each
+    // point at its own removal.
+    std::vector<std::vector<std::array<double, 3>>> fibers;
+    for (double radius : {3.0, 10.0, 40.0})
+    {
+      std::vector<std::array<double, 3>> arc;
+      double angle = 0;
+      for (int k = 0; angle < 180; ++k)
+      {
+        arc.push_back({radius * std::cos(angle * itk::Math::pi / 180), radius * std::sin(angle * itk::Math::pi / 180), 0.02 * angle});
+        angle += (k % 3 == 0) ? 0.3 : 2.0;
+      }
+      fibers.push_back(arc);
+    }
+    auto original = MakeBundle(fibers);
+    for (float error : {0.05f, 0.1f, 0.5f})
+    {
+      auto fib = original->Clone();
+      fib->Compress(error);
+      CPPUNIT_ASSERT_EQUAL(original->GetNumFibers(), fib->GetNumFibers());
+      for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      {
+        vtkCell *cell = fib->GetFiberPolyData()->GetCell(i);
+        CPPUNIT_ASSERT(cell->GetNumberOfPoints() < static_cast<vtkIdType>(fibers[i].size()));
+        double worst = 0;
+        for (const auto &p : fibers[i])
+          worst = std::max(worst, DistanceToPolyline(p, cell));
+        CPPUNIT_ASSERT_MESSAGE("error " + std::to_string(error) + ", fiber " + std::to_string(i) + ": largest distance " + std::to_string(worst),
+                               worst <= error * (1 + 1e-6));
+      }
+    }
+  }
+
+  /** Fiber from first to last end point through a middle point off the line; SubtractBundle compares end points only. */
+  static std::vector<std::array<double, 3>> FiberBetween(const std::array<double, 3> &first, const std::array<double, 3> &last, double bend)
+  {
+    return {first, {(first[0] + last[0]) / 2 + bend, (first[1] + last[1]) / 2, (first[2] + last[2]) / 2}, last};
+  }
+
+  /** Fibers of result, in order, as indices of fibers of source with the same first point and weight. */
+  static std::vector<unsigned int> SourceIds(mitk::FiberBundle *source, mitk::FiberBundle *result)
+  {
+    std::vector<unsigned int> ids;
+    for (unsigned int k = 0; k < result->GetNumFibers(); ++k)
+    {
+      const PointKey key = Key(result->GetFiberPolyData()->GetCell(k)->GetPoints()->GetPoint(0));
+      unsigned int found = source->GetNumFibers();
+      for (unsigned int i = 0; i < source->GetNumFibers(); ++i)
+        if (Key(source->GetFiberPolyData()->GetCell(i)->GetPoints()->GetPoint(0)) == key)
+          found = i;
+      CPPUNIT_ASSERT_MESSAGE("result fiber " + std::to_string(k) + " is a fiber of the source", found < source->GetNumFibers());
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(source->GetFiberWeight(found), result->GetFiberWeight(k), 0.0);
+      ids.push_back(found);
+    }
+    return ids;
+  }
+
+  void SubtractBundle_EndPointsAcrossBinBorders_MatchByDistance()
+  {
+    // SubtractBundle bins the subtrahend's fibers by their first end point (0.01 mm cells) and
+    // removes a fiber when the mean squared distance of the two end points, in either order, is
+    // below 1e-6 mm^2. Fibers whose end points lie in neighbouring cells, at negative
+    // coordinates, far from the origin or reversed must match like any other pair.
+    std::vector<std::vector<std::array<double, 3>>> own, other;
+    // 0: first point in the next x cell (0.0095 -> 0.0105), mean 5e-7: removed
+    own.push_back(FiberBetween({0.0095, 1, 2}, {10, 1, 2}, 0));
+    other.push_back(FiberBetween({0.0105, 1, 2}, {10, 1, 2}, 0));
+    // 1: reversed, other middle point, first point in the next z cell (5.0095 -> 5.0105): removed
+    own.push_back(FiberBetween({3, 4, 5}, {6, 9, 5.0095}, 0));
+    other.push_back(FiberBetween({6, 9, 5.0105}, {3, 4, 5}, 2));
+    // 2: across zero in x and z, mean 6.4e-7: removed
+    own.push_back(FiberBetween({-0.0004, -5, -0.0004}, {-7, -5, -3}, 0));
+    other.push_back(FiberBetween({0.0004, -5, 0.0004}, {-7, -5, -3}, 0));
+    // 3: both end points 0.0011 off in x, mean 1.21e-6: kept
+    own.push_back(FiberBetween({20, 20, 20}, {30, 20, 20}, 0));
+    other.push_back(FiberBetween({20.0011, 20, 20}, {30.0011, 20, 20}, 0));
+    // 4: first end point 0.0015 off in y, mean 1.125e-6: kept
+    own.push_back(FiberBetween({-20, -20, 20}, {-30, -20, 20}, 0));
+    other.push_back(FiberBetween({-20, -19.9985, 20}, {-30, -20, 20}, 0));
+    // 5: far from the origin, first point in the next x cell, mean 8.45e-7: removed
+    own.push_back(FiberBetween({100.0093, 50, 60}, {110, 50, 60}, 0));
+    other.push_back(FiberBetween({100.0106, 50, 60}, {110, 50, 60}, 0));
+    // 6: no counterpart: kept
+    own.push_back(FiberBetween({40, 40, 40}, {40, 50, 40}, 0));
+
+    auto fib = MakeBundle(own);
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      fib->SetFiberWeight(i, 1.0f + i);
+    auto subtracted = fib->SubtractBundle(MakeBundle(other));
+    CPPUNIT_ASSERT((SourceIds(fib, subtracted) == std::vector<unsigned int>{3, 4, 6}));
+  }
+
+  void SubtractBundle_RandomPerturbations_RemoveExactlyTheCloseCopies()
+  {
+    // Copies of fibers with end points moved by a known mean squared distance, many of them into
+    // a neighbouring 0.01 mm cell: below 0.9e-6 mm^2 they remove their fiber, above 1.1e-6 they
+    // do not. Unrelated fibers are millimetres apart. The expected result is known from the
+    // construction, independently of the binning.
+    std::mt19937 rng(42);
+    std::uniform_real_distribution<double> coordinate(-2.0, 2.0);
+    std::uniform_real_distribution<double> unit(0.0, 1.0);
+    std::normal_distribution<double> gauss(0.0, 1.0);
+    auto randomOffset = [&](double length)
+    {
+      std::array<double, 3> d{gauss(rng), gauss(rng), gauss(rng)};
+      const double norm = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+      for (auto &c : d)
+        c *= length / norm;
+      return d;
+    };
+    auto moved = [](const std::array<double, 3> &p, const std::array<double, 3> &d)
+    {
+      return std::array<double, 3>{p[0] + d[0], p[1] + d[1], p[2] + d[2]};
+    };
+    auto cell = [](const std::array<double, 3> &p)
+    {
+      return std::array<long long, 3>{static_cast<long long>(std::floor(p[0] / 0.01)), static_cast<long long>(std::floor(p[1] / 0.01)),
+                                      static_cast<long long>(std::floor(p[2] / 0.01))};
+    };
+
+    // end points on a 0.5 mm grid with a small jitter, so that unrelated fibers never match
+    std::vector<std::vector<std::array<double, 3>>> own, other;
+    std::vector<unsigned int> expected;
+    unsigned int removedAcrossCells = 0;
+    for (unsigned int i = 0; i < 400; ++i)
+    {
+      const std::array<double, 3> first{0.5 * (i % 8) + 0.1 * unit(rng), 0.5 * (i / 8 % 8) + 0.1 * unit(rng), 0.5 * (i / 64) + 0.1 * unit(rng)};
+      const std::array<double, 3> last{coordinate(rng) + 10, coordinate(rng), coordinate(rng)};
+      own.push_back(FiberBetween(first, last, 0.3));
+
+      const unsigned int kind = i % 4; // 0: no copy, 1: close copy, 2: close reversed copy, 3: distant copy
+      if (kind == 0)
+      {
+        expected.push_back(i);
+        continue;
+      }
+      // mean squared distance m, shared out between the two end points: |d1|^2 + |d2|^2 = 2m
+      const double m = kind == 3 ? 1.1e-6 + 2e-6 * unit(rng) : 0.9e-6 * unit(rng);
+      const double share = unit(rng);
+      const auto first2 = moved(first, randomOffset(std::sqrt(2 * m * share)));
+      const auto last2 = moved(last, randomOffset(std::sqrt(2 * m * (1 - share))));
+      other.push_back(kind == 2 ? FiberBetween(last2, first2, -0.2) : FiberBetween(first2, last2, -0.2));
+      if (kind == 3)
+        expected.push_back(i);
+      else if (cell(first2) != cell(first) || cell(last2) != cell(last))
+        ++removedAcrossCells;
+    }
+    CPPUNIT_ASSERT_MESSAGE("removed fibers with an end point in another cell: " + std::to_string(removedAcrossCells), removedAcrossCells >= 20);
+
+    auto fib = MakeBundle(own);
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      fib->SetFiberWeight(i, 1.0f + 0.01f * i);
+    auto subtracted = fib->SubtractBundle(MakeBundle(other));
+    CPPUNIT_ASSERT((SourceIds(fib, subtracted) == expected));
   }
 
   void ApplyCurvatureThreshold_CircularArc_RadiusDecides()
@@ -1164,7 +1349,7 @@ public:
   void ColorFibersByScalarMap_SignedIntegerImage_InterpolatedLikeFloat()
   {
     auto fromShort = MakeBundle({{{0.5, 0, 0}, {1.0, 0, 0}, {1.5, 0, 0}}});
-    auto fromFloat = fromShort->GetDeepCopy();
+    auto fromFloat = fromShort->Clone();
     fromShort->ColorFibersByScalarMap(EdgeImage<short>(), true, true, mitk::LookupTable::JET, 1.0, true);
     fromFloat->ColorFibersByScalarMap(EdgeImage<float>(), true, true, mitk::LookupTable::JET, 1.0, true);
 
@@ -1182,7 +1367,7 @@ public:
   void TransformFibers_ItkTransform_MovesEveryPoint()
   {
     auto source = LoadWeightedFibers();
-    auto fib = source->GetDeepCopy();
+    auto fib = source->Clone();
     auto transform = itk::ScalableAffineTransform<mitk::ScalarType>::New();
     itk::ScalableAffineTransform<mitk::ScalarType>::OutputVectorType axis;
     axis[0] = 0.2;
@@ -1250,14 +1435,14 @@ public:
     AssertHeaderContainsAllPoints(a->AddBundle(b), "AddBundle");
     AssertHeaderContainsAllPoints(b->AddBundles({a}), "AddBundles");
 
-    auto moved = a->GetDeepCopy();
+    auto moved = a->Clone();
     moved->TranslateFibers(100, 0, 0);
     AssertHeaderContainsAllPoints(moved, "TranslateFibers");
     moved->RotateAroundAxis(0, 0, 90);
     AssertHeaderContainsAllPoints(moved, "RotateAroundAxis");
 
     // The first bundle with fibers gives the join its coordinate convention and a set header
-    auto withReference = a->GetDeepCopy();
+    auto withReference = a->Clone();
     withReference->setIsRAS(true);
     auto header = withReference->GetTrackVisHeader();
     header.dim[0] = 77;
@@ -1317,7 +1502,7 @@ public:
     auto resampled = MakeBundle({{{0, 0, 0}, {0, 3, 0}}, {{7, 7, 7}, {7, 7, 7}}});
     resampled->SetFiberWeight(0, 5.0f);
     resampled->SetFiberWeight(1, 6.0f);
-    auto source = resampled->GetDeepCopy();
+    auto source = resampled->Clone();
     resampled->ResampleLinear(1);
     AssertWeightsByFirstPoint({source}, resampled, "ResampleLinear");
   }

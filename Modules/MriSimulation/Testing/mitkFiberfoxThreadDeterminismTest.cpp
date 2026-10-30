@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <mitkFiberfoxParameters.h>
 #include <itkTractsToDWIImageFilter.h>
 #include <itkImageRegionConstIterator.h>
+#include <mitkOmpThreadGuard.h>
 #include <omp.h>
 #include <stdexcept>
 #include <functional>
@@ -61,19 +62,19 @@ class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
   using DoubleDwiType = FilterType::DoubleDwiType;
 
   mitk::FiberBundle::Pointer m_FiberBundle;
-  int m_MaxThreads = 1;
+  std::unique_ptr<mitk::OmpThreadGuard> m_Threads;  ///< restores the thread count in tearDown
 
 public:
 
   void setUp() override
   {
     m_FiberBundle = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("Fiberfox/Signalgen.fib"));
-    m_MaxThreads = omp_get_max_threads();
+    m_Threads = std::make_unique<mitk::OmpThreadGuard>(omp_get_max_threads());
   }
 
   void tearDown() override
   {
-    omp_set_num_threads(m_MaxThreads);
+    m_Threads.reset();
     m_FiberBundle = nullptr;
   }
 
@@ -81,7 +82,7 @@ public:
 
   FilterType::Pointer Simulate(const std::string& parameterFile, int threads, const Modifier& modify, bool constantSeed = true)
   {
-    omp_set_num_threads(threads);
+    m_Threads->SetNumberOfThreads(threads);
     mitk::FiberfoxParameters parameters;
     parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/" + parameterFile), true);
     if (modify)
@@ -207,7 +208,7 @@ public:
   /** An exception must not leave an OpenMP region (that terminates the process); it reaches the caller of Update. */
   void ExceptionInFiberLoop()
   {
-    omp_set_num_threads(8);
+    m_Threads->SetNumberOfThreads(8);
     mitk::FiberfoxParameters parameters;
     parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
     for (auto model : parameters.m_FiberModelList)

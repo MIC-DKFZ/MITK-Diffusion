@@ -4,9 +4,9 @@ if(BUILD_MODULE_FiberBundle)
 
 MITK_CREATE_MODULE(
   INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} IO Rendering
-  DEPENDS MitkPlanarFigure MitkDICOM MitkDiffusionModelling
+  DEPENDS MitkPlanarFigure MitkDiffusionModelling
   PACKAGE_DEPENDS
-    DCMTK|dcmtract VTK|CommonComputationalGeometry ITK|ITKIONRRD+ITKIONIFTI
+    DCMTK|dcmtract VTK|CommonComputationalGeometry
 )
 
 add_subdirectory(Testing)

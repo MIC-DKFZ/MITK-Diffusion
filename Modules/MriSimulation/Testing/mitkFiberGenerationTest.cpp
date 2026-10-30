@@ -19,6 +19,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkFiberBundle.h>
 #include <mitkPlanarEllipse.h>
 #include <itkFibersFromPlanarFiguresFilter.h>
+#include <mitkOmpThreadGuard.h>
 #include <omp.h>
 #include <vtkCell.h>
 #include <vtkPolyData.h>
@@ -57,7 +58,7 @@ namespace
  */
 int mitkFiberGenerationTest(int argc, char* argv[])
 {
-    omp_set_num_threads(1);
+    mitk::OmpThreadGuard threads(1);
     MITK_TEST_BEGIN("mitkFiberGenerationTest");
 
     MITK_TEST_CONDITION_REQUIRED(argc==6,"check for input data")

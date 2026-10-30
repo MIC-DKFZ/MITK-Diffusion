@@ -902,7 +902,7 @@ void QmitkFiberGenerationView::CopyBundles()
     }
 
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>((*it)->GetData());
-    mitk::FiberBundle::Pointer newBundle = fib->GetDeepCopy();
+    mitk::FiberBundle::Pointer newBundle = fib->Clone();
     QString name((*it)->GetName().c_str());
     name += "_copy";
 

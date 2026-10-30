@@ -1401,7 +1401,7 @@ public:
     for (const std::string name : {"StreamlineTractography/mask_image.nii.gz", "mean_FA.nii.gz"})
     {
       auto image = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath(name));
-      auto withReference = fib->GetDeepCopy();
+      auto withReference = fib->Clone();
       withReference->SetTrackVisHeader(image->GetGeometry());
       mitk::IOUtil::Save(withReference, path, options);
       AssertSpecPointsMatchBundle(fib, ReadTrkAsSpec(path, header, inside), name);

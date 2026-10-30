@@ -96,7 +96,7 @@ The cutoff of the tractography parameters (FA, GFA or peak magnitude) does not a
 - Use Stop-Votes: If checked, the majority of sampling points has to place a stop-vote for the streamline to terminate. If not checked, all sampling positions have to vote for a streamline termination.
 
 \section StrTrackUserManualPostprocessing Output and Postprocessing
-- Compress Fibers: Whole brain tractograms obtained with a small step size can contain billions of points. The tractograms can be compressed by removing points that do not really contribute to the fiber shape, such as many points on a straight line. The error threshold is one tenth of the smallest voxel size of the input image.
+- Compress Fibers: Whole brain tractograms obtained with a small step size can contain billions of points. The tractograms can be compressed by removing points that do not really contribute to the fiber shape, such as many points on a straight line. The error threshold is one tenth of the smallest voxel size of the input image: no point of the original fiber lies farther than this from the compressed fiber.
 - Output Probability Map: No streamlines are generated. Instead, the tractography outputs a visitation-count map that indicates the probability of a fiber to reach a voxel from the selected seed region. For this measure to be sensible, the number of seeds per voxel needs to be rather large.
 
 \section StrTrackUserManualParameterFiles Parameter Files

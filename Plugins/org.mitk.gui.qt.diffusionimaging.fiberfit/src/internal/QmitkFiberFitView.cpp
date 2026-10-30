@@ -97,7 +97,7 @@ void QmitkFiberFitView::StartFit()
   if (m_Controls->m_TractBox->GetSelectedNode().IsNull() || m_Controls->m_ImageBox->GetSelectedNode().IsNull())
     return;
 
-  mitk::FiberBundle::Pointer input_tracts = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_TractBox->GetSelectedNode()->GetData())->GetDeepCopy();
+  mitk::FiberBundle::Pointer input_tracts = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_TractBox->GetSelectedNode()->GetData())->Clone();
 
   mitk::DataNode::Pointer node = m_Controls->m_ImageBox->GetSelectedNode();
   // the fitter keeps a raw pointer to the signal model; declared first, the model outlives it
