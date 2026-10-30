@@ -29,6 +29,16 @@ found in the LICENSE file.
 #include <mitkConventionalSpinEcho.h>
 #include <mitkFastSpinEcho.h>
 
+/** The k-space filter with the count of time segments of its last update readable (0: exact sum). */
+class KspaceSegmentsProbe : public itk::KspaceImageFilter<float>
+{
+public:
+  using Self = KspaceSegmentsProbe;
+  using Pointer = itk::SmartPointer<Self>;
+  itkFactorylessNewMacro(Self)
+  unsigned int NumSegments() const { return m_NumSegments; }
+};
+
 /**
  * k-space acquisition of Fiberfox on synthetic input images (the input-image mode of the
  * simulation: no signal model, no relaxation, signal scale 1): each artifact against its
@@ -45,6 +55,7 @@ class mitkFiberfoxKspaceTestSuite : public mitk::TestFixture
   MITK_TEST(OffResonanceShift);
   MITK_TEST(EddyCurrentsEqualFieldMap);
   MITK_TEST(TimeSegmentsApproximateExactSum);
+  MITK_TEST(TimeSegmentsHoldForStrongPhase);
   MITK_TEST(NoiseFullFourier);
   MITK_TEST(NoisePartialFourier);
   MITK_TEST(NoiseMultiCoil);
@@ -469,6 +480,153 @@ public:
       CPPUNIT_ASSERT_MESSAGE(c.name + ": automatic count within 0.1 % of the exact sum", automatic < 1e-3);
       if (c.type == mitk::SignalGenerationParameters::SingleShotEpi)
         CPPUNIT_ASSERT_MESSAGE(c.name + ": 2 segments are far off", few > 1e-2);
+    }
+  }
+
+  /** A 64x64 slice to acquire with KspaceImageFilter directly: EPI, two compartments in an ellipse. */
+  struct PhaseCase
+  {
+    std::string name;
+    double spacing;      ///< mm; with the line time it sets the phase spread
+    float tLine;         ///< ms
+    float eddyStrength;  ///< mT/m along (0.6, 0.8, 0) at b = 1000; 0 without eddy currents
+    Pattern fieldMap;    ///< Hz; empty without distortions
+    bool relaxation;     ///< T2 90 and 2000 ms; without, the compartments share one set of spectra
+  };
+
+  /** Complex k-space of the slice with the given m_KspaceTimeSegments; numSegments is the count used (0: exact sum). */
+  static std::vector<std::complex<float>> AcquireSlice(const PhaseCase& c, int segments, unsigned int& numSegments)
+  {
+    const int n = 64;
+    mitk::FiberfoxParameters parameters;
+    auto& signalGen = parameters.m_SignalGen;
+    signalGen.m_ImageRegion.SetSize(0, n);
+    signalGen.m_ImageRegion.SetSize(1, n);
+    signalGen.m_ImageRegion.SetSize(2, 1);
+    signalGen.m_CroppedRegion = signalGen.m_ImageRegion;
+    signalGen.m_ImageSpacing.Fill(c.spacing);
+    signalGen.m_tLine = c.tLine;
+    signalGen.m_tEcho = 2 * n * c.tLine;
+    signalGen.m_DoSimulateRelaxation = c.relaxation;
+    signalGen.m_SignalScale = 1;
+    signalGen.m_KspaceTimeSegments = segments;
+    signalGen.m_EddyStrength = c.eddyStrength;
+    parameters.m_Misc.m_DoAddEddyCurrents = c.eddyStrength > 0;
+    parameters.m_Misc.m_DoAddDistortions = static_cast<bool>(c.fieldMap);
+    if (c.fieldMap)
+    {
+      auto fmap = FloatImageType::New();
+      fmap->SetRegions(signalGen.m_ImageRegion);
+      fmap->SetSpacing(signalGen.m_ImageSpacing);
+      fmap->Allocate();
+      for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x)
+          fmap->SetPixel({{x, y, 0}}, static_cast<float>(c.fieldMap(x, y)));
+      signalGen.m_FrequencyMap = fmap;
+    }
+
+    std::vector<itk::KspaceImageFilter<float>::InputImagePointerType> compartments;
+    for (int i = 0; i < 2; ++i)
+    {
+      auto compartment = itk::KspaceImageFilter<float>::InputImageType::New();
+      itk::ImageRegion<2> region;
+      region.SetSize(0, n);
+      region.SetSize(1, n);
+      compartment->SetRegions(region);
+      compartment->Allocate();
+      for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x)
+        {
+          const double dx = (x - 0.5 * n) / (0.4 * n), dy = (y - 0.52 * n) / (0.45 * n);
+          const double r2 = dx * dx + dy * dy;
+          double value = 0;
+          if (r2 < 1)
+            value = i == 0 ? 300 + 200 * std::cos(0.4 * x) * std::sin(0.3 * y) : (r2 < 0.15 ? 800 : 50);
+          compartment->SetPixel({{x, y}}, static_cast<float>(value));
+        }
+      compartments.push_back(compartment);
+    }
+
+    auto filter = KspaceSegmentsProbe::New();
+    filter->SetCompartmentImages(compartments);
+    filter->SetT2({90, 2000});
+    filter->SetT1({900, 4000});
+    filter->SetParameters(&parameters);
+    filter->SetZ(0);
+    filter->SetZidx(0);
+    itk::Vector<float, 3> coil;
+    coil.Fill(0);
+    filter->SetCoilPosition(coil);
+    filter->SetMotion(mitk::FiberfoxMotion());
+    itk::Vector<double, 3> gradient;
+    gradient[0] = 0.6;
+    gradient[1] = 0.8;
+    gradient[2] = 0;
+    filter->SetDiffusionGradientDirection(gradient);
+    filter->SetRandSeed(0);
+    filter->Update();
+    numSegments = filter->NumSegments();
+    const auto* data = filter->GetOutput()->GetBufferPointer();
+    return std::vector<std::complex<float>>(data, data + filter->GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels());
+  }
+
+  static double RelativeDifference(const std::vector<std::complex<float>>& test, const std::vector<std::complex<float>>& reference)
+  {
+    double difference = 0, norm = 0;
+    for (std::size_t i = 0; i < test.size(); ++i)
+    {
+      difference += std::norm(Complex(test[i]) - Complex(reference[i]));
+      norm += std::norm(Complex(reference[i]));
+    }
+    return std::sqrt(difference / norm);
+  }
+
+  /**
+   * The default, the automatic count of time segments, stays within 0.1 % (relative RMS of the complex
+   * k-space) of the exact sum also where the phase is strong: eddy currents, whose phase changes about
+   * five times faster at the start of the readout than at the echo (an image of 128 mm at 4 mm and a
+   * line time of 2 ms has the phase spread of 256 mm at 2 mm and 1 ms), a field map together with eddy
+   * currents (more than 512 bins of the field histogram), a field map whose values cluster (a linear
+   * field, one value per column, plus a bump), and a field map alone with a phase spread above 128
+   * cycles, also with a fixed count of 200 segments. Where the time segments are used, the case must
+   * test them (the slice must not have taken the exact sum).
+   */
+  void TimeSegmentsHoldForStrongPhase()
+  {
+    const auto bump = [](double amplitude, double linear)
+    {
+      return Pattern([amplitude, linear](int x, int y)
+      {
+        const double dx = x - 0.62 * 64, dy = y - 0.3 * 64, sigma = 0.12 * 64;
+        return amplitude * std::exp(-(dx * dx + dy * dy) / (2 * sigma * sigma)) - 0.2 * amplitude + linear * (x - 32) / 64.0;
+      });
+    };
+    struct Expectation { PhaseCase phase; bool segmented; int fixedSegments; };
+    const std::vector<Expectation> cases = {
+      {{"eddy currents 0.02 mT/m", 4, 2, 0.02f, Pattern(), true}, true, 0},
+      {{"eddy currents 0.05 mT/m", 4, 2, 0.05f, Pattern(), true}, true, 0},
+      {{"field map 200 Hz, eddy currents 0.1 mT/m", 2, 1, 0.1f, bump(200, 0), true}, true, 0},
+      {{"field map 400 Hz, eddy currents 0.05 mT/m", 4, 2, 0.05f, bump(400, 0), true}, false, 0},
+      {{"clustered field map", 2, 1, 0, bump(500, 1500), false}, true, 0},
+      {{"field map, phase spread 140 cycles", 2, 2, 0, bump(400, 1300), true}, false, 200} };
+    for (const auto& c : cases)
+    {
+      unsigned int numSegments = 0;
+      const auto exact = AcquireSlice(c.phase, 0, numSegments);
+      const auto automatic = AcquireSlice(c.phase, mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, numSegments);
+      const double error = RelativeDifference(automatic, exact);
+      MITK_INFO << "Time segments, " << c.phase.name << ": " << numSegments << " segments, error " << error;
+      CPPUNIT_ASSERT_MESSAGE(c.phase.name + ": automatic count within 0.1 % of the exact sum", error < 1e-3);
+      if (c.segmented)
+        CPPUNIT_ASSERT_MESSAGE(c.phase.name + ": time segments used", numSegments > 0);
+      if (c.fixedSegments > 0)
+      {
+        const auto fixed = AcquireSlice(c.phase, c.fixedSegments, numSegments);
+        const double fixedError = RelativeDifference(fixed, exact);
+        MITK_INFO << "Time segments, " << c.phase.name << ": " << numSegments << " fixed segments, error " << fixedError;
+        CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(c.fixedSegments), numSegments);
+        CPPUNIT_ASSERT_MESSAGE(c.phase.name + ": fixed count within 0.1 % of the exact sum", fixedError < 1e-3);
+      }
     }
   }
 
