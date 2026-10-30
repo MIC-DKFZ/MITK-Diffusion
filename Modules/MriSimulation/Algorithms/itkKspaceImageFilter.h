@@ -25,6 +25,8 @@ This file is based heavily on a corresponding ITK filter.
 #include <itkImageSource.h>
 #include <vector>
 #include <mutex>
+#include <condition_variable>
+#include <algorithm>
 #include <memory>
 #include <complex>
 #include <array>
@@ -35,6 +37,59 @@ This file is based heavily on a corresponding ITK filter.
 #include <mitkAcquisitionType.h>
 
 namespace itk{
+
+  /**
+   * Memory of the time segments (KspaceImageFilter) shared by the slice jobs of a simulation
+   * (TractsToDWIImageFilter). A job holds the memory its time segments need while it builds them and
+   * waits until that much is free, so the budget bounds the memory of all jobs together. Waiting changes
+   * only when a job runs, never its result: whether a slice takes the time segments is decided by a
+   * limit per slice (KspaceImageFilter::MAX_TIME_SEGMENT_BYTES), not by the jobs running at the time.
+   */
+  class TimeSegmentMemoryBudget
+  {
+  public:
+    explicit TimeSegmentMemoryBudget(double bytes) : m_Total(bytes), m_Free(bytes) {}
+
+    /** The bytes of a budget one job holds; released when destroyed. Without a budget it holds nothing. */
+    class Share
+    {
+    public:
+      explicit Share(TimeSegmentMemoryBudget* budget) : m_Budget(budget) {}
+      ~Share() { Resize(0); }
+      Share(const Share&) = delete;
+      Share& operator=(const Share&) = delete;
+      /**
+       * Holds bytes, at most the whole budget (a job that needs more runs alone), instead of the bytes
+       * held so far. These are released before the job waits, so no job waits while holding memory and
+       * the jobs cannot block each other for good.
+       */
+      void Resize(double bytes)
+      {
+        if (m_Budget != nullptr)
+          m_Held = m_Budget->Exchange(m_Held, bytes);
+      }
+    private:
+      TimeSegmentMemoryBudget* m_Budget;
+      double m_Held = 0;
+    };
+
+  private:
+    double Exchange(double held, double bytes)
+    {
+      std::unique_lock<std::mutex> lock(m_Mutex);
+      m_Free += held;
+      m_Changed.notify_all();
+      bytes = std::min(bytes, m_Total);
+      m_Changed.wait(lock, [this, bytes] { return m_Free >= bytes; });
+      m_Free -= bytes;
+      return bytes;
+    }
+
+    const double m_Total;
+    double m_Free;
+    std::mutex m_Mutex;
+    std::condition_variable m_Changed;
+  };
 
 /**
 * \brief Simulates k-space acquisition of one slice with a single shot EPI sequence. Enables the simulation of various effects occuring during real MR acquisitions:
@@ -90,13 +145,17 @@ namespace itk{
     itkGetConstMacro( TimeSegmentsCapped, bool )    ///< time segments were asked for, but would have cost more than the exact sum, which the last update took
 
     /**
-     * Memory of the time segments of all slice jobs of a simulation together; TractsToDWIImageFilter
-     * gives each of its parallel jobs (one per parallel volume) an equal share (SetMaxTimeSegmentBytes).
+     * Memory limit of the time segments of one slice; above it the slice takes the exact sum. A constant,
+     * so that the choice, and with it the image, does not depend on the threads or on the other slice jobs.
      */
+    static constexpr double MAX_TIME_SEGMENT_BYTES = 256.0*1024*1024;
+    /** Memory of the time segments of all slice jobs of a simulation together (TimeSegmentMemoryBudget of TractsToDWIImageFilter). */
     static constexpr double TIME_SEGMENT_MEMORY_BUDGET = 2.0*1024*1024*1024;
-    /** Memory limit of the time segments of this filter's slice; above it the slice takes the exact sum. TIME_SEGMENT_MEMORY_BUDGET by default. */
+    /** Memory limit of the time segments of this filter's slice; MAX_TIME_SEGMENT_BYTES by default. */
     itkSetMacro( MaxTimeSegmentBytes, double )
     itkGetConstMacro( MaxTimeSegmentBytes, double )
+    /** Budget shared with the other slice jobs, whose memory the time segments hold while they are built; none (nullptr) by default. Not owned. */
+    void SetTimeSegmentMemoryBudget( TimeSegmentMemoryBudget* budget ){ m_TimeSegmentMemoryBudget = budget; }
 
     void SetParameters( const mitk::FiberfoxParameters* param ){ m_Parameters = param; }
     void SetMotion( const mitk::FiberfoxMotion& motion ){ m_Motion = motion; }  ///< head motion of the volume; moves the frequency map
@@ -206,6 +265,7 @@ namespace itk{
 
     unsigned int                            m_NumSegments;  ///< L of the time segments, 0 for the other two paths
     double                                  m_MaxTimeSegmentBytes;
+    TimeSegmentMemoryBudget*                m_TimeSegmentMemoryBudget;
     bool                                    m_TimeSegmentsCapped;
 
   private:

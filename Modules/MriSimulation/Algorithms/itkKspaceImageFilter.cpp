@@ -54,7 +54,8 @@ namespace itk {
     , m_IsBaseline(true)
     , m_StoreTimings(false)
     , m_NumSegments(0)
-    , m_MaxTimeSegmentBytes(TIME_SEGMENT_MEMORY_BUDGET)
+    , m_MaxTimeSegmentBytes(MAX_TIME_SEGMENT_BYTES)
+    , m_TimeSegmentMemoryBudget(nullptr)
     , m_TimeSegmentsCapped(false)
   {
     m_DiffusionGradientDirection.Fill(0.0);
@@ -387,7 +388,8 @@ namespace itk {
    * times, estimated from pixels of every bin of the histogram, is below 1e-4. Where the time
    * segments would take longer than the exact sum on one core (estimated before each fit, with the
    * fits done), or more memory than m_MaxTimeSegmentBytes, the slice takes the exact sum
-   * (GetTimeSegmentsCapped).
+   * (GetTimeSegmentsCapped). While the time segments are built, their memory is held from the budget
+   * shared with the other slice jobs, if one is set (SetTimeSegmentMemoryBudget).
    */
   template< class ScalarType >
   void KspaceImageFilter< ScalarType >::ComputeTimeSegmentation(bool eddyCurrents, bool distortions)
@@ -737,6 +739,8 @@ namespace itk {
         SolveSegmentWeights(pinvRe, pinvIm, binU, binWeight, &vs[first], std::min(SEGMENT_WEIGHT_BLOCK, count - first), &a[first], count);
       });
     };
+    // the memory of the fit and of the final interpolators and transforms, held from the shared budget
+    TimeSegmentMemoryBudget::Share memoryShare(m_TimeSegmentMemoryBudget);
     for (;;)
     {
       // The exact sum (in DynamicThreadedGenerateData) where the time segments would need more memory
@@ -750,6 +754,7 @@ namespace itk {
         m_TimeSegmentsCapped = true;
         return;
       }
+      memoryShare.Resize(memory(numSegments));
 
       // segment times: the ticks whose accumulated phase is closest to L values evenly spaced over the readout
       segmentV.clear();

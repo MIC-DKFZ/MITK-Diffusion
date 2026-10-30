@@ -32,6 +32,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 namespace itk
 {
 
+class TimeSegmentMemoryBudget;
+
 /**
 * \brief Generates artificial diffusion weighted image volume from the input fiberbundle using a generic multicompartment model.
 * See "Fiberfox: Facilitating the creation of realistic white matter software phantoms" (DOI: 10.1002/mrm.25045) for details.
@@ -68,7 +70,7 @@ public:
     itkSetMacro( FiberBundle, FiberBundleType )             ///< Input fiber bundle
     itkSetMacro( InputImage, typename OutputImageType::Pointer )     ///< Input diffusion-weighted image. If no fiber bundle is set, then the acquisition is simulated for this image without a new diffusion simulation.
     itkSetMacro( UseConstantRandSeed, bool )                ///< Seed for random generator.
-    /** Memory of the time segments of all k-space slice jobs together; KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET by default (tests set less). */
+    /** Memory of the time segments of all k-space slice jobs together, which they wait for (TimeSegmentMemoryBudget); KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET by default (tests set less). */
     itkSetMacro( TimeSegmentMemoryBudget, double )
     void SetParameters( mitk::FiberfoxParameters param )  ///< Simulation parameters.
     { m_Parameters = param; }
@@ -137,7 +139,7 @@ protected:
       std::vector< itk::Vector<double, 3> > coilPositions;
       std::vector< Spike > spikes;
       int threadsPerSlice;
-      double timeSegmentBytes;   ///< memory limit of the time segments of one slice job
+      TimeSegmentMemoryBudget* timeSegmentMemory;   ///< memory budget of the time segments of all slice jobs
       bool storeTimings;   ///< the job of volume 0, slice 0 and coil 0 stores the readout timings
       DoubleDwiType::Pointer magnitude;
       std::atomic<unsigned int>* cappedJobs;   ///< counts the jobs that took the exact sum instead of the time segments asked for

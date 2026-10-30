@@ -279,9 +279,10 @@ public:
    * The memory of the time segments of all slice jobs together is bounded (TIME_SEGMENT_MEMORY_BUDGET),
    * and more threads run more slice jobs at once. Whether a slice takes the time segments must not
    * depend on that: a share of the budget per parallel job sent the slices to the exact sum at more
-   * threads, so the image depended on the thread count (#47, branch review round 3). Here eight volumes
-   * of a 32x32 slice, whose time segments need about 0.6 MB each, share a budget of 1 MiB, which holds
-   * one of them at a time, at 1 and at 8 threads (eight parallel volumes).
+   * threads, so the image depended on the thread count (#47, branch review round 3). Now a slice job
+   * waits until the budget holds its time segments. Here eight volumes of a 32x32 slice, whose time
+   * segments need about 0.6 MB each, share a budget of 1 MiB, which holds one of them at a time, at 1
+   * and at 8 threads (eight parallel volumes).
    */
   void TimeSegmentsWithinMemoryBudget()
   {
@@ -295,6 +296,8 @@ public:
     CPPUNIT_ASSERT_EQUAL_MESSAGE("coil image, imaginary part", 0ul, CountDifferences<DoubleDwiType>(test->GetOutputImagesImag()[0], reference->GetOutputImagesImag()[0]));
     for (const auto& filter : {reference, test})
       CPPUNIT_ASSERT_MESSAGE("time segments used", filter->GetStatusText().find("exact sum in") == std::string::npos);
+    // the eight jobs run at once, so they wait for the budget
+    CPPUNIT_ASSERT_MESSAGE("parallel volumes", test->GetStatusText().find("Parallel volumes: 8") != std::string::npos);
   }
 
   /** Fiber compartments that draw random numbers: prototype kernels and randomized astrosticks. */
