@@ -20,6 +20,7 @@ found in the LICENSE file.
 #include <mitkPlanarCircle.h>
 #include <mitkPlanarPolygon.h>
 #include <mitkPointSet.h>
+#include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkSliceNavigationController.h>
 
 #include <QmitkDataStorageComboBox.h>
@@ -32,6 +33,7 @@ found in the LICENSE file.
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QSpinBox>
 
 #include <itkEuler3DTransform.h>
@@ -61,6 +63,7 @@ class QmitkFiberProcessingViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Processing_SelectedBundleDeleted_NotUsed);
   CPPUNIT_TEST(Processing_SegmentationRoi_AsBinaryMaskAlsoOneSlice);
   CPPUNIT_TEST(Processing_RoiImageOfFigures_ObliqueGridUnionAndExtraction);
+  CPPUNIT_TEST(Processing_CurvatureDecimalsScalarMapBoxUnplacedCircle);
   CPPUNIT_TEST(Quantification_EnvelopeEndingsAndReferenceImages);
   CPPUNIT_TEST(Clustering_MissingInputs_MessagesAndClusters);
   CPPUNIT_TEST_SUITE_END();
@@ -433,6 +436,45 @@ public:
                              closest <= 3.0 + 1e-6);
     }
     CPPUNIT_ASSERT(roiVoxels > 0);
+  }
+
+  void Processing_CurvatureDecimalsScalarMapBoxUnplacedCircle()
+  {
+    auto *view = ShowProcessing();
+    auto fib = Load("FiberProcessing/original.fib");
+    const auto fibersBefore = Fibers(fib)->GetNumFibers();
+    Select({fib});
+
+    // The curvature threshold keeps its decimals; removing curved fibers changes the bundle.
+    auto *angle = GetChild<QDoubleSpinBox>(view, "m_CurvSpinBox");
+    angle->setValue(30.5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(30.5, angle->value(), 1e-9);
+    GetChild<QCheckBox>(view, "m_RemoveCurvedFibersBox")->setChecked(true);
+    Remove(view, 2);
+    CPPUNIT_ASSERT(Fibers(fib)->GetNumFibers() < fibersBefore);
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+
+    // The scalar map box lists 3D one-component images only, no DWI or peak image.
+    auto scalar = Load("tensorImage_FA.nrrd");
+    auto dwi = Load("ImageReconstruction/test.dwi");
+    mitk::PreferenceListReaderOptionsFunctor functor(mitk::PreferenceListReaderOptionsFunctor::ListType({"Peak Image"}),
+                                                     mitk::PreferenceListReaderOptionsFunctor::ListType());
+    auto peaks = mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), *GetDataStorage(), &functor)->front();
+    Wait(20);
+    CPPUNIT_ASSERT(BoxOffers(view, "m_ColorMapBox", scalar));
+    CPPUNIT_ASSERT(!BoxOffers(view, "m_ColorMapBox", dwi));
+    CPPUNIT_ASSERT(!BoxOffers(view, "m_ColorMapBox", peaks));
+
+    // Extraction with a circle created but not placed: the hint to place it.
+    Select({fib});
+    GetChild<QPushButton>(view, "m_CircleButton")->click();
+    Wait(20);
+    GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(0);
+    auto *extract = GetChild<QCommandLinkButton>(view, "m_ExtractFibersButton");
+    CPPUNIT_ASSERT(extract->isEnabled());
+    extract->click();
+    CPPUNIT_ASSERT(OneMessage().contains("forgot to actually place it"));
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), GetNodesOfClass("FiberBundle").size());
   }
 
   void Quantification_EnvelopeEndingsAndReferenceImages()
