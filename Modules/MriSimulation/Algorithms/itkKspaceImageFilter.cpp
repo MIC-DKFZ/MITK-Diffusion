@@ -582,16 +582,23 @@ namespace itk {
       binWeight.push_back(std::sqrt(bin[0]));
       binU.push_back({bin[1]/bin[0], bin[2]/bin[0]});
     }
-    // the pixels with signal, for the residual check
-    std::vector< std::size_t > signalPixels;
-    double totalEnergy = 0;
-    for (std::size_t r=0; r<numPixels; ++r)
-      if (energy[r] > 0)
-      {
-        signalPixels.push_back(r);
-        totalEnergy += energy[r];
-      }
-    const std::size_t numResidualSamples = std::min<std::size_t>(256, distinct.size());
+    // The residual check takes at most 1024 of the pixels with signal, evenly spread, and up to 256
+    // readout times, 16 per segment: in a test application of 93 small slice jobs it otherwise took
+    // longer than the transforms. Its estimate changed by 1 % with 1024 pixels of 9268.
+    std::vector< std::size_t > checkPixels;
+    double checkEnergy = 0;
+    {
+      const auto numSignalPixels = static_cast<std::size_t>(std::count_if(energy.begin(), energy.end(), [](double e) { return e > 0; }));
+      const std::size_t step = std::max<std::size_t>(1, numSignalPixels/1024);
+      std::size_t count = 0;
+      for (std::size_t r=0; r<numPixels; ++r)
+        if (energy[r] > 0 && count++ % step == 0)
+        {
+          checkPixels.push_back(r);
+          checkEnergy += energy[r];
+        }
+    }
+    const auto residualSamples = [&distinct](unsigned int numSegments) { return std::min<std::size_t>({256, 16*std::size_t(numSegments), distinct.size()}); };
 
     const int requested = m_Parameters->m_SignalGen.m_KspaceTimeSegments;
     const std::size_t numGroups = groups.size();
@@ -602,13 +609,13 @@ namespace itk {
     const auto withinCap = [&](unsigned int numSegments)
     {
       const double L = numSegments;
-      const double bytes = sizeof(std::complex<double>)*L*(numGroups*numTicks + distinct.size() + numBins + signalPixels.size());
+      const double bytes = sizeof(std::complex<double>)*L*(numGroups*numTicks + distinct.size() + numBins + checkPixels.size());
       if (bytes > MAX_TIME_SEGMENT_BYTES)
         return false;
       if (requested > 0)
         return true;
       const double transforms = numGroups*L*(parities*ny*nkx*nx + nky*nkx*ny) + 10*L*numPixels;
-      const double fit = 8*numBins*L*L + distinct.size()*numBins*L + numResidualSamples*signalPixels.size()*L;
+      const double fit = 8*numBins*L*L + distinct.size()*numBins*L + residualSamples(numSegments)*checkPixels.size()*(L + 10);
       return transforms + fit + numGroups*L*numTicks < exactCost;
     };
 
@@ -664,13 +671,14 @@ namespace itk {
         break;
       // energy-weighted residual of the pixels' phase factors at readout times evenly spread over the
       // distinct ones, both ends included; its RMS estimates the relative RMS error of the k-space
-      std::vector< std::complex<double> > segmentPhase(signalPixels.size()*numSegments);
-      parallelFor(signalPixels.size(), [&](std::size_t i)
+      std::vector< std::complex<double> > segmentPhase(checkPixels.size()*numSegments);
+      parallelFor(checkPixels.size(), [&](std::size_t i)
       {
-        const auto& ur = u[signalPixels[i]];
+        const auto& ur = u[checkPixels[i]];
         for (unsigned int l=0; l<numSegments; ++l)
           segmentPhase[i*numSegments + l] = std::polar(1.0, itk::Math::twopi*(ur[0]*segmentV[l][0] + ur[1]*segmentV[l][1]));
       });
+      const std::size_t numResidualSamples = residualSamples(numSegments);
       std::vector< double > residual(numResidualSamples, 0.0);
       parallelFor(numResidualSamples, [&](std::size_t s)
       {
@@ -679,18 +687,18 @@ namespace itk {
         std::vector< std::complex<double> > target(numBins), a(numSegments);
         SolveSegmentWeights(pseudoInverse, binU, binWeight, vt, target, a);
         double sum = 0;
-        for (std::size_t i=0; i<signalPixels.size(); ++i)
+        for (std::size_t i=0; i<checkPixels.size(); ++i)
         {
-          const auto& ur = u[signalPixels[i]];
+          const auto& ur = u[checkPixels[i]];
           const std::complex<double>* phase = &segmentPhase[i*numSegments];
           std::complex<double> fitted(0, 0);
           for (unsigned int l=0; l<numSegments; ++l)
             fitted += a[l]*phase[l];
-          sum += energy[signalPixels[i]]*std::norm(std::polar(1.0, itk::Math::twopi*(ur[0]*vt[0] + ur[1]*vt[1])) - fitted);
+          sum += energy[checkPixels[i]]*std::norm(std::polar(1.0, itk::Math::twopi*(ur[0]*vt[0] + ur[1]*vt[1])) - fitted);
         }
         residual[s] = sum;
       });
-      if (std::accumulate(residual.begin(), residual.end(), 0.0) <= 1e-8*totalEnergy*numResidualSamples)
+      if (std::accumulate(residual.begin(), residual.end(), 0.0) <= 1e-8*checkEnergy*numResidualSamples)
         break;
       numSegments = static_cast<unsigned int>(std::ceil(1.25*numSegments));
     }
