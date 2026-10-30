@@ -119,6 +119,16 @@ Facts the layout does not show:
   auto-loaded: MITK forbids depending on an auto-loaded module. `mitkDiffusionWorkbenchReadersTest`
   (`Modules/FiberBundle/Testing/WorkbenchReaders/`, a driver that links no diffusion module) opens
   a file of every diffusion type as the Workbench does.
+- `ctest -R mitkDiffusionViewsUiTest` runs the offscreen UI tests of the views, one test per
+  plugin group (`Plugins/org.mitk.gui.qt.diffusionimaging.uitests`, a `TEST_PLUGIN` that the
+  controls plugin adds under `BUILD_TESTING`; not in `PluginList.cmake`, so the Workbench never
+  starts it). Each test starts `MitkDiffusionUiTestWorkbench` (the Workbench product plus the test
+  plugin; `MitkWorkbench` ignores `--BlueBerry.provisioning`) with `QT_QPA_PLATFORM=offscreen`, a
+  profile of its own and `MITK_DIFFUSION_UITEST=<suite>`; the plugin's BlueBerry test harness
+  runs the CppUnit suite of that name in the GUI thread once the window is open. The suites open
+  views, find widgets by their `.ui` object names, select nodes through the selection service
+  (`QmitkDiffusionUiTestUtil.h`), answer dialogs and wait for workers. Offscreen there is no
+  OpenGL: render windows draw nothing, so rendering looks stay manual checks (#45).
 - Test data: module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each
   `Testing/` folder and read their input and references from a checkout of
   https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion-test-data (branch `main`; paths as
