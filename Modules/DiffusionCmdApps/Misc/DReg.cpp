@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
     mitk::Image::Pointer registered_image = apply_transform(moving, fixed_single, reg, resample);
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(registered_image))
     {
-      std::string file_extension = itksys::SystemTools::GetFilenameExtension(o);
+      std::string file_extension = mitk::DiffusionDataIOHelper::GetExtension(o);
       if (file_extension==".nii" || file_extension==".nii.gz")
         mitk::IOUtil::Save(registered_image, "DWI_NIFTI", o);
       else
@@ -136,8 +136,8 @@ int main(int argc, char* argv[])
     auto coreg_images = mitk::DiffusionDataIOHelper::load_mitk_images(coreg, &file_names);
     for (unsigned int i=0; i<coreg_images.size(); ++i)
     {
-      std::string ext = ist::GetFilenameExtension(file_names.at(i));
-      std::string out_name = path + ist::GetFilenameWithoutExtension(file_names.at(i)) + "_registered" + ext;
+      std::string ext = mitk::DiffusionDataIOHelper::GetExtension(file_names.at(i));
+      std::string out_name = path + mitk::DiffusionDataIOHelper::GetNameWithoutExtension(file_names.at(i)) + "_registered" + ext;
 
       registered_image = apply_transform(coreg_images.at(i), fixed_single, reg, resample);
       if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(registered_image))

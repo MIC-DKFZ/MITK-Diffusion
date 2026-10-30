@@ -28,6 +28,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkLexicalCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 
 using namespace mitk;
 
@@ -111,10 +112,10 @@ static int RunFiberfox(int argc, char* argv[])
       parameters.m_Misc.m_OutputPath = itksys::SystemTools::GetCurrentWorkingDirectory() + '/';
     }
 
-    file_extension = itksys::SystemTools::GetFilenameExtension(outName);
-    if( ! itksys::SystemTools::GetFilenameWithoutExtension( outName ).empty() )
+    file_extension = mitk::DiffusionDataIOHelper::GetExtension(outName);
+    if( ! mitk::DiffusionDataIOHelper::GetNameWithoutExtension( outName ).empty() )
     {
-      parameters.m_Misc.m_OutputPrefix = itksys::SystemTools::GetFilenameWithoutExtension( outName );
+      parameters.m_Misc.m_OutputPrefix = mitk::DiffusionDataIOHelper::GetNameWithoutExtension( outName );
     }
     else
     {

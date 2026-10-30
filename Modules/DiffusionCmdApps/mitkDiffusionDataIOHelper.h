@@ -35,6 +35,20 @@ class MITKDIFFUSIONCMDAPPS_EXPORT DiffusionDataIOHelper
 {
 public:
 
+  /**
+   * The extension of the file name: the longest extension of a MIME type registered with MITK
+   * (e.g. ".nii.gz", ".fib"), compared case-insensitively and returned as written, with the dot;
+   * empty if none matches. Other dots belong to the name: "sub.01.nii.gz" has ".nii.gz".
+   */
+  static std::string GetExtension(const std::string& path);
+
+  /** The path without GetExtension(path), with its folder. */
+  static std::string GetPathWithoutExtension(const std::string& path);
+
+  /** The file name without folder and without GetExtension(path); a stem for derived outputs. */
+  static std::string GetNameWithoutExtension(const std::string& path);
+
+  /** The files in the folder whose names end with one of the extensions (e.g. ".nii.gz"), sorted. */
   static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string > extensions);
 
   static std::vector< mitk::Image::Pointer > load_mitk_images(const std::vector<std::string> files, std::vector<std::string>* filenames=nullptr);

@@ -23,6 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkCommandLineParser.h"
 #include <boost/algorithm/string.hpp>
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkIOUtil.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkImage.h>
@@ -59,8 +60,7 @@ int main(int argc, char* argv[])
   std::string index = us::any_cast<std::string>(parsedArgs["index"]);
   std::string outFileName = us::any_cast<std::string>(parsedArgs["o"]);
 
-  std::string ext = itksys::SystemTools::GetFilenameLastExtension(outFileName);
-  if (ext.empty())
+  if (mitk::DiffusionDataIOHelper::GetExtension(outFileName).empty())
     outFileName += ".nii.gz";
 
   try

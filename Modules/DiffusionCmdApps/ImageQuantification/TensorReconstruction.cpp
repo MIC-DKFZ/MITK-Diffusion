@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkNrrdImageIO.h>
 #include "mitkCommandLineParser.h"
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkIOUtil.h>
 #include <mitkLocaleSwitch.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
@@ -53,11 +54,7 @@ int main(int argc, char* argv[])
 
   std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string outfilename = us::any_cast<std::string>(parsedArgs["o"]);
-  if (!itksys::SystemTools::GetFilenamePath(outfilename).empty())
-    outfilename = itksys::SystemTools::GetFilenamePath(outfilename)+"/"+itksys::SystemTools::GetFilenameWithoutExtension(outfilename);
-  else
-    outfilename = itksys::SystemTools::GetFilenameWithoutExtension(outfilename);
-  outfilename += ".dti";
+  outfilename = mitk::DiffusionDataIOHelper::GetPathWithoutExtension(outfilename) + ".dti";
 
   int threshold = 0;
   if (parsedArgs.count("b0_threshold"))

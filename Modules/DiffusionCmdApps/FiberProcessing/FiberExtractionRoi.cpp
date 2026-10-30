@@ -27,9 +27,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkImageToItk.h>
 #include <mitkStandaloneDataStorage.h>
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <itkFiberExtractionFilter.h>
-
-#include <filesystem>
 
 typedef itk::Image<float, 3>    ItkFloatImgType;
 
@@ -168,7 +167,7 @@ int main(int argc, char* argv[])
       for (std::size_t i=0; i<roi_files.size(); ++i)
       {
         roi_images.push_back( LoadItkImage(roi_files.at(i)) );
-        roi_names.push_back(itksys::SystemTools::GetFilenameWithoutExtension(roi_files.at(i)));
+        roi_names.push_back(mitk::DiffusionDataIOHelper::GetNameWithoutExtension(roi_files.at(i)));
       }
     }
     MITK_INFO << "Loaded " << roi_images.size() << " ROI images.";
@@ -211,11 +210,10 @@ int main(int argc, char* argv[])
       extractor->SetInputType(itk::FiberExtractionFilter<float>::INPUT::LABEL_MAP);
     extractor->Update();
 
-    std::string ext = itksys::SystemTools::GetFilenameExtension(outFib);
+    std::string ext = mitk::DiffusionDataIOHelper::GetExtension(outFib);
     if (ext.empty())
       ext = ".trk";
-    // A bare file name has an empty parent path; its outputs go to the working directory.
-    outFib = (std::filesystem::path(outFib).parent_path() / itksys::SystemTools::GetFilenameWithoutExtension(outFib)).string();
+    outFib = mitk::DiffusionDataIOHelper::GetPathWithoutExtension(outFib);
     if (invert)
       mitk::IOUtil::Save(extractor->GetNegatives().at(0), outFib + ext);
     else

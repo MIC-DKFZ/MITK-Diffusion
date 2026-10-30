@@ -16,6 +16,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkDiffusionDataIOHelper.h"
 
+#include <mitkCoreServices.h>
+#include <mitkIMimeTypeProvider.h>
+
 namespace
 {
   /**
@@ -43,6 +46,33 @@ namespace
   };
 }
 
+std::string mitk::DiffusionDataIOHelper::GetExtension(const std::string& path)
+{
+  const std::string name = ist::LowerCase(ist::GetFilenameName(path));
+  std::size_t longest = 0;
+  mitk::CoreServicePointer<mitk::IMimeTypeProvider> provider(mitk::CoreServices::GetMimeTypeProvider());
+  for (const auto& mimeType : provider->GetMimeTypes())
+  {
+    for (const auto& extension : mimeType.GetExtensions())
+    {
+      const std::string dotted = "." + ist::LowerCase(extension);
+      if (!extension.empty() && dotted.size() > longest && name.ends_with(dotted))
+        longest = dotted.size();
+    }
+  }
+  return path.substr(path.size() - longest);
+}
+
+std::string mitk::DiffusionDataIOHelper::GetPathWithoutExtension(const std::string& path)
+{
+  return path.substr(0, path.size() - GetExtension(path).size());
+}
+
+std::string mitk::DiffusionDataIOHelper::GetNameWithoutExtension(const std::string& path)
+{
+  return ist::GetFilenameName(GetPathWithoutExtension(path));
+}
+
 std::vector< std::string > mitk::DiffusionDataIOHelper::get_file_list(const std::string& path, const std::vector<std::string> extensions)
 {
   std::vector< std::string > file_list;
@@ -53,11 +83,11 @@ std::vector< std::string > mitk::DiffusionDataIOHelper::get_file_list(const std:
     int n = dir->GetNumberOfFiles();
     for (int r = 0; r < n; r++)
     {
-      const char *filename = dir->GetFile(r);
-      std::string ext = ist::GetFilenameExtension(filename);
+      const std::string filename = dir->GetFile(r);
       for (auto e : extensions)
       {
-        if (ext==e)
+        // By the end of the name, so that dots within it ("sub.01.nii.gz") do not matter.
+        if (filename.size() > e.size() && filename.ends_with(e))
         {
           file_list.push_back(path + '/' + filename);
           break;
