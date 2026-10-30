@@ -280,7 +280,7 @@
          <item row="8" column="1">
           <widget class="QSpinBox" name="m_TIbox">
            <property name="toolTip">
-            <string>Inversion time (in ms) for inversion recovery sequences, shorter than TR. If 0, no inversion pulse is simulated.</string>
+            <string>Inversion time (in ms) for inversion recovery sequences, shorter than TR. If 0, no inversion pulse is simulated. Used only with signal relaxation.</string>
            </property>
            <property name="minimum">
             <number>0</number>

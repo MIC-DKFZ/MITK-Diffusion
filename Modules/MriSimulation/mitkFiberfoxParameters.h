@@ -187,9 +187,10 @@ namespace mitk
      */
     bool SetMotionVolumes(const std::string& text, itk::Statistics::MersenneTwisterRandomVariateGenerator* randgen);
     /**
-     * Throws a mitk::Exception if an inversion pulse is set (TI > 0) and TI is not shorter than
-     * TR: the inversion comes before the excitation within one repetition, and the
-     * inversion-recovery signal 1 - 2 exp(-TI/T1) + exp(-TR/T1) holds only for TI < TR.
+     * Throws a mitk::Exception if relaxation is simulated, an inversion pulse is set (TI > 0) and
+     * TI is not shorter than TR: the inversion comes before the excitation within one repetition,
+     * and the inversion-recovery signal 1 - 2 exp(-TI/T1) + exp(-TR/T1) holds only for TI < TR.
+     * Without relaxation TI is not used, so any TI passes.
      */
     void CheckInversionTime() const;
 

@@ -328,7 +328,8 @@ bool mitk::SignalGenerationParameters::SetMotionVolumes(const std::string& text,
 
 void mitk::SignalGenerationParameters::CheckInversionTime() const
 {
-  if (m_tInv > 0 && m_tInv >= m_tRep)
+  // TI enters only the T1 relaxation term of the k-space simulation; without relaxation it has no effect
+  if (m_DoSimulateRelaxation && m_tInv > 0 && m_tInv >= m_tRep)
     mitkThrow() << "The inversion time TI (" << m_tInv << " ms) must be shorter than the repetition time TR ("
                 << m_tRep << " ms): the inversion pulse comes before the excitation within one repetition."
                 << " Set TI to 0 to simulate without inversion pulse.";
