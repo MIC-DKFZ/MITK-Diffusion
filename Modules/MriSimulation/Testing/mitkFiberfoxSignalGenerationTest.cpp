@@ -53,6 +53,9 @@ class mitkFiberfoxSignalGenerationTestSuite : public mitk::TestFixture
   MITK_TEST(Test7);
   MITK_TEST(Test8);
   MITK_TEST(Test9);
+  MITK_TEST(Test1Exact);
+  MITK_TEST(Test6Exact);
+  MITK_TEST(Test8Exact);
   CPPUNIT_TEST_SUITE_END();
 
   typedef itk::VectorImage< short, 3>   ItkDwiType;
@@ -74,7 +77,8 @@ public:
 
   }
 
-  bool CompareDwi(itk::VectorImage< short, 3 >* dwi1, itk::VectorImage< short, 3 >* dwi2)
+  /** True if no value differs by more than maxDifference. */
+  bool CompareDwi(itk::VectorImage< short, 3 >* dwi1, itk::VectorImage< short, 3 >* dwi2, short maxDifference)
   {
     bool out = true;
     typedef itk::VectorImage< short, 3 > DwiImageType;
@@ -96,7 +100,7 @@ public:
         {
           short d = abs(it1.Get()[i]-it2.Get()[i]);
 
-          if (d>1)
+          if (d>maxDifference)
           {
             if (count<10)
             {
@@ -122,7 +126,8 @@ public:
     return out;
   }
 
-  void StartSimulation(mitk::FiberfoxParameters parameters, mitk::Image::Pointer refImage, std::string out)
+  /** maxDifference 1 allows rounding of the int16 output to differ; 0 asks for the reference bit for bit. */
+  void StartSimulation(mitk::FiberfoxParameters parameters, mitk::Image::Pointer refImage, std::string out, short maxDifference = 1)
   {
     itk::TractsToDWIImageFilter< short >::Pointer tractsToDwiFilter = itk::TractsToDWIImageFilter< short >::New();
     tractsToDwiFilter->SetUseConstantRandSeed(true);
@@ -145,7 +150,7 @@ public:
         ItkDwiType::Pointer itkRefImagePointer = ItkDwiType::New();
         mitk::CastToItkImage(refImage, itkRefImagePointer);
 
-        bool cond = CompareDwi(itkTestImagePointer, itkRefImagePointer);
+        bool cond = CompareDwi(itkTestImagePointer, itkRefImagePointer, maxDifference);
         if (!cond)
         {
           MITK_INFO << "Saving test image to " << mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + out;
@@ -228,6 +233,24 @@ public:
     mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param9_v2.dwi"));
     StartSimulation(parameters, refImage, "param9.dwi");
   }
+
+  /**
+   * The references of the files with eddy currents and distortions (param1, param6, param8) were
+   * simulated with the exact sum of the k-space phase. That sum is not the default (Test1, Test6 and
+   * Test8 simulate with the time segments) and still reproduces them bit for bit.
+   */
+  void SimulateExact(const std::string& name, const std::string& reference)
+  {
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/" + name + ".ffp"), true);
+    parameters.m_SignalGen.m_KspaceTimeSegments = 0;
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/" + reference));
+    StartSimulation(parameters, refImage, name + "_exact.dwi", 0);
+  }
+
+  void Test1Exact() { SimulateExact("param1", "param1_v3.dwi"); }
+  void Test6Exact() { SimulateExact("param6", "param6_v2.dwi"); }
+  void Test8Exact() { SimulateExact("param8", "param8_v3.dwi"); }
 
 };
 

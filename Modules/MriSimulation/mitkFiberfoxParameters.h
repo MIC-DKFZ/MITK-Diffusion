@@ -94,7 +94,7 @@ namespace mitk
       , m_Drift(0.06)
       , m_DoAddGibbsRinging(false)
       , m_ZeroRinging(0)
-      , m_KspaceTimeSegments(0)
+      , m_KspaceTimeSegments(AUTOMATIC_TIME_SEGMENTS)
       , m_DoSimulateRelaxation(true)
       , m_DoAddMotion(false)
       , m_DoRandomizeMotion(true)
@@ -151,11 +151,13 @@ namespace mitk
     bool                                m_DoAddGibbsRinging;        ///< Add Gibbs ringing artifact
     int                                 m_ZeroRinging;              ///< If > 0, ringing is simulated by by setting the defined percentage of higher frequencies to 0 in k-space. Otherwise, the input to the k-space simulation is generated with twice the resolution and cropped during k-space simulation (much slower).
     /**
-     * How the k-space simulation sums the phase of distortions (field map) and eddy currents: 0, the
-     * default and the value for parameter files without the setting, sums the exact phase of every
-     * pixel for every k-space sample; a number L > 0 approximates the phase by L time segments, a few
-     * transforms per slice instead of the full sum (itk::KspaceImageFilter::ComputeTimeSegmentation);
-     * AUTOMATIC_TIME_SEGMENTS chooses L per slice from the phase spread, with the error bound stated there.
+     * How the k-space simulation sums the phase of distortions (field map) and eddy currents: 0 sums the
+     * exact phase of every pixel for every k-space sample; a number L > 0 approximates the phase by L
+     * time segments, a few transforms per slice instead of the full sum
+     * (itk::KspaceImageFilter::ComputeTimeSegmentation); AUTOMATIC_TIME_SEGMENTS, the default and the
+     * value for parameter files without the setting (the user's decision in #47: its error stays below
+     * 0.1 %, far below simulated noise, at 5 to 100 times the speed), chooses L per slice from the phase
+     * spread, with the error bound stated there.
      */
     int                                 m_KspaceTimeSegments;
     static constexpr int                AUTOMATIC_TIME_SEGMENTS = -1;

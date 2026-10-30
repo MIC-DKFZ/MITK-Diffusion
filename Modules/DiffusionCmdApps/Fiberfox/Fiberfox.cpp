@@ -51,8 +51,9 @@ static int RunFiberfox(int argc, char* argv[])
   parser.addArgument("verbose", "v", mitkCommandLineParser::Bool, "Output additional images:", "output volume fraction images etc.", us::Any());
   parser.addArgument("dont_apply_direction_matrix", "", mitkCommandLineParser::Bool, "Don't apply direction matrix:", "the gradients of the parameter file are world vectors, not FSL bvecs of the simulated geometry", us::Any());
   parser.addArgument("fix_seed", "", mitkCommandLineParser::Bool, "Use fix random seed:", "always use same sequence of random numbers", us::Any());
-  parser.addArgument("fast_kspace", "", mitkCommandLineParser::Bool, "Fast k-space distortions:", "approximate the phase of distortions and eddy currents in the k-space simulation by time segments, as many per slice as its phase spread needs (relative RMS error below 0.1 percent), instead of the exact sum; overrides the parameter file", us::Any());
-  parser.addArgument("time_segments", "", mitkCommandLineParser::Int, "Time segments:", "as --fast_kspace, with this fixed number of time segments (0: exact sum); overrides the parameter file and --fast_kspace", us::Any());
+  parser.addArgument("fast_kspace", "", mitkCommandLineParser::Bool, "Fast k-space distortions:", "approximate the phase of distortions and eddy currents in the k-space simulation by time segments, as many per slice as its phase spread needs (relative RMS error below 0.1 percent), instead of the exact sum; the default, also for parameter files without the setting; overrides a parameter file that asks for the exact sum", us::Any());
+  parser.addArgument("exact_kspace", "", mitkCommandLineParser::Bool, "Exact k-space distortions:", "sum the exact phase of distortions and eddy currents for every pixel and k-space sample, as earlier MITK versions did (much slower); overrides the parameter file", us::Any());
+  parser.addArgument("time_segments", "", mitkCommandLineParser::Int, "Time segments:", "as --fast_kspace, with this fixed number of time segments (0: exact sum); overrides the parameter file, --fast_kspace and --exact_kspace", us::Any());
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -80,8 +81,15 @@ static int RunFiberfox(int argc, char* argv[])
 
   FiberfoxParameters parameters;
   parameters.LoadParameters(paramName, fix_seed);
+  if (parsedArgs.count("fast_kspace") && parsedArgs.count("exact_kspace"))
+  {
+    std::cerr << "--fast_kspace and --exact_kspace exclude each other" << std::endl;
+    return EXIT_FAILURE;
+  }
   if (parsedArgs.count("fast_kspace"))
     parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+  if (parsedArgs.count("exact_kspace"))
+    parameters.m_SignalGen.m_KspaceTimeSegments = 0;
   if (parsedArgs.count("time_segments"))
   {
     const int segments = us::any_cast<int>(parsedArgs["time_segments"]);
@@ -99,7 +107,7 @@ static int RunFiberfox(int argc, char* argv[])
     if (segments == 0)
       MITK_INFO << "Phase of distortions and eddy currents: exact sum (--fast_kspace approximates it much faster)";
     else if (segments < 0)
-      MITK_INFO << "Phase of distortions and eddy currents: time segments, count per slice from the phase spread";
+      MITK_INFO << "Phase of distortions and eddy currents: time segments, count per slice from the phase spread (--exact_kspace for the exact sum)";
     else
       MITK_INFO << "Phase of distortions and eddy currents: " << segments << " time segments";
   }

@@ -394,20 +394,22 @@ public:
   }
 
   /**
-   * The k-space time segments are saved and loaded; files without the setting keep the exact sum (0),
-   * also when loaded into parameters that held another count, and are not reported as incomplete.
+   * The k-space time segments are saved and loaded; files without the setting get the default, the
+   * automatic count, also when loaded into parameters that held another count, and are not reported
+   * as incomplete.
    */
   void TimeSegmentsInFile()
   {
     const std::string earlierFile = mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp");
     mitk::FiberfoxParameters earlier;
     earlier.LoadParameters(earlierFile, true);
-    CPPUNIT_ASSERT_EQUAL(0, earlier.m_SignalGen.m_KspaceTimeSegments);
+    CPPUNIT_ASSERT_EQUAL(mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, earlier.m_SignalGen.m_KspaceTimeSegments);
+    CPPUNIT_ASSERT_EQUAL(mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, mitk::SignalGenerationParameters().m_KspaceTimeSegments);
     CPPUNIT_ASSERT_MESSAGE(earlier.m_MissingTags, earlier.m_MissingTags.find("kspaceTimeSegments") == std::string::npos);
 
     const std::string folder = mitk::IOUtil::CreateTemporaryDirectory("fiberfox_segments_XXXXXX");
     const std::string file = folder + "/segments.ffp";
-    for (int segments : { mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, 12 })
+    for (int segments : { 0, 12 })
     {
       earlier.m_SignalGen.m_KspaceTimeSegments = segments;
       earlier.SaveParameters(file);
@@ -415,7 +417,7 @@ public:
       loaded.LoadParameters(file, true);
       CPPUNIT_ASSERT_EQUAL(segments, loaded.m_SignalGen.m_KspaceTimeSegments);
       loaded.LoadParameters(earlierFile, true);
-      CPPUNIT_ASSERT_EQUAL(0, loaded.m_SignalGen.m_KspaceTimeSegments);
+      CPPUNIT_ASSERT_EQUAL(mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS, loaded.m_SignalGen.m_KspaceTimeSegments);
     }
     itksys::SystemTools::RemoveADirectory(folder);
   }

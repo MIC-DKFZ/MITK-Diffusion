@@ -851,8 +851,8 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
       m_SignalGen.m_DoAddGibbsRinging = ReadVal<bool>(v1,"artifacts.addringing", m_SignalGen.m_DoAddGibbsRinging);
       m_SignalGen.m_ZeroRinging = ReadVal<int>(v1,"artifacts.zeroringing", m_SignalGen.m_ZeroRinging);
       // optional: files of earlier versions have no such key and are complete without it; they get the
-      // file default also when this object held another value before
-      m_SignalGen.m_KspaceTimeSegments = v1.second.get_optional<int>("kspaceTimeSegments").value_or(0);
+      // default, the automatic count, also when this object held another value before
+      m_SignalGen.m_KspaceTimeSegments = v1.second.get_optional<int>("kspaceTimeSegments").value_or(SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS);
       m_SignalGen.m_DoSimulateRelaxation = ReadVal<bool>(v1,"doSimulateRelaxation", m_SignalGen.m_DoSimulateRelaxation);
       m_SignalGen.m_DoDisablePartialVolume = ReadVal<bool>(v1,"doDisablePartialVolume", m_SignalGen.m_DoDisablePartialVolume);
       m_SignalGen.m_DoAddMotion = ReadVal<bool>(v1,"artifacts.doAddMotion", m_SignalGen.m_DoAddMotion);

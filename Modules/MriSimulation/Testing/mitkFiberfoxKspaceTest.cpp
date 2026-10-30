@@ -96,6 +96,9 @@ class mitkFiberfoxKspaceTestSuite : public mitk::TestFixture
     parameters.m_SignalGen.m_ImageOrigin = image->GetOrigin();
     parameters.m_SignalGen.m_ImageDirection = image->GetDirection();
     parameters.m_Misc.m_OutputPath = "";  // no log file
+    // the exact sum of the phase of distortions and eddy currents, the model the cases below check;
+    // TimeSegmentsApproximateExactSum compares the default, the time-segmented phase, with it
+    parameters.m_SignalGen.m_KspaceTimeSegments = 0;
     // the k-space simulation reads T1/T2 of one model per compartment image
     parameters.m_NonFiberModelList.push_back(new mitk::BallModel<double>());
     gradients.resize(image->GetVectorLength());

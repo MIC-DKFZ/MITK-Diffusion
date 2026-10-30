@@ -151,8 +151,16 @@ public:
     }
   }
 
-  void Param1() { CompareAtThreadCounts("param1.ffp"); }
+  /** The exact sum of the k-space phase (eddy currents and distortions of param1), which is not the default. */
+  void Param1()
+  {
+    CompareAtThreadCounts("param1.ffp", [](mitk::FiberfoxParameters& parameters)
+    {
+      parameters.m_SignalGen.m_KspaceTimeSegments = 0;
+    });
+  }
   void Param3() { CompareAtThreadCounts("param3.ffp"); }
+  /** param6 as loaded: distortions with the default, the automatic count of time segments. */
   void Param6() { CompareAtThreadCounts("param6.ffp"); }
 
   /** The time-segmented k-space phase (eddy currents and distortions of param1), automatic count. */

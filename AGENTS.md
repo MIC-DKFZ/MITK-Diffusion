@@ -227,10 +227,13 @@ Facts the layout does not show:
   images, spike log), and so does a fiber fit (`mitkFiberFitTest`; `--max_iter` counts L-BFGS-B
   iterations). The simulation log (status text, log file, progress) is `mitk::FiberfoxLog`, which
   reports progress through `itk::ProgressEvent`. With a field map or eddy currents the k-space step
-  sums the exact phase per pixel and sample (`.ffp` `image.kspaceTimeSegments` 0, the default and
-  the value of files without it), or approximates it by L time segments (Sutton et al. 2003; L > 0,
-  or -1 for 1.25 x the phase spread in cycles + 8, which stays below 0.1 % relative RMS error;
-  `MitkFiberfox --fast_kspace` / `--time_segments`). Fiberfox references in the
+  approximates the phase by L time segments (Sutton et al. 2003; `.ffp` `image.kspaceTimeSegments`
+  -1, the default and the value of files without it, for 1.25 x the phase spread in cycles + 8,
+  which stays below 0.1 % relative RMS error; or a fixed L > 0), or sums the exact phase per pixel
+  and sample (0; `MitkFiberfox --exact_kspace`, view "Distortion Phase"). The references with
+  distortions or eddy currents are exact sums: an explicit 0 reproduces param1, param6 and param8
+  bit for bit (`mitkFiberfoxSignalGenerationTest::Test1Exact`, ...), BrainSlice_4 within 1
+  (`Test4Exact`); the default reproduces all four within 1. Fiberfox references in the
   test data depend on the random engines and seeds, so a change there is checked bit for bit
   against the old output.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
