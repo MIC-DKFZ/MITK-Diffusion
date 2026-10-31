@@ -36,6 +36,11 @@ namespace mitk
    * turned into ODFs: TensorImage (6 values), OdfImage (ODF_SAMPLING_SIZE values) or ShImage
    * (coefficients in the image's SH convention). The output has the point arrays "ODF_COLORS"
    * (RGBA) and "Normals".
+   *
+   * Glyphs that are small on screen (Settings::pixelsPerMm) are geodesic spheres of fewer
+   * directions, with the voxel's values at those directions; ODF images give each the value of the
+   * nearest ODF direction. Their size, colour by direction and normalization still come from the
+   * ODF at the ODF_SAMPLING_SIZE directions, and their values are limited to its range.
    */
   class MITKDIFFUSIONMODELLING_EXPORT OdfGlyphGenerator
   {
@@ -60,9 +65,25 @@ namespace mitk
       bool tensorEllipsoids = false;
       /** One colour per glyph from its principal direction instead of colours by ODF value. */
       bool colourByDirection = false;
+      /**
+       * Most glyphs to draw. With pixelsPerMm > 0 the glyph meshes of Generate are fewer still: at
+       * most 60,000 of 42 points, 15,000 of 162 and 10,000 of the base mesh, so that a view
+       * generates and first draws them in about 200 ms. The instances of GenerateEllipsoidInstances
+       * cost little per glyph and are not limited so.
+       */
       int maxGlyphs = 500;
-      /** Random subset of the voxels when there are more than maxGlyphs, else every n-th voxel. */
+      /**
+       * With more voxels than maxGlyphs: a fixed pseudo-random subset of exactly maxGlyphs voxels,
+       * in which a voxel keeps its glyph while it stays in view; else every n-th voxel.
+       */
       bool randomPlacement = true;
+      /**
+       * Screen pixels per mm in the plane, for the mesh of the glyphs. A glyph is at most
+       * scaling x glyph spacing x pixelsPerMm pixels wide; below 8 pixels it has 42 points (80
+       * triangles), below 20 pixels 162 points (320 triangles), else the ODF_SAMPLING_SIZE points
+       * of the ODF base mesh. 0 gives every glyph the base mesh.
+       */
+      double pixelsPerMm = 0;
     };
 
     /** The voxel layer of the image a plane shows. */
@@ -97,8 +118,15 @@ namespace mitk
     static std::optional<Slice> GetSlice(const Image &image, TimeStepType t, const PlaneGeometry &plane);
 
     /**
+     * The number of points of each glyph mesh, and of the sphere of the instanced ellipsoids, for
+     * this slice and these settings: 42, 162 or ODF_SAMPLING_SIZE by the glyphs' width on screen
+     * (Settings::pixelsPerMm).
+     */
+    static unsigned int GetPointsPerGlyph(const Slice &slice, const Settings &settings);
+
+    /**
      * Glyphs of the slice at time step t, for the voxels inside the window (all voxels of the
-     * slice without one), at most settings.maxGlyphs of them.
+     * slice without one), at most settings.maxGlyphs of them (fewer in a view, see Settings::maxGlyphs).
      * \throw mitk::Exception for images other than tensor, ODF and SH images of float values.
      */
     static vtkSmartPointer<vtkPolyData> Generate(const Image &image,
@@ -106,6 +134,39 @@ namespace mitk
                                                  const Slice &slice,
                                                  const Window *window,
                                                  const Settings &settings);
+
+    /**
+     * Whether the glyphs of the image with these settings can be drawn as instances of one sphere
+     * (GenerateEllipsoidInstances): tensor images as ellipsoids, coloured by direction and
+     * normalized by their maximum. Colours by value change along a glyph, and the other
+     * normalizations change its shape, so those glyphs need a mesh of their own (Generate).
+     */
+    static bool CanDrawEllipsoidInstances(const Image &image, const Settings &settings);
+
+    /**
+     * The tensor ellipsoids of Generate as instances of a unit sphere (GetInstanceSphere), for the
+     * same voxels: one point per glyph at its centre, with the point arrays "Orientation" (unit
+     * quaternion w, x, y, z of the rotation that takes the sphere's x, y and z axes to the
+     * eigenvectors in ascending order of their eigenvalues), "Scale" (the semi-axes along them)
+     * and "ODF_COLORS" (RGBA, the colour of the principal direction, as Generate's). A semi-axis is
+     * scaling x (GFA or principal curvature of the ellipsoid's ODF, or 1) x glyph spacing / 2 x
+     * eigenvalue / largest eigenvalue, so the glyph is the exact ellipsoid as long as Generate's
+     * largest radius; all are zero for a null tensor or an eigenvalue <= 0.
+     * \throw mitk::Exception for images other than tensor images of float values.
+     */
+    static vtkSmartPointer<vtkPolyData> GenerateEllipsoidInstances(const Image &image,
+                                                                   TimeStepType t,
+                                                                   const Slice &slice,
+                                                                   const Window *window,
+                                                                   const Settings &settings);
+
+    /**
+     * The unit sphere of the instanced ellipsoids, with its normals: the mesh of Generate's glyphs
+     * for this slice and settings (Settings::pixelsPerMm), so that small instances are as cheap to
+     * draw as small glyph meshes. A new copy at each call; the meshes of different sizes have
+     * different numbers of points.
+     */
+    static vtkSmartPointer<vtkPolyData> GetInstanceSphere(const Slice &slice, const Settings &settings);
   };
 }
 
