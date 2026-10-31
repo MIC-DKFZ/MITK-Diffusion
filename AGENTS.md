@@ -316,11 +316,11 @@ Facts the layout does not show:
 
 ## Porting state
 
-In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
-line apps, plugins, user manuals) compile and link without warnings, and all 79 diffusion tests
-pass. `DiffusionRelease` is built less often; its last full build stopped at the GCC 13 warning
-named under "Facts", which is fixed but not rebuilt there. The Workbench has not been started.
-Remove an item once it is fixed.
+In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
+test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
+all 79 diffusion tests pass. The Workbench starts offscreen, opens a file of every diffusion type,
+and its views run in the offscreen UI tests; it has not been used at a display since the #13
+review (#45 lists what a person has to check there). Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,
