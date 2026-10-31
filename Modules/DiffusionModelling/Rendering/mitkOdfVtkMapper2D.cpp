@@ -216,12 +216,17 @@ void mitk::OdfVtkMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
         localStorage->m_InstanceMapper->SetSourceData(sphere);
       localStorage->m_InstanceMapper->SetInputData(OdfGlyphGenerator::GenerateEllipsoidInstances(*image, this->GetTimestep(), target->slice, &target->window, settings));
       localStorage->m_Mapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
+      // The GPU buffers of the mapper the actor stops using would stay until it draws again.
+      if (localStorage->m_Actor->GetMapper() != localStorage->m_InstanceMapper)
+        localStorage->m_Mapper->ReleaseGraphicsResources(renderer->GetRenderWindow());
       localStorage->m_Actor->SetMapper(localStorage->m_InstanceMapper);
     }
     else
     {
       localStorage->m_Mapper->SetInputData(OdfGlyphGenerator::Generate(*image, this->GetTimestep(), target->slice, &target->window, settings));
       localStorage->m_InstanceMapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
+      if (localStorage->m_Actor->GetMapper() != localStorage->m_Mapper)
+        localStorage->m_InstanceMapper->ReleaseGraphicsResources(renderer->GetRenderWindow());
       localStorage->m_Actor->SetMapper(localStorage->m_Mapper);
     }
     localStorage->m_Actor->VisibilityOn();
