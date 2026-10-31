@@ -593,8 +593,8 @@ public:
   }
 
   // In MITK's 2D view the instanced ellipsoids cover the pixels of the glyph meshes of the same
-  // tensors. The meshes are a little wider (normalized by the largest of their 252 radii, not by
-  // the largest eigenvalue), so the drawn areas agree only mostly.
+  // tensors. The meshes of anisotropic tensors are wider (normalized by the largest of their 252
+  // radii, not by the largest eigenvalue), so the drawn areas agree only mostly.
   void TensorEllipsoids_InstancesDrawnWhereTheMeshIs()
   {
     // The ODF mapper alone, without the image's colour map under the glyphs.

@@ -205,22 +205,23 @@ Facts the layout does not show:
   display needed) and is skipped with exit code 77 where no OpenGL context can be created.
 - Glyphs of tensor, ODF and SH images (2D views only; `Rendering/mitkOdfGlyphGenerator.h`,
   `mitkOdfVtkMapper2D.h`): a renderer regenerates them at once for new data, node properties, time
-  step, slice or plane axes, and after a pan or zoom only at the LOD-1 render MITK runs about
-  200 ms after the interaction (`GetViewToGenerate`; `IsLODEnabled` only while glyphs are
-  shown); a zoom that needs a finer mesh, e.g. a magnified screenshot (`vtkRenderLargeImage`,
-  always LOD 0), refines the glyphs at once for the voxels they cover. Random placement keeps a
-  fixed per-voxel hash subset of exactly `ShowMaxNumber` voxels (spin box up to 60,000; in a view
-  at most 15,000 glyph meshes of 162 points and 10,000 of 252, `MaxGlyphsInView`: about 2.5
-  million points, 125-170 ms to generate and first draw on an RTX 2080; instances have no such
-  cap). A glyph under 8 screen pixels wide (scaling x glyph spacing x pixels per mm, device pixels) is a
-  42-point geodesic sphere, under 20 pixels a 162-point one, else the 252-point ODF mesh; size,
-  colour and normalization come from the 252-sample ODF, and coarse values are limited to its
-  range. Tensor ellipsoids coloured by direction with Max normalization are `vtkGlyph3DMapper`
-  instances of that sphere (`GenerateEllipsoidInstances`: quaternion and semi-axes
-  `size * lambda_i / lambda_max`, the exact ellipsoid; the mesh glyph, normalized by the largest of
-  252 samples, is wider). The full mesh is pinned bit for bit
-  (`GlyphGenerator_FullMesh_RecordedOutput`), and both outputs are the same at any number of
-  OpenMP threads. `ctest -R 'mitkDiffusionModelling(Rendering|Mapper)'` runs these tests.
+  step, slice or plane axes, and after a pan or zoom only at the LOD-1 render MITK runs about 200 ms
+  after the interaction (`GetViewToGenerate`; `IsLODEnabled` only while glyphs are shown); a zoom
+  that needs a finer mesh, e.g. a magnified screenshot (`vtkRenderLargeImage`, always LOD 0),
+  refines the glyphs at once for the voxels they cover. Random placement keeps a fixed per-voxel
+  hash subset of exactly `ShowMaxNumber` voxels (spin box up to 60,000; in a view at most 15,000
+  glyph meshes of 162 points and 10,000 of 252, `MaxGlyphsInView`: about 2.5 million points,
+  125-170 ms to generate and first draw on an RTX 2080; instances have no such cap). A glyph under 8
+  screen pixels wide (scaling x glyph spacing x pixels per mm, device pixels) is a 42-point geodesic
+  sphere, under 20 pixels a 162-point one, else the 252-point ODF mesh; size, colour and
+  normalization come from the 252-sample ODF, and coarse values are limited to its range. Tensor
+  ellipsoids coloured by direction with Max normalization are `vtkGlyph3DMapper` instances of that
+  sphere (`GenerateEllipsoidInstances`: quaternion and semi-axes `size * lambda_i / lambda_max`, the
+  exact ellipsoid; the mesh glyph, normalized by the largest of 252 samples, is wider by an
+  orientation-dependent 3 % for 3:1:1 tensors, 10 % for 5:1:1 and 28 % on average for 9:1:1, up to
+  62 %, its tip up to 8.7 degrees off the principal axis). The full mesh is pinned bit for bit
+  (`GlyphGenerator_FullMesh_RecordedOutput`), and both outputs are the same at any number of OpenMP
+  threads. `ctest -R 'mitkDiffusionModelling(Rendering|Mapper)'` runs these tests.
 - The netlib L-BFGS-B code behind `vnl_lbfgsb` keeps its working variables in static storage.
   Threaded code holds `mitk::GetLbfgsbMutex()` (`Modules/DiffusionModelling/Algorithms/mitkLbfgsbMutex.h`)
   while `minimize` runs; the cost function may release it during its evaluation.
