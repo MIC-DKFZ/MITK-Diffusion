@@ -491,6 +491,7 @@ void mitk::FiberfoxParameters::SaveParameters(std::string filename)
 
   parameters.put("fiberfox.image.artifacts.addringing", m_SignalGen.m_DoAddGibbsRinging);
   parameters.put("fiberfox.image.artifacts.zeroringing", m_SignalGen.m_ZeroRinging);
+  parameters.put("fiberfox.image.kspaceTimeSegments", m_SignalGen.m_KspaceTimeSegments);
   parameters.put("fiberfox.image.artifacts.addnoise", m_Misc.m_DoAddNoise);
   parameters.put("fiberfox.image.artifacts.addghosts", m_Misc.m_DoAddGhosts);
   parameters.put("fiberfox.image.artifacts.addaliasing", m_Misc.m_DoAddAliasing);
@@ -849,6 +850,9 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
       m_SignalGen.m_Drift = ReadVal<float>(v1,"artifacts.drift", m_SignalGen.m_Drift);
       m_SignalGen.m_DoAddGibbsRinging = ReadVal<bool>(v1,"artifacts.addringing", m_SignalGen.m_DoAddGibbsRinging);
       m_SignalGen.m_ZeroRinging = ReadVal<int>(v1,"artifacts.zeroringing", m_SignalGen.m_ZeroRinging);
+      // optional: files of earlier versions have no such key and are complete without it; they get the
+      // default, the automatic count, also when this object held another value before
+      m_SignalGen.m_KspaceTimeSegments = v1.second.get_optional<int>("kspaceTimeSegments").value_or(SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS);
       m_SignalGen.m_DoSimulateRelaxation = ReadVal<bool>(v1,"doSimulateRelaxation", m_SignalGen.m_DoSimulateRelaxation);
       m_SignalGen.m_DoDisablePartialVolume = ReadVal<bool>(v1,"doDisablePartialVolume", m_SignalGen.m_DoDisablePartialVolume);
       m_SignalGen.m_DoAddMotion = ReadVal<bool>(v1,"artifacts.doAddMotion", m_SignalGen.m_DoAddMotion);
@@ -866,6 +870,36 @@ void mitk::FiberfoxParameters::LoadParameters(std::string filename, bool fix_see
         m_Misc.m_BvalsFile = filename+".bvals";
         m_Misc.m_BvecsFile = filename+".bvecs";
         m_SignalGen.SetGradienDirections( mitk::gradients::ReadBvalsBvecs(m_Misc.m_BvalsFile, m_Misc.m_BvecsFile, m_SignalGen.m_Bvalue) );
+
+        // The .bvals/.bvecs files hold the gradients as unit vectors with b-values rounded to 1e-6
+        // s/mm^2, and a vector normalized once more can change in its last bits, so gradients read
+        // from them drifted with every save and load. Where they still give the gradients written
+        // into the file itself (not edited since), those are taken as written.
+        const auto writtenBvalue = v1.second.get_optional<double>("bvalue");
+        const auto writtenGradients = v1.second.get_child_optional("gradients");
+        if (writtenBvalue && writtenGradients && std::abs(*writtenBvalue - m_SignalGen.m_Bvalue) <= 1e-5)
+        {
+          SignalGenerationParameters::GradientListType written;
+          for (const auto& v2 : *writtenGradients)
+          {
+            SignalGenerationParameters::GradientType g;
+            g[0] = v2.second.get<double>("x", 0);
+            g[1] = v2.second.get<double>("y", 0);
+            g[2] = v2.second.get<double>("z", 0);
+            written.push_back(g);
+          }
+          const auto read = m_SignalGen.GetGradientDirections();
+          // 1e-6 is far above the rounding of the files (below 1e-7 for b-values down to 1 s/mm^2)
+          const auto same = [](const SignalGenerationParameters::GradientType& a, const SignalGenerationParameters::GradientType& b)
+          {
+            return std::abs(a[0]-b[0])<=1e-6 && std::abs(a[1]-b[1])<=1e-6 && std::abs(a[2]-b[2])<=1e-6;
+          };
+          if (written.size()==read.size() && std::equal(written.begin(), written.end(), read.begin(), same))
+          {
+            m_SignalGen.m_Bvalue = *writtenBvalue;
+            m_SignalGen.SetGradienDirections(written);
+          }
+        }
       }
       else
       {

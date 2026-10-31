@@ -58,7 +58,7 @@ mitk-diffusion code too. Read the matching rule before touching CMake, a module 
 | --- | --- |
 | `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO; `mitkMaskGeometry.h` holds the voxel-grid rule (`HasVoxelGridOf`, 1e-4 mm) of the IVIM, kurtosis and peak filters' masks. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters; in `Algorithms/Reconstruction/` the functions the reconstruction views and apps call (`mitkDiffusionReconstruction.h`: tensors, Q-ball, tensors to DWI; `mitkDiffusionPeaks.h`; `mitkDiffusionIndices.h`) and the ODF direction tables (`mitkPointShell.h`). `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk and DICOM tractography IO. `DiffusionMasks` (on MITK's `Multilabel`): the mask rule of the views' mask and ROI boxes (`mitkDiffusionMasks.h`: binary 3D images and MITK's multi-label segmentations; `GetMaskImage` turns a segmentation into a mask image, the union of its labels), tested by `mitkDiffusionMasksTest`; the ivim, reconstruction, fiberfox, tractography and fiberprocessing plugins depend on it, so every configuration that builds one of them switches it on (no command line app uses it). `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`. |
 | `mitk-diffusion/Modules/DiffusionCmdApps/` | Command line tools, one subfolder per group, each group switched by a `BUILD_Diffusion*CmdApps` option. A group's `CMakeLists.txt` is one call of `mitk_diffusion_create_cmdapps` (defined in `Modules/DiffusionCmdApps/CMakeLists.txt`) with the option, the modules of the group and its apps, `<App>` or `<App>:<module>,...` for modules only that app links. The apps link with `--no-as-needed`: a diffusion module registers its readers and writers when it is loaded, and an app that only loads and saves files uses none of its symbols. `MitkCopyGeometry` turns DWI gradients and the world directions of tensor, SH, ODF and peak images (`mitk::ModelDirectionRotation`, DiffusionModelling) with the geometry; 4D SH and peak NIfTI files need `--input_type sh|peak`, since MITK's image reader is their default. Apps derive output names with `DiffusionDataIOHelper::GetExtension` and the stems next to it (`mitkDiffusionDataIOHelper.h`), which strip only the longest extension of a registered MIME type, so `sub.01.nii.gz` keeps `sub.01`. MITK's parser writes help texts unescaped into `--xml`, so they hold no `<` or `&` (placeholders in capitals, e.g. `OUTPUT_ADC.dwi`). |
-| `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. atTRACTive (`...attractive`, on `FiberDissection`) is a plugin of its own, so the other fiber views (`...fiberprocessing`) build without OpenCV. Mask and ROI boxes take binary images and MITK's multi-label segmentations through `DiffusionMasks` (`GetBinaryMaskPredicate`, `GetMaskImage`). Perspectives build their layout with `QmitkDiffusionPerspectiveLayout::CreateLayout` (controls plugin, `src/`), which leaves out views not registered in the configuration; a plugin with a perspective requires the controls plugin. |
+| `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. atTRACTive (`...attractive`, on `FiberDissection`) is a plugin of its own, so the other fiber views (`...fiberprocessing`) build without OpenCV. Mask and ROI boxes take binary images and MITK's multi-label segmentations through `DiffusionMasks` (`GetBinaryMaskPredicate`, `GetMaskImage`). Perspectives build their layout with `QmitkDiffusionPerspectiveLayout::CreateLayout` (controls plugin, `src/`), which leaves out views not registered in the configuration; a plugin with a perspective requires the controls plugin. BlueBerry deletes a closed view's widgets before the view, and MITK's `QmitkDataStorageComboBox` emits `currentIndexChanged` from its destructor, so a view that connects such a box to code touching its widgets calls `QmitkDiffusionViewControlsGuard::Install(parent, this)` (controls plugin, `src/`) before `setupUi`; every diffusion plugin requires the controls plugin. The view goes right after its widgets (on quitting, before them), so timers and worker results it owns need no such guard. |
 | `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI); `Tractography`, `Fiberfox` and `IVIM` include the fiber processing views, only `DiffusionDebug`/`DiffusionRelease` and `atTRACTive` build OpenCV and atTRACTive. Each starts with `set_always.txt`, which resets every variable a configuration changes (external packages; every diffusion module, cmd-app group and plugin off), and then switches on what it contains; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
 | `mitk-diffusion/CMakeExternals/`, `CMake/PackageDepends/` | OpenCV, which MITK no longer provides, added to the superbuild by the extension; `MITK-Diffusion-Data`, the test data (see "Test data"). |
 | `mitk-diffusion/.claude/` | Skills (`bug-report`, `feature-request`, `improvement-request`, `handoff`, `investigate`, `review`), `settings.json`, `scripts/create_gitlab_issue.py`, which searches and creates issues in the GitLab project with `GITLAB_TOKEN` from `mitk-diffusion/.env` (git-ignored), and `scripts/configure-worktree-build.sh` for a worktree's build tree. |
@@ -119,6 +119,25 @@ Facts the layout does not show:
   auto-loaded: MITK forbids depending on an auto-loaded module. `mitkDiffusionWorkbenchReadersTest`
   (`Modules/FiberBundle/Testing/WorkbenchReaders/`, a driver that links no diffusion module) opens
   a file of every diffusion type as the Workbench does.
+- `ctest -R mitkDiffusionViewsUiTest` runs the offscreen UI tests of the views, one test per
+  plugin group (`Plugins/org.mitk.gui.qt.diffusionimaging.uitests`, a `TEST_PLUGIN` that the
+  controls plugin adds under `BUILD_TESTING`, which `DiffusionRelease` switches on again after
+  `set_release.txt`; not in `PluginList.cmake`, so the Workbench never starts it). Each test
+  starts `MitkDiffusionUiTestWorkbench` (the Workbench product plus the test plugin; `MitkWorkbench`
+  ignores `--BlueBerry.provisioning`) with `QT_QPA_PLATFORM=offscreen`, a new profile below
+  `TMPDIR` for each run and `MITK_DIFFUSION_UITEST=<suite>`; the plugin's BlueBerry test harness
+  runs the CppUnit suite of that name in the GUI thread once the window is open. The suites open
+  views, find widgets by their `.ui` object names, select nodes through the selection service
+  (`QmitkDiffusionUiTestUtil.h`, also segmentations and masks on a reference grid), answer dialogs
+  and wait for workers; the streamline and Fiber Fit views are compared with
+  `MitkStreamlineTractography` and `MitkFitFibersToImage` (paths in
+  `MITK_DIFFUSION_UITEST_STREAMLINE_APP` and `MITK_DIFFUSION_UITEST_FIT_APP`). The Reconstruction,
+  Tractography, Preprocessing and Fiberfox suites end with a case that leaves views, data and runs
+  open for the harness's quit; Fiberfox runs simulate a small synthetic geometry from fibers built in
+  the test (`ShowFiberfox`, `StraightFibers`). Setting `MITK_DIFFUSION_UITEST_CASE=<method>` in the shell that runs ctest
+  runs that case alone. The tests run with `LC_ALL=C.UTF-8` and are skipped (exit code 77) without
+  a Qt platform plugin. Offscreen there is no OpenGL: render windows draw nothing, so rendering
+  looks stay manual checks (#45).
 - Test data: module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each
   `Testing/` folder and read their input and references from a checkout of
   https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion-test-data (branch `main`; paths as
@@ -253,7 +272,10 @@ Facts the layout does not show:
 - `ctest -R 'FiberGeneration|Fiberfox|FiberFit'` runs the `MriSimulation` tests. Gradients in
   `.ffp` files (and their `.ffp.bvals`/`.ffp.bvecs`) are FSL bvecs of the simulated geometry;
   `FiberfoxParameters::ApplyDirectionMatrix` turns them into world vectors and
-  `SetGradientsFromImage` stores a DWI's gradients in that form. Noise is complex Gaussian in
+  `SetGradientsFromImage` stores a DWI's gradients in that form. The side files hold unit vectors
+  and rounded b-values, so `LoadParameters` takes the gradients written into the `.ffp` where the
+  side files still give them; save, load and save give the same files
+  (`SaveLoadSaveGivesTheSameFiles`). Noise is complex Gaussian in
   k-space, or a noise model on the magnitude image: Rician or noncentral chi (`.ffp`
   `artifacts.noisetype` `noncentralchi` with `artifacts.noisecoils`; the `chisquare` type of earlier
   files is read as noncentral chi with the file's `numberofcoils`). With relaxation, an inversion
@@ -262,9 +284,24 @@ Facts the layout does not show:
   number of OpenMP threads (`mitkFiberfoxThreadDeterminismTest`: output, coil, phase and k-space
   images, spike log), and so does a fiber fit (`mitkFiberFitTest`; `--max_iter` counts L-BFGS-B
   iterations). The simulation log (status text, log file, progress) is `mitk::FiberfoxLog`, which
-  reports progress through `itk::ProgressEvent`. Fiberfox references in the
-  test data depend on the random engines and seeds, so a change there is checked bit for bit
-  against the old output.
+  reports progress through `itk::ProgressEvent`. With a field map or eddy currents the k-space step
+  approximates the phase by L time segments (Sutton et al. 2003; `.ffp` `image.kspaceTimeSegments`
+  -1, the default and the value of files without it: from 1.25 x the phase spread in cycles + 8 up
+  until a residual check of pixels from every histogram bin passes at 1e-4, which keeps the
+  relative RMS error below 0.1 %, 4.9e-5 measured; or a fixed L > 0), or sums the exact phase per
+  pixel and sample (0; `MitkFiberfox --exact_kspace`, view "Distortion Phase"). A slice takes the
+  exact sum where the time segments would take longer on one core (automatic count; estimated in
+  measured -O3 times, not per work unit) or need more than
+  `KspaceImageFilter::MAX_TIME_SEGMENT_BYTES` (256 MiB, any L), so the result does not depend on the
+  threads; the log counts such slice jobs. The slice jobs hold the memory of their time segments
+  from a `TimeSegmentMemoryBudget` of 2 GiB and wait for it, which changes only the run time.
+  `mitkFiberfoxKspaceTest::TimeSegmentsHoldForStrongPhase` checks the bound,
+  `mitkFiberfoxThreadDeterminismTest::TimeSegmentsInSliceThreads` the setup in several work units of
+  a slice job, `TimeSegmentsWithinMemoryBudget` the waiting jobs. The references with distortions or
+  eddy currents are exact sums: an explicit 0 reproduces param1, param6 and param8 bit for bit
+  (`mitkFiberfoxSignalGenerationTest::Test1Exact`, ...), BrainSlice_4 within 1 (`Test4Exact`); the
+  default reproduces all four within 1. Fiberfox references in the test data depend on the random
+  engines and seeds, so a change there is checked bit for bit against the old output.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
   labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
   without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
@@ -275,7 +312,7 @@ Facts the layout does not show:
 ## Porting state
 
 In the `DiffusionDebug` build, MITK and all of mitk-diffusion (modules, test drivers, command
-line apps, plugins, user manuals) compile and link without warnings, and all 70 diffusion tests
+line apps, plugins, user manuals) compile and link without warnings, and all 79 diffusion tests
 pass. `DiffusionRelease` is built less often; its last full build stopped at the GCC 13 warning
 named under "Facts", which is fixed but not rebuilt there. The Workbench has not been started.
 Remove an item once it is fixed.

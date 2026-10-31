@@ -581,7 +581,7 @@ QGroupBox {
              </font>
             </property>
             <property name="toolTip">
-             <string>Generate a binary image containing all selected ROIs. Select at least one ROI (planar figure) and a reference fiber bundle or image.</string>
+             <string>Generate a binary image containing all selected ROIs. Select at least one ROI (planar figure) and a reference image or fiber bundle. A selected image gives the grid; without one, the fiber bundle does.</string>
             </property>
             <property name="text">
              <string>Generate ROI Image</string>

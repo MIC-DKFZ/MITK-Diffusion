@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?BlueBerry version="0.1"?>
+<plugin>
+
+  <extension point="org.blueberry.ui.views">
+    <view id="org.mitk.views.diffusionuitestselection"
+      name="Diffusion UI Test Selection"
+      class="QmitkDiffusionUiTestSelectionView">
+      <description>Selects data nodes for the diffusion UI tests, as the Data Manager does.</description>
+    </view>
+  </extension>
+
+</plugin>

@@ -151,6 +151,9 @@ protected:
     void ReadCompartments();         ///< signal model and volume fraction map of each compartment
     void SetResultProperties();      ///< "Fiberfox.*" properties of the result node, from the parameters read
     void SetGradientsFromGui();      ///< bvals/bvecs files, loaded gradients or a generated half shell
+    /** Shows SignalGenerationParameters::m_KspaceTimeSegments: exact (0), automatic (negative) or a fixed count. */
+    void ShowKspaceTimeSegments(int segments);
+    void EnableKspacePhase();        ///< the k-space phase option applies only with distortions or eddy currents
 
     /** Signal model types the compartment boxes offer. */
     enum class CompartmentModel { None, Stick, Zeppelin, Tensor, Ball, Astrosticks, Dot, Prototype };
@@ -216,7 +219,7 @@ protected:
 
     friend class QmitkFiberfoxWorker;
     mitk::FiberfoxParameters  m_Parameters;
-    mitk::SignalGenerationParameters::GradientListType  m_LoadedGradients;  ///< of a .ffp without .bvals/.bvecs files
+    mitk::SignalGenerationParameters::GradientListType  m_LoadedGradients;  ///< of the loaded .ffp, until a gradient setting changes
     double                    m_LoadedBvalue = 0;
     /** Prototype model with kernels from a loaded .ffp and the widget settings it was loaded with. */
     struct LoadedPrototype

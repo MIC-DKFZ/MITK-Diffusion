@@ -18,6 +18,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkReconstructionResults.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <mitkDiffusionModellingHelperFunctions.h>
 #include <mitkDiffusionReconstruction.h>
 #include <mitkITKImageImport.h>
@@ -46,6 +48,7 @@ void QmitkTensorReconstructionView::CreateQtPartControl(QWidget *parent)
   if (!m_Controls)
   {
     m_Controls = new Ui::QmitkTensorReconstructionViewControls;
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi(parent);
     this->CreateConnections();
 

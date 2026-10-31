@@ -22,7 +22,7 @@ class mitkDiffusionCmdAppsFiberfoxTestSuite : public mitk::TestFixture
 {
   CPPUNIT_TEST_SUITE(mitkDiffusionCmdAppsFiberfoxTestSuite);
   MITK_TEST(HelpAndXml);
-  MITK_TEST(Fiberfox_ArtifactsOnDwi_DottedPrefix);
+  MITK_TEST(Fiberfox_EddyOnDwi_DottedPrefix);
   MITK_TEST(Fiberfox_MissingParameters_Fails);
   MITK_TEST(RandomFiberPhantom_Bundles);
   CPPUNIT_TEST_SUITE_END();
@@ -31,15 +31,22 @@ public:
   void HelpAndXml() { CheckHelpAndXml("Fiberfox", {"Fiberfox", "RandomFiberPhantom"}); }
 
   // A DWI as input gets only the artifacts of the parameters, which is fast (a fiber simulation of
-  // BrainSlice_1 takes about a minute in Debug). The output prefix keeps its dot (#43).
-  void Fiberfox_ArtifactsOnDwi_DottedPrefix()
+  // BrainSlice_1 takes about a minute in Debug). BrainSlice_4 has eddy currents, simulated with the
+  // time-segmented k-space phase, which the log names; the exact sum would take about half a minute
+  // here in Debug. The output prefix keeps its dot (#43). Contradicting phase options are refused.
+  void Fiberfox_EddyOnDwi_DottedPrefix()
   {
     const auto dir = WorkDir("Fiberfox");
-    RunOk("Fiberfox", {"-i", Data("StreamlineTractography/diffusion_image.nii.gz"), "-p", Data("Fiberfox/params/BrainSlice_1.ffp"),
-                       "-o", Path(dir, "sim.01.nii.gz"), "--fix_seed"}, dir);
+    const auto input = Data("StreamlineTractography/diffusion_image.nii.gz");
+    const auto parameters = Data("Fiberfox/params/BrainSlice_4.ffp");
+    const auto result = RunOk("Fiberfox", {"-i", input, "-p", parameters, "-o", Path(dir, "sim.01.nii.gz"), "--fix_seed", "--fast_kspace"}, dir);
+    CPPUNIT_ASSERT_MESSAGE(result.output, result.output.find("time segments, count per slice from the phase spread") != std::string::npos);
     auto dwi = Load<mitk::Image>(dir, "sim.01.nii.gz");
     CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi));
     CheckSize(dwi, 64, 64, 3);
+
+    RunFails("Fiberfox", {"-i", input, "-p", parameters, "-o", Path(dir, "both.nii.gz"), "--fast_kspace", "--exact_kspace"}, dir);
+    RunFails("Fiberfox", {"-i", input, "-p", parameters, "-o", Path(dir, "negative.nii.gz"), "--time_segments", "-3"}, dir);
   }
 
   void Fiberfox_MissingParameters_Fails()

@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkFiberfoxView.h"
+#include <QmitkDiffusionViewControlsGuard.h>
 
 // MITK
 #include <mitkDiffusionMasks.h>
@@ -384,6 +385,8 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkFiberfoxViewControls;
+    // the selection slots of its boxes update other widgets (UpdateGui)
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     m_Controls->m_StickWidget1->setVisible(true);
@@ -435,6 +438,7 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_AliasingFrame->setVisible(false);
     m_Controls->m_MotionArtifactFrame->setVisible(false);
     m_Controls->m_DriftFrame->setVisible(false);
+    ShowKspaceTimeSegments(m_Parameters.m_SignalGen.m_KspaceTimeSegments);   // the parameters' default
     m_ParameterFile = QDir::currentPath()+"/param.ffp";
 
     m_Controls->m_AbortSimulationButton->setVisible(false);
@@ -495,6 +499,12 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     connect((QObject*) m_Controls->m_AddGhosts, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddGhosts(int)));
     connect((QObject*) m_Controls->m_AddDistortions, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddDistortions(int)));
     connect((QObject*) m_Controls->m_AddEddy, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddEddy(int)));
+    // the segment count is a setting of the fixed time segments (index 2) only
+    connect(m_Controls->m_KspacePhaseBox, &QComboBox::currentIndexChanged, this, [this](int index)
+    {
+      m_Controls->m_KspaceTimeSegmentsLabel->setVisible(index==2);
+      m_Controls->m_KspaceTimeSegmentsBox->setVisible(index==2);
+    });
     connect((QObject*) m_Controls->m_AddSpikes, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddSpikes(int)));
     connect((QObject*) m_Controls->m_AddAliasing, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddAliasing(int)));
     connect((QObject*) m_Controls->m_AddMotion, SIGNAL(stateChanged(int)), (QObject*) this, SLOT(OnAddMotion(int)));
@@ -627,17 +637,17 @@ mitk::RawShModel<>* QmitkFiberfoxView::NewPrototypeModel(QmitkPrototypeSignalPar
 
 void QmitkFiberfoxView::SetGradientsFromGui()
 {
-  if (m_Controls->m_UseBvalsBvecsBox->isChecked())
+  if (!m_LoadedGradients.empty())
+  {
+    // the gradients of a loaded .ffp, until a gradient setting is changed
+    m_Parameters.SetGradienDirections(m_LoadedGradients);
+    m_Parameters.SetBvalue(m_LoadedBvalue);
+  }
+  else if (m_Controls->m_UseBvalsBvecsBox->isChecked())
   {
     double bval;
     m_Parameters.SetGradienDirections( mitk::gradients::ReadBvalsBvecs(m_Controls->m_LoadBvalsEdit->text().toStdString(), m_Controls->m_LoadBvecsEdit->text().toStdString(), bval) );
     m_Parameters.SetBvalue(bval);
-  }
-  else if (!m_LoadedGradients.empty())
-  {
-    // the gradients of a loaded .ffp without .bvals/.bvecs files, until count or b-value is changed
-    m_Parameters.SetGradienDirections(m_LoadedGradients);
-    m_Parameters.SetBvalue(m_LoadedBvalue);
   }
   else
   {
@@ -670,6 +680,9 @@ void QmitkFiberfoxView::ReadOutputSettings()
   m_Parameters.m_Misc.m_CheckAdvancedSignalOptionsBox = m_Controls->m_AdvancedOptionsBox_2->isChecked();
   m_Parameters.m_Misc.m_OutputAdditionalImages = m_Controls->m_VolumeFractionsBox->isChecked();
 
+  // the log file is named by the result, like the image and parameters saved with it; the prefix
+  // names the output of MitkFiberfox
+  m_Parameters.m_Misc.m_OutputPrefix = "";
   std::string outputPath = m_Controls->m_SavePathEdit->text().toStdString();
   // "-" or an emptied box: no automatic save (an empty path plus "/" would be the root folder)
   if (!outputPath.empty() && outputPath.compare("-")!=0)
@@ -836,6 +849,19 @@ void QmitkFiberfoxView::ReadArtifacts()
   {
     m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
     m_Parameters.m_Misc.m_ArtifactModelString += "_EDDY";
+  }
+
+  // phase of distortions and eddy currents, read also while greyed out, so a saved .ffp keeps the choice
+  switch (m_Controls->m_KspacePhaseBox->currentIndex())
+  {
+  case 0:
+    m_Parameters.m_SignalGen.m_KspaceTimeSegments = 0;   // exact sum
+    break;
+  case 1:
+    m_Parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+    break;
+  default:
+    m_Parameters.m_SignalGen.m_KspaceTimeSegments = m_Controls->m_KspaceTimeSegmentsBox->value();
   }
 
   // Motion
@@ -1265,6 +1291,12 @@ void QmitkFiberfoxView::SetResultProperties()
     node->SetProperty("Fiberfox.Distortions", mitk::BoolProperty::New(true));
   if (misc.m_DoAddEddyCurrents)
     node->SetProperty("Fiberfox.Eddy-strength", mitk::DoubleProperty::New(signalGen.m_EddyStrength));
+  if ((misc.m_DoAddDistortions && signalGen.m_FrequencyMap.IsNotNull()) || misc.m_DoAddEddyCurrents)
+  {
+    const int segments = signalGen.m_KspaceTimeSegments;
+    const std::string phase = segments==0 ? "Exact" : segments<0 ? "Time segments (automatic)" : std::to_string(segments)+" time segments";
+    node->SetProperty("Fiberfox.Distortion-phase", mitk::StringProperty::New(phase));
+  }
   if (signalGen.m_DoAddMotion)
   {
     node->SetProperty("Fiberfox.Motion.Random", mitk::BoolProperty::New(signalGen.m_DoRandomizeMotion));
@@ -1524,15 +1556,14 @@ void QmitkFiberfoxView::LoadParameters()
   else
     m_Controls->m_LoadBvecsEdit->setText("-");
 
-  // Without side files the gradients come from the .ffp itself; the boxes show only their count
-  // and b-value, so the view keeps them (set after the boxes, whose changes discard them).
-  m_LoadedGradients.clear();
+  // The view keeps the gradients as loaded (set after the boxes, whose changes discard them): without
+  // side files they come from the .ffp itself and the boxes show only their count and b-value; with
+  // them, reading the side files again would give them rounded (FiberfoxParameters::LoadParameters),
+  // and saving would change the file.
   if (m_Parameters.m_Misc.m_BvalsFile.empty() || m_Parameters.m_Misc.m_BvecsFile.empty())
-  {
     m_Controls->m_UseBvalsBvecsBox->setChecked(false);
-    m_LoadedGradients = m_Parameters.m_SignalGen.GetGradientDirections();
-    m_LoadedBvalue = m_Parameters.m_SignalGen.GetBvalue();
-  }
+  m_LoadedGradients = m_Parameters.m_SignalGen.GetGradientDirections();
+  m_LoadedBvalue = m_Parameters.m_SignalGen.GetBvalue();
 
   // m_NoiseDistributionBox offers 0 "Complex Gaussian" (no noise model), 1 "Rician" and 2 "Noncentral chi"
   if (m_Parameters.m_NoiseModel!=nullptr)
@@ -1568,6 +1599,7 @@ void QmitkFiberfoxView::LoadParameters()
   m_Controls->m_SpikeNumBox->setValue(m_Parameters.m_SignalGen.m_Spikes);
   m_Controls->m_SpikeScaleBox->setValue(m_Parameters.m_SignalGen.m_SpikeAmplitude);
   m_Controls->m_EddyGradientStrength->setValue(m_Parameters.m_SignalGen.m_EddyStrength);
+  ShowKspaceTimeSegments(m_Parameters.m_SignalGen.m_KspaceTimeSegments);
   m_Controls->m_AddGibbsRinging->setChecked(m_Parameters.m_SignalGen.m_DoAddGibbsRinging);
   m_Controls->m_ZeroRinging->setValue(m_Parameters.m_SignalGen.m_ZeroRinging);
   m_Controls->m_AddMotion->setChecked(m_Parameters.m_SignalGen.m_DoAddMotion);
@@ -1736,6 +1768,7 @@ void QmitkFiberfoxView::OnAddEddy(int value)
     m_Controls->m_EddyFrame->setVisible(true);
   else
     m_Controls->m_EddyFrame->setVisible(false);
+  EnableKspacePhase();
 }
 
 void QmitkFiberfoxView::OnAddDistortions(int value)
@@ -1744,6 +1777,24 @@ void QmitkFiberfoxView::OnAddDistortions(int value)
     m_Controls->m_DistortionsFrame->setVisible(true);
   else
     m_Controls->m_DistortionsFrame->setVisible(false);
+  EnableKspacePhase();
+}
+
+void QmitkFiberfoxView::EnableKspacePhase()
+{
+  m_Controls->m_KspacePhaseFrame->setEnabled(m_Controls->m_AddDistortions->isChecked() || m_Controls->m_AddEddy->isChecked());
+}
+
+void QmitkFiberfoxView::ShowKspaceTimeSegments(int segments)
+{
+  // any negative count means automatic, as in itk::KspaceImageFilter
+  const int index = segments==0 ? 0 : (segments<0 ? 1 : 2);
+  if (index==2)
+    m_Controls->m_KspaceTimeSegmentsBox->setValue(segments);
+  m_Controls->m_KspacePhaseBox->setCurrentIndex(index);
+  // also without a change of the index, which emits no signal
+  m_Controls->m_KspaceTimeSegmentsLabel->setVisible(index==2);
+  m_Controls->m_KspaceTimeSegmentsBox->setVisible(index==2);
 }
 
 void QmitkFiberfoxView::OnAddGhosts(int value)
