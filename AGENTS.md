@@ -209,8 +209,10 @@ Facts the layout does not show:
   200 ms after the interaction (`GetViewToGenerate`; `IsLODEnabled` only while glyphs are
   shown); a zoom that needs a finer mesh, e.g. a magnified screenshot (`vtkRenderLargeImage`,
   always LOD 0), refines the glyphs at once for the voxels they cover. Random placement keeps a
-  fixed per-voxel hash subset of exactly `ShowMaxNumber` voxels (spin box up to 60,000). A glyph
-  under 8 screen pixels wide (scaling x glyph spacing x pixels per mm, device pixels) is a
+  fixed per-voxel hash subset of exactly `ShowMaxNumber` voxels (spin box up to 60,000; in a view
+  at most 15,000 glyph meshes of 162 points and 10,000 of 252, `MaxGlyphsInView`: about 2.5
+  million points, 125-170 ms to generate and first draw on an RTX 2080; instances have no such
+  cap). A glyph under 8 screen pixels wide (scaling x glyph spacing x pixels per mm, device pixels) is a
   42-point geodesic sphere, under 20 pixels a 162-point one, else the 252-point ODF mesh; size,
   colour and normalization come from the 252-sample ODF, and coarse values are limited to its
   range. Tensor ellipsoids coloured by direction with Max normalization are `vtkGlyph3DMapper`

@@ -300,6 +300,20 @@ namespace
     return GetBaseMeshArrays();
   }
 
+  /**
+   * The most glyph meshes of a level that a view draws, whatever Settings::maxGlyphs: about 2.5
+   * million points each, whose generation and first render (mostly the upload) took 125-170 ms
+   * (RTX 2080, 24 threads); a sixth to a quarter more took 205-240 ms. At the 42-point level this
+   * is the most glyphs the Visualization view allows; the finer levels reach that many glyphs on
+   * large or HiDPI screens, where they would take 0.7 and 1.1 s.
+   */
+  int MaxGlyphsInView(const BaseMesh &mesh)
+  {
+    if (mesh.points.size() <= 42)
+      return 60000;
+    return mesh.points.size() <= 162 ? 15000 : 10000;
+  }
+
   /** Radii of a tensor's ellipsoid in any direction, with the arithmetic of OdfType::InitFromEllipsoid. */
   class EllipsoidRadii
   {
@@ -750,16 +764,19 @@ vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &imag
   const unsigned int numComponents = format.numComponents;
 
   auto result = vtkSmartPointer<vtkPolyData>::New();
+  const BaseMesh &mesh = ChooseMesh(slice, settings);
+  Settings selection = settings;
+  if (settings.pixelsPerMm > 0)
+    selection.maxGlyphs = std::min(settings.maxGlyphs, MaxGlyphsInView(mesh));
   // Everything the glyph loop reads is fetched before it: the loop runs in parallel, and
   // GetShBasis locks a mutex.
-  const GlyphVoxels glyphVoxels = SelectGlyphVoxels(image, t, slice, window, settings);
+  const GlyphVoxels glyphVoxels = SelectGlyphVoxels(image, t, slice, window, selection);
   if (glyphVoxels.centers.empty())
     return result;
   const auto numGlyphs = static_cast<vtkIdType>(glyphVoxels.centers.size());
   const auto &glyphCenters = glyphVoxels.centers;
   const auto &glyphVoxelOffsets = glyphVoxels.offsets;
 
-  const BaseMesh &mesh = ChooseMesh(slice, settings);
   const bool fullMesh = &mesh == &GetBaseMeshArrays();
   const auto numMeshPoints = static_cast<vtkIdType>(mesh.points.size());
   const auto numMeshTriangles = static_cast<vtkIdType>(mesh.triangles.size());

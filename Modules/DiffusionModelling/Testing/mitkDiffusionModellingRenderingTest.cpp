@@ -76,6 +76,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_RotatedImage_OrientationFromWorldAxes);
   MITK_TEST(GlyphGenerator_PositionsAndWindow);
   MITK_TEST(GlyphGenerator_MaxGlyphs_SpreadsOverSlice);
+  MITK_TEST(GlyphGenerator_MaxGlyphs_FewerForFinerMeshesInView);
   MITK_TEST(GlyphGenerator_RandomPlacement_StableSubset);
   MITK_TEST(GlyphGenerator_NormalizationScaleAndColours);
   MITK_TEST(GlyphGenerator_ShMatchesOdfOfBothConventions);
@@ -340,6 +341,67 @@ public:
 
     settings.maxGlyphs = 0;
     CPPUNIT_ASSERT_EQUAL(vtkIdType(0), mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings)->GetNumberOfPoints());
+  }
+
+  // A view (pixels per mm > 0) draws at most 60,000 glyph meshes of 42 points, 15,000 of 162 and
+  // 10,000 of the full mesh, about 2.5 million points that it generates and first draws in about
+  // 200 ms; without pixels per mm, and as instanced ellipsoids, maxGlyphs alone limits them.
+  void GlyphGenerator_MaxGlyphs_FewerForFinerMeshesInView()
+  {
+    auto image = MakeOdfImage(250, 250, 1, 1);
+    const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 30, 0, 0, 1));
+    CPPUNIT_ASSERT(slice.has_value());
+    const std::tuple<double, vtkIdType, vtkIdType> levels[] = {{5, 42, 60000}, {15, 162, 15000}, {50, ODF_SAMPLING_SIZE, 10000}};
+    for (const auto &[width, n, maxInView] : levels)
+    {
+      const std::string name = std::to_string(n) + " points";
+      auto settings = AllGlyphs();
+      settings.pixelsPerMm = PixelsPerMm(*slice, settings.scaling, width);
+      settings.maxGlyphs = 250 * 250;
+      for (const bool random : {true, false})
+      {
+        settings.randomPlacement = random;
+        auto glyphs = mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings);
+        const vtkIdType numGlyphs = glyphs->GetNumberOfPoints() / n;
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(name, numGlyphs * n, glyphs->GetNumberOfPoints());
+        if (random)
+          CPPUNIT_ASSERT_EQUAL_MESSAGE(name, maxInView, numGlyphs);
+        else
+          CPPUNIT_ASSERT_MESSAGE(name + ", striding", numGlyphs <= maxInView && numGlyphs > maxInView / 2);
+      }
+      settings.randomPlacement = true;
+      settings.maxGlyphs = static_cast<int>(maxInView) - 1;
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, (maxInView - 1) * n, mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings)->GetNumberOfPoints());
+    }
+
+    auto settings = AllGlyphs();
+    settings.randomPlacement = true;
+    settings.maxGlyphs = 12000;
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(12000 * ODF_SAMPLING_SIZE), mitk::OdfGlyphGenerator::Generate(*image, 0, *slice, nullptr, settings)->GetNumberOfPoints());
+
+    using ItkTensorImageType = mitk::TensorImage::ItkTensorImageType;
+    auto itkImage = ItkTensorImageType::New();
+    ItkTensorImageType::RegionType region;
+    region.SetSize({{110, 110, 1}});
+    itkImage->SetRegions(region);
+    itkImage->Allocate();
+    ItkTensorImageType::PixelType tensor;
+    tensor.Fill(0);
+    tensor(0, 0) = 3;
+    tensor(1, 1) = 1;
+    tensor(2, 2) = 1;
+    itkImage->FillBuffer(tensor);
+    auto tensors = mitk::TensorImage::New();
+    tensors->InitializeByItk(itkImage.GetPointer());
+    tensors->SetVolume(itkImage->GetBufferPointer());
+    const auto tensorSlice = mitk::OdfGlyphGenerator::GetSlice(*tensors, 0, *Plane(0, 0, 0, 0, 0, 1));
+    CPPUNIT_ASSERT(tensorSlice.has_value());
+    settings.maxGlyphs = 110 * 110;
+    settings.tensorEllipsoids = true;
+    settings.colourByDirection = true;
+    settings.pixelsPerMm = PixelsPerMm(*tensorSlice, settings.scaling, 50);
+    CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(ODF_SAMPLING_SIZE), mitk::OdfGlyphGenerator::GetPointsPerGlyph(*tensorSlice, settings));
+    CPPUNIT_ASSERT_EQUAL(vtkIdType(110 * 110), mitk::OdfGlyphGenerator::GenerateEllipsoidInstances(*tensors, 0, *tensorSlice, nullptr, settings)->GetNumberOfPoints());
   }
 
   /** The voxels (x and y index) of the glyphs of an image of MakeOdfImage with constant ODFs. */

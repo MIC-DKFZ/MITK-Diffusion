@@ -65,6 +65,12 @@ namespace mitk
       bool tensorEllipsoids = false;
       /** One colour per glyph from its principal direction instead of colours by ODF value. */
       bool colourByDirection = false;
+      /**
+       * Most glyphs to draw. With pixelsPerMm > 0 the glyph meshes of Generate are fewer still: at
+       * most 60,000 of 42 points, 15,000 of 162 and 10,000 of the base mesh, so that a view
+       * generates and first draws them in about 200 ms. The instances of GenerateEllipsoidInstances
+       * cost little per glyph and are not limited so.
+       */
       int maxGlyphs = 500;
       /**
        * With more voxels than maxGlyphs: a fixed pseudo-random subset of exactly maxGlyphs voxels,
@@ -120,7 +126,7 @@ namespace mitk
 
     /**
      * Glyphs of the slice at time step t, for the voxels inside the window (all voxels of the
-     * slice without one), at most settings.maxGlyphs of them.
+     * slice without one), at most settings.maxGlyphs of them (fewer in a view, see Settings::maxGlyphs).
      * \throw mitk::Exception for images other than tensor, ODF and SH images of float values.
      */
     static vtkSmartPointer<vtkPolyData> Generate(const Image &image,

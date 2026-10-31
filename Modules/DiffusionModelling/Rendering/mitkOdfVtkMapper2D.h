@@ -91,7 +91,8 @@ namespace mitk
      * another slice or plane at any level of detail, and for a pan or zoom (another window or
      * pixelsPerMm) at LOD 1 and higher. A zoom whose glyphs need a finer mesh than the current
      * ones (more pointsPerGlyph) at LOD 0: the generated window at the current zoom, so the same
-     * voxels get finer glyphs at once; a magnified screenshot renders at LOD 0 with its
+     * voxels get finer glyphs at once (fewer of them where the finer mesh allows fewer glyphs,
+     * OdfGlyphGenerator::Settings::maxGlyphs); a magnified screenshot renders at LOD 0 with its
      * magnification's zoom and so gets the mesh it shows.
      * \param generated the view the current glyphs were generated for; none if there are none
      * \param lod the level of detail of the render, RenderingManager::GetNextLOD
