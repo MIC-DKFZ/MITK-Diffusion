@@ -285,7 +285,11 @@ namespace
   /**
    * The mesh of the glyphs: the full ODF mesh, or for glyphs that are small on screen a geodesic
    * sphere of fewer directions, which looks the same at that size and is far cheaper to build and
-   * draw. A glyph is at most scaling * glyph spacing wide (its normalized maximum is 1).
+   * draw. A glyph is at most scaling * glyph spacing wide (its normalized maximum is 1). With the
+   * normalization "None" the radii are the unnormalized ODF values (times the scale), so the bound
+   * holds only for values up to 1: smaller ones (ODFs of unit sum) get a finer mesh than they need,
+   * larger ones a coarser one. A bound from the data would need every glyph's ODF before the choice,
+   * and the mapper's choice of when to refine (GetPointsPerGlyph) the data as well.
    */
   const BaseMesh &ChooseMesh(const mitk::OdfGlyphGenerator::Slice &slice, const mitk::OdfGlyphGenerator::Settings &settings)
   {
