@@ -104,8 +104,8 @@ std::optional<mitk::OdfVtkMapper2D::GlyphView> mitk::OdfVtkMapper2D::GetViewToGe
                             generated->planeAxis0 != current.planeAxis0 || generated->planeAxis1 != current.planeAxis1;
   if (sliceChanged)
     return current;
-  // Generating and uploading thousands of glyphs at every mouse step of a pan or zoom made the
-  // view lag; the glyphs in place are still right, only the area they cover is out of date.
+  // Generating and uploading thousands of glyphs at every mouse step of a pan or zoom would make
+  // the view lag; the glyphs in place are still right, only the area they cover is out of date.
   if (lod > 0 && (!SameWindow(generated->window, current.window) || generated->pixelsPerMm != current.pixelsPerMm))
     return current;
   // Coarse glyphs magnified would show their facets, e.g. in a magnified screenshot, which never

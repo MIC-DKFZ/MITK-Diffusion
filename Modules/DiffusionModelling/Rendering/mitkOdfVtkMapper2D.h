@@ -41,6 +41,8 @@ namespace mitk
    * MITK's RenderingManager runs about 200 ms after the last render of a renderer with LOD
    * enabled (IsLODEnabled). A new slice, new data or new properties are drawn at once, and so is
    * a zoom whose glyphs need a finer mesh, for the voxels the glyphs cover (GetViewToGenerate).
+   * Without Qt, MITK's RenderingManager runs no render at LOD 1 (StartOrResetTimer does nothing),
+   * so there the glyphs of a pan or zoom stay until the slice, the data or a property changes.
    *
    * Tensor ellipsoids coloured by direction (OdfGlyphGenerator::CanDrawEllipsoidInstances) are
    * drawn as GPU instances of one sphere, all other glyphs as one mesh.
