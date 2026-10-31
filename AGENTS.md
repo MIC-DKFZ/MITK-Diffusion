@@ -208,8 +208,8 @@ Facts the layout does not show:
   step, slice or plane axes, and after a pan or zoom only at the LOD-1 render MITK runs about
   200 ms after the interaction (`IsGenerationRequired`; `IsLODEnabled` only while glyphs are
   shown). Random placement keeps a fixed per-voxel hash subset of exactly `ShowMaxNumber` voxels
-  (spin box up to 60,000). A glyph under 16 screen pixels wide (scaling x glyph spacing x pixels
-  per mm, device pixels) is a 42-point geodesic sphere, under 40 pixels a 162-point one, else the
+  (spin box up to 60,000). A glyph under 8 screen pixels wide (scaling x glyph spacing x pixels
+  per mm, device pixels) is a 42-point geodesic sphere, under 20 pixels a 162-point one, else the
   252-point ODF mesh; size, colour and normalization come from the 252-sample ODF, and coarse
   values are limited to its range. Tensor ellipsoids coloured by direction with Max normalization
   are `vtkGlyph3DMapper` instances of that sphere (`GenerateEllipsoidInstances`: quaternion and

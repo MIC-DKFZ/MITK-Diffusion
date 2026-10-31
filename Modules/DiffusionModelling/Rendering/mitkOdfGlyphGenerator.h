@@ -73,8 +73,8 @@ namespace mitk
       bool randomPlacement = true;
       /**
        * Screen pixels per mm in the plane, for the mesh of the glyphs. A glyph is at most
-       * scaling x glyph spacing x pixelsPerMm pixels wide; below 16 pixels it has 42 points (80
-       * triangles), below 40 pixels 162 points (320 triangles), else the ODF_SAMPLING_SIZE points
+       * scaling x glyph spacing x pixelsPerMm pixels wide; below 8 pixels it has 42 points (80
+       * triangles), below 20 pixels 162 points (320 triangles), else the ODF_SAMPLING_SIZE points
        * of the ODF base mesh. 0 gives every glyph the base mesh.
        */
       double pixelsPerMm = 0;

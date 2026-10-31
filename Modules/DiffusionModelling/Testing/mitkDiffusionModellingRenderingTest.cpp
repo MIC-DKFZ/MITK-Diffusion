@@ -1130,15 +1130,15 @@ public:
     return vnl_vector_fixed<double, 3>(directions(0, j), directions(1, j), directions(2, j));
   }
 
-  // Glyphs narrower than 16 and 40 pixels on screen (scaling x glyph spacing x pixels per mm)
+  // Glyphs narrower than 8 and 20 pixels on screen (scaling x glyph spacing x pixels per mm)
   // are geodesic spheres of 42 and 162 directions; pixels per mm 0 keeps the full mesh.
   void GlyphGenerator_MeshLevel_ByGlyphWidth()
   {
     std::vector<std::pair<std::string, mitk::Image::Pointer>> images = {
       {"tensor", MakeDegenerateTensorImage().GetPointer()}, {"SH", LoadShImage().GetPointer()}, {"ODF", MakeOdfImage(2, 1, 1, 1).GetPointer()}};
     const std::tuple<double, double, vtkIdType> cases[] = {
-      {1, 0, ODF_SAMPLING_SIZE}, {1, 0.01, 42}, {1, 15.9, 42}, {1, 16.1, 162}, {1, 39.9, 162}, {1, 40.1, ODF_SAMPLING_SIZE},
-      {2.5, 15.9, 42}, {2.5, 16.1, 162}, {2.5, 39.9, 162}, {2.5, 40.1, ODF_SAMPLING_SIZE}};
+      {1, 0, ODF_SAMPLING_SIZE}, {1, 0.01, 42}, {1, 7.9, 42}, {1, 8.1, 162}, {1, 19.9, 162}, {1, 20.1, ODF_SAMPLING_SIZE},
+      {2.5, 7.9, 42}, {2.5, 8.1, 162}, {2.5, 19.9, 162}, {2.5, 20.1, ODF_SAMPLING_SIZE}};
     for (const auto &[name, image] : images)
     {
       mitk::Point3D layer1;
@@ -1163,7 +1163,7 @@ public:
   }
 
   /** Glyph widths in pixels that give the coarse meshes, and their numbers of points. */
-  static constexpr std::pair<double, vtkIdType> coarseLevels[] = {{10, 42}, {30, 162}};
+  static constexpr std::pair<double, vtkIdType> coarseLevels[] = {{5, 42}, {15, 162}};
 
   // A coarse glyph is a closed surface on the 42 or 162 directions of mitk::pointshell, in their
   // order, with triangles counterclockwise seen from outside and the normals of vtkPolyDataNormals.
@@ -1455,7 +1455,7 @@ public:
 
     for (const bool ellipsoids : {true, false})
     {
-      for (const double width : {0.0, 10.0, 30.0})
+      for (const double width : {0.0, 5.0, 15.0})
       {
         auto settings = AllGlyphs();
         settings.tensorEllipsoids = ellipsoids;
@@ -1702,7 +1702,7 @@ public:
     auto image = MakeDegenerateTensorImage();
     const auto slice = mitk::OdfGlyphGenerator::GetSlice(*image, 0, *Plane(0, 0, 0, 0, 0, 1));
     CPPUNIT_ASSERT(slice.has_value());
-    const std::pair<double, vtkIdType> levels[] = {{0, ODF_SAMPLING_SIZE}, {10, 42}, {30, 162}, {100, ODF_SAMPLING_SIZE}};
+    const std::pair<double, vtkIdType> levels[] = {{0, ODF_SAMPLING_SIZE}, {5, 42}, {15, 162}, {100, ODF_SAMPLING_SIZE}};
     for (const auto &[width, n] : levels)
     {
       const std::string name = std::to_string(width) + " pixels";

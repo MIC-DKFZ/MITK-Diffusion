@@ -292,9 +292,9 @@ namespace
     if (settings.pixelsPerMm > 0)
     {
       const double widthInPixels = settings.scaling * slice.glyphSpacing * settings.pixelsPerMm;
-      if (widthInPixels < 16)
+      if (widthInPixels < 8)
         return GetGeodesicMesh<2>();
-      if (widthInPixels < 40)
+      if (widthInPixels < 20)
         return GetGeodesicMesh<4>();
     }
     return GetBaseMeshArrays();
@@ -367,7 +367,7 @@ namespace
   /**
    * The voxel's values at the points of a coarse mesh, computed at its directions as ToOdf does at
    * the ODF directions. ODF images have values only at the ODF directions; a point gets the value
-   * of the nearest one, at most 7 degrees off, which a glyph under 40 pixels does not show.
+   * of the nearest one, at most 7 degrees off, which a glyph under 20 pixels does not show.
    * \param meshShBasis the SH basis at the mesh's directions, for SH images
    */
   void SampleMesh(VoxelKind kind, const float *values, unsigned int numComponents, const vnl_matrix<float> *meshShBasis, bool tensorEllipsoids, const BaseMesh &mesh, float *result)

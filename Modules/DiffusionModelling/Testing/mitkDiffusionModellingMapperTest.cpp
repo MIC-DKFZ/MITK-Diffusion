@@ -159,15 +159,15 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
 
   /**
    * Points per glyph of the mesh, or of the instances' sphere, for the renderer's zoom:
-   * tensorImage.dti's glyphs are at most "Scaling" x 3 mm wide; below 16 pixels 42 points, below
-   * 40 pixels 162.
+   * tensorImage.dti's glyphs are at most "Scaling" x 3 mm wide; below 8 pixels 42 points, below
+   * 20 pixels 162.
    */
   vtkIdType ExpectedPointsPerGlyph()
   {
     float scaling = 0;
     CPPUNIT_ASSERT(m_Node->GetFloatProperty("Scaling", scaling));
     const double width = scaling * 3 / this->Renderer()->GetScaleFactorMMPerDisplayUnit();
-    return width < 16 ? 42 : (width < 40 ? 162 : ODF_SAMPLING_SIZE);
+    return width < 8 ? 42 : (width < 20 ? 162 : ODF_SAMPLING_SIZE);
   }
 
   vtkPolyData *RenderGlyphs(mitk::AnatomicalPlane view)
