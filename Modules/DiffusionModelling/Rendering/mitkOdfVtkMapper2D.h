@@ -39,7 +39,8 @@ namespace mitk
    * The glyphs are in world coordinates, so a pan or zoom leaves them in place: while the view
    * moves, the mapper keeps them, and fills the new view at the render of level of detail 1 that
    * MITK's RenderingManager runs about 200 ms after the last render of a renderer with LOD
-   * enabled (IsLODEnabled). A new slice, new data or new properties are drawn at once.
+   * enabled (IsLODEnabled). A new slice, new data or new properties are drawn at once, and so is
+   * a zoom whose glyphs need a finer mesh, for the voxels the glyphs cover (GetViewToGenerate).
    *
    * Tensor ellipsoids coloured by direction (OdfGlyphGenerator::CanDrawEllipsoidInstances) are
    * drawn as GPU instances of one sphere, all other glyphs as one mesh.
@@ -80,16 +81,22 @@ namespace mitk
       OdfGlyphGenerator::Window window;
       /** Zoom of the view, which chooses the glyph mesh (OdfGlyphGenerator::Settings). */
       double pixelsPerMm = 0;
+      /** Points of each glyph's mesh at this zoom (OdfGlyphGenerator::GetPointsPerGlyph). */
+      unsigned int pointsPerGlyph = 0;
     };
 
     /**
-     * Whether the glyphs of a renderer have to be generated again: for new data, new node
-     * properties or another time step (contentChanged), and for another slice or plane at any
-     * level of detail; for a pan or zoom (another window or pixelsPerMm) only at LOD 1 and higher.
+     * The view to generate the glyphs of a renderer for, or none if the current glyphs stay. The
+     * current view for new data, new node properties or another time step (contentChanged), for
+     * another slice or plane at any level of detail, and for a pan or zoom (another window or
+     * pixelsPerMm) at LOD 1 and higher. A zoom whose glyphs need a finer mesh than the current
+     * ones (more pointsPerGlyph) at LOD 0: the generated window at the current zoom, so the same
+     * voxels get finer glyphs at once; a magnified screenshot renders at LOD 0 with its
+     * magnification's zoom and so gets the mesh it shows.
      * \param generated the view the current glyphs were generated for; none if there are none
      * \param lod the level of detail of the render, RenderingManager::GetNextLOD
      */
-    static bool IsGenerationRequired(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged, int lod);
+    static std::optional<GlyphView> GetViewToGenerate(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged, int lod);
 
     class LocalStorage : public Mapper::BaseLocalStorage
     {

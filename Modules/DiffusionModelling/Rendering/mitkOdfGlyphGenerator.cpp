@@ -734,6 +734,11 @@ std::optional<mitk::OdfGlyphGenerator::Slice> mitk::OdfGlyphGenerator::GetSlice(
   return slice;
 }
 
+unsigned int mitk::OdfGlyphGenerator::GetPointsPerGlyph(const Slice &slice, const Settings &settings)
+{
+  return static_cast<unsigned int>(ChooseMesh(slice, settings).points.size());
+}
+
 vtkSmartPointer<vtkPolyData> mitk::OdfGlyphGenerator::Generate(const Image &image,
                                                               TimeStepType t,
                                                               const Slice &slice,

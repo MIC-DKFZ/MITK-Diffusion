@@ -112,6 +112,13 @@ namespace mitk
     static std::optional<Slice> GetSlice(const Image &image, TimeStepType t, const PlaneGeometry &plane);
 
     /**
+     * The number of points of each glyph mesh, and of the sphere of the instanced ellipsoids, for
+     * this slice and these settings: 42, 162 or ODF_SAMPLING_SIZE by the glyphs' width on screen
+     * (Settings::pixelsPerMm).
+     */
+    static unsigned int GetPointsPerGlyph(const Slice &slice, const Settings &settings);
+
+    /**
      * Glyphs of the slice at time step t, for the voxels inside the window (all voxels of the
      * slice without one), at most settings.maxGlyphs of them.
      * \throw mitk::Exception for images other than tensor, ODF and SH images of float values.

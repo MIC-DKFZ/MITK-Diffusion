@@ -47,6 +47,7 @@ found in the LICENSE file.
 #include <vtkPropAssembly.h>
 #include <vtkPropCollection.h>
 #include <vtkProperty.h>
+#include <vtkRenderLargeImage.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
@@ -59,7 +60,6 @@ found in the LICENSE file.
 #include <array>
 #include <cmath>
 #include <functional>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -83,6 +83,7 @@ class mitkDiffusionModellingMapperTestSuite : public mitk::TestFixture
   MITK_TEST(LodEnabled_OnlyWhileGlyphsShown);
   MITK_TEST(Zoom_MeshLevelFollowsGlyphWidth);
   MITK_TEST(Zoom_MeshLevelOfGlyphMeshes);
+  MITK_TEST(MagnifiedScreenshot_FinerMeshForTheSameGlyphs);
   MITK_TEST(TensorEllipsoids_InstancesOnlyForTheirSettings);
   MITK_TEST(TensorEllipsoids_InstancesDrawnWhereTheMeshIs);
   MITK_TEST(InstancedEllipsoid_ScaledThenRotated);
@@ -448,7 +449,8 @@ public:
   }
 
   // The glyph mesh, and the sphere of instanced ellipsoids, follow the glyphs' width on screen, so
-  // a zoom changes it, at the render of LOD 1 as any zoom.
+  // a zoom changes it. A zoom that needs a finer mesh refines the glyphs at once, for the voxels
+  // they cover; the render at LOD 1 then generates them for the new view as after any zoom.
   void Zoom_MeshLevelFollowsGlyphWidth() { this->ZoomThroughMeshLevels(true); }
 
   void Zoom_MeshLevelOfGlyphMeshes() { this->ZoomThroughMeshLevels(false); }
@@ -457,25 +459,106 @@ public:
   {
     m_Node->SetBoolProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", instanced);
     m_Node->SetBoolProperty("VisibleOdfs_T", true);
-    // Glyphs at most 3 mm wide: 42 points at the fitted zoom of 2.5 pixels per mm.
+    // Glyphs at most 3 mm wide: 7.5 pixels at the fitted zoom of 2.5 pixels per mm, then 18.75,
+    // 46.9 and 117 pixels.
     m_Node->SetFloatProperty("Scaling", 1);
     vtkSmartPointer<vtkPolyData> glyphs = this->RenderGlyphs(mitk::AnatomicalPlane::Axial);
     mitk::CameraController *camera = this->Renderer()->GetCameraController();
-    std::set<vtkIdType> levels;
+    const vtkIdType levels[] = {42, 162, ODF_SAMPLING_SIZE, ODF_SAMPLING_SIZE};
     for (int step = 0; step < 3; ++step)
     {
-      CPPUNIT_ASSERT(glyphs != nullptr);
-      CPPUNIT_ASSERT_EQUAL(instanced, this->InstanceSphere() != nullptr);
-      CPPUNIT_ASSERT_EQUAL(this->ExpectedPointsPerGlyph(), this->PointsPerGlyph());
-      levels.insert(this->PointsPerGlyph());
+      const std::string name = "zoom step " + std::to_string(step);
+      CPPUNIT_ASSERT_MESSAGE(name, glyphs != nullptr);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, instanced, this->InstanceSphere() != nullptr);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, levels[step], this->PointsPerGlyph());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, this->ExpectedPointsPerGlyph(), this->PointsPerGlyph());
+      const auto centres = this->GlyphCentres();
       camera->Zoom(2.5, camera->GetCameraPositionOnPlane());
       m_RenderingTestHelper.Render();
-      CPPUNIT_ASSERT(this->Glyphs() == glyphs.GetPointer());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, levels[step + 1], this->PointsPerGlyph());
+      if (levels[step + 1] > levels[step])
+      {
+        CPPUNIT_ASSERT_MESSAGE(name + ": finer mesh at once", this->Glyphs() != glyphs.GetPointer());
+        CPPUNIT_ASSERT_MESSAGE(name + ": for the same voxels", SameCentres(centres, this->GlyphCentres()));
+      }
+      else
+      {
+        CPPUNIT_ASSERT_MESSAGE(name + ": kept at LOD 0", this->Glyphs() == glyphs.GetPointer());
+      }
+      vtkSmartPointer<vtkPolyData> atLod0 = this->Glyphs();
       mitk::RenderingManager::GetInstance()->ExecutePendingHighResRenderingRequest();
       m_RenderingTestHelper.Render();
       glyphs = this->Glyphs();
+      CPPUNIT_ASSERT_MESSAGE(name + ": the new view at LOD 1", glyphs != atLod0 && this->NumberOfGlyphs() < static_cast<vtkIdType>(centres.size()));
     }
-    CPPUNIT_ASSERT(levels == std::set<vtkIdType>({42, 162, ODF_SAMPLING_SIZE}));
+  }
+
+  /** Centres of the current glyphs in their order: the instances' points, or the mean of each glyph mesh's points. */
+  std::vector<mitk::Point3D> GlyphCentres()
+  {
+    vtkPolyData *glyphs = this->Glyphs();
+    CPPUNIT_ASSERT(glyphs != nullptr);
+    const vtkIdType numGlyphs = this->NumberOfGlyphs();
+    const vtkIdType pointsPerGlyph = this->InstanceSphere() != nullptr ? 1 : this->PointsPerGlyph();
+    std::vector<mitk::Point3D> centres(numGlyphs, mitk::Point3D(0.0));
+    for (vtkIdType g = 0; g < numGlyphs; ++g)
+    {
+      for (vtkIdType j = 0; j < pointsPerGlyph; ++j)
+      {
+        const double *point = glyphs->GetPoint(g * pointsPerGlyph + j);
+        for (unsigned int c = 0; c < 3; ++c)
+          centres[g][c] += point[c] / pointsPerGlyph;
+      }
+    }
+    return centres;
+  }
+
+  /** The glyph meshes are point symmetric about their voxel's centre, up to float rounding. */
+  static bool SameCentres(const std::vector<mitk::Point3D> &a, const std::vector<mitk::Point3D> &b)
+  {
+    return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](const mitk::Point3D &p, const mitk::Point3D &q) {
+             return p.EuclideanDistanceTo(q) < 1e-3;
+           });
+  }
+
+  // A magnified screenshot (vtkRenderLargeImage, as MITK's screenshot of a render window takes
+  // it) renders at LOD 0 with the zoom of its magnification. Its glyphs have the mesh of their
+  // size in the screenshot, for the voxels on screen; back on screen the render at LOD 1 restores
+  // the screen's mesh.
+  void MagnifiedScreenshot_FinerMeshForTheSameGlyphs()
+  {
+    // 7.5 pixels wide on screen (42 points), 30 in a screenshot magnified 4 times (252 points);
+    // a random quarter of the voxels.
+    m_Node->SetFloatProperty("Scaling", 1);
+    m_Node->SetIntProperty("ShowMaxNumber", 1000);
+    m_Node->SetBoolProperty("VisibleOdfs_T", true);
+    for (const bool instanced : {true, false})
+    {
+      const std::string name = instanced ? "instances" : "mesh";
+      m_Node->SetBoolProperty("DiffusionCore.Rendering.OdfVtkMapper.ColourisationModeBit", instanced);
+      CPPUNIT_ASSERT_MESSAGE(name, this->RenderGlyphs(mitk::AnatomicalPlane::Axial) != nullptr);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, instanced, this->InstanceSphere() != nullptr);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, vtkIdType(42), this->PointsPerGlyph());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, vtkIdType(1000), this->NumberOfGlyphs());
+      const auto centres = this->GlyphCentres();
+
+      auto magnifier = vtkSmartPointer<vtkRenderLargeImage>::New();
+      magnifier->SetInput(this->Renderer()->GetVtkRenderer());
+      magnifier->SetMagnification(4);
+      magnifier->Update();
+      int dimensions[3];
+      magnifier->GetOutput()->GetDimensions(dimensions);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, 4 * 640, dimensions[0]);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, vtkIdType(ODF_SAMPLING_SIZE), this->PointsPerGlyph());
+      CPPUNIT_ASSERT_MESSAGE(name, SameCentres(centres, this->GlyphCentres()));
+
+      m_RenderingTestHelper.Render();
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name + " on screen at LOD 0", vtkIdType(ODF_SAMPLING_SIZE), this->PointsPerGlyph());
+      mitk::RenderingManager::GetInstance()->ExecutePendingHighResRenderingRequest();
+      m_RenderingTestHelper.Render();
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name + " on screen at LOD 1", vtkIdType(42), this->PointsPerGlyph());
+      CPPUNIT_ASSERT_MESSAGE(name, SameCentres(centres, this->GlyphCentres()));
+    }
   }
 
   // Tensor ellipsoids coloured by direction and normalized by their maximum are instances of a

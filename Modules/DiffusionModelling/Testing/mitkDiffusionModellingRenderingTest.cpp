@@ -97,6 +97,7 @@ class mitkDiffusionModellingRenderingTestSuite : public mitk::TestFixture
   MITK_TEST(GlyphGenerator_InstanceSphere_MeshOfTheLevel);
   MITK_TEST(OdfMapper_DefaultProperties_KeepExistingValues);
   MITK_TEST(OdfMapper_GenerationRequired);
+  MITK_TEST(OdfMapper_FinerMeshGeneratedAtOnce);
   CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -1800,7 +1801,24 @@ public:
     view.window.halfSize1 = 10;
     view.window.halfSize2 = 5;
     view.pixelsPerMm = 2;
+    view.pointsPerGlyph = 42;
     return view;
+  }
+
+  static bool SameView(const mitk::OdfVtkMapper2D::GlyphView &a, const mitk::OdfVtkMapper2D::GlyphView &b)
+  {
+    return a.slice.normalAxis == b.slice.normalAxis && a.slice.index == b.slice.index && a.slice.planeIndex == b.slice.planeIndex &&
+           a.planeAxis0 == b.planeAxis0 && a.planeAxis1 == b.planeAxis1 && a.window.center == b.window.center &&
+           a.window.axis1 == b.window.axis1 && a.window.axis2 == b.window.axis2 && a.window.halfSize1 == b.window.halfSize1 &&
+           a.window.halfSize2 == b.window.halfSize2 && a.pixelsPerMm == b.pixelsPerMm && a.pointsPerGlyph == b.pointsPerGlyph;
+  }
+
+  /** Whether the 2D mapper generates the glyphs again, and if so, for the current view. */
+  static bool IsGenerationRequired(const std::optional<mitk::OdfVtkMapper2D::GlyphView> &generated, const mitk::OdfVtkMapper2D::GlyphView &current, bool contentChanged, int lod)
+  {
+    const auto view = mitk::OdfVtkMapper2D::GetViewToGenerate(generated, current, contentChanged, lod);
+    CPPUNIT_ASSERT(!view || SameView(*view, current));
+    return view.has_value();
   }
 
   // The rule of the 2D mapper: glyphs are generated the first time, for new content and for
@@ -1813,9 +1831,9 @@ public:
     for (const int lod : {0, 1})
     {
       const std::string level = ", LOD " + std::to_string(lod);
-      CPPUNIT_ASSERT_MESSAGE("first" + level, mitk::OdfVtkMapper2D::IsGenerationRequired(std::nullopt, generated, false, lod));
-      CPPUNIT_ASSERT_MESSAGE("unchanged" + level, !mitk::OdfVtkMapper2D::IsGenerationRequired(generated, generated, false, lod));
-      CPPUNIT_ASSERT_MESSAGE("content" + level, mitk::OdfVtkMapper2D::IsGenerationRequired(generated, generated, true, lod));
+      CPPUNIT_ASSERT_MESSAGE("first" + level, IsGenerationRequired(std::nullopt, generated, false, lod));
+      CPPUNIT_ASSERT_MESSAGE("unchanged" + level, !IsGenerationRequired(generated, generated, false, lod));
+      CPPUNIT_ASSERT_MESSAGE("content" + level, IsGenerationRequired(generated, generated, true, lod));
     }
 
     const std::pair<std::string, std::function<void(GlyphView &)>> sliceChanges[] = {
@@ -1835,14 +1853,51 @@ public:
       {
         GlyphView current = generated;
         change(current);
-        CPPUNIT_ASSERT_MESSAGE(name + ", LOD " + std::to_string(lod), mitk::OdfVtkMapper2D::IsGenerationRequired(generated, current, false, lod));
+        CPPUNIT_ASSERT_MESSAGE(name + ", LOD " + std::to_string(lod), IsGenerationRequired(generated, current, false, lod));
       }
       for (const auto &[name, change] : viewChanges)
       {
         GlyphView current = generated;
         change(current);
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(name + ", LOD " + std::to_string(lod), lod > 0, mitk::OdfVtkMapper2D::IsGenerationRequired(generated, current, false, lod));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(name + ", LOD " + std::to_string(lod), lod > 0, IsGenerationRequired(generated, current, false, lod));
       }
+    }
+  }
+
+  // A zoom whose glyphs need a finer mesh (e.g. a magnified screenshot) refines the glyphs at
+  // once: at LOD 0 for the window they were generated for, so the voxels stay those on screen; at
+  // LOD 1 for the new view as any zoom. A coarser mesh waits for LOD 1.
+  void OdfMapper_FinerMeshGeneratedAtOnce()
+  {
+    using GlyphView = mitk::OdfVtkMapper2D::GlyphView;
+    const GlyphView generated = MakeGlyphView();
+    GlyphView zoomedIn = generated;
+    zoomedIn.pixelsPerMm *= 4;
+    zoomedIn.pointsPerGlyph = ODF_SAMPLING_SIZE;
+    zoomedIn.window.halfSize1 /= 4;
+    zoomedIn.window.halfSize2 /= 4;
+    zoomedIn.window.center[0] += 1;
+
+    const auto refined = mitk::OdfVtkMapper2D::GetViewToGenerate(generated, zoomedIn, false, 0);
+    CPPUNIT_ASSERT(refined.has_value());
+    GlyphView expected = zoomedIn;
+    expected.window = generated.window;
+    CPPUNIT_ASSERT(SameView(expected, *refined));
+    // The refined glyphs stay until LOD 1, which generates them for the view.
+    CPPUNIT_ASSERT(!IsGenerationRequired(refined, zoomedIn, false, 0));
+    CPPUNIT_ASSERT(IsGenerationRequired(refined, zoomedIn, false, 1));
+    CPPUNIT_ASSERT(IsGenerationRequired(generated, zoomedIn, false, 1));
+
+    GlyphView zoomedOut = generated;
+    zoomedOut.pixelsPerMm /= 4;
+    zoomedOut.window.halfSize1 *= 4;
+    GlyphView coarser = zoomedIn;
+    coarser.pixelsPerMm = generated.pixelsPerMm;
+    coarser.pointsPerGlyph = 162;
+    for (const auto &[name, finer, current] : {std::make_tuple("zoomed out", generated, zoomedOut), std::make_tuple("back from a refinement", zoomedIn, coarser)})
+    {
+      CPPUNIT_ASSERT_MESSAGE(name, !IsGenerationRequired(finer, current, false, 0));
+      CPPUNIT_ASSERT_MESSAGE(name, IsGenerationRequired(finer, current, false, 1));
     }
   }
 };

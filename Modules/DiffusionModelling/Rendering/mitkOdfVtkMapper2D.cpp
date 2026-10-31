@@ -94,19 +94,29 @@ namespace
   }
 }
 
-bool mitk::OdfVtkMapper2D::IsGenerationRequired(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged, int lod)
+std::optional<mitk::OdfVtkMapper2D::GlyphView> mitk::OdfVtkMapper2D::GetViewToGenerate(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged, int lod)
 {
   if (!generated || contentChanged)
-    return true;
+    return current;
   const bool sliceChanged = generated->slice.normalAxis != current.slice.normalAxis ||
                             generated->slice.index != current.slice.index ||
                             generated->slice.planeIndex != current.slice.planeIndex ||
                             generated->planeAxis0 != current.planeAxis0 || generated->planeAxis1 != current.planeAxis1;
   if (sliceChanged)
-    return true;
+    return current;
   // Generating and uploading thousands of glyphs at every mouse step of a pan or zoom made the
   // view lag; the glyphs in place are still right, only the area they cover is out of date.
-  return lod > 0 && (!SameWindow(generated->window, current.window) || generated->pixelsPerMm != current.pixelsPerMm);
+  if (lod > 0 && (!SameWindow(generated->window, current.window) || generated->pixelsPerMm != current.pixelsPerMm))
+    return current;
+  // Coarse glyphs magnified would show their facets, e.g. in a magnified screenshot, which never
+  // gets a render at LOD 1. Only the mesh is refined; the area and the voxels stay those on screen.
+  if (current.pointsPerGlyph > generated->pointsPerGlyph)
+  {
+    GlyphView refined = current;
+    refined.window = generated->window;
+    return refined;
+  }
+  return std::nullopt;
 }
 
 bool mitk::OdfVtkMapper2D::IsLODEnabled(BaseRenderer *renderer) const
@@ -158,6 +168,9 @@ std::optional<mitk::OdfVtkMapper2D::GlyphView> mitk::OdfVtkMapper2D::GetVisibleV
   // resolves.
   const double mmPerPixel = renderer->GetScaleFactorMMPerDisplayUnit();
   view.pixelsPerMm = mmPerPixel > 0 && std::isfinite(mmPerPixel) ? 1 / mmPerPixel : 0;
+  auto settings = this->GetSettings();
+  settings.pixelsPerMm = view.pixelsPerMm;
+  view.pointsPerGlyph = OdfGlyphGenerator::GetPointsPerGlyph(view.slice, settings);
   return view;
 }
 
@@ -181,32 +194,33 @@ void mitk::OdfVtkMapper2D::GenerateDataForRenderer(BaseRenderer *renderer)
     }
     return;
   }
-  if (!IsGenerationRequired(localStorage->m_GeneratedView, *view, contentChanged, RenderingManager::GetInstance()->GetNextLOD(renderer)))
+  const auto target = GetViewToGenerate(localStorage->m_GeneratedView, *view, contentChanged, RenderingManager::GetInstance()->GetNextLOD(renderer));
+  if (!target)
     return;
 
   localStorage->UpdateGenerateDataTime();
   // Also set when the generation fails, so that the error is not repeated at every render.
-  localStorage->m_GeneratedView = view;
+  localStorage->m_GeneratedView = target;
   try
   {
     const auto *image = static_cast<const Image *>(node->GetData());
     auto settings = this->GetSettings();
-    settings.pixelsPerMm = view->pixelsPerMm;
+    settings.pixelsPerMm = target->pixelsPerMm;
     // One sphere and three values per glyph are far less to build and upload than a mesh per glyph.
     if (OdfGlyphGenerator::CanDrawEllipsoidInstances(*image, settings))
     {
-      auto sphere = OdfGlyphGenerator::GetInstanceSphere(view->slice, settings);
+      auto sphere = OdfGlyphGenerator::GetInstanceSphere(target->slice, settings);
       // A new source is uploaded again; the spheres of the mesh levels differ in their number of points.
       vtkPolyData *source = localStorage->m_InstanceMapper->GetSource();
       if (source == nullptr || source->GetNumberOfPoints() != sphere->GetNumberOfPoints())
         localStorage->m_InstanceMapper->SetSourceData(sphere);
-      localStorage->m_InstanceMapper->SetInputData(OdfGlyphGenerator::GenerateEllipsoidInstances(*image, this->GetTimestep(), view->slice, &view->window, settings));
+      localStorage->m_InstanceMapper->SetInputData(OdfGlyphGenerator::GenerateEllipsoidInstances(*image, this->GetTimestep(), target->slice, &target->window, settings));
       localStorage->m_Mapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
       localStorage->m_Actor->SetMapper(localStorage->m_InstanceMapper);
     }
     else
     {
-      localStorage->m_Mapper->SetInputData(OdfGlyphGenerator::Generate(*image, this->GetTimestep(), view->slice, &view->window, settings));
+      localStorage->m_Mapper->SetInputData(OdfGlyphGenerator::Generate(*image, this->GetTimestep(), target->slice, &target->window, settings));
       localStorage->m_InstanceMapper->SetInputData(vtkSmartPointer<vtkPolyData>::New());
       localStorage->m_Actor->SetMapper(localStorage->m_Mapper);
     }
