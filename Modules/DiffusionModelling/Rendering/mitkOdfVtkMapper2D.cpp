@@ -255,7 +255,9 @@ void mitk::OdfVtkMapper2D::ReleaseGraphicsResources(BaseRenderer *renderer)
 
 void mitk::OdfVtkMapper2D::SetDefaultProperties(DataNode *node, BaseRenderer *renderer, bool overwrite)
 {
-  node->AddProperty("ShowMaxNumber", IntProperty::New(500), renderer, overwrite);
+  // The cap of the full 252-point mesh in a view (MaxGlyphsInView): zooming in thins no glyphs, and
+  // each update stays near 150 ms (#50).
+  node->AddProperty("ShowMaxNumber", IntProperty::New(10000), renderer, overwrite);
   node->AddProperty("Normalization", OdfNormalizationMethodProperty::New(), renderer, overwrite);
 
   auto scaleBy = OdfScaleByProperty::New();
