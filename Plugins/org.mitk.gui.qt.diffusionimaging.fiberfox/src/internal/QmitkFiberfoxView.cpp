@@ -70,9 +70,62 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateOr.h>
 #include <algorithm>
+#include <cmath>
+#include <QFontDatabase>
+#include <QMouseEvent>
+#include <QPainter>
+#include <QStyleOptionSizeGrip>
+#include <QTextCharFormat>
+#include <QTextCursor>
 
 namespace
 {
+  /**
+   * Handle in the lower right corner of a text field, below its vertical scroll bar: dragging it makes
+   * the field taller or lower, like the corner of a text area in a web browser. The view lies in a
+   * scroll area, which takes a taller page; the width follows the view.
+   */
+  class HeightGrip : public QWidget
+  {
+  public:
+    explicit HeightGrip(QAbstractScrollArea* field)
+      : QWidget(field), m_Field(field)
+    {
+      this->setCursor(Qt::SizeVerCursor);
+      this->setToolTip("Drag to change the height of the field.");
+    }
+
+  protected:
+    void paintEvent(QPaintEvent*) override
+    {
+      QPainter painter(this);
+      QStyleOptionSizeGrip option;
+      option.initFrom(this);
+      option.corner = Qt::BottomRightCorner;
+      this->style()->drawControl(QStyle::CE_SizeGrip, &option, &painter, this);
+    }
+
+    void mousePressEvent(QMouseEvent* event) override
+    {
+      m_StartY = event->globalPosition().y();
+      m_StartHeight = m_Field->height();
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override
+    {
+      if (!(event->buttons() & Qt::LeftButton))
+        return;
+      // at least three lines of text
+      const int minimum = 3*m_Field->fontMetrics().lineSpacing() + 2*m_Field->frameWidth();
+      m_Field->setFixedHeight(std::max(minimum, m_StartHeight + static_cast<int>(std::lround(event->globalPosition().y() - m_StartY))));
+    }
+
+  private:
+    QAbstractScrollArea* m_Field;
+    double m_StartY = 0;
+    int m_StartHeight = 0;
+  };
+
   /**
    * The model names of a signal model string as the view writes it, one per model in list order
    * ("StickZeppelinBallBall"); empty if the string is not of that form.
@@ -358,7 +411,15 @@ void QmitkFiberfoxView::UpdateSimulationStatus()
   {
     m_SimulationStatusText = statusText;
     m_Controls->m_SimulationStatusText->clear();
-    m_Controls->m_SimulationStatusText->setText(statusText);
+    m_Controls->m_SimulationStatusText->setPlainText(statusText);
+    // The percentages above a progress bar line up with its stars only in a fixed-pitch font. The
+    // theme's font rule replaces the font of the widget, not that of the text's characters.
+    QTextCharFormat fixedPitch;
+    fixedPitch.setFontFamilies({QFontDatabase::systemFont(QFontDatabase::FixedFont).family()});
+    fixedPitch.setFontFixedPitch(true);
+    QTextCursor cursor(m_Controls->m_SimulationStatusText->document());
+    cursor.select(QTextCursor::Document);
+    cursor.mergeCharFormat(fixedPitch);
     QScrollBar *vScrollBar = m_Controls->m_SimulationStatusText->verticalScrollBar();
     vScrollBar->triggerAction(QScrollBar::SliderToMaximum);
   }
@@ -407,6 +468,11 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_AstrosticksWidget2->setVisible(false);
     m_Controls->m_AstrosticksWidget2->SetT1(4658);
     m_Controls->m_AstrosticksWidget2->SetT2(2200);
+
+    // the handle that changes the height of the simulation log is the corner widget, which takes the
+    // place below a vertical scroll bar that is always shown
+    m_Controls->m_SimulationStatusText->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    m_Controls->m_SimulationStatusText->setCornerWidget(new HeightGrip(m_Controls->m_SimulationStatusText));
     m_Controls->m_DotWidget1->setVisible(false);
     m_Controls->m_DotWidget2->setVisible(false);
     m_Controls->m_DotWidget2->SetT1(4658);

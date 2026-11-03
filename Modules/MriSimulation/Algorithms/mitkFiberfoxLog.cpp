@@ -70,8 +70,9 @@ void mitk::FiberfoxLog::Print(const std::string& m, bool addTime, bool lineBreak
     m_File << text;
     m_File.flush();
   }
+  // flushed: the stars of a progress bar have no line break, and a terminal shows stdout line by line
   if (stdOut)
-    std::cout << text;
+    std::cout << text << std::flush;
 }
 
 std::string mitk::FiberfoxLog::GetStatusText() const
@@ -80,11 +81,11 @@ std::string mitk::FiberfoxLog::GetStatusText() const
   return m_StatusText;
 }
 
-void mitk::FiberfoxLog::StartProgress(unsigned long total)
+void mitk::FiberfoxLog::StartProgress(std::uint64_t total)
 {
   {
     std::lock_guard<std::mutex> lock(m_ProgressMutex);
-    m_ProgressTotal = std::max(total, 1ul);
+    m_ProgressTotal = std::max<std::uint64_t>(total, 1);
     m_ProgressCount = 0;
     m_ProgressStars = 0;
     m_Progress = 0.0;
@@ -93,12 +94,12 @@ void mitk::FiberfoxLog::StartProgress(unsigned long total)
   this->Print("|----|----|----|----|----|----|----|----|----|----|\n*", false, false, true);
 }
 
-void mitk::FiberfoxLog::AdvanceProgress()
+void mitk::FiberfoxLog::AdvanceProgress(std::uint64_t steps)
 {
   std::lock_guard<std::mutex> lock(m_ProgressMutex);
-  ++m_ProgressCount;
-  const unsigned long done = std::min(m_ProgressCount, m_ProgressTotal);
-  const unsigned long stars = 50*done/m_ProgressTotal;
+  m_ProgressCount += steps;
+  const std::uint64_t done = std::min(m_ProgressCount, m_ProgressTotal);
+  const std::uint64_t stars = 50*done/m_ProgressTotal;
   m_Progress = static_cast<double>(done)/m_ProgressTotal;
   if (stars == m_ProgressStars)
     return;

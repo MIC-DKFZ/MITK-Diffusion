@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <itkObjectFactory.h>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <fstream>
 #include <mutex>
 #include <string>
@@ -62,10 +63,10 @@ namespace mitk
     std::string GetStatusText() const;
 
     /** Starts the progress bar of a simulation step with total steps. */
-    void StartProgress(unsigned long total);
+    void StartProgress(std::uint64_t total);
 
-    /** One step of the progress bar. */
-    void AdvanceProgress();
+    /** Steps of the progress bar, one by default. */
+    void AdvanceProgress(std::uint64_t steps = 1);
 
     /** Fraction of the current progress bar done, 0 to 1. */
     double GetProgress() const;
@@ -84,9 +85,10 @@ namespace mitk
     std::chrono::steady_clock::time_point m_StartTime;
 
     std::mutex m_ProgressMutex;  ///< guards the counters and serializes the progress events
-    unsigned long m_ProgressTotal = 1;
-    unsigned long m_ProgressCount = 0;
-    unsigned long m_ProgressStars = 0;  ///< stars printed so far
+    // 64 bits: a simulation counts up to fibers x slices x volumes steps
+    std::uint64_t m_ProgressTotal = 1;
+    std::uint64_t m_ProgressCount = 0;
+    std::uint64_t m_ProgressStars = 0;  ///< stars printed so far
     std::atomic<double> m_Progress{0.0};
   };
 }
