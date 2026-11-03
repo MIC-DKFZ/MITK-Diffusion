@@ -69,6 +69,11 @@ void mitk::FiberBundleMapper2D::Update(mitk::BaseRenderer * renderer)
   int lineWidth = 0;
   this->GetDataNode()->GetIntProperty("shape.linewidth", lineWidth);
   property->SetLineWidth(lineWidth);
+  bool fading = true;
+  this->GetDataNode()->GetBoolProperty("Fiber2DfadeEFX", fading);
+  float fadeStrength = 0.8f;
+  this->GetDataNode()->GetFloatProperty("Fiber2DfadeStrength", fadeStrength);
+  localStorage->m_Tiles.SetDepthShading(fading ? fadeStrength : 0.0f);
   double normal[3];
   double from = 0, to = 0;
   const bool slab = this->UpdateSlab(renderer, localStorage, normal, from, to);
@@ -188,5 +193,9 @@ void mitk::FiberBundleMapper2D::SetDefaultProperties(mitk::DataNode* node, mitk:
 {
   Superclass::SetDefaultProperties(node, renderer, overwrite);
   node->AddProperty( "Fiber2DSliceThickness", mitk::FloatProperty::New(1.0f), renderer, overwrite );
+  // the name of earlier MITK versions, so that their scene files keep their setting
+  node->AddProperty( "Fiber2DfadeEFX", mitk::BoolProperty::New(true), renderer, overwrite );
+  // how much darker the farthest fibers of the slab are, 0 to 1
+  node->AddProperty( "Fiber2DfadeStrength", mitk::FloatProperty::New(0.8f), renderer, overwrite );
   node->AddProperty( "color", mitk::ColorProperty::New(1.0,1.0,1.0), renderer, overwrite);
 }
