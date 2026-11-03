@@ -31,7 +31,11 @@ found in the LICENSE file.
 #include <QLineEdit>
 #include <QProcess>
 #include <QPushButton>
+#include <QApplication>
+#include <QFontMetricsF>
+#include <QMouseEvent>
 #include <QSpinBox>
+#include <QTextDocument>
 #include <QTextEdit>
 
 #include <itkImageRegionConstIteratorWithIndex.h>
@@ -61,6 +65,7 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST_SUITE(QmitkFiberfoxViewsUiTest);
   CPPUNIT_TEST(Fiberfox_ViewClosedWithData_NoCrash);
   CPPUNIT_TEST(Fiberfox_StickBall_OneRunPerDoubleClickWithProperties);
+  CPPUNIT_TEST(Fiberfox_StatusText_AlignedProgressAndResizable);
   CPPUNIT_TEST(Fiberfox_AbortAndCloseDuringKspaceStep_NoImageNoCrash);
   CPPUNIT_TEST(Fiberfox_FourCompartmentsAndMultiShellPrototype_MessagesThenRuns);
   CPPUNIT_TEST(Fiberfox_CompartmentModels_ShownAsSavedAfterLoad);
@@ -329,6 +334,51 @@ public:
     CPPUNIT_ASSERT(status.contains(QString(50, '*')));
     CPPUNIT_ASSERT(status.contains("Finished simulation"));
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /** Drags the widget dy pixels down (up if negative) with the left mouse button. */
+  static void DragVertically(QWidget *widget, int dy)
+  {
+    const QPointF local = widget->rect().center();
+    const QPointF global = widget->mapToGlobal(local);
+    const QPointF offset(0, dy);
+    QMouseEvent press(QEvent::MouseButtonPress, local, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(widget, &press);
+    QMouseEvent move(QEvent::MouseMove, local + offset, global + offset, Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(widget, &move);
+    QMouseEvent release(QEvent::MouseButtonRelease, local + offset, global + offset, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(widget, &release);
+  }
+
+  /**
+   * The log shows a progress bar's percentages in the font of its ticks and stars, a fixed-pitch one,
+   * so that they line up under the theme's font as well. The handle in the log's corner changes the
+   * height of the log.
+   */
+  void Fiberfox_StatusText_AlignedProgressAndResizable()
+  {
+    auto *view = ShowFiberfox();
+    auto fibers = AddFibers(view);
+    Simulate(view, fibers);
+    auto *text = GetChild<QTextEdit>(view, "m_SimulationStatusText");
+
+    const auto header = text->document()->find("0%   10   20");
+    const auto ticks = text->document()->find("|----|----|");
+    CPPUNIT_ASSERT(!header.isNull() && !ticks.isNull());
+    CPPUNIT_ASSERT(header.charFormat().font() == ticks.charFormat().font());
+    const QFontMetricsF metrics(header.charFormat().font());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(metrics.horizontalAdvance("|----|----|"), metrics.horizontalAdvance("0%   10   2"), 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(metrics.horizontalAdvance("|----|----|"), metrics.horizontalAdvance("***********"), 1e-6);
+
+    auto *grip = text->cornerWidget();
+    CPPUNIT_ASSERT(grip != nullptr && grip->isVisible() && grip->height() > 0);
+    const int height = text->height();
+    DragVertically(grip, 120);
+    Wait(200);
+    CPPUNIT_ASSERT_EQUAL(height + 120, text->height());
+    DragVertically(grip, -60);
+    Wait(200);
+    CPPUNIT_ASSERT_EQUAL(height + 60, text->height());
   }
 
   /**

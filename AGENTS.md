@@ -315,7 +315,10 @@ Facts the layout does not show:
   references depend on, so the images do not depend on the batch size
   (`mitkFiberfoxThreadDeterminismTest::BatchSizes`). `EstimateMemoryBytes()` estimates the peak
   memory before a run; the view asks before a run above the available memory, `MitkFiberfox`
-  refuses it without `--ignore_memory_check`.
+  refuses it without `--ignore_memory_check`. One progress bar spans all batches, the signal and
+  the k-space step of a volume with equal shares. The view gives its log a fixed-pitch character
+  format, since the theme's `*` font rule replaces widget fonts and the bar's percentages would not
+  line up with its stars; a corner widget of the log changes its height.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
   labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
   without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
