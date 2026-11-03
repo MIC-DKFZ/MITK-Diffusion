@@ -75,6 +75,8 @@ TractsToDWIImageFilter< PixelType >::TractsToDWIImageFilter()
   , m_UseConstantRandSeed(false)
   , m_TimeSegmentMemoryBudget(KspaceImageFilter< Float2DImageType::PixelType >::TIME_SEGMENT_MEMORY_BUDGET)
   , m_VolumesPerBatch(0)
+  , m_ProgressPerFiber(1)
+  , m_ProgressPerSlice(1)
   , m_MotionVolume(0)
   , m_RandGen(itk::Statistics::MersenneTwisterRandomVariateGenerator::New())
 {
@@ -268,7 +270,7 @@ std::string TractsToDWIImageFilter< PixelType >::SimulateKspaceVolume(const Kspa
     if (m_Parameters.m_SignalGen.m_NumberOfCoils>1)
       CombineCoils(run.magnitude, g - run.firstVolume, g, z);
 
-    AdvanceProgress();
+    AdvanceProgress(m_ProgressPerSlice);
   }
   return spikeLog;
 }
@@ -1217,7 +1219,7 @@ double TractsToDWIImageFilter< PixelType >::SimulateFiberSignal(unsigned int g, 
         try
         {
           // before the fibers without signal, so that the progress over all batches reaches its end
-          AdvanceProgress();
+          AdvanceProgress(m_ProgressPerFiber);
           auto& fiberContributions = contributions[i-chunkStart];
           float fiberWeight = m_FiberBundleTransformed->GetFiberWeight(i);
           if (fiberWeight == 0)
@@ -1534,7 +1536,6 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
   const unsigned int num_gradients = m_Parameters.m_SignalGen.GetNumVolumes();
   int signalModelSeed = 0;
   int fiberThreads = 1;
-  unsigned long progressSteps = 0;
   if ( m_FiberBundle.IsNotNull() )    // if no fiber bundle is found, we directly proceed to the k-space acquisition simulation
   {
     CheckVolumeFractionImages();
@@ -1565,7 +1566,6 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
       fiberThreads = 2;
 
     DrawMotion();
-    progressSteps += static_cast<unsigned long>(m_FiberBundle->GetNumFibers())*num_gradients;
   }
 
   // The volumes are simulated in batches, each from its signal to its output values, so that only
@@ -1639,7 +1639,6 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     run.timeSegmentMemory = &timeSegmentMemory;
     run.cappedJobs = &cappedJobs;
     signalScale = 1; // already scaled in the k-space step
-    progressSteps += static_cast<unsigned long>(num_gradients)*run.numSlices;
   }
   else    // don't do k-space stuff, just sum compartments
     PrintToLog("Summing compartments");
@@ -1657,7 +1656,17 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     // the noise model has its own generator; seeded from the run's generator, a constant seed makes it reproducible too
     m_Parameters.m_NoiseModel->SetSeed(static_cast<int>(m_RandGen->GetIntegerVariate() & 0x7fffffff));
   }
-  else
+
+  // One progress bar over all batches, in which the signal and the k-space step of a volume take the
+  // same share: each fiber counts as many steps as there are slices, each slice as many as there are
+  // fibers. At one step each, the many fast fibers filled the bar long before the slow k-space step.
+  const std::uint64_t numFibers = m_FiberBundle.IsNotNull() ? m_FiberBundle->GetNumFibers() : 0;
+  const std::uint64_t numSlices = m_WorkingImageRegion.GetSize(2);
+  const bool kspace = m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition;
+  m_ProgressPerFiber = kspace ? numSlices : 1;
+  m_ProgressPerSlice = std::max<std::uint64_t>(numFibers, 1);
+  std::uint64_t progressSteps = num_gradients*(numFibers*m_ProgressPerFiber + (kspace ? numSlices*m_ProgressPerSlice : 0));
+  if (!m_Parameters.m_NoiseModel)
     progressSteps += num_gradients;   // one step per finalized volume
 
   PrintToLog("Volumes per batch: " + boost::lexical_cast<std::string>(volumesPerBatch), false);

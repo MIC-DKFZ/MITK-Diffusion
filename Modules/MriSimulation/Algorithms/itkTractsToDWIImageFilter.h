@@ -133,11 +133,11 @@ protected:
     void PrintToLog(const std::string& m, bool addTime=true, bool linebreak=true, bool stdOut=true)
     { m_Log->Print(m, addTime, linebreak, stdOut); }
     /** Progress bar of 50 stars in the log, the status text and on stdout, for total steps. */
-    void StartProgress(unsigned long total)
+    void StartProgress(std::uint64_t total)
     { m_Log->StartProgress(total); }
-    /** One step of the progress bar; called from the parallel loops. */
-    void AdvanceProgress()
-    { m_Log->AdvanceProgress(); }
+    /** Steps of the progress bar, one by default; called from the parallel loops. */
+    void AdvanceProgress(std::uint64_t steps = 1)
+    { m_Log->AdvanceProgress(steps); }
 
     /** Volume, slice and coil of one spike. */
     struct Spike
@@ -288,6 +288,8 @@ protected:
     bool                                        m_UseConstantRandSeed;
     std::uint64_t                               m_TimeSegmentMemoryBudget;
     unsigned int                                m_VolumesPerBatch;
+    std::uint64_t                               m_ProgressPerFiber;   ///< progress steps of a fiber's signal in one volume
+    std::uint64_t                               m_ProgressPerSlice;   ///< progress steps of a slice's k-space step in one volume
     bool                                        m_MaskImageSet;
     std::string                                 m_MotionLog;
     std::string                                 m_SpikeLog;
