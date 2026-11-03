@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkInteractiveFiberDissectionView.h"
+#include <QmitkDiffusionWarningText.h>
 
 #include <QMessageBox>
 
@@ -150,7 +151,7 @@ void QmitkInteractiveFiberDissectionView::SetFocus()
 
 void QmitkInteractiveFiberDissectionView::UpdateGui()
 {
-  m_Controls->m_FibLabel->setText("<font color='red'>nothing selected</font>");
+  m_Controls->m_FibLabel->setText(QmitkDiffusionWarningText::Format("nothing selected"));
   m_Controls->m_InputData->setTitle("Please Select Input Data");
 
   // disable everything, then enable what is possible. Both tabs have the same tools.

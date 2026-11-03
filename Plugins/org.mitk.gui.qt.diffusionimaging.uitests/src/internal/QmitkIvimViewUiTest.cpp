@@ -35,7 +35,6 @@ found in the LICENSE file.
 #include <QApplication>
 #include <QClipboard>
 #include <QCheckBox>
-#include <QCommandLinkButton>
 #include <QComboBox>
 #include <QLabel>
 #include <QLocale>
@@ -162,7 +161,7 @@ public:
     GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(0);
     for (const auto *box : {"m_CheckDStar", "m_CheckD", "m_Checkf"})
       GetChild<QCheckBox>(m_View, box)->setChecked(true);
-    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    GetChild<QPushButton>(m_View, "m_ButtonStart")->click();
 
     const auto method = std::to_string(GetChild<QComboBox>(m_View, "m_MethodCombo")->currentIndex() + 1);
     for (const auto &name : {"D* Fit-" + method, "D Fit-" + method, "f Fit-" + method})
@@ -181,7 +180,7 @@ public:
     GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(1);
     GetChild<QCheckBox>(m_View, "m_CheckKurtD")->setChecked(true);
     GetChild<QCheckBox>(m_View, "m_CheckKurtK")->setChecked(true);
-    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    GetChild<QPushButton>(m_View, "m_ButtonStart")->click();
 
     const auto method = "_Method-" + GetChild<QComboBox>(m_View, "m_KurtosisFitScale")->currentText().toStdString();
     Map("Kurtosis_DMap" + method);
@@ -226,7 +225,7 @@ public:
     GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(0);
     for (const auto *box : {"m_CheckDStar", "m_CheckD", "m_Checkf"})
       GetChild<QCheckBox>(m_View, box)->setChecked(true);
-    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    GetChild<QPushButton>(m_View, "m_ButtonStart")->click();
     const auto method = std::to_string(GetChild<QComboBox>(m_View, "m_MethodCombo")->currentIndex() + 1);
 
     SetCrosshair(VoxelCenter(image, 5, 5, 5));
@@ -240,7 +239,7 @@ public:
     GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(1);
     GetChild<QCheckBox>(m_View, "m_CheckKurtD")->setChecked(true);
     GetChild<QCheckBox>(m_View, "m_CheckKurtK")->setChecked(true);
-    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    GetChild<QPushButton>(m_View, "m_ButtonStart")->click();
     const auto kurtosisMethod = "_Method-" + GetChild<QComboBox>(m_View, "m_KurtosisFitScale")->currentText().toStdString();
     SetCrosshair(VoxelCenter(image, 5, 5, 4));
     SetCrosshair(VoxelCenter(image, 5, 5, 5));
@@ -278,7 +277,7 @@ public:
 
     GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(0);
     GetChild<QCheckBox>(m_View, "m_CheckD")->setChecked(true);
-    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    GetChild<QPushButton>(m_View, "m_ButtonStart")->click();
     const auto method = std::to_string(GetChild<QComboBox>(m_View, "m_MethodCombo")->currentIndex() + 1);
     auto *d = dynamic_cast<mitk::Image *>(Map("D Fit-" + method)->GetData());
     CPPUNIT_ASSERT(Voxel(d, 4, 4, 4) != 0.0);
@@ -303,7 +302,7 @@ public:
 
     GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(0);
     GetChild<QCheckBox>(m_View, "m_CheckD")->setChecked(true);
-    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    GetChild<QPushButton>(m_View, "m_ButtonStart")->click();
     const auto name = "D Fit-" + std::to_string(GetChild<QComboBox>(m_View, "m_MethodCombo")->currentIndex() + 1);
     auto *d = dynamic_cast<mitk::Image *>(Map(name)->GetData());
     CPPUNIT_ASSERT(Voxel(d, 4, 4, 4) != 0.0);
@@ -324,7 +323,7 @@ public:
     GetChild<QmitkDataStorageComboBox>(m_View, "m_MaskBox")->SetSelectedNode(otherGrid);
     Wait(50);
     CPPUNIT_ASSERT(GetChild<QLabel>(m_View, "m_Warning")->text() != QString("Averaging 8 voxels!"));
-    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    GetChild<QPushButton>(m_View, "m_ButtonStart")->click();
     const auto messages = DialogHandler::Instance().TakeMessages();
     CPPUNIT_ASSERT_EQUAL(qsizetype(1), messages.size());
     CPPUNIT_ASSERT_MESSAGE(messages.front().toStdString(), messages.front().contains("Fit failed"));
@@ -346,7 +345,7 @@ public:
 
     GetChild<QTabWidget>(m_View, "m_ModelTabSelectionWidget")->setCurrentIndex(0);
     GetChild<QCheckBox>(m_View, "m_CheckD")->setChecked(true);
-    GetChild<QCommandLinkButton>(m_View, "m_ButtonStart")->click();
+    GetChild<QPushButton>(m_View, "m_ButtonStart")->click();
     const auto method = std::to_string(GetChild<QComboBox>(m_View, "m_MethodCombo")->currentIndex() + 1);
     CPPUNIT_ASSERT(Voxel(dynamic_cast<mitk::Image *>(Map("D Fit-" + method)->GetData()), 0, 0, 0) != 0.0);
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());

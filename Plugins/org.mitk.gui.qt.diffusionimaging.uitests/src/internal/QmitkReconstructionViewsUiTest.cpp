@@ -30,8 +30,8 @@ found in the LICENSE file.
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QCommandLinkButton>
 #include <QDoubleSpinBox>
+#include <QPushButton>
 #include <QSpinBox>
 
 #include <algorithm>
@@ -160,12 +160,12 @@ public:
     auto *view = ShowView(TensorId, "QmitkTensorReconstructionViewControls");
     Choose(view, "m_DwiBox", dwi);
 
-    auto *start = GetChild<QCommandLinkButton>(view, "m_StartReconstruction");
+    auto *start = GetChild<QPushButton>(view, "m_StartReconstruction");
     CPPUNIT_ASSERT(start->isEnabled());
     start->click();
     // The action runs in the background; until it ends, no other action can start.
     CPPUNIT_ASSERT(!start->isEnabled());
-    CPPUNIT_ASSERT(!GetChild<QCommandLinkButton>(view, "m_TensorsToDWIButton")->isEnabled());
+    CPPUNIT_ASSERT(!GetChild<QPushButton>(view, "m_TensorsToDWIButton")->isEnabled());
     start->click();
 
     auto tensors = WaitForNode("test_LinearLeastSquares_DT");
@@ -203,7 +203,7 @@ public:
     Choose(view, "m_DtiBox", tensors);
     Choose(view, "m_OdfBox", tensors);
 
-    GetChild<QCommandLinkButton>(view, "m_TensorsToDWIButton")->click();
+    GetChild<QPushButton>(view, "m_TensorsToDWIButton")->click();
     auto dwiNode = WaitForNode("tensorImage_DWI");
     auto *dwi = dynamic_cast<mitk::Image *>(dwiNode->GetData());
     CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi));
@@ -213,7 +213,7 @@ public:
     CPPUNIT_ASSERT(dwi->GetPropertyList()->GetBoolProperty("DWMRI.ApplyMatrixToGradients", applyRotation));
     CPPUNIT_ASSERT(!applyRotation);
 
-    auto *toOdf = GetChild<QCommandLinkButton>(view, "m_TensorsToOdfButton");
+    auto *toOdf = GetChild<QPushButton>(view, "m_TensorsToOdfButton");
     CPPUNIT_ASSERT(WaitFor([toOdf]() { return toOdf->isEnabled(); }));
     toOdf->click();
     auto odfs = WaitForNode("tensorImage_Odf");
@@ -225,7 +225,7 @@ public:
     auto dwi = Load("ImageReconstruction/test.dwi");
     auto *view = ShowView(TensorId, "QmitkTensorReconstructionViewControls");
     Choose(view, "m_DwiBox", dwi);
-    GetChild<QCommandLinkButton>(view, "m_StartReconstruction")->click();
+    GetChild<QPushButton>(view, "m_StartReconstruction")->click();
     HideView(TensorId);
 
     // The worker ends on its own; with the view gone its result is dropped, without a crash.
@@ -233,7 +233,7 @@ public:
     CPPUNIT_ASSERT(GetNodesOfClass("TensorImage").empty());
     view = ShowView(TensorId, "QmitkTensorReconstructionViewControls");
     Choose(view, "m_DwiBox", dwi);
-    GetChild<QCommandLinkButton>(view, "m_StartReconstruction")->click();
+    GetChild<QPushButton>(view, "m_StartReconstruction")->click();
     WaitForNode("test_LinearLeastSquares_DT");
   }
 
@@ -251,7 +251,7 @@ public:
     CPPUNIT_ASSERT_EQUAL(static_cast<int>(shells), static_cast<int>(GetChild<QWidget>(view, "m_QBallSelectionBox")->findChildren<QCheckBox *>().size()));
 
     GetChild<QComboBox>(view, "m_QBallReconstructionMethodComboBox")->setCurrentIndex(1); // Standard
-    GetChild<QCommandLinkButton>(view, "m_ButtonStandard")->click();
+    GetChild<QPushButton>(view, "m_ButtonStandard")->click();
     CPPUNIT_ASSERT(WaitFor([]() { return !DialogHandler::Instance().PeekMessages().isEmpty(); }));
     const auto messages = DialogHandler::Instance().TakeMessages();
     CPPUNIT_ASSERT_EQUAL(qsizetype(1), messages.size());
@@ -266,7 +266,7 @@ public:
     Choose(view, "m_ImageBox", dwi);
     GetChild<QComboBox>(view, "m_QBallReconstructionMethodComboBox")->setCurrentIndex(1); // Standard
     GetChild<QCheckBox>(view, "m_OutputOdfImage")->setChecked(true);
-    GetChild<QCommandLinkButton>(view, "m_ButtonStandard")->click();
+    GetChild<QPushButton>(view, "m_ButtonStandard")->click();
 
     auto sh = WaitForNode("test_Qball_SH");
     CPPUNIT_ASSERT_EQUAL(std::string("ShImage"), std::string(sh->GetData()->GetNameOfClass()));
@@ -275,7 +275,7 @@ public:
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
 
     // SH to ODF conversion of the result.
-    auto *convert = GetChild<QCommandLinkButton>(view, "m_ConvertButton");
+    auto *convert = GetChild<QPushButton>(view, "m_ConvertButton");
     Choose(view, "m_ShImageBox", sh);
     CPPUNIT_ASSERT(WaitFor([convert]() { return convert->isEnabled(); }));
     convert->click();
@@ -290,7 +290,7 @@ public:
     GetChild<QComboBox>(view, "m_QBallReconstructionMethodComboBox")->setCurrentIndex(5); // multi-shell
     for (auto *box : GetChild<QWidget>(view, "m_QBallSelectionBox")->findChildren<QCheckBox *>())
       box->setChecked(false);
-    GetChild<QCommandLinkButton>(view, "m_ButtonStandard")->click();
+    GetChild<QPushButton>(view, "m_ButtonStandard")->click();
     const auto messages = DialogHandler::Instance().TakeMessages();
     CPPUNIT_ASSERT_EQUAL(qsizetype(1), messages.size());
     CPPUNIT_ASSERT_MESSAGE(messages.front().toStdString(), messages.front().contains("Select three equidistant shells"));
@@ -301,16 +301,16 @@ public:
     auto tensors = Load("tensorImage.dti");
     auto *view = ShowView(QuantificationId, "QmitkDiffusionQuantificationViewControls");
     Choose(view, "m_ImageBox", tensors);
-    CPPUNIT_ASSERT(!GetChild<QCommandLinkButton>(view, "m_GFAButton")->isEnabled());
+    CPPUNIT_ASSERT(!GetChild<QPushButton>(view, "m_GFAButton")->isEnabled());
 
-    auto *ra = GetChild<QCommandLinkButton>(view, "m_RAButton");
+    auto *ra = GetChild<QPushButton>(view, "m_RAButton");
     ra->click();
     // Basser and Pierpaoli's RA: 0 to sqrt(2).
     CheckLevelWindow(WaitForNode("tensorImage_RA"), 0.0, 1.4);
 
     auto *scale = GetChild<QDoubleSpinBox>(view, "m_ScaleImageValuesBox");
     scale->setValue(2.0);
-    auto *fa = GetChild<QCommandLinkButton>(view, "m_FAButton");
+    auto *fa = GetChild<QPushButton>(view, "m_FAButton");
     CPPUNIT_ASSERT(WaitFor([fa]() { return fa->isEnabled(); }));
     fa->click();
     CheckLevelWindow(WaitForNode("tensorImage_FA"), 0.0, 2.0);
@@ -324,7 +324,7 @@ public:
     // The view has no SH convention choice; the SH image carries its basis.
     CPPUNIT_ASSERT(view->findChild<QComboBox *>("m_ShConvention") == nullptr);
 
-    GetChild<QCommandLinkButton>(view, "m_StartPeakExtractionButton")->click();
+    GetChild<QPushButton>(view, "m_StartPeakExtractionButton")->click();
     CPPUNIT_ASSERT(WaitFor([]() { return !GetNodesOfClass("PeakImage").empty(); }));
     auto *peaks = dynamic_cast<mitk::PeakImage *>(GetNodesOfClass("PeakImage").front()->GetData());
 
@@ -366,7 +366,7 @@ public:
     Choose(view, "m_ImageBox", sh);
     auto extract = [view](const mitk::DataNode::Pointer &mask) {
       ChooseNode(view, "m_MaskBox", mask);
-      GetChild<QCommandLinkButton>(view, "m_StartPeakExtractionButton")->click();
+      GetChild<QPushButton>(view, "m_StartPeakExtractionButton")->click();
       CPPUNIT_ASSERT_MESSAGE(mask->GetName(), WaitFor([]() { return !GetNodesOfClass("PeakImage").empty(); }));
       auto node = GetNodesOfClass("PeakImage").front();
       GetDataStorage()->Remove(node);
@@ -402,7 +402,7 @@ public:
     other->Initialize(mitk::MakeScalarPixelType<unsigned char>(), 3, size);
     auto otherGrid = AddNode(CreateSegmentation(other, {{1, 0, first}}), "other grid");
     ChooseNode(view, "m_MaskBox", otherGrid);
-    GetChild<QCommandLinkButton>(view, "m_StartPeakExtractionButton")->click();
+    GetChild<QPushButton>(view, "m_StartPeakExtractionButton")->click();
     CPPUNIT_ASSERT(WaitFor([]() { return !DialogHandler::Instance().PeekMessages().isEmpty(); }, 30000));
     Wait(200);
     CPPUNIT_ASSERT_EQUAL(qsizetype(1), DialogHandler::Instance().TakeMessages().size());
@@ -423,7 +423,7 @@ public:
     Choose(qball, "m_ImageBox", dwi);
     auto *tensor = ShowView(TensorId, "QmitkTensorReconstructionViewControls");
     Choose(tensor, "m_DwiBox", dwi);
-    auto *start = GetChild<QCommandLinkButton>(tensor, "m_StartReconstruction");
+    auto *start = GetChild<QPushButton>(tensor, "m_StartReconstruction");
     start->click();
     CPPUNIT_ASSERT(!start->isEnabled());
   }

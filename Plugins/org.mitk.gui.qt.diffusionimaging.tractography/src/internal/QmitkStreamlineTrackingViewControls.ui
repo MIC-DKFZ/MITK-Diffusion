@@ -19,15 +19,6 @@
   <property name="windowTitle">
    <string>QmitkTemplate</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_11">
    <property name="topMargin">
     <number>3</number>
@@ -109,7 +100,7 @@ QGroupBox {
           <number>0</number>
          </property>
          <item row="0" column="1">
-          <widget class="QCommandLinkButton" name="m_SaveParametersButton">
+          <widget class="QPushButton" name="m_SaveParametersButton">
            <property name="enabled">
             <bool>true</bool>
            </property>
@@ -126,7 +117,7 @@ QGroupBox {
           </widget>
          </item>
          <item row="0" column="0">
-          <widget class="QCommandLinkButton" name="m_LoadParametersButton">
+          <widget class="QPushButton" name="m_LoadParametersButton">
            <property name="enabled">
             <bool>true</bool>
            </property>
@@ -146,7 +137,7 @@ QGroupBox {
        </widget>
       </item>
       <item row="3" column="0">
-       <widget class="QCommandLinkButton" name="commandLinkButton">
+       <widget class="QPushButton" name="commandLinkButton">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -160,7 +151,7 @@ QGroupBox {
        </widget>
       </item>
       <item row="2" column="0">
-       <widget class="QCommandLinkButton" name="commandLinkButton_2">
+       <widget class="QPushButton" name="commandLinkButton_2">
         <property name="enabled">
          <bool>true</bool>
         </property>
@@ -213,7 +204,7 @@ QGroupBox {
             <string>Input Image. Tensor, ODF, SH and peak images are supported.</string>
            </property>
            <property name="text">
-            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ff0000;&quot;&gt;select image in data-manager&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;select image in data-manager&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="wordWrap">
             <bool>true</bool>
@@ -518,9 +509,6 @@ QGroupBox {
           </item>
           <item row="0" column="1">
            <widget class="QmitkSingleNodeSelectionWidget" name="m_SeedImageSelectionWidget" native="true">
-            <property name="styleSheet">
-             <string notr="true"/>
-            </property>
            </widget>
           </item>
          </layout>

@@ -19,15 +19,6 @@
   <property name="windowTitle">
    <string>QmitkTemplate</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout">
    <property name="leftMargin">
     <number>9</number>
@@ -320,7 +311,7 @@ QGroupBox {
     </widget>
    </item>
    <item row="4" column="0">
-    <widget class="QCommandLinkButton" name="m_ApplyButton">
+    <widget class="QPushButton" name="m_ApplyButton">
      <property name="text">
       <string>Start</string>
      </property>

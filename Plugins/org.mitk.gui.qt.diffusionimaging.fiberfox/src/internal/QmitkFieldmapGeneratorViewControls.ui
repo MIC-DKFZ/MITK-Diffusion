@@ -19,15 +19,6 @@
   <property name="windowTitle">
    <string>QmitkTemplate</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_5">
    <property name="leftMargin">
     <number>9</number>
@@ -66,7 +57,7 @@ QGroupBox {
        <number>0</number>
       </property>
       <item row="2" column="0">
-       <widget class="QCommandLinkButton" name="m_PlaceFieldSource">
+       <widget class="QPushButton" name="m_PlaceFieldSource">
         <property name="text">
          <string>Place Field Source</string>
         </property>
@@ -125,7 +116,7 @@ QGroupBox {
        </widget>
       </item>
       <item row="3" column="0">
-       <widget class="QCommandLinkButton" name="m_GenerateFieldmap">
+       <widget class="QPushButton" name="m_GenerateFieldmap">
         <property name="text">
          <string>Generate Fieldmap</string>
         </property>

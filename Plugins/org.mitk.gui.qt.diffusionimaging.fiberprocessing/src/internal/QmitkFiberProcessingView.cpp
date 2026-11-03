@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkFiberProcessingView.h"
+#include <QmitkDiffusionWarningText.h>
 
 #include <QMessageBox>
 #include <QStringList>
@@ -724,7 +725,7 @@ void QmitkFiberProcessingView::WritePfToImage(mitk::DataNode::Pointer node, ItkU
 
 void QmitkFiberProcessingView::UpdateGui()
 {
-  m_Controls->m_FibLabel->setText("<font color='red'>mandatory</font>");
+  m_Controls->m_FibLabel->setText(QmitkDiffusionWarningText::Format("mandatory"));
   m_Controls->m_PfLabel->setText("<font color='grey'>needed for extraction</font>");
   m_Controls->m_InputData->setTitle("Please Select Input Data");
 

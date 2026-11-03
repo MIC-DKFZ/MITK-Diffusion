@@ -19,15 +19,6 @@
   <property name="windowTitle">
    <string>IVIM</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_11">
    <property name="leftMargin">
     <number>9</number>
@@ -67,9 +58,6 @@ QGroupBox {
       </property>
       <item row="0" column="0">
        <widget class="QLabel" name="m_Warning">
-        <property name="styleSheet">
-         <string notr="true"/>
-        </property>
         <property name="text">
          <string>warning display</string>
         </property>
@@ -107,7 +95,7 @@ QGroupBox {
     </widget>
    </item>
    <item row="7" column="0">
-    <widget class="QCommandLinkButton" name="m_ButtonStart">
+    <widget class="QPushButton" name="m_ButtonStart">
      <property name="text">
       <string>Generate Parameter Maps</string>
      </property>

@@ -245,7 +245,7 @@ void QmitkControlVisualizationPropertiesView::CreateQtPartControl(QWidget *paren
     connect(clip, &QRadioButton::toggled, this, [this](bool checked) { if (checked) this->Toggle3DClipping(); });
   connect(m_Controls->m_FlipClipBox, &QCheckBox::checkStateChanged, this, &Self::Toggle3DClipping);
   connect(m_Controls->m_Enable3dPeaks, &QCheckBox::checkStateChanged, this, &Self::Toggle3DPeaks);
-  connect(m_Controls->m_FlipPeaksButton, &QCommandLinkButton::clicked, this, &Self::FlipPeaks);
+  connect(m_Controls->m_FlipPeaksButton, &QAbstractButton::clicked, this, &Self::FlipPeaks);
   connect(m_Controls->m_SetColor1, &QToolButton::clicked, this, &Self::SetColor);
   connect(m_Controls->m_SetColor2, &QToolButton::clicked, this, &Self::SetColor);
 

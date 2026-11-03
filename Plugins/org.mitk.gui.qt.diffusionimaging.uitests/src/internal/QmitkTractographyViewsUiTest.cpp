@@ -31,12 +31,12 @@ found in the LICENSE file.
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QCommandLinkButton>
 #include <QDoubleSpinBox>
 #include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
 #include <QProcess>
+#include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
 #include <QToolButton>
@@ -126,7 +126,7 @@ class QmitkTractographyViewsUiTest : public CppUnit::TestFixture
   /** Starts tracking and waits until the start button is back (the run ended). */
   static void Track(QWidget *view)
   {
-    auto *start = GetChild<QCommandLinkButton>(view, "commandLinkButton");
+    auto *start = GetChild<QPushButton>(view, "commandLinkButton");
     start->click();
     CPPUNIT_ASSERT(WaitFor([start]() { return !start->isHidden(); }));
     Wait(50);
@@ -271,7 +271,7 @@ public:
     auto tensors = Load("StreamlineTractography/tensor_image.dti");
     auto *view = ShowStreamline();
     Select({tensors});
-    CPPUNIT_ASSERT(!GetChild<QLabel>(view, "m_TensorImageLabel")->text().contains("red"));
+    CPPUNIT_ASSERT(!GetChild<QLabel>(view, "m_TensorImageLabel")->text().contains("warning"));
 
     GetChild<QComboBox>(view, "m_ModeBox")->setCurrentIndex(0);
     Track(view);
@@ -305,8 +305,8 @@ public:
     auto dwi = Load("ImageReconstruction/test.dwi");
     auto *view = ShowStreamline();
     Select({dwi});
-    CPPUNIT_ASSERT(GetChild<QLabel>(view, "m_TensorImageLabel")->text().contains("red"));
-    GetChild<QCommandLinkButton>(view, "commandLinkButton")->click();
+    CPPUNIT_ASSERT(GetChild<QLabel>(view, "m_TensorImageLabel")->text().contains("warning"));
+    GetChild<QPushButton>(view, "commandLinkButton")->click();
     Wait(50);
     CPPUNIT_ASSERT(GetNodesOfClass("FiberBundle").empty());
   }
@@ -367,8 +367,8 @@ public:
     GetChild<QSpinBox>(view, "m_SeedsPerVoxelBox")->setValue(50);
     GetChild<QSpinBox>(view, "m_NumFibersBox")->setValue(-1);
 
-    auto *start = GetChild<QCommandLinkButton>(view, "commandLinkButton");
-    auto *stop = GetChild<QCommandLinkButton>(view, "commandLinkButton_2");
+    auto *start = GetChild<QPushButton>(view, "commandLinkButton");
+    auto *stop = GetChild<QPushButton>(view, "commandLinkButton_2");
     start->click();
     CPPUNIT_ASSERT(start->isHidden() && !stop->isHidden());
     // A second click on the hidden start button does not start a second run.
@@ -387,7 +387,7 @@ public:
     GetChild<QComboBox>(view, "m_ModeBox")->setCurrentIndex(1);
     GetChild<QSpinBox>(view, "m_SeedsPerVoxelBox")->setValue(20);
     GetChild<QSpinBox>(view, "m_NumFibersBox")->setValue(-1);
-    GetChild<QCommandLinkButton>(view, "commandLinkButton")->click();
+    GetChild<QPushButton>(view, "commandLinkButton")->click();
     HideView(StreamlineId);
     Wait(3000);
 
@@ -405,19 +405,19 @@ public:
     angle->setValue(-1);
     const auto file = QString::fromStdString(m_TempDir + "/parameters.stp");
     DialogHandler::Instance().AnswerFileDialog(file);
-    GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+    GetChild<QPushButton>(view, "m_SaveParametersButton")->click();
     CPPUNIT_ASSERT(std::filesystem::exists(file.toStdString()));
 
     angle->setValue(30);
     DialogHandler::Instance().AnswerFileDialog(file);
-    GetChild<QCommandLinkButton>(view, "m_LoadParametersButton")->click();
+    GetChild<QPushButton>(view, "m_LoadParametersButton")->click();
     CPPUNIT_ASSERT_EQUAL(-1, angle->value());
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
 
     const auto broken = m_TempDir + "/broken.stp";
     std::ofstream(broken) << "not a parameter file";
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(broken));
-    GetChild<QCommandLinkButton>(view, "m_LoadParametersButton")->click();
+    GetChild<QPushButton>(view, "m_LoadParametersButton")->click();
     const auto messages = DialogHandler::Instance().TakeMessages();
     CPPUNIT_ASSERT_EQUAL(qsizetype(1), messages.size());
     CPPUNIT_ASSERT_MESSAGE(messages.front().toStdString(), messages.front().contains("Could not load the parameters"));
@@ -440,7 +440,7 @@ public:
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, radius, 1e-9);
 
     auto *interactive = GetChild<QCheckBox>(view, "m_InteractiveBox");
-    auto *start = GetChild<QCommandLinkButton>(view, "commandLinkButton");
+    auto *start = GetChild<QPushButton>(view, "commandLinkButton");
     interactive->setChecked(true);
     CPPUNIT_ASSERT(start->isHidden());
     CPPUNIT_ASSERT(GetChild<QFrame>(view, "m_InteractiveSeedingFrame")->isVisibleTo(view));
@@ -502,7 +502,7 @@ public:
     auto tensors = Load("StreamlineTractography/tensor_image.dti");
     auto odfs = Load("StreamlineTractography/qball_image.qbi");
     auto *view = ShowStreamline();
-    auto *start = GetChild<QCommandLinkButton>(view, "commandLinkButton");
+    auto *start = GetChild<QPushButton>(view, "commandLinkButton");
     auto *mode = GetChild<QComboBox>(view, "m_ModeBox");
 
     // A tensor and an ODF image: a message, no run, the view ready for the next start.
@@ -567,7 +567,7 @@ public:
       // to the prior as in the view.
       const auto parameters = m_TempDir + "/prior.stp";
       DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(parameters));
-      GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+      GetChild<QPushButton>(view, "m_SaveParametersButton")->click();
       CPPUNIT_ASSERT(std::filesystem::exists(parameters));
       auto fromApp = RunStreamlineApp(app,
                                       {"-i", QString::fromStdString(mitk::GetDiffusionTestDataFilePath(tensorFile)),
@@ -723,7 +723,7 @@ public:
     angle->setValue(30);
     const auto file = m_TempDir + "/angle.stp";
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
-    GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+    GetChild<QPushButton>(view, "m_SaveParametersButton")->click();
 
     // A file with 22.5 degrees (written by the command line app or by hand): the box shows 23.
     std::string content;
@@ -738,7 +738,7 @@ public:
     std::ofstream(file) << content;
     angle->setValue(10);
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
-    GetChild<QCommandLinkButton>(view, "m_LoadParametersButton")->click();
+    GetChild<QPushButton>(view, "m_LoadParametersButton")->click();
     CPPUNIT_ASSERT_EQUAL(23, angle->value());
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
@@ -789,7 +789,7 @@ public:
 
   static void TrackGibbs(QWidget *view)
   {
-    auto *start = GetChild<QCommandLinkButton>(view, "m_TrackingStart");
+    auto *start = GetChild<QPushButton>(view, "m_TrackingStart");
     CPPUNIT_ASSERT(start->isEnabled());
     start->click();
     CPPUNIT_ASSERT(WaitFor([start]() { return start->isEnabled(); }, 300000));
@@ -826,7 +826,7 @@ public:
     for (const auto *iterations : {"abc", "0"})
     {
       GetChild<QLineEdit>(view, "m_IterationsBox")->setText(iterations);
-      GetChild<QCommandLinkButton>(view, "m_TrackingStart")->click();
+      GetChild<QPushButton>(view, "m_TrackingStart")->click();
       const auto messages = DialogHandler::Instance().TakeMessages();
       CPPUNIT_ASSERT_EQUAL_MESSAGE(iterations, qsizetype(1), messages.size());
       CPPUNIT_ASSERT_MESSAGE(messages.front().toStdString(), messages.front().contains("iterations"));
@@ -848,7 +848,7 @@ public:
       const auto file = m_TempDir + "/bad" + std::to_string(i++) + ".gtp";
       std::ofstream(file) << content;
       DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
-      GetChild<QCommandLinkButton>(view, "m_LoadTrackingParameters")->click();
+      GetChild<QPushButton>(view, "m_LoadTrackingParameters")->click();
       const auto messages = DialogHandler::Instance().TakeMessages();
       CPPUNIT_ASSERT_EQUAL_MESSAGE(content, qsizetype(1), messages.size());
       CPPUNIT_ASSERT_EQUAL_MESSAGE(content, curvatureBefore, curvature->value());
@@ -861,7 +861,7 @@ public:
     auto *view = ShowGibbs();
     GetChild<QLineEdit>(view, "m_IterationsBox")->setText("100000000");
     GetChild<QmitkDataStorageComboBox>(view, "m_InputImageBox")->SetSelectedNode(odfs);
-    GetChild<QCommandLinkButton>(view, "m_TrackingStart")->click();
+    GetChild<QPushButton>(view, "m_TrackingStart")->click();
     Wait(1000);
     HideView(GibbsId);
     Wait(3000);
@@ -882,8 +882,8 @@ public:
     ChooseNode(view, "m_InputImageBox", odfs);
     auto *visualize = GetChild<QCheckBox>(view, "m_VisualizationCheckbox");
     auto *once = GetChild<QToolButton>(view, "m_VisualizeOnceButton");
-    auto *start = GetChild<QCommandLinkButton>(view, "m_TrackingStart");
-    auto *stop = GetChild<QCommandLinkButton>(view, "m_TrackingStop");
+    auto *start = GetChild<QPushButton>(view, "m_TrackingStart");
+    auto *stop = GetChild<QPushButton>(view, "m_TrackingStop");
     auto *time = GetChild<QLabel>(view, "m_TrackingTimeLabel");
     CPPUNIT_ASSERT(visualize->isChecked());
 
@@ -969,8 +969,8 @@ public:
     GetChild<QLineEdit>(view, "m_IterationsBox")->setText("100000000");
     CPPUNIT_ASSERT_EQUAL(0, GetChild<QSlider>(view, "m_ParticleWeightSlider")->value()); // automatic
     ChooseNode(view, "m_InputImageBox", odfs);
-    auto *start = GetChild<QCommandLinkButton>(view, "m_TrackingStart");
-    auto *stop = GetChild<QCommandLinkButton>(view, "m_TrackingStop");
+    auto *start = GetChild<QPushButton>(view, "m_TrackingStart");
+    auto *stop = GetChild<QPushButton>(view, "m_TrackingStop");
     start->click();
     Wait(1000);
     stop->click();
@@ -991,7 +991,7 @@ public:
                            "particle_length=\"0\" particle_width=\"0\" particle_weight=\"0\" temp_start=\"0.29\" temp_end=\"0.001\" "
                            "inexbalance=\"0\" fiber_length=\"20\" curvature_threshold=\"45\"/></global_tracking_parameter_file>";
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
-    GetChild<QCommandLinkButton>(view, "m_LoadTrackingParameters")->click();
+    GetChild<QPushButton>(view, "m_LoadTrackingParameters")->click();
     CPPUNIT_ASSERT_EQUAL(29, GetChild<QSlider>(view, "m_StartTempSlider")->value());
     CPPUNIT_ASSERT_EQUAL(QString("0.29"), GetChild<QLabel>(view, "m_StartTempLabel")->text());
     CPPUNIT_ASSERT_EQUAL(QString("1000"), GetChild<QLineEdit>(view, "m_IterationsBox")->text());
@@ -1011,7 +1011,7 @@ public:
     std::filesystem::create_directory(readOnly);
     std::filesystem::permissions(readOnly, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString((readOnly / "parameters.gtp").string()));
-    GetChild<QCommandLinkButton>(view, "m_SaveTrackingParameters")->click();
+    GetChild<QPushButton>(view, "m_SaveTrackingParameters")->click();
     std::filesystem::permissions(readOnly, std::filesystem::perms::owner_all);
     messages = DialogHandler::Instance().TakeMessages();
     CPPUNIT_ASSERT(messages.size() == 1 && messages.front().contains("Could not save the parameters"));
@@ -1033,7 +1033,7 @@ public:
     // A fixed particle weight spares the estimation, so the tracking itself runs.
     GetChild<QSlider>(gibbs, "m_ParticleWeightSlider")->setValue(3);
     ChooseNode(gibbs, "m_InputImageBox", odfs);
-    GetChild<QCommandLinkButton>(gibbs, "m_TrackingStart")->click();
+    GetChild<QPushButton>(gibbs, "m_TrackingStart")->click();
     Wait(1500);
 
     auto *streamline = ShowStreamline();
@@ -1041,9 +1041,9 @@ public:
     GetChild<QComboBox>(streamline, "m_ModeBox")->setCurrentIndex(1);
     GetChild<QSpinBox>(streamline, "m_SeedsPerVoxelBox")->setValue(20);
     GetChild<QSpinBox>(streamline, "m_NumFibersBox")->setValue(-1);
-    auto *streamlineStart = GetChild<QCommandLinkButton>(streamline, "commandLinkButton");
+    auto *streamlineStart = GetChild<QPushButton>(streamline, "commandLinkButton");
     streamlineStart->click();
-    CPPUNIT_ASSERT(GetChild<QCommandLinkButton>(gibbs, "m_TrackingStop")->isEnabled() && streamlineStart->isHidden());
+    CPPUNIT_ASSERT(GetChild<QPushButton>(gibbs, "m_TrackingStop")->isEnabled() && streamlineStart->isHidden());
   }
 };
 
