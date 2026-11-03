@@ -90,6 +90,7 @@ public:
     m_Threads->SetNumberOfThreads(threads);
     mitk::FiberfoxParameters parameters;
     parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/" + parameterFile), true);
+    parameters.m_Misc.m_OutputAdditionalImages = true;   // the coil and phase images are compared too
     if (modify)
       modify(parameters);
     auto filter = FilterType::New();
@@ -218,6 +219,7 @@ public:
     parameters.m_SignalGen.m_ImageOrigin = image->GetOrigin();
     parameters.m_SignalGen.m_ImageDirection = image->GetDirection();
     parameters.m_Misc.m_OutputPath = "";  // no log file
+    parameters.m_Misc.m_OutputAdditionalImages = true;   // the coil images are compared too
     parameters.m_NonFiberModelList.push_back(new mitk::BallModel<double>());
     mitk::SignalGenerationParameters::GradientListType gradients(volumes);
     for (auto& gradient : gradients)

@@ -84,7 +84,7 @@ public:
     { return m_Log->GetStatusText(); }
     mitk::FiberfoxLog* GetLog() const   ///< log and progress (itk::ProgressEvent of the log) of the simulation
     { return m_Log; }
-    itkGetMacro( PhaseImage, DoubleDwiType::Pointer )
+    itkGetMacro( PhaseImage, DoubleDwiType::Pointer )   ///< phase of the k-space simulation; only with m_OutputAdditionalImages, else null
     itkGetMacro( KspaceImage, DoubleDwiType::Pointer )
     itkGetMacro( CoilPointset, mitk::PointSet::Pointer )
     itkGetMacro( TickImage, typename Float2DImageType::Pointer )    ///< k-space readout ordering encoded in the voxels
@@ -94,6 +94,7 @@ public:
 
     void GenerateData() override;
 
+    /** Real and imaginary part of each coil's image; only with m_OutputAdditionalImages, else empty. */
     std::vector<DoubleDwiType::Pointer> GetOutputImagesReal() const
     {
       return m_OutputImagesReal;
@@ -164,7 +165,8 @@ protected:
                                   std::vector< Float2DImageType::Pointer >& slices, std::vector< float >& t1, std::vector< float >& t2) const;
     /**
      * Acquires slice z of volume g with coil c (k-space filter, then DFT back to image space) and stores
-     * the result in the coil's real and imaginary images, the magnitude and the phase; returns the spike log.
+     * the result in the magnitude and, if allocated, the coil's real and imaginary images and the phase;
+     * returns the spike log.
      */
     std::string SimulateKspaceCoil(const KspaceRun& run, unsigned int g, unsigned int z, unsigned int c,
                                    const std::vector< Float2DImageType::Pointer >& slices, const std::vector< float >& t1, const std::vector< float >& t2);

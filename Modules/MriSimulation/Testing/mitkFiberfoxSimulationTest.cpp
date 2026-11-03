@@ -65,6 +65,7 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(RandomPhantom);
   MITK_TEST(PartialFourierLines);
   MITK_TEST(LogReportsProgress);
+  MITK_TEST(AdditionalImagesOnlyWhenRequested);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -188,6 +189,7 @@ public:
         model->SetT1(t1);
       for (auto model : parameters.m_NonFiberModelList)
         model->SetT1(t1);
+      parameters.m_Misc.m_OutputAdditionalImages = true;   // the coils' complex images
       auto filter = FilterType::New();
       filter->SetUseConstantRandSeed(true);
       filter->SetParameters(parameters);
@@ -460,6 +462,39 @@ public:
     const std::string text = filter->GetStatusText();
     CPPUNIT_ASSERT_MESSAGE("status text", text.find("Finished simulation") != std::string::npos);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("status text of filter and log", log->GetStatusText(), text);
+  }
+
+  /** The coils' real and imaginary images and the phase are 4D double images, allocated only as
+   * additional outputs; the output image is the same with and without them. */
+  void AdditionalImagesOnlyWhenRequested()
+  {
+    std::vector<FilterType::Pointer> filters;
+    for (bool additional : { false, true })
+    {
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+      CPPUNIT_ASSERT(parameters.m_SignalGen.m_SimulateKspaceAcquisition);
+      parameters.m_Misc.m_OutputAdditionalImages = additional;
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetFiberBundle(m_FiberBundle);
+      filter->Update();
+      filters.push_back(filter);
+    }
+    CPPUNIT_ASSERT(filters[0]->GetOutputImagesReal().empty());
+    CPPUNIT_ASSERT(filters[0]->GetOutputImagesImag().empty());
+    CPPUNIT_ASSERT(filters[0]->GetPhaseImage().IsNull());
+    const auto coils = filters[1]->GetParameters().m_SignalGen.m_NumberOfCoils;
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(coils), filters[1]->GetOutputImagesReal().size());
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(coils), filters[1]->GetOutputImagesImag().size());
+    CPPUNIT_ASSERT(filters[1]->GetPhaseImage().IsNotNull());
+
+    auto without = filters[0]->GetOutput();
+    auto with = filters[1]->GetOutput();
+    const auto n = without->GetLargestPossibleRegion().GetNumberOfPixels() * without->GetNumberOfComponentsPerPixel();
+    CPPUNIT_ASSERT_EQUAL(n, with->GetLargestPossibleRegion().GetNumberOfPixels() * with->GetNumberOfComponentsPerPixel());
+    CPPUNIT_ASSERT_MESSAGE("same image with and without additional outputs", std::equal(without->GetBufferPointer(), without->GetBufferPointer() + n, with->GetBufferPointer()));
   }
 };
 

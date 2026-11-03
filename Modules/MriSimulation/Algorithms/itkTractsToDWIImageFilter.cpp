@@ -174,7 +174,8 @@ SimulateKspaceAcquisition( std::vector< DoubleDwiType::Pointer >& compartment_im
   KspaceRun run;
   run.compartmentImages = &compartment_images;
   run.magnitude = NewKspaceResultImage(compartment_images.at(0)->GetVectorLength());
-  m_PhaseImage = NewKspaceResultImage(compartment_images.at(0)->GetVectorLength());
+  // an additional output only, like the coils' real and imaginary images
+  m_PhaseImage = m_Parameters.m_Misc.m_OutputAdditionalImages ? NewKspaceResultImage(compartment_images.at(0)->GetVectorLength()) : nullptr;
   m_KspaceImage = NewKspaceResultImage(m_Parameters.m_SignalGen.m_NumberOfCoils);  // one value per coil
   run.coilPositions = ComputeCoilPositions();
   std::atomic<unsigned int> cappedJobs(0);
@@ -390,18 +391,23 @@ std::string TractsToDWIImageFilter< PixelType >::SimulateKspaceCoil(const Kspace
       // in (-pi, pi]; atan(imag/real) lost the quadrant
       double phase = std::arg(cPix);
 
-      Component(m_OutputImagesReal.at(c), index3D, g) = cPix.real();
-      Component(m_OutputImagesImag.at(c), index3D, g) = cPix.imag();
+      if (!m_OutputImagesReal.empty())
+      {
+        Component(m_OutputImagesReal.at(c), index3D, g) = cPix.real();
+        Component(m_OutputImagesImag.at(c), index3D, g) = cPix.imag();
+      }
 
       if (m_Parameters.m_SignalGen.m_NumberOfCoils>1)
       {
         Component(run.magnitude, index3D, g) += magn*magn;
-        Component(m_PhaseImage, index3D, g) += phase*phase;
+        if (m_PhaseImage)
+          Component(m_PhaseImage, index3D, g) += phase*phase;
       }
       else
       {
         Component(run.magnitude, index3D, g) = magn;
-        Component(m_PhaseImage, index3D, g) = phase;
+        if (m_PhaseImage)
+          Component(m_PhaseImage, index3D, g) = phase;
       }
 
       // k-space image
@@ -420,8 +426,11 @@ void TractsToDWIImageFilter< PixelType >::CombineCoils(DoubleDwiType* magnitudeI
       DoubleDwiType::IndexType index3D; index3D[0]=x; index3D[1]=y; index3D[2]=z;
       double& magnitude = Component(magnitudeImage, index3D, g);
       magnitude = sqrt(magnitude/m_Parameters.m_SignalGen.m_NumberOfCoils);
-      double& phase = Component(m_PhaseImage, index3D, g);
-      phase = sqrt(phase/m_Parameters.m_SignalGen.m_NumberOfCoils);
+      if (m_PhaseImage)
+      {
+        double& phase = Component(m_PhaseImage, index3D, g);
+        phase = sqrt(phase/m_Parameters.m_SignalGen.m_NumberOfCoils);
+      }
     }
 }
 
@@ -604,10 +613,11 @@ void TractsToDWIImageFilter< PixelType >::InitializeData()
   PrintToLog("Output image spacing: [" + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_ImageSpacing[0]) + "," + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_ImageSpacing[1]) + "," + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_ImageSpacing[2]) + "]", false);
   PrintToLog("Output image size: [" + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_CroppedRegion.GetSize(0)) + "," + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_CroppedRegion.GetSize(1)) + "," + boost::lexical_cast<std::string>(m_Parameters.m_SignalGen.m_CroppedRegion.GetSize(2)) + "]", false);
 
-  // images containing real and imaginary part of the dMRI signal for each coil
+  // images containing real and imaginary part of the dMRI signal for each coil; only additional
+  // outputs, since each is a 4D double image of the size of the whole simulation
   m_OutputImagesReal.clear();
   m_OutputImagesImag.clear();
-  for (unsigned int i=0; i<m_Parameters.m_SignalGen.m_NumberOfCoils; ++i)
+  for (unsigned int i=0; m_Parameters.m_Misc.m_OutputAdditionalImages && i<m_Parameters.m_SignalGen.m_NumberOfCoils; ++i)
   {
     typename DoubleDwiType::Pointer outputImageReal = DoubleDwiType::New();
     outputImageReal->SetSpacing( m_Parameters.m_SignalGen.m_ImageSpacing );
