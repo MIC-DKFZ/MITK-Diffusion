@@ -23,6 +23,7 @@ class vtkActor;
 class vtkPlane;
 class vtkPropAssembly;
 class vtkProperty;
+class vtkShaderProperty;
 class vtkUnsignedCharArray;
 class vtkWindow;
 
@@ -39,7 +40,8 @@ namespace mitk
    * that the turned slab needs in addition cost less than new ones, or replaces them with the
    * tiles along the new normal that the slab needs. Two clipping planes, shared by the tiles'
    * mappers, cut out the slab, so the image is that of the whole bundle. The tiles share one
-   * vtkProperty. It depends on VTK only.
+   * vtkProperty and one vtkShaderProperty, which can shade the fibers by their depth in the slab
+   * (SetDepthShading). It depends on VTK only.
    */
   class FiberSlabTiles
   {
@@ -53,6 +55,12 @@ namespace mitk
     vtkPropAssembly *GetProp() const;
     /** The property of every tile's actor */
     vtkProperty *GetProperty() const;
+    /** The shader property of every tile's actor */
+    vtkShaderProperty *GetShaderProperty() const;
+    /** Darkens the fibers linearly with their depth in the slab: full colour at the first slab
+     *  plane, 1 - strength of it at the second; strength in [0, 1], 0 (the default) is off.
+     *  Changing it rebuilds no shader. */
+    void SetDepthShading(float strength);
     /** The two clipping planes of the slab (i = 0, 1), in every tile's mapper; moving them needs
      *  no new tiles */
     vtkPlane *GetSlabPlane(int i) const;
@@ -99,6 +107,7 @@ namespace mitk
 
     vtkSmartPointer<vtkPropAssembly> m_Assembly;
     vtkSmartPointer<vtkProperty> m_Property;
+    vtkSmartPointer<vtkShaderProperty> m_ShaderProperty;
     vtkSmartPointer<vtkPlane> m_SlabPlanes[2];
   };
 }

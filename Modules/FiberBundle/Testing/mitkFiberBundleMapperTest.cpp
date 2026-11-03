@@ -32,6 +32,7 @@ found in the LICENSE file.
 #include <vtkIdList.h>
 #include <vtkImageData.h>
 #include <vtkMapper.h>
+#include <vtkMath.h>
 #include <vtkOutputWindow.h>
 #include <vtkPlane.h>
 #include <vtkPlaneCollection.h>
@@ -82,6 +83,7 @@ class mitkFiberBundleMapperTestSuite : public mitk::TestFixture
   MITK_TEST(Mapper2D_Tiles_SameImageAsWholeBundle);
   MITK_TEST(Mapper2D_PickAlongAFiber_GivesItsIndex);
   MITK_TEST(Mapper2D_NodeOpacity_AppliedToTheFibers);
+  MITK_TEST(Mapper2D_DepthShading_DarkensThroughTheSlab);
   MITK_TEST(Rendering_LeavesTheBundleUnchanged);
   CPPUNIT_TEST_SUITE_END();
 
@@ -191,6 +193,8 @@ public:
     CPPUNIT_ASSERT(dynamic_cast<mitk::FloatProperty *>(m_Node->GetProperty("shape.tuberadius")) != nullptr);
     CPPUNIT_ASSERT(dynamic_cast<mitk::FloatProperty *>(m_Node->GetProperty("shape.ribbonwidth")) != nullptr);
     CPPUNIT_ASSERT(dynamic_cast<mitk::FloatProperty *>(m_Node->GetProperty("Fiber2DSliceThickness")) != nullptr);
+    CPPUNIT_ASSERT(dynamic_cast<mitk::BoolProperty *>(m_Node->GetProperty("Fiber2DfadeEFX")) != nullptr);
+    CPPUNIT_ASSERT(dynamic_cast<mitk::FloatProperty *>(m_Node->GetProperty("Fiber2DfadeStrength")) != nullptr);
     CPPUNIT_ASSERT(dynamic_cast<mitk::ClippingProperty *>(m_Node->GetProperty("3DClipping")) != nullptr);
     CPPUNIT_ASSERT(dynamic_cast<mitk::IntProperty *>(m_Node->GetProperty("3DClippingPlaneId")) != nullptr);
     CPPUNIT_ASSERT(dynamic_cast<mitk::BoolProperty *>(m_Node->GetProperty("3DClippingPlaneFlip")) != nullptr);
@@ -768,6 +772,7 @@ public:
     auto actor = vtkSmartPointer<vtkActor>::New();
     actor->SetMapper(mapper);
     actor->SetProperty(tiles.front()->GetProperty());
+    actor->SetShaderProperty(tiles.front()->GetShaderProperty());
     for (vtkActor *tile : tiles)
       tile->VisibilityOff();
     assembly->AddPart(actor);
@@ -1139,6 +1144,8 @@ public:
     // A white fiber in the axial slice through the centre of the bundle and two 10 mm above and
     // below it, outside the slab; one fiber in the slab, so no fibers overlap in the image.
     m_Node->SetData(AxialFibers({0.0, -10.0, 10.0}));
+    // depth shading would draw the fiber, which lies inside the slab, darker
+    m_Node->SetBoolProperty("Fiber2DfadeEFX", false);
 
     m_Node->SetOpacity(1.0f);
     Render2D(mitk::AnatomicalPlane::Axial);
@@ -1151,6 +1158,60 @@ public:
     const int translucent = BrightestPixel();
     MITK_INFO << "Brightest fiber pixel at opacity 1.0: " << opaque << ", at 0.3: " << translucent;
     CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("the fiber is blended with opacity 0.3", 0.3 * opaque, static_cast<double>(translucent), 13.0);
+  }
+
+  // Depth shading (Fiber2DfadeEFX, on by default) scales the fibers' colours with their depth in
+  // the slab as seen from the camera, from full colour at the slab plane nearer the camera to
+  // 1 - Fiber2DfadeStrength (default 0.8) of it at the farther one, so that the nearest fibers,
+  // which cover the others, are the brightest. Changing it needs no new tiles.
+  void Mapper2D_DepthShading_DarkensThroughTheSlab()
+  {
+    // one white fiber in the slab, in the plane z = 0
+    m_Node->SetData(AxialFibers({0.0, -10.0, 10.0}));
+    bool fading = false;
+    CPPUNIT_ASSERT(m_Node->GetBoolProperty("Fiber2DfadeEFX", fading) && fading);
+
+    m_Node->SetBoolProperty("Fiber2DfadeEFX", false);
+    const std::vector<vtkActor *> tiles = Tiles(Render2D(mitk::AnatomicalPlane::Axial));
+    const int unshaded = BrightestPixel();
+    CPPUNIT_ASSERT_MESSAGE("the fiber in the slice is drawn", unshaded > 200);
+
+    m_Node->SetBoolProperty("Fiber2DfadeEFX", true);
+    CPPUNIT_ASSERT_MESSAGE("same tiles", Tiles(Render2D(mitk::AnatomicalPlane::Axial)) == tiles);
+    const int shaded = BrightestPixel();
+
+    // the planes' distances along the camera's view direction from the fiber, which passes
+    // through the world origin; the view direction is the slab's normal
+    auto renderer = mitk::BaseRenderer::GetInstance(m_RenderingTestHelper.GetVtkRenderWindow());
+    double view[3];
+    renderer->GetVtkRenderer()->GetActiveCamera()->GetDirectionOfProjection(view);
+    vtkPlaneCollection *planes = tiles.front()->GetMapper()->GetClippingPlanes();
+    double ahead[2];
+    for (int i = 0; i < 2; ++i)
+    {
+      double origin[3], normal[3];
+      planes->GetItem(i)->GetOrigin(origin);
+      planes->GetItem(i)->GetNormal(normal);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, std::abs(vtkMath::Dot(view, normal)) / vtkMath::Norm(normal), 1e-9);
+      ahead[i] = vtkMath::Dot(view, origin);
+    }
+    const double nearPlane = std::min(ahead[0], ahead[1]);
+    const double farPlane = std::max(ahead[0], ahead[1]);
+    // 1 at the near plane, 0 at the far one
+    const double nearness = farPlane / (farPlane - nearPlane);
+    MITK_INFO << "Brightest fiber pixel without depth shading: " << unshaded << ", with: " << shaded << ", fiber at nearness " << nearness;
+    CPPUNIT_ASSERT(nearness > 0.1 && nearness < 0.9);
+    float strength = 0;
+    CPPUNIT_ASSERT(m_Node->GetFloatProperty("Fiber2DfadeStrength", strength));
+    CPPUNIT_ASSERT_EQUAL(0.8f, strength);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("brighter nearer the camera", (1.0 - strength * (1.0 - nearness)) * unshaded,
+                                         static_cast<double>(shaded), 3.0);
+
+    m_Node->SetFloatProperty("Fiber2DfadeStrength", 1.0f);
+    CPPUNIT_ASSERT_MESSAGE("same tiles", Tiles(Render2D(mitk::AnatomicalPlane::Axial)) == tiles);
+    const int fullStrength = BrightestPixel();
+    MITK_INFO << "Brightest fiber pixel at strength 1: " << fullStrength;
+    CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("black at the far plane at strength 1", nearness * unshaded, static_cast<double>(fullStrength), 3.0);
   }
 
   void Rendering_LeavesTheBundleUnchanged()

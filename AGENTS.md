@@ -233,7 +233,10 @@ Facts the layout does not show:
   ribbons on the CPU. Each 2D window holds only the tiles of 1 mm along its plane normal near its
   slab (`Rendering/mitkFiberSlabTiles.h`, an actor per tile, each segment in one tile; the index
   `mitkFiberSlabIndex.h` holds the geometry only, so new colours keep the tiles): a slice or
-  rotation step uploads only the tiles it newly needs. The image is the whole bundle's except
+  rotation step uploads only the tiles it newly needs. The tiles share a shader property that
+  scales the colour by the fragment's depth in the slab, from VTK's two clip distances (node
+  property `Fiber2DfadeEFX`, on by default, the name of earlier MITK versions; the farthest
+  fibers get `1 - Fiber2DfadeStrength`, 0.2 by default). The image is the whole bundle's except
   where two fibers lie within about 0.05 mm in depth, the depth resolution of MITK's 2D camera
   (900 000 mm from the plane, clipping range 0.1-1e6 mm): there the tiles' draw order decides
   (about 0.5 % of the fiber pixels of a dense whole-brain tractogram), so the mapper test compares

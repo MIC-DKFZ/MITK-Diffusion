@@ -20,6 +20,8 @@ found in the LICENSE file.
 #include <vtkPropCollection.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
+#include <vtkShaderProperty.h>
+#include <vtkUniforms.h>
 #include <vtkUnsignedCharArray.h>
 
 #include <algorithm>
@@ -40,10 +42,27 @@ namespace
 
 mitk::FiberSlabTiles::FiberSlabTiles()
   : m_Assembly(vtkSmartPointer<vtkPropAssembly>::New()),
-    m_Property(vtkSmartPointer<vtkProperty>::New())
+    m_Property(vtkSmartPointer<vtkProperty>::New()),
+    m_ShaderProperty(vtkSmartPointer<vtkShaderProperty>::New())
 {
   for (auto &plane : m_SlabPlanes)
     plane = vtkSmartPointer<vtkPlane>::New();
+
+  // Depth shading (the 2D fiber fading of earlier MITK versions): VTK passes each fragment's
+  // distances to the two slab planes to the fragment shader, so their ratio is the fragment's
+  // depth in the slab. MITK's 2D camera looks at the plane from the side its normal points to,
+  // the side of the first slab plane: fibers there are drawn in full colour, deeper ones darker,
+  // at the second plane by the strength.
+  // The other way round, the nearest fibers, which cover the deeper ones, would be the darkest.
+  // Appended to VTK's lighting, which writes the colour. The tiles always have both planes, so
+  // the clip distances exist.
+  m_ShaderProperty->AddFragmentShaderReplacement("//VTK::Light::Impl", true,
+    "//VTK::Light::Impl\n"
+    "  float slabWidth = clipDistancesVSOutput[0] + clipDistancesVSOutput[1];\n"
+    "  if (slabWidth > 0.0)\n"
+    "    gl_FragData[0].rgb *= 1.0 - fiberDepthShading * clamp(clipDistancesVSOutput[0] / slabWidth, 0.0, 1.0);\n",
+    false);
+  m_ShaderProperty->GetFragmentCustomUniforms()->SetUniformf("fiberDepthShading", 0.0f);
 }
 
 mitk::FiberSlabTiles::~FiberSlabTiles() = default;
@@ -56,6 +75,16 @@ vtkPropAssembly *mitk::FiberSlabTiles::GetProp() const
 vtkProperty *mitk::FiberSlabTiles::GetProperty() const
 {
   return m_Property;
+}
+
+vtkShaderProperty *mitk::FiberSlabTiles::GetShaderProperty() const
+{
+  return m_ShaderProperty;
+}
+
+void mitk::FiberSlabTiles::SetDepthShading(float strength)
+{
+  m_ShaderProperty->GetFragmentCustomUniforms()->SetUniformf("fiberDepthShading", std::clamp(strength, 0.0f, 1.0f));
 }
 
 vtkPlane *mitk::FiberSlabTiles::GetSlabPlane(int i) const
@@ -201,6 +230,7 @@ void mitk::FiberSlabTiles::Add(Tile &tile)
   tile.actor = vtkSmartPointer<vtkActor>::New();
   tile.actor->SetMapper(mapper);
   tile.actor->SetProperty(m_Property);
+  tile.actor->SetShaderProperty(m_ShaderProperty);
   m_Assembly->AddPart(tile.actor);
 }
 
