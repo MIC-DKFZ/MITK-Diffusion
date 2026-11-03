@@ -307,7 +307,8 @@ public:
       gradient[0] = 0.6;
       gradient[1] = 0.8;
     }
-    parameters.SetGradienDirections(gradients);
+    // moved, not copied: GCC 13 at -O3 reports a false -Warray-bounds for the copy of one gradient
+    parameters.SetGradienDirections(std::move(gradients));
     parameters.m_Misc.m_DoAddDistortions = true;
     parameters.m_SignalGen.m_FrequencyMap = fmap;
     parameters.m_Misc.m_DoAddEddyCurrents = true;
