@@ -307,6 +307,15 @@ Facts the layout does not show:
   (`mitkFiberfoxSignalGenerationTest::Test1Exact`, ...), BrainSlice_4 within 1 (`Test4Exact`); the
   default reproduces all four within 1. Fiberfox references in the test data depend on the random
   engines and seeds, so a change there is checked bit for bit against the old output.
+  A simulation runs in batches of volumes (`SetVolumesPerBatch`; by default as many as fit into
+  2 GiB, at most one per OpenMP thread), each from its signal to its output values, so that memory
+  does not grow with the number of volumes except for the 16-bit output, the magnitude of all
+  volumes that a noise model needs, and the coil and phase images, which exist only as additional
+  outputs. Motion and spikes are drawn for all volumes before the first batch, in the order the
+  references depend on, so the images do not depend on the batch size
+  (`mitkFiberfoxThreadDeterminismTest::BatchSizes`). `EstimateMemoryBytes()` estimates the peak
+  memory before a run; the view asks before a run above the available memory, `MitkFiberfox`
+  refuses it without `--ignore_memory_check`.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
   labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
   without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,

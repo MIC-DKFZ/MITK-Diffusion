@@ -64,6 +64,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <set>
 #include <sstream>
 #include <mitkBValueMapProperty.h>
+#include <mitkMemoryUtilities.h>
 
 namespace itk
 {
@@ -938,6 +939,57 @@ unsigned int TractsToDWIImageFilter< PixelType >::GetVolumesPerBatch(const RunSi
 }
 
 template< class PixelType >
+std::uint64_t TractsToDWIImageFilter< PixelType >::EstimateMemoryBytes() const
+{
+  const auto& signalGen = m_Parameters.m_SignalGen;
+  const RunSizes sizes = GetRunSizes();
+  const std::uint64_t volumesPerBatch = GetVolumesPerBatch(sizes);
+  const std::uint64_t numVolumes = sizes.numVolumes;
+  const std::uint64_t numCoils = signalGen.m_NumberOfCoils;
+
+  std::uint64_t bytes = sizeof(PixelType)*sizes.outputVoxels*numVolumes;   // output
+  bytes += volumesPerBatch*BatchBytesPerVolume(sizes);
+  // tissue mask on the working grid, its moved copy, and the copy upsampled 4x4x4 for head motion
+  bytes += (1 + 1 + 64)*sizes.workingVoxels;
+  if (signalGen.m_FrequencyMap.IsNotNull())
+    bytes += sizeof(float)*sizes.workingVoxels;   // resampled to the working grid
+  if (m_FiberBundle.IsNotNull())
+  {
+    // intra-axonal volume of one volume, volume fraction of each compartment
+    bytes += sizeof(double)*(1 + sizes.numCompartments)*sizes.workingVoxels;
+    // two copies of the tractogram: normalized weights, moved fibers
+    std::uint64_t tractogramKiB = m_FiberBundle->GetFiberPolyData()->GetActualMemorySize();
+    if (m_FiberBundle->GetFiberColors() != nullptr)
+      tractogramKiB += m_FiberBundle->GetFiberColors()->GetActualMemorySize();
+    if (m_FiberBundle->GetFiberWeights() != nullptr)
+      tractogramKiB += m_FiberBundle->GetFiberWeights()->GetActualMemorySize();
+    bytes += 2*1024*tractogramKiB;
+  }
+  if (m_Parameters.m_NoiseModel)
+    bytes += sizeof(double)*(sizes.kspace ? sizes.outputVoxels : sizes.workingVoxels)*numVolumes;   // magnitude of all volumes
+  if (sizes.kspace)
+  {
+    bytes += sizeof(double)*sizes.outputVoxels*numCoils;   // k-space image
+    const bool eddyCurrents = m_Parameters.m_Misc.m_DoAddEddyCurrents && signalGen.m_EddyStrength>0;
+    const bool distortions = m_Parameters.m_Misc.m_DoAddDistortions && signalGen.m_FrequencyMap.IsNotNull();
+    if (signalGen.m_KspaceTimeSegments!=0 && (eddyCurrents || distortions))
+    {
+      // the time segments of the slice jobs running at the same time, at most the budget
+      const std::uint64_t parallelVolumes = std::min<std::uint64_t>(volumesPerBatch, std::max(1, omp_get_max_threads()));
+      const auto perSlice = static_cast<std::uint64_t>(KspaceImageFilter< Float2DImageType::PixelType >::MAX_TIME_SEGMENT_BYTES);
+      bytes += std::min(m_TimeSegmentMemoryBudget, parallelVolumes*perSlice);
+    }
+  }
+  if (m_Parameters.m_Misc.m_OutputAdditionalImages)
+  {
+    bytes += 2*sizeof(double)*sizes.outputVoxels*numVolumes*numCoils;   // real and imaginary image of each coil
+    if (sizes.kspace)
+      bytes += sizeof(double)*sizes.outputVoxels*numVolumes;   // phase
+  }
+  return bytes;
+}
+
+template< class PixelType >
 void TractsToDWIImageFilter< PixelType >::InitializeBatch(unsigned int firstVolume, unsigned int numVolumes)
 {
   if (m_FiberBundle.IsNotNull())
@@ -1470,6 +1522,8 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
 
   if (!m_Parameters.m_SignalGen.m_SimulateKspaceAcquisition)  // No upsampling of input image needed if no k-space simulation is performed
     m_Parameters.m_SignalGen.m_DoAddGibbsRinging = false;
+
+  PrintToLog("Estimated memory: " + mitk::MemoryUtilities::FormatSize(EstimateMemoryBytes()), false);
 
   if (m_UseConstantRandSeed)  // always generate the same random numbers?
     m_RandGen->SetSeed(0);

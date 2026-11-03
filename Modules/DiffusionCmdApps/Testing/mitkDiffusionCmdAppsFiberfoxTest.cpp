@@ -13,7 +13,10 @@ found in the LICENSE file.
 #include "mitkDiffusionCmdAppTestHelper.h"
 
 #include <mitkDiffusionPropertyHelper.h>
+#include <mitkMemoryUtilities.h>
 #include <mitkTestFixture.h>
+
+#include <sstream>
 
 using namespace mitk::CmdAppTest;
 
@@ -24,6 +27,7 @@ class mitkDiffusionCmdAppsFiberfoxTestSuite : public mitk::TestFixture
   MITK_TEST(HelpAndXml);
   MITK_TEST(Fiberfox_EddyOnDwi_DottedPrefix);
   MITK_TEST(Fiberfox_MissingParameters_Fails);
+  MITK_TEST(Fiberfox_MoreMemoryThanAvailable_Refused);
   MITK_TEST(RandomFiberPhantom_Bundles);
   CPPUNIT_TEST_SUITE_END();
 
@@ -53,6 +57,29 @@ public:
   {
     const auto dir = WorkDir("FiberfoxFails");
     RunFails("Fiberfox", {"-i", Data("StreamlineTractography/diffusion_image.nii.gz"), "-p", Path(dir, "missing.ffp"), "-o", Path(dir, "sim.nii.gz")}, dir);
+  }
+
+  // A run whose estimated memory exceeds the available memory is refused before anything of the image
+  // is allocated: param5 with 20000 x 20000 x 3000 voxels needs terabytes. Without its mask, which
+  // would set the image size. Where the available memory is unknown the app would start the run.
+  void Fiberfox_MoreMemoryThanAvailable_Refused()
+  {
+    if (mitk::MemoryUtilities::GetAvailableSizeOfPhysicalRam() == 0)
+      return;
+    const auto dir = WorkDir("FiberfoxMemory");
+    std::ifstream in(Data("Fiberfox/params/param5.ffp"));
+    std::stringstream content;
+    content << in.rdbuf();
+    std::string parameters = content.str();
+    const auto start = parameters.find("<size>");
+    const auto end = parameters.find("</size>");
+    CPPUNIT_ASSERT(start != std::string::npos && end != std::string::npos);
+    parameters.replace(start, end - start, "<size><x>20000</x><y>20000</y><z>3000</z>");
+    std::ofstream(Path(dir, "large.ffp")) << parameters;
+
+    const auto result = Run("Fiberfox", {"-i", Data("Fiberfox/Signalgen.fib"), "-p", Path(dir, "large.ffp"), "-o", Path(dir, "sim.nii.gz")}, dir);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(result.output, 1, result.exitCode);
+    CPPUNIT_ASSERT_MESSAGE(result.output, result.output.find("--ignore_memory_check") != std::string::npos);
   }
 
   void RandomFiberPhantom_Bundles()

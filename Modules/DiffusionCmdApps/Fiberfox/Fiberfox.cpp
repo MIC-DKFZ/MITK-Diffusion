@@ -29,6 +29,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkDiffusionDataIOHelper.h>
+#include <mitkMemoryUtilities.h>
 
 using namespace mitk;
 
@@ -54,6 +55,7 @@ static int RunFiberfox(int argc, char* argv[])
   parser.addArgument("fast_kspace", "", mitkCommandLineParser::Bool, "Fast k-space distortions:", "approximate the phase of distortions and eddy currents in the k-space simulation by time segments, as many per slice as keep the relative RMS error below 0.1 percent, instead of the exact sum (2.2 to 127 times faster on a 128x128 slice on one core; slices where the time segments would take longer on one core, or more than 256 MB of memory, take the exact sum; slices simulated at the same time wait for memory beyond 2 GB in all, which changes only the run time); the default, also for parameter files without the setting; overrides a parameter file that asks for the exact sum", us::Any());
   parser.addArgument("exact_kspace", "", mitkCommandLineParser::Bool, "Exact k-space distortions:", "sum the exact phase of distortions and eddy currents for every pixel and k-space sample, as earlier MITK versions did (much slower); overrides the parameter file", us::Any());
   parser.addArgument("time_segments", "", mitkCommandLineParser::Int, "Time segments:", "as --fast_kspace, with this fixed number of time segments (0: exact sum); overrides the parameter file, --fast_kspace and --exact_kspace", us::Any());
+  parser.addArgument("ignore_memory_check", "", mitkCommandLineParser::Bool, "Ignore memory check:", "start the simulation even if its estimated memory exceeds the available memory, which can make the computer stop responding", us::Any());
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -231,6 +233,18 @@ static int RunFiberfox(int argc, char* argv[])
   }
   tractsToDwiFilter->SetParameters(parameters);
   tractsToDwiFilter->SetUseConstantRandSeed(fix_seed);
+
+  // a simulation beyond the physical memory swaps until the whole computer stops responding
+  const std::uint64_t estimate = tractsToDwiFilter->EstimateMemoryBytes();
+  const std::uint64_t available = mitk::MemoryUtilities::GetAvailableSizeOfPhysicalRam();
+  MITK_INFO << "Estimated memory: " << mitk::MemoryUtilities::FormatSize(estimate) << ", available: " << mitk::MemoryUtilities::FormatSize(available);
+  if (available > 0 && estimate > available && !parsedArgs.count("ignore_memory_check"))
+  {
+    std::cerr << "The simulation needs about " << mitk::MemoryUtilities::FormatSize(estimate) << " of memory, but only "
+              << mitk::MemoryUtilities::FormatSize(available) << " are available. A smaller image, fewer volumes, no additional output images (--verbose)"
+              << " or ringing by zeroing k-space frequencies need less memory; --ignore_memory_check starts it anyway." << std::endl;
+    return EXIT_FAILURE;
+  }
   tractsToDwiFilter->Update();
 
   mitk::Image::Pointer image = mitk::GrabItkImageMemory(tractsToDwiFilter->GetOutput());

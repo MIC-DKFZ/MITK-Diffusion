@@ -50,6 +50,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <boost/foreach.hpp>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QPushButton>
+#include <mitkMemoryUtilities.h>
 #include "usModuleRegistry.h"
 #include <mitkNoncentralChiNoiseModel.h>
 #include <itksys/SystemTools.hxx>
@@ -1914,6 +1916,11 @@ void QmitkFiberfoxView::SimulateForExistingDwi(mitk::DataNode* imageNode)
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetInputImage(itkVectorImagePointer);
+  if (!ConfirmMemory())
+  {
+    m_TractsToDwiFilter = nullptr;
+    return;
+  }
   m_ThreadIsRunning = true;
   m_Thread.start(QThread::LowestPriority);
 }
@@ -1958,8 +1965,33 @@ void QmitkFiberfoxView::SimulateImageFromFibers(mitk::DataNode* fiberNode)
   m_Parameters.ApplyDirectionMatrix();
   m_TractsToDwiFilter->SetParameters(m_Parameters);
   m_TractsToDwiFilter->SetFiberBundle(fiberBundle);
+  if (!ConfirmMemory())
+  {
+    m_TractsToDwiFilter = nullptr;
+    return;
+  }
   m_ThreadIsRunning = true;
   m_Thread.start(QThread::LowestPriority);
+}
+
+bool QmitkFiberfoxView::ConfirmMemory()
+{
+  // a simulation beyond the physical memory swaps until the whole computer stops responding
+  const double gigabyte = 1024.0*1024.0*1024.0;
+  const double estimate = m_TractsToDwiFilter->EstimateMemoryBytes()/gigabyte;
+  const double available = mitk::MemoryUtilities::GetAvailableSizeOfPhysicalRam()/gigabyte;
+  if (available <= 0 || estimate <= available)   // 0: unknown
+    return true;
+
+  QMessageBox box(QMessageBox::Warning, "Not enough memory",
+                  QString("The simulation needs about %1 GB of memory, but only %2 GB are available. "
+                          "It can make the computer stop responding.\n\n"
+                          "A smaller image, fewer volumes, no additional output images or ringing by zeroing "
+                          "k-space frequencies need less memory.").arg(estimate, 0, 'f', 1).arg(available, 0, 'f', 1),
+                  QMessageBox::Yes | QMessageBox::Cancel);
+  box.button(QMessageBox::Yes)->setText("Start anyway");
+  box.setDefaultButton(QMessageBox::Cancel);
+  return box.exec() == QMessageBox::Yes;
 }
 
 void QmitkFiberfoxView::SetBvalsEdit()

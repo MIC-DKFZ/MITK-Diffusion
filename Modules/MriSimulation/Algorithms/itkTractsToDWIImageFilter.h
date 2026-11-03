@@ -99,6 +99,14 @@ public:
     /** Memory of the compartment images and k-space magnitudes of one batch of volumes, from which the automatic number of volumes per batch follows. */
     static constexpr std::uint64_t BATCH_MEMORY_BUDGET = std::uint64_t(2)*1024*1024*1024;
 
+    /**
+     * Estimated peak memory of the simulation in bytes, from the parameters and inputs, to be called before
+     * Update(): the output, the images of a batch of volumes, masks, the volume fractions and two copies of
+     * the tractogram, the magnitude of all volumes with a noise model, the time segments of the k-space step
+     * and the additional outputs (real, imaginary and phase images) if requested.
+     */
+    std::uint64_t EstimateMemoryBytes() const;
+
     /** Real and imaginary part of each coil's image; only with m_OutputAdditionalImages, else empty. */
     std::vector<DoubleDwiType::Pointer> GetOutputImagesReal() const
     {
