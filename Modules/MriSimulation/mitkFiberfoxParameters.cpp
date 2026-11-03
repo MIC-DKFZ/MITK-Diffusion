@@ -192,7 +192,7 @@ unsigned int mitk::SignalGenerationParameters::GetNumBaselineVolumes()
   return m_NumBaseline;
 }
 
-unsigned int mitk::SignalGenerationParameters::GetNumVolumes()
+unsigned int mitk::SignalGenerationParameters::GetNumVolumes() const
 {
   return m_GradientDirections.size();
 }

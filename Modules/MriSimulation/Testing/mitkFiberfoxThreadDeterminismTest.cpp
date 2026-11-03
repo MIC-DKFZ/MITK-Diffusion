@@ -60,6 +60,9 @@ class mitkFiberfoxThreadDeterminismTestSuite : public mitk::TestFixture
   MITK_TEST(RandomFiberModels);
   MITK_TEST(NoiseModelsFollowSeed);
   MITK_TEST(ExceptionInFiberLoop);
+  MITK_TEST(BatchSizes);
+  MITK_TEST(BatchSizesWithNoiseModel);
+  MITK_TEST(BatchSizesOfInputImageWithRinging);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -85,7 +88,8 @@ public:
 
   using Modifier = std::function<void(mitk::FiberfoxParameters&)>;
 
-  FilterType::Pointer Simulate(const std::string& parameterFile, int threads, const Modifier& modify, bool constantSeed = true)
+  /** volumesPerBatch 0: the automatic number. */
+  FilterType::Pointer Simulate(const std::string& parameterFile, int threads, const Modifier& modify, bool constantSeed = true, unsigned int volumesPerBatch = 0)
   {
     m_Threads->SetNumberOfThreads(threads);
     mitk::FiberfoxParameters parameters;
@@ -97,6 +101,7 @@ public:
     filter->SetUseConstantRandSeed(constantSeed);
     filter->SetParameters(parameters);
     filter->SetFiberBundle(m_FiberBundle);
+    filter->SetVolumesPerBatch(volumesPerBatch);
     filter->Update();
     return filter;
   }
@@ -123,37 +128,112 @@ public:
     return start == std::string::npos ? std::string() : text.substr(start);
   }
 
+  /** Output, coil, phase and k-space images and the spike log of test equal those of reference, bit for bit. */
+  static void CompareResults(FilterType* reference, FilterType* test, const std::string& name)
+  {
+    const auto differences = CountDifferences<DwiType>(test->GetOutput(), reference->GetOutput());
+    MITK_INFO << name << ": " << differences << " output values differ";
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(name + ": output", 0ul, differences);
+
+    // the complex coil images before rounding show differences in the last bits too
+    const auto real = test->GetOutputImagesReal();
+    const auto imag = test->GetOutputImagesImag();
+    CPPUNIT_ASSERT_EQUAL(reference->GetOutputImagesReal().size(), real.size());
+    unsigned long complexDifferences = 0;
+    for (std::size_t c = 0; c < real.size(); ++c)
+    {
+      complexDifferences += CountDifferences<DoubleDwiType>(real[c], reference->GetOutputImagesReal()[c]);
+      complexDifferences += CountDifferences<DoubleDwiType>(imag[c], reference->GetOutputImagesImag()[c]);
+    }
+    MITK_INFO << name << ": " << complexDifferences << " coil image values differ";
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(name + ": coil images", 0ul, complexDifferences);
+
+    // the other k-space results: phase, k-space magnitude and the spike log
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(name + ": phase image", 0ul, CountDifferences<DoubleDwiType>(test->GetPhaseImage(), reference->GetPhaseImage()));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(name + ": k-space image", 0ul, CountDifferences<DoubleDwiType>(test->GetKspaceImage(), reference->GetKspaceImage()));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(name + ": spike log", SpikeLog(reference), SpikeLog(test));
+  }
+
   void CompareAtThreadCounts(const std::string& parameterFile, const Modifier& modify = Modifier())
   {
     auto reference = Simulate(parameterFile, 1, modify);
     for (int threads : {2, 3, 8, 8})
     {
       auto test = Simulate(parameterFile, threads, modify);
-      const auto differences = CountDifferences<DwiType>(test->GetOutput(), reference->GetOutput());
-      MITK_INFO << parameterFile << ", " << threads << " threads: " << differences << " output values differ from 1 thread";
-      CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": output at " + std::to_string(threads) + " threads equals the 1-thread output", 0ul, differences);
-
-      // the complex coil images before rounding show differences in the last bits too
-      const auto real = test->GetOutputImagesReal();
-      const auto imag = test->GetOutputImagesImag();
-      CPPUNIT_ASSERT_EQUAL(reference->GetOutputImagesReal().size(), real.size());
-      unsigned long complexDifferences = 0;
-      for (std::size_t c = 0; c < real.size(); ++c)
-      {
-        complexDifferences += CountDifferences<DoubleDwiType>(real[c], reference->GetOutputImagesReal()[c]);
-        complexDifferences += CountDifferences<DoubleDwiType>(imag[c], reference->GetOutputImagesImag()[c]);
-      }
-      MITK_INFO << parameterFile << ", " << threads << " threads: " << complexDifferences << " coil image values differ from 1 thread";
-      CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": coil images at " + std::to_string(threads) + " threads equal the 1-thread images", 0ul, complexDifferences);
-
-      // the other k-space results: phase, k-space magnitude and the spike log
-      CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": phase image at " + std::to_string(threads) + " threads",
-                                   0ul, CountDifferences<DoubleDwiType>(test->GetPhaseImage(), reference->GetPhaseImage()));
-      CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": k-space image at " + std::to_string(threads) + " threads",
-                                   0ul, CountDifferences<DoubleDwiType>(test->GetKspaceImage(), reference->GetKspaceImage()));
-      CPPUNIT_ASSERT_EQUAL_MESSAGE(parameterFile + ": spike log at " + std::to_string(threads) + " threads",
-                                   SpikeLog(reference), SpikeLog(test));
+      CompareResults(reference, test, parameterFile + " at " + std::to_string(threads) + " threads against 1 thread");
     }
+  }
+
+  /**
+   * The volumes are simulated in batches, from their signal to their output values. Head motion and
+   * spikes are drawn for all volumes before the first batch, and a noise model adds its noise after the
+   * last. param1 (7 volumes, random motion, spikes, two coils, Gibbs ringing, eddy currents,
+   * distortions) gives the same images in batches of 1, of 3 (the last batch has one volume) and of all
+   * volumes, at 8 threads and at 1.
+   */
+  void BatchSizes()
+  {
+    const Modifier none;
+    auto reference = Simulate("param1.ffp", 8, none, true, 7);
+    const std::string spikes = SpikeLog(reference);
+    CPPUNIT_ASSERT_MESSAGE("spikes", spikes.find("Volume") != std::string::npos);
+    CPPUNIT_ASSERT_MESSAGE("motion", !reference->GetMotion().back().IsIdentity());
+    for (int threads : {8, 1})
+      for (unsigned int batch : {1u, 3u})
+      {
+        auto test = Simulate("param1.ffp", threads, none, true, batch);
+        const std::string name = "param1 in batches of " + std::to_string(batch) + " at " + std::to_string(threads) + " threads";
+        CPPUNIT_ASSERT_MESSAGE(name, test->GetStatusText().find("Volumes per batch: " + std::to_string(batch)) != std::string::npos);
+        CompareResults(reference, test, name);
+        CPPUNIT_ASSERT_EQUAL(reference->GetMotion().size(), test->GetMotion().size());
+        for (std::size_t g = 0; g < test->GetMotion().size(); ++g)
+          for (unsigned int i = 0; i < 3; ++i)
+          {
+            CPPUNIT_ASSERT_EQUAL(reference->GetMotion()[g].GetRotation()[i], test->GetMotion()[g].GetRotation()[i]);
+            CPPUNIT_ASSERT_EQUAL(reference->GetMotion()[g].GetTranslation()[i], test->GetMotion()[g].GetTranslation()[i]);
+          }
+      }
+  }
+
+  /** A Rician noise model adds noise voxel by voxel over all volumes, after the last batch. */
+  void BatchSizesWithNoiseModel()
+  {
+    const Modifier rician = [](mitk::FiberfoxParameters& parameters)
+    {
+      parameters.m_NoiseModel = std::make_shared< mitk::RicianNoiseModel<double> >();
+      parameters.m_NoiseModel->SetNoiseVariance(50);
+    };
+    auto reference = Simulate("param5.ffp", 8, rician, true, 7);
+    for (unsigned int batch : {1u, 3u})
+      CompareResults(reference, Simulate("param5.ffp", 8, rician, true, batch), "param5 with Rician noise in batches of " + std::to_string(batch));
+  }
+
+  /**
+   * A DWI as input is cast and, for Gibbs ringing, upsampled batch by batch; the windowed sinc
+   * interpolation of each volume does not depend on the other volumes of its batch.
+   */
+  void BatchSizesOfInputImageWithRinging()
+  {
+    DwiType::Pointer image;
+    auto parameters = TimeSegmentCase(24, 2, 5, image);
+    parameters.m_SignalGen.m_DoAddGibbsRinging = true;
+    parameters.m_SignalGen.m_ZeroRinging = 0;
+    const std::vector<unsigned int> batches = {5, 1, 3};
+    std::vector<FilterType::Pointer> filters;
+    for (unsigned int batch : batches)
+    {
+      m_Threads->SetNumberOfThreads(8);
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetInputImage(image);
+      filter->SetVolumesPerBatch(batch);
+      filter->Update();
+      CPPUNIT_ASSERT(filter->GetStatusText().find("Upsampling input diffusion-weighted image") != std::string::npos);
+      filters.push_back(filter);
+    }
+    for (std::size_t i = 1; i < filters.size(); ++i)
+      CompareResults(filters[0], filters[i], "input image with ringing in batches of " + std::to_string(batches[i]));
   }
 
   /** The exact sum of the k-space phase (eddy currents and distortions of param1), which is not the default. */

@@ -183,7 +183,7 @@ namespace mitk
     bool IsBaselineIndex(unsigned int idx);                  ///< Checks if image volume with given index is non-diffusion-weighted volume or not.
     unsigned int GetNumWeightedVolumes();                    ///< Get number of diffusion-weighted image volumes
     unsigned int GetNumBaselineVolumes();                    ///< Get number of non-diffusion-weighted image volumes
-    unsigned int GetNumVolumes();                            ///< Get number of baseline and diffusion-weighted image volumes
+    unsigned int GetNumVolumes() const;                      ///< Get number of baseline and diffusion-weighted image volumes
     GradientListType GetGradientDirections();                ///< Return gradient direction container
     mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer GetItkGradientContainer();
     GradientType GetGradientDirection(unsigned int i);
