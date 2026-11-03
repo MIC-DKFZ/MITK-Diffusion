@@ -197,8 +197,14 @@ protected:
     /** The interpolator reads the volume fraction maps; one per thread. */
     void SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3>& volume_fraction_point, double intraAxonalVolume, int g, DoubleInterpolatorType* interpolator);
 
-    /** Move fibers to simulate headmotion */
-    void SimulateMotion(int g=-1);
+    /**
+     * Head motion of every volume (m_Motion) and the motion log, drawn before any volume is simulated:
+     * the run's generator draws the signal model seed, the motion of the moved volumes in volume order,
+     * the spikes and the noise model's seed in this order, which the references depend on.
+     */
+    void DrawMotion();
+    /** Moves fibers and mask to the head position of volume g; called for the volumes in their order. */
+    void ApplyMotion(unsigned int g);
     /**
      * Writes the points of m_FiberBundle, moved by the transform (unmoved without one), into the
      * points of m_FiberBundleTransformed, a copy with the same point ids made once per run: one moved
@@ -211,6 +217,7 @@ protected:
     void InitializeData();
     void InitializeFiberData();
 
+    /** A voxel's centre moved by the motion of m_MotionVolume (forward, voxel of the upsampled mask) or back. */
     itk::Point<float, 3> GetMovedPoint(itk::Index<3>& index, bool forward);
 
     // input
@@ -244,6 +251,7 @@ protected:
     ItkUcharImgType::Pointer                    m_TransformedMaskImage;     ///< copy of mask image (changes for each motion step)
     ItkUcharImgType::Pointer                    m_UpsampledMaskImage;       ///< helper image for motion simulation
     std::vector< mitk::FiberfoxMotion >         m_Motion;                   ///< head motion of each volume (fibers, mask, volume fraction and frequency map lookup)
+    unsigned int                                m_MotionVolume;             ///< volume whose head position the moved fibers and mask have (ApplyMotion)
     mitk::FiberfoxMotion::PointType             m_MotionCenter;             ///< rotation centre of all volumes: centre of the unmoved fiber bundle
     double                                      m_mmRadius;
     double                                      m_SegmentVolume;

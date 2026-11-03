@@ -73,6 +73,7 @@ TractsToDWIImageFilter< PixelType >::TractsToDWIImageFilter()
   : m_Log(mitk::FiberfoxLog::New())
   , m_UseConstantRandSeed(false)
   , m_TimeSegmentMemoryBudget(KspaceImageFilter< Float2DImageType::PixelType >::TIME_SEGMENT_MEMORY_BUDGET)
+  , m_MotionVolume(0)
   , m_RandGen(itk::Statistics::MersenneTwisterRandomVariateGenerator::New())
 {
   m_NullDir.Fill(0);
@@ -1366,12 +1367,13 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
     if (m_FiberBundle->GetMeanFiberLength()<5.0)
       fiberThreads = 2;
 
+    DrawMotion();
     StartProgress(static_cast<unsigned long>(numFibers)*num_gradients);
 
     for (unsigned int g=0; g<num_gradients; ++g)
     {
       // move fibers
-      SimulateMotion(g);
+      ApplyMotion(g);
 
       // Set signal model random generator seeds to get same configuration in each voxel
       for (std::size_t i=0; i<m_Parameters.m_FiberModelList.size(); i++)
@@ -1563,42 +1565,71 @@ void TractsToDWIImageFilter< PixelType >::GenerateData()
 
 
 template< class PixelType >
-void TractsToDWIImageFilter< PixelType >::SimulateMotion(int g)
+void TractsToDWIImageFilter< PixelType >::DrawMotion()
 {
   auto& signalGen = m_Parameters.m_SignalGen;
-  const bool moved = signalGen.m_DoAddMotion
-      && g<static_cast<int>(signalGen.GetNumVolumes())
-      && signalGen.m_MotionVolumes[g];
-
-  if (moved)
+  for (unsigned int g=0; g<signalGen.GetNumVolumes(); ++g)
   {
-    mitk::FiberfoxMotion::VectorType rotation;
-    mitk::FiberfoxMotion::VectorType translation;
-    if ( signalGen.m_DoRandomizeMotion )
+    const bool moved = signalGen.m_DoAddMotion && signalGen.m_MotionVolumes[g];
+    if (moved)
     {
-      // independent random position of each moved volume
-      for (unsigned int i=0; i<3; ++i)
-        rotation[i] = m_RandGen->GetVariateWithClosedRange(signalGen.m_Rotation[i]*2) - signalGen.m_Rotation[i];
-      for (unsigned int i=0; i<3; ++i)
-        translation[i] = m_RandGen->GetVariateWithClosedRange(signalGen.m_Translation[i]*2) - signalGen.m_Translation[i];
+      mitk::FiberfoxMotion::VectorType rotation;
+      mitk::FiberfoxMotion::VectorType translation;
+      if ( signalGen.m_DoRandomizeMotion )
+      {
+        // independent random position of each moved volume
+        for (unsigned int i=0; i<3; ++i)
+          rotation[i] = m_RandGen->GetVariateWithClosedRange(signalGen.m_Rotation[i]*2) - signalGen.m_Rotation[i];
+        for (unsigned int i=0; i<3; ++i)
+          translation[i] = m_RandGen->GetVariateWithClosedRange(signalGen.m_Translation[i]*2) - signalGen.m_Translation[i];
+      }
+      else
+      {
+        // linear motion: the k-th moved volume has k/N of the rotation angles and translation, so the
+        // last one reaches the full values (user manual); fibers, mask and maps all use this position
+        m_MotionCounter++;
+        const double fraction = static_cast<double>(m_MotionCounter)/m_NumMotionVolumes;
+        for (unsigned int i=0; i<3; ++i)
+        {
+          rotation[i] = signalGen.m_Rotation[i]*fraction;
+          translation[i] = signalGen.m_Translation[i]*fraction;
+        }
+      }
+      m_Motion.emplace_back(rotation, translation, m_MotionCenter);
+    }
+    else if (signalGen.m_DoAddMotion && !signalGen.m_DoRandomizeMotion && g>0)
+    {
+      // linear motion: a volume without motion keeps the last position
+      m_Motion.push_back(m_Motion.back());
     }
     else
-    {
-      // linear motion: the k-th moved volume has k/N of the rotation angles and translation, so the
-      // last one reaches the full values (user manual); fibers, mask and maps all use this position
-      m_MotionCounter++;
-      const double fraction = static_cast<double>(m_MotionCounter)/m_NumMotionVolumes;
-      for (unsigned int i=0; i<3; ++i)
-      {
-        rotation[i] = signalGen.m_Rotation[i]*fraction;
-        translation[i] = signalGen.m_Translation[i]*fraction;
-      }
-    }
-    m_Motion.emplace_back(rotation, translation, m_MotionCenter);
+      m_Motion.emplace_back();
 
+    if (signalGen.m_DoAddMotion)
+    {
+      const auto& rotation = m_Motion.back().GetRotation();
+      const auto& translation = m_Motion.back().GetTranslation();
+      m_MotionLog += boost::lexical_cast<std::string>(g) + " rotation: " + boost::lexical_cast<std::string>(rotation[0])
+          + "," + boost::lexical_cast<std::string>(rotation[1])
+          + "," + boost::lexical_cast<std::string>(rotation[2]) + ";";
+
+      m_MotionLog += " translation: " + boost::lexical_cast<std::string>(translation[0])
+          + "," + boost::lexical_cast<std::string>(translation[1])
+          + "," + boost::lexical_cast<std::string>(translation[2]) + "\n";
+    }
+  }
+}
+
+template< class PixelType >
+void TractsToDWIImageFilter< PixelType >::ApplyMotion(unsigned int g)
+{
+  const auto& signalGen = m_Parameters.m_SignalGen;
+  m_MotionVolume = g;
+  if (signalGen.m_DoAddMotion && signalGen.m_MotionVolumes[g])
+  {
     // the fibers are moved from their unmoved position, never step by step, so that rounding and the
     // bounding box centre of moved fibers do not accumulate
-    SetMovedFiberPoints(m_Motion.back().GetTransform());
+    SetMovedFiberPoints(m_Motion.at(g).GetTransform());
 
     // move mask image accoring to new transform
     if (m_MaskImageSet)
@@ -1622,40 +1653,19 @@ void TractsToDWIImageFilter< PixelType >::SimulateMotion(int g)
       }
     }
   }
-  else if (signalGen.m_DoAddMotion && !signalGen.m_DoRandomizeMotion && g>0)
+  else if (signalGen.m_DoAddMotion && signalGen.m_DoRandomizeMotion && g>0 && signalGen.m_MotionVolumes[g-1])
   {
-    // linear motion: a volume without motion keeps the last position
-    m_Motion.push_back(m_Motion.back());
-  }
-  else
-  {
-    if (signalGen.m_DoAddMotion && g>0 && signalGen.m_MotionVolumes[g-1])
+    // the last volume was randomly moved: back to the unmoved fibers and mask (with linear motion a
+    // volume without motion keeps the last position)
+    SetMovedFiberPoints(nullptr);
+
+    if (m_MaskImageSet)
     {
-      // the last volume was randomly moved: back to the unmoved fibers and mask
-      SetMovedFiberPoints(nullptr);
-
-      if (m_MaskImageSet)
-      {
-        auto duplicator = itk::ImageDuplicator<ItkUcharImgType>::New();
-        duplicator->SetInputImage(m_Parameters.m_SignalGen.m_MaskImage);
-        duplicator->Update();
-        m_TransformedMaskImage = duplicator->GetOutput();
-      }
+      auto duplicator = itk::ImageDuplicator<ItkUcharImgType>::New();
+      duplicator->SetInputImage(m_Parameters.m_SignalGen.m_MaskImage);
+      duplicator->Update();
+      m_TransformedMaskImage = duplicator->GetOutput();
     }
-    m_Motion.emplace_back();
-  }
-
-  if (signalGen.m_DoAddMotion)
-  {
-    const auto& rotation = m_Motion.back().GetRotation();
-    const auto& translation = m_Motion.back().GetTranslation();
-    m_MotionLog += boost::lexical_cast<std::string>(g) + " rotation: " + boost::lexical_cast<std::string>(rotation[0])
-        + "," + boost::lexical_cast<std::string>(rotation[1])
-        + "," + boost::lexical_cast<std::string>(rotation[2]) + ";";
-
-    m_MotionLog += " translation: " + boost::lexical_cast<std::string>(translation[0])
-        + "," + boost::lexical_cast<std::string>(translation[1])
-        + "," + boost::lexical_cast<std::string>(translation[2]) + "\n";
   }
 }
 
@@ -1691,10 +1701,10 @@ itk::Point<float, 3> TractsToDWIImageFilter< PixelType >::GetMovedPoint(itk::Ind
   if (forward)
   {
     m_UpsampledMaskImage->TransformIndexToPhysicalPoint(index, point);
-    return m_Motion.back().Forward(point);
+    return m_Motion.at(m_MotionVolume).Forward(point);
   }
   m_TransformedMaskImage->TransformIndexToPhysicalPoint(index, point);
-  return m_Motion.back().Inverse(point);
+  return m_Motion.at(m_MotionVolume).Inverse(point);
 }
 
 template< class PixelType >
