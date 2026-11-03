@@ -26,6 +26,9 @@ found in the LICENSE file.
 #include <itkRandomPhantomFilter.h>
 #include <itkKspaceImageFilter.h>
 #include <mitkFiberfoxLog.h>
+#include <mitkRicianNoiseModel.h>
+#include <mitkBallModel.h>
+#include <cstdint>
 
 namespace
 {
@@ -65,6 +68,8 @@ class mitkFiberfoxSimulationTestSuite : public mitk::TestFixture
   MITK_TEST(RandomPhantom);
   MITK_TEST(PartialFourierLines);
   MITK_TEST(LogReportsProgress);
+  MITK_TEST(AdditionalImagesOnlyWhenRequested);
+  MITK_TEST(MemoryEstimate);
   CPPUNIT_TEST_SUITE_END();
 
   using FilterType = itk::TractsToDWIImageFilter<short>;
@@ -188,6 +193,7 @@ public:
         model->SetT1(t1);
       for (auto model : parameters.m_NonFiberModelList)
         model->SetT1(t1);
+      parameters.m_Misc.m_OutputAdditionalImages = true;   // the coils' complex images
       auto filter = FilterType::New();
       filter->SetUseConstantRandSeed(true);
       filter->SetParameters(parameters);
@@ -460,6 +466,116 @@ public:
     const std::string text = filter->GetStatusText();
     CPPUNIT_ASSERT_MESSAGE("status text", text.find("Finished simulation") != std::string::npos);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("status text of filter and log", log->GetStatusText(), text);
+  }
+
+  /** The coils' real and imaginary images and the phase are 4D double images, allocated only as
+   * additional outputs; the output image is the same with and without them. */
+  void AdditionalImagesOnlyWhenRequested()
+  {
+    std::vector<FilterType::Pointer> filters;
+    for (bool additional : { false, true })
+    {
+      mitk::FiberfoxParameters parameters;
+      parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+      CPPUNIT_ASSERT(parameters.m_SignalGen.m_SimulateKspaceAcquisition);
+      parameters.m_Misc.m_OutputAdditionalImages = additional;
+      auto filter = FilterType::New();
+      filter->SetUseConstantRandSeed(true);
+      filter->SetParameters(parameters);
+      filter->SetFiberBundle(m_FiberBundle);
+      filter->Update();
+      filters.push_back(filter);
+    }
+    CPPUNIT_ASSERT(filters[0]->GetOutputImagesReal().empty());
+    CPPUNIT_ASSERT(filters[0]->GetOutputImagesImag().empty());
+    CPPUNIT_ASSERT(filters[0]->GetPhaseImage().IsNull());
+    const auto coils = filters[1]->GetParameters().m_SignalGen.m_NumberOfCoils;
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(coils), filters[1]->GetOutputImagesReal().size());
+    CPPUNIT_ASSERT_EQUAL(static_cast<std::size_t>(coils), filters[1]->GetOutputImagesImag().size());
+    CPPUNIT_ASSERT(filters[1]->GetPhaseImage().IsNotNull());
+
+    auto without = filters[0]->GetOutput();
+    auto with = filters[1]->GetOutput();
+    const auto n = without->GetLargestPossibleRegion().GetNumberOfPixels() * without->GetNumberOfComponentsPerPixel();
+    CPPUNIT_ASSERT_EQUAL(n, with->GetLargestPossibleRegion().GetNumberOfPixels() * with->GetNumberOfComponentsPerPixel());
+    CPPUNIT_ASSERT_MESSAGE("same image with and without additional outputs", std::equal(without->GetBufferPointer(), without->GetBufferPointer() + n, with->GetBufferPointer()));
+  }
+
+  /** The memory estimate of a run, for a tractogram and for a DWI, as the sum of what the filter allocates. */
+  void MemoryEstimate()
+  {
+    // param5: 20x20x3 voxels, aliasing 0.75 (output 20x15x3), one coil, no ringing; three volumes per batch
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+    CPPUNIT_ASSERT(parameters.m_SignalGen.m_SimulateKspaceAcquisition && parameters.m_Misc.m_DoAddAliasing && !parameters.m_SignalGen.m_DoAddGibbsRinging);
+    CPPUNIT_ASSERT_EQUAL(0.75, static_cast<double>(parameters.m_SignalGen.m_CroppingFactor));
+    CPPUNIT_ASSERT_EQUAL(1u, parameters.m_SignalGen.m_NumberOfCoils);
+    CPPUNIT_ASSERT(!parameters.m_SignalGen.m_DoDisablePartialVolume);
+    parameters.m_NoiseModel = nullptr;
+    parameters.m_Misc.m_OutputAdditionalImages = false;
+    parameters.m_Misc.m_DoAddEddyCurrents = false;
+    parameters.m_Misc.m_DoAddDistortions = false;
+    auto filter = FilterType::New();
+    filter->SetUseConstantRandSeed(true);
+    filter->SetParameters(parameters);
+    filter->SetFiberBundle(m_FiberBundle);
+    filter->SetVolumesPerBatch(3);
+    const std::uint64_t voxels = 20 * 20 * 3;
+    const std::uint64_t outputVoxels = 20 * 15 * 3;
+    const std::uint64_t volumes = parameters.m_SignalGen.GetNumVolumes();
+    const std::uint64_t compartments = parameters.m_FiberModelList.size() + parameters.m_NonFiberModelList.size();
+    const std::uint64_t tractogramKiB = m_FiberBundle->GetFiberPolyData()->GetActualMemorySize()
+        + m_FiberBundle->GetFiberColors()->GetActualMemorySize() + m_FiberBundle->GetFiberWeights()->GetActualMemorySize();
+    std::uint64_t expected = sizeof(short) * outputVoxels * volumes   // output
+        + 3 * 8 * (compartments * voxels + outputVoxels)                // compartment images and magnitude of a batch
+        + 66 * voxels                                                   // mask, moved mask, mask upsampled 4x4x4
+        + 8 * (1 + compartments) * voxels                               // intra-axonal volume, volume fractions
+        + 2 * 1024 * tractogramKiB                                      // two copies of the tractogram
+        + 8 * outputVoxels;                                             // k-space image of the coil
+    CPPUNIT_ASSERT_EQUAL(expected, filter->EstimateMemoryBytes());
+    filter->Update();
+    CPPUNIT_ASSERT(filter->GetStatusText().find("Estimated memory: ") != std::string::npos);
+
+    // a DWI of 10x12x4 voxels and 5 volumes, two coils, Gibbs ringing (working grid 20x24x4), eddy
+    // currents with time segments, Rician noise and additional outputs; two volumes per batch
+    auto image = FilterType::OutputImageType::New();
+    itk::ImageRegion<3> region;
+    region.SetSize(0, 10);
+    region.SetSize(1, 12);
+    region.SetSize(2, 4);
+    image->SetRegions(region);
+    image->SetVectorLength(5);
+    image->Allocate();
+    mitk::FiberfoxParameters dwiParameters;
+    dwiParameters.m_SignalGen.m_SimulateKspaceAcquisition = true;
+    dwiParameters.m_SignalGen.m_ImageRegion = region;
+    dwiParameters.m_SignalGen.m_NumberOfCoils = 2;
+    dwiParameters.m_SignalGen.m_DoAddGibbsRinging = true;
+    dwiParameters.m_SignalGen.m_ZeroRinging = 0;
+    dwiParameters.m_Misc.m_DoAddEddyCurrents = true;
+    dwiParameters.m_SignalGen.m_EddyStrength = 0.02;
+    dwiParameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+    dwiParameters.m_Misc.m_OutputAdditionalImages = true;
+    dwiParameters.m_NoiseModel = std::make_shared< mitk::RicianNoiseModel<double> >();
+    dwiParameters.m_NonFiberModelList.push_back(new mitk::BallModel<double>());
+    dwiParameters.SetGradienDirections(mitk::SignalGenerationParameters::GradientListType(5));
+    auto dwiFilter = FilterType::New();
+    dwiFilter->SetParameters(dwiParameters);
+    dwiFilter->SetInputImage(image);
+    dwiFilter->SetVolumesPerBatch(2);
+    const std::uint64_t timeSegmentBudget = 100 * 1024 * 1024;   // less than the time segments of one slice job may take
+    dwiFilter->SetTimeSegmentMemoryBudget(timeSegmentBudget);
+    const std::uint64_t inputVoxels = 10 * 12 * 4;
+    const std::uint64_t workingVoxels = 4 * inputVoxels;
+    expected = sizeof(short) * inputVoxels * 5                         // output
+        + 2 * 8 * (workingVoxels + inputVoxels + inputVoxels)          // batch: upsampled input, magnitude, input as double
+        + 66 * workingVoxels                                           // masks
+        + 8 * inputVoxels * 5                                          // magnitude of all volumes for the noise model
+        + 8 * inputVoxels * 2                                          // k-space image of two coils
+        + timeSegmentBudget
+        + 2 * 8 * inputVoxels * 5 * 2                                  // real and imaginary image of each coil
+        + 8 * inputVoxels * 5;                                         // phase
+    CPPUNIT_ASSERT_EQUAL(expected, dwiFilter->EstimateMemoryBytes());
   }
 };
 

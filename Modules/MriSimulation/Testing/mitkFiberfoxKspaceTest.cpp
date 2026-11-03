@@ -97,6 +97,7 @@ class mitkFiberfoxKspaceTestSuite : public mitk::TestFixture
     parameters.m_SignalGen.m_ImageOrigin = image->GetOrigin();
     parameters.m_SignalGen.m_ImageDirection = image->GetDirection();
     parameters.m_Misc.m_OutputPath = "";  // no log file
+    parameters.m_Misc.m_OutputAdditionalImages = true;   // the cases read the coils' complex images
     // the exact sum of the phase of distortions and eddy currents, the model the cases below check;
     // TimeSegmentsApproximateExactSum compares the default, the time-segmented phase, with it
     parameters.m_SignalGen.m_KspaceTimeSegments = 0;

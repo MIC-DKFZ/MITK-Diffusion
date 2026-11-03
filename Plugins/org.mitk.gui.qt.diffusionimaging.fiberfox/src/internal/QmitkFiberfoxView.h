@@ -142,6 +142,7 @@ protected:
     void StartSimulation();     ///< GenerateImage without its exception handling
     void SimulateForExistingDwi(mitk::DataNode* imageNode);     ///< add artifacts to existing diffusion weighted image
     void SimulateImageFromFibers(mitk::DataNode* fiberNode);    ///< simulate new diffusion weighted image
+    bool ConfirmMemory();        ///< asks before a run whose estimated memory exceeds the available memory; false if cancelled
     void UpdateParametersFromGui();  ///< update fiberfox paramater object: the Read* functions in this order, then SetResultProperties
     void ReadOutputSettings();       ///< output path and additional images
     void ReadImageGeometry();        ///< mask, image geometry (template, mask or boxes) and gradients

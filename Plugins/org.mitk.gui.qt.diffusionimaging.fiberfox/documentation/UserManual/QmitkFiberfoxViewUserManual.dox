@@ -9,6 +9,7 @@ Additionally it enables the simulation of magnetic resonance artifacts including
 The employed parameters can be saved and loaded as xml file with the ending ".ffp" (Fiberfox parameters).
 The .ffp file holds the b-value and the gradient directions; saving "x.ffp" also writes them to "x.ffp.bvals" and "x.ffp.bvecs", and loading prefers these two files when they exist (where they still hold the gradients of the .ffp, up to their rounding, the .ffp's values are taken, so that saving again gives the same file). The loaded gradient directions are kept until a gradient setting (number of directions, b-value, bvals/bvecs files) is changed. Without any gradient direction the simulation stops with a message.
 If the simulation stops with an error (e.g. four compartments without volume fraction maps), the view shows the message and adds no image. Closing the view during a simulation aborts it.
+Memory: the simulation keeps its output image (2 bytes per voxel and volume) and simulates a few volumes at a time, which need a fixed amount of memory (at most about 2 GB). The additional output images of the k-space simulation (real and imaginary image of each coil, phase) take 8 bytes per voxel and volume each, as does a Rician or noncentral chi noise model, which adds its noise to the magnitude of all volumes at the end. Gibbs ringing by cropping simulates the signal on an image twice as fine in-plane, i.e. on four times as many voxels; ringing by zeroing k-space frequencies needs no finer image and so less memory. Before a simulation starts, the view estimates the memory it needs and asks whether to start it anyway if that is more than the computer has available (MitkFiberfox refuses such a run unless it is given --ignore_memory_check).
 It is furthermore possible to add artifacts to an already existing diffusion-weighted image.
 
 <b>Available sections:</b>
@@ -57,7 +58,7 @@ If no fiber bundle but a diffusion-weighted image is selected, the specified art
 \li <b>Partial Fourier</b>: Fraction of the k-space lines in phase direction that is acquired (0.5-1), rounded to whole lines; the lines read last are missing and are filled in from the conjugate-symmetric lines. Both phase encoding directions acquire the same number of lines.
 \li <b>Simulate Signal Relaxation</b>: If checked, the relaxation induced signal decay is simulated, other wise the parameters <em>TE</em>, Line Readout Time, <em>T<sub>inhom</sub></em>, and <em>T2</em> are ignored.
 \li <b>Disable Partial Volume Effects</b>: If checked, the actual volume fractions of the single compartments are ignored. A voxel will either be filled by the intra axonal compartment completely or will contain no fiber at all.
-\li <b>Output Additional Images</b>: Output a double image for each compartment. The voxel values correspond to the volume fraction of the respective compartment.
+\li <b>Output Additional Images</b>: Output a double image for each compartment. The voxel values correspond to the volume fraction of the respective compartment. With the k-space simulation also the real and imaginary image of each coil, the phase image and the k-space; these are computed only when this box is checked.
 
 
 <b>Compartment Settings:</b>
