@@ -25,15 +25,6 @@
   <property name="autoFillBackground">
    <bool>true</bool>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_18">
    <property name="verticalSpacing">
     <number>25</number>
@@ -110,7 +101,7 @@ QGroupBox {
            <number>6</number>
           </property>
           <item row="0" column="0">
-           <widget class="QCommandLinkButton" name="m_RemoveGradientButton">
+           <widget class="QPushButton" name="m_RemoveGradientButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -123,7 +114,7 @@ QGroupBox {
            <widget class="QSpinBox" name="m_RemoveGradientBox"/>
           </item>
           <item row="1" column="0">
-           <widget class="QCommandLinkButton" name="m_ExtractGradientButton">
+           <widget class="QPushButton" name="m_ExtractGradientButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -163,7 +154,7 @@ QGroupBox {
            <number>6</number>
           </property>
           <item row="9" column="0">
-           <widget class="QCommandLinkButton" name="m_ReduceGradientsButton">
+           <widget class="QPushButton" name="m_ReduceGradientsButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -266,7 +257,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="7" column="0">
-           <widget class="QCommandLinkButton" name="m_MirrorGradientToHalfSphereButton">
+           <widget class="QPushButton" name="m_MirrorGradientToHalfSphereButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -285,7 +276,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="4" column="0">
-           <widget class="QCommandLinkButton" name="m_FlipGradientsButton">
+           <widget class="QPushButton" name="m_FlipGradientsButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -304,7 +295,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="3" column="0">
-           <widget class="QCommandLinkButton" name="m_CreateLengthCorrectedDwi">
+           <widget class="QPushButton" name="m_CreateLengthCorrectedDwi">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -314,7 +305,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="6" column="0">
-           <widget class="QCommandLinkButton" name="m_ShowGradientsButton">
+           <widget class="QPushButton" name="m_ShowGradientsButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -343,7 +334,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="10" column="0">
-           <widget class="QCommandLinkButton" name="m_ClearRotationButton">
+           <widget class="QPushButton" name="m_ClearRotationButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -362,7 +353,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="5" column="0">
-           <widget class="QCommandLinkButton" name="m_SwapGradientsButton">
+           <widget class="QPushButton" name="m_SwapGradientsButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -619,7 +610,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="6" column="0">
-           <widget class="QCommandLinkButton" name="m_MergeDwisButton">
+           <widget class="QPushButton" name="m_MergeDwisButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -665,7 +656,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="1" column="0">
-           <widget class="QCommandLinkButton" name="m_ButtonAverageGradients">
+           <widget class="QPushButton" name="m_ButtonAverageGradients">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -711,7 +702,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="4" column="0">
-           <widget class="QCommandLinkButton" name="m_FlipAxis">
+           <widget class="QPushButton" name="m_FlipAxis">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -953,7 +944,7 @@ QGroupBox {
               </widget>
              </item>
              <item row="1" column="0">
-              <widget class="QCommandLinkButton" name="m_ResampleImageButton">
+              <widget class="QPushButton" name="m_ResampleImageButton">
                <property name="enabled">
                 <bool>false</bool>
                </property>
@@ -1080,7 +1071,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="3" column="0">
-           <widget class="QCommandLinkButton" name="m_CropImageButton">
+           <widget class="QPushButton" name="m_CropImageButton">
             <property name="text">
              <string>Crop Image</string>
             </property>
@@ -1175,7 +1166,7 @@ QGroupBox {
         </widget>
        </item>
        <item row="0" column="0">
-        <widget class="QCommandLinkButton" name="m_ModifyHeader">
+        <widget class="QPushButton" name="m_ModifyHeader">
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -1551,7 +1542,7 @@ QGroupBox {
            <widget class="QmitkDataStorageComboBox" name="m_AlignImageBox"/>
           </item>
           <item row="0" column="0">
-           <widget class="QCommandLinkButton" name="m_AlignImageButton">
+           <widget class="QPushButton" name="m_AlignImageButton">
             <property name="text">
              <string>Align to</string>
             </property>
@@ -1581,7 +1572,7 @@ QGroupBox {
         </spacer>
        </item>
        <item row="0" column="0">
-        <widget class="QCommandLinkButton" name="m_ButtonExtractB0">
+        <widget class="QPushButton" name="m_ButtonExtractB0">
          <property name="enabled">
           <bool>false</bool>
          </property>

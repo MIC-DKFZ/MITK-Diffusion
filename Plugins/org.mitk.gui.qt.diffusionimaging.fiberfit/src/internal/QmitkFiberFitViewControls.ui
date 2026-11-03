@@ -13,15 +13,6 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_10">
    <item row="0" column="0">
     <widget class="QFrame" name="frame">
@@ -94,7 +85,7 @@ QGroupBox {
        </widget>
       </item>
       <item row="6" column="0">
-       <widget class="QCommandLinkButton" name="m_StartButton">
+       <widget class="QPushButton" name="m_StartButton">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -109,11 +100,6 @@ QGroupBox {
           <width>200</width>
           <height>16777215</height>
          </size>
-        </property>
-        <property name="font">
-         <font>
-          <pointsize>11</pointsize>
-         </font>
         </property>
         <property name="toolTip">
          <string/>

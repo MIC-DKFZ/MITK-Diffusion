@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 // Qmitk
 #include "QmitkFiberfoxView.h"
 #include <QmitkDiffusionViewControlsGuard.h>
+#include <QmitkDiffusionWarningText.h>
 
 // MITK
 #include <mitkDiffusionMasks.h>
@@ -424,6 +425,8 @@ void QmitkFiberfoxView::CreateQtPartControl( QWidget *parent )
 
     m_Controls->m_Comp2FractionFrame->setVisible(false);
     m_Controls->m_Comp4FractionFrame->setVisible(false);
+    m_Controls->m_DiffusionPropsMessage->setText(QmitkDiffusionWarningText::Format(m_Controls->m_DiffusionPropsMessage->text()));
+    m_Controls->m_GeometryMessage->setText(QmitkDiffusionWarningText::Format(m_Controls->m_GeometryMessage->text()));
     m_Controls->m_DiffusionPropsMessage->setVisible(false);
     m_Controls->m_GeometryMessage->setVisible(false);
     m_Controls->m_AdvancedSignalOptionsFrame->setVisible(false);

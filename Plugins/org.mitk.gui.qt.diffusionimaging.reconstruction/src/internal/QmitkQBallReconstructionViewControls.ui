@@ -22,15 +22,6 @@
   <property name="windowTitle">
    <string>QmitkQBallReconstructionViewControls</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_4">
    <property name="verticalSpacing">
     <number>25</number>
@@ -234,7 +225,7 @@ QGroupBox {
        </widget>
       </item>
       <item row="3" column="0">
-       <widget class="QCommandLinkButton" name="m_ButtonStandard">
+       <widget class="QPushButton" name="m_ButtonStandard">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -351,7 +342,7 @@ QGroupBox {
        <number>6</number>
       </property>
       <item row="3" column="0">
-       <widget class="QCommandLinkButton" name="m_ConvertButton">
+       <widget class="QPushButton" name="m_ConvertButton">
         <property name="enabled">
          <bool>false</bool>
         </property>

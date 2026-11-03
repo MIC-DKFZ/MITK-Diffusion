@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkFiberGenerationView.h"
+#include <QmitkDiffusionWarningText.h>
 
 // MITK
 #include <mitkImage.h>
@@ -104,6 +105,7 @@ void QmitkFiberGenerationView::CreateQtPartControl( QWidget *parent )
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkFiberGenerationViewControls;
     m_Controls->setupUi( parent );
+    m_Controls->m_FiberGenMessage->setText(QmitkDiffusionWarningText::Format(m_Controls->m_FiberGenMessage->text()));
 
     m_ParameterFile = QDir::currentPath()+"/param.ffp";
 

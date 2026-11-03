@@ -13,15 +13,6 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_3">
    <property name="leftMargin">
     <number>9</number>
@@ -247,7 +238,7 @@ QGroupBox {
         </widget>
        </item>
        <item row="6" column="0">
-        <widget class="QCommandLinkButton" name="m_ExtractFibersButton">
+        <widget class="QPushButton" name="m_ExtractFibersButton">
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -262,11 +253,6 @@ QGroupBox {
            <width>200</width>
            <height>16777215</height>
           </size>
-         </property>
-         <property name="font">
-          <font>
-           <pointsize>11</pointsize>
-          </font>
          </property>
          <property name="toolTip">
           <string>Extract fibers passing through selected ROI or composite ROI. Select ROI and fiber bundle to execute.</string>
@@ -486,7 +472,7 @@ QGroupBox {
               <number>0</number>
              </property>
              <item row="0" column="2">
-              <widget class="QCommandLinkButton" name="PFCompoNOTButton">
+              <widget class="QPushButton" name="PFCompoNOTButton">
                <property name="enabled">
                 <bool>false</bool>
                </property>
@@ -505,7 +491,7 @@ QGroupBox {
               </widget>
              </item>
              <item row="0" column="1">
-              <widget class="QCommandLinkButton" name="PFCompoORButton">
+              <widget class="QPushButton" name="PFCompoORButton">
                <property name="enabled">
                 <bool>false</bool>
                </property>
@@ -537,7 +523,7 @@ QGroupBox {
               </spacer>
              </item>
              <item row="0" column="0">
-              <widget class="QCommandLinkButton" name="PFCompoANDButton">
+              <widget class="QPushButton" name="PFCompoANDButton">
                <property name="enabled">
                 <bool>false</bool>
                </property>
@@ -559,7 +545,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="2" column="0">
-           <widget class="QCommandLinkButton" name="m_GenerateRoiImage">
+           <widget class="QPushButton" name="m_GenerateRoiImage">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -574,11 +560,6 @@ QGroupBox {
               <width>16777215</width>
               <height>16777215</height>
              </size>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
             </property>
             <property name="toolTip">
              <string>Generate a binary image containing all selected ROIs. Select at least one ROI (planar figure) and a reference image or fiber bundle. A selected image gives the grid; without one, the fiber bundle does.</string>
@@ -791,7 +772,7 @@ QGroupBox {
         </widget>
        </item>
        <item row="6" column="0">
-        <widget class="QCommandLinkButton" name="m_RemoveButton">
+        <widget class="QPushButton" name="m_RemoveButton">
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -806,11 +787,6 @@ QGroupBox {
            <width>200</width>
            <height>16777215</height>
           </size>
-         </property>
-         <property name="font">
-          <font>
-           <pointsize>11</pointsize>
-          </font>
          </property>
          <property name="toolTip">
           <string/>
@@ -1578,7 +1554,7 @@ QGroupBox {
         </spacer>
        </item>
        <item row="6" column="0">
-        <widget class="QCommandLinkButton" name="m_ModifyButton">
+        <widget class="QPushButton" name="m_ModifyButton">
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -1593,11 +1569,6 @@ QGroupBox {
            <width>200</width>
            <height>16777215</height>
           </size>
-         </property>
-         <property name="font">
-          <font>
-           <pointsize>11</pointsize>
-          </font>
          </property>
          <property name="toolTip">
           <string/>
@@ -1676,7 +1647,7 @@ QGroupBox {
       </attribute>
       <layout class="QGridLayout" name="gridLayout_13">
        <item row="0" column="0">
-        <widget class="QCommandLinkButton" name="m_SubstractBundles">
+        <widget class="QPushButton" name="m_SubstractBundles">
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -1691,11 +1662,6 @@ QGroupBox {
            <width>200</width>
            <height>16777215</height>
           </size>
-         </property>
-         <property name="font">
-          <font>
-           <pointsize>11</pointsize>
-          </font>
          </property>
          <property name="toolTip">
           <string>Returns all fibers contained in bundle X that are not contained in bundle Y (not commutative!). Select at least two fiber bundles to execute.</string>
@@ -1719,7 +1685,7 @@ QGroupBox {
         </spacer>
        </item>
        <item row="0" column="2">
-        <widget class="QCommandLinkButton" name="m_JoinBundles">
+        <widget class="QPushButton" name="m_JoinBundles">
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -1734,11 +1700,6 @@ QGroupBox {
            <width>200</width>
            <height>16777215</height>
           </size>
-         </property>
-         <property name="font">
-          <font>
-           <pointsize>11</pointsize>
-          </font>
          </property>
          <property name="toolTip">
           <string>Merge selected fiber bundles. Select at least two fiber bundles to execute.</string>
@@ -1749,7 +1710,7 @@ QGroupBox {
         </widget>
        </item>
        <item row="1" column="0">
-        <widget class="QCommandLinkButton" name="m_CopyBundle">
+        <widget class="QPushButton" name="m_CopyBundle">
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -1764,11 +1725,6 @@ QGroupBox {
            <width>200</width>
            <height>16777215</height>
           </size>
-         </property>
-         <property name="font">
-          <font>
-           <pointsize>11</pointsize>
-          </font>
          </property>
          <property name="toolTip">
           <string>Add a copy of each selected fiber bundle.</string>
@@ -1803,7 +1759,7 @@ QGroupBox {
       <item row="0" column="1">
        <widget class="QLabel" name="m_FibLabel">
         <property name="text">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ff0000;&quot;&gt;mandatory&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;mandatory&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="wordWrap">
          <bool>true</bool>

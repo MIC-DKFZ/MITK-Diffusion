@@ -25,15 +25,6 @@
   <property name="windowTitle">
    <string>QmitkTemplate</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QFormLayout" name="formLayout">
    <property name="fieldGrowthPolicy">
     <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
@@ -66,7 +57,7 @@ QGroupBox {
        <number>6</number>
       </property>
       <item row="1" column="0">
-       <widget class="QCommandLinkButton" name="m_TrackingStart">
+       <widget class="QPushButton" name="m_TrackingStart">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -87,7 +78,7 @@ QGroupBox {
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QCommandLinkButton" name="m_TrackingStop">
+       <widget class="QPushButton" name="m_TrackingStop">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -805,7 +796,7 @@ QGroupBox {
        <number>6</number>
       </property>
       <item row="0" column="0">
-       <widget class="QCommandLinkButton" name="m_SaveTrackingParameters">
+       <widget class="QPushButton" name="m_SaveTrackingParameters">
         <property name="enabled">
          <bool>true</bool>
         </property>
@@ -826,7 +817,7 @@ QGroupBox {
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QCommandLinkButton" name="m_LoadTrackingParameters">
+       <widget class="QPushButton" name="m_LoadTrackingParameters">
         <property name="enabled">
          <bool>true</bool>
         </property>

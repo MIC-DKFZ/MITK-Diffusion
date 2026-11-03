@@ -37,7 +37,6 @@ found in the LICENSE file.
 #include <QmitkDataStorageComboBoxWithSelectNone.h>
 
 #include <QCheckBox>
-#include <QCommandLinkButton>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFrame>
@@ -255,7 +254,7 @@ public:
     }
 
     GetChild<QCheckBox>(m_View, "m_FlipPeaksX")->setChecked(true);
-    GetChild<QCommandLinkButton>(m_View, "m_FlipPeaksButton")->click();
+    GetChild<QPushButton>(m_View, "m_FlipPeaksButton")->click();
     Wait(20);
 
     // The 4th dimension holds x, y, z of each peak; only x changes sign.
@@ -426,7 +425,7 @@ public:
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(mitk::GetDiffusionTestDataFilePath(folder)));
     GetChild<QPushButton>(view, "m_AddFoldersButton")->click();
     CPPUNIT_ASSERT_EQUAL(1, GetChild<QListWidget>(view, "listWidget")->count());
-    GetChild<QCommandLinkButton>(view, "m_DicomLoadStartLoadButton")->click();
+    GetChild<QPushButton>(view, "m_DicomLoadStartLoadButton")->click();
     Wait(50);
   }
 
@@ -467,7 +466,7 @@ public:
     recursive->click();
     CPPUNIT_ASSERT(Shown(GetChild<QLineEdit>(view, "m_SubdirPrefixLineEdit"), view));
     GetChild<QLineEdit>(view, "m_SubdirPrefixLineEdit")->setText("Siemens");
-    GetChild<QCommandLinkButton>(view, "m_DicomLoadStartLoadButton")->click();
+    GetChild<QPushButton>(view, "m_DicomLoadStartLoadButton")->click();
     Wait(50);
 
     // Siemens and SiemensMosaic: two series of four volumes; GE and Philips do not match.
@@ -505,7 +504,7 @@ public:
     CPPUNIT_ASSERT_EQUAL(std::string("Corpus callosum"), value);
 
     // "Copy Properties From Image" with the DWI of a DICOM series selected.
-    auto *copyButton = GetChild<QCommandLinkButton>(view, "m_CopyPropsButton");
+    auto *copyButton = GetChild<QPushButton>(view, "m_CopyPropsButton");
     CPPUNIT_ASSERT(!copyButton->isEnabled());
     auto *importView = ShowView(DicomImportId, "QmitkDiffusionDicomImportControls");
     ImportDicom(importView, "DicomDwi/Siemens");

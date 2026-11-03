@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkStreamlineTrackingView.h"
+#include <QmitkDiffusionWarningText.h>
 #include "QmitkStdMultiWidget.h"
 
 // Qt
@@ -882,7 +883,7 @@ void QmitkStreamlineTrackingView::OnSelectionChanged( berry::IWorkbenchPart::Poi
 
 void QmitkStreamlineTrackingView::UpdateGui()
 {
-  m_Controls->m_TensorImageLabel->setText("<font color='red'>select in data-manager</font>");
+  m_Controls->m_TensorImageLabel->setText(QmitkDiffusionWarningText::Format("select in data-manager"));
 
   m_Controls->m_fBox->setEnabled(false);
   m_Controls->m_fLabel->setEnabled(false);

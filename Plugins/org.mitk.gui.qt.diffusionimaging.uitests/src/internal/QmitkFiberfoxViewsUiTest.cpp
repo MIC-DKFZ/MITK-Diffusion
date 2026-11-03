@@ -25,7 +25,6 @@ found in the LICENSE file.
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QCommandLinkButton>
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -164,12 +163,12 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
   /** "Start Simulation" is hidden while a simulation runs. */
   static bool Running(QWidget *view)
   {
-    return GetChild<QCommandLinkButton>(view, "m_GenerateImageButton")->isHidden();
+    return GetChild<QPushButton>(view, "m_GenerateImageButton")->isHidden();
   }
 
   static void Start(QWidget *view)
   {
-    GetChild<QCommandLinkButton>(view, "m_GenerateImageButton")->click();
+    GetChild<QPushButton>(view, "m_GenerateImageButton")->click();
   }
 
   static void WaitForIdle(QWidget *view)
@@ -221,13 +220,13 @@ class QmitkFiberfoxViewsUiTest : public CppUnit::TestFixture
   static void SaveParameters(QWidget *view, const std::string &file)
   {
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
-    GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+    GetChild<QPushButton>(view, "m_SaveParametersButton")->click();
   }
 
   static void LoadParameters(QWidget *view, const std::string &file)
   {
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
-    GetChild<QCommandLinkButton>(view, "m_LoadParametersButton")->click();
+    GetChild<QPushButton>(view, "m_LoadParametersButton")->click();
   }
 
   static std::string StringProperty(const mitk::DataNode::Pointer &node, const std::string &name)
@@ -345,12 +344,12 @@ public:
     Start(view);
     CPPUNIT_ASSERT(WaitFor(inKspaceStep, 60000));
     CPPUNIT_ASSERT_MESSAGE("The run ended before the abort", Running(view));
-    GetChild<QCommandLinkButton>(view, "m_AbortSimulationButton")->click();
+    GetChild<QPushButton>(view, "m_AbortSimulationButton")->click();
     WaitForIdle(view);
     CPPUNIT_ASSERT(StatusText(view).contains("Simulation aborted"));
     Wait(200);
     CPPUNIT_ASSERT_EQUAL(0u, NumDerived(fibers));
-    CPPUNIT_ASSERT(!GetChild<QCommandLinkButton>(view, "m_GenerateImageButton")->isHidden());
+    CPPUNIT_ASSERT(!GetChild<QPushButton>(view, "m_GenerateImageButton")->isHidden());
 
     GetChild<QTextEdit>(view, "m_SimulationStatusText")->clear();
     Start(view);
@@ -487,7 +486,7 @@ public:
     const auto withoutKernels = m_TempDir + "/without_kernels.ffp";
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(withoutKernels));
     DialogHandler::Instance().AnswerMessageBox(QMessageBox::No);
-    GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+    GetChild<QPushButton>(view, "m_SaveParametersButton")->click();
     CPPUNIT_ASSERT(OneMessage().contains("sample prototype signals"));
     CPPUNIT_ASSERT(std::filesystem::exists(withoutKernels));
     CPPUNIT_ASSERT_EQUAL(std::string("prototype"), Element(withoutKernels, "model"));
@@ -499,7 +498,7 @@ public:
       ChooseNode(view, "m_TemplateComboBox", node);
       DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
       DialogHandler::Instance().AnswerMessageBox(QMessageBox::Yes);
-      GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+      GetChild<QPushButton>(view, "m_SaveParametersButton")->click();
       CPPUNIT_ASSERT(OneMessage().contains("sample prototype signals"));
       CPPUNIT_ASSERT_EQUAL_MESSAGE(file, std::string("20"), Element(file, "numSamples"));
       sampled.push_back(Element(file, "compartments"));
@@ -920,13 +919,13 @@ public:
     const auto first = m_TempDir + "/first.ffp";
     const auto second = m_TempDir + "/second.ffp";
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(first));
-    GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+    GetChild<QPushButton>(view, "m_SaveParametersButton")->click();
     CPPUNIT_ASSERT(std::filesystem::exists(first));
 
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(first));
-    GetChild<QCommandLinkButton>(view, "m_LoadParametersButton")->click();
+    GetChild<QPushButton>(view, "m_LoadParametersButton")->click();
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(second));
-    GetChild<QCommandLinkButton>(view, "m_SaveParametersButton")->click();
+    GetChild<QPushButton>(view, "m_SaveParametersButton")->click();
     CPPUNIT_ASSERT(std::filesystem::exists(second));
     for (const std::string extension : {"", ".bvals", ".bvecs"})
       CPPUNIT_ASSERT_EQUAL_MESSAGE(extension, Content(first + extension), Content(second + extension));
@@ -939,7 +938,7 @@ public:
     const auto file = m_TempDir + "/broken.ffp";
     std::ofstream(file) << "not a parameter file";
     DialogHandler::Instance().AnswerFileDialog(QString::fromStdString(file));
-    GetChild<QCommandLinkButton>(view, "m_LoadParametersButton")->click();
+    GetChild<QPushButton>(view, "m_LoadParametersButton")->click();
     CPPUNIT_ASSERT(OneMessage().contains("Cannot read"));
   }
 
@@ -961,7 +960,7 @@ public:
 
     // Only a bundle with two fiducials gets fibers, the one it belongs to.
     Select({first, second});
-    GetChild<QCommandLinkButton>(view, "m_GenerateFibersButton")->click();
+    GetChild<QPushButton>(view, "m_GenerateFibersButton")->click();
     Wait(50);
     CPPUNIT_ASSERT_EQUAL(0u, dynamic_cast<mitk::FiberBundle *>(first->GetData())->GetNumFibers());
     CPPUNIT_ASSERT(dynamic_cast<mitk::FiberBundle *>(second->GetData())->GetNumFibers() > 0);
@@ -1010,7 +1009,7 @@ public:
       minBox->setValue(minBox->maximum());
       if (minBox->value() <= maxBox->value())
         continue; // the boxes' ranges do not allow min > max
-      GetChild<QCommandLinkButton>(view, "m_RandomPhantomButton")->click();
+      GetChild<QPushButton>(view, "m_RandomPhantomButton")->click();
       CPPUNIT_ASSERT_MESSAGE(minName, OneMessage().contains("minimum is larger than the maximum"));
       CPPUNIT_ASSERT(GetNodesOfClass("FiberBundle").empty());
       minBox->setValue(minBefore);
@@ -1024,7 +1023,7 @@ public:
     for (const auto *name : {"m_CircleButton", "m_FlipButton"})
       CPPUNIT_ASSERT_MESSAGE(name, !GetChild<QPushButton>(view, name)->icon().isNull());
     for (const auto *name : {"m_SaveParametersButton", "m_LoadParametersButton"})
-      CPPUNIT_ASSERT_MESSAGE(name, !GetChild<QCommandLinkButton>(view, name)->icon().isNull());
+      CPPUNIT_ASSERT_MESSAGE(name, !GetChild<QPushButton>(view, name)->icon().isNull());
   }
 
   void Fieldmap_TwoSources_FieldmapBelowImage()
@@ -1035,7 +1034,7 @@ public:
     auto *view = ShowView(FieldmapId, "QmitkFieldmapGeneratorViewControls");
     ChooseNode(view, "m_SelectedImageBox", image);
 
-    auto *place = GetChild<QCommandLinkButton>(view, "m_PlaceFieldSource");
+    auto *place = GetChild<QPushButton>(view, "m_PlaceFieldSource");
     auto *fa = dynamic_cast<mitk::Image *>(image->GetData());
     const auto center = fa->GetGeometry()->GetCenter();
     for (const double shift : {-5.0, 5.0})
@@ -1047,7 +1046,7 @@ public:
     }
     CPPUNIT_ASSERT_EQUAL(2u, GetDataStorage()->GetDerivations(image)->Size());
 
-    GetChild<QCommandLinkButton>(view, "m_GenerateFieldmap")->click();
+    GetChild<QPushButton>(view, "m_GenerateFieldmap")->click();
     auto *fieldmap = GetDataStorage()->GetNamedNode(image->GetName() + "_Fieldmap");
     CPPUNIT_ASSERT(fieldmap != nullptr);
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
@@ -1088,7 +1087,7 @@ class QmitkFiberFitViewUiTest : public CppUnit::TestFixture
   static std::vector<float> FittedWeights(QWidget *view, const mitk::DataNode::Pointer &image)
   {
     ChooseNode(view, "m_ImageBox", image);
-    GetChild<QCommandLinkButton>(view, "m_StartButton")->click();
+    GetChild<QPushButton>(view, "m_StartButton")->click();
     Wait(50);
     const auto derived = GetDataStorage()->GetDerivations(image);
     for (const auto &node : *derived)
@@ -1123,7 +1122,7 @@ public:
     ChooseNode(view, "m_ImageBox", peaks);
     ChooseNode(view, "m_TractBox", tracts);
     GetChild<QCheckBox>(view, "m_ResidualsBox")->setChecked(true);
-    GetChild<QCommandLinkButton>(view, "m_StartButton")->click();
+    GetChild<QPushButton>(view, "m_StartButton")->click();
 
     // The fitted tractogram and the fitted and residual images, all below the peak image.
     std::vector<std::string> names;

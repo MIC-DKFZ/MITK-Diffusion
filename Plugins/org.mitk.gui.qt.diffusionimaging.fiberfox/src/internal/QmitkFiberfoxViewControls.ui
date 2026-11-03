@@ -13,17 +13,9 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <property name="styleSheet">
-   <string notr="true"/>
-  </property>
   <layout class="QGridLayout" name="gridLayout_2">
    <item row="3" column="0">
     <widget class="QGroupBox" name="m_IntraAxonalGroupBox">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Intra-axonal Compartment</string>
      </property>
@@ -122,11 +114,6 @@
    </item>
    <item row="4" column="0">
     <widget class="QGroupBox" name="groupBox_5">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Inter-axonal Compartment</string>
      </property>
@@ -222,11 +209,6 @@
    </item>
    <item row="2" column="0">
     <widget class="QGroupBox" name="groupBox">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Image Settings</string>
      </property>
@@ -245,9 +227,6 @@
       </property>
       <item row="2" column="0">
        <widget class="QLabel" name="m_GeometryMessage">
-        <property name="styleSheet">
-         <string notr="true">color: rgb(255, 0, 0);</string>
-        </property>
         <property name="text">
          <string>Using  geometry of selected image!</string>
         </property>
@@ -849,9 +828,6 @@
       </item>
       <item row="4" column="0">
        <widget class="QLabel" name="m_DiffusionPropsMessage">
-        <property name="styleSheet">
-         <string notr="true">color: rgb(255, 0, 0);</string>
-        </property>
         <property name="text">
          <string>Using  gradients of selected DWI!</string>
         </property>
@@ -1117,11 +1093,6 @@
    </item>
    <item row="5" column="0">
     <widget class="QGroupBox" name="groupBox_6">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Extra-axonal Compartments</string>
      </property>
@@ -1309,11 +1280,6 @@
    </item>
    <item row="6" column="0">
     <widget class="QGroupBox" name="groupBox_3">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Noise and other Artifacts</string>
      </property>
@@ -1379,11 +1345,6 @@
          </item>
          <item row="3" column="0">
           <widget class="QGroupBox" name="m_RotationArtifactFrame">
-           <property name="styleSheet">
-            <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-           </property>
            <property name="title">
             <string>Rotation</string>
            </property>
@@ -1566,11 +1527,6 @@
          </item>
          <item row="4" column="0">
           <widget class="QGroupBox" name="m_TranslationArtifactFrame">
-           <property name="styleSheet">
-            <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-           </property>
            <property name="title">
             <string>Translation</string>
            </property>
@@ -2570,15 +2526,12 @@
        <number>0</number>
       </property>
       <item row="0" column="1">
-       <widget class="QCommandLinkButton" name="m_SaveParametersButton">
+       <widget class="QPushButton" name="m_SaveParametersButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="toolTip">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Start DWI generation from selected fiber bundle.&lt;/p&gt;&lt;p&gt;If no fiber bundle but an existing diffusion weighted image is selected, the enabled artifacts are added to this image.&lt;/p&gt;&lt;p&gt;If neither a fiber bundle nor a diffusion weighted image is selected, a grayscale image containing a simple gradient is generated.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true"/>
         </property>
         <property name="text">
          <string>Save Parameters</string>
@@ -2590,15 +2543,12 @@
        </widget>
       </item>
       <item row="0" column="0">
-       <widget class="QCommandLinkButton" name="m_LoadParametersButton">
+       <widget class="QPushButton" name="m_LoadParametersButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="toolTip">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Start DWI generation from selected fiber bundle.&lt;/p&gt;&lt;p&gt;If no fiber bundle but an existing diffusion weighted image is selected, the enabled artifacts are added to this image.&lt;/p&gt;&lt;p&gt;If neither a fiber bundle nor a diffusion weighted image is selected, a grayscale image containing a simple gradient is generated.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true"/>
         </property>
         <property name="text">
          <string>Load Parameters</string>
@@ -2634,15 +2584,12 @@
        <number>0</number>
       </property>
       <item row="1" column="0">
-       <widget class="QCommandLinkButton" name="m_GenerateImageButton">
+       <widget class="QPushButton" name="m_GenerateImageButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="toolTip">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Start DWI generation from selected fiber bundle.&lt;/p&gt;&lt;p&gt;If no fiber bundle but an existing diffusion weighted image is selected, the enabled artifacts are added to this image.&lt;/p&gt;&lt;p&gt;If neither a fiber bundle nor a diffusion weighted image is selected, a grayscale image containing a simple gradient is generated.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true"/>
         </property>
         <property name="text">
          <string>Start Simulation</string>
@@ -2655,11 +2602,6 @@
       </item>
       <item row="0" column="0">
        <widget class="QGroupBox" name="groupBox_2">
-        <property name="styleSheet">
-         <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-        </property>
         <property name="title">
          <string>Input Data</string>
         </property>
@@ -2827,15 +2769,12 @@
        </widget>
       </item>
       <item row="2" column="0">
-       <widget class="QCommandLinkButton" name="m_AbortSimulationButton">
+       <widget class="QPushButton" name="m_AbortSimulationButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="toolTip">
          <string>Stop current simulation.</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true"/>
         </property>
         <property name="text">
          <string>Abort Simulation</string>
@@ -2848,12 +2787,6 @@
       </item>
       <item row="3" column="0">
        <widget class="QTextEdit" name="m_SimulationStatusText">
-        <property name="font">
-         <font>
-          <family>Courier</family>
-          <pointsize>7</pointsize>
-         </font>
-        </property>
         <property name="readOnly">
          <bool>true</bool>
         </property>

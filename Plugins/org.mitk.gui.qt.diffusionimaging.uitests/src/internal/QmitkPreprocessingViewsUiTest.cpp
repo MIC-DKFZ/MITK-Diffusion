@@ -19,8 +19,8 @@ found in the LICENSE file.
 #include <cppunit/extensions/HelperMacros.h>
 
 #include <QCheckBox>
-#include <QCommandLinkButton>
 #include <QDoubleSpinBox>
+#include <QPushButton>
 
 #include <algorithm>
 
@@ -75,7 +75,7 @@ public:
     auto dwi = Load("ImageReconstruction/test.dwi");
     auto *view = ShowView(DenoisingId, "QmitkDenoisingViewControls");
     ChooseNode(view, "m_InputImageBox", dwi);
-    GetChild<QCommandLinkButton>(view, "m_ApplyButton")->click();
+    GetChild<QPushButton>(view, "m_ApplyButton")->click();
     WaitForDerived(dwi);
     CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
   }
@@ -85,7 +85,7 @@ public:
     auto dwi = Load("ImageReconstruction/test.dwi");
     auto *view = ShowView(DenoisingId, "QmitkDenoisingViewControls");
     ChooseNode(view, "m_InputImageBox", dwi);
-    GetChild<QCommandLinkButton>(view, "m_ApplyButton")->click();
+    GetChild<QPushButton>(view, "m_ApplyButton")->click();
     HideView(DenoisingId);
     Wait(3000);
   }
@@ -95,7 +95,7 @@ public:
     auto dwi = Load("ImageReconstruction/test.dwi");
     auto *view = ShowView(PreprocessingId, "QmitkPreprocessingViewControls");
     ChooseNode(view, "m_SelctedImageComboBox", dwi);
-    GetChild<QCommandLinkButton>(view, "m_ButtonExtractB0")->click();
+    GetChild<QPushButton>(view, "m_ButtonExtractB0")->click();
     WaitForDerived(dwi);
   }
 
@@ -127,7 +127,7 @@ public:
     CPPUNIT_ASSERT_DOUBLES_EQUAL(origin[0], originX->value(), 1e-4);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(spacing[0], GetChild<QDoubleSpinBox>(view, "m_HeaderSpacingX")->value(), 1e-4);
     originX->setValue(origin[0] + 10.5);
-    GetChild<QCommandLinkButton>(view, "m_ModifyHeader")->click();
+    GetChild<QPushButton>(view, "m_ModifyHeader")->click();
     auto *newHeader = Result(dwi, dwi->GetName() + "_newheader");
     CPPUNIT_ASSERT_DOUBLES_EQUAL(origin[0] + 10.5, newHeader->GetGeometry()->GetOrigin()[0], 1e-9);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(origin[1], newHeader->GetGeometry()->GetOrigin()[1], 1e-9);
@@ -138,14 +138,14 @@ public:
     // Align: the target image's origin.
     ChooseNode(view, "m_SelctedImageComboBox", dwi);
     ChooseNode(view, "m_AlignImageBox", target);
-    GetChild<QCommandLinkButton>(view, "m_AlignImageButton")->click();
+    GetChild<QPushButton>(view, "m_AlignImageButton")->click();
     auto *aligned = Result(dwi, dwi->GetName() + "_aligned");
     CPPUNIT_ASSERT(mitk::Equal(dynamic_cast<mitk::Image *>(target->GetData())->GetGeometry()->GetOrigin(), aligned->GetGeometry()->GetOrigin(), 1e-9, true));
 
     // Flip x: the first column of voxels is the last one of the input.
     ChooseNode(view, "m_SelctedImageComboBox", dwi);
     GetChild<QCheckBox>(view, "m_FlipX")->setChecked(true);
-    GetChild<QCommandLinkButton>(view, "m_FlipAxis")->click();
+    GetChild<QPushButton>(view, "m_FlipAxis")->click();
     auto *flipped = Result(dwi, dwi->GetName() + "_flipped");
     const unsigned int nx = image->GetDimension(0);
     const unsigned int voxelBytes = image->GetPixelType().GetSize();
@@ -169,7 +169,7 @@ public:
     ChooseNode(view, "m_SelctedImageComboBox", node);
     GetChild<QDoubleSpinBox>(view, "m_HeaderOriginX")->setValue(12.25);
     GetChild<QDoubleSpinBox>(view, "m_HeaderSpacingZ")->setValue(2.5);
-    GetChild<QCommandLinkButton>(view, "m_ModifyHeader")->click();
+    GetChild<QPushButton>(view, "m_ModifyHeader")->click();
     auto *result = Result(node, "series_newheader");
     CPPUNIT_ASSERT_EQUAL(3u, result->GetTimeSteps());
     for (unsigned int t = 0; t < 3; ++t)
@@ -185,7 +185,7 @@ public:
     auto dwi = Load("ImageReconstruction/test.dwi");
     auto *view = ShowView(HeadMotionId, "QmitkHeadMotionCorrectionViewControls");
     ChooseNode(view, "m_ImageBox", dwi);
-    GetChild<QCommandLinkButton>(view, "m_RegistrationStartButton")->click();
+    GetChild<QPushButton>(view, "m_RegistrationStartButton")->click();
     HideView(HeadMotionId);
     Wait(3000);
   }
@@ -197,7 +197,7 @@ public:
     auto *view = ShowView(RegistrationId, "QmitkSimpleRegistrationViewControls");
     ChooseNode(view, "m_FixedImageBox", fixed);
     ChooseNode(view, "m_MovingImageBox", moving);
-    GetChild<QCommandLinkButton>(view, "m_RegistrationStartButton")->click();
+    GetChild<QPushButton>(view, "m_RegistrationStartButton")->click();
     CPPUNIT_ASSERT(WaitFor([&moving]() {
       return GetDataStorage()->GetNamedNode(moving->GetName() + "_registered (rigid)") != nullptr
           || GetDataStorage()->GetNamedNode(moving->GetName() + "_registered (affine)") != nullptr;
@@ -216,10 +216,10 @@ public:
     auto dwi = Load("StreamlineTractography/diffusion_image_v2.nii.gz");
     auto *denoising = ShowView(DenoisingId, "QmitkDenoisingViewControls");
     ChooseNode(denoising, "m_InputImageBox", dwi);
-    GetChild<QCommandLinkButton>(denoising, "m_ApplyButton")->click();
+    GetChild<QPushButton>(denoising, "m_ApplyButton")->click();
     auto *headMotion = ShowView(HeadMotionId, "QmitkHeadMotionCorrectionViewControls");
     ChooseNode(headMotion, "m_ImageBox", dwi);
-    auto *start = GetChild<QCommandLinkButton>(headMotion, "m_RegistrationStartButton");
+    auto *start = GetChild<QPushButton>(headMotion, "m_RegistrationStartButton");
     start->click();
     CPPUNIT_ASSERT(!start->isEnabled());
   }

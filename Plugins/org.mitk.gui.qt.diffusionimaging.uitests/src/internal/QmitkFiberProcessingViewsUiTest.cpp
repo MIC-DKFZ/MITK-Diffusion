@@ -29,7 +29,6 @@ found in the LICENSE file.
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QCommandLinkButton>
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -95,7 +94,7 @@ class QmitkFiberProcessingViewsUiTest : public CppUnit::TestFixture
   static void Remove(QWidget *view, int method)
   {
     GetChild<QComboBox>(view, "m_RemovalMethodBox")->setCurrentIndex(method);
-    GetChild<QCommandLinkButton>(view, "m_RemoveButton")->click();
+    GetChild<QPushButton>(view, "m_RemoveButton")->click();
     Wait(20);
   }
 
@@ -157,7 +156,7 @@ public:
     GetChild<QComboBox>(view, "m_ModificationMethodBox")->setCurrentIndex(2);
     GetChild<QDoubleSpinBox>(view, "m_ErrorThresholdBox")->setValue(0.1);
     LogCapture log;
-    GetChild<QCommandLinkButton>(view, "m_ModifyButton")->click();
+    GetChild<QPushButton>(view, "m_ModifyButton")->click();
     Wait(20);
     CPPUNIT_ASSERT(Reference("FiberProcessing/modify_compress_v2.fib")->Equals(Fibers(fib)));
   }
@@ -186,7 +185,7 @@ public:
     GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(1);
     GetChild<QComboBox>(view, "m_ExtractionBoxMask")->setCurrentIndex(4);
     GetChild<QLineEdit>(view, "m_LabelsBox")->setText("1, x");
-    GetChild<QCommandLinkButton>(view, "m_ExtractFibersButton")->click();
+    GetChild<QPushButton>(view, "m_ExtractFibersButton")->click();
     CPPUNIT_ASSERT(OneMessage().contains("Invalid labels"));
     CPPUNIT_ASSERT_EQUAL(std::size_t(1), GetNodesOfClass("FiberBundle").size());
   }
@@ -203,7 +202,7 @@ public:
 
     GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(1);
     GetChild<QComboBox>(view, "m_ExtractionBoxMask")->setCurrentIndex(2); // passing ROI
-    GetChild<QCommandLinkButton>(view, "m_ExtractFibersButton")->click();
+    GetChild<QPushButton>(view, "m_ExtractFibersButton")->click();
     Wait(50);
     // One extracted bundle below each input, named after the ROI.
     for (const auto &bundle : {first, second})
@@ -216,7 +215,7 @@ public:
 
     // Copies of both bundles, independent of their sources.
     Select({first, second});
-    GetChild<QCommandLinkButton>(view, "m_CopyBundle")->click();
+    GetChild<QPushButton>(view, "m_CopyBundle")->click();
     Wait(50);
     auto copy = GetDataStorage()->GetNamedNode("first_copy");
     CPPUNIT_ASSERT(copy != nullptr && GetDataStorage()->GetNamedNode("second_copy") != nullptr);
@@ -248,7 +247,7 @@ public:
   {
     Select({fib, roi});
     CPPUNIT_ASSERT_EQUAL(QString::fromStdString(roi->GetName()), GetChild<QLabel>(view, "m_PfLabel")->text());
-    GetChild<QCommandLinkButton>(view, "m_ExtractFibersButton")->click();
+    GetChild<QPushButton>(view, "m_ExtractFibersButton")->click();
     Wait(50);
     auto derived = GetDataStorage()->GetDerivations(fib);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(roi->GetName(), 1u, derived->Size());
@@ -400,7 +399,7 @@ public:
     // The ROI image of both figures: on the image's grid, both figures filled, nothing else set.
     auto *view = ShowProcessing();
     Select({imageNode, circleNode, rectangleNode});
-    auto *generate = GetChild<QCommandLinkButton>(view, "m_GenerateRoiImage");
+    auto *generate = GetChild<QPushButton>(view, "m_GenerateRoiImage");
     CPPUNIT_ASSERT(generate->isEnabled());
     generate->click();
     Wait(50);
@@ -435,7 +434,7 @@ public:
 
     // An AND composite cannot be converted: a message, no image.
     Select({circleNode, rectangleNode});
-    GetChild<QCommandLinkButton>(view, "PFCompoANDButton")->click();
+    GetChild<QPushButton>(view, "PFCompoANDButton")->click();
     Wait(50);
     auto andNode = GetDataStorage()->GetNamedNode("AND");
     CPPUNIT_ASSERT(andNode != nullptr);
@@ -482,7 +481,7 @@ public:
     auto circleNode = AddNode(CreateCircle(plane, circleCentre, 4), "Circle1");
 
     auto *view = ShowProcessing();
-    auto *generate = GetChild<QCommandLinkButton>(view, "m_GenerateRoiImage");
+    auto *generate = GetChild<QPushButton>(view, "m_GenerateRoiImage");
     // The ROI image of the selection, removed from the storage; its figure's centre is set.
     auto generateRoiImage = [&](const QList<mitk::DataNode::Pointer> &selection) {
       Select(selection);
@@ -561,7 +560,7 @@ public:
     GetChild<QPushButton>(view, "m_CircleButton")->click();
     Wait(20);
     GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(0);
-    auto *extract = GetChild<QCommandLinkButton>(view, "m_ExtractFibersButton");
+    auto *extract = GetChild<QPushButton>(view, "m_ExtractFibersButton");
     CPPUNIT_ASSERT(extract->isEnabled());
     extract->click();
     CPPUNIT_ASSERT(OneMessage().contains("forgot to actually place it"));
@@ -580,7 +579,7 @@ public:
     auto *view = ShowView(QuantificationId, "QmitkFiberQuantificationViewControls");
     ChooseNode(view, "m_TractBox", fib);
     auto *method = GetChild<QComboBox>(view, "m_GenerationBox");
-    auto *start = GetChild<QCommandLinkButton>(view, "m_ProcessFiberBundleButton");
+    auto *start = GetChild<QPushButton>(view, "m_ProcessFiberBundleButton");
 
     // Binary envelope on the grid of the reference image, without any fiber in it.
     ChooseNode(view, "m_ImageBox", reference);
@@ -609,7 +608,7 @@ public:
     auto fib = Load("fiberBundleX.fib");
     auto *view = ShowView(ClusteringId, "QmitkFiberClusteringViewControls");
     ChooseNode(view, "m_TractBox", fib);
-    auto *start = GetChild<QCommandLinkButton>(view, "m_StartButton");
+    auto *start = GetChild<QPushButton>(view, "m_StartButton");
 
     // The anatomical metric without a parcellation.
     GetChild<QCheckBox>(view, "m_MetricBox4")->setChecked(true);

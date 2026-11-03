@@ -13,15 +13,6 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_2">
    <property name="verticalSpacing">
     <number>25</number>
@@ -48,7 +39,7 @@ QGroupBox {
        <number>0</number>
       </property>
       <item row="1" column="0">
-       <widget class="QCommandLinkButton" name="m_StartPeakExtractionButton">
+       <widget class="QPushButton" name="m_StartPeakExtractionButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
