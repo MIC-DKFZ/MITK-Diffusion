@@ -152,9 +152,12 @@ Facts the layout does not show:
   `PATCH`/`DELETE .../labels/:value`, `POST /diffusion/tractography/{streamline,extract,metrics}`.
   Long work runs as `RestJob`s on worker threads (`diffusionrest::JobRunner`,
   `mitkDiffusionRestUtil.h`): the work returns a finish function that the runner posts to the GUI
-  thread (`IRestServerService::Post`) to add the result nodes; the runner joins its threads when the
-  routes are removed, so the Workbench's quit waits for a running reconstruction (tracking stops at
-  once). Masks come as a uid (binary image or segmentation) or `{segmentation, labels}`; every label
+  thread (`IRestServerService::Post`) to add the result nodes; the runner cancels and joins its
+  threads when the routes are removed, which the auto-load module does at `aboutToQuit` (the server
+  service goes only in the exit handlers, after statics a running filter still reads). Cancelling
+  stops tracking at once (also while it is set up) and the SH peak extraction after the blocks of
+  voxels already running (`ExtractPeaks`' stop flag); the other reconstructions run to their end.
+  A tracking job reports progress 0 with a message while it is set up. Masks come as a uid (binary image or segmentation) or `{segmentation, labels}`; every label
   a route creates gets a group of its own, so ROIs may overlap. The streamline route uses the setup
   shared with the view and the app (`Modules/FiberTracking/mitkStreamlineTractography.h`:
   `CreateTrackingHandler`, `CreateTrackingPriorHandler`, `SetTrackingRois`). `ctest -R
