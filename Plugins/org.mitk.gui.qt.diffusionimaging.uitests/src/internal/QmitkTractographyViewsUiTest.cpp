@@ -104,6 +104,7 @@ class QmitkTractographyViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Gibbs_ParameterFileNoFibersReadOnlyFolder_LabelsAndMessages);
   CPPUNIT_TEST(Gibbs_ParallelSampler_SameFibersAtTwoThreadCounts);
   CPPUNIT_TEST(Rest_DiffusionRoutesListed_PolygonRoiInTheShownSlice);
+  CPPUNIT_TEST(Rest_PickAndPropertiesWhileJobsRun_NoCrash);
   // Last: it leaves its views, data and runs to the harness, which then quits the Workbench.
   CPPUNIT_TEST(Quit_WhileTrackingRuns_NoCrash);
   CPPUNIT_TEST_SUITE_END();
@@ -1230,6 +1231,114 @@ public:
       recipes = recipes || (section.at("title").get<std::string>() == "Recipes for Common Tracts" &&
                             section.at("page").get<std::string>().ends_with("Streamline Tractography"));
     CPPUNIT_ASSERT_MESSAGE("The manual search does not find the recipes: " + found.Body.substr(0, 1500), recipes);
+#else
+    MITK_WARN << "MITK's REST API is not built; the REST case is left out.";
+#endif
+  }
+
+  /**
+   * The agent's sequence on a DWI: tensors, brain mask, FA, Q-ball and peaks as jobs, and while
+   * the peak job runs, property changes, render updates and picks through MITK's own endpoints.
+   * Repeated, so that the job's allocations overlap the GUI thread's work on the nodes: MITK's
+   * pick (QmitkRestApiRenderingRoutes.cpp, DescribeData) iterated a node set whose owner was a
+   * temporary, freed memory that a running job reuses, and crashed the Workbench in the trial of
+   * #55. The case fails until that MITK fix is in the base.
+   */
+  void Rest_PickAndPropertiesWhileJobsRun_NoCrash()
+  {
+#if MITK_DIFFUSION_UITEST_RESTAPI
+    const char *dwiFile = std::getenv("MITK_DIFFUSION_UITEST_DWI");
+    auto dwi = dwiFile != nullptr ? AddNode(mitk::IOUtil::Load<mitk::Image>(dwiFile), "dwi") : Load("ImageReconstruction/test.dwi");
+    Select({dwi});
+    InitializeViews();
+    // The pick and the other rendering routes come with MITK's REST API plug-in, which starts with its view.
+    ShowView("org.mitk.views.restapi", "QmitkRestApiViewControls");
+
+    auto *context = us::ModuleRegistry::GetModule(1)->GetModuleContext();
+    auto reference = context->GetServiceReference<mitk::IRestServerService>();
+    CPPUNIT_ASSERT_MESSAGE("No REST server service", reference);
+    auto *server = context->GetService(reference);
+    CPPUNIT_ASSERT(server != nullptr);
+
+    if (!server->IsRunning())
+    {
+      mitk::RestServerConfig config;
+      config.enabled = true;
+      config.host = "127.0.0.1";
+      config.port = 0;
+      CPPUNIT_ASSERT_MESSAGE("The REST server does not start", server->Start(config, "UI test"));
+    }
+
+    const auto token = server->CreateToken("UI test", mitk::RestTokenRights());
+    const auto call = [&](const std::string &method, const std::string &target, const nlohmann::json &body = nlohmann::json()) {
+      mitk::RestRequest request;
+      request.Method = method;
+      request.SetTarget(target);
+      request.Headers["authorization"] = "Bearer " + token;
+      if (!body.is_null())
+        request.Body = body.dump();
+
+      mitk::RestResponse response;
+      std::atomic<bool> done{false};
+      std::thread worker([&]() {
+        response = server->HandleRequest(request);
+        done = true;
+      });
+      CPPUNIT_ASSERT_MESSAGE("No answer for " + target, WaitFor([&]() { return done.load(); }, 600000));
+      worker.join();
+      return response;
+    };
+    const auto data = [](const mitk::RestResponse &response) {
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(response.Body, 200, response.Status);
+      return nlohmann::json::parse(response.Body).at("data");
+    };
+    const auto result = [&](const mitk::RestResponse &response) {
+      const auto job = data(response);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(job.dump(), std::string("succeeded"), job.at("state").get<std::string>());
+      return job.at("result");
+    };
+
+    const auto uid = server->GetNodeUid(dwi);
+    const auto tensors = result(call("POST", "/api/v1/diffusion/reconstruction/tensors?wait=300", nlohmann::json{{"dwi", uid}})).at("tensors").at("uid").get<std::string>();
+    const auto brain = result(call("POST", "/api/v1/diffusion/masks/brain?wait=300", nlohmann::json{{"dwi", uid}}));
+    const auto brainUid = brain.at("segmentation").at("uid").get<std::string>();
+    const auto brainLabel = brain.at("label").at("value").get<int>();
+    const auto fa = result(call("POST", "/api/v1/diffusion/reconstruction/tensor-indices?wait=300", nlohmann::json{{"tensors", tensors}})).at("images")[0].at("uid").get<std::string>();
+    const auto sh = result(call("POST", "/api/v1/diffusion/reconstruction/qball?wait=600", nlohmann::json{{"dwi", uid}, {"method", "csa"}})).at("sh").at("uid").get<std::string>();
+
+    for (int round = 0; round < 4; ++round)
+    {
+      const nlohmann::json mask = {{"segmentation", brainUid}, {"labels", {brainLabel}}};
+      const auto startResponse = call("POST", "/api/v1/diffusion/reconstruction/peaks?wait=0", nlohmann::json{{"image", sh}, {"mask", mask}});
+      CPPUNIT_ASSERT_MESSAGE(startResponse.Body, startResponse.Status == 200 || startResponse.Status == 202);
+      const auto jobId = nlohmann::json::parse(startResponse.Body).at("data").at("id").get<std::string>();
+
+      // Meanwhile, what the agent did: hide nodes, update, pick in every 2D window.
+      for (const auto &node : {brainUid, fa, sh})
+        CPPUNIT_ASSERT_EQUAL(200, call("PATCH", "/api/v1/datastorage/nodes/" + node + "/properties", nlohmann::json{{"visible", round % 2 == 0}}).Status);
+      call("POST", "/api/v1/rendering/update");
+
+      bool ended = false;
+      for (int i = 0; i < 400 && !ended; ++i)
+      {
+        for (const char *window : {"coronal", "axial", "sagittal"})
+        {
+          auto *renderer = mitk::BaseRenderer::GetByName(window == std::string("axial") ? "stdmulti.widget0" : window == std::string("sagittal") ? "stdmulti.widget1" : "stdmulti.widget2");
+          const double w = renderer->GetSizeX(), h = renderer->GetSizeY();
+          const auto picked = call("POST", std::string("/api/v1/rendering/windows/") + window + "/pick",
+                                   nlohmann::json{{"window", window}, {"image_size", {w, h}}, {"pixels", {{0.4 * w, 0.45 * h}, {0.6 * w, 0.45 * h}, {0.5 * w, 0.4 * h}}}});
+          CPPUNIT_ASSERT_EQUAL_MESSAGE(picked.Body, 200, picked.Status);
+        }
+        call("GET", "/api/v1/datastorage/nodes?limit=50");
+        const auto job = data(call("GET", "/api/v1/jobs/" + jobId));
+        ended = job.at("state").get<std::string>() != "running";
+      }
+      CPPUNIT_ASSERT(ended);
+      // Remove the peak image again, so the next round starts the same.
+      for (const auto &node : GetNodesOfClass("PeakImage"))
+        GetDataStorage()->Remove(node);
+      Wait(20);
+    }
 #else
     MITK_WARN << "MITK's REST API is not built; the REST case is left out.";
 #endif
