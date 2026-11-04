@@ -19,6 +19,8 @@ found in the LICENSE file.
 #include <usServiceEvent.h>
 #include <usServiceReference.h>
 
+#include <QCoreApplication>
+
 #include <mutex>
 #include <vector>
 
@@ -46,6 +48,7 @@ namespace mitk
 
     void Unload(us::ModuleContext* context) override
     {
+      QObject::disconnect(m_QuitConnection);
       context->RemoveServiceListener(this, &DiffusionRestRoutesActivator::OnServiceChanged);
       this->RemoveRoutes();
       m_Context = nullptr;
@@ -79,6 +82,13 @@ namespace mitk
 
         m_Server = server;
         MITK_INFO << "Offering " << m_Routes.size() << " diffusion REST endpoints below /api/v1/diffusion";
+
+        // Removing the routes cancels and joins their jobs. The server service goes only in the
+        // exit handlers, after the function-local statics of the diffusion modules that a running
+        // job still reads (e.g. the ODF neighbours of the peak extraction), so the routes go when
+        // the event loop ends.
+        if (auto* application = QCoreApplication::instance(); application != nullptr && !m_QuitConnection)
+          m_QuitConnection = QObject::connect(application, &QCoreApplication::aboutToQuit, [this]() { this->RemoveRoutes(); });
       }
       catch (const mitk::Exception& e)
       {
@@ -110,6 +120,7 @@ namespace mitk
     std::mutex m_Mutex;
     IRestServerService* m_Server = nullptr;
     std::vector<RestRouteId> m_Routes;
+    QMetaObject::Connection m_QuitConnection;
   };
 }
 

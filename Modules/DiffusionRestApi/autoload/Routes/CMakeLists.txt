@@ -7,5 +7,6 @@
 # the endpoints up before any diffusion view is open.
 mitk_create_module(DiffusionRestApiRoutes
   DEPENDS PRIVATE MitkDiffusionRestApi
+  PACKAGE_DEPENDS PRIVATE Qt6|Core
   AUTOLOAD_WITH MitkRESTAPI
 )
