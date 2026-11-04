@@ -41,8 +41,18 @@ gets a Debug inner build of its own in `wt-build/<worktree name>`, configured by
 `mitk-diffusion/.claude/scripts/configure-worktree-build.sh` (see "Commands"); it reuses the
 externals in `debug/ep` and MITK's test data in `debug/MITK-Data`, and reads the diffusion test
 data from `mitk-diffusion-test-data/`. `mitkConfig.h` embeds the extension path, so the first
-build of a tree compiles nearly all of MITK: keep the tree as long as its worktree exists, and
-rerun the script after a superbuild in `debug/`.
+build of a tree compiles nearly all of MITK (about 20 minutes at `-j8`, 14 GB), while switching
+the branch of a worktree recompiles only the files that differ. Work in a worktree therefore uses
+a **slot**: `mitk-diffusion/.worktrees/slot-<n>` with its tree `wt-build/slot-<n>`, both kept
+between tasks. A task switches a free slot to its branch
+(`git -C <ws>/mitk-diffusion/.worktrees/slot-<n> switch -c <branch> <base>`). A slot is free when
+its HEAD is detached and its working tree is clean (a new branch without commits counts as merged,
+so "merged" does not mean free); whoever merges a slot's branch frees the slot with
+`git -C <slot> switch --detach <base>`. A new slot takes
+`git -C <ws>/mitk-diffusion worktree add --detach <absolute slot path> develop` (absolute: `-C`
+resolves a relative path inside the repository), the configure script and one full build. Rerun
+the script for every slot after a superbuild in `debug/`. Worktrees named after a branch are of
+earlier tasks.
 
 When MITK changed an interface, adapt mitk-diffusion to it. MITK usually migrated its own modules
 in the same commit, so `git -C mitk log -S'<old symbol>'` shows the intended replacement. If a
@@ -372,8 +382,8 @@ Run from the workspace root. Both superbuild trees use Unix Makefiles; for Relea
 | `ctest --test-dir debug/MITK-build -R Fiber` | Run tests matching a pattern; `-N` lists without running. Never call a test driver directly. |
 | `ctest --test-dir debug/MITK-build -R mitkDiffusionCmdApps` | Smoke tests of the command line apps, one per app group (`Modules/DiffusionCmdApps/Testing`): each app runs as a process on test-data input with output checks, a wrong call per group, and `--help` and well-formed `--xml` of every app; about a minute in Debug. FiberScreenshot has a test of its own, skipped (exit code 77) without an OpenGL context. Building the test driver builds the apps; each test case works in its own folder below `$TMPDIR/mitkDiffusionCmdAppTests`, so the group tests can run in parallel. |
 | `debug/MITK-build/bin/MitkWorkbench` | Start the Workbench with the diffusion plugins; command line apps are in the same `bin/`. |
-| `mitk-diffusion/.claude/scripts/configure-worktree-build.sh mitk-diffusion/.worktrees/<name> wt-build/<name>` | Configure a worktree's own build tree (about 20 s), and re-configure it after editing CMake files. Extra arguments override the initial cache, e.g. `-DMITK_BUILD_CONFIGURATION=Fiberfox` in a throwaway tree to check another configuration. Build it like `debug/MITK-build`. |
-| `mkdir -p wt-build/<name>/tmp && TMPDIR=wt-build/<name>/tmp ctest --test-dir wt-build/<name> -R Fiber` | Tests in a worktree's tree. Failing tests write to the system temp folder; a `TMPDIR` per tree keeps parallel sessions apart. |
+| `mitk-diffusion/.claude/scripts/configure-worktree-build.sh mitk-diffusion/.worktrees/slot-<n> wt-build/slot-<n>` | Configure a worktree's own build tree (about 20 s), and re-configure it after editing CMake files. Extra arguments override the initial cache, e.g. `-DMITK_BUILD_CONFIGURATION=Fiberfox` in a throwaway tree to check another configuration. Build it like `debug/MITK-build`. |
+| `mkdir -p wt-build/slot-<n>/tmp && TMPDIR=wt-build/slot-<n>/tmp ctest --test-dir wt-build/slot-<n> -R Fiber` | Tests in a worktree's tree. Failing tests write to the system temp folder; a `TMPDIR` per tree keeps parallel sessions apart. |
 
 ## Working rules
 

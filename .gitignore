@@ -5,3 +5,4 @@
 .worktrees/
 .claude/settings.local.json
 .claude/worktrees/
+*.pyc

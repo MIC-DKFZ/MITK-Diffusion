@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Investigate a feature or fix read-only, settle the open design decisions with the user, then create the GitLab issue (through the feature-request, bug-report or improvement-request skill), a <nr>-branch in its own mitk-diffusion/.worktrees/ worktree, a self-contained handoff plan, and the start sentence ("carry out this plan: <path>") for a new Claude session in the workspace root that implements, tests and commits in that worktree. Use whenever the user wants work prepared for a separate session or worktree - "hand this off", "prepare a handoff", "plan this for a new session", "create issue, branch and plan", "set this up so another session can implement it" - also when an /investigate discussion should turn into issue + branch + plan, even if the word "handoff" is not used. Not for implementing in the current session, and not for issue text alone (that is feature-request / bug-report / improvement-request).
+description: Investigate a feature or fix read-only, settle the open design decisions with the user, then create the GitLab issue (through the feature-request, bug-report or improvement-request skill), a <nr>-branch in a free worktree slot (mitk-diffusion/.worktrees/slot-<n>, kept built in wt-build/slot-<n>), a self-contained handoff plan, and the start sentence ("carry out this plan: <path>") for a new Claude session in the workspace root that implements, tests and commits in that worktree. Use whenever the user wants work prepared for a separate session or worktree - "hand this off", "prepare a handoff", "plan this for a new session", "create issue, branch and plan", "set this up so another session can implement it" - also when an /investigate discussion should turn into issue + branch + plan, even if the word "handoff" is not used. Not for implementing in the current session, and not for issue text alone (that is feature-request / bug-report / improvement-request).
 ---
 
 # Handoff: investigate, plan, create issue and branch, hand over
@@ -23,7 +23,9 @@ not the worktree. Consequences:
 - The plan must carry every fact, decision and command the implementer needs.
 - The plan pins every edit, git command, build and test to the worktree by absolute path;
   without that, work lands in the main checkout `<repo>`.
-- A worktree is not built by `debug/` or `release/`, which are bound to the main checkout.
+- The work runs in a worktree slot (`AGENTS.md`), whose Debug tree `<ws>/wt-build/slot-<n>` is
+  already built and recompiles only what the branch changes; `debug/` and `release/` are bound to
+  the main checkout.
 
 ## 1. Investigate - read-only
 
@@ -45,9 +47,9 @@ Every plan gets tests; the UI tests whenever a view's behaviour can change.
 ## 2. Settle the decisions
 
 Ask the user only what changes the work and cannot be read from the code: scope, trade-offs,
-behaviour choices, and **where the implementing session builds and tests** (the worktree has no
-build tree of its own; `<ws>/wt-build/configure.sh <worktree> <ws>/wt-build/<branch>` sets up a
-Debug tree on the externals in `debug/ep`). Ask one question at a time, with a recommendation. Record each answer
+behaviour choices, and **where the implementing session builds and tests** (by default the
+slot's Debug tree `<ws>/wt-build/slot-<n>`; a Release check or another build configuration needs a
+tree of its own, see `AGENTS.md`). Ask one question at a time, with a recommendation. Record each answer
 in the user's words; the plan states them as decisions, so the implementer does not reopen them.
 
 Some points cannot be settled from here: checks on real data, values only the user has. Do not
@@ -55,9 +57,10 @@ block on them. They go into the plan as open points the implementer must not dec
 
 ## 3. Confirm before creating anything
 
-Show in a few lines the issue type and title, the branch name (with `<nr>`), the base branch,
-and the plan's goals, steps and tests (module, command line app and UI tests). Then ask once whether to create the issue, the branch and the
-worktree. Skip this only if the user's request already said to go ahead without asking.
+Show in a few lines the issue type and title, the branch name (with `<nr>`), the base branch, the
+slot,
+and the plan's goals, steps and tests (module, command line app and UI tests). Then ask once whether to create the issue and the branch in the
+slot. Skip this only if the user's request already said to go ahead without asking.
 Creating a GitLab issue is visible to others and is not undone by deleting a file.
 
 ## 4. Issue
@@ -79,17 +82,34 @@ with the number filled in.
   it and give the number, and wait.
 - **Work only in MITK:** it does not belong here. Say so and stop.
 
-## 5. Branch and worktree
+## 5. Branch in a worktree slot
 
 The main checkout stays as it is: no switching, no stashing. The base is `master` unless the
-user named another. Record the base commit (`git -C mitk-diffusion rev-parse --short <base>`)
-for the plan.
+user named another. Record the base commit (`git -C <repo> rev-parse --short <base>`) for the
+plan.
+
+Take a free slot `<repo>/.worktrees/slot-<n>` (`AGENTS.md`): its HEAD is detached and its working
+tree is clean. A slot with a branch checked out belongs to a handoff that is running, not yet
+carried out or not yet merged; never take it, even when the branch shows as merged (a new branch
+without commits does).
 
 ```bash
-git -C mitk-diffusion worktree add .worktrees/<branch> -b <branch> master   # new branch
-git -C mitk-diffusion worktree add .worktrees/<branch> <branch>             # branch already exists
+git -C <repo> worktree list                                    # slots: detached or on a branch
+git -C <repo>/.worktrees/slot-<n> status --short               # empty when clean
+git -C <repo>/.worktrees/slot-<n> switch -c <branch> <base>    # new branch
+git -C <repo>/.worktrees/slot-<n> switch <branch>              # branch already exists
 ```
 
+When no slot is free, ask the user whether to add one (one full build, about 20 minutes at
+`-j8`, 14 GB), then:
+
+```bash
+git -C <repo> worktree add --detach <repo>/.worktrees/slot-<n> <base>
+<repo>/.claude/scripts/configure-worktree-build.sh <repo>/.worktrees/slot-<n> <ws>/wt-build/slot-<n>
+cmake --build <ws>/wt-build/slot-<n> -j8    # in the background
+```
+
+Use absolute paths: `git -C <repo>` resolves a relative worktree path inside the repository.
 Afterwards, check that the main checkout's status is unchanged.
 
 ## 6. Plan file
@@ -106,7 +126,7 @@ Copy into it every memory fact the work depends on; memory changes, the plan mus
 Reply with:
 
 - issue number and link;
-- branch, base commit and worktree path;
+- branch, base commit and slot path;
 - the plan file's absolute path;
 - the start sentence, fenced so it copies in one click, with the absolute plan path:
 

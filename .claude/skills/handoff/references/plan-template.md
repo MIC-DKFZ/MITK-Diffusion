@@ -8,8 +8,8 @@ conversation, so every fact it relies on must be in it, with a file and line it 
 # Plan: <issue title>
 
 Handoff plan, carried out by a session started in the workspace root `<ws>` (started with
-"carry out this plan: <this file>"). All work happens in the worktree `<wt>` =
-`<repo>/.worktrees/<branch>`; see "Working in the worktree". `AGENTS.md` is loaded and its
+"carry out this plan: <this file>"). All work happens in the worktree slot `<wt>` =
+`<repo>/.worktrees/slot-<n>`, on `<branch>`; see "Working in the worktree". `AGENTS.md` is loaded and its
 rules apply throughout. Checked against `<base>` at `<base commit>`.
 
 ## Issue and branch (already created)
@@ -26,7 +26,9 @@ rules apply throughout. Checked against `<base>` at `<base commit>`.
 - Git only as `git -C <wt> ...`. At start and end, `git -C <wt> status --short --branch` shows
   `<branch>`, and `git -C <repo> status --short --branch` is the same as at the start.
 - Skills that default to `mitk-diffusion/` (e.g. `review`) get paths under `<wt>` as scope.
-- Builds and tests use `<tree>`, the build tree bound to `<wt>` (see "Environment").
+- Builds and tests use `<tree>` = `<ws>/wt-build/slot-<n>`, the slot's build tree, kept between
+  tasks: build it as it is (only what the branch changes recompiles); rerun the configure script
+  only after editing CMake files (see "Environment").
 - Other sessions may work in other worktrees at the same time; their worktrees and build trees
   are not touched.
 
@@ -76,7 +78,7 @@ where an existing helper fits; the tests that check this step>
   added to or changed in the plugin's suite in
   `<wt>/Plugins/org.mitk.gui.qt.diffusionimaging.uitests/src/internal/`, with the widgets
   (`.ui` object names) and results it checks; what stays a manual check at a display
-  (rendering, #45); or "no view affected" and why>
+  (rendering); or "no view affected" and why>
 - Commands: <the exact build and ctest commands, run from where, with a `TMPDIR` per tree,
   e.g. `ctest -R mitkDiffusionViewsUiTest_<suite>`; which need the test data
   (`MITK_DIFFUSION_DATA_DIR`); a skip (exit code 77: no Qt platform plugin, no OpenGL) is
@@ -95,6 +97,8 @@ where an existing helper fits; the tests that check this step>
   - Message: the issue skill's commit message as subject, in the shape of `mitk/CLAUDE.md`
     (blank line, body with what and why). No `Co-Authored-By` or other attribution lines.
 - No push, merge request, merge, rebase or tag unless the user asks.
+- Leave the slot on `<branch>` with a clean working tree; do not remove the worktree or its build
+  tree. The slot is freed (`git -C <wt> switch --detach <base>`) when the branch is merged.
 - Report in the user's format (Answer / Files changed / Potential side effects / Not checked /
   Open questions), with each build and test's actual result.
 ```
