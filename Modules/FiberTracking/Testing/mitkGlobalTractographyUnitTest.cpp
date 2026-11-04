@@ -18,6 +18,7 @@ found in the LICENSE file.
 #include <mitkGibbsCellMasses.h>
 #include <mitkGibbsEnergyComputer.h>
 #include <mitkMetropolisHastingsSampler.h>
+#include <mitkParallelGibbsSampler.h>
 #include <mitkParticleGrid.h>
 #include <mitkSimpSamp.h>
 #include <mitkSphereInterpolator.h>
@@ -70,6 +71,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(BlockProposals_ShiftLeavingBlock_Rejected);
   MITK_TEST(BlockProposals_TrackReachingOutside_Rejected);
   MITK_TEST(BlockProposals_BirthsInBlockByMaskWeight);
+  MITK_TEST(ParallelSampler_Sweeps_ConsistentAtAnyThreadCount);
   MITK_TEST(SimpSamp_MoreThanThousandEndPoints);
   MITK_TEST(SphereInterpolator_TruncatedLookupTables_Invalid);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
@@ -634,6 +636,67 @@ public:
     const double share = static_cast<double>(heavy) / setup.grid.m_NumParticles;
     MITK_INFO << "share of births at mask value 2: " << share << " (expected 0.75)";
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.75, share, 0.04);
+  }
+
+  /** ODFs along image x (|d.x|^10 at the sampling directions), mean subtracted as by the filter. */
+  static OdfImageType::Pointer MakeOdfsAlongX(unsigned int x, unsigned int y, unsigned int z)
+  {
+    using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
+    OdfImageType::PixelType odf;
+    double mean = 0;
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+    {
+      odf[i] = static_cast<float>(std::pow(std::fabs(OdfType::GetDirection(i)[0]), 10));
+      mean += odf[i];
+    }
+    mean /= ODF_SAMPLING_SIZE;
+    for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
+      odf[i] -= static_cast<float>(mean);
+    return MakeFilledImage<OdfImageType>(x, y, z, odf);
+  }
+
+  /** Sweeps of the parallel sampler leave a consistent grid, and its state after them is the
+   *  same with 1 and with 4 threads. */
+  void ParallelSampler_Sweeps_ConsistentAtAnyThreadCount()
+  {
+    auto odfs = MakeOdfsAlongX(30, 30, 10);
+    auto mask = MakeFilledImage<FloatImageType>(30, 30, 10, 1.0f);
+    SphereInterpolator interpolator("");
+    CPPUNIT_ASSERT(interpolator.IsInValidState());
+    const float curvature = std::cos(itk::Math::pi / 4);
+
+    auto run = [&](unsigned int threads) {
+      mitk::ParticleGrid grid(mask, 1.0f, 1024); // cells of 2 mm: 16x16x6, 4 or 5 blocks per axis
+      auto rng = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+      rng->SetSeed(1);
+      GibbsEnergyComputer energy(odfs, mask, &grid, &interpolator, rng);
+      energy.SetParameters(0.5f, 0.5f, 10.0f, curvature, 0.0f, 0.2f);
+      mitk::ParallelGibbsSampler sampler(&grid, energy, mask, curvature, 7, threads);
+      CPPUNIT_ASSERT_EQUAL(threads, sampler.GetNumberOfThreads());
+      sampler.SetTemperature(0.05f);
+      for (int sweep = 0; sweep < 8; ++sweep)
+      {
+        CPPUNIT_ASSERT_EQUAL(3000ul, sampler.Sweep(3000));
+        CPPUNIT_ASSERT(grid.CheckConsistency());
+      }
+      MITK_INFO << threads << " threads: " << grid.m_NumParticles << " particles, " << grid.m_NumConnections << " connections, "
+                << sampler.GetNumAcceptedProposals() << " accepted, " << sampler.GetWriteRejections() << " rejected at block borders";
+      CPPUNIT_ASSERT_EQUAL(0ul, sampler.GetReadRejections());
+
+      std::vector<float> state;
+      for (int i = 0; i < grid.m_NumParticles; ++i)
+      {
+        mitk::Particle *p = grid.GetParticle(i);
+        state.insert(state.end(), {p->GetPos()[0], p->GetPos()[1], p->GetPos()[2], p->GetDir()[0], p->GetDir()[1], p->GetDir()[2],
+                                   static_cast<float>(p->pID), static_cast<float>(p->mID)});
+      }
+      return std::make_pair(state, grid.m_NumConnections);
+    };
+    const auto oneThread = run(1);
+    const auto fourThreads = run(4);
+    CPPUNIT_ASSERT(oneThread.first.size() > 8 * 100);
+    CPPUNIT_ASSERT(oneThread.second > 0);
+    CPPUNIT_ASSERT(oneThread == fourThreads);
   }
 
   /** The sampler of the track proposal had a fixed buffer of 1000 end points without bound check,

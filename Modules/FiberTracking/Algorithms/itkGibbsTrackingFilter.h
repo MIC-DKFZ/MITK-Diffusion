@@ -74,6 +74,11 @@ public:
     itkSetMacro( CurvatureThreshold, float)         ///< Cosine of the maximum angle between two connected particles; values below 0 (angles above 90 degrees) act as 0.
     itkSetMacro( DuplicateImage, bool )             ///< Work on copy of input image.
     itkSetMacro( RandomSeed, int )                  ///< Seed for random generator.
+    /** Run the parallel sampler (mitk::ParallelGibbsSampler): blocks of the particle grid on several
+     *  threads. With a fixed seed it gives the same tractogram at any number of threads, but not the
+     *  same as the serial sampler. A run option, not saved in parameter files. */
+    itkSetMacro( ParallelSampler, bool )
+    itkSetMacro( NumberOfThreads, unsigned int )    ///< Threads of the parallel sampler; 0: all (omp_get_max_threads()).
     itkSetMacro( LoadParameterFile, std::string )   ///< Parameter file.
     itkSetMacro( LutPath, std::string )             ///< Path to lookuptables. Default is binary directory.
 
@@ -91,6 +96,8 @@ public:
     itkGetMacro( CurrentIteration, double)
     itkGetMacro( Iterations, double)
     itkGetMacro( IsInValidState, bool)
+    itkGetMacro( ParallelSampler, bool )
+    itkGetMacro( NumberOfThreads, unsigned int )
     /** Output fibers. While the sampling loop of Update() runs in another thread, this asks it for
      *  the fibers of the current state and waits until they are built; otherwise it returns the
      *  last result (nullptr before the first one). The counters above may also be read from
@@ -145,6 +152,8 @@ protected:
     std::atomic<int> m_NumParticles;        ///< current number of particles in grid
     std::atomic<int> m_NumConnections;      ///< current number of connections between particles in grid
     int             m_RandomSeed;           ///< seed value for random generator (-1 for standard seeding)
+    bool            m_ParallelSampler;      ///< run the parallel sampler instead of the serial one
+    unsigned int    m_NumberOfThreads;      ///< threads of the parallel sampler, 0: all
     std::string     m_LoadParameterFile;    ///< filename of parameter file (reader)
     std::string     m_LutPath;              ///< path to lookuptables used by the sphere interpolator
     bool            m_IsInValidState;       ///< Whether the filter is in a valid state, false if error occured

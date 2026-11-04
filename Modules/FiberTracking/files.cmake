@@ -9,6 +9,7 @@ set(CPP_FILES
   Algorithms/GibbsTracking/mitkFiberBuilder.cpp
   Algorithms/GibbsTracking/mitkSphereInterpolator.cpp
   Algorithms/GibbsTracking/mitkGibbsCellMasses.cpp
+  Algorithms/GibbsTracking/mitkParallelGibbsSampler.cpp
 
   Algorithms/itkStreamlineTrackingFilter.cpp
   Algorithms/TrackingHandlers/mitkTrackingDataHandler.cpp
@@ -31,6 +32,7 @@ set(H_FILES
   Algorithms/GibbsTracking/mitkParticleGrid.h
   Algorithms/GibbsTracking/mitkGibbsBlock.h
   Algorithms/GibbsTracking/mitkGibbsCellMasses.h
+  Algorithms/GibbsTracking/mitkParallelGibbsSampler.h
   Algorithms/GibbsTracking/mitkMetropolisHastingsSampler.h
   Algorithms/GibbsTracking/mitkSimpSamp.h
   Algorithms/GibbsTracking/mitkEnergyComputer.h
