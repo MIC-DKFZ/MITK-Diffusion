@@ -23,7 +23,9 @@ found in the LICENSE file.
 #include <mitkSimpSamp.h>
 #include <mitkSphereInterpolator.h>
 #include <array>
+#include <numeric>
 #include <random>
+#include <sstream>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
 #include <vtkMath.h>
@@ -72,6 +74,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(BlockProposals_TrackReachingOutside_Rejected);
   MITK_TEST(BlockProposals_BirthsInBlockByMaskWeight);
   MITK_TEST(ParallelSampler_Sweeps_ConsistentAtAnyThreadCount);
+  MITK_TEST(ParallelSampler_SameStatisticsAsSerial);
   MITK_TEST(SimpSamp_MoreThanThousandEndPoints);
   MITK_TEST(SphereInterpolator_TruncatedLookupTables_Invalid);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
@@ -639,14 +642,14 @@ public:
   }
 
   /** ODFs along image x (|d.x|^10 at the sampling directions), mean subtracted as by the filter. */
-  static OdfImageType::Pointer MakeOdfsAlongX(unsigned int x, unsigned int y, unsigned int z)
+  static OdfImageType::Pointer MakeOdfsAlongX(unsigned int x, unsigned int y, unsigned int z, double exponent = 10)
   {
     using OdfType = itk::OrientationDistributionFunction<float, ODF_SAMPLING_SIZE>;
     OdfImageType::PixelType odf;
     double mean = 0;
     for (unsigned int i = 0; i < ODF_SAMPLING_SIZE; ++i)
     {
-      odf[i] = static_cast<float>(std::pow(std::fabs(OdfType::GetDirection(i)[0]), 10));
+      odf[i] = static_cast<float>(std::pow(std::fabs(OdfType::GetDirection(i)[0]), exponent));
       mean += odf[i];
     }
     mean /= ODF_SAMPLING_SIZE;
@@ -697,6 +700,114 @@ public:
     CPPUNIT_ASSERT(oneThread.first.size() > 8 * 100);
     CPPUNIT_ASSERT(oneThread.second > 0);
     CPPUNIT_ASSERT(oneThread == fourThreads);
+  }
+
+  /** Statistics of a Gibbs run on the tube image of ParallelSampler_SameStatisticsAsSerial. */
+  struct TubeStatistics
+  {
+    std::array<double, 5> values; ///< particles, connections, fibers, mean and 90th percentile fiber length (mm)
+  };
+
+  static constexpr const char *TubeStatisticNames[5] = {"particles", "connections", "fibers", "mean length", "90th percentile length"};
+
+  /** 24x8x8 voxels of 2 mm, a straight tube of 4x4 voxels with ODFs along x (|d.x|^4) in isotropic
+   *  background, the whole image as mask; a fixed temperature, weight, length and width. */
+  static TubeStatistics TrackTube(bool parallel, int seed, double iterations)
+  {
+    auto odfs = MakeOdfsAlongX(24, 8, 8, 4);
+    OdfImageType::SpacingType spacing;
+    spacing.Fill(2.0);
+    odfs->SetSpacing(spacing);
+    OdfImageType::PixelType isotropic;
+    isotropic.Fill(1.0f);
+    itk::ImageRegionIteratorWithIndex<OdfImageType> it(odfs, odfs->GetLargestPossibleRegion());
+    for (it.GoToBegin(); !it.IsAtEnd(); ++it)
+    {
+      const auto &index = it.GetIndex();
+      if (index[1] < 2 || index[1] > 5 || index[2] < 2 || index[2] > 5)
+        it.Set(isotropic);
+    }
+    auto mask = MakeFilledImage<FloatImageType>(24, 8, 8, 1.0f);
+    mask->SetSpacing(spacing);
+
+    auto filter = FilterType::New();
+    filter->SetOdfImage(odfs);
+    filter->SetMaskImage(mask);
+    filter->SetIterations(iterations);
+    filter->SetStartTemperature(0.05f);
+    filter->SetEndTemperature(0.05f);
+    filter->SetParticleWeight(0.5f);
+    filter->SetParticleWidth(1.0f);
+    filter->SetParticleLength(3.0f);
+    filter->SetMinFiberLength(10);
+    filter->SetCurvatureThreshold(std::cos(itk::Math::pi / 4));
+    filter->SetRandomSeed(seed);
+    filter->SetParallelSampler(parallel);
+    filter->SetNumberOfThreads(4);
+    filter->Update();
+
+    std::vector<double> lengths;
+    vtkPolyData *fibers = filter->GetFiberBundle();
+    for (vtkIdType i = 0; i < fibers->GetNumberOfCells(); ++i)
+    {
+      vtkCell *cell = fibers->GetCell(i);
+      double length = 0;
+      for (vtkIdType j = 1; j < cell->GetNumberOfPoints(); ++j)
+      {
+        double p0[3], p1[3];
+        cell->GetPoints()->GetPoint(j - 1, p0);
+        cell->GetPoints()->GetPoint(j, p1);
+        length += std::sqrt(vtkMath::Distance2BetweenPoints(p0, p1));
+      }
+      lengths.push_back(length);
+    }
+    std::sort(lengths.begin(), lengths.end());
+    TubeStatistics statistics;
+    statistics.values[0] = filter->GetNumParticles();
+    statistics.values[1] = filter->GetNumConnections();
+    statistics.values[2] = static_cast<double>(lengths.size());
+    statistics.values[3] = lengths.empty() ? 0 : std::accumulate(lengths.begin(), lengths.end(), 0.0) / lengths.size();
+    statistics.values[4] = lengths.empty() ? 0 : lengths[static_cast<std::size_t>(0.9 * (lengths.size() - 1))];
+    return statistics;
+  }
+
+  /** The parallel sampler samples the same distribution as the serial one: at a fixed temperature,
+   *  the mean over 5 seeds of each statistic of the parallel runs lies within 2 standard deviations
+   *  of the serial runs' mean (fixed seeds, so the outcome is fixed).
+   *  The comparison holds only near equilibrium: the parallel sampler rejects about 11 % of the
+   *  proposals at block borders and joins chains across them later, so on the way it has fewer
+   *  connections and shorter fibers per proposal (here at 1e5 proposals; on a 30x30x10 image with
+   *  a sharper ODF and weight 0.05 still at 1e6). Here the counts level off by about 4e5 proposals
+   *  (particles at 1e5, 2e5, 4e5, 8e5: 314, 349, 368, 379). */
+  void ParallelSampler_SameStatisticsAsSerial()
+  {
+    const double iterations = 4e5;
+    std::array<std::vector<double>, 5> serial, parallel;
+    for (int seed = 1; seed <= 5; ++seed)
+    {
+      const TubeStatistics s = TrackTube(false, seed, iterations);
+      const TubeStatistics p = TrackTube(true, seed, iterations);
+      for (int k = 0; k < 5; ++k)
+      {
+        serial[k].push_back(s.values[k]);
+        parallel[k].push_back(p.values[k]);
+      }
+    }
+    for (int k = 0; k < 5; ++k)
+    {
+      const double serialMean = std::accumulate(serial[k].begin(), serial[k].end(), 0.0) / 5;
+      const double parallelMean = std::accumulate(parallel[k].begin(), parallel[k].end(), 0.0) / 5;
+      double variance = 0;
+      for (double value : serial[k])
+        variance += (value - serialMean) * (value - serialMean);
+      const double sd = std::sqrt(variance / 4);
+      std::ostringstream values;
+      for (int i = 0; i < 5; ++i)
+        values << " " << serial[k][i] << "/" << parallel[k][i];
+      MITK_INFO << TubeStatisticNames[k] << ": serial " << serialMean << " +- " << sd << ", parallel " << parallelMean
+                << " (serial/parallel per seed:" << values.str() << ")";
+      CPPUNIT_ASSERT_MESSAGE(TubeStatisticNames[k], std::fabs(parallelMean - serialMean) <= 2 * sd);
+    }
   }
 
   /** The sampler of the track proposal had a fixed buffer of 1000 end points without bound check,

@@ -84,6 +84,7 @@ class QmitkTractographyViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Gibbs_ProbabilityMapAndSegmentation_OfferedAndUsedAsMask);
   CPPUNIT_TEST(Gibbs_StopDuringWeightEstimation_RunEnds);
   CPPUNIT_TEST(Gibbs_ParameterFileNoFibersReadOnlyFolder_LabelsAndMessages);
+  CPPUNIT_TEST(Gibbs_ParallelSampler_SameFibersAtTwoThreadCounts);
   // Last: it leaves its views, data and runs to the harness, which then quits the Workbench.
   CPPUNIT_TEST(Quit_WhileTrackingRuns_NoCrash);
   CPPUNIT_TEST_SUITE_END();
@@ -853,6 +854,41 @@ public:
       CPPUNIT_ASSERT_EQUAL_MESSAGE(content, qsizetype(1), messages.size());
       CPPUNIT_ASSERT_EQUAL_MESSAGE(content, curvatureBefore, curvature->value());
     }
+  }
+
+  /** With a fixed seed, the parallel sampler gives the same tractogram at 1 and at 4 threads; the
+   *  thread box is enabled only with the checkbox. */
+  void Gibbs_ParallelSampler_SameFibersAtTwoThreadCounts()
+  {
+    auto odfs = Load("StreamlineTractography/qball_image.qbi");
+    auto *view = ShowGibbs();
+    GetChild<QmitkDataStorageComboBox>(view, "m_InputImageBox")->SetSelectedNode(odfs);
+    GetChild<QSlider>(view, "m_RandomSeedSlider")->setValue(1);
+    auto *parallel = GetChild<QCheckBox>(view, "m_ParallelSamplerCheckbox");
+    auto *threads = GetChild<QSpinBox>(view, "m_ThreadsBox");
+    CPPUNIT_ASSERT(!threads->isEnabled());
+    parallel->setChecked(true);
+    CPPUNIT_ASSERT(threads->isEnabled());
+
+    const auto name = "FiberBundle_" + odfs->GetName() + "_Gibbs";
+    threads->setValue(1);
+    TrackGibbs(view);
+    auto *node = GetDataStorage()->GetNamedNode(name);
+    CPPUNIT_ASSERT(node != nullptr);
+    mitk::FiberBundle::Pointer oneThread = dynamic_cast<mitk::FiberBundle *>(node->GetData());
+    CPPUNIT_ASSERT(oneThread.IsNotNull() && oneThread->GetNumFibers() > 0);
+    RemoveTractograms();
+
+    threads->setValue(4);
+    TrackGibbs(view);
+    node = GetDataStorage()->GetNamedNode(name);
+    CPPUNIT_ASSERT(node != nullptr);
+    auto *fourThreads = dynamic_cast<mitk::FiberBundle *>(node->GetData());
+    CPPUNIT_ASSERT(fourThreads != nullptr && fourThreads->Equals(oneThread, 0.0));
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+
+    parallel->setChecked(false);
+    CPPUNIT_ASSERT(!threads->isEnabled());
   }
 
   void Gibbs_ViewClosedWhileRunning_NoCrash()
