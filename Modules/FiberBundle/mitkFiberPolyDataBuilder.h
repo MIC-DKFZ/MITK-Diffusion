@@ -54,6 +54,13 @@ namespace mitk::FiberBundleDetail
    *  in the order of first use. Point and cell data go along with their points and cells. */
   vtkSmartPointer<vtkPolyData> CleanFiberPolyData(vtkPolyData* polyData);
 
+  /** Sets the fiber weights (cell data "FIBER_WEIGHTS") and colours (point data "FIBER_COLORS",
+   *  RGB or RGBA) that a reader put on the polydata of the new bundle fib. They are taken from the
+   *  bundle's own polydata, to which the constructor carried them along with their fibers and
+   *  points, so fibers without points and unused points do not shift them. Arrays of another size
+   *  are ignored with a warning naming filename; negative or NaN weights become 0. */
+  void SetFiberArraysOfReader(FiberBundle* fib, const std::string& filename);
+
   /** Builds the cell lookup of polyData, which FiberPointIds would otherwise build on first use. */
   inline void PrepareParallelReading(vtkPolyData* polyData)
   {

@@ -38,6 +38,10 @@ public:
   static CustomMimeType FIBERBUNDLE_TCK_MIMETYPE();
   static std::string FIBERBUNDLE_TCK_MIMETYPE_NAME();
 
+  // ------------------------------ TRX formats ----------------------------------
+  static CustomMimeType FIBERBUNDLE_TRX_MIMETYPE();
+  static std::string FIBERBUNDLE_TRX_MIMETYPE_NAME();
+
   // ------------------------------ TrackVis formats ----------------------------------
 
   static CustomMimeType FIBERBUNDLE_TRK_MIMETYPE();

@@ -16,6 +16,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkFiberBundleVtkReader.h"
 #include "mitkFiberBundleMimeTypes.h"
+#include "mitkFiberPolyDataBuilder.h"
 
 #include <itksys/SystemTools.hxx>
 #include <mitkFiberBundle.h>
@@ -164,52 +165,7 @@ std::vector<itk::SmartPointer<mitk::BaseData> > mitk::FiberBundleVtkReader::DoRe
   FiberBundle::Pointer fiberBundle = FiberBundle::New(fiberPolyData);
   fiberBundle->setIsRAS(ras);
 
-  // The arrays are taken from the bundle's own polydata: the constructor drops unused points and
-  // fibers without points, and carries the arrays along.
-  vtkPolyData* cleaned = fiberBundle->GetFiberPolyData();
-
-  vtkFloatArray* fileWeights = vtkFloatArray::SafeDownCast(cleaned->GetCellData()->GetArray("FIBER_WEIGHTS"));
-  if (fileWeights != nullptr && fileWeights->GetNumberOfValues() != static_cast<vtkIdType>(fiberBundle->GetNumFibers()))
-  {
-    MITK_WARN << "Ignoring FIBER_WEIGHTS of " << filename << ": " << fileWeights->GetNumberOfValues() << " values for "
-              << fiberBundle->GetNumFibers() << " fibers.";
-  }
-  else if (fileWeights != nullptr)
-  {
-    vtkSmartPointer<vtkFloatArray> weights = vtkSmartPointer<vtkFloatArray>::New();
-    weights->DeepCopy(fileWeights);
-    for (vtkIdType i=0; i<weights->GetNumberOfValues(); i++)
-    {
-      if (!(weights->GetValue(i) >= 0.0f)) // negative or NaN
-      {
-        MITK_ERROR << "Fiber weight<0 or NaN detected! Setting value to 0.";
-        weights->SetValue(i, 0);
-      }
-    }
-    fiberBundle->SetFiberWeights(weights);
-  }
-
-  vtkUnsignedCharArray* fileColors = vtkUnsignedCharArray::SafeDownCast(cleaned->GetPointData()->GetArray("FIBER_COLORS"));
-  if (fileColors != nullptr)
-  {
-    const int components = fileColors->GetNumberOfComponents();
-    if (fileColors->GetNumberOfTuples() != cleaned->GetNumberOfPoints() || (components != 3 && components != 4))
-    {
-      MITK_WARN << "Ignoring FIBER_COLORS of " << filename << ": " << fileColors->GetNumberOfTuples() << " tuples of "
-                << components << " components for " << cleaned->GetNumberOfPoints() << " points.";
-    }
-    else
-    {
-      // RGB colours get an opaque alpha
-      vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-      colors->SetNumberOfComponents(4);
-      colors->SetNumberOfTuples(fileColors->GetNumberOfTuples());
-      for (vtkIdType i=0; i<fileColors->GetNumberOfTuples(); ++i)
-        for (int c=0; c<4; ++c)
-          colors->SetValue(4*i+c, c<components ? fileColors->GetValue(components*i+c) : 255);
-      fiberBundle->SetFiberColors(colors);
-    }
-  }
+  FiberBundleDetail::SetFiberArraysOfReader(fiberBundle, filename);
 
   result.push_back(fiberBundle.GetPointer());
   return result;

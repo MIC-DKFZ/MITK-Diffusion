@@ -50,6 +50,14 @@ namespace mitk::TrackVisFile
    *  of a matrix. Throws mitk::Exception for a grid without three independent axes. */
   void SetGrid(Header& header, const double indexToRas[3][4], const double dims[3], const double spacing[3], const char* voxelOrder);
 
+  /** A complete header of the grid RAS = indexToRas * index (TRX's VOXEL_TO_RASMM and
+   *  DIMENSIONS) with the voxel axes as given: voxel order = the axes of the matrix, vox_to_ras =
+   *  indexToRas in float, voxel sizes = column norms, image_orientation_patient zero (as nibabel
+   *  writes it, unlike MITK's legacy files). VoxmmToLps reads it without reorientation, so a
+   *  writer gives back the same matrix and dimensions. Throws mitk::Exception for a grid without
+   *  three independent axes or dimensions outside 1 to 32767. */
+  Header HeaderOfGrid(const double indexToRas[3][4], const double dims[3]);
+
   /** Reads a .trk file; the flips negate the LPS axes after the map. Scalars and properties are
    *  skipped. The bundle keeps the file's header; for MITK's own files of 2019 to 2026 the
    *  reference grid their LPS matrix describes, with voxel order "RAS". Throws mitk::Exception for

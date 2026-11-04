@@ -511,7 +511,7 @@ public:
       context->UngetService(reference);
     }
     const std::string base = mitk::IOMimeTypes::DEFAULT_BASE_NAME();
-    for (const std::string suffix : {".pfc", ".FiberBundle.vtk", ".FiberBundle.trk", ".FiberBundle.tck", ".FiberBundle.dcm"})
+    for (const std::string suffix : {".pfc", ".FiberBundle.vtk", ".FiberBundle.trk", ".FiberBundle.tck", ".FiberBundle.dcm", ".FiberBundle.trx"})
       CPPUNIT_ASSERT_EQUAL_MESSAGE(base + suffix, 1, registrations[base + suffix]);
   }
 
@@ -1444,12 +1444,13 @@ public:
   {
     // Written by nibabel (TrackVis version 2, image axes rotated by 10 degrees about z, without
     // the header fingerprint of old MITK files), by dipy against an LAS reference image and by
-    // MRtrix tckconvert; ThirdPartyTractograms/README_v2.md describes how. All hold these fibers,
-    // given in RAS millimetres.
+    // MRtrix tckconvert, and by trx-python against the LAS reference (TRX/README.md);
+    // ThirdPartyTractograms/README_v2.md describes how. All hold these fibers, given in RAS
+    // millimetres.
     const std::vector<Fiber> rasFibers = {{{1.5, 2.0, 3.0}, {4.0, 5.25, 5.0}, {7.0, 8.0, 6.5}},
                                           {{-1.0, -2.0, -3.0}, {-4.0, -5.0, 0.5}},
                                           {{0.0, 0.0, 0.0}, {0.5, -1.0, 1.0}, {1.0, -2.0, 2.0}, {1.5, -3.0, 3.0}}};
-    for (const std::string name : {"nibabel_trackvis2.trk", "dipy_las.trk", "mrtrix.tck"})
+    for (const std::string name : {"nibabel_trackvis2.trk", "dipy_las.trk", "mrtrix.tck", "TRX/trx_python.trx"})
     {
       auto fib = LoadFibers("ThirdPartyTractograms/" + name);
       CPPUNIT_ASSERT_EQUAL_MESSAGE(name, static_cast<unsigned int>(rasFibers.size()), fib->GetNumFibers());
