@@ -55,11 +55,13 @@ class MITKFIBERBUNDLE_EXPORT FiberBundleIOHelper
 {
 public:
 
-  /** Files in path (not recursive) whose last extension is one of the given ones, sorted. */
-  static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string >& extensions={".fib", ".trk", ".tck"});
+  /** Files in path (not recursive) whose last extension is one of the given ones, sorted;
+   *  folders are not listed, also TRX folders (name.trx). */
+  static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string >& extensions={".fib", ".trk", ".tck", ".trx"});
 
-  /** The tractograms of the given files and folders (their .fib, .trk and .tck files); the
-   *  readers' console output is suppressed. filenames receives the file of each tractogram. */
+  /** The tractograms of the given files and folders (their .fib, .trk, .tck and .trx files; a
+   *  folder named *.trx is read as a TRX file); the readers' console output is suppressed.
+   *  filenames receives the file of each tractogram. */
   static std::vector< mitk::FiberBundle::Pointer > load_fibs(const std::vector<std::string>& files, std::vector<std::string>* filenames=nullptr);
 
   /** The tractogram in file. Throws mitk::Exception if the file cannot be read or holds no fiber

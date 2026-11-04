@@ -18,11 +18,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkFiberBundleVtkReader.h>
 #include <mitkFiberBundleTckReader.h>
+#include <mitkFiberBundleTrxReader.h>
 #include <mitkFiberBundleTrackVisReader.h>
 #include <mitkFiberBundleDicomReader.h>
 
 #include <mitkFiberBundleVtkWriter.h>
 #include <mitkFiberBundleTrackVisWriter.h>
+#include <mitkFiberBundleTrxWriter.h>
 #include <mitkFiberBundleDicomWriter.h>
 
 #include <mitkPlanarFigureCompositeReader.h>
@@ -65,6 +67,8 @@ namespace mitk
           props[ us::ServiceConstants::SERVICE_RANKING() ] = -3;
         else if (mt->GetName()==mitk::FiberBundleMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME())
           props[ us::ServiceConstants::SERVICE_RANKING() ] = -4;
+        else if (mt->GetName()==mitk::FiberBundleMimeTypes::FIBERBUNDLE_TRX_MIMETYPE_NAME())
+          props[ us::ServiceConstants::SERVICE_RANKING() ] = -5;
         else
           props[ us::ServiceConstants::SERVICE_RANKING() ] = 10;
 
@@ -75,7 +79,9 @@ namespace mitk
       m_FiberBundleVtkWriter = std::make_unique<FiberBundleVtkWriter>();
       m_FiberBundleTrackVisReader = std::make_unique<FiberBundleTrackVisReader>();
       m_FiberBundleTrackVisWriter = std::make_unique<FiberBundleTrackVisWriter>();
+      m_FiberBundleTrxWriter = std::make_unique<FiberBundleTrxWriter>();
       m_FiberBundleTckReader = std::make_unique<FiberBundleTckReader>();
+      m_FiberBundleTrxReader = std::make_unique<FiberBundleTrxReader>();
       m_FiberBundleDicomReader = std::make_unique<FiberBundleDicomReader>();
       m_FiberBundleDicomWriter = std::make_unique<FiberBundleDicomWriter>();
 
@@ -92,12 +98,14 @@ namespace mitk
 
       m_FiberBundleVtkReader.reset();
       m_FiberBundleTckReader.reset();
+      m_FiberBundleTrxReader.reset();
       m_FiberBundleTrackVisReader.reset();
       m_FiberBundleDicomReader.reset();
 
       m_FiberBundleDicomWriter.reset();
       m_FiberBundleVtkWriter.reset();
       m_FiberBundleTrackVisWriter.reset();
+      m_FiberBundleTrxWriter.reset();
 
       m_PlanarFigureCompositeReader.reset();
       m_PlanarFigureCompositeWriter.reset();
@@ -115,12 +123,14 @@ namespace mitk
 
     std::unique_ptr<FiberBundleVtkReader> m_FiberBundleVtkReader;
     std::unique_ptr<FiberBundleTckReader> m_FiberBundleTckReader;
+    std::unique_ptr<FiberBundleTrxReader> m_FiberBundleTrxReader;
     std::unique_ptr<FiberBundleTrackVisReader> m_FiberBundleTrackVisReader;
     std::unique_ptr<FiberBundleDicomReader> m_FiberBundleDicomReader;
 
     std::unique_ptr<FiberBundleDicomWriter> m_FiberBundleDicomWriter;
     std::unique_ptr<FiberBundleVtkWriter> m_FiberBundleVtkWriter;
     std::unique_ptr<FiberBundleTrackVisWriter> m_FiberBundleTrackVisWriter;
+    std::unique_ptr<FiberBundleTrxWriter> m_FiberBundleTrxWriter;
 
     std::unique_ptr<PlanarFigureCompositeReader> m_PlanarFigureCompositeReader;
     std::unique_ptr<PlanarFigureCompositeWriter> m_PlanarFigureCompositeWriter;

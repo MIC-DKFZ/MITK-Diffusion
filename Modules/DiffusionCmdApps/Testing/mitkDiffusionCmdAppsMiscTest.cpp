@@ -32,6 +32,7 @@ class mitkDiffusionCmdAppsMiscTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkDiffusionCmdAppsMiscTestSuite);
   MITK_TEST(HelpAndXml);
   MITK_TEST(FileFormatConverter_DwiToNifti_KeepsGradients);
+  MITK_TEST(FileFormatConverter_TrxToFibAndBack_KeepsFibers);
   MITK_TEST(ImageResampler_Spacing);
   MITK_TEST(CopyGeometry_RotatedReference_TurnsTensors);
   MITK_TEST(CopyGeometry_UnknownInputType_Fails);
@@ -57,6 +58,23 @@ public:
     auto dwi = Load<mitk::Image>(dir, "dwi.01.nii.gz");
     CPPUNIT_ASSERT(mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dwi));
     CPPUNIT_ASSERT_EQUAL(195u, static_cast<unsigned int>(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi)->Size()));
+  }
+
+  void FileFormatConverter_TrxToFibAndBack_KeepsFibers()
+  {
+    const auto dir = WorkDir("FileFormatConverterTrx");
+    RunOk("FileFormatConverter", {"-i", Data("ThirdPartyTractograms/TRX/small.trx"), "-o", "small.fib"}, dir);
+    RunOk("FileFormatConverter", {"-i", "small.fib", "-o", "small.01.trx"}, dir);
+    for (const std::string file : {"small.fib", "small.01.trx"})
+    {
+      auto fib = Load<mitk::FiberBundle>(dir, file);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(file, 1000u, fib->GetNumFibers());
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(file, 33886u, fib->GetNumberOfPoints());
+    }
+    // a TRX folder, as only the command line can give it
+    RunOk("FileFormatConverter", {"-i", Data("ThirdPartyTractograms/TRX/gs_fldr.trx"), "-o", "gs.trk"}, dir);
+    CPPUNIT_ASSERT_EQUAL(13u, NumFibers(dir, "gs.trk"));
+    RunFails("FileFormatConverter", {"-i", "missing.trx", "-o", "missing.fib"}, dir);
   }
 
   void ImageResampler_Spacing()

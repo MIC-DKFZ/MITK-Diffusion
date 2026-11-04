@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input fiber bundle (.fib; .trk; .tck)", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input fiber bundle (.fib; .trk; .tck; .trx)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output root", us::Any(), false, false, false, mitkCommandLineParser::Output);
 
   parser.addArgument("cluster_size", "", mitkCommandLineParser::Int, "Cluster size:", "", 10);

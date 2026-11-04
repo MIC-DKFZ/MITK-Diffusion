@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
 
   parser.beginGroup("1. Mandatory arguments:");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "Input fiber bundle (.fib, .trk, .tck)", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "Input fiber bundle (.fib, .trk, .tck, .trx)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "Output fiber bundle (.fib)", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("resample", "", mitkCommandLineParser::Float, "Resample:", "Resample the fibers with splines at this point distance (mm) before colouring");
   parser.endGroup();

@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
   parser.setDescription("Remove outlier fibers: keep the fibers with at least the given fraction of their length in voxels whose max-normalized tract density reaches the threshold.");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.dcm)", us::Any(), false);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.trx/.dcm)", us::Any(), false);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram", us::Any(), false);
 
   parser.addArgument("threshold", "", mitkCommandLineParser::Float, "Threshold:", "minimum max-normalized tract density (0-1) of the voxels that count", 0.05);

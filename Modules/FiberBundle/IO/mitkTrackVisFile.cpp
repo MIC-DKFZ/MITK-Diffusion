@@ -344,6 +344,38 @@ void mitk::TrackVisFile::SetGrid(Header& header, const double indexToRas[3][4], 
   header.voxel_order[3] = 0;
 }
 
+mitk::TrackVisFile::Header mitk::TrackVisFile::HeaderOfGrid(const double indexToRas[3][4], const double dims[3])
+{
+  double linear[3][3];
+  double spacing[3];
+  for (int c=0; c<3; ++c)
+  {
+    spacing[c] = 0;
+    for (int r=0; r<3; ++r)
+    {
+      linear[r][c] = indexToRas[r][c];
+      spacing[c] += indexToRas[r][c]*indexToRas[r][c];
+    }
+    spacing[c] = std::sqrt(spacing[c]);
+    if (!(dims[c] >= 1 && dims[c] <= std::numeric_limits<short>::max()) || dims[c] != std::floor(dims[c]))
+      mitkThrow() << "The reference grid has dimension " << dims[c] << ", which no TrackVis header can hold.";
+  }
+  const auto codes = MatrixAxisCodes(linear);
+  if (!codes)
+    mitkThrow() << "The reference grid has no three independent axes; no TrackVis header can describe it.";
+  // The letters of the axes the voxel axes point to; SetGrid then keeps the axes as they are.
+  char voxelOrder[4] = {0, 0, 0, 0};
+  for (int k=0; k<3; ++k)
+    voxelOrder[k] = "RLAPSI"[2*(*codes)[k].first + ((*codes)[k].second > 0 ? 0 : 1)];
+
+  Header header;
+  std::memset(&header, 0, sizeof(header));
+  SetGrid(header, indexToRas, dims, spacing, voxelOrder);
+  std::memcpy(header.id_string, "TRACK", 6);
+  header.hdr_size = 1000;
+  return header;
+}
+
 mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename, bool useMatrix, bool flipX, bool flipY, bool flipZ, bool printHeader)
 {
   std::ifstream in(filename, std::ios::binary);
@@ -433,11 +465,11 @@ mitk::FiberBundle::Pointer mitk::TrackVisFile::Read(const std::string& filename,
   return fib;
 }
 
-void mitk::TrackVisFile::Write(const std::string& filename, const FiberBundle* fib, bool useLps, bool printHeader)
+mitk::TrackVisFile::Header mitk::TrackVisFile::ConsistentHeader(const Header& source, bool useLps)
 {
-  Header header = fib->GetTrackVisHeader();
-  // A header that the readers would read in different ways (see IsConsistent) is written as the
-  // grid MITK reads it with, with a voxel order that names the axes of its matrix.
+  Header header = source;
+  // A header that the readers would read in different ways (see IsConsistent) becomes the grid
+  // MITK reads it with, with a voxel order that names the axes of its matrix.
   if (!IsConsistent(header) || (useLps && std::strncmp(header.voxel_order, "LPS", 3)!=0))
   {
     vtkSmartPointer<vtkMatrix4x4> indexToLps = VoxmmToLps(header, true);
@@ -446,6 +478,12 @@ void mitk::TrackVisFile::Write(const std::string& filename, const FiberBundle* f
         indexToLps->SetElement(r, c, indexToLps->GetElement(r, c)*header.voxel_size[c]);
     SetGridFromLps(header, indexToLps, useLps ? "LPS" : "RAS");
   }
+  return header;
+}
+
+void mitk::TrackVisFile::Write(const std::string& filename, const FiberBundle* fib, bool useLps, bool printHeader)
+{
+  Header header = ConsistentHeader(fib->GetTrackVisHeader(), useLps);
   // Only coordinates are written, and readers such as nibabel read exactly n_count tracks; a
   // header copied from a loaded file would otherwise keep its counts.
   header.n_scalars = 0;

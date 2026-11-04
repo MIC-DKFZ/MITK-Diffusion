@@ -39,6 +39,7 @@ std::vector<CustomMimeType*> FiberBundleMimeTypes::Get()
   mimeTypes.push_back(FIBERBUNDLE_VTK_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_TRK_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_TCK_MIMETYPE().Clone());
+  mimeTypes.push_back(FIBERBUNDLE_TRX_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_DICOM_MIMETYPE().Clone());
 
   return mimeTypes;
@@ -81,6 +82,16 @@ CustomMimeType FiberBundleMimeTypes::FIBERBUNDLE_TCK_MIMETYPE()
   mimeType.SetComment("MRtrix Fibers");
   mimeType.SetCategory(category);
   mimeType.AddExtension("tck");
+  return mimeType;
+}
+
+CustomMimeType FiberBundleMimeTypes::FIBERBUNDLE_TRX_MIMETYPE()
+{
+  CustomMimeType mimeType(FIBERBUNDLE_TRX_MIMETYPE_NAME());
+  std::string category = "TRX Fibers";
+  mimeType.SetComment("TRX Fibers");
+  mimeType.SetCategory(category);
+  mimeType.AddExtension("trx");
   return mimeType;
 }
 
@@ -170,6 +181,12 @@ std::string FiberBundleMimeTypes::FIBERBUNDLE_VTK_MIMETYPE_NAME()
 std::string FiberBundleMimeTypes::FIBERBUNDLE_TCK_MIMETYPE_NAME()
 {
   static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.tck";
+  return name;
+}
+
+std::string FiberBundleMimeTypes::FIBERBUNDLE_TRX_MIMETYPE_NAME()
+{
+  static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.trx";
   return name;
 }
 

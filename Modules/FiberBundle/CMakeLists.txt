@@ -7,6 +7,8 @@ MITK_CREATE_MODULE(
   DEPENDS MitkPlanarFigure MitkDiffusionModelling
   PACKAGE_DEPENDS
     DCMTK|dcmtract VTK|CommonComputationalGeometry
+    # TRX tractograms are ZIP archives (IO/mitkTrxFile.cpp)
+    PRIVATE Poco|Zip
 )
 
 add_subdirectory(Testing)

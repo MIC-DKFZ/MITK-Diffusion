@@ -25,7 +25,7 @@ if(BUILD_TESTING)
     ExternalProject_Add(${proj}
       SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/${proj}
       GIT_REPOSITORY https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion-test-data.git
-      GIT_TAG 6fff8db5543021a344109adbb60586dfc582545d
+      GIT_TAG 1434638e307d710c37b37e34802cf4df0750bb1d
       CONFIGURE_COMMAND ""
       BUILD_COMMAND ""
       INSTALL_COMMAND ""

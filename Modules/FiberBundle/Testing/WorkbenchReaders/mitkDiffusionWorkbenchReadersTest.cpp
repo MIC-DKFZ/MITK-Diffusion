@@ -44,7 +44,7 @@ class mitkDiffusionWorkbenchReadersTestSuite : public mitk::TestFixture
   MITK_TEST(Odf_OdfAndQbi_ReadAsOdfImage);
   MITK_TEST(Sh_NrrdAndNiftiLegacyAndMrtrix_ReadAsShImage);
   MITK_TEST(Peaks_NrrdAndNifti_ReadAsPeakImage);
-  MITK_TEST(Tractograms_FibVtkTrkTckDicom_ReadAsFiberBundle);
+  MITK_TEST(Tractograms_FibVtkTrkTckTrxDicom_ReadAsFiberBundle);
   MITK_TEST(PlanarFigureComposite_Pfc_ReadAsComposite);
   CPPUNIT_TEST_SUITE_END();
 
@@ -150,7 +150,7 @@ public:
     Load(nrrd, "Peak Image", "PeakImage");
   }
 
-  void Tractograms_FibVtkTrkTckDicom_ReadAsFiberBundle()
+  void Tractograms_FibVtkTrkTckTrxDicom_ReadAsFiberBundle()
   {
     const std::string vtkReader = "VTK Fiber Bundle Reader";
     auto fibers = Load(mitk::GetDiffusionTestDataFilePath("fiberBundleX.fib"), vtkReader, "FiberBundle");
@@ -161,6 +161,7 @@ public:
     Load(mitk::GetDiffusionTestDataFilePath("ThirdPartyTractograms/mrtrix.tck"),
          "tck Fiber Bundle Reader (MRtrix format)",
          "FiberBundle");
+    Load(mitk::GetDiffusionTestDataFilePath("ThirdPartyTractograms/TRX/gs.trx"), "TRX Fiber Bundle Reader", "FiberBundle");
     const std::string dicom = m_TempDir + "/tractogram.dcm";
     mitk::IOUtil::Save(fibers, mitk::IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.dcm", dicom);
     Load(dicom, "DICOM Fiber Bundle Reader", "FiberBundle");
