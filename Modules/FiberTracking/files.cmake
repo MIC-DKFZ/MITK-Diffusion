@@ -28,6 +28,7 @@ set(H_FILES
   Algorithms/itkGibbsTrackingFilter.h
   Algorithms/GibbsTracking/mitkParticle.h
   Algorithms/GibbsTracking/mitkParticleGrid.h
+  Algorithms/GibbsTracking/mitkGibbsBlock.h
   Algorithms/GibbsTracking/mitkMetropolisHastingsSampler.h
   Algorithms/GibbsTracking/mitkSimpSamp.h
   Algorithms/GibbsTracking/mitkEnergyComputer.h

@@ -52,6 +52,7 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(FiberBuilder_AllParticlesOfEveryChain);
   MITK_TEST(Neighbours_ThinImage_EachOnce);
   MITK_TEST(ParticleGrid_ReallocateMoveRemove_Consistent);
+  MITK_TEST(ParticleGrid_BlockStorage_Consistent);
   MITK_TEST(SimpSamp_MoreThanThousandEndPoints);
   MITK_TEST(SphereInterpolator_TruncatedLookupTables_Invalid);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
@@ -238,6 +239,153 @@ public:
         found = n == p;
       CPPUNIT_ASSERT_MESSAGE("particle " + std::to_string(k) + " in its cell", found);
     }
+  }
+
+  /** Blocks of 4 cells per axis with the 8 colours of the parallel sampler, at the given offset. */
+  static std::vector<mitk::GibbsBlock> MakeBlocks(const mitk::ParticleGrid &grid, const int offset[3])
+  {
+    const int edge = 4;
+    const auto &gridSize = grid.GetGridSize();
+    int numBlocks[3];
+    for (int a = 0; a < 3; ++a)
+      numBlocks[a] = (gridSize[a] - 1 + offset[a]) / edge + 1;
+    std::vector<mitk::GibbsBlock> blocks;
+    for (int bz = 0; bz < numBlocks[2]; ++bz)
+      for (int by = 0; by < numBlocks[1]; ++by)
+        for (int bx = 0; bx < numBlocks[0]; ++bx)
+        {
+          mitk::GibbsBlock block;
+          const int b[3] = {bx, by, bz};
+          for (int a = 0; a < 3; ++a)
+          {
+            block.cellMin[a] = std::max(0, b[a] * edge - offset[a]);
+            block.cellMax[a] = std::min(gridSize[a] - 1, (b[a] + 1) * edge - offset[a] - 1);
+          }
+          blocks.push_back(block);
+        }
+    return blocks;
+  }
+
+  static int Colour(const mitk::GibbsBlock &block, const int offset[3])
+  {
+    const int edge = 4;
+    int colour = 0;
+    for (int a = 0; a < 3; ++a)
+      colour |= (((block.cellMin[a] + offset[a]) / edge) & 1) << a;
+    return colour;
+  }
+
+  /** The storage of the parallel sampler: in each phase the blocks of one colour change only their
+   *  cells and reserved slots, dead slots stay until the sweep's compaction. Births, deaths, moves
+   *  and connections in every block over two sweeps leave a consistent grid with the counts of the
+   *  changes made. */
+  void ParticleGrid_BlockStorage_Consistent()
+  {
+    auto mask = FloatImageType::New();
+    FloatImageType::SizeType size = {{24, 24, 24}};
+    mask->SetRegions(FloatImageType::RegionType(size));
+    mask->Allocate();
+    mask->FillBuffer(1.0f);
+    mitk::ParticleGrid grid(mask, 1.0f, 1024); // cells of 2 mm: 13x13x13
+    std::mt19937 rng(1);
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+    std::uniform_real_distribution<float> coordinate(0.0f, 24.0f);
+
+    for (int i = 0; i < 3000; ++i)
+      CPPUNIT_ASSERT(grid.NewParticle(vnl_vector_fixed<float, 3>(coordinate(rng), coordinate(rng), coordinate(rng))) != nullptr);
+    for (int i = 0; i < 1000; i += 2)
+      grid.CreateConnection(grid.GetParticle(i), +1, grid.GetParticle(i + 1), -1);
+    int expectedParticles = grid.m_NumParticles;
+    int expectedConnections = grid.m_NumConnections;
+    int births = 0, deaths = 0, moves = 0, connections = 0;
+
+    const int offsets[2][3] = {{1, 2, 3}, {3, 0, 2}};
+    for (const auto &offset : offsets)
+    {
+      std::vector<mitk::GibbsBlock> blocks = MakeBlocks(grid, offset);
+      grid.BeginBlockSweep();
+      for (int colour = 0; colour < 8; ++colour)
+      {
+        std::vector<mitk::GibbsBlock *> active;
+        for (auto &block : blocks)
+          if (Colour(block, offset) == colour)
+          {
+            block.proposals = 40;
+            active.push_back(&block);
+          }
+        CPPUNIT_ASSERT(grid.ReserveBlockSlots(active));
+        for (mitk::GibbsBlock *block : active)
+        {
+          grid.CollectBlockParticles(*block);
+          for (int id : block->particles)
+            CPPUNIT_ASSERT(grid.InBlock(grid.GetParticle(id), *block));
+          auto positionInBlock = [&]() {
+            vnl_vector_fixed<float, 3> R;
+            for (int a = 0; a < 3; ++a)
+              R[a] = 2.0f * (block->cellMin[a] + unit(rng) * (block->cellMax[a] + 1 - block->cellMin[a]));
+            return R;
+          };
+          for (unsigned long k = 0; k < block->proposals; ++k)
+          {
+            const int n = static_cast<int>(block->particles.size());
+            switch (rng() % 4)
+            {
+              case 0:
+              {
+                const vnl_vector_fixed<float, 3> R = positionInBlock();
+                if (grid.InBlock(R, *block) && grid.NewBlockParticle(R, *block) != nullptr)
+                  ++births;
+                break;
+              }
+              case 1:
+                if (n > 0 && grid.RemoveBlockParticle(static_cast<int>(rng() % n), *block))
+                  ++deaths;
+                break;
+              case 2:
+                if (n > 0)
+                {
+                  mitk::Particle *p = grid.GetParticle(block->particles[rng() % n]);
+                  const vnl_vector_fixed<float, 3> R = positionInBlock();
+                  if (grid.InBlock(R, *block))
+                  {
+                    const vnl_vector_fixed<float, 3> old = p->GetPos();
+                    p->GetPos() = R;
+                    if (grid.TryUpdateGrid(p->ID, block->cellOverflows))
+                      ++moves;
+                    else
+                      p->GetPos() = old;
+                  }
+                }
+                break;
+              default:
+                if (n > 1)
+                {
+                  mitk::Particle *a = grid.GetParticle(block->particles[rng() % n]);
+                  mitk::Particle *b = grid.GetParticle(block->particles[rng() % n]);
+                  if (a != b && a->pID == -1 && b->mID == -1)
+                  {
+                    grid.CreateConnection(a, +1, b, -1, block->connectionChange);
+                    ++connections;
+                  }
+                }
+            }
+          }
+          for (int id : block->particles)
+            CPPUNIT_ASSERT(grid.InBlock(grid.GetParticle(id), *block));
+        }
+        grid.EndBlockPhase(active);
+      }
+      grid.CompactParticles();
+      expectedParticles += births - deaths;
+      expectedConnections += connections;
+      births = deaths = connections = 0;
+      CPPUNIT_ASSERT(grid.CheckConsistency());
+      CPPUNIT_ASSERT_EQUAL(expectedParticles, grid.m_NumParticles);
+      CPPUNIT_ASSERT_EQUAL(expectedConnections, grid.m_NumConnections);
+    }
+    MITK_INFO << grid.m_NumParticles << " particles, " << grid.m_NumConnections << " connections, " << moves << " moves";
+    CPPUNIT_ASSERT(moves > 0);
+    CPPUNIT_ASSERT(expectedParticles != 3000);
   }
 
   /** The sampler of the track proposal had a fixed buffer of 1000 end points without bound check,
