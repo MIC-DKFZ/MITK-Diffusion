@@ -57,7 +57,7 @@ public:
 protected:
 
     vnl_matrix_fixed<float, 3, 3>   m_RotationMatrix;
-    SphereInterpolator*             m_SphereInterpolator;
+    const SphereInterpolator*       m_SphereInterpolator;
     ParticleGrid*                   m_ParticleGrid;
     ParticleGrid::NeighborIterator  m_Neighbors;
     ItkRandGenType*                 m_RandGen;

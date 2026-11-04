@@ -30,7 +30,7 @@ float GibbsEnergyComputer::EvaluateOdf(vnl_vector_fixed<float, 3>& pos, vnl_vect
     // Particles live in the image-axis frame (spacing-scaled index, no rotation), the ODF directions
     // are world vectors: the lookup uses the rotated direction, the sample positions the particle's own.
     vnl_vector_fixed<float, 3> worldDir = m_RotationMatrix*dir;
-    m_SphereInterpolator->getInterpolation(worldDir);
+    const SphereInterpolator::Interpolation interpolation = m_SphereInterpolator->getInterpolation(worldDir);
 
     // sample ODF values along particle direction
     for (int i=-sampleSteps; i <= sampleSteps;i++)
@@ -45,9 +45,9 @@ float GibbsEnergyComputer::EvaluateOdf(vnl_vector_fixed<float, 3>& pos, vnl_vect
             index[2] = floor(samplePos[2]/m_Spacing[2]);
             if (m_Image->GetLargestPossibleRegion().IsInside(index))
             {
-                result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[1]-1]*m_SphereInterpolator->interpw[1] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[2]-1]* m_SphereInterpolator->interpw[2]);
+                result += (m_Image->GetPixel(index)[interpolation.idx[0]-1]*interpolation.interpw[0] +
+                       m_Image->GetPixel(index)[interpolation.idx[1]-1]*interpolation.interpw[1] +
+                       m_Image->GetPixel(index)[interpolation.idx[2]-1]* interpolation.interpw[2]);
             }
         }
         else    // use trilinear interpolation
@@ -71,51 +71,51 @@ float GibbsEnergyComputer::EvaluateOdf(vnl_vector_fixed<float, 3>& pos, vnl_vect
 
                 weight = (1-xfrac)*(1-yfrac)*(1-zfrac);
                 index[0] = xint; index[1] = yint; index[2] = zint;
-                result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[1]-1]*m_SphereInterpolator->interpw[1] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[2]-1]* m_SphereInterpolator->interpw[2])*weight;
+                result += (m_Image->GetPixel(index)[interpolation.idx[0]-1]*interpolation.interpw[0] +
+                       m_Image->GetPixel(index)[interpolation.idx[1]-1]*interpolation.interpw[1] +
+                       m_Image->GetPixel(index)[interpolation.idx[2]-1]* interpolation.interpw[2])*weight;
 
                 weight = (xfrac)*(1-yfrac)*(1-zfrac);
                 index[0] = xint+1; index[1] = yint; index[2] = zint;
-                result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[1]-1]*m_SphereInterpolator->interpw[1] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[2]-1]* m_SphereInterpolator->interpw[2])*weight;
+                result += (m_Image->GetPixel(index)[interpolation.idx[0]-1]*interpolation.interpw[0] +
+                       m_Image->GetPixel(index)[interpolation.idx[1]-1]*interpolation.interpw[1] +
+                       m_Image->GetPixel(index)[interpolation.idx[2]-1]* interpolation.interpw[2])*weight;
 
                 weight = (1-xfrac)*(yfrac)*(1-zfrac);
                 index[0] = xint; index[1] = yint+1; index[2] = zint;
-                result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[1]-1]*m_SphereInterpolator->interpw[1] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[2]-1]* m_SphereInterpolator->interpw[2])*weight;
+                result += (m_Image->GetPixel(index)[interpolation.idx[0]-1]*interpolation.interpw[0] +
+                       m_Image->GetPixel(index)[interpolation.idx[1]-1]*interpolation.interpw[1] +
+                       m_Image->GetPixel(index)[interpolation.idx[2]-1]* interpolation.interpw[2])*weight;
 
                 weight = (1-xfrac)*(1-yfrac)*(zfrac);
                 index[0] = xint; index[1] = yint; index[2] = zint+1;
-                result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[1]-1]*m_SphereInterpolator->interpw[1] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[2]-1]* m_SphereInterpolator->interpw[2])*weight;
+                result += (m_Image->GetPixel(index)[interpolation.idx[0]-1]*interpolation.interpw[0] +
+                       m_Image->GetPixel(index)[interpolation.idx[1]-1]*interpolation.interpw[1] +
+                       m_Image->GetPixel(index)[interpolation.idx[2]-1]* interpolation.interpw[2])*weight;
 
                 weight = (xfrac)*(yfrac)*(1-zfrac);
                 index[0] = xint+1; index[1] = yint+1; index[2] = zint;
-                result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[1]-1]*m_SphereInterpolator->interpw[1] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[2]-1]* m_SphereInterpolator->interpw[2])*weight;
+                result += (m_Image->GetPixel(index)[interpolation.idx[0]-1]*interpolation.interpw[0] +
+                       m_Image->GetPixel(index)[interpolation.idx[1]-1]*interpolation.interpw[1] +
+                       m_Image->GetPixel(index)[interpolation.idx[2]-1]* interpolation.interpw[2])*weight;
 
                 weight = (1-xfrac)*(yfrac)*(zfrac);
                 index[0] = xint; index[1] = yint+1; index[2] = zint+1;
-                result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[1]-1]*m_SphereInterpolator->interpw[1] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[2]-1]* m_SphereInterpolator->interpw[2])*weight;
+                result += (m_Image->GetPixel(index)[interpolation.idx[0]-1]*interpolation.interpw[0] +
+                       m_Image->GetPixel(index)[interpolation.idx[1]-1]*interpolation.interpw[1] +
+                       m_Image->GetPixel(index)[interpolation.idx[2]-1]* interpolation.interpw[2])*weight;
 
                 weight = (xfrac)*(1-yfrac)*(zfrac);
                 index[0] = xint+1; index[1] = yint; index[2] = zint+1;
-                result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[1]-1]*m_SphereInterpolator->interpw[1] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[2]-1]* m_SphereInterpolator->interpw[2])*weight;
+                result += (m_Image->GetPixel(index)[interpolation.idx[0]-1]*interpolation.interpw[0] +
+                       m_Image->GetPixel(index)[interpolation.idx[1]-1]*interpolation.interpw[1] +
+                       m_Image->GetPixel(index)[interpolation.idx[2]-1]* interpolation.interpw[2])*weight;
 
                 weight = (xfrac)*(yfrac)*(zfrac);
                 index[0] = xint+1; index[1] = yint+1; index[2] = zint+1;
-                result += (m_Image->GetPixel(index)[m_SphereInterpolator->idx[0]-1]*m_SphereInterpolator->interpw[0] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[1]-1]*m_SphereInterpolator->interpw[1] +
-                       m_Image->GetPixel(index)[m_SphereInterpolator->idx[2]-1]* m_SphereInterpolator->interpw[2])*weight;
+                result += (m_Image->GetPixel(index)[interpolation.idx[0]-1]*interpolation.interpw[0] +
+                       m_Image->GetPixel(index)[interpolation.idx[1]-1]*interpolation.interpw[1] +
+                       m_Image->GetPixel(index)[interpolation.idx[2]-1]* interpolation.interpw[2])*weight;
             }
         }
     }
