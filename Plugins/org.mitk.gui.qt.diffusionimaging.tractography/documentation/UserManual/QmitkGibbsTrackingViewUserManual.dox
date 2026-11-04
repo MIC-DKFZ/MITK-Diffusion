@@ -24,6 +24,10 @@ Optional Input:
 \li Minimum fiber length constraint (in mm). Shorter fibers are discarded after the tracking.
 \li Curvature threshold (in degree): maximum angle between two connected particles. Values above 90 degree act as 90 degree.
 \li Random seed: "auto" draws a new seed for every run; any other value reproduces the run exactly.
+\li Parallel sampler: updates blocks of the particle grid on several threads at the same time, which is much faster on whole-brain data. With a fixed random seed it gives the same tractogram at any number of threads, but not the same tractogram as the default (serial) sampler. Since 10 to 20% of its proposals are rejected at block borders, its fibers grow more slowly per iteration; give it more iterations. In a whole-brain test (HCP data, 1.25 mm, brain mask, 24 threads on 12 cores) it ran the same number of iterations 20 times as fast as the serial sampler, and with twice the iterations it gave longer fibers than the serial sampler in a seventh of the time.
+\li Threads: the number of threads of the parallel sampler; "all cores" uses as many as OpenMP does (all cores, unless OMP_NUM_THREADS says otherwise).
+
+The command line application offers the parallel sampler as --parallel and --threads. Like the random seed, neither is saved in the parameter file.
 
 The automatic selection of parameters for the particle length/width and weight are determined directly from the input image using information about the image spacing and GFA. After a run, the values used are shown next to "auto"; the parameters stay automatic for the next run. When the particle weight cannot be estimated (e.g. only isotropic ODFs inside the mask), the run stops with a message; set the weight by hand then.
 

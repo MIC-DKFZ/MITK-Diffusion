@@ -269,8 +269,14 @@ Facts the layout does not show:
   engines per seed point, so a tractogram with a fixed seed (`--fix_seed`, "Fix Random Seed") is
   the same at any number of OpenMP threads; the handlers take tensors, ODF directions and peaks as
   world (LPS) vectors and never apply the image rotation. Gibbs tracking samples the ODF along the
-  particle in the image-axis frame and looks it up at the world direction. Tractography
-  references in the test data (`StreamlineTractography/ReferenceFibs/`, `gibbsTractogram_v3.fib`)
+  particle in the image-axis frame and looks it up at the world direction. Its serial sampler is
+  the default (`gibbsTractogram_v3.fib`); the opt-in parallel sampler (`mitk::ParallelGibbsSampler`,
+  `--parallel`) updates blocks of 4x4x4 grid cells in 8 colours at a random offset per sweep, each
+  block on a random stream of its own, so a fixed seed gives the same tractogram at any number of
+  threads (`gibbsTractogram_parallel.fib`). It rejects 10-20 % of the proposals at block borders,
+  so its fibers grow more slowly per proposal, and matches the serial sampler's statistics near
+  equilibrium (`ParallelSampler_SameStatisticsAsSerial`). Tractography references in the test data
+  (`StreamlineTractography/ReferenceFibs/`, `gibbsTractogram_v3.fib`, `gibbsTractogram_parallel.fib`)
   depend on the exact random engines and seeds, so a change there is checked bit for bit against
   the old output. The streamline inputs (`tensor_image.dti`, `qball_*`) follow the phantom's
   bundles and match fits of `StreamlineTractography/diffusion_image_v2` (FSL bvecs;
