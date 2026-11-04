@@ -137,7 +137,7 @@ Facts the layout does not show:
   the test (`ShowFiberfox`, `StraightFibers`). Setting `MITK_DIFFUSION_UITEST_CASE=<method>` in the shell that runs ctest
   runs that case alone. The tests run with `LC_ALL=C.UTF-8` and are skipped (exit code 77) without
   a Qt platform plugin. Offscreen there is no OpenGL: render windows draw nothing, so rendering
-  looks stay manual checks (#45).
+  looks stay manual checks.
 - Test data: module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each
   `Testing/` folder and read their input and references from a checkout of
   https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion-test-data (branch `main`; paths as
@@ -340,8 +340,8 @@ Facts the layout does not show:
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
 all 80 diffusion tests pass. The Workbench starts offscreen, opens a file of every diffusion type,
-and its views run in the offscreen UI tests; it has not been used at a display since the #13
-review (#45 lists what a person has to check there). Remove an item once it is fixed.
+and its views run in the offscreen UI tests; after the #13 review, every view was checked by hand
+in a Release Workbench at a display. Remove an item once it is fixed.
 
 - MITK bugs stop the inner configure of the smaller configurations; mitk-diffusion itself
   configures in all of them. With `BUILD_TESTING` off (`set_release.txt`: `Tractography`,

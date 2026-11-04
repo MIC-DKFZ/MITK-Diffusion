@@ -30,7 +30,7 @@ using namespace QmitkDiffusionUiTest;
 /**
  * \brief UI tests of the atTRACTive view that need no mouse in a render window: the bundle
  * resampling, the brush buttons and closing the view while a brush is active. The labeling and
- * prediction brushes themselves stay manual checks (#45).
+ * prediction brushes themselves stay manual checks.
  */
 class QmitkAttractiveViewUiTest : public CppUnit::TestFixture
 {
