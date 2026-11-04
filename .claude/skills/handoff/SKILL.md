@@ -36,6 +36,12 @@ Find the cause for a fix and the smallest design that fits the existing architec
 feature. Note what the design rests on, with anchors, as you go: that list becomes the plan's
 "Facts" section and saves the next session from repeating the work.
 
+Find the tests that cover the changed code and where new ones go: the module's `Testing/`
+folder; for a command line app its group's smoke test in `Modules/DiffusionCmdApps/Testing/`;
+for a view, its `.ui` file or anything a view calls, the plugin's UI test suite in
+`Plugins/org.mitk.gui.qt.diffusionimaging.uitests/src/internal/` (`mitkDiffusionViewsUiTest_<suite>`).
+Every plan gets tests; the UI tests whenever a view's behaviour can change.
+
 ## 2. Settle the decisions
 
 Ask the user only what changes the work and cannot be read from the code: scope, trade-offs,
@@ -50,7 +56,7 @@ block on them. They go into the plan as open points the implementer must not dec
 ## 3. Confirm before creating anything
 
 Show in a few lines the issue type and title, the branch name (with `<nr>`), the base branch,
-and the plan's goals and steps. Then ask once whether to create the issue, the branch and the
+and the plan's goals, steps and tests (module, command line app and UI tests). Then ask once whether to create the issue, the branch and the
 worktree. Skip this only if the user's request already said to go ahead without asking.
 Creating a GitLab issue is visible to others and is not undone by deleting a file.
 

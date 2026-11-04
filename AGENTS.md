@@ -382,10 +382,10 @@ Run from the workspace root. Both superbuild trees use Unix Makefiles; for Relea
 - Fix the cause, not the symptom, and report the cause. When the cause is in MITK, say so and
   state what the change in mitk-diffusion does and does not cover.
 - For every bug, first look for an existing issue and a branch named `<issue-number>-…` in the
-  mitk-diffusion GitLab project and build on it. GitLab is read-only: never create or edit
-  anything there; print issue text for the user to post. One exception: when the user
-  explicitly asks an issue skill (`bug-report`, `feature-request`, `improvement-request`) to
-  create the issue, it creates it in the mitk-diffusion project.
+  mitk-diffusion GitLab project and build on it. Write to GitLab (create or edit issues,
+  comments, merge requests) only when the user directly tells you to, and only in the
+  mitk-diffusion project; otherwise GitLab is read-only and issue text is printed for the
+  user to post.
 - Port to the current MITK API instead of wrapping old calls in compatibility shims. Keep each
   change small: no collateral refactoring or formatting churn in files touched only for the port.
 - Keep this file current when structure, commands or the porting state change.

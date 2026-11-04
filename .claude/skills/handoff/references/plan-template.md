@@ -1,7 +1,7 @@
 # Handoff plan template
 
 The sections a handoff plan has, in this order, and why each is there. Leave out a section only
-when it would be empty. The plan is read by a fresh Claude session that knows nothing of the
+when it would be empty; "Tests" is never left out. The plan is read by a fresh Claude session that knows nothing of the
 conversation, so every fact it relies on must be in it, with a file and line it can check.
 
 ```markdown
@@ -58,7 +58,7 @@ rules apply throughout. Checked against `<base>` at `<base commit>`.
 ### 1. <step>
 
 <files with anchors, what changes, why, the edge cases to cover; "factor out, do not copy"
-where an existing helper fits>
+where an existing helper fits; the tests that check this step>
 
 ### 2. ...
 
@@ -68,8 +68,19 @@ where an existing helper fits>
 
 ## Tests
 
-<new and changed tests per step, then the exact build and ctest commands, run from where; which
-need the test data (`MITK_DIFFUSION_DATA_DIR`); a skip is reported as a skip>
+- Module tests: <new and changed test cases per step, file and name; the existing tests that
+  cover the changed code and must still pass>
+- Command line apps: <for a changed app, its case in
+  `<wt>/Modules/DiffusionCmdApps/Testing/mitkDiffusionCmdApps<Group>Test.cpp`, or "no app changes">
+- UI tests: <for a change a view can show (its code, `.ui` file, or what it calls), the case
+  added to or changed in the plugin's suite in
+  `<wt>/Plugins/org.mitk.gui.qt.diffusionimaging.uitests/src/internal/`, with the widgets
+  (`.ui` object names) and results it checks; what stays a manual check at a display
+  (rendering, #45); or "no view affected" and why>
+- Commands: <the exact build and ctest commands, run from where, with a `TMPDIR` per tree,
+  e.g. `ctest -R mitkDiffusionViewsUiTest_<suite>`; which need the test data
+  (`MITK_DIFFUSION_DATA_DIR`); a skip (exit code 77: no Qt platform plugin, no OpenGL) is
+  reported as a skip>
 
 ## Open points for the user
 
@@ -100,6 +111,9 @@ Why these sections:
 - **Environment** carries what lives outside the worktree (MITK, the build tree, the memory
   facts), so the session does not have to rediscover it.
 - **Work in order** is ordered so each step can be tested before the next builds on it.
+- **Tests** are part of every handoff, so the implementer writes them instead of only running
+  the existing ones; the UI tests are the only automatic check of a view, since nobody uses
+  the Workbench at a display during the run.
 - **Open points** keep decisions that belong to the user with the user.
 - **Finish** is the explicit permission to commit, scoped to this branch, which AGENTS.md
   otherwise withholds.
