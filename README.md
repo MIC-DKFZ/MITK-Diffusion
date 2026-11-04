@@ -1,66 +1,67 @@
 MITK Diffusion
 ==============
 
-Copyright © German Cancer Research Center (DKFZ), [Division of Medical Image Computing (MIC)](https://www.dkfz.de/en/mic/index.php). Please make sure that your usage of this code is in compliance with the code [license](https://github.com/MIC-DKFZ/MITK-Diffusion/blob/master/LICENSE.txt).
+Copyright © German Cancer Research Center (DKFZ), [Division of Medical Image Computing (MIC)](https://www.dkfz.de/en/mic/index.php). Please make sure that your usage of this code is in compliance with the code [license](LICENSE.txt).
 
 [![DOI](https://zenodo.org/badge/195387051.svg)](https://zenodo.org/badge/latestdoi/195387051)
 
-The MITK Diffusion application [[1,2]](#References) offers a selection of image analysis algorithms for the processing of diffusion-weighted MR images. It encompasses the research of the Division of Medical Image Computing at the German Cancer Research Center (DKFZ).
+MITK Diffusion [[1,2]](#references) offers a selection of image analysis algorithms for the processing of diffusion-weighted MR images. It encompasses the research of the Division of Medical Image Computing at the German Cancer Research Center (DKFZ). It is an extension of [MITK](https://github.com/MITK/MITK): its views run in the MITK Workbench, and most of its algorithms are also available as command line tools.
 
-* [Features](#Features)
-* [Related Links](#Related-Links)
-* [Image Gallery](#Image-Gallery)
-* [Building MITK Diffusion from source](#Building-MITK-Diffusion-from-source)
-* [User Manual](http://docs.mitk.org/diffusion/nightly/)
+* [Features](#features)
+* [Related Links](#related-links)
+* [Image Gallery](#image-gallery)
+* [Building MITK Diffusion from source](#building-mitk-diffusion-from-source)
+* [User Manual](http://docs.mitk.org/diffusion/nightly/) (the manuals of a build are also in the help of its Workbench)
 * [Report a Bug](https://github.com/MIC-DKFZ/MITK-Diffusion/issues)
-* [References](#References)
-* [Contact](#Contact)
+* [References](#references)
+* [Contact](#contact)
 
 ## Features
 
 **Support for most established image formats**
-* Images: DICOM, NIFTI, NRRD (peak and SH images compatible with MRtrix)
-* Tractograms: fib/vtk, tck and trk.
+* Images: DICOM, NIfTI, NRRD; spherical harmonics and peak images of MRtrix, spherical harmonics of FSL and Dipy, tensor images of Camino
+* Tractograms: fib/vtk, tck (read only), trk, TRX and DICOM
 
 **Image preprocessing**
 * Registration
 * Head-motion correction
-* Denoising
+* Denoising (non-local means, total variation, Gaussian)
 * Resampling, cropping, flipping and merging
 * Header modifications
 * Single volume extraction
 
 **Diffusion gradient/b-value processing**
 * b-value rounding
-* Gradient direction flipping
+* Gradient direction flipping and reordering
 * Gradient direction subsampling
 * Averaging of gradient directions/volumes
 * Gradient direction and b-value visualization
 
 **ODF reconstruction and signal modelling**
-* Tensor and Q-ball reconstruction
-* ODF peak calculation
-* MRtrix or camino results can be imported
+* Tensor reconstruction
+* Q-ball reconstruction (numerical, analytical, solid angle, single- and multi-shell)
+* ODF peak extraction
 
 **Quantification of diffusion-weighted/tensor/ODF images**
 * Intravoxel Incoherent Motion (IVIM) and diffusion kurtosis analysis
 * Calculation of many other derived indices such as ADC, MD, GFA, FA, RA, AD, RD
-* Image statistics
+* Image statistics (MITK)
 
 **Segmentation**
-* Manual image segmentation and operations on segmentations
+* Manual image segmentation and operations on segmentations (MITK)
 
 **Fiber tractography**
-* Global tractography [[4]](#References)
+* Global tractography [[4]](#references)
 * Streamline tractography
-    * Interactive (similar to [[5]](#References)) or seed image based
+    * Interactive (similar to [[5]](#references)) or seed image based
     * Deterministic or probabilistic
-    * Peak, ODF, tensor and raw dMRI based. The latter one in conjunction with machine learning based tractography [[6]](#References)
-    * Various possibilities for anatomical constraints.
-    * Tractography priors in form of additional peak images, e.g. obtained using TractSeg
+    * Peak, ODF and tensor based
+    * Various possibilities for anatomical constraints
+    * Tractography priors in form of additional peak images, e.g. obtained using TractSeg [[3]](#references)
 
 **Fiber processing**
 * Tract dissection (parcellation or ROI based)
+* Semi-automatic tract dissection with active learning (atTRACTive) [[10]](#references)
 * Tract filtering by
     * length
     * curvature
@@ -70,8 +71,8 @@ The MITK Diffusion application [[1,2]](#References) offers a selection of image 
 * Tract resampling and compression
 * Tract transformation
     * Mirroring
-    * Rotating and translating
-    * Registration (apply transform of previously performed image registration)
+    * Rotating, translating and scaling
+    * Registration (apply the affine transform of a previous image registration)
 * Tract coloring
     * Curvature
     * Length
@@ -81,15 +82,15 @@ The MITK Diffusion application [[1,2]](#References) offers a selection of image 
     * Join
     * Subtract
     * Copy
-* Fiber clustering [[7]](#References)
-* Fiber fitting and weighting similar to SIFT2 and LiFE [[8,9]](#References)
+* Fiber clustering [[6]](#references)
+* Fiber fitting and weighting similar to SIFT2 and LiFE [[7,8]](#references)
 * Principal direction extraction (fibers --> peaks)
 * Tract derived images:
     * Tract density images
     * Tract endpoint images
     * Tract envelopes
 
-**Fiberfox dMRI simulations** [[10]](#References)
+**Fiberfox dMRI simulations** [[9]](#references)
 * Multi-compartment signal modeling
 * Simulation of the k-space acquisition including
     * Compartment specific relaxation effects
@@ -99,8 +100,8 @@ The MITK Diffusion application [[1,2]](#References) offers a selection of image 
 * Automatic generation of random fiber configurations
 
 **Other features**
-* Integrated screenshot maker
-* Command line tools for most functionalities
+* Integrated screenshot maker (MITK)
+* Command line tools for reconstruction, diffusion indices, IVIM and kurtosis, tractography, fiber processing and quantification, Fiberfox, registration, resampling, DICOM import and file conversion
 
 ## Related Links
 * Great python package for logging your (MITK or other) command line experiments:
@@ -184,15 +185,15 @@ The smaller configurations currently stop during the MITK configure step because
 
 [5] Chamberland, M., K. Whittingstall, D. Fortin, D. Mathieu, und M. Descoteaux. „Real-time multi-peak tractography for instantaneous connectivity display“. Front Neuroinform 8 (2014): 59. doi:10.3389/fninf.2014.00059.
 
-[6] Neher, Peter F., Marc-Alexandre Côté, Jean-Christophe Houde, Maxime Descoteaux, and Klaus H. Maier-Hein. “Fiber Tractography Using Machine Learning.” NeuroImage. Accessed July 17, 2017. doi:10.1016/j.neuroimage.2017.07.028.
+[6] Garyfallidis, Eleftherios, Matthew Brett, Marta Morgado Correia, Guy B. Williams, and Ian Nimmo-Smith. “QuickBundles, a Method for Tractography Simplification.” Frontiers in Neuroscience 6 (2012).
 
-[7] Garyfallidis, Eleftherios, Matthew Brett, Marta Morgado Correia, Guy B. Williams, and Ian Nimmo-Smith. “QuickBundles, a Method for Tractography Simplification.” Frontiers in Neuroscience 6 (2012).
+[7] Smith, Robert E., Jacques-Donald Tournier, Fernando Calamante, and Alan Connelly. “SIFT2: Enabling Dense Quantitative Assessment of Brain White Matter Connectivity Using Streamlines Tractography.” NeuroImage 119, no. Supplement C (October 1, 2015): 338–51.
 
-[8] Smith, Robert E., Jacques-Donald Tournier, Fernando Calamante, and Alan Connelly. “SIFT2: Enabling Dense Quantitative Assessment of Brain White Matter Connectivity Using Streamlines Tractography.” NeuroImage 119, no. Supplement C (October 1, 2015): 338–51.
+[8] Pestilli, Franco, Jason D. Yeatman, Ariel Rokem, Kendrick N. Kay, and Brian A. Wandell. “Evaluation and Statistical Inference for Human Connectomes.” Nature Methods 11, no. 10 (October 2014): 1058–63.
 
-[9] Pestilli, Franco, Jason D. Yeatman, Ariel Rokem, Kendrick N. Kay, and Brian A. Wandell. “Evaluation and Statistical Inference for Human Connectomes.” Nature Methods 11, no. 10 (October 2014): 1058–63.
+[9] Neher, Peter F., Frederik B. Laun, Bram Stieltjes, and Klaus H. Maier-Hein. “Fiberfox: Facilitating the Creation of Realistic White Matter Software Phantoms.” Magnetic Resonance in Medicine 72, no. 5 (November 2014): 1460–70. doi:10.1002/mrm.25045.
 
-[10] Neher, Peter F., Frederik B. Laun, Bram Stieltjes, and Klaus H. Maier-Hein. “Fiberfox: Facilitating the Creation of Realistic White Matter Software Phantoms.” Magnetic Resonance in Medicine 72, no. 5 (November 2014): 1460–70. doi:10.1002/mrm.25045.
+[10] Peretzke, Robin, Klaus H. Maier-Hein, Jonas Bohn, Yannick Kirchhoff, Saikat Roy, Sabrina Oberli-Palma, Daniela Becker, Pavlina Lenga, and Peter F. Neher. “atTRACTive: Semi-automatic White Matter Tract Segmentation Using Active Learning.” In Medical Image Computing and Computer Assisted Intervention – MICCAI 2023.
 
 
 ## Contact
