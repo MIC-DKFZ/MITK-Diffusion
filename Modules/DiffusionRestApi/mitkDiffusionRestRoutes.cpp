@@ -68,6 +68,7 @@ std::vector<mitk::RestRoute> mitk::CreateDiffusionRoutes(IRestServerService* ser
   diffusionrest::AddReconstructionRoutes(routes, server, jobs);
   diffusionrest::AddMaskRoutes(routes, server, jobs);
   diffusionrest::AddTrackingRoutes(routes, server, jobs);
+  diffusionrest::AddExtractionRoutes(routes, server, jobs);
 
   return routes;
 }

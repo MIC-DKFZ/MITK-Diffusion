@@ -3,4 +3,5 @@ set(MODULE_TESTS
   mitkDiffusionRestReconstructionTest.cpp
   mitkDiffusionRestMasksTest.cpp
   mitkDiffusionRestTrackingTest.cpp
+  mitkDiffusionRestExtractionTest.cpp
 )

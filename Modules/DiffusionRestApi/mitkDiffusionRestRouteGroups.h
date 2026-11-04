@@ -36,6 +36,9 @@ namespace mitk::diffusionrest
 
   /** \brief The /diffusion/tractography endpoints: streamline tractography with ROIs, previews, cancel and metrics. */
   void AddTrackingRoutes(std::vector<RestRoute>& routes, IRestServerService* server, const std::shared_ptr<JobRunner>& jobs);
+
+  /** \brief /diffusion/tractography/extract and /metrics: fibers by ROIs, numbers about a tractogram. */
+  void AddExtractionRoutes(std::vector<RestRoute>& routes, IRestServerService* server, const std::shared_ptr<JobRunner>& jobs);
 }
 
 #endif

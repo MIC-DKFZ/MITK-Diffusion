@@ -10,4 +10,5 @@ set(CPP_FILES
   mitkDiffusionRestReconstruction.cpp
   mitkDiffusionRestMasks.cpp
   mitkDiffusionRestTracking.cpp
+  mitkDiffusionRestExtraction.cpp
 )
