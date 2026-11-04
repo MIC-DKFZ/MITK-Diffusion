@@ -18,10 +18,10 @@ found in the LICENSE file.
 #include <mitkLog.h>
 
 #include <nlohmann/json.hpp>
-#include <Poco/DateTime.h>
+#include <Poco/Checksum.h>
+#include <Poco/DeflatingStream.h>
 #include <Poco/Exception.h>
-#include <Poco/Path.h>
-#include <Poco/Zip/Compress.h>
+#include <Poco/LocalDateTime.h>
 #include <Poco/Zip/ZipArchive.h>
 #include <Poco/Zip/ZipLocalFileHeader.h>
 #include <Poco/Zip/ZipStream.h>
@@ -39,8 +39,6 @@ found in the LICENSE file.
 #include <memory>
 #include <optional>
 #include <span>
-#include <sstream>
-#include <streambuf>
 #include <type_traits>
 
 namespace
@@ -632,76 +630,214 @@ namespace
     return out + sizeof(T);
   }
 
-  /** An input stream buffer of numRows rows of rowBytes bytes that fill produces chunk by chunk
-   *  when they are read, so that an archive entry need not be held in memory. Poco's Compress
-   *  reads the first byte, seeks to the end for the length and back, then reads to the end. */
-  class GeneratedStreamBuf : public std::streambuf
+  /** Passes numRows rows of rowBytes bytes, which fill writes to a buffer, to consume in
+   *  pieces of about 1 MiB, so that an archive entry is never held in memory as a whole. */
+  using Fill = std::function<void(std::uint64_t firstRow, std::size_t numRows, char* out)>;
+  using Consume = std::function<void(const char* data, std::size_t bytes)>;
+
+  void Produce(std::uint64_t numRows, std::size_t rowBytes, const Fill& fill, const Consume& consume)
+  {
+    const std::size_t chunkRows = std::max<std::size_t>(1, (std::size_t(1) << 20) / rowBytes);
+    std::vector<char> buffer(chunkRows * rowBytes);
+    for (std::uint64_t first = 0; first < numRows; first += chunkRows)
+    {
+      const auto rows = static_cast<std::size_t>(std::min<std::uint64_t>(chunkRows, numRows - first));
+      fill(first, rows, buffer.data());
+      consume(buffer.data(), rows * rowBytes);
+    }
+  }
+
+  /**
+   * Writes a ZIP archive (PKWARE APPNOTE 6.3) entry by entry: stored entries straight to the
+   * file, deflated ones through Poco's raw deflate stream, each with its CRC-32 (Poco::Checksum,
+   * zlib's), the local header rewritten with CRC and sizes after the data. With zip64, every
+   * entry gets the Zip64 extra field and the archive the Zip64 end records, so that sizes and
+   * offsets beyond 4 GiB fit. Poco's Compress passes every byte through stream buffers of 1 KiB,
+   * which made the TRX writer slower than the TRK writer (1.4 s for 600 MB stored, against
+   * 0.5 s for CRC and write, Release build).
+   */
+  class ZipWriter
   {
   public:
-    /** Writes numRows rows from row firstRow on to out. */
-    using Fill = std::function<void(std::uint64_t firstRow, std::size_t numRows, char* out)>;
-
-    GeneratedStreamBuf(std::uint64_t numRows, std::size_t rowBytes, Fill fill)
-      : m_Size(numRows * rowBytes)
-      , m_RowBytes(rowBytes)
-      , m_Fill(std::move(fill))
-      , m_Buffer(rowBytes * std::max<std::size_t>(1, (std::size_t(1) << 20) / rowBytes))
+    ZipWriter(std::ostream& out, bool zip64, bool deflate)
+      : m_Out(out)
+      , m_Zip64(zip64)
+      , m_Deflate(deflate)
     {
+      const Poco::LocalDateTime now;
+      m_Time = static_cast<std::uint16_t>((now.hour() << 11) | (now.minute() << 5) | (now.second() / 2));
+      m_Date = static_cast<std::uint16_t>(((std::max(now.year(), 1980) - 1980) << 9) | (now.month() << 5) | now.day());
     }
 
-  protected:
-    int_type underflow() override
+    /** Adds the entry name with the bytes that produce passes to its argument. */
+    void Add(const std::string& name, const std::function<void(const Consume&)>& produce)
     {
-      if (this->gptr() != nullptr && this->gptr() < this->egptr())
-        return traits_type::to_int_type(*this->gptr());
-      const std::uint64_t position = this->Position();
-      if (position >= m_Size)
-        return traits_type::eof();
-      const std::uint64_t chunkStart = position / m_Buffer.size() * m_Buffer.size();
-      const auto chunkBytes = static_cast<std::size_t>(std::min<std::uint64_t>(m_Buffer.size(), m_Size - chunkStart));
-      m_Fill(chunkStart / m_RowBytes, chunkBytes / m_RowBytes, m_Buffer.data());
-      m_ChunkStart = chunkStart;
-      this->setg(m_Buffer.data(), m_Buffer.data() + (position - chunkStart), m_Buffer.data() + chunkBytes);
-      return traits_type::to_int_type(*this->gptr());
-    }
+      Entry entry;
+      entry.name = name;
+      entry.offset = this->Position();
+      this->WriteLocalHeader(entry);
+      const std::uint64_t dataStart = this->Position();
 
-    pos_type seekoff(off_type offset, std::ios_base::seekdir direction, std::ios_base::openmode which) override
-    {
-      if ((which & std::ios_base::in) == 0)
-        return pos_type(off_type(-1));
-      const std::uint64_t base = direction == std::ios_base::beg ? 0 : direction == std::ios_base::cur ? this->Position() : m_Size;
-      const auto target = static_cast<off_type>(base) + offset;
-      if (target < 0 || static_cast<std::uint64_t>(target) > m_Size)
-        return pos_type(off_type(-1));
-      const auto position = static_cast<std::uint64_t>(target);
-      if (this->eback() != nullptr && position >= m_ChunkStart && position <= m_ChunkStart + static_cast<std::uint64_t>(this->egptr() - this->eback()))
-        this->setg(this->eback(), this->eback() + (position - m_ChunkStart), this->egptr());
+      Poco::Checksum crc(Poco::Checksum::TYPE_CRC32);
+      if (m_Deflate)
+      {
+        // negative window bits: raw deflate data, as ZIP stores it
+        Poco::DeflatingOutputStream deflater(m_Out, -15, Poco::DeflatingStreamBuf::DEFAULT_COMPRESSION);
+        produce([&](const char* data, std::size_t bytes)
+        {
+          crc.update(data, static_cast<unsigned int>(bytes));
+          deflater.write(data, static_cast<std::streamsize>(bytes));
+          entry.size += bytes;
+        });
+        deflater.close();
+      }
       else
       {
-        this->setg(nullptr, nullptr, nullptr);
-        m_Position = position;
+        produce([&](const char* data, std::size_t bytes)
+        {
+          crc.update(data, static_cast<unsigned int>(bytes));
+          m_Out.write(data, static_cast<std::streamsize>(bytes));
+          entry.size += bytes;
+        });
       }
-      return pos_type(target);
+      const std::uint64_t dataEnd = this->Position();
+      entry.compressedSize = dataEnd - dataStart;
+      entry.crc = crc.checksum();
+      if (!m_Zip64 && (entry.size >= 0xffffffffu || entry.compressedSize >= 0xffffffffu || entry.offset >= 0xffffffffu))
+        mitkThrow() << name << " exceeds the 4 GiB of an archive without Zip64 records.";
+
+      m_Out.seekp(static_cast<std::streamoff>(entry.offset));
+      this->WriteLocalHeader(entry);
+      m_Out.seekp(static_cast<std::streamoff>(dataEnd));
+      this->Check();
+      m_Entries.push_back(entry);
     }
 
-    pos_type seekpos(pos_type position, std::ios_base::openmode which) override
+    /** Writes the central directory and the end records. */
+    void Close()
     {
-      return this->seekoff(off_type(position), std::ios_base::beg, which);
+      const std::uint64_t directoryStart = this->Position();
+      for (const Entry& entry : m_Entries)
+      {
+        Put32(0x02014b50);
+        Put16(static_cast<std::uint16_t>((3 << 8) | this->Version())); // made by: Unix
+        Put16(this->Version());
+        this->PutCommon(entry);
+        Put16(m_Zip64 ? 28 : 0); // extra field length
+        Put16(0);                // comment length
+        Put16(0);                // disk number
+        Put16(0);                // internal attributes
+        Put32(0100644u << 16);   // external attributes: regular file, rw-r--r--
+        Put32(m_Zip64 ? 0xffffffffu : static_cast<std::uint32_t>(entry.offset));
+        m_Out.write(entry.name.data(), static_cast<std::streamsize>(entry.name.size()));
+        if (m_Zip64)
+        {
+          Put16(0x0001);
+          Put16(24);
+          Put64(entry.size);
+          Put64(entry.compressedSize);
+          Put64(entry.offset);
+        }
+      }
+      const std::uint64_t directoryEnd = this->Position();
+      const std::uint64_t directorySize = directoryEnd - directoryStart;
+      const std::uint64_t count = m_Entries.size();
+      if (!m_Zip64 && (directoryEnd >= 0xffffffffu || count >= 0xffff))
+        mitkThrow() << "The archive exceeds the 4 GiB or 65535 entries of an archive without Zip64 records.";
+      if (m_Zip64)
+      {
+        Put32(0x06064b50); // Zip64 end of central directory record
+        Put64(44);
+        Put16(static_cast<std::uint16_t>((3 << 8) | 45));
+        Put16(45);
+        Put32(0);
+        Put32(0);
+        Put64(count);
+        Put64(count);
+        Put64(directorySize);
+        Put64(directoryStart);
+        Put32(0x07064b50); // its locator
+        Put32(0);
+        Put64(directoryEnd);
+        Put32(1);
+      }
+      Put32(0x06054b50);
+      Put16(0);
+      Put16(0);
+      Put16(static_cast<std::uint16_t>(std::min<std::uint64_t>(count, 0xffff)));
+      Put16(static_cast<std::uint16_t>(std::min<std::uint64_t>(count, 0xffff)));
+      Put32(static_cast<std::uint32_t>(std::min<std::uint64_t>(directorySize, 0xffffffffu)));
+      Put32(static_cast<std::uint32_t>(std::min<std::uint64_t>(directoryStart, 0xffffffffu)));
+      Put16(0);
+      this->Check();
     }
 
   private:
-    std::uint64_t Position() const
+    struct Entry
     {
-      return this->eback() != nullptr ? m_ChunkStart + static_cast<std::uint64_t>(this->gptr() - this->eback()) : m_Position;
+      std::string name;
+      std::uint64_t offset = 0;
+      std::uint64_t size = 0;
+      std::uint64_t compressedSize = 0;
+      std::uint32_t crc = 0;
+    };
+
+    std::uint16_t Version() const { return m_Zip64 ? 45 : 20; }
+
+    std::uint64_t Position()
+    {
+      const auto position = m_Out.tellp();
+      if (position < 0)
+        mitkThrow() << "The archive cannot report its write position.";
+      return static_cast<std::uint64_t>(position);
     }
 
-    const std::uint64_t m_Size;
-    const std::size_t m_RowBytes;
-    Fill m_Fill;
-    std::vector<char> m_Buffer;
-    std::uint64_t m_ChunkStart = 0;
-    /** the position while there is no chunk */
-    std::uint64_t m_Position = 0;
+    void Check() const
+    {
+      if (!m_Out)
+        mitkThrow() << "Could not write the archive.";
+    }
+
+    void Put16(std::uint16_t value) { char bytes[2]; StoreLittleEndian(value, bytes); m_Out.write(bytes, 2); }
+    void Put32(std::uint32_t value) { char bytes[4]; StoreLittleEndian(value, bytes); m_Out.write(bytes, 4); }
+    void Put64(std::uint64_t value) { char bytes[8]; StoreLittleEndian(value, bytes); m_Out.write(bytes, 8); }
+
+    /** The fields from the method to the name length, shared by local and central headers. */
+    void PutCommon(const Entry& entry)
+    {
+      Put16(0); // flags
+      Put16(m_Deflate ? 8 : 0);
+      Put16(m_Time);
+      Put16(m_Date);
+      Put32(entry.crc);
+      Put32(m_Zip64 ? 0xffffffffu : static_cast<std::uint32_t>(entry.compressedSize));
+      Put32(m_Zip64 ? 0xffffffffu : static_cast<std::uint32_t>(entry.size));
+      Put16(static_cast<std::uint16_t>(entry.name.size()));
+    }
+
+    void WriteLocalHeader(const Entry& entry)
+    {
+      Put32(0x04034b50);
+      Put16(this->Version());
+      this->PutCommon(entry);
+      Put16(m_Zip64 ? 20 : 0);
+      m_Out.write(entry.name.data(), static_cast<std::streamsize>(entry.name.size()));
+      if (m_Zip64)
+      {
+        Put16(0x0001);
+        Put16(16);
+        Put64(entry.size);
+        Put64(entry.compressedSize);
+      }
+      this->Check();
+    }
+
+    std::ostream& m_Out;
+    const bool m_Zip64;
+    const bool m_Deflate;
+    std::uint16_t m_Time = 0;
+    std::uint16_t m_Date = 0;
+    std::vector<Entry> m_Entries;
   };
 
   /** Walks the point ids of the fibers of a polydata in fiber order, the vertices of a TRX file;
@@ -838,7 +974,6 @@ void mitk::TrxFile::Write(const std::string& filename, const FiberBundle* fib, c
   header["VOXEL_TO_RASMM"] = matrix;
   header["NB_STREAMLINES"] = numFibers;
   header["NB_VERTICES"] = numVertices;
-  std::istringstream headerStream(header.dump());
 
   const bool half = options.positionType == PositionType::Float16;
   const std::size_t positionBytes = half ? 2 : 4;
@@ -858,80 +993,78 @@ void mitk::TrxFile::Write(const std::string& filename, const FiberBundle* fib, c
     mitkThrow() << "Could not create " << filename;
   try
   {
-    Poco::Zip::Compress compress(out, true, bytes >= options.zip64Threshold);
-    const auto method = options.compression == Compression::Deflated ? Poco::Zip::ZipCommon::CM_DEFLATE : Poco::Zip::ZipCommon::CM_STORE;
-    auto add = [&](const std::string& name, std::istream& in)
-    {
-      // Errors of the fill functions leave the stream instead of ending the entry early.
-      in.exceptions(std::ios::badbit);
-      compress.addFile(in, Poco::DateTime(), Poco::Path(name, Poco::Path::PATH_UNIX), method, Poco::Zip::ZipCommon::CL_NORMAL);
-    };
-    add("header.json", headerStream);
+    ZipWriter zip(out, bytes >= options.zip64Threshold, options.compression == Compression::Deflated);
+    const std::string headerText = header.dump();
+    zip.Add("header.json", [&](const Consume& consume) { consume(headerText.data(), headerText.size()); });
 
     // trx-python writes no positions and offsets for a file without streamlines.
     if (entries)
     {
       vtkPoints* points = polyData->GetPoints();
       VertexCursor positionCursor(polyData);
-      GeneratedStreamBuf positionBuffer(numVertices, 3 * positionBytes, [&](std::uint64_t first, std::size_t count, char* data)
+      zip.Add(half ? "positions.3.float16" : "positions.3.float32", [&](const Consume& consume)
       {
-        positionCursor.Visit(first, count, [&](vtkIdType id)
+        Produce(numVertices, 3 * positionBytes, [&](std::uint64_t first, std::size_t count, char* data)
         {
-          double p[3];
-          points->GetPoint(id, p);
-          // LPS to RAS; exact for MITK's float points, so that float32 files keep them bit for bit
-          const float ras[3] = {static_cast<float>(-p[0]), static_cast<float>(-p[1]), static_cast<float>(p[2])};
-          for (const float v : ras)
-            data = half ? StoreLittleEndian(FloatToHalf(v), data) : StoreLittleEndian(v, data);
-        });
+          positionCursor.Visit(first, count, [&](vtkIdType id)
+          {
+            double p[3];
+            points->GetPoint(id, p);
+            // LPS to RAS; exact for MITK's float points, so that float32 files keep them bit for bit
+            const float ras[3] = {static_cast<float>(-p[0]), static_cast<float>(-p[1]), static_cast<float>(p[2])};
+            for (const float v : ras)
+              data = half ? StoreLittleEndian(FloatToHalf(v), data) : StoreLittleEndian(v, data);
+          });
+        }, consume);
       });
-      std::istream positionStream(&positionBuffer);
-      add(half ? "positions.3.float16" : "positions.3.float32", positionStream);
 
-      GeneratedStreamBuf offsetBuffer(numFibers + 1, offsets64 ? 8 : 4, [&](std::uint64_t first, std::size_t count, char* data)
+      zip.Add(offsets64 ? "offsets.uint64" : "offsets.uint32", [&](const Consume& consume)
       {
-        for (std::size_t k = 0; k < count; ++k)
-          data = offsets64 ? StoreLittleEndian(offsets[first + k], data) : StoreLittleEndian(static_cast<std::uint32_t>(offsets[first + k]), data);
+        Produce(numFibers + 1, offsets64 ? 8 : 4, [&](std::uint64_t first, std::size_t count, char* data)
+        {
+          for (std::size_t k = 0; k < count; ++k)
+            data = offsets64 ? StoreLittleEndian(offsets[first + k], data) : StoreLittleEndian(static_cast<std::uint32_t>(offsets[first + k]), data);
+        }, consume);
       });
-      std::istream offsetStream(&offsetBuffer);
-      add(offsets64 ? "offsets.uint64" : "offsets.uint32", offsetStream);
 
       if (colors != nullptr)
       {
         const unsigned char* rgba = colors->GetPointer(0);
         VertexCursor colorCursor(polyData);
-        GeneratedStreamBuf colorBuffer(numVertices, 3, [&](std::uint64_t first, std::size_t count, char* data)
+        zip.Add("dpv/color.3.uint8", [&](const Consume& consume)
         {
-          colorCursor.Visit(first, count, [&](vtkIdType id)
+          Produce(numVertices, 3, [&](std::uint64_t first, std::size_t count, char* data)
           {
-            std::memcpy(data, rgba + 4 * id, 3);
-            data += 3;
-          });
+            colorCursor.Visit(first, count, [&](vtkIdType id)
+            {
+              std::memcpy(data, rgba + 4 * id, 3);
+              data += 3;
+            });
+          }, consume);
         });
-        std::istream colorStream(&colorBuffer);
-        add("dpv/color.3.uint8", colorStream);
       }
 
       if (weights != nullptr)
       {
-        GeneratedStreamBuf weightBuffer(numFibers, 4, [&](std::uint64_t first, std::size_t count, char* data)
+        zip.Add("dps/weights.float32", [&](const Consume& consume)
         {
-          for (std::size_t k = 0; k < count; ++k)
-            data = StoreLittleEndian(weights->GetValue(static_cast<vtkIdType>(first + k)), data);
+          Produce(numFibers, 4, [&](std::uint64_t first, std::size_t count, char* data)
+          {
+            for (std::size_t k = 0; k < count; ++k)
+              data = StoreLittleEndian(weights->GetValue(static_cast<vtkIdType>(first + k)), data);
+          }, consume);
         });
-        std::istream weightStream(&weightBuffer);
-        add("dps/weights.float32", weightStream);
       }
     }
-    compress.close();
+    zip.Close();
+  }
+  catch (const mitk::Exception& e)
+  {
+    mitkThrow() << "Could not write " << filename << ": " << e.GetDescription();
   }
   catch (const Poco::Exception& e)
   {
     mitkThrow() << "Could not write " << filename << ": " << e.displayText();
-  }
-  catch (const std::ios_base::failure& e)
-  {
-    mitkThrow() << "Could not write " << filename << ": " << e.what();
   }
   // Buffered write errors (disk full) show up only here.
   out.close();
