@@ -73,6 +73,14 @@ TRK is the tractography file format used by TrackVis and DIPY. See http://www.tr
 
 MITK Diffusion is able to read the tck file format native to MRtrix. Writing this format is currently not supported. By default, MRtrix uses a RAS coordinate convention in contrast to the MITK Diffusion (and also ITK) convention of LPS. To compensate for this, the fiber coordinates are negated in the x and y dimension.
 
+\subsection tract_trx TRX (.trx)
+
+TRX (https://github.com/tee-ar-ex/trx-spec) is the tractography format of trx-python, DIPY and scilpy. A TRX file is a ZIP archive, uncompressed (stored) or compressed (deflated), of the streamline points, the streamlines' offsets into them and further arrays. MITK Diffusion reads TRX files in the Workbench and in the command line tools; the command line tools also read a TRX folder (the same entries as files in a folder named *.trx). TRX stores RAS coordinates; they are negated in x and y for MITK Diffusion's LPS convention. The reference geometry (VOXEL_TO_RASMM and DIMENSIONS) is kept and written back unchanged, also when the tractogram is saved as .trk.
+
+Fiber weights are read from the per-streamline array "weights", fiber colors from the per-point array "color" (red, green, blue) or the arrays "color_x", "color_y" and "color_z" of trx-python's test files. Other arrays (per streamline, per point or per group) are not loaded; the log names them. TRX groups (named sets of streamlines) are not loaded by default; with the reader option "Load groups as separate bundles", each group is loaded as a tractogram of its own, named after the group, after the whole tractogram.
+
+When saving, the writer option "Position type" chooses between float32 (default, the points as MITK Diffusion holds them) and float16 (half the size of the points, with errors of up to 0.016 mm for coordinates below 64 mm and up to 0.06 mm below 256 mm). "Compression" chooses between stored (default, faster to read and write) and deflated. Fiber weights and colors are saved by default ("Save fiber weights", "Save color information"); the color transparency is not saved. Groups are not written.
+
 \subsection tract_dicom DICOM
 
 Tractography DICOM files compliant with the supplement 181 of the DICOM standard can be read and written by MITK Diffusion. This format is for example supported by the neuronavigation software of Brainlab.

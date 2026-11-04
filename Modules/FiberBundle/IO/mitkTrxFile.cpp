@@ -652,9 +652,9 @@ namespace
    * file, deflated ones through Poco's raw deflate stream, each with its CRC-32 (Poco::Checksum,
    * zlib's), the local header rewritten with CRC and sizes after the data. With zip64, every
    * entry gets the Zip64 extra field and the archive the Zip64 end records, so that sizes and
-   * offsets beyond 4 GiB fit. Poco's Compress passes every byte through stream buffers of 1 KiB,
-   * which made the TRX writer slower than the TRK writer (1.4 s for 600 MB stored, against
-   * 0.5 s for CRC and write, Release build).
+   * offsets beyond 4 GiB fit. Not Poco's Compress: it passes every byte through stream buffers
+   * of 1 KiB and takes 1.4 s for 600 MB stored, against 0.5 s for CRC and write (Release build),
+   * which puts the TRX writer behind the TRK writer.
    */
   class ZipWriter
   {
