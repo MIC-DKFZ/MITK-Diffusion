@@ -765,6 +765,45 @@
         </property>
        </widget>
       </item>
+      <item row="10" column="0">
+       <widget class="QCheckBox" name="m_ParallelSamplerCheckbox">
+        <property name="toolTip">
+         <string>Run the parallel sampler: blocks of the particle grid on several threads. Much faster on large images. With a fixed seed it gives the same tractogram at any number of threads, but not the same as the serial sampler.</string>
+        </property>
+        <property name="text">
+         <string>Parallel sampler</string>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="1">
+       <widget class="QLabel" name="m_ThreadsLabel">
+        <property name="text">
+         <string>Threads</string>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="2">
+       <widget class="QSpinBox" name="m_ThreadsBox">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="toolTip">
+         <string>Threads of the parallel sampler; all cores: as many as OpenMP uses.</string>
+        </property>
+        <property name="specialValueText">
+         <string>all cores</string>
+        </property>
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>256</number>
+        </property>
+        <property name="value">
+         <number>0</number>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
