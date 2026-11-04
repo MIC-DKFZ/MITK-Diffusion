@@ -161,7 +161,9 @@ void mitk::diffusionrest::AddTrackingRoutes(std::vector<RestRoute>& routes, IRes
     "seeds_processed, acceptance (fibers per processed seed), seconds, step_size_mm, "
     "angular_threshold_deg}}; the tractogram is added below the model image. A low acceptance or few "
     "short fibers mean the cutoff or angular threshold is too strict or the seed ROI lies outside the "
-    "white matter. See the manual section \"Streamline Tractography\".";
+    "white matter. Read the manual page \"Streamline Tractography\" first: \"Choosing the Model and the "
+    "Method\" (which model and mode for which tract), \"Tractography Parameters\" (each parameter's effect "
+    "and range), \"ROI Strategy\" and \"Recipes for Common Tracts\" (the ROIs of named tracts).";
   track.Handler = [server, jobs](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     auto imageNode = FindNode(*server, body, "image", request.Path);

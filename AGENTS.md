@@ -141,9 +141,26 @@ Facts the layout does not show:
   learns the diffusion tools only from the route descriptions
   (`GET /api/v1/endpoints?path=/api/v1/diffusion&details=true`) and the user manuals
   (`/api/v1/manual/search`): every description says what the route takes and returns and names the
-  manual section of its method. `ctest -R mitkDiffusionRestRoutes` runs the module's tests, which
-  call the handlers in-process on a `mitk::RestServer` without dispatcher or network (without a
-  dispatcher, `Dispatch` and `Post` run their task at once in the caller's thread).
+  manual section of its method. The routes: `GET /diffusion` (overview), `POST
+  /diffusion/reconstruction/{tensors,tensor-indices,color-fa,qball,peaks}`, `POST
+  /diffusion/masks/{brain,white-matter}`, `POST /diffusion/rois` (sphere in mm, or polygon from
+  screenshot pixels of a 2D window through `GetRestWorldPoints`) with `GET /diffusion/rois/:uid`,
+  `PATCH`/`DELETE .../labels/:value`, `POST /diffusion/tractography/{streamline,extract,metrics}`.
+  Long work runs as `RestJob`s on worker threads (`diffusionrest::JobRunner`,
+  `mitkDiffusionRestUtil.h`): the work returns a finish function that the runner posts to the GUI
+  thread (`IRestServerService::Post`) to add the result nodes; the runner joins its threads when the
+  routes are removed, so the Workbench's quit waits for a running reconstruction (tracking stops at
+  once). Masks come as a uid (binary image or segmentation) or `{segmentation, labels}`; every label
+  a route creates gets a group of its own, so ROIs may overlap. The streamline route uses the setup
+  shared with the view and the app (`Modules/FiberTracking/mitkStreamlineTractography.h`:
+  `CreateTrackingHandler`, `CreateTrackingPriorHandler`, `SetTrackingRois`). `ctest -R
+  mitkDiffusionRest` runs the module's tests, which call the handlers in-process on a
+  `mitk::RestServer` without dispatcher or network (without a dispatcher, `Dispatch` and `Post` run
+  their task at once in the caller's thread; MITK refuses a second image access of one thread, so a
+  test releases its own ITK views of an image before a route casts it). The tractography UI suite's
+  `Rest_` case calls the routes through the Workbench's server (`HandleRequest` on a worker thread,
+  the GUI thread kept running) and checks the polygon ROI against the shown slice. The trial
+  protocol for the agent on real data is `<ws>/gitlab_issues/55-agent-tractography.trial.md`.
 - `ctest -R mitkDiffusionViewsUiTest` runs the offscreen UI tests of the views, one test per
   plugin group (`Plugins/org.mitk.gui.qt.diffusionimaging.uitests`, a `TEST_PLUGIN` that the
   controls plugin adds under `BUILD_TESTING`, which `DiffusionRelease` switches on again after

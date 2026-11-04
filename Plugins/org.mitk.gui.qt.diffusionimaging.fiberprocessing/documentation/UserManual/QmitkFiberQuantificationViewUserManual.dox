@@ -32,6 +32,12 @@ Calculate the voxel-wise principal fiber directions (fixels) from a tractogram, 
 - Normalization: Normalize the principal fiber directions by the global maximum, the voxel-wise maximum or each direction individually.
 - Output \#Directions per Voxel: Generate an image that contains the number of principal directions per voxel as values.
 
+\section SecJudging Judging a Tractogram
+
+Numbers that tell whether a tractogram is a plausible tract: the fiber count (a dense tract of a single bundle has hundreds to thousands of fibers; a handful means that the ROIs or the cutoff cut it), the fiber lengths (minimum, mean, median and maximum along the streamlines: the arcuate fasciculus is 100 to 130 mm long, the corticospinal tract from the brain stem to the cortex about 120 mm, the uncinate 40 to 60 mm; a mean far below the expected length means fibers that stop early), the volume of the voxels the fibers pass (the binary envelope: a tract of several millilitres, not a thread of a few voxels), and the fibers that pass, end in or end with both ends in given ROIs (fibers ending outside the expected regions suggest a missing not ROI). The view's binary envelope and fiber endings image show the same in images.
+
+The REST endpoint POST /api/v1/diffusion/tractography/metrics returns these numbers for a tractogram and optional ROIs (binary images or labels of a segmentation) without changing the data storage: {fibers, length_mm: {min, mean, median, max}, volume_ml, rois: [{name, fibers_passing, fibers_ending, fibers_both_ends}]}.
+
 \imageMacro{DirectionExtractionFib.png, "Input fiber bundle",10}
 \imageMacro{DirectionExtractionPeaks.png, "Output principal fiber directions",10}
 

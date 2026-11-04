@@ -14,12 +14,25 @@
 # ids and link none of their plug-ins, so this plug-in can be configured before them.
 project(org_mitk_gui_qt_diffusionimaging_uitests)
 
+set(_module_depends MitkFiberBundle MitkDiffusionModelling MitkMultilabel MitkQtWidgets MitkQtWidgetsExt MitkSceneSerialization)
+
+# The tractography suite calls the diffusion REST endpoints through MITK's REST server where it
+# is built (MITK_DIFFUSION_UITEST_RESTAPI).
+if(TARGET MitkRESTAPI)
+  list(APPEND _module_depends MitkRESTAPI)
+  set(_has_restapi 1)
+else()
+  set(_has_restapi 0)
+endif()
+
 mitk_create_plugin(
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_UITESTS_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
-  MODULE_DEPENDS MitkFiberBundle MitkDiffusionModelling MitkMultilabel MitkQtWidgets MitkQtWidgetsExt MitkSceneSerialization
+  MODULE_DEPENDS ${_module_depends}
   TEST_PLUGIN
 )
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE MITK_DIFFUSION_UITEST_RESTAPI=${_has_restapi})
 
 # QmitkAbstractView (the test selection view) without Require-Plugin, see manifest_headers.cmake.
 target_link_libraries(${PROJECT_NAME} PRIVATE org_mitk_gui_qt_common org_mitk_gui_common)

@@ -15,5 +15,13 @@ An optional mask (a binary 3D image or a segmentation, whose labels together for
 
 The extraction runs in the background: the application stays usable, and the start button is disabled until the peak image appears as a new node below the input image. A running computation cannot be stopped: closing the view lets it run to its end and drops its result, and quitting the application waits until it has ended.
 
+\section OdfMaximaExtractionUse Peaks for Tractography
+
+A peak image holds up to "Max. Peaks" directions per voxel with their lengths. Streamline tractography on peaks (the manual page "Streamline Tractography") follows, at every step, the peak closest to the current direction, so it passes crossings where a tensor would stop. With the normalization "by the largest peak" (the default), the lengths are relative to the voxel's largest peak and the tracking cutoff of 0.1 to 0.3 on them drops weak secondary peaks; without normalization, the lengths are the ODF values. The defaults (3 peaks, relative threshold 0.4, absolute threshold 0.03, angular threshold 15 degrees) suit CSA Q-ball ODFs of in-vivo data; a brain mask keeps the extraction out of the background, where noise gives random peaks.
+
+\section OdfMaximaExtractionRest REST Endpoints
+
+\li POST /api/v1/diffusion/reconstruction/peaks with {image: uid of an SH or tensor image, mask (optional), max_peaks, relative_threshold, absolute_threshold, angular_threshold, normalization: "max", "none" or "unit"; for tensors fa_threshold and normalize}: the extraction of this view as a job; the peak image is added below the input image.
+
 
 */

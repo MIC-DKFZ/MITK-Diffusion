@@ -46,7 +46,9 @@ std::vector<mitk::RestRoute> mitk::CreateDiffusionRoutes(IRestServerService* ser
     "storage: they reconstruct models from a DWI, make masks and ROIs, track fibers and extract "
     "tracts. Returns {data: {workflow, manual_pages}}: workflow is the order in which a tract is "
     "built from a raw DWI, manual_pages the titles of the user manual pages that explain the "
-    "methods and their parameters; search them with GET /api/v1/manual/search?query=<title>.";
+    "methods and their parameters; search them with GET /api/v1/manual/search?query=<title or section>. "
+    "Before the first tractography, read on the page \"Streamline Tractography\" the sections "
+    "\"Choosing the Model and the Method\", \"ROI Strategy\" and \"Recipes for Common Tracts\".";
   overview.Handler = [](const RestRequest&) {
     return RestResponse::FromData({
       { "workflow",
@@ -56,7 +58,9 @@ std::vector<mitk::RestRoute> mitk::CreateDiffusionRoutes(IRestServerService* ser
         "segmentation. "
         "3. Run streamline tractography from the model with seed, mask, stop, exclusion and "
         "target ROIs, or whole-brain and extract the tract with ROIs afterwards. "
-        "4. Judge the result by its metrics and screenshots." },
+        "4. Judge the result by its metrics and screenshots. The manual page \"Streamline Tractography\" "
+        "explains the choices (sections \"Choosing the Model and the Method\", \"ROI Strategy\", "
+        "\"Recipes for Common Tracts\")." },
       { "manual_pages", std::vector<std::string>(std::begin(ManualPages), std::end(ManualPages)) }
     });
   };

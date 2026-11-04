@@ -277,8 +277,10 @@ namespace
   }
 
   /** The voxel size of the grid along a direction: the sum of the projected voxel edges. */
-  double VoxelSizeAlong(const mitk::BaseGeometry* geometry, const mitk::Vector3D& normal)
+  double VoxelSizeAlong(const mitk::BaseGeometry* geometry, mitk::Vector3D normal)
   {
+    // PlaneGeometry::GetNormal() is not a unit vector.
+    normal /= normal.GetNorm();
     double size = 0;
 
     for (int i = 0; i < 3; ++i)
@@ -406,7 +408,7 @@ void mitk::diffusionrest::AddMaskRoutes(std::vector<RestRoute>& routes, IRestSer
     "label \"Brain\" in a group of its own. Use it as the tracking mask of tractography, as the mask of "
     "the peak extraction, and to limit a white matter mask. Pass it to other endpoints as {segmentation: "
     "uid, labels: [value]} or by the segmentation's uid. Check it in a screenshot: it should cover the "
-    "brain and leave out skull and neck. See the manual section \"Streamline Tractography\".";
+    "brain and leave out skull and neck. See the manual page \"Streamline Tractography\", section \"ROI Constraints\".";
   brain.Handler = [server, jobs](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     auto dwiNode = FindNode(*server, body, "dwi", request.Path);
@@ -439,8 +441,8 @@ void mitk::diffusionrest::AddMaskRoutes(std::vector<RestRoute>& routes, IRestSer
     "segmentation to add the label to; without it a new one below the FA image}. Returns {segmentation: "
     "{uid, name}, label: {value, name, group, voxels, volume_ml}} with status 201: the label \"White "
     "matter\" in a group of its own. Typical use: the tracking mask or the seed region of whole-brain "
-    "tractography. A threshold of 0.2 keeps most white matter; 0.3 is stricter. See the manual section "
-    "\"Streamline Tractography\".";
+    "tractography. A threshold of 0.2 keeps most white matter; 0.3 is stricter. See the manual page "
+    "\"Streamline Tractography\", section \"ROI Strategy\", and the page \"Diffusion Indices\".";
   whiteMatter.Handler = [server](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     auto faNode = FindNode(*server, body, "fa", request.Path);
@@ -509,8 +511,8 @@ void mitk::diffusionrest::AddMaskRoutes(std::vector<RestRoute>& routes, IRestSer
     "label: {value, name, group, voxels, volume_ml}} with status 201. Pass the ROI to tractography and "
     "extraction as {segmentation: uid, labels: [value]}. Draw ROIs on the colour-FA map: the slice and "
     "the pixels come from a screenshot of that window taken after the last change of slice or zoom. "
-    "GET /diffusion/rois/{uid} lists the ROIs of a segmentation. See the manual section \"Streamline "
-    "Tractography\", ROI constraints.";
+    "GET /diffusion/rois/{uid} lists the ROIs of a segmentation. Where to place the ROIs of a tract: the manual page "
+    "\"Streamline Tractography\", sections \"ROI Strategy\" and \"Recipes for Common Tracts\".";
   createRoi.Handler = [server](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     const bool existing = body.contains("segmentation") && !body["segmentation"].is_null();

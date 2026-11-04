@@ -159,8 +159,9 @@ void mitk::diffusionrest::AddExtractionRoutes(std::vector<RestRoute>& routes, IR
     "ROIs: interpolate the mask), min_fibers 0 (an extraction with fewer fibers gives an empty "
     "result)}. Runs as a job; the result is {tractogram: {uid, name}, fibers, fibers_in}, the "
     "extracted bundle added below the input. This is how a tract is dissected from a whole-brain "
-    "tractogram: pass ROIs where the tract must run, not ROIs where it must not. See the manual "
-    "section \"Fiber Processing\".";
+    "tractogram: pass ROIs where the tract must run, not ROIs where it must not. See the manual page "
+    "\"Fiber Processing\", section \"Fiber Extraction by ROIs\", and the ROIs of named tracts in "
+    "\"Recipes for Common Tracts\" on the page \"Streamline Tractography\".";
   extract.Handler = [server, jobs](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     auto inputNode = FindNode(*server, body, "tractogram", request.Path);
@@ -243,8 +244,8 @@ void mitk::diffusionrest::AddExtractionRoutes(std::vector<RestRoute>& routes, IR
     "a fiber passes), rois: [{name, fibers_passing, fibers_ending (at least one end inside), "
     "fibers_both_ends}]}. Use it to judge a result: a tract of a few fibers or of fibers far shorter "
     "than the expected length is not dense; fibers ending outside the expected regions suggest "
-    "missing not ROIs. Changes nothing in the data storage. See the manual section \"Fiber "
-    "Quantification\".";
+    "missing not ROIs. Changes nothing in the data storage. See the manual page \"Fiber "
+    "Quantification\", section \"Judging a Tractogram\".";
   metrics.Handler = [server, jobs](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     auto node = FindNode(*server, body, "tractogram", request.Path);

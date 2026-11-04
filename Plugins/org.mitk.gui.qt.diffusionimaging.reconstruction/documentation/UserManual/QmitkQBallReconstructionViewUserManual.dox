@@ -13,7 +13,7 @@ All methods but Multi-Shell model a single shell: the diffusion-weighted volumes
 
 Parameters:
 \li <b>B0 Threshold:</b> voxels whose mean baseline signal is below this value are not reconstructed.
-\li <b>SH-Order:</b> the order of the spherical harmonics. Higher orders (e.g. 8) resolve more detail, lower orders (e.g. 4) are more robust against noise.
+\li <b>SH-Order:</b> the order of the spherical harmonics. Higher orders (e.g. 8) resolve more detail, lower orders (e.g. 4) are more robust against noise. An order l has (l+1)(l+2)/2 coefficients, which the diffusion-weighted volumes must determine: order 4 needs at least 15 directions, order 6 at least 28, order 8 at least 45, order 10 at least 66. Take the highest order the number of directions allows, up to 8: order 4 for 15 to 27 directions, 6 for 28 to 44, 8 for 45 and more. Orders above 8 bring little for in-vivo data and amplify noise.
 \li <b>Lambda:</b> the weight of the regularisation; 0 switches it off. lambda = 0.006 has proven to be a stable choice under various settings. It weights the Laplace-Beltrami regularisation of Descoteaux et al. (2007), which does not depend on the orientation of the fibres or on whether the gradient directions cover half of the sphere or all of it; lambda has the same meaning as the smoothing parameter of dipy's QballModel and CsaOdfModel.
 \li <b>Output Sampled ODF Image:</b> besides the spherical harmonics image, also add the ODF sampled on 252 directions.
 
@@ -22,6 +22,14 @@ The reconstruction runs in the background: the application stays usable, and the
 "Convert SH to sampled ODF image" samples a selected spherical harmonics image on the 252 directions; the result is named after the SH image with "_Odf".
 
 Standard Q-balls feature a relatively low GFA and thus appear rather dark; adjust the level window.
+
+\section QballReconstructionUse When to Use Q-ball ODFs
+
+An ODF gives the probability of a fiber direction in every direction of the sphere, so it can hold several directions per voxel where fibers cross. The constant solid angle (CSA) reconstruction gives sharp ODFs that resolve crossings of about 45 degrees and more at b = 1000 to 3000 s/mm^2 with 30 or more directions; the standard Q-ball is smoother. For tractography, extract the maxima of the SH image as a peak image (\ref org_mitk_views_odfmaximaextraction) and track on the peaks (deterministic or probabilistic), or track probabilistically on the ODF itself. The choice between tensors and ODFs is discussed in "Choosing the Model and the Method" of the "Streamline Tractography" manual page.
+
+\section QballReconstructionRest REST Endpoints
+
+\li POST /api/v1/diffusion/reconstruction/qball with {dwi: uid, method: "csa" (default), "standard", "multishell", "adc_profile", "raw_signal" or "numerical", sh_order (default: the highest order up to 8 that the number of diffusion-weighted volumes determines), lambda, b0_threshold, sampled_odf}: the reconstruction of this view as a job; the SH image is added below the DWI, the sampled ODF image below the SH image.
 
 \imageMacro{qballs3.png,"Q-ball image after reconstruction",16.00}
 

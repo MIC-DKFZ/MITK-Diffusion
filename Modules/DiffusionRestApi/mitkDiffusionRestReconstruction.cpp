@@ -101,8 +101,8 @@ void mitk::diffusionrest::AddReconstructionRoutes(std::vector<RestRoute>& routes
     "zero_negative_eigenvalues: false}. Runs as a job (query parameter wait, seconds); the result is "
     "{tensors: {uid, name}}, a tensor image added below the DWI, shown as a colour-coded map (direction "
     "colours times FA). Tensors are the model for FA maps and deterministic tractography of compact "
-    "bundles; where fibers cross, use the CSA Q-ball reconstruction and its peaks. See the manual "
-    "section \"Tensor Reconstruction\".";
+    "bundles; where fibers cross, use the CSA Q-ball reconstruction and its peaks. See the manual page \"Tensor Reconstruction\" and, for the choice of the model, \"Choosing the "
+    "Model and the Method\" on the page \"Streamline Tractography\".";
   tensors.Handler = [server, jobs](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     DataNode::Pointer dwiNode;
@@ -134,7 +134,7 @@ void mitk::diffusionrest::AddReconstructionRoutes(std::vector<RestRoute>& routes
     "anisotropy, 0 to 1) is high in white matter and the usual basis of a white matter mask (FA above "
     "0.2) and of the FA cutoff of tractography; MD, AD and RD are diffusivities in mm^2/s. Runs as a "
     "job; the result is {images: [{index, uid, name}]}, float images added below the tensors with a "
-    "level window that fits the index. See the manual section \"Diffusion Indices\".";
+    "level window that fits the index. See the manual page \"Diffusion Indices\".";
   indices.Handler = [server, jobs](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     auto tensorNode = FindNode(*server, body, "tensors", request.Path);
@@ -210,7 +210,8 @@ void mitk::diffusionrest::AddReconstructionRoutes(std::vector<RestRoute>& routes
     "This is the map on which the ROIs of tracts are placed: a tract shows in its direction's colour. "
     "Runs as a job; the result is {image: {uid, name}}, an RGB image added below the tensors, which "
     "screenshots show without a level window. The tensor image itself renders the same way, so this "
-    "map is for screenshots next to other images. See the manual section \"Tensor Reconstruction\".";
+    "map is for screenshots next to other images. How to read the colours when placing ROIs: the manual page "
+    "\"Streamline Tractography\", section \"ROI Strategy\".";
   colorFa.Handler = [server, jobs](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     auto tensorNode = FindNode(*server, body, "tensors", request.Path);
@@ -243,8 +244,9 @@ void mitk::diffusionrest::AddReconstructionRoutes(std::vector<RestRoute>& routes
     "mean b0 get zero ODFs); sampled_odf: false (also add the ODFs sampled on 252 directions, which "
     "the views render as glyphs)}. The single-shell methods need a DWI of one b-value besides b0. Runs "
     "as a job; the result is {sh: {uid, name}, odf: {uid, name} or null}, added below the DWI. The SH "
-    "image is the input of the peak extraction and of probabilistic ODF tractography. See the manual "
-    "section \"Q-Ball Reconstruction\".";
+    "image is the input of the peak extraction and of probabilistic ODF tractography. See the manual page "
+    "\"Q-Ball Reconstruction\" (the methods and the SH order) and \"Choosing the Model and the Method\" "
+    "on the page \"Streamline Tractography\".";
   qball.Handler = [server, jobs](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     DataNode::Pointer dwiNode;
@@ -324,7 +326,7 @@ void mitk::diffusionrest::AddReconstructionRoutes(std::vector<RestRoute>& routes
     "true (unit vectors; else scaled by FA)}. Runs as a job; the result is {peaks: {uid, name}}, a "
     "peak image added below the input. Peak images are the input of peak tractography, which follows "
     "up to max_peaks directions per voxel and so passes crossings; the peak length cutoff of the "
-    "tracking applies to these lengths. See the manual section \"ODF Peak Extraction\".";
+    "tracking applies to these lengths. See the manual page \"ODF Peak Extraction\".";
   peaks.Handler = [server, jobs](const RestRequest& request) {
     const auto body = request.GetJsonBody();
     auto imageNode = FindNode(*server, body, "image", request.Path);
