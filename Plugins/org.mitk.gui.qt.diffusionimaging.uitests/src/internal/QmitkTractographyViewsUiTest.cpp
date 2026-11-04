@@ -1087,7 +1087,7 @@ public:
   {
 #if MITK_DIFFUSION_UITEST_RESTAPI
     auto tensors = Load("StreamlineTractography/tensor_image.dti");
-    // Starts the tractography plug-in, which registers the routes.
+    // The routes exist before any view: MitkRESTAPI's auto-load module registers them.
     ShowStreamline();
     Select({tensors});
     InitializeViews();

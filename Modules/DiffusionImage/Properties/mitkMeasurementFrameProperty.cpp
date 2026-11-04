@@ -16,6 +16,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkMeasurementFrameProperty.h"
 
+#include <nlohmann/json.hpp>
+
 mitk::MeasurementFrameProperty::MeasurementFrameProperty()
   : m_MeasurementFrame()
 {
@@ -54,6 +56,29 @@ bool mitk::MeasurementFrameProperty::IsEqual(const BaseProperty& property) const
 bool mitk::MeasurementFrameProperty::Assign(const BaseProperty& property)
 {
   this->m_MeasurementFrame = static_cast<const Self&>(property).m_MeasurementFrame;
+  return true;
+}
+
+// Three rows of three values.
+bool mitk::MeasurementFrameProperty::ToJSON(nlohmann::json& j) const
+{
+  j = nlohmann::json::array();
+
+  for (unsigned int row = 0; row < 3; ++row)
+    j.push_back({ m_MeasurementFrame(row, 0), m_MeasurementFrame(row, 1), m_MeasurementFrame(row, 2) });
+
+  return true;
+}
+
+bool mitk::MeasurementFrameProperty::FromJSON(const nlohmann::json& j)
+{
+  MeasurementFrameType frame;
+
+  for (unsigned int row = 0; row < 3; ++row)
+    for (unsigned int column = 0; column < 3; ++column)
+      frame(row, column) = j.at(row).at(column).get<double>();
+
+  m_MeasurementFrame = frame;
   return true;
 }
 

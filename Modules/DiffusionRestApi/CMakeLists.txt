@@ -8,6 +8,7 @@ if(BUILD_MODULE_DiffusionRestApi)
     PACKAGE_DEPENDS PRIVATE ITK|ITKLabelMap+ITKConnectedComponents+ITKThresholding
   )
 
+  add_subdirectory(autoload/Routes)
   add_subdirectory(Testing)
 
 endif()

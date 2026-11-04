@@ -35,6 +35,7 @@ class mitkDiffusionPropertySerializerTestSuite : public mitk::TestFixture
   MITK_TEST(Equal_SerializeandDeserialize_ReturnsTrue);
   MITK_TEST(Equal_DifferentGradientDirections_ReturnsFalse);
   MITK_TEST(Deserialize_MissingEntriesOrAttributes_DoesNotCrash);
+  MITK_TEST(Json_RoundTripThroughText);
 
 
   CPPUNIT_TEST_SUITE_END();
@@ -188,6 +189,48 @@ public:
       CPPUNIT_ASSERT_EQUAL(name != "MeasurementFramePropertySerializer", fromNoEntries.IsNotNull());
       CPPUNIT_ASSERT(serializer->Deserialize(entryWithoutAttributes).IsNull());
     }
+  }
+
+  /**
+   * The REST API serializes node properties to JSON (mitk::ConvertPropertyToSelfContainedJson):
+   * each diffusion property gives a JSON value that reads back to an equal property, also after a
+   * round trip through text, and the deserialization service creates the types by name.
+   */
+  void Json_RoundTripThroughText()
+  {
+    const auto roundTrip = [](const mitk::BaseProperty* property, mitk::BaseProperty* target) {
+      nlohmann::json j;
+      CPPUNIT_ASSERT(property->ToJSON(j));
+      CPPUNIT_ASSERT(target->FromJSON(nlohmann::json::parse(j.dump())));
+      CPPUNIT_ASSERT(*target == *property);
+      return j;
+    };
+
+    const auto bvalues = roundTrip(bvaluemap_prop, mitk::BValueMapProperty::New());
+    CPPUNIT_ASSERT_EQUAL(std::string("[1,2,3,4]"), bvalues.at("0").dump());
+    CPPUNIT_ASSERT_EQUAL(std::string("[4,3,2,1]"), bvalues.at("1000").dump());
+
+    const auto gradients = roundTrip(gradientdirection_prop, mitk::GradientDirectionsProperty::New());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(3), gradients.size());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.70710678118654752, gradients.at(0).at(0).get<double>(), 1e-16);
+
+    const auto frame = roundTrip(measurementframe_prop, mitk::MeasurementFrameProperty::New());
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(-0.5, frame.at(0).at(1).get<double>(), 1e-16);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, frame.at(1).at(0).get<double>(), 1e-16);
+
+    // The self-contained form names the type, and reads back through the deserialization service.
+    const auto self = mitk::ConvertPropertyToSelfContainedJson(bvaluemap_prop);
+    CPPUNIT_ASSERT_EQUAL(std::string("BValueMapProperty"), self.at("type").get<std::string>());
+    CPPUNIT_ASSERT(self.at("value") == bvalues);
+    const auto back = mitk::ConvertPropertyFromSelfContainedJson(nlohmann::json::parse(self.dump()));
+    CPPUNIT_ASSERT(back.IsNotNull() && *back == *bvaluemap_prop);
+    const auto frameBack = mitk::ConvertPropertyFromSelfContainedJson(mitk::ConvertPropertyToSelfContainedJson(measurementframe_prop));
+    CPPUNIT_ASSERT(frameBack.IsNotNull() && *frameBack == *measurementframe_prop);
+
+    // Malformed values are refused with an exception, not taken in parts.
+    auto broken = mitk::MeasurementFrameProperty::New();
+    CPPUNIT_ASSERT_THROW(broken->FromJSON(nlohmann::json::parse("[[1,2,3],[4,5]]")), nlohmann::json::exception);
+    CPPUNIT_ASSERT_THROW(mitk::GradientDirectionsProperty::New()->FromJSON(nlohmann::json::parse("[[1,2]]")), nlohmann::json::exception);
   }
 };
 

@@ -131,12 +131,16 @@ Facts the layout does not show:
   (`Modules/FiberBundle/Testing/WorkbenchReaders/`, a driver that links no diffusion module) opens
   a file of every diffusion type as the Workbench does.
 - The diffusion REST endpoints (`Modules/DiffusionRestApi`, `mitk::CreateDiffusionRoutes` in
-  `mitkDiffusionRestRoutes.h`) are registered with MITK's `IRestServerService` by the activator of
-  the tractography plugin, whose CMake adds the module when the target `MitkDiffusionRestApi`
-  exists (`MITK_DIFFUSION_HAS_RESTAPI` in its configured `mitkTractographyPluginConfig.h`), and
-  removed when the plugin stops; the Workbench log says how many it offers. `DiffusionDebug`,
+  `mitkDiffusionRestRoutes.h`) are registered with MITK's `IRestServerService` by the module's
+  auto-load module `MitkDiffusionRestApiRoutes` (`autoload/Routes`, loaded with `MitkRESTAPI`, so
+  in the Workbench but in no command line app), which takes the service when it appears and
+  removes the routes when it goes; the Workbench log says how many it offers. No plugin can do
+  this: the Agent view looks the endpoints up before any diffusion view, and so its plugin, has
+  started, and BlueBerry must not start a plugin that requires `org.mitk.gui.qt.common` eagerly
+  (MITK's Agent view starts its own route plugins by a hard-coded list). `DiffusionDebug`,
   `DiffusionRelease` and `Tractography` build MITK's `org.mitk.gui.qt.restapi` and
-  `org.mitk.gui.qt.agent` plugins with it. The agent's system prompt is MITK's
+  `org.mitk.gui.qt.agent` plugins with it. The diffusion properties (b-value map, gradients,
+  measurement frame) serialize to JSON, which the API's property endpoints need for DWI nodes. The agent's system prompt is MITK's
   (`mitk/Modules/Agent/resource/AgentSystemPrompt.md`) and no plugin can extend it, so the agent
   learns the diffusion tools only from the route descriptions
   (`GET /api/v1/endpoints?path=/api/v1/diffusion&details=true`) and the user manuals

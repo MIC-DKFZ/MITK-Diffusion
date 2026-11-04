@@ -16,6 +16,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkBValueMapProperty.h"
 
+#include <nlohmann/json.hpp>
+#include <string>
+
 #include <cmath>
 
 mitk::BValueMapProperty::BValueMapProperty() = default;
@@ -51,6 +54,28 @@ bool mitk::BValueMapProperty::IsEqual(const BaseProperty& property) const
 bool mitk::BValueMapProperty::Assign(const BaseProperty& property)
 {
   this->m_BValueMap = static_cast<const Self&>(property).m_BValueMap;
+  return true;
+}
+
+// {"<b-value>": [volume indices], ...}: the form clients of the REST API see.
+bool mitk::BValueMapProperty::ToJSON(nlohmann::json& j) const
+{
+  j = nlohmann::json::object();
+
+  for (const auto& [bValue, indices] : m_BValueMap)
+    j[std::to_string(bValue)] = indices;
+
+  return true;
+}
+
+bool mitk::BValueMapProperty::FromJSON(const nlohmann::json& j)
+{
+  BValueMap map;
+
+  for (const auto& [key, indices] : j.items())
+    map[static_cast<unsigned int>(std::stoul(key))] = indices.get<std::vector<unsigned int>>();
+
+  m_BValueMap = map;
   return true;
 }
 
