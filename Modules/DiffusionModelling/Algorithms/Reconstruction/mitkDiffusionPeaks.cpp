@@ -49,7 +49,8 @@ namespace
   }
 
   template <int L>
-  mitk::PeakResult Extract(const mitk::ShImage *shImage, const mitk::PeakParameters &parameters, const mitk::Image *mask)
+  mitk::PeakResult Extract(const mitk::ShImage *shImage, const mitk::PeakParameters &parameters, const mitk::Image *mask,
+                           const std::atomic<bool> *stop)
   {
     using FilterType = itk::OdfMaximaExtractionFilter<float, L, ODF_SAMPLING_SIZE>;
     auto filter = FilterType::New();
@@ -74,29 +75,41 @@ namespace
         filter->SetNormalizationMethod(FilterType::SINGLE_VEC_NORM);
         break;
     }
+    if (stop != nullptr)
+    {
+      // ITK fires the start and progress events in the thread that runs Update, and every thread
+      // checks the abort flag before it starts a block of voxels.
+      const auto abortIfStopped = [filter = filter.GetPointer(), stop](const itk::EventObject &) {
+        if (*stop)
+          filter->AbortGenerateDataOn();
+      };
+      filter->AddObserver(itk::StartEvent(), abortIfStopped);
+      filter->AddObserver(itk::ProgressEvent(), abortIfStopped);
+    }
     filter->Update();
     return Result(filter->GetPeakImage(), filter->GetNumDirectionsImage(), shImage);
   }
 }
 
-mitk::PeakResult mitk::ExtractPeaks(const ShImage *shImage, const PeakParameters &parameters, const Image *mask)
+mitk::PeakResult mitk::ExtractPeaks(const ShImage *shImage, const PeakParameters &parameters, const Image *mask,
+                                     const std::atomic<bool> *stop)
 {
   if (shImage == nullptr)
     mitkThrow() << "No SH image.";
   switch (shImage->ShOrder())
   {
     case 2:
-      return Extract<2>(shImage, parameters, mask);
+      return Extract<2>(shImage, parameters, mask, stop);
     case 4:
-      return Extract<4>(shImage, parameters, mask);
+      return Extract<4>(shImage, parameters, mask, stop);
     case 6:
-      return Extract<6>(shImage, parameters, mask);
+      return Extract<6>(shImage, parameters, mask, stop);
     case 8:
-      return Extract<8>(shImage, parameters, mask);
+      return Extract<8>(shImage, parameters, mask, stop);
     case 10:
-      return Extract<10>(shImage, parameters, mask);
+      return Extract<10>(shImage, parameters, mask, stop);
     case 12:
-      return Extract<12>(shImage, parameters, mask);
+      return Extract<12>(shImage, parameters, mask, stop);
     default:
       mitkThrow() << "Only spherical harmonics orders 2 to 12 are supported.";
   }

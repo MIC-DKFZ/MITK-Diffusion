@@ -355,8 +355,9 @@ void mitk::diffusionrest::AddReconstructionRoutes(std::vector<RestRoute>& routes
     ShImage::Pointer sh = shImage;
     TensorImage::Pointer tensors = tensorImage;
 
-    auto job = jobs->Start("Peak extraction of " + imageNode->GetName(), [=](RestJob&, const std::atomic<bool>&) {
-      const auto result = sh.IsNotNull() ? ExtractPeaks(sh, parameters, mask) : ExtractTensorPeaks(tensors, faThreshold, normalize, mask);
+    auto job = jobs->Start("Peak extraction of " + imageNode->GetName(), [=](RestJob&, const std::atomic<bool>& stop) {
+      // Tensor peaks take seconds; the SH peaks of a whole brain take minutes in a Debug build.
+      const auto result = sh.IsNotNull() ? ExtractPeaks(sh, parameters, mask, &stop) : ExtractTensorPeaks(tensors, faThreshold, normalize, mask);
 
       return [=]() {
         auto node = AddResultNode(*server, result.peaks, imageNode, sh.IsNotNull() ? "_PEAKS" : "_PrincipalDirection");

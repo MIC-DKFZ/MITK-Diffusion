@@ -18,6 +18,8 @@ found in the LICENSE file.
 #include <mitkShImage.h>
 #include <mitkTensorImage.h>
 
+#include <atomic>
+
 /** Peak extraction from SH and tensor images, as the peak extraction view runs it. */
 namespace mitk
 {
@@ -54,12 +56,15 @@ namespace mitk
    * \brief Maxima of the ODFs of an SH image (itk::OdfMaximaExtractionFilter on the ODF directions),
    * evaluated in the SH convention stored in the image.
    * \param mask optional; voxels where it is 0 get no peaks. Any pixel type, cast to unsigned char.
+   * \param stop optional; once set, the extraction starts no further block of voxels and ends with
+   * itk::ProcessAborted after the blocks already running.
    * \throw mitk::Exception without SH image or for an SH order other than 2 to 12;
    * itk::ExceptionObject for a mask of another geometry.
    */
   MITKDIFFUSIONMODELLING_EXPORT PeakResult ExtractPeaks(const ShImage *shImage,
                                                         const PeakParameters &parameters,
-                                                        const Image *mask = nullptr);
+                                                        const Image *mask = nullptr,
+                                                        const std::atomic<bool> *stop = nullptr);
 
   /**
    * \brief Principal eigenvectors of a tensor image (itk::DiffusionTensorPrincipalDirectionImageFilter).
