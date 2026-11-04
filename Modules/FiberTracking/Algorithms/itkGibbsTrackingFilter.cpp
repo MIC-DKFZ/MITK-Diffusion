@@ -22,6 +22,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkStandardFileLocations.h>
 #include <mitkFiberBuilder.h>
 #include <mitkMetropolisHastingsSampler.h>
+#include <mitkParallelGibbsSampler.h>
 #include <itkTensorImageToOdfImageFilter.h>
 #include <mitkGibbsEnergyComputer.h>
 
@@ -32,8 +33,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkTimeProbe.h>
 
 // MISC
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <tinyxml2.h>
 #include <boost/timer/progress_display.hpp>
 #include <mitkLexicalCast.h>
@@ -64,6 +68,8 @@ GibbsTrackingFilter< ItkOdfImageType >::GibbsTrackingFilter():
   m_NumParticles(0),
   m_NumConnections(0),
   m_RandomSeed(-1),
+  m_ParallelSampler(false),
+  m_NumberOfThreads(0),
   m_LoadParameterFile(""),
   m_LutPath(""),
   m_IsInValidState(true),
@@ -274,6 +280,7 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
   MITK_INFO << "Min. fiber length: " << m_MinFiberLength;
   MITK_INFO << "Curvature threshold: " << m_CurvatureThreshold;
   MITK_INFO << "Random seed: " << m_RandomSeed;
+  MITK_INFO << "Sampler: " << (m_ParallelSampler ? "parallel" : "serial");
   MITK_INFO << "----------------------------------------";
 
   // FiberBuilder only reads the grid (its labels are reset afterwards), so fibers built on request
@@ -315,23 +322,65 @@ void GibbsTrackingFilter< ItkOdfImageType >::GenerateData()
 
     double iteration = 0;
     boost::timer::progress_display disp(m_Iterations);
-    while (iteration<m_Iterations && !m_AbortTracking)
+    if (m_ParallelSampler)
     {
-      ++disp;
-      ++iteration;
-      m_CurrentIteration.store(iteration, std::memory_order_relaxed);
+      // without a seed one is drawn from the clock and logged, so that the run can be repeated
+      const std::uint64_t seed = m_RandomSeed > -1 ? static_cast<std::uint64_t>(m_RandomSeed) : randGen->GetIntegerVariate();
+      mitk::ParallelGibbsSampler parallelSampler(particleGrid.get(), *encomp, m_MaskImage, m_CurvatureThreshold, seed, m_NumberOfThreads);
+      parallelSampler.SetAbortFlag(&m_AbortTracking);
+      // The temperature is fixed during a sweep; at least about 100 temperature steps per run.
+      const double sweepProposals = std::max(1e3, std::min(1e6, std::floor(m_Iterations/100)));
+      MITK_INFO << "Parallel sampler: " << parallelSampler.GetNumberOfThreads() << " threads, blocks of "
+                << mitk::ParallelGibbsSampler::BlockEdge << " cells per axis, " << sweepProposals << " proposals per sweep, seed " << seed;
 
-      // update temperatur for simulated annealing process
-      float temperature = m_StartTemperature * exp(alpha*iteration/m_Iterations);
-      sampler->SetTemperature(temperature);
-      sampler->MakeProposal();
+      while (iteration<m_Iterations && !m_AbortTracking)
+      {
+        float temperature = m_StartTemperature * exp(alpha*iteration/m_Iterations);
+        parallelSampler.SetTemperature(temperature);
+        const unsigned long made = parallelSampler.Sweep(static_cast<unsigned long>(std::min(sweepProposals, std::ceil(m_Iterations-iteration))));
+        if (made == 0)
+          break;
+        disp += made;
+        iteration += made;
+        m_CurrentIteration.store(iteration, std::memory_order_relaxed);
 
-      m_ProposalAcceptance.store((float)sampler->GetNumAcceptedProposals()/iteration, std::memory_order_relaxed);
-      m_NumParticles.store(particleGrid->m_NumParticles, std::memory_order_relaxed);
-      m_NumConnections.store(particleGrid->m_NumConnections, std::memory_order_relaxed);
+        m_ProposalAcceptance.store((float)parallelSampler.GetNumAcceptedProposals()/iteration, std::memory_order_relaxed);
+        m_NumParticles.store(particleGrid->m_NumParticles, std::memory_order_relaxed);
+        m_NumConnections.store(particleGrid->m_NumConnections, std::memory_order_relaxed);
 
-      if (m_BuildFibers.load(std::memory_order_relaxed))
-        buildFibers();
+        // the grid is compact between sweeps
+        if (m_BuildFibers.load(std::memory_order_relaxed))
+          buildFibers();
+      }
+
+      std::ostringstream blocks;
+      for (int colour = 0; colour < 8; ++colour)
+        blocks << (colour > 0 ? " " : "") << parallelSampler.GetBlocksPerColour()[colour];
+      MITK_INFO << "Parallel sampler: " << parallelSampler.GetNumSweeps() << " sweeps; blocks per colour in the last sweep: " << blocks.str()
+                << "; rejected since outside the block: " << parallelSampler.GetWriteRejections() << " proposals ("
+                << (iteration > 0 ? 100.0*parallelSampler.GetWriteRejections()/iteration : 0.0) << " %), reads beyond the read box: "
+                << parallelSampler.GetReadRejections();
+    }
+    else
+    {
+      while (iteration<m_Iterations && !m_AbortTracking)
+      {
+        ++disp;
+        ++iteration;
+        m_CurrentIteration.store(iteration, std::memory_order_relaxed);
+
+        // update temperatur for simulated annealing process
+        float temperature = m_StartTemperature * exp(alpha*iteration/m_Iterations);
+        sampler->SetTemperature(temperature);
+        sampler->MakeProposal();
+
+        m_ProposalAcceptance.store((float)sampler->GetNumAcceptedProposals()/iteration, std::memory_order_relaxed);
+        m_NumParticles.store(particleGrid->m_NumParticles, std::memory_order_relaxed);
+        m_NumConnections.store(particleGrid->m_NumConnections, std::memory_order_relaxed);
+
+        if (m_BuildFibers.load(std::memory_order_relaxed))
+          buildFibers();
+      }
     }
     buildFibers();
   }

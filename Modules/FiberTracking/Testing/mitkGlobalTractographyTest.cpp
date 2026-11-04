@@ -39,6 +39,8 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
   CPPUNIT_TEST_SUITE(mitkGlobalTractographyTestSuite);
   MITK_TEST(Test_Odf);
   MITK_TEST(Test_Odf_FibersRequestedDuringRun);
+  MITK_TEST(Test_Odf_Parallel);
+  MITK_TEST(Test_Odf_Parallel_FibersRequestedDuringRun);
   CPPUNIT_TEST_SUITE_END();
 
   typedef itk::VectorImage< short, 3>   ItkDwiType;
@@ -112,6 +114,19 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
   }
 
 
+  /** The tracker of Test_Odf, with the parallel sampler at the given number of threads. */
+  void SetUpParallelTracker(unsigned int threads)
+  {
+    tracker = GibbsTrackingFilterType::New();
+    tracker->SetOdfImage(itk_odf_image.GetPointer());
+    tracker->SetMaskImage(itk_mask_image);
+    tracker->SetDuplicateImage(false);
+    tracker->SetRandomSeed(1);
+    tracker->SetLoadParameterFile(mitk::GetDiffusionTestDataFilePath("gibbsTrackingParameters.gtp"));
+    tracker->SetParallelSampler(true);
+    tracker->SetNumberOfThreads(threads);
+  }
+
   void Test_Odf()
   {
     tracker = GibbsTrackingFilterType::New();
@@ -167,6 +182,57 @@ class mitkGlobalTractographyTestSuite : public mitk::TestFixture
 
     mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(tracker->GetFiberBundle());
     CheckFibResult("gibbsTractogram_v3.fib", outFib);
+  }
+
+  /** With a fixed seed, the parallel sampler gives the same tractogram at any number of threads
+   *  (blocks, not threads, are its units of work). */
+  void Test_Odf_Parallel()
+  {
+    SetUpParallelTracker(1);
+    tracker->Update();
+    mitk::FiberBundle::Pointer oneThread = mitk::FiberBundle::New(tracker->GetFiberBundle());
+    MITK_INFO << oneThread->GetNumFibers() << " fibers with the parallel sampler";
+    for (unsigned int threads : {2u, 7u, 24u})
+    {
+      SetUpParallelTracker(threads);
+      tracker->Update();
+      mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(tracker->GetFiberBundle());
+      CPPUNIT_ASSERT_MESSAGE(std::to_string(threads) + " threads", oneThread->Equals(outFib, 0.0));
+    }
+    CheckFibResult("gibbsTractogram_parallel.fib", oneThread);
+  }
+
+  /** As Test_Odf_FibersRequestedDuringRun: fibers are built between sweeps on request. */
+  void Test_Odf_Parallel_FibersRequestedDuringRun()
+  {
+    SetUpParallelTracker(4);
+
+    std::atomic<bool> done(false);
+    std::string error;
+    std::thread worker([&]() {
+      try
+      {
+        tracker->Update();
+      }
+      catch (const std::exception &e)
+      {
+        error = e.what();
+      }
+      done = true;
+    });
+    int snapshots = 0;
+    while (!done)
+    {
+      if (tracker->GetFiberBundle() != nullptr)
+        ++snapshots;
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    worker.join();
+    CPPUNIT_ASSERT_MESSAGE(error, error.empty());
+    MITK_INFO << snapshots << " intermediate tractograms";
+
+    mitk::FiberBundle::Pointer outFib = mitk::FiberBundle::New(tracker->GetFiberBundle());
+    CheckFibResult("gibbsTractogram_parallel.fib", outFib);
   }
 
 };

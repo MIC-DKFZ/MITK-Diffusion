@@ -227,6 +227,7 @@ void QmitkGibbsTrackingView::CreateQtPartControl( QWidget *parent )
     connect( m_Controls->m_EndTempSlider, SIGNAL(valueChanged(int)), this, SLOT(SetEndTemp(int)) );
     connect( m_Controls->m_CurvatureThresholdSlider, SIGNAL(valueChanged(int)), this, SLOT(SetCurvatureThreshold(int)) );
     connect( m_Controls->m_RandomSeedSlider, SIGNAL(valueChanged(int)), this, SLOT(SetRandomSeed(int)) );
+    connect( m_Controls->m_ParallelSamplerCheckbox, &QCheckBox::toggled, m_Controls->m_ThreadsBox, &QSpinBox::setEnabled );
     connect( m_Controls->m_OutputFileButton, SIGNAL(clicked()), this, SLOT(SetOutputFile()) );
 
     m_Controls->m_InputImageBox->SetDataStorage(this->GetDataStorage());
@@ -491,6 +492,8 @@ void QmitkGibbsTrackingView::StartGibbsTracking()
   m_GlobalTracker->SetMinFiberLength(m_Controls->m_FiberLengthSlider->value());
   m_GlobalTracker->SetCurvatureThreshold(cos((float)m_Controls->m_CurvatureThresholdSlider->value()*itk::Math::pi/180));
   m_GlobalTracker->SetRandomSeed(m_Controls->m_RandomSeedSlider->value());
+  m_GlobalTracker->SetParallelSampler(m_Controls->m_ParallelSamplerCheckbox->isChecked());
+  m_GlobalTracker->SetNumberOfThreads(static_cast<unsigned int>(m_Controls->m_ThreadsBox->value()));
 
   // set before start(): BeforeThread is queued, and a second click must not restart the run
   m_ThreadIsRunning = true;
