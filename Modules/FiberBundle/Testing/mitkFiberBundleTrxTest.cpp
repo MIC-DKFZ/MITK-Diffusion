@@ -12,6 +12,7 @@ found in the LICENSE file.
 
 #include <mitkDiffusionTestData.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkImage.h>
 #include <mitkIOUtil.h>
 #include <mitkTestFixture.h>
@@ -184,6 +185,7 @@ class mitkFiberBundleTrxTestSuite : public mitk::TestFixture
   MITK_TEST(Writer_ForcedZip64_ReadBack);
   MITK_TEST(Writer_EmptyBundle_HeaderOnly);
   MITK_TEST(Writer_WriteErrors_Throw);
+  MITK_TEST(IOHelper_TrxFilesAndFolders);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -818,6 +820,26 @@ public:
     CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(fib, m_TempDir + "/no/such/folder/fibers.trx"), mitk::Exception);
     mitk::TrxFile::WriteOptions options;
     CPPUNIT_ASSERT_THROW(mitk::TrxFile::Write(m_TempDir, fib, options), mitk::Exception);
+  }
+
+  void IOHelper_TrxFilesAndFolders()
+  {
+    // A folder of tractograms lists .trx files but not TRX folders; a TRX folder given as such
+    // (also with a trailing slash, as shells complete it) is one tractogram.
+    const std::filesystem::path folder = std::filesystem::path(m_TempDir) / "tractograms";
+    std::filesystem::create_directories(folder);
+    std::filesystem::copy_file(Data("trx_python.trx"), folder / "a.trx");
+    std::filesystem::copy(Data("gs_fldr.trx"), folder / "b.trx", std::filesystem::copy_options::recursive);
+    const auto files = mitk::FiberBundleIOHelper::get_file_list(folder.string());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), files.size());
+    CPPUNIT_ASSERT_EQUAL(std::string("a.trx"), std::filesystem::path(files[0]).filename().string());
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), mitk::FiberBundleIOHelper::load_fibs({folder.string()}).size());
+
+    std::vector<std::string> names;
+    const auto fibs = mitk::FiberBundleIOHelper::load_fibs({(folder / "b.trx").string() + "/"}, &names);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), fibs.size());
+    CPPUNIT_ASSERT_EQUAL(13u, fibs[0]->GetNumFibers());
+    CPPUNIT_ASSERT_EQUAL((folder / "b.trx").string(), names[0]);
   }
 
   /** Loading path throws; the reader's message names path (IOUtil names it once more) and
