@@ -11,6 +11,8 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include "mitkDiffusionRestRoutes.h"
+#include "mitkDiffusionRestRouteGroups.h"
+#include "mitkDiffusionRestUtil.h"
 
 #include <mitkIRestServerService.h>
 
@@ -59,6 +61,13 @@ std::vector<mitk::RestRoute> mitk::CreateDiffusionRoutes(IRestServerService* ser
     });
   };
   routes.push_back(overview);
+
+  // The runner is shared by the handlers and joins its worker threads when the last of them goes,
+  // which is when the routes are removed.
+  auto jobs = std::make_shared<diffusionrest::JobRunner>(server);
+  diffusionrest::AddReconstructionRoutes(routes, server, jobs);
+  diffusionrest::AddMaskRoutes(routes, server, jobs);
+  diffusionrest::AddTrackingRoutes(routes, server, jobs);
 
   return routes;
 }
