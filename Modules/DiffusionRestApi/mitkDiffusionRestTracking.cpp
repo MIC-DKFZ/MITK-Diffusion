@@ -207,6 +207,9 @@ void mitk::diffusionrest::AddTrackingRoutes(std::vector<RestRoute>& routes, IRes
 
     auto job = jobs->Start("Streamline tractography of " + imageNode->GetName(),
       [=](RestJob& job, const std::atomic<bool>& stopped) -> JobRunner::Finish {
+        // The setup takes minutes for the ODFs of a whole brain in a Debug build; the message tells
+        // that the job is alive until it counts seeds.
+        job.SetProgress(0, "preparing the model image, the ROIs and the tracker");
         auto handler = CreateTrackingHandler({ image.GetPointer() }, params->m_Mode, faImage);
         std::unique_ptr<TrackingDataHandler> priorHandler;
 
@@ -227,6 +230,9 @@ void mitk::diffusionrest::AddTrackingRoutes(std::vector<RestRoute>& routes, IRes
         tracker->SetTrackingHandler(handler.get());
         tracker->SetParameters(params);
         tracker->SetVerbose(false);
+
+        if (stopped)
+          return {};
 
         const auto start = std::chrono::steady_clock::now();
         std::exception_ptr error;
@@ -249,6 +255,12 @@ void mitk::diffusionrest::AddTrackingRoutes(std::vector<RestRoute>& routes, IRes
         while (!done)
         {
           std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+          // The tracker clears its stop flag when it starts, which would drop a cancel that came
+          // while it initialized.
+          if (stopped)
+            tracker->SetStopTracking(true);
+
           const auto seeds = tracker->GetNumSeeds();
 
           if (seeds > 0)
