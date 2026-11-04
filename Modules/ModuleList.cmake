@@ -7,6 +7,7 @@ set(MITK_MODULES
   FiberBundle
   FiberProcessing
   FiberTracking
+  DiffusionRestApi
   MriSimulation
   FiberDissection
   IVIM

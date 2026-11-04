@@ -13,6 +13,7 @@ set(BUILD_MODULE_DiffusionMasks ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionModelling ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionPreprocessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_DiffusionRegistration ON CACHE BOOL "" FORCE)
+set(BUILD_MODULE_DiffusionRestApi ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberBundle ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberProcessing ON CACHE BOOL "" FORCE)
 set(BUILD_MODULE_FiberTracking ON CACHE BOOL "" FORCE)
@@ -28,5 +29,9 @@ set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.preprocessing" ON CACHE BOOL ""
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.registration" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.reconstruction" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.diffusionimaging.tractography" ON CACHE BOOL "" FORCE)
+# MITK's REST API and Agent views: the agent drives the diffusion tools through the REST
+# endpoints of the tractography plugin (module DiffusionRestApi).
+set("MITK_BUILD_org.mitk.gui.qt.restapi" ON CACHE BOOL "" FORCE)
+set("MITK_BUILD_org.mitk.gui.qt.agent" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.segmentation" ON CACHE BOOL "" FORCE)
 set("MITK_BUILD_org.mitk.gui.qt.measurementtoolbox" ON CACHE BOOL "" FORCE)
