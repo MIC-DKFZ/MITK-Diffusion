@@ -19,8 +19,13 @@ found in the LICENSE file.
 #include <mitkTrxFile.h>
 
 #include <itksys/SystemTools.hxx>
+#include <nlohmann/json.hpp>
+#include <Poco/Zip/ZipArchive.h>
+#include <Poco/Zip/ZipLocalFileHeader.h>
+#include <Poco/Zip/ZipStream.h>
 #include <vtkCell.h>
 #include <vtkPolyData.h>
+#include <vtkUnsignedCharArray.h>
 
 #include <algorithm>
 #include <array>
@@ -30,8 +35,10 @@ found in the LICENSE file.
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -170,6 +177,13 @@ class mitkFiberBundleTrxTestSuite : public mitk::TestFixture
   MITK_TEST(Reader_GeneratedWeightsAndColours);
   MITK_TEST(Reader_StreamlinesWithoutPoints_DroppedWithTheirData);
   MITK_TEST(Reader_MalformedFiles_ThrowNamingTheFile);
+  MITK_TEST(Writer_Float32RoundTrip_KeepsFibersWeightsColoursAndGrid);
+  MITK_TEST(Writer_TrxFromTrx_KeepsVoxelToRasmmAndDimensions);
+  MITK_TEST(Writer_Float16_WithinHalfAStep);
+  MITK_TEST(Writer_Options_EntriesAndCompression);
+  MITK_TEST(Writer_ForcedZip64_ReadBack);
+  MITK_TEST(Writer_EmptyBundle_HeaderOnly);
+  MITK_TEST(Writer_WriteErrors_Throw);
   CPPUNIT_TEST_SUITE_END();
 
   std::string m_TempDir;
@@ -220,6 +234,77 @@ class mitkFiberBundleTrxTestSuite : public mitk::TestFixture
         expected.push_back({-p[0], -p[1], p[2]});
       CPPUNIT_ASSERT_MESSAGE(message + " fiber " + std::to_string(i), expected == FiberPoints(fib, i));
     }
+  }
+
+  struct ZipEntry
+  {
+    int method;
+    std::string content;
+  };
+
+  /** The entries of the ZIP archive at path with their compression method and content. */
+  static std::map<std::string, ZipEntry> ZipEntries(const std::string& path)
+  {
+    std::ifstream in(path, std::ios::binary);
+    Poco::Zip::ZipArchive archive(in);
+    std::map<std::string, ZipEntry> entries;
+    for (auto it = archive.headerBegin(); it != archive.headerEnd(); ++it)
+    {
+      std::ifstream file(path, std::ios::binary);
+      Poco::Zip::ZipInputStream zipIn(file, it->second, true);
+      const std::string content((std::istreambuf_iterator<char>(zipIn)), std::istreambuf_iterator<char>());
+      entries[it->first] = {it->second.getCompressionMethod(), content};
+    }
+    return entries;
+  }
+
+  static std::set<std::string> Names(const std::map<std::string, ZipEntry>& entries)
+  {
+    std::set<std::string> names;
+    for (const auto& entry : entries)
+      names.insert(entry.first);
+    return names;
+  }
+
+  /** original.fib with a weight per fiber, an RGBA colour per point (alpha 100, which TRX does not
+   *  keep) and the oblique reference grid of gs.trx */
+  mitk::FiberBundle::Pointer AnnotatedBundle()
+  {
+    auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib"));
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      fib->SetFiberWeight(i, 0.25f + 0.125f * static_cast<float>(i));
+    auto colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    colors->SetNumberOfComponents(4);
+    colors->SetNumberOfTuples(fib->GetFiberPolyData()->GetNumberOfPoints());
+    for (vtkIdType k = 0; k < colors->GetNumberOfTuples(); ++k)
+    {
+      const unsigned char rgba[4] = {static_cast<unsigned char>(k % 251), static_cast<unsigned char>((3 * k) % 256), static_cast<unsigned char>((7 * k) % 256), 100};
+      colors->SetTypedTuple(k, rgba);
+    }
+    fib->SetFiberColors(colors);
+    fib->SetTrackVisHeader(mitk::IOUtil::Load<mitk::FiberBundle>(Data("gs.trx"))->GetTrackVisHeader());
+    return fib;
+  }
+
+  static mitk::IFileWriter::Options WriterOptions(const std::string& positionType, const std::string& compression, bool weights, bool colors)
+  {
+    mitk::IFileWriter::Options options;
+    options["Position type"] = positionType;
+    options["Compression"] = compression;
+    options["Save fiber weights"] = weights;
+    options["Save color information"] = colors;
+    return options;
+  }
+
+  static void AssertSameGrid(mitk::FiberBundle* expected, mitk::FiberBundle* actual)
+  {
+    const auto e = expected->GetTrackVisHeader();
+    const auto a = actual->GetTrackVisHeader();
+    for (int r = 0; r < 4; ++r)
+      for (int c = 0; c < 4; ++c)
+        CPPUNIT_ASSERT_EQUAL(e.vox_to_ras[r][c], a.vox_to_ras[r][c]);
+    for (int c = 0; c < 3; ++c)
+      CPPUNIT_ASSERT_EQUAL(e.dim[c], a.dim[c]);
   }
 
 public:
@@ -597,6 +682,142 @@ public:
     const std::string truncated = m_TempDir + "/truncated.trx";
     std::ofstream(truncated, std::ios::binary) << bytes.substr(0, bytes.size() / 2);
     AssertThrows(truncated, false, "");
+  }
+
+  void Writer_Float32RoundTrip_KeepsFibersWeightsColoursAndGrid()
+  {
+    auto fib = AnnotatedBundle();
+    const std::string path = m_TempDir + "/roundtrip.trx";
+    mitk::IOUtil::Save(fib, path);
+    auto read = mitk::IOUtil::Load<mitk::FiberBundle>(path);
+    AssertSamePoints(fib, read, "float32");
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      CPPUNIT_ASSERT_EQUAL(fib->GetFiberWeight(i), read->GetFiberWeight(i));
+      const auto numPoints = static_cast<vtkIdType>(FiberPoints(fib, i).size());
+      for (vtkIdType j = 0; j < numPoints; ++j)
+      {
+        auto expected = FiberColor(fib, i, j);
+        expected[3] = 255;
+        CPPUNIT_ASSERT(expected == FiberColor(read, i, j));
+      }
+    }
+    AssertSameGrid(fib, read);
+  }
+
+  void Writer_TrxFromTrx_KeepsVoxelToRasmmAndDimensions()
+  {
+    // the LAS grid of small.trx and the oblique one of gs.trx
+    for (const std::string name : {"small.trx", "gs.trx"})
+    {
+      auto fib = mitk::IOUtil::Load<mitk::FiberBundle>(Data(name));
+      const std::string path = m_TempDir + "/copy_of_" + name;
+      mitk::IOUtil::Save(fib, path);
+      const auto original = nlohmann::json::parse(ZipEntries(Data(name)).at("header.json").content);
+      const auto written = nlohmann::json::parse(ZipEntries(path).at("header.json").content);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(name, original["VOXEL_TO_RASMM"].dump(), written["VOXEL_TO_RASMM"].dump());
+      CPPUNIT_ASSERT_MESSAGE(name, original["VOXEL_TO_RASMM"] == written["VOXEL_TO_RASMM"]);
+      CPPUNIT_ASSERT_MESSAGE(name, original["DIMENSIONS"] == written["DIMENSIONS"]);
+      CPPUNIT_ASSERT_MESSAGE(name, original["NB_STREAMLINES"] == written["NB_STREAMLINES"]);
+      CPPUNIT_ASSERT_MESSAGE(name, original["NB_VERTICES"] == written["NB_VERTICES"]);
+      AssertSamePoints(fib, mitk::IOUtil::Load<mitk::FiberBundle>(path), name);
+    }
+  }
+
+  void Writer_Float16_WithinHalfAStep()
+  {
+    auto fib = AnnotatedBundle();
+    const std::string path = m_TempDir + "/half.trx";
+    mitk::IOUtil::Save(fib, path, WriterOptions("float16", "stored", true, true));
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), ZipEntries(path).count("positions.3.float16"));
+    auto read = mitk::IOUtil::Load<mitk::FiberBundle>(path);
+    CPPUNIT_ASSERT_EQUAL(fib->GetNumFibers(), read->GetNumFibers());
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+    {
+      const Fiber expected = FiberPoints(fib, i);
+      const Fiber actual = FiberPoints(read, i);
+      CPPUNIT_ASSERT_EQUAL(expected.size(), actual.size());
+      for (std::size_t j = 0; j < expected.size(); ++j)
+        for (std::size_t c = 0; c < 3; ++c)
+        {
+          // half of the float16 step at the value: 2^(exponent - 10) / 2, at least the subnormal 2^-25
+          const double v = std::fabs(expected[j][c]);
+          const double halfStep = v < std::ldexp(1.0, -14) ? std::ldexp(1.0, -25) : std::ldexp(1.0, std::ilogb(v) - 11);
+          CPPUNIT_ASSERT(std::fabs(expected[j][c] - actual[j][c]) <= halfStep);
+          CPPUNIT_ASSERT_EQUAL(mitk::TrxFile::HalfToFloat(mitk::TrxFile::FloatToHalf(static_cast<float>(actual[j][c]))), static_cast<float>(actual[j][c]));
+        }
+    }
+  }
+
+  void Writer_Options_EntriesAndCompression()
+  {
+    auto fib = AnnotatedBundle();
+    const std::string stored = m_TempDir + "/stored.trx";
+    mitk::IOUtil::Save(fib, stored);
+    auto entries = ZipEntries(stored);
+    const std::set<std::string> all = {"header.json", "positions.3.float32", "offsets.uint32", "dps/weights.float32", "dpv/color.3.uint8"};
+    CPPUNIT_ASSERT(all == Names(entries));
+    for (const auto& entry : entries)
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(entry.first, int(Poco::Zip::ZipCommon::CM_STORE), entry.second.method);
+    // offsets with the last one, NB_VERTICES
+    std::vector<std::uint32_t> offsets = {0};
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      offsets.push_back(offsets.back() + static_cast<std::uint32_t>(FiberPoints(fib, i).size()));
+    CPPUNIT_ASSERT(Raw(offsets) == entries["offsets.uint32"].content);
+    std::vector<float> weights;
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      weights.push_back(fib->GetFiberWeight(i));
+    CPPUNIT_ASSERT(Raw(weights) == entries["dps/weights.float32"].content);
+
+    const std::string deflated = m_TempDir + "/deflated.trx";
+    mitk::IOUtil::Save(fib, deflated, WriterOptions("float16", "deflated", false, false));
+    entries = ZipEntries(deflated);
+    const std::set<std::string> some = {"header.json", "positions.3.float16", "offsets.uint32"};
+    CPPUNIT_ASSERT(some == Names(entries));
+    for (const auto& entry : entries)
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(entry.first, int(Poco::Zip::ZipCommon::CM_DEFLATE), entry.second.method);
+    auto read = mitk::IOUtil::Load<mitk::FiberBundle>(deflated);
+    CPPUNIT_ASSERT_EQUAL(fib->GetNumFibers(), read->GetNumFibers());
+    for (unsigned int i = 0; i < read->GetNumFibers(); ++i)
+      CPPUNIT_ASSERT_EQUAL(1.0f, read->GetFiberWeight(i));
+    AssertSameGrid(fib, read);
+
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(fib, m_TempDir + "/wrong.trx", WriterOptions("float64", "stored", true, true)), mitk::Exception);
+  }
+
+  void Writer_ForcedZip64_ReadBack()
+  {
+    auto fib = AnnotatedBundle();
+    const std::string path = m_TempDir + "/zip64.trx";
+    mitk::TrxFile::WriteOptions options;
+    options.zip64Threshold = 0;
+    mitk::TrxFile::Write(path, fib, options);
+    std::ifstream in(path, std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    // the Zip64 end of central directory record and its locator
+    CPPUNIT_ASSERT(bytes.find(std::string("PK\x06\x06", 4)) != std::string::npos);
+    CPPUNIT_ASSERT(bytes.find(std::string("PK\x06\x07", 4)) != std::string::npos);
+    auto read = mitk::IOUtil::Load<mitk::FiberBundle>(path);
+    AssertSamePoints(fib, read, "zip64");
+    for (unsigned int i = 0; i < fib->GetNumFibers(); ++i)
+      CPPUNIT_ASSERT_EQUAL(fib->GetFiberWeight(i), read->GetFiberWeight(i));
+  }
+
+  void Writer_EmptyBundle_HeaderOnly()
+  {
+    // as trx-python writes a file without streamlines
+    const std::string path = m_TempDir + "/empty.trx";
+    mitk::IOUtil::Save(mitk::FiberBundle::New(), path);
+    CPPUNIT_ASSERT(std::set<std::string>{"header.json"} == Names(ZipEntries(path)));
+    CPPUNIT_ASSERT_EQUAL(0u, mitk::IOUtil::Load<mitk::FiberBundle>(path)->GetNumFibers());
+  }
+
+  void Writer_WriteErrors_Throw()
+  {
+    auto fib = AnnotatedBundle();
+    CPPUNIT_ASSERT_THROW(mitk::IOUtil::Save(fib, m_TempDir + "/no/such/folder/fibers.trx"), mitk::Exception);
+    mitk::TrxFile::WriteOptions options;
+    CPPUNIT_ASSERT_THROW(mitk::TrxFile::Write(m_TempDir, fib, options), mitk::Exception);
   }
 
   /** Loading path throws; the reader's message names path (IOUtil names it once more) and

@@ -11,12 +11,17 @@ found in the LICENSE file.
 ============================================================================*/
 
 #include "mitkTrxFile.h"
+#include "mitkFiberPolyDataBuilder.h"
+#include "mitkTrackVisFile.h"
 
 #include <mitkExceptionMacro.h>
 #include <mitkLog.h>
 
 #include <nlohmann/json.hpp>
+#include <Poco/DateTime.h>
 #include <Poco/Exception.h>
+#include <Poco/Path.h>
+#include <Poco/Zip/Compress.h>
 #include <Poco/Zip/ZipArchive.h>
 #include <Poco/Zip/ZipLocalFileHeader.h>
 #include <Poco/Zip/ZipStream.h>
@@ -33,6 +38,9 @@ found in the LICENSE file.
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
+#include <sstream>
+#include <streambuf>
 #include <type_traits>
 
 namespace
@@ -613,6 +621,139 @@ namespace
     std::stable_sort(contents.groups.begin(), contents.groups.end(), [](const auto& a, const auto& b) { return a.name < b.name; });
     return contents;
   }
+
+  /** Stores value little-endian at out; the position after it. */
+  template <typename T>
+  char* StoreLittleEndian(T value, char* out)
+  {
+    std::memcpy(out, &value, sizeof(T));
+    if constexpr (std::endian::native == std::endian::big)
+      std::reverse(out, out + sizeof(T));
+    return out + sizeof(T);
+  }
+
+  /** An input stream buffer of numRows rows of rowBytes bytes that fill produces chunk by chunk
+   *  when they are read, so that an archive entry need not be held in memory. Poco's Compress
+   *  reads the first byte, seeks to the end for the length and back, then reads to the end. */
+  class GeneratedStreamBuf : public std::streambuf
+  {
+  public:
+    /** Writes numRows rows from row firstRow on to out. */
+    using Fill = std::function<void(std::uint64_t firstRow, std::size_t numRows, char* out)>;
+
+    GeneratedStreamBuf(std::uint64_t numRows, std::size_t rowBytes, Fill fill)
+      : m_Size(numRows * rowBytes)
+      , m_RowBytes(rowBytes)
+      , m_Fill(std::move(fill))
+      , m_Buffer(rowBytes * std::max<std::size_t>(1, (std::size_t(1) << 20) / rowBytes))
+    {
+    }
+
+  protected:
+    int_type underflow() override
+    {
+      if (this->gptr() != nullptr && this->gptr() < this->egptr())
+        return traits_type::to_int_type(*this->gptr());
+      const std::uint64_t position = this->Position();
+      if (position >= m_Size)
+        return traits_type::eof();
+      const std::uint64_t chunkStart = position / m_Buffer.size() * m_Buffer.size();
+      const auto chunkBytes = static_cast<std::size_t>(std::min<std::uint64_t>(m_Buffer.size(), m_Size - chunkStart));
+      m_Fill(chunkStart / m_RowBytes, chunkBytes / m_RowBytes, m_Buffer.data());
+      m_ChunkStart = chunkStart;
+      this->setg(m_Buffer.data(), m_Buffer.data() + (position - chunkStart), m_Buffer.data() + chunkBytes);
+      return traits_type::to_int_type(*this->gptr());
+    }
+
+    pos_type seekoff(off_type offset, std::ios_base::seekdir direction, std::ios_base::openmode which) override
+    {
+      if ((which & std::ios_base::in) == 0)
+        return pos_type(off_type(-1));
+      const std::uint64_t base = direction == std::ios_base::beg ? 0 : direction == std::ios_base::cur ? this->Position() : m_Size;
+      const auto target = static_cast<off_type>(base) + offset;
+      if (target < 0 || static_cast<std::uint64_t>(target) > m_Size)
+        return pos_type(off_type(-1));
+      const auto position = static_cast<std::uint64_t>(target);
+      if (this->eback() != nullptr && position >= m_ChunkStart && position <= m_ChunkStart + static_cast<std::uint64_t>(this->egptr() - this->eback()))
+        this->setg(this->eback(), this->eback() + (position - m_ChunkStart), this->egptr());
+      else
+      {
+        this->setg(nullptr, nullptr, nullptr);
+        m_Position = position;
+      }
+      return pos_type(target);
+    }
+
+    pos_type seekpos(pos_type position, std::ios_base::openmode which) override
+    {
+      return this->seekoff(off_type(position), std::ios_base::beg, which);
+    }
+
+  private:
+    std::uint64_t Position() const
+    {
+      return this->eback() != nullptr ? m_ChunkStart + static_cast<std::uint64_t>(this->gptr() - this->eback()) : m_Position;
+    }
+
+    const std::uint64_t m_Size;
+    const std::size_t m_RowBytes;
+    Fill m_Fill;
+    std::vector<char> m_Buffer;
+    std::uint64_t m_ChunkStart = 0;
+    /** the position while there is no chunk */
+    std::uint64_t m_Position = 0;
+  };
+
+  /** Walks the point ids of the fibers of a polydata in fiber order, the vertices of a TRX file;
+   *  a visit before the current fiber starts over at the first one. */
+  class VertexCursor
+  {
+  public:
+    explicit VertexCursor(vtkPolyData* polyData)
+      : m_PolyData(polyData)
+      , m_NumFibers(polyData->GetNumberOfCells())
+      , m_Buffer(vtkSmartPointer<vtkIdList>::New())
+    {
+      this->Load();
+    }
+
+    /** Calls f(pointId) for count vertices from vertex first on. */
+    template <typename F>
+    void Visit(std::uint64_t first, std::size_t count, F&& f)
+    {
+      if (first < m_FiberStart)
+      {
+        m_Fiber = 0;
+        m_FiberStart = 0;
+        this->Load();
+      }
+      for (std::uint64_t v = first; v < first + count; ++v)
+      {
+        while (v >= m_FiberStart + m_Ids.size())
+        {
+          m_FiberStart += m_Ids.size();
+          ++m_Fiber;
+          if (m_Fiber >= m_NumFibers)
+            mitkThrow() << "Vertex " << v << " lies beyond the last fiber.";
+          this->Load();
+        }
+        f(m_Ids[static_cast<std::size_t>(v - m_FiberStart)]);
+      }
+    }
+
+  private:
+    void Load()
+    {
+      m_Ids = m_Fiber < m_NumFibers ? mitk::FiberBundleDetail::FiberPointIds(m_PolyData, m_Fiber, m_Buffer) : std::span<const vtkIdType>();
+    }
+
+    vtkPolyData* m_PolyData;
+    const vtkIdType m_NumFibers;
+    vtkSmartPointer<vtkIdList> m_Buffer;
+    vtkIdType m_Fiber = 0;
+    std::uint64_t m_FiberStart = 0;
+    std::span<const vtkIdType> m_Ids;
+  };
 }
 
 float mitk::TrxFile::HalfToFloat(std::uint16_t half)
@@ -673,4 +814,127 @@ mitk::TrxFile::Contents mitk::TrxFile::Read(const std::string& path, bool loadGr
   {
     mitkThrow() << path << ": " << e.displayText();
   }
+}
+
+void mitk::TrxFile::Write(const std::string& filename, const FiberBundle* fib, const WriteOptions& options)
+{
+  vtkPolyData* polyData = fib->GetFiberPolyData();
+  const auto numFibers = static_cast<std::uint64_t>(polyData->GetNumberOfCells());
+  std::vector<std::uint64_t> offsets(static_cast<std::size_t>(numFibers + 1), 0);
+  vtkSmartPointer<vtkIdList> idBuffer = vtkSmartPointer<vtkIdList>::New();
+  for (std::uint64_t i = 0; i < numFibers; ++i)
+    offsets[i + 1] = offsets[i] + FiberBundleDetail::FiberPointIds(polyData, static_cast<vtkIdType>(i), idBuffer).size();
+  const std::uint64_t numVertices = offsets.back();
+
+  // The reference grid as MITK reads it; a grid read from a TRX file comes back unchanged.
+  const TrackVisFile::Header grid = TrackVisFile::ConsistentHeader(fib->GetTrackVisHeader(), false);
+  nlohmann::json matrix = nlohmann::json::array();
+  for (int r = 0; r < 3; ++r)
+    matrix.push_back({static_cast<double>(grid.vox_to_ras[r][0]), static_cast<double>(grid.vox_to_ras[r][1]),
+                      static_cast<double>(grid.vox_to_ras[r][2]), static_cast<double>(grid.vox_to_ras[r][3])});
+  matrix.push_back({0.0, 0.0, 0.0, 1.0});
+  nlohmann::json header;
+  header["DIMENSIONS"] = nlohmann::json::array({grid.dim[0], grid.dim[1], grid.dim[2]});
+  header["VOXEL_TO_RASMM"] = matrix;
+  header["NB_STREAMLINES"] = numFibers;
+  header["NB_VERTICES"] = numVertices;
+  std::istringstream headerStream(header.dump());
+
+  const bool half = options.positionType == PositionType::Float16;
+  const std::size_t positionBytes = half ? 2 : 4;
+  const bool offsets64 = numVertices > std::numeric_limits<std::uint32_t>::max();
+  vtkFloatArray* weights = options.weights ? fib->GetFiberWeights().GetPointer() : nullptr;
+  if (weights != nullptr && static_cast<std::uint64_t>(weights->GetNumberOfValues()) != numFibers)
+    mitkThrow() << "Cannot write " << filename << ": " << weights->GetNumberOfValues() << " fiber weights for " << numFibers << " fibers.";
+  vtkUnsignedCharArray* colors = options.colors ? fib->GetFiberColors().GetPointer() : nullptr;
+  if (colors != nullptr && (colors->GetNumberOfComponents() != 4 || colors->GetNumberOfTuples() < polyData->GetNumberOfPoints()))
+    mitkThrow() << "Cannot write " << filename << ": the fiber colours are no RGBA values per point.";
+  const bool entries = numFibers > 0;
+  const std::uint64_t bytes = (entries ? numVertices * (3 * positionBytes + (colors != nullptr ? 3 : 0)) + (numFibers + 1) * (offsets64 ? 8 : 4)
+                                         + (weights != nullptr ? 4 * numFibers : 0) : 0) + (std::uint64_t(1) << 20);
+
+  std::ofstream out(filename, std::ios::binary | std::ios::trunc);
+  if (!out)
+    mitkThrow() << "Could not create " << filename;
+  try
+  {
+    Poco::Zip::Compress compress(out, true, bytes >= options.zip64Threshold);
+    const auto method = options.compression == Compression::Deflated ? Poco::Zip::ZipCommon::CM_DEFLATE : Poco::Zip::ZipCommon::CM_STORE;
+    auto add = [&](const std::string& name, std::istream& in)
+    {
+      // Errors of the fill functions leave the stream instead of ending the entry early.
+      in.exceptions(std::ios::badbit);
+      compress.addFile(in, Poco::DateTime(), Poco::Path(name, Poco::Path::PATH_UNIX), method, Poco::Zip::ZipCommon::CL_NORMAL);
+    };
+    add("header.json", headerStream);
+
+    // trx-python writes no positions and offsets for a file without streamlines.
+    if (entries)
+    {
+      vtkPoints* points = polyData->GetPoints();
+      VertexCursor positionCursor(polyData);
+      GeneratedStreamBuf positionBuffer(numVertices, 3 * positionBytes, [&](std::uint64_t first, std::size_t count, char* data)
+      {
+        positionCursor.Visit(first, count, [&](vtkIdType id)
+        {
+          double p[3];
+          points->GetPoint(id, p);
+          // LPS to RAS; exact for MITK's float points, so that float32 files keep them bit for bit
+          const float ras[3] = {static_cast<float>(-p[0]), static_cast<float>(-p[1]), static_cast<float>(p[2])};
+          for (const float v : ras)
+            data = half ? StoreLittleEndian(FloatToHalf(v), data) : StoreLittleEndian(v, data);
+        });
+      });
+      std::istream positionStream(&positionBuffer);
+      add(half ? "positions.3.float16" : "positions.3.float32", positionStream);
+
+      GeneratedStreamBuf offsetBuffer(numFibers + 1, offsets64 ? 8 : 4, [&](std::uint64_t first, std::size_t count, char* data)
+      {
+        for (std::size_t k = 0; k < count; ++k)
+          data = offsets64 ? StoreLittleEndian(offsets[first + k], data) : StoreLittleEndian(static_cast<std::uint32_t>(offsets[first + k]), data);
+      });
+      std::istream offsetStream(&offsetBuffer);
+      add(offsets64 ? "offsets.uint64" : "offsets.uint32", offsetStream);
+
+      if (colors != nullptr)
+      {
+        const unsigned char* rgba = colors->GetPointer(0);
+        VertexCursor colorCursor(polyData);
+        GeneratedStreamBuf colorBuffer(numVertices, 3, [&](std::uint64_t first, std::size_t count, char* data)
+        {
+          colorCursor.Visit(first, count, [&](vtkIdType id)
+          {
+            std::memcpy(data, rgba + 4 * id, 3);
+            data += 3;
+          });
+        });
+        std::istream colorStream(&colorBuffer);
+        add("dpv/color.3.uint8", colorStream);
+      }
+
+      if (weights != nullptr)
+      {
+        GeneratedStreamBuf weightBuffer(numFibers, 4, [&](std::uint64_t first, std::size_t count, char* data)
+        {
+          for (std::size_t k = 0; k < count; ++k)
+            data = StoreLittleEndian(weights->GetValue(static_cast<vtkIdType>(first + k)), data);
+        });
+        std::istream weightStream(&weightBuffer);
+        add("dps/weights.float32", weightStream);
+      }
+    }
+    compress.close();
+  }
+  catch (const Poco::Exception& e)
+  {
+    mitkThrow() << "Could not write " << filename << ": " << e.displayText();
+  }
+  catch (const std::ios_base::failure& e)
+  {
+    mitkThrow() << "Could not write " << filename << ": " << e.what();
+  }
+  // Buffered write errors (disk full) show up only here.
+  out.close();
+  if (!out)
+    mitkThrow() << "Could not finish writing " << filename;
 }

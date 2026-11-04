@@ -14,6 +14,7 @@ found in the LICENSE file.
 #define mitkTrxFile_h
 
 #include <MitkFiberBundleExports.h>
+#include <mitkFiberBundle.h>
 
 #include <vtkFloatArray.h>
 #include <vtkSmartPointer.h>
@@ -83,6 +84,37 @@ namespace mitk::TrxFile
    *  positions, dps or dpv arrays with another number of rows than streamlines or points, and
    *  (loadGroups) group indices out of range. */
   Contents Read(const std::string& path, bool loadGroups);
+
+  enum class PositionType
+  {
+    Float32,
+    Float16
+  };
+
+  enum class Compression
+  {
+    Stored,
+    Deflated
+  };
+
+  struct WriteOptions
+  {
+    PositionType positionType = PositionType::Float32;
+    Compression compression = Compression::Stored;
+    bool weights = true;
+    bool colors = true;
+    /** Archives of at least this many bytes (entries plus 1 MiB for the ZIP records) get Zip64
+     *  records throughout, since ZIP's 32-bit sizes and offsets end at 4 GiB; a test lowers it. */
+    std::uint64_t zip64Threshold = 0xffffffffu;
+  };
+
+  /** Writes the bundle as a TRX ZIP archive: header.json with VOXEL_TO_RASMM and DIMENSIONS of
+   *  the bundle's reference grid (TrackVisFile::ConsistentHeader), NB_STREAMLINES and
+   *  NB_VERTICES; the points in fiber order in RAS millimetres (x and y negated); the offsets
+   *  with the last one, as uint32 when NB_VERTICES fits, else uint64; dps/weights.float32 and
+   *  dpv/color.3.uint8 (RGB, the alpha is not written). The entries are produced while they are
+   *  written, not held in memory. Throws mitk::Exception when the file cannot be written. */
+  MITKFIBERBUNDLE_EXPORT void Write(const std::string& filename, const FiberBundle* fib, const WriteOptions& options);
 }
 
 #endif

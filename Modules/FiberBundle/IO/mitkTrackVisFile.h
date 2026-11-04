@@ -58,17 +58,24 @@ namespace mitk::TrackVisFile
    *  three independent axes or dimensions outside 1 to 32767. */
   Header HeaderOfGrid(const double indexToRas[3][4], const double dims[3]);
 
+  /** The reference grid of the header as MITK reads it (VoxmmToLps), in a header that nibabel,
+   *  readers that use only the matrix, and MITK read the same way: the header itself if it is
+   *  such a header (and, with useLps, has voxel order "LPS"), else the same grid with voxel order
+   *  "RAS" (with useLps "LPS"). Its vox_to_ras and dim are the grid's index-to-RAS map and
+   *  dimensions, which the TRK and TRX writers write. */
+  Header ConsistentHeader(const Header& header, bool useLps);
+
   /** Reads a .trk file; the flips negate the LPS axes after the map. Scalars and properties are
    *  skipped. The bundle keeps the file's header; for MITK's own files of 2019 to 2026 the
    *  reference grid their LPS matrix describes, with voxel order "RAS". Throws mitk::Exception for
    *  files that are no valid TrackVis file. */
   FiberBundle::Pointer Read(const std::string& filename, bool useMatrix, bool flipX, bool flipY, bool flipZ, bool printHeader);
 
-  /** Writes the bundle with its TrackVis header (reference geometry). A header that nibabel would
-   *  read otherwise than MITK, or than readers that use only the matrix (voxel order naming other
-   *  axes than the matrix, no matrix, MITK's map for its LPS files), is written as the same grid
-   *  with voxel order "RAS"; useLps writes the grid with voxel order "LPS". Throws mitk::Exception
-   *  when the file cannot be written. */
+  /** Writes the bundle with its TrackVis header (reference geometry), made consistent by
+   *  ConsistentHeader: a header that nibabel would read otherwise than MITK, or than readers that
+   *  use only the matrix (voxel order naming other axes than the matrix, no matrix, MITK's map for
+   *  its LPS files), is written as the same grid with voxel order "RAS"; useLps writes the grid
+   *  with voxel order "LPS". Throws mitk::Exception when the file cannot be written. */
   void Write(const std::string& filename, const FiberBundle* fib, bool useLps, bool printHeader);
 
   void PrintHeader(const Header& header, std::ostream& os);

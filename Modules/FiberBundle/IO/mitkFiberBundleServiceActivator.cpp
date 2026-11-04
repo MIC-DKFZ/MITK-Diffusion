@@ -24,6 +24,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkFiberBundleVtkWriter.h>
 #include <mitkFiberBundleTrackVisWriter.h>
+#include <mitkFiberBundleTrxWriter.h>
 #include <mitkFiberBundleDicomWriter.h>
 
 #include <mitkPlanarFigureCompositeReader.h>
@@ -78,6 +79,7 @@ namespace mitk
       m_FiberBundleVtkWriter = std::make_unique<FiberBundleVtkWriter>();
       m_FiberBundleTrackVisReader = std::make_unique<FiberBundleTrackVisReader>();
       m_FiberBundleTrackVisWriter = std::make_unique<FiberBundleTrackVisWriter>();
+      m_FiberBundleTrxWriter = std::make_unique<FiberBundleTrxWriter>();
       m_FiberBundleTckReader = std::make_unique<FiberBundleTckReader>();
       m_FiberBundleTrxReader = std::make_unique<FiberBundleTrxReader>();
       m_FiberBundleDicomReader = std::make_unique<FiberBundleDicomReader>();
@@ -103,6 +105,7 @@ namespace mitk
       m_FiberBundleDicomWriter.reset();
       m_FiberBundleVtkWriter.reset();
       m_FiberBundleTrackVisWriter.reset();
+      m_FiberBundleTrxWriter.reset();
 
       m_PlanarFigureCompositeReader.reset();
       m_PlanarFigureCompositeWriter.reset();
@@ -127,6 +130,7 @@ namespace mitk
     std::unique_ptr<FiberBundleDicomWriter> m_FiberBundleDicomWriter;
     std::unique_ptr<FiberBundleVtkWriter> m_FiberBundleVtkWriter;
     std::unique_ptr<FiberBundleTrackVisWriter> m_FiberBundleTrackVisWriter;
+    std::unique_ptr<FiberBundleTrxWriter> m_FiberBundleTrxWriter;
 
     std::unique_ptr<PlanarFigureCompositeReader> m_PlanarFigureCompositeReader;
     std::unique_ptr<PlanarFigureCompositeWriter> m_PlanarFigureCompositeWriter;

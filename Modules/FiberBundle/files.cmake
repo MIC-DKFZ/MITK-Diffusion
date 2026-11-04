@@ -16,6 +16,7 @@ set(H_FILES
   IO/mitkFiberBundleDicomWriter.h
   IO/mitkFiberBundleTckReader.h
   IO/mitkFiberBundleTrxReader.h
+  IO/mitkFiberBundleTrxWriter.h
   IO/mitkTrxFile.h
   IO/mitkFiberBundleTrackVisReader.h
   IO/mitkFiberBundleTrackVisWriter.h
@@ -55,6 +56,7 @@ set(CPP_FILES
   IO/mitkFiberBundleDicomWriter.cpp
   IO/mitkFiberBundleTckReader.cpp
   IO/mitkFiberBundleTrxReader.cpp
+  IO/mitkFiberBundleTrxWriter.cpp
   IO/mitkTrxFile.cpp
   IO/mitkFiberBundleTrackVisReader.cpp
   IO/mitkFiberBundleTrackVisWriter.cpp
