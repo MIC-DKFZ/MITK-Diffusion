@@ -131,8 +131,8 @@ float GibbsEnergyComputer::ComputeExternalEnergy(vnl_vector_fixed<float, 3> &R, 
     float odfVal = EvaluateOdf(R, N);   // evaluate ODF in given direction
 
     float modelVal = 0;
-    m_ParticleGrid->ComputeNeighbors(R);    // retrieve neighbouring particles from particle grid
-    Particle* neighbour =  m_ParticleGrid->GetNextNeighbor();
+    m_ParticleGrid->ComputeNeighbors(R, m_Neighbors);    // retrieve neighbouring particles from particle grid
+    Particle* neighbour =  m_ParticleGrid->GetNextNeighbor(m_Neighbors);
     while (neighbour!=nullptr)                         // iterate over nieghbouring particles
     {
         if (dp != neighbour)                        // don't evaluate against itself
@@ -146,7 +146,7 @@ float GibbsEnergyComputer::ComputeExternalEnergy(vnl_vector_fixed<float, 3> &R, 
 
             modelVal += pos_w*I_0;
         }
-        neighbour =  m_ParticleGrid->GetNextNeighbor();
+        neighbour =  m_ParticleGrid->GetNextNeighbor(m_Neighbors);
     }
     modelVal += CalcI0(1.0)+m_ParticleChemicalPotential;
 

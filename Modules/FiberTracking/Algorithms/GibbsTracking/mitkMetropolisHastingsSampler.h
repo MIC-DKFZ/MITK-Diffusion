@@ -45,6 +45,7 @@ public:
 
     MetropolisHastingsSampler(ParticleGrid* grid, EnergyComputer* enComp, ItkRandGenType* randGen, float curvThres);
     void SetTemperature(float val);
+    void SetRandGen(ItkRandGenType* randGen);   ///< e.g. one random stream per block of the parallel sampler
 
     void MakeProposal();    ///< make proposal for birth/death/shift/connection of particles
     int GetNumAcceptedProposals();
@@ -66,6 +67,7 @@ protected:
     Track       m_ProposalTrack;    ///< stores proposal track
     Track       m_BackupTrack;      ///< stores track removed for new proposal traCK
     SimpSamp    m_SimpSamp;         ///< neighbouring particles and their probabilities for the local tracking
+    ParticleGrid::NeighborIterator m_Neighbors;   ///< neighbourhood query of the end point proposal distribution
 
     float m_InTemp;     ///< simulated annealing temperature
     float m_ExTemp;     ///< simulated annealing temperature

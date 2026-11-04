@@ -50,6 +50,11 @@ void MetropolisHastingsSampler::SetTemperature(float val)
     m_InTemp = val;
 }
 
+void MetropolisHastingsSampler::SetRandGen(ItkRandGenType* randGen)
+{
+    m_RandGen = randGen;
+}
+
 // add small random number drawn from gaussian to each vector element
 void MetropolisHastingsSampler::DistortVector(float sigma, vnl_vector_fixed<float, 3>& vec)
 {
@@ -412,14 +417,14 @@ void MetropolisHastingsSampler::ComputeEndPointProposalDistribution(EndPoint P)
 
     float dist,dot;
     vnl_vector_fixed<float, 3> R = p->GetPos() + (p->GetDir() * (ep*m_ParticleLength) );
-    m_ParticleGrid->ComputeNeighbors(R);
+    m_ParticleGrid->ComputeNeighbors(R, m_Neighbors);
     m_SimpSamp.clear();
 
     m_SimpSamp.add(m_StopProb,EndPoint(nullptr,0));
 
     for (;;)
     {
-        Particle *p2 =  m_ParticleGrid->GetNextNeighbor();
+        Particle *p2 =  m_ParticleGrid->GetNextNeighbor(m_Neighbors);
         if (p2 == nullptr) break;
         if (p!=p2 && p2->label == 0)
         {

@@ -51,8 +51,18 @@ public:
     bool TryUpdateGrid(int k);
     void RemoveParticle(int k);
 
-    void ComputeNeighbors(vnl_vector_fixed<float, 3> &R);
-    Particle* GetNextNeighbor();
+    /** State of a neighbourhood query. The caller owns it, so that several samplers can query
+     *  one grid at the same time (parallel sampler). */
+    struct NeighborIterator
+    {
+        int cellidx[8];
+        int cellnum;    // distinct cells in cellidx (fewer than 8 along an axis with one cell)
+        int cellcnt;
+        int pcnt;
+    };
+
+    void ComputeNeighbors(const vnl_vector_fixed<float, 3> &R, NeighborIterator &it) const;
+    Particle* GetNextNeighbor(NeighborIterator &it) const;
 
     void CreateConnection(Particle *P1,int ep1, Particle *P2, int ep2);
     void DestroyConnection(Particle *P1,int ep1, Particle *P2, int ep2);
@@ -79,14 +89,6 @@ protected:
     vnl_vector_fixed< float, 3 >    m_GridScale;    // scaling factor for grid
 
     int m_CellCapacity;      // particle capacity of single cell in grid
-
-    struct NeighborTracker  // to run over the neighbors
-    {
-        std::vector< int > cellidx;
-        int cellnum;    // distinct cells in cellidx (fewer than 8 along an axis with one cell)
-        int cellcnt;
-        int pcnt;
-    } m_NeighbourTracker;
 
 };
 

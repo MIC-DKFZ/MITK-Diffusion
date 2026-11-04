@@ -21,11 +21,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkParticleGrid.h>
 #include <mitkSphereInterpolator.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
+#include <memory>
 
 using namespace mitk;
 
 /**
-* \brief Calculates internal and external energy of the new particle configuration proposal.   */
+* \brief Calculates internal and external energy of the new particle configuration proposal.
+*
+* A copy shares the per-voxel tables and has its own neighbourhood query, so that each thread of the
+* parallel sampler can use one.   */
 
 class MITKFIBERTRACKING_EXPORT EnergyComputer
 {
@@ -37,6 +41,7 @@ public:
 
     EnergyComputer(ItkFloatImageType* mask, ParticleGrid* particleGrid, SphereInterpolator* interpolator, ItkRandGenType* randGen);
     void SetParameters(float particleWeight, float particleWidth, float connectionPotential, float curvThres, float inexBalance, float particlePotential);
+    void SetRandGen(ItkRandGenType* randGen);
 
     // get random position inside mask
     void DrawRandomPosition(vnl_vector_fixed<float, 3>& R);
@@ -54,12 +59,14 @@ protected:
     vnl_matrix_fixed<float, 3, 3>   m_RotationMatrix;
     SphereInterpolator*             m_SphereInterpolator;
     ParticleGrid*                   m_ParticleGrid;
+    ParticleGrid::NeighborIterator  m_Neighbors;
     ItkRandGenType*                 m_RandGen;
     ItkFloatImageType*              m_Mask;
     vnl_vector_fixed<int, 3>        m_Size;
     vnl_vector_fixed<float, 3>      m_Spacing;
-    std::vector< float >            m_CumulatedSpatialProbability;
-    std::vector< int >              m_ActiveIndices;    // indices inside mask
+    // per-voxel tables (29 MB for 145x174x145 voxels), shared by copies instead of copied
+    std::shared_ptr< const std::vector< float > >   m_CumulatedSpatialProbability;
+    std::shared_ptr< const std::vector< int > >     m_ActiveIndices;    // indices inside mask
 
     bool    m_UseTrilinearInterpolation;    // is deactivated if less than 3 image slices are available
     int     m_NumActiveVoxels;              // voxels inside mask

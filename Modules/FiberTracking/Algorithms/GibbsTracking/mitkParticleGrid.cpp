@@ -48,7 +48,6 @@ ParticleGrid::ParticleGrid(ItkFloatImageType* image, float particleLength, int c
     m_Particles.resize(m_ContainerCapacity);        // allocate and initialize particles
     m_Grid.resize(numCells);                        // empty cells
     m_OccupationCount.resize(numCells, 0);          // allocate and initialize occupation counter array
-    m_NeighbourTracker.cellidx.resize(8, 0);        // allocate and initialize neighbour tracker
 
     for (int i = 0;i < m_ContainerCapacity;i++)     // initialize particle IDs
         m_Particles[i].ID = i;
@@ -76,14 +75,12 @@ void ParticleGrid::ResetGrid()
     m_Particles.clear();
     m_Grid.clear();
     m_OccupationCount.clear();
-    m_NeighbourTracker.cellidx.clear();
 
     const std::size_t numCells = static_cast<std::size_t>(m_GridSize[0])*m_GridSize[1]*m_GridSize[2];
 
     m_Particles.resize(m_ContainerCapacity);        // allocate and initialize particles
     m_Grid.resize(numCells);                        // empty cells
     m_OccupationCount.resize(numCells, 0);          // allocate and initialize occupation counter array
-    m_NeighbourTracker.cellidx.resize(8, 0);        // allocate and initialize neighbour tracker
 
     for (int i = 0;i < m_ContainerCapacity;i++)     // initialize particle IDs
         m_Particles[i].ID = i;
@@ -269,7 +266,7 @@ void ParticleGrid::RemoveParticle(int k)
 // A connection partner's endpoint lies within L of R, but its centre (the stored position) can be
 // up to 2L away, so some candidates between L and 2L are missed. Kept on purpose: a 3x3x3 search
 // would find them all at about 3.4 times the neighbour visits and change every Gibbs result.
-void ParticleGrid::ComputeNeighbors(vnl_vector_fixed<float, 3> &R)
+void ParticleGrid::ComputeNeighbors(const vnl_vector_fixed<float, 3> &R, NeighborIterator &it) const
 {
     float xfrac = R[0]*m_GridScale[0];
     float yfrac = R[1]*m_GridScale[1];
@@ -297,53 +294,53 @@ void ParticleGrid::ComputeNeighbors(vnl_vector_fixed<float, 3> &R)
     if (m_GridSize[2] <= 1) { dz = 0; } // Necessary with 2d images (bug 15416)
 
 
-    m_NeighbourTracker.cellidx[0] = xint + m_GridSize[0]*(yint+zint*m_GridSize[1]);
-    m_NeighbourTracker.cellidx[1] = m_NeighbourTracker.cellidx[0] + dx;
-    m_NeighbourTracker.cellidx[2] = m_NeighbourTracker.cellidx[1] + dy*m_GridSize[0];
-    m_NeighbourTracker.cellidx[3] = m_NeighbourTracker.cellidx[2] - dx;
-    m_NeighbourTracker.cellidx[4] = m_NeighbourTracker.cellidx[0] + dz*m_GridSize[0]*m_GridSize[1];
-    m_NeighbourTracker.cellidx[5] = m_NeighbourTracker.cellidx[4] + dx;
-    m_NeighbourTracker.cellidx[6] = m_NeighbourTracker.cellidx[5] + dy*m_GridSize[0];
-    m_NeighbourTracker.cellidx[7] = m_NeighbourTracker.cellidx[6] - dx;
+    it.cellidx[0] = xint + m_GridSize[0]*(yint+zint*m_GridSize[1]);
+    it.cellidx[1] = it.cellidx[0] + dx;
+    it.cellidx[2] = it.cellidx[1] + dy*m_GridSize[0];
+    it.cellidx[3] = it.cellidx[2] - dx;
+    it.cellidx[4] = it.cellidx[0] + dz*m_GridSize[0]*m_GridSize[1];
+    it.cellidx[5] = it.cellidx[4] + dx;
+    it.cellidx[6] = it.cellidx[5] + dy*m_GridSize[0];
+    it.cellidx[7] = it.cellidx[6] - dx;
 
 
     // With one cell along an axis (d = 0) some of the 8 cells coincide; each is visited once, in the
     // order above, so that every neighbour is returned once.
-    m_NeighbourTracker.cellnum = 0;
+    it.cellnum = 0;
     for (int k=0; k<8; ++k)
     {
-        const int cell = m_NeighbourTracker.cellidx[k];
+        const int cell = it.cellidx[k];
         bool seen = false;
-        for (int j=0; j<m_NeighbourTracker.cellnum; ++j)
-            seen = seen || m_NeighbourTracker.cellidx[j] == cell;
+        for (int j=0; j<it.cellnum; ++j)
+            seen = seen || it.cellidx[j] == cell;
         if (seen)
             continue;
-        m_NeighbourTracker.cellidx[m_NeighbourTracker.cellnum] = cell;
-        m_NeighbourTracker.cellnum++;
+        it.cellidx[it.cellnum] = cell;
+        it.cellnum++;
     }
 
-    m_NeighbourTracker.cellcnt = 0;
-    m_NeighbourTracker.pcnt = 0;
+    it.cellcnt = 0;
+    it.pcnt = 0;
 }
 
-Particle* ParticleGrid::GetNextNeighbor()
+Particle* ParticleGrid::GetNextNeighbor(NeighborIterator &it) const
 {
-    if (m_NeighbourTracker.pcnt < m_OccupationCount[m_NeighbourTracker.cellidx[m_NeighbourTracker.cellcnt]])
+    if (it.pcnt < m_OccupationCount[it.cellidx[it.cellcnt]])
     {
-        return m_Grid[m_NeighbourTracker.cellidx[m_NeighbourTracker.cellcnt]][m_NeighbourTracker.pcnt++];
+        return m_Grid[it.cellidx[it.cellcnt]][it.pcnt++];
     }
     else
     {
         for(;;)
         {
-            m_NeighbourTracker.cellcnt++;
-            if (m_NeighbourTracker.cellcnt >= m_NeighbourTracker.cellnum)
+            it.cellcnt++;
+            if (it.cellcnt >= it.cellnum)
                 return nullptr;
-            if (m_OccupationCount[m_NeighbourTracker.cellidx[m_NeighbourTracker.cellcnt]] > 0)
+            if (m_OccupationCount[it.cellidx[it.cellcnt]] > 0)
                 break;
         }
-        m_NeighbourTracker.pcnt = 1;
-        return m_Grid[m_NeighbourTracker.cellidx[m_NeighbourTracker.cellcnt]][0];
+        it.pcnt = 1;
+        return m_Grid[it.cellidx[it.cellcnt]][0];
     }
 }
 

@@ -189,9 +189,10 @@ public:
     grid.NewParticle(vnl_vector_fixed<float, 3>(4.0f, 3.0f, 0.5f));
 
     vnl_vector_fixed<float, 3> query(3.6f, 3.6f, 0.5f);
-    grid.ComputeNeighbors(query);
+    mitk::ParticleGrid::NeighborIterator neighbours;
+    grid.ComputeNeighbors(query, neighbours);
     int count = 0;
-    while (grid.GetNextNeighbor() != nullptr)
+    while (grid.GetNextNeighbor(neighbours) != nullptr)
       ++count;
     CPPUNIT_ASSERT_EQUAL(2, count);
   }
@@ -227,13 +228,13 @@ public:
 
     CPPUNIT_ASSERT_EQUAL(100000, grid.m_NumParticles);
     CPPUNIT_ASSERT(grid.CheckConsistency());
+    mitk::ParticleGrid::NeighborIterator neighbours;
     for (int k = 0; k < grid.m_NumParticles; k += 37)
     {
       mitk::Particle *p = grid.GetParticle(k);
-      vnl_vector_fixed<float, 3> pos = p->GetPos();
-      grid.ComputeNeighbors(pos);
+      grid.ComputeNeighbors(p->GetPos(), neighbours);
       bool found = false;
-      for (mitk::Particle *n = grid.GetNextNeighbor(); n != nullptr && !found; n = grid.GetNextNeighbor())
+      for (mitk::Particle *n = grid.GetNextNeighbor(neighbours); n != nullptr && !found; n = grid.GetNextNeighbor(neighbours))
         found = n == p;
       CPPUNIT_ASSERT_MESSAGE("particle " + std::to_string(k) + " in its cell", found);
     }
