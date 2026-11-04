@@ -408,6 +408,13 @@ in a Release Workbench at a display. Remove an item once it is fixed.
   is only used inside `#if MITK_HAS_PYTHON` (`-Werror=unused-function`). A bug in MITK.
   `DiffusionDebug` leaves the plugin off; `DiffusionRelease`, `Tractography`, `Fiberfox` and
   `IVIM` switch Python on and build it.
+- MITK's pick endpoint (`POST /api/v1/rendering/windows/{id}/pick`) iterates
+  `*dataStorage->GetSubset(notHelper)` in `DescribeData`
+  (`mitk/Plugins/org.mitk.gui.qt.restapi/src/internal/QmitkRestApiRenderingRoutes.cpp:532`), a
+  node set whose owning smart pointer dies at the end of that line, so the loop walks freed memory
+  and crashes the Workbench when another thread reuses it, e.g. while a diffusion job runs. The
+  fix (hold the set in a local) is MITK's; the UI case `Rest_PickAndPropertiesWhileJobsRun_NoCrash`
+  of the Tractography suite reproduces it and fails until the fix is in the base.
 
 ## Commands
 
