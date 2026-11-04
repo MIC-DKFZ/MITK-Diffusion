@@ -100,6 +100,15 @@ public:
 
   std::string GetStatusText();
 
+  /** Seed points of the run (seeds per voxel times seed voxels, or the seed points given); 0 before it. */
+  unsigned int GetNumSeeds() const { return m_NumSeeds; }
+
+  /** Seed points processed so far; can be read from another thread while the tracking runs. */
+  unsigned int GetProcessedSeeds() const { return m_Progress; }
+
+  /** Fibers accepted so far; after the run, the fibers of the output. */
+  unsigned int GetAcceptedFibers() const { return m_CurrentTracts; }
+
   void SetTrackingPriorHandler(mitk::TrackingDataHandler *TrackingPriorHandler);
 
   std::shared_ptr< mitk::StreamlineTractographyParameters > GetParameters() const;

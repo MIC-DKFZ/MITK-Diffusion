@@ -84,6 +84,8 @@ namespace mitk
         m_RngItk->SetSeed();
     }
 
+    std::shared_ptr<mitk::StreamlineTractographyParameters> GetParameters() const { return m_Parameters; }
+
     /** Uniform random number from the handler's own engine, which is seeded in SetParameters.
      *  For set-up work outside the tracking threads (seed point jitter); not thread-safe. */
     double GetRandDouble(const double &a, const double &b) { return m_RngItk->GetUniformVariate(a, b); }
