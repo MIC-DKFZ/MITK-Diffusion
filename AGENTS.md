@@ -412,9 +412,12 @@ in a Release Workbench at a display. Remove an item once it is fixed.
   `*dataStorage->GetSubset(notHelper)` in `DescribeData`
   (`mitk/Plugins/org.mitk.gui.qt.restapi/src/internal/QmitkRestApiRenderingRoutes.cpp:532`), a
   node set whose owning smart pointer dies at the end of that line, so the loop walks freed memory
-  and crashes the Workbench when another thread reuses it, e.g. while a diffusion job runs. The
-  fix (hold the set in a local) is MITK's; the UI case `Rest_PickAndPropertiesWhileJobsRun_NoCrash`
-  of the Tractography suite reproduces it and fails until the fix is in the base.
+  and crashes the Workbench when another thread reuses it, e.g. while a diffusion job runs. Its
+  `GetImageValue` reads every visible image as scalar, so a pick over a tensor or RGB image fails
+  with HTTP 500. Both fixes (hold the set in a local; skip pixel types other than scalar and
+  vector) are MITK's, only on its branch `984-claude-in-mitk`; the UI case
+  `Rest_PickAndPropertiesWhileJobsRun_NoCrash` of the Tractography suite hits both and fails
+  until they are in the base.
 
 ## Commands
 
