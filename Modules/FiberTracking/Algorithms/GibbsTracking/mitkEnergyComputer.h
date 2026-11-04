@@ -42,6 +42,7 @@ public:
     EnergyComputer(ItkFloatImageType* mask, ParticleGrid* particleGrid, SphereInterpolator* interpolator, ItkRandGenType* randGen);
     void SetParameters(float particleWeight, float particleWidth, float connectionPotential, float curvThres, float inexBalance, float particlePotential);
     void SetRandGen(ItkRandGenType* randGen);
+    void SetBlock(GibbsBlock* block);   ///< parallel sampler: the block whose read box the neighbourhood queries keep to
 
     // get random position inside mask
     void DrawRandomPosition(vnl_vector_fixed<float, 3>& R);

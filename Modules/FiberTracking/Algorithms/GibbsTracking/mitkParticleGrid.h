@@ -61,6 +61,9 @@ public:
         int cellnum;    // distinct cells in cellidx (fewer than 8 along an axis with one cell)
         int cellcnt;
         int pcnt;
+        /** Parallel sampler: the block of the querying thread. A query beyond its read box sets
+         *  block->readOutside and reads only cells of the box; the proposal is then rejected. */
+        GibbsBlock* block = nullptr;
     };
 
     void ComputeNeighbors(const vnl_vector_fixed<float, 3> &R, NeighborIterator &it) const;

@@ -21,6 +21,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <MitkFiberTrackingExports.h>
 #include <mitkParticleGrid.h>
 #include <mitkEnergyComputer.h>
+#include <mitkGibbsCellMasses.h>
 #include <mitkSimpSamp.h>
 
 // ITK
@@ -47,6 +48,14 @@ public:
     void SetTemperature(float val);
     void SetRandGen(ItkRandGenType* randGen);   ///< e.g. one random stream per block of the parallel sampler
 
+    /** Parallel sampler: restricts the proposals to a block of grid cells (nullptr: the whole grid,
+     *  the serial sampler). Particles are picked from the block's list and born at a position of its
+     *  cell masses, with birth and death ratios for the block's particle count and mass share. A
+     *  proposal that would write outside the block (a shift leaving it, a track reaching a particle
+     *  outside) or read outside its read box is rejected; forward and reverse moves touch the same
+     *  particles, so each block update keeps the target distribution. */
+    void SetBlock(GibbsBlock* block, const GibbsCellMasses* cellMasses);
+
     void MakeProposal();    ///< make proposal for birth/death/shift/connection of particles
     int GetNumAcceptedProposals();
 
@@ -62,6 +71,21 @@ protected:
     /** generate random vectors */
     void DistortVector(float sigma, vnl_vector_fixed<float, 3>& vec);
     vnl_vector_fixed<float, 3> GetRandomDirection();
+
+    /** Acceptance ratio of a birth and of a death without the energy term. */
+    float BirthRatio() const;
+    float DeathRatio() const;
+
+    /** the particles proposals pick from: those of the block, or all */
+    int NumParticles() const;
+    Particle* PickParticle(int pnum);
+    int& ConnectionCount();
+
+    /** block mode: true (and the proposal is to be rejected) if the position or particle lies
+     *  outside the block, or if a neighbourhood query read outside the read box */
+    bool OutsideBlock(const vnl_vector_fixed<float, 3>& R);
+    bool OutsideBlock(const Particle* p);
+    bool ReadOutsideBlock();
 
     ItkRandGenType* m_RandGen;      ///< random generator
     Track       m_ProposalTrack;    ///< stores proposal track
@@ -92,6 +116,10 @@ protected:
     ParticleGrid*   m_ParticleGrid;         ///< storest all particles
     EnergyComputer* m_EnergyComputer;       ///< computes internal and external energy of particles
     unsigned int    m_AcceptedProposals;    ///< counts accepted proposals
+
+    GibbsBlock*             m_Block;        ///< parallel sampler: the block of the proposals, else nullptr
+    const GibbsCellMasses*  m_CellMasses;   ///< parallel sampler: birth positions of the block
+    bool                    m_LeftBlock;    ///< the current track walk reached a particle outside the block
 };
 
 }

@@ -23,13 +23,21 @@ namespace mitk
 * cells stay fixed.
 *
 * During a phase, the block's thread writes only the block's cells, the particles in them and the
-* particle slots reserved for the block's births (ParticleGrid::ReserveBlockSlots). The counts it
-* changes are kept here and added to the grid's counters after the phase.
+* particle slots reserved for the block's births (ParticleGrid::ReserveBlockSlots), and reads only
+* cells of its read box. The counts it changes are kept here and added to the grid's counters after
+* the phase. A proposal that would write outside the block or read outside the read box is
+* rejected (MetropolisHastingsSampler::SetBlock).
 */
 struct GibbsBlock
 {
   int cellMin[3] = {0, 0, 0};     ///< first cell of the block along each axis
   int cellMax[3] = {-1, -1, -1};  ///< last cell of the block along each axis
+  int readMin[3] = {0, 0, 0};     ///< read box: the block and the cells around it (GibbsCellMasses::PrepareBlock)
+  int readMax[3] = {-1, -1, -1};
+
+  std::vector<int> birthCells;      ///< the block's cells with mask mass, ascending
+  std::vector<double> cumulatedMass;  ///< mask mass of birthCells[0..i]
+  double massShare = 0;           ///< M_b/M: the block's share of the mask mass
 
   unsigned long proposals = 0;    ///< proposals of the block in a sweep, one reserved slot each
   std::vector<int> particles;     ///< IDs of the particles in the block's cells
@@ -39,6 +47,10 @@ struct GibbsBlock
   int particleChange = 0;         ///< births minus deaths
   int connectionChange = 0;       ///< connections made minus connections removed
   int cellOverflows = 0;          ///< births and moves refused by a full cell
+
+  bool readOutside = false;       ///< set by a neighbourhood query beyond the read box
+  unsigned long writeRejections = 0;  ///< proposals rejected since they would write outside the block
+  unsigned long readRejections = 0;   ///< proposals rejected since they read outside the read box
 
   bool ContainsCell(int x, int y, int z) const
   {

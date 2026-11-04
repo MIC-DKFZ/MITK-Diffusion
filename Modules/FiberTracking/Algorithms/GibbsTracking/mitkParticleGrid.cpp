@@ -301,6 +301,24 @@ void ParticleGrid::ComputeNeighbors(const vnl_vector_fixed<float, 3> &R, Neighbo
     if (zint >= m_GridSize[2]-1) {zint = m_GridSize[2]-1; dz = -1;}
     if (m_GridSize[2] <= 1) { dz = 0; } // Necessary with 2d images (bug 15416)
 
+    // Cells beyond the read box may be changed by another thread of the parallel sampler meanwhile.
+    if (it.block != nullptr)
+    {
+        int* cell[3] = {&xint, &yint, &zint};
+        int* step[3] = {&dx, &dy, &dz};
+        for (int a=0; a<3; a++)
+        {
+            const int low = it.block->readMin[a];
+            const int high = it.block->readMax[a];
+            if (*cell[a] < low || *cell[a] > high || *cell[a]+*step[a] < low || *cell[a]+*step[a] > high)
+            {
+                it.block->readOutside = true;
+                *cell[a] = std::max(low, std::min(high, *cell[a]));
+                if (*cell[a]+*step[a] < low || *cell[a]+*step[a] > high)
+                    *step[a] = 0;
+            }
+        }
+    }
 
     it.cellidx[0] = xint + m_GridSize[0]*(yint+zint*m_GridSize[1]);
     it.cellidx[1] = it.cellidx[0] + dx;

@@ -15,11 +15,13 @@ found in the LICENSE file.
 #include <fstream>
 #include <mitkFiberBuilder.h>
 #include <mitkIOUtil.h>
+#include <mitkGibbsCellMasses.h>
 #include <mitkGibbsEnergyComputer.h>
 #include <mitkMetropolisHastingsSampler.h>
 #include <mitkParticleGrid.h>
 #include <mitkSimpSamp.h>
 #include <mitkSphereInterpolator.h>
+#include <array>
 #include <random>
 #include <mitkTestFixture.h>
 #include <mitkTestingMacros.h>
@@ -38,6 +40,17 @@ public:
   }
 
   using mitk::MetropolisHastingsSampler::ComputeOptimalShift;
+  using mitk::MetropolisHastingsSampler::BirthRatio;
+  using mitk::MetropolisHastingsSampler::DeathRatio;
+
+  void SetProposalProbabilities(float birth, float death, float shift, float optimalShift, float connection)
+  {
+    m_BirthProb = birth;
+    m_DeathProb = death;
+    m_ShiftProb = shift;
+    m_OptShiftProb = optimalShift;
+    m_ConnectionProb = connection;
+  }
 };
 
 /**
@@ -53,6 +66,10 @@ class mitkGlobalTractographyUnitTestSuite : public mitk::TestFixture
   MITK_TEST(Neighbours_ThinImage_EachOnce);
   MITK_TEST(ParticleGrid_ReallocateMoveRemove_Consistent);
   MITK_TEST(ParticleGrid_BlockStorage_Consistent);
+  MITK_TEST(BlockProposals_WholeGrid_SerialRatios);
+  MITK_TEST(BlockProposals_ShiftLeavingBlock_Rejected);
+  MITK_TEST(BlockProposals_TrackReachingOutside_Rejected);
+  MITK_TEST(BlockProposals_BirthsInBlockByMaskWeight);
   MITK_TEST(SimpSamp_MoreThanThousandEndPoints);
   MITK_TEST(SphereInterpolator_TruncatedLookupTables_Invalid);
   MITK_TEST(TrackProposal_LongerThanThousandParticles);
@@ -386,6 +403,237 @@ public:
     MITK_INFO << grid.m_NumParticles << " particles, " << grid.m_NumConnections << " connections, " << moves << " moves";
     CPPUNIT_ASSERT(moves > 0);
     CPPUNIT_ASSERT(expectedParticles != 3000);
+  }
+
+  /** Image of the given size with 1 mm voxels and identity direction, filled with value. */
+  template <class TImage>
+  static typename TImage::Pointer MakeFilledImage(unsigned int x, unsigned int y, unsigned int z, typename TImage::PixelType value)
+  {
+    auto image = TImage::New();
+    typename TImage::SizeType size = {{x, y, z}};
+    image->SetRegions(typename TImage::RegionType(size));
+    image->SetDirection(Identity());
+    image->Allocate();
+    image->FillBuffer(value);
+    return image;
+  }
+
+  static OdfImageType::PixelType IsotropicOdf()
+  {
+    OdfImageType::PixelType odf;
+    odf.Fill(1.0f);
+    return odf;
+  }
+
+  /** Grid, energy computer and sampler as the filter sets them up, on the given images. */
+  struct BlockSetup
+  {
+    SphereInterpolator interpolator{""};
+    mitk::ParticleGrid grid;
+    itk::Statistics::MersenneTwisterRandomVariateGenerator::Pointer rng;
+    GibbsEnergyComputer energy;
+    TrackProposalSampler sampler;
+    mitk::GibbsCellMasses masses;
+
+    BlockSetup(OdfImageType *odfs, FloatImageType *mask, float length, float weight)
+      : grid(mask, length, 1024),
+        rng(MakeRandGen()),
+        energy(odfs, mask, &grid, &interpolator, rng),
+        sampler(&grid, &energy, rng, std::cos(itk::Math::pi / 4)),
+        masses(mask, grid)
+    {
+      energy.SetParameters(weight, 0.5f * length, 10 * length * length, std::cos(itk::Math::pi / 4), 0.0f, 0.2f);
+      sampler.SetTemperature(0.1f);
+    }
+
+    static itk::Statistics::MersenneTwisterRandomVariateGenerator::Pointer MakeRandGen()
+    {
+      auto rng = itk::Statistics::MersenneTwisterRandomVariateGenerator::New();
+      rng->SetSeed(1);
+      return rng;
+    }
+
+    mitk::GibbsBlock Block(int x0, int x1, int y0, int y1, int z0, int z1) const
+    {
+      mitk::GibbsBlock block;
+      const int first[3] = {x0, y0, z0}, last[3] = {x1, y1, z1};
+      for (int a = 0; a < 3; ++a)
+      {
+        block.cellMin[a] = first[a];
+        block.cellMax[a] = std::min(last[a], grid.GetGridSize()[a] - 1);
+      }
+      masses.PrepareBlock(block, 4);
+      return block;
+    }
+
+    /** `proposals` proposals in the block as one phase of the parallel sampler, then compaction. */
+    void Run(mitk::GibbsBlock &block, unsigned long proposals)
+    {
+      grid.BeginBlockSweep();
+      block.proposals = proposals;
+      std::vector<mitk::GibbsBlock *> blocks = {&block};
+      CPPUNIT_ASSERT(grid.ReserveBlockSlots(blocks));
+      grid.CollectBlockParticles(block);
+      sampler.SetBlock(&block, &masses);
+      for (unsigned long k = 0; k < proposals; ++k)
+        sampler.MakeProposal();
+      sampler.SetBlock(nullptr, nullptr);
+      grid.EndBlockPhase(blocks);
+      grid.CompactParticles();
+    }
+  };
+
+  /** A block that holds the whole mask and all particles gives the serial birth and death ratios;
+   *  a block with half the mask mass doubles the birth ratio of its particle count. */
+  void BlockProposals_WholeGrid_SerialRatios()
+  {
+    auto odfs = MakeFilledImage<OdfImageType>(12, 12, 12, IsotropicOdf());
+    auto mask = MakeFilledImage<FloatImageType>(12, 12, 12, 1.0f);
+    BlockSetup setup(odfs, mask, 1.0f, 0.001f); // cells of 2 mm: 7x7x7
+    std::mt19937 rng(1);
+    std::uniform_real_distribution<float> coordinate(0.0f, 12.0f);
+    for (int i = 0; i < 50; ++i)
+      setup.grid.NewParticle(vnl_vector_fixed<float, 3>(coordinate(rng), coordinate(rng), coordinate(rng)));
+    const float serialBirth = setup.sampler.BirthRatio();
+    const float serialDeath = setup.sampler.DeathRatio();
+
+    mitk::GibbsBlock whole = setup.Block(0, 6, 0, 6, 0, 6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, whole.massShare, 1e-12);
+    setup.grid.CollectBlockParticles(whole);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(50), whole.particles.size());
+    setup.sampler.SetBlock(&whole, &setup.masses);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(serialBirth, setup.sampler.BirthRatio(), 1e-6 * serialBirth);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(serialDeath, setup.sampler.DeathRatio(), 1e-6 * serialDeath);
+
+    // cells x 0..2 cover x in [0, 6) mm, half of the mask
+    mitk::GibbsBlock half = setup.Block(0, 2, 0, 6, 0, 6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, half.massShare, 1e-12);
+    setup.grid.CollectBlockParticles(half);
+    const float n = static_cast<float>(half.particles.size());
+    setup.sampler.SetBlock(&half, &setup.masses);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5 * 0.05 / (0.25 * (n + 1)), setup.sampler.BirthRatio(), 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(n * 0.25 / 0.05 / 0.5, setup.sampler.DeathRatio(), 1e-4);
+    setup.sampler.SetBlock(nullptr, nullptr);
+  }
+
+  /** Positions (and partners' positions) of the particles outside x < border, sorted. */
+  static std::vector<std::array<float, 9>> ParticlesOutside(mitk::ParticleGrid &grid, float border)
+  {
+    std::vector<std::array<float, 9>> outside;
+    for (int i = 0; i < grid.m_NumParticles; ++i)
+    {
+      mitk::Particle *p = grid.GetParticle(i);
+      if (p->GetPos()[0] < border)
+        continue;
+      std::array<float, 9> entry;
+      entry.fill(-1.0f);
+      for (int a = 0; a < 3; ++a)
+      {
+        entry[a] = p->GetPos()[a];
+        if (p->pID != -1)
+          entry[3 + a] = grid.GetParticle(p->pID)->GetPos()[a];
+        if (p->mID != -1)
+          entry[6 + a] = grid.GetParticle(p->mID)->GetPos()[a];
+      }
+      outside.push_back(entry);
+    }
+    std::sort(outside.begin(), outside.end());
+    return outside;
+  }
+
+  /** Shifts that would move a particle out of the block are rejected; the particles outside it
+   *  and the grid stay unchanged. */
+  void BlockProposals_ShiftLeavingBlock_Rejected()
+  {
+    auto odfs = MakeFilledImage<OdfImageType>(12, 12, 12, IsotropicOdf());
+    auto mask = MakeFilledImage<FloatImageType>(12, 12, 12, 1.0f);
+    BlockSetup setup(odfs, mask, 1.0f, 0.001f); // cells of 2 mm, the block x in [0, 6) mm
+    setup.sampler.SetProposalProbabilities(0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+    std::mt19937 rng(1);
+    std::uniform_real_distribution<float> coordinate(0.0f, 12.0f);
+    std::uniform_real_distribution<float> nearBorder(5.6f, 6.0f);
+    for (int i = 0; i < 40; ++i)
+    {
+      const float x = i % 2 == 0 ? nearBorder(rng) : 6.0f + coordinate(rng) / 2;
+      mitk::Particle *p = setup.grid.NewParticle(vnl_vector_fixed<float, 3>(x, coordinate(rng), coordinate(rng)));
+      p->GetDir() = vnl_vector_fixed<float, 3>(1.0f, 0.0f, 0.0f);
+    }
+    const auto outsideBefore = ParticlesOutside(setup.grid, 6.0f);
+
+    mitk::GibbsBlock block = setup.Block(0, 2, 0, 6, 0, 6);
+    setup.Run(block, 500);
+
+    CPPUNIT_ASSERT(setup.grid.CheckConsistency());
+    CPPUNIT_ASSERT_EQUAL(40, setup.grid.m_NumParticles);
+    CPPUNIT_ASSERT(outsideBefore == ParticlesOutside(setup.grid, 6.0f));
+    CPPUNIT_ASSERT(block.writeRejections > 0);
+    CPPUNIT_ASSERT(setup.sampler.GetNumAcceptedProposals() > 0);
+    CPPUNIT_ASSERT_EQUAL(0ul, block.readRejections);
+  }
+
+  /** Connection proposals whose old or new track reaches a particle outside the block are
+   *  rejected: links of particles outside stay as they are, also the one across the border. */
+  void BlockProposals_TrackReachingOutside_Rejected()
+  {
+    auto odfs = MakeFilledImage<OdfImageType>(24, 4, 4, IsotropicOdf());
+    auto mask = MakeFilledImage<FloatImageType>(24, 4, 4, 1.0f);
+    BlockSetup setup(odfs, mask, 1.0f, 0.001f); // cells of 2 mm: 13x3x3, the block x in [0, 6) mm
+    setup.sampler.SetProposalProbabilities(0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    // a row of particles along x whose end points touch: x = 1, 3, 5 in the block, 7, ..., 23 outside
+    std::vector<mitk::Particle *> row;
+    for (int k = 0; k < 12; ++k)
+    {
+      mitk::Particle *p = setup.grid.NewParticle(vnl_vector_fixed<float, 3>(1.0f + 2.0f * k, 2.0f, 2.0f));
+      p->GetDir() = vnl_vector_fixed<float, 3>(1.0f, 0.0f, 0.0f);
+      row.push_back(p);
+    }
+    setup.grid.CreateConnection(row[2], +1, row[3], -1); // across the border
+    setup.grid.CreateConnection(row[5], +1, row[6], -1);
+    const auto outsideBefore = ParticlesOutside(setup.grid, 6.0f);
+
+    mitk::GibbsBlock block = setup.Block(0, 2, 0, 2, 0, 2);
+    setup.Run(block, 300);
+
+    CPPUNIT_ASSERT(setup.grid.CheckConsistency());
+    CPPUNIT_ASSERT(outsideBefore == ParticlesOutside(setup.grid, 6.0f));
+    CPPUNIT_ASSERT(block.writeRejections > 0);
+    CPPUNIT_ASSERT(setup.sampler.GetNumAcceptedProposals() > 0);
+    CPPUNIT_ASSERT_EQUAL(0ul, block.readRejections);
+  }
+
+  /** Births of a block land in its part of the mask (voxels above 0.5), with a density
+   *  proportional to the mask value. */
+  void BlockProposals_BirthsInBlockByMaskWeight()
+  {
+    auto odfs = MakeFilledImage<OdfImageType>(12, 12, 12, IsotropicOdf());
+    auto mask = MakeFilledImage<FloatImageType>(12, 12, 12, 0.0f);
+    itk::ImageRegionIteratorWithIndex<FloatImageType> it(mask, mask->GetLargestPossibleRegion());
+    for (it.GoToBegin(); !it.IsAtEnd(); ++it)
+    {
+      const int x = it.GetIndex()[0];
+      it.Set(x < 7 ? 2.0f : (x < 9 ? 1.0f : 0.4f)); // 0.4: no births
+    }
+    BlockSetup setup(odfs, mask, 1.0f, 0.0001f);
+    // the birth ratio holds the death probability; at this weight deaths are never accepted
+    setup.sampler.SetProposalProbabilities(0.95f, 0.05f, 0.0f, 0.0f, 0.0f);
+
+    // cells x 2..5 cover x in [4, 12) mm: mass 3*2 (x in [4, 7)) + 2*1 per mm^2 of y and z
+    mitk::GibbsBlock block = setup.Block(2, 5, 0, 2, 0, 6);
+    setup.Run(block, 3000);
+
+    CPPUNIT_ASSERT(setup.grid.CheckConsistency());
+    MITK_INFO << setup.grid.m_NumParticles << " births";
+    CPPUNIT_ASSERT(setup.grid.m_NumParticles > 2700);
+    int heavy = 0;
+    for (int i = 0; i < setup.grid.m_NumParticles; ++i)
+    {
+      const auto &pos = setup.grid.GetParticle(i)->GetPos();
+      CPPUNIT_ASSERT(pos[0] >= 4.0f && pos[0] < 9.0f && pos[1] >= 0.0f && pos[1] < 6.0f);
+      heavy += pos[0] < 7.0f ? 1 : 0;
+    }
+    const double share = static_cast<double>(heavy) / setup.grid.m_NumParticles;
+    MITK_INFO << "share of births at mask value 2: " << share << " (expected 0.75)";
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.75, share, 0.04);
   }
 
   /** The sampler of the track proposal had a fixed buffer of 1000 end points without bound check,

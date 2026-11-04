@@ -29,6 +29,9 @@ MetropolisHastingsSampler::MetropolisHastingsSampler(ParticleGrid* grid, EnergyC
     , m_TractProb(0.5)
     , m_DelProb(0.1)
     , m_AcceptedProposals(0)
+    , m_Block(nullptr)
+    , m_CellMasses(nullptr)
+    , m_LeftBlock(false)
 {
     m_RandGen = randGen;
     m_ParticleGrid = grid;
@@ -55,6 +58,73 @@ void MetropolisHastingsSampler::SetRandGen(ItkRandGenType* randGen)
     m_RandGen = randGen;
 }
 
+void MetropolisHastingsSampler::SetBlock(GibbsBlock* block, const GibbsCellMasses* cellMasses)
+{
+    m_Block = block;
+    m_CellMasses = cellMasses;
+    m_Neighbors.block = block;
+    m_EnergyComputer->SetBlock(block);
+}
+
+// The reverse of a birth is a death that picks 1 of n+1 particles. A serial birth position has
+// the density m(x)/M (mask value over mask mass, DrawRandomPosition), which the target's particle
+// intensity m(x)/M cancels. A block's births have the density m(x)/M_b and its proposals pick
+// among its n_b particles, hence the mass share M_b/M; with M_b = M and n_b = n the ratios agree.
+float MetropolisHastingsSampler::BirthRatio() const
+{
+    if (m_Block == nullptr)
+        return m_DeathProb /((m_BirthProb)*(m_ParticleGrid->m_NumParticles+1));
+    return static_cast<float>(m_Block->massShare) * m_DeathProb / (m_BirthProb*(NumParticles()+1));
+}
+
+float MetropolisHastingsSampler::DeathRatio() const
+{
+    if (m_Block == nullptr)
+        return m_ParticleGrid->m_NumParticles * (m_BirthProb) /(m_DeathProb);
+    return NumParticles() * m_BirthProb / m_DeathProb / static_cast<float>(m_Block->massShare);
+}
+
+int MetropolisHastingsSampler::NumParticles() const
+{
+    return m_Block == nullptr ? m_ParticleGrid->m_NumParticles : static_cast<int>(m_Block->particles.size());
+}
+
+Particle* MetropolisHastingsSampler::PickParticle(int pnum)
+{
+    return m_ParticleGrid->GetParticle(m_Block == nullptr ? pnum : m_Block->particles[pnum]);
+}
+
+int& MetropolisHastingsSampler::ConnectionCount()
+{
+    return m_Block == nullptr ? m_ParticleGrid->m_NumConnections : m_Block->connectionChange;
+}
+
+bool MetropolisHastingsSampler::OutsideBlock(const vnl_vector_fixed<float, 3>& R)
+{
+    if (m_Block == nullptr || m_ParticleGrid->InBlock(R, *m_Block))
+        return false;
+    m_Block->writeRejections++;
+    m_LeftBlock = true;
+    return true;
+}
+
+bool MetropolisHastingsSampler::OutsideBlock(const Particle* p)
+{
+    if (m_Block == nullptr || m_ParticleGrid->InBlock(p, *m_Block))
+        return false;
+    m_Block->writeRejections++;
+    m_LeftBlock = true;
+    return true;
+}
+
+bool MetropolisHastingsSampler::ReadOutsideBlock()
+{
+    if (m_Block == nullptr || !m_Block->readOutside)
+        return false;
+    m_Block->readRejections++;
+    return true;
+}
+
 // add small random number drawn from gaussian to each vector element
 void MetropolisHastingsSampler::DistortVector(float sigma, vnl_vector_fixed<float, 3>& vec)
 {
@@ -78,26 +148,37 @@ vnl_vector_fixed<float, 3> MetropolisHastingsSampler::GetRandomDirection()
 void MetropolisHastingsSampler::MakeProposal()
 {
     float randnum = m_RandGen->GetVariate();
+    if (m_Block != nullptr)
+        m_Block->readOutside = false;
 
     // Birth Proposal
     if (randnum < m_BirthProb)
     {
         vnl_vector_fixed<float, 3> R;
-        m_EnergyComputer->DrawRandomPosition(R);
+        if (m_Block == nullptr)
+            m_EnergyComputer->DrawRandomPosition(R);
+        else if (m_Block->birthCells.empty())
+            return;     // no mask in the block
+        else
+            m_CellMasses->DrawPosition(*m_Block, *m_RandGen, R);
+        if (OutsideBlock(R))
+            return;
         vnl_vector_fixed<float, 3> N = GetRandomDirection();
         Particle prop;
         prop.GetPos() = R;
         prop.GetDir() = N;
 
-        float prob =  m_DeathProb /((m_BirthProb)*(m_ParticleGrid->m_NumParticles+1));
+        float prob = BirthRatio();
 
         float ex_energy = m_EnergyComputer->ComputeExternalEnergy(R,N,nullptr);
         float in_energy = m_EnergyComputer->ComputeInternalEnergy(&prop);
         prob *= exp((in_energy/m_InTemp+ex_energy/m_ExTemp)) ;
+        if (ReadOutsideBlock())
+            return;
 
         if (prob > 1 || m_RandGen->GetVariate() < prob)
         {
-            Particle *p = m_ParticleGrid->NewParticle(R);
+            Particle *p = m_Block == nullptr ? m_ParticleGrid->NewParticle(R) : m_ParticleGrid->NewBlockParticle(R, *m_Block);
             if (p!=nullptr)
             {
                 p->GetPos() = R;
@@ -109,20 +190,25 @@ void MetropolisHastingsSampler::MakeProposal()
     // Death Proposal
     else if (randnum < m_BirthProb+m_DeathProb)
     {
-        if (m_ParticleGrid->m_NumParticles > 0)
+        if (NumParticles() > 0)
         {
-            int pnum = m_RandGen->GetIntegerVariate()%m_ParticleGrid->m_NumParticles;
-            Particle *dp = m_ParticleGrid->GetParticle(pnum);
+            int pnum = m_RandGen->GetIntegerVariate()%NumParticles();
+            Particle *dp = PickParticle(pnum);
             if (dp->pID == -1 && dp->mID == -1)
             {
                 float ex_energy = m_EnergyComputer->ComputeExternalEnergy(dp->GetPos(),dp->GetDir(),dp);
                 float in_energy = m_EnergyComputer->ComputeInternalEnergy(dp);
 
-                float prob = m_ParticleGrid->m_NumParticles * (m_BirthProb) /(m_DeathProb);
+                float prob = DeathRatio();
                 prob *= exp(-(in_energy/m_InTemp+ex_energy/m_ExTemp)) ;
+                if (ReadOutsideBlock())
+                    return;
                 if (prob > 1 || m_RandGen->GetVariate() < prob)
                 {
-                    m_ParticleGrid->RemoveParticle(pnum);
+                    if (m_Block == nullptr)
+                        m_ParticleGrid->RemoveParticle(pnum);
+                    else
+                        m_ParticleGrid->RemoveBlockParticle(pnum, *m_Block);
                     m_AcceptedProposals++;
                 }
             }
@@ -131,15 +217,17 @@ void MetropolisHastingsSampler::MakeProposal()
     // Shift Proposal
     else  if (randnum < m_BirthProb+m_DeathProb+m_ShiftProb)
     {
-        if (m_ParticleGrid->m_NumParticles > 0)
+        if (NumParticles() > 0)
         {
-            int pnum = m_RandGen->GetIntegerVariate()%m_ParticleGrid->m_NumParticles;
-            Particle *p =  m_ParticleGrid->GetParticle(pnum);
+            int pnum = m_RandGen->GetIntegerVariate()%NumParticles();
+            Particle *p =  PickParticle(pnum);
             Particle prop_p = *p;
 
             DistortVector(m_Sigma, prop_p.GetPos());
             DistortVector(m_Sigma/(2*m_ParticleLength), prop_p.GetDir());
             prop_p.GetDir().normalize();
+            if (OutsideBlock(prop_p.GetPos()))
+                return;
 
 
             float ex_energy = m_EnergyComputer->ComputeExternalEnergy(prop_p.GetPos(),prop_p.GetDir(),p)
@@ -147,13 +235,15 @@ void MetropolisHastingsSampler::MakeProposal()
             float in_energy = m_EnergyComputer->ComputeInternalEnergy(&prop_p) - m_EnergyComputer->ComputeInternalEnergy(p);
 
             float prob = exp(ex_energy/m_ExTemp+in_energy/m_InTemp);
+            if (ReadOutsideBlock())
+                return;
             if (m_RandGen->GetVariate() < prob)
             {
                 vnl_vector_fixed<float, 3> Rtmp = p->GetPos();
                 vnl_vector_fixed<float, 3> Ntmp = p->GetDir();
                 p->GetPos() = prop_p.GetPos();
                 p->GetDir() = prop_p.GetDir();
-                if (!m_ParticleGrid->TryUpdateGrid(pnum))
+                if (m_Block == nullptr ? !m_ParticleGrid->TryUpdateGrid(pnum) : !m_ParticleGrid->TryUpdateGrid(p->ID, m_Block->cellOverflows))
                 {
                     p->GetPos() = Rtmp;
                     p->GetDir() = Ntmp;
@@ -165,14 +255,16 @@ void MetropolisHastingsSampler::MakeProposal()
     // Optimal Shift Proposal
     else  if (randnum < m_BirthProb+m_DeathProb+m_ShiftProb+m_OptShiftProb)
     {
-        if (m_ParticleGrid->m_NumParticles > 0)
+        if (NumParticles() > 0)
         {
-            int pnum = m_RandGen->GetIntegerVariate()%m_ParticleGrid->m_NumParticles;
-            Particle *p =  m_ParticleGrid->GetParticle(pnum);
+            int pnum = m_RandGen->GetIntegerVariate()%NumParticles();
+            Particle *p =  PickParticle(pnum);
 
             Particle prop_p = *p;
             if (ComputeOptimalShift(p, prop_p))
             {
+                if (OutsideBlock(prop_p.GetPos()))
+                    return;
                 float cos = dot_product(prop_p.GetDir(), p->GetDir());
                 float p_rev = exp(-((prop_p.GetPos()-p->GetPos()).squared_magnitude() + (1-cos*cos))*m_Gamma)/m_Z;
 
@@ -181,6 +273,8 @@ void MetropolisHastingsSampler::MakeProposal()
                 float in_energy = m_EnergyComputer->ComputeInternalEnergy(&prop_p) - m_EnergyComputer->ComputeInternalEnergy(p);
 
                 float prob = exp(ex_energy/m_ExTemp+in_energy/m_InTemp)*m_ShiftProb*p_rev/(m_OptShiftProb+m_ShiftProb*p_rev);
+                if (ReadOutsideBlock())
+                    return;
 
                 if (m_RandGen->GetVariate() < prob)
                 {
@@ -188,7 +282,7 @@ void MetropolisHastingsSampler::MakeProposal()
                     vnl_vector_fixed<float, 3> Ntmp = p->GetDir();
                     p->GetPos() = prop_p.GetPos();
                     p->GetDir() = prop_p.GetDir();
-                    if (!m_ParticleGrid->TryUpdateGrid(pnum))
+                    if (m_Block == nullptr ? !m_ParticleGrid->TryUpdateGrid(pnum) : !m_ParticleGrid->TryUpdateGrid(p->ID, m_Block->cellOverflows))
                     {
                         p->GetPos() = Rtmp;
                         p->GetDir() = Ntmp;
@@ -201,19 +295,26 @@ void MetropolisHastingsSampler::MakeProposal()
     // Connection Proposal
     else
     {
-        if (m_ParticleGrid->m_NumParticles > 0)
+        if (NumParticles() > 0)
         {
-            int pnum = m_RandGen->GetIntegerVariate()%m_ParticleGrid->m_NumParticles;
-            Particle *p = m_ParticleGrid->GetParticle(pnum);
+            int pnum = m_RandGen->GetIntegerVariate()%NumParticles();
+            Particle *p = PickParticle(pnum);
 
             EndPoint P;
             P.p = p;
             P.ep = (m_RandGen->GetVariate() > 0.5)? 1 : -1; // direction of the new tract
 
             RemoveAndSaveTrack(P);  // remove old tract and save it for later
-            if (m_BackupTrack.m_Probability != 0)
+            if (m_LeftBlock || ReadOutsideBlock())
+                ImplementTrack(m_BackupTrack);
+            else if (m_BackupTrack.m_Probability != 0)
             {
                 MakeTrackProposal(P);   // propose new tract starting from P
+                if (m_LeftBlock || ReadOutsideBlock())
+                {
+                    ImplementTrack(m_BackupTrack);
+                    return;
+                }
 
                 float prob = (m_ProposalTrack.m_Energy-m_BackupTrack.m_Energy)/m_InTemp ;
 
@@ -274,7 +375,7 @@ bool MetropolisHastingsSampler::ComputeOptimalShift(Particle* p, Particle& prop_
 void MetropolisHastingsSampler::ImplementTrack(Track &T)
 {
     for (int k = 1; k < T.m_Length;k++)
-        m_ParticleGrid->CreateConnection(T.track[k-1].p,T.track[k-1].ep,T.track[k].p,-T.track[k].ep);
+        m_ParticleGrid->CreateConnection(T.track[k-1].p,T.track[k-1].ep,T.track[k].p,-T.track[k].ep,ConnectionCount());
 }
 
 // remove pending track from random particle, save it in m_BackupTrack and calculate its probability
@@ -287,6 +388,7 @@ void MetropolisHastingsSampler::RemoveAndSaveTrack(EndPoint P)
     m_BackupTrack.track.clear();
     m_BackupTrack.track.push_back(Current);
     EndPoint Next;
+    m_LeftBlock = false;
 
     for (;;)
     {
@@ -296,8 +398,10 @@ void MetropolisHastingsSampler::RemoveAndSaveTrack(EndPoint P)
             if (Current.p->pID != -1)
             {
                 Next.p = m_ParticleGrid->GetParticle(Current.p->pID);
+                if (OutsideBlock(Next.p))   // before anything is unlinked
+                    break;
                 Current.p->pID = -1;
-                m_ParticleGrid->m_NumConnections--;
+                ConnectionCount()--;
             }
         }
         else if (Current.ep == -1)
@@ -305,8 +409,10 @@ void MetropolisHastingsSampler::RemoveAndSaveTrack(EndPoint P)
             if (Current.p->mID != -1)
             {
                 Next.p = m_ParticleGrid->GetParticle(Current.p->mID);
+                if (OutsideBlock(Next.p))
+                    break;
                 Current.p->mID = -1;
-                m_ParticleGrid->m_NumConnections--;
+                ConnectionCount()--;
             }
         }
         else
@@ -365,6 +471,7 @@ void MetropolisHastingsSampler::MakeTrackProposal(EndPoint P)
     m_ProposalTrack.track.push_back(Current);
     cnt++;
     Current.p->label = 1;
+    m_LeftBlock = false;
 
     for (;;)
     {
@@ -385,6 +492,8 @@ void MetropolisHastingsSampler::MakeTrackProposal(EndPoint P)
             break;
 
         EndPoint Next = m_SimpSamp.objs[k];
+        if (OutsideBlock(Next.p))
+            break;
         float probability = m_SimpSamp.probFor(k);
 
         // accumulate energy and proposal distribution

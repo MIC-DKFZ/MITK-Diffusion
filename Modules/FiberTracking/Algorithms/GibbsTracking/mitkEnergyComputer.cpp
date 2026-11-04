@@ -108,6 +108,11 @@ void EnergyComputer::SetRandGen(ItkRandGenType* randGen)
     m_RandGen = randGen;
 }
 
+void EnergyComputer::SetBlock(GibbsBlock* block)
+{
+    m_Neighbors.block = block;
+}
+
 // draw random position from active voxels
 void EnergyComputer::DrawRandomPosition(vnl_vector_fixed<float, 3>& R)
 {
