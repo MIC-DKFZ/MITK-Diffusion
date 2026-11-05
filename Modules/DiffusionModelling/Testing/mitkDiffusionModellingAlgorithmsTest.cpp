@@ -102,6 +102,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(MaximaExtraction_RecordedOutput);
   MITK_TEST(MaximaExtraction_SyntheticOdfs_FibreDirections);
   MITK_TEST(MaximaExtraction_WorkUnits_SameResult);
+  MITK_TEST(MaximaExtraction_PeaksAreLocalMaxima);
   MITK_TEST(Filters_OutputTakenBeforeUpdate_GetsResult);
   MITK_TEST(EigenvalueCorrection_RecordedOutput);
   CPPUNIT_TEST_SUITE_END();
@@ -1205,7 +1206,8 @@ public:
   }
 
   // Peaks of sh_image_test.nii.gz, summarized per component, with the number of peaks and the 4D
-  // geometry. Its 244 isotropic voxels have no peak, each axis of the others one.
+  // geometry. Its 244 isotropic voxels have no peak, each axis of the others one. Recorded from the
+  // refinement by mitk::ShEvaluator::FindLocalMaximum.
   void MaximaExtraction_RecordedOutput()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
@@ -1227,9 +1229,9 @@ public:
     itk::ImageRegionConstIterator<MaskImageType> itNum(filter->GetNumDirectionsImage(), filter->GetNumDirectionsImage()->GetLargestPossibleRegion());
     for (; !itNum.IsAtEnd(); ++itNum)
       numPeaks += itNum.Get();
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(58.92215708270669, sums[0], 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.298910463810898, sums[1], 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(16.957745654814062, sums[2], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(59.161808622768149, sums[0], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.060348113998771, sums[1], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(17.266059563025919, sums[2], 1e-6);
     CPPUNIT_ASSERT_EQUAL(76u, numPeaks);
 
     CPPUNIT_ASSERT(filter->GetNumDirectionsImage()->GetLargestPossibleRegion() == coefficients->GetLargestPossibleRegion());
@@ -1275,7 +1277,8 @@ public:
   // ODFs of known fibre configurations: each fibre gives exactly one peak, and an isotropic ODF,
   // where every sampled direction is a maximum, gives none. The fibres are rotated off the axes of
   // the ODF direction table, whose 252 directions are about 13 degrees apart; the refined peaks
-  // are within 0.11 degrees of the fibres, 0.64 for the 60-degree crossing, whose lobes overlap.
+  // are within 0.1 degrees of the fibres, 0.62 for the 60-degree crossing, whose lobes overlap.
+  // These are the maxima of the order-8 fit, not exactly the fibre directions.
   void MaximaExtraction_SyntheticOdfs_FibreDirections()
   {
     const Direction e1 = Direction(1, 2, 3).normalize();
@@ -1326,17 +1329,15 @@ public:
     }
   }
 
-  // The peak refinement (L-BFGS-B) runs in every work unit at once only because the cost
-  // evaluation releases the lock that guards netlib's static state; the peaks of one and of eight
-  // work units must be the same bit for bit. A block of the white matter of the CSD image keeps
-  // the Debug test short.
-  void MaximaExtraction_WorkUnits_SameResult()
+  /** Order-8 coefficients of the CSD image and a mask of a block of its white matter, which keeps
+    * the Debug tests short. */
+  static itk::Image<itk::Vector<float, 45>, 3>::Pointer CsdBlock(MaskImageType::Pointer &mask)
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
     auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image_sh.nii.gz"), &functor);
     auto coefficients = mitk::convert::GetItkShFromShImage<45>(shImage.GetPointer());
 
-    auto mask = MaskImageType::New();
+    mask = MaskImageType::New();
     mask->CopyInformation(coefficients);
     mask->SetRegions(coefficients->GetLargestPossibleRegion());
     mask->Allocate();
@@ -1345,6 +1346,15 @@ public:
       for (itk::IndexValueType y = 24; y < 36; ++y)
         for (itk::IndexValueType x = 24; x < 36; ++x)
           mask->SetPixel({{x, y, z}}, 1);
+    return coefficients;
+  }
+
+  // The work units refine their peaks at once, each on its own; the peaks of one and of eight
+  // work units must be the same bit for bit.
+  void MaximaExtraction_WorkUnits_SameResult()
+  {
+    MaskImageType::Pointer mask;
+    auto coefficients = CsdBlock(mask);
 
     using FilterType = itk::OdfMaximaExtractionFilter<float, 8, ODF_SAMPLING_SIZE>;
     std::vector<FilterType::Pointer> filters;
@@ -1373,6 +1383,56 @@ public:
     itk::ImageRegionConstIterator<PeakImageType> itParallelPeaks(filters[1]->GetPeakImage(), filters[1]->GetPeakImage()->GetLargestPossibleRegion());
     for (; !itSerialPeaks.IsAtEnd(); ++itSerialPeaks, ++itParallelPeaks)
       CPPUNIT_ASSERT_EQUAL(itSerialPeaks.Get(), itParallelPeaks.Get());
+  }
+
+  // Every refined peak is a local maximum of the SH function: its length (NO_NORM: the SH value)
+  // is the evaluator's value at its direction, and no direction 0.1 degree around it is higher.
+  // L-BFGS-B, which this refinement replaced, stopped up to 3 degrees early.
+  void MaximaExtraction_PeaksAreLocalMaxima()
+  {
+    MaskImageType::Pointer mask;
+    auto coefficients = CsdBlock(mask);
+
+    using FilterType = itk::OdfMaximaExtractionFilter<float, 8, ODF_SAMPLING_SIZE>;
+    auto filter = FilterType::New();
+    filter->SetInput(coefficients);
+    filter->SetMaskImage(mask);
+    filter->SetMaxNumPeaks(3);
+    filter->SetNormalizationMethod(FilterType::NO_NORM);
+    filter->Update();
+
+    const mitk::ShEvaluator evaluator(8, true);
+    const double angle = 0.1 * itk::Math::pi / 180;
+    unsigned int checked = 0;
+    std::vector<double> c(45);
+    itk::ImageRegionConstIteratorWithIndex<MaskImageType> it(filter->GetNumDirectionsImage(), filter->GetNumDirectionsImage()->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+    {
+      const auto voxel = it.GetIndex();
+      for (unsigned int j = 0; j < 45; ++j)
+        c[j] = coefficients->GetPixel(voxel)[j];
+      for (unsigned int p = 0; p < it.Get(); ++p)
+      {
+        Direction peak;
+        for (unsigned int k = 0; k < 3; ++k)
+          peak[k] = filter->GetPeakImage()->GetPixel({{voxel[0], voxel[1], voxel[2], 3 * p + k}});
+        const double length = peak.magnitude();
+        const Direction u = peak / length;
+        const double value = evaluator.GetValue(c.data(), u);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, length, 1e-6 * value);
+
+        const Direction e1 = vnl_cross_3d(u, std::fabs(u[0]) < 0.6 ? Direction(1, 0, 0) : Direction(0, 1, 0)).normalize();
+        const Direction e2 = vnl_cross_3d(u, e1);
+        for (unsigned int i = 0; i < 8; ++i)
+        {
+          const double phi = i * itk::Math::pi / 4;
+          const Direction around = std::cos(angle) * u + std::sin(angle) * (std::cos(phi) * e1 + std::sin(phi) * e2);
+          CPPUNIT_ASSERT(evaluator.GetValue(c.data(), around) <= value);
+        }
+        ++checked;
+      }
+    }
+    CPPUNIT_ASSERT(checked > 300);
   }
 
   // Three filters replaced their primary output during the update, so an output taken before

@@ -553,8 +553,8 @@ public:
 
   // The peaks follow the SH convention stored in the image (PL-M5): the same ODFs in the FSL
   // convention give the same peaks, the FSL coefficients read as MRtrix ones do not (0.55 apart).
-  // The gradient descent that refines each peak (f tolerance 1e-6) stops up to 0.05 (3 degrees)
-  // apart on the broad lobes of this image when the coefficients differ in the last bits.
+  // The refined peaks are local maxima, so coefficients that differ in the last bits move them
+  // only by float rounding (3e-8 measured).
   void Peaks_FslConvention_SameAsMrtrix()
   {
     auto mrtrixImage = LoadShImage();
@@ -566,17 +566,17 @@ public:
 
     const auto expected = mitk::ExtractPeaks(mrtrixImage, parameters, mask);
     const auto actual = mitk::ExtractPeaks(fslImage, parameters, mask);
-    CPPUNIT_ASSERT(PeakDifference(expected.peaks, actual.peaks) < 0.1);
+    CPPUNIT_ASSERT(PeakDifference(expected.peaks, actual.peaks) < 1e-5);
 
     fslImage->SetShConvention(mitk::ShImage::MRTRIX);
     const auto misread = mitk::ExtractPeaks(fslImage, parameters, mask);
     CPPUNIT_ASSERT(PeakDifference(expected.peaks, misread.peaks) > 0.1);
   }
 
-  // Of two peak candidates closer than the angular threshold only the larger is kept, also when
-  // both have exactly the same length, as the two opposite (antipodal) candidates of one axis in
-  // voxel (6, 4, 1) in MITK's convention. Isotropic voxels (the background, whose coefficients
-  // other than the first are 1e-8 of it) have no peak.
+  // Of two peak candidates closer than the angular threshold only the larger is kept, and of the
+  // two opposite (antipodal) candidates of one axis only one is refined, as in voxel (6, 4, 1) in
+  // MITK's convention. Isotropic voxels (the background, whose coefficients other than the first
+  // are 1e-8 of it) have no peak.
   void Peaks_EachAxisOnce()
   {
     auto mrtrixImage = LoadShImage();
