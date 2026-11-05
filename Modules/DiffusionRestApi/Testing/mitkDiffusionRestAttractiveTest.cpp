@@ -39,6 +39,7 @@ class mitkDiffusionRestAttractiveTestSuite : public DiffusionRestTestFixture
   MITK_TEST(Spheres_EnrichTheInitialSample);
   MITK_TEST(WrongInput_400_404);
   MITK_TEST(SecondTraining_409);
+  MITK_TEST(Overview_RecommendsAtTRACTive);
   CPPUNIT_TEST_SUITE_END();
 
   using Point = std::array<double, 3>;
@@ -307,6 +308,15 @@ public:
     for (const auto& [method, suffix] : std::vector<std::pair<std::string, std::string>>{
            { "GET", "" }, { "DELETE", "" }, { "POST", "/sample" }, { "POST", "/labels" }, { "POST", "/train" }, { "POST", "/finish" } })
       CPPUNIT_ASSERT_EQUAL(404, ErrorStatus(method, "/diffusion/attractive/sessions/99" + suffix));
+  }
+
+  /** The overview names atTRACTive as the way to a single tract and its manual page. */
+  void Overview_RecommendsAtTRACTive()
+  {
+    const auto overview = Call("GET", "/diffusion");
+    const auto pages = overview.at("manual_pages").get<std::vector<std::string>>();
+    CPPUNIT_ASSERT(std::find(pages.begin(), pages.end(), "atTRACTive") != pages.end());
+    CPPUNIT_ASSERT(overview.at("workflow").get<std::string>().find("/api/v1/diffusion/attractive/sessions") != std::string::npos);
   }
 
   /** While a training runs, the session answers 409 to a second training and to labels. */

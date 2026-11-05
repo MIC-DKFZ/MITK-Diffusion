@@ -38,6 +38,45 @@ To delete all annotated fibers and start dissection from scratch, it is possible
 Enable/Disable Workflow Help Messages:
 If the workflow is novel for you, help messages are presented before each action. After some time, they become obsolete, so feel free to disable.
 
+\section SecDissectionTwoSpheres Dissecting a Tract with Two Spheres
+
+atTRACTive is the recommended way to obtain a single tract, in this view as for the Workbench agent (\ref SecDissectionRest): two rough regions and a few rounds of labeling give the tract with its fanning and crossing parts, which ROIs alone lose or mix with neighbouring bundles. Extraction by ROIs (the manual page "Streamline Tractography", section "ROI Strategy") stays the fallback.
+
+1. Two spheres at the tract's two ends, as two labels of one segmentation: one sphere where the tract ends on each side. The recipes of the manual page "Streamline Tractography", section "Recipes for Common Tracts", name the end regions of common tracts; for the corticospinal tract, for example, the cerebral peduncle and the white matter below the precentral gyrus. Each sphere is both start and end region of the fibers, so it has to contain the ends of the tract's fibers: rather too large than too small, a radius of about 8 to 15 mm for a cortical end region and 5 to 8 mm in the brain stem. The classifier removes wrong fibers later, but it cannot add fibers that the tracking did not produce.
+2. Tractography between the spheres: seeds in both spheres, and a fiber is kept only if its two ends lie in the two different spheres. In the Streamline Tractography view: the segmentation with both labels as seed image and as target image, endpoint constraint "Both EPs are required to be located in the target image and the image values at the respective position needs to be distinct". Through the REST API: seed and target {segmentation, labels: [a, b]} and endpoint_constraint "both_in_target_different_labels". Track probabilistically on peaks or on the SH image, so that the fanning parts are covered, with a brain mask and 5 to 20 seeds per voxel (the spheres are small seed regions). A few thousand fibers are enough; with none, the spheres miss the fiber ends: enlarge them or move them deeper into the white matter.
+3. A session on the result: an initial sample, labels, a training, and then uncertain samples and further trainings until the prediction stops changing (\ref SecDissectionStop).
+
+The fibers between the spheres all connect the two regions, so the regions alone do not separate the tract from fibers that take a wrong route between them (through the other hemisphere, the cerebellum or a neighbouring bundle); the labels teach the classifier which routes belong to the tract.
+
+A session also works on a whole-brain tractogram. The two spheres then select the fibers with one end in each, in either direction, and half of every initial sample is drawn from them (in this view the start and end ROI, through the REST API the spheres of the session). A tractogram of more than 80,000 fibers is reduced in the first training to the 20 % of its fibers closest to the positive labels, so label fibers of the tract positive in the first cycle.
+
+\section SecDissectionDescriptors Labeling by Descriptors
+
+Without a mouse, a fiber is judged from its description. The REST API describes every sampled fiber by its id, its length in millimeters, its two ends and five points from end to end at equal distances along it (world coordinates in millimeters, as the sphere centres), and, with a landmark segmentation, the names of the labels it ends in at each end and of all labels it touches. A screenshot of the node "ToLabel" shows the sample as a whole; the descriptions judge each fiber.
+
+- A fiber of the tract has one end in each end region of the tract, runs the tract's course between them (compare the five points with it: the corticospinal tract runs superior-inferior through the posterior limb of the internal capsule, the arcuate fasciculus arches around the Sylvian fissure), and has about the tract's length.
+- Landmark labels make the judgement explicit. Draw them as labels of a segmentation (spheres or polygons, POST /api/v1/diffusion/rois): at the tract's stem, a region every fiber of the tract passes (the posterior limb of the internal capsule for the corticospinal tract), and where wrong fibers go (the midsagittal plane, the middle cerebellar peduncle, the corpus callosum, a neighbouring bundle). A fiber that ends in both end regions and passes the stem is positive; a fiber that touches the landmark of a wrong route is negative.
+- Label clear cases only and leave doubtful fibers unlabeled: a wrong label moves the classifier's boundary, an unlabeled fiber only comes back in a later sample. Label fibers of both classes; the first training needs at least one positive and one negative label.
+- After a training, a description says whether the classifier puts the fiber into the tract. A fiber of the prediction that does not belong to the tract is labeled negative and leaves the tract at the next training; a missed fiber of the tract is labeled positive.
+
+\section SecDissectionStop When to Stop
+
+Every training reports changed_fraction: the fibers that entered or left the prediction since the last training, relative to the fibers of either prediction (1 after the first training). Stop when changed_fraction stays small, below about 0.05 (5 %), over two trainings and a screenshot of the prediction shows no fibers outside the tract; then save the prediction as the tract. As long as it changes more, sample the most uncertain fibers, label them and train again; three to six cycles of 10 to 20 fibers are typical. A falling number of uncertain fibers (classified with an entropy of at least 0.95) is a further sign that the classifier has settled. The value of 0.05 and the two quiet trainings are provisional; trials on real data will adjust them.
+
+\section SecDissectionRest REST Endpoints
+
+The REST API of the Workbench (the REST API view; the Agent view works through it) offers the sessions of this view below /api/v1/diffusion/attractive, labeled by fiber id instead of the brush. A session of the API is independent of this view: its nodes ("ToLabel", "+Bundle", "-Bundle", "Prediction<n>") appear below the tractogram in the Data Manager, but the view does not continue it. GET /api/v1/endpoints?path=/api/v1/diffusion/attractive&details=true describes every parameter.
+
+- POST /api/v1/diffusion/attractive/sessions: starts a session on a tractogram as a job (resampling, prototypes), with an optional seed (the same samples and predictions at every run), the two spheres for a whole-brain tractogram, and a landmark segmentation.
+- GET /api/v1/diffusion/attractive/sessions and GET .../sessions/{id}: the sessions, and the state of one: labels, trainings, the numbers of the last training, its nodes.
+- POST .../sessions/{id}/sample: fibers to label, "initial", "uncertain" or "diverse", with their descriptions (\ref SecDissectionDescriptors), shown as "ToLabel".
+- POST .../sessions/{id}/labels: positive, negative and unlabel by fiber id, shown as "+Bundle" and "-Bundle".
+- POST .../sessions/{id}/train: trains the classifier and predicts the tract as a job; adds "Prediction<n>" and reports changed_fraction (\ref SecDissectionStop).
+- POST .../sessions/{id}/finish: the prediction as a tract with the tractogram's own fibers at full resolution.
+- DELETE .../sessions/{id}: ends the session and removes "ToLabel", "+Bundle" and "-Bundle"; predictions and tracts stay.
+
+\section SecDissectionReferences References
+
 [1] Peretzke, R. (2023). atTRACTive: Semi-automatic white matter tract segmentation using active learning. Proceedings of the 26th International Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI 2023) (pp. 123-135). Springer.
 [2] Olivetti, E., Avesani, P.: Supervised segmentation of fiber tracts. In: International Workshop on Similarity-Based Pattern Recognition. pp. 261–274. Springer (2011)
 
