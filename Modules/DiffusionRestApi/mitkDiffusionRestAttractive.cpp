@@ -171,7 +171,8 @@ namespace
 
     for (const auto& value : body[key])
     {
-      if (!value.is_number_integer() || value.get<long long>() < 0)
+      // A larger value would wrap around to another fiber's id.
+      if (!value.is_number_integer() || value.get<long long>() < 0 || value.get<long long>() > 0xffffffffLL)
         ThrowInvalid(std::string("\"") + key + "\" holds " + value.dump() + ", which is no fiber id.", path);
 
       ids.push_back(value.get<unsigned int>());

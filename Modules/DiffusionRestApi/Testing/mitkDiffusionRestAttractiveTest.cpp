@@ -294,6 +294,7 @@ public:
     CPPUNIT_ASSERT_EQUAL(400, ErrorStatus("POST", path + "/labels", { { "positive", { 180 } } }));
     CPPUNIT_ASSERT_EQUAL(400, ErrorStatus("POST", path + "/labels", { { "positive", { 1, 2 } }, { "negative", { 2 } } }));
     CPPUNIT_ASSERT_EQUAL(400, ErrorStatus("POST", path + "/labels", { { "positive", { -1 } } }));
+    CPPUNIT_ASSERT_EQUAL(400, ErrorStatus("POST", path + "/labels", { { "positive", { 4294967301LL } } }));
     CPPUNIT_ASSERT_EQUAL(400, ErrorStatus("POST", path + "/labels", { { "positive", "1" } }));
     CPPUNIT_ASSERT_EQUAL(0u, Call("GET", path).at("positives").get<unsigned int>());
 
