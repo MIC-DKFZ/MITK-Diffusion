@@ -183,6 +183,31 @@ mitk::Image::Pointer mitk::diffusionrest::MaskOfLabels(const MultiLabelSegmentat
   return keepLabelValues ? ::MaskOfLabels<Label::PixelType>(segmentation, labels, true) : ::MaskOfLabels<unsigned char>(segmentation, labels, false);
 }
 
+mitk::FiberBundle::Pointer mitk::diffusionrest::Extract(const FiberBundle* fibers, itk::Image<float, 3>* roi, itk::FiberExtractionFilter<float>::MODE mode, bool bothEnds,
+                                                         float overlapFraction, float threshold, bool interpolate, bool negatives)
+{
+  if (fibers->GetNumFibers() == 0)
+    return FiberBundle::New();
+
+  auto extractor = itk::FiberExtractionFilter<float>::New();
+  extractor->SetInputFiberBundle(fibers);
+  extractor->SetRoiImages({ roi });
+  extractor->SetMode(mode);
+  extractor->SetBothEnds(bothEnds);
+  extractor->SetOverlapFraction(overlapFraction);
+  extractor->SetThreshold(threshold);
+  extractor->SetInterpolate(interpolate);
+
+  if (negatives)
+    extractor->SetNoPositives(true);
+  else
+    extractor->SetNoNegatives(true);
+
+  extractor->Update();
+  const auto result = negatives ? extractor->GetNegatives() : extractor->GetPositives();
+  return result.empty() || result.front().IsNull() ? FiberBundle::New() : result.front();
+}
+
 mitk::DataNode::Pointer mitk::diffusionrest::AddResultNode(const IRestServerService& server, BaseData* data, DataNode* parent, const std::string& suffix)
 {
   auto dataStorage = server.GetDataStorage();

@@ -39,6 +39,12 @@ namespace mitk::diffusionrest
 
   /** \brief /diffusion/tractography/extract and /metrics: fibers by ROIs, numbers about a tractogram. */
   void AddExtractionRoutes(std::vector<RestRoute>& routes, IRestServerService* server, const std::shared_ptr<JobRunner>& jobs);
+
+  /**
+   * \brief The /diffusion/attractive endpoints: atTRACTive sessions that dissect a tract by labeling
+   *        fibers and training a classifier. Built only with FiberDissection (MITK_DIFFUSION_REST_ATTRACTIVE).
+   */
+  void AddAttractiveRoutes(std::vector<RestRoute>& routes, IRestServerService* server, const std::shared_ptr<JobRunner>& jobs);
 }
 
 #endif

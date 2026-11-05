@@ -14,11 +14,14 @@ found in the LICENSE file.
 #define mitkDiffusionRestUtil_h
 
 #include <mitkDataNode.h>
+#include <mitkFiberBundle.h>
 #include <mitkIRestServerService.h>
 #include <mitkImage.h>
 #include <mitkLabelSetImage.h>
 #include <mitkRestJob.h>
 #include <mitkRestRoute.h>
+
+#include <itkFiberExtractionFilter.h>
 
 #include <nlohmann/json.hpp>
 
@@ -99,6 +102,13 @@ namespace mitk::diffusionrest
    *        labels and 0 elsewhere, or with the label values (label pixel type) with keepLabelValues.
    */
   Image::Pointer MaskOfLabels(const MultiLabelSegmentation* segmentation, const std::vector<MultiLabelSegmentation::LabelValueType>& labels, bool keepLabelValues = false);
+
+  /**
+   * \brief The fibers positive for the ROI (touching it with at least the fraction of their length
+   *        in OVERLAP mode, ending in it in ENDPOINTS mode), or the negatives.
+   */
+  FiberBundle::Pointer Extract(const FiberBundle* fibers, itk::Image<float, 3>* roi, itk::FiberExtractionFilter<float>::MODE mode, bool bothEnds,
+                               float overlapFraction, float threshold, bool interpolate, bool negatives);
 
   /**
    * \brief A node for data derived from parent, named after it with the suffix, added below parent
