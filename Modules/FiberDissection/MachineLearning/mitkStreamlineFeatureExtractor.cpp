@@ -693,7 +693,16 @@ std::vector<unsigned int> StreamlineFeatureExtractor::SelectDiverseFibers(mitk::
 {
   std::vector<unsigned int> ids(fib->GetFiberPolyData()->GetNumberOfCells());
   std::iota(ids.begin(), ids.end(), 0);
-  std::shuffle(ids.begin(), ids.end(), std::mt19937(std::random_device()()));
+  std::mt19937 engine(std::random_device{}());
+  return SelectDiverseFibers(fib, std::move(ids), count, subsetSize, engine);
+}
+
+std::vector<unsigned int> StreamlineFeatureExtractor::SelectDiverseFibers(mitk::FiberBundle *fib, std::vector<unsigned int> ids, unsigned int count, unsigned int subsetSize, std::mt19937 &engine)
+{
+  if (count == 0 || ids.empty())
+    return {};
+
+  std::shuffle(ids.begin(), ids.end(), engine);
   ids.resize(std::min<std::size_t>(std::max(subsetSize, count), ids.size()));
 
   const FiberMatrix fibers = ToMatrix(fib, ids, "The tractogram");

@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <opencv2/ml.hpp>
 
 #include <cstdint>
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -101,6 +102,12 @@ public:
   * farthest-first traversal on the MDF distance picks the fibers from it. All fibers need NumPoints points.
   */
   static std::vector<unsigned int> SelectDiverseFibers(mitk::FiberBundle *fib, unsigned int count, unsigned int subsetSize);
+
+  /**
+  * As above, among the fibers 'ids' of the bundle and with the caller's random engine: a seeded engine gives
+  * the same selection at every run (ActiveLearningSession with a seed).
+  */
+  static std::vector<unsigned int> SelectDiverseFibers(mitk::FiberBundle *fib, std::vector<unsigned int> ids, unsigned int count, unsigned int subsetSize, std::mt19937 &engine);
 
 protected:
 

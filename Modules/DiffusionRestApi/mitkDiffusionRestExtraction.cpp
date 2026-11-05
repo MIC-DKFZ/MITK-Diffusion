@@ -16,7 +16,6 @@ found in the LICENSE file.
 #include <mitkFiberBundle.h>
 #include <mitkImageCast.h>
 
-#include <itkFiberExtractionFilter.h>
 #include <itkTractDensityImageFilter.h>
 
 #include <cmath>
@@ -71,35 +70,6 @@ namespace
     }
 
     return rois;
-  }
-
-  /**
-   * The fibers positive for the ROI (touching it with at least the fraction of their length in
-   * OVERLAP mode, ending in it in ENDPOINTS mode), or the negatives.
-   */
-  mitk::FiberBundle::Pointer Extract(const mitk::FiberBundle* fibers, FloatImage* roi, Extractor::MODE mode, bool bothEnds,
-                                     float overlapFraction, float threshold, bool interpolate, bool negatives)
-  {
-    if (fibers->GetNumFibers() == 0)
-      return mitk::FiberBundle::New();
-
-    auto extractor = Extractor::New();
-    extractor->SetInputFiberBundle(fibers);
-    extractor->SetRoiImages({ roi });
-    extractor->SetMode(mode);
-    extractor->SetBothEnds(bothEnds);
-    extractor->SetOverlapFraction(overlapFraction);
-    extractor->SetThreshold(threshold);
-    extractor->SetInterpolate(interpolate);
-
-    if (negatives)
-      extractor->SetNoPositives(true);
-    else
-      extractor->SetNoNegatives(true);
-
-    extractor->Update();
-    const auto result = negatives ? extractor->GetNegatives() : extractor->GetPositives();
-    return result.empty() || result.front().IsNull() ? mitk::FiberBundle::New() : result.front();
   }
 
   nlohmann::json Lengths(const mitk::FiberBundle* fibers)
