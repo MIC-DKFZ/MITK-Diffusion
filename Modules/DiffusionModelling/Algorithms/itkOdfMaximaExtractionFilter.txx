@@ -25,7 +25,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkOrientationDistributionFunction.h>
 #include <itkContinuousIndex.h>
 #include <mitkImageGeometry4D.h>
-#include <mitkLbfgsbMutex.h>
 
 #include <limits>
 
@@ -52,7 +51,7 @@ OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   , m_FlipZ(false)
   , m_ApplyDirectionMatrix(false)
   , m_ScaleByGfa(false)
-  , m_Iterations(10)
+  , m_Iterations(100)
 {
   this->SetNumberOfRequiredInputs(1);
 
@@ -89,7 +88,20 @@ double OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
         }
       if (flag)   // point is a peak
       {
-        container.push_back(odf.GetDirection(i).normalize());
+        // The SH function is antipodally symmetric, so a candidate opposite one kept before is the
+        // same axis and would be refined again. The table's pairs are antipodal only to about
+        // 1.5e-6, and float rounding can make only one of a pair a sampled maximum, so the pair is
+        // found by direction, not by index.
+        const DirectionType direction = odf.GetDirection(i).normalize();
+        bool antipodal = false;
+        for (const DirectionType &kept : container)
+          if (std::fabs(dot_product(kept, direction)) > 1 - 1e-4)
+          {
+            antipodal = true;
+            break;
+          }
+        if (!antipodal)
+          container.push_back(direction);
         used[i] = true;
         for (unsigned int j=0; j<neighbours.size(); j++)
           used[neighbours.at(j)] = true;
@@ -132,6 +144,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, dir_matrix, true);
   else
     m_ShBasis = mitk::sh::CalcShBasisForDirections(ShOrder, dir_matrix, false);
+  m_ShEvaluator = std::make_unique<mitk::ShEvaluator>(ShOrder, m_Toolkit==Toolkit::MRTRIX);
 
   MITK_INFO << "Starting peak extraction";
   MITK_INFO << "SH order: " << ShOrder;
@@ -166,6 +179,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     ++cit;
   };
   OdfType odf;
+  std::vector<double> coeffs(m_NumCoeffs);
   while( !cit.IsAtEnd() )
   {
     typename CoefficientImageType::IndexType idx3 = cit.GetIndex();
@@ -176,7 +190,6 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     }
 
     CoefficientPixelType c = cit.Get();
-    vnl_vector<float> coeffs; coeffs.set_size((ShOrder*ShOrder + ShOrder + 2)/2 + ShOrder);
     for (int j=0; j<m_NumCoeffs; j++)
       coeffs[j] = c[j];
 
@@ -207,35 +220,10 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     max = 0;
     for (unsigned int i=0; i<candidates.size(); ++i)
     {
-      double spherical[3];
-      mitk::gradients::Cart2Sph(candidates[i][0], candidates[i][1], candidates[i][2], spherical);
-      vnl_vector<double> x;
-      x.set_size(2);
-      x[0] = spherical[1];  // theta
-      x[1] = spherical[0];  // phi
-
-      // The netlib L-BFGS-B code keeps its state in static variables, see mitk::GetLbfgsbMutex().
-      std::unique_lock<std::mutex> lbfgsbLock(mitk::GetLbfgsbMutex(), std::defer_lock);
-      ShCostFunction cost(coeffs, m_Toolkit==Toolkit::MRTRIX, lbfgsbLock);
-
-      vnl_lbfgsb minimizer(cost);
-      minimizer.set_f_tolerance(1e-6);
-//      minimizer.set_trace(true);
-
-      vnl_vector<double> l; l.set_size(2); l[0] = 0; l[1] = -itk::Math::pi;
-      vnl_vector<double> u; u.set_size(2); u[0] = itk::Math::pi; u[1] = itk::Math::pi;
-      vnl_vector<long> bound_selection; bound_selection.set_size(2); bound_selection.fill(2);
-      minimizer.set_bound_selection(bound_selection);
-      minimizer.set_lower_bound(l);
-      minimizer.set_upper_bound(u);
-      if (m_Iterations>0)
-        minimizer.set_max_function_evals(m_Iterations);
-      lbfgsbLock.lock();
-      minimizer.minimize(x);
-      lbfgsbLock.unlock();
-
-      float v = -minimizer.get_end_error()*scale;
-      candidates[i] = mitk::gradients::Sph2Cart(x[0], x[1], v);
+      // Each work unit refines on its own; the evaluator keeps no state.
+      DirectionType dir = candidates[i];
+      const double v = m_ShEvaluator->FindLocalMaximum(coeffs.data(), dir, m_Iterations>0 ? m_Iterations : 0)*scale;
+      candidates[i] = dir*v;
       if (v>max)
         max = v;
     }
@@ -243,8 +231,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     std::sort( candidates.begin(), candidates.end(), CompareVectors );  // sort peaks
 
     // From the largest down, a candidate closer than the angular threshold to a peak kept before
-    // is dropped. Each axis gives two opposite (antipodal) candidates, often of exactly equal
-    // length; only the first of them is kept.
+    // is dropped: two candidates can be refined to the same axis.
     for (const DirectionType &v1 : candidates)
     {
       double val = v1.magnitude();

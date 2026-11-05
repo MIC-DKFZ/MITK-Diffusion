@@ -44,7 +44,7 @@
          <bool>true</bool>
         </property>
         <property name="toolTip">
-         <string>Extract ODF peaks: local maxima on the densely sampled ODF, refined by gradient descent; principal eigenvectors for tensor images.</string>
+         <string>Extract ODF peaks: local maxima on the densely sampled ODF, each refined to a maximum of the SH function; principal eigenvectors for tensor images.</string>
         </property>
         <property name="text">
          <string>Start Peak Extraction</string>

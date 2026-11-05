@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
 
   parser.setCategory("Preprocessing Tools");
   parser.setTitle("Peak Extraction");
-  parser.setDescription("Extract the maxima of the ODFs of a spherical harmonics image (candidates on the ODF directions, refined by L-BFGS-B), as the peak extraction view.");
+  parser.setDescription("Extract the maxima of the ODFs of a spherical harmonics image (candidates on the ODF directions, each refined to a maximum of the SH function by Newton steps), as the peak extraction view.");
   parser.setContributor("MIC");
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);

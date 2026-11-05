@@ -25,6 +25,7 @@ found in the LICENSE file.
 #include <mitkOdfImage.h>
 #include <mitkPeakImage.h>
 #include <mitkPointShell.h>
+#include <mitkShEvaluator.h>
 #include <mitkShImage.h>
 #include <mitkTensorImage.h>
 
@@ -44,6 +45,10 @@ found in the LICENSE file.
 #include <itkTensorImageToOdfImageFilter.h>
 #include <itkTensorToL2NormImageFilter.h>
 #include <itkTensorToRgbImageFilter.h>
+
+#include <boost/math/special_functions/factorials.hpp>
+#include <boost/math/special_functions/legendre.hpp>
+#include <boost/math/special_functions/spherical_harmonic.hpp>
 
 #include <vnl/algo/vnl_svd.h>
 #include <vnl/vnl_cross.h>
@@ -88,6 +93,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(Gfa_MatchesReference);
   MITK_TEST(ShToOdf_MatchesReference);
   MITK_TEST(ShBasis_ConventionsAndEvaluationAgree);
+  MITK_TEST(ShEvaluator_SameAsBasisWithDerivatives);
   MITK_TEST(Convert_WrongImageType_Throws);
   MITK_TEST(RgbFilters_RecordedOutput);
   MITK_TEST(TensorToOdf_RecordedOutput);
@@ -96,6 +102,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(MaximaExtraction_RecordedOutput);
   MITK_TEST(MaximaExtraction_SyntheticOdfs_FibreDirections);
   MITK_TEST(MaximaExtraction_WorkUnits_SameResult);
+  MITK_TEST(MaximaExtraction_PeaksAreLocalMaxima);
   MITK_TEST(Filters_OutputTakenBeforeUpdate_GetsResult);
   MITK_TEST(EigenvalueCorrection_RecordedOutput);
   CPPUNIT_TEST_SUITE_END();
@@ -996,6 +1003,120 @@ public:
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrixBasis(i, j), reconstructionBasis(i, j), 1e-6);
   }
 
+  using Direction = vnl_vector_fixed<double, 3>;
+
+  /** Basis value of index j (order k, m) at (theta, phi) in double, by the definitions of
+    * mitk::sh::Yj, which evaluates in float. */
+  static double DoubleBasisValue(int k, int m, double theta, double phi, bool mrtrix)
+  {
+    const unsigned int a = std::abs(m);
+    if (mrtrix)
+    {
+      const double mag = std::sqrt((2.0 * k + 1.0) / (4.0 * itk::Math::pi) * boost::math::factorial<double>(k - a) / boost::math::factorial<double>(k + a))
+        * boost::math::legendre_p<double>(k, a, -std::cos(theta));
+      return m > 0 ? mag * std::cos(m * phi) : (m == 0 ? mag : mag * std::sin(-m * phi));
+    }
+    if (m < 0)
+      return std::sqrt(2.0) * boost::math::spherical_harmonic_r<double, double>(k, a, theta, phi);
+    if (m == 0)
+      return boost::math::spherical_harmonic_r<double, double>(k, 0, theta, phi);
+    return std::pow(-1.0, m) * std::sqrt(2.0) * boost::math::spherical_harmonic_i<double, double>(k, m, theta, phi);
+  }
+
+  /** Value of the evaluator at the great circle through u in the tangent direction t, at angle s. */
+  static double ValueAlong(const mitk::ShEvaluator &evaluator, const double *c, const Direction &u, const Direction &t, double s)
+  {
+    return evaluator.GetValue(c, std::cos(s) * u + std::sin(s) * t);
+  }
+
+  // The SH evaluator of the peak refinement computes the basis of mitk::sh::Yj in double, with
+  // its gradient and Hessian on the sphere, also at the poles. Value: to float precision against
+  // Yj (which settles the convention signs) and to 1e-10 against the same definitions in double;
+  // derivatives against central differences of its own value along great circles.
+  void ShEvaluator_SameAsBasisWithDerivatives()
+  {
+    std::vector<Direction> directions = {{0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {0, 1, 0}, {-1, 0, 0}, Direction(1, 1, 0).normalize(),
+                                         Direction(1e-7, 0, 1).normalize(), Direction(0, -1e-4, -1).normalize()};
+    const auto sphere = SphereDirections(300);
+    for (unsigned int i = 0; i < sphere.cols(); ++i)
+      directions.push_back(sphere.get_column(i));
+
+    for (unsigned int order = 2; order <= 12; order += 2)
+    {
+      for (bool mrtrix : {true, false})
+      {
+        const mitk::ShEvaluator evaluator(order, mrtrix);
+        const unsigned int numCoeffs = evaluator.GetNumberOfCoefficients();
+        CPPUNIT_ASSERT_EQUAL((order + 1) * (order + 2) / 2, numCoeffs);
+        std::vector<double> c(numCoeffs);
+        double scale = 0;
+        for (unsigned int j = 0; j < numCoeffs; ++j)
+        {
+          c[j] = std::sin(1.0 + j);
+          scale += std::fabs(c[j]);
+        }
+
+        // At both poles only the m = 0 functions are not 0, each sqrt((2k+1)/(4 pi)).
+        double poleValue = 0;
+        for (unsigned int k = 0; k <= order; k += 2)
+          poleValue += c[(k * k + k + 2) / 2 - 1] * std::sqrt((2.0 * k + 1.0) / (4.0 * itk::Math::pi));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(poleValue, evaluator.GetValue(c.data(), Direction(0, 0, 1)), 1e-12 * scale);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(poleValue, evaluator.GetValue(c.data(), Direction(0, 0, -1)), 1e-12 * scale);
+
+        for (const Direction &direction : directions)
+        {
+          double sph[3];
+          mitk::gradients::Cart2Sph(direction[0], direction[1], direction[2], sph);
+          // Yj takes float angles; the evaluator gets the direction of exactly these angles.
+          // float(pi) is above pi, where the polar formulas no longer describe that direction.
+          const float theta = std::min(static_cast<float>(sph[1]), std::nextafter(static_cast<float>(itk::Math::pi), 0.0f));
+          const float phi = static_cast<float>(sph[0]);
+          const Direction u = mitk::gradients::Sph2Cart(theta, phi, 1.0);
+          double yjSum = 0, yjScale = 0, doubleSum = 0;
+          for (unsigned int k = 0, j = 0; k <= order; k += 2)
+          {
+            for (int m = -static_cast<int>(k); m <= static_cast<int>(k); ++m, ++j)
+            {
+              const double yj = mitk::sh::Yj(m, k, theta, phi, mrtrix);
+              yjSum += c[j] * yj;
+              yjScale += std::fabs(c[j] * yj);
+              doubleSum += c[j] * DoubleBasisValue(k, m, theta, phi, mrtrix);
+            }
+          }
+          const double value = evaluator.GetValue(c.data(), u);
+          // The polar formulas take sin(theta) from 1 - cos(theta)^2, which loses digits near the
+          // poles (Yj in float, the reference in double); the evaluator uses x and y.
+          const double sinTheta = std::hypot(u[0], u[1]);
+          if (sinTheta > 0.05)
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(yjSum, value, 1e-6 * yjScale);
+          if (sinTheta > 1e-3)
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(doubleSum, value, 1e-10 * yjScale);
+
+          Direction gradient;
+          mitk::ShEvaluator::Matrix3 hessian;
+          CPPUNIT_ASSERT_EQUAL(value, evaluator.GetValue(c.data(), u, gradient, hessian));
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, dot_product(gradient, u), 1e-12 * scale);
+
+          const Direction e1 = vnl_cross_3d(u, std::fabs(u[0]) < 0.6 ? Direction(1, 0, 0) : Direction(0, 1, 0)).normalize();
+          const Direction e2 = vnl_cross_3d(u, e1);
+          const Direction diagonal = (e1 + e2) / std::sqrt(2.0);
+          for (const Direction &t : {e1, e2, diagonal})
+          {
+            const double h = 1e-5;
+            const double slope = (ValueAlong(evaluator, c.data(), u, t, h) - ValueAlong(evaluator, c.data(), u, t, -h)) / (2 * h);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(slope, dot_product(gradient, t), 1e-6 * scale);
+            const double h2 = 1e-4;
+            const double curvature = (ValueAlong(evaluator, c.data(), u, t, h2) - 2 * value + ValueAlong(evaluator, c.data(), u, t, -h2)) / (h2 * h2);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(curvature, dot_product(t, hessian * t), 1e-4 * scale);
+          }
+          CPPUNIT_ASSERT((hessian * u).magnitude() < 1e-12 * scale * order * order);
+        }
+      }
+    }
+    CPPUNIT_ASSERT_THROW(mitk::ShEvaluator(3, true), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(mitk::ShEvaluator(mitk::ShEvaluator::MaxOrder + 2, true), mitk::Exception);
+  }
+
   void Convert_WrongImageType_Throws()
   {
     auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
@@ -1085,7 +1206,8 @@ public:
   }
 
   // Peaks of sh_image_test.nii.gz, summarized per component, with the number of peaks and the 4D
-  // geometry. Its 244 isotropic voxels have no peak, each axis of the others one.
+  // geometry. Its 244 isotropic voxels have no peak, each axis of the others one. Recorded from the
+  // refinement by mitk::ShEvaluator::FindLocalMaximum.
   void MaximaExtraction_RecordedOutput()
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
@@ -1107,9 +1229,9 @@ public:
     itk::ImageRegionConstIterator<MaskImageType> itNum(filter->GetNumDirectionsImage(), filter->GetNumDirectionsImage()->GetLargestPossibleRegion());
     for (; !itNum.IsAtEnd(); ++itNum)
       numPeaks += itNum.Get();
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(58.92215708270669, sums[0], 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.298910463810898, sums[1], 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(16.957745654814062, sums[2], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(59.161808622768149, sums[0], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(20.060348113998771, sums[1], 1e-6);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(17.266059563025919, sums[2], 1e-6);
     CPPUNIT_ASSERT_EQUAL(76u, numPeaks);
 
     CPPUNIT_ASSERT(filter->GetNumDirectionsImage()->GetLargestPossibleRegion() == coefficients->GetLargestPossibleRegion());
@@ -1124,8 +1246,6 @@ public:
         CPPUNIT_ASSERT_EQUAL(r < 3 && c < 3 ? coefficients->GetDirection()[r][c] : (r == c ? 1.0 : 0.0), peaks->GetDirection()[r][c]);
     }
   }
-
-  using Direction = vnl_vector_fixed<double, 3>;
 
   /**
    * Order-8 SH coefficients (MITK's convention) of an ODF with one sharp lobe (u.d)^20 per fibre
@@ -1157,7 +1277,8 @@ public:
   // ODFs of known fibre configurations: each fibre gives exactly one peak, and an isotropic ODF,
   // where every sampled direction is a maximum, gives none. The fibres are rotated off the axes of
   // the ODF direction table, whose 252 directions are about 13 degrees apart; the refined peaks
-  // are within 0.11 degrees of the fibres, 0.64 for the 60-degree crossing, whose lobes overlap.
+  // are within 0.1 degrees of the fibres, 0.62 for the 60-degree crossing, whose lobes overlap.
+  // These are the maxima of the order-8 fit, not exactly the fibre directions.
   void MaximaExtraction_SyntheticOdfs_FibreDirections()
   {
     const Direction e1 = Direction(1, 2, 3).normalize();
@@ -1208,17 +1329,15 @@ public:
     }
   }
 
-  // The peak refinement (L-BFGS-B) runs in every work unit at once only because the cost
-  // evaluation releases the lock that guards netlib's static state; the peaks of one and of eight
-  // work units must be the same bit for bit. A block of the white matter of the CSD image keeps
-  // the Debug test short.
-  void MaximaExtraction_WorkUnits_SameResult()
+  /** Order-8 coefficients of the CSD image and a mask of a block of its white matter, which keeps
+    * the Debug tests short. */
+  static itk::Image<itk::Vector<float, 45>, 3>::Pointer CsdBlock(MaskImageType::Pointer &mask)
   {
     mitk::PreferenceListReaderOptionsFunctor functor({"SH Image"}, std::vector<std::string>());
     auto shImage = mitk::IOUtil::Load<mitk::ShImage>(mitk::GetDiffusionTestDataFilePath("StreamlineTractography/csd_image_sh.nii.gz"), &functor);
     auto coefficients = mitk::convert::GetItkShFromShImage<45>(shImage.GetPointer());
 
-    auto mask = MaskImageType::New();
+    mask = MaskImageType::New();
     mask->CopyInformation(coefficients);
     mask->SetRegions(coefficients->GetLargestPossibleRegion());
     mask->Allocate();
@@ -1227,6 +1346,15 @@ public:
       for (itk::IndexValueType y = 24; y < 36; ++y)
         for (itk::IndexValueType x = 24; x < 36; ++x)
           mask->SetPixel({{x, y, z}}, 1);
+    return coefficients;
+  }
+
+  // The work units refine their peaks at once, each on its own; the peaks of one and of eight
+  // work units must be the same bit for bit.
+  void MaximaExtraction_WorkUnits_SameResult()
+  {
+    MaskImageType::Pointer mask;
+    auto coefficients = CsdBlock(mask);
 
     using FilterType = itk::OdfMaximaExtractionFilter<float, 8, ODF_SAMPLING_SIZE>;
     std::vector<FilterType::Pointer> filters;
@@ -1255,6 +1383,56 @@ public:
     itk::ImageRegionConstIterator<PeakImageType> itParallelPeaks(filters[1]->GetPeakImage(), filters[1]->GetPeakImage()->GetLargestPossibleRegion());
     for (; !itSerialPeaks.IsAtEnd(); ++itSerialPeaks, ++itParallelPeaks)
       CPPUNIT_ASSERT_EQUAL(itSerialPeaks.Get(), itParallelPeaks.Get());
+  }
+
+  // Every refined peak is a local maximum of the SH function: its length (NO_NORM: the SH value)
+  // is the evaluator's value at its direction, and no direction 0.1 degree around it is higher.
+  // L-BFGS-B, which this refinement replaced, stopped up to 3 degrees early.
+  void MaximaExtraction_PeaksAreLocalMaxima()
+  {
+    MaskImageType::Pointer mask;
+    auto coefficients = CsdBlock(mask);
+
+    using FilterType = itk::OdfMaximaExtractionFilter<float, 8, ODF_SAMPLING_SIZE>;
+    auto filter = FilterType::New();
+    filter->SetInput(coefficients);
+    filter->SetMaskImage(mask);
+    filter->SetMaxNumPeaks(3);
+    filter->SetNormalizationMethod(FilterType::NO_NORM);
+    filter->Update();
+
+    const mitk::ShEvaluator evaluator(8, true);
+    const double angle = 0.1 * itk::Math::pi / 180;
+    unsigned int checked = 0;
+    std::vector<double> c(45);
+    itk::ImageRegionConstIteratorWithIndex<MaskImageType> it(filter->GetNumDirectionsImage(), filter->GetNumDirectionsImage()->GetLargestPossibleRegion());
+    for (; !it.IsAtEnd(); ++it)
+    {
+      const auto voxel = it.GetIndex();
+      for (unsigned int j = 0; j < 45; ++j)
+        c[j] = coefficients->GetPixel(voxel)[j];
+      for (unsigned int p = 0; p < it.Get(); ++p)
+      {
+        Direction peak;
+        for (unsigned int k = 0; k < 3; ++k)
+          peak[k] = filter->GetPeakImage()->GetPixel({{voxel[0], voxel[1], voxel[2], 3 * p + k}});
+        const double length = peak.magnitude();
+        const Direction u = peak / length;
+        const double value = evaluator.GetValue(c.data(), u);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, length, 1e-6 * value);
+
+        const Direction e1 = vnl_cross_3d(u, std::fabs(u[0]) < 0.6 ? Direction(1, 0, 0) : Direction(0, 1, 0)).normalize();
+        const Direction e2 = vnl_cross_3d(u, e1);
+        for (unsigned int i = 0; i < 8; ++i)
+        {
+          const double phi = i * itk::Math::pi / 4;
+          const Direction around = std::cos(angle) * u + std::sin(angle) * (std::cos(phi) * e1 + std::sin(phi) * e2);
+          CPPUNIT_ASSERT(evaluator.GetValue(c.data(), around) <= value);
+        }
+        ++checked;
+      }
+    }
+    CPPUNIT_ASSERT(checked > 300);
   }
 
   // Three filters replaced their primary output during the update, so an output taken before

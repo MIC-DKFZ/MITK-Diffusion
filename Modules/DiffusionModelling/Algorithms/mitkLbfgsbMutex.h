@@ -22,9 +22,7 @@ namespace mitk
   /**
    * One mutex for the whole process around vnl_lbfgsb::minimize. The netlib L-BFGS-B code behind
    * vnl_lbfgsb keeps its working variables in static storage, so two of its steps must never run
-   * at the same time. Between steps it keeps its state in the arrays of the running minimize()
-   * call, so a cost function may release the mutex while it is evaluated and lock it again before
-   * it returns; then only the cheap L-BFGS-B steps are serialized.
+   * at the same time; threaded code holds the mutex while minimize() runs.
    */
   MITKDIFFUSIONMODELLING_EXPORT std::mutex &GetLbfgsbMutex();
 }
