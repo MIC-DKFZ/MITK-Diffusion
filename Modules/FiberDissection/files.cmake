@@ -6,6 +6,7 @@ set(H_FILES
     Interactor/mitkStreamlineInteractorBrush.h
 
     #MachineLearning
+    MachineLearning/mitkActiveLearningSession.h
     MachineLearning/mitkStreamlineFeatureExtractor.h
 )
 
@@ -17,6 +18,7 @@ set(CPP_FILES
     Interactor/mitkStreamlineInteractorBrush.cpp
 
     #MachineLearning
+    MachineLearning/mitkActiveLearningSession.cpp
     MachineLearning/mitkStreamlineFeatureExtractor.cpp
 )
 
