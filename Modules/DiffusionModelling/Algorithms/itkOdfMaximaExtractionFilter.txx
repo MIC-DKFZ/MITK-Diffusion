@@ -51,7 +51,7 @@ OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
   , m_FlipZ(false)
   , m_ApplyDirectionMatrix(false)
   , m_ScaleByGfa(false)
-  , m_Iterations(50)
+  , m_Iterations(100)
 {
   this->SetNumberOfRequiredInputs(1);
 

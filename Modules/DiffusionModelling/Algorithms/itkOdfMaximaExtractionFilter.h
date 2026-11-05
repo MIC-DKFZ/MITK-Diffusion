@@ -100,8 +100,9 @@ Image< unsigned char, 3 > >
     itkSetMacro( ApplyDirectionMatrix, bool)
     itkSetMacro( ScaleByGfa, bool)
     /** Maximum number of refinement steps per peak (mitk::ShEvaluator::FindLocalMaximum), 0 or
-      * less for its limit of 1000. Default 50; on an order-4 whole-brain image the refinement
-      * converged in at most 25 steps, 99.7 % of the peaks in at most 10. */
+      * less for its limit of 1000. Default 100; on a block of 387,000 white- and grey-matter
+      * voxels of an order-4 image the refinement converged in at most 65 steps, 98 % of the
+      * candidates in at most 10. */
     itkSetMacro( Iterations, int)
 
     // output

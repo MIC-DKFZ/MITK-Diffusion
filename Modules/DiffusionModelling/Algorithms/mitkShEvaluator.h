@@ -71,8 +71,11 @@ namespace mitk
      */
     double FindLocalMaximum(const double *coefficients, Vector3 &direction, unsigned int maxIterations, unsigned int *iterations = nullptr) const;
 
-    /** Longest step of FindLocalMaximum in rad, about the spacing of the 252 ODF directions. */
-    static constexpr double MaxStep = 0.2;
+    /** Longest step of FindLocalMaximum in rad (about 3 degrees, a quarter of the spacing of the
+      * 252 ODF directions). A step is accepted when the value at its end is higher, so a longer
+      * one can cross a saddle into the basin of another maximum: with 0.2 rad, the candidate of a
+      * flat secondary peak of an order-4 ODF ended on the primary peak 70 degrees away. */
+    static constexpr double MaxStep = 0.05;
 
   private:
     /** Coefficient index and factor (normalization and convention sign) of the Re and Im part of
