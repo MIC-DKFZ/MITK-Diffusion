@@ -206,9 +206,13 @@ Facts the layout does not show:
   multi-shell filters take their shells from the b-value map they are given, without one from
   `BValueMapProperty::CreateBValueMap`, the DWI's own map. `ReconstructQball` computes the sampled
   ODFs only when asked (`QballParameters::sampledOdf`). Peak extraction
-  (`itk::OdfMaximaExtractionFilter`) keeps a refined maximum only if it is farther than the
-  angular threshold from every larger one kept, so each axis appears once, and gives no peak
-  where the sampled ODF varies by at most 1e-5 of its maximum (isotropic).
+  (`itk::OdfMaximaExtractionFilter`) takes the local maxima of the 252 sampled ODF values as
+  candidates, one per axis (an antipodal candidate is dropped before refinement), and refines each
+  with `mitk::ShEvaluator::FindLocalMaximum` (`Algorithms/mitkShEvaluator.h`: SH value, gradient
+  and Hessian in double, Newton steps of at most 0.05 rad, no shared lock, so work units run in
+  parallel). It keeps a refined maximum only if it is farther than the angular threshold from
+  every larger one kept, and gives no peak where the sampled ODF varies by at most 1e-5 of its
+  maximum (isotropic). `MaximaExtraction_PeaksAreLocalMaxima` checks that the peaks are maxima.
   `ctest -R 'ImageReconstruction|DiffusionReconstruction'` runs their tests.
 - `ctest -R 'mitkDiffusion(Modelling|Reconstruction)|PeakShImageReader|ImageReconstruction'` runs
   the `DiffusionModelling` tests. `mitkDiffusionModellingMapperTest` renders offscreen (EGL, no
@@ -234,7 +238,7 @@ Facts the layout does not show:
   threads. `ctest -R 'mitkDiffusionModelling(Rendering|Mapper)'` runs these tests.
 - The netlib L-BFGS-B code behind `vnl_lbfgsb` keeps its working variables in static storage.
   Threaded code holds `mitk::GetLbfgsbMutex()` (`Modules/DiffusionModelling/Algorithms/mitkLbfgsbMutex.h`)
-  while `minimize` runs; the cost function may release it during its evaluation.
+  while `minimize` runs (its one user is the fiber fit, `itkFitFibersToImageFilter.cpp`).
 - `ctest -R mitkFiberBundle` runs the `FiberBundle` tests; `mitkFiberBundleMapperTest` renders
   offscreen (EGL) and is skipped with exit code 77 where no OpenGL context can be created.
   The 3D fiber mapper draws tubes on the GPU from the lines (`Rendering/mitkFiberTubeShader.h`:

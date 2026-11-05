@@ -22,8 +22,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "ui_QmitkOdfMaximaExtractionViewControls.h"
 
 /**
- * \brief Peaks of the ODFs of an SH image (local maxima on the sampled ODF, refined by gradient
- * descent) or principal eigenvectors of a tensor image.
+ * \brief Peaks of the ODFs of an SH image (local maxima on the sampled ODF, each refined to a
+ * maximum of the SH function) or principal eigenvectors of a tensor image.
  */
 class QmitkOdfMaximaExtractionView : public QmitkAbstractView
 {
