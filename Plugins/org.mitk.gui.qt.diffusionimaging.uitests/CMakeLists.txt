@@ -25,6 +25,14 @@ else()
   set(_has_restapi 0)
 endif()
 
+# The Attractive suite calls the atTRACTive endpoints, which DiffusionRestApi offers only where
+# FiberDissection is built (MITK_DIFFUSION_UITEST_ATTRACTIVE).
+if(_has_restapi AND TARGET MitkDiffusionRestApi AND TARGET MitkFiberDissection)
+  set(_has_attractive 1)
+else()
+  set(_has_attractive 0)
+endif()
+
 mitk_create_plugin(
   EXPORT_DIRECTIVE DIFFUSIONIMAGING_UITESTS_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
@@ -32,7 +40,7 @@ mitk_create_plugin(
   TEST_PLUGIN
 )
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE MITK_DIFFUSION_UITEST_RESTAPI=${_has_restapi})
+target_compile_definitions(${PROJECT_NAME} PRIVATE MITK_DIFFUSION_UITEST_RESTAPI=${_has_restapi} MITK_DIFFUSION_UITEST_ATTRACTIVE=${_has_attractive})
 
 # QmitkAbstractView (the test selection view) without Require-Plugin, see manifest_headers.cmake.
 target_link_libraries(${PROJECT_NAME} PRIVATE org_mitk_gui_qt_common org_mitk_gui_common)
