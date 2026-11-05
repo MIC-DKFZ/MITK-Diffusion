@@ -16,6 +16,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkGradientDirectionsProperty.h"
 
+#include <nlohmann/json.hpp>
+
 mitk::GradientDirectionsProperty::GradientDirectionsProperty()
 {
   m_GradientDirectionsContainer = mitk::GradientDirectionsProperty::GradientDirectionsContainerType::New();
@@ -70,6 +72,38 @@ bool mitk::GradientDirectionsProperty::IsEqual(const BaseProperty& property) con
 bool mitk::GradientDirectionsProperty::Assign(const BaseProperty& property)
 {
   this->m_GradientDirectionsContainer = static_cast<const Self&>(property).m_GradientDirectionsContainer;
+  return true;
+}
+
+// [[x, y, z], ...], one entry per volume.
+bool mitk::GradientDirectionsProperty::ToJSON(nlohmann::json& j) const
+{
+  j = nlohmann::json::array();
+
+  for (unsigned int index = 0; index < m_GradientDirectionsContainer->Size(); ++index)
+  {
+    const auto& direction = m_GradientDirectionsContainer->ElementAt(index);
+    j.push_back({ direction[0], direction[1], direction[2] });
+  }
+
+  return true;
+}
+
+bool mitk::GradientDirectionsProperty::FromJSON(const nlohmann::json& j)
+{
+  auto container = GradientDirectionsContainerType::New();
+
+  for (const auto& item : j)
+  {
+    GradientDirectionType direction;
+
+    for (unsigned int i = 0; i < 3; ++i)
+      direction[i] = item.at(i).get<double>();
+
+    container->push_back(direction);
+  }
+
+  m_GradientDirectionsContainer = container.GetPointer();
   return true;
 }
 

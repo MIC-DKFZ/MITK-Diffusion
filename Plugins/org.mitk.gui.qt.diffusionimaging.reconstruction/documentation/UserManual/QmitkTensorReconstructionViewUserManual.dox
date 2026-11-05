@@ -15,4 +15,16 @@ The view also generates images from a tensor image:
 \li <b>ODF Image from Tensors:</b> the ODFs are initialized directly from the tensor values and normalized.
 \li <b>Diffusion-weighted Image from Tensors:</b> a DWI with the chosen b-value and number of gradient directions (the directions are subdivisions of an icosahedron) and one baseline volume. The baseline signal is the l2-norm of the tensor; the diffusion-weighted volumes follow the tensor model.
 
+\section TensorReconstructionUse When to Use Tensors
+
+The tensor is the simplest model: one ellipsoid per voxel, whose principal axis is the main fiber direction and whose shape gives the FA (\ref org_mitk_views_diffusionquantification). It needs only six or more gradient directions at one b-value (typically 1000 s/mm^2), is robust to noise and is the basis of FA maps, of the colour-coded FA map and of deterministic tractography of compact bundles. It cannot represent crossing fibers: where bundles cross, the tensor is flat (low FA, no clear direction), and tractography stops or turns into the wrong bundle. For such regions, reconstruct Q-ball ODFs and peaks (\ref org_mitk_views_qballreconstruction, \ref org_mitk_views_odfmaximaextraction); the choice is discussed in "Choosing the Model and the Method" of the "Streamline Tractography" manual page.
+
+The tensor image renders as a colour-coded FA map in the 2D views: each voxel gets the colour of its principal direction (red left-right, green anterior-posterior, blue superior-inferior) scaled by its FA. This is the map on which the ROIs of a tract are placed.
+
+\section TensorReconstructionRest REST Endpoints
+
+\li POST /api/v1/diffusion/reconstruction/tensors with {dwi: uid, fit: "lls" or "eigenvalue_correction", b0_threshold, zero_negative_eigenvalues}: the reconstruction of this view as a job; the tensor image is added below the DWI, named as the view names it.
+\li POST /api/v1/diffusion/reconstruction/color-fa with {tensors: uid}: the colour-coded FA map as an RGB image below the tensor image, for screenshots.
+\li The scalar maps (FA, MD, ...) of a tensor image: POST /api/v1/diffusion/reconstruction/tensor-indices, see \ref org_mitk_views_diffusionquantification.
+
 */

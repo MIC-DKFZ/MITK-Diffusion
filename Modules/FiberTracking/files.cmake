@@ -1,5 +1,6 @@
 set(CPP_FILES
   mitkStreamlineTractographyParameters.cpp
+  mitkStreamlineTractography.cpp
 
   # Tractography
   Algorithms/GibbsTracking/mitkParticleGrid.cpp
@@ -20,6 +21,7 @@ set(CPP_FILES
 
 set(H_FILES
   mitkStreamlineTractographyParameters.h
+  mitkStreamlineTractography.h
 
   # Tractography
   Algorithms/TrackingHandlers/mitkTrackingDataHandler.h

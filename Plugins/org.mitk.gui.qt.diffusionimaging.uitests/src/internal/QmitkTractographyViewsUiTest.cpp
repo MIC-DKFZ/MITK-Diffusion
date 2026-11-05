@@ -20,6 +20,24 @@ found in the LICENSE file.
 #include <mitkPointSet.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
+#if MITK_DIFFUSION_UITEST_RESTAPI
+#include <mitkBaseRenderer.h>
+#include <mitkIRestServerService.h>
+#include <mitkPlaneGeometry.h>
+#include <mitkRestPoints.h>
+#include <mitkRestServerConfig.h>
+
+#include <usModule.h>
+#include <usModuleContext.h>
+#include <usModuleRegistry.h>
+
+#include <nlohmann/json.hpp>
+
+#include <atomic>
+#include <set>
+#include <thread>
+#endif
+
 #include <QmitkDataStorageComboBox.h>
 #include <QmitkSingleNodeSelectionWidget.h>
 
@@ -85,6 +103,8 @@ class QmitkTractographyViewsUiTest : public CppUnit::TestFixture
   CPPUNIT_TEST(Gibbs_StopDuringWeightEstimation_RunEnds);
   CPPUNIT_TEST(Gibbs_ParameterFileNoFibersReadOnlyFolder_LabelsAndMessages);
   CPPUNIT_TEST(Gibbs_ParallelSampler_SameFibersAtTwoThreadCounts);
+  CPPUNIT_TEST(Rest_DiffusionRoutesListed_PolygonRoiInTheShownSlice);
+  CPPUNIT_TEST(Rest_PickAndPropertiesWhileJobsRun_NoCrash);
   // Last: it leaves its views, data and runs to the harness, which then quits the Workbench.
   CPPUNIT_TEST(Quit_WhileTrackingRuns_NoCrash);
   CPPUNIT_TEST_SUITE_END();
@@ -1059,6 +1079,271 @@ public:
    * Workbench after it (IWorkbench::Close, as File > Exit does). The Gibbs run is past its first
    * monitor update. A crash fails the suite.
    */
+  /**
+   * The diffusion REST endpoints through the Workbench's server, as the agent reaches them: they are
+   * listed, a polygon drawn in pixels of the axial window becomes a label in the slice the window
+   * shows, and a tracking job runs with the Workbench's dispatcher.
+   */
+  void Rest_DiffusionRoutesListed_PolygonRoiInTheShownSlice()
+  {
+#if MITK_DIFFUSION_UITEST_RESTAPI
+    auto tensors = Load("StreamlineTractography/tensor_image.dti");
+    // The routes exist before any view: MitkRESTAPI's auto-load module registers them.
+    ShowStreamline();
+    Select({tensors});
+    InitializeViews();
+
+    auto *context = us::ModuleRegistry::GetModule(1)->GetModuleContext();
+    auto reference = context->GetServiceReference<mitk::IRestServerService>();
+    CPPUNIT_ASSERT_MESSAGE("No REST server service", reference);
+    auto *server = context->GetService(reference);
+    CPPUNIT_ASSERT(server != nullptr);
+
+    if (!server->IsRunning())
+    {
+      mitk::RestServerConfig config;
+      config.enabled = true;
+      config.host = "127.0.0.1";
+      config.port = 0;
+      CPPUNIT_ASSERT_MESSAGE("The REST server does not start", server->Start(config, "UI test"));
+    }
+
+    const auto token = server->CreateToken("UI test", mitk::RestTokenRights());
+
+    // Requests run on a thread of their own, as the server's do: the handlers hand their work to
+    // the GUI thread, which this test keeps running.
+    const auto call = [&](const std::string &method, const std::string &target, const nlohmann::json &body = nlohmann::json()) {
+      mitk::RestRequest request;
+      request.Method = method;
+      request.SetTarget(target);
+      request.Headers["authorization"] = "Bearer " + token;
+      if (!body.is_null())
+        request.Body = body.dump();
+
+      mitk::RestResponse response;
+      std::atomic<bool> done{false};
+      std::thread worker([&]() {
+        response = server->HandleRequest(request);
+        done = true;
+      });
+      CPPUNIT_ASSERT_MESSAGE("No answer for " + target, WaitFor([&]() { return done.load(); }));
+      worker.join();
+      return response;
+    };
+
+    // The routes are listed.
+    const auto listed = call("GET", "/api/v1/endpoints?path=/api/v1/diffusion");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(listed.Body, 200, listed.Status);
+    std::set<std::string> paths;
+    const auto endpoints = nlohmann::json::parse(listed.Body).at("data");
+    for (const auto &endpoint : endpoints)
+      paths.insert(endpoint.at("method").get<std::string>() + " " + endpoint.at("path").get<std::string>());
+    for (const char *expected : {"GET /api/v1/diffusion", "POST /api/v1/diffusion/reconstruction/tensors", "POST /api/v1/diffusion/rois",
+                                 "POST /api/v1/diffusion/tractography/streamline", "POST /api/v1/diffusion/tractography/extract"})
+      CPPUNIT_ASSERT_MESSAGE(std::string("Not listed: ") + expected, paths.count(expected) == 1);
+
+    // A rectangle around the centre of the axial window, in pixels of a screenshot of its size.
+    auto *renderer = mitk::BaseRenderer::GetByName("stdmulti.widget0");
+    CPPUNIT_ASSERT(renderer != nullptr && renderer->GetSizeX() > 0 && renderer->GetSizeY() > 0);
+    const double w = renderer->GetSizeX(), h = renderer->GetSizeY();
+    nlohmann::json polygon = {{"window", "axial"},
+                              {"image_size", {w, h}},
+                              {"pixels", {{0.4 * w, 0.4 * h}, {0.6 * w, 0.4 * h}, {0.6 * w, 0.6 * h}, {0.4 * w, 0.6 * h}}}};
+    const auto uid = server->GetNodeUid(tensors);
+    const auto created = call("POST", "/api/v1/diffusion/rois", nlohmann::json{{"reference", uid}, {"name", "poly"}, {"polygon", polygon}});
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(created.Body, 201, created.Status);
+    const auto data = nlohmann::json::parse(created.Body).at("data");
+    const auto voxels = data.at("label").at("voxels").get<unsigned int>();
+    CPPUNIT_ASSERT(voxels > 0);
+
+    // The expected voxels: centres in the shown slice (within half a voxel of the plane) and inside
+    // the rectangle, mapped onto the plane as the route maps them.
+    mitk::PlaneGeometry::ConstPointer plane = renderer->GetCurrentWorldPlaneGeometry();
+    const auto corners = mitk::GetRestWorldPoints(polygon, "", 3);
+    std::vector<mitk::Point2D> rectangle;
+    for (const auto &corner : corners)
+    {
+      mitk::Point2D p;
+      plane->Map(corner, p);
+      rectangle.push_back(p);
+    }
+    const auto *geometry = ImageOf(tensors)->GetGeometry();
+    const auto spacing = geometry->GetSpacing();
+    const auto dims = ImageOf(tensors)->GetDimensions();
+    unsigned int expected = 0;
+    std::set<int> slices;
+    for (unsigned int z = 0; z < dims[2]; ++z)
+      for (unsigned int y = 0; y < dims[1]; ++y)
+        for (unsigned int x = 0; x < dims[0]; ++x)
+        {
+          mitk::Point3D index, centre;
+          index[0] = x; index[1] = y; index[2] = z;
+          geometry->IndexToWorld(index, centre);
+          if (std::abs(plane->SignedDistance(centre)) > spacing[2] / 2)
+            continue;
+          mitk::Point2D p;
+          plane->Map(centre, p);
+          const bool inside = p[0] >= std::min(rectangle[0][0], rectangle[1][0]) && p[0] <= std::max(rectangle[0][0], rectangle[1][0]) &&
+                              p[1] >= std::min(rectangle[1][1], rectangle[2][1]) && p[1] <= std::max(rectangle[1][1], rectangle[2][1]);
+          if (inside)
+          {
+            ++expected;
+            slices.insert(static_cast<int>(z));
+          }
+        }
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), slices.size());
+    CPPUNIT_ASSERT_EQUAL(expected, voxels);
+
+    // The label lies in that slice only.
+    auto segmentationNode = server->FindNode(data.at("segmentation").at("uid").get<std::string>());
+    CPPUNIT_ASSERT(segmentationNode.IsNotNull());
+    auto *segmentation = dynamic_cast<mitk::MultiLabelSegmentation *>(segmentationNode->GetData());
+    CPPUNIT_ASSERT(segmentation != nullptr);
+    const auto value = static_cast<mitk::Label::PixelType>(data.at("label").at("value").get<int>());
+    {
+      mitk::ImagePixelReadAccessor<mitk::Label::PixelType, 3> access(segmentation->GetGroupImage(0));
+      for (unsigned int z = 0; z < dims[2]; ++z)
+        for (unsigned int y = 0; y < dims[1]; ++y)
+          for (unsigned int x = 0; x < dims[0]; ++x)
+            if (access.GetPixelByIndex({{x, y, z}}) == value)
+              CPPUNIT_ASSERT_EQUAL(*slices.begin(), static_cast<int>(z));
+    }
+
+    // A tracking job seeded in the polygon, finished through the Workbench's GUI thread.
+    const nlohmann::json seed = {{"segmentation", data.at("segmentation").at("uid")}, {"labels", {value}}};
+    const auto tracked = call("POST", "/api/v1/diffusion/tractography/streamline?wait=120",
+                              nlohmann::json{{"image", uid}, {"seed", seed}, {"preview", 20}, {"fix_seed", true}, {"name", "poly tract"}});
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(tracked.Body, 200, tracked.Status);
+    const auto job = nlohmann::json::parse(tracked.Body).at("data");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(job.dump(), std::string("succeeded"), job.at("state").get<std::string>());
+    CPPUNIT_ASSERT(job.at("result").at("metrics").at("fibers").get<unsigned int>() <= 20);
+    CPPUNIT_ASSERT(GetDataStorage()->GetNamedNode("poly tract") != nullptr);
+
+    // The manual search of MITK's REST API plug-in (started with its view) finds the sections the
+    // route descriptions name, from the built help files of the diffusion plug-ins.
+    ShowView("org.mitk.views.restapi", "QmitkRestApiViewControls");
+    const auto found = call("GET", "/api/v1/manual/search?query=Recipes%20for%20Common%20Tracts");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(found.Body, 200, found.Status);
+    // The best matches hold the section; its page is named with the plug-in ("MITK Tractography: ...").
+    const auto sections = nlohmann::json::parse(found.Body).at("data").at("sections");
+    bool recipes = false;
+    for (const auto &section : sections)
+      recipes = recipes || (section.at("title").get<std::string>() == "Recipes for Common Tracts" &&
+                            section.at("page").get<std::string>().ends_with("Streamline Tractography"));
+    CPPUNIT_ASSERT_MESSAGE("The manual search does not find the recipes: " + found.Body.substr(0, 1500), recipes);
+#else
+    MITK_WARN << "MITK's REST API is not built; the REST case is left out.";
+#endif
+  }
+
+  /**
+   * The agent's sequence on a DWI: tensors, brain mask, FA, Q-ball and peaks as jobs, and while
+   * the peak job runs, property changes, render updates and picks through MITK's own endpoints.
+   * Repeated, so that the job's allocations overlap the GUI thread's work on the nodes: MITK's
+   * pick (QmitkRestApiRenderingRoutes.cpp, DescribeData) iterated a node set whose owner was a
+   * temporary, freed memory that a running job reuses, and crashed the Workbench in the trial of
+   * #55. The case fails until that MITK fix is in the base.
+   */
+  void Rest_PickAndPropertiesWhileJobsRun_NoCrash()
+  {
+#if MITK_DIFFUSION_UITEST_RESTAPI
+    const char *dwiFile = std::getenv("MITK_DIFFUSION_UITEST_DWI");
+    auto dwi = dwiFile != nullptr ? AddNode(mitk::IOUtil::Load<mitk::Image>(dwiFile), "dwi") : Load("ImageReconstruction/test.dwi");
+    Select({dwi});
+    InitializeViews();
+    // The pick and the other rendering routes come with MITK's REST API plug-in, which starts with its view.
+    ShowView("org.mitk.views.restapi", "QmitkRestApiViewControls");
+
+    auto *context = us::ModuleRegistry::GetModule(1)->GetModuleContext();
+    auto reference = context->GetServiceReference<mitk::IRestServerService>();
+    CPPUNIT_ASSERT_MESSAGE("No REST server service", reference);
+    auto *server = context->GetService(reference);
+    CPPUNIT_ASSERT(server != nullptr);
+
+    if (!server->IsRunning())
+    {
+      mitk::RestServerConfig config;
+      config.enabled = true;
+      config.host = "127.0.0.1";
+      config.port = 0;
+      CPPUNIT_ASSERT_MESSAGE("The REST server does not start", server->Start(config, "UI test"));
+    }
+
+    const auto token = server->CreateToken("UI test", mitk::RestTokenRights());
+    const auto call = [&](const std::string &method, const std::string &target, const nlohmann::json &body = nlohmann::json()) {
+      mitk::RestRequest request;
+      request.Method = method;
+      request.SetTarget(target);
+      request.Headers["authorization"] = "Bearer " + token;
+      if (!body.is_null())
+        request.Body = body.dump();
+
+      mitk::RestResponse response;
+      std::atomic<bool> done{false};
+      std::thread worker([&]() {
+        response = server->HandleRequest(request);
+        done = true;
+      });
+      CPPUNIT_ASSERT_MESSAGE("No answer for " + target, WaitFor([&]() { return done.load(); }, 600000));
+      worker.join();
+      return response;
+    };
+    const auto data = [](const mitk::RestResponse &response) {
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(response.Body, 200, response.Status);
+      return nlohmann::json::parse(response.Body).at("data");
+    };
+    const auto result = [&](const mitk::RestResponse &response) {
+      const auto job = data(response);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(job.dump(), std::string("succeeded"), job.at("state").get<std::string>());
+      return job.at("result");
+    };
+
+    const auto uid = server->GetNodeUid(dwi);
+    const auto tensors = result(call("POST", "/api/v1/diffusion/reconstruction/tensors?wait=300", nlohmann::json{{"dwi", uid}})).at("tensors").at("uid").get<std::string>();
+    const auto brain = result(call("POST", "/api/v1/diffusion/masks/brain?wait=300", nlohmann::json{{"dwi", uid}}));
+    const auto brainUid = brain.at("segmentation").at("uid").get<std::string>();
+    const auto brainLabel = brain.at("label").at("value").get<int>();
+    const auto fa = result(call("POST", "/api/v1/diffusion/reconstruction/tensor-indices?wait=300", nlohmann::json{{"tensors", tensors}})).at("images")[0].at("uid").get<std::string>();
+    const auto sh = result(call("POST", "/api/v1/diffusion/reconstruction/qball?wait=600", nlohmann::json{{"dwi", uid}, {"method", "csa"}})).at("sh").at("uid").get<std::string>();
+
+    for (int round = 0; round < 4; ++round)
+    {
+      const nlohmann::json mask = {{"segmentation", brainUid}, {"labels", {brainLabel}}};
+      const auto startResponse = call("POST", "/api/v1/diffusion/reconstruction/peaks?wait=0", nlohmann::json{{"image", sh}, {"mask", mask}});
+      CPPUNIT_ASSERT_MESSAGE(startResponse.Body, startResponse.Status == 200 || startResponse.Status == 202);
+      const auto jobId = nlohmann::json::parse(startResponse.Body).at("data").at("id").get<std::string>();
+
+      // Meanwhile, what the agent did: hide nodes, update, pick in every 2D window.
+      for (const auto &node : {brainUid, fa, sh})
+        CPPUNIT_ASSERT_EQUAL(200, call("PATCH", "/api/v1/datastorage/nodes/" + node + "/properties", nlohmann::json{{"visible", round % 2 == 0}}).Status);
+      call("POST", "/api/v1/rendering/update");
+
+      bool ended = false;
+      for (int i = 0; i < 400 && !ended; ++i)
+      {
+        for (const char *window : {"coronal", "axial", "sagittal"})
+        {
+          auto *renderer = mitk::BaseRenderer::GetByName(window == std::string("axial") ? "stdmulti.widget0" : window == std::string("sagittal") ? "stdmulti.widget1" : "stdmulti.widget2");
+          const double w = renderer->GetSizeX(), h = renderer->GetSizeY();
+          const auto picked = call("POST", std::string("/api/v1/rendering/windows/") + window + "/pick",
+                                   nlohmann::json{{"window", window}, {"image_size", {w, h}}, {"pixels", {{0.4 * w, 0.45 * h}, {0.6 * w, 0.45 * h}, {0.5 * w, 0.4 * h}}}});
+          CPPUNIT_ASSERT_EQUAL_MESSAGE(picked.Body, 200, picked.Status);
+        }
+        call("GET", "/api/v1/datastorage/nodes?limit=50");
+        const auto job = data(call("GET", "/api/v1/jobs/" + jobId));
+        ended = job.at("state").get<std::string>() != "running";
+      }
+      CPPUNIT_ASSERT(ended);
+      // Remove the peak image again, so the next round starts the same.
+      for (const auto &node : GetNodesOfClass("PeakImage"))
+        GetDataStorage()->Remove(node);
+      Wait(20);
+    }
+#else
+    MITK_WARN << "MITK's REST API is not built; the REST case is left out.";
+#endif
+  }
+
   void Quit_WhileTrackingRuns_NoCrash()
   {
     m_LeaveForQuit = true;

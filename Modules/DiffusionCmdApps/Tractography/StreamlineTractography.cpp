@@ -26,14 +26,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itksys/SystemTools.hxx>
 
 #include <mitkFiberBundle.h>
+#include <mitkOdfImage.h>
 #include <mitkPeakImage.h>
+#include <mitkShImage.h>
 #include <itkStreamlineTrackingFilter.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingDataHandler.h>
-#include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
-#include <Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h>
-#include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
-#include <itkTensorImageToOdfImageFilter.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkStreamlineTractography.h>
 #include <mitkStreamlineTractographyParameters.h>
 
 namespace
@@ -333,67 +332,54 @@ int Run(int argc, char* argv[])
   if (parsedArgs.count("additional_images"))
     addFiles = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["additional_images"]);
 
-  typedef itk::Image<float, 3> ItkFloatImgType;
-
-  ItkFloatImgType::Pointer mask = nullptr;
+  // The ROI images, as loaded; the tracker gets them cast to float (SetTrackingRois).
+  mitk::StreamlineTractographyRois rois;
+  mitk::Image::Pointer mask, seed, stop, target, exclusion;
   if (!maskFile.empty())
   {
     MITK_INFO << "loading mask image";
-    mitk::Image::Pointer img = mitk::IOUtil::Load<mitk::Image>(maskFile);
-    mask = ItkFloatImgType::New();
-    mitk::CastToItkImage(img, mask);
+    mask = mitk::IOUtil::Load<mitk::Image>(maskFile);
+    rois.mask = mask;
   }
 
-  ItkFloatImgType::Pointer seed = nullptr;
   if (!seedFile.empty())
   {
     MITK_INFO << "loading seed ROI image";
-    mitk::Image::Pointer img = mitk::IOUtil::Load<mitk::Image>(seedFile);
-    seed = ItkFloatImgType::New();
-    mitk::CastToItkImage(img, seed);
+    seed = mitk::IOUtil::Load<mitk::Image>(seedFile);
+    rois.seed = seed;
   }
 
-  ItkFloatImgType::Pointer stop = nullptr;
   if (!stopFile.empty())
   {
     MITK_INFO << "loading stop ROI image";
-    mitk::Image::Pointer img = mitk::IOUtil::Load<mitk::Image>(stopFile);
-    stop = ItkFloatImgType::New();
-    mitk::CastToItkImage(img, stop);
+    stop = mitk::IOUtil::Load<mitk::Image>(stopFile);
+    rois.stop = stop;
   }
 
-  ItkFloatImgType::Pointer target = nullptr;
   if (!targetFile.empty())
   {
     MITK_INFO << "loading target ROI image";
-    mitk::Image::Pointer img = mitk::IOUtil::Load<mitk::Image>(targetFile);
-    target = ItkFloatImgType::New();
-    mitk::CastToItkImage(img, target);
+    target = mitk::IOUtil::Load<mitk::Image>(targetFile);
+    rois.target = target;
   }
 
-  ItkFloatImgType::Pointer exclusion = nullptr;
   if (!exclusionFile.empty())
   {
     MITK_INFO << "loading exclusion ROI image";
-    mitk::Image::Pointer img = mitk::IOUtil::Load<mitk::Image>(exclusionFile);
-    exclusion = ItkFloatImgType::New();
-    mitk::CastToItkImage(img, exclusion);
+    exclusion = mitk::IOUtil::Load<mitk::Image>(exclusionFile);
+    rois.exclusion = exclusion;
   }
 
   MITK_INFO << "loading additional images";
-  std::vector< std::vector< ItkFloatImgType::Pointer > > addImages;
-  addImages.push_back(std::vector< ItkFloatImgType::Pointer >());
+  // The first is the FA/GFA image of the cutoff.
+  std::vector<mitk::Image::Pointer> addImages;
   for (auto file : addFiles)
-  {
-    mitk::Image::Pointer img = mitk::IOUtil::Load<mitk::Image>(file);
-    ItkFloatImgType::Pointer itkimg = ItkFloatImgType::New();
-    mitk::CastToItkImage(img, itkimg);
-    addImages.at(0).push_back(itkimg);
-  }
+    addImages.push_back(mitk::IOUtil::Load<mitk::Image>(file));
 
   typedef itk::StreamlineTrackingFilter TrackerType;
   TrackerType::Pointer tracker = TrackerType::New();
 
+  // the tracker only borrows the handlers
   std::unique_ptr<mitk::TrackingDataHandler> priorhandler;
   if (!prior_image.empty())
   {
@@ -406,32 +392,15 @@ int Run(int argc, char* argv[])
       return EXIT_FAILURE;
     }
 
-    auto peakPrior = std::make_unique<mitk::TrackingHandlerPeaks>();
-
-    typedef mitk::ImageToItk< mitk::TrackingHandlerPeaks::PeakImgType > CasterType;
-    CasterType::Pointer caster = CasterType::New();
-    caster->SetInput(priorImage);
-    caster->Update();
-    mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = caster->GetOutput();
-
-    std::shared_ptr< mitk::StreamlineTractographyParameters > prior_params = std::make_shared< mitk::StreamlineTractographyParameters >(*params);
-    prior_params->m_FlipX = params->m_PriorFlipX;
-    prior_params->m_FlipY = params->m_PriorFlipY;
-    prior_params->m_FlipZ = params->m_PriorFlipZ;
-    prior_params->m_Cutoff = 0.0;
-    peakPrior->SetPeakImage(itkImg);
-    peakPrior->SetParameters(prior_params);
-    priorhandler = std::move(peakPrior);
+    priorhandler = mitk::CreateTrackingPriorHandler(priorImage);
+    mitk::SetTrackingPriorParameters(*priorhandler, *params);
     tracker->SetTrackingPriorHandler(priorhandler.get());
   }
 
-  // the tracker only borrows the handlers
-  std::unique_ptr<mitk::TrackingDataHandler> handler;
-  mitk::Image::Pointer reference_image;
+  // The type chooses the reader; the handler follows the images read.
+  std::vector<mitk::Image::Pointer> input_images;
   if (type == "Peaks")
   {
-    auto peakHandler = std::make_unique<mitk::TrackingHandlerPeaks>();
-
     MITK_INFO << "loading input peak image";
     // Without the reader preference, a 4D NIfTI peak file is read as a plain image.
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Peak Image"}, std::vector<std::string>());
@@ -441,84 +410,46 @@ int Run(int argc, char* argv[])
       MITK_ERROR << "Input is not a peak image: " << input_files.at(0);
       return EXIT_FAILURE;
     }
-    reference_image = mitkImage;
-    mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = mitkImage->GetItkPeakImage();
-    peakHandler->SetPeakImage(itkImg);
-    handler = std::move(peakHandler);
+    input_images.push_back(mitkImage.GetPointer());
   }
-  else if (type == "Tensor" && params->m_Mode == mitk::StreamlineTractographyParameters::MODE::DETERMINISTIC)
+  else if (type == "Tensor")
   {
-    auto tensorHandler = std::make_unique<mitk::TrackingHandlerTensor>();
-
     MITK_INFO << "loading input tensor images";
-    std::vector< mitk::Image::Pointer > input_images;
-    for (unsigned int i=0; i<input_files.size(); i++)
-    {
-      mitk::Image::Pointer mitkImage = mitk::IOUtil::Load<mitk::Image>(input_files.at(i));
-      reference_image = mitkImage;
-      mitk::TensorImage::ItkTensorImageType::Pointer itkImg = mitk::convert::GetItkTensorFromTensorImage(mitkImage);
-      tensorHandler->AddTensorImage(itkImg.GetPointer());
-    }
-
-    if (addImages.at(0).size()>0)
-      tensorHandler->SetFaImage(addImages.at(0).at(0));
-    handler = std::move(tensorHandler);
+    // Several tensor images make a multi-tensor model in deterministic mode; probabilistic mode
+    // tracks the ODFs of the first.
+    const std::size_t count = params->m_Mode == mitk::StreamlineTractographyParameters::MODE::DETERMINISTIC ? input_files.size() : 1;
+    for (std::size_t i=0; i<count; i++)
+      input_images.push_back(mitk::IOUtil::Load<mitk::Image>(input_files.at(i)));
   }
-  else if (type == "ODF" || type == "ODF-DIPY/FSL" || (type == "Tensor" && params->m_Mode == mitk::StreamlineTractographyParameters::MODE::PROBABILISTIC))
+  else if (type == "ODF" || type == "ODF-DIPY/FSL")
   {
-    auto odfHandler = std::make_unique<mitk::TrackingHandlerOdf>();
-
-    mitk::OdfImage::ItkOdfImageType::Pointer itkImg = nullptr;
-
-    if (type == "Tensor")
+    std::vector<std::string> include = {"SH Image", "ODF Image"};
+    // The SH reader converts dipy's coefficients, which are given in the bvec frame, into MITK's
+    // basis; files without a convention marker are read as MRtrix 3 or MITK files otherwise.
+    mitk::IFileReader::Options options;
+    if (type == "ODF-DIPY/FSL")
+      options["SH convention"] = std::string("FSL/Dipy");
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor(include, options);
+    auto input = mitk::IOUtil::Load(input_files.at(0), &functor)[0];
+    if (dynamic_cast<mitk::ShImage*>(input.GetPointer()) == nullptr && dynamic_cast<mitk::OdfImage*>(input.GetPointer()) == nullptr)
     {
-      MITK_INFO << "Converting Tensor to ODF image";
-      auto input = mitk::IOUtil::Load<mitk::Image>(input_files.at(0));
-      reference_image = input;
-      itkImg = mitk::convert::GetItkOdfFromTensorImage(input);
-      odfHandler->SetIsOdfFromTensor(true);
+      MITK_ERROR << "Input is neither an SH nor an ODF image: " << input_files.at(0);
+      return EXIT_FAILURE;
     }
-    else
-    {
-      std::vector<std::string> include = {"SH Image", "ODF Image"};
-      // The SH reader converts dipy's coefficients, which are given in the bvec frame, into MITK's
-      // basis; files without a convention marker are read as MRtrix 3 or MITK files otherwise.
-      mitk::IFileReader::Options options;
-      if (type == "ODF-DIPY/FSL")
-        options["SH convention"] = std::string("FSL/Dipy");
-      mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor(include, options);
-      auto input = mitk::IOUtil::Load(input_files.at(0), &functor)[0];
-      reference_image = dynamic_cast<mitk::Image*>(input.GetPointer());
-      if (dynamic_cast<mitk::ShImage*>(input.GetPointer()))
-      {
-        MITK_INFO << "Converting SH to ODF image";
-        mitk::ShImage::Pointer mitkShImage = dynamic_cast<mitk::ShImage*>(input.GetPointer());
-        mitk::Image::Pointer mitkImg = dynamic_cast<mitk::Image*>(mitkShImage.GetPointer());
-        itkImg = mitk::convert::GetItkOdfFromShImage(mitkImg);
-      }
-      else if (dynamic_cast<mitk::OdfImage*>(input.GetPointer()))
-      {
-        mitk::Image::Pointer mitkImg = dynamic_cast<mitk::Image*>(input.GetPointer());
-        itkImg = mitk::convert::GetItkOdfFromOdfImage(mitkImg);
-      }
-      else
-      {
-        MITK_ERROR << "Input is neither an SH nor an ODF image: " << input_files.at(0);
-        return EXIT_FAILURE;
-      }
-    }
-
-    odfHandler->SetOdfImage(itkImg);
-
-    if (addImages.at(0).size()>0)
-      odfHandler->SetGfaImage(addImages.at(0).at(0));
-    handler = std::move(odfHandler);
+    input_images.push_back(dynamic_cast<mitk::Image*>(input.GetPointer()));
   }
   else
   {
     MITK_ERROR << "Unknown tractography algorithm (" + type+"). Known types are Peaks, Tensor, ODF and ODF-DIPY/FSL.";
     return EXIT_FAILURE;
   }
+
+  mitk::Image::Pointer reference_image = input_images.front();
+  std::vector<const mitk::Image*> model_images;
+  for (const auto& image : input_images)
+    model_images.push_back(image);
+  std::unique_ptr<mitk::TrackingDataHandler> handler = mitk::CreateTrackingHandler(model_images, params->m_Mode,
+    addImages.empty() ? nullptr : addImages.front().GetPointer());
 
   float max_size = 0;
   for (int i=0; i<3; ++i)
@@ -539,11 +470,7 @@ int Run(int argc, char* argv[])
   }
 
   MITK_INFO << "Tractography algorithm: " << type;
-  tracker->SetMaskImage(mask);
-  tracker->SetSeedImage(seed);
-  tracker->SetStoppingRegions(stop);
-  tracker->SetTargetRegions(target);
-  tracker->SetExclusionRegions(exclusion);
+  mitk::SetTrackingRois(*tracker, rois);
   tracker->SetTrackingHandler(handler.get());
   params->m_OutputProbMap = imageOutput;
   tracker->SetParameters(params);

@@ -1,19 +1,36 @@
 /**
 \page org_mitk_views_streamlinetracking Streamline Tractography
 
-This view enables streamline tractography on various input data. The corresponding command line application is named "MitkStreamlineTractography".
+This view enables streamline tractography on various input data. The corresponding command line application is named "MitkStreamlineTractography", and the REST API of the Workbench offers the same tractography to scripts and to the Agent view (\ref StrTrackUserManualRest).
 
 Available sections:
+- \ref StrTrackUserManualChoosing
 - \ref StrTrackUserManualInputData
 - \ref StrTrackUserManualSeeding
 - \ref StrTrackUserManualConstraints
+- \ref StrTrackUserManualRoiStrategy
+- \ref StrTrackUserManualRecipes
 - \ref StrTrackUserManualParameters
 - \ref StrTrackUserManualTractographyPrior
 - \ref StrTrackUserManualNeighbourhoodSampling
 - \ref StrTrackUserManualDataHandling
 - \ref StrTrackUserManualPostprocessing
 - \ref StrTrackUserManualParameterFiles
+- \ref StrTrackUserManualRest
 - \ref StrTrackUserManualReferences
+
+\section StrTrackUserManualChoosing Choosing the Model and the Method
+
+<b>Which model to track on.</b> Streamline tractography follows the directions that a model of the diffusion signal gives in every voxel. The model comes from the reconstruction views:
+- Tensors (the manual page "Tensor Reconstruction") give one direction per voxel. They are enough for compact bundles that do not cross other bundles over long stretches (the corticospinal tract below the centrum semiovale, the cingulum, the fornix, the optic radiation) and for quick, reproducible first results. Where fibers cross, for example in the centrum semiovale, where the corticospinal tract, the corpus callosum and the superior longitudinal fasciculus meet, a tensor shows only their average, so tensor streamlines stop there or turn into the wrong bundle.
+- Constant solid angle (CSA) Q-ball ODFs (the manual page "Q-Ball Reconstruction") as a spherical harmonics (SH) image, and the peak image extracted from them (the manual page "ODF Peak Extraction"), give several directions per voxel. They are the choice for tracts through crossings: the arcuate fasciculus, the lateral parts of the corticospinal tract, the corpus callosum and the inferior fronto-occipital fasciculus. Peaks need a DWI with about 30 or more gradient directions at b = 1000 s/mm^2 or higher; with fewer directions, stay with tensors.
+- Tracking on the ODF itself (the SH image or the sampled ODF image) is the most complete probabilistic method, but slower than peak tracking.
+
+<b>Deterministic or probabilistic.</b>
+- Deterministic tractography follows the main direction at every step. It is reproducible, gives compact bundles with few false positives and runs fast. Take it for a first look at a tract, for compact bundles, and whenever a result has to be reproduced exactly (with "Fix Random Seed" the seed positions repeat as well).
+- Probabilistic tractography samples the next direction from the ODF (sharpened by "Sharpen ODFs"), or jitters the peak direction. It covers fanning regions (the corticospinal tract towards the motor cortex, the corpus callosum towards the cortex) and passes crossings more completely, at the price of more spurious fibers and of results that depend on the number of seeds and trials. Take it for dense tractograms of tracts with known fanning or crossings, and remove the spurious fibers with exclusion ROIs, a minimum length, or an extraction afterwards (the manual page "Fiber Processing").
+
+<b>Judging a result.</b> The command line application and the REST endpoint report the fiber count, the fiber lengths (minimum, mean, median, maximum), the number of processed seeds and the acceptance (fibers per processed seed). A run seeded in white matter accepts most of its seeds; an acceptance well below 0.5 with a cutoff of 0.1 means that the seeds lie partly outside the white matter, that the angular threshold is too strict, or that the mask cuts the tract. Fibers much shorter than the tract (the arcuate fasciculus is 100 mm and longer, the corticospinal tract from the brain stem to the cortex about 120 mm) stop early: lower the cutoff, raise the angular threshold or check the mask. Always compare the tract with its expected course on the colour-coded FA map in the three 2D views and in the 3D view (\ref StrTrackUserManualRoiStrategy).
 
 \section StrTrackUserManualInputData Input Data
 
@@ -30,7 +47,7 @@ Specify how, where and how many tractography seed points are placed. This can be
 
 Image based seeding:
 - Seed Image: ROI image (a 3D image or a segmentation, as the images below) used to define the seed voxels. If no seed mask is specified, the whole image volume is seeded.
-- Seeds per voxel: If set to 1, the seed is defined as the voxel center. If > 1 the seeds are distributed randomly inside the voxel.
+- Seeds per voxel: If set to 1, the seed is defined as the voxel center. If > 1 the seeds are distributed randomly inside the voxel. For a dense tractogram of a small seed region (a ROI of a few hundred voxels) use 5 to 20 seeds per voxel; whole-brain seeding of a white matter mask with 1 seed per voxel gives a few hundred thousand fibers.
 
 Interactive seeding:
 - Update on Parameter Change: When "Update on Parameter Change" is checked, each parameter change causes an instant retracking with the new parameters. This enables an intuitive exploration of the effects that the other tractography parameters have on the resulting tractogram.
@@ -38,7 +55,7 @@ Interactive seeding:
 - Num.Seeds: Number of seeds placed randomly inside the spherical seed region (uniformly distributed in its volume). With "Fix Random Seed" checked, the same seed points are used at every update.
 
 Parameters for both seeding modes:
-- Trials Per Seed: Try each seed N times until a valid streamline is obtained (only for probabilistic tractography).
+- Trials Per Seed: Try each seed N times until a valid streamline is obtained (only for probabilistic tractography). 10 is the default; 20 to 50 for small seed regions with strict endpoint constraints, where most trials are rejected.
 - Max. Num. Fibers: Tractography is stopped after the desired number of fibers is reached, even before all seed points are processed.
 
 \section StrTrackUserManualConstraints ROI Constraints
@@ -58,17 +75,42 @@ Specify various ROI and mask images to constrain the tractography process. Each 
   - No EP is allowed to be located in the target image (command line option NO_EP_IN_TARGET)
 - Target Image: ROI image needed for endpoint constraints. It is ignored with "No constraints on endpoint locations". A segmentation as target image keeps its label values for the label difference constraint, which compares labels; the other constraints use the union of its labels.
 
+\section StrTrackUserManualRoiStrategy ROI Strategy
+
+Two ways lead to a tract:
+- Seed, target and exclusion ROIs in the tractography itself: seed in a region that every fiber of the tract passes (its stem), exclude the neighbouring tracts, and keep the fibers through a second region of the tract with a pass ROI of the extraction afterwards (the manual page "Fiber Processing"). An endpoint constraint fits only a target where the fibers end, such as the cortex at the end of the tract: every constraint tests the fiber ends, so a target the tract only passes through gives no fibers. This is fast, since only the tract's region is tracked, and the usual way for a single tract.
+- Whole-brain tractography (seeds in a white matter mask, 1 seed per voxel) and the extraction of the tract afterwards with pass, end and not ROIs (the manual page "Fiber Processing"). This is slower, but the tractogram serves all tracts, and the ROIs can be adjusted without tracking again.
+
+<b>Placing ROIs.</b> ROIs are labels of a segmentation, drawn in the Segmentation view, or through the REST endpoint as a polygon in a slice or as a sphere (\ref StrTrackUserManualRest). Place them on the colour-coded FA map (the tensor image, or its colour FA image), where a tract shows in the colour of its direction: red for left-right, green for anterior-posterior, blue for superior-inferior. A ROI that cuts a tract across its course, in a slice perpendicular to the tract's main direction, catches all its fibers: a tract running anterior-posterior (green) gets its ROIs in coronal slices, a tract running superior-inferior (blue) in axial slices, a tract running left-right (red) in sagittal slices. Make pass ROIs generous, the whole cross section of the tract plus a margin of a few voxels, and exclusion ROIs precise. Two pass ROIs (AND) define a tract far better than one; an exclusion ROI (NOT) removes the fibers that turn into a neighbouring tract. A midsagittal exclusion ROI keeps a hemispheric tract from crossing to the other side.
+
+<b>Plausibility checks.</b> The tract runs where the colour-coded FA map shows it in all three views; its fibers have the expected length; the fibers end in grey matter, not in the middle of the white matter; the two hemispheres give mirrored tracts of similar size; no fibers cross the midline except in commissural tracts (corpus callosum, anterior commissure); the tract does not follow a neighbouring bundle (the arcuate fasciculus must not turn into the corticospinal tract, the inferior fronto-occipital fasciculus not into the uncinate). A tract of very few fibers, or of fibers that all stop at the same place, points to a ROI outside the tract or a cutoff that is too high.
+
+\section StrTrackUserManualRecipes Recipes for Common Tracts
+
+Standard ROI placement, after the dissection protocols of Wakana et al. (2007) and Catani and Thiebaut de Schotten (2008), see \ref StrTrackUserManualReferences. Find the landmarks on the colour-coded FA map. "Pass" ROIs are regions every fiber must touch (one as the seed, the others as pass ROIs of the extraction; as a tracking target only where the fibers end), "not" ROIs are exclusion ROIs. Dissect left and right separately with ROIs in that hemisphere, and add a not ROI on the midsagittal plane for every tract but the corpus callosum. Where the recipe names a slice, draw the ROI as a polygon in that slice, one or two slices thick; a sphere suits a round landmark.
+
+- <b>Arcuate fasciculus (AF)</b>, the long segment of the superior longitudinal fasciculus: it runs anterior-posterior (green) lateral and superior to the corticospinal tract and bends down (blue, then green) into the temporal lobe behind the Sylvian fissure. Pass ROI 1 in a coronal slice at the level of the central sulcus, through the middle of the lateral ventricle's body: the green region lateral to the blue corona radiata and the corticospinal tract. Pass ROI 2 in an axial slice through the posterior temporal lobe, at the level of the atrium of the lateral ventricle: the green and blue fibers lateral to the atrium that curve downward into the temporal lobe. Expected: one bundle arching from the frontal lobe around the Sylvian fissure into the temporal lobe, 100 to 130 mm long. Deterministic peak tracking works; probabilistic tracking adds the fanning into the frontal and temporal cortex.
+- <b>Corticospinal tract (CST)</b>, blue, superior-inferior: pass ROI 1 in an axial slice through the cerebral peduncle of the midbrain (the blue region in the anterior lateral part of the peduncle); pass ROI 2 in an axial slice through the white matter below the precentral gyrus, at the level of the centrum semiovale (the superior blue region lateral to the midline), or, for a stricter result, the posterior limb of the internal capsule. Not ROIs: the midsagittal plane, and an axial slice through the middle cerebellar peduncle to remove cortico-ponto-cerebellar fibers. Through the centrum semiovale the CST crosses the corpus callosum and the superior longitudinal fasciculus: use peaks or probabilistic tracking for the fanning towards the motor cortex; tensors give only the medial part.
+- <b>Inferior fronto-occipital fasciculus (IFOF)</b>, green, the ventral route from the occipital to the frontal lobe through the external and extreme capsule: pass ROI 1 in a coronal slice through the anterior temporal lobe at the level of the external capsule (the green fibers between the insula and the putamen); pass ROI 2 in a coronal slice through the occipital lobe, posterior to the splenium of the corpus callosum (the green fibers of the sagittal stratum lateral to the occipital horn of the ventricle). The uncinate fasciculus shares the first ROI; the occipital ROI separates the two.
+- <b>Inferior longitudinal fasciculus (ILF)</b>, green, the temporal-occipital bundle lateral and inferior to the IFOF: pass ROI 1 in a coronal slice through the anterior temporal lobe, the whole white matter of the temporal lobe; pass ROI 2 the occipital ROI of the IFOF. Not ROI: a coronal slice at the level of the external capsule, anterior to the temporal ROI, which removes the IFOF, since the IFOF continues into the frontal lobe and the ILF does not.
+- <b>Uncinate fasciculus (UF)</b>, a hook from the anterior temporal lobe into the orbitofrontal cortex, green and blue: pass ROI 1 in a coronal slice through the anterior temporal lobe, the white matter of the temporal stem; pass ROI 2 in the coronal slice of the external capsule, its ventral part at the level of the orbitofrontal lobe, where the fibers curve up into the frontal lobe. Not ROI: a coronal slice posterior to the temporal stem, which removes the IFOF and the ILF. The uncinate is short (40 to 60 mm) and sharply curved: a minimum length of 20 mm and an angular threshold of 60 degrees.
+- <b>Cingulum</b>, green, anterior-posterior within the cingulate gyrus directly above the corpus callosum: pass ROIs 1 and 2 in two coronal slices, one anterior and one posterior to the level of the central sulcus, on the green bundle above the corpus callosum and medial to the corona radiata. Not ROI: an axial slice through the body of the corpus callosum, which removes callosal fibers. A deterministic tensor tracking suffices.
+- <b>Corpus callosum (CC)</b>, red at the midline: pass ROI the midsagittal slice of the corpus callosum (one ROI for the whole corpus callosum, or separate ROIs for genu, body and splenium). Not ROIs in an axial slice below the corpus callosum through the internal capsule on both sides, which remove the fibers of the brain stem. Seed in the ROI itself with several seeds per voxel; no midsagittal not ROI. The lateral projections cross the corona radiata: use peaks or probabilistic tracking for them.
+- <b>Optic radiation (OR)</b>, from the lateral geniculate nucleus to the calcarine cortex, green, with the sharp anterior bend of Meyer's loop in the temporal lobe: pass ROI 1 a sphere of about 5 mm radius at the lateral geniculate nucleus (posterior and lateral to the thalamus, in an axial slice through the midbrain); pass ROI 2 the white matter around the calcarine sulcus in a coronal slice through the occipital lobe. Not ROIs: the midsagittal plane, a coronal slice anterior to the temporal stem (removes the uncinate fasciculus and the anterior commissure) and the splenium. Probabilistic tracking with a large angular threshold (60 to 70 degrees) and a small step size reaches Meyer's loop.
+
+Each recipe gives a plausible tract on healthy adult data with isotropic voxels of 1 to 2 mm. Tumours, atrophy and strong artifacts need adapted ROIs.
+
 \section StrTrackUserManualParameters Tractography Parameters
 
 - Mode: Toggle between deterministic and probabilistic tractography (also affects tracking prior proposals). Probabilistic ODF tractography samples the next direction from the discrete probability distribution provided by the discretized ODF. In case of probabilistic tensor tractography, an ODF is calculated from the tensor. Probabilistic peak tracking does not derive probabilities from the data but simply adds a normally distributed jitter to the proposed direction. Deterministic ODF tractography follows the ODF maximum between the discrete sampling directions (local maximum of the sampled ODF, refined by a quadratic fit to its neighbouring directions).
-- Sharpen ODFs: If you are using dODF or tensor images as input for probabilistic tractography, it is advisable to sharpen the ODFs (raise to the power of X). This is not necessary (and not recommended) for CSD fODFs, since they are naturally much sharper.
-- Cutoff: If the streamline reaches a position with an FA value or peak magnitude lower than the specified threshold, tracking is terminated. Typical values are 0.2 for FA/GFA and 0.1 for CSD peaks.
+- Sharpen ODFs: If you are using dODF or tensor images as input for probabilistic tractography, it is advisable to sharpen the ODFs (raise to the power of X). This is not necessary (and not recommended) for CSD fODFs, since they are naturally much sharper. 4 to 8 sharpens Q-ball ODFs enough for probabilistic tracking; 1 switches the sharpening off.
+- Cutoff: If the streamline reaches a position with an FA value or peak magnitude lower than the specified threshold, tracking is terminated. Typical values are 0.2 for FA/GFA and 0.1 for CSD peaks. 0.1 on FA is lenient and lets fibers run into the cortex, 0.2 keeps them in the core of the white matter; peak lengths normalized by the largest peak of the voxel take a cutoff of 0.1 to 0.3.
 - FA/GFA image used to determine streamline termination. If no image is specified, the FA/GFA image is automatically calculated from the input image. If multiple tensor images are used as input, it is recommended to provide such an image since the FA maps calculated from the individual input tensor images can not provide a suitable termination criterion.
 - ODF Cutoff: Additional threshold on the ODF magnitude. This is useful in case of CSD fODF tractography. For fODFs a good default value is 0.1, for normalized dODFs, e.g. Q-ball ODFs, this threshold should be very low (0.00025) or 0.
-- Step Size: The algorithm proceeds along the streamline with a fixed stepsize. Default is 0.5*minSpacing.
-- Min. Tract Length: Shorter fibers are discarded. The length is measured along the streamline (sum of its steps).
-- Max. Tract Length: Streamlines stop when they reach this length.
-- Angular Threshold: Maximum angle between two successive steps (in degree). The default -1 means automatic: 90° * step_size (step size in voxels), at most 86.9°; it follows later changes of the step size and is saved as -1 in parameter files. For probabilistic tractography, candidate directions exceeding this threshold have probability 0, i.e. the respective ODF value is set to zero. The probabilities of the valid directions are normalized to sum to 1.
+- Step Size: The algorithm proceeds along the streamline with a fixed stepsize. Default is 0.5*minSpacing. Sensible values are 0.3 to 0.5 voxels: smaller steps follow curved tracts (the uncinate, Meyer's loop) better and cost time.
+- Min. Tract Length: Shorter fibers are discarded. The length is measured along the streamline (sum of its steps). A minimum of about a third of the expected tract length (40 mm for the arcuate fasciculus, 20 mm for the uncinate) drops short spurious fibers.
+- Max. Tract Length: Streamlines stop when they reach this length. The default of 400 mm only guards against loops; no tract of the human brain is longer than about 200 mm.
+- Angular Threshold: Maximum angle between two successive steps (in degree). The default -1 means automatic: 90° * step_size (step size in voxels), at most 86.9°; it follows later changes of the step size and is saved as -1 in parameter files. Typical fixed values are 30 to 45 degrees per step of half a voxel; strongly curved tracts (the uncinate, Meyer's loop of the optic radiation) need 60 degrees or more, and a threshold that is too strict stops fibers in curves and lowers the acceptance. For probabilistic tractography, candidate directions exceeding this threshold have probability 0, i.e. the respective ODF value is set to zero. The probabilities of the valid directions are normalized to sum to 1.
 - Loop Check: Stop streamline if the mean angular deviation (in degree) of the step directions from their mean direction over the last 4 voxel lengths (at least 8 steps) exceeds this threshold. -1 = no loop check.
 - f and g values to balance between FACT [2] and TEND [3,4] tracking (only for tensor based tractography). For further information please refer to [2,3]
 - Peak Jitter: Used for probabilistic peak tractography. Since the data provide no probabilities, Gaussian noise is added to the peaks: each component of the unit peak direction gets normal noise with standard deviation peak_jitter (dir[i] += normal(0, peak_jitter)), then the direction is normalized again. The mean deviation from the peak is about 1.25 * peak_jitter in radians (0.1: about 7°; the default 0.01: about 0.7°, i.e. nearly deterministic).
@@ -102,6 +144,16 @@ The cutoff of the tractography parameters (FA, GFA or peak magnitude) does not a
 \section StrTrackUserManualParameterFiles Parameter Files
 "Save Parameters" writes all parameters of the view to a json file, "Load Parameters" sets the view from such a file (an automatic angular threshold is kept as -1). The command line application reads the same files (option parameter_file). A file that cannot be read or written gives a message.
 
+\section StrTrackUserManualRest REST Endpoints
+
+The REST API of the Workbench (the REST API view; the Agent view works through it) offers this view's tractography and the masks and ROIs it needs below /api/v1/diffusion. GET /api/v1/endpoints?path=/api/v1/diffusion&details=true describes the parameters of every endpoint; GET /api/v1/diffusion names the order of the steps and the manual pages. Every endpoint takes and returns the uids of data nodes.
+
+- POST /api/v1/diffusion/masks/brain: the brain mask of a DWI (Otsu threshold of the mean b0 volume, largest connected component, holes filled) as the label "Brain" of a new segmentation below the DWI. Use it as "Mask Image" of the tractography.
+- POST /api/v1/diffusion/masks/white-matter: the white matter mask, FA above a threshold (0.2) within a brain mask, as a label; the seed region of whole-brain tractography.
+- POST /api/v1/diffusion/rois: a ROI as a label of a segmentation on an image's grid, either a sphere (centre and radius in millimetres) or a polygon in the slice that a 2D window shows (the corners as pixels of a screenshot of that window); every ROI label gets a group of its own, so ROIs may overlap. GET /api/v1/diffusion/rois/{uid} lists the labels of a segmentation with their voxel counts; PATCH and DELETE .../labels/{value} rename and remove a label. See \ref StrTrackUserManualRoiStrategy and \ref StrTrackUserManualRecipes.
+- POST /api/v1/diffusion/tractography/streamline: the tractography of this view: the model image, the mode, all parameters of \ref StrTrackUserManualParameters by name with the view's defaults, the ROIs and endpoint constraints of \ref StrTrackUserManualConstraints as masks or as labels of a segmentation, the prior of \ref StrTrackUserManualTractographyPrior, and a preview that stops after a number of fibers. It runs as a job that reports its progress and can be cancelled; the result names the tractogram node and the metrics of \ref StrTrackUserManualChoosing.
+- POST /api/v1/diffusion/tractography/extract and POST /api/v1/diffusion/tractography/metrics: the extraction of a tract from a tractogram with pass, end and not ROIs, and the numbers about a tractogram; see the manual page "Fiber Processing" and the manual page "Fiber Quantification". The reconstruction endpoints are described with their views: the manual page "Tensor Reconstruction", the manual page "Q-Ball Reconstruction", the manual page "ODF Peak Extraction" and the manual page "Diffusion Indices".
+
 \section StrTrackUserManualReferences References
 
 [1] Neher, Peter F., Marc-Alexandre Côté, Jean-Christophe Houde, Maxime Descoteaux, and Klaus H. Maier-Hein. “Fiber Tractography Using Machine Learning.” NeuroImage. Accessed July 19, 2017. doi:10.1016/j.neuroimage.2017.07.028.\n
@@ -109,6 +161,8 @@ The cutoff of the tractography parameters (FA, GFA or peak magnitude) does not a
 [3] Weinstein, David, Gordon Kindlmann, and Eric Lundberg. “Tensorlines: Advection-Diffusion Based Propagation through Diffusion Tensor Fields.” In Proceedings of the Conference on Visualization’99: Celebrating Ten Years, 249–253, n.d.\n
 [4] Lazar, Mariana, David M. Weinstein, Jay S. Tsuruda, Khader M. Hasan, Konstantinos Arfanakis, M. Elizabeth Meyerand, Benham Badie, et al. “White Matter Tractography Using Diffusion Tensor Deflection.” Human Brain Mapping 18, no. 4 (2003): 306–321.\n
 [5] Chamberland, M., K. Whittingstall, D. Fortin, D. Mathieu, and M. Descoteaux. “Real-Time Multi-Peak Tractography for Instantaneous Connectivity Display.” Front Neuroinform 8 (2014): 59. doi:10.3389/fninf.2014.00059.\n
-[6] Tournier, J-Donald, Fernando Calamante, and Alan Connelly. “MRtrix: Diffusion Tractography in Crossing Fiber Regions.” International Journal of Imaging Systems and Technology 22, no. 1 (March 2012): 53–66. doi:10.1002/ima.22005.
+[6] Tournier, J-Donald, Fernando Calamante, and Alan Connelly. “MRtrix: Diffusion Tractography in Crossing Fiber Regions.” International Journal of Imaging Systems and Technology 22, no. 1 (March 2012): 53–66. doi:10.1002/ima.22005.\n
+[7] Wakana, Setsu, Arvind Caprihan, Martina M. Panzenboeck, James H. Fallon, Muriel Perry, Randy L. Gollub, Kegang Hua, et al. “Reproducibility of Quantitative Tractography Methods Applied to Cerebral White Matter.” NeuroImage 36, no. 3 (2007): 630–644. doi:10.1016/j.neuroimage.2007.02.049.\n
+[8] Catani, Marco, and Michel Thiebaut de Schotten. “A Diffusion Tensor Imaging Tractography Atlas for Virtual in Vivo Dissections.” Cortex 44, no. 8 (2008): 1105–1132. doi:10.1016/j.cortex.2008.05.004.
 
 */

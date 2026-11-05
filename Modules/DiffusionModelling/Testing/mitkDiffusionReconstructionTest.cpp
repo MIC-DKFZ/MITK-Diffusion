@@ -41,6 +41,7 @@ found in the LICENSE file.
 #include <vnl/algo/vnl_svd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -70,6 +71,7 @@ class mitkDiffusionReconstructionTestSuite : public mitk::TestFixture
   MITK_TEST(Peaks_EachAxisOnce);
   MITK_TEST(Peaks_SameAsFilter_AllVolumes);
   MITK_TEST(Peaks_MaskOfOtherSize_Throws);
+  MITK_TEST(Peaks_Stopped_Aborts);
   MITK_TEST(TensorPeaks_SameAsFilter);
   MITK_TEST(TensorIndices_MatchReferences);
   MITK_TEST(Gfa_MatchesReference);
@@ -662,6 +664,20 @@ public:
     mask->Allocate();
     mask->FillBuffer(1);
     return mitk::GrabItkImageMemory(mask.GetPointer());
+  }
+
+  // The REST job of the agent stops a running extraction with this flag; one that is already set
+  // ends the extraction before its first block of voxels, and an unset one changes nothing.
+  void Peaks_Stopped_Aborts()
+  {
+    auto shImage = LoadShImage();
+    const std::atomic<bool> stop{true};
+    CPPUNIT_ASSERT_THROW(mitk::ExtractPeaks(shImage, mitk::PeakParameters(), nullptr, &stop), itk::ProcessAborted);
+
+    const std::atomic<bool> go{false};
+    const auto expected = mitk::ExtractPeaks(shImage, mitk::PeakParameters());
+    const auto actual = mitk::ExtractPeaks(shImage, mitk::PeakParameters(), nullptr, &go);
+    CPPUNIT_ASSERT(SameVoxels(expected.peaks->GetItkPeakImage().GetPointer(), actual.peaks->GetItkPeakImage().GetPointer()));
   }
 
   void Peaks_MaskOfOtherSize_Throws()

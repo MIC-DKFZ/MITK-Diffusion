@@ -30,6 +30,10 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkCoreServices.h>
 #include <mitkIPropertyDescriptions.h>
+#include <mitkIPropertyDeserialization.h>
+#include <mitkBValueMapProperty.h>
+#include <mitkGradientDirectionsProperty.h>
+#include <mitkMeasurementFrameProperty.h>
 #include <mitkIPropertyPersistence.h>
 
 #include "mitkDiffusionImageMimeTypes.h"
@@ -49,6 +53,14 @@ namespace mitk
       // next to the NIfTI file, diffusion DICOM tags) are used; the readers and writers refer to them by
       // name. The ranking makes the DWI readers and writers the default for diffusion data over MITK's
       // plain NRRD and NIfTI IO.
+      // The API's property endpoints create properties by their class name from JSON.
+      if (auto* deserialization = mitk::CoreServices::GetPropertyDeserialization(context))
+      {
+        deserialization->RegisterProperty<BValueMapProperty>();
+        deserialization->RegisterProperty<GradientDirectionsProperty>();
+        deserialization->RegisterProperty<MeasurementFrameProperty>();
+      }
+
       m_MimeTypes = mitk::DiffusionImageMimeTypes::Get();
       us::ServiceProperties props;
       props[us::ServiceConstants::SERVICE_RANKING()] = 10;

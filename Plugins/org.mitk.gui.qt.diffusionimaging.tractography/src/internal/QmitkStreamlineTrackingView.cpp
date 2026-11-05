@@ -48,6 +48,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPeakImage.h>
 #include <mitkShImage.h>
 #include <mitkSliceNavigationController.h>
+#include <mitkStreamlineTractography.h>
 
 // VTK
 #include <vtkRenderWindowInteractor.h>
@@ -58,7 +59,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <vtkPolyLine.h>
 #include <vtkCellData.h>
 
-#include <itkTensorImageToOdfImageFilter.h>
 #include <omp.h>
 #include <mitkLexicalCast.h>
 
@@ -1020,83 +1020,29 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
   {
   m_Tracker = TrackerType::New();
 
-  if( dynamic_cast<mitk::TensorImage*>(m_InputImageNodes.at(0)->GetData()) )
+  if (m_TrackingHandler == nullptr)
   {
-    if (m_Controls->m_ModeBox->currentIndex()==1)
-    {
-      if (m_TrackingHandler==nullptr)
-      {
-        m_TrackingHandler = std::make_unique<mitk::TrackingHandlerOdf>();
-        typedef itk::TensorImageToOdfImageFilter< float, float > FilterType;
-        FilterType::Pointer filter = FilterType::New();
-        filter->SetInput( mitk::convert::GetItkTensorFromTensorImage(dynamic_cast<mitk::Image*>(m_InputImageNodes.at(0)->GetData())) );
-        filter->Update();
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetOdfImage(filter->GetOutput());
+    std::vector<const mitk::Image*> modelImages;
+    for (const auto &node : m_InputImageNodes)
+      modelImages.push_back(dynamic_cast<const mitk::Image*>(node->GetData()));
 
-        if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
-        {
-          ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
-          mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
+    const mitk::Image* faImage = nullptr;
+    if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
+      faImage = dynamic_cast<const mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData());
 
-          dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetGfaImage(itkImg);
-        }
-      }
-
-      dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetIsOdfFromTensor(true);
-    }
-    else
-    {
-      if (m_TrackingHandler==nullptr)
-      {
-        m_TrackingHandler = std::make_unique<mitk::TrackingHandlerTensor>();
-        for (unsigned int i=0; i<m_InputImageNodes.size(); ++i)
-          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler.get())->AddTensorImage(mitk::convert::GetItkTensorFromTensorImage(dynamic_cast<mitk::Image*>(m_InputImageNodes.at(i)->GetData())).GetPointer());
-
-        if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
-        {
-          ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
-          mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
-
-          dynamic_cast<mitk::TrackingHandlerTensor*>(m_TrackingHandler.get())->SetFaImage(itkImg);
-        }
-      }
-    }
+    // Throws for an input that is no tensor, ODF, SH or peak image; the catch below shows it.
+    m_TrackingHandler = mitk::CreateTrackingHandler(modelImages, params->m_Mode, faImage);
   }
-  else if ( dynamic_cast<mitk::OdfImage*>(m_InputImageNodes.at(0)->GetData()) ||
-            dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData()))
-  {
-    if (m_TrackingHandler==nullptr)
-    {
-      m_TrackingHandler = std::make_unique<mitk::TrackingHandlerOdf>();
 
-      if (dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData()))
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetOdfImage(mitk::convert::GetItkOdfFromShImage(dynamic_cast<mitk::ShImage*>(m_InputImageNodes.at(0)->GetData())));
-      else
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetOdfImage(mitk::convert::GetItkOdfFromOdfImage(dynamic_cast<mitk::OdfImage*>(m_InputImageNodes.at(0)->GetData())));
-
-      if (m_Controls->m_FaImageSelectionWidget->GetSelectedNode().IsNotNull())
-      {
-        ItkFloatImageType::Pointer itkImg = ItkFloatImageType::New();
-        mitk::CastToItkImage(dynamic_cast<mitk::Image*>(m_Controls->m_FaImageSelectionWidget->GetSelectedNode()->GetData()), itkImg);
-        dynamic_cast<mitk::TrackingHandlerOdf*>(m_TrackingHandler.get())->SetGfaImage(itkImg);
-      }
-    }
-  }
-  else if (dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData()))
-  {
-    if (m_TrackingHandler==nullptr)
-    {
-      m_TrackingHandler = std::make_unique<mitk::TrackingHandlerPeaks>();
-      auto itk_peak_image = dynamic_cast<mitk::PeakImage*>(m_InputImageNodes.at(0)->GetData())->GetItkPeakImage();
-      dynamic_cast<mitk::TrackingHandlerPeaks*>(m_TrackingHandler.get())->SetPeakImage(itk_peak_image);
-    }
-  }
-  else
-  {
-    QMessageBox::information(nullptr, "Information", "The selected input is not supported. Please select a tensor, ODF, SH or peak image.");
-    StartStopTrackingGui(false);
-    return;
-  }
+  // The ROI images as the tracker reads them: a segmentation becomes its mask image.
+  const auto maskOf = [](const QmitkSingleNodeSelectionWidget* widget, bool keepLabelValues = false) {
+    auto mask = mitk::GetMaskImage(widget->GetSelectedNode()->GetData(), keepLabelValues);
+    if (mask.IsNull())
+      mitkThrow() << widget->GetSelectedNode()->GetName() << " is no mask image or segmentation.";
+    return mask;
+  };
+  mitk::StreamlineTractographyRois rois;
+  mitk::Image::ConstPointer seedMask, trackingMask, stopMask, targetMask, exclusionMask;
 
   if (m_Controls->m_InteractiveBox->isChecked())
   {
@@ -1104,23 +1050,20 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
   }
   else if (m_Controls->m_SeedImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
-    ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_SeedImageSelectionWidget->GetSelectedNode()->GetData()), mask);
-    m_Tracker->SetSeedImage(mask);
+    seedMask = maskOf(m_Controls->m_SeedImageSelectionWidget);
+    rois.seed = seedMask;
   }
 
   if (m_Controls->m_MaskImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
-    ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_MaskImageSelectionWidget->GetSelectedNode()->GetData()), mask);
-    m_Tracker->SetMaskImage(mask);
+    trackingMask = maskOf(m_Controls->m_MaskImageSelectionWidget);
+    rois.mask = trackingMask;
   }
 
   if (m_Controls->m_StopImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
-    ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_StopImageSelectionWidget->GetSelectedNode()->GetData()), mask);
-    m_Tracker->SetStoppingRegions(mask);
+    stopMask = maskOf(m_Controls->m_StopImageSelectionWidget);
+    rois.stop = stopMask;
   }
 
   // With "No Constraints" the target widget is disabled but keeps its selection; the filter would
@@ -1128,51 +1071,36 @@ void QmitkStreamlineTrackingView::DoFiberTracking()
   if (params->m_EpConstraints != itk::StreamlineTrackingFilter::EndpointConstraints::NONE
       && m_Controls->m_TargetImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
-    ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
     // Label values only for "label difference", which compares the target values at both ends. The
     // other constraints test the target with a 0.5 threshold on interpolated values, so label values
     // above 1 would widen the target region; they get the 0/1 union like a binary mask.
     const bool keepLabelValues = params->m_EpConstraints == itk::StreamlineTrackingFilter::EndpointConstraints::EPS_IN_TARGET_LABELDIFF;
-    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_TargetImageSelectionWidget->GetSelectedNode()->GetData(), keepLabelValues), mask);
-    m_Tracker->SetTargetRegions(mask);
+    targetMask = maskOf(m_Controls->m_TargetImageSelectionWidget, keepLabelValues);
+    rois.target = targetMask;
   }
-
-  if (m_Controls->m_PriorImageSelectionWidget->GetSelectedNode().IsNotNull())
-  {
-    auto prior_params = GetParametersFromGui();
-    if (m_LastPrior!=m_Controls->m_PriorImageSelectionWidget->GetSelectedNode() || m_TrackingPriorHandler==nullptr)
-    {
-      typedef mitk::ImageToItk< mitk::TrackingHandlerPeaks::PeakImgType > CasterType;
-      CasterType::Pointer caster = CasterType::New();
-      caster->SetInput(dynamic_cast<mitk::PeakImage*>(m_Controls->m_PriorImageSelectionWidget->GetSelectedNode()->GetData()));
-      caster->SetCopyMemFlag(true);
-      caster->Update();
-      mitk::TrackingHandlerPeaks::PeakImgType::Pointer itkImg = caster->GetOutput();
-      auto priorHandler = std::make_unique<mitk::TrackingHandlerPeaks>();
-      priorHandler->SetPeakImage(itkImg);
-      m_TrackingPriorHandler = std::move(priorHandler);  // releases the copy of the previous prior
-      m_LastPrior = m_Controls->m_PriorImageSelectionWidget->GetSelectedNode();
-    }
-
-    prior_params->m_FlipX = m_Controls->m_PriorFlipXBox->isChecked();
-    prior_params->m_FlipY = m_Controls->m_PriorFlipYBox->isChecked();
-    prior_params->m_FlipZ = m_Controls->m_PriorFlipZBox->isChecked();
-    // as in MitkStreamlineTractography: the data cutoff (FA/GFA/peak length) does not apply to the
-    // prior, which would otherwise stop streamlines with "Restrict to Prior"
-    prior_params->m_Cutoff = 0.0;
-    m_TrackingPriorHandler->SetParameters(prior_params);
-
-    m_Tracker->SetTrackingPriorHandler(m_TrackingPriorHandler.get());
-  }
-  else if (m_Controls->m_PriorImageSelectionWidget->GetSelectedNode().IsNull())
-    m_Tracker->SetTrackingPriorHandler(nullptr);
 
   if (m_Controls->m_ExclusionImageSelectionWidget->GetSelectedNode().IsNotNull())
   {
-    ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
-    mitk::CastToItkImage(mitk::GetMaskImage(m_Controls->m_ExclusionImageSelectionWidget->GetSelectedNode()->GetData()), mask);
-    m_Tracker->SetExclusionRegions(mask);
+    exclusionMask = maskOf(m_Controls->m_ExclusionImageSelectionWidget);
+    rois.exclusion = exclusionMask;
   }
+
+  mitk::SetTrackingRois(*m_Tracker, rois);
+
+  if (m_Controls->m_PriorImageSelectionWidget->GetSelectedNode().IsNotNull())
+  {
+    if (m_LastPrior!=m_Controls->m_PriorImageSelectionWidget->GetSelectedNode() || m_TrackingPriorHandler==nullptr)
+    {
+      // a copy of the prior, which releases the copy of the previous one
+      m_TrackingPriorHandler = mitk::CreateTrackingPriorHandler(dynamic_cast<const mitk::Image*>(m_Controls->m_PriorImageSelectionWidget->GetSelectedNode()->GetData()));
+      m_LastPrior = m_Controls->m_PriorImageSelectionWidget->GetSelectedNode();
+    }
+
+    mitk::SetTrackingPriorParameters(*m_TrackingPriorHandler, *params);
+    m_Tracker->SetTrackingPriorHandler(m_TrackingPriorHandler.get());
+  }
+  else
+    m_Tracker->SetTrackingPriorHandler(nullptr);
 
   if (params->m_EpConstraints!=itk::StreamlineTrackingFilter::EndpointConstraints::NONE && m_Controls->m_TargetImageSelectionWidget->GetSelectedNode().IsNull())
   {
