@@ -88,7 +88,20 @@ double OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
         }
       if (flag)   // point is a peak
       {
-        container.push_back(odf.GetDirection(i).normalize());
+        // The SH function is antipodally symmetric, so a candidate opposite one kept before is the
+        // same axis and would be refined again. The table's pairs are antipodal only to about
+        // 1.5e-6, and float rounding can make only one of a pair a sampled maximum, so the pair is
+        // found by direction, not by index.
+        const DirectionType direction = odf.GetDirection(i).normalize();
+        bool antipodal = false;
+        for (const DirectionType &kept : container)
+          if (std::fabs(dot_product(kept, direction)) > 1 - 1e-4)
+          {
+            antipodal = true;
+            break;
+          }
+        if (!antipodal)
+          container.push_back(direction);
         used[i] = true;
         for (unsigned int j=0; j<neighbours.size(); j++)
           used[neighbours.at(j)] = true;
@@ -218,8 +231,7 @@ void OdfMaximaExtractionFilter< PixelType, ShOrder, NrOdfDirections>
     std::sort( candidates.begin(), candidates.end(), CompareVectors );  // sort peaks
 
     // From the largest down, a candidate closer than the angular threshold to a peak kept before
-    // is dropped. Each axis gives two opposite (antipodal) candidates, often of exactly equal
-    // length; only the first of them is kept.
+    // is dropped: two candidates can be refined to the same axis.
     for (const DirectionType &v1 : candidates)
     {
       double val = v1.magnitude();
