@@ -15,6 +15,9 @@ found in the LICENSE file.
 #include <itkMath.h>
 #include <mitkExceptionMacro.h>
 
+#include <vnl/vnl_cross.h>
+
+#include <algorithm>
 #include <cmath>
 
 mitk::ShEvaluator::ShEvaluator(unsigned int order, bool mrtrix)
@@ -188,5 +191,100 @@ double mitk::ShEvaluator::GetValue(const double *coefficients, const Vector3 &di
 
   gradient = g - radial * direction;
   hessian = projection * h * projection - radial * projection;
+  return value;
+}
+
+double mitk::ShEvaluator::FindLocalMaximum(const double *coefficients, Vector3 &direction, unsigned int maxIterations, unsigned int *iterations) const
+{
+  const unsigned int limit = maxIterations > 0 ? maxIterations : 1000;
+  Vector3 u = direction / direction.magnitude();
+  Vector3 gradient;
+  Matrix3 hessian;
+  double value = GetValue(coefficients, u, gradient, hessian);
+
+  unsigned int steps = 0;
+  for (; steps < limit; ++steps)
+  {
+    const double gradientNorm = gradient.magnitude();
+    if (gradientNorm <= 1e-9 * std::fabs(value))
+      break;
+
+    // Orthonormal basis of the tangent plane; gradient and Hessian in it.
+    Vector3 e1 = vnl_cross_3d(u, std::fabs(u[0]) < 0.6 ? Vector3(1, 0, 0) : Vector3(0, 1, 0));
+    e1.normalize();
+    const Vector3 e2 = vnl_cross_3d(u, e1);
+    const double g1 = dot_product(e1, gradient);
+    const double g2 = dot_product(e2, gradient);
+    const Vector3 he1 = hessian * e1;
+    const Vector3 he2 = hessian * e2;
+    const double h11 = dot_product(e1, he1);
+    const double h12 = dot_product(e1, he2);
+    const double h22 = dot_product(e2, he2);
+
+    // Newton step with the eigenvalues of the 2x2 Hessian replaced by -max(|lambda|, floor):
+    // the Newton step where the Hessian is negative definite; elsewhere (near a saddle or on a
+    // flat ridge) it still moves uphill along each eigenvector, by the gradient over the
+    // curvature's magnitude.
+    const double mean = 0.5 * (h11 + h22);
+    const double radius = std::hypot(0.5 * (h11 - h22), h12);
+    const double lambdas[2] = {mean - radius, mean + radius};
+    double eigen[2][2];
+    if (radius <= 1e-14 * std::fabs(mean))
+    {
+      eigen[0][0] = 1; eigen[0][1] = 0;
+      eigen[1][0] = 0; eigen[1][1] = 1;
+    }
+    else
+    {
+      // Eigenvector of lambdas[0]: (h12, lambda - h11) or (lambda - h22, h12), the longer one.
+      double a1 = h12, a2 = lambdas[0] - h11;
+      const double b1 = lambdas[0] - h22, b2 = h12;
+      if (a1 * a1 + a2 * a2 < b1 * b1 + b2 * b2)
+      {
+        a1 = b1;
+        a2 = b2;
+      }
+      const double n = std::hypot(a1, a2);
+      eigen[0][0] = a1 / n; eigen[0][1] = a2 / n;
+      eigen[1][0] = -a2 / n; eigen[1][1] = a1 / n;
+    }
+    const double curvatureFloor = 1e-3 * std::fabs(value) + 1e-300;
+    double s1 = 0, s2 = 0;
+    for (unsigned int i = 0; i < 2; ++i)
+    {
+      const double along = (eigen[i][0] * g1 + eigen[i][1] * g2) / std::max(std::fabs(lambdas[i]), curvatureFloor);
+      s1 += along * eigen[i][0];
+      s2 += along * eigen[i][1];
+    }
+
+    double length = std::min(std::hypot(s1, s2), MaxStep);
+    const Vector3 tangent = (s1 * e1 + s2 * e2).normalize();
+    bool accepted = false;
+    Vector3 newU, newGradient;
+    Matrix3 newHessian;
+    double newValue = value;
+    for (; length >= 1e-8; length *= 0.5)
+    {
+      // Along the great circle through u in the step's direction.
+      newU = std::cos(length) * u + std::sin(length) * tangent;
+      newU.normalize();
+      newValue = GetValue(coefficients, newU, newGradient, newHessian);
+      if (newValue > value)
+      {
+        accepted = true;
+        break;
+      }
+    }
+    if (!accepted)
+      break;
+    u = newU;
+    value = newValue;
+    gradient = newGradient;
+    hessian = newHessian;
+  }
+
+  direction = u;
+  if (iterations != nullptr)
+    *iterations = steps;
   return value;
 }

@@ -59,6 +59,21 @@ namespace mitk
      */
     double GetValue(const double *coefficients, const Vector3 &direction, Vector3 &gradient, Matrix3 &hessian) const;
 
+    /**
+     * Moves the unit vector direction uphill on the sphere to a local maximum of the SH function
+     * and returns the value there. Each step is a Newton step in the tangent plane with the
+     * eigenvalues of the Hessian replaced by -max(|eigenvalue|, 1e-3 |value|), so it is the Newton
+     * step where the Hessian is negative definite and still goes uphill near saddles and on flat
+     * ridges; it is at most MaxStep long and halved until the value increases, so the result is
+     * never below the value at the start. Stops when the gradient is
+     * at most 1e-9 of the value, when no step of at least 1e-8 rad increases the value, or after
+     * maxIterations steps (0: at most 1000). iterations, if given, gets the number of steps taken.
+     */
+    double FindLocalMaximum(const double *coefficients, Vector3 &direction, unsigned int maxIterations, unsigned int *iterations = nullptr) const;
+
+    /** Longest step of FindLocalMaximum in rad, about the spacing of the 252 ODF directions. */
+    static constexpr double MaxStep = 0.2;
+
   private:
     /** Coefficient index and factor (normalization and convention sign) of the Re and Im part of
       * order k and |m| = a. */
