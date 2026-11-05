@@ -37,6 +37,7 @@ set(CPP_FILES
   # Algorithms
   Algorithms/mitkLbfgsbMutex.cpp
   Algorithms/mitkModelDirectionRotation.cpp
+  Algorithms/mitkShEvaluator.cpp
   Algorithms/itkFlipPeaksFilter.cpp
   Algorithms/Reconstruction/mitkDiffusionReconstruction.cpp
   Algorithms/Reconstruction/mitkDiffusionReconstructionQball.cpp
@@ -115,6 +116,7 @@ set(H_FILES
   Algorithms/mitkImageGeometry4D.h
   Algorithms/mitkLbfgsbMutex.h
   Algorithms/mitkModelDirectionRotation.h
+  Algorithms/mitkShEvaluator.h
   Algorithms/itkDiffusionTensorPrincipalDirectionImageFilter.h
   Algorithms/itkTensorReconstructionWithEigenvalueCorrectionFilter.h
   Algorithms/itkShCoefficientImageImporter.h

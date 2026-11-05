@@ -25,6 +25,7 @@ found in the LICENSE file.
 #include <mitkOdfImage.h>
 #include <mitkPeakImage.h>
 #include <mitkPointShell.h>
+#include <mitkShEvaluator.h>
 #include <mitkShImage.h>
 #include <mitkTensorImage.h>
 
@@ -44,6 +45,10 @@ found in the LICENSE file.
 #include <itkTensorImageToOdfImageFilter.h>
 #include <itkTensorToL2NormImageFilter.h>
 #include <itkTensorToRgbImageFilter.h>
+
+#include <boost/math/special_functions/factorials.hpp>
+#include <boost/math/special_functions/legendre.hpp>
+#include <boost/math/special_functions/spherical_harmonic.hpp>
 
 #include <vnl/algo/vnl_svd.h>
 #include <vnl/vnl_cross.h>
@@ -88,6 +93,7 @@ class mitkDiffusionModellingAlgorithmsTestSuite : public mitk::TestFixture
   MITK_TEST(Gfa_MatchesReference);
   MITK_TEST(ShToOdf_MatchesReference);
   MITK_TEST(ShBasis_ConventionsAndEvaluationAgree);
+  MITK_TEST(ShEvaluator_SameAsBasisWithDerivatives);
   MITK_TEST(Convert_WrongImageType_Throws);
   MITK_TEST(RgbFilters_RecordedOutput);
   MITK_TEST(TensorToOdf_RecordedOutput);
@@ -996,6 +1002,120 @@ public:
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mrtrixBasis(i, j), reconstructionBasis(i, j), 1e-6);
   }
 
+  using Direction = vnl_vector_fixed<double, 3>;
+
+  /** Basis value of index j (order k, m) at (theta, phi) in double, by the definitions of
+    * mitk::sh::Yj, which evaluates in float. */
+  static double DoubleBasisValue(int k, int m, double theta, double phi, bool mrtrix)
+  {
+    const unsigned int a = std::abs(m);
+    if (mrtrix)
+    {
+      const double mag = std::sqrt((2.0 * k + 1.0) / (4.0 * itk::Math::pi) * boost::math::factorial<double>(k - a) / boost::math::factorial<double>(k + a))
+        * boost::math::legendre_p<double>(k, a, -std::cos(theta));
+      return m > 0 ? mag * std::cos(m * phi) : (m == 0 ? mag : mag * std::sin(-m * phi));
+    }
+    if (m < 0)
+      return std::sqrt(2.0) * boost::math::spherical_harmonic_r<double, double>(k, a, theta, phi);
+    if (m == 0)
+      return boost::math::spherical_harmonic_r<double, double>(k, 0, theta, phi);
+    return std::pow(-1.0, m) * std::sqrt(2.0) * boost::math::spherical_harmonic_i<double, double>(k, m, theta, phi);
+  }
+
+  /** Value of the evaluator at the great circle through u in the tangent direction t, at angle s. */
+  static double ValueAlong(const mitk::ShEvaluator &evaluator, const double *c, const Direction &u, const Direction &t, double s)
+  {
+    return evaluator.GetValue(c, std::cos(s) * u + std::sin(s) * t);
+  }
+
+  // The SH evaluator of the peak refinement computes the basis of mitk::sh::Yj in double, with
+  // its gradient and Hessian on the sphere, also at the poles. Value: to float precision against
+  // Yj (which settles the convention signs) and to 1e-10 against the same definitions in double;
+  // derivatives against central differences of its own value along great circles.
+  void ShEvaluator_SameAsBasisWithDerivatives()
+  {
+    std::vector<Direction> directions = {{0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {0, 1, 0}, {-1, 0, 0}, Direction(1, 1, 0).normalize(),
+                                         Direction(1e-7, 0, 1).normalize(), Direction(0, -1e-4, -1).normalize()};
+    const auto sphere = SphereDirections(300);
+    for (unsigned int i = 0; i < sphere.cols(); ++i)
+      directions.push_back(sphere.get_column(i));
+
+    for (unsigned int order = 2; order <= 12; order += 2)
+    {
+      for (bool mrtrix : {true, false})
+      {
+        const mitk::ShEvaluator evaluator(order, mrtrix);
+        const unsigned int numCoeffs = evaluator.GetNumberOfCoefficients();
+        CPPUNIT_ASSERT_EQUAL((order + 1) * (order + 2) / 2, numCoeffs);
+        std::vector<double> c(numCoeffs);
+        double scale = 0;
+        for (unsigned int j = 0; j < numCoeffs; ++j)
+        {
+          c[j] = std::sin(1.0 + j);
+          scale += std::fabs(c[j]);
+        }
+
+        // At both poles only the m = 0 functions are not 0, each sqrt((2k+1)/(4 pi)).
+        double poleValue = 0;
+        for (unsigned int k = 0; k <= order; k += 2)
+          poleValue += c[(k * k + k + 2) / 2 - 1] * std::sqrt((2.0 * k + 1.0) / (4.0 * itk::Math::pi));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(poleValue, evaluator.GetValue(c.data(), Direction(0, 0, 1)), 1e-12 * scale);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(poleValue, evaluator.GetValue(c.data(), Direction(0, 0, -1)), 1e-12 * scale);
+
+        for (const Direction &direction : directions)
+        {
+          double sph[3];
+          mitk::gradients::Cart2Sph(direction[0], direction[1], direction[2], sph);
+          // Yj takes float angles; the evaluator gets the direction of exactly these angles.
+          // float(pi) is above pi, where the polar formulas no longer describe that direction.
+          const float theta = std::min(static_cast<float>(sph[1]), std::nextafter(static_cast<float>(itk::Math::pi), 0.0f));
+          const float phi = static_cast<float>(sph[0]);
+          const Direction u = mitk::gradients::Sph2Cart(theta, phi, 1.0);
+          double yjSum = 0, yjScale = 0, doubleSum = 0;
+          for (unsigned int k = 0, j = 0; k <= order; k += 2)
+          {
+            for (int m = -static_cast<int>(k); m <= static_cast<int>(k); ++m, ++j)
+            {
+              const double yj = mitk::sh::Yj(m, k, theta, phi, mrtrix);
+              yjSum += c[j] * yj;
+              yjScale += std::fabs(c[j] * yj);
+              doubleSum += c[j] * DoubleBasisValue(k, m, theta, phi, mrtrix);
+            }
+          }
+          const double value = evaluator.GetValue(c.data(), u);
+          // The polar formulas take sin(theta) from 1 - cos(theta)^2, which loses digits near the
+          // poles (Yj in float, the reference in double); the evaluator uses x and y.
+          const double sinTheta = std::hypot(u[0], u[1]);
+          if (sinTheta > 0.05)
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(yjSum, value, 1e-6 * yjScale);
+          if (sinTheta > 1e-3)
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(doubleSum, value, 1e-10 * yjScale);
+
+          Direction gradient;
+          mitk::ShEvaluator::Matrix3 hessian;
+          CPPUNIT_ASSERT_EQUAL(value, evaluator.GetValue(c.data(), u, gradient, hessian));
+          CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, dot_product(gradient, u), 1e-12 * scale);
+
+          const Direction e1 = vnl_cross_3d(u, std::fabs(u[0]) < 0.6 ? Direction(1, 0, 0) : Direction(0, 1, 0)).normalize();
+          const Direction e2 = vnl_cross_3d(u, e1);
+          const Direction diagonal = (e1 + e2) / std::sqrt(2.0);
+          for (const Direction &t : {e1, e2, diagonal})
+          {
+            const double h = 1e-5;
+            const double slope = (ValueAlong(evaluator, c.data(), u, t, h) - ValueAlong(evaluator, c.data(), u, t, -h)) / (2 * h);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(slope, dot_product(gradient, t), 1e-6 * scale);
+            const double h2 = 1e-4;
+            const double curvature = (ValueAlong(evaluator, c.data(), u, t, h2) - 2 * value + ValueAlong(evaluator, c.data(), u, t, -h2)) / (h2 * h2);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(curvature, dot_product(t, hessian * t), 1e-4 * scale);
+          }
+          CPPUNIT_ASSERT((hessian * u).magnitude() < 1e-12 * scale * order * order);
+        }
+      }
+    }
+    CPPUNIT_ASSERT_THROW(mitk::ShEvaluator(3, true), mitk::Exception);
+    CPPUNIT_ASSERT_THROW(mitk::ShEvaluator(mitk::ShEvaluator::MaxOrder + 2, true), mitk::Exception);
+  }
+
   void Convert_WrongImageType_Throws()
   {
     auto tensorImage = mitk::IOUtil::Load<mitk::TensorImage>(mitk::GetDiffusionTestDataFilePath("ImageReconstruction/test_dti.dti"));
@@ -1124,8 +1244,6 @@ public:
         CPPUNIT_ASSERT_EQUAL(r < 3 && c < 3 ? coefficients->GetDirection()[r][c] : (r == c ? 1.0 : 0.0), peaks->GetDirection()[r][c]);
     }
   }
-
-  using Direction = vnl_vector_fixed<double, 3>;
 
   /**
    * Order-8 SH coefficients (MITK's convention) of an ODF with one sharp lobe (u.d)^20 per fibre
