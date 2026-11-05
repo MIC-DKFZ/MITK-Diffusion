@@ -36,9 +36,10 @@ namespace
    *  and ROIs alone the fallback. */
 #ifdef MITK_DIFFUSION_REST_ATTRACTIVE
   const char* const TractStep =
-    "3. For a single tract, use atTRACTive, the recommended way: two sphere ROIs at the tract's two "
-    "ends (where its fibers stop: over the cortex, or at the border of the image or mask) as two labels "
-    "of one segmentation, probabilistic tractography between them (seed and target "
+    "3. For a single tract, use atTRACTive, the recommended way: two sphere ROIs, each covering the "
+    "tract's whole start or end region (all the cortex where its fibers stop, or the border of the image "
+    "or mask; large rather than tight, the two apart), as two labels of one segmentation, probabilistic "
+    "tractography on peaks between them (seed and target "
     "both labels, endpoint_constraint \"both_in_target_different_labels\"), then an atTRACTive session "
     "on the result (POST /api/v1/diffusion/attractive/sessions): sample fibers, label them by their "
     "descriptions, train, and repeat until the prediction stops changing; finish saves the tract. "
