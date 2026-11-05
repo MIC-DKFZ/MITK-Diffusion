@@ -67,7 +67,7 @@ mitk-diffusion code too. Read the matching rule before touching CMake, a module 
 
 | Path | What it is |
 | --- | --- |
-| `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO; `mitkMaskGeometry.h` holds the voxel-grid rule (`HasVoxelGridOf`, 1e-4 mm) of the IVIM, kurtosis and peak filters' masks. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters; in `Algorithms/Reconstruction/` the functions the reconstruction views and apps call (`mitkDiffusionReconstruction.h`: tensors, Q-ball, tensors to DWI; `mitkDiffusionPeaks.h`; `mitkDiffusionIndices.h`) and the ODF direction tables (`mitkPointShell.h`). `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk, TRX and DICOM tractography IO. `DiffusionMasks` (on MITK's `Multilabel`): the mask rule of the views' mask and ROI boxes (`mitkDiffusionMasks.h`: binary 3D images and MITK's multi-label segmentations; `GetMaskImage` turns a segmentation into a mask image, the union of its labels), tested by `mitkDiffusionMasksTest`; the ivim, reconstruction, fiberfox, tractography and fiberprocessing plugins depend on it, so every configuration that builds one of them switches it on (no command line app uses it). `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`, `DiffusionRestApi` (on MITK's `RESTAPI`: the endpoints below `/api/v1/diffusion`, see "How the build works"). |
+| `mitk-diffusion/Modules/` | Modules, built in the order of `ModuleList.cmake`. `DiffusionImage`: a DWI is a plain `mitk::Image` plus gradient, b-value and measurement-frame properties (`Properties/mitkDiffusionPropertyHelper.h`), with NRRD/NIfTI/DICOM IO; `mitkMaskGeometry.h` holds the voxel-grid rule (`HasVoxelGridOf`, 1e-4 mm) of the IVIM, kurtosis and peak filters' masks. `DiffusionModelling`: tensor, ODF, SH and peak image types, their IO and mappers, reconstruction filters; in `Algorithms/Reconstruction/` the functions the reconstruction views and apps call (`mitkDiffusionReconstruction.h`: tensors, Q-ball, tensors to DWI; `mitkDiffusionPeaks.h`; `mitkDiffusionIndices.h`) and the ODF direction tables (`mitkPointShell.h`). `FiberBundle`: `mitk::FiberBundle` (a `vtkPolyData` of streamlines) and fib/vtk, tck, trk, TRX and DICOM tractography IO. `DiffusionMasks` (on MITK's `Multilabel`): the mask rule of the views' mask and ROI boxes (`mitkDiffusionMasks.h`: binary 3D images and MITK's multi-label segmentations; `GetMaskImage` turns a segmentation into a mask image, the union of its labels), tested by `mitkDiffusionMasksTest`; the ivim, reconstruction, fiberfox, tractography and fiberprocessing plugins depend on it, so every configuration that builds one of them switches it on (no command line app uses it). `FiberProcessing`, `FiberTracking` (streamline + Gibbs), `MriSimulation` (Fiberfox), `FiberDissection` (OpenCV; atTRACTive's classifier, and `mitk::ActiveLearningSession` in `MachineLearning/mitkActiveLearningSession.h`, a labeling session without GUI for the REST endpoints), `DiffusionPreprocessing`, `DiffusionRegistration` (MatchPoint), `IVIM`, `DiffusionRestApi` (on MITK's `RESTAPI`: the endpoints below `/api/v1/diffusion`, see "How the build works"). |
 | `mitk-diffusion/Modules/DiffusionCmdApps/` | Command line tools, one subfolder per group, each group switched by a `BUILD_Diffusion*CmdApps` option. A group's `CMakeLists.txt` is one call of `mitk_diffusion_create_cmdapps` (defined in `Modules/DiffusionCmdApps/CMakeLists.txt`) with the option, the modules of the group and its apps, `<App>` or `<App>:<module>,...` for modules only that app links. The apps link with `--no-as-needed`: a diffusion module registers its readers and writers when it is loaded, and an app that only loads and saves files uses none of its symbols. `MitkCopyGeometry` turns DWI gradients and the world directions of tensor, SH, ODF and peak images (`mitk::ModelDirectionRotation`, DiffusionModelling) with the geometry; 4D SH and peak NIfTI files need `--input_type sh|peak`, since MITK's image reader is their default. Apps derive output names with `DiffusionDataIOHelper::GetExtension` and the stems next to it (`mitkDiffusionDataIOHelper.h`), which strip only the longest extension of a registered MIME type, so `sub.01.nii.gz` keeps `sub.01`. MITK's parser writes help texts unescaped into `--xml`, so they hold no `<` or `&` (placeholders in capitals, e.g. `OUTPUT_ADC.dwi`). |
 | `mitk-diffusion/Plugins/` | `org.mitk.gui.qt.diffusionimaging.*` views; `PluginList.cmake` registers them, all off by default. User manuals in `<plugin>/documentation/UserManual/`. atTRACTive (`...attractive`, on `FiberDissection`) is a plugin of its own, so the other fiber views (`...fiberprocessing`) build without OpenCV. Mask and ROI boxes take binary images and MITK's multi-label segmentations through `DiffusionMasks` (`GetBinaryMaskPredicate`, `GetMaskImage`). Perspectives build their layout with `QmitkDiffusionPerspectiveLayout::CreateLayout` (controls plugin, `src/`), which leaves out views not registered in the configuration; a plugin with a perspective requires the controls plugin. BlueBerry deletes a closed view's widgets before the view, and MITK's `QmitkDataStorageComboBox` emits `currentIndexChanged` from its destructor, so a view that connects such a box to code touching its widgets calls `QmitkDiffusionViewControlsGuard::Install(parent, this)` (controls plugin, `src/`) before `setupUi`; every diffusion plugin requires the controls plugin. The view goes right after its widgets (on quitting, before them), so timers and worker results it owns need no such guard. Views use `QPushButton` and no inline style sheets, colours or fonts: MITK's theme styles them, and its global `*` font rule overrides fonts from `.ui` files and `setFont`. Warning labels get their text from `QmitkDiffusionWarningText::Format` (controls plugin, `src/`), since a `QLabel` ignores the theme's `font.warning` rule; grey hint texts stay. |
 | `mitk-diffusion/CMake/BuildConfigurations/` | `DiffusionDebug` (everything, tests on), `DiffusionRelease` (= DiffusionDebug + release settings), `Tractography`, `Fiberfox`, `IVIM`, `atTRACTive`, `DiffusionCmdApps` (no GUI); `Tractography`, `Fiberfox` and `IVIM` include the fiber processing views, only `DiffusionDebug`/`DiffusionRelease` and `atTRACTive` build OpenCV and atTRACTive. Each starts with `set_always.txt`, which resets every variable a configuration changes (external packages; every diffusion module, cmd-app group and plugin off), and then switches on what it contains; `set_release.txt` forces `Release` and `BUILD_TESTING OFF`. |
@@ -149,7 +149,18 @@ Facts the layout does not show:
   /diffusion/reconstruction/{tensors,tensor-indices,color-fa,qball,peaks}`, `POST
   /diffusion/masks/{brain,white-matter}`, `POST /diffusion/rois` (sphere in mm, or polygon from
   screenshot pixels of a 2D window through `GetRestWorldPoints`) with `GET /diffusion/rois/:uid`,
-  `PATCH`/`DELETE .../labels/:value`, `POST /diffusion/tractography/{streamline,extract,metrics}`.
+  `PATCH`/`DELETE .../labels/:value`, `POST /diffusion/tractography/{streamline,extract,metrics}`,
+  and the atTRACTive sessions: `POST`/`GET /diffusion/attractive/sessions`, `GET`/`DELETE
+  .../sessions/:id`, `POST .../sessions/:id/{sample,labels,train,finish}`. The atTRACTive routes
+  (`mitkDiffusionRestAttractive.cpp`) are compiled only where `FiberDissection` is built
+  (`MITK_DIFFUSION_REST_ATTRACTIVE`: `DiffusionDebug`, `DiffusionRelease`; `ModuleList.cmake` lists
+  `FiberDissection` before `DiffusionRestApi` for the `if(TARGET ...)`), and only there does the
+  overview name atTRACTive as the way to a single tract. A session (an `ActiveLearningSession`) lives
+  until its `DELETE` or until the routes go; its calls run under its mutex, which a training job
+  holds for the whole classifier run, so the session's other routes answer 409 meanwhile, and code
+  in the GUI thread never takes it (a route holding it waits for the GUI thread). Fiber ids of a
+  session are pool ids; the whole-brain enrichment runs `Extract` (`mitkDiffusionRestUtil.h`, shared
+  with the extraction routes) on the pool and maps the result back by geometry (`GetPoolIdsOf`).
   Long work runs as `RestJob`s on worker threads (`diffusionrest::JobRunner`,
   `mitkDiffusionRestUtil.h`): the work returns a finish function that the runner posts to the GUI
   thread (`IRestServerService::Post`) to add the result nodes; the runner cancels and joins its
@@ -166,8 +177,10 @@ Facts the layout does not show:
   their task at once in the caller's thread; MITK refuses a second image access of one thread, so a
   test releases its own ITK views of an image before a route casts it). The tractography UI suite's
   `Rest_` case calls the routes through the Workbench's server (`HandleRequest` on a worker thread,
-  the GUI thread kept running) and checks the polygon ROI against the shown slice. The trial
-  protocol for the agent on real data is `<ws>/gitlab_issues/55-agent-tractography.trial.md`.
+  the GUI thread kept running) and checks the polygon ROI against the shown slice; the Attractive
+  suite's `Rest_` case tracks between two spheres and dissects the result with a session
+  (`MITK_DIFFUSION_UITEST_ATTRACTIVE`). The trial protocols for the agent on real data are
+  `<ws>/gitlab_issues/55-agent-tractography.trial.md` and `57-agent-attractive.trial.md`.
 - `ctest -R mitkDiffusionViewsUiTest` runs the offscreen UI tests of the views, one test per
   plugin group (`Plugins/org.mitk.gui.qt.diffusionimaging.uitests`, a `TEST_PLUGIN` that the
   controls plugin adds under `BUILD_TESTING`, which `DiffusionRelease` switches on again after
@@ -186,7 +199,10 @@ Facts the layout does not show:
   the test (`ShowFiberfox`, `StraightFibers`). Setting `MITK_DIFFUSION_UITEST_CASE=<method>` in the shell that runs ctest
   runs that case alone. The tests run with `LC_ALL=C.UTF-8` and are skipped (exit code 77) without
   a Qt platform plugin. Offscreen there is no OpenGL: render windows draw nothing, so rendering
-  looks stay manual checks.
+  looks stay manual checks. Without `DISPLAY`, the offscreen plugin gets no OpenGL context and the
+  2D render windows keep size 0, so cases that use window sizes fail (the Tractography suite's two
+  `Rest_` cases); run the UI tests with the desktop's display, e.g. `DISPLAY=:1
+  XAUTHORITY=/run/user/<uid>/gdm/Xauthority` (no window appears).
 - Test data: module tests use `MITK_CREATE_MODULE_TESTS` / `mitkAddCustomModuleTest` in each
   `Testing/` folder and read their input and references from a checkout of
   https://git.dkfz.de/mic/personal/group6/neuro/mitk-diffusion-test-data (branch `main`; paths as
@@ -388,17 +404,20 @@ Facts the layout does not show:
   format, since the theme's `*` font rule replaces widget fonts and the bar's percentages would not
   line up with its stars; a corner widget of the log changes its height.
 - `ctest -R mitkFiberDissection` runs the `FiberDissection` tests (label bundle moves of the
-  labeling brush, sphere ROI selection, the classifier's candidates), all on synthetic bundles
-  without a display. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
+  labeling brush, sphere ROI selection, the classifier's candidates, the session: oracle labels
+  find the target bundle, a seed repeats samples and predictions, the finished tract has the
+  original fibers, enrichment, wrong labels), all on synthetic bundles without a display. A
+  seeded session sets OpenCV's thread RNG (`cv::theRNG()`) before every training: the random
+  forest draws from it, so the forest would otherwise depend on what the thread trained before. Label bundles are changed only through `StreamlineInteractorBrush::MoveFiber`,
   so fiber count and weights stay consistent; labeled fibers are found in the classifier's pool
   by their exact geometry. The module depends only on `FiberBundle` and OpenCV (`opencv_ml`);
-  its one user is the atTRACTive plugin.
+  its users are the atTRACTive plugin and `DiffusionRestApi`.
 
 ## Porting state
 
 In the `DiffusionDebug` and `DiffusionRelease` builds, MITK and all of mitk-diffusion (modules,
 test drivers, command line apps, plugins, user manuals) compile and link without warnings, and
-all 80 diffusion tests pass. The Workbench starts offscreen, opens a file of every diffusion type,
+all 81 diffusion tests pass. The Workbench starts offscreen, opens a file of every diffusion type,
 and its views run in the offscreen UI tests; after the #13 review, every view was checked by hand
 in a Release Workbench at a display. Remove an item once it is fixed.
 
