@@ -14,13 +14,19 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _ClusteringMetricScalarMap
-#define _ClusteringMetricScalarMap
+#ifndef mitkClusteringMetricScalarMap_h
+#define mitkClusteringMetricScalarMap_h
 
 #include <mitkClusteringMetric.h>
 #include <itkImage.h>
+#include <itkLinearInterpolateImageFunction.h>
+#include <mitkDiffusionImageHelperFunctions.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkNumericTraits.h>
+
+#include <cmath>
+#include <memory>
+#include <vector>
 
 namespace mitk
 {
@@ -33,97 +39,91 @@ class ClusteringMetricScalarMap : public ClusteringMetric
 
 public:
 
-  typedef itk::Image<float, 3>  ItkFloatImgType;
+  using ItkFloatImgType = itk::Image<float, 3>;
 
   ClusteringMetricScalarMap()
   {
-    m_Interpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
     this->m_Scale = 30;
   }
-  virtual ~ClusteringMetricScalarMap(){}
 
-  float CalculateDistance(vnl_matrix<float>& s, vnl_matrix<float>& t, bool &flipped)
+  float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
+    const auto sData = PrepareFiber(s);
+    const auto tData = PrepareFiber(t);
+    return CalculatePreparedDistance(s, t, sData.get(), tData.get(), flipped);
+  }
+
+  /** The map values at the points of a fiber: values[i*numMaps+c] of map c at point i */
+  class ValueData : public FiberData
+  {
+  public:
+    std::vector<float> values;
+  };
+
+  std::unique_ptr<FiberData> PrepareFiber(const vnl_matrix<float>& s) const override
+  {
+    auto data = std::make_unique<ValueData>();
+    data->values.reserve(s.cols()*m_Interpolators.size());
+    for (unsigned int i=0; i<s.cols(); ++i)
+    {
+      itk::Point<float, 3> p;
+      p[0] = s[0][i];
+      p[1] = s[1][i];
+      p[2] = s[2][i];
+      for (const auto& interpolator : m_Interpolators)
+        data->values.push_back(mitk::imv::GetImageValue<float>(p, true, interpolator));
+    }
+    return data;
+  }
+
+  float CalculatePreparedDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t,
+                                  const FiberData* sData, const FiberData* tData, bool &flipped) const override
+  {
+    const auto& v1 = dynamic_cast<const ValueData&>(*sData).values;
+    const auto& v2 = dynamic_cast<const ValueData&>(*tData).values;
+
+    // Every fourth point; fibers with fewer than four points use every point.
     float d_direct = 0;
     float d_flipped = 0;
+    const unsigned int n = s.cols();
+    const unsigned int inc = n>=4 ? n/4 : 1;
+    SumPointDistances(s, t, inc, d_direct, d_flipped);
+    flipped = d_direct>d_flipped;
+
+    // the norm of the difference of the map values at each point, as vnl_vector::magnitude()
+    const std::size_t numMaps = m_Interpolators.size();
     float map_distance = 0;
-
-    vnl_vector<float> dists_d; dists_d.set_size(s.cols());
-    vnl_vector<float> dists_f; dists_f.set_size(s.cols());
-
-    int inc = s.cols()/4;
-    for (unsigned int i=0; i<s.cols(); i += inc)
+    for (unsigned int i=0; i<n; ++i)
     {
-      d_direct += (s.get_column(i)-t.get_column(i)).magnitude();
-      d_flipped += (s.get_column(i)-t.get_column(s.cols()-i-1)).magnitude();
-    }
-
-    if (d_direct>d_flipped)
-    {
-      flipped = true;
-
-      for (unsigned int i=0; i<s.cols(); ++i)
+      const std::size_t j = flipped ? n-i-1 : i;
+      float sum = 0;
+      for (std::size_t c=0; c<numMaps; ++c)
       {
-        itk::Point<float, 3> p;
-        p[0] = s[0][i];
-        p[1] = s[1][i];
-        p[2] = s[2][i];
-        vnl_vector<float> vals1 = GetImageValuesAtPoint(p);
-
-        p[0] = t[0][s.cols()-i-1];
-        p[1] = t[1][s.cols()-i-1];
-        p[2] = t[2][s.cols()-i-1];
-        vnl_vector<float> vals2 = GetImageValuesAtPoint(p);
-
-        map_distance += (vals1-vals2).magnitude();
+        const float diff = v1[i*numMaps+c]-v2[j*numMaps+c];
+        sum += diff*diff;
       }
-    }
-    else
-    {
-      flipped = false;
-
-      for (unsigned int i=0; i<s.cols(); ++i)
-      {
-        itk::Point<float, 3> p;
-        p[0] = s[0][i];
-        p[1] = s[1][i];
-        p[2] = s[2][i];
-        vnl_vector<float> vals1 = GetImageValuesAtPoint(p);
-
-        p[0] = t[0][i];
-        p[1] = t[1][i];
-        p[2] = t[2][i];
-        vnl_vector<float> vals2 = GetImageValuesAtPoint(p);
-
-        map_distance += (vals1-vals2).magnitude();
-      }
+      map_distance += static_cast<float>(std::sqrt(static_cast<double>(sum)));
     }
 
     return m_Scale*map_distance;
   }
 
-  vnl_vector<float> GetImageValuesAtPoint(itk::Point<float, 3>& itkP)
-  {
-    vnl_vector<float> vals; vals.set_size(m_ScalarMaps.size());
-    int c = 0;
-    for (auto map : m_ScalarMaps)
-    {
-      m_Interpolator->SetInputImage(map);
-      vals[c] = mitk::imv::GetImageValue<float>(itkP, true, m_Interpolator);
-      ++c;
-    }
-    return vals;
-  }
-
   void SetImages(const std::vector<ItkFloatImgType::Pointer> &Parcellations)
   {
     m_ScalarMaps = Parcellations;
+    m_Interpolators.clear();
+    for (auto map : m_ScalarMaps)
+    {
+      auto interpolator = itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::New();
+      interpolator->SetInputImage(map);
+      m_Interpolators.push_back(interpolator);
+    }
   }
 
 protected:
 
   std::vector< ItkFloatImgType::Pointer > m_ScalarMaps;
-  itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::Pointer   m_Interpolator;
+  std::vector< itk::LinearInterpolateImageFunction< ItkFloatImgType, float >::Pointer > m_Interpolators;
 };
 
 }

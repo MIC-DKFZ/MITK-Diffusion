@@ -1,11 +1,13 @@
 /**
 \page org_mitk_views_controlvisualizationpropertiesview Visualization Control Panel
 
-\section QmitkDiffusionImagingVisualizationSettings ODF Visualization
+This view configures how diffusion images, peak images and tractograms are shown. The controls depend on the data selected in the Data Manager. With several nodes selected, the controls show the values of the last selected node of each kind, and a change applies to all selected nodes of that kind; the glyph buttons (T, S, C) apply to the last selected tensor, ODF or SH image only.
 
-In this small view, the visualization of ODFs and diffusion images can be configured. Depending on the selected image in the data storage, different options are shown here.
+\section QmitkDiffusionImagingVisualizationSettings ODF and Tensor Glyphs
 
-For tensor or ODF images, the visibility of glyphs in the different render windows (T)ransversal, (S)agittal, and (C)oronal can be configured here. The maximal number of glyphs to display can also be configured here for. This is usefull to keep the system response time during rendering feasible. The other options configure normalization and scaling of the glyphs.
+For tensor, ODF and spherical-harmonic images, the visibility of glyphs in (T)ransversal, (S)agittal and (C)oronal slices can be switched here; it applies to every 2D render window that shows a slice of that orientation (the image axis nearest to the slice normal). The maximal number of glyphs to display (\#Glyphs, 10,000 by default, up to 60,000) keeps the time to draw a new slice short; with more voxels in view, the glyphs are spread over them. While a view is panned or zoomed, its glyphs stay where they are, and they fill the new view about 0.2 seconds after the movement stops. Glyphs that are small on screen (less than 8 or 20 pixels wide) are drawn with a coarser mesh; zooming in, or a magnified screenshot, redraws the glyphs with the finer mesh at once. Of the larger glyphs, at most 15,000 (8 to 20 pixels wide) or 10,000 (wider) are drawn, which take about as long to draw as 60,000 small ones (so a magnified screenshot of more than 15,000 glyphs shows a subset of them); tensor ellipsoids coloured by principal direction are not limited this way. Tensor ellipsoids coloured by principal direction are drawn by the graphics card from one sphere, which is fast also for many of them; they are the exact ellipsoids. The ellipsoids drawn when colouring by ODF value are wider for anisotropic tensors, by an amount that depends on their orientation: about 3 % for a tensor with eigenvalues 3:1:1, 10 % for 5:1:1 and 28 % on average for 9:1:1 (up to 62 %), and their tip can point up to 8.7 degrees away from the principal direction. The other options configure the normalization (Min-Max, Max or None; not offered for tensors; a scene file with the former "Global Maximum" shows "Max", which draws the same), the scaling of the glyphs (None, FA/GFA or Principal Curvature), an additional scaling factor, and the colouring by ODF value or by principal direction.
+
+A diffusion-weighted image that is loaded while this view is open shows its first b=0 volume instead of volume 0, unless it already shows another volume, e.g. one restored from a scene file.
 
 This is how a visualization with activated glyphs should look like:
 
@@ -13,10 +15,24 @@ This is how a visualization with activated glyphs should look like:
 
 \imageMacro{Data_Tensors.png,"Tensor image with glyph visibility toggled ON",1}
 
+\section QmitkDiffusionImagingThickSlices Thick Slices
+
+For images, the thick-slice menu sets a maximum, sum or weighted intensity projection over a slab of slices in all three 2D render windows at once. The slider sets the number of slices; the menu shows the state of the axial render window.
+
 \section QmitkDiffusionImagingTractVisualizationSettings Tractogram Visualization
 
-If a tractogram is selected in the data manager, this view enables to visualize the fibers as tubes or thick lines as well as to play with the 2D and 3D clipping of the fiber visualization. The 3D clipping works per tractogram individually, which enables nice visualization of e.g. a CST tract extending upwards out of the bottom half of a whole brain tractogram.
+If a tractogram is selected in the data manager, this view enables to visualize the fibers as tubes (tube radius) or ribbons (ribbon width) and to clip the fibers in 2D and 3D. Tube radius and ribbon width are in mm; a tube radius above 0 takes precedence over the ribbons. Tubes are drawn by the graphics card from the fiber lines, so they appear at once also for large tractograms; ribbons are computed for the whole tractogram first, which takes a few seconds for some hundred thousand fibers. In the 2D render windows, a tractogram shows the fibers within the given distance (2D clipping) from the displayed plane. The fibers are shaded by their depth in this slab, from full colour on the side facing the viewer to 20 % of it on the far side, so that fibers leaving the plane can be told apart from those in it. The data node properties (in the Properties view) Fiber2DfadeStrength sets how much darker the far side is (0 to 1, 0.8 by default) and Fiber2DfadeEFX switches the shading off. Each 2D window keeps only the fibers near its plane on the graphics card, in layers of 1 mm: scrolling loads the layer that comes near the plane and drops layers far from it, and rotating a plane (e.g. with the crosshair) loads the layers along its new orientation. Scrolling and rotating therefore run without pauses also for large tractograms (a million fibers: about 50 ms per slice step and about 150 ms per rotation step of one degree, with four render windows; about 0.3 s per step when two planes are rotated together). Recolouring the fibers (e.g. by a scalar map or with the atTRACTive brush) keeps the loaded fibers and only replaces their colours. Where two fibers cross within about 0.05 mm in depth, either of them can be on top (in earlier versions the order of the fibers in the file decided); in a dense whole-brain tractogram this concerns about 0.5 % of the fiber pixels. The 3D clipping cuts a tractogram at the current axial, sagittal or coronal plane, optionally on the other side ("Flip Clipping Direction"), and follows the plane when the slice is changed. It works per tractogram individually, which enables nice visualization of e.g. a CST tract extending upwards out of the bottom half of a whole brain tractogram.
+
+The colour button opens one colour dialog and colours all selected tractograms and peak images with the chosen colour; a tractogram or peak image whose node colour is changed elsewhere (e.g. in the Data Manager) while it is selected takes the new colour as well. The reset button restores the colouring by fiber orientation.
 
 \imageMacro{tract_visualization.png,"CST tube visualization with sagittal 3D clipping of the whole-brain tractogram.",1}
+
+\section QmitkDiffusionImagingPeakVisualizationSettings Peak Images
+
+For peak images, the view sets the line width, the colour (or the colouring by orientation), the 3D clipping as for tractograms, and whether the peaks are also shown in the 3D render window. "Flip Peaks" mirrors the peak directions of the selected peak images along the chosen axes, e.g. to correct peaks computed in another coordinate convention. The images are changed in place and keep their names, properties and colour.
+
+\section QmitkDiffusionImagingPlanarFigures Planar Figures
+
+When a planar figure (e.g. a ROI for fiber extraction) is selected, the 2D render window whose plane is closest to the figure's plane moves to the figure, and the figure becomes editable.
 
 */

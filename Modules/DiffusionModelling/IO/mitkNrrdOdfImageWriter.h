@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _MITK_NRRDODF_WRITER__H_
-#define _MITK_NRRDODF_WRITER__H_
+#ifndef mitkNrrdOdfImageWriter_h
+#define mitkNrrdOdfImageWriter_h
 
 #include <mitkAbstractFileWriter.h>
 #include <mitkOdfImage.h>
@@ -25,7 +25,7 @@ namespace mitk
 {
 
 /**
- * Writes diffusion volumes to a file
+ * Writes ODF images to NRRD files (.odf, .qbi)
  * @ingroup Process
  */
   class NrrdOdfImageWriter : public mitk::AbstractFileWriter
@@ -40,7 +40,6 @@ namespace mitk
     using AbstractFileWriter::Write;
     void Write() override;
 
-    ConfidenceLevel GetConfidenceLevel() const override;
 
   protected:
 
@@ -51,4 +50,4 @@ namespace mitk
 
 } // end of namespace mitk
 
-#endif //_MITK_NRRDODF_WRITER__H_
+#endif

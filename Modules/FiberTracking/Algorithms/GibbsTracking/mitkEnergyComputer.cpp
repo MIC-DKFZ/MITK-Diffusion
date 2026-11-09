@@ -58,16 +58,13 @@ EnergyComputer::EnergyComputer(ItkFloatImageType* mask, ParticleGrid* particleGr
     }
     m_RotationMatrix = directionMatrix;
 
-    if (ODF_SAMPLING_SIZE != m_SphereInterpolator->nverts)
-        fprintf(stderr,"EnergyComputer: error during init: data does not match with interpolation scheme\n");
-
     int totsz = m_Size[0]*m_Size[1]*m_Size[2];
-    m_CumulatedSpatialProbability.resize(totsz + 1, 0.0);
-    m_ActiveIndices.resize(totsz, 0);
+    std::vector< float > cumulatedSpatialProbability(totsz + 1, 0.0);
+    std::vector< int > activeIndices(totsz, 0);
 
     // calculate active voxels and cumulate probabilities
     m_NumActiveVoxels = 0;
-    m_CumulatedSpatialProbability[0] = 0;
+    cumulatedSpatialProbability[0] = 0;
     for (int x = 0; x < m_Size[0];x++)
         for (int y = 0; y < m_Size[1];y++)
             for (int z = 0; z < m_Size[2];z++)
@@ -77,13 +74,15 @@ EnergyComputer::EnergyComputer(ItkFloatImageType* mask, ParticleGrid* particleGr
                 index[0] = x; index[1] = y; index[2] = z;
                 if (m_Mask->GetPixel(index) > 0.5)
                 {
-                    m_CumulatedSpatialProbability[m_NumActiveVoxels+1] = m_CumulatedSpatialProbability[m_NumActiveVoxels] + m_Mask->GetPixel(index);
-                    m_ActiveIndices[m_NumActiveVoxels] = idx;
+                    cumulatedSpatialProbability[m_NumActiveVoxels+1] = cumulatedSpatialProbability[m_NumActiveVoxels] + m_Mask->GetPixel(index);
+                    activeIndices[m_NumActiveVoxels] = idx;
                     m_NumActiveVoxels++;
                 }
             }
     for (int k = 0; k < m_NumActiveVoxels; k++)
-        m_CumulatedSpatialProbability[k] /= m_CumulatedSpatialProbability[m_NumActiveVoxels];
+        cumulatedSpatialProbability[k] /= cumulatedSpatialProbability[m_NumActiveVoxels];
+    m_CumulatedSpatialProbability = std::make_shared< const std::vector< float > >(std::move(cumulatedSpatialProbability));
+    m_ActiveIndices = std::make_shared< const std::vector< int > >(std::move(activeIndices));
 
     std::cout << "EnergyComputer: " << m_NumActiveVoxels << " active voxels found" << std::endl;
 }
@@ -104,9 +103,21 @@ void EnergyComputer::SetParameters(float particleWeight, float particleWidth, fl
     m_SigmaInv = 1/(2*sigma_s*sigma_s);
 }
 
+void EnergyComputer::SetRandGen(ItkRandGenType* randGen)
+{
+    m_RandGen = randGen;
+}
+
+void EnergyComputer::SetBlock(GibbsBlock* block)
+{
+    m_Neighbors.block = block;
+}
+
 // draw random position from active voxels
 void EnergyComputer::DrawRandomPosition(vnl_vector_fixed<float, 3>& R)
 {
+    const std::vector< float >& cumulatedSpatialProbability = *m_CumulatedSpatialProbability;
+    const std::vector< int >& activeIndices = *m_ActiveIndices;
     float r = static_cast<float>(m_RandGen->GetVariate());
     int j;
     int rl = 1;
@@ -114,21 +125,21 @@ void EnergyComputer::DrawRandomPosition(vnl_vector_fixed<float, 3>& R)
     while(rh != rl)
     {
         j = rl + (rh-rl)/2;
-        if (r < m_CumulatedSpatialProbability[j])
+        if (r < cumulatedSpatialProbability[j])
         {
             rh = j;
             continue;
         }
-        if (r > m_CumulatedSpatialProbability[j])
+        if (r > cumulatedSpatialProbability[j])
         {
             rl = j+1;
             continue;
         }
         break;
     }
-    R[0] = m_Spacing[0]*((float)(m_ActiveIndices[rh-1] % m_Size[0])  + m_RandGen->GetVariate());
-    R[1] = m_Spacing[1]*((float)((m_ActiveIndices[rh-1]/m_Size[0]) % m_Size[1])  + m_RandGen->GetVariate());
-    R[2] = m_Spacing[2]*((float)(m_ActiveIndices[rh-1]/(m_Size[0]*m_Size[1]))    + m_RandGen->GetVariate());
+    R[0] = m_Spacing[0]*((float)(activeIndices[rh-1] % m_Size[0])  + m_RandGen->GetVariate());
+    R[1] = m_Spacing[1]*((float)((activeIndices[rh-1]/m_Size[0]) % m_Size[1])  + m_RandGen->GetVariate());
+    R[2] = m_Spacing[2]*((float)(activeIndices[rh-1]/(m_Size[0]*m_Size[1]))    + m_RandGen->GetVariate());
 }
 
 // return spatial probability of position
@@ -157,15 +168,4 @@ float EnergyComputer::CalcI0(float x)
     erg += y*y*-1.4889;
     erg += y*y*y*2.0389;
     return erg;
-}
-
-float EnergyComputer::mexp(float x)
-{
-    return((x>=7.0) ? 0 : ((x>=5.0) ? (-0.0029*x+0.0213) : ((x>=3.0) ? (-0.0215*x+0.1144) : ((x>=2.0) ? (-0.0855*x+0.3064) : ((x>=1.0) ? (-0.2325*x+0.6004) : ((x>=0.5) ? (-0.4773*x+0.8452) : ((x>=0.0) ? (-0.7869*x+1.0000) : 1 )))))));
-    //  return exp(-x);
-}
-
-int EnergyComputer::GetNumActiveVoxels()
-{
-    return m_NumActiveVoxels;
 }

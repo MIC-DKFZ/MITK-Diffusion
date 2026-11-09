@@ -1,13 +1,15 @@
 set(MITK_MODULES
   DiffusionImage
+  DiffusionMasks
   DiffusionPreprocessing
   DiffusionModelling
   DiffusionRegistration
   FiberBundle
   FiberProcessing
   FiberTracking
-  MriSimulation
   FiberDissection
+  DiffusionRestApi
+  MriSimulation
   IVIM
   DiffusionCmdApps
 )

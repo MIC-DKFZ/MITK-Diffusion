@@ -1,4 +1,5 @@
 set(SRC_CPP_FILES
+  QmitkDiffusionPerspectiveLayout.cpp
 )
 
 set(INTERNAL_CPP_FILES
@@ -7,7 +8,6 @@ set(INTERNAL_CPP_FILES
   QmitkControlVisualizationPropertiesView.cpp
   QmitkDicomTractogramTagEditorView.cpp
 
-  Perspectives/QmitkDiffusionDefaultPerspective.cpp
   Perspectives/QmitkSegmentationPerspective.cpp
 )
 
@@ -23,7 +23,6 @@ set(MOC_H_FILES
   src/internal/QmitkControlVisualizationPropertiesView.h
   src/internal/QmitkDicomTractogramTagEditorView.h
 
-  src/internal/Perspectives/QmitkDiffusionDefaultPerspective.h
   src/internal/Perspectives/QmitkSegmentationPerspective.h
 )
 
@@ -36,22 +35,12 @@ set(CACHED_RESOURCE_FILES
 
   resources/dwiimport.png
   resources/vizControls.png
-  resources/arrow.png
-  resources/dwi.png
-  resources/odf.png
-  resources/tensor.png
-  resources/tractogram.png
-  resources/odf_peaks.png
-  resources/ml_tractogram.png
-  resources/sh.png
-  resources/refresh.xpm
   resources/segmentation.svg
  )
 
+# Refresh_48.png is also used by the tractography plugin (Gibbs tracking view).
 set(QRC_FILES
-# uncomment the following line if you want to use Qt resources
   resources/QmitkDiffusionImaging.qrc
-  #resources/QmitkTractbasedSpatialStatisticsView.qrc
 )
 
 set(CPP_FILES )

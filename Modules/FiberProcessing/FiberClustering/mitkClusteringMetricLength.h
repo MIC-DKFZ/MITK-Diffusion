@@ -14,26 +14,25 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _ClusteringMetricLength
-#define _ClusteringMetricLength
+#ifndef mitkClusteringMetricLength_h
+#define mitkClusteringMetricLength_h
 
 #include <mitkClusteringMetric.h>
+
+#include <cmath>
 
 namespace mitk
 {
 
 /**
-* \brief Fiber clustering metric based on the angles between certain parts of the streamline */
+* \brief Fiber clustering metric based on the difference of the fiber lengths */
 
 class ClusteringMetricLength : public ClusteringMetric
 {
 
 public:
 
-  ClusteringMetricLength(){}
-  virtual ~ClusteringMetricLength(){}
-
-  float CalculateDistance(vnl_matrix<float>& s, vnl_matrix<float>& t, bool &flipped)
+  float CalculateDistance(const vnl_matrix<float>& s, const vnl_matrix<float>& t, bool &flipped) const override
   {
     float l1 = 0;
     float l2 = 0;
@@ -41,17 +40,15 @@ public:
     float d_direct = 0;
     float d_flipped = 0;
 
-    int inc = s.cols()/4;
-    for (unsigned int i=0; i<s.cols(); i += inc)
-    {
-      d_direct += (s.get_column(i)-t.get_column(i)).magnitude();
-      d_flipped += (s.get_column(i)-t.get_column(s.cols()-i-1)).magnitude();
+    // Every fourth point; fibers with fewer than four points use every point.
+    const unsigned int inc = s.cols()>=4 ? s.cols()/4 : 1;
+    SumPointDistances(s, t, inc, d_direct, d_flipped);
 
-      if (i<s.cols()-1)
-      {
-        l1 += (s.get_column(i+1)-s.get_column(i)).magnitude();
-        l2 += (t.get_column(i+1)-t.get_column(i)).magnitude();
-      }
+    // The distance is the difference of the fiber lengths in mm, over all segments.
+    for (unsigned int i=0; i+1<s.cols(); ++i)
+    {
+      l1 += PointDistance(s, i+1, s, i);
+      l2 += PointDistance(t, i+1, t, i);
     }
 
     if (d_direct>d_flipped)
@@ -62,8 +59,6 @@ public:
     flipped = false;
     return m_Scale * std::fabs(l1-l2);
   }
-
-protected:
 
 };
 

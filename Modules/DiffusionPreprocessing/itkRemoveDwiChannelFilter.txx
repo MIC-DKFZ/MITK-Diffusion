@@ -14,19 +14,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkRemoveDwiChannelFilter_txx
-#define __itkRemoveDwiChannelFilter_txx
-
-#include <time.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#define _USE_MATH_DEFINES
-#include <math.h>
+#ifndef itkRemoveDwiChannelFilter_txx
+#define itkRemoveDwiChannelFilter_txx
 
 #include "itkImageRegionConstIterator.h"
-#include "itkImageRegionConstIteratorWithIndex.h"
 #include "itkImageRegionIterator.h"
+
+#include <set>
 
 namespace itk {
 
@@ -40,96 +34,54 @@ RemoveDwiChannelFilter< TInPixelType>::RemoveDwiChannelFilter()
 }
 
 template< class TInPixelType >
-void RemoveDwiChannelFilter< TInPixelType>::BeforeThreadedGenerateData()
+void RemoveDwiChannelFilter< TInPixelType>::GenerateOutputInformation()
 {
-  typename InputImageType::Pointer inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
-  if ( inputImagePointer->GetVectorLength()-m_ChannelIndices.size()<=0 )
+  Superclass::GenerateOutputInformation();
+
+  // The output vector length must be known before the output is allocated. A channel listed
+  // twice is removed once; an index past the last channel is an error, since the caller expects
+  // a channel to be gone that does not exist.
+  const unsigned int numChannels = this->GetInput()->GetVectorLength();
+  const std::set<unsigned int> removed(m_ChannelIndices.begin(), m_ChannelIndices.end());
+  if (!removed.empty() && *removed.rbegin() >= numChannels)
+    itkExceptionMacro("Channel index " << *removed.rbegin() << " is out of range, the image has " << numChannels << " channels.");
+
+  m_KeptChannels.clear();
+  for (unsigned int i=0; i<numChannels; ++i)
+    if (removed.count(i)==0)
+      m_KeptChannels.push_back(i);
+  if (m_KeptChannels.empty())
     itkExceptionMacro("No channels remaining!");
 
-  typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
-  outputImage->SetSpacing( inputImagePointer->GetSpacing() );
-  outputImage->SetOrigin( inputImagePointer->GetOrigin() );
-  outputImage->SetDirection( inputImagePointer->GetDirection() );
-  outputImage->SetLargestPossibleRegion( inputImagePointer->GetLargestPossibleRegion() );
-  outputImage->SetBufferedRegion( inputImagePointer->GetLargestPossibleRegion() );
-  outputImage->SetRequestedRegion( inputImagePointer->GetLargestPossibleRegion() );
-  outputImage->Allocate();
-  outputImage->SetVectorLength( inputImagePointer->GetVectorLength()-m_ChannelIndices.size() );
-  typename OutputImageType::PixelType nullPix;
-  nullPix.SetSize(outputImage->GetVectorLength());
-  nullPix.Fill(0);
-  outputImage->FillBuffer(nullPix);
-  this->SetNthOutput(0, outputImage);
+  this->GetOutput()->SetVectorLength(m_KeptChannels.size());
+}
+
+template< class TInPixelType >
+void RemoveDwiChannelFilter< TInPixelType>::BeforeThreadedGenerateData()
+{
+  if (m_Directions.IsNull() || m_Directions->Size()!=this->GetInput()->GetVectorLength())
+    itkExceptionMacro("The number of gradient directions does not match the number of image channels.");
 
   m_NewDirections = DirectionContainerType::New();
-
-  int chIdx = 0;
-  for (unsigned int i=0; i<inputImagePointer->GetVectorLength(); i++)
-  {
-    bool use = true;
-    for (unsigned int j=0; j<m_ChannelIndices.size(); j++)
-      if (m_ChannelIndices.at(j)==i)
-      {
-        use = false;
-        break;
-      }
-    if (use)
-    {
-      m_NewDirections->InsertElement(chIdx, m_Directions->GetElement(i));
-      ++chIdx;
-      MITK_INFO << "Using channel " << i;
-    }
-  }
+  for (unsigned int i=0; i<m_KeptChannels.size(); ++i)
+    m_NewDirections->InsertElement(i, m_Directions->GetElement(m_KeptChannels[i]));
 }
 
 template< class TInPixelType >
 void RemoveDwiChannelFilter< TInPixelType>::DynamicThreadedGenerateData(const OutputImageRegionType& outputRegionForThread )
 {
-  typename OutputImageType::Pointer outputImage = static_cast< OutputImageType * >(this->ProcessObject::GetOutput(0));
-
-  ImageRegionIterator< OutputImageType > oit(outputImage, outputRegionForThread);
-  oit.GoToBegin();
-
-  typedef ImageRegionConstIterator< InputImageType > InputIteratorType;
-  typename InputImageType::Pointer inputImagePointer = static_cast< InputImageType * >( this->ProcessObject::GetInput(0) );
-
-  InputIteratorType git( inputImagePointer, outputRegionForThread );
-  git.GoToBegin();
-  while( !git.IsAtEnd() )
+  ImageRegionIterator< OutputImageType > oit(this->GetOutput(), outputRegionForThread);
+  ImageRegionConstIterator< InputImageType > git(this->GetInput(), outputRegionForThread);
+  for (; !git.IsAtEnd(); ++git, ++oit)
   {
-    int chIdx = 0;
+    const typename InputImageType::PixelType in = git.Get();
     typename OutputImageType::PixelType pix = oit.Get();
-    for (unsigned int i=0; i<inputImagePointer->GetVectorLength(); i++)
-    {
-      bool use = true;
-      for (unsigned int j=0; j<m_ChannelIndices.size(); j++)
-        if (m_ChannelIndices.at(j)==i)
-        {
-          use = false;
-          break;
-        }
-      if (use)
-      {
-        pix[chIdx] = git.Get()[i];
-        ++chIdx;
-      }
-    }
+    for (unsigned int c=0; c<m_KeptChannels.size(); ++c)
+      pix[c] = in[m_KeptChannels[c]];
     oit.Set(pix);
-    ++oit;
-    ++git;
   }
-
-  std::cout << "One Thread finished calculation" << std::endl;
-}
-
-template< class TInPixelType >
-void
-RemoveDwiChannelFilter< TInPixelType>
-::PrintSelf(std::ostream& os, Indent indent) const
-{
-  Superclass::PrintSelf(os,indent);
 }
 
 }
 
-#endif // __itkRemoveDwiChannelFilter_txx
+#endif

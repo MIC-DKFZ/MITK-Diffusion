@@ -39,12 +39,84 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkCustomMimeType.h"
 #include "mitkDiffusionImageMimeTypes.h"
+#include "mitkNrrdMeasurementFrame.h"
 
 #include <mitkITKImageImport.h>
 #include <mitkImageWriteAccessor.h>
 #include <mitkImageDataItem.h>
 #include "mitkIOUtil.h"
 #include <mitkLocaleSwitch.h>
+
+#include <charconv>
+
+namespace
+{
+  using GradientDirectionType = mitk::DiffusionPropertyHelper::GradientDirectionType;
+  using MeasurementFrameType = mitk::DiffusionPropertyHelper::MeasurementFrameType;
+  using GradientDirectionContainerType = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType;
+
+  /**
+   * Reads gradients, reference b-value and measurement frame from the NRRD key/value pairs.
+   * Throws if they do not describe a DWI with one gradient per image component. Returns whether the
+   * file was written by an earlier MITK version.
+   */
+  bool ParseDiffusionHeader(const itk::MetaDataDictionary& dictionary,
+                            unsigned int numberOfComponents,
+                            GradientDirectionContainerType* gradients,
+                            MeasurementFrameType& measurementFrame,
+                            float& referenceBValue)
+  {
+    const std::string gradientPrefix = "DWMRI_gradient_";
+    std::map<unsigned int, GradientDirectionType> gradientsByIndex;
+    bool hasBValue = false;
+
+    for (const auto& key : dictionary.GetKeys())
+    {
+      std::string value;
+      if (!itk::ExposeMetaData<std::string>(dictionary, key, value))
+        continue;
+
+      if (key.starts_with(gradientPrefix))
+      {
+        const std::string indexString = key.substr(gradientPrefix.size());
+        unsigned int index = 0;
+        const auto [end, error] = std::from_chars(indexString.data(), indexString.data() + indexString.size(), index);
+        if (error != std::errc() || end != indexString.data() + indexString.size())
+          mitkThrow() << "Invalid gradient key " << key;
+
+        double x, y, z;
+        if (sscanf(value.c_str(), "%lf %lf %lf", &x, &y, &z) != 3)
+          mitkThrow() << "Invalid gradient " << key << ":=" << value;
+        GradientDirectionType g;
+        g[0] = x;
+        g[1] = y;
+        g[2] = z;
+        gradientsByIndex[index] = g;
+      }
+      else if (key == "DWMRI_b-value")
+      {
+        referenceBValue = atof(value.c_str());
+        hasBValue = true;
+      }
+      else if (key == "DWMRI_NEX")
+      {
+        mitkThrow() << "DWMRI_NEX keys (repeated gradients) are not supported";
+      }
+    }
+
+    if (!hasBValue)
+      mitkThrow() << "DWMRI_b-value is missing";
+    if (gradientsByIndex.size() != numberOfComponents || (!gradientsByIndex.empty() && gradientsByIndex.rbegin()->first != numberOfComponents - 1))
+      mitkThrow() << "Found " << gradientsByIndex.size() << " gradients DWMRI_gradient_0000.. for " << numberOfComponents << " image components";
+    for (const auto& [index, g] : gradientsByIndex)
+      gradients->InsertElement(index, g);
+
+    const auto frame = mitk::ReadNrrdMeasurementFrame(dictionary);
+    if (frame.frame)
+      measurementFrame = *frame.frame;
+    return frame.onlyMitkKey;
+  }
+}
 
 namespace mitk
 {
@@ -62,13 +134,11 @@ namespace mitk
   }
 
 
-  DiffusionImageNrrdReader::
-  ~DiffusionImageNrrdReader()
-  {}
+  DiffusionImageNrrdReader::~DiffusionImageNrrdReader() = default;
 
   DiffusionImageNrrdReader::
   DiffusionImageNrrdReader()
-    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NRRD_MIMETYPE() ), mitk::DiffusionImageMimeTypes::DWI_NRRD_MIMETYPE_DESCRIPTION() )
+    : mitk::AbstractFileReader( CustomMimeType( mitk::DiffusionImageMimeTypes::DWI_NRRD_MIMETYPE_NAME() ), mitk::DiffusionImageMimeTypes::DWI_NRRD_MIMETYPE_DESCRIPTION() )
   {
     Options defaultOptions;
     defaultOptions["Apply image rotation to gradients"] = true;
@@ -81,24 +151,13 @@ namespace mitk
   DoRead()
   {
     std::vector<itk::SmartPointer<mitk::BaseData> > result;
-
-    // Since everything is completely read in GenerateOutputInformation() it is stored
-    // in a cache variable. A timestamp is associated.
-    // If the timestamp of the cache variable is newer than the MTime, we only need to
-    // assign the cache variable to the DataObject.
-    // Otherwise, the tree must be read again from the file and OuputInformation must
-    // be updated!
-
-    if(m_OutputCache.IsNull()) InternalRead();
-
-    result.push_back(m_OutputCache.GetPointer());
+    result.push_back(InternalRead().GetPointer());
     return result;
   }
 
 
-  void DiffusionImageNrrdReader::InternalRead()
+  DiffusionImageNrrdReader::OutputType::Pointer DiffusionImageNrrdReader::InternalRead()
   {
-    OutputType::Pointer outputForCache = OutputType::New();
     if ( this->GetInputLocation() == "")
     {
       throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, the filename to be read is empty!");
@@ -111,13 +170,8 @@ namespace mitk
 
         MITK_INFO << "DiffusionImageNrrdReader: reading image information";
         VectorImageType::Pointer itkVectorImage;
-
-        std::string ext = this->GetMimeType()->GetExtension( this->GetInputLocation() );
-        ext = itksys::SystemTools::LowerCase( ext );
-
-        if (ext == ".hdwi" || ext == ".dwi" || ext == ".nrrd")
         {
-          typedef itk::ImageFileReader<VectorImageType> FileReaderType;
+          using FileReaderType = itk::ImageFileReader<VectorImageType>;
           FileReaderType::Pointer reader = FileReaderType::New();
           reader->SetFileName(this->GetInputLocation());
           itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
@@ -126,109 +180,20 @@ namespace mitk
           itkVectorImage = reader->GetOutput();
         }
 
-        // Diffusion Image information START
         GradientDirectionContainerType::Pointer DiffusionVectors = GradientDirectionContainerType::New();
-        GradientDirectionContainerType::Pointer OriginalDiffusionVectors = GradientDirectionContainerType::New();
         MeasurementFrameType MeasurementFrame;
+        MeasurementFrame.set_identity();
         float BValue = -1;
-        // Diffusion Image information END
+        const bool legacyMitkFile = ParseDiffusionHeader(itkVectorImage->GetMetaDataDictionary(), itkVectorImage->GetVectorLength(), DiffusionVectors, MeasurementFrame, BValue);
 
-        if (ext == ".hdwi" || ext == ".dwi" || ext == ".nrrd")
-        {
+        OutputType::Pointer output = mitk::GrabItkImageMemory( itkVectorImage);
 
-          itk::MetaDataDictionary imgMetaDictionary =  itkVectorImage->GetMetaDataDictionary();
-          std::vector<std::string> imgMetaKeys = imgMetaDictionary.GetKeys();
-          std::vector<std::string>::const_iterator itKey = imgMetaKeys.begin();
-          std::string metaString;
-
-          GradientDirectionType vect3d;
-
-          int numberOfImages = 0;
-          int numberOfGradientImages = 0;
-          bool readb0 = false;
-          double xx, xy, xz, yx, yy, yz, zx, zy, zz;
-
-          for (; itKey != imgMetaKeys.end(); itKey ++)
-          {
-            double x,y,z;
-
-            itk::ExposeMetaData<std::string> (imgMetaDictionary, *itKey, metaString);
-            if (itKey->find("DWMRI_gradient") != std::string::npos)
-            {
-              sscanf(metaString.c_str(), "%lf %lf %lf\n", &x, &y, &z);
-              vect3d[0] = x; vect3d[1] = y; vect3d[2] = z;
-              DiffusionVectors->InsertElement( numberOfImages, vect3d );
-              ++numberOfImages;
-              // If the direction is 0.0, this is a reference image
-              if (vect3d[0] == 0.0 &&
-                  vect3d[1] == 0.0 &&
-                  vect3d[2] == 0.0)
-              {
-                continue;
-              }
-              ++numberOfGradientImages;;
-            }
-            else if (itKey->find("DWMRI_b-value") != std::string::npos)
-            {
-              readb0 = true;
-              BValue = atof(metaString.c_str());
-            }
-            else if (itKey->find("measurement frame") != std::string::npos)
-            {
-              sscanf(metaString.c_str(), " ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) ( %lf , %lf , %lf ) \n", &xx, &xy, &xz, &yx, &yy, &yz, &zx, &zy, &zz);
-
-              if (xx>10e-10 || xy>10e-10 || xz>10e-10 ||
-                  yx>10e-10 || yy>10e-10 || yz>10e-10 ||
-                  zx>10e-10 || zy>10e-10 || zz>10e-10 )
-              {
-                MeasurementFrame(0,0) = xx;
-                MeasurementFrame(0,1) = xy;
-                MeasurementFrame(0,2) = xz;
-                MeasurementFrame(1,0) = yx;
-                MeasurementFrame(1,1) = yy;
-                MeasurementFrame(1,2) = yz;
-                MeasurementFrame(2,0) = zx;
-                MeasurementFrame(2,1) = zy;
-                MeasurementFrame(2,2) = zz;
-              }
-              else
-              {
-                MeasurementFrame(0,0) = 1;
-                MeasurementFrame(0,1) = 0;
-                MeasurementFrame(0,2) = 0;
-                MeasurementFrame(1,0) = 0;
-                MeasurementFrame(1,1) = 1;
-                MeasurementFrame(1,2) = 0;
-                MeasurementFrame(2,0) = 0;
-                MeasurementFrame(2,1) = 0;
-                MeasurementFrame(2,2) = 1;
-              }
-            }
-          }
-
-          if(!readb0)
-          {
-            MITK_INFO << "BValue not specified in header file";
-          }
-
-        }
-
-        outputForCache = mitk::GrabItkImageMemory( itkVectorImage);
-
-        // create BValueMap
-        mitk::BValueMapProperty::BValueMap BValueMap = mitk::BValueMapProperty::CreateBValueMap(DiffusionVectors,BValue);
-        mitk::DiffusionPropertyHelper::SetOriginalGradientContainer(outputForCache, DiffusionVectors);
-        mitk::DiffusionPropertyHelper::SetMeasurementFrame(outputForCache, MeasurementFrame);
-        mitk::DiffusionPropertyHelper::SetBValueMap(outputForCache, BValueMap);
-        mitk::DiffusionPropertyHelper::SetReferenceBValue(outputForCache, BValue);
-        mitk::DiffusionPropertyHelper::SetApplyMatrixToGradients(outputForCache, us::any_cast<bool>(this->GetOptions()["Apply image rotation to gradients"]));
-        mitk::DiffusionPropertyHelper::InitializeImage(outputForCache);
-
-        // Since we have already read the tree, we can store it in a cache variable
-        // so that it can be assigned to the DataObject in GenerateData();
-        m_OutputCache = outputForCache;
-        m_CacheTime.Modified();
-
+        // NRRD defines the gradients through the measurement frame alone, which makes the modified
+        // gradients world vectors. Files written by earlier MITK versions are read as they always
+        // were, with the image rotation applied before the frame.
+        const bool applyRotation = legacyMitkFile && us::any_cast<bool>(this->GetOptions()["Apply image rotation to gradients"]);
+        mitk::DiffusionPropertyHelper::InitializeImage(output, DiffusionVectors.GetPointer(), BValue, MeasurementFrame, applyRotation);
+        return output;
       }
       catch(std::exception& e)
       {
@@ -239,7 +204,7 @@ namespace mitk
       catch(...)
       {
         MITK_INFO << "Exception while reading file!!";
-        throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested vessel tree file!");
+        throw itk::ImageFileReaderException(__FILE__, __LINE__, "Sorry, an error occurred while reading the requested file!");
       }
     }
   }

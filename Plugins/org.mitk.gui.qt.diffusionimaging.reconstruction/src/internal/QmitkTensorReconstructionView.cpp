@@ -16,59 +16,39 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkTensorReconstructionView.h"
 
-// qt includes
-#include <QMessageBox>
-#include <QImage>
-#include <QGraphicsScene>
-#include <QGraphicsPixmapItem>
-#include <QGraphicsLinearLayout>
+#include "QmitkReconstructionResults.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
 
-#include "mitkNodePredicateDataType.h"
-#include "QmitkDataStorageComboBox.h"
-#include "itkDiffusionTensor3DReconstructionImageFilter.h"
-#include "itkTensorImageToDiffusionImageFilter.h"
-#include "itkPointShell.h"
-#include "itkVector.h"
-#include "itkB0ImageExtractionImageFilter.h"
-#include "itkTensorReconstructionWithEigenvalueCorrectionFilter.h"
-#include "mitkImageCast.h"
-#include <itkBinaryThresholdImageFilter.h>
-#include <mitkImageVtkMapper2D.h>
+#include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkDiffusionReconstruction.h>
 #include <mitkITKImageImport.h>
-#include <itkTensorImageToOdfImageFilter.h>
-#include <berryIWorkbenchWindow.h>
-#include <berryISelectionService.h>
+#include <mitkImageCast.h>
 #include <mitkImageVtkMapper2D.h>
-#include <mitkNodePredicateIsDWI.h>
 #include <mitkNodePredicateDataType.h>
+#include <mitkNodePredicateIsDWI.h>
+#include <mitkStatusBar.h>
+
+#include <itkB0ImageExtractionImageFilter.h>
+#include <itkBinaryThresholdImageFilter.h>
 
 const std::string QmitkTensorReconstructionView::VIEW_ID = "org.mitk.views.tensorreconstruction";
 
-typedef mitk::TensorImage::ScalarPixelType          TTensorPixelType;
-typedef mitk::TensorImage::PixelType                TensorPixelType;
-typedef mitk::TensorImage::ItkTensorImageType       TensorImageType;
-
-using namespace berry;
-
-QmitkTensorReconstructionView::QmitkTensorReconstructionView()
-  : QmitkAbstractView(),
-    m_Controls(nullptr)
-{
-
-}
+using QmitkReconstructionResults::AddResult;
+using QmitkReconstructionResults::ResultNode;
 
 QmitkTensorReconstructionView::~QmitkTensorReconstructionView()
 {
-
+  // The generated Ui class owns no widgets (they belong to the parent widget), only itself.
+  delete m_Controls;
 }
 
 void QmitkTensorReconstructionView::CreateQtPartControl(QWidget *parent)
 {
   if (!m_Controls)
   {
-    // create GUI widgets
     m_Controls = new Ui::QmitkTensorReconstructionViewControls;
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi(parent);
     this->CreateConnections();
 
@@ -83,465 +63,184 @@ void QmitkTensorReconstructionView::SetFocus()
 
 void QmitkTensorReconstructionView::CreateConnections()
 {
-  if ( m_Controls )
-  {
-    connect( (QObject*)(m_Controls->m_StartReconstruction), SIGNAL(clicked()), this, SLOT(Reconstruct()) );
-    connect( (QObject*)(m_Controls->m_Advanced1), SIGNAL(clicked()), this, SLOT(Advanced1CheckboxClicked()) );
-    connect( (QObject*)(m_Controls->m_TensorsToDWIButton), SIGNAL(clicked()), this, SLOT(TensorsToDWI()) );
-    connect( (QObject*)(m_Controls->m_TensorsToOdfButton), SIGNAL(clicked()), this, SLOT(TensorsToOdf()) );
-    connect( (QObject*)(m_Controls->m_TensorReconstructionThreshold), SIGNAL(valueChanged(int)), this, SLOT(PreviewThreshold(int)) );
+  connect(m_Controls->m_StartReconstruction, &QAbstractButton::clicked, this, &QmitkTensorReconstructionView::Reconstruct);
+  connect(m_Controls->m_Advanced1, &QAbstractButton::clicked, this, &QmitkTensorReconstructionView::Advanced1CheckboxClicked);
+  connect(m_Controls->m_TensorsToDWIButton, &QAbstractButton::clicked, this, &QmitkTensorReconstructionView::TensorsToDwi);
+  connect(m_Controls->m_TensorsToOdfButton, &QAbstractButton::clicked, this, &QmitkTensorReconstructionView::TensorsToOdf);
+  connect(m_Controls->m_TensorReconstructionThreshold, &QSpinBox::valueChanged, this, &QmitkTensorReconstructionView::PreviewThreshold);
 
-    m_Controls->m_DwiBox->SetDataStorage(this->GetDataStorage());
-    mitk::NodePredicateIsDWI::Pointer isDwi = mitk::NodePredicateIsDWI::New();
-    m_Controls->m_DwiBox->SetPredicate( isDwi );
-    connect( (QObject*)(m_Controls->m_DwiBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()));
+  m_Controls->m_DwiBox->SetDataStorage(this->GetDataStorage());
+  m_Controls->m_DwiBox->SetPredicate(mitk::NodePredicateIsDWI::New());
+  connect(m_Controls->m_DwiBox, &QComboBox::currentIndexChanged, this, &QmitkTensorReconstructionView::UpdateGui);
 
-    m_Controls->m_OdfBox->SetDataStorage(this->GetDataStorage());
-    mitk::TNodePredicateDataType<mitk::TensorImage>::Pointer isDti = mitk::TNodePredicateDataType<mitk::TensorImage>::New();
-    m_Controls->m_OdfBox->SetPredicate( isDti );
-    connect( (QObject*)(m_Controls->m_OdfBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()));
+  auto isDti = mitk::TNodePredicateDataType<mitk::TensorImage>::New();
+  m_Controls->m_OdfBox->SetDataStorage(this->GetDataStorage());
+  m_Controls->m_OdfBox->SetPredicate(isDti);
+  connect(m_Controls->m_OdfBox, &QComboBox::currentIndexChanged, this, &QmitkTensorReconstructionView::UpdateGui);
 
-    m_Controls->m_DtiBox->SetDataStorage(this->GetDataStorage());
-    m_Controls->m_DtiBox->SetPredicate( isDti );
-    connect( (QObject*)(m_Controls->m_DtiBox), SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()));
-  }
+  m_Controls->m_DtiBox->SetDataStorage(this->GetDataStorage());
+  m_Controls->m_DtiBox->SetPredicate(isDti);
+  connect(m_Controls->m_DtiBox, &QComboBox::currentIndexChanged, this, &QmitkTensorReconstructionView::UpdateGui);
 }
 
 void QmitkTensorReconstructionView::Advanced1CheckboxClicked()
 {
-  bool check = m_Controls->
-               m_Advanced1->isChecked();
-
-  m_Controls->frame->setVisible(check);
-}
-
-void QmitkTensorReconstructionView::Activated()
-{
+  m_Controls->frame->setVisible(m_Controls->m_Advanced1->isChecked());
 }
 
 void QmitkTensorReconstructionView::Deactivated()
 {
-
-  // Get all current nodes
-
-  mitk::DataStorage::SetOfObjects::ConstPointer objects =  this->GetDataStorage()->GetAll();
-  mitk::DataStorage::SetOfObjects::const_iterator itemiter( objects->begin() );
-  mitk::DataStorage::SetOfObjects::const_iterator itemiterend( objects->end() );
-  while ( itemiter != itemiterend ) // for all items
+  // Named: a temporary in the range expression would be released before the loop runs.
+  const auto nodes = this->GetDataStorage()->GetAll();
+  for (const auto &node : *nodes)
   {
-    mitk::DataNode::Pointer node = *itemiter;
-    if (node.IsNull())
-      continue;
-
-    // only look at interesting types
-    if( mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dynamic_cast<mitk::Image*>(node->GetData())))
+    if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(dynamic_cast<mitk::Image *>(node->GetData())))
     {
-      if (this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", *itemiter))
-      {
-        node = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", *itemiter);
-        this->GetDataStorage()->Remove(node);
-      }
+      if (auto overlay = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", node))
+        this->GetDataStorage()->Remove(overlay);
     }
-    itemiter++;
   }
-
-
+  m_PreviewB0 = nullptr;
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
-void QmitkTensorReconstructionView::Visible()
+template <typename Work, typename Done>
+void QmitkTensorReconstructionView::RunInBackground(const char *title, Work work, Done done)
 {
-}
-
-void QmitkTensorReconstructionView::Hidden()
-{
+  QmitkReconstructionResults::RunInBackground(this, m_Busy, [this]() { this->UpdateGui(); }, title, std::move(work), std::move(done));
 }
 
 void QmitkTensorReconstructionView::Reconstruct()
 {
-  int method = m_Controls->m_ReconctructionMethodBox->currentIndex();
-
-  switch (method)
-  {
-  case 0:
-    ItkTensorReconstruction();
-    break;
-  case 1:
-    TensorReconstructionWithCorr();
-    break;
-  default:
-    ItkTensorReconstruction();
-  }
-}
-
-void QmitkTensorReconstructionView::TensorReconstructionWithCorr()
-{
-  try
-  {
-    if ( m_Controls->m_DwiBox->GetSelectedNode().IsNotNull() ) // for all items
-    {
-      mitk::Image* vols = static_cast<mitk::Image*>(m_Controls->m_DwiBox->GetSelectedNode()->GetData());
-      std::string nodename = m_Controls->m_DwiBox->GetSelectedNode()->GetName();
-
-      typedef itk::TensorReconstructionWithEigenvalueCorrectionFilter< DiffusionPixelType, TTensorPixelType > ReconstructionFilter;
-
-      float b0Threshold = m_Controls->m_TensorReconstructionThreshold->value();
-      mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::Pointer gradientContainerCopy = mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::New();
-      for(auto it = mitk::DiffusionPropertyHelper::GetGradientContainer(vols)->Begin(); it != mitk::DiffusionPropertyHelper::GetGradientContainer(vols)->End(); it++)
-        gradientContainerCopy->push_back(it.Value());
-
-      ITKDiffusionImageType::Pointer itkVectorImagePointer = ITKDiffusionImageType::New();
-      mitk::CastToItkImage(vols, itkVectorImagePointer);
-
-      ReconstructionFilter::Pointer reconFilter = ReconstructionFilter::New();
-      reconFilter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(vols));
-      reconFilter->SetGradientImage( mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer(gradientContainerCopy), itkVectorImagePointer);
-      reconFilter->SetB0Threshold(b0Threshold);
-      reconFilter->Update();
-
-      typedef mitk::TensorImage::ItkTensorImageType TensorImageType;
-      TensorImageType::Pointer outputTensorImg = reconFilter->GetOutput();
-
-      typedef itk::ImageRegionIterator<TensorImageType> TensorImageIteratorType;
-      TensorImageIteratorType tensorIt(outputTensorImg, outputTensorImg->GetRequestedRegion());
-      tensorIt.GoToBegin();
-
-      int negatives = 0;
-      while(!tensorIt.IsAtEnd())
-      {
-        typedef mitk::TensorImage::PixelType TensorType;
-        TensorType tensor = tensorIt.Get();
-
-        TensorType::EigenValuesArrayType ev;
-        tensor.ComputeEigenValues(ev);
-
-        for(unsigned int i=0; i<ev.Size(); i++)
-        {
-          if(ev[i] < 0.0)
-          {
-            tensor.Fill(0.0);
-            tensorIt.Set(tensor);
-            negatives++;
-            break;
-          }
-        }
-        ++tensorIt;
-      }
-      MITK_INFO << negatives << " tensors with negative eigenvalues" << std::endl;
-
-      mitk::TensorImage::Pointer image = mitk::TensorImage::New();
-      image->InitializeByItk( outputTensorImg.GetPointer() );
-      image->SetVolume( outputTensorImg->GetBufferPointer() );
-      mitk::DiffusionPropertyHelper::CopyDICOMProperties(vols, image);
-      mitk::DataNode::Pointer node=mitk::DataNode::New();
-      node->SetData( image );
-      node->SetName(nodename+"_EigenvalueCorrected_DT");
-      GetDataStorage()->Add(node, m_Controls->m_DwiBox->GetSelectedNode());
-    }
-
-    this->GetRenderWindowPart()->RequestUpdate();
-  }
-  catch (itk::ExceptionObject &ex)
-  {
-    MITK_INFO << ex ;
-    QMessageBox::information(0, "Reconstruction not possible:", ex.GetDescription());
-  }
-}
-
-void QmitkTensorReconstructionView::ItkTensorReconstruction()
-{
-  try
-  {
-    if ( m_Controls->m_DwiBox->GetSelectedNode().IsNotNull() ) // for all items
-    {
-      mitk::Image* vols = static_cast<mitk::Image*>(m_Controls->m_DwiBox->GetSelectedNode()->GetData());
-
-      std::string nodename = m_Controls->m_DwiBox->GetSelectedNode()->GetName();
-
-
-      typedef itk::DiffusionTensor3DReconstructionImageFilter<DiffusionPixelType, DiffusionPixelType, TTensorPixelType > TensorReconstructionImageFilterType;
-      TensorReconstructionImageFilterType::Pointer tensorReconstructionFilter = TensorReconstructionImageFilterType::New();
-
-      GradientDirectionContainerType::Pointer gradientContainerCopy = GradientDirectionContainerType::New();
-      for(GradientDirectionContainerType::ConstIterator it = mitk::DiffusionPropertyHelper::GetGradientContainer(vols)->Begin();
-          it != mitk::DiffusionPropertyHelper::GetGradientContainer(vols)->End(); it++)
-      {
-        gradientContainerCopy->push_back(it.Value());
-      }
-
-      ITKDiffusionImageType::Pointer itkVectorImagePointer = ITKDiffusionImageType::New();
-      mitk::CastToItkImage(vols, itkVectorImagePointer);
-
-      tensorReconstructionFilter->SetBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(vols));
-      tensorReconstructionFilter->SetGradientImage( gradientContainerCopy, itkVectorImagePointer );
-      tensorReconstructionFilter->SetThreshold( m_Controls->m_TensorReconstructionThreshold->value() );
-      tensorReconstructionFilter->Update();
-
-      // TENSORS TO DATATREE
-      mitk::TensorImage::Pointer image = mitk::TensorImage::New();
-
-      typedef mitk::TensorImage::ItkTensorImageType TensorImageType;
-      TensorImageType::Pointer tensorImage;
-      tensorImage = tensorReconstructionFilter->GetOutput();
-
-      // Check the tensor for negative eigenvalues
-      if(m_Controls->m_CheckNegativeEigenvalues->isChecked())
-      {
-        typedef itk::ImageRegionIterator<TensorImageType> TensorImageIteratorType;
-        TensorImageIteratorType tensorIt(tensorImage, tensorImage->GetRequestedRegion());
-        tensorIt.GoToBegin();
-
-        while(!tensorIt.IsAtEnd())
-        {
-
-          typedef mitk::TensorImage::PixelType TensorType;
-          //typedef itk::Tensor<TTensorPixelType, 3> TensorType2;
-
-          TensorType tensor = tensorIt.Get();
-
-          TensorType::EigenValuesArrayType ev;
-          tensor.ComputeEigenValues(ev);
-          for(unsigned int i=0; i<ev.Size(); i++)
-          {
-            if(ev[i] < 0.0)
-            {
-              tensor.Fill(0.0);
-              tensorIt.Set(tensor);
-              break;
-            }
-          }
-          ++tensorIt;
-        }
-      }
-
-      tensorImage->SetDirection( itkVectorImagePointer->GetDirection() );
-      image->InitializeByItk( tensorImage.GetPointer() );
-      image->SetVolume( tensorReconstructionFilter->GetOutput()->GetBufferPointer() );
-      mitk::DataNode::Pointer node=mitk::DataNode::New();
-      mitk::DiffusionPropertyHelper::CopyDICOMProperties(vols, image);
-      node->SetData( image );
-      node->SetName(nodename+"_LinearLeastSquares_DT");
-      GetDataStorage()->Add(node, m_Controls->m_DwiBox->GetSelectedNode());
-    }
-
-    this->GetRenderWindowPart()->RequestUpdate();
-  }
-  catch (itk::ExceptionObject &ex)
-  {
-    MITK_INFO << ex ;
-    QMessageBox::information(0, "Reconstruction not possible:", ex.GetDescription());
+  auto dwiNode = m_Controls->m_DwiBox->GetSelectedNode();
+  mitk::Image::ConstPointer dwi = dwiNode.IsNotNull() ? dynamic_cast<mitk::Image *>(dwiNode->GetData()) : nullptr;
+  if (m_Busy || dwi.IsNull())
     return;
-  }
-}
 
-void QmitkTensorReconstructionView::TensorsToDWI()
-{
-  DoTensorsToDWI();
+  // The combo box lists ITK's linear least squares, then the eigenvalue correction. The corrected
+  // fit always zeroes the tensors whose eigenvalues it could not make positive; the check box
+  // acts on the linear fit only.
+  const bool corrected = m_Controls->m_ReconctructionMethodBox->currentIndex() == 1;
+  const auto fit = corrected ? mitk::TensorFit::EigenvalueCorrection : mitk::TensorFit::LinearLeastSquares;
+  const double threshold = m_Controls->m_TensorReconstructionThreshold->value();
+  const bool zeroNegativeEigenvalues = corrected || m_Controls->m_CheckNegativeEigenvalues->isChecked();
+  this->RunInBackground(
+    "Reconstruction not possible:",
+    [dwi, fit, threshold, zeroNegativeEigenvalues]() { return mitk::ReconstructTensors(dwi, fit, threshold, zeroNegativeEigenvalues); },
+    [this, dwiNode, corrected](mitk::TensorImage::Pointer tensors) {
+      AddResult(this->GetDataStorage(), ResultNode(tensors, dwiNode, corrected ? "_EigenvalueCorrected_DT" : "_LinearLeastSquares_DT"), dwiNode);
+      this->RequestRenderWindowUpdate();
+    });
 }
 
 void QmitkTensorReconstructionView::TensorsToOdf()
 {
-  if (m_Controls->m_OdfBox->GetSelectedNode().IsNotNull())
-  {
-    mitk::DataNode::Pointer tensorImageNode = m_Controls->m_OdfBox->GetSelectedNode();
+  auto tensorNode = m_Controls->m_OdfBox->GetSelectedNode();
+  mitk::TensorImage::ConstPointer tensors = tensorNode.IsNotNull() ? dynamic_cast<mitk::TensorImage *>(tensorNode->GetData()) : nullptr;
+  if (m_Busy || tensors.IsNull())
+    return;
 
-    typedef mitk::TensorImage::ScalarPixelType    TTensorPixelType;
-    typedef mitk::TensorImage::ItkTensorImageType TensorImageType;
-
-    TensorImageType::Pointer itkvol = TensorImageType::New();
-    mitk::CastToItkImage(dynamic_cast<mitk::TensorImage*>(tensorImageNode->GetData()), itkvol);
-
-    typedef itk::TensorImageToOdfImageFilter< TTensorPixelType, TTensorPixelType > FilterType;
-    FilterType::Pointer filter = FilterType::New();
-    filter->SetInput( itkvol );
-    filter->Update();
-
-    typedef itk::Vector<TTensorPixelType,ODF_SAMPLING_SIZE>  OutputPixelType;
-    typedef itk::Image<OutputPixelType,3>                OutputImageType;
-
-    mitk::OdfImage::Pointer image = mitk::OdfImage::New();
-    OutputImageType::Pointer outimg = filter->GetOutput();
-    image->InitializeByItk( outimg.GetPointer() );
-    image->SetVolume( outimg->GetBufferPointer() );
-    mitk::DataNode::Pointer node = mitk::DataNode::New();
-    mitk::DiffusionPropertyHelper::CopyDICOMProperties(tensorImageNode->GetData(), image);
-    node->SetData( image );
-    node->SetName(tensorImageNode->GetName()+"_Odf");
-    GetDataStorage()->Add(node, tensorImageNode);
-  }
+  this->RunInBackground(
+    "ODF estimation failed:",
+    [tensors]() {
+      auto odfs = mitk::convert::GetOdfFromTensorImage(tensors);
+      mitk::DiffusionPropertyHelper::CopyDICOMProperties(tensors, odfs);
+      return odfs;
+    },
+    [this, tensorNode](mitk::OdfImage::Pointer odfs) { AddResult(this->GetDataStorage(), ResultNode(odfs, tensorNode, "_Odf"), tensorNode); });
 }
 
-void QmitkTensorReconstructionView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& )
+void QmitkTensorReconstructionView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer> &)
 {
   UpdateGui();
 }
 
 void QmitkTensorReconstructionView::UpdateGui()
 {
-  m_Controls->m_StartReconstruction->setEnabled(m_Controls->m_DwiBox->GetSelectedNode().IsNotNull());
-
-  m_Controls->m_TensorsToDWIButton->setEnabled(m_Controls->m_DtiBox->GetSelectedNode().IsNotNull());
-  m_Controls->m_TensorsToOdfButton->setEnabled(m_Controls->m_OdfBox->GetSelectedNode().IsNotNull());
+  // One action at a time: the buttons stay disabled while one runs in the background.
+  m_Controls->m_StartReconstruction->setEnabled(!m_Busy && m_Controls->m_DwiBox->GetSelectedNode().IsNotNull());
+  m_Controls->m_TensorsToDWIButton->setEnabled(!m_Busy && m_Controls->m_DtiBox->GetSelectedNode().IsNotNull());
+  m_Controls->m_TensorsToOdfButton->setEnabled(!m_Busy && m_Controls->m_OdfBox->GetSelectedNode().IsNotNull());
 }
 
-template<int ndirs>
-itk::VectorContainer<unsigned int, vnl_vector_fixed<double, 3> >::Pointer
-QmitkTensorReconstructionView::MakeGradientList()
+void QmitkTensorReconstructionView::TensorsToDwi()
 {
-  itk::VectorContainer<unsigned int, vnl_vector_fixed<double,3> >::Pointer retval =
-      itk::VectorContainer<unsigned int, vnl_vector_fixed<double,3> >::New();
-  vnl_matrix_fixed<double, 3, ndirs>* U =
-      itk::PointShell<ndirs, vnl_matrix_fixed<double, 3, ndirs> >::DistributePointShell();
+  auto tensorNode = m_Controls->m_DtiBox->GetSelectedNode();
+  mitk::TensorImage::ConstPointer tensors = tensorNode.IsNotNull() ? dynamic_cast<mitk::TensorImage *>(tensorNode->GetData()) : nullptr;
+  if (m_Busy || tensors.IsNull())
+    return;
 
-  for(int i=0; i<ndirs;i++)
-  {
-    vnl_vector_fixed<double,3> v;
-    v[0] = U->get(0,i); v[1] = U->get(1,i); v[2] = U->get(2,i);
-    retval->push_back(v);
-  }
-  // Add 0 vector for B0
-  vnl_vector_fixed<double,3> v;
-  v.fill(0.0);
-  retval->push_back(v);
-
-  return retval;
-}
-
-void QmitkTensorReconstructionView::DoTensorsToDWI()
-{
-  try
-  {
-    if (m_Controls->m_DtiBox->GetSelectedNode().IsNotNull())
-    {
-      std::string nodename = m_Controls->m_DtiBox->GetSelectedNode()->GetName();
-
-      mitk::TensorImage* vol = static_cast<mitk::TensorImage*>(m_Controls->m_DtiBox->GetSelectedNode()->GetData());
-
-      typedef mitk::TensorImage::ScalarPixelType      TTensorPixelType;
-      typedef mitk::TensorImage::ItkTensorImageType   TensorImageType;
-
-
-      TensorImageType::Pointer itkvol = TensorImageType::New();
-      mitk::CastToItkImage(vol, itkvol);
-
-      typedef itk::TensorImageToDiffusionImageFilter<
-          TTensorPixelType, DiffusionPixelType > FilterType;
-
-      FilterType::GradientListPointerType gradientList;
-
-      switch(m_Controls->m_TensorsToDWINumDirsSelect->currentIndex())
-      {
-      case 0:
-        gradientList = MakeGradientList<12>();
-        break;
-      case 1:
-        gradientList = MakeGradientList<42>();
-        break;
-      case 2:
-        gradientList = MakeGradientList<92>();
-        break;
-      case 3:
-        gradientList = MakeGradientList<162>();
-        break;
-      case 4:
-        gradientList = MakeGradientList<252>();
-        break;
-      case 5:
-        gradientList = MakeGradientList<362>();
-        break;
-      case 6:
-        gradientList = MakeGradientList<492>();
-        break;
-      case 7:
-        gradientList = MakeGradientList<642>();
-        break;
-      case 8:
-        gradientList = MakeGradientList<812>();
-        break;
-      case 9:
-        gradientList = MakeGradientList<1002>();
-        break;
-      default:
-        gradientList = MakeGradientList<92>();
-
-      }
-      double bVal = m_Controls->m_TensorsToDWIBValueEdit->text().toDouble();
-
-      FilterType::Pointer filter = FilterType::New();
-      filter->SetInput( itkvol );
-      filter->SetBValue(bVal);
-      filter->SetGradientList(gradientList);
-      filter->Update();
-
-      mitk::Image::Pointer image = mitk::GrabItkImageMemory( filter->GetOutput() );
-
-      mitk::DiffusionPropertyHelper::SetGradientContainer(image, gradientList);
-      mitk::DiffusionPropertyHelper::SetReferenceBValue(image, bVal);
-      mitk::DiffusionPropertyHelper::InitializeImage( image );
-
-      mitk::DataNode::Pointer node=mitk::DataNode::New();
-      mitk::DiffusionPropertyHelper::CopyDICOMProperties(vol, image);
-      node->SetData( image );
+  // The combo box lists the sizes of the direction tables.
+  const unsigned int numberOfDirections = m_Controls->m_TensorsToDWINumDirsSelect->currentText().toUInt();
+  const double bValue = m_Controls->m_TensorsToDWIBValueEdit->value();
+  this->RunInBackground(
+    "DWI estimation failed:",
+    [tensors, numberOfDirections, bValue]() { return mitk::TensorsToDwi(tensors, numberOfDirections, bValue); },
+    [this, tensorNode](mitk::Image::Pointer dwi) {
+      auto node = ResultNode(dwi, tensorNode, "_DWI");
       mitk::ImageVtkMapper2D::SetDefaultProperties(node);
-      node->SetName(nodename+"_DWI");
-      GetDataStorage()->Add(node, m_Controls->m_DtiBox->GetSelectedNode());
-    }
-    this->GetRenderWindowPart()->RequestUpdate();
-  }
-  catch (itk::ExceptionObject &ex)
-  {
-    MITK_INFO << ex ;
-    QMessageBox::information(0, "DWI estimation failed:", ex.GetDescription());
-    return ;
-  }
+      AddResult(this->GetDataStorage(), node, tensorNode);
+      this->RequestRenderWindowUpdate();
+    });
 }
-
 
 void QmitkTensorReconstructionView::PreviewThreshold(int threshold)
 {
-  if (m_Controls->m_DwiBox->GetSelectedNode().IsNotNull())
+  auto dwiNode = m_Controls->m_DwiBox->GetSelectedNode();
+  const mitk::Image *dwi = dwiNode.IsNotNull() ? dynamic_cast<mitk::Image *>(dwiNode->GetData()) : nullptr;
+  if (dwi == nullptr)
+    return;
+
+  // The mean b0 image is computed once per DWI (and again when the DWI changes), not on every step
+  // of the threshold box. The DWI is read through a const image, which does not block rendering.
+  if (m_PreviewB0.IsNull() || m_PreviewDwi.Lock().GetPointer() != dwi || m_PreviewDwiTime != dwi->GetMTime())
   {
-    mitk::Image* vols = static_cast<mitk::Image*>(m_Controls->m_DwiBox->GetSelectedNode()->GetData());
-
-    ITKDiffusionImageType::Pointer itkVectorImagePointer = ITKDiffusionImageType::New();
-    mitk::CastToItkImage(vols, itkVectorImagePointer);
-
-    // Extract b0 image
-    typedef itk::B0ImageExtractionImageFilter<short, short> FilterType;
-    FilterType::Pointer filterB0 = FilterType::New();
-    filterB0->SetInput(itkVectorImagePointer);
-    filterB0->SetDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(vols));
-    filterB0->Update();
-
-    mitk::Image::Pointer mitkImage = mitk::Image::New();
-
-    typedef itk::Image<short, 3> ImageType;
-    typedef itk::Image<short, 3> SegmentationType;
-    typedef itk::BinaryThresholdImageFilter<ImageType, SegmentationType> ThresholdFilterType;
-    // apply threshold
-    ThresholdFilterType::Pointer filterThreshold = ThresholdFilterType::New();
-    filterThreshold->SetInput(filterB0->GetOutput());
-    filterThreshold->SetLowerThreshold(threshold);
-    filterThreshold->SetInsideValue(0);
-    filterThreshold->SetOutsideValue(1); // mark cut off values red
-    filterThreshold->Update();
-
-    mitkImage->InitializeByItk( filterThreshold->GetOutput() );
-    mitkImage->SetVolume( filterThreshold->GetOutput()->GetBufferPointer() );
-    mitk::DataNode::Pointer node;
-    if (this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", m_Controls->m_DwiBox->GetSelectedNode()))
+    m_PreviewB0 = nullptr;
+    using FilterType = itk::B0ImageExtractionImageFilter<short, short>;
+    auto filterB0 = FilterType::New();
+    try
     {
-      node = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", m_Controls->m_DwiBox->GetSelectedNode());
+      mitk::DiffusionPropertyHelper::ImageType::Pointer itkDwi;
+      mitk::CastToItkImage(dwi, itkDwi);
+      filterB0->SetInput(itkDwi);
+      filterB0->SetDirections(mitk::DiffusionPropertyHelper::GetGradientContainer(dwi));
+      filterB0->SetReferenceBValue(mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi));
+      filterB0->Update();
     }
-    else
+    catch (const std::exception &e)
     {
-      // create a new node, to show thresholded values
-      node = mitk::DataNode::New();
-      GetDataStorage()->Add( node, m_Controls->m_DwiBox->GetSelectedNode() );
-      node->SetProperty( "name", mitk::StringProperty::New("ThresholdOverlay"));
-      node->SetBoolProperty("helper object", true);
+      // The preview runs on every step of the threshold box, so it reports in the status bar
+      // instead of opening a dialog per key press. A DWI without b0 volume has no preview.
+      if (auto overlay = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", dwiNode))
+        this->GetDataStorage()->Remove(overlay);
+      mitk::StatusBar::GetInstance()->DisplayText((std::string("No threshold preview: ") + e.what()).c_str());
+      mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+      return;
     }
-    node->SetData( mitkImage );
-    mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+    m_PreviewB0 = filterB0->GetOutput();
+    m_PreviewB0->DisconnectPipeline();
+    m_PreviewDwi = dwi;
+    m_PreviewDwiTime = dwi->GetMTime();
   }
+
+  using ImageType = itk::Image<short, 3>;
+  auto filterThreshold = itk::BinaryThresholdImageFilter<ImageType, ImageType>::New();
+  filterThreshold->SetInput(m_PreviewB0);
+  filterThreshold->SetLowerThreshold(threshold);
+  filterThreshold->SetInsideValue(0);
+  filterThreshold->SetOutsideValue(1); // mark cut off values red
+  filterThreshold->Update();
+
+  auto mitkImage = mitk::GrabItkImageMemory(filterThreshold->GetOutput());
+
+  mitk::DataNode::Pointer node = this->GetDataStorage()->GetNamedDerivedNode("ThresholdOverlay", dwiNode);
+  if (node.IsNull())
+  {
+    node = mitk::DataNode::New();
+    this->GetDataStorage()->Add(node, dwiNode);
+    node->SetProperty("name", mitk::StringProperty::New("ThresholdOverlay"));
+    node->SetBoolProperty("helper object", true);
+  }
+  node->SetData(mitkImage);
+  mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }

@@ -16,12 +16,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkTestingMacros.h"
 #include <mitkFiberBundle.h>
+#include <mitkImageCast.h>
 #include <mitkBaseData.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkTestingConfig.h>
 #include <mitkIOUtil.h>
 #include <itkFiberCurvatureFilter.h>
-#include <omp.h>
+#include "mitkDiffusionTestData.h"
 #include "mitkTestFixture.h"
 
 class mitkFiberProcessingTestSuite : public mitk::TestFixture
@@ -60,11 +61,10 @@ public:
 
     void setUp() override
     {
-        omp_set_num_threads(1);
         original = nullptr;
-        original = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/original.fib"));
+        original = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib"));
 
-        mitk::Image::Pointer img = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/MASK.nrrd"));
+        mitk::Image::Pointer img = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/MASK.nrrd"));
         mask = ItkUcharImgType::New();
         mitk::CastToItkImage(img, mask);
     }
@@ -78,14 +78,14 @@ public:
     {
         MITK_INFO << "TEST 1: Remove by direction";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         vnl_vector_fixed<double,3> dir;
         dir[0] = 0;
         dir[1] = 1;
         dir[2] = 0;
         fib->RemoveDir(dir,cos(5.0*itk::Math::pi/180));
 
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/remove_direction.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_direction.fib"));
 
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
@@ -94,11 +94,11 @@ public:
     {
         MITK_INFO << "TEST 2: Remove by length";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->RemoveShortFibers(30);
         fib->RemoveLongFibers(40);
 
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/remove_length.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_length.fib"));
 
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
@@ -107,7 +107,7 @@ public:
     {
         MITK_INFO << "TEST 3: Remove by curvature 1";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         auto filter = itk::FiberCurvatureFilter::New();
         filter->SetInputFiberBundle(fib);
         filter->SetAngularDeviation(30);
@@ -115,7 +115,7 @@ public:
         filter->SetRemoveFibers(false);
         filter->SetUseMedian(true);
         filter->Update();
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/remove_curvature1.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_curvature1.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(filter->GetOutputFiberBundle()));
     }
 
@@ -123,7 +123,7 @@ public:
     {
         MITK_INFO << "TEST 4: Remove by curvature 2";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         auto filter = itk::FiberCurvatureFilter::New();
         filter->SetInputFiberBundle(fib);
         filter->SetAngularDeviation(30);
@@ -131,7 +131,7 @@ public:
         filter->SetRemoveFibers(true);
         filter->SetUseMedian(true);
         filter->Update();
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/remove_curvature2.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_curvature2.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(filter->GetOutputFiberBundle()));
     }
 
@@ -139,10 +139,10 @@ public:
     {
         MITK_INFO << "TEST 5: Remove outside mask";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib = fib->RemoveFibersOutside(mask);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/remove_outside.fib"));
-//        mitk::IOUtil::Save(fib, mitk::IOUtil::GetTempPath()+"remove_outside.fib");
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_outside_v2.fib"));
+//        mitk::IOUtil::Save(fib, mitk::IOUtil::GetTempPath()+"remove_outside_v2.fib");
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
@@ -150,9 +150,9 @@ public:
     {
         MITK_INFO << "TEST 6: Remove inside mask";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib = fib->RemoveFibersOutside(mask, true);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/remove_inside.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_inside_v2.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
@@ -160,9 +160,9 @@ public:
     {
         MITK_INFO << "TEST 7: Modify resample spline";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->ResampleSpline(5);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/modify_resample.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/modify_resample.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
@@ -170,9 +170,10 @@ public:
     {
         MITK_INFO << "TEST 8: Modify compress";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->Compress(0.1f);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/modify_compress.fib"));
+        // _v2: Compress bounds every removed point, not only each point at its removal.
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/modify_compress_v2.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
@@ -180,9 +181,9 @@ public:
     {
         MITK_INFO << "TEST 9: Modify sagittal mirror";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->MirrorFibers(0);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/modify_sagittal_mirror.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/modify_sagittal_mirror.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
@@ -190,9 +191,9 @@ public:
     {
         MITK_INFO << "TEST 10: Modify coronal mirror";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->MirrorFibers(1);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/modify_coronal_mirror.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/modify_coronal_mirror.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
@@ -200,9 +201,9 @@ public:
     {
         MITK_INFO << "TEST 11: Modify axial mirror";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->MirrorFibers(2);
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/modify_axial_mirror.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/modify_axial_mirror.fib"));
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
 
@@ -210,15 +211,15 @@ public:
     {
         MITK_INFO << "TEST 12: Weight and join";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->SetFiberWeights(0.1f);
 
-        mitk::FiberBundle::Pointer fib2 = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib2 = original->Clone();
         fib2->SetFiberWeight(3, 0.5);
 
         fib = fib->AddBundle(fib2);
 
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/modify_weighted_joined.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/modify_weighted_joined.fib"));
 
         CPPUNIT_ASSERT_MESSAGE("Number of fibers", ref->GetNumFibers() == fib->GetNumFibers());
 
@@ -230,12 +231,12 @@ public:
     {
         MITK_INFO << "TEST 13: Subtract";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
 
-        mitk::FiberBundle::Pointer fib2 = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/remove_length.fib"));
+        mitk::FiberBundle::Pointer fib2 = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/remove_length.fib"));
         fib = fib->SubtractBundle(fib2);
 
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/subtracted.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/subtracted.fib"));
 
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
@@ -244,10 +245,10 @@ public:
     {
         MITK_INFO << "TEST 14: rotate";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->TransformFibers(1,2,3,0,0,0);
 
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/transform_rotate.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/transform_rotate.fib"));
 
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
@@ -256,10 +257,10 @@ public:
     {
         MITK_INFO << "TEST 15: translate";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->TransformFibers(0,0,0,1,2,3);
 
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/transform_translate.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/transform_translate.fib"));
 
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
@@ -268,10 +269,10 @@ public:
     {
         MITK_INFO << "TEST 16: scale 1";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->ScaleFibers(0.1, 0.2, 0.3);
 
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/transform_scale1.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/transform_scale1.fib"));
 
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
@@ -280,10 +281,10 @@ public:
     {
         MITK_INFO << "TEST 17: scale 2";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->ScaleFibers(0.1, 0.2, 0.3, false);
 
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/transform_scale2.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/transform_scale2.fib"));
 
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }
@@ -292,9 +293,9 @@ public:
     {
         MITK_INFO << "TEST 18: Modify resample linear";
 
-        mitk::FiberBundle::Pointer fib = original->GetDeepCopy();
+        mitk::FiberBundle::Pointer fib = original->Clone();
         fib->ResampleLinear();
-        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(GetTestDataFilePath("DiffusionImaging/FiberProcessing/modify_resample_linear.fib"));
+        mitk::FiberBundle::Pointer ref = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/modify_resample_linear.fib"));
 //        mitk::IOUtil::Save(fib, mitk::IOUtil::GetTempPath()+"modify_resample_linear.fib");
         CPPUNIT_ASSERT_MESSAGE("Should be equal", ref->Equals(fib));
     }

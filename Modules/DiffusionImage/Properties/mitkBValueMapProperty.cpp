@@ -16,10 +16,12 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkBValueMapProperty.h"
 
-mitk::BValueMapProperty::BValueMapProperty()
-  : m_BValueMap()
-{
-}
+#include <nlohmann/json.hpp>
+#include <string>
+
+#include <cmath>
+
+mitk::BValueMapProperty::BValueMapProperty() = default;
 
 mitk::BValueMapProperty::BValueMapProperty(const BValueMapProperty& other)
   : mitk::BaseProperty(other)
@@ -32,9 +34,7 @@ mitk::BValueMapProperty::BValueMapProperty(const BValueMap& bValueMap)
   m_BValueMap = bValueMap;
 }
 
-mitk::BValueMapProperty::~BValueMapProperty()
-{
-}
+mitk::BValueMapProperty::~BValueMapProperty() = default;
 
 const mitk::BValueMapProperty::BValueMap & mitk::BValueMapProperty::GetBValueMap() const
 {
@@ -57,42 +57,47 @@ bool mitk::BValueMapProperty::Assign(const BaseProperty& property)
   return true;
 }
 
+// {"<b-value>": [volume indices], ...}: the form clients of the REST API see.
+bool mitk::BValueMapProperty::ToJSON(nlohmann::json& j) const
+{
+  j = nlohmann::json::object();
+
+  for (const auto& [bValue, indices] : m_BValueMap)
+    j[std::to_string(bValue)] = indices;
+
+  return true;
+}
+
+bool mitk::BValueMapProperty::FromJSON(const nlohmann::json& j)
+{
+  BValueMap map;
+
+  for (const auto& [key, indices] : j.items())
+    map[static_cast<unsigned int>(std::stoul(key))] = indices.get<std::vector<unsigned int>>();
+
+  m_BValueMap = map;
+  return true;
+}
+
 mitk::BValueMapProperty::BValueMap mitk::BValueMapProperty::CreateBValueMap(const mitk::BValueMapProperty::GradientDirectionsContainerType * gdc, float referenceBValue)
 {
   mitk::BValueMapProperty::BValueMap map;
 
   mitk::BValueMapProperty::GradientDirectionsContainerType::ConstIterator gdcit;
   for( gdcit = gdc->Begin(); gdcit != gdc->End(); ++gdcit)
-  {
-    float keyBValue = mitk::BValueMapProperty::GetBValueOfGradientDirection(gdcit.Index(),referenceBValue, gdc);
-    map[keyBValue].push_back(gdcit.Index());
-  }
+    map[GetBValue(gdcit.Value(), referenceBValue)].push_back(gdcit.Index());
 
   return map;
 }
 
-
-float mitk::BValueMapProperty::GetBValueOfGradientDirection(unsigned int i, float referenceBValue, const mitk::BValueMapProperty::GradientDirectionsContainerType * gdc)
+double mitk::BValueMapProperty::GetBValue(const GradientDirectionType& gradient, double referenceBValue)
 {
-  if(i > gdc->Size()-1)
-    return -1;
-
-  if(gdc->ElementAt(i).one_norm() <= 0.0)
-  {
+  if (gradient.one_norm() <= 0.0)
     return 0;
-  }
-  else
-  {
-    double twonorm = gdc->ElementAt(i).two_norm();
-    double bval = referenceBValue*twonorm*twonorm;
 
-    if (bval<0)
-      bval = ceil(bval - 0.5);
-    else
-      bval = floor(bval + 0.5);
-
-    return bval;
-  }
+  const double twonorm = gradient.two_norm();
+  const double bValue = referenceBValue*twonorm*twonorm;
+  return bValue < 0 ? std::ceil(bValue - 0.5) : std::floor(bValue + 0.5);
 }
 
 itk::LightObject::Pointer  mitk::BValueMapProperty::InternalClone() const

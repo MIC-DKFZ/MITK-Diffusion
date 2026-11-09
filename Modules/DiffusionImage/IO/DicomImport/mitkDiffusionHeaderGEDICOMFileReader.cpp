@@ -39,8 +39,8 @@ bool mitk::DiffusionHeaderGEDICOMFileReader
   // typical example:  "1000\8\0\0" for bvalue=1000
   //                   "40\8\0\0" for bvalue=40
   // so we need to cut off the last 6 elements
-  const char* bval_string = ge_tagvalue_string.substr(0,ge_tagvalue_string.length()-6).c_str();
-  header_info.b_value = static_cast<unsigned int>(strtod( bval_string, &pEnd ));
+  const std::string bval_string = ge_tagvalue_string.substr(0, ge_tagvalue_string.length() > 6 ? ge_tagvalue_string.length() - 6 : 0);
+  header_info.b_value = static_cast<unsigned int>(strtod( bval_string.c_str(), &pEnd ));
 
   // now retrieve the gradient direction
   if(success &&

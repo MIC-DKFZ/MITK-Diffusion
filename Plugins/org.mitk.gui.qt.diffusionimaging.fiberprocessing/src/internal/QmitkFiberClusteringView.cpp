@@ -21,6 +21,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkFiberClusteringView.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <mitkNodePredicateDataType.h>
 #include <mitkNodePredicateDimension.h>
 #include <mitkNodePredicateAnd.h>
@@ -61,6 +63,7 @@ void QmitkFiberClusteringView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkFiberClusteringViewControls;
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     connect( m_Controls->m_StartButton, SIGNAL(clicked()), this, SLOT(StartClustering()) );
@@ -114,6 +117,11 @@ void QmitkFiberClusteringView::StartClustering()
   float clusterSize = m_Controls->m_ClusterSizeBox->value();
 
   mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
+  if (fib->GetNumFibers()==0)
+  {
+    QMessageBox::information(nullptr, "Fiber Clustering", "The tractogram contains no fibers.");
+    return;
+  }
 
   float max_d = 0;
   int i=1;
@@ -134,36 +142,36 @@ void QmitkFiberClusteringView::StartClustering()
     clusterer->SetInCentroids(in_centroids);
   }
 
-  std::vector< mitk::ClusteringMetric* > metrics;
+  std::vector< std::unique_ptr<mitk::ClusteringMetric> > metrics;
   if (m_Controls->m_MetricBox1->isChecked())
   {
-    mitk::ClusteringMetricEuclideanMean* metric = new mitk::ClusteringMetricEuclideanMean();
+    auto metric = std::make_unique<mitk::ClusteringMetricEuclideanMean>();
     metric->SetScale(m_Controls->m_MetricWeight1->value());
-    metrics.push_back(metric);
+    metrics.push_back(std::move(metric));
   }
   if (m_Controls->m_MetricBox2->isChecked())
   {
-    mitk::ClusteringMetricEuclideanStd* metric = new mitk::ClusteringMetricEuclideanStd();
+    auto metric = std::make_unique<mitk::ClusteringMetricEuclideanStd>();
     metric->SetScale(m_Controls->m_MetricWeight2->value());
-    metrics.push_back(metric);
+    metrics.push_back(std::move(metric));
   }
   if (m_Controls->m_MetricBox3->isChecked())
   {
-    mitk::ClusteringMetricEuclideanMax* metric = new mitk::ClusteringMetricEuclideanMax();
+    auto metric = std::make_unique<mitk::ClusteringMetricEuclideanMax>();
     metric->SetScale(m_Controls->m_MetricWeight3->value());
-    metrics.push_back(metric);
+    metrics.push_back(std::move(metric));
   }
   if (m_Controls->m_MetricBox6->isChecked())
   {
-    mitk::ClusteringMetricInnerAngles* metric = new mitk::ClusteringMetricInnerAngles();
+    auto metric = std::make_unique<mitk::ClusteringMetricInnerAngles>();
     metric->SetScale(m_Controls->m_MetricWeight6->value());
-    metrics.push_back(metric);
+    metrics.push_back(std::move(metric));
   }
   if (m_Controls->m_MetricBox7->isChecked())
   {
-    mitk::ClusteringMetricLength* metric = new mitk::ClusteringMetricLength();
+    auto metric = std::make_unique<mitk::ClusteringMetricLength>();
     metric->SetScale(m_Controls->m_MetricWeight7->value());
-    metrics.push_back(metric);
+    metrics.push_back(std::move(metric));
   }
 
   if (m_Controls->m_ParcellationBox->GetSelectedNode().IsNotNull() && m_Controls->m_MetricBox4->isChecked())
@@ -172,10 +180,10 @@ void QmitkFiberClusteringView::StartClustering()
 
     ShortImageType::Pointer itk_map = ShortImageType::New();
     mitk::CastToItkImage(mitk_map, itk_map);
-    mitk::ClusteringMetricAnatomic* metric = new mitk::ClusteringMetricAnatomic();
+    auto metric = std::make_unique<mitk::ClusteringMetricAnatomic>();
     metric->SetParcellations({itk_map});
     metric->SetScale(m_Controls->m_MetricWeight4->value());
-    metrics.push_back(metric);
+    metrics.push_back(std::move(metric));
   }
   if (m_Controls->m_MapBox->GetSelectedNode().IsNotNull() && m_Controls->m_MetricBox5->isChecked())
   {
@@ -183,26 +191,43 @@ void QmitkFiberClusteringView::StartClustering()
 
     FloatImageType::Pointer itk_map = FloatImageType::New();
     mitk::CastToItkImage(mitk_map, itk_map);
-    mitk::ClusteringMetricScalarMap* metric = new mitk::ClusteringMetricScalarMap();
+    auto metric = std::make_unique<mitk::ClusteringMetricScalarMap>();
     metric->SetImages({itk_map});
     metric->SetScale(m_Controls->m_MetricWeight5->value());
-    metrics.push_back(metric);
+    metrics.push_back(std::move(metric));
   }
 
+  if ((m_Controls->m_MetricBox4->isChecked() && m_Controls->m_ParcellationBox->GetSelectedNode().IsNull())
+      || (m_Controls->m_MetricBox5->isChecked() && m_Controls->m_MapBox->GetSelectedNode().IsNull()))
+  {
+    QMessageBox::warning(nullptr, "Warning", "The anatomical metric needs a parcellation, the scalar map metric a scalar map.");
+    return;
+  }
   if (metrics.empty())
   {
     QMessageBox::warning(nullptr, "Warning", "No metric selected!");
     return;
   }
 
-  clusterer->SetMetrics(metrics);
+  for (auto& metric : metrics)
+    clusterer->AddMetric(std::move(metric));
   clusterer->SetMergeDuplicateThreshold(m_Controls->m_MergeDuplicatesBox->value());
   clusterer->SetNumPoints(m_Controls->m_FiberPointsBox->value());
   clusterer->SetMaxClusters(m_Controls->m_MaxClustersBox->value());
   clusterer->SetMinClusterSize(m_Controls->m_MinFibersBox->value());
-  clusterer->Update();
+  try
+  {
+    clusterer->Update();
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Fiber Clustering", e.what());
+    return;
+  }
   std::vector<mitk::FiberBundle::Pointer> tracts = clusterer->GetOutTractograms();
   std::vector<mitk::FiberBundle::Pointer> centroids = clusterer->GetOutCentroids();
+  if (tracts.empty())
+    QMessageBox::information(nullptr, "Fiber Clustering", QString("No cluster with at least %1 fibers.").arg(m_Controls->m_MinFibersBox->value()));
 
   unsigned int c = 0;
   for (auto f : tracts)
@@ -226,7 +251,15 @@ void QmitkFiberClusteringView::StartClustering()
     ++c;
   }
 
-  if (m_Controls->m_CentroidsBox->isChecked() && m_Controls->m_MergeCentroidsBox->isChecked())
+  if (clusterer->GetOutUnassigned()->GetNumFibers()>0)
+  {
+    mitk::DataNode::Pointer new_node = mitk::DataNode::New();
+    new_node->SetData(clusterer->GetOutUnassigned());
+    new_node->SetName("Cluster_unassigned");
+    this->GetDataStorage()->Add(new_node, m_Controls->m_InCentroidsBox->GetSelectedNode());
+  }
+
+  if (m_Controls->m_CentroidsBox->isChecked() && m_Controls->m_MergeCentroidsBox->isChecked() && !centroids.empty())
   {
     mitk::DataNode::Pointer new_node2 = mitk::DataNode::New();
     auto centroid_bundle = centroids.at(0);

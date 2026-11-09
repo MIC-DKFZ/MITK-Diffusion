@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef MITKDiffusionIOMimeTypes_H
-#define MITKDiffusionIOMimeTypes_H
+#ifndef mitkDiffusionIOMimeTypes_h
+#define mitkDiffusionIOMimeTypes_h
 
 #include "mitkCustomMimeType.h"
 #include <string>
@@ -27,6 +27,13 @@ class DiffusionIOMimeTypes
 public:
 
   static std::vector<CustomMimeType*> Get();
+
+  /**
+   * True for a NRRD or NIfTI file with SH coefficients in vector layout, as earlier MITK versions
+   * saved them: a 3D image with one vector per voxel whose length is the coefficient count of an
+   * SH order from 2 to 12. NRRD DWIs (modality DWMRI) are not.
+   */
+  static bool IsShVectorLayout(const std::string &path);
 
   class  SHImageMimeType : public CustomMimeType
   {
@@ -63,13 +70,10 @@ public:
   static std::string PEAK_MIMETYPE_DESCRIPTION();
 
 
-private:
-
-  // purposely not implemented
-  DiffusionIOMimeTypes();
-  DiffusionIOMimeTypes(const DiffusionIOMimeTypes&);
+  DiffusionIOMimeTypes() = delete;
+  DiffusionIOMimeTypes(const DiffusionIOMimeTypes&) = delete;
 };
 
 }
 
-#endif // MITKDiffusionIOMimeTypes_H
+#endif

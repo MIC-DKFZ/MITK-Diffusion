@@ -18,11 +18,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include <mitkFiberBundleVtkReader.h>
 #include <mitkFiberBundleTckReader.h>
+#include <mitkFiberBundleTrxReader.h>
 #include <mitkFiberBundleTrackVisReader.h>
 #include <mitkFiberBundleDicomReader.h>
 
 #include <mitkFiberBundleVtkWriter.h>
 #include <mitkFiberBundleTrackVisWriter.h>
+#include <mitkFiberBundleTrxWriter.h>
 #include <mitkFiberBundleDicomWriter.h>
 
 #include <mitkPlanarFigureCompositeReader.h>
@@ -65,24 +67,26 @@ namespace mitk
           props[ us::ServiceConstants::SERVICE_RANKING() ] = -3;
         else if (mt->GetName()==mitk::FiberBundleMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME())
           props[ us::ServiceConstants::SERVICE_RANKING() ] = -4;
+        else if (mt->GetName()==mitk::FiberBundleMimeTypes::FIBERBUNDLE_TRX_MIMETYPE_NAME())
+          props[ us::ServiceConstants::SERVICE_RANKING() ] = -5;
         else
           props[ us::ServiceConstants::SERVICE_RANKING() ] = 10;
 
-        context->RegisterService(*mimeTypeIter, props);
+        m_MimeTypeRegistrations.push_back(context->RegisterService(*mimeTypeIter, props));
       }
 
-      m_FiberBundleVtkReader = new FiberBundleVtkReader();
-      m_FiberBundleVtkWriter = new FiberBundleVtkWriter();
-      m_FiberBundleTrackVisReader = new FiberBundleTrackVisReader();
-      m_FiberBundleTrackVisWriter = new FiberBundleTrackVisWriter();
-      m_FiberBundleTckReader = new FiberBundleTckReader();
-      m_FiberBundleDicomReader = new FiberBundleDicomReader();
-      m_FiberBundleDicomWriter = new FiberBundleDicomWriter();
+      m_FiberBundleVtkReader = std::make_unique<FiberBundleVtkReader>();
+      m_FiberBundleVtkWriter = std::make_unique<FiberBundleVtkWriter>();
+      m_FiberBundleTrackVisReader = std::make_unique<FiberBundleTrackVisReader>();
+      m_FiberBundleTrackVisWriter = std::make_unique<FiberBundleTrackVisWriter>();
+      m_FiberBundleTrxWriter = std::make_unique<FiberBundleTrxWriter>();
+      m_FiberBundleTckReader = std::make_unique<FiberBundleTckReader>();
+      m_FiberBundleTrxReader = std::make_unique<FiberBundleTrxReader>();
+      m_FiberBundleDicomReader = std::make_unique<FiberBundleDicomReader>();
+      m_FiberBundleDicomWriter = std::make_unique<FiberBundleDicomWriter>();
 
-      m_PlanarFigureCompositeReader = new PlanarFigureCompositeReader();
-      m_PlanarFigureCompositeWriter = new PlanarFigureCompositeWriter();
-
-      mitk::DiffusionPropertyHelper::SetupProperties();
+      m_PlanarFigureCompositeReader = std::make_unique<PlanarFigureCompositeReader>();
+      m_PlanarFigureCompositeWriter = std::make_unique<PlanarFigureCompositeWriter>();
 
       m_MapperProviders.push_back(std::make_unique<MapperProviderBase<FiberBundleMapper2D, FiberBundle>>(BaseRenderer::Standard2D));
       m_MapperProviders.push_back(std::make_unique<MapperProviderBase<FiberBundleMapper3D, FiberBundle>>(BaseRenderer::Standard3D));
@@ -92,39 +96,47 @@ namespace mitk
     {
       m_MapperProviders.clear();
 
-      for (unsigned int loop(0); loop < m_MimeTypes.size(); ++loop)
-      {
-        delete m_MimeTypes.at(loop);
-      }
+      m_FiberBundleVtkReader.reset();
+      m_FiberBundleTckReader.reset();
+      m_FiberBundleTrxReader.reset();
+      m_FiberBundleTrackVisReader.reset();
+      m_FiberBundleDicomReader.reset();
 
-      delete m_FiberBundleVtkReader;
-      delete m_FiberBundleTckReader;
-      delete m_FiberBundleTrackVisReader;
-      delete m_FiberBundleDicomReader;
+      m_FiberBundleDicomWriter.reset();
+      m_FiberBundleVtkWriter.reset();
+      m_FiberBundleTrackVisWriter.reset();
+      m_FiberBundleTrxWriter.reset();
 
-      delete m_FiberBundleDicomWriter;
-      delete m_FiberBundleVtkWriter;
-      delete m_FiberBundleTrackVisWriter;
+      m_PlanarFigureCompositeReader.reset();
+      m_PlanarFigureCompositeWriter.reset();
 
-      delete m_PlanarFigureCompositeReader;
-      delete m_PlanarFigureCompositeWriter;
+      // The registry holds raw pointers to the mime types: unregister them before deleting them.
+      for (auto& registration : m_MimeTypeRegistrations)
+        registration.Unregister();
+      m_MimeTypeRegistrations.clear();
+      for (auto mimeType : m_MimeTypes)
+        delete mimeType;
+      m_MimeTypes.clear();
     }
 
   private:
 
-    FiberBundleVtkReader * m_FiberBundleVtkReader;
-    FiberBundleTckReader * m_FiberBundleTckReader;
-    FiberBundleTrackVisReader * m_FiberBundleTrackVisReader;
-    FiberBundleDicomReader * m_FiberBundleDicomReader;
+    std::unique_ptr<FiberBundleVtkReader> m_FiberBundleVtkReader;
+    std::unique_ptr<FiberBundleTckReader> m_FiberBundleTckReader;
+    std::unique_ptr<FiberBundleTrxReader> m_FiberBundleTrxReader;
+    std::unique_ptr<FiberBundleTrackVisReader> m_FiberBundleTrackVisReader;
+    std::unique_ptr<FiberBundleDicomReader> m_FiberBundleDicomReader;
 
-    FiberBundleDicomWriter * m_FiberBundleDicomWriter;
-    FiberBundleVtkWriter * m_FiberBundleVtkWriter;
-    FiberBundleTrackVisWriter * m_FiberBundleTrackVisWriter;
+    std::unique_ptr<FiberBundleDicomWriter> m_FiberBundleDicomWriter;
+    std::unique_ptr<FiberBundleVtkWriter> m_FiberBundleVtkWriter;
+    std::unique_ptr<FiberBundleTrackVisWriter> m_FiberBundleTrackVisWriter;
+    std::unique_ptr<FiberBundleTrxWriter> m_FiberBundleTrxWriter;
 
-    PlanarFigureCompositeReader* m_PlanarFigureCompositeReader;
-    PlanarFigureCompositeWriter* m_PlanarFigureCompositeWriter;
+    std::unique_ptr<PlanarFigureCompositeReader> m_PlanarFigureCompositeReader;
+    std::unique_ptr<PlanarFigureCompositeWriter> m_PlanarFigureCompositeWriter;
 
     std::vector<mitk::CustomMimeType*> m_MimeTypes;
+    std::vector<us::ServiceRegistration<mitk::CustomMimeType>> m_MimeTypeRegistrations;
 
     std::vector<std::unique_ptr<IMapperProvider>> m_MapperProviders;
   };

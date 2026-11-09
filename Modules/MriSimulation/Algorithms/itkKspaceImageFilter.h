@@ -24,12 +24,76 @@ This file is based heavily on a corresponding ITK filter.
 
 #include <itkImageSource.h>
 #include <vector>
+#include <mutex>
+#include <condition_variable>
+#include <algorithm>
+#include <memory>
+#include <cstdint>
+#include <complex>
+#include <array>
+#include <vnl/vnl_matrix.h>
 #include <itkMersenneTwisterRandomVariateGenerator.h>
 #include <mitkFiberfoxParameters.h>
-#include <mitkFiberBundle.h>
+#include <mitkFiberfoxMotion.h>
 #include <mitkAcquisitionType.h>
 
 namespace itk{
+
+  /**
+   * Memory of the time segments (KspaceImageFilter) shared by the slice jobs of a simulation
+   * (TractsToDWIImageFilter). A job holds the estimated memory of its time segments while it builds them
+   * and waits until that much is free, so the budget bounds the memory of the time segments of all jobs
+   * together; the other arrays of a job, built before it asks and kept while it waits, are not counted.
+   * The bytes are whole numbers, so that every release restores the free amount exactly (fractional
+   * amounts drift, and a request of the whole budget would then wait for good). Waiting changes
+   * only when a job runs, never its result: whether a slice takes the time segments is decided by a
+   * limit per slice (KspaceImageFilter::MAX_TIME_SEGMENT_BYTES), not by the jobs running at the time.
+   */
+  class TimeSegmentMemoryBudget
+  {
+  public:
+    explicit TimeSegmentMemoryBudget(std::uint64_t bytes) : m_Total(bytes), m_Free(bytes) {}
+
+    /** The bytes of a budget one job holds; released when destroyed. Without a budget it holds nothing. */
+    class Share
+    {
+    public:
+      explicit Share(TimeSegmentMemoryBudget* budget) : m_Budget(budget) {}
+      ~Share() { Resize(0); }
+      Share(const Share&) = delete;
+      Share& operator=(const Share&) = delete;
+      /**
+       * Holds bytes, at most the whole budget (a job that needs more runs alone), instead of the bytes
+       * held so far. These are released before the job waits, so no job waits while holding memory and
+       * the jobs cannot block each other for good.
+       */
+      void Resize(std::uint64_t bytes)
+      {
+        if (m_Budget != nullptr)
+          m_Held = m_Budget->Exchange(m_Held, bytes);
+      }
+    private:
+      TimeSegmentMemoryBudget* m_Budget;
+      std::uint64_t m_Held = 0;
+    };
+
+  private:
+    std::uint64_t Exchange(std::uint64_t held, std::uint64_t bytes)
+    {
+      std::unique_lock<std::mutex> lock(m_Mutex);
+      m_Free += held;
+      m_Changed.notify_all();
+      bytes = std::min(bytes, m_Total);
+      m_Changed.wait(lock, [this, bytes] { return m_Free >= bytes; });
+      m_Free -= bytes;
+      return bytes;
+    }
+
+    const std::uint64_t m_Total;
+    std::uint64_t m_Free;
+    std::mutex m_Mutex;
+    std::condition_variable m_Changed;
+  };
 
 /**
 * \brief Simulates k-space acquisition of one slice with a single shot EPI sequence. Enables the simulation of various effects occuring during real MR acquisitions:
@@ -74,18 +138,44 @@ namespace itk{
     itkSetMacro( SpikesPerSlice, unsigned int )     ///< Number of spikes per slice. Corresponding parameter in fiberfox parameter object specifies the number of spikes for the whole image and can thus not be used here.
     itkSetMacro( Z, double )                        ///< Slice position, necessary for eddy current simulation.
     itkSetMacro( RandSeed, int )                  ///< Use constant seed for random generator for reproducible results.
-    itkSetMacro( Translation, VectorType )
-    itkSetMacro( RotationMatrix, MatrixType )
     itkSetMacro( Zidx, int )
     itkSetMacro( StoreTimings, bool )
-    itkSetMacro( FiberBundle, FiberBundle::Pointer )
     itkSetMacro( CoilPosition, VectorType )
     itkGetMacro( KSpaceImage, typename InputImageType::Pointer )    ///< k-space magnitude image
     itkGetMacro( TickImage, typename InputImageType::Pointer )    ///< k-space readout ordering encoded in the voxels
     itkGetMacro( RfImage, typename InputImageType::Pointer )    ///< time passed since last RF pulse encoded per voxel
     itkGetMacro( SpikeLog, std::string )
+    itkGetConstMacro( NumSegments, unsigned int )   ///< time segments of the last update; 0 for the exact sum and without distortions and eddy currents
+    itkGetConstMacro( TimeSegmentsCapped, bool )    ///< time segments were asked for, but would have cost more than the exact sum, which the last update took
 
-    void SetParameters( FiberfoxParameters* param ){ m_Parameters = param; }
+    /**
+     * Memory limit of the time segments of one slice; above it the slice takes the exact sum. A constant,
+     * so that the choice, and with it the image, does not depend on the threads or on the other slice jobs.
+     */
+    static constexpr double MAX_TIME_SEGMENT_BYTES = 256.0*1024*1024;
+    /** Memory of the time segments of all slice jobs of a simulation together (TimeSegmentMemoryBudget of TractsToDWIImageFilter). */
+    static constexpr std::uint64_t TIME_SEGMENT_MEMORY_BUDGET = std::uint64_t(2)*1024*1024*1024;
+    /** Memory limit of the time segments of this filter's slice; MAX_TIME_SEGMENT_BYTES by default. */
+    itkSetMacro( MaxTimeSegmentBytes, double )
+    itkGetConstMacro( MaxTimeSegmentBytes, double )
+    /** Budget shared with the other slice jobs, whose memory the time segments hold while they are built; none (nullptr) by default. Not owned. */
+    void SetTimeSegmentMemoryBudget( TimeSegmentMemoryBudget* budget ){ m_TimeSegmentMemoryBudget = budget; }
+
+    void SetParameters( const mitk::FiberfoxParameters* param ){ m_Parameters = param; }
+    void SetMotion( const mitk::FiberfoxMotion& motion ){ m_Motion = motion; }  ///< head motion of the volume; moves the frequency map
+
+    /** Readout scheme (k-space trajectory and timing) of the acquisition type in the parameters. */
+    static std::unique_ptr<mitk::AcquisitionType> CreateReadoutScheme(const mitk::FiberfoxParameters* parameters);
+
+    /**
+     * Whether partial Fourier leaves the phase-encoding line with k-space index ky (0 to numLines-1)
+     * unacquired. The partial Fourier factor is the fraction of the numLines lines that is acquired:
+     * round(partialFourier*numLines) lines, at least up to the k-space centre. They are the lines read
+     * first: the highest indices in normal and the lowest in reversed phase direction. With an even
+     * number of lines, line 0 (the highest frequency, without a conjugate partner) is always acquired
+     * and counted, so both directions acquire the same number of lines, mirrored about the centre.
+     */
+    static bool IsSkippedLine(int ky, int numLines, double partialFourier, bool reversePhase);
 
     void SetCompartmentImages( std::vector< InputImagePointerType > cImgs ) { m_CompartmentImages=cImgs; }  ///< One signal image per compartment.
     void SetT2( std::vector< float > t2Vector ) { m_T2=t2Vector; } ///< One T2 relaxation constant per compartment image.
@@ -96,34 +186,51 @@ namespace itk{
     KspaceImageFilter();
     ~KspaceImageFilter() override {}
 
-    float CoilSensitivity(VectorType& pos);
+    float CoilSensitivity(VectorType& pos) const;
+    /** Fills m_CompartmentSpectra; see there. */
+    void ComputeCompartmentSpectra();
+    /**
+     * Factors of the separable DFT of a slice (factorsX: kx along x per line parity, factorsY: ky along
+     * y with aliasing) and the signal scale times coil sensitivity of every pixel (weight).
+     */
+    void ComputeDftFactors(std::vector< std::complex<double> >& factorsX, std::vector< std::complex<double> >& factorsY, std::vector< double >& weight) const;
+    /** Fills m_CompartmentSpectra for the time-segmented approximation; see there. */
+    void ComputeTimeSegmentation(bool eddyCurrents, bool distortions);
+    /** Number of v whose interpolators SolveSegmentWeights computes together. */
+    static constexpr std::size_t SEGMENT_WEIGHT_BLOCK = 32;
+    /**
+     * Least-squares interpolators of the time segments (see ComputeTimeSegmentation) at count v, at most
+     * SEGMENT_WEIGHT_BLOCK, written to a[l*stride + i]. pinvRe and pinvIm hold the pseudo-inverse of the
+     * fit (L x bins, row by row), binU and binWeight the mean u and the square root of the weight of the bins.
+     */
+    static void SolveSegmentWeights(const std::vector< double >& pinvRe, const std::vector< double >& pinvIm,
+                                    const std::vector< std::array<double, 2> >& binU, const std::vector< double >& binWeight,
+                                    const std::array<double, 2>* v, std::size_t count, std::complex<double>* a, std::size_t stride);
 
     void BeforeThreadedGenerateData() override;
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
     void AfterThreadedGenerateData() override;
 
     VectorType                              m_CoilPosition;
-    FiberfoxParameters*                     m_Parameters;
+    const mitk::FiberfoxParameters*               m_Parameters;
     std::vector< float >                    m_T2;
     std::vector< float >                    m_T1;
     std::vector< float >                    m_T1Relax;
     std::vector< InputImagePointerType >    m_CompartmentImages;
     itk::Vector<double,3>                   m_DiffusionGradientDirection;
+    itk::Vector<double,3>                   m_EddyFieldGradient;    ///< eddy-current field gradient times gamma, along the diffusion gradient
     float                                   m_Z;
     int                                     m_Zidx;
     int                                     m_RandSeed;
     itk::Statistics::MersenneTwisterRandomVariateGenerator::Pointer m_RandGen;
     unsigned int                            m_SpikesPerSlice;
-    FiberBundle::Pointer                    m_FiberBundle;
     float                                   m_Gamma;
-    VectorType                              m_Translation;  ///< used to find correct point in frequency map (head motion)
-    MatrixType                              m_RotationMatrix;
-    float                                   m_TransX;
-    float                                   m_TransY;
-    float                                   m_TransZ;
+    mitk::FiberfoxMotion                    m_Motion;
 
     bool                                    m_IsBaseline;
     std::complex<ScalarType>                 m_Spike;
+    long                                    m_SpikeTick;    ///< readout position of m_Spike, decides between equal maxima
+    std::mutex                              m_SpikeMutex;
     MatrixType                              m_Transform;
     std::string                             m_SpikeLog;
 
@@ -131,7 +238,7 @@ namespace itk{
     typename InputImageType::Pointer        m_KSpaceImage;
     typename InputImageType::Pointer        m_TickImage;
     typename InputImageType::Pointer        m_RfImage;
-    AcquisitionType*                        m_ReadoutScheme;
+    std::unique_ptr<mitk::AcquisitionType>        m_ReadoutScheme;
 
     typename itk::Image< ScalarType, 2 >::Pointer m_MovedFmap;
     int                                     ringing_lines_x;
@@ -144,6 +251,26 @@ namespace itk{
     float                                   yMaxFov_half;
     float                                   numPix;
     bool                                    m_StoreTimings;
+
+    /**
+     * Without eddy currents and distortions the phase of a k-space sample does not depend on its
+     * readout time: s(k) = sum_i relaxation_i(t(k)) F_i(k) / numPix, with F_i the spectrum of
+     * compartment i (signal scale and coil sensitivity included; ghost offset and aliasing in the
+     * DFT factors). Then m_CompartmentSpectra holds F_i at index ky*kxMax + kx.
+     *
+     * With eddy currents or distortions and m_KspaceTimeSegments != 0, the phase factor of every pixel
+     * is approximated by L time segments (L = m_KspaceTimeSegments, or chosen from the phase spread):
+     * exp(i 2 pi phi(r, t)) ~ sum_l a_l(t) exp(i 2 pi phi(r, t_l)). Then m_CompartmentSpectra holds,
+     * for every compartment (or for their sum without relaxation), sum_l a_l(t(k)) S_l(k), with S_l
+     * the spectrum of the compartment times the phase factor at the segment time t_l, and is used as
+     * above (ComputeTimeSegmentation). Otherwise it is empty and every sample sums over all pixels.
+     */
+    std::vector< std::vector< std::complex<double> > > m_CompartmentSpectra;
+
+    unsigned int                            m_NumSegments;  ///< L of the time segments, 0 for the other two paths
+    double                                  m_MaxTimeSegmentBytes;
+    TimeSegmentMemoryBudget*                m_TimeSegmentMemoryBudget;
+    bool                                    m_TimeSegmentsCapped;
 
   private:
 

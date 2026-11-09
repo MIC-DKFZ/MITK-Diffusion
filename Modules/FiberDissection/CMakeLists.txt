@@ -4,9 +4,11 @@ if(BUILD_MODULE_FiberDissection)
 
 MITK_CREATE_MODULE(
   INCLUDE_DIRS Interactor MachineLearning ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS MitkMultilabel MitkFiberProcessing
+  DEPENDS MitkFiberBundle
   PACKAGE_DEPENDS
     PUBLIC OpenCV|opencv_ml
 )
+
+add_subdirectory(Testing)
 
 endif()

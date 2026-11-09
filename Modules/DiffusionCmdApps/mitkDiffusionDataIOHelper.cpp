@@ -16,6 +16,63 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkDiffusionDataIOHelper.h"
 
+#include <mitkCoreServices.h>
+#include <mitkIMimeTypeProvider.h>
+
+namespace
+{
+  /**
+   * Silences std::cout until destroyed, also when a reader throws. The same as mitk::CoutSilencer
+   * of FiberBundle, which this module does not depend on (the IVIM build has no FiberBundle).
+   */
+  class CoutSilencer
+  {
+  public:
+    CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
+    ~CoutSilencer() { this->Restore(); }
+    CoutSilencer(const CoutSilencer&) = delete;
+    CoutSilencer& operator=(const CoutSilencer&) = delete;
+
+    void Restore()
+    {
+      if (m_Old != nullptr)
+        std::cout.rdbuf(m_Old);
+      m_Old = nullptr;
+    }
+
+  private:
+    std::stringstream m_Buffer;
+    std::streambuf* m_Old;
+  };
+}
+
+std::string mitk::DiffusionDataIOHelper::GetExtension(const std::string& path)
+{
+  const std::string name = itksys::SystemTools::LowerCase(itksys::SystemTools::GetFilenameName(path));
+  std::size_t longest = 0;
+  mitk::CoreServicePointer<mitk::IMimeTypeProvider> provider(mitk::CoreServices::GetMimeTypeProvider());
+  for (const auto& mimeType : provider->GetMimeTypes())
+  {
+    for (const auto& extension : mimeType.GetExtensions())
+    {
+      const std::string dotted = "." + itksys::SystemTools::LowerCase(extension);
+      if (!extension.empty() && dotted.size() > longest && name.ends_with(dotted))
+        longest = dotted.size();
+    }
+  }
+  return path.substr(path.size() - longest);
+}
+
+std::string mitk::DiffusionDataIOHelper::GetPathWithoutExtension(const std::string& path)
+{
+  return path.substr(0, path.size() - GetExtension(path).size());
+}
+
+std::string mitk::DiffusionDataIOHelper::GetNameWithoutExtension(const std::string& path)
+{
+  return itksys::SystemTools::GetFilenameName(GetPathWithoutExtension(path));
+}
+
 std::vector< std::string > mitk::DiffusionDataIOHelper::get_file_list(const std::string& path, const std::vector<std::string> extensions)
 {
   std::vector< std::string > file_list;
@@ -26,11 +83,11 @@ std::vector< std::string > mitk::DiffusionDataIOHelper::get_file_list(const std:
     int n = dir->GetNumberOfFiles();
     for (int r = 0; r < n; r++)
     {
-      const char *filename = dir->GetFile(r);
-      std::string ext = ist::GetFilenameExtension(filename);
+      const std::string filename = dir->GetFile(r);
       for (auto e : extensions)
       {
-        if (ext==e)
+        // By the end of the name, so that dots within it ("sub.01.nii.gz") do not matter.
+        if (filename.size() > e.size() && filename.ends_with(e))
         {
           file_list.push_back(path + '/' + filename);
           break;
@@ -45,9 +102,7 @@ std::vector< std::string > mitk::DiffusionDataIOHelper::get_file_list(const std:
 std::vector< mitk::Image::Pointer > mitk::DiffusionDataIOHelper::load_mitk_images(const std::vector<std::string> files, std::vector<std::string>* filenames)
 {
   mitk::LocaleSwitch localeSwitch("C");
-  std::streambuf *old = std::cout.rdbuf(); // <-- save
-  std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf());       // <-- redirect
+  CoutSilencer silencer;
   std::vector< mitk::Image::Pointer > out;
   for (auto f : files)
   {
@@ -80,7 +135,7 @@ std::vector< mitk::Image::Pointer > mitk::DiffusionDataIOHelper::load_mitk_image
     }
   }
 
-  std::cout.rdbuf (old);              // <-- restore
+  silencer.Restore();
   MITK_INFO << "Loaded " << out.size() << " images";
   return out;
 }

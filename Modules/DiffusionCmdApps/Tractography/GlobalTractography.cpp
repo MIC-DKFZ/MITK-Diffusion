@@ -47,7 +47,10 @@ int main(int argc, char* argv[])
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input image (tensor, ODF or SH-coefficient image)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("parameters", "", mitkCommandLineParser::String, "Parameters:", "parameter file (.gtp)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "binary mask image", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("mask", "", mitkCommandLineParser::String, "Mask:", "mask image (voxels above 0.5 are seeded, values weight the particle density); default: the whole image", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("seed", "", mitkCommandLineParser::Int, "Random seed:", "seed of the random generator, for reproducible runs (default: from the clock)", -1);
+  parser.addArgument("parallel", "", mitkCommandLineParser::Bool, "Parallel sampler:", "run the parallel sampler: faster on large images; for the same seed a different tractogram than the serial sampler, but the same at any thread count", us::Any(false));
+  parser.addArgument("threads", "", mitkCommandLineParser::Int, "Threads:", "threads of the parallel sampler, 0: all cores", 0);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -87,12 +90,14 @@ int main(int argc, char* argv[])
     }
     else if ( dynamic_cast<mitk::ShImage*>(mitkImage.GetPointer()) )
     {
-      MITK_INFO << "Assuming MITK/MRtrix style SH convention!";
       mitk::Image::Pointer shImage = dynamic_cast<mitk::Image*>(mitkImage.GetPointer());
       gibbsTracker->SetOdfImage(mitk::convert::GetItkOdfFromShImage(shImage));
     }
     else
+    {
+      MITK_ERROR << "Unsupported input " << inFileName << ": expected a tensor, ODF or SH image.";
       return EXIT_FAILURE;
+    }
 
     // global tracking
     if (parsedArgs.count("mask"))
@@ -104,6 +109,23 @@ int main(int argc, char* argv[])
       gibbsTracker->SetMaskImage(itk_mask);
     }
 
+    if (parsedArgs.count("seed"))
+      gibbsTracker->SetRandomSeed(us::any_cast<int>(parsedArgs["seed"]));
+    const bool parallel = parsedArgs.count("parallel") && us::any_cast<bool>(parsedArgs["parallel"]);
+    gibbsTracker->SetParallelSampler(parallel);
+    if (parsedArgs.count("threads"))
+    {
+      const int threads = us::any_cast<int>(parsedArgs["threads"]);
+      if (!parallel)
+        MITK_WARN << "--threads is used only with --parallel; ignored.";
+      else if (threads < 0)
+      {
+        MITK_ERROR << "--threads must be 0 (all cores) or more.";
+        return EXIT_FAILURE;
+      }
+      else
+        gibbsTracker->SetNumberOfThreads(static_cast<unsigned int>(threads));
+    }
     gibbsTracker->SetDuplicateImage(false);
     gibbsTracker->SetLoadParameterFile( paramFileName );
     //        gibbsTracker->SetLutPath( "" );
@@ -116,17 +138,17 @@ int main(int argc, char* argv[])
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    MITK_ERROR << e.GetDescription();
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    MITK_ERROR << e.what();
     return EXIT_FAILURE;
   }
   catch (...)
   {
-    std::cout << "ERROR!?!";
+    MITK_ERROR << "Unknown error.";
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

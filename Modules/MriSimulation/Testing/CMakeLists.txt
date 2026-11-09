@@ -1,7 +1,13 @@
 MITK_CREATE_MODULE_TESTS()
+include(mitkDiffusionTestData)
 
-mitkAddCustomModuleTest(mitkFiberGenerationTest mitkFiberGenerationTest ${MITK_DATA_DIR}/DiffusionImaging/Fiberfox/Fiducial_0.pf ${MITK_DATA_DIR}/DiffusionImaging/Fiberfox/Fiducial_1.pf ${MITK_DATA_DIR}/DiffusionImaging/Fiberfox/Fiducial_2.pf ${MITK_DATA_DIR}/DiffusionImaging/Fiberfox/uniform.fib ${MITK_DATA_DIR}/DiffusionImaging/Fiberfox/gaussian.fib)
+mitkAddCustomModuleTest(mitkFiberGenerationTest mitkFiberGenerationTest ${MITK_DIFFUSION_DATA_DIR}/Fiberfox/Fiducial_0.pf ${MITK_DIFFUSION_DATA_DIR}/Fiberfox/Fiducial_1.pf ${MITK_DIFFUSION_DATA_DIR}/Fiberfox/Fiducial_2.pf ${MITK_DIFFUSION_DATA_DIR}/Fiberfox/uniform_v2.fib ${MITK_DIFFUSION_DATA_DIR}/Fiberfox/gaussian_v2.fib)
  
 mitkAddCustomModuleTest(mitkFiberfoxSignalGenerationBrainSliceTest mitkFiberfoxSignalGenerationBrainSliceTest)
 mitkAddCustomModuleTest(mitkFiberfoxSignalGenerationTest mitkFiberfoxSignalGenerationTest)
 mitkAddCustomModuleTest(mitkFiberFitTest mitkFiberFitTest)
+mitkAddCustomModuleTest(mitkFiberfoxThreadDeterminismTest mitkFiberfoxThreadDeterminismTest)
+mitkAddCustomModuleTest(mitkFiberfoxParametersTest mitkFiberfoxParametersTest)
+mitkAddCustomModuleTest(mitkFiberfoxSignalModelTest mitkFiberfoxSignalModelTest)
+mitkAddCustomModuleTest(mitkFiberfoxSimulationTest mitkFiberfoxSimulationTest)
+mitkAddCustomModuleTest(mitkFiberfoxKspaceTest mitkFiberfoxKspaceTest)

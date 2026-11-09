@@ -23,7 +23,6 @@ const std::string QmitkBallModelParametersWidget::VIEW_ID = "org.mitk.views.Ball
 QmitkBallModelParametersWidget::QmitkBallModelParametersWidget( QWidget * parent, Qt::WindowFlags )
     : QWidget(parent)
 {
-    m_Controls = nullptr;
     this->CreateQtPartControl(this);
 }
 
@@ -36,7 +35,7 @@ void QmitkBallModelParametersWidget::CreateQtPartControl(QWidget *parent)
     if (!m_Controls)
     {
         // create GUI widgets
-        m_Controls = new Ui::QmitkBallModelParametersWidgetControls;
+        m_Controls = std::make_unique<Ui::QmitkBallModelParametersWidgetControls>();
         m_Controls->setupUi(parent);
     }
 }

@@ -14,8 +14,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkNrrdTensorImageReader_h
-#define __mitkNrrdTensorImageReader_h
+#ifndef mitkNrrdTensorImageReader_h
+#define mitkNrrdTensorImageReader_h
 
 #include "mitkCommon.h"
 #include "itkVectorContainer.h"
@@ -38,7 +38,7 @@ namespace mitk
   public:
 
     typedef mitk::TensorImage OutputType;
-    typedef itk::Matrix< float, 3, 3 > MeasurementFrameType;
+    typedef itk::Matrix< double, 3, 3 > MeasurementFrameType;
 
     NrrdTensorImageReader(const NrrdTensorImageReader& other);
     NrrdTensorImageReader();
@@ -52,12 +52,8 @@ namespace mitk
 
   private:
     NrrdTensorImageReader* Clone() const override;
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
-
-    TensorImage::PixelType ConvertMatrixTypeToFixedArrayType(const TensorImage::PixelType::Superclass::MatrixType & matrix);
   };
 
 } //namespace MITK
 
-#endif // __mitkNrrdTensorImageReader_h
+#endif

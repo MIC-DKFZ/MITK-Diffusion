@@ -14,34 +14,27 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkFiberBundleDicomWriter_h
-#define __mitkFiberBundleDicomWriter_h
+#ifndef mitkFiberBundleDicomWriter_h
+#define mitkFiberBundleDicomWriter_h
 
 #include <mitkAbstractFileWriter.h>
-#include "mitkFiberBundle.h"
 
 namespace mitk
 {
 
-/**
- * Writes fiber bundles to a DICOM file
- * @ingroup Process
- */
+/** \brief Writes fiber bundles as DICOM tractography results that refer to the image named by the DICOM.* properties. */
 class FiberBundleDicomWriter : public mitk::AbstractFileWriter
 {
 public:
 
-
     FiberBundleDicomWriter();
-    FiberBundleDicomWriter(const FiberBundleDicomWriter & other);
+    FiberBundleDicomWriter(const FiberBundleDicomWriter & other) = default;
     FiberBundleDicomWriter * Clone() const override;
-    ~FiberBundleDicomWriter() override;
 
     using mitk::AbstractFileWriter::Write;
     void Write() override;
 };
 
+}
 
-} // end of namespace mitk
-
-#endif //__mitkFiberBundleWriter_h
+#endif

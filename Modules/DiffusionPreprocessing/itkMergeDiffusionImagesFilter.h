@@ -29,32 +29,34 @@ the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef _itk_MergeDiffusionImagesFilter_h_
-#define _itk_MergeDiffusionImagesFilter_h_
+#ifndef itkMergeDiffusionImagesFilter_h
+#define itkMergeDiffusionImagesFilter_h
 
-#include "itkImageToImageFilter.h"
-#include <itkDiffusionTensor3D.h>
+#include <itkImageSource.h>
 #include <itkVectorImage.h>
 #include <itkVectorContainer.h>
 
+#include <vector>
+
 namespace itk
 {
-
 /**
-* \brief Merges diffusion weighted images, e.g. to generate one multishell volume from several single shell volumes.   */
-
+ * \brief Merges diffusion-weighted images, e.g. to generate one multishell volume from several single shell volumes.
+ *
+ * The images must share their geometry (within ITK's default tolerances) and each needs as many
+ * gradients as volumes. The output gradients are rescaled to the largest reference b-value; b0
+ * volumes (mitk::DiffusionPropertyHelper::IsB0) get the zero vector.
+ */
 template <class TScalarType>
 class MergeDiffusionImagesFilter
         : public ImageSource<itk::VectorImage<TScalarType,3> >
 {
-
 public:
 
-
-    typedef MergeDiffusionImagesFilter Self;
-    typedef ImageSource< itk::VectorImage<TScalarType,3> > Superclass;
-    typedef SmartPointer<Self> Pointer;
-    typedef SmartPointer<const Self> ConstPointer;
+    using Self = MergeDiffusionImagesFilter;
+    using Superclass = ImageSource<itk::VectorImage<TScalarType,3>>;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
@@ -63,16 +65,16 @@ public:
     /** Runtime information support. */
     itkTypeMacro(MergeDiffusionImagesFilter, ImageSource)
 
-    typedef itk::VectorImage<TScalarType,3>                  DwiImageType;
-    typedef typename DwiImageType::PixelType                DwiPixelType;
-    typedef typename DwiImageType::RegionType               DwiRegionType;
-    typedef typename std::vector< typename DwiImageType::Pointer >   DwiImageContainerType;
+    using DwiImageType = itk::VectorImage<TScalarType,3>;
+    using DwiPixelType = typename DwiImageType::PixelType;
+    using DwiRegionType = typename DwiImageType::RegionType;
+    using DwiImageContainerType = typename std::vector<typename DwiImageType::Pointer>;
 
-    typedef vnl_vector_fixed< double, 3 >                       GradientType;
-    typedef itk::VectorContainer< unsigned int, GradientType >  GradientListType;
-    typedef typename std::vector< GradientListType::ConstPointer >   GradientListContainerType;
+    using GradientType = vnl_vector_fixed<double, 3>;
+    using GradientListType = itk::VectorContainer<unsigned int, GradientType>;
+    using GradientListContainerType = typename std::vector<GradientListType::ConstPointer>;
 
-   // input
+    // input
     void SetImageVolumes(DwiImageContainerType cont);       ///< input DWI image volume container
     void SetGradientLists(GradientListContainerType cont);  ///< gradients of all input images
     void SetBValues(std::vector< double > bvals);           ///< b-values of all input images
@@ -83,19 +85,19 @@ public:
 
 protected:
 
-    MergeDiffusionImagesFilter();
-    ~MergeDiffusionImagesFilter();
+    MergeDiffusionImagesFilter() = default;
+    ~MergeDiffusionImagesFilter() override = default;
 
+    /** Checks the inputs; the output has the geometry of the first image and all their volumes. */
+    void GenerateOutputInformation() override;
     void GenerateData() override;
 
     DwiImageContainerType       m_ImageVolumes;     ///< contains input images
     GradientListContainerType   m_GradientLists;    ///< contains gradients of all input images
     std::vector< double >       m_BValues;          ///< contains b-values of all input images
-    int                         m_NumGradients;     ///< number of gradients in the output image
     GradientListType::Pointer   m_OutputGradients;  ///< container for output gradients
-    double                      m_BValue;           ///< main output b-value
+    double                      m_BValue = 0;       ///< main output b-value
 };
-
 
 } // end of namespace
 
@@ -103,6 +105,5 @@ protected:
 #ifndef ITK_MANUAL_INSTANTIATION
 #include "itkMergeDiffusionImagesFilter.txx"
 #endif
-
 
 #endif

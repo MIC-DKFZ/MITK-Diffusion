@@ -11,6 +11,13 @@
   <keyword label="tractogram" id="org.mitk.views.dicomtractogramtageditor.Keyword"/>
   <keyword label="tag" id="org.mitk.views.dicomtractogramtageditor.Keyword"/>
 
+  <keyword label="visualization" id="org.mitk.views.controlvisualizationpropertiesview.Keyword"/>
+  <keyword label="glyphs" id="org.mitk.views.controlvisualizationpropertiesview.Keyword"/>
+  <keyword label="ODF" id="org.mitk.views.controlvisualizationpropertiesview.Keyword"/>
+  <keyword label="peaks" id="org.mitk.views.controlvisualizationpropertiesview.Keyword"/>
+  <keyword label="tractogram" id="org.mitk.views.controlvisualizationpropertiesview.Keyword"/>
+  <keyword label="clipping" id="org.mitk.views.controlvisualizationpropertiesview.Keyword"/>
+
   <keyword label="DICOM" id="org.mitk.views.diffusiondicomimport.Keyword"/>
   <keyword label="image" id="org.mitk.views.diffusiondicomimport.Keyword"/>
   <keyword label="data" id="org.mitk.views.diffusiondicomimport.Keyword"/>
@@ -34,7 +41,7 @@
     <view id="org.mitk.views.diffusiondicomimport"
     name="DICOM Import"
     category="Data"
-    class="QmitkDiffusionDicomImport"
+    class="QmitkDiffusionDicomImportView"
     icon="resources/dwiimport.png">
     <description>Diffusion DICOM data import</description>
     <keywordReference id="org.mitk.views.diffusiondicomimport.Keyword"/>
@@ -42,6 +49,7 @@
 
     <view id="org.mitk.views.controlvisualizationpropertiesview"
     name="Visualization"
+    category="Visualization"
     icon="resources/vizControls.png"
     class="QmitkControlVisualizationPropertiesView">
     <keywordReference id="org.mitk.views.controlvisualizationpropertiesview.Keyword"/>

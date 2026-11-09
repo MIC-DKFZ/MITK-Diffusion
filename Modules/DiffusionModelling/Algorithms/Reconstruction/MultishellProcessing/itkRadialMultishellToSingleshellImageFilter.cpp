@@ -13,30 +13,18 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-/*=========================================================================
-
-Program:   Tensor ToolKit - TTK
-Module:    $URL: svn://scm.gforge.inria.fr/svn/ttk/trunk/Algorithms/itkElectrostaticRepulsionDiffusionGradientReductionFilter.txx $
-Language:  C++
-Date:      $Date: 2010-06-07 13:39:13 +0200 (Mo, 07 Jun 2010) $
-Version:   $Revision: 68 $
-
-Copyright (c) INRIA 2010. All rights reserved.
-See LICENSE.txt for details.
-
-This software is distributed WITHOUT ANY WARRANTY; without even
-the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-PURPOSE.  See the above copyright notices for more information.
-
-=========================================================================*/
-#ifndef _itk_RadialMultishellToSingleshellImageFilter_cpp_
-#define _itk_RadialMultishellToSingleshellImageFilter_cpp_
-#endif
-
-#define _USE_MATH_DEFINES
+#ifndef itkRadialMultishellToSingleshellImageFilter_cpp
+#define itkRadialMultishellToSingleshellImageFilter_cpp
 
 #include "itkRadialMultishellToSingleshellImageFilter.h"
 #include "mitkDiffusionModellingHelperFunctions.h"
+#include <mitkBValueMapProperty.h>
+
+#include <itkImageRegionIterator.h>
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 
 namespace itk
@@ -55,25 +43,22 @@ template <class TInputScalarType, class TOutputScalarType>
 void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
 ::BeforeThreadedGenerateData()
 {
-  // test whether BvalueMap contains all necessary information
-  if(m_BValueMap.size() == 0)
-  {
-    itkWarningMacro(<< "No BValueMap given: create one using GradientDirectionContainer");
+  if (m_Functor == nullptr)
+    itkExceptionMacro(<< "No voxel functor set.");
+  if (m_OriginalGradientDirections.IsNull() || m_OriginalGradientDirections->Size() != this->GetInput()->GetNumberOfComponentsPerPixel())
+    itkExceptionMacro(<< "The gradient directions do not match the volumes of the input image.");
 
-    GradientDirectionContainerType::ConstIterator gdcit;
-    for( gdcit = m_OriginalGradientDirections->Begin(); gdcit != m_OriginalGradientDirections->End(); ++gdcit)
-    {
-      double bValueKey = int(((m_OriginalBValue * gdcit.Value().two_norm() * gdcit.Value().two_norm())+7.5)/10)*10;
-      m_BValueMap[bValueKey].push_back(gdcit.Index());
-    }
-  }
+  // Without a map the shells are those of the DWI's own map (DiffusionPropertyHelper).
+  if (m_BValueMap.empty())
+    m_BValueMap = mitk::BValueMapProperty::CreateBValueMap(m_OriginalGradientDirections, m_OriginalBValue);
 
   //# BValueMap contains no bZero --> itkException
   if(m_BValueMap.find(0.0) == m_BValueMap.end())
   {
-    MITK_INFO << "No ReferenceSignal (BZeroImages) found!";
     itkExceptionMacro(<< "No ReferenceSignal (BZeroImages) found!");
   }
+  // Every non-zero entry of the map is one column of the functor's signal matrix.
+  m_Functor->CheckShells(m_BValueMap.size() - 1);
 
   // [allDirectionsContainer] Gradient DirectionContainer containing all unique directions
   m_TargetDirectionsIndicies = mitk::gradients::GetAllUniqueDirections(m_BValueMap, m_OriginalGradientDirections);
@@ -81,6 +66,8 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
   m_NumberTargetDirections = m_TargetDirectionsIndicies.size();
   m_TargetGradientDirections = mitk::gradients::CreateNormalizedUniqueGradientDirectionContainer(m_BValueMap,m_OriginalGradientDirections);
 
+  // Rebuilt per execution, so that a second Update() does not append to the matrices of the first.
+  m_ShellInterpolationMatrixVector.clear();
   m_ShellInterpolationMatrixVector.reserve(m_BValueMap.size()-1);
 
   // for each shell
@@ -132,15 +119,9 @@ void RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarTyp
   m_ErrorImage->SetRequestedRegion( this->GetInput()->GetLargestPossibleRegion() );
   m_ErrorImage->Allocate();
 
-  MITK_INFO << "Input:" << std::endl << std::endl
-            << "    GradientDirections: " << m_OriginalGradientDirections->Size() << std::endl
-            << "    Shells: " << (m_BValueMap.size() - 1) << std::endl
-            << "    ReferenceImages: " << m_BValueMap[0.0].size() << std::endl;
-
-  MITK_INFO << "Output:" << std::endl << std::endl
-            << "    OutImageVectorLength: " << outImage->GetVectorLength() << std::endl
-            << "    TargetDirections: " << m_NumberTargetDirections << std::endl
-            << std::endl;
+  itkDebugMacro(<< "Input: " << m_OriginalGradientDirections->Size() << " gradient directions, " << (m_BValueMap.size() - 1)
+                << " shells, " << m_BValueMap[0.0].size() << " reference images; output: vector length "
+                << outImage->GetVectorLength() << ", " << m_NumberTargetDirections << " target directions");
 
 }
 
@@ -166,7 +147,7 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
   eit.GoToBegin();
 
   // calculate target bZero-Value [b0_t]
-  const IndicesVector IndicesS0 = m_BValueMap[0.0];
+  const IndicesVector IndicesS0 = m_BValueMap.at(0);
   double AverageS0 = 0.0;
 
   unsigned int numberOfShells = m_BValueMap.size()-1;
@@ -192,6 +173,18 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
     }
     AverageS0 /= (double)IndicesS0.size();
     out = oit.Get();
+
+    // Without a positive baseline there is no attenuation to model; the voxel stays 0.
+    if (!(AverageS0 > 0))
+    {
+      out.Fill(0);
+      oit.Set(out);
+      eit.Set(0);
+      ++eit;
+      ++oit;
+      ++iit;
+      continue;
+    }
     out.SetElement(0,AverageS0);
 
     shellIterator = m_BValueMap.begin();
@@ -222,8 +215,19 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
     (*m_Functor)(NewSignalMatrix, /*const &*/SignalMatrix,/*const &*/ AverageS0);
     SignalVector = NewSignalMatrix.get_column(0);
 
+    // A non-positive interpolated signal makes the functors' logarithms NaN, and converting NaN or
+    // an out-of-range value to the integer output is undefined: such values give 0, the others are
+    // clamped and truncated (not rounded: the references test_multi_*.dwi hold truncated values).
     for(unsigned int i = 1 ; i < out.Size(); i ++)
-      out.SetElement(i,SignalVector.get(i-1));
+    {
+      const double value = SignalVector.get(i-1);
+      if (!std::isfinite(value))
+        out.SetElement(i, 0);
+      else
+        out.SetElement(i, static_cast<OutputScalarType>(std::clamp(value,
+          static_cast<double>(std::numeric_limits<OutputScalarType>::lowest()),
+          static_cast<double>(std::numeric_limits<OutputScalarType>::max()))));
+    }
 
     eit.Set(NewSignalMatrix.get_column(1).mean());
 
@@ -235,3 +239,5 @@ RadialMultishellToSingleshellImageFilter<TInputScalarType, TOutputScalarType>
 }
 
 } // end of namespace
+
+#endif

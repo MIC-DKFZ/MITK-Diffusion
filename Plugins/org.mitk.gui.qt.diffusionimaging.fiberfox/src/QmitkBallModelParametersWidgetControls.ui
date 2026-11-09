@@ -48,7 +48,7 @@
    <item row="2" column="1">
     <widget class="QDoubleSpinBox" name="m_D1box">
      <property name="toolTip">
-      <string>Diffusivity along stick.</string>
+      <string>Diffusivity of the isotropic compartment.</string>
      </property>
      <property name="decimals">
       <number>5</number>

@@ -20,31 +20,32 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionPropertyHelper.h>
 
 #include <itkTensorReconstructionWithEigenvalueCorrectionFilter.h>
-#include <itkDiffusionTensor3DReconstructionImageFilter.h>
+#include <mitkDiffusionReconstruction.h>
 #include <itkDiffusionTensor3D.h>
 #include <itkImageFileWriter.h>
 #include <itkNrrdImageIO.h>
 #include "mitkCommandLineParser.h"
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkIOUtil.h>
 #include <mitkLocaleSwitch.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
 /**
- * Convert files from one ending to the other
+ * Fits a diffusion tensor per voxel to a DWI.
  */
 int main(int argc, char* argv[])
 {
   mitkCommandLineParser parser;
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input image", "input raw dwi", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output image", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output image", "output image, written as .dti; the extension of a known file type is replaced, other dots stay in the name", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("b0_threshold", "", mitkCommandLineParser::Int, "b0 threshold", "baseline image intensity threshold", 0);
   parser.addArgument("correct_negative_eigenv", "", mitkCommandLineParser::Bool, "Correct negative eigenvalues", "correct negative eigenvalues", us::Any(false));
 
   parser.setCategory("Signal Modelling");
   parser.setTitle("Tensor Reconstruction");
-  parser.setDescription("");
+  parser.setDescription("Fits a diffusion tensor per voxel to a DWI (linear least squares on the log signal, every volume with its own b-value; with --correct_negative_eigenv ITK's fit with eigenvalue correction) and writes it as .dti.");
   parser.setContributor("MIC");
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
@@ -53,11 +54,7 @@ int main(int argc, char* argv[])
 
   std::string inFileName = us::any_cast<std::string>(parsedArgs["i"]);
   std::string outfilename = us::any_cast<std::string>(parsedArgs["o"]);
-  if (!itksys::SystemTools::GetFilenamePath(outfilename).empty())
-    outfilename = itksys::SystemTools::GetFilenamePath(outfilename)+"/"+itksys::SystemTools::GetFilenameWithoutExtension(outfilename);
-  else
-    outfilename = itksys::SystemTools::GetFilenameWithoutExtension(outfilename);
-  outfilename += ".dti";
+  outfilename = mitk::DiffusionDataIOHelper::GetPathWithoutExtension(outfilename) + ".dti";
 
   int threshold = 0;
   if (parsedArgs.count("b0_threshold"))
@@ -97,12 +94,12 @@ int main(int argc, char* argv[])
       writer->Update();
     }
     else {
-      typedef itk::DiffusionTensor3DReconstructionImageFilter< short, short, float > TensorReconstructionImageFilterType;
-      TensorReconstructionImageFilterType::Pointer filter = TensorReconstructionImageFilterType::New();
-      filter->SetGradientImage( dynamic_cast<mitk::GradientDirectionsProperty *>(dwi->GetProperty(mitk::DiffusionPropertyHelper::GetGradientContainerPropertyName().c_str()).GetPointer())->GetGradientDirectionsContainerCopy(), itkVectorImagePointer );
-      filter->SetBValue( mitk::DiffusionPropertyHelper::GetReferenceBValue( dwi ));
-      filter->SetThreshold(threshold);
-      filter->Update();
+      // ITK's DiffusionTensor3DReconstructionImageFilter fits every volume with the reference
+      // b-value, which is wrong for multi-shell DWIs.
+      auto tensors = mitk::ReconstructTensorsLinearLeastSquares(itkVectorImagePointer,
+                                                                mitk::DiffusionPropertyHelper::GetGradientContainer(dwi),
+                                                                mitk::DiffusionPropertyHelper::GetReferenceBValue(dwi),
+                                                                threshold);
 
       // Save tensor image
       itk::NrrdImageIO::Pointer io = itk::NrrdImageIO::New();
@@ -110,7 +107,7 @@ int main(int argc, char* argv[])
 
       mitk::LocaleSwitch localeSwitch("C");
       itk::ImageFileWriter< itk::Image< itk::DiffusionTensor3D< float >, 3 > >::Pointer writer = itk::ImageFileWriter< itk::Image< itk::DiffusionTensor3D< float >, 3 > >::New();
-      writer->SetInput(filter->GetOutput());
+      writer->SetInput(tensors);
       writer->SetFileName(outfilename);
       writer->SetImageIO(io);
       writer->UseCompressionOn();
@@ -120,15 +117,18 @@ int main(int argc, char* argv[])
   }
   catch ( itk::ExceptionObject &err)
   {
-    std::cout << "Exception: " << err;
+    std::cout << "Exception: " << err << std::endl;
+    return EXIT_FAILURE;
   }
   catch ( std::exception& err)
   {
-    std::cout << "Exception: " << err.what();
+    std::cout << "Exception: " << err.what() << std::endl;
+    return EXIT_FAILURE;
   }
   catch ( ... )
   {
-    std::cout << "Exception!";
+    std::cout << "Exception!" << std::endl;
+    return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 

@@ -1,3 +1,18 @@
+/*===================================================================
+
+The Medical Imaging Interaction Toolkit (MITK)
+
+Copyright (c) German Cancer Research Center.
+
+All rights reserved.
+
+This software is distributed WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.
+
+See LICENSE.txt or http://www.mitk.org for details.
+
+===================================================================*/
 #include "itkTractsToVectorImageFilter.h"
 
 // VTK
@@ -10,10 +25,10 @@
 #include <itkImageRegionIterator.h>
 
 // misc
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <boost/timer/progress_display.hpp>
 #include <mitkDiffusionModellingHelperFunctions.h>
+#include <mitkFiberImageGrid.h>
 
 namespace itk{
 
@@ -24,9 +39,8 @@ static inline bool CompareVectorLengths(const vnl_vector_fixed< double, 3 >& v1,
 
 template< class PixelType >
 TractsToVectorImageFilter< PixelType >::TractsToVectorImageFilter():
-  m_NormalizationMethod(GLOBAL_MAX),
+  m_NormalizationMethod(NormalizationMethods::GLOBAL_MAX),
   m_AngularThreshold(0.7),
-  m_Epsilon(0.999),
   m_MaxNumDirections(3),
   m_SizeThreshold(0.3),
   m_OnlyUseMaskGeometry(false)
@@ -35,67 +49,49 @@ TractsToVectorImageFilter< PixelType >::TractsToVectorImageFilter():
 }
 
 
-template< class PixelType >
-TractsToVectorImageFilter< PixelType >::~TractsToVectorImageFilter()
-{
-}
-
-
-template< class PixelType >
-vnl_vector_fixed<double, 3> TractsToVectorImageFilter< PixelType >::GetVnlVector(double point[])
-{
-  vnl_vector_fixed<double, 3> vnlVector;
-  vnlVector[0] = point[0];
-  vnlVector[1] = point[1];
-  vnlVector[2] = point[2];
-  return vnlVector;
-}
 
 template< class PixelType >
 void TractsToVectorImageFilter< PixelType >::GenerateData()
 {
-  mitk::BaseGeometry::Pointer geometry = m_FiberBundle->GetGeometry();
+  // The 4th image dimension holds MaxNumDirections x 3 vector components.
+  if (m_MaxNumDirections < 1)
+    mitkThrow() << "The maximum number of directions per voxel must be at least 1.";
+
+  const mitk::BaseGeometry* geometry = m_FiberBundle->GetGeometry();
 
   // calculate new image parameters
   itk::Vector<double> spacing3;
   itk::Point<double> origin3;
   itk::Matrix<double, 3, 3> direction3;
   ImageRegion<3> imageRegion3;
-  if (!m_MaskImage.IsNull())
+  // Without a mask image a mask covering the bundle grid is used for this run only, so that the
+  // next Update with another bundle gets its own grid.
+  ItkUcharImgType::Pointer mask = m_MaskImage;
+  if (!mask.IsNull())
   {
-    spacing3 = m_MaskImage->GetSpacing();
-    imageRegion3 = m_MaskImage->GetLargestPossibleRegion();
-    origin3 = m_MaskImage->GetOrigin();
-    direction3 = m_MaskImage->GetDirection();
+    spacing3 = mask->GetSpacing();
+    imageRegion3 = mask->GetLargestPossibleRegion();
+    origin3 = mask->GetOrigin();
+    direction3 = mask->GetDirection();
   }
   else
   {
-    spacing3 = geometry->GetSpacing();
-    origin3 = geometry->GetOrigin();
-    mitk::BaseGeometry::BoundsArrayType bounds = geometry->GetBounds();
-    origin3[0] += bounds.GetElement(0);
-    origin3[1] += bounds.GetElement(2);
-    origin3[2] += bounds.GetElement(4);
+    // The same grid as the tract density image, so that the derived images share voxels.
+    const auto grid = mitk::FiberImageGrid::FromBundle(geometry, 1);
+    spacing3 = grid.Spacing;
+    origin3 = grid.Origin;
+    direction3 = grid.Direction;
+    imageRegion3 = grid.Region;
 
-    for (int i=0; i<3; i++)
-      for (int j=0; j<3; j++)
-        direction3[j][i] = geometry->GetMatrixColumn(i)[j];
-    imageRegion3.SetSize(0, geometry->GetExtent(0)+1);
-    imageRegion3.SetSize(1, geometry->GetExtent(1)+1);
-    imageRegion3.SetSize(2, geometry->GetExtent(2)+1);
-
-
-    m_MaskImage = ItkUcharImgType::New();
-    m_MaskImage->SetSpacing( spacing3 );
-    m_MaskImage->SetOrigin( origin3 );
-    m_MaskImage->SetDirection( direction3 );
-    m_MaskImage->SetRegions( imageRegion3 );
-    m_MaskImage->Allocate();
-    m_MaskImage->FillBuffer(1);
+    mask = ItkUcharImgType::New();
+    mask->SetSpacing( spacing3 );
+    mask->SetOrigin( origin3 );
+    mask->SetDirection( direction3 );
+    mask->SetRegions( imageRegion3 );
+    mask->Allocate();
+    mask->FillBuffer(1);
   }
   OutputImageType::RegionType::SizeType outImageSize = imageRegion3.GetSize();
-  m_OutImageSpacing = m_MaskImage->GetSpacing();
-  m_ClusteredDirectionsContainer = ContainerType::New();
 
   // initialize num directions image
   m_NumDirectionsImage = ItkUcharImgType::New();
@@ -112,7 +108,7 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
   itk::ImageRegion<4> imageRegion4;
 
   spacing4[0] = spacing3[0]; spacing4[1] = spacing3[1]; spacing4[2] = spacing3[2]; spacing4[3] = 1;
-  origin4[0] = origin3[0]; origin4[1] = origin3[1]; origin4[2] = origin3[2]; origin3[3] = 0;
+  origin4[0] = origin3[0]; origin4[1] = origin3[1]; origin4[2] = origin3[2]; origin4[3] = 0;
   for (int r=0; r<3; r++)
     for (int c=0; c<3; c++)
       direction4[r][c] = direction3[r][c];
@@ -133,7 +129,8 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
   // iterate over all fibers
   vtkSmartPointer<vtkPolyData> fiberPolyData = m_FiberBundle->GetFiberPolyData();
   int numFibers = m_FiberBundle->GetNumFibers();
-  m_DirectionsContainer = ContainerType::New();
+  // per voxel (linear index): the directions of the segments in it and their weighted lengths
+  typename ContainerType::Pointer directionsContainer = ContainerType::New();
 
   VectorContainer< unsigned int, std::vector< double > >::Pointer peakLengths = VectorContainer< unsigned int, std::vector< double > >::New();
 
@@ -158,14 +155,14 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
       itk::Point<float, 3> startVertex = mitk::imv::GetItkPoint(points->GetPoint(j));
       itk::Index<3> startIndex;
       itk::ContinuousIndex<float, 3> startIndexCont;
-      (void)m_MaskImage->TransformPhysicalPointToIndex(startVertex, startIndex);
-      (void)m_MaskImage->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
+      (void)mask->TransformPhysicalPointToIndex(startVertex, startIndex);
+      (void)mask->TransformPhysicalPointToContinuousIndex(startVertex, startIndexCont);
 
       itk::Point<float, 3> endVertex = mitk::imv::GetItkPoint(points->GetPoint(j + 1));
       itk::Index<3> endIndex;
       itk::ContinuousIndex<float, 3> endIndexCont;
-      (void)m_MaskImage->TransformPhysicalPointToIndex(endVertex, endIndex);
-      (void)m_MaskImage->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
+      (void)mask->TransformPhysicalPointToIndex(endVertex, endIndex);
+      (void)mask->TransformPhysicalPointToContinuousIndex(endVertex, endIndexCont);
 
       dir[0] = endVertex[0]-startVertex[0];
       dir[1] = endVertex[1]-startVertex[1];
@@ -177,22 +174,22 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
       std::vector< std::pair< itk::Index<3>, double > > segments = mitk::imv::IntersectImage(spacing3, startIndex, endIndex, startIndexCont, endIndexCont);
       for (std::pair< itk::Index<3>, double > segment : segments)
       {
-        if (!m_MaskImage->GetLargestPossibleRegion().IsInside(segment.first) || (!m_OnlyUseMaskGeometry && m_MaskImage->GetPixel(segment.first)==0))
+        if (!mask->GetLargestPossibleRegion().IsInside(segment.first) || (!m_OnlyUseMaskGeometry && mask->GetPixel(segment.first)==0))
           continue;
 
         // add direction to container
         unsigned int idx = segment.first[0] + outImageSize[0]*(segment.first[1] + outImageSize[1]*segment.first[2]);
         DirectionContainerType::Pointer dirCont;
-        if (m_DirectionsContainer->IndexExists(idx))
+        if (directionsContainer->IndexExists(idx))
         {
           peakLengths->ElementAt(idx).push_back(fiberWeight*segment.second);
 
-          dirCont = m_DirectionsContainer->GetElement(idx);
+          dirCont = directionsContainer->GetElement(idx);
           if (dirCont.IsNull())
           {
             dirCont = DirectionContainerType::New();
             dirCont->push_back(dir);
-            m_DirectionsContainer->InsertElement(idx, dirCont);
+            directionsContainer->InsertElement(idx, dirCont);
           }
           else
             dirCont->push_back(dir);
@@ -201,10 +198,11 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
         {
           dirCont = DirectionContainerType::New();
           dirCont->push_back(dir);
-          m_DirectionsContainer->InsertElement(idx, dirCont);
+          directionsContainer->InsertElement(idx, dirCont);
 
-          std::vector< double > lengths; lengths.push_back(fiberWeight*segment.second);
-          peakLengths->InsertElement(idx, lengths);
+          // grows the container like InsertElement, without copying a temporary vector (GCC 13 at
+          // -O2/-O3 reported a false -Warray-bounds on that copy)
+          peakLengths->CreateElementAt(idx).push_back(fiberWeight*segment.second);
         }
       }
 
@@ -224,30 +222,27 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
 
     itk::Index<4> idx4; idx4[0] = idx3[0]; idx4[1] = idx3[1]; idx4[2] = idx3[2];
 
-    if (!m_DirectionsContainer->IndexExists(idx_lin))
+    if (!directionsContainer->IndexExists(idx_lin))
     {
       ++dirIt;
       continue;
     }
-    DirectionContainerType::Pointer dirCont = m_DirectionsContainer->GetElement(idx_lin);
+    DirectionContainerType::Pointer dirCont = directionsContainer->GetElement(idx_lin);
     if (dirCont.IsNull() || dirCont->empty())
     {
       ++dirIt;
       continue;
     }
 
-    DirectionContainerType::Pointer directions;
-    if (m_MaxNumDirections>0)
-    {
-      directions = FastClustering(dirCont, peakLengths->GetElement(idx_lin));
-      std::sort( directions->begin(), directions->end(), CompareVectorLengths );
-    }
-    else
-      directions = dirCont;
+    DirectionContainerType::Pointer directions = FastClustering(dirCont, peakLengths->GetElement(idx_lin));
+    std::sort( directions->begin(), directions->end(), CompareVectorLengths );
 
-    unsigned int numDir = directions->size();
-    if (m_MaxNumDirections>0 && numDir>m_MaxNumDirections)
-      numDir = m_MaxNumDirections;
+    // The directions are sorted by size; peaks smaller than SizeThreshold x the largest peak of the
+    // voxel are discarded.
+    const double largestPeak = directions->empty() ? 0.0 : directions->at(0).magnitude();
+    unsigned int numDir = 0;
+    while (numDir<directions->size() && numDir<m_MaxNumDirections && directions->at(numDir).magnitude()>=m_SizeThreshold*largestPeak)
+      ++numDir;
 
     float voxel_max_mag = 0;
     for (unsigned int i=0; i<numDir; i++)
@@ -268,9 +263,9 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
       count++;
 
       float mag = dir.magnitude();
-      if (m_NormalizationMethod==MAX_VEC_NORM && voxel_max_mag>mitk::eps)
+      if (m_NormalizationMethod==NormalizationMethods::MAX_VEC_NORM && voxel_max_mag>mitk::eps)
         dir /= voxel_max_mag;
-      else if (m_NormalizationMethod==SINGLE_VEC_NORM && mag>mitk::eps)
+      else if (m_NormalizationMethod==NormalizationMethods::SINGLE_VEC_NORM && mag>mitk::eps)
         dir.normalize();
 
       for (unsigned int j = 0; j<3; j++)
@@ -283,7 +278,7 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
     ++dirIt;
   }
 
-  if (m_NormalizationMethod==GLOBAL_MAX && max_dir_mag>0)
+  if (m_NormalizationMethod==NormalizationMethods::GLOBAL_MAX && max_dir_mag>0)
   {
     itk::ImageRegionIterator<ItkDirectionImageType> dirImgIt(m_DirectionImage, m_DirectionImage->GetLargestPossibleRegion());
     while(!dirImgIt.IsAtEnd())
@@ -293,8 +288,9 @@ void TractsToVectorImageFilter< PixelType >::GenerateData()
     }
   }
 
+  // A mask that no fiber passes gives an empty direction image.
   if (max_dir_mag < 0.00000001)
-    mitkThrow() << "Maximum peak size is 0.0!";
+    MITK_WARN << "No fiber direction inside the mask; the direction image is empty.";
 }
 
 
@@ -334,22 +330,23 @@ TractsToVectorImageFilter< PixelType >::DirectionContainerType::Pointer TractsTo
     {
       oldMean = currentMean;
       currentMean.fill(0.0);
+      // The peak size is the summed length of the cluster's members in the last iteration, each
+      // direction counted once, not accumulated over the mean-shift iterations.
+      double memberLength = 0;
       for (unsigned int i=0; i<inDirs->size(); i++)
       {
         angle = dot_product(oldMean, inDirs->at(i));
         if (angle>=m_AngularThreshold)
         {
           currentMean += inDirs->at(i);
-          if (meanChanged)
-            length += lengths.at(i);
+          memberLength += lengths.at(i);
           touched[i] = 1;
           meanChanged = true;
         }
         else if (-angle>=m_AngularThreshold)
         {
           currentMean -= inDirs->at(i);
-          if (meanChanged)
-            length += lengths.at(i);
+          memberLength += lengths.at(i);
           touched[i] = 1;
           meanChanged = true;
         }
@@ -357,7 +354,10 @@ TractsToVectorImageFilter< PixelType >::DirectionContainerType::Pointer TractsTo
       if(!meanChanged)
         currentMean = oldMean;
       else
+      {
         currentMean.normalize();
+        length = memberLength;
+      }
     }
 
     // found stable mean
@@ -389,6 +389,8 @@ TractsToVectorImageFilter< PixelType >::DirectionContainerType::Pointer TractsTo
     }
     return outDirs;
   }
+  // The mean-shift windows of this pass may overlap, so a direction can be a member of two
+  // clusters; when the next pass merges them, their sizes add and that direction counts twice.
   else
     return FastClustering(outDirs, newLengths);
 }

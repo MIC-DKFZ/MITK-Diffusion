@@ -31,13 +31,13 @@ See LICENSE.txt or http://www.mitk.org for details.
   16 =========================================================================*/
 #ifndef _itk_TensorImageToDiffusionImageFilter_txx_
 #define _itk_TensorImageToDiffusionImageFilter_txx_
-#endif
 
 #include "itkTensorImageToDiffusionImageFilter.h"
 #include "itkTensorToL2NormImageFilter.h"
 #include "itkRescaleIntensityImageFilter.h"
 #include <itkImageRegionIterator.h>
 #include <itkImageRegionConstIterator.h>
+#include <mitkDiffusionPropertyHelper.h>
 
 namespace itk
 {
@@ -45,15 +45,29 @@ namespace itk
 template <class TInputScalarType, class TOutputScalarType>
 void
 TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
+::GenerateOutputInformation()
+{
+  Superclass::GenerateOutputInformation();
+
+  if( m_GradientList.IsNull() || m_GradientList->Size()==0 )
+    itkExceptionMacro(<< "Gradient list is empty, cannot generate DWI.");
+  this->GetOutput()->SetVectorLength( m_GradientList->Size() );
+}
+
+template <class TInputScalarType, class TOutputScalarType>
+void
+TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 ::BeforeThreadedGenerateData()
 {
+  const auto inputRegion = this->GetInput()->GetLargestPossibleRegion();
+  if( m_BaselineImage.IsNotNull() && m_BaselineImage->GetLargestPossibleRegion() != inputRegion )
+    itkExceptionMacro(<< "The baseline image must have the size of the tensor image.");
+  if( m_MaskImage.IsNotNull() && m_MaskImage->GetLargestPossibleRegion() != inputRegion )
+    itkExceptionMacro(<< "The mask image must have the size of the tensor image.");
 
-  if( m_GradientList->Size()==0 )
-  {
-    throw itk::ExceptionObject (__FILE__,__LINE__,"Error: gradient list is empty, cannot generate DWI.");
-  }
-
-  if( m_BaselineImage.IsNull() )
+  // A generated baseline belongs to this input only and is not kept for the next update.
+  m_UsedBaselineImage = m_BaselineImage;
+  if( m_UsedBaselineImage.IsNull() )
   {
     // create a B0 image by taking the norm of the tensor field * scale:
     typedef itk::TensorToL2NormImageFilter<InputImageType, itk::Image<InputScalarType,3> >
@@ -61,16 +75,7 @@ TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 
     typename TensorToL2NormFilterType::Pointer myFilter1 = TensorToL2NormFilterType::New();
     myFilter1->SetInput (this->GetInput());
-
-    try
-    {
-      myFilter1->Update();
-    }
-    catch (itk::ExceptionObject &e)
-    {
-      std::cerr << e;
-      return;
-    }
+    myFilter1->Update();
 
     typename itk::RescaleIntensityImageFilter< itk::Image<InputScalarType,3>, BaselineImageType>::Pointer rescaler=
         itk::RescaleIntensityImageFilter<itk::Image<InputScalarType,3>, BaselineImageType>::New();
@@ -78,32 +83,18 @@ TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
     rescaler->SetOutputMinimum ( m_Min );
     rescaler->SetOutputMaximum ( m_Max );
     rescaler->SetInput ( myFilter1->GetOutput() );
-    try
-    {
-      rescaler->Update();
-    }
-    catch (itk::ExceptionObject &e)
-    {
-      std::cerr << e;
-      return;
-    }
+    rescaler->Update();
 
-    m_BaselineImage = rescaler->GetOutput();
+    m_UsedBaselineImage = rescaler->GetOutput();
   }
+}
 
-  typename OutputImageType::Pointer outImage = OutputImageType::New();
-  outImage->SetSpacing( this->GetInput()->GetSpacing() );   // Set the image spacing
-  outImage->SetOrigin( this->GetInput()->GetOrigin() );     // Set the image origin
-  outImage->SetDirection( this->GetInput()->GetDirection() );  // Set the image direction
-  outImage->SetLargestPossibleRegion( this->GetInput()->GetLargestPossibleRegion());
-  outImage->SetBufferedRegion( this->GetInput()->GetLargestPossibleRegion() );
-  outImage->SetRequestedRegion( this->GetInput()->GetLargestPossibleRegion() );
-  outImage->SetVectorLength(m_GradientList->Size());
-  outImage->Allocate();
-
-  this->SetNumberOfRequiredOutputs (1);
-  this->SetNthOutput (0, outImage);
-
+template <class TInputScalarType, class TOutputScalarType>
+void
+TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
+::AfterThreadedGenerateData()
+{
+  m_UsedBaselineImage = nullptr;
 }
 
 template <class TInputScalarType, class TOutputScalarType>
@@ -116,7 +107,7 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 
   IteratorOutputType itOut (this->GetOutput(), outputRegionForThread);
   IteratorInputType  itIn (this->GetInput(), outputRegionForThread);
-  IteratorBaselineType itB0 (m_BaselineImage, outputRegionForThread);
+  IteratorBaselineType itB0 (m_UsedBaselineImage, outputRegionForThread);
 
   typedef ImageRegionConstIterator< MaskImageType >   IteratorMaskImageType;
   IteratorMaskImageType itMask;
@@ -126,6 +117,44 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
     itMask = IteratorMaskImageType( m_MaskImage, outputRegionForThread);
     itMask.GoToBegin();
   }
+
+  // Per gradient, computed once instead of per voxel: whether it is a baseline, its b-value and
+  // the outer product of its normalized direction.
+  const unsigned int numGradients = m_GradientList->Size();
+  std::vector<bool> isBaseline(numGradients);
+  std::vector<double> bValues(numGradients);
+  std::vector<InputPixelType> outerProducts(numGradients);
+  for( unsigned int i=0; i<numGradients; i++)
+  {
+    GradientType g = m_GradientList->at(i);
+
+    // The b0 volumes (mitk::DiffusionPropertyHelper::IsB0) get the baseline signal, so that the
+    // reconstructions take them as b0 again.
+    isBaseline[i] = mitk::DiffusionPropertyHelper::IsB0(g, m_BValue);
+    if( isBaseline[i] )
+      continue;
+
+    const double twonorm = g.two_norm();
+
+    // normalize vector so the following computations work
+    GradientType gn = g.normalize();
+
+    InputPixelType &S = outerProducts[i];
+    S[0] = gn[0]*gn[0];
+    S[1] = gn[1]*gn[0];
+    S[2] = gn[2]*gn[0];
+    S[3] = gn[1]*gn[1];
+    S[4] = gn[2]*gn[1];
+    S[5] = gn[2]*gn[2];
+
+    // estimate the bvalue from the base value and the norm of the gradient
+    //   - because of this estimation the vector have to be normalized beforehand
+    //     otherwise the modelled signal is wrong ( i.e. not scaled properly )
+    bValues[i] = m_BValue * twonorm * twonorm;
+  }
+
+  OutputPixelType out;
+  out.SetSize(numGradients);
 
   while(!itIn.IsAtEnd())
   {
@@ -139,8 +168,6 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 
     BaselinePixelType b0 = itB0.Get();
 
-    OutputPixelType out;
-    out.SetSize(m_GradientList->Size());
     out.Fill(0);
 
     short maskvalue = 1;
@@ -150,31 +177,18 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
       ++itMask;
     }
 
-    std::vector<unsigned int> b0_indices;
     if( b0 > 0)
     {
-      for( unsigned int i=0; i<m_GradientList->Size(); i++)
+      for( unsigned int i=0; i<numGradients; i++)
       {
-        GradientType g = m_GradientList->at(i);
-
-        // normalize vector so the following computations work
-        const double twonorm = g.two_norm();
-        if( twonorm < vnl_math::eps )
+        // The mask applies to the baseline volumes as to the weighted ones.
+        if( isBaseline[i] )
         {
-          b0_indices.push_back(i);
+          out[i] = static_cast<OutputScalarType>( maskvalue * b0 );
           continue;
         }
 
-        GradientType gn = g.normalize();
-
-        InputPixelType S;
-        S[0] = gn[0]*gn[0];
-        S[1] = gn[1]*gn[0];
-        S[2] = gn[2]*gn[0];
-        S[3] = gn[1]*gn[1];
-        S[4] = gn[2]*gn[1];
-        S[5] = gn[2]*gn[2];
-
+        const InputPixelType &S = outerProducts[i];
         const double res =
             T[0]*S[0] +
             2 * T[1]*S[1] +     T[3]*S[3] +
@@ -182,21 +196,9 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
 
         // check for corrupted tensor
         if (res>=0)
-        {
-          // estimate the bvalue from the base value and the norm of the gradient
-          //   - because of this estimation the vector have to be normalized beforehand
-          //     otherwise the modelled signal is wrong ( i.e. not scaled properly )
-          const double bval = m_BValue * twonorm * twonorm;
-          out[i] = static_cast<OutputScalarType>( maskvalue * 1.0 * b0 * exp ( -1.0 * bval * res ) );
-        }
+          out[i] = static_cast<OutputScalarType>( maskvalue * 1.0 * b0 * exp ( -1.0 * bValues[i] * res ) );
       }
     }
-
-    for(unsigned int idx = 0; idx < b0_indices.size(); idx++ )
-    {
-      out[b0_indices.at(idx)] = b0;
-    }
-
 
     itOut.Set(out);
 
@@ -206,15 +208,6 @@ void TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
   }
 }
 
-template <class TInputScalarType, class TOutputScalarType>
-void
-TensorImageToDiffusionImageFilter<TInputScalarType, TOutputScalarType>
-::UpdateOutputInformation()
-{
-  // Calls to superclass updateoutputinformation
-  Superclass::UpdateOutputInformation();
-
-  this->GetOutput()->SetVectorLength( m_GradientList->size() );
-}
-
 } // end of namespace
+
+#endif

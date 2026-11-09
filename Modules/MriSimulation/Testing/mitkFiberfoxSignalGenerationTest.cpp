@@ -28,7 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkTestingComparisonImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <mitkRicianNoiseModel.h>
-#include <mitkChiSquareNoiseModel.h>
 #include <mitkIOUtil.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkProperties.h>
@@ -38,6 +37,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVectorImage.h>
 #include <omp.h>
 
+#include "mitkDiffusionTestData.h"
 #include "mitkTestFixture.h"
 
 class mitkFiberfoxSignalGenerationTestSuite : public mitk::TestFixture
@@ -53,6 +53,9 @@ class mitkFiberfoxSignalGenerationTestSuite : public mitk::TestFixture
   MITK_TEST(Test7);
   MITK_TEST(Test8);
   MITK_TEST(Test9);
+  MITK_TEST(Test1Exact);
+  MITK_TEST(Test6Exact);
+  MITK_TEST(Test8Exact);
   CPPUNIT_TEST_SUITE_END();
 
   typedef itk::VectorImage< short, 3>   ItkDwiType;
@@ -62,11 +65,11 @@ private:
 public:
 
   /** Members used inside the different (sub-)tests. All members are initialized via setUp().*/
-  FiberBundle::Pointer m_FiberBundle;
+  mitk::FiberBundle::Pointer m_FiberBundle;
 
   void setUp() override
   {
-    m_FiberBundle = mitk::IOUtil::Load<FiberBundle>(GetTestDataFilePath("DiffusionImaging/Fiberfox/Signalgen.fib"));
+    m_FiberBundle = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("Fiberfox/Signalgen.fib"));
   }
 
   void tearDown() override
@@ -74,10 +77,19 @@ public:
 
   }
 
-  bool CompareDwi(itk::VectorImage< short, 3 >* dwi1, itk::VectorImage< short, 3 >* dwi2)
+  /** True if no value differs by more than maxDifference. */
+  bool CompareDwi(itk::VectorImage< short, 3 >* dwi1, itk::VectorImage< short, 3 >* dwi2, short maxDifference)
   {
     bool out = true;
     typedef itk::VectorImage< short, 3 > DwiImageType;
+    // the iterators below walk both images in step
+    if (dwi1->GetLargestPossibleRegion().GetSize() != dwi2->GetLargestPossibleRegion().GetSize()
+        || dwi1->GetVectorLength() != dwi2->GetVectorLength())
+    {
+      MITK_INFO << "Image size " << dwi1->GetLargestPossibleRegion().GetSize() << " x " << dwi1->GetVectorLength()
+                << " differs from the reference size " << dwi2->GetLargestPossibleRegion().GetSize() << " x " << dwi2->GetVectorLength();
+      return false;
+    }
     try{
       itk::ImageRegionIterator< DwiImageType > it1(dwi1, dwi1->GetLargestPossibleRegion());
       itk::ImageRegionIterator< DwiImageType > it2(dwi2, dwi2->GetLargestPossibleRegion());
@@ -88,7 +100,7 @@ public:
         {
           short d = abs(it1.Get()[i]-it2.Get()[i]);
 
-          if (d>1)
+          if (d>maxDifference)
           {
             if (count<10)
             {
@@ -114,7 +126,8 @@ public:
     return out;
   }
 
-  void StartSimulation(FiberfoxParameters parameters, mitk::Image::Pointer refImage, std::string out)
+  /** maxDifference 1 allows rounding of the int16 output to differ; 0 asks for the reference bit for bit. */
+  void StartSimulation(mitk::FiberfoxParameters parameters, mitk::Image::Pointer refImage, std::string out, short maxDifference = 1)
   {
     itk::TractsToDWIImageFilter< short >::Pointer tractsToDwiFilter = itk::TractsToDWIImageFilter< short >::New();
     tractsToDwiFilter->SetUseConstantRandSeed(true);
@@ -130,14 +143,14 @@ public:
 
     if (refImage.IsNotNull())
     {
-      if(mitk::DiffusionPropertyHelper::GetGradientContainer(refImage).IsNotNull() )
+      CPPUNIT_ASSERT_MESSAGE("Reference should be a diffusion-weighted image", mitk::DiffusionPropertyHelper::GetGradientContainer(refImage).IsNotNull());
       {
         ItkDwiType::Pointer itkTestImagePointer = ItkDwiType::New();
         mitk::CastToItkImage(testImage, itkTestImagePointer);
         ItkDwiType::Pointer itkRefImagePointer = ItkDwiType::New();
         mitk::CastToItkImage(refImage, itkRefImagePointer);
 
-        bool cond = CompareDwi(itkTestImagePointer, itkRefImagePointer);
+        bool cond = CompareDwi(itkTestImagePointer, itkRefImagePointer, maxDifference);
         if (!cond)
         {
           MITK_INFO << "Saving test image to " << mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + out;
@@ -151,75 +164,93 @@ public:
 
   void Test1()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.ffp"), true);
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param1.dwi"));
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1.ffp"), true);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param1_v3.dwi"));
     StartSimulation(parameters, refImage, "param1.dwi");
   }
 
   void Test2()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param2.ffp"), true);
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param2.dwi"));
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param2.ffp"), true);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param2_v3.dwi"));
     StartSimulation(parameters, refImage, "param2.dwi");
   }
 
   void Test3()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param3.ffp"), true);
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param3.dwi"));
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param3.ffp"), true);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param3_v2.dwi"));
     StartSimulation(parameters, refImage, "param3.dwi");
   }
 
   void Test4()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param4.ffp"), true);
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param4.dwi"));
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param4.ffp"), true);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param4_v2.dwi"));
     StartSimulation(parameters, refImage, "param4.dwi");
   }
 
   void Test5()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.ffp"), true);
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param5.dwi"));
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5.ffp"), true);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param5_v2.dwi"));
     StartSimulation(parameters, refImage, "param5.dwi");
   }
 
   void Test6()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param6.ffp"), true);
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param6.dwi"));
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param6.ffp"), true);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param6_v2.dwi"));
     StartSimulation(parameters, refImage, "param6.dwi");
   }
 
   void Test7()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param7.ffp"), true);
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param7.dwi"));
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param7.ffp"), true);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param7_v3.dwi"));
     StartSimulation(parameters, refImage, "param7.dwi");
   }
 
   void Test8()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param8.ffp"), true);
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param8.dwi"));
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param8.ffp"), true);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param8_v3.dwi"));
     StartSimulation(parameters, refImage, "param8.dwi");
   }
 
   void Test9()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param9.ffp"), true);
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/param9.dwi"));
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param9.ffp"), true);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/param9_v2.dwi"));
     StartSimulation(parameters, refImage, "param9.dwi");
   }
+
+  /**
+   * The references of the files with eddy currents and distortions (param1, param6, param8) were
+   * simulated with the exact sum of the k-space phase. That sum is not the default (Test1, Test6 and
+   * Test8 simulate with the time segments) and still reproduces them bit for bit.
+   */
+  void SimulateExact(const std::string& name, const std::string& reference)
+  {
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/" + name + ".ffp"), true);
+    parameters.m_SignalGen.m_KspaceTimeSegments = 0;
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/" + reference));
+    StartSimulation(parameters, refImage, name + "_exact.dwi", 0);
+  }
+
+  void Test1Exact() { SimulateExact("param1", "param1_v3.dwi"); }
+  void Test6Exact() { SimulateExact("param6", "param6_v2.dwi"); }
+  void Test8Exact() { SimulateExact("param8", "param8_v3.dwi"); }
 
 };
 

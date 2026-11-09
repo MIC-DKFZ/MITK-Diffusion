@@ -4,6 +4,22 @@
 This view provides tools to extract subbundles from a given fiber bundle, to remove unwanted fibers (e.g. via length, curvature, directional and fiber weight constraints) and to modify the properties of a fiber bundles such as coloring, fiber weights or fiber sampling.
 
 <b>Fiber Extraction:</b>
-Place ROIs in the 2D render widgets (cricles or polygons) and extract fibers from the bundle that pass through these ROIs by selecting the according ROI and fiber bundle in the datamanger and starting the extraction. The ROIs can be combined via logical operations. All fibers that pass through the thus generated composite ROI are extracted. The extraction can also be performed using 3D ROIs represented as binary mask images. In this extraction method, the logical operations are not implemented at the moment.
+Place ROIs in the 2D render widgets (cricles or polygons) and extract fibers from the bundle that pass through these ROIs by selecting the according ROI and fiber bundle in the datamanger and starting the extraction. The ROIs can be combined via logical operations. All fibers that pass through the thus generated composite ROI are extracted. The extraction can also be performed using 3D ROIs represented as binary mask images or segmentations (all labels of a segmentation together form the ROI, also hidden ones; the label map extraction uses the label values). In this extraction method, the logical operations are not implemented at the moment.
+
+\section FiberProcessingRoiExtraction Fiber Extraction by ROIs
+
+A tract is dissected from a whole-brain tractogram with three kinds of ROI (binary mask images or labels of a segmentation; where to place them is described in "ROI Strategy" and "Recipes for Common Tracts" of the "Streamline Tractography" manual page):
+- Pass ROIs: a fiber is kept if any part of it lies inside the ROI ("overlap fraction" 0). With a larger overlap fraction, the fiber must have that share of its length inside, which selects fibers that run along a ROI rather than through it.
+- End ROIs: a fiber is kept if one of its two end points lies inside the ROI, or with "both ends" if both do. End ROIs select the fibers that terminate in a region (a cortical area, a nucleus) and leave out the fibers that only pass it.
+- Not ROIs (exclusion): a fiber that touches the ROI is removed. A not ROI on the midsagittal plane removes fibers that cross to the other hemisphere; a not ROI in a neighbouring tract removes the fibers that turn into it.
+
+All conditions must hold (AND), so two pass ROIs at both ends of a tract select it far better than one. The view applies one ROI at a time (extract, then extract again from the result); the REST endpoint POST /api/v1/diffusion/tractography/extract takes lists of pass, end and not ROIs in one call, with "both_ends", "overlap_fraction", "threshold" (the mask value counted as inside, 0.5), "interpolate" (end ROIs) and "min_fibers" (a result with fewer fibers is empty), and adds the extracted bundle below the input tractogram. An empty result means that no fiber satisfies all ROIs: check each ROI alone, and that it lies on the tract in the colour-coded FA map.
+
+<b>Fiber Removal:</b>
+Among others, fibers can be removed by direction: a fiber is removed if any of its segments deviates less than the given angle from the given direction (components from -1 to 1; length and sign do not matter), and by length (minimum and maximum length in mm; the bundle stays unchanged if no fiber would be left). "Remove fiber parts outside mask" and "Remove fiber parts inside mask" cut each fiber where it crosses the border of the binary mask, also between two of its points, so the pieces end at the mask border whatever the point spacing; each piece keeps the weight of its fiber.
+
+<b>Generate ROI Image:</b>
+Converts the selected planar figures into a binary image on the grid of the selected image. Without a selected image it uses the grid of the fiber bundle: the selected one or, if none is selected, the topmost bundle, which the view then selects on its own. The image is the union of the figures; OR composites are converted as well, AND and NOT composites are refused.
+A figure sets every voxel that its plane passes through and whose centre, projected onto the plane, lies inside the figure. For a figure drawn on a slice of the image these are the voxels of that slice whose centres lie inside the figure; for a figure on a plane oblique to the image grid, every voxel the plane cuts there, so the figure has no holes in the view it was drawn in.
 
 */

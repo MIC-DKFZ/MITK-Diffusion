@@ -16,16 +16,16 @@ Fiber strands are defined simply by placing markers in a 3D image volume. The fi
 
 
 <b>Example:</b>
-\li Chose an image volume to place the markers used to define the fiber pathway. If you don't have such an image available switch to the "Signal Generation" tab, define the size and spacing of the desired image and click "Generate Image". If no fiber bundle is selected, this will generate a dummy image that can be used to place the fiducials.
+\li Chose an image volume to place the markers used to define the fiber pathway. If you don't have such an image available open the Fiberfox view, define the size and spacing of the desired image and click "Start Simulation". If no fiber bundle is selected, this will generate a dummy image that can be used to place the fiducials.
 \li Start placing fiducials at the desired positions to define the fiber pathway. To do that, click on the button with the circle pictogram, then click at the desired position and plane in the image volume and drag your mouse while keeping the button pressed to generate a circular shape. Adjust the shape using the control points (Fig. 2). The position of control point D introduces a twist of the fibers between two successive fiducials. The actual fiber generation is triggered automatically as soon as you place the second control point.
 \li In some cases the fibers are entangled in a way that can't be resolved by introducing an additional fiber twist. Fiberfox tries to avoid these situations, which arise from different normal orientations of succeeding fiducials, automatically. In rare cases this is not successful. Use the double-arrow button to flip the fiber positions of the selected fiducial in one dimension. Either the problem is resolved now or you can resolve it manually by adjusting the twist-control point.
-\li To create non elliptical fiber profile shapes switch to the Fiber Extraction View. This view provides tools to extract subesets of fibers from fiber bundles and enables to cut out arbitrary polygonal fiber shapes from existing bundles.
+\li To create non elliptical fiber profile shapes switch to the Fiber Processing view. This view provides tools to extract subsets of fibers from fiber bundles and enables to cut out arbitrary polygonal fiber shapes from existing bundles.
 
 \imageMacro{Fiberfox-Fiducial.png, "Fig. 1: Control points defining the actual shape of the fiducial. A specifies the fiducials position in space\, B and C the two ellipse radii and D the twisting angle between two successive fiducials.",10}
 
 <b>Fiber Options:</b>
 \li <b>Real Time Fibers</b>: If checked, each parameter adjustment (fiducial position, number of fibers, ...) will be directly applied to the selected fiber bundle. If unchecked, the fibers will only be generated if the corresponding button "Generate Fibers" is clicked.
-\li <b>Fiber Distribution</b>: Specifies if the fiber distribution inside the bundle follows a uniform or normal distribution.
+\li <b>Fiber Distribution</b>: Specifies if the fiber distribution inside the bundle follows a uniform or normal distribution. Uniform: the fibers are spread evenly over the ellipse of each fiducial. Normal: the fiber positions follow a normal distribution with the given variance, in a frame where the ellipse radii are 1, cut off at the ellipse. Each fiber passes through every fiducial inside its ellipse, so the bundle starts and ends within the first and the last fiducial.
 \li <b>\# Fibers</b>: Specifies the number of fibers that will be generated for the selected bundle.
 \li <b>Advanced Options</b>: Show/hide advanced options
 \li <b>Fiber Sampling</b>: Adjusts the distenace of the fiber sampling points (in mm). A higher sampling rate is needed if high curvatures are modeled.
@@ -34,6 +34,7 @@ Fiber strands are defined simply by placing markers in a 3D image volume. The fi
 
 <b>Fiducial Options:</b>
 \li <b>Use Constant Fiducial Radius</b>: If checked, all fiducials are treated as circles with the same radius. The first fiducial of the bundle defines the radius of all other fiducials.
+\li <b>Generate Fibers</b>: Generates the fibers of every selected bundle that has at least two fiducials; a selected bundle with only one fiducial is emptied.
 \li <b>Align with grid</b>: Click to shift the selected fiducial center points to the next voxel center.
 
 <b>Operations:</b>
@@ -47,6 +48,9 @@ Fiber strands are defined simply by placing markers in a 3D image volume. The fi
 
 \imageMacro{FiberfoxExamples.png, "Fig. 2: Examples of artificial crossing (a\,b)\, fanning (c\,d)\, highly curved (e\,f)\, kissing (g\,h) and twisting (i\,j) fibers as well as of the corresponding tensor images generated with Fiberfox.",4}
 
+<b>Random Phantom:</b>
+\li Generates the given number of bundles with random pathways in a volume of the given size. Each bundle starts with an elliptical cross-section whose two radii (in mm) are drawn from the given radius range; its number of fibers is its mean cross-sectional area times a density drawn from the given range (fibers per cm²). Each minimum must not be larger than its maximum; otherwise no phantom is generated and a message names the range.
+
 \imageMacro{random_phantom.png, "Fig. 3: Example of a random fiber phantom containing all kinds of configurations.",4}
 
 \section QmitkFiberGenerationViewUserManualKnownIssues Known Issues
@@ -54,7 +58,8 @@ Fiber strands are defined simply by placing markers in a 3D image volume. The fi
 \li If a scaling factor is applied to the selcted fiber bundle, the corresponding fiducials are not scaled accordingly.
 \li In some cases the automatic update of the selected fiber bundle is not triggered even if "Real Time Fibers" is checked, e.g. if a fiducial is deleted. If this happens on can always force an update by pressing the "Generate Fibers" button.
 
-If any other issues or feature requests arises during the use of Fiberfox, please don't hesitate to send us an e-mail or directly report the issue in our bugtracker: https://phabricator.mitk.org/maniphest/
+If any other issues or feature requests arises during the use of Fiberfox, please don't hesitate to send us an e-mail.
+
 \section QmitkFiberGenerationViewUserManualReferences References
 
 [1] Neher, P.F., Laun, F.B., Stieltjes, B., Maier-Hein, K.H., 2014. Fiberfox: facilitating the creation of realistic white matter software phantoms. Magn Reson Med 72, 1460–1470. doi:10.1002/mrm.25045

@@ -14,374 +14,135 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-//misc
-#include <QFileDialog>
-
-// Blueberry
-#include <berryISelectionService.h>
-#include <berryIWorkbenchWindow.h>
-
-// Qmitk
 #include "QmitkOdfMaximaExtractionView.h"
 
-#include <mitkImageCast.h>
-#include <mitkFiberBundle.h>
-#include <mitkImage.h>
-#include <mitkImageToItk.h>
-#include <mitkTensorImage.h>
-#include <itkVectorImage.h>
-#include <itkOdfMaximaExtractionFilter.h>
-#include <itkOdfMaximaExtractionFilter.h>
-#include <itkShCoefficientImageImporter.h>
-#include <itkDiffusionTensorPrincipalDirectionImageFilter.h>
-#include <mitkNodePredicateAnd.h>
-#include <mitkNodePredicateDimension.h>
-#include <mitkNodePredicateOr.h>
-#include <mitkNodePredicateNot.h>
+#include "QmitkReconstructionResults.h"
+
+#include <QmitkDiffusionViewControlsGuard.h>
+
+#include <mitkDiffusionMasks.h>
+#include <mitkDiffusionPeaks.h>
+#include <mitkExceptionMacro.h>
 #include <mitkNodePredicateDataType.h>
-#include <mitkNodePredicateProperty.h>
-#include <mitkNodePredicateIsDWI.h>
-#include <mitkPeakImage.h>
-#include <mitkShImage.h>
+#include <mitkNodePredicateOr.h>
 
-// Qt
-#include <QMessageBox>
+#include <algorithm>
+#include <initializer_list>
 
-const std::string QmitkOdfMaximaExtractionView::VIEW_ID = "org.mitk.views.odfmaximaextractionview";
-using namespace mitk;
+using QmitkReconstructionResults::AddResult;
+using QmitkReconstructionResults::ResultNode;
 
-QmitkOdfMaximaExtractionView::QmitkOdfMaximaExtractionView()
-  : m_Controls(nullptr)
-{
-
-}
-
-// Destructor
 QmitkOdfMaximaExtractionView::~QmitkOdfMaximaExtractionView()
 {
-
+  // The generated Ui class owns no widgets (they belong to the parent widget), only itself.
+  delete m_Controls;
 }
-
 
 void QmitkOdfMaximaExtractionView::CreateQtPartControl(QWidget *parent)
 {
-  // build up qt view, unless already done
-  if (!m_Controls)
-  {
-    // create GUI widgets from the Qt Designer's .ui file
-    m_Controls = new Ui::QmitkOdfMaximaExtractionViewControls;
-    m_Controls->setupUi(parent);
+  if (m_Controls)
+    return;
 
-    connect((QObject*)m_Controls->m_StartPeakExtractionButton, SIGNAL(clicked()), (QObject*) this, SLOT(StartPeakExtraction()));
-    connect((QObject*)m_Controls->m_ImportShCoeffs, SIGNAL(clicked()), (QObject*) this, SLOT(ConvertShCoeffs()));
+  m_Controls = new Ui::QmitkOdfMaximaExtractionViewControls;
+  QmitkDiffusionViewControlsGuard::Install(parent, this);
+  m_Controls->setupUi(parent);
 
-    m_Controls->m_MaskBox->SetDataStorage(this->GetDataStorage());
-    m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
+  connect(m_Controls->m_StartPeakExtractionButton, &QAbstractButton::clicked, this, &QmitkOdfMaximaExtractionView::StartPeakExtraction);
 
-    mitk::TNodePredicateDataType<mitk::ShImage>::Pointer isShImage = mitk::TNodePredicateDataType<mitk::ShImage>::New();
-    mitk::TNodePredicateDataType<mitk::TensorImage>::Pointer isTensorImage = mitk::TNodePredicateDataType<mitk::TensorImage>::New();
+  m_Controls->m_MaskBox->SetDataStorage(this->GetDataStorage());
+  m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
 
-    mitk::NodePredicateNot::Pointer isDwi = mitk::NodePredicateNot::New(mitk::NodePredicateIsDWI::New());
-    mitk::NodePredicateNot::Pointer isOdf = mitk::NodePredicateNot::New(mitk::NodePredicateDataType::New("OdfImage"));
-    mitk::NodePredicateAnd::Pointer unwanted = mitk::NodePredicateAnd::New(isOdf, isDwi);
-    mitk::NodePredicateDimension::Pointer dim3 = mitk::NodePredicateDimension::New(3);
-    mitk::NodePredicateProperty::Pointer isBinaryPredicate = mitk::NodePredicateProperty::New("binary", mitk::BoolProperty::New(true));
+  m_Controls->m_MaskBox->SetPredicate(mitk::GetBinaryMaskPredicate());
+  m_Controls->m_ImageBox->SetPredicate(mitk::NodePredicateOr::New(mitk::TNodePredicateDataType<mitk::TensorImage>::New(),
+                                                                  mitk::TNodePredicateDataType<mitk::ShImage>::New()));
+  m_Controls->m_MaskBox->SetZeroEntryText("--");
 
-    m_Controls->m_MaskBox->SetPredicate(mitk::NodePredicateAnd::New(mitk::NodePredicateAnd::New(unwanted, dim3), isBinaryPredicate));
-    m_Controls->m_ImageBox->SetPredicate(mitk::NodePredicateOr::New(isTensorImage, isShImage));
-    m_Controls->m_MaskBox->SetZeroEntryText("--");
+  connect(m_Controls->m_ImageBox, &QmitkDataStorageComboBox::OnSelectionChanged, this, &QmitkOdfMaximaExtractionView::OnImageSelectionChanged);
 
-    connect( (QObject*)(m_Controls->m_ImageBox), SIGNAL(OnSelectionChanged(const mitk::DataNode*)), this, SLOT(OnImageSelectionChanged()) );
-
-    m_Controls->m_StartPeakExtractionButton->setVisible(false);
-    m_Controls->m_ImportShCoeffs->setVisible(false);
-  }
+  OnImageSelectionChanged();
 }
 
-void QmitkOdfMaximaExtractionView::SetFocus()
+template <typename Work, typename Done>
+void QmitkOdfMaximaExtractionView::RunInBackground(const char *title, Work work, Done done)
 {
+  QmitkReconstructionResults::RunInBackground(this, m_Busy, [this]() { this->OnImageSelectionChanged(); }, title, std::move(work), std::move(done));
 }
 
 void QmitkOdfMaximaExtractionView::StartPeakExtraction()
 {
-  if (dynamic_cast<TensorImage*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData()) != nullptr)
-  {
-    StartTensorPeakExtraction(dynamic_cast<TensorImage*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData()));
-  }
-  else
-  {
-    StartMaximaExtraction(dynamic_cast<Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData()));
-  }
-}
-
-template<int shOrder>
-void QmitkOdfMaximaExtractionView::TemplatedConvertShCoeffs(mitk::Image* mitkImg)
-{
-  typedef itk::ShCoefficientImageImporter< float, shOrder > FilterType;
-  typedef mitk::ImageToItk< itk::Image< float, 4 > > CasterType;
-  CasterType::Pointer caster = CasterType::New();
-  caster->SetInput(mitkImg);
-  caster->Update();
-
-  typename FilterType::Pointer filter = FilterType::New();
-  filter->SetInputImage(caster->GetOutput());
-  filter->GenerateData();
-  typename FilterType::CoefficientImageType::Pointer itkCi = filter->GetCoefficientImage();
-
-  {
-    mitk::Image::Pointer img = dynamic_cast<mitk::Image*>(mitk::ShImage::New().GetPointer());
-    img->InitializeByItk(itkCi.GetPointer());
-    img->SetVolume(itkCi->GetBufferPointer());
-    mitk::DiffusionPropertyHelper::CopyDICOMProperties(mitkImg, img);
-
-    DataNode::Pointer node = DataNode::New();
-    node->SetData(img);
-
-    QString name(m_Controls->m_ImageBox->GetSelectedNode()->GetName().c_str());
-    name += "_ShImage_Imported";
-    node->SetName(name.toStdString().c_str());
-
-    GetDataStorage()->Add(node, m_Controls->m_ImageBox->GetSelectedNode());
-  }
-}
-
-void QmitkOdfMaximaExtractionView::ConvertShCoeffs()
-{
-  if (m_Controls->m_ImageBox->GetSelectedNode().IsNull())
+  auto imageNode = m_Controls->m_ImageBox->GetSelectedNode();
+  if (m_Busy || imageNode.IsNull())
     return;
+  auto maskNode = m_Controls->m_MaskBox->GetSelectedNode();
+  // A segmentation becomes a mask image in the worker thread, where its errors are reported too.
+  mitk::BaseData::ConstPointer maskData = maskNode.IsNotNull() ? maskNode->GetData() : nullptr;
+  const bool outputNumberOfPeaks = m_Controls->m_OutputNumDirectionsBox->isChecked();
+  const auto done = [this, imageNode, outputNumberOfPeaks](const char *peaksSuffix, const char *numberSuffix) {
+    return [this, imageNode, outputNumberOfPeaks, peaksSuffix, numberSuffix](const mitk::PeakResult &result) {
+      AddResult(this->GetDataStorage(), ResultNode(result.peaks, imageNode, peaksSuffix), imageNode);
+      if (outputNumberOfPeaks)
+        AddResult(this->GetDataStorage(), ResultNode(result.numberOfPeaks, imageNode, numberSuffix), imageNode);
+    };
+  };
 
-  Image::Pointer mitkImg = dynamic_cast<Image*>(m_Controls->m_ImageBox->GetSelectedNode()->GetData());
-  if (mitkImg->GetDimension() != 4 && mitkImg->GetLargestPossibleRegion().GetSize()[3]<6)
+  if (mitk::TensorImage::ConstPointer tensors = dynamic_cast<mitk::TensorImage *>(imageNode->GetData()))
   {
-    MITK_INFO << "wrong image type (need 4 dimensions)";
+    // The absolute threshold acts as FA threshold; without normalization the vectors are scaled by FA.
+    const double faThreshold = m_Controls->m_AbsoluteThresholdBox->value();
+    const bool normalize = m_Controls->m_NormalizationBox->currentIndex() != 0;
+    this->RunInBackground(
+      "Peak extraction not possible:",
+      [tensors, faThreshold, normalize, maskData]() {
+        return mitk::ExtractTensorPeaks(tensors, faThreshold, normalize, mitk::GetMaskImage(maskData));
+      },
+      done("_PrincipalDirection", "_NumDirections"));
     return;
   }
 
-  int nrCoeffs = mitkImg->GetLargestPossibleRegion().GetSize()[3];
-  switch (nrCoeffs)
+  mitk::ShImage::ConstPointer shImage = dynamic_cast<mitk::ShImage *>(imageNode->GetData());
+  if (shImage.IsNull())
   {
-  case 6:
-    TemplatedConvertShCoeffs<2>(mitkImg);
-    break;
-  case 15:
-    TemplatedConvertShCoeffs<4>(mitkImg);
-    break;
-  case 28:
-    TemplatedConvertShCoeffs<6>(mitkImg);
-    break;
-  case 45:
-    TemplatedConvertShCoeffs<8>(mitkImg);
-    break;
-  case 66:
-    TemplatedConvertShCoeffs<10>(mitkImg);
-    break;
-  case 91:
-    TemplatedConvertShCoeffs<12>(mitkImg);
-    break;
-  default :
-    QMessageBox::warning(nullptr, "Error", "Only spherical harmonics orders 2-12 are supported.", QMessageBox::Ok);
-  }
-}
-
-void QmitkOdfMaximaExtractionView::StartTensorPeakExtraction(mitk::TensorImage* img)
-{
-  typedef itk::DiffusionTensorPrincipalDirectionImageFilter< float > MaximaExtractionFilterType;
-  MaximaExtractionFilterType::Pointer filter = MaximaExtractionFilterType::New();
-  filter->SetUsePolarCoordinates(false);
-
-  mitk::BaseGeometry::Pointer geometry;
-  try{
-    ItkTensorImage::Pointer itkImage = ItkTensorImage::New();
-    CastToItkImage(img, itkImage);
-    filter->SetInput(itkImage);
-    geometry = img->GetGeometry();
-  }
-  catch (itk::ExceptionObject &e)
-  {
-    MITK_INFO << "wrong image type: " << e.what();
-    QMessageBox::warning(nullptr, "Wrong pixel type", "Could not perform Tensor Principal Direction Extraction due to Image has wrong pixel type.", QMessageBox::Ok);
+    QmitkReconstructionResults::Run("Peak extraction not possible:", []() { mitkThrow() << "Select a tensor or an SH image."; });
     return;
   }
 
-  if (m_Controls->m_MaskBox->GetSelectedNode().IsNotNull())
-  {
-    ItkUcharImgType::Pointer itkMaskImage = ItkUcharImgType::New();
-    Image::Pointer mitkMaskImg = dynamic_cast<Image*>(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
-    CastToItkImage(mitkMaskImg, itkMaskImage);
-    filter->SetMaskImage(itkMaskImage);
-  }
+  // The entries of m_NormalizationBox: none, by the largest peak, unit vectors.
+  constexpr mitk::PeakNormalization normalizations[] = {
+    mitk::PeakNormalization::None, mitk::PeakNormalization::MaxVector, mitk::PeakNormalization::SingleVector};
+  mitk::PeakParameters parameters;
+  parameters.maxPeaks = m_Controls->m_MaxNumPeaksBox->value();
+  parameters.relativeThreshold = m_Controls->m_PeakThresholdBox->value();
+  parameters.absoluteThreshold = m_Controls->m_AbsoluteThresholdBox->value();
+  parameters.angularThreshold = m_Controls->m_AngularThreshold->value();
+  parameters.scaleByGfa = m_Controls->m_ScaleByGfaBox->isChecked();
+  parameters.normalization = normalizations[std::clamp(m_Controls->m_NormalizationBox->currentIndex(), 0, 2)];
 
-  if (m_Controls->m_NormalizationBox->currentIndex() == 0)
-    filter->SetNormalizeVectors(false);
-  filter->SetFaThreshold(m_Controls->m_AbsoluteThresholdBox->value());
-
-  filter->Update();
-
-  MaximaExtractionFilterType::PeakImageType::Pointer itkImg = filter->GetPeakImage();
-  mitk::Image::Pointer mitkPeakImage = dynamic_cast<Image*>(PeakImage::New().GetPointer());
-  CastToMitkImage(itkImg, mitkPeakImage);
-
-  mitk::DiffusionPropertyHelper::CopyDICOMProperties(img, mitkPeakImage);
-
-  DataNode::Pointer node = DataNode::New();
-  node->SetData(mitkPeakImage);
-  QString name(m_Controls->m_ImageBox->GetSelectedNode()->GetName().c_str());
-  name += "_PrincipalDirection";
-  node->SetName(name.toStdString().c_str());
-  GetDataStorage()->Add(node, m_Controls->m_ImageBox->GetSelectedNode());
-
-  if (m_Controls->m_OutputNumDirectionsBox->isChecked())
-  {
-    ItkUcharImgType::Pointer numDirImage = filter->GetOutput();
-    mitk::Image::Pointer image2 = mitk::Image::New();
-    image2->InitializeByItk(numDirImage.GetPointer());
-    image2->SetVolume(numDirImage->GetBufferPointer());
-    DataNode::Pointer node2 = DataNode::New();
-    node2->SetData(image2);
-    QString name(m_Controls->m_ImageBox->GetSelectedNode()->GetName().c_str());
-    name += "_NumDirections";
-    node2->SetName(name.toStdString().c_str());
-    GetDataStorage()->Add(node2, m_Controls->m_ImageBox->GetSelectedNode());
-  }
+  this->RunInBackground(
+    "Peak extraction not possible:",
+    [shImage, parameters, maskData]() { return mitk::ExtractPeaks(shImage, parameters, mitk::GetMaskImage(maskData)); },
+    done("_PEAKS", "_NUM_DIRECTIONS"));
 }
 
-template<int shOrder>
-void QmitkOdfMaximaExtractionView::StartMaximaExtraction(Image *image)
+void QmitkOdfMaximaExtractionView::OnSelectionChanged(berry::IWorkbenchPart::Pointer, const QList<mitk::DataNode::Pointer> &)
 {
-  typedef itk::OdfMaximaExtractionFilter< float, shOrder, ODF_SAMPLING_SIZE > MaximaExtractionFilterType;
-  typename MaximaExtractionFilterType::Pointer filter = MaximaExtractionFilterType::New();
-
-  switch (m_Controls->m_ToolkitBox->currentIndex())
-  {
-  case 0:
-    filter->SetToolkit(MaximaExtractionFilterType::MRTRIX);
-    break;
-  case 1:
-    filter->SetToolkit(MaximaExtractionFilterType::FSL);
-    break;
-  default:
-    filter->SetToolkit(MaximaExtractionFilterType::MRTRIX);
-  }
-
-  mitk::BaseGeometry::Pointer geometry;
-  try{
-    typedef ImageToItk< typename MaximaExtractionFilterType::CoefficientImageType > CasterType;
-    typename CasterType::Pointer caster = CasterType::New();
-    caster->SetInput(image);
-    caster->Update();
-    filter->SetInput(caster->GetOutput());
-    geometry = image->GetGeometry();
-  }
-  catch (itk::ExceptionObject &e)
-  {
-    MITK_INFO << "wrong image type: " << e.what();
-    QMessageBox::warning(nullptr, "Wrong pixel type", "Could not perform Finite Differences Extraction due to Image has wrong pixel type.", QMessageBox::Ok);
-    return;
-  }
-
-  filter->SetAngularThreshold(cos((float)m_Controls->m_AngularThreshold->value()*itk::Math::pi / 180));
-  filter->SetMaxNumPeaks(m_Controls->m_MaxNumPeaksBox->value());
-  filter->SetRelativePeakThreshold(m_Controls->m_PeakThresholdBox->value());
-  filter->SetAbsolutePeakThreshold(m_Controls->m_AbsoluteThresholdBox->value());
-  filter->SetScaleByGfa(m_Controls->m_ScaleByGfaBox->isChecked());
-
-  if (m_Controls->m_MaskBox->GetSelectedNode().IsNotNull())
-  {
-    ItkUcharImgType::Pointer itkMaskImage = ItkUcharImgType::New();
-    Image::Pointer mitkMaskImg = dynamic_cast<Image*>(m_Controls->m_MaskBox->GetSelectedNode()->GetData());
-    CastToItkImage(mitkMaskImg, itkMaskImage);
-    filter->SetMaskImage(itkMaskImage);
-  }
-
-  switch (m_Controls->m_NormalizationBox->currentIndex())
-  {
-  case 0:
-    filter->SetNormalizationMethod(MaximaExtractionFilterType::NO_NORM);
-    break;
-  case 1:
-    filter->SetNormalizationMethod(MaximaExtractionFilterType::MAX_VEC_NORM);
-    break;
-  case 2:
-    filter->SetNormalizationMethod(MaximaExtractionFilterType::SINGLE_VEC_NORM);
-    break;
-  }
-
-  filter->Update();
-
-  typename MaximaExtractionFilterType::PeakImageType::Pointer itkImg = filter->GetPeakImage();
-  mitk::Image::Pointer img = dynamic_cast<Image*>(PeakImage::New().GetPointer());
-  CastToMitkImage(itkImg, img);
-  mitk::DiffusionPropertyHelper::CopyDICOMProperties(image, img);
-
-  DataNode::Pointer node = DataNode::New();
-  node->SetData(img);
-  QString name(m_Controls->m_ImageBox->GetSelectedNode()->GetName().c_str());
-  name += "_PEAKS";
-  node->SetName(name.toStdString().c_str());
-  GetDataStorage()->Add(node, m_Controls->m_ImageBox->GetSelectedNode());
-
-  if (m_Controls->m_OutputNumDirectionsBox->isChecked())
-  {
-    ItkUcharImgType::Pointer numDirImage = filter->GetNumDirectionsImage();
-    mitk::Image::Pointer image2 = mitk::Image::New();
-    CastToMitkImage(numDirImage, image2);
-
-    DataNode::Pointer node2 = DataNode::New();
-    node2->SetData(image2);
-    QString name(m_Controls->m_ImageBox->GetSelectedNode()->GetName().c_str());
-    name += "_NUM_DIRECTIONS";
-    node2->SetName(name.toStdString().c_str());
-    GetDataStorage()->Add(node2, m_Controls->m_ImageBox->GetSelectedNode());
-  }
-}
-
-void QmitkOdfMaximaExtractionView::StartMaximaExtraction(Image* img)
-{
-  mitk::PixelType pixT = img->GetPixelType();
-
-  switch (pixT.GetNumberOfComponents())
-  {
-  case 6:
-    StartMaximaExtraction<2>(img);
-    break;
-  case 15:
-    StartMaximaExtraction<4>(img);
-    break;
-  case 28:
-    StartMaximaExtraction<6>(img);
-    break;
-  case 45:
-    StartMaximaExtraction<8>(img);
-    break;
-  case 66:
-    StartMaximaExtraction<10>(img);
-    break;
-  case 91:
-    StartMaximaExtraction<12>(img);
-    break;
-  default :
-    QMessageBox::warning(nullptr, "Error", "Only spherical harmonics orders 2-12 are supported.", QMessageBox::Ok);
-  }
-}
-
-void QmitkOdfMaximaExtractionView::OnSelectionChanged(berry::IWorkbenchPart::Pointer , const QList<mitk::DataNode::Pointer>& nodes)
-{
-  (void) nodes;
   this->OnImageSelectionChanged();
 }
 
 void QmitkOdfMaximaExtractionView::OnImageSelectionChanged()
 {
-  m_Controls->m_StartPeakExtractionButton->setVisible(false);
-  m_Controls->m_ImportShCoeffs->setVisible(false);
+  // The combo box admits tensor and SH images only. One extraction at a time: the button stays
+  // disabled while one runs in the background.
+  auto node = m_Controls->m_ImageBox->GetSelectedNode();
+  m_Controls->m_StartPeakExtractionButton->setVisible(node.IsNotNull());
+  m_Controls->m_StartPeakExtractionButton->setEnabled(!m_Busy);
 
-  mitk::DataNode::Pointer node = m_Controls->m_ImageBox->GetSelectedNode();
-  if (node.IsNull())
-    return;
-
-  Image::Pointer img = dynamic_cast<Image*>(node->GetData());
-  if (img->GetDimension()==4)
-    m_Controls->m_ImportShCoeffs->setVisible(true);
-  else
-    m_Controls->m_StartPeakExtractionButton->setVisible(true);
+  // For tensors only the threshold (on the FA) and the normalization act; the other parameters
+  // belong to the ODF maxima.
+  const bool tensors = node.IsNotNull() && dynamic_cast<mitk::TensorImage *>(node->GetData()) != nullptr;
+  m_Controls->label_7->setText(tensors ? "FA Threshold:" : "Absolute Threshold:");
+  for (QWidget *odfOnly : std::initializer_list<QWidget *>{m_Controls->m_PeakThresholdBox, m_Controls->label_6,
+                                                           m_Controls->m_MaxNumPeaksBox, m_Controls->label_5,
+                                                           m_Controls->m_AngularThreshold, m_Controls->label_11,
+                                                           m_Controls->m_ScaleByGfaBox, m_Controls->label_12})
+    odfOnly->setEnabled(!tensors);
 }

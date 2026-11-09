@@ -25,15 +25,6 @@
   <property name="autoFillBackground">
    <bool>true</bool>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_18">
    <property name="verticalSpacing">
     <number>25</number>
@@ -110,7 +101,7 @@ QGroupBox {
            <number>6</number>
           </property>
           <item row="0" column="0">
-           <widget class="QCommandLinkButton" name="m_RemoveGradientButton">
+           <widget class="QPushButton" name="m_RemoveGradientButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -123,7 +114,7 @@ QGroupBox {
            <widget class="QSpinBox" name="m_RemoveGradientBox"/>
           </item>
           <item row="1" column="0">
-           <widget class="QCommandLinkButton" name="m_ExtractGradientButton">
+           <widget class="QPushButton" name="m_ExtractGradientButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -163,12 +154,12 @@ QGroupBox {
            <number>6</number>
           </property>
           <item row="9" column="0">
-           <widget class="QCommandLinkButton" name="m_ReduceGradientsButton">
+           <widget class="QPushButton" name="m_ReduceGradientsButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Retain only the specified number of gradient directions and according image volumes. The retained directions are spread equally over the half sphere using an iterative energy repulsion strategy.</string>
+             <string>Retain only the specified number of gradient directions and according image volumes. The retained directions are spread over the half sphere by iteratively swapping directions as long as this increases the smallest angle between two retained directions.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -266,7 +257,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="7" column="0">
-           <widget class="QCommandLinkButton" name="m_MirrorGradientToHalfSphereButton">
+           <widget class="QPushButton" name="m_MirrorGradientToHalfSphereButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -285,12 +276,12 @@ QGroupBox {
            </widget>
           </item>
           <item row="4" column="0">
-           <widget class="QCommandLinkButton" name="m_FlipGradientsButton">
+           <widget class="QPushButton" name="m_FlipGradientsButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
+             <string>Negates the checked world (LPS) components of all gradients. The image data are not changed.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -304,7 +295,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="3" column="0">
-           <widget class="QCommandLinkButton" name="m_CreateLengthCorrectedDwi">
+           <widget class="QPushButton" name="m_CreateLengthCorrectedDwi">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -314,7 +305,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="6" column="0">
-           <widget class="QCommandLinkButton" name="m_ShowGradientsButton">
+           <widget class="QPushButton" name="m_ShowGradientsButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -343,12 +334,12 @@ QGroupBox {
            </widget>
           </item>
           <item row="10" column="0">
-           <widget class="QCommandLinkButton" name="m_ClearRotationButton">
+           <widget class="QPushButton" name="m_ClearRotationButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>By default, the image matrix is applied to the image gradients. This button removes this additional rotation.</string>
+             <string>Recomputes the gradients without the rotation of the image matrix. Only DWIs whose gradients include it have one to clear: NRRD files of earlier MITK versions and DICOM. Other DWIs store world gradients.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -362,12 +353,12 @@ QGroupBox {
            </widget>
           </item>
           <item row="5" column="0">
-           <widget class="QCommandLinkButton" name="m_SwapGradientsButton">
+           <widget class="QPushButton" name="m_SwapGradientsButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Generate pointset displaying the gradient vectors (applied measurement frame).</string>
+             <string>Reorders the world (LPS) components of all gradients, e.g. &quot;y x z&quot; swaps x and y. The image data are not changed.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -619,12 +610,12 @@ QGroupBox {
            </widget>
           </item>
           <item row="6" column="0">
-           <widget class="QCommandLinkButton" name="m_MergeDwisButton">
+           <widget class="QPushButton" name="m_MergeDwisButton">
             <property name="enabled">
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Merges selected DWIs of same dimension. If several b-values are present, the resulting image will contain multiple b-shells.</string>
+             <string>Appends the volumes of the DWI chosen next to the button to the selected DWI. Both need the same size, voxel size, origin and direction matrix. If several b-values are present, the resulting image will contain multiple b-shells.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -665,7 +656,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="1" column="0">
-           <widget class="QCommandLinkButton" name="m_ButtonAverageGradients">
+           <widget class="QPushButton" name="m_ButtonAverageGradients">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -711,12 +702,12 @@ QGroupBox {
            </widget>
           </item>
           <item row="4" column="0">
-           <widget class="QCommandLinkButton" name="m_FlipAxis">
+           <widget class="QPushButton" name="m_FlipAxis">
             <property name="enabled">
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Merges selected DWIs of same dimension. If several b-values are present, the resulting image will contain multiple b-shells.</string>
+             <string>Mirrors the image along the checked image (voxel) axes; the geometry stays the same. The gradients of a DWI are mirrored along the same axes.</string>
             </property>
             <property name="statusTip">
              <string/>
@@ -953,7 +944,7 @@ QGroupBox {
               </widget>
              </item>
              <item row="1" column="0">
-              <widget class="QCommandLinkButton" name="m_ResampleImageButton">
+              <widget class="QPushButton" name="m_ResampleImageButton">
                <property name="enabled">
                 <bool>false</bool>
                </property>
@@ -1080,7 +1071,7 @@ QGroupBox {
            </widget>
           </item>
           <item row="3" column="0">
-           <widget class="QCommandLinkButton" name="m_CropImageButton">
+           <widget class="QPushButton" name="m_CropImageButton">
             <property name="text">
              <string>Crop Image</string>
             </property>
@@ -1138,10 +1129,10 @@ QGroupBox {
              <number>4</number>
             </property>
             <property name="minimum">
-             <double>0.000000000000000</double>
+             <double>0.000100000000000</double>
             </property>
             <property name="maximum">
-             <double>99.989999999999995</double>
+             <double>10000.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -1150,6 +1141,12 @@ QGroupBox {
             <property name="decimals">
              <number>4</number>
             </property>
+            <property name="minimum">
+             <double>0.000100000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10000.000000000000000</double>
+            </property>
            </widget>
           </item>
           <item row="0" column="1">
@@ -1157,13 +1154,19 @@ QGroupBox {
             <property name="decimals">
              <number>4</number>
             </property>
+            <property name="minimum">
+             <double>0.000100000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10000.000000000000000</double>
+            </property>
            </widget>
           </item>
          </layout>
         </widget>
        </item>
        <item row="0" column="0">
-        <widget class="QCommandLinkButton" name="m_ModifyHeader">
+        <widget class="QPushButton" name="m_ModifyHeader">
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -1312,7 +1315,7 @@ QGroupBox {
           </sizepolicy>
          </property>
          <property name="title">
-          <string>Measurment frame</string>
+          <string>Measurement frame</string>
          </property>
          <layout class="QGridLayout" name="gridLayout">
           <property name="leftMargin">
@@ -1431,6 +1434,19 @@ QGroupBox {
          </layout>
         </widget>
        </item>
+       <item row="5" column="0">
+        <widget class="QCheckBox" name="m_RotateGradientsWithImageBox">
+         <property name="toolTip">
+          <string>For DWIs: if checked, a new direction matrix turns the gradients with the image, so they keep their relation to the voxel grid (as FSL bvecs do). If unchecked, the gradients stay fixed in world coordinates.</string>
+         </property>
+         <property name="text">
+          <string>Rotate gradients with the image</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
        <item row="7" column="0">
         <spacer name="verticalSpacer_2">
          <property name="orientation">
@@ -1526,7 +1542,7 @@ QGroupBox {
            <widget class="QmitkDataStorageComboBox" name="m_AlignImageBox"/>
           </item>
           <item row="0" column="0">
-           <widget class="QCommandLinkButton" name="m_AlignImageButton">
+           <widget class="QPushButton" name="m_AlignImageButton">
             <property name="text">
              <string>Align to</string>
             </property>
@@ -1556,7 +1572,7 @@ QGroupBox {
         </spacer>
        </item>
        <item row="0" column="0">
-        <widget class="QCommandLinkButton" name="m_ButtonExtractB0">
+        <widget class="QPushButton" name="m_ButtonExtractB0">
          <property name="enabled">
           <bool>false</bool>
          </property>

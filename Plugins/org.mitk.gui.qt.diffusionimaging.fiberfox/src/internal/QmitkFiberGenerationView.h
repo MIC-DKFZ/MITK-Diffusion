@@ -119,21 +119,23 @@ protected:
     struct QmitkPlanarFigureData
     {
         QmitkPlanarFigureData()
-            : m_Figure(0)
-            , m_EndPlacementObserverTag(0)
+            : m_Figure(nullptr)
             , m_SelectObserverTag(0)
             , m_StartInteractionObserverTag(0)
             , m_EndInteractionObserverTag(0)
             , m_Flipped(0)
         {
         }
-        mitk::PlanarFigure* m_Figure;
-        unsigned int m_EndPlacementObserverTag;
+        /** kept alive so that its observers can be removed even after the node got other data */
+        mitk::PlanarFigure::Pointer m_Figure;
         unsigned int m_SelectObserverTag;
         unsigned int m_StartInteractionObserverTag;
         unsigned int m_EndInteractionObserverTag;
         unsigned int m_Flipped;
     };
+
+    /** The observers call back into this view, so they are removed before the view or the node goes. */
+    static void RemoveObservers(QmitkPlanarFigureData& data);
 
     std::map<mitk::DataNode*, QmitkPlanarFigureData>    m_DataNodeToPlanarFigureData;   ///< map each planar figure uniquely to a QmitkPlanarFigureData
     mitk::DataNode::Pointer                             m_SelectedFiducial;             ///< selected planar ellipse
@@ -144,5 +146,5 @@ protected:
     std::vector< mitk::DataNode::Pointer >              m_SelectedImages;
 
     QString m_ParameterFile;    ///< parameter file name
-    FiberfoxParameters  m_Parameters;
+    mitk::FiberfoxParameters  m_Parameters;
 };

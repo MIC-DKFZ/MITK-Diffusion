@@ -35,7 +35,6 @@ vtkSmartPointer<vtkPolyData> FiberBuilder::iterate(int minFiberLength)
     m_VtkCellArray = vtkSmartPointer<vtkCellArray>::New();
     m_VtkPoints = vtkSmartPointer<vtkPoints>::New();
 
-    int cur_label = 1;
     int numFibers = 0;
     m_FiberLength = 0;
     for (int k = 0; k < m_Grid->m_NumParticles;k++)
@@ -44,10 +43,10 @@ vtkSmartPointer<vtkPolyData> FiberBuilder::iterate(int minFiberLength)
         if (dp->label == 0)
         {
             vtkSmartPointer<vtkPolyLine> container = vtkSmartPointer<vtkPolyLine>::New();
-            dp->label = cur_label;
+            // label 1 marks "in the current fiber, not yet added"; AddPoint adds only such particles
+            dp->label = 1;
             LabelPredecessors(dp, -1, container);
             LabelSuccessors(dp, 1, container);
-            cur_label++;
             if(m_FiberLength >= minFiberLength)
             {
                 m_VtkCellArray->InsertNextCell(container);

@@ -44,7 +44,6 @@ found in the LICENSE file.
 #include "mitkSurface.h"
 #include "mitkFiberBundle.h"
 #include "mitkInteractionPositionEvent.h"
-#include <mitkLabelSetImage.h>
 
 #include <vtkSphereSource.h>
 
@@ -81,7 +80,7 @@ void mitk::SphereSegmentationInteractor::EndCreationStart(mitk::StateMachineActi
 {
 
   this->GetDataNode()->SetBoolProperty(DATANODE_PROPERTY_CREATED, true);
-   if (this->GetDataNode()->GetName() == m_startDataNode->GetName()) {
+   if (this->GetDataNode() == m_startDataNode) {
      DataInteractor::SetDataNode(m_endDataNode);
    }
   else {

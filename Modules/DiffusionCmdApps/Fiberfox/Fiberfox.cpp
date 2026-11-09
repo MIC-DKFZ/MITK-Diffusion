@@ -21,13 +21,15 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
 #include <mitkFiberfoxParameters.h>
+#include <boost/lexical_cast.hpp>
 #include "mitkCommandLineParser.h"
 
 #include <itkTractsToDWIImageFilter.h>
 #include <mitkLexicalCast.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <itksys/SystemTools.hxx>
-#include <mitkFiberfoxParameters.h>
+#include <mitkDiffusionDataIOHelper.h>
+#include <mitkMemoryUtilities.h>
 
 using namespace mitk;
 
@@ -35,7 +37,7 @@ using namespace mitk;
 * \brief Command line interface to Fiberfox.
 * Simulate a diffusion-weighted image from a tractogram using the specified parameter file.
 */
-int main(int argc, char* argv[])
+static int RunFiberfox(int argc, char* argv[])
 {
   mitkCommandLineParser parser;
   parser.setTitle("Fiberfox");
@@ -43,13 +45,17 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
   parser.setDescription("Command line interface to Fiberfox." " Simulate a diffusion-weighted image from a tractogram using the specified parameter file.");
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output root:", "output folder and file prefix", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output root:", "output folder and file prefix; an extension of a known file type (e.g. .nii.gz) sets the image format and is not part of the prefix", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram or diffusion-weighted image", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("parameters", "p", mitkCommandLineParser::String, "Parameter file:", "fiberfox parameter file (.ffp)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("template", "t", mitkCommandLineParser::String, "Template image:", "use parameters of the template image", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("verbose", "v", mitkCommandLineParser::Bool, "Output additional images:", "output volume fraction images etc.", us::Any());
-  parser.addArgument("dont_apply_direction_matrix", "", mitkCommandLineParser::Bool, "Don't apply direction matrix:", "don't rotate gradients by image direction matrix", us::Any());
+  parser.addArgument("dont_apply_direction_matrix", "", mitkCommandLineParser::Bool, "Don't apply direction matrix:", "the gradients of the parameter file are world vectors, not FSL bvecs of the simulated geometry", us::Any());
   parser.addArgument("fix_seed", "", mitkCommandLineParser::Bool, "Use fix random seed:", "always use same sequence of random numbers", us::Any());
+  parser.addArgument("fast_kspace", "", mitkCommandLineParser::Bool, "Fast k-space distortions:", "approximate the phase of distortions and eddy currents in the k-space simulation by time segments, as many per slice as keep the relative RMS error below 0.1 percent, instead of the exact sum (2.2 to 127 times faster on a 128x128 slice on one core; slices where the time segments would take longer on one core, or more than 256 MB of memory, take the exact sum; slices simulated at the same time wait for memory beyond 2 GB in all, which changes only the run time); the default, also for parameter files without the setting; overrides a parameter file that asks for the exact sum", us::Any());
+  parser.addArgument("exact_kspace", "", mitkCommandLineParser::Bool, "Exact k-space distortions:", "sum the exact phase of distortions and eddy currents for every pixel and k-space sample, as earlier MITK versions did (much slower); overrides the parameter file", us::Any());
+  parser.addArgument("time_segments", "", mitkCommandLineParser::Int, "Time segments:", "as --fast_kspace, with this fixed number of time segments (0: exact sum); overrides the parameter file, --fast_kspace and --exact_kspace", us::Any());
+  parser.addArgument("ignore_memory_check", "", mitkCommandLineParser::Bool, "Ignore memory check:", "start the simulation even if its estimated memory exceeds the available memory, which can make the computer stop responding", us::Any());
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -77,12 +83,44 @@ int main(int argc, char* argv[])
 
   FiberfoxParameters parameters;
   parameters.LoadParameters(paramName, fix_seed);
+  if (parsedArgs.count("fast_kspace") && parsedArgs.count("exact_kspace"))
+  {
+    std::cerr << "--fast_kspace and --exact_kspace exclude each other" << std::endl;
+    return EXIT_FAILURE;
+  }
+  if (parsedArgs.count("fast_kspace"))
+    parameters.m_SignalGen.m_KspaceTimeSegments = mitk::SignalGenerationParameters::AUTOMATIC_TIME_SEGMENTS;
+  if (parsedArgs.count("exact_kspace"))
+    parameters.m_SignalGen.m_KspaceTimeSegments = 0;
+  if (parsedArgs.count("time_segments"))
+  {
+    const int segments = us::any_cast<int>(parsedArgs["time_segments"]);
+    if (segments < 0)
+    {
+      std::cerr << "--time_segments must be 0 (exact sum) or positive" << std::endl;
+      return EXIT_FAILURE;
+    }
+    parameters.m_SignalGen.m_KspaceTimeSegments = segments;
+  }
+  // the parameter file can choose the approximation without a flag, so name the k-space path in the log
+  if (parameters.m_SignalGen.m_SimulateKspaceAcquisition && (parameters.m_Misc.m_DoAddDistortions || parameters.m_Misc.m_DoAddEddyCurrents))
+  {
+    const int segments = parameters.m_SignalGen.m_KspaceTimeSegments;
+    if (segments == 0)
+      MITK_INFO << "Phase of distortions and eddy currents: exact sum (--fast_kspace approximates it much faster)";
+    else if (segments < 0)
+      MITK_INFO << "Phase of distortions and eddy currents: time segments, count per slice from the phase spread (--exact_kspace for the exact sum)";
+    else
+      MITK_INFO << "Phase of distortions and eddy currents: " << segments << " time segments";
+  }
+  // refuse TI >= TR before the fibers are loaded
+  parameters.m_SignalGen.CheckInversionTime();
 
   // Test if /path/dir is an existing directory:
   std::string file_extension = "";
   if( itksys::SystemTools::FileIsDirectory( outName ) )
   {
-    while( *(--(outName.cend())) == '/')
+    while( !outName.empty() && outName.back() == '/')
     {
       outName.pop_back();
     }
@@ -93,7 +131,7 @@ int main(int argc, char* argv[])
   else
   {
     // outName is NOT an existing directory, so we need to remove all trailing slashes:
-    while( *(--(outName.cend())) == '/')
+    while( !outName.empty() && outName.back() == '/')
     {
       outName.pop_back();
     }
@@ -109,10 +147,10 @@ int main(int argc, char* argv[])
       parameters.m_Misc.m_OutputPath = itksys::SystemTools::GetCurrentWorkingDirectory() + '/';
     }
 
-    file_extension = itksys::SystemTools::GetFilenameExtension(outName);
-    if( ! itksys::SystemTools::GetFilenameWithoutExtension( outName ).empty() )
+    file_extension = mitk::DiffusionDataIOHelper::GetExtension(outName);
+    if( ! mitk::DiffusionDataIOHelper::GetNameWithoutExtension( outName ).empty() )
     {
-      parameters.m_Misc.m_OutputPrefix = itksys::SystemTools::GetFilenameWithoutExtension( outName );
+      parameters.m_Misc.m_OutputPrefix = mitk::DiffusionDataIOHelper::GetNameWithoutExtension( outName );
     }
     else
     {
@@ -146,8 +184,7 @@ int main(int argc, char* argv[])
         parameters.m_SignalGen.m_ImageSpacing = itkVectorImagePointer->GetSpacing();
         parameters.m_SignalGen.m_ImageOrigin = itkVectorImagePointer->GetOrigin();
         parameters.m_SignalGen.m_ImageDirection = itkVectorImagePointer->GetDirection();
-        parameters.SetBvalue(mitk::DiffusionPropertyHelper::GetReferenceBValue(template_image));
-        parameters.SetGradienDirections(mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(template_image));
+        parameters.SetGradientsFromImage(template_image, apply_direction_matrix);
       }
       else
       {
@@ -172,8 +209,7 @@ int main(int argc, char* argv[])
     parameters.m_SignalGen.m_ImageSpacing = itkVectorImagePointer->GetSpacing();
     parameters.m_SignalGen.m_ImageOrigin = itkVectorImagePointer->GetOrigin();
     parameters.m_SignalGen.m_ImageDirection = itkVectorImagePointer->GetDirection();
-    parameters.SetBvalue(mitk::DiffusionPropertyHelper::GetReferenceBValue(diffImg));
-    parameters.SetGradienDirections(mitk::DiffusionPropertyHelper::GetOriginalGradientContainer(diffImg));
+    parameters.SetGradientsFromImage(diffImg, apply_direction_matrix);
 
     tractsToDwiFilter->SetInputImage(itkVectorImagePointer);
   }
@@ -182,7 +218,10 @@ int main(int argc, char* argv[])
   {
     MITK_DEBUG << outName << ".ffp";
     parameters.m_Misc.m_OutputAdditionalImages = true;
-    parameters.SaveParameters(outName+".ffp");
+    // as the view: the saved file lists the volumes this run moves
+    mitk::FiberfoxParameters saved = parameters;
+    saved.ListMovedVolumes();
+    saved.SaveParameters(outName+".ffp");
   }
   else
     parameters.m_Misc.m_OutputAdditionalImages = false;
@@ -194,16 +233,26 @@ int main(int argc, char* argv[])
   }
   tractsToDwiFilter->SetParameters(parameters);
   tractsToDwiFilter->SetUseConstantRandSeed(fix_seed);
+
+  // a simulation beyond the physical memory swaps until the whole computer stops responding
+  const std::uint64_t estimate = tractsToDwiFilter->EstimateMemoryBytes();
+  const std::uint64_t available = mitk::MemoryUtilities::GetAvailableSizeOfPhysicalRam();
+  MITK_INFO << "Estimated memory: " << mitk::MemoryUtilities::FormatSize(estimate) << ", available: " << mitk::MemoryUtilities::FormatSize(available);
+  if (available > 0 && estimate > available && !parsedArgs.count("ignore_memory_check"))
+  {
+    std::cerr << "The simulation needs about " << mitk::MemoryUtilities::FormatSize(estimate) << " of memory, but only "
+              << mitk::MemoryUtilities::FormatSize(available) << " are available. A smaller image, fewer volumes, no additional output images (--verbose)"
+              << " or ringing by zeroing k-space frequencies need less memory; --ignore_memory_check starts it anyway." << std::endl;
+    return EXIT_FAILURE;
+  }
   tractsToDwiFilter->Update();
 
   mitk::Image::Pointer image = mitk::GrabItkImageMemory(tractsToDwiFilter->GetOutput());
 
   if (parameters.m_SignalGen.GetNumWeightedVolumes()>0)
   {
-    if (apply_direction_matrix)
-      mitk::DiffusionPropertyHelper::SetGradientContainer(image, parameters.m_SignalGen.GetItkGradientContainer());
-    else
-      mitk::DiffusionPropertyHelper::SetOriginalGradientContainer(image, parameters.m_SignalGen.GetItkGradientContainer());
+    // the simulated gradients are world vectors, with or without the direction matrix step
+    mitk::DiffusionPropertyHelper::SetGradientContainer(image, parameters.m_SignalGen.GetItkGradientContainer());
     mitk::DiffusionPropertyHelper::SetReferenceBValue(image, parameters.m_SignalGen.GetBvalue());
     mitk::DiffusionPropertyHelper::InitializeImage(image);
 
@@ -286,3 +335,24 @@ int main(int argc, char* argv[])
   return EXIT_SUCCESS;
 }
 
+int main(int argc, char* argv[])
+{
+  // report errors (missing or corrupt parameter files, failed simulations) instead of terminating
+  try
+  {
+    return RunFiberfox(argc, argv);
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+  catch (const std::exception& e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+  catch (...)
+  {
+    std::cerr << "Unknown error." << std::endl;
+  }
+  return EXIT_FAILURE;
+}

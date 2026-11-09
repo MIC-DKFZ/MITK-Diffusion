@@ -3,11 +3,13 @@ set(H_FILES
   FiberDerivedImages/itkTractsToVectorImageFilter.h
   FiberDerivedImages/itkTractsToFiberEndingsImageFilter.h
   FiberDerivedImages/itkTractsToRgbaImageFilter.h
+  FiberDerivedImages/mitkFiberImageGrid.h
 
   FiberModification/itkFiberCurvatureFilter.h
   FiberModification/itkFiberExtractionFilter.h
-
-  FiberQuantification/itkDistanceFromSegmentationImageFilter.h
+  FiberModification/mitkFiberWeightsFile.h
+  FiberModification/mitkDerivedFiberBundle.h
+  FiberModification/mitkPlanarFigureRoiImage.h
 
   # Clustering
   FiberClustering/mitkTractClusteringFilter.h
@@ -23,6 +25,9 @@ set(H_FILES
 
 set(CPP_FILES
   FiberClustering/mitkTractClusteringFilter.cpp
+  FiberModification/itkFiberCurvatureFilter.cpp
+  FiberModification/mitkFiberWeightsFile.cpp
+  FiberModification/mitkPlanarFigureRoiImage.cpp
 )
 
 set(RESOURCE_FILES

@@ -1,163 +1,136 @@
-/*===================================================================
+/*============================================================================
 
 The Medical Imaging Interaction Toolkit (MITK)
 
-Copyright (c) German Cancer Research Center.
-
+Copyright (c) German Cancer Research Center (DKFZ)
 All rights reserved.
 
-This software is distributed WITHOUT ANY WARRANTY; without
-even the implied warranty of MERCHANTABILITY or FITNESS FOR
-A PARTICULAR PURPOSE.
+Use of this source code is governed by a 3-clause BSD license that can be
+found in the LICENSE file.
 
-See LICENSE.txt or http://www.mitk.org for details.
+============================================================================*/
 
-===================================================================*/
+#ifndef mitkOdfVtkMapper2D_h
+#define mitkOdfVtkMapper2D_h
 
+#include <MitkDiffusionModellingExports.h>
 
-#ifndef ODFVTKMAPPER2D_H_HEADER_INCLUDED
-#define ODFVTKMAPPER2D_H_HEADER_INCLUDED
+#include <mitkLocalStorageHandler.h>
+#include <mitkOdfGlyphGenerator.h>
+#include <mitkVtkMapper.h>
 
-#include "mitkVtkMapper.h"
-#include "vtkPropAssembly.h"
-#include "vtkAppendPolyData.h"
-#include "vtkActor.h"
-#include "vtkPolyDataMapper.h"
-#include "vtkPlane.h"
-#include "vtkCutter.h"
-#include "vtkClipPolyData.h"
-#include "vtkTransform.h"
-#include "vtkSmartPointer.h"
-#include "vtkOdfSource.h"
-#include "vtkThickPlane.h"
-#include <mitkDiffusionModellingHelperFunctions.h>
-#include <itkPointShell.h>
-#include <vtkImageProbeFilter.h>
+#include <vtkActor.h>
+#include <vtkGlyph3DMapper.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkSmartPointer.h>
 
-namespace mitk {
+#include <optional>
 
-//##Documentation
-//## @brief Mapper for spherical object densitiy function representations
-//##
-template<class TPixelType, int NrOdfDirections>
-class OdfVtkMapper2D : public VtkMapper
+namespace mitk
 {
-    struct OdfDisplayGeometry {
-        double vp[ 3 ], vnormal[ 3 ];
-        Vector3D normal;
-        double d, d1, d2;
-        mitk::Point3D M3D, L3D, O3D;
+  /**
+   * \brief 2D mapper for the glyphs of tensor, ODF and SH images.
+   *
+   * Draws the glyphs of the image slice the renderer's plane shows, for the voxels in view, if
+   * the node property "VisibleOdfs_T", "_S" or "_C" of the plane's orientation is on. The glyphs
+   * themselves come from OdfGlyphGenerator; the node properties set in SetDefaultProperties
+   * control them.
+   *
+   * The glyphs are in world coordinates, so a pan or zoom leaves them in place: while the view
+   * moves, the mapper keeps them, and fills the new view at the render of level of detail 1 that
+   * MITK's RenderingManager runs about 200 ms after the last render of a renderer with LOD
+   * enabled (IsLODEnabled). A new slice, new data or new properties are drawn at once, and so is
+   * a zoom whose glyphs need a finer mesh, for the voxels the glyphs cover (GetViewToGenerate).
+   * Without Qt, MITK's RenderingManager runs no render at LOD 1 (StartOrResetTimer does nothing),
+   * so there the glyphs of a pan or zoom stay until the slice, the data or a property changes.
+   *
+   * Tensor ellipsoids coloured by direction (OdfGlyphGenerator::CanDrawEllipsoidInstances) are
+   * drawn as GPU instances of one sphere, all other glyphs as one mesh.
+   */
+  class MITKDIFFUSIONMODELLING_EXPORT OdfVtkMapper2D : public VtkMapper
+  {
+  public:
+    mitkClassMacro(OdfVtkMapper2D, VtkMapper);
+    itkFactorylessNewMacro(Self);
+    itkCloneMacro(Self);
 
-        double vp_original[ 3 ], vnormal_original[ 3 ];
-        mitk::Vector2D size, origin;
+    vtkProp *GetVtkProp(BaseRenderer *renderer) override;
 
-        bool Equals(OdfDisplayGeometry other)
-        {
-            return other.vp_original[0] == vp[0] &&
-                    other.vp_original[1] == vp[1] &&
-                    other.vp_original[2] == vp[2] &&
-                    other.vnormal_original[0] == vnormal[0] &&
-                    other.vnormal_original[1] == vnormal[1] &&
-                    other.vnormal_original[2] == vnormal[2] &&
-                    other.size[0] == size[0] &&
-                    other.size[1] == size[1] &&
-                    other.origin[0] == origin[0] &&
-                    other.origin[1] == origin[1];
-        }
+    /** The glyphs are already in world coordinates; the image geometry must not move them again. */
+    void UpdateVtkTransform(BaseRenderer *) override {}
+
+    /** Both VTK mappers hold GPU buffers, also the one the actor does not use at the moment. */
+    void ReleaseGraphicsResources(BaseRenderer *renderer) override;
+
+    /**
+     * True while the renderer shows glyphs of the node, so that the RenderingManager renders it
+     * once more at LOD 1 after an interaction, and only then.
+     */
+    bool IsLODEnabled(BaseRenderer *renderer) const override;
+
+    static void SetDefaultProperties(DataNode *node, BaseRenderer *renderer = nullptr, bool overwrite = false);
+
+    /** Name of the node property that switches the glyphs of an orientation on. */
+    static const char *GetVisibilityPropertyName(OdfGlyphGenerator::Orientation orientation);
+
+    /** What the glyphs of a renderer are generated for. */
+    struct GlyphView
+    {
+      OdfGlyphGenerator::Slice slice;
+      Vector3D planeAxis0;
+      Vector3D planeAxis1;
+      /** The part of the plane in view. */
+      OdfGlyphGenerator::Window window;
+      /** Zoom of the view, which chooses the glyph mesh (OdfGlyphGenerator::Settings). */
+      double pixelsPerMm = 0;
+      /** Points of each glyph's mesh at this zoom (OdfGlyphGenerator::GetPointsPerGlyph). */
+      unsigned int pointsPerGlyph = 0;
     };
 
-public:
+    /**
+     * The view to generate the glyphs of a renderer for, or none if the current glyphs stay. The
+     * current view for new data, new node properties or another time step (contentChanged), for
+     * another slice or plane at any level of detail, and for a pan or zoom (another window or
+     * pixelsPerMm) at LOD 1 and higher. A zoom whose glyphs need a finer mesh than the current
+     * ones (more pointsPerGlyph) at LOD 0: the generated window at the current zoom, so the same
+     * voxels get finer glyphs at once (fewer of them where the finer mesh allows fewer glyphs,
+     * OdfGlyphGenerator::Settings::maxGlyphs); a magnified screenshot renders at LOD 0 with its
+     * magnification's zoom and so gets the mesh it shows.
+     * \param generated the view the current glyphs were generated for; none if there are none
+     * \param lod the level of detail of the render, RenderingManager::GetNextLOD
+     */
+    static std::optional<GlyphView> GetViewToGenerate(const std::optional<GlyphView> &generated, const GlyphView &current, bool contentChanged, int lod);
 
-    mitkClassMacro(OdfVtkMapper2D,VtkMapper)
-    itkFactorylessNewMacro(Self)
-    itkCloneMacro(Self)
-
-    vtkProp* GetVtkProp(mitk::BaseRenderer* renderer) override;
-    bool IsVisibleOdfs(mitk::BaseRenderer* renderer);
-    int MitkRenderOverlay(mitk::BaseRenderer* renderer) override;
-    int MitkRenderOpaqueGeometry(mitk::BaseRenderer* renderer) override;
-    int MitkRenderTranslucentGeometry(mitk::BaseRenderer* renderer) override;
-    int MitkRenderVolumetricGeometry(mitk::BaseRenderer*  /*renderer*/) override{ return 0; }
-
-    OdfDisplayGeometry MeasureDisplayedGeometry(mitk::BaseRenderer* renderer);
-    double GetMinImageSpacing( int index );
-    void ApplyPropertySettings();
-    virtual void Slice(mitk::BaseRenderer* renderer, OdfDisplayGeometry dispGeo);
-    virtual int GetIndex(mitk::BaseRenderer* renderer);
-    static void SetDefaultProperties(DataNode* node, BaseRenderer* renderer = nullptr, bool overwrite = false);
-    void Update(mitk::BaseRenderer * renderer) override;
-    void GenerateDataForRenderer(mitk::BaseRenderer* renderer) override;
-    bool IsLODEnabled( BaseRenderer * /*renderer*/ ) const override { return true; }
-
-    class LocalStorage : public mitk::Mapper::BaseLocalStorage
+    class LocalStorage : public Mapper::BaseLocalStorage
     {
     public:
+      LocalStorage();
 
-        std::vector< vtkSmartPointer<vtkPropAssembly> >       m_PropAssemblies;
-        std::vector< vtkSmartPointer<vtkAppendPolyData> >     m_OdfsPlanes;
-        std::vector< vtkSmartPointer<vtkActor> >              m_OdfsActors;
-        std::vector< vtkSmartPointer<vtkPolyDataMapper> >     m_OdfsMappers;
-        vtkSmartPointer< vtkPolyData >                        m_TemplateOdf;
+      vtkSmartPointer<vtkActor> m_Actor;
+      /** Draws the glyph mesh of OdfGlyphGenerator::Generate. */
+      vtkSmartPointer<vtkPolyDataMapper> m_Mapper;
+      /** Draws the tensor ellipsoids of OdfGlyphGenerator::GenerateEllipsoidInstances. */
+      vtkSmartPointer<vtkGlyph3DMapper> m_InstanceMapper;
 
-        itk::TimeStamp                      m_LastUpdateTime;
-
-        /** \brief Default constructor of the local storage. */
-        LocalStorage();
-        /** \brief Default deconstructor of the local storage. */
-        ~LocalStorage() override
-        {
-        }
+      /** The view the glyphs were generated (or failed) for; none while no glyphs are shown. */
+      std::optional<GlyphView> m_GeneratedView;
     };
 
-protected:
+  protected:
+    OdfVtkMapper2D() = default;
+    ~OdfVtkMapper2D() override = default;
 
-    OdfVtkMapper2D();
-    ~OdfVtkMapper2D() override;
+    void GenerateDataForRenderer(BaseRenderer *renderer) override;
+    void ResetMapper(BaseRenderer *renderer) override;
 
-    static void GlyphMethod(void *arg);
-    bool IsPlaneRotated(mitk::BaseRenderer* renderer);
-    static bool m_ToggleTensorEllipsoidView;
-    static bool m_ToggleColourisationMode;
-    static bool m_ToggleGlyphPlacementMode;
+  private:
+    OdfGlyphGenerator::Settings GetSettings() const;
 
+    /** The view to draw glyphs for; none if the renderer shows no glyphs of the node. */
+    std::optional<GlyphView> GetVisibleView(BaseRenderer *renderer) const;
 
-    typedef vnl_matrix_fixed<double, 3, 3> DirectionsType;
+    LocalStorageHandler<LocalStorage> m_LSH;
+  };
+}
 
-
-private:
-
-    mitk::Image* GetInput();
-
-    static vtkSmartPointer<vtkTransform>              m_OdfTransform;
-    static vtkSmartPointer<vtkOdfSource>              m_OdfSource;
-    static float                                      m_Scaling;
-    static int                                        m_Normalization;
-    static int                                        m_ScaleBy;
-    static float                                      m_IndexParam1;
-    static float                                      m_IndexParam2;
-    static vtkSmartPointer<vtkDoubleArray>            m_ColourScalars;
-    int                                               m_ShowMaxNumber;
-    std::vector< vtkSmartPointer<vtkPlane> >          m_Planes;
-    std::vector< vtkSmartPointer<vtkCutter> >         m_Cutters;
-    std::vector< vtkSmartPointer<vtkThickPlane> >     m_ThickPlanes1;
-    std::vector< vtkSmartPointer<vtkClipPolyData> >   m_Clippers1;
-    std::vector< vtkSmartPointer<vtkThickPlane> >     m_ThickPlanes2;
-    std::vector< vtkSmartPointer<vtkClipPolyData> >   m_Clippers2;
-    vtkImageData*                                     m_VtkImage ;
-    std::vector< OdfDisplayGeometry >                 m_LastDisplayGeometry;
-    mitk::LocalStorageHandler<LocalStorage>           m_LSH;
-    vtkSmartPointer<vtkImageProbeFilter>              m_ProbeFilter;
-
-    static vnl_matrix<float>                          m_Sh2Basis;
-    static vnl_matrix<float>                          m_Sh4Basis;
-    static vnl_matrix<float>                          m_Sh6Basis;
-    static vnl_matrix<float>                          m_Sh8Basis;
-    static vnl_matrix<float>                          m_Sh10Basis;
-    static vnl_matrix<float>                          m_Sh12Basis;
-};
-
-} // namespace mitk
-
-#include "mitkOdfVtkMapper2D.txx"
-
-#endif /* ODFVTKMAPPER2D_H_HEADER_INCLUDED */
+#endif

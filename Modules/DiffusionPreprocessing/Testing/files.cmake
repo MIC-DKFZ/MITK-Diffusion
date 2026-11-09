@@ -1,4 +1,12 @@
 set(MODULE_CUSTOM_TESTS
   mitkNonLocalMeansDenoisingTest.cpp
+  mitkDiffusionResampleDwiImageFilterTest.cpp
+  mitkDiffusionRemoveDwiChannelFilterTest.cpp
+  mitkDiffusionMergeDiffusionImagesFilterTest.cpp
+  mitkDiffusionGradientReductionFilterTest.cpp
+  mitkDiffusionBValueRoundingTest.cpp
+  mitkDiffusionB0ExtractionFilterTest.cpp
+  mitkDiffusionImageEditingTest.cpp
+  mitkDiffusionImageDenoisingTest.cpp
+  mitkDiffusionVolumeEditingTest.cpp
 )
-

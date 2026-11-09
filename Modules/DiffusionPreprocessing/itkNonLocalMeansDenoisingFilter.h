@@ -14,11 +14,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __itkNonLocalMeansDenoisingFilter_h_
-#define __itkNonLocalMeansDenoisingFilter_h_
+#ifndef itkNonLocalMeansDenoisingFilter_h
+#define itkNonLocalMeansDenoisingFilter_h
 
 #include "itkImageToImageFilter.h"
 #include "itkVectorImage.h"
+
+#include <atomic>
 
 
 namespace itk{
@@ -36,14 +38,14 @@ namespace itk{
   public:
 
     /** Typedefs */
-    typedef NonLocalMeansDenoisingFilter                                                          Self;
-    typedef SmartPointer<Self>                                                                    Pointer;
-    typedef SmartPointer<const Self>                                                              ConstPointer;
-    typedef ImageToImageFilter< VectorImage < TPixelType, 3 >, VectorImage < TPixelType, 3 > >    Superclass;
-    typedef typename Superclass::InputImageType                                                   InputImageType;
-    typedef typename Superclass::OutputImageType                                                  OutputImageType;
-    typedef typename Superclass::OutputImageRegionType                                            OutputImageRegionType;
-    typedef Image <TPixelType, 3>                                                                 MaskImageType;
+    using Self = NonLocalMeansDenoisingFilter;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
+    using Superclass = ImageToImageFilter< VectorImage < TPixelType, 3 >, VectorImage < TPixelType, 3 > >;
+    using InputImageType = typename Superclass::InputImageType;
+    using OutputImageType = typename Superclass::OutputImageType;
+    using OutputImageRegionType = typename Superclass::OutputImageRegionType;
+    using MaskImageType = Image <TPixelType, 3>;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
@@ -88,7 +90,7 @@ namespace itk{
      *
      * @return the number of calculated Voxels until yet, useful for the use of a progressbars.
      */
-    itkGetMacro(CurrentVoxelCount, unsigned int)
+    virtual unsigned int GetCurrentVoxelCount() const { return m_CurrentVoxelCount; }
 
 
     /** @brief Set the input image. **/
@@ -104,7 +106,7 @@ namespace itk{
 
   protected:
     NonLocalMeansDenoisingFilter();
-    ~NonLocalMeansDenoisingFilter() override {}
+    ~NonLocalMeansDenoisingFilter() override = default;
 
     /**
      * @brief Calculations which need to be done before the denoising starts
@@ -124,6 +126,9 @@ namespace itk{
      */
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
+    /** Releases the mask used for this run. */
+    void AfterThreadedGenerateData() override;
+
 
 
   private:
@@ -132,9 +137,10 @@ namespace itk{
     int m_ComparisonRadius;                           ///< Radius of the comparisonblock.
     bool m_UseJointInformation;                       ///< Flag to use joint information.
     bool m_UseRicianAdaption;                         ///< Flag to use rician adaption.
-    unsigned int m_CurrentVoxelCount;                 ///< Amount of processed voxels.
+    std::atomic<unsigned int> m_CurrentVoxelCount;    ///< Amount of processed voxels, counted by all work units.
     double m_Variance;                                ///< Estimated noise variance.
     typename MaskImageType::Pointer m_Mask;           ///< Pointer to the mask image.
+    typename MaskImageType::Pointer m_UsedMask;       ///< m_Mask, or a full mask without one, during one run.
   };
 }
 
@@ -142,4 +148,4 @@ namespace itk{
 #include "itkNonLocalMeansDenoisingFilter.txx"
 #endif
 
-#endif //__itkNonLocalMeansDenoisingFilter_h_
+#endif

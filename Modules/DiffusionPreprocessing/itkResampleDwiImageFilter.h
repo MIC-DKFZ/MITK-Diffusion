@@ -29,23 +29,105 @@ the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef _itk_ResampleDwiImageFilter_h_
-#define _itk_ResampleDwiImageFilter_h_
+#ifndef itkResampleDwiImageFilter_h
+#define itkResampleDwiImageFilter_h
 
 #include <itkImageToImageFilter.h>
 #include <itkVectorImage.h>
+
+#include <algorithm>
+#include <cmath>
+#include <type_traits>
 
 namespace itk
 {
 
 /**
-* \brief Resample DWI channel by channel.   */
+ * \brief Origin (centre of voxel 0) of a resampled grid that keeps the outer corner of voxel 0
+ * where it is in the input. The half-voxel shifts run along the image axes, i.e. through the
+ * direction matrix; shifting along the world axes moves images with a flipped or oblique axis.
+ * The two shifts are applied one after the other so that an axis-aligned image gets exactly
+ * origin - spacing/2 + newSpacing/2 per axis, bit for bit.
+ */
+inline Point<double, 3> ResampledImageOrigin(const Point<double, 3>& origin, const Matrix<double, 3, 3>& direction, const Vector<double, 3>& spacing, const Vector<double, 3>& newSpacing)
+{
+  Point<double, 3> newOrigin = origin;
+  newOrigin -= direction * (spacing * 0.5);
+  newOrigin += direction * (newSpacing * 0.5);
+  return newOrigin;
+}
 
+/**
+ * \brief An interpolated value as pixel of type T: rounded and clamped to the range of an integer
+ * type. ITK's cast truncates, which would bias every resampled value by about -0.5, i.e. -0.18 % of the
+ * b0 signal to -1.86 % of the b=3000 signal of FWE/InputDiffusionWeightedImage.dwi (tensor MD
+ * +1.2 % after resampling it from 2 to 1 mm).
+ */
+template <class T>
+T ResampledPixel(double value)
+{
+  if constexpr (std::is_integral_v<T>)
+    return static_cast<T>(std::clamp(std::round(value), static_cast<double>(NumericTraits<T>::NonpositiveMin()), static_cast<double>(NumericTraits<T>::max())));
+  else
+    return static_cast<T>(value);
+}
+
+/** \brief How a resampled grid is given: relative to the input, as factor, spacing or size. */
+enum class ResampleGridMode { SamplingFactor, Spacing, Size };
+
+/**
+ * \brief Spacing and region of a resampled grid.
+ *
+ * SamplingFactor: spacing / value, size * value. Spacing: value, size * spacing / value. Size:
+ * value, spacing * size / value. The sizes are truncated, after adding 1e-6 voxels: a size that is
+ * an integer in exact arithmetic can come out just below it (spacing 1.2 -> 0.4 gives
+ * 2.9999999999999996 per voxel, the spacing of an oblique image 1.9999999999999998), and
+ * truncating it would lose a voxel.
+ */
+inline void ResampledImageGrid(const Vector<double, 3>& spacing, const ImageRegion<3>& region, ResampleGridMode mode, const Vector<double, 3>& value, Vector<double, 3>& newSpacing, ImageRegion<3>& newRegion)
+{
+  newSpacing = spacing;
+  newRegion = region;
+  const auto truncated = [](double size) { return static_cast<SizeValueType>(std::floor(size + 1e-6)); };
+  switch (mode)
+  {
+  case ResampleGridMode::SamplingFactor:
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      newSpacing[i] /= value[i];
+      newRegion.SetSize(i, truncated(newRegion.GetSize(i)*value[i]));
+    }
+    break;
+  case ResampleGridMode::Spacing:
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      const double sampling = spacing[i]/value[i];
+      newRegion.SetSize(i, truncated(newRegion.GetSize(i)*sampling));
+    }
+    newSpacing = value;
+    break;
+  case ResampleGridMode::Size:
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      newRegion.SetSize(i, value[i]);
+      const double sampling = (double)newRegion.GetSize(i)/region.GetSize(i);
+      newSpacing[i] /= sampling;
+    }
+    break;
+  }
+}
+
+/**
+ * \brief Resamples a DWI channel by channel onto a grid with the same outer corner and direction.
+ *
+ * The grid is given by a sampling factor, a new spacing or a new size, each relative to the input;
+ * the derived sizes are truncated. The setters only store the request, so they may be called
+ * before the input is set.
+ */
 template <class TScalarType>
 class ResampleDwiImageFilter
         : public ImageToImageFilter<itk::VectorImage<TScalarType,3>, itk::VectorImage<TScalarType,3> >
 {
-
 public:
 
     enum Interpolation {
@@ -55,15 +137,13 @@ public:
         Interpolate_WindowedSinc
     };
 
-    typedef ResampleDwiImageFilter Self;
-    typedef SmartPointer<Self>                      Pointer;
-    typedef SmartPointer<const Self>                ConstPointer;
-    typedef ImageToImageFilter< itk::VectorImage<TScalarType,3>, itk::VectorImage<TScalarType,3> >
-    Superclass;
-
-    typedef itk::Vector< double, 3 > DoubleVectorType;
-    typedef itk::VectorImage<TScalarType,3> DwiImageType;
-    typedef itk::Image<TScalarType,3> DwiChannelType;
+    using Self = ResampleDwiImageFilter;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
+    using Superclass = ImageToImageFilter<itk::VectorImage<TScalarType,3>, itk::VectorImage<TScalarType,3>>;
+    using DoubleVectorType = itk::Vector<double, 3>;
+    using DwiImageType = itk::VectorImage<TScalarType,3>;
+    using DwiChannelType = itk::Image<TScalarType,3>;
 
     /** Method for creation through the object factory. */
     itkFactorylessNewMacro(Self)
@@ -74,63 +154,45 @@ public:
 
     itkSetMacro( Interpolation, Interpolation )
 
+    /** Output spacing = input spacing / factor, output size = input size * factor. */
     void SetSamplingFactor(DoubleVectorType sampling)
     {
-        m_NewSpacing = this->GetInput()->GetSpacing();
-        m_NewSpacing[0] /= sampling[0];
-        m_NewSpacing[1] /= sampling[1];
-        m_NewSpacing[2] /= sampling[2];
-        m_NewImageRegion = this->GetInput()->GetLargestPossibleRegion();
-        m_NewImageRegion.SetSize(0, m_NewImageRegion.GetSize(0)*sampling[0]);
-        m_NewImageRegion.SetSize(1, m_NewImageRegion.GetSize(1)*sampling[1]);
-        m_NewImageRegion.SetSize(2, m_NewImageRegion.GetSize(2)*sampling[2]);
+        m_GridMode = ResampleGridMode::SamplingFactor;
+        m_GridValue = sampling;
+        this->Modified();
     }
+
+    /** Output size = input size * input spacing / spacing. */
     void SetNewSpacing(DoubleVectorType spacing)
     {
-        DoubleVectorType oldSpacing = this->GetInput()->GetSpacing();
-        DoubleVectorType sampling;
-        sampling[0] = oldSpacing[0]/spacing[0];
-        sampling[1] = oldSpacing[1]/spacing[1];
-        sampling[2] = oldSpacing[2]/spacing[2];
-
-        m_NewSpacing = spacing;
-        m_NewImageRegion = this->GetInput()->GetLargestPossibleRegion();
-        m_NewImageRegion.SetSize(0, m_NewImageRegion.GetSize(0)*sampling[0]);
-        m_NewImageRegion.SetSize(1, m_NewImageRegion.GetSize(1)*sampling[1]);
-        m_NewImageRegion.SetSize(2, m_NewImageRegion.GetSize(2)*sampling[2]);
+        m_GridMode = ResampleGridMode::Spacing;
+        m_GridValue = spacing;
+        this->Modified();
     }
+
+    /** Output spacing = input spacing * input size / size. */
     void SetNewImageSize(ImageRegion<3> region)
     {
-        ImageRegion<3> oldRegion = this->GetInput()->GetLargestPossibleRegion();
-        DoubleVectorType sampling;
-        sampling[0] = (double)region.GetSize(0)/oldRegion.GetSize(0);
-        sampling[1] = (double)region.GetSize(1)/oldRegion.GetSize(1);
-        sampling[2] = (double)region.GetSize(2)/oldRegion.GetSize(2);
-
-        m_NewImageRegion = region;
-        m_NewSpacing = this->GetInput()->GetSpacing();
-        m_NewSpacing[0] /= sampling[0];
-        m_NewSpacing[1] /= sampling[1];
-        m_NewSpacing[2] /= sampling[2];
+        m_GridMode = ResampleGridMode::Size;
+        for (unsigned int i = 0; i < 3; ++i)
+            m_GridValue[i] = region.GetSize(i);
+        this->Modified();
     }
 
-    void UpdateOutputInformation() override;
+protected:
+    ResampleDwiImageFilter();
+    ~ResampleDwiImageFilter() override = default;
 
-    virtual void PropagateRequestedRegion(){}
-
-    void PropagateRequestedRegion(itk::DataObject *) override{}
-
-    protected:
-        ResampleDwiImageFilter();
-    ~ResampleDwiImageFilter() override{}
-
+    void GenerateOutputInformation() override;
+    /** Every channel is resampled from the whole input. */
+    void GenerateInputRequestedRegion() override;
+    void EnlargeOutputRequestedRegion(DataObject* output) override;
     void GenerateData() override;
 
-    DoubleVectorType m_NewSpacing;
-    ImageRegion<3>   m_NewImageRegion;
+    ResampleGridMode m_GridMode = ResampleGridMode::SamplingFactor;
+    DoubleVectorType m_GridValue;
     Interpolation    m_Interpolation;
 };
-
 
 } // end of namespace
 
@@ -138,6 +200,5 @@ public:
 #ifndef ITK_MANUAL_INSTANTIATION
 #include "itkResampleDwiImageFilter.txx"
 #endif
-
 
 #endif

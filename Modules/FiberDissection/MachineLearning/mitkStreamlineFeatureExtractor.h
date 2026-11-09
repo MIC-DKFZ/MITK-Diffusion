@@ -26,6 +26,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <opencv2/ml.hpp>
 
 #include <cstdint>
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -68,7 +69,8 @@ public:
   /** Updates the features, trains the classifier and predicts the pool. Throws std::runtime_error on invalid input. */
   void Update();
 
-  /** Pool fibers predicted as part of the target tract. */
+  /** Pool fibers predicted as part of the target tract. Labeled fibers (pool fibers whose
+   *  geometry equals a positive or negative label) are not classified and not part of it. */
   const std::vector<unsigned int>& GetPredictedIds() const { return m_PredictedIds; }
   /** Pool fibers sorted by decreasing prediction uncertainty. */
   const std::vector<unsigned int>& GetUncertainIds() const { return m_UncertainIds; }
@@ -78,13 +80,16 @@ public:
 
   /**
   * Picks up to 'count' uncertain fibers (entropy >= entropyThreshold) that are far apart from each other in
-  * feature space. Fibers removed from the pool since the last Update() are skipped.
+  * feature space. Fibers excluded from sampling since the last Update() are skipped.
   */
   std::vector<unsigned int> GetDiverseUncertainIds(float entropyThreshold, unsigned int count) const;
 
-  /** Excludes fibers from future predictions, e.g. because they were handed to the user for labeling. */
-  void RemoveFromPool(const std::vector<unsigned int> &ids);
-  bool IsInPool(unsigned int id) const;
+  /** Excludes fibers from sampling until the next Update(), because they were handed to the user
+   *  for labeling. Fibers the user labels leave the candidates with that Update(); the others are
+   *  classified again. */
+  void ExcludeFromSampling(const std::vector<unsigned int> &ids);
+  /** Whether a fiber is a classified candidate not handed out for labeling since the last Update(). */
+  bool IsAvailableForSampling(unsigned int id) const;
 
   /** Creates a new bundle containing the given pool fibers. */
   mitk::FiberBundle::Pointer ExtractFibers(const std::vector<unsigned int> &ids) const;
@@ -97,6 +102,12 @@ public:
   * farthest-first traversal on the MDF distance picks the fibers from it. All fibers need NumPoints points.
   */
   static std::vector<unsigned int> SelectDiverseFibers(mitk::FiberBundle *fib, unsigned int count, unsigned int subsetSize);
+
+  /**
+  * As above, among the fibers 'ids' of the bundle and with the caller's random engine: a seeded engine gives
+  * the same selection at every run (ActiveLearningSession with a seed).
+  */
+  static std::vector<unsigned int> SelectDiverseFibers(mitk::FiberBundle *fib, std::vector<unsigned int> ids, unsigned int count, unsigned int subsetSize, std::mt19937 &engine);
 
 protected:
 
@@ -155,9 +166,12 @@ protected:
   mitk::FiberBundle::Pointer                  m_TractogramMinus;
   FiberMatrix                                 m_Prototypes;
 
-  // pool candidates: sorted pool ids, their geometry and whether they are still available
+  // pool: sorted pool ids, their geometry and its hash, whether they are candidates (not labeled)
+  // and whether they were handed out for labeling since the last Update()
   std::vector<unsigned int>                   m_PoolIds;
+  std::vector<std::uint64_t>                  m_PoolKeys;
   std::vector<char>                           m_PoolActive;
+  std::vector<char>                           m_PoolHandedOut;
   FiberMatrix                                 m_PoolFibers;
 
   // cached features of the pool candidates, one column per reference fiber

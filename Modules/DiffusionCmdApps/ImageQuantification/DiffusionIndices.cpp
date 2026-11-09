@@ -23,6 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "mitkCommandLineParser.h"
 #include <boost/algorithm/string.hpp>
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <mitkIOUtil.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 #include <mitkImage.h>
@@ -48,8 +49,8 @@ int main(int argc, char* argv[])
 
   parser.setArgumentPrefix("--", "-");
   parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input image (tensor, ODF or SH-coefficient image)", us::Any(), false, false, false, mitkCommandLineParser::Input);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
-  parser.addArgument("index", "idx", mitkCommandLineParser::String, "Index:", "index (fa, gfa, ra, ad, rd, ca, l2, l3, md, adc)", us::Any(), false);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image; .nii.gz is appended if the name has no extension of a known file type", us::Any(), false, false, false, mitkCommandLineParser::Output);
+  parser.addArgument("index", "idx", mitkCommandLineParser::String, "Index:", "index (fa, gfa, ra, ad, rd, ca, l2, l3, md, adc). For a DWI, md is the mean of the ADCs -ln(S/S0)/b of the diffusion-weighted volumes, which equals the tensor MD only for evenly spread directions and mono-exponential decay, and adc the fit of S0 exp(-b ADC) to them; S0 is the mean of the positive b=0 values", us::Any(), false);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -59,14 +60,13 @@ int main(int argc, char* argv[])
   std::string index = us::any_cast<std::string>(parsedArgs["index"]);
   std::string outFileName = us::any_cast<std::string>(parsedArgs["o"]);
 
-  std::string ext = itksys::SystemTools::GetFilenameLastExtension(outFileName);
-  if (ext.empty())
+  if (mitk::DiffusionDataIOHelper::GetExtension(outFileName).empty())
     outFileName += ".nii.gz";
 
   try
   {
     // load input image
-    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images", "SH Image", "ODF Image", "Tensor Image"}, std::vector<std::string>());
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images", "SH Image", "ODF Image", "Diffusion Tensor Image"}, std::vector<std::string>());
     auto input = mitk::IOUtil::Load<mitk::Image>(inFileName, &functor);
 
     bool is_odf = (dynamic_cast<mitk::ShImage*>(input.GetPointer()) || dynamic_cast<mitk::OdfImage*>(input.GetPointer()));
@@ -173,7 +173,10 @@ int main(int argc, char* argv[])
       fileWriter->Update();
     }
     else
-      std::cout << "Diffusion index " << index << " not supported for supplied file type.";
+    {
+      std::cout << "Diffusion index " << index << " not supported for supplied file type." << std::endl;
+      return EXIT_FAILURE;
+    }
   }
   catch (const itk::ExceptionObject& e)
   {

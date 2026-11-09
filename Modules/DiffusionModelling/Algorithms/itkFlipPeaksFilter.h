@@ -16,15 +16,9 @@ See LICENSE.txt or http://www.mitk.org for details.
 #ifndef __itkFlipPeaksFilter_h_
 #define __itkFlipPeaksFilter_h_
 
-#include "itkImageToImageFilter.h"
-#include "vnl/vnl_vector_fixed.h"
-#include "vnl/vnl_matrix.h"
-#include "vnl/algo/vnl_svd.h"
-#include "itkVectorContainer.h"
-#include "itkVectorImage.h"
-#include <mitkFiberBundle.h>
-#include <itkOrientationDistributionFunction.h>
+#include <itkImageToImageFilter.h>
 #include <mitkPeakImage.h>
+#include <MitkDiffusionModellingExports.h>
 
 namespace itk{
 
@@ -32,8 +26,7 @@ namespace itk{
 * \brief Flip peaks along specified axes
 */
 
-template< class PixelType >
-class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImageType, mitk::PeakImage::ItkPeakImageType >
+class MITKDIFFUSIONMODELLING_EXPORT FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImageType, mitk::PeakImage::ItkPeakImageType >
 {
 
     public:
@@ -48,11 +41,11 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
     itkCloneMacro(Self)
 
     /** Runtime information support. */
-    itkTypeMacro(FlipPeaksFilter, ImageToImageFilter)
+    itkOverrideGetNameOfClassMacro(FlipPeaksFilter)
 
-    typedef typename Superclass::InputImageType InputImageType;
-    typedef typename Superclass::OutputImageType OutputImageType;
-    typedef typename OutputImageType::RegionType         OutputImageRegionType;
+    typedef Superclass::InputImageType InputImageType;
+    typedef Superclass::OutputImageType OutputImageType;
+    typedef OutputImageType::RegionType         OutputImageRegionType;
 
     itkSetMacro( FlipX, bool)                               ///< flip peaks in x direction
     itkSetMacro( FlipY, bool)                               ///< flip peaks in y direction
@@ -60,24 +53,18 @@ class FlipPeaksFilter : public ImageToImageFilter< mitk::PeakImage::ItkPeakImage
 
     protected:
     FlipPeaksFilter();
-    ~FlipPeaksFilter(){}
+    ~FlipPeaksFilter() override = default;
 
-    void BeforeThreadedGenerateData() override;
-    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread);
-    void AfterThreadedGenerateData();
+    void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
     private:
 
-    bool                                        m_FlipX;
-    bool                                        m_FlipY;
-    bool                                        m_FlipZ;
+    bool                                        m_FlipX = false;
+    bool                                        m_FlipY = false;
+    bool                                        m_FlipZ = false;
 };
 
 }
-
-#ifndef ITK_MANUAL_INSTANTIATION
-#include "itkFlipPeaksFilter.cpp"
-#endif
 
 #endif //__itkFlipPeaksFilter_h_
 

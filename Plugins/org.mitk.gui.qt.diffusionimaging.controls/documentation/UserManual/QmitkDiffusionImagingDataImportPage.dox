@@ -1,7 +1,7 @@
 /**
 \page QmitkDiffusionImagingDataImportPage Data formats, import and export
 
-MITK Diffusion supports many standard image formats such as NIFTI, NRRD and DICOM as well as common tractography file formats such as vtk/fib, trk, tck, and tractography DICOM. By including multiple tractography file formats native to other tools (e.g. 3D Slicer, MRtrix, DIPY), MITK Diffusion integrates seamlessly in complex workflows involving other tools. Additional file types such as spherical-harmonic coefficient files and voxel-wise fiber orientation or peak images are compliant with MRtrix.
+MITK Diffusion supports many standard image formats such as NIFTI, NRRD and DICOM as well as common tractography file formats such as vtk/fib, trk, tck, and tractography DICOM. By including multiple tractography file formats native to other tools (e.g. 3D Slicer, MRtrix, DIPY), MITK Diffusion integrates seamlessly in complex workflows involving other tools. Spherical-harmonic coefficient files and peak images are written so that MRtrix reads them (see below).
 
 Data can be loaded using the open file dialog via the menu bar or by simply dragging and dropping the file into the data manager or one of data display windows.
 
@@ -11,11 +11,11 @@ MITK Diffusion uses a left-posterior-superior coordinate system convention. Othe
 
 This section describes the different file formats of raw diffusion-weighted images that are supported by MITK Diffusion.
 General points:
-\li MITK Diffusion internally applies the image rotation matrix to the diffusion-gradient vectors while loading the image. The original gradient directions are retained and used when saving the image again.
+\li Inside MITK Diffusion, the diffusion-gradient vectors are given in world coordinates (LPS), independent of the image orientation. While loading, MITK converts the vectors of the file to world coordinates (see the measurement frame of NRRD files and the bvecs convention of NIfTI files below); while saving, it converts them back, so that loading the saved file gives the same gradient vectors.
 
 \subsection dwi_nrrd NRRD (.nrrd/.dwi)
 
-NRRD (http://teem.sourceforge.net/nrrd/format.html) is the default file format for saving diffusion-weighted images with MITK Diffusion. The gradient and b-value information is directly stored in the file header. The image information is stored as a 3D vector image. Storing the file as .dwi or .nrrd is equivalent, only the file ending is different. Diffusion-weighted images are discerned from other images by the tag "modality:=DWMRI" in the NRRD image header. The gradient information is stored in the NRRD header in the following way:
+NRRD (http://teem.sourceforge.net/nrrd/format.html) is the default file format for saving diffusion-weighted images with MITK Diffusion. The gradient and b-value information is directly stored in the file header. The image information is stored as a 3D vector image. Storing the file as .dwi or .nrrd is equivalent, only the file ending is different. NRRD files with a detached header (.nhdr, .hdwi) can be read as well. Diffusion-weighted images are discerned from other images by the tag "modality:=DWMRI" in the NRRD image header. The gradient information is stored in the NRRD header in the following way:
 
 DWMRI_b-value:=1000.000000
 
@@ -29,15 +29,15 @@ DWMRI_gradient_0002:=-0.051773 0.252917 0.966102
 
 The b-value of the individual gradient directions is encoded via the squared norm of the respective vector. The tag "DWMRI_b-value" defines which b-value corresponds to a vector with norm 1.
 
-In some cases, dMRI NRRD files contain an additional "measurement frame" matrix, which specifies an additional rotation of the gradient vectors. This matrix is automatically applied when loading the file. The original gradient directions are retained and used when saving the image again.
+dMRI NRRD files can contain a "measurement frame" matrix, which defines the coordinate system of the gradient vectors. It is applied when loading the file, as the NRRD format defines it; gradients of a file without measurement frame are taken as world (LPS) vectors. MITK Diffusion saves the gradient vectors in world coordinates together with an identity measurement frame. Files saved by earlier versions of MITK Diffusion are recognized by their own "measurement frame:=" entry and are loaded as before.
 
-\subsection dwi_nifti NIFTI (.nii/.ni.gz)
+\subsection dwi_nifti NIFTI (.nii/.nii.gz)
 
-Diffusion-weighted images can be saved and loaded as NIFTI files (NIFTI-1 https://nifti.nimh.nih.gov/nifti-1). The gradient vector information is stored in to separate files for b-values (filename.bvals) and gradient vectors (filename.bvecs). When loading a nifti file (.nii or .nii.gz), MITK Diffusion looks for these two additional files (.bval/.bvals and .bvec/.bvecs) and if they are found, MITK will offer to load the image as diffusion-weighted image. In contrast to the NRRD format, all gradient vectors should have a length of 1. The b-values are stored explicietly in the .bval/.bvals file. When loaded into MITK, this information is again encoded into the gradient vectors, as it is done in the NRRD file format.
+Diffusion-weighted images can be saved and loaded as NIFTI files (NIFTI-1 https://nifti.nimh.nih.gov/nifti-1). The gradient vector information is stored in two separate files for b-values (filename.bvals) and gradient vectors (filename.bvecs). When loading a nifti file (.nii or .nii.gz), MITK Diffusion looks for these two additional files (.bval/.bvals and .bvec/.bvecs) and if they are found, MITK will offer to load the image as diffusion-weighted image. In contrast to the NRRD format, all gradient vectors should have a length of 1. The b-values are stored explicitly in the .bval/.bvals file. When loaded into MITK, this information is again encoded into the gradient vectors, as it is done in the NRRD file format. Files named "bvals" and "bvecs" in the folder of the image (as in the data of the Human Connectome Project) are found as well. The gradient vectors follow the convention of FSL, which MRtrix uses too: they are given in the voxel coordinate system of the image, with the x component negated if the image matrix has a positive determinant. MITK Diffusion reads and writes bvecs files in this convention. DIPY applies bvecs to the data array without FSL's x negation, so for an image with a positive determinant its own directions are mirrored in x. To load DIPY's SH coefficients with the "FSL/Dipy" option (see below), fit them with the unchanged bvecs that MITK or FSL wrote.
 
 \subsection dwi_dicom DICOM
 
-MITK is capable of importing diffusion-weighted DICOM images from GE, Siemens and Philips. Writing images is DICOM format is NOT supported! Mosaic images can be directly converted to regular images during import. To load a dMRI DICOM, simply drag and drop any file of the series into the application.
+MITK is capable of importing diffusion-weighted DICOM images from GE, Siemens and Philips. Writing images in DICOM format is NOT supported. To load a dMRI DICOM, simply drag and drop any file of the series into the application. The view \ref org_mitk_views_diffusiondicomimport imports several series from folders and their subfolders at once, splits mosaic images and averages duplicate gradients.
 
 \section special_format Special Image Types
 
@@ -48,16 +48,14 @@ MITK Diffusion is also able to read NIFTI DTI files (6 or 9 component format), w
 
 \subsection ODF_format ODF Images (.odf, .qbi (deprecated) )
 
-MITK stores ODFs as 252 float values spherically sampled from the continuous ODF. The sampling directions are generate by a 5-fold subdivisions of an icosahedron. ODF images are stored in NRRD file format with the ending .odf. The image information is stored as a 3D vector image with a vector length of 252.
-
-The specific ODF sampling directions can be found <a href="https://phabricator.mitk.org/source/mitk/browse/master/Modules/DiffusionImaging/DiffusionCore/include/Algorithms/Reconstruction/itkPointShell.txx;8cdb084b2eccff7f5caa30ba5a88bf43ccc9ec6f$457">here</a>.
+MITK stores ODFs as 252 float values spherically sampled from the continuous ODF. The sampling directions are generated by a 5-fold subdivision of an icosahedron (mitk::pointshell::Directions in Modules/DiffusionModelling/Algorithms/Reconstruction/mitkPointShell.h); their order is part of the format. ODF images are stored in NRRD file format with the ending .odf. The image information is stored as a 3D vector image with a vector length of 252.
 
 \subsection sh_format Spherical Harmonics (.nii, .nii.gz, .nrrd)
-Many applications in dMRI are using spherical harmonics to store spherical functions such as ODFs. MITK Diffusion stores these files as 4D float images this is the same format as MRtrix is using.
+Many applications in dMRI are using spherical harmonics to store spherical functions such as ODFs. MITK Diffusion stores these files as 4D float images with one volume per coefficient, as MRtrix does, in MRtrix 3's orthonormal basis, and marks them with "MITK_SH_convention=MRtrix3" (NRRD key, NIfTI description). Files without this mark that MITK Diffusion wrote earlier are read in its former basis (MRtrix 0.2's); files written by MRtrix 3 are recognized by their description. For files without the mark, the reader option "SH convention" forces a basis (a marked file is always read in its marked basis); "FSL/Dipy" reads DIPY's default basis (descoteaux07, legacy) in the frame of FSL bvecs (coefficients computed with unchanged FSL bvecs). A 4D SH NIfTI file opens as a plain image by default; choose the reader "SH Image" in the open dialog to read it as SH image. SH coefficient files of earlier MITK versions with one vector of coefficients per voxel of a 3D image also open as plain images; with the reader "SH Image" they are read as SH images (with "auto" in MITK's FSL definition, the basis of those versions).
 
 \subsection peak_format Peak Images (.nii, .nii.gz, .nrrd)
 
-MITK Diffusion stores peak images, resulting for example from an ODF maxima extraction, as 4D float images. The peak vector components are stored in the 4th dimension, therefore dimension 4 always contains a multiple of 3 entries. This format is the same as the format used by MRtrix.
+MITK Diffusion stores peak images, resulting for example from an ODF maxima extraction, as 4D float images. The peak vector components are stored in the 4th dimension, therefore dimension 4 always contains a multiple of 3 entries. NIfTI peak files are written in RAS coordinates, as MRtrix uses them, and marked with the description "MITK_peak_convention=RAS"; NRRD peak files hold LPS vectors.
 
 \section Tract_format Tractography Formats
 
@@ -75,8 +73,16 @@ TRK is the tractography file format used by TrackVis and DIPY. See http://www.tr
 
 MITK Diffusion is able to read the tck file format native to MRtrix. Writing this format is currently not supported. By default, MRtrix uses a RAS coordinate convention in contrast to the MITK Diffusion (and also ITK) convention of LPS. To compensate for this, the fiber coordinates are negated in the x and y dimension.
 
+\subsection tract_trx TRX (.trx)
+
+TRX (https://github.com/tee-ar-ex/trx-spec) is the tractography format of trx-python, DIPY and scilpy. A TRX file is a ZIP archive, uncompressed (stored) or compressed (deflated), of the streamline points, the streamlines' offsets into them and further arrays. MITK Diffusion reads TRX files in the Workbench and in the command line tools; the command line tools also read a TRX folder (the same entries as files in a folder named *.trx). TRX stores RAS coordinates; they are negated in x and y for MITK Diffusion's LPS convention. The reference geometry (VOXEL_TO_RASMM and DIMENSIONS) is kept and written back unchanged, also when the tractogram is saved as .trk.
+
+Fiber weights are read from the per-streamline array "weights", fiber colors from the per-point array "color" (red, green, blue) or the arrays "color_x", "color_y" and "color_z" of trx-python's test files. Other arrays (per streamline, per point or per group) are not loaded; the log names them. TRX groups (named sets of streamlines) are not loaded by default; with the reader option "Load groups as separate bundles", each group is loaded as a tractogram of its own, named after the group, after the whole tractogram.
+
+When saving, the writer option "Position type" chooses between float32 (default, the points as MITK Diffusion holds them) and float16 (half the size of the points, with errors of up to 0.016 mm for coordinates below 64 mm and up to 0.06 mm below 256 mm). "Compression" chooses between stored (default, faster to read and write) and deflated. Fiber weights and colors are saved by default ("Save fiber weights", "Save color information"); the color transparency is not saved. Groups are not written.
+
 \subsection tract_dicom DICOM
 
 Tractography DICOM files compliant with the supplement 181 of the DICOM standard can be read and written by MITK Diffusion. This format is for example supported by the neuronavigation software of Brainlab.
-DICOM tags of the read tractogram can be manually set or modified using the "Properties" view in MITK Diffusion. To do this, enable the "Developer Mode" option in Window>Preferences>Properties>Developer Mode. Then select the fiber bundle in the data manager and select the "Base Data" property list in the corresponding combobox of the "Properties" view.
+The DICOM tags of a tractogram, among them the image it refers to, are set and edited in the view \ref org_mitk_views_dicomtractogramtageditor.
 */

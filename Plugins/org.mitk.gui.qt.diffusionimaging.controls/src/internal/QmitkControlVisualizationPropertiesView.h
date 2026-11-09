@@ -14,35 +14,29 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _QMITKControlVisualizationPropertiesView_H_INCLUDED
-#define _QMITKControlVisualizationPropertiesView_H_INCLUDED
+#ifndef QmitkControlVisualizationPropertiesView_h
+#define QmitkControlVisualizationPropertiesView_h
 
 #include <QmitkAbstractView.h>
-
-#include <string>
-
-#include "berryISelectionListener.h"
-#include "berryIStructuredSelection.h"
-#include "berryISizeProvider.h"
+#include <QmitkSliceNavigationListener.h>
+#include <mitkIRenderWindowPartListener.h>
 
 #include "ui_QmitkControlVisualizationPropertiesViewControls.h"
 
-#include "mitkEnumerationProperty.h"
-#include <mitkILifecycleAwarePart.h>
-#include <QmitkSliceNavigationListener.h>
+#include <memory>
+#include <string>
+#include <vector>
 
-/*!
- * \ingroup org_mitk_gui_qt_diffusionquantification_internal
- *
- * \brief QmitkControlVisualizationPropertiesView
- *
- * Document your class here.
+class QActionGroup;
+class QSlider;
+
+/**
+ * \brief Visualization controls for glyph images (ODF, tensor, SH), peak images and fiber
+ * bundles, and the thick-slice menu. An edit applies to all selected nodes of the matching kind;
+ * the controls show the values of the last selected node of each kind.
  */
-class QmitkControlVisualizationPropertiesView : public QmitkAbstractView, public mitk::ILifecycleAwarePart
+class QmitkControlVisualizationPropertiesView : public QmitkAbstractView, public mitk::IRenderWindowPartListener
 {
-
-  friend struct CvpSelListener;
-
   // this is needed for all Qt objects that should have a MOC object (everything that derives from QObject)
   Q_OBJECT
 
@@ -51,13 +45,12 @@ class QmitkControlVisualizationPropertiesView : public QmitkAbstractView, public
   static const std::string VIEW_ID;
 
   QmitkControlVisualizationPropertiesView();
-  virtual ~QmitkControlVisualizationPropertiesView();
+  ~QmitkControlVisualizationPropertiesView() override;
 
-  virtual void CreateQtPartControl(QWidget *parent) override;
+  void CreateQtPartControl(QWidget *parent) override;
 
-  /// \brief Creation of the connections of main and control widget
-  virtual void CreateConnections();
-
+  void RenderWindowPartActivated(mitk::IRenderWindowPart* renderWindowPart) override;
+  void RenderWindowPartDeactivated(mitk::IRenderWindowPart* renderWindowPart) override;
 
 protected slots:
 
@@ -71,61 +64,70 @@ protected slots:
   void OnThickSlicesModeSelected( QAction* action );
   void OnTSNumChanged(int num);
   void ResetColoring();
-  void PlanarFigureFocus();
-  void Fiber2DfadingEFX();
   void FiberSlicingThickness2D();
   void LineWidthChanged();
   void TubeRadiusChanged();
   void RibbonWidthChanged();
-  void SetInteractor();
-  void Toggle3DClipping(bool enabled=true);
+  void Toggle3DClipping();
   void FlipPeaks();
-  void Welcome();
   void OnSliceChanged();
   void SetColor();
   void Toggle3DPeaks();
 
-  /// \brief Slot function for switching colourisation mode of glyphs.
+  /** Switches the colourisation mode of the glyphs. */
   void OnColourisationModeChanged();
 
 protected:
 
-  virtual void SetFocus() override;
-  virtual void Activated() override;
-  virtual void Deactivated() override;
-  virtual void Visible() override;
-  virtual void Hidden() override;
+  /** Recolours the fibers or peaks of one node when its colour property changes; stops
+   *  observing when destroyed. */
+  class ColorObserver
+  {
+  public:
+    explicit ColorObserver(mitk::DataNode* node);
+    ~ColorObserver();
+    ColorObserver(const ColorObserver&) = delete;
+    ColorObserver& operator=(const ColorObserver&) = delete;
 
-  virtual void NodeRemoved(const mitk::DataNode* node) override;
+  private:
+    void ColorChanged();
 
-  /// \brief called by QmitkAbstractView when DataManager's selection has changed
-  virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
+    mitk::DataNode::Pointer m_Node;
+    mitk::ColorProperty::Pointer m_Color;
+    unsigned long m_Tag = 0;
+  };
 
-  virtual void NodeAdded(const mitk::DataNode *node) override;
-  void SetCustomColor(const itk::EventObject& /*e*/);
-  bool IsPlaneRotated();
+  void SetFocus() override;
 
-  void SliceRotation(const itk::EventObject&);
-  void Set3DClippingPlane(bool disable, mitk::DataNode *node, std::string plane);
-  void SetTs(int m_CurrentThickSlicesMode, int num, std::string render_window);
+  void NodeRemoved(const mitk::DataNode* node) override;
+
+  /** called by QmitkAbstractView when DataManager's selection has changed */
+  void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
+
+  void NodeAdded(const mitk::DataNode *node) override;
+  void PlanarFigureFocus(mitk::DataNode* node);
+
+  void Set3DClippingPlane(mitk::DataNode *node, int planeId);
+  void SetTs(int m_CurrentThickSlicesMode, int num, mitk::AnatomicalPlane plane);
+  void CreateThickSliceMenu();
+  void UpdateThickSliceMenu(const QList<mitk::DataNode::Pointer>& nodes);
+
+  /** Shows the 3D clipping plane id (0: none, 1-3: axial, sagittal, coronal) in the radio buttons. */
+  void ShowClippingPlaneId(const mitk::DataNode* node);
+
+  /** Calls action for every selected node whose data passes isKind. */
+  template <class TPredicate, class TAction>
+  void ForSelected(TPredicate isKind, TAction action)
+  {
+    for (const auto& node : m_SelectedNodes)
+      if (node.IsNotNull() && node->GetData() != nullptr && isKind(node->GetData()))
+        action(node.GetPointer());
+  }
 
   Ui::QmitkControlVisualizationPropertiesViewControls* m_Controls;
 
-  QScopedPointer<berry::ISelectionListener> m_SelListener;
-  berry::IStructuredSelection::ConstPointer m_CurrentSelection;
-
   mitk::DataNode::Pointer m_NodeUsedForOdfVisualization;
 
-  QIcon* m_IconTexOFF;
-  QIcon* m_IconTexON;
-  QIcon* m_IconGlyOFF_T;
-  QIcon* m_IconGlyON_T;
-  QIcon* m_IconGlyOFF_C;
-  QIcon* m_IconGlyON_C;
-  QIcon* m_IconGlyOFF_S;
-  QIcon* m_IconGlyON_S;
-
-  bool m_TexIsOn;
   bool m_GlyIsOn_T;
   bool m_GlyIsOn_C;
   bool m_GlyIsOn_S;
@@ -134,21 +136,13 @@ protected:
   int m_CurrentThickSlicesNum;
   QLabel* m_TSLabel;
   QMenu* m_MyMenu;
+  QSlider* m_TSSlider;
+  QActionGroup* m_ThickSliceModeGroup;
 
-  // for planarfigure and bundle handling:
   std::vector< mitk::DataNode::Pointer > m_SelectedNodes;
-  mitk::DataNode* m_CurrentPickingNode;
-
-  unsigned long m_ColorPropertyObserverTag;
-  unsigned long m_OpacityPropertyObserverTag;
-  mitk::ColorProperty::Pointer m_Color;
-  mitk::FloatProperty::Pointer m_Opacity;
+  std::vector< std::unique_ptr<ColorObserver> > m_ColorObservers;
 
   QmitkSliceNavigationListener  m_SliceChangeListener;
 };
 
-
-
-
-#endif // _QMITKControlVisualizationPropertiesView_H_INCLUDED
-
+#endif

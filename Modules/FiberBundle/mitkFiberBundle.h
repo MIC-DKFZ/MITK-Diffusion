@@ -15,39 +15,36 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 
-#ifndef _MITK_FiberBundle_H
-#define _MITK_FiberBundle_H
+#ifndef mitkFiberBundle_h
+#define mitkFiberBundle_h
 
-//includes for MITK datastructure
-#include <mitkBaseData.h>
 #include <MitkFiberBundleExports.h>
-#include <mitkImage.h>
-#include <mitkDataStorage.h>
-#include <mitkPlanarFigure.h>
-#include <mitkPixelTypeTraits.h>
-#include <mitkPlanarFigureComposite.h>
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkPoints.h>
-#include <vtkDataSet.h>
-#include <vtkTransform.h>
-#include <vtkFloatArray.h>
-#include <itkScalableAffineTransform.h>
+#include <mitkBaseData.h>
 #include <mitkLookupTable.h>
-#include <mitkDiffusionImageHelperFunctions.h>
+
+#include <itkImage.h>
+#include <itkScalableAffineTransform.h>
+#include <vnl/vnl_vector_fixed.h>
+#include <vtkFloatArray.h>
+#include <vtkPolyData.h>
+#include <vtkSmartPointer.h>
+#include <vtkUnsignedCharArray.h>
 
 namespace mitk {
 
+class DataNode;
+class DataStorage;
+class Image;
+
 /**
-   * \brief Base Class for Fiber Bundles;   */
+ * \brief Tractogram: streamlines (fibers) as the lines of a vtkPolyData, with one weight per
+ * fiber, one RGBA colour per point and the fiber length statistics.
+ */
 class MITKFIBERBUNDLE_EXPORT FiberBundle : public BaseData
 {
 public:
 
-    typedef itk::Image<unsigned char, 3> ItkUcharImgType;
-
-    // fiber colorcodings
-    static const char* FIBER_ID_ARRAY;
+    using ItkUcharImgType = itk::Image<unsigned char, 3>;
 
     void UpdateOutputInformation() override;
     void SetRequestedRegionToLargestPossibleRegion() override;
@@ -61,16 +58,11 @@ public:
     mitkNewMacro1Param(Self, vtkSmartPointer<vtkPolyData>) // custom constructor
 
     // colorcoding related methods
-    void ColorSinglePoint(int f_idx, int p_idx, double rgb[3]);
     void ColorFibersByFiberWeights(bool opacity, LookupTable::LookupTableType type);
     void ColorFibersByCurvature(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
     void ColorFibersByLength(bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type);
-    void ColorFibersByScalarMap(mitk::Image::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate=true);
-    template <typename TPixel>
-    void ColorFibersByScalarMap(typename itk::Image<TPixel, 3>::Pointer, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate=true);
+    void ColorFibersByScalarMap(const mitk::Image* image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate=true);
     void ColorFibersByOrientation();
-    void SetFiberOpacity(vtkDoubleArray *FAValArray);
-    void ResetFiberOpacity();
     void SetFiberColors(vtkSmartPointer<vtkUnsignedCharArray> fiberColors);
     void SetFiberColors(float r, float g, float b, float alpha=255);
     void SetSingleFiberColor(float r, float g, float b, unsigned int cellId, float alpha=255);
@@ -83,9 +75,18 @@ public:
     void ResampleSpline(float pointDistance=1);
     void ResampleSpline(float pointDistance, double tension, double continuity, double bias );
     void ResampleLinear(double pointDistance=1);
+    /** Resamples every fiber to targetPoints points at equal arc length along it, both end
+     *  points included (dipy's set_number_of_points), also fibers that have targetPoints points
+     *  already. A fiber without length gets targetPoints copies of its position. */
     void ResampleToNumPoints(unsigned int targetPoints);
 
-    mitk::FiberBundle::Pointer FilterByWeights(float weight_thr, bool invert=false);
+    /** The polyline through points resampled to numPoints points at equal arc length along it,
+     *  both end points included; a polyline without length or of one point gives numPoints copies
+     *  of its first point, an empty one nothing. Used by ResampleToNumPoints and the fiber
+     *  clustering filter, so that both resample the same way. */
+    static std::vector< vnl_vector_fixed<double, 3> > ResamplePolylineToNumPoints(const std::vector< vnl_vector_fixed<double, 3> >& points, unsigned int numPoints);
+
+    mitk::FiberBundle::Pointer FilterByWeights(float weight_thr, bool invert=false) const;
     bool RemoveShortFibers(float lengthInMM);
     bool RemoveLongFibers(float lengthInMM);
     bool ApplyCurvatureThreshold(float minRadius, bool deleteFibers);
@@ -94,7 +95,7 @@ public:
     void TranslateFibers(double x, double y, double z);
     void ScaleFibers(double x, double y, double z, bool subtractCenter=true);
     void TransformFibers(double rx, double ry, double rz, double tx, double ty, double tz);
-    void TransformFibers(itk::ScalableAffineTransform< mitk::ScalarType >::Pointer transform);
+    void TransformFibers(const itk::ScalableAffineTransform< mitk::ScalarType >* transform);
     void RemoveDir(vnl_vector_fixed<double,3> dir, double threshold);
 
     template< class TType=float >
@@ -111,33 +112,16 @@ public:
       point[2] += center[2]+tz;
     }
 
-    template< class TType=float >
-    void TransformPoint(itk::Point<TType, 3>& point, TType rx, TType ry, TType rz, TType tx, TType ty, TType tz)
-    {
-      auto rot = mitk::imv::GetRotationMatrixItk<TType>(rx, ry, rz);
-      mitk::Point3D center = this->GetGeometry()->GetCenter();
-
-      point[0] -= center[0];
-      point[1] -= center[1];
-      point[2] -= center[2];
-      point = rot*point;
-      point[0] += center[0]+tx;
-      point[1] += center[1]+ty;
-      point[2] += center[2]+tz;
-    }
-
-    itk::Matrix< double, 3, 3 > TransformMatrix(itk::Matrix< double, 3, 3 > m, double rx, double ry, double rz);
-
     // add/subtract fibers
-    FiberBundle::Pointer AddBundle(FiberBundle* fib);
-    mitk::FiberBundle::Pointer AddBundles(std::vector< mitk::FiberBundle::Pointer > fibs);
-    FiberBundle::Pointer SubtractBundle(FiberBundle* fib);
+    FiberBundle::Pointer AddBundle(const FiberBundle* fib) const;
+    mitk::FiberBundle::Pointer AddBundles(const std::vector< mitk::FiberBundle::Pointer >& fibs) const;
+    FiberBundle::Pointer SubtractBundle(const FiberBundle* fib) const;
 
     // fiber subset extraction
-    FiberBundle::Pointer           ExtractFiberSubset(DataNode *roi, DataStorage* storage);
-    std::vector<unsigned int>      ExtractFiberIdSubset(DataNode* roi, DataStorage* storage);
-    FiberBundle::Pointer           RemoveFibersOutside(ItkUcharImgType* mask, bool invert=false);
-    mitk::FiberBundle::Pointer     SubsampleFibers(float factor, bool random_seed);
+    FiberBundle::Pointer           ExtractFiberSubset(const DataNode* roi, const DataStorage* storage) const;
+    std::vector<unsigned int>      ExtractFiberIdSubset(const DataNode* roi, const DataStorage* storage) const;
+    FiberBundle::Pointer           RemoveFibersOutside(const ItkUcharImgType* mask, bool invert=false) const;
+    mitk::FiberBundle::Pointer     SubsampleFibers(float factor, bool random_seed) const;
 
     // get/set data
     float GetFiberLength(unsigned int index) const { return m_FiberLengths.at(index); }
@@ -146,10 +130,11 @@ public:
     void SetFiberWeights(float newWeight);
     void SetFiberWeight(unsigned int fiber, float weight);
     void SetFiberWeights(vtkSmartPointer<vtkFloatArray> weights);
-    void SetFiberPolyData(vtkSmartPointer<vtkPolyData>, bool updateGeometry = true);
+    /** Replaces the fibers; the new fibers have weight 1 (set theirs with SetFiberWeights) and
+     *  are coloured by orientation. */
+    void SetFiberPolyData(vtkSmartPointer<vtkPolyData>);
     vtkSmartPointer<vtkPolyData> GetFiberPolyData() const;
     itkGetConstMacro( NumFibers, unsigned int)
-    //itkGetMacro( FiberSampling, int)
     itkGetConstMacro( MinFiberLength, float )
     itkGetConstMacro( MaxFiberLength, float )
     itkGetConstMacro( MeanFiberLength, float )
@@ -163,13 +148,11 @@ public:
 
     unsigned int GetNumberOfPoints() const;
 
-    // copy fiber bundle
-    mitk::FiberBundle::Pointer GetDeepCopy();
-
     // compare fiber bundles
-    bool Equals(FiberBundle* fib, double eps=0.01);
+    bool Equals(const FiberBundle* fib, double eps=0.01) const;
 
-    vtkSmartPointer<vtkPolyData>    GeneratePolyDataByIds(std::vector<unsigned int> fiberIds, vtkSmartPointer<vtkFloatArray> weights);
+    /** The fibers with the given ids, and their weights in weights, both in the order of fiberIds. */
+    vtkSmartPointer<vtkPolyData>    GeneratePolyDataByIds(const std::vector<unsigned int>& fiberIds, vtkFloatArray* weights) const;
 
     // Structure to hold metadata of a TrackVis file
     struct TrackVis_header
@@ -199,10 +182,18 @@ public:
         int                 hdr_size;
     };
 
-    TrackVis_header GetTrackVisHeader();
+    /** The header set, read from a .trk file or set from a reference geometry; while there is
+     *  none, a header describing the bundle's current bounding box. */
+    TrackVis_header GetTrackVisHeader() const;
+    /** Whether a header was set (read from a .trk file, set from a reference geometry or copied
+     *  from a bundle that had one), as opposed to the one derived from the bounding box. */
+    bool HasTrackVisHeader() const;
     void SetTrackVisHeader(const TrackVis_header &TrackVisHeader);
-    void SetTrackVisHeader(BaseGeometry *geometry);
+    void SetTrackVisHeader(const BaseGeometry *geometry);
 
+    /** Fiber count, length, extent and weight statistics and the TrackVis reference grid, as
+     *  PrintSelf prints them before the BaseData part (geometry objects and properties). */
+    void PrintStatistics(std::ostream &os, itk::Indent indent) const;
     void PrintSelf(std::ostream &os, itk::Indent indent) const override;
 
     void setIsRAS(bool newIsRAS);
@@ -212,18 +203,20 @@ public:
 protected:
 
     FiberBundle( vtkPolyData* fiberPolyData = nullptr );
+    FiberBundle(const FiberBundle& other);
     ~FiberBundle() override;
 
-    void                            GenerateFiberIds();
+    mitkCloneMacro(Self)
+
     void                            UpdateFiberGeometry();
 
 private:
 
+    template <typename TPixel>
+    void ColorFibersByScalarMap(const itk::Image<TPixel, 3>* image, bool opacity, bool weight_fibers, mitk::LookupTable::LookupTableType type, double max_cap, bool interpolate);
+
     // actual fiber container
     vtkSmartPointer<vtkPolyData>  m_FiberPolyData;
-
-    // contains fiber ids
-    vtkSmartPointer<vtkDataSet>   m_FiberIdDataSet;
 
     unsigned int m_NumFibers;
 
@@ -245,4 +238,4 @@ private:
 
 } // namespace mitk
 
-#endif /*  _MITK_FiberBundle_H */
+#endif

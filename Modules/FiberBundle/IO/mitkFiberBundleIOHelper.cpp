@@ -16,7 +16,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkFiberBundleIOHelper.h"
 
-std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::string& path, const std::vector<std::string> extensions)
+#include <itkDirectory.h>
+#include <itksys/SystemTools.hxx>
+#include <mitkExceptionMacro.h>
+#include <mitkIOUtil.h>
+
+#include <algorithm>
+
+std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::string& path, const std::vector<std::string>& extensions)
 {
   std::vector< std::string > file_list;
   itk::Directory::Pointer dir = itk::Directory::New();
@@ -27,8 +34,11 @@ std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::s
     for (int r = 0; r < n; r++)
     {
       const char *filename = dir->GetFile(r);
-      std::string ext = ist::GetFilenameExtension(filename);
-      for (auto e : extensions)
+      if (itksys::SystemTools::FileIsDirectory(path + '/' + filename))
+        continue;
+      // last extension only, so that names with dots (sub-01.CST.trk) are found
+      std::string ext = itksys::SystemTools::GetFilenameLastExtension(filename);
+      for (const auto& e : extensions)
       {
         if (ext==e)
         {
@@ -42,15 +52,20 @@ std::vector< std::string > mitk::FiberBundleIOHelper::get_file_list(const std::s
   return file_list;
 }
 
-std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(const std::vector<std::string> files, std::vector<std::string>* filenames)
+std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(const std::vector<std::string>& files, std::vector<std::string>* filenames)
 {
-  std::streambuf *old = std::cout.rdbuf(); // <-- save
-  std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf());       // <-- redirect
+  CoutSilencer silencer;
   std::vector< mitk::FiberBundle::Pointer > out;
-  for (auto f : files)
+  for (auto f : files) // copied: a folder name may get a slash
   {
-    if (itksys::SystemTools::FileExists(f, true))
+    // A TRX folder (also given with a trailing slash) is one tractogram, not a folder to list.
+    std::string folder = f;
+    while (folder.size() > 1 && folder.back() == '/')
+      folder.pop_back();
+    const bool isTrxFolder = itksys::SystemTools::FileIsDirectory(folder) && itksys::SystemTools::GetFilenameLastExtension(folder) == ".trx";
+    if (isTrxFolder)
+      f = folder;
+    if (itksys::SystemTools::FileExists(f, true) || isTrxFolder)
     {
       mitk::FiberBundle::Pointer fib = mitk::IOUtil::Load<mitk::FiberBundle>(f);
       if (fib.IsNotNull())
@@ -65,7 +80,7 @@ std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(c
       if (!f.empty() && f.back() != '/')
         f += "/";
 
-      auto list = get_file_list(f, {".fib",".trk",".tck"});
+      auto list = get_file_list(f, {".fib",".trk",".tck",".trx"});
       for (auto file : list)
       {
         mitk::FiberBundle::Pointer fib = mitk::IOUtil::Load<mitk::FiberBundle>(file);
@@ -78,7 +93,16 @@ std::vector< mitk::FiberBundle::Pointer > mitk::FiberBundleIOHelper::load_fibs(c
       }
     }
   }
-  std::cout.rdbuf (old);              // <-- restore
+  silencer.Restore();
   MITK_INFO << "Loaded " << out.size() << " tractograms";
   return out;
+}
+
+mitk::FiberBundle::Pointer mitk::FiberBundleIOHelper::load_fib(const std::string& file)
+{
+  // IOUtil throws if the file cannot be read and gives a null pointer for other data.
+  mitk::FiberBundle::Pointer fib = mitk::IOUtil::Load<mitk::FiberBundle>(file);
+  if (fib.IsNull())
+    mitkThrow() << file << " holds no fiber bundle.";
+  return fib;
 }

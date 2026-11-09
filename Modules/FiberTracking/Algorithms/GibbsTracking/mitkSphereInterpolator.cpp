@@ -32,24 +32,7 @@ static const std::string IndicesFileName = "FiberTrackingLUTIndices.bin";
 
 SphereInterpolator::SphereInterpolator(const std::string& lutPath)
 {
-  m_ValidState = true;
-  if (lutPath.length()==0)
-  {
-    if (!LoadLookuptables())
-    {
-      m_ValidState = false;
-      return;
-    }
-  }
-  else
-  {
-    if (!LoadLookuptables(lutPath))
-    {
-      m_ValidState = false;
-      return;
-    }
-  }
-
+  // set before loading, so that no member is left uninitialized when loading fails
   size = 301;
   sN = (size-1)/2;
   nverts = ODF_SAMPLING_SIZE;
@@ -57,6 +40,8 @@ SphereInterpolator::SphereInterpolator(const std::string& lutPath)
 
   inva = (sqrt(1+beta)-sqrt(beta));
   b = 1/(1-sqrt(1/beta + 1));
+
+  m_ValidState = lutPath.length()==0 ? LoadLookuptables() : LoadLookuptables(lutPath);
 }
 
 SphereInterpolator::~SphereInterpolator()
@@ -71,7 +56,6 @@ bool SphereInterpolator::LoadLookuptables(const std::string& lutPath)
   std::string path = lutPath; path.append(BaryCoordsFileName);
   std::ifstream BaryCoordsStream;
   BaryCoordsStream.open(path.c_str(), ios::in | ios::binary);
-  MITK_INFO << "SphereInterpolator: 1 " << path;
   if (!BaryCoordsStream.is_open())
   {
     MITK_INFO << "SphereInterpolator: could not load FiberTrackingLUTBaryCoords.bin from " << path;
@@ -81,7 +65,6 @@ bool SphereInterpolator::LoadLookuptables(const std::string& lutPath)
   std::ifstream IndicesStream;
   path = lutPath; path.append("FiberTrackingLUTIndices.bin");
   IndicesStream.open(path.c_str(), ios::in | ios::binary);
-  MITK_INFO << "SphereInterpolator: 1 " << path;
   if (!IndicesStream.is_open())
   {
     MITK_INFO << "SphereInterpolator: could not load FiberTrackingLUTIndices.bin from " << path;
@@ -123,51 +106,26 @@ bool SphereInterpolator::LoadLookuptables()
 
 bool SphereInterpolator::LoadLookuptables(std::istream& BaryCoordsStream, std::istream& IndicesStream)
 {
-  if (BaryCoordsStream)
+  // getInterpolation reads 3 values for each of 6 cube faces at size x size positions
+  const std::size_t expected = static_cast<std::size_t>(3*6*size*size);
+
+  barycoords.clear();
+  float coord;
+  BaryCoordsStream.seekg (0, ios::beg);
+  while (BaryCoordsStream.read(reinterpret_cast<char *>(&coord), sizeof(coord)))
+    barycoords.push_back(coord);
+
+  indices.clear();
+  int index;
+  IndicesStream.seekg (0, ios::beg);
+  while (IndicesStream.read(reinterpret_cast<char *>(&index), sizeof(index)))
+    indices.push_back(index);
+
+  if (barycoords.size()!=expected || indices.size()!=expected)
   {
-    try
-    {
-      float tmp;
-      BaryCoordsStream.seekg (0, ios::beg);
-      while (!BaryCoordsStream.eof())
-      {
-        BaryCoordsStream.read((char *)&tmp, sizeof(tmp));
-        barycoords.push_back(tmp);
-      }
-    }
-    catch (const std::exception& e)
-    {
-      MITK_INFO << e.what();
-    }
-  }
-  else
-  {
-    MITK_INFO << "SphereInterpolator: could not load FiberTrackingLUTBaryCoords.bin";
+    MITK_ERROR << "SphereInterpolator: lookup tables have " << barycoords.size() << " and " << indices.size()
+               << " entries, expected " << expected << " each.";
     return false;
   }
-
-  if (IndicesStream)
-  {
-    try
-    {
-      int tmp;
-      IndicesStream.seekg (0, ios::beg);
-      while (!IndicesStream.eof())
-      {
-        IndicesStream.read((char *)&tmp, sizeof(tmp));
-        indices.push_back(tmp);
-      }
-    }
-    catch (const std::exception& e)
-    {
-      MITK_INFO << e.what();
-    }
-  }
-  else
-  {
-    MITK_INFO << "SphereInterpolator: could not load FiberTrackingLUTIndices.bin";
-    return false;
-  }
-
   return true;
 }

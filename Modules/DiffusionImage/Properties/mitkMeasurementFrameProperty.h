@@ -44,11 +44,8 @@ namespace mitk
     std::string GetValueAsString() const override
     { return ""; }
 
-    bool ToJSON(nlohmann::json& ) const override
-    { return false; }
-
-    bool FromJSON(const nlohmann::json& ) override
-    { return false; }
+    bool ToJSON(nlohmann::json& j) const override;
+    bool FromJSON(const nlohmann::json& j) override;
 
   protected:
 

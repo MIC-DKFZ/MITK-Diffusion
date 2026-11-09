@@ -20,6 +20,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkFiberGenerationView.h"
+#include <QmitkDiffusionWarningText.h>
 
 // MITK
 #include <mitkImage.h>
@@ -50,7 +51,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <QFileDialog>
 #include <QMessageBox>
 #include "usModuleRegistry.h"
-#include <mitkChiSquareNoiseModel.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkIOUtil.h>
 #include <QScrollBar>
@@ -84,6 +84,17 @@ QmitkFiberGenerationView::QmitkFiberGenerationView()
 // Destructor
 QmitkFiberGenerationView::~QmitkFiberGenerationView()
 {
+  // the fiducials stay in the data storage after the view is closed
+  for (auto& entry : m_DataNodeToPlanarFigureData)
+    RemoveObservers(entry.second);
+  delete m_Controls;
+}
+
+void QmitkFiberGenerationView::RemoveObservers(QmitkPlanarFigureData& data)
+{
+  data.m_Figure->RemoveObserver( data.m_SelectObserverTag );
+  data.m_Figure->RemoveObserver( data.m_StartInteractionObserverTag );
+  data.m_Figure->RemoveObserver( data.m_EndInteractionObserverTag );
 }
 
 void QmitkFiberGenerationView::CreateQtPartControl( QWidget *parent )
@@ -94,6 +105,7 @@ void QmitkFiberGenerationView::CreateQtPartControl( QWidget *parent )
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkFiberGenerationViewControls;
     m_Controls->setupUi( parent );
+    m_Controls->m_FiberGenMessage->setText(QmitkDiffusionWarningText::Format(m_Controls->m_FiberGenMessage->text()));
 
     m_ParameterFile = QDir::currentPath()+"/param.ffp";
 
@@ -132,6 +144,22 @@ void QmitkFiberGenerationView::CreateQtPartControl( QWidget *parent )
 
 void QmitkFiberGenerationView::RandomPhantom()
 {
+  // the filter throws for a minimum above its maximum
+  const std::vector< std::pair<QString, std::pair<double, double>> > ranges = {
+    {"Streamline density", {m_Controls->m_MinDensityBox->value(), m_Controls->m_MaxDensityBox->value()}},
+    {"Step size", {m_Controls->m_StepSizeMinBox->value(), m_Controls->m_StepSizeMaxBox->value()}},
+    {"Curviness", {m_Controls->m_CurvyMinBox->value(), m_Controls->m_CurvyMaxBox->value()}},
+    {"Start radius", {m_Controls->m_SizeMinBox->value(), m_Controls->m_SizeMaxBox->value()}},
+    {"Twist", {m_Controls->m_MinTwistBox->value(), m_Controls->m_MaxTwistBox->value()}}};
+  for (const auto& range : ranges)
+  {
+    if (range.second.first > range.second.second)
+    {
+      QMessageBox::information(nullptr, "No phantom generated", range.first + ": the minimum is larger than the maximum.");
+      return;
+    }
+  }
+
   itk::RandomPhantomFilter::Pointer filter = itk::RandomPhantomFilter::New();
   filter->SetNumTracts(m_Controls->m_NumBundlesBox->value());
   filter->SetMinStreamlineDensity(m_Controls->m_MinDensityBox->value());
@@ -149,7 +177,15 @@ void QmitkFiberGenerationView::RandomPhantom()
   filter->SetStartRadiusMax(m_Controls->m_SizeMaxBox->value());
   filter->SetMinTwist(m_Controls->m_MinTwistBox->value());
   filter->SetMaxTwist(m_Controls->m_MaxTwistBox->value());
-  filter->Update();
+  try
+  {
+    filter->Update();
+  }
+  catch (const itk::ExceptionObject& e)
+  {
+    QMessageBox::warning(nullptr, "No phantom generated", e.GetDescription());
+    return;
+  }
   auto fibs = filter->GetFiberBundles();
 
   std::vector< mitk::DataNode::Pointer > fiber_nodes;
@@ -176,13 +212,13 @@ void QmitkFiberGenerationView::UpdateParametersFromGui()
   switch(m_Controls->m_DistributionBox->currentIndex())
   {
   case 0:
-    m_Parameters.m_FiberGen.m_Distribution = FiberGenerationParameters::DISTRIBUTE_UNIFORM;
+    m_Parameters.m_FiberGen.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_UNIFORM;
     break;
   case 1:
-    m_Parameters.m_FiberGen.m_Distribution = FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
+    m_Parameters.m_FiberGen.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_GAUSSIAN;
     break;
   default:
-    m_Parameters.m_FiberGen.m_Distribution = FiberGenerationParameters::DISTRIBUTE_UNIFORM;
+    m_Parameters.m_FiberGen.m_Distribution = mitk::FiberGenerationParameters::DISTRIBUTE_UNIFORM;
   }
   m_Parameters.m_FiberGen.m_Variance = m_Controls->m_VarianceBox->value();
   m_Parameters.m_FiberGen.m_Density = m_Controls->m_FiberDensityBox->value();
@@ -220,6 +256,8 @@ void QmitkFiberGenerationView::SaveParameters()
         tr("Save Parameters"),
         m_ParameterFile,
         tr("Fiberfox Parameters (*.ffp)") );
+  if (filename.isEmpty())
+    return;
 
   SaveParameters(filename);
 }
@@ -230,8 +268,16 @@ void QmitkFiberGenerationView::LoadParameters()
   if(filename.isEmpty() || filename.isNull())
     return;
 
+  try
+  {
+    m_Parameters.LoadParameters(filename.toStdString());
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Parameters not loaded", QString("Cannot read ") + filename + ":\n" + e.what());
+    return;
+  }
   m_ParameterFile = filename;
-  m_Parameters.LoadParameters(filename.toStdString());
 
   if (m_Parameters.m_MissingTags.size()>0)
   {
@@ -611,6 +657,8 @@ void QmitkFiberGenerationView::GenerateFibers()
 
   UpdateParametersFromGui();
 
+  // the filter returns one bundle per fiducial list, i.e. only for bundles with two or more fiducials
+  std::vector< mitk::DataNode::Pointer > targetNodes;
   for (unsigned int i=0; i<m_SelectedBundles.size(); i++)
   {
     mitk::DataStorage::SetOfObjects::ConstPointer children = GetDataStorage()->GetDerivations(m_SelectedBundles.at(i));
@@ -660,13 +708,14 @@ void QmitkFiberGenerationView::GenerateFibers()
         }
         else
           flip.push_back(0);
+        count++;  // the constant radius is that of the first fiducial
       }
-      count++;
     }
     if (fib.size()>1)
     {
       m_Parameters.m_FiberGen.m_Fiducials.push_back(fib);
       m_Parameters.m_FiberGen.m_FlipList.push_back(flip);
+      targetNodes.push_back(m_SelectedBundles.at(i));
     }
     else if (fib.size()>0)
       m_SelectedBundles.at(i)->SetData( mitk::FiberBundle::New() );
@@ -679,11 +728,11 @@ void QmitkFiberGenerationView::GenerateFibers()
   filter->Update();
   std::vector< mitk::FiberBundle::Pointer > fiberBundles = filter->GetFiberBundles();
 
-  for (unsigned int i=0; i<fiberBundles.size(); i++)
+  for (unsigned int i=0; i<fiberBundles.size() && i<targetNodes.size(); i++)
   {
-    m_SelectedBundles.at(i)->SetData( fiberBundles.at(i) );
+    targetNodes.at(i)->SetData( fiberBundles.at(i) );
     if (fiberBundles.at(i)->GetNumFibers()>50000)
-      m_SelectedBundles.at(i)->SetVisibility(false);
+      targetNodes.at(i)->SetVisibility(false);
   }
 
   mitk::RenderingManager::GetInstance()->RequestUpdateAll();
@@ -855,7 +904,7 @@ void QmitkFiberGenerationView::CopyBundles()
     }
 
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>((*it)->GetData());
-    mitk::FiberBundle::Pointer newBundle = fib->GetDeepCopy();
+    mitk::FiberBundle::Pointer newBundle = fib->Clone();
     QString name((*it)->GetName().c_str());
     name += "_copy";
 
@@ -1064,35 +1113,29 @@ void QmitkFiberGenerationView::NodeRemoved(const mitk::DataNode* node)
   mitk::DataNode* nonConstNode = const_cast<mitk::DataNode*>(node);
   std::map<mitk::DataNode*, QmitkPlanarFigureData>::iterator it = m_DataNodeToPlanarFigureData.find(nonConstNode);
 
-  if (dynamic_cast<FiberBundle*>(node->GetData()))
+  if (dynamic_cast<mitk::FiberBundle*>(node->GetData()))
   {
     m_SelectedBundles.clear();
     m_SelectedBundles2.clear();
   }
-  else if (dynamic_cast<Image*>(node->GetData()))
+  else if (dynamic_cast<mitk::Image*>(node->GetData()))
     m_SelectedImages.clear();
 
   if( it != m_DataNodeToPlanarFigureData.end() )
   {
-    QmitkPlanarFigureData& data = it->second;
-
-    // remove observers
-    data.m_Figure->RemoveObserver( data.m_EndPlacementObserverTag );
-    data.m_Figure->RemoveObserver( data.m_SelectObserverTag );
-    data.m_Figure->RemoveObserver( data.m_StartInteractionObserverTag );
-    data.m_Figure->RemoveObserver( data.m_EndInteractionObserverTag );
-
+    RemoveObservers(it->second);
     m_DataNodeToPlanarFigureData.erase( it );
   }
 }
 
 void QmitkFiberGenerationView::NodeAdded( const mitk::DataNode* node )
 {
-  // add observer for selection in renderwindow
-  mitk::PlanarFigure* figure = dynamic_cast<mitk::PlanarFigure*>(node->GetData());
+  // add observer for selection in renderwindow; only fiducials (ellipses) are this view's figures,
+  // the planar figures of other views keep their own interaction
+  mitk::PlanarEllipse* figure = dynamic_cast<mitk::PlanarEllipse*>(node->GetData());
   bool isPositionMarker (false);
   node->GetBoolProperty("isContourMarker", isPositionMarker);
-  if( figure && !isPositionMarker )
+  if( figure && !isPositionMarker && m_DataNodeToPlanarFigureData.count(const_cast<mitk::DataNode*>(node))==0 )
   {
     MITK_DEBUG << "figure added. will add interactor if needed.";
     mitk::PlanarFigureInteractor::Pointer figureInteractor
@@ -1112,11 +1155,7 @@ void QmitkFiberGenerationView::NodeAdded( const mitk::DataNode* node )
     QmitkPlanarFigureData data;
     data.m_Figure = figure;
 
-    //        // add observer for event when figure has been placed
     typedef itk::SimpleMemberCommand< QmitkFiberGenerationView > SimpleCommandType;
-    //        SimpleCommandType::Pointer initializationCommand = SimpleCommandType::New();
-    //        initializationCommand->SetCallbackFunction( this, &QmitkFiberGenerationView::PlanarFigureInitialized );
-    //        data.m_EndPlacementObserverTag = figure->AddObserver( mitk::EndPlacementPlanarFigureEvent(), initializationCommand );
 
     // add observer for event when figure is picked (selected)
     typedef itk::MemberCommand< QmitkFiberGenerationView > MemberCommandType;

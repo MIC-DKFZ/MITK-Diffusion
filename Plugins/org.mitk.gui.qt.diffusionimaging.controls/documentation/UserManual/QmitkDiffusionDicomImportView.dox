@@ -1,0 +1,13 @@
+/**
+\page org_mitk_views_diffusiondicomimport Diffusion DICOM Import
+
+This view imports diffusion-weighted DICOM series of GE, Siemens and Philips scanners. A single series can also be loaded by dragging any of its files into the application; the view is meant for folders with several series and for the import options.
+
+\li "Add Input Folders" adds folders to the list, "Remove" removes the selected folder, "Clear" all of them.
+\li Without "Recursive", the files directly in each listed folder are imported. With "Recursive", the files in the folder and in all its subfolders at any depth. A prefix restricts this to the subfolders of the listed folder whose name starts with it (and everything below them), e.g. one subfolder per acquisition. The prefix is the text of the field when the import starts; "Set Prefix" only locks the field.
+\li "Merge duplicate gradients" averages the volumes of gradient directions that differ by less than the given radius (rounding differences), as the preprocessing view does.
+\li "Split Mosaic" converts Siemens mosaic images into regular volumes.
+
+"Import DICOM" loads every diffusion-weighted series found and adds each as an image to the Data Manager; the folder list is cleared after a successful import. A message reports when no file or no diffusion-weighted image was found. Save the images from the Data Manager, e.g. as NRRD or NIfTI (see \ref QmitkDiffusionImagingDataImportPage).
+
+*/

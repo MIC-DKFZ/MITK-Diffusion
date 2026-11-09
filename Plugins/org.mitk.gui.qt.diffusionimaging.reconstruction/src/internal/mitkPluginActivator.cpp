@@ -23,13 +23,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "src/internal/Perspectives/QmitkQuantificationPerspective.h"
 #include "src/internal/QmitkOdfMaximaExtractionView.h"
 
-ctkPluginContext* mitk::PluginActivator::m_Context = nullptr;
-
-ctkPluginContext* mitk::PluginActivator::GetContext()
-{
-  return m_Context;
-}
-
 void mitk::PluginActivator::start(ctkPluginContext* context)
 {
   BERRY_REGISTER_EXTENSION_CLASS(QmitkReconstructionPerspective, context)
@@ -39,11 +32,9 @@ void mitk::PluginActivator::start(ctkPluginContext* context)
   BERRY_REGISTER_EXTENSION_CLASS(QmitkDiffusionQuantificationView, context)
   BERRY_REGISTER_EXTENSION_CLASS(QmitkTensorReconstructionView, context)
   BERRY_REGISTER_EXTENSION_CLASS(QmitkOdfMaximaExtractionView, context)
-  m_Context = context;
 }
 
 void mitk::PluginActivator::stop(ctkPluginContext* context)
 {
   Q_UNUSED(context)
-  m_Context = nullptr;
 }

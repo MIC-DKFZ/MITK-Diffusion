@@ -22,17 +22,22 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 // Qmitk
 #include "QmitkFiberProcessingView.h"
+#include <QmitkDiffusionWarningText.h>
 
 #include <QMessageBox>
+#include <QStringList>
+#include <functional>
 
+#include <mitkNodePredicateFunction.h>
 #include <mitkNodePredicateProperty.h>
+#include <mitkDiffusionMasks.h>
 #include <mitkImageCast.h>
 #include <mitkPointSet.h>
 #include <mitkPlanarCircle.h>
 #include <mitkPlanarPolygon.h>
 #include <mitkPlanarRectangle.h>
 #include <mitkPlanarFigureInteractor.h>
-#include <mitkImageAccessByItk.h>
+#include <mitkPlanarFigureRoiImage.h>
 #include <mitkDataNodeObject.h>
 #include <mitkTensorImage.h>
 #include "usModuleRegistry.h"
@@ -44,9 +49,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateOr.h>
 
-#include <itkResampleImageFilter.h>
-#include <itkGaussianInterpolateImageFunction.h>
-#include <itkImageRegionIteratorWithIndex.h>
 #include <itkTractsToFiberEndingsImageFilter.h>
 #include <itkTractDensityImageFilter.h>
 #include <itkImageRegion.h>
@@ -105,16 +107,14 @@ void QmitkFiberProcessingView::CreateQtPartControl( QWidget *parent )
     connect(m_Controls->m_ModificationMethodBox, SIGNAL(currentIndexChanged(int)), this, SLOT(UpdateGui()));
     connect(m_Controls->m_ExtractionBoxMask, SIGNAL(currentIndexChanged(int)), this, SLOT(OnMaskExtractionChanged()));
 
+    // FiberBundle::ColorFibersByScalarMap reads a 3D scalar image; DWIs, tensor, ODF, peak and
+    // RGB images have several components or four dimensions.
     m_Controls->m_ColorMapBox->SetDataStorage(this->GetDataStorage());
-    mitk::TNodePredicateDataType<mitk::Image>::Pointer isMitkImage = mitk::TNodePredicateDataType<mitk::Image>::New();
-    mitk::NodePredicateDataType::Pointer isDwi = mitk::NodePredicateDataType::New("DiffusionImage");
-    mitk::NodePredicateDataType::Pointer isDti = mitk::NodePredicateDataType::New("TensorImage");
-    mitk::NodePredicateDataType::Pointer isOdf = mitk::NodePredicateDataType::New("OdfImage");
-    mitk::NodePredicateOr::Pointer isDiffusionImage = mitk::NodePredicateOr::New(isDwi, isDti);
-    isDiffusionImage = mitk::NodePredicateOr::New(isDiffusionImage, isOdf);
-    mitk::NodePredicateNot::Pointer noDiffusionImage = mitk::NodePredicateNot::New(isDiffusionImage);
-    mitk::NodePredicateAnd::Pointer finalPredicate = mitk::NodePredicateAnd::New(isMitkImage, noDiffusionImage);
-    m_Controls->m_ColorMapBox->SetPredicate(finalPredicate);
+    auto isScalarMap = mitk::NodePredicateFunction::New([](const mitk::DataNode* node) {
+      auto image = dynamic_cast<const mitk::Image*>(node->GetData());
+      return image!=nullptr && image->GetDimension()==3 && image->GetPixelType().GetNumberOfComponents()==1;
+    });
+    m_Controls->m_ColorMapBox->SetPredicate(isScalarMap);
   }
 
   UpdateGui();
@@ -228,7 +228,7 @@ void QmitkFiberProcessingView::WeightFibers()
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
     fib->SetFiberWeights(weight);
   }
-
+  RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
 void QmitkFiberProcessingView::Remove()
@@ -321,13 +321,19 @@ void QmitkFiberProcessingView::PruneBundle()
 {
   int minLength = this->m_Controls->m_PruneFibersMinBox->value();
   int maxLength = this->m_Controls->m_PruneFibersMaxBox->value();
+  if (minLength>maxLength)
+  {
+    QMessageBox::information(nullptr, "No output generated:", "The minimum length is larger than the maximum length.");
+    return;
+  }
   for (auto node : m_SelectedFB)
   {
-    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    if (!fib->RemoveShortFibers(minLength))
+    // on a copy: when the second step would leave no fibers, the bundle stays as it was
+    mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData())->Clone();
+    if (!fib->RemoveShortFibers(minLength) || !fib->RemoveLongFibers(maxLength))
       QMessageBox::information(nullptr, "No output generated:", "The resulting fiber bundle contains no fibers.");
-    else if (!fib->RemoveLongFibers(maxLength))
-      QMessageBox::information(nullptr, "No output generated:", "The resulting fiber bundle contains no fibers.");
+    else
+      node->SetData(fib);
   }
   RenderingManager::GetInstance()->RequestUpdateAll();
 }
@@ -392,7 +398,7 @@ void QmitkFiberProcessingView::ApplyDensityThreshold()
 
     itk::TractDensityImageFilter< ItkFloatImageType >::Pointer generator = itk::TractDensityImageFilter< ItkFloatImageType >::New();
     generator->SetFiberBundle(fib);
-    generator->SetMode(TDI_MODE::DENSITY);
+    generator->SetMode(itk::TDI_MODE::DENSITY);
     generator->SetOutputAbsoluteValues(false);
     generator->Update();
 
@@ -422,8 +428,8 @@ void QmitkFiberProcessingView::ApplyDensityThreshold()
 
 void QmitkFiberProcessingView::ApplyCurvatureThreshold()
 {
-  int angle = this->m_Controls->m_CurvSpinBox->value();
-  int dist = this->m_Controls->m_CurvDistanceSpinBox->value();
+  double angle = this->m_Controls->m_CurvSpinBox->value();
+  double dist = this->m_Controls->m_CurvDistanceSpinBox->value();
   std::vector< DataNode::Pointer > nodes = m_SelectedFB;
   for (auto node : nodes)
   {
@@ -449,13 +455,20 @@ void QmitkFiberProcessingView::ApplyCurvatureThreshold()
 
 void QmitkFiberProcessingView::RemoveDir()
 {
+  vnl_vector_fixed<double,3> dir;
+  dir[0] = m_Controls->m_ExtractDirX->value();
+  dir[1] = m_Controls->m_ExtractDirY->value();
+  dir[2] = m_Controls->m_ExtractDirZ->value();
+  // a zero vector would be normalized to zero: no fiber would ever match
+  if (dir.magnitude()==0)
+  {
+    QMessageBox::information(nullptr, "Remove fibers in direction", "Enter a direction other than (0, 0, 0).");
+    return;
+  }
+
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    vnl_vector_fixed<double,3> dir;
-    dir[0] = m_Controls->m_ExtractDirX->value();
-    dir[1] = m_Controls->m_ExtractDirY->value();
-    dir[2] = m_Controls->m_ExtractDirZ->value();
     fib->RemoveDir(dir,cos((float)m_Controls->m_ExtractAngle->value()*itk::Math::pi/180));
   }
   RenderingManager::GetInstance()->RequestUpdateAll();
@@ -466,7 +479,7 @@ void QmitkFiberProcessingView::RemoveWithMask(bool removeInside)
   if (m_RoiImageNode.IsNull())
     return;
 
-  mitk::Image::Pointer mitkMask = dynamic_cast<mitk::Image*>(m_RoiImageNode->GetData());
+  mitk::Image::ConstPointer mitkMask = mitk::GetMaskImage(m_RoiImageNode->GetData());
   for (auto node : m_SelectedFB)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
@@ -486,13 +499,18 @@ void QmitkFiberProcessingView::RemoveWithMask(bool removeInside)
 
 void QmitkFiberProcessingView::ExtractWithMask(bool onlyEnds, bool invert, bool labelmap)
 {
-  if (m_RoiImageNode.IsNull())
+  // Adding the results to the data storage may change the selection (NodeAdded), so the loop
+  // works on copies.
+  const mitk::DataNode::Pointer roiNode = m_RoiImageNode;
+  const auto bundleNodes = m_SelectedFB;
+  if (roiNode.IsNull())
     return;
 
-  mitk::Image::Pointer mitkMask = dynamic_cast<mitk::Image*>(m_RoiImageNode->GetData());
-  for (auto node : m_SelectedFB)
+  // A segmentation keeps its label values for the label map extraction.
+  mitk::Image::ConstPointer mitkMask = mitk::GetMaskImage(roiNode->GetData(), labelmap);
+  const std::string roi_name = roiNode->GetName();
+  for (auto node : bundleNodes)
   {
-    std::string roi_name = m_RoiImageNode->GetName();
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
     ItkFloatImageType::Pointer mask = ItkFloatImageType::New();
     mitk::CastToItkImage(mitkMask, mask);
@@ -521,16 +539,25 @@ void QmitkFiberProcessingView::ExtractWithMask(bool onlyEnds, bool invert, bool 
         boost::split(strs,labels_string,boost::is_any_of(" ,;\t"));
 
         std::vector< unsigned short > labels_vector;
+        QStringList invalid;
         for (auto v : strs)
         {
+          if (v.empty())
+            continue;
           try{
             unsigned short l = boost::lexical_cast<unsigned short>(v);
             labels_vector.push_back(l);
           }
           catch(...)
           {
-
+            invalid.push_back(QString::fromStdString(v));
           }
+        }
+        // an empty label list means "all labels" to the extractor
+        if (!invalid.empty() || labels_vector.empty())
+        {
+          QMessageBox::information(nullptr, "No output generated:", QString("Invalid labels: \"%1\". Enter label values separated by spaces, commas or semicolons, or ALL.").arg(invalid.join(" ")));
+          return;
         }
         extractor->SetLabels(labels_vector);
       }
@@ -583,6 +610,7 @@ void QmitkFiberProcessingView::ExtractWithMask(bool onlyEnds, bool invert, bool 
           name = "passing-" + name;
       }
 
+      newNode->SetName(name);
       float currentThickness = 0;
       node->GetFloatProperty("Fiber2DSliceThickness", currentThickness);
       newNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(currentThickness));
@@ -598,14 +626,39 @@ void QmitkFiberProcessingView::GenerateRoiImage()
   if (m_SelectedPF.empty())
     return;
 
+  // WritePfToImage paints every figure of a composite, so the ROI image is the union of the
+  // figures; an AND or NOT composite would silently differ from the fiber extraction with it.
+  std::function<bool(const mitk::DataNode*)> hasAndOrNot = [this, &hasAndOrNot](const mitk::DataNode* node) {
+    auto composite = dynamic_cast<mitk::PlanarFigureComposite*>(node->GetData());
+    if (composite==nullptr)
+      return false;
+    if (composite->getOperationType()!=mitk::PlanarFigureComposite::OR)
+      return true;
+    auto children = this->GetDataStorage()->GetDerivations(node);
+    for (unsigned int i=0; i<children->Size(); i++)
+      if (hasAndOrNot(children->at(i)))
+        return true;
+    return false;
+  };
+  for (const auto& node : m_SelectedPF)
+  {
+    if (hasAndOrNot(node))
+    {
+      QMessageBox::information(nullptr, "Generate ROI Image", "The ROI image is the union of the selected planar figures. AND and NOT composites cannot be converted; select the figures or an OR composite.");
+      return;
+    }
+  }
+
+  // A selected image gives the grid. m_SelectedFB is filled with the topmost bundle whenever none
+  // is selected (SelectTopmostIfEmpty), so the bundle's grid is taken only without an image.
   mitk::BaseGeometry::Pointer geometry;
-  if (!m_SelectedFB.empty())
+  if (m_SelectedImage)
+    geometry = m_SelectedImage->GetGeometry();
+  else if (!m_SelectedFB.empty())
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(m_SelectedFB.front()->GetData());
     geometry = fib->GetGeometry();
   }
-  else if (m_SelectedImage)
-    geometry = m_SelectedImage->GetGeometry();
   else
     return;
 
@@ -618,59 +671,47 @@ void QmitkFiberProcessingView::GenerateRoiImage()
   newOrigin[1] += bounds.GetElement(2);
   newOrigin[2] += bounds.GetElement(4);
 
+  // Column i of the geometry matrix is direction i scaled by the original spacing along i.
   itk::Matrix<double, 3, 3> direction;
   itk::ImageRegion<3> imageRegion;
   for (int i=0; i<3; i++)
     for (int j=0; j<3; j++)
-      direction[j][i] = geometry->GetMatrixColumn(i)[j]/spacing[j];
+      direction[j][i] = geometry->GetMatrixColumn(i)[j]/geometry->GetSpacing()[i];
   imageRegion.SetSize(0, geometry->GetExtent(0)*m_UpsamplingFactor);
   imageRegion.SetSize(1, geometry->GetExtent(1)*m_UpsamplingFactor);
   imageRegion.SetSize(2, geometry->GetExtent(2)*m_UpsamplingFactor);
 
-  m_PlanarFigureImage = ItkUCharImageType::New();
-  m_PlanarFigureImage->SetSpacing( spacing );   // Set the image spacing
-  m_PlanarFigureImage->SetOrigin( newOrigin );     // Set the image origin
-  m_PlanarFigureImage->SetDirection( direction );  // Set the image direction
-  m_PlanarFigureImage->SetRegions( imageRegion );
-  m_PlanarFigureImage->Allocate();
-  m_PlanarFigureImage->FillBuffer( 0 );
-
-  Image::Pointer tmpImage = Image::New();
-  tmpImage->InitializeByItk(m_PlanarFigureImage.GetPointer());
-  tmpImage->SetVolume(m_PlanarFigureImage->GetBufferPointer());
+  auto roiImage = ItkUCharImageType::New();
+  roiImage->SetSpacing( spacing );   // Set the image spacing
+  roiImage->SetOrigin( newOrigin );     // Set the image origin
+  roiImage->SetDirection( direction );  // Set the image direction
+  roiImage->SetRegions( imageRegion );
+  roiImage->Allocate();
+  roiImage->FillBuffer( 0 );
 
   std::string name = m_SelectedPF.at(0)->GetName();
-  WritePfToImage(m_SelectedPF.at(0), tmpImage);
+  WritePfToImage(m_SelectedPF.at(0), *roiImage);
   for (unsigned int i=1; i<m_SelectedPF.size(); i++)
   {
     name += "+";
     name += m_SelectedPF.at(i)->GetName();
-    WritePfToImage(m_SelectedPF.at(i), tmpImage);
+    WritePfToImage(m_SelectedPF.at(i), *roiImage);
   }
 
   DataNode::Pointer node = DataNode::New();
-  tmpImage = Image::New();
-  tmpImage->InitializeByItk(m_PlanarFigureImage.GetPointer());
-  tmpImage->SetVolume(m_PlanarFigureImage->GetBufferPointer());
+  Image::Pointer tmpImage = Image::New();
+  tmpImage->InitializeByItk(roiImage.GetPointer());
+  tmpImage->SetVolume(roiImage->GetBufferPointer());
   node->SetData(tmpImage);
   node->SetName(name);
   this->GetDataStorage()->Add(node);
 }
 
-void QmitkFiberProcessingView::WritePfToImage(mitk::DataNode::Pointer node, mitk::Image* image)
+void QmitkFiberProcessingView::WritePfToImage(mitk::DataNode::Pointer node, ItkUCharImageType& image)
 {
-  if (dynamic_cast<mitk::PlanarFigure*>(node->GetData()))
+  if (auto figure = dynamic_cast<mitk::PlanarFigure*>(node->GetData()))
   {
-    m_PlanarFigure = dynamic_cast<mitk::PlanarFigure*>(node->GetData());
-    AccessFixedDimensionByItk_2(
-          image,
-          InternalReorientImagePlane, 3,
-          m_PlanarFigure->GetGeometry(), -1);
-
-    AccessFixedDimensionByItk_2(
-          m_InternalImage,
-          InternalCalculateMaskFromPlanarFigure,
-          3, 2, node->GetName() );
+    mitk::AddPlanarFigureToRoiImage(*figure, image);
   }
   else if (dynamic_cast<mitk::PlanarFigureComposite*>(node->GetData()))
   {
@@ -682,343 +723,9 @@ void QmitkFiberProcessingView::WritePfToImage(mitk::DataNode::Pointer node, mitk
   }
 }
 
-template < typename TPixel, unsigned int VImageDimension >
-void QmitkFiberProcessingView::InternalReorientImagePlane( const itk::Image< TPixel, VImageDimension > *image, mitk::BaseGeometry* planegeo3D, int additionalIndex )
-{
-  typedef itk::Image< TPixel, VImageDimension > ImageType;
-  typedef itk::Image< float, VImageDimension > FloatImageType;
-
-  typedef itk::ResampleImageFilter<ImageType, FloatImageType, double> ResamplerType;
-  typename ResamplerType::Pointer resampler = ResamplerType::New();
-
-  mitk::PlaneGeometry* planegeo = dynamic_cast<mitk::PlaneGeometry*>(planegeo3D);
-
-  float upsamp = m_UpsamplingFactor;
-  float gausssigma = 0.5;
-
-  // Spacing
-  typename ResamplerType::SpacingType spacing = planegeo->GetSpacing();
-  spacing[0] = image->GetSpacing()[0] / upsamp;
-  spacing[1] = image->GetSpacing()[1] / upsamp;
-  spacing[2] = image->GetSpacing()[2];
-  resampler->SetOutputSpacing( spacing );
-
-  // Size
-  typename ResamplerType::SizeType size;
-  size[0] = planegeo->GetExtentInMM(0) / spacing[0];
-  size[1] = planegeo->GetExtentInMM(1) / spacing[1];
-  size[2] = 1;
-  resampler->SetSize( size );
-
-  // Origin
-  typename mitk::Point3D orig = planegeo->GetOrigin();
-  typename mitk::Point3D corrorig;
-  planegeo3D->WorldToIndex(orig,corrorig);
-  corrorig[0] += 0.5/upsamp;
-  corrorig[1] += 0.5/upsamp;
-  corrorig[2] += 0;
-  planegeo3D->IndexToWorld(corrorig,corrorig);
-  resampler->SetOutputOrigin(corrorig );
-
-  // Direction
-  typename ResamplerType::DirectionType direction;
-  typename mitk::AffineTransform3D::MatrixType matrix = planegeo->GetIndexToWorldTransform()->GetMatrix();
-  for(unsigned int c=0; c<matrix.ColumnDimensions; c++)
-  {
-    double sum = 0;
-    for(unsigned int r=0; r<matrix.RowDimensions; r++)
-      sum += matrix(r,c)*matrix(r,c);
-    for(unsigned int r=0; r<matrix.RowDimensions; r++)
-      direction(r,c) = matrix(r,c)/sqrt(sum);
-  }
-  resampler->SetOutputDirection( direction );
-
-  // Gaussian interpolation
-  if(gausssigma != 0)
-  {
-    double sigma[3];
-    for( unsigned int d = 0; d < 3; d++ )
-      sigma[d] = gausssigma * image->GetSpacing()[d];
-    double alpha = 2.0;
-    typedef itk::GaussianInterpolateImageFunction<ImageType, double> GaussianInterpolatorType;
-    typename GaussianInterpolatorType::Pointer interpolator = GaussianInterpolatorType::New();
-    interpolator->SetInputImage( image );
-    interpolator->SetParameters( sigma, alpha );
-    resampler->SetInterpolator( interpolator );
-  }
-  else
-  {
-    typedef typename itk::LinearInterpolateImageFunction<ImageType, double> InterpolatorType;
-    typename InterpolatorType::Pointer interpolator = InterpolatorType::New();
-    interpolator->SetInputImage( image );
-    resampler->SetInterpolator( interpolator );
-  }
-
-  resampler->SetInput( image );
-  resampler->SetDefaultPixelValue(0);
-  resampler->Update();
-
-  if(additionalIndex < 0)
-  {
-    this->m_InternalImage = mitk::Image::New();
-    this->m_InternalImage->InitializeByItk( resampler->GetOutput() );
-    this->m_InternalImage->SetVolume( resampler->GetOutput()->GetBufferPointer() );
-  }
-}
-
-template < typename TPixel, unsigned int VImageDimension >
-void QmitkFiberProcessingView::InternalCalculateMaskFromPlanarFigure( itk::Image< TPixel, VImageDimension > *image, unsigned int axis, std::string )
-{
-  typedef itk::Image< TPixel, VImageDimension > ImageType;
-
-  // Generate mask image as new image with same header as input image and
-  // initialize with "1".
-  ItkUCharImageType::Pointer newMaskImage = ItkUCharImageType::New();
-  newMaskImage->SetSpacing( image->GetSpacing() );   // Set the image spacing
-  newMaskImage->SetOrigin( image->GetOrigin() );     // Set the image origin
-  newMaskImage->SetDirection( image->GetDirection() );  // Set the image direction
-  newMaskImage->SetRegions( image->GetLargestPossibleRegion() );
-  newMaskImage->Allocate();
-  newMaskImage->FillBuffer( 1 );
-
-  // Generate VTK polygon from (closed) PlanarFigure polyline
-  // (The polyline points are shifted by -0.5 in z-direction to make sure
-  // that the extrusion filter, which afterwards elevates all points by +0.5
-  // in z-direction, creates a 3D object which is cut by the the plane z=0)
-  const PlaneGeometry *planarFigurePlaneGeometry = m_PlanarFigure->GetPlaneGeometry();
-  const PlanarFigure::PolyLineType planarFigurePolyline = m_PlanarFigure->GetPolyLine( 0 );
-  const BaseGeometry *imageGeometry3D = m_InternalImage->GetGeometry( 0 );
-
-  vtkPolyData *polyline = vtkPolyData::New();
-  polyline->Allocate( 1, 1 );
-
-  // Determine x- and y-dimensions depending on principal axis
-  int i0, i1;
-  switch ( axis )
-  {
-  case 0:
-    i0 = 1;
-    i1 = 2;
-    break;
-  case 1:
-    i0 = 0;
-    i1 = 2;
-    break;
-  case 2:
-  default:
-    i0 = 0;
-    i1 = 1;
-    break;
-  }
-
-  // Create VTK polydata object of polyline contour
-  vtkPoints *points = vtkPoints::New();
-  PlanarFigure::PolyLineType::const_iterator it;
-  unsigned int numberOfPoints = 0;
-
-  for ( it = planarFigurePolyline.begin(); it != planarFigurePolyline.end(); ++it )
-  {
-    Point3D point3D;
-
-    // Convert 2D point back to the local index coordinates of the selected image
-    Point2D point2D = *it;
-    planarFigurePlaneGeometry->WorldToIndex(point2D, point2D);
-    point2D[0] -= 0.5/m_UpsamplingFactor;
-    point2D[1] -= 0.5/m_UpsamplingFactor;
-    planarFigurePlaneGeometry->IndexToWorld(point2D, point2D);
-    planarFigurePlaneGeometry->Map( point2D, point3D );
-
-    // Polygons (partially) outside of the image bounds can not be processed further due to a bug in vtkPolyDataToImageStencil
-    if ( !imageGeometry3D->IsInside( point3D ) )
-    {
-      float bounds[2] = {0,0};
-      bounds[0] =
-          this->m_InternalImage->GetLargestPossibleRegion().GetSize().GetElement(i0);
-      bounds[1] =
-          this->m_InternalImage->GetLargestPossibleRegion().GetSize().GetElement(i1);
-
-      imageGeometry3D->WorldToIndex( point3D, point3D );
-
-      if (point3D[i0]<0)
-        point3D[i0] = 0.0;
-      else if (point3D[i0]>bounds[0])
-        point3D[i0] = bounds[0]-0.001;
-
-      if (point3D[i1]<0)
-        point3D[i1] = 0.0;
-      else if (point3D[i1]>bounds[1])
-        point3D[i1] = bounds[1]-0.001;
-
-      points->InsertNextPoint( point3D[i0], point3D[i1], -0.5 );
-      numberOfPoints++;
-    }
-    else
-    {
-      imageGeometry3D->WorldToIndex( point3D, point3D );
-      // Add point to polyline array
-      points->InsertNextPoint( point3D[i0], point3D[i1], -0.5 );
-      numberOfPoints++;
-    }
-  }
-  polyline->SetPoints( points );
-  points->Delete();
-
-  vtkIdType *ptIds = new vtkIdType[numberOfPoints];
-  for ( vtkIdType i = 0; i < numberOfPoints; ++i )
-    ptIds[i] = i;
-  polyline->InsertNextCell( VTK_POLY_LINE, numberOfPoints, ptIds );
-
-  // Extrude the generated contour polygon
-  vtkLinearExtrusionFilter *extrudeFilter = vtkLinearExtrusionFilter::New();
-  extrudeFilter->SetInputData( polyline );
-  extrudeFilter->SetScaleFactor( 1 );
-  extrudeFilter->SetExtrusionTypeToNormalExtrusion();
-  extrudeFilter->SetVector( 0.0, 0.0, 1.0 );
-
-  // Make a stencil from the extruded polygon
-  vtkPolyDataToImageStencil *polyDataToImageStencil = vtkPolyDataToImageStencil::New();
-  polyDataToImageStencil->SetInputConnection( extrudeFilter->GetOutputPort() );
-
-  // Export from ITK to VTK (to use a VTK filter)
-  typedef itk::VTKImageImport< ItkUCharImageType > ImageImportType;
-  typedef itk::VTKImageExport< ItkUCharImageType > ImageExportType;
-
-  typename ImageExportType::Pointer itkExporter = ImageExportType::New();
-  itkExporter->SetInput( newMaskImage );
-
-  vtkImageImport *vtkImporter = vtkImageImport::New();
-  this->ConnectPipelines( itkExporter, vtkImporter );
-  vtkImporter->Update();
-
-  // Apply the generated image stencil to the input image
-  vtkImageStencil *imageStencilFilter = vtkImageStencil::New();
-  imageStencilFilter->SetInputConnection( vtkImporter->GetOutputPort() );
-  imageStencilFilter->SetStencilConnection(polyDataToImageStencil->GetOutputPort() );
-  imageStencilFilter->ReverseStencilOff();
-  imageStencilFilter->SetBackgroundValue( 0 );
-  imageStencilFilter->Update();
-
-  // Export from VTK back to ITK
-  vtkImageExport *vtkExporter = vtkImageExport::New();
-  vtkExporter->SetInputConnection( imageStencilFilter->GetOutputPort() );
-  vtkExporter->Update();
-
-  typename ImageImportType::Pointer itkImporter = ImageImportType::New();
-  this->ConnectPipelines( vtkExporter, itkImporter );
-  itkImporter->Update();
-
-  // calculate cropping bounding box
-  m_InternalImageMask3D = itkImporter->GetOutput();
-  m_InternalImageMask3D->SetDirection(image->GetDirection());
-
-  itk::ImageRegionConstIterator<ItkUCharImageType>
-      itmask(m_InternalImageMask3D, m_InternalImageMask3D->GetLargestPossibleRegion());
-  itk::ImageRegionIterator<ImageType>
-      itimage(image, image->GetLargestPossibleRegion());
-
-  itmask.GoToBegin();
-  itimage.GoToBegin();
-
-  typename ImageType::SizeType lowersize = {{itk::NumericTraits<unsigned long>::max(),itk::NumericTraits<unsigned long>::max(),itk::NumericTraits<unsigned long>::max()}};
-  typename ImageType::SizeType uppersize = {{0,0,0}};
-  while( !itmask.IsAtEnd() )
-  {
-    if(itmask.Get() == 0)
-      itimage.Set(0);
-    else
-    {
-      typename ImageType::IndexType index = itimage.GetIndex();
-      typename ImageType::SizeType signedindex;
-      signedindex[0] = index[0];
-      signedindex[1] = index[1];
-      signedindex[2] = index[2];
-
-      lowersize[0] = signedindex[0] < lowersize[0] ? signedindex[0] : lowersize[0];
-      lowersize[1] = signedindex[1] < lowersize[1] ? signedindex[1] : lowersize[1];
-      lowersize[2] = signedindex[2] < lowersize[2] ? signedindex[2] : lowersize[2];
-
-      uppersize[0] = signedindex[0] > uppersize[0] ? signedindex[0] : uppersize[0];
-      uppersize[1] = signedindex[1] > uppersize[1] ? signedindex[1] : uppersize[1];
-      uppersize[2] = signedindex[2] > uppersize[2] ? signedindex[2] : uppersize[2];
-    }
-
-    ++itmask;
-    ++itimage;
-  }
-
-  typename ImageType::IndexType index;
-  index[0] = lowersize[0];
-  index[1] = lowersize[1];
-  index[2] = lowersize[2];
-
-  typename ImageType::SizeType size;
-  size[0] = uppersize[0] - lowersize[0] + 1;
-  size[1] = uppersize[1] - lowersize[1] + 1;
-  size[2] = uppersize[2] - lowersize[2] + 1;
-
-  itk::ImageRegion<3> cropRegion = itk::ImageRegion<3>(index, size);
-
-  // crop internal mask
-  typedef itk::RegionOfInterestImageFilter< ItkUCharImageType, ItkUCharImageType > ROIMaskFilterType;
-  typename ROIMaskFilterType::Pointer roi2 = ROIMaskFilterType::New();
-  roi2->SetRegionOfInterest(cropRegion);
-  roi2->SetInput(m_InternalImageMask3D);
-  roi2->Update();
-  m_InternalImageMask3D = roi2->GetOutput();
-
-  Image::Pointer tmpImage = Image::New();
-  tmpImage->InitializeByItk(m_InternalImageMask3D.GetPointer());
-  tmpImage->SetVolume(m_InternalImageMask3D->GetBufferPointer());
-
-  Image::Pointer tmpImage2 = Image::New();
-  tmpImage2->InitializeByItk(m_PlanarFigureImage.GetPointer());
-  const BaseGeometry *pfImageGeometry3D = tmpImage2->GetGeometry( 0 );
-
-  const BaseGeometry *intImageGeometry3D = tmpImage->GetGeometry( 0 );
-
-  typedef itk::ImageRegionIteratorWithIndex<ItkUCharImageType> IteratorType;
-  IteratorType imageIterator (m_InternalImageMask3D, m_InternalImageMask3D->GetRequestedRegion());
-  imageIterator.GoToBegin();
-  while ( !imageIterator.IsAtEnd() )
-  {
-    unsigned char val = imageIterator.Value();
-    if (val>0)
-    {
-      itk::Index<3> index = imageIterator.GetIndex();
-      Point3D point;
-      point[0] = index[0];
-      point[1] = index[1];
-      point[2] = index[2];
-
-      intImageGeometry3D->IndexToWorld(point, point);
-      pfImageGeometry3D->WorldToIndex(point, point);
-
-      point[i0] += 0.5;
-      point[i1] += 0.5;
-
-      index[0] = point[0];
-      index[1] = point[1];
-      index[2] = point[2];
-
-      if (pfImageGeometry3D->IsIndexInside(index))
-        m_PlanarFigureImage->SetPixel(index, 1);
-    }
-    ++imageIterator;
-  }
-
-  // Clean up VTK objects
-  polyline->Delete();
-  extrudeFilter->Delete();
-  polyDataToImageStencil->Delete();
-  vtkImporter->Delete();
-  imageStencilFilter->Delete();
-  //vtkExporter->Delete(); // TODO: crashes when outcommented; memory leak??
-  delete[] ptIds;
-}
-
 void QmitkFiberProcessingView::UpdateGui()
 {
-  m_Controls->m_FibLabel->setText("<font color='red'>mandatory</font>");
+  m_Controls->m_FibLabel->setText(QmitkDiffusionWarningText::Format("mandatory"));
   m_Controls->m_PfLabel->setText("<font color='grey'>needed for extraction</font>");
   m_Controls->m_InputData->setTitle("Please Select Input Data");
 
@@ -1204,25 +911,35 @@ void QmitkFiberProcessingView::UpdateGui()
 
 void QmitkFiberProcessingView::NodeRemoved(const mitk::DataNode* node )
 {
-  for (auto fnode: m_SelectedFB)
-    if (node == fnode)
-    {
-      m_SelectedFB.clear();
-      break;
-    }
+  // Only the removed node leaves the selection. The data storage calls this before the node
+  // leaves it, so the topmost fallback must skip the node.
+  RemoveObservers();
+  auto isRemoved = [node](const mitk::DataNode::Pointer& selected) { return selected.GetPointer() == node; };
+  std::erase_if(m_SelectedFB, isRemoved);
+  std::erase_if(m_SelectedPF, isRemoved);
+  std::erase_if(m_SelectedSurfaces, [node](const mitk::Surface::Pointer& surface) { return surface.GetPointer() == node->GetData(); });
+  if (m_RoiImageNode.GetPointer() == node)
+    m_RoiImageNode = nullptr;
+  if (m_SelectedImage.IsNotNull() && m_SelectedImage.GetPointer() == node->GetData())
+    m_SelectedImage = nullptr;
+  if (m_InteractiveNode.GetPointer() == node)
+    m_InteractiveNode = nullptr;
 
-  berry::IWorkbenchPart::Pointer nullPart;
-  QList<mitk::DataNode::Pointer> nodes;
-  OnSelectionChanged(nullPart, nodes);
+  SelectTopmostIfEmpty(node);
+  AddObservers();
+  UpdateGui();
 }
 
 void QmitkFiberProcessingView::NodeAdded(const mitk::DataNode* )
 {
+  // A node added anywhere (a result of this view, a loaded file) keeps the selection, also the
+  // bundles a slot of this view is looping over; it only fills an empty selection.
   if (!m_Controls->m_InteractiveBox->isChecked())
   {
-    berry::IWorkbenchPart::Pointer nullPart;
-    QList<mitk::DataNode::Pointer> nodes;
-    OnSelectionChanged(nullPart, nodes);
+    RemoveObservers();
+    SelectTopmostIfEmpty(nullptr);
+    AddObservers();
+    UpdateGui();
   }
 }
 
@@ -1240,24 +957,20 @@ void QmitkFiberProcessingView::AddObservers()
     mitk::PlanarFigure* figure = dynamic_cast<mitk::PlanarFigure*>(node->GetData());
     if (figure!=nullptr)
     {
-      figure->RemoveAllObservers();
-
-      // add observer for event when interaction with figure starts
+      // add observer for event when interaction with figure ends
       SimpleCommandType::Pointer endInteractionCommand = SimpleCommandType::New();
       endInteractionCommand->SetCallbackFunction( this, &QmitkFiberProcessingView::OnEndInteraction);
-      m_EndInteractionObserverTag = figure->AddObserver( mitk::EndInteractionPlanarFigureEvent(), endInteractionCommand );
+      m_FigureObservers.emplace_back(figure, figure->AddObserver( mitk::EndInteractionPlanarFigureEvent(), endInteractionCommand ));
     }
   }
 }
 
 void QmitkFiberProcessingView::RemoveObservers()
 {
-  for (auto node : m_SelectedPF)
-  {
-    mitk::PlanarFigure* figure = dynamic_cast<mitk::PlanarFigure*>(node->GetData());
-    if (figure!=nullptr)
-      figure->RemoveAllObservers();
-  }
+  // only the observers of this view: other views (e.g. Measurement) observe the same figures
+  for (const auto& [figure, tag] : m_FigureObservers)
+    figure->RemoveObserver(tag);
+  m_FigureObservers.clear();
 }
 
 void QmitkFiberProcessingView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*part*/, const QList<mitk::DataNode::Pointer>& nodes)
@@ -1284,6 +997,8 @@ void QmitkFiberProcessingView::OnSelectionChanged(berry::IWorkbenchPart::Pointer
       if (m_SelectedImage->GetDimension()==3)
         m_RoiImageNode = node;
     }
+    else if (mitk::GetSegmentationMaskPredicate()->CheckNode(node))
+      m_RoiImageNode = node;
     else if (dynamic_cast<mitk::Surface*>(node->GetData()))
       m_SelectedSurfaces.push_back(dynamic_cast<mitk::Surface*>(node->GetData()));
   }
@@ -1292,54 +1007,55 @@ void QmitkFiberProcessingView::OnSelectionChanged(berry::IWorkbenchPart::Pointer
   if (m_SelectedFB.empty() && m_Controls->m_InteractiveBox->isChecked())
     m_SelectedFB = lastSelectedFB;
 
-  // if no fibers or surfaces are selected, select topmost
-  if (m_SelectedFB.empty() && m_SelectedSurfaces.empty())
-  {
-    int maxLayer = 0;
-    itk::VectorContainer<unsigned int, mitk::DataNode::Pointer>::ConstPointer nodes = this->GetDataStorage()->GetAll();
-    for (unsigned int i=0; i<nodes->Size(); i++)
-      if (dynamic_cast<mitk::FiberBundle*>(nodes->at(i)->GetData()))
-      {
-        mitk::DataStorage::SetOfObjects::ConstPointer sources = GetDataStorage()->GetSources(nodes->at(i));
-        if (sources->Size()>0)
-          continue;
-
-        int layer = 0;
-        nodes->at(i)->GetPropertyValue("layer", layer);
-        if (layer>=maxLayer)
-        {
-          maxLayer = layer;
-          m_SelectedFB.clear();
-          m_SelectedFB.push_back(nodes->at(i));
-        }
-      }
-  }
-
-  // if no plar figure is selected, select topmost
-  if (m_SelectedPF.empty())
-  {
-    int maxLayer = 0;
-    itk::VectorContainer<unsigned int, mitk::DataNode::Pointer>::ConstPointer nodes = this->GetDataStorage()->GetAll();
-    for (unsigned int i=0; i<nodes->Size(); i++)
-      if (dynamic_cast<mitk::PlanarPolygon*>(nodes->at(i)->GetData()) || dynamic_cast<mitk::PlanarFigureComposite*>(nodes->at(i)->GetData()) || dynamic_cast<mitk::PlanarCircle*>(nodes->at(i)->GetData()))
-      {
-        mitk::DataStorage::SetOfObjects::ConstPointer sources = GetDataStorage()->GetSources(nodes->at(i));
-        if (sources->Size()>0)
-          continue;
-
-        int layer = 0;
-        nodes->at(i)->GetPropertyValue("layer", layer);
-        if (layer>=maxLayer)
-        {
-          maxLayer = layer;
-          m_SelectedPF.clear();
-          m_SelectedPF.push_back(nodes->at(i));
-        }
-      }
-  }
+  SelectTopmostIfEmpty(nullptr);
 
   AddObservers();
   UpdateGui();
+}
+
+void QmitkFiberProcessingView::SelectTopmostIfEmpty(const mitk::DataNode* excluded)
+{
+  auto isPlanarFigure = [](const mitk::DataNode* node) {
+    return dynamic_cast<mitk::PlanarPolygon*>(node->GetData()) || dynamic_cast<mitk::PlanarFigureComposite*>(node->GetData()) || dynamic_cast<mitk::PlanarCircle*>(node->GetData());
+  };
+
+  // the top-level node of the given kind with the highest layer
+  auto topmost = [this, excluded](auto isKind) {
+    mitk::DataNode::Pointer result;
+    int maxLayer = 0;
+    auto nodes = this->GetDataStorage()->GetAll();
+    for (unsigned int i=0; i<nodes->Size(); i++)
+    {
+      mitk::DataNode::Pointer node = nodes->at(i);
+      if (node.GetPointer()==excluded || !isKind(node.GetPointer()) || this->GetDataStorage()->GetSources(node)->Size()>0)
+        continue;
+
+      int layer = 0;
+      node->GetPropertyValue("layer", layer);
+      if (layer>=maxLayer)
+      {
+        maxLayer = layer;
+        result = node;
+      }
+    }
+    return result;
+  };
+
+  // if no fibers or surfaces are selected, select topmost
+  if (m_SelectedFB.empty() && m_SelectedSurfaces.empty())
+  {
+    auto node = topmost([](const mitk::DataNode* n) { return dynamic_cast<mitk::FiberBundle*>(n->GetData())!=nullptr; });
+    if (node.IsNotNull())
+      m_SelectedFB.push_back(node);
+  }
+
+  // if no planar figure is selected, select topmost
+  if (m_SelectedPF.empty())
+  {
+    auto node = topmost(isPlanarFigure);
+    if (node.IsNotNull())
+      m_SelectedPF.push_back(node);
+  }
 }
 
 void QmitkFiberProcessingView::OnDrawPolygon()
@@ -1394,8 +1110,12 @@ void QmitkFiberProcessingView::AddFigureToDataStorage(mitk::PlanarFigure* figure
 
 void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
 {
-  if ( m_SelectedFB.empty() || m_SelectedPF.empty() ){
-    QMessageBox::information( nullptr, "Warning", "No fibe bundle selected!");
+  if ( m_SelectedFB.empty() ){
+    QMessageBox::information( nullptr, "Warning", "No fiber bundle selected!");
+    return;
+  }
+  if ( m_SelectedPF.empty() ){
+    QMessageBox::information( nullptr, "Warning", "No planar figure selected!");
     return;
   }
 
@@ -1422,7 +1142,8 @@ void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
           m_InteractiveNode->SetProperty("Fiber2DSliceThickness", mitk::FloatProperty::New(currentThickness));
           GetDataStorage()->Add(m_InteractiveNode);
         }
-        float op = 5.0/sqrt(fib->GetNumFibers());
+        // fainter for larger bundles, opaque below 25 fibers (and for an empty bundle)
+        float op = fib->GetNumFibers()>25 ? 5.0/sqrt(fib->GetNumFibers()) : 1.0;
         float currentOp = 0;
         fiberBundles.at(i)->GetFloatProperty("opacity", currentOp);
 
@@ -1430,7 +1151,6 @@ void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
         {
           fib->SetFiberColors(255, 255, 255);
           fiberBundles.at(i)->SetFloatProperty("opacity", op);
-          fiberBundles.at(i)->SetBoolProperty("Fiber2DfadeEFX", false);
         }
         m_InteractiveNode->SetData(extFB);
       }
@@ -1454,8 +1174,11 @@ void QmitkFiberProcessingView::ExtractWithPlanarFigure(bool interactive)
       }
     }
   }
-  catch(const std::out_of_range& )
+  catch(const std::exception& e)
   {
+    // an unplaced figure has no control points: PlanarFigure throws itk::ExceptionObject,
+    // the extraction mitk::Exception or std::out_of_range
+    MITK_ERROR << e.what();
     QMessageBox::warning( nullptr, "Fiber extraction failed", "Did you only create the planar figure, using the circle or polygon button, but forgot to actually place it in the image afterwards? \nAfter creating a planar figure, simply left-click at the desired position in the image or on the tractogram to place it.");
   }
 }
@@ -1562,14 +1285,16 @@ void QmitkFiberProcessingView::CopyBundles()
     return;
   }
 
-  for (auto node : m_SelectedFB)
+  // adding the copies may change the selection (NodeAdded), so the loop works on a copy
+  const auto bundleNodes = m_SelectedFB;
+  for (auto node : bundleNodes)
   {
     mitk::FiberBundle::Pointer fib = dynamic_cast<mitk::FiberBundle*>(node->GetData());
-    mitk::FiberBundle::Pointer newFib = fib->GetDeepCopy();
+    mitk::FiberBundle::Pointer newFib = fib->Clone();
 
     node->SetVisibility(false);
     QString name("");
-    name += QString(m_SelectedFB.at(0)->GetName().c_str());
+    name += QString(node->GetName().c_str());
     name += "_copy";
 
     mitk::DataNode::Pointer fbNode = mitk::DataNode::New();
@@ -1878,6 +1603,7 @@ void QmitkFiberProcessingView::MirrorFibers()
     }
     poly->SetPoints(vtkNewPoints);
     surf->CalculateBoundingBox();
+    surf->Modified();
   }
 
   if (auto renderWindowPart = this->GetRenderWindowPart())

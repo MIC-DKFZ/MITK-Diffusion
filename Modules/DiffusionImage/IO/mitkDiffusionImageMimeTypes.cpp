@@ -15,16 +15,13 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkDiffusionImageMimeTypes.h"
-#include "mitkIOMimeTypes.h"
 #include <itksys/SystemTools.hxx>
 #include <itkNrrdImageIO.h>
 #include <itkMetaDataDictionary.h>
 #include <itkMetaDataObject.h>
 #include <mitkLog.h>
-#include <dcmtk/dcmtract/trctractographyresults.h>
 #include <mitkDICOMDCMTKTagScanner.h>
 #include <itkGDCMImageIO.h>
-#include <itkNiftiImageIO.h>
 #include <itkBruker2dseqImageIO.h>
 
 namespace mitk
@@ -53,7 +50,9 @@ DiffusionImageMimeTypes::DiffusionImageNrrdMimeType::DiffusionImageNrrdMimeType(
   this->SetComment("nrrd dMRI");
 
   this->AddExtension("dwi");
-  //this->AddExtension("hdwi"); // saving with detached header does not work out of the box
+  // Detached-header DWIs. ITK writes a detached header only for ".nhdr", so a written .hdwi file
+  // holds its data inline; the reader handles both.
+  this->AddExtension("hdwi");
   this->AddExtension("nrrd");
 }
 
@@ -144,17 +143,15 @@ bool DiffusionImageMimeTypes::DiffusionImageNiftiMimeType::AppliesTo(const std::
   }
   //end fix for bug 18572
 
-  std::string ext = itksys::SystemTools::GetFilenameExtension(path);
-  ext = itksys::SystemTools::LowerCase(ext);
   std::string base_path = itksys::SystemTools::GetFilenamePath(path);
 
   itk::Bruker2dseqImageIO::Pointer io = itk::Bruker2dseqImageIO::New();
-  if(io->CanReadFile(path.c_str()) && ext.empty() && itksys::SystemTools::FileExists(std::string(base_path + "/../../method").c_str()))
+  if(io->CanReadFile(path.c_str()) && itksys::SystemTools::GetFilenameLastExtension(path).empty() && itksys::SystemTools::FileExists(std::string(base_path + "/../../method").c_str()))
     return true;
 
   // Nifti files should only be considered for this mime type if they are
   // accompanied by bvecs and bvals files defining the diffusion information
-  if (ext == ".nii" || ext == ".nii.gz")
+  if (this->MatchesExtension(path))
   {
     std::string base = this->GetFilenameWithoutExtension(path);
     std::string filename = base;
@@ -244,6 +241,8 @@ bool DiffusionImageMimeTypes::DiffusionImageDicomMimeType::AppliesTo(const std::
   mitk::DICOMTagCache::Pointer tagCache = scanner->GetScanCache();
 
   mitk::DICOMImageFrameList imageFrameList = mitk::ConvertToDICOMImageFrameList(tagCache->GetFrameInfoList());
+  if (imageFrameList.empty())
+    return false;
   mitk::DICOMImageFrameInfo *firstFrame = imageFrameList.begin()->GetPointer();
 
   std::string byteString = tagCache->GetTagValue(firstFrame, ImageTypeTag).value;

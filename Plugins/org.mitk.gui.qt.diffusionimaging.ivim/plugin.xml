@@ -24,6 +24,23 @@
     <keywordReference id="org.mitk.perspectives.ivim.Keyword"/>
     </perspective>
   
-  </extension>  
-  
+  </extension>
+
+  <extension point="org.blueberry.ui.keywords">
+    <keyword label="IVIM" id="org.mitk.views.ivim.Keyword"/>
+    <keyword label="intravoxel incoherent motion" id="org.mitk.views.ivim.Keyword"/>
+    <keyword label="perfusion" id="org.mitk.views.ivim.Keyword"/>
+    <keyword label="pseudo-diffusion" id="org.mitk.views.ivim.Keyword"/>
+    <keyword label="kurtosis" id="org.mitk.views.ivim.Keyword"/>
+    <keyword label="DKI" id="org.mitk.views.ivim.Keyword"/>
+    <keyword label="ADC" id="org.mitk.views.ivim.Keyword"/>
+    <keyword label="multi b-value" id="org.mitk.views.ivim.Keyword"/>
+    <keyword label="fit" id="org.mitk.views.ivim.Keyword"/>
+    <keyword label="IVIM" id="org.mitk.perspectives.ivim.Keyword"/>
+    <keyword label="intravoxel incoherent motion" id="org.mitk.perspectives.ivim.Keyword"/>
+    <keyword label="perfusion" id="org.mitk.perspectives.ivim.Keyword"/>
+    <keyword label="kurtosis" id="org.mitk.perspectives.ivim.Keyword"/>
+    <keyword label="DKI" id="org.mitk.perspectives.ivim.Keyword"/>
+  </extension>
+
 </plugin>

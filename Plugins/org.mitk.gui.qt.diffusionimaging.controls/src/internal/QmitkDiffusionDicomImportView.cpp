@@ -16,74 +16,94 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkDiffusionDicomImportView.h"
 
-// qt includes
-#include <QFileDialog>
-
-// itk includes
-#include "itkTimeProbesCollectorBase.h"
-#include "itkGDCMSeriesFileNames.h"
-#include "itksys/SystemTools.hxx"
-
-// mitk includes
-#include <mitkProgressTask.h>
-#include "mitkStatusBar.h"
-#include "mitkProperties.h"
-#include "mitkRenderingManager.h"
-#include "mitkMemoryUtilities.h"
-#include "mitkIOUtil.h"
-
-// diffusion module includes
-#include "mitkDicomDiffusionImageHeaderReader.h"
-#include "mitkDicomDiffusionImageReader.h"
-#include "mitkImage.h"
+#include <mitkDiffusionDICOMFileReader.h>
 #include <mitkDiffusionPropertyHelper.h>
+#include <mitkImage.h>
+#include <mitkProgressTask.h>
+#include <mitkRenderingManager.h>
+#include <mitkStatusBar.h>
 
-#include "mitkDiffusionDICOMFileReader.h"
-#include "mitkDICOMTagBasedSorter.h"
-#include "mitkDICOMSortByTag.h"
-#include "mitkSortByImagePositionPatient.h"
-
-#include "gdcmDirectory.h"
-#include "gdcmScanner.h"
-#include "gdcmSorter.h"
-#include "gdcmIPPSorter.h"
-#include "gdcmAttribute.h"
-#include "gdcmVersion.h"
-
-#include <itksys/SystemTools.hxx>
+#include <gdcmDirectory.h>
+#include <gdcmVersion.h>
 #include <itksys/Directory.hxx>
+#include <itksys/SystemTools.hxx>
 
+#include <QFileDialog>
+#include <QListView>
 #include <QMessageBox>
 #include <QTreeView>
-#include <mitkStringProperty.h>
 
-const std::string QmitkDiffusionDicomImport::VIEW_ID = "org.mitk.views.diffusiondicomimport";
+const std::string QmitkDiffusionDicomImportView::VIEW_ID = "org.mitk.views.diffusiondicomimport";
+
+namespace
+{
+  /** Files of one input folder. Without "Recursive", the files in the folder itself. With
+   *  "Recursive", the files in the folder and in all its subfolders at any depth; a prefix
+   *  restricts this to the subfolders of the input folder whose name starts with it (and
+   *  everything below them), e.g. one subfolder per acquisition. */
+  gdcm::Directory::FilenamesType CollectDicomFiles(const std::string& folder, bool recursive, const std::string& prefix)
+  {
+    if (!recursive || prefix.empty())
+    {
+      gdcm::Directory directory;
+      directory.Load(folder, recursive);
+      return directory.GetFilenames();
+    }
+
+    gdcm::Directory::FilenamesType files;
+    itksys::Directory root;
+    if (!root.Load(folder))
+      return files;
+    for (unsigned long i = 0; i < root.GetNumberOfFiles(); ++i)
+    {
+      const std::string name = root.GetFile(i);
+      const std::string path = folder + "/" + name;
+      if (name == "." || name == ".." || !name.starts_with(prefix) || !itksys::SystemTools::FileIsDirectory(path))
+        continue;
+      gdcm::Directory directory;
+      directory.Load(path, true);
+      const auto& subfolderFiles = directory.GetFilenames();
+      files.insert(files.end(), subfolderFiles.begin(), subfolderFiles.end());
+    }
+    return files;
+  }
+}
 
 
-QmitkDiffusionDicomImport::QmitkDiffusionDicomImport(QObject* /*parent*/, const char* /*name*/)
+QmitkDiffusionDicomImportView::QmitkDiffusionDicomImportView()
   : m_Controls(nullptr)
-  , m_OutputFolderName("")
-  , m_OutputFolderNameSet(false)
+  , m_Parent(nullptr)
 {
 }
 
-QmitkDiffusionDicomImport::~QmitkDiffusionDicomImport()
-{}
+QmitkDiffusionDicomImportView::~QmitkDiffusionDicomImportView()
+{
+  // The widgets belong to the parent; only the Ui struct is this view's.
+  delete m_Controls;
+}
 
-void QmitkDiffusionDicomImport::CreateQtPartControl(QWidget *parent)
+void QmitkDiffusionDicomImportView::CreateQtPartControl(QWidget *parent)
 {
   m_Parent = parent;
   if (m_Controls == nullptr)
   {
     m_Controls = new Ui::QmitkDiffusionDicomImportControls;
     m_Controls->setupUi(parent);
-    this->CreateConnections();
+
+    using Self = QmitkDiffusionDicomImportView;
+    connect(m_Controls->m_AddFoldersButton, &QAbstractButton::clicked, this, &Self::DicomLoadAddFolderNames);
+    connect(m_Controls->m_DeleteFoldersButton, &QAbstractButton::clicked, this, &Self::DicomLoadDeleteFolderNames);
+    connect(m_Controls->m_DicomLoadStartLoadButton, &QAbstractButton::clicked, this, &Self::NewDicomLoadStartLoad);
+    connect(m_Controls->m_DicomLoadAverageDuplicatesCheckbox, &QAbstractButton::clicked, this, &Self::AverageClicked);
+    connect(m_Controls->m_Remove, &QAbstractButton::clicked, this, &Self::Remove);
+    connect(m_Controls->m_SetPrefixButton, &QAbstractButton::clicked, this, &Self::SetPrefixButtonPushed);
+    connect(m_Controls->m_ResetPrefixButton, &QAbstractButton::clicked, this, &Self::ResetPrefixButtonPushed);
+    connect(m_Controls->m_DicomLoadRecursiveCheckbox, &QAbstractButton::clicked, this, &Self::RecursiveSettingsChanged);
 
     m_Controls->m_DicomLoadRecursiveCheckbox->setChecked(false);
     m_Controls->m_DicomLoadAverageDuplicatesCheckbox->setChecked(false);
 
     m_Controls->m_DicomLoadRecursiveCheckbox->setVisible(true);
-    m_Controls->m_OverrideOptionCheckbox->setVisible(false);
     m_Controls->m_SubdirPrefixLineEdit->setVisible(false);
     m_Controls->m_SetPrefixButton->setVisible(false);
     m_Controls->m_ResetPrefixButton->setVisible(false);
@@ -94,40 +114,24 @@ void QmitkDiffusionDicomImport::CreateQtPartControl(QWidget *parent)
 
 
 
-void QmitkDiffusionDicomImport::CreateConnections()
-{
-  if ( m_Controls )
-  {
-    connect( m_Controls->m_AddFoldersButton, SIGNAL(clicked()), this, SLOT(DicomLoadAddFolderNames()) );
-    connect( m_Controls->m_DeleteFoldersButton, SIGNAL(clicked()), this, SLOT(DicomLoadDeleteFolderNames()) );
-    //connect( m_Controls->m_DicomLoadStartLoadButton, SIGNAL(clicked()), this, SLOT(DicomLoadStartLoad()) );
-    connect( m_Controls->m_DicomLoadStartLoadButton, SIGNAL(clicked()), this, SLOT(NewDicomLoadStartLoad()) );
-    connect( m_Controls->m_DicomLoadAverageDuplicatesCheckbox, SIGNAL(clicked()), this, SLOT(AverageClicked()) );
-    connect( m_Controls->m_OutputSetButton, SIGNAL(clicked()), this, SLOT(OutputSet()) );
-    connect( m_Controls->m_OutputClearButton, SIGNAL(clicked()), this, SLOT(OutputClear()) );
-    connect( m_Controls->m_Remove, SIGNAL(clicked()), this, SLOT(Remove()) );
-    connect( m_Controls->m_SetPrefixButton, SIGNAL(clicked()), this, SLOT(SetPrefixButtonPushed()));
-    connect( m_Controls->m_ResetPrefixButton, SIGNAL(clicked()), this, SLOT(ResetPrefixButtonPushed()));
-    connect( m_Controls->m_DicomLoadRecursiveCheckbox, SIGNAL(clicked()), this, SLOT(RecursiveSettingsChanged()) );
-  }
-}
-
-void QmitkDiffusionDicomImport::SetFocus()
+void QmitkDiffusionDicomImportView::SetFocus()
 {
   m_Controls->textBrowser->setFocus();
 }
 
-void QmitkDiffusionDicomImport::RecursiveSettingsChanged()
+void QmitkDiffusionDicomImportView::RecursiveSettingsChanged()
 {
+  // The prefix is the text of the line edit when the import starts; Set Prefix only locks it.
   m_Controls->m_SubdirPrefixLineEdit->setVisible( m_Controls->m_DicomLoadRecursiveCheckbox->isChecked() );
   m_Controls->m_SetPrefixButton->setVisible( m_Controls->m_DicomLoadRecursiveCheckbox->isChecked() );
   m_Controls->m_SubdirPrefixLineEdit->clear();
   this->m_Controls->m_SubdirPrefixLineEdit->setEnabled(true);
+  m_Controls->m_SetPrefixButton->setEnabled(true);
+  m_Controls->m_ResetPrefixButton->setVisible(false);
 }
 
-void QmitkDiffusionDicomImport::SetPrefixButtonPushed()
+void QmitkDiffusionDicomImportView::SetPrefixButtonPushed()
 {
-  m_Prefix = this->m_Controls->m_SubdirPrefixLineEdit->text().toStdString();
   if( !this->m_Controls->m_ResetPrefixButton->isVisible() )
     this->m_Controls->m_ResetPrefixButton->setVisible(true);
 
@@ -136,7 +140,7 @@ void QmitkDiffusionDicomImport::SetPrefixButtonPushed()
   this->m_Controls->m_SetPrefixButton->setEnabled(false);
 }
 
-void QmitkDiffusionDicomImport::ResetPrefixButtonPushed()
+void QmitkDiffusionDicomImportView::ResetPrefixButtonPushed()
 {
   m_Controls->m_SubdirPrefixLineEdit->clear();
 
@@ -146,51 +150,23 @@ void QmitkDiffusionDicomImport::ResetPrefixButtonPushed()
   this->m_Controls->m_SetPrefixButton->setEnabled(true);
 }
 
-void QmitkDiffusionDicomImport::Remove()
+void QmitkDiffusionDicomImportView::Remove()
 {
   int i = m_Controls->listWidget->currentRow();
-  m_Controls->listWidget->takeItem(i);
+  delete m_Controls->listWidget->takeItem(i);
 }
 
-void QmitkDiffusionDicomImport::OutputSet()
-{
-  // SELECT FOLDER DIALOG
-  QFileDialog* w = new QFileDialog( m_Parent, QString("Select folders containing DWI data") );
-  w->setFileMode( QFileDialog::Directory );
-
-  // RETRIEVE SELECTION
-  if ( w->exec() != QDialog::Accepted )
-    return;
-
-  m_OutputFolderName = w->selectedFiles()[0];
-  m_OutputFolderNameSet = true;
-  m_Controls->m_OutputLabel->setText(m_OutputFolderName);
-
-  // show file override option checkbox
-  m_Controls->m_OverrideOptionCheckbox->setVisible(true);
-}
-
-void QmitkDiffusionDicomImport::OutputClear()
-{
-  m_OutputFolderName = "";
-  m_OutputFolderNameSet = false;
-  m_Controls->m_OutputLabel->setText("... optional out-folder ...");
-
-  // hide file override option checkbox - no output specified
-  m_Controls->m_OverrideOptionCheckbox->setVisible(false);
-}
-
-void QmitkDiffusionDicomImport::AverageClicked()
+void QmitkDiffusionDicomImportView::AverageClicked()
 {
   m_Controls->m_Blur->setEnabled(m_Controls->m_DicomLoadAverageDuplicatesCheckbox->isChecked());
 }
 
-void QmitkDiffusionDicomImport::DicomLoadDeleteFolderNames()
+void QmitkDiffusionDicomImportView::DicomLoadDeleteFolderNames()
 {
   m_Controls->listWidget->clear();
 }
 
-void QmitkDiffusionDicomImport::DicomLoadAddFolderNames()
+void QmitkDiffusionDicomImportView::DicomLoadAddFolderNames()
 {
   // SELECT FOLDER DIALOG
   QFileDialog w( m_Parent, QString("Select folders containing DWI data") );
@@ -213,144 +189,23 @@ void QmitkDiffusionDicomImport::DicomLoadAddFolderNames()
   m_Controls->listWidget->addItems(w.selectedFiles());
 }
 
-bool SortBySeriesUID(gdcm::DataSet const & ds1, gdcm::DataSet const & ds2 )
-{
-  gdcm::Attribute<0x0020,0x000e> at1;
-  at1.Set( ds1 );
-  gdcm::Attribute<0x0020,0x000e> at2;
-  at2.Set( ds2 );
-  return at1 < at2;
-}
-
-bool SortByAcquisitionNumber(gdcm::DataSet const & ds1, gdcm::DataSet const & ds2 )
-{
-  gdcm::Attribute<0x0020,0x0012> at1;
-  at1.Set( ds1 );
-  gdcm::Attribute<0x0020,0x0012> at2;
-  at2.Set( ds2 );
-  return at1 < at2;
-}
-
-bool SortBySeqName(gdcm::DataSet const & ds1, gdcm::DataSet const & ds2 )
-{
-  gdcm::Attribute<0x0018, 0x0024> at1;
-  at1.Set( ds1 );
-  gdcm::Attribute<0x0018, 0x0024> at2;
-  at2.Set( ds2 );
-
-  std::string str1 = at1.GetValue().Trim();
-  std::string str2 = at2.GetValue().Trim();
-  return std::lexicographical_compare(str1.begin(), str1.end(),
-                                      str2.begin(), str2.end() );
-}
-
-void QmitkDiffusionDicomImport::Status(QString status)
+void QmitkDiffusionDicomImportView::Status(const QString& status)
 {
   mitk::StatusBar::GetInstance()->DisplayText(status.toLatin1());
-  MITK_INFO << status.toStdString().c_str();
+  MITK_INFO << status.toStdString();
 }
 
-void QmitkDiffusionDicomImport::Status(std::string status)
-{
-  mitk::StatusBar::GetInstance()->DisplayText(status.c_str());
-  MITK_INFO << status.c_str();
-}
-
-void QmitkDiffusionDicomImport::Status(const char* status)
-{
-  mitk::StatusBar::GetInstance()->DisplayText(status);
-  MITK_INFO << status;
-}
-
-void QmitkDiffusionDicomImport::Error(QString status)
+void QmitkDiffusionDicomImportView::Error(const QString& status)
 {
   mitk::StatusBar::GetInstance()->DisplayErrorText(status.toLatin1());
-  MITK_ERROR << status.toStdString().c_str();
+  MITK_ERROR << status.toStdString();
 }
 
-void QmitkDiffusionDicomImport::Error(std::string status)
+void QmitkDiffusionDicomImportView::NewDicomLoadStartLoad()
 {
-  mitk::StatusBar::GetInstance()->DisplayErrorText(status.c_str());
-  MITK_ERROR << status.c_str();
-}
-
-void QmitkDiffusionDicomImport::Error(const char* status)
-{
-  mitk::StatusBar::GetInstance()->DisplayErrorText(status);
-  MITK_ERROR << status;
-}
-
-void QmitkDiffusionDicomImport::PrintMemoryUsage()
-{
-  size_t processSize = mitk::MemoryUtilities::GetProcessMemoryUsage();
-  size_t totalSize =  mitk::MemoryUtilities::GetTotalSizeOfPhysicalRam();
-  float percentage = ( (float) processSize / (float) totalSize ) * 100.0;
-  MITK_INFO << "Current memory usage: " << GetMemoryDescription( processSize, percentage );
-}
-
-std::string QmitkDiffusionDicomImport::FormatMemorySize( size_t size )
-{
-  double val = size;
-  std::string descriptor("B");
-  if ( val >= 1000.0 )
-  {
-    val /= 1024.0;
-    descriptor = "KB";
-  }
-  if ( val >= 1000.0 )
-  {
-    val /= 1024.0;
-    descriptor = "MB";
-  }
-  if ( val >= 1000.0 )
-  {
-    val /= 1024.0;
-    descriptor = "GB";
-  }
-  std::ostringstream str;
-  str << std::fixed << std::setprecision(2) << val << " " << descriptor;
-  return str.str();
-}
-
-std::string QmitkDiffusionDicomImport::FormatPercentage( double val )
-{
-  std::ostringstream str;
-  str << std::fixed << std::setprecision(2) << val << " " << "%";
-  return str.str();
-}
-
-std::string QmitkDiffusionDicomImport::GetMemoryDescription( size_t processSize, float percentage )
-{
-  std::ostringstream str;
-  str << FormatMemorySize(processSize) << " (" << FormatPercentage( percentage ) <<")" ;
-  return str.str();
-}
-
-void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
-{
-  itk::TimeProbesCollectorBase clock;
-  bool imageSuccessfullySaved = true;
-
-  bool has_prefix = true;
-
+  // LoadDiffusionDicomSeries switches to the C locale itself, for the time it parses.
   try
   {
-    const std::string& locale = "C";
-    const std::string& currLocale = setlocale( LC_ALL, nullptr );
-
-    if ( locale.compare(currLocale)!=0 )
-    {
-      try
-      {
-        MITK_INFO << " ** Changing locale from " << setlocale(LC_ALL, nullptr) << " to '" << locale << "'";
-        setlocale(LC_ALL, locale.c_str());
-      }
-      catch(...)
-      {
-        MITK_INFO << "Could not set locale " << locale;
-      }
-    }
-
     int nrFolders = m_Controls->listWidget->count();
 
     if(!nrFolders)
@@ -361,201 +216,58 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
 
     Status(QString("GDCM %1 used for DICOM parsing and sorting!").arg(gdcm::Version::GetVersion()));
 
-    PrintMemoryUsage();
-    QString status;
     mitk::DataNode::Pointer node;
     // Indeterminate: the import has no step to report; the task ends when this function returns.
     mitk::ProgressTask progress("Importing diffusion DICOM");
 
+    // The folder list is cleared only after a successful import, so that a failed one can be
+    // repeated with other options.
     gdcm::Directory::FilenamesType complete_list;
-    while(m_Controls->listWidget->count())
+    for (int folderIndex = 0; folderIndex < nrFolders; ++folderIndex)
     {
       // RETREIVE FOLDERNAME
-      QListWidgetItem * item  = m_Controls->listWidget->takeItem(0);
-      QString folderName = item->text();
+      QString folderName = m_Controls->listWidget->item(folderIndex)->text();
+      const auto files = CollectDicomFiles(folderName.toStdString(),
+                                           m_Controls->m_DicomLoadRecursiveCheckbox->isChecked(),
+                                           m_Controls->m_SubdirPrefixLineEdit->text().toStdString());
+      Status(QString(" ... found %1 different files").arg(files.size()));
+      complete_list.insert(complete_list.end(), files.begin(), files.end());
+    }
 
-
-      if( this->m_Controls->m_DicomLoadRecursiveCheckbox->isChecked() )
-      {
-
-        std::string subdir_prefix = "";
-        if( has_prefix )
-        {
-          subdir_prefix = this->m_Prefix;
-        }
-
-        itksys::Directory rootdir;
-        rootdir.Load( folderName.toStdString().c_str() );
-
-        for( unsigned int idx=0; idx<rootdir.GetNumberOfFiles(); idx++)
-        {
-          std::string current_path = rootdir.GetFile(idx);
-          std::string directory_path = std::string(rootdir.GetPath()) + std::string("/") + current_path;
-
-          MITK_INFO("dicom.loader.inputrootdir.test") << "ProbePath:   " << current_path;
-          MITK_INFO("dicom.loader.inputrootdir.test") << "IsDirectory: " << itksys::SystemTools::FileIsDirectory( itksys::SystemTools::ConvertToOutputPath( directory_path.c_str() ).c_str() )
-                                                      << " StartsWith: " << itksys::SystemTools::StringStartsWith( current_path.c_str(), subdir_prefix.c_str() );
-
-          // test for prefix
-          if(    itksys::SystemTools::FileIsDirectory( itksys::SystemTools::ConvertToOutputPath( directory_path.c_str() ).c_str() )
-                 && itksys::SystemTools::StringStartsWith( current_path.c_str(), subdir_prefix.c_str() )
-                 )
-          {
-
-            gdcm::Directory d;
-            d.Load( itksys::SystemTools::ConvertToOutputPath( directory_path.c_str() ) , false);
-
-            MITK_INFO("dicom.load.subdir.attempt") << "In directory " << itksys::SystemTools::ConvertToOutputPath( directory_path.c_str() );
-
-            const gdcm::Directory::FilenamesType &l1 = d.GetFilenames();
-            const unsigned int ntotalfiles = l1.size();
-            Status(QString(" ... found %1 different files").arg(ntotalfiles));
-
-            for( unsigned int i=0; i< ntotalfiles; i++)
-            {
-              complete_list.push_back( l1.at(i) );
-            }
-
-
-          }
-
-        }
-      }
-      else
-      {
-        gdcm::Directory d;
-        d.Load( folderName.toStdString().c_str(), this->m_Controls->m_DicomLoadRecursiveCheckbox->isChecked() ); // recursive !
-        const gdcm::Directory::FilenamesType &l1 = d.GetFilenames();
-        const unsigned int ntotalfiles = l1.size();
-        Status(QString(" ... found %1 different files").arg(ntotalfiles));
-
-        for( unsigned int i=0; i< ntotalfiles; i++)
-        {
-          complete_list.push_back( l1.at(i) );
-        }
-
-      }
-
-
-
+    if (complete_list.empty())
+    {
+      Error(QString("No files found in the selected folders."));
+      QMessageBox::warning(m_Parent, "Diffusion DICOM import", "No files were found in the selected folders.");
+      return;
     }
 
     {
-      mitk::DiffusionDICOMFileReader::Pointer gdcmReader = mitk::DiffusionDICOMFileReader::New();
-      mitk::DICOMTagBasedSorter::Pointer tagSorter = mitk::DICOMTagBasedSorter::New();
-
-      // Use tags as in Qmitk
-      // all the things that split by tag in DicomSeriesReader
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0010) ); // Number of Rows
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0011) ); // Number of Columns
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0030) ); // Pixel Spacing
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x1164) ); // Imager Pixel Spacing
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x0037) ); // Image Orientation (Patient) // TODO add tolerance parameter (l. 1572 of original code)
-      // TODO handle as real vectors! cluster with configurable errors!
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x000e) ); // Series Instance UID
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0018, 0x0050) ); // Slice Thickness
-      tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0028, 0x0008) ); // Number of Frames
-      //tagSorter->AddDistinguishingTag( mitk::DICOMTag(0x0020, 0x0052) ); // Frame of Reference UID
-
-      // gdcmReader->AddSortingElement( tagSorter );
-      //mitk::DICOMFileReaderTestHelper::TestOutputsContainInputs( gdcmReader );
-
-      mitk::DICOMSortCriterion::ConstPointer sorting =
-          mitk::SortByImagePositionPatient::New(  // Image Position (Patient)
-                                                  //mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0020, 0x0013), // instance number
-                                                  mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0020, 0x0012), // aqcuisition number
-                                                                             mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0032), // aqcuisition time
-                                                                                                        mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0018, 0x1060), // trigger time
-                                                                                                                                   mitk::DICOMSortByTag::New( mitk::DICOMTag(0x0008, 0x0018) // SOP instance UID (last resort, not really meaningful but decides clearly)
-                                                                                                                                                              ).GetPointer()
-                                                                                                                                   ).GetPointer()
-                                                                                                        ).GetPointer()
-                                                                             ).GetPointer()
-                                                  // ).GetPointer()
-                                                  ).GetPointer();
-      tagSorter->SetSortCriterion( sorting );
-
-      // mosaic
-      gdcmReader->SetResolveMosaic( this->m_Controls->m_SplitMosaicCheckBox->isChecked() );
-      gdcmReader->AddSortingElement( tagSorter );
-      gdcmReader->SetInputFiles( complete_list );
-      try
+      const auto images = mitk::DiffusionDICOMFileReader::LoadDiffusionDicomSeries( complete_list, this->m_Controls->m_SplitMosaicCheckBox->isChecked(), true );
+      if (images.empty())
       {
-        gdcmReader->AnalyzeInputFiles();
+        Error(QString("No diffusion-weighted image found in the selected folders."));
+        QMessageBox::warning(m_Parent, "Diffusion DICOM import", "No diffusion-weighted image was found in the selected folders.");
+        return;
       }
-      catch( const itk::ExceptionObject &e)
+      for( const auto& loaded_image : images )
       {
-        MITK_ERROR << "Failed to analyze data. " << e.what();
-      }
-      catch( const std::exception &se)
-      {
-        MITK_ERROR << "Std Exception " << se.what();
-      }
-
-      gdcmReader->LoadImages();
-
-      for( unsigned int o = 0; o < gdcmReader->GetNumberOfOutputs(); o++ )
-      {
-        mitk::Image::Pointer loaded_image = gdcmReader->GetOutput(o).GetMitkImage();
-
-        std::string outname;
-        if (gdcmReader->GetSeriesName(o)!="-")
-          outname = gdcmReader->GetSeriesName(o);
-        else if (gdcmReader->GetStudyName(o)!="-")
-          outname = gdcmReader->GetStudyName(o);
-        else
-          loaded_image->GetPropertyList()->GetStringProperty("diffusion.dicom.importname", outname );
-
-        std::string val = "-";
-
-        if (gdcmReader->patient_ids().size()>o)
+        // "Merge duplicate gradients": volumes whose gradients differ by less than the given
+        // precision are averaged, as in the preprocessing view.
+        if (m_Controls->m_DicomLoadAverageDuplicatesCheckbox->isChecked())
         {
-          val = gdcmReader->patient_ids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.patient_id",val.c_str());
-        }
-
-        if (gdcmReader->patient_names().size()>o)
-        {
-          val = gdcmReader->patient_names().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.patient_name",val.c_str());
-        }
-
-        if (gdcmReader->study_instance_uids().size()>o)
-        {
-          val = gdcmReader->study_instance_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.study_instance_uid",val.c_str());
-        }
-
-        if (gdcmReader->series_instance_uids().size()>o)
-        {
-          val = gdcmReader->series_instance_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.series_instance_uid",val.c_str());
-        }
-
-        if (gdcmReader->sop_instance_uids().size()>o)
-        {
-          val = gdcmReader->sop_instance_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.sop_instance_uid",val.c_str());
-        }
-
-        if (gdcmReader->frame_of_reference_uids().size()>o)
-        {
-          val = gdcmReader->frame_of_reference_uids().at(o);
-          loaded_image->GetPropertyList()->SetStringProperty("DICOM.frame_of_reference_uid",val.c_str());
+          mitk::DiffusionPropertyHelper::AverageRedundantGradients(loaded_image, m_Controls->m_Blur->value());
+          mitk::DiffusionPropertyHelper::InitializeImage(loaded_image);
         }
 
         node = mitk::DataNode::New();
         node->SetData( loaded_image );
-        node->SetName( outname.c_str() );
+        node->SetName( loaded_image->GetProperty("name")->GetValueAsString() );
 
         GetDataStorage()->Add(node);
       }
     }
 
-    Status("Timing information");
-    clock.Report();
-
-    if(!m_OutputFolderNameSet && node.IsNotNull())
+    if(node.IsNotNull())
     {
       mitk::BaseData::Pointer basedata = node->GetData();
       if (basedata.IsNotNull())
@@ -567,35 +279,19 @@ void QmitkDiffusionDicomImport::NewDicomLoadStartLoad()
 
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 
-    try
-    {
-      MITK_INFO << " ** Changing locale back from " << setlocale(LC_ALL, nullptr) << " to '" << currLocale << "'";
-      setlocale(LC_ALL, currLocale.c_str());
-    }
-    catch(...)
-    {
-      MITK_INFO << "Could not reset locale " << currLocale;
-    }
+    m_Controls->listWidget->clear();
   }
   catch (itk::ExceptionObject &ex)
   {
     Error(QString("%1\n%2\n%3\n%4\n%5\n%6").arg(ex.GetNameOfClass()).arg(ex.GetFile()).arg(ex.GetLine()).arg(ex.GetLocation()).arg(ex.what()).arg(ex.GetDescription()));
     return ;
   }
+  catch (const std::exception &ex)
+  {
+    // e.g. std::bad_alloc for a series too large for the memory; the slot must not let it escape
+    Error(QString("DICOM import failed: %1").arg(ex.what()));
+    return;
+  }
 
-  if (!imageSuccessfullySaved)
-    QMessageBox::warning(nullptr,"WARNING","One or more files could not be saved! The according files where moved to the datastorage.");
-  Status(QString("Finished import with memory:"));
-
-  PrintMemoryUsage();
-}
-
-void QmitkDiffusionDicomImport::SetDwiNodeProperties(mitk::DataNode::Pointer node, std::string name)
-{
-
-  node->SetProperty( "IsDWIRawVolume", mitk::BoolProperty::New( true ) );
-
-  // set foldername as string property
-  mitk::StringProperty::Pointer nameProp = mitk::StringProperty::New( name );
-  node->SetProperty( "name", nameProp );
+  Status(QString("Finished import"));
 }

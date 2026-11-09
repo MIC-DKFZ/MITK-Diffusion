@@ -1,9 +1,27 @@
 /**
 \page org_mitk_views_odfmaximaextraction ODF Peak Extraction
 
-This view provides the user interface to extract the principal diffusion direction of tensors and the peaks of spherical harmonic ODFs using gradient descent optimization.
+This view provides the user interface to extract the principal diffusion direction of tensors and the peaks of spherical harmonic ODFs: the local maxima of the ODF sampled in 252 directions, each then refined to the exact maximum of the spherical harmonic function.
 
 The output peaks can for example be used for streamline tractography.
+
+The spherical harmonics convention of an SH image (MITK/MRtrix or FSL/Dipy) is a property of the image: it is chosen in the reader options when an SH image of another toolkit is loaded, and the peak extraction uses it.
+
+A NIfTI or NRRD file is read as an SH image when "SH Image" is chosen as reader in the open dialog. SH files of earlier MITK versions that store one vector of coefficients per voxel of a 3D image open as plain multi-component images unless "SH Image" is chosen. With the reader option "SH convention" left at "auto", their coefficients are taken over unchanged in MITK's own FSL definition, the basis those versions used. Do not choose "FSL/Dipy" for these files: that option converts files written by dipy (its descoteaux07 basis) and gives wrong peaks for them. A file in this layout that the current MITK saved from an SH image with the generic image writer (only when that writer is chosen in the save dialog) usually holds MITK's legacy basis instead; choose "MITK legacy (MRtrix 0.2)" for it.
+
+For SH images, a peak is dropped if it is below the relative threshold (a fraction of the largest peak of the voxel) or the absolute threshold, or closer than the angular threshold to a larger peak that is kept, so that each fiber direction appears once; at most "Max. Peaks" are kept. Voxels with an isotropic ODF, where no direction stands out, get no peak. For tensor images, the threshold is an FA threshold (voxels with a lower FA get no direction), and only it and the vector normalization act: without normalization the principal eigenvector is scaled by the FA. The other parameters are disabled while a tensor image is selected.
+
+An optional mask (a binary 3D image or a segmentation, whose labels together form the mask, hidden ones too) restricts the extraction to its non-zero voxels; it must have the geometry of the input image.
+
+The extraction runs in the background: the application stays usable, and the start button is disabled until the peak image appears as a new node below the input image. A running computation cannot be stopped: closing the view lets it run to its end and drops its result, and quitting the application waits until it has ended.
+
+\section OdfMaximaExtractionUse Peaks for Tractography
+
+A peak image holds up to "Max. Peaks" directions per voxel with their lengths. Streamline tractography on peaks (the manual page "Streamline Tractography") follows, at every step, the peak closest to the current direction, so it passes crossings where a tensor would stop. With the normalization "by the largest peak" (the default), the lengths are relative to the voxel's largest peak and the tracking cutoff of 0.1 to 0.3 on them drops weak secondary peaks; without normalization, the lengths are the ODF values. The defaults (3 peaks, relative threshold 0.4, absolute threshold 0.03, angular threshold 15 degrees) suit CSA Q-ball ODFs of in-vivo data; a brain mask keeps the extraction out of the background, where noise gives random peaks.
+
+\section OdfMaximaExtractionRest REST Endpoints
+
+\li POST /api/v1/diffusion/reconstruction/peaks with {image: uid of an SH or tensor image, mask (optional), max_peaks, relative_threshold, absolute_threshold, angular_threshold, normalization: "max", "none" or "unit"; for tensors fa_threshold and normalize}: the extraction of this view as a job; the peak image is added below the input image.
 
 
 */

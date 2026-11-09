@@ -19,68 +19,32 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include "itkImage.h"
 #include <mitkProperties.h>
 #include "itkShToRgbImageFilter.h"
+#include <mitkDiffusionModellingHelperFunctions.h>
 
-mitk::ShImage::ShImage() : Image()
-  , m_ShOrder(0)
-  , m_NumCoefficients(0)
-  , m_ShConvention(SH_CONVENTION::MRTRIX)
+mitk::ShImage::ShImage()
+  : m_ShConvention(SH_CONVENTION::MRTRIX)
 {
-  m_RgbImage = nullptr;
 }
 
-mitk::ShImage::~ShImage()
+mitk::ShImage::ShImage(const ShImage& other) : RgbCachedImage(other)
+  , m_ShConvention(other.m_ShConvention)
 {
-
 }
 
-unsigned int mitk::ShImage::NumCoefficients()
+mitk::ShImage::~ShImage() = default;
+
+unsigned int mitk::ShImage::NumCoefficients() const
 {
-  if (m_NumCoefficients==0 || m_ShOrder==0)
-  {
-    m_NumCoefficients = static_cast<unsigned int>(this->m_ImageDescriptor->GetChannelTypeById(0).GetNumberOfComponents());
-    int c=3, d=2-2*static_cast<int>(m_NumCoefficients);
-    int D = c*c-4*d;
-    if (D>0)
-    {
-      int s = (-c+static_cast<int>(sqrt(D)))/2;
-      if (s<0)
-        s = (-c-static_cast<int>(sqrt(D)))/2;
-      m_ShOrder = static_cast<unsigned int>(s);
-    }
-    else if (D==0)
-      m_ShOrder = static_cast<unsigned int>(-c/2);
-  }
-  return m_NumCoefficients;
+  return static_cast<unsigned int>(this->m_ImageDescriptor->GetChannelTypeById(0).GetNumberOfComponents());
 }
 
-unsigned int mitk::ShImage::ShOrder()
+unsigned int mitk::ShImage::ShOrder() const
 {
-  NumCoefficients();
-  return m_ShOrder;
-}
-
-vtkImageData* mitk::ShImage::GetVtkImageData(int t, int n)
-{
-  if(m_RgbImage.IsNull())
-  {
-    ShOrder();
-    NumCoefficients();
-    ConstructRgbImage();
-  }
-   return m_RgbImage->GetVtkImageData(t,n);
-}
-
-const vtkImageData*mitk::ShImage::GetVtkImageData(int t, int n) const
-{
-  if(m_RgbImage.IsNull())
-  {
-    ConstructRgbImage();
-  }
-  return m_RgbImage->GetVtkImageData(t,n);
+  return mitk::sh::ShOrder(static_cast<int>(this->NumCoefficients()));
 }
 
 template<int nShOrder>
-void mitk::ShImage::Construct() const
+mitk::Image::Pointer mitk::ShImage::Construct() const
 {
   typedef itk::Image<itk::Vector<float, ( nShOrder * nShOrder + nShOrder + 2)/2 + nShOrder >,3> ImageType;
   typedef itk::ShToRgbImageFilter<ImageType, nShOrder> FilterType;
@@ -93,61 +57,50 @@ void mitk::ShImage::Construct() const
   filter->Update();
 
   itk::Image<itk::RGBAPixel<unsigned char>,3>::Pointer tmp = filter->GetOutput();
-  m_RgbImage = mitk::Image::New();
-  m_RgbImage->InitializeByItk( tmp.GetPointer() );
-  m_RgbImage->SetVolume( tmp->GetBufferPointer() );
+  mitk::Image::Pointer image = mitk::Image::New();
+  image->InitializeByItk( tmp.GetPointer() );
+  image->SetVolume( tmp->GetBufferPointer() );
+  return image;
 }
 
-void mitk::ShImage::ConstructRgbImage() const
+mitk::Image::Pointer mitk::ShImage::CreateRgbImage() const
 {
   switch (this->m_ImageDescriptor->GetChannelTypeById(0).GetNumberOfComponents())
   {
   case 6:
-    Construct<2>();
-    break;
+    return Construct<2>();
   case 15:
-    Construct<4>();
-    break;
+    return Construct<4>();
   case 28:
-    Construct<6>();
-    break;
+    return Construct<6>();
   case 45:
-    Construct<8>();
-    break;
+    return Construct<8>();
   case 66:
-    Construct<10>();
-    break;
+    return Construct<10>();
   case 91:
-    Construct<12>();
-    break;
+    return Construct<12>();
   default :
     mitkThrow() << "SH order larger 12 not supported";
   }
 }
 
-const vtkImageData* mitk::ShImage::GetNonRgbVtkImageData(int t, int n) const
-{
-  return Superclass::GetVtkImageData(t,n);
-}
-
-vtkImageData* mitk::ShImage::GetNonRgbVtkImageData(int t, int n)
-{
-  return Superclass::GetVtkImageData(t,n);
-}
-
 void mitk::ShImage::PrintSelf(std::ostream &os, itk::Indent indent) const
 {
-  os << indent << "Spherical harmonics order: " << m_ShOrder << std::endl;
-  os << indent << "Number of coefficients: " << m_NumCoefficients << std::endl;
+  if (this->IsInitialized())
+    os << indent << "Number of coefficients: " << this->NumCoefficients() << std::endl;
   Superclass::PrintSelf(os, indent);
 }
 
-mitk::ShImage::SH_CONVENTION mitk::ShImage::ShImage::GetShConvention() const
+mitk::ShImage::SH_CONVENTION mitk::ShImage::GetShConvention() const
 {
   return m_ShConvention;
 }
 
-void mitk::ShImage::ShImage::SetShConvention(SH_CONVENTION ShConvention)
+void mitk::ShImage::SetShConvention(SH_CONVENTION ShConvention)
 {
+  if (m_ShConvention == ShConvention)
+    return;
   m_ShConvention = ShConvention;
+  // The colour map and the glyphs depend on the convention.
+  this->Modified();
 }

@@ -31,14 +31,11 @@ See LICENSE.txt or http://www.mitk.org for details.
 #endif
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkMAPAlgorithmHelper.h>
-#include <itkExtractDwiChannelFilter.h>
 #include <mitkRegistrationHelper.h>
-#include <mitkImageMappingHelper.h>
 #include <itksys/SystemTools.hxx>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
-#include <itkComposeImageFilter.h>
-#include <mitkITKImageImport.h>
-#include <mitkDiffusionImageCorrectionFilter.h>
+#include <mitkDiffusionImageEditing.h>
+#include <mitkDiffusionImageMapping.h>
 #include <mitkDiffusionDataIOHelper.h>
 
 typedef mitk::DiffusionPropertyHelper DPH;
@@ -46,54 +43,10 @@ typedef mitk::DiffusionPropertyHelper DPH;
 
 mitk::Image::Pointer apply_transform(mitk::Image::Pointer moving, mitk::Image::Pointer fixed_single, mitk::MAPRegistrationWrapper::Pointer reg, bool resample)
 {
-  mitk::Image::Pointer registered_image;
+  // DiffusionImageMapping turns the world gradients of a DWI with the image.
   if (!resample)
-  {
-    registered_image = mitk::ImageMappingHelper::refineGeometry(moving, reg, true);
-  }
-  else
-  {
-    if (!mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(moving))
-    {
-      registered_image = mitk::ImageMappingHelper::map(moving, reg, false, 0, fixed_single->GetGeometry(), false, 0, mitk::ImageMappingInterpolator::BSpline_3);
-    }
-    else
-    {
-      typedef itk::Image<mitk::DiffusionPropertyHelper::DiffusionPixelType, 3> ITKDiffusionVolumeType;
-      typedef itk::ComposeImageFilter < ITKDiffusionVolumeType > ComposeFilterType;
-      auto composer = ComposeFilterType::New();
-
-      auto itkVectorImagePointer = mitk::DiffusionPropertyHelper::GetItkVectorImage(moving);
-      for (unsigned int i=0; i<itkVectorImagePointer->GetVectorLength(); ++i)
-      {
-        itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
-        filter->SetInput( itkVectorImagePointer);
-        filter->SetChannelIndex(i);
-        filter->Update();
-
-        mitk::Image::Pointer gradientVolume = mitk::Image::New();
-        gradientVolume->InitializeByItk( filter->GetOutput() );
-        gradientVolume->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-
-        mitk::Image::Pointer registered_mitk_image = mitk::ImageMappingHelper::map(gradientVolume, reg, false, 0, fixed_single->GetGeometry(), false, 0, mitk::ImageMappingInterpolator::BSpline_3);
-
-        auto registered_itk_image = ITKDiffusionVolumeType::New();
-        mitk::CastToItkImage(registered_mitk_image, registered_itk_image);
-        composer->SetInput(i, registered_itk_image);
-      }
-      composer->Update();
-
-      registered_image = mitk::GrabItkImageMemory( composer->GetOutput() );
-      mitk::DiffusionPropertyHelper::CopyProperties(moving, registered_image, true);
-
-      typedef mitk::DiffusionImageCorrectionFilter CorrectionFilterType;
-      CorrectionFilterType::Pointer corrector = CorrectionFilterType::New();
-      corrector->SetImage( registered_image );
-      corrector->CorrectDirections( mitk::MITKRegistrationHelper::getAffineMatrix(reg, false)->GetMatrix().GetVnlMatrix() );
-    }
-  }
-
-  return registered_image;
+    return mitk::DiffusionImageMapping::RefineGeometry(moving, reg);
+  return mitk::DiffusionImageMapping::MapImage(moving, reg, fixed_single->GetGeometry(), mitk::ImageMappingInterpolator::BSpline_3);
 }
 
 
@@ -111,7 +64,7 @@ int main(int argc, char* argv[])
   parser.addArgument("", "m", mitkCommandLineParser::String, "Moving:", "moving image", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output image", us::Any(), false, false, false, mitkCommandLineParser::Output);
   parser.addArgument("resample", "", mitkCommandLineParser::Bool, "Resample:", "resample moving image", false);
-  parser.addArgument("coreg", "", mitkCommandLineParser::StringList, "", "additionally apply transform to these images", us::Any(), true, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("coreg", "", mitkCommandLineParser::StringList, "", "additionally apply transform to these images (files or folders); written next to the output as NAME_registered.EXT", us::Any(), true, false, false, mitkCommandLineParser::Input);
 
   std::map<std::string, us::Any> parsedArgs = parser.parseArguments(argc, argv);
   if (parsedArgs.size()==0)
@@ -130,6 +83,16 @@ int main(int argc, char* argv[])
   if (parsedArgs.count("coreg"))
     coreg = us::any_cast<mitkCommandLineParser::StringContainerType>(parsedArgs["coreg"]);
 
+  // load_mitk_images skips paths that do not exist; check them before the registration runs.
+  for (const auto& file : coreg)
+  {
+    if (!itksys::SystemTools::FileExists(file))
+    {
+      std::cout << "--coreg: " << file << " does not exist." << std::endl;
+      return EXIT_FAILURE;
+    }
+  }
+
   try
   {
     typedef itk::Image< float, 3 > ItkFloatImageType;
@@ -145,34 +108,10 @@ int main(int argc, char* argv[])
     mitk::MAPAlgorithmHelper helper(algo);
 
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(fixed))
-    {
-      DPH::ImageType::Pointer itkVectorImagePointer = DPH::ImageType::New();
-      mitk::CastToItkImage(fixed, itkVectorImagePointer);
-
-      itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
-      filter->SetInput( itkVectorImagePointer);
-      filter->SetChannelIndex(0);
-      filter->Update();
-
-      fixed_single = mitk::Image::New();
-      fixed_single->InitializeByItk( filter->GetOutput() );
-      fixed_single->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-    }
+      fixed_single = mitk::DiffusionImageEditing::ExtractVolume(fixed, 0);
 
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(moving))
-    {
-      DPH::ImageType::Pointer itkVectorImagePointer = DPH::ImageType::New();
-      mitk::CastToItkImage(moving, itkVectorImagePointer);
-
-      itk::ExtractDwiChannelFilter< short >::Pointer filter = itk::ExtractDwiChannelFilter< short >::New();
-      filter->SetInput( itkVectorImagePointer);
-      filter->SetChannelIndex(0);
-      filter->Update();
-
-      moving_single = mitk::Image::New();
-      moving_single->InitializeByItk( filter->GetOutput() );
-      moving_single->SetImportChannel( filter->GetOutput()->GetBufferPointer() );
-    }
+      moving_single = mitk::DiffusionImageEditing::ExtractVolume(moving, 0);
 
     helper.SetData(moving_single, fixed_single);
     mitk::MAPRegistrationWrapper::Pointer reg = helper.GetMITKRegistrationWrapper();
@@ -180,9 +119,7 @@ int main(int argc, char* argv[])
     mitk::Image::Pointer registered_image = apply_transform(moving, fixed_single, reg, resample);
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(registered_image))
     {
-      mitk::DiffusionPropertyHelper::InitializeImage( registered_image );
-
-      std::string file_extension = itksys::SystemTools::GetFilenameExtension(o);
+      std::string file_extension = mitk::DiffusionDataIOHelper::GetExtension(o);
       if (file_extension==".nii" || file_extension==".nii.gz")
         mitk::IOUtil::Save(registered_image, "DWI_NIFTI", o);
       else
@@ -191,19 +128,20 @@ int main(int argc, char* argv[])
     else
       mitk::IOUtil::Save(registered_image, o);
 
-    std::string path = ist::GetFilenamePath(o) + "/";
+    // Next to the output; for an output without folder, in the working directory.
+    std::string path = itksys::SystemTools::GetFilenamePath(o);
+    if (!path.empty())
+      path += "/";
     std::vector< std::string > file_names;
     auto coreg_images = mitk::DiffusionDataIOHelper::load_mitk_images(coreg, &file_names);
     for (unsigned int i=0; i<coreg_images.size(); ++i)
     {
-      std::string ext = ist::GetFilenameExtension(file_names.at(i));
-      std::string out_name = path + ist::GetFilenameWithoutExtension(file_names.at(i)) + "_registered" + ext;
+      std::string ext = mitk::DiffusionDataIOHelper::GetExtension(file_names.at(i));
+      std::string out_name = path + mitk::DiffusionDataIOHelper::GetNameWithoutExtension(file_names.at(i)) + "_registered" + ext;
 
       registered_image = apply_transform(coreg_images.at(i), fixed_single, reg, resample);
       if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(registered_image))
       {
-        mitk::DiffusionPropertyHelper::InitializeImage( registered_image );
-
         if (ext==".nii" || ext==".nii.gz")
           mitk::IOUtil::Save(registered_image, "DWI_NIFTI", out_name);
         else

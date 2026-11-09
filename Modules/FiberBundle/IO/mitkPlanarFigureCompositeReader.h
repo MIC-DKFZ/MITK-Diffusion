@@ -14,37 +14,26 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkPlanarFigureCompositeReader_h
-#define __mitkPlanarFigureCompositeReader_h
-
-#include <mitkCommon.h>
-#include <vtkSmartPointer.h>
+#ifndef mitkPlanarFigureCompositeReader_h
+#define mitkPlanarFigureCompositeReader_h
 
 #include <mitkAbstractFileReader.h>
 
 namespace mitk
 {
-
-  /** \brief
-  */
-
+  /** \brief Reads the operation (AND, OR, NOT) of a planar figure composite (.pfc). */
   class PlanarFigureCompositeReader : public AbstractFileReader
   {
   public:
 
     PlanarFigureCompositeReader();
-    ~PlanarFigureCompositeReader() override{}
-    PlanarFigureCompositeReader(const PlanarFigureCompositeReader& other);
+    PlanarFigureCompositeReader(const PlanarFigureCompositeReader& other) = default;
     PlanarFigureCompositeReader * Clone() const override;
 
     using mitk::AbstractFileReader::DoRead;
     std::vector<itk::SmartPointer<BaseData> > DoRead() override;
-
-  private:
-
-    us::ServiceRegistration<mitk::IFileReader> m_ServiceReg;
   };
 
-} //namespace MITK
+}
 
-#endif // __mitkFiberBundleReader_h
+#endif

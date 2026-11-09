@@ -13,17 +13,9 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <property name="styleSheet">
-   <string notr="true"/>
-  </property>
   <layout class="QGridLayout" name="gridLayout_2">
    <item row="3" column="0">
     <widget class="QGroupBox" name="m_IntraAxonalGroupBox">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Intra-axonal Compartment</string>
      </property>
@@ -122,11 +114,6 @@
    </item>
    <item row="4" column="0">
     <widget class="QGroupBox" name="groupBox_5">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Inter-axonal Compartment</string>
      </property>
@@ -146,7 +133,7 @@
       <item row="0" column="0">
        <widget class="QComboBox" name="m_Compartment2Box">
         <property name="toolTip">
-         <string>Select signal model for intra-axonal compartment.</string>
+         <string>Select signal model for inter-axonal compartment.</string>
         </property>
         <item>
          <property name="text">
@@ -180,9 +167,6 @@
        <widget class="QmitkTensorModelParametersWidget" name="m_TensorWidget2" native="true"/>
       </item>
       <item row="4" column="0">
-       <widget class="QmitkPrototypeSignalParametersWidget" name="m_PrototypeWidget2" native="true"/>
-      </item>
-      <item row="5" column="0">
        <widget class="QFrame" name="m_Comp2FractionFrame">
         <property name="frameShape">
          <enum>QFrame::NoFrame</enum>
@@ -225,11 +209,6 @@
    </item>
    <item row="2" column="0">
     <widget class="QGroupBox" name="groupBox">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Image Settings</string>
      </property>
@@ -248,9 +227,6 @@
       </property>
       <item row="2" column="0">
        <widget class="QLabel" name="m_GeometryMessage">
-        <property name="styleSheet">
-         <string notr="true">color: rgb(255, 0, 0);</string>
-        </property>
         <property name="text">
          <string>Using  geometry of selected image!</string>
         </property>
@@ -283,7 +259,7 @@
          <item row="8" column="1">
           <widget class="QSpinBox" name="m_TIbox">
            <property name="toolTip">
-            <string>Inversion time (in ms) for inversion recovery sequences. If 0, no inversion pulse is simulated.</string>
+            <string>Inversion time (in ms) for inversion recovery sequences, shorter than TR. If 0, no inversion pulse is simulated. Used only with signal relaxation.</string>
            </property>
            <property name="minimum">
             <number>0</number>
@@ -419,7 +395,7 @@
          <item row="14" column="0">
           <widget class="QCheckBox" name="m_ReversePhaseBox">
            <property name="toolTip">
-            <string>Output one image per compartment containing the corresponding volume fractions per voxel.</string>
+            <string>Reverse the phase encoding direction (posterior-anterior instead of anterior-posterior).</string>
            </property>
            <property name="text">
             <string>Reverse Phase Encoding Direction</string>
@@ -436,6 +412,9 @@
            </property>
            <property name="decimals">
             <number>4</number>
+           </property>
+           <property name="minimum">
+            <double>0.000100000000000</double>
            </property>
            <property name="maximum">
             <double>100.000000000000000</double>
@@ -849,9 +828,6 @@
       </item>
       <item row="4" column="0">
        <widget class="QLabel" name="m_DiffusionPropsMessage">
-        <property name="styleSheet">
-         <string notr="true">color: rgb(255, 0, 0);</string>
-        </property>
         <property name="text">
          <string>Using  gradients of selected DWI!</string>
         </property>
@@ -952,7 +928,7 @@
          <item row="0" column="1">
           <widget class="QSpinBox" name="m_SizeX">
            <property name="toolTip">
-            <string>Fiber sampling factor which determines the accuracy of the calculated fiber and non-fiber volume fractions.</string>
+            <string>Image size in x direction (number of voxels).</string>
            </property>
            <property name="minimum">
             <number>1</number>
@@ -971,7 +947,7 @@
          <item row="0" column="2">
           <widget class="QSpinBox" name="m_SizeY">
            <property name="toolTip">
-            <string>Fiber sampling factor which determines the accuracy of the calculated fiber and non-fiber volume fractions.</string>
+            <string>Image size in y direction (number of voxels).</string>
            </property>
            <property name="minimum">
             <number>1</number>
@@ -990,7 +966,7 @@
          <item row="0" column="3">
           <widget class="QSpinBox" name="m_SizeZ">
            <property name="toolTip">
-            <string>Fiber sampling factor which determines the accuracy of the calculated fiber and non-fiber volume fractions.</string>
+            <string>Image size in z direction (number of voxels).</string>
            </property>
            <property name="minimum">
             <number>1</number>
@@ -1117,11 +1093,6 @@
    </item>
    <item row="5" column="0">
     <widget class="QGroupBox" name="groupBox_6">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Extra-axonal Compartments</string>
      </property>
@@ -1309,11 +1280,6 @@
    </item>
    <item row="6" column="0">
     <widget class="QGroupBox" name="groupBox_3">
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-     </property>
      <property name="title">
       <string>Noise and other Artifacts</string>
      </property>
@@ -1379,11 +1345,6 @@
          </item>
          <item row="3" column="0">
           <widget class="QGroupBox" name="m_RotationArtifactFrame">
-           <property name="styleSheet">
-            <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-           </property>
            <property name="title">
             <string>Rotation</string>
            </property>
@@ -1566,11 +1527,6 @@
          </item>
          <item row="4" column="0">
           <widget class="QGroupBox" name="m_TranslationArtifactFrame">
-           <property name="styleSheet">
-            <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-           </property>
            <property name="title">
             <string>Translation</string>
            </property>
@@ -1779,7 +1735,7 @@
             <item row="0" column="1">
              <widget class="QLineEdit" name="m_MotionVolumesBox">
               <property name="toolTip">
-               <string>Type in the volume indices that should be affected by motion (e.g. &quot;0 3 7&quot; whithout quotation marks). Leave blank for motion in all volumes. Type in &quot;random&quot; to randomly select volumes for motion. A list of negative numbers (e.g. -1 -2 -3) excludes volumes (e.g. 1 2 3) selects all remaining volumes.</string>
+               <string>Type in the volume indices that should be affected by motion (e.g. &quot;0 3 7&quot; without quotation marks). Leave blank for motion in all volumes. Type in &quot;random&quot; to randomly select volumes for motion (volume 0 never moves). A list of negative numbers (e.g. -1 -2 -3) moves all volumes except 1, 2 and 3. A list with both signs or without numbers moves no volume.</string>
               </property>
               <property name="text">
                <string>random</string>
@@ -2126,6 +2082,88 @@
         </layout>
        </widget>
       </item>
+      <item row="24" column="0">
+       <widget class="QFrame" name="m_KspacePhaseFrame">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <layout class="QFormLayout" name="m_KspacePhaseLayout">
+         <property name="horizontalSpacing">
+          <number>6</number>
+         </property>
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="m_KspacePhaseLabel">
+           <property name="text">
+            <string>Distortion Phase:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="m_KspacePhaseBox">
+           <property name="toolTip">
+            <string>How the k-space simulation computes the phase of distortions and eddy currents. Exact: sums the phase of every pixel for every k-space sample (slow). Time segments: approximates the phase by a few transforms per slice; the automatic count stays below 0.1 % relative error (far below typical noise) and was 2.2 to 127 times faster on a 128x128 slice on one processor core, the less the stronger the field; slices where the time segments would take longer on one core, or more than 256 MB of memory, take the exact sum; slices simulated at the same time wait for memory beyond 2 GB in all, which changes only the run time.</string>
+           </property>
+           <item>
+            <property name="text">
+             <string>Exact</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Time Segments (automatic)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Time Segments (fixed)</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="m_KspaceTimeSegmentsLabel">
+           <property name="text">
+            <string>Segments:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QSpinBox" name="m_KspaceTimeSegmentsBox">
+           <property name="toolTip">
+            <string>Fixed number of time segments per slice. The count needed grows with the frequency range of the field map times the readout time; too few segments give large errors, so the automatic count is recommended.</string>
+           </property>
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>10000</number>
+           </property>
+           <property name="value">
+            <number>32</number>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
       <item row="11" column="0">
        <widget class="Line" name="line_6">
         <property name="orientation">
@@ -2248,6 +2286,34 @@
              <string>Rician</string>
             </property>
            </item>
+           <item>
+            <property name="text">
+             <string>Noncentral chi</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="m_NoiseCoilsLabel">
+           <property name="text">
+            <string>Channels:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QSpinBox" name="m_NoiseCoilsBox">
+           <property name="toolTip">
+            <string>Number of receive channels combined by sum of squares whose magnitude noise is added (noncentral chi distribution). Independent of &quot;Number of Channels&quot;, the coils simulated in k-space.</string>
+           </property>
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>128</number>
+           </property>
+           <property name="value">
+            <number>1</number>
+           </property>
           </widget>
          </item>
         </layout>
@@ -2362,7 +2428,7 @@
         </property>
        </widget>
       </item>
-      <item row="25" column="0">
+      <item row="26" column="0">
        <widget class="QCheckBox" name="m_AddGibbsRinging">
         <property name="toolTip">
          <string>Add ringing artifacts occuring at strong edges in the image.</string>
@@ -2392,7 +2458,7 @@
         </property>
        </widget>
       </item>
-      <item row="24" column="0">
+      <item row="25" column="0">
        <widget class="Line" name="line">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -2409,7 +2475,7 @@
         </property>
        </widget>
       </item>
-      <item row="26" column="0">
+      <item row="27" column="0">
        <widget class="QSpinBox" name="m_ZeroRinging">
         <property name="toolTip">
          <string>If &gt; 0, ringing is simulated by by setting the defined percentage of higher frequencies to 0 in k-space. Otherwise, the input to the k-space simulation is generated with twice the resolution and cropped during k-space simulation (much slower).</string>
@@ -2460,15 +2526,12 @@
        <number>0</number>
       </property>
       <item row="0" column="1">
-       <widget class="QCommandLinkButton" name="m_SaveParametersButton">
+       <widget class="QPushButton" name="m_SaveParametersButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="toolTip">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Start DWI generation from selected fiber bundle.&lt;/p&gt;&lt;p&gt;If no fiber bundle but an existing diffusion weighted image is selected, the enabled artifacts are added to this image.&lt;/p&gt;&lt;p&gt;If neither a fiber bundle nor a diffusion weighted image is selected, a grayscale image containing a simple gradient is generated.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true"/>
         </property>
         <property name="text">
          <string>Save Parameters</string>
@@ -2480,15 +2543,12 @@
        </widget>
       </item>
       <item row="0" column="0">
-       <widget class="QCommandLinkButton" name="m_LoadParametersButton">
+       <widget class="QPushButton" name="m_LoadParametersButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="toolTip">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Start DWI generation from selected fiber bundle.&lt;/p&gt;&lt;p&gt;If no fiber bundle but an existing diffusion weighted image is selected, the enabled artifacts are added to this image.&lt;/p&gt;&lt;p&gt;If neither a fiber bundle nor a diffusion weighted image is selected, a grayscale image containing a simple gradient is generated.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true"/>
         </property>
         <property name="text">
          <string>Load Parameters</string>
@@ -2524,15 +2584,12 @@
        <number>0</number>
       </property>
       <item row="1" column="0">
-       <widget class="QCommandLinkButton" name="m_GenerateImageButton">
+       <widget class="QPushButton" name="m_GenerateImageButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="toolTip">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Start DWI generation from selected fiber bundle.&lt;/p&gt;&lt;p&gt;If no fiber bundle but an existing diffusion weighted image is selected, the enabled artifacts are added to this image.&lt;/p&gt;&lt;p&gt;If neither a fiber bundle nor a diffusion weighted image is selected, a grayscale image containing a simple gradient is generated.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true"/>
         </property>
         <property name="text">
          <string>Start Simulation</string>
@@ -2545,11 +2602,6 @@
       </item>
       <item row="0" column="0">
        <widget class="QGroupBox" name="groupBox_2">
-        <property name="styleSheet">
-         <string notr="true">QGroupBox {
-  background-color: transparent;
-}</string>
-        </property>
         <property name="title">
          <string>Input Data</string>
         </property>
@@ -2613,7 +2665,7 @@
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select a binary image to define the area of signal generation. Outside of the mask image only noise will be actively generated.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="sizeAdjustPolicy">
-            <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+            <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
            </property>
           </widget>
          </item>
@@ -2680,7 +2732,7 @@
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select a fiber bundle to generate the white matter signal from. You can either use the fiber definition tab to manually define an input fiber bundle or you can also use any existing bundle, e.g. yielded by a tractography algorithm.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="sizeAdjustPolicy">
-            <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+            <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
            </property>
           </widget>
          </item>
@@ -2709,7 +2761,7 @@
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The parameters for the simulation (e.g. spacing, size, diffuison-weighted gradients, b-value) are adopted from this image.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="sizeAdjustPolicy">
-            <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+            <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
            </property>
           </widget>
          </item>
@@ -2717,15 +2769,12 @@
        </widget>
       </item>
       <item row="2" column="0">
-       <widget class="QCommandLinkButton" name="m_AbortSimulationButton">
+       <widget class="QPushButton" name="m_AbortSimulationButton">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="toolTip">
          <string>Stop current simulation.</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true"/>
         </property>
         <property name="text">
          <string>Abort Simulation</string>
@@ -2738,12 +2787,6 @@
       </item>
       <item row="3" column="0">
        <widget class="QTextEdit" name="m_SimulationStatusText">
-        <property name="font">
-         <font>
-          <family>Courier</family>
-          <pointsize>7</pointsize>
-         </font>
-        </property>
         <property name="readOnly">
          <bool>true</bool>
         </property>
@@ -2881,6 +2924,8 @@
   <tabstop>m_MaxTranslationBoxZ</tabstop>
   <tabstop>m_AddEddy</tabstop>
   <tabstop>m_EddyGradientStrength</tabstop>
+  <tabstop>m_KspacePhaseBox</tabstop>
+  <tabstop>m_KspaceTimeSegmentsBox</tabstop>
   <tabstop>m_AddGibbsRinging</tabstop>
   <tabstop>m_ZeroRinging</tabstop>
  </tabstops>

@@ -16,6 +16,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "mitkGradientDirectionsProperty.h"
 
+#include <nlohmann/json.hpp>
+
 mitk::GradientDirectionsProperty::GradientDirectionsProperty()
 {
   m_GradientDirectionsContainer = mitk::GradientDirectionsProperty::GradientDirectionsContainerType::New();
@@ -37,20 +39,7 @@ mitk::GradientDirectionsProperty::GradientDirectionsProperty(const GradientDirec
   m_GradientDirectionsContainer = gradientDirectionsContainer;
 }
 
-mitk::GradientDirectionsProperty::GradientDirectionsProperty(const AlternativeGradientDirectionsContainerType gradientDirectionsContainer)
-{
-  auto temp = mitk::GradientDirectionsProperty::GradientDirectionsContainerType::New();
-  for(unsigned int index(0); index < gradientDirectionsContainer.size(); index++)
-  {
-    GradientDirectionType newDirection = gradientDirectionsContainer.at(index).GetVnlVector();
-    temp->InsertElement( index, newDirection);
-  }
-  m_GradientDirectionsContainer = temp;
-}
-
-mitk::GradientDirectionsProperty::~GradientDirectionsProperty()
-{
-}
+mitk::GradientDirectionsProperty::~GradientDirectionsProperty() = default;
 
 const mitk::GradientDirectionsProperty::GradientDirectionsContainerType::Pointer mitk::GradientDirectionsProperty::GetGradientDirectionsContainerCopy() const
 {
@@ -75,24 +64,46 @@ const mitk::GradientDirectionsProperty::GradientDirectionsContainerType::ConstPo
 bool mitk::GradientDirectionsProperty::IsEqual(const BaseProperty& property) const
 {
 
-  GradientDirectionsContainerType::ConstPointer lhs = this->m_GradientDirectionsContainer;
-  GradientDirectionsContainerType::ConstPointer rhs = static_cast<const Self&>(property).m_GradientDirectionsContainer;
-
-  if(lhs->Size() != rhs->Size()) return false;
-
-  GradientDirectionsContainerType::ConstIterator lhsit = lhs->Begin();
-  GradientDirectionsContainerType::ConstIterator rhsit = rhs->Begin();
-
-  bool equal = true;
-  for(unsigned int i = 0 ; i < lhs->Size(); i++, ++lhsit, ++rhsit)
-    equal |= lhsit.Value() == rhsit.Value();
-
-  return  equal;
+  const auto& lhs = this->m_GradientDirectionsContainer->CastToSTLConstContainer();
+  const auto& rhs = static_cast<const Self&>(property).m_GradientDirectionsContainer->CastToSTLConstContainer();
+  return lhs == rhs;
 }
 
 bool mitk::GradientDirectionsProperty::Assign(const BaseProperty& property)
 {
   this->m_GradientDirectionsContainer = static_cast<const Self&>(property).m_GradientDirectionsContainer;
+  return true;
+}
+
+// [[x, y, z], ...], one entry per volume.
+bool mitk::GradientDirectionsProperty::ToJSON(nlohmann::json& j) const
+{
+  j = nlohmann::json::array();
+
+  for (unsigned int index = 0; index < m_GradientDirectionsContainer->Size(); ++index)
+  {
+    const auto& direction = m_GradientDirectionsContainer->ElementAt(index);
+    j.push_back({ direction[0], direction[1], direction[2] });
+  }
+
+  return true;
+}
+
+bool mitk::GradientDirectionsProperty::FromJSON(const nlohmann::json& j)
+{
+  auto container = GradientDirectionsContainerType::New();
+
+  for (const auto& item : j)
+  {
+    GradientDirectionType direction;
+
+    for (unsigned int i = 0; i < 3; ++i)
+      direction[i] = item.at(i).get<double>();
+
+    container->push_back(direction);
+  }
+
+  m_GradientDirectionsContainer = container.GetPointer();
   return true;
 }
 

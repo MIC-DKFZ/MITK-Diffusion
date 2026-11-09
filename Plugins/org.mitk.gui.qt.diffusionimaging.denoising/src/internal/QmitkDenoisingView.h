@@ -14,30 +14,30 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _QMITKQmitkDenoisingView_H_INCLUDED
-#define _QMITKQmitkDenoisingView_H_INCLUDED
-
-#include <berryISelectionListener.h>
+#ifndef QmitkDenoisingView_h
+#define QmitkDenoisingView_h
 
 #include <QmitkAbstractView.h>
 
 #include "ui_QmitkDenoisingViewControls.h"
 
-#include <itkVectorImage.h>
-#include <itkImage.h>
+#include <mitkDataNode.h>
 #include <mitkImage.h>
-#include <QThread>
-#include <QTimer>
 
+#include <QFutureWatcher>
+
+#include <memory>
+#include <string>
 
 /**
  * \class QmitkDenoisingView
  * \brief View for denoising diffusion-weighted images.
+ *
+ * The denoising (mitk::DiffusionImageDenoising) runs in a worker thread, so the application stays
+ * responsive; one run at a time.
  */
 class QmitkDenoisingView : public QmitkAbstractView
 {
-  // this is needed for all Qt objects that should have a Qt meta-object
-  // (everything that derives from QObject and wants to have signal/slots)
   Q_OBJECT
 
 public:
@@ -45,34 +45,30 @@ public:
   static const std::string VIEW_ID;
 
   QmitkDenoisingView();
-  virtual ~QmitkDenoisingView();
+  ~QmitkDenoisingView() override;
 
-  /** Typedefs */
-  typedef short                                                                         DiffusionPixelType;
-  typedef itk::VectorImage<DiffusionPixelType, 3>                                       DwiImageType;
-  typedef itk::Image<DiffusionPixelType, 3>                                             DwiVolumeType;
-
-  virtual void CreateQtPartControl(QWidget *parent) override;
-
-  ///
-  /// Sets the focus to an internal widget.
-  ///
-  virtual void SetFocus() override;
+  void CreateQtPartControl(QWidget *parent) override;
+  void SetFocus() override;
 
 private slots:
 
   void StartDenoising();
+  void OnDenoisingFinished();
   void UpdateGui();
 
 private:
 
-  /// \brief called by QmitkAbstractView when DataManager's selection has changed
-  virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
+  /** The denoised image, or the reason why there is none. */
+  struct Result
+  {
+    mitk::Image::Pointer image;
+    std::string error;
+  };
 
-  Ui::QmitkDenoisingViewControls*             m_Controls;
-  mitk::DataNode::Pointer                     m_ImageNode;
+  std::unique_ptr<Ui::QmitkDenoisingViewControls> m_Controls;
+  QFutureWatcher<Result> m_Watcher;
+  mitk::DataNode::Pointer m_ImageNode;  ///< input of the running denoising
+  QString m_ResultName;
 };
 
-
-
-#endif // _QmitkDenoisingView_H_INCLUDED
+#endif

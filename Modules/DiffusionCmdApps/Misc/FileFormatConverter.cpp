@@ -59,7 +59,10 @@ int main(int argc, char* argv[])
             mitk::IOUtil::Save(dynamic_cast<mitk::FiberBundle*>(baseData[0].GetPointer()) ,outName.c_str());
         }
         else
-            std::cout << "File type currently not supported!";
+        {
+            std::cout << "File type currently not supported!" << std::endl;
+            return EXIT_FAILURE;
+        }
     }
     catch (const itk::ExceptionObject& e)
     {

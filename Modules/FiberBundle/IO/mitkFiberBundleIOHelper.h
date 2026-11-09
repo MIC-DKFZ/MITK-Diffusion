@@ -14,34 +14,61 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef __mitkFiberBundleIOHelper_h_
-#define __mitkFiberBundleIOHelper_h_
+#ifndef mitkFiberBundleIOHelper_h
+#define mitkFiberBundleIOHelper_h
 
 #include <MitkFiberBundleExports.h>
-#include <itkImage.h>
-#include <mitkImage.h>
-#include <mitkIOUtil.h>
 #include <mitkFiberBundle.h>
-#include <mitkImageToItk.h>
 
-#include <itksys/SystemTools.hxx>
-#include <itkDirectory.h>
-#include <mitkLocaleSwitch.h>
-
-typedef itksys::SystemTools ist;
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace mitk{
 
+/** Sends std::cout to a buffer while it exists, which hides the console output of readers and
+ *  writers, and restores it when it is destroyed or Restore is called. Restoring in the destructor
+ *  also covers an exception that leaves the scope, so that its message reaches the console. */
+class CoutSilencer
+{
+public:
+  CoutSilencer() : m_Old(std::cout.rdbuf(m_Buffer.rdbuf())) {}
+  ~CoutSilencer() { this->Restore(); }
+  CoutSilencer(const CoutSilencer&) = delete;
+  CoutSilencer& operator=(const CoutSilencer&) = delete;
+
+  void Restore()
+  {
+    if (m_Old != nullptr)
+      std::cout.rdbuf(m_Old);
+    m_Old = nullptr;
+  }
+
+private:
+  std::stringstream m_Buffer;
+  std::streambuf* m_Old;
+};
+
+/** \brief Tractogram lists for the command line apps. */
 class MITKFIBERBUNDLE_EXPORT FiberBundleIOHelper
 {
 public:
 
-  static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string > extensions={".fib", ".trk"});
+  /** Files in path (not recursive) whose last extension is one of the given ones, sorted;
+   *  folders are not listed, also TRX folders (name.trx). */
+  static std::vector< std::string > get_file_list(const std::string& path, const std::vector< std::string >& extensions={".fib", ".trk", ".tck", ".trx"});
 
-  static std::vector< mitk::FiberBundle::Pointer > load_fibs(const std::vector<std::string> files, std::vector<std::string>* filenames=nullptr);
+  /** The tractograms of the given files and folders (their .fib, .trk, .tck and .trx files; a
+   *  folder named *.trx is read as a TRX file); the readers' console output is suppressed.
+   *  filenames receives the file of each tractogram. */
+  static std::vector< mitk::FiberBundle::Pointer > load_fibs(const std::vector<std::string>& files, std::vector<std::string>* filenames=nullptr);
+
+  /** The tractogram in file. Throws mitk::Exception if the file cannot be read or holds no fiber
+   *  bundle, so that the apps need not check for a null bundle. */
+  static mitk::FiberBundle::Pointer load_fib(const std::string& file);
 };
 
 }
 
-#endif //__mitkFiberBundleIOHelper_h_
-
+#endif

@@ -73,7 +73,6 @@ protected:
   int m_SliceObserverTag1;
   int m_SliceObserverTag2;
   int m_SliceObserverTag3;
-  int m_PropertyObserverTag;
 
   mitk::Point3D                 m_WorldPoint;
   mitk::DataNode::Pointer       m_SelectedSource;

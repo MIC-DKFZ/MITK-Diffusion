@@ -13,75 +13,28 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
-#ifndef __itkFlipPeaksFilter_cpp
-#define __itkFlipPeaksFilter_cpp
-
 #include "itkFlipPeaksFilter.h"
-#include <itkImageRegionConstIterator.h>
-#include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkImageRegionIterator.h>
-#include <vnl/vnl_vector.h>
-#include <itkOrientationDistributionFunction.h>
-#include <itkContinuousIndex.h>
-
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkCellArray.h>
-#include <vtkPoints.h>
-#include <vtkPolyLine.h>
-
-#include <boost/math/special_functions.hpp>
-#include <boost/timer/progress_display.hpp>
-
-
-using namespace boost::math;
 
 namespace itk {
 
-template< class PixelType >
-FlipPeaksFilter< PixelType>::FlipPeaksFilter()
+FlipPeaksFilter::FlipPeaksFilter()
 {
   this->SetNumberOfRequiredInputs(1);
-
-  
 }
 
 
-template< class PixelType >
-void FlipPeaksFilter< PixelType>
-::BeforeThreadedGenerateData()
+void FlipPeaksFilter::DynamicThreadedGenerateData( const OutputImageRegionType& outputRegionForThread )
 {
-  typename InputImageType::Pointer input = static_cast< InputImageType* >( this->ProcessObject::GetInput(0) );
-
-//  typename OutputImageType::Pointer output = OutputImageType::New();
-//  output->SetSpacing( input->GetSpacing() );
-//  output->SetOrigin( input->GetOrigin() );
-//  output->SetDirection( input->GetDirection() );
-//  output->SetRegions( input->GetLargestPossibleRegion() );
-//  output->Allocate();
-//  output->FillBuffer(0.0);
-}
-
-template< class PixelType >
-void FlipPeaksFilter< PixelType>
-::AfterThreadedGenerateData()
-{
-
-}
-
-template< class PixelType >
-void FlipPeaksFilter< PixelType>
-::DynamicThreadedGenerateData( const OutputImageRegionType& outputRegionForThread )
-{
-  typename InputImageType::Pointer input_image = static_cast< InputImageType* >( this->ProcessObject::GetInput(0) );
-  typename OutputImageType::Pointer output_image = static_cast< OutputImageType* >( this->ProcessObject::GetOutput(0) );
+  InputImageType::Pointer input_image = static_cast< InputImageType* >( this->ProcessObject::GetInput(0) );
+  OutputImageType::Pointer output_image = static_cast< OutputImageType* >( this->ProcessObject::GetOutput(0) );
 
   ImageRegionIterator< InputImageType > iit(input_image, outputRegionForThread );
   ImageRegionIterator< OutputImageType > oit(output_image, outputRegionForThread );
 
   while( !iit.IsAtEnd() )
   {
-    typename InputImageType::IndexType idx = iit.GetIndex();
+    InputImageType::IndexType idx = iit.GetIndex();
 
     oit.Set(iit.Get());
     if (m_FlipX && idx[3]%3==0)
@@ -97,5 +50,3 @@ void FlipPeaksFilter< PixelType>
 }
 
 }
-
-#endif // __itkFlipPeaksFilter_cpp

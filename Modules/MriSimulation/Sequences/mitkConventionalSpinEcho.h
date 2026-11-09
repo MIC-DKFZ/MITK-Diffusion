@@ -30,7 +30,7 @@ class ConventionalSpinEcho : public AcquisitionType
 public:
 
   float half_read_time;
-  ConventionalSpinEcho(FiberfoxParameters* parameters) : AcquisitionType(parameters)
+  ConventionalSpinEcho(const FiberfoxParameters* parameters) : AcquisitionType(parameters)
   {
     dt =  m_Parameters->m_SignalGen.m_tLine/kxMax;  // time to read one k-space voxel
 
@@ -70,14 +70,9 @@ public:
     return out_idx;
   }
 
-  void AdjustEchoTime() override
+  float GetMinimumEchoTime() const override
   {
-    if ( m_Parameters->m_SignalGen.m_tEcho < m_Parameters->m_SignalGen.m_tLine )
-    {
-      m_Parameters->m_SignalGen.m_tEcho = m_Parameters->m_SignalGen.m_tLine;
-      MITK_WARN << "Echo time is too short! Time not sufficient to read slice. Automatically adjusted to " << m_Parameters->m_SignalGen.m_tEcho << " ms";
-      m_Parameters->m_Misc.m_AfterSimulationMessage += "Echo time was chosen too short! Time not sufficient to read slice. Internally adjusted to " + boost::lexical_cast<std::string>(m_Parameters->m_SignalGen.m_tEcho) + " ms\n";
-    }
+    return m_Parameters->m_SignalGen.m_tLine;
   }
 
 protected:

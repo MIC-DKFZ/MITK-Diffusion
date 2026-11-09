@@ -23,13 +23,14 @@ This file is based heavily on a corresponding ITK filter.
 #define __itkDftImageFilter_h_
 
 #include <itkImageToImageFilter.h>
-#include <itkDiffusionTensor3D.h>
-#include <mitkFiberfoxParameters.h>
+#include <complex>
+#include <vector>
 
 namespace itk{
 
 /**
-* \brief 2D Discrete Fourier Transform Filter (complex to real). Special issue for Fiberfox -> rearranges slice. */
+* \brief Inverse 2D DFT of a Fiberfox k-space slice (complex to complex), with the indices of both images
+* centred like KspaceImageFilter's forward transform, which carries the 1/N factor. */
 
 template< class TPixelType >
 class DftImageFilter :
@@ -54,8 +55,6 @@ public:
     typedef typename Superclass::OutputImageType        OutputImageType;
     typedef typename Superclass::OutputImageRegionType  OutputImageRegionType;
 
-    void SetParameters( FiberfoxParameters& param ){ m_Parameters = param; }
-
 protected:
     DftImageFilter();
     ~DftImageFilter() override {}
@@ -64,8 +63,12 @@ protected:
     void DynamicThreadedGenerateData( const OutputImageRegionType &outputRegionForThread) override;
 
 private:
+    /** e^{-2 pi i k x / n} for the centred indices k and x of an axis of n samples, row k. */
+    static std::vector< std::complex<double> > Factors(unsigned int n);
 
-    FiberfoxParameters  m_Parameters;
+    /** The transform is separable: the rows transformed along x (row y at y*nx), then the factors along y. */
+    std::vector< std::complex<double> > m_Rows;
+    std::vector< std::complex<double> > m_FactorsY;
 };
 
 }

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?BlueBerry version="0.1"?>
+<plugin>
+
+  <extension point="org.blueberry.ui.views">
+
+    <view id="org.mitk.views.interactivefiberdissection"
+    name="atTRACTive"
+    category="Fiber processing"
+    class="QmitkInteractiveFiberDissectionView"
+    icon="resources/atTRACTive.png">
+    <keywordReference id="org.mitk.views.interactivefiberdissection.Keyword"/>
+    </view>
+
+  </extension>
+
+  <extension point="org.blueberry.ui.keywords">
+
+  <keyword label="attractive" id="org.mitk.views.interactivefiberdissection.Keyword"/>
+  <keyword label="fiber" id="org.mitk.views.interactivefiberdissection.Keyword"/>
+  <keyword label="tract" id="org.mitk.views.interactivefiberdissection.Keyword"/>
+  <keyword label="dissect" id="org.mitk.views.interactivefiberdissection.Keyword"/>
+  <keyword label="segment" id="org.mitk.views.interactivefiberdissection.Keyword"/>
+  <keyword label="classifier" id="org.mitk.views.interactivefiberdissection.Keyword"/>
+  <keyword label="active learning" id="org.mitk.views.interactivefiberdissection.Keyword"/>
+
+  </extension>
+
+</plugin>

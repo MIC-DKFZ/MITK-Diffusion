@@ -18,7 +18,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #define _MITK_AstroStickModel_H
 
 #include <mitkDiffusionSignalModel.h>
-#include <itkPointShell.h>
+#include <mitkPointShell.h>
 
 namespace mitk {
 
@@ -33,22 +33,9 @@ class AstroStickModel : public DiffusionSignalModel< ScalarType >
 public:
 
   AstroStickModel();
-  template< class OtherType >AstroStickModel(AstroStickModel<OtherType>* model)
-  {
-    this->m_CompartmentId = model->m_CompartmentId;
-    this->m_T1 = model->GetT1();
-    this->m_T2 = model->GetT2();
-    this->m_GradientList = model->GetGradientList();
-    this->m_VolumeFractionImage = model->GetVolumeFractionImage();
-    this->m_RandGen = model->GetRandomGenerator();
+  ~AstroStickModel() override;
 
-    this->m_BValue = model->GetBvalue();
-    this->m_Diffusivity = model->GetDiffusivity();
-    this->m_Sticks = model->GetSticks();
-    this->m_NumSticks = model->GetNumSticks();
-    this->m_RandomizeSticks = model->GetRandomizeSticks();
-  }
-  ~AstroStickModel();
+  DiffusionSignalModel< ScalarType >* Clone() const override { return new AstroStickModel(*this); }
 
   typedef typename DiffusionSignalModel< ScalarType >::PixelType          PixelType;
   typedef typename DiffusionSignalModel< ScalarType >::GradientType       GradientType;
@@ -60,41 +47,37 @@ public:
 
   void SetRandomizeSticks(bool randomize=true){ m_RandomizeSticks=randomize; } ///< Random stick configuration in each voxel
   bool GetRandomizeSticks() { return m_RandomizeSticks; }
+  bool UsesRandomNumbers() const override { return m_RandomizeSticks; }
 
   void SetDiffusivity(double diffusivity) { m_Diffusivity = diffusivity; } ///< Scalar diffusion constant
   double GetDiffusivity() { return m_Diffusivity; }
 
   void SetNumSticks(unsigned int order)
   {
-    vnl_matrix<double> sticks;
     switch (order)
     {
     case 1:
       m_NumSticks = 12;
-      sticks = itk::PointShell<12, vnl_matrix_fixed<double, 3, 12> >::DistributePointShell()->as_matrix();
       break;
     case 2:
       m_NumSticks = 42;
-      sticks = itk::PointShell<42, vnl_matrix_fixed<double, 3, 42> >::DistributePointShell()->as_matrix();
       break;
     case 3:
       m_NumSticks = 92;
-      sticks = itk::PointShell<92, vnl_matrix_fixed<double, 3, 92> >::DistributePointShell()->as_matrix();
       break;
     case 4:
       m_NumSticks = 162;
-      sticks = itk::PointShell<162, vnl_matrix_fixed<double, 3, 162> >::DistributePointShell()->as_matrix();
       break;
     case 5:
       m_NumSticks = 252;
-      sticks = itk::PointShell<252, vnl_matrix_fixed<double, 3, 252> >::DistributePointShell()->as_matrix();
       break;
     default:
       m_NumSticks = 42;
-      sticks = itk::PointShell<42, vnl_matrix_fixed<double, 3, 42> >::DistributePointShell()->as_matrix();
       break;
     }
-    for (int i=0; i<m_NumSticks; i++)
+    const vnl_matrix<double> &sticks = mitk::pointshell::Directions(m_NumSticks);
+    m_Sticks.clear();
+    for (unsigned int i=0; i<m_NumSticks; i++)
     {
       GradientType stick;
       stick[0] = sticks.get(0,i); stick[1] = sticks.get(1,i); stick[2] = sticks.get(2,i);
@@ -116,7 +99,7 @@ protected:
 
 }
 
-#include "mitkAstroStickModel.cpp"
+#include "mitkAstroStickModel.txx"
 
 #endif
 

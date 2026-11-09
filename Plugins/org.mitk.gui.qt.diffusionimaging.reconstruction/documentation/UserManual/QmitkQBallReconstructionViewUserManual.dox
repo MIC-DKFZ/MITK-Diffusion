@@ -1,21 +1,36 @@
 /**
 \page org_mitk_views_qballreconstruction Q-Ball Reconstruction
 
-The q-ball reonstruction view implements a variety of reconstruction methods. The different reconstruction methods are described in the following:
-\li <b>Numerical:</b> The original, numerical q-ball reconstruction presented by Tuch et al. [5]
-\li <b>Standard (SH):</b> Descoteaux's reconstruction based on spherical harmonic basis functions [6]
-\li <b>Solid Angle (SH):</b> Aganj's reconstruction with solid angle consideration [7]
-\li <b>ADC-profile only:</b> The ADC-profile reconstructed with spherical harmonic basis functions
-\li <b>Raw signal only:</b> The raw signal reconstructed with spherical harmonic basis functions
+The Q-ball reconstruction view computes orientation distribution functions (ODFs) from a diffusion-weighted image (DWI). Select the DWI as "Raw DWI", choose a method and press "Start Reconstruction". The methods are:
+\li <b>Numerical:</b> the original numerical Q-ball reconstruction (Tuch, "Q-ball imaging", MRM 2004). Its result is an ODF image.
+\li <b>Standard:</b> the Q-ball ODF in spherical harmonics (Descoteaux et al., "Regularized, fast, and robust analytical Q-ball imaging", MRM 2007).
+\li <b>Solid Angle:</b> the ODF with solid-angle consideration (Aganj et al., "Reconstruction of the orientation distribution function in single- and multiple-shell q-ball imaging within constant solid angle", MRM 2010).
+\li <b>ADC-Profile only:</b> the ADC profile -ln(S/S0)/b in spherical harmonics, with b the b-value of the shell (also when it is below the reference b-value of the DWI, e.g. after other shells were removed). The spherical harmonics image holds the fit of ln(S); the sampled ODF image holds the ADC.
+\li <b>Raw Signal only:</b> the raw signal in spherical harmonics.
+\li <b>Multi-Shell:</b> Aganj's solid-angle reconstruction from three shells with b-values b, 2b and 3b (Aganj et al. 2010). Check boxes for the shells of the selected DWI appear below the parameters; exactly three such shells must be checked.
 
-\imageMacro{qballs1.png,"The q-ball resonstruction view",9.99}
+All methods but Multi-Shell model a single shell: the diffusion-weighted volumes of the DWI must all have the same b-value, and volumes whose b-value rounds to 0 are the baseline volumes. For a DWI with several shells, extract one shell first; if the b-values differ only slightly (e.g. 995 and 1000), round them in the preprocessing view.
 
-B0 threshold works the same as in tensor reconstruction. The maximum l-level configures the size of the spherical harmonics basis. Larger l-values (e.g. l=8) allow higher levels of detail, lower levels are more stable against noise (e.g. l=4). Lambda is a regularisation parameter. Set it to 0 for no regularisation. lambda = 0.006 has proven to be a stable choice under various settings.
+Parameters:
+\li <b>B0 Threshold:</b> voxels whose mean baseline signal is below this value are not reconstructed.
+\li <b>SH-Order:</b> the order of the spherical harmonics. Higher orders (e.g. 8) resolve more detail, lower orders (e.g. 4) are more robust against noise. An order l has (l+1)(l+2)/2 coefficients, which the diffusion-weighted volumes must determine: order 4 needs at least 15 directions, order 6 at least 28, order 8 at least 45, order 10 at least 66. Take the highest order the number of directions allows, up to 8: order 4 for 15 to 27 directions, 6 for 28 to 44, 8 for 45 and more. Orders above 8 bring little for in-vivo data and amplify noise.
+\li <b>Lambda:</b> the weight of the regularisation; 0 switches it off. lambda = 0.006 has proven to be a stable choice under various settings. It weights the Laplace-Beltrami regularisation of Descoteaux et al. (2007), which does not depend on the orientation of the fibres or on whether the gradient directions cover half of the sphere or all of it; lambda has the same meaning as the smoothing parameter of dipy's QballModel and CsaOdfModel.
+\li <b>Output Sampled ODF Image:</b> besides the spherical harmonics image, also add the ODF sampled on 252 directions.
 
-\imageMacro{qballs2.png,"Advanced q-ball reconstruction settings",8.00}
+The reconstruction runs in the background: the application stays usable, and the buttons of the view are disabled until the result appears as a new node below the DWI. A running computation cannot be stopped: closing the view lets it run to its end and drops its result, and quitting the application waits until it has ended.
 
-This is how a q-ball image should initially look after reconstruction. Standard q-balls feature a relatively low GFA and thus appear rather dark. Adjust the level-window to solve this.
+"Convert SH to sampled ODF image" samples a selected spherical harmonics image on the 252 directions; the result is named after the SH image with "_Odf".
 
-\imageMacro{qballs3.png,"q-ball image after reconstruction",16.00}
+Standard Q-balls feature a relatively low GFA and thus appear rather dark; adjust the level window.
+
+\section QballReconstructionUse When to Use Q-ball ODFs
+
+An ODF gives the probability of a fiber direction in every direction of the sphere, so it can hold several directions per voxel where fibers cross. The constant solid angle (CSA) reconstruction gives sharp ODFs that resolve crossings of about 45 degrees and more at b = 1000 to 3000 s/mm^2 with 30 or more directions; the standard Q-ball is smoother. For tractography, extract the maxima of the SH image as a peak image (\ref org_mitk_views_odfmaximaextraction) and track on the peaks (deterministic or probabilistic), or track probabilistically on the ODF itself. The choice between tensors and ODFs is discussed in "Choosing the Model and the Method" of the "Streamline Tractography" manual page.
+
+\section QballReconstructionRest REST Endpoints
+
+\li POST /api/v1/diffusion/reconstruction/qball with {dwi: uid, method: "csa" (default), "standard", "multishell", "adc_profile", "raw_signal" or "numerical", sh_order (default: the highest order up to 8 that the number of diffusion-weighted volumes determines), lambda, b0_threshold, sampled_odf}: the reconstruction of this view as a job; the SH image is added below the DWI, the sampled ODF image below the SH image.
+
+\imageMacro{qballs3.png,"Q-ball image after reconstruction",16.00}
 
 */

@@ -1,18 +1,15 @@
 set(H_FILES
-
+  mitkIvimFit.h
+  mitkKurtosisFit.h
+  mitkDiffusionSignalSampling.h
   itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.h
   itkDiffusionKurtosisReconstructionImageFilter.h
-  itkRegularizedIVIMLocalVariationImageFilter.h
-  itkRegularizedIVIMReconstructionFilter.h
-  itkRegularizedIVIMReconstructionSingleIteration.h
 )
 
 set(CPP_FILES
-  itkDiffusionIntravoxelIncoherentMotionReconstructionImageFilter.cpp
-  itkDiffusionKurtosisReconstructionImageFilter.cpp
-  itkRegularizedIVIMLocalVariationImageFilter.txx
-  itkRegularizedIVIMReconstructionFilter.txx
-  itkRegularizedIVIMReconstructionSingleIteration.txx
+  mitkIvimFit.cpp
+  mitkKurtosisFit.cpp
+  mitkDiffusionSignalSampling.cpp
 )
 
 set(RESOURCE_FILES

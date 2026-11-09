@@ -3,25 +3,94 @@
 
 \section QmitkDiffusionImagingPreprocessingPagePreprocessing Preprocessing
 
-The Preprocessing View bundles a selection of features and tools for dealing with diffusion weighted MR images. It can be used to modify header and geometry information, manipulate gradients and gradient images as well as calculating ADC maps.
+The Preprocessing view inspects and edits diffusion-weighted images (DWIs) and other images: their
+gradients and b-values, their volumes, and their header (geometry). Select the image in the
+<b>Image</b> box at the top. Every action creates a new image below the selected one in the Data
+Manager and leaves the selected image unchanged. Actions that need a DWI are disabled for other
+images; flipping, cropping and resampling also work on 3D images with one value per voxel. If an
+action cannot be carried out, a message says why.
 
-\section QmitkDiffusionImagingPreprocessingPageDetails Details
+\section QmitkDiffusionImagingPreprocessingPageGradients Gradients tab
 
-\imageMacro{PreprocessingGUI_1.png,"Gradients tab",9.97}
+The table lists the shells of the DWI: each b-value and the number of volumes acquired with it.
+b-values are rounded to whole numbers; volumes whose b-value rounds to 0 are b0 volumes.
 
+\li <b>Remove gradient volume</b> and <b>Extract gradient volume</b> remove the volume with the given
+index from the DWI or copy it into a 3D image.
+\li <b>Reduce number of gradients</b> keeps, per shell, the number of volumes entered in the
+second column of the table; a number larger than the shell keeps all of its volumes. The kept
+directions are spread evenly over the sphere: starting from the first ones, directions are swapped
+at random as long as this increases the smallest angle between two kept directions (opposite
+directions count as equal). The search always starts the same way, so it gives the same result
+for the same image. With <b>first n</b> the first volumes of each shell are kept instead.
+\li <b>Round b-values</b> rounds each b-value to the nearest multiple of the value in
+<b>Sampling frame</b>, for example 1995 and 2005 to 2000 with a value of 100. b-values that round to
+0 become b0 volumes.
+\li <b>Flip gradients</b> negates the checked x, y and z components of all gradients,
+<b>Reorder gradient dimensions</b> reorders the components (for example "y x z" swaps x and y),
+and <b>Mirror gradients to half sphere</b> negates every gradient whose x component is negative.
+The image data stay as they are.
+\li <b>Show gradients</b> adds one point set per shell that shows the gradient directions around
+the centre of the image, and a point for the b0 volumes.
+\li <b>Clear rotation of gradients</b> is described in the section on gradient directions below.
 
-The Gradients tab allows you to examine the number of b values and how many gradients were acquired for each. Here you can also visualize the gradients as points on a sphere, mirror opposite gradients so all are oriented within the same half sphere, round b values and merge similar gradients.
+The two text boxes list the gradients, one line per component and one column per volume:
+<b>Original Gradients</b> as stored in the file, <b>Working Gradients</b> as all tools use them
+(see below).
 
-\imageMacro{PreprocessingGUI_2.png,"Image values tab",9.97}
+\section QmitkDiffusionImagingPreprocessingPageValues Image Values tab
 
-The Image values tab enables you to manipulate the voxel values by e.g. resampling images, averaging repetitions of the same gradient, normalizing the image values or merging several DWIs into one.
+\li <b>Average repetitions</b> averages the volumes whose gradients agree within the
+<b>Merge radius</b>, for example repeated b0 volumes or repeated directions.
+\li <b>Merge selected DWIs</b> appends the volumes of the DWI chosen in the box next to the button
+to those of the selected DWI. Both need the same size, voxel size, origin and direction matrix.
+The gradients are rescaled to the larger of the two reference b-values, so each volume keeps its
+b-value.
+\li <b>Flip axis</b> mirrors the image along the checked image axes (the voxel axes, not the world
+axes) and keeps its geometry.
+\li <b>Resample image</b> changes the voxel grid, given as a <b>Sampling factor</b> per axis (2
+halves the voxel size), a <b>New image spacing</b> or a <b>New image size</b>, with the chosen
+interpolation. Sizes are rounded down. The outer corner of the image and its orientation stay
+where they are. DWIs are resampled volume by volume; their gradients do not change.
+\li <b>Crop Image</b> removes the given numbers of voxels at the lower (left column) and upper
+(right column) end of each image axis. The remaining voxels keep their position in space.
 
-\imageMacro{PreprocessingGUI_3.png,"Header tab",9.97}
+\section QmitkDiffusionImagingPreprocessingPageHeader Header tab
 
-In the Header tab you can selectively change geometry information of the image and delete or extract specific gradient volumes.
+The tab shows voxel size, origin, direction matrix (one column per image axis) and, for DWIs, the
+measurement frame of the selected image. <b>Apply new header information</b> creates an image with
+the values that were edited; untouched values stay exactly as they were. Voxel sizes must be
+positive, the columns of the direction matrix are normalized and must be orthogonal, and the
+measurement frame must be invertible.
 
-\imageMacro{PreprocessingGUI_4.png,"Other tab",9.97}
+<b>Align to</b> creates a copy of the selected image with the origin of the image chosen in the box
+next to it. Only the origin is taken over.
 
-Miscellaneous tools in the Other tab allow for ADC map calculation and the extraction of the b0 image with the possibility of averaging all b0 images.
+Both buttons give every time step of a 3D+t image the same new values.
+
+\section QmitkDiffusionImagingPreprocessingPageOther Other tab
+
+<b>Extract baseline image</b> averages the b0 volumes of the DWI into one 3D image. With the check
+box, all b0 volumes are copied into the time steps of a 3D+t image instead. A DWI without b0 volume
+gives an error message.
+
+\section QmitkDiffusionImagingPreprocessingPageConvention Gradient directions and image geometry
+
+MITK Diffusion stores the working gradients of a DWI as directions in world (LPS) coordinates,
+derived from the original gradients of the file with its measurement frame. All tools use the
+working gradients. The tools that change the geometry or the gradients keep them consistent with
+the image data:
+
+\li <b>Flip axis</b> mirrors the gradients of a DWI along the same image axes as the data, i.e.
+along the world directions of these axes.
+\li <b>Apply new header information</b>: when the direction matrix of a DWI changes and
+<b>Rotate gradients with the image</b> is checked (default), the gradients turn with the image and
+keep their relation to the voxel grid, as FSL bvecs do; unchecked, they stay fixed in world
+coordinates. An edited measurement frame is applied to the original gradients.
+\li <b>Clear rotation of gradients</b> recomputes the gradients without the rotation of the image
+matrix. It is available only for DWIs whose gradients include that rotation: NRRD files of earlier
+MITK versions and DICOM data.
+\li <b>Flip gradients</b> and <b>Reorder gradient dimensions</b> act on the world components of the
+gradients. Reordering requires each of x, y and z once.
 
 */

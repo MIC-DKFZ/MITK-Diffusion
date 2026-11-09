@@ -23,7 +23,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkDiffusionSignalModel.h>
 #include <mitkDataNode.h>
 #include <mitkRicianNoiseModel.h>
-#include <mitkChiSquareNoiseModel.h>
+#include <mitkNoncentralChiNoiseModel.h>
 #include <mitkImage.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkPlanarEllipse.h>
@@ -94,6 +94,7 @@ namespace mitk
       , m_Drift(0.06)
       , m_DoAddGibbsRinging(false)
       , m_ZeroRinging(0)
+      , m_KspaceTimeSegments(AUTOMATIC_TIME_SEGMENTS)
       , m_DoSimulateRelaxation(true)
       , m_DoAddMotion(false)
       , m_DoRandomizeMotion(true)
@@ -131,7 +132,7 @@ namespace mitk
     unsigned int                        m_EchoTrainLength;          ///< Only relevant for Fast Spin Echo sequence (number of k-space lines acquired with one RF pulse)
     bool                                m_ReversePhase;             ///< If true, the phase readout direction will be inverted (-y instead of y)
     float                               m_PartialFourier;           ///< Partial fourier factor (0.5-1)
-    float                               m_NoiseVariance;            ///< Variance of complex gaussian noise
+    float                               m_NoiseVariance;            ///< Variance of the complex Gaussian k-space noise; not added when FiberfoxParameters::m_NoiseModel is set
     unsigned int                        m_NumberOfCoils;            ///< Number of coils in multi-coil acquisition
     CoilSensitivityProfile              m_CoilSensitivityProfile;   ///< Choose between constant, linear or exponential sensitivity profile of the used coils
     float                               m_CoilSensitivity;          ///< signal remaining in slice center
@@ -149,11 +150,28 @@ namespace mitk
     float                               m_Drift;                    ///< Global signal decrease by the end of the acquisition.
     bool                                m_DoAddGibbsRinging;        ///< Add Gibbs ringing artifact
     int                                 m_ZeroRinging;              ///< If > 0, ringing is simulated by by setting the defined percentage of higher frequencies to 0 in k-space. Otherwise, the input to the k-space simulation is generated with twice the resolution and cropped during k-space simulation (much slower).
+    /**
+     * How the k-space simulation sums the phase of distortions (field map) and eddy currents: 0 sums the
+     * exact phase of every pixel for every k-space sample; a number L > 0 approximates the phase by L
+     * time segments, a few transforms per slice instead of the full sum
+     * (itk::KspaceImageFilter::ComputeTimeSegmentation); AUTOMATIC_TIME_SEGMENTS, the default and the
+     * value for parameter files without the setting (the user's decision in #47), chooses L per slice
+     * so that the relative RMS error stays below 0.1 % (the residual check passes below an estimated
+     * 1e-4; measured: 4.9e-5 at most), far below simulated
+     * noise; on a 128x128 slice it was 2.2 to 127 times faster than the exact sum on one core, the less
+     * the stronger the field. A slice takes the exact sum where the automatic count would take longer
+     * than it on one core, and for any L where the segments would need more than
+     * KspaceImageFilter::MAX_TIME_SEGMENT_BYTES (256 MiB); so the choice, and the image, does not depend
+     * on the threads. Slice jobs running at the same time wait for memory beyond
+     * KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET (2 GiB together), which changes only the run time.
+     */
+    int                                 m_KspaceTimeSegments;
+    static constexpr int                AUTOMATIC_TIME_SEGMENTS = -1;
     bool                                m_DoSimulateRelaxation;     ///< Add T2 relaxation effects
     bool                                m_DoAddMotion;              ///< Enable motion artifacts.
     bool                                m_DoRandomizeMotion;        ///< Toggles between random and linear motion.
     bool                                m_DoAddDrift;               ///< Add quadratic signal drift.
-    std::vector< bool >                 m_MotionVolumes;            ///< Indicates the image volumes that are affected by motion
+    std::vector< bool >                 m_MotionVolumes;            ///< Indicates the image volumes that are affected by motion; empty: all, missing entries: not moved
     ///< with positive numbers, inverted logic with negative numbers.
     itk::Vector<float,3>                m_Translation;              ///< Maximum translational motion.
     itk::Vector<float,3>                m_Rotation;                 ///< Maximum rotational motion.
@@ -165,13 +183,34 @@ namespace mitk
     bool IsBaselineIndex(unsigned int idx);                  ///< Checks if image volume with given index is non-diffusion-weighted volume or not.
     unsigned int GetNumWeightedVolumes();                    ///< Get number of diffusion-weighted image volumes
     unsigned int GetNumBaselineVolumes();                    ///< Get number of non-diffusion-weighted image volumes
-    unsigned int GetNumVolumes();                            ///< Get number of baseline and diffusion-weighted image volumes
+    unsigned int GetNumVolumes() const;                      ///< Get number of baseline and diffusion-weighted image volumes
     GradientListType GetGradientDirections();                ///< Return gradient direction container
     mitk::DiffusionPropertyHelper::GradientDirectionsContainerType::ConstPointer GetItkGradientContainer();
     GradientType GetGradientDirection(unsigned int i);
     std::vector< int > GetBvalues();                         ///< Returns a vector with all unique b-values (determined by the gradient magnitudes)
     double GetBvalue();
+    /**
+     * The gradients of .ffp and bvecs files are FSL bvecs of the simulated geometry (voxel frame, x
+     * negated for a direction matrix with positive determinant), like every bvecs file MITK reads.
+     * This turns them into the world (LPS) vectors the simulation uses (and stores as the output's
+     * gradients). Without it, the gradients are taken as world vectors.
+     */
     void ApplyDirectionMatrix();
+    /**
+     * Sets m_MotionVolumes, one flag per volume, from the motion-volume text of the Fiberfox view
+     * or of a .ffp file (leading and trailing spaces ignored): "random" moves every volume but the
+     * first with probability 1/2, a blank text moves every volume, positive numbers name the
+     * moved volumes and negative numbers the volumes that stay. Any other text (no numbers, both
+     * signs) moves no volume and returns false.
+     */
+    bool SetMotionVolumes(const std::string& text, itk::Statistics::MersenneTwisterRandomVariateGenerator* randgen);
+    /**
+     * Throws a mitk::Exception if relaxation is simulated, an inversion pulse is set (TI > 0) and
+     * TI is not shorter than TR: the inversion comes before the excitation within one repetition,
+     * and the inversion-recovery signal 1 - 2 exp(-TI/T1) + exp(-TR/T1) holds only for TI < TR.
+     * Without relaxation TI is not used, so any TI passes.
+     */
+    void CheckInversionTime() const;
 
   protected:
 
@@ -303,9 +342,9 @@ namespace mitk
     typedef DiffusionNoiseModel<double>                     NoiseModelType;
 
     FiberfoxParameters();
+    /** Copy and assignment clone the signal models and the noise model. */
     FiberfoxParameters(const FiberfoxParameters &params);
-    /** Member-wise: unlike the copy constructor, it shares the signal models with params. */
-    FiberfoxParameters& operator=(const FiberfoxParameters &params) = default;
+    FiberfoxParameters& operator=(const FiberfoxParameters &params);
     ~FiberfoxParameters();
 
     /** Not templated parameters */
@@ -313,7 +352,7 @@ namespace mitk
     SignalGenerationParameters          m_SignalGen;            ///< Signal generation parameters
     MiscFiberfoxParameters              m_Misc;                 ///< GUI realted and I/O parameters
 
-    /** Templated parameters */
+    /** Templated parameters. The parameters own the models in both lists (created with new) and delete them. */
     DiffusionModelListType              m_FiberModelList;       ///< Intra- and inter-axonal compartments.
     DiffusionModelListType              m_NonFiberModelList;    ///< Extra-axonal compartments.
     std::shared_ptr< NoiseModelType >   m_NoiseModel;           ///< If != nullptr, noise is added to the image.
@@ -327,6 +366,21 @@ namespace mitk
     void ClearFiberParameters();
     void ClearSignalParameters();
     void ApplyDirectionMatrix();
+    /**
+     * Gradients and reference b-value of a diffusion-weighted image, for a simulation that reproduces
+     * its world gradients; m_SignalGen.m_ImageDirection has to be set to the simulated geometry first.
+     * Stored as FSL bvecs of that geometry (the form of .ffp files, see ApplyDirectionMatrix) or,
+     * with asFslBvecs false, as world vectors for a simulation without ApplyDirectionMatrix.
+     */
+    void SetGradientsFromImage(const mitk::Image* dwi, bool asFslBvecs=true);
+    /**
+     * For the .ffp saved next to a simulated image: with motion, the motion-volume text becomes the
+     * list of the volumes that m_SignalGen.m_MotionVolumes moves, so that loading the file moves the
+     * same volumes ("random" would draw anew). An empty list stays blank (every volume moves, in
+     * SetMotionVolumes and TractsToDWIImageFilter alike); a list without a moved volume switches
+     * motion off, because a blank text would move every volume.
+     */
+    void ListMovedVolumes();
 
     void PrintSelf();                           ///< Print parameters to stdout.
     void SaveParameters(std::string filename);  ///< Save image generation parameters to .ffp file.
@@ -334,6 +388,10 @@ namespace mitk
     template< class ParameterType >
     ParameterType ReadVal(boost::property_tree::ptree::value_type const& v, std::string tag, ParameterType defaultValue, bool essential=false);
     std::string                         m_MissingTags;
+
+  private:
+    void DeleteSignalModels();
+    void CopyFrom(const FiberfoxParameters &params);
   };
 }
 

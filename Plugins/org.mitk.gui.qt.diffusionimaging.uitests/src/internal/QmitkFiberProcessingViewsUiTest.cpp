@@ -1,0 +1,633 @@
+/*============================================================================
+
+The Medical Imaging Interaction Toolkit (MITK)
+
+Copyright (c) German Cancer Research Center (DKFZ)
+All rights reserved.
+
+Use of this source code is governed by a 3-clause BSD license that can be
+found in the LICENSE file.
+
+============================================================================*/
+
+#include "QmitkDiffusionUiTestUtil.h"
+
+#include <mitkDiffusionTestData.h>
+#include <mitkFiberBundle.h>
+#include <mitkImageCast.h>
+#include <mitkImagePixelReadAccessor.h>
+#include <mitkIOUtil.h>
+#include <mitkPlanarCircle.h>
+#include <mitkPlanarPolygon.h>
+#include <mitkPointSet.h>
+#include <mitkPreferenceListReaderOptionsFunctor.h>
+#include <mitkSliceNavigationController.h>
+
+#include <QmitkDataStorageComboBox.h>
+
+#include <cppunit/extensions/HelperMacros.h>
+
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QSpinBox>
+
+#include <itkEuler3DTransform.h>
+
+#include <vtkCell.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
+using namespace QmitkDiffusionUiTest;
+
+/**
+ * \brief UI tests of the Fiber Processing, Fiber Quantification and Fiber Clustering views. The
+ * processing results are compared with the references of the FiberProcessing module test, which
+ * uses the same parameters.
+ */
+class QmitkFiberProcessingViewsUiTest : public CppUnit::TestFixture
+{
+  CPPUNIT_TEST_SUITE(QmitkFiberProcessingViewsUiTest);
+  CPPUNIT_TEST(Processing_RemoveByDirectionLengthAndMask_AsModuleReferences);
+  CPPUNIT_TEST(Processing_Compress_AsModuleReference);
+  CPPUNIT_TEST(Processing_BadParameters_Messages);
+  CPPUNIT_TEST(Processing_TwoBundlesAndMask_ExtractAndCopy);
+  CPPUNIT_TEST(Processing_SelectedBundleDeleted_NotUsed);
+  CPPUNIT_TEST(Processing_SegmentationRoi_AsBinaryMaskAlsoOneSlice);
+  CPPUNIT_TEST(Processing_RoiImageOfFigures_ObliqueGridUnionAndExtraction);
+  CPPUNIT_TEST(Processing_RoiImageWithBundleLoaded_SelectedImageGridElseBundleGrid);
+  CPPUNIT_TEST(Processing_CurvatureDecimalsScalarMapBoxUnplacedCircle);
+  CPPUNIT_TEST(Quantification_EnvelopeEndingsAndReferenceImages);
+  CPPUNIT_TEST(Clustering_MissingInputs_MessagesAndClusters);
+  CPPUNIT_TEST_SUITE_END();
+
+  static constexpr const char *ProcessingId = "org.mitk.views.fiberprocessing";
+  static constexpr const char *QuantificationId = "org.mitk.views.fiberquantification";
+  static constexpr const char *ClusteringId = "org.mitk.views.fiberclustering";
+
+  static QWidget *ShowProcessing() { return ShowView(ProcessingId, "QmitkFiberProcessingViewControls"); }
+
+  static mitk::FiberBundle::Pointer Reference(const std::string &file)
+  {
+    return mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath(file));
+  }
+
+  static mitk::FiberBundle *Fibers(const mitk::DataNode::Pointer &node)
+  {
+    return dynamic_cast<mitk::FiberBundle *>(node->GetData());
+  }
+
+  static mitk::DataNode::Pointer LoadMask(const std::string &file)
+  {
+    auto node = Load(file);
+    node->SetBoolProperty("binary", true);
+    return node;
+  }
+
+  static void Remove(QWidget *view, int method)
+  {
+    GetChild<QComboBox>(view, "m_RemovalMethodBox")->setCurrentIndex(method);
+    GetChild<QPushButton>(view, "m_RemoveButton")->click();
+    Wait(20);
+  }
+
+  static QString OneMessage()
+  {
+    const auto messages = DialogHandler::Instance().TakeMessages();
+    CPPUNIT_ASSERT_EQUAL(qsizetype(1), messages.size());
+    return messages.front();
+  }
+
+public:
+  void tearDown() override
+  {
+    for (const auto *id : {ProcessingId, QuantificationId, ClusteringId})
+      HideView(id);
+    ClearDataStorage();
+    DialogHandler::Instance().TakeMessages();
+  }
+
+  void Processing_RemoveByDirectionLengthAndMask_AsModuleReferences()
+  {
+    auto *view = ShowProcessing();
+
+    auto fib = Load("FiberProcessing/original.fib");
+    Select({fib});
+    GetChild<QDoubleSpinBox>(view, "m_ExtractDirX")->setValue(0);
+    GetChild<QDoubleSpinBox>(view, "m_ExtractDirY")->setValue(1);
+    GetChild<QDoubleSpinBox>(view, "m_ExtractDirZ")->setValue(0);
+    GetChild<QDoubleSpinBox>(view, "m_ExtractAngle")->setValue(5);
+    Remove(view, 0);
+    CPPUNIT_ASSERT(Reference("FiberProcessing/remove_direction.fib")->Equals(Fibers(fib)));
+    ClearDataStorage();
+
+    fib = Load("FiberProcessing/original.fib");
+    Select({fib});
+    GetChild<QSpinBox>(view, "m_PruneFibersMinBox")->setValue(30);
+    GetChild<QSpinBox>(view, "m_PruneFibersMaxBox")->setValue(40);
+    Remove(view, 1);
+    CPPUNIT_ASSERT(Reference("FiberProcessing/remove_length.fib")->Equals(Fibers(fib)));
+    ClearDataStorage();
+
+    for (const auto &[method, reference] : {std::pair{3, "FiberProcessing/remove_outside_v2.fib"}, std::pair{4, "FiberProcessing/remove_inside_v2.fib"}})
+    {
+      fib = Load("FiberProcessing/original.fib");
+      auto mask = LoadMask("FiberProcessing/MASK.nrrd");
+      Select({fib, mask});
+      Remove(view, method);
+      CPPUNIT_ASSERT_MESSAGE(reference, Reference(reference)->Equals(Fibers(fib)));
+      ClearDataStorage();
+    }
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  void Processing_Compress_AsModuleReference()
+  {
+    auto *view = ShowProcessing();
+    auto fib = Load("FiberProcessing/original.fib");
+    Select({fib});
+    GetChild<QComboBox>(view, "m_ModificationMethodBox")->setCurrentIndex(2);
+    GetChild<QDoubleSpinBox>(view, "m_ErrorThresholdBox")->setValue(0.1);
+    LogCapture log;
+    GetChild<QPushButton>(view, "m_ModifyButton")->click();
+    Wait(20);
+    CPPUNIT_ASSERT(Reference("FiberProcessing/modify_compress_v2.fib")->Equals(Fibers(fib)));
+  }
+
+  void Processing_BadParameters_Messages()
+  {
+    auto *view = ShowProcessing();
+    auto fib = Load("FiberProcessing/original.fib");
+    const auto fibersBefore = Fibers(fib)->GetNumFibers();
+    Select({fib});
+
+    GetChild<QSpinBox>(view, "m_PruneFibersMinBox")->setValue(50);
+    GetChild<QSpinBox>(view, "m_PruneFibersMaxBox")->setValue(40);
+    Remove(view, 1);
+    CPPUNIT_ASSERT(OneMessage().contains("minimum length is larger"));
+
+    for (const auto *box : {"m_ExtractDirX", "m_ExtractDirY", "m_ExtractDirZ"})
+      GetChild<QDoubleSpinBox>(view, box)->setValue(0);
+    Remove(view, 0);
+    CPPUNIT_ASSERT(OneMessage().contains("other than (0, 0, 0)"));
+    CPPUNIT_ASSERT_EQUAL(fibersBefore, Fibers(fib)->GetNumFibers());
+
+    // Label map extraction with a label that is no number.
+    auto mask = LoadMask("FiberProcessing/MASK.nrrd");
+    Select({fib, mask});
+    GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(1);
+    GetChild<QComboBox>(view, "m_ExtractionBoxMask")->setCurrentIndex(4);
+    GetChild<QLineEdit>(view, "m_LabelsBox")->setText("1, x");
+    GetChild<QPushButton>(view, "m_ExtractFibersButton")->click();
+    CPPUNIT_ASSERT(OneMessage().contains("Invalid labels"));
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), GetNodesOfClass("FiberBundle").size());
+  }
+
+  void Processing_TwoBundlesAndMask_ExtractAndCopy()
+  {
+    auto *view = ShowProcessing();
+    auto first = Load("FiberProcessing/original.fib");
+    first->SetName("first");
+    auto second = Load("FiberProcessing/original.fib");
+    second->SetName("second");
+    auto mask = LoadMask("FiberProcessing/MASK.nrrd");
+    Select({first, second, mask});
+
+    GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(1);
+    GetChild<QComboBox>(view, "m_ExtractionBoxMask")->setCurrentIndex(2); // passing ROI
+    GetChild<QPushButton>(view, "m_ExtractFibersButton")->click();
+    Wait(50);
+    // One extracted bundle below each input, named after the ROI.
+    for (const auto &bundle : {first, second})
+    {
+      auto derived = GetDataStorage()->GetDerivations(bundle);
+      CPPUNIT_ASSERT_EQUAL_MESSAGE(bundle->GetName(), 1u, derived->Size());
+      CPPUNIT_ASSERT_MESSAGE(derived->front()->GetName(), derived->front()->GetName().starts_with("passing-"));
+      CPPUNIT_ASSERT(Fibers(derived->front())->GetNumFibers() > 0);
+    }
+
+    // Copies of both bundles, independent of their sources.
+    Select({first, second});
+    GetChild<QPushButton>(view, "m_CopyBundle")->click();
+    Wait(50);
+    auto copy = GetDataStorage()->GetNamedNode("first_copy");
+    CPPUNIT_ASSERT(copy != nullptr && GetDataStorage()->GetNamedNode("second_copy") != nullptr);
+    const auto fibersBefore = Fibers(first)->GetNumFibers();
+    Select({copy});
+    GetChild<QSpinBox>(view, "m_PruneFibersMinBox")->setValue(30);
+    GetChild<QSpinBox>(view, "m_PruneFibersMaxBox")->setValue(40);
+    Remove(view, 1);
+    CPPUNIT_ASSERT(Fibers(copy)->GetNumFibers() < fibersBefore);
+    CPPUNIT_ASSERT_EQUAL(fibersBefore, Fibers(first)->GetNumFibers());
+  }
+
+  void Processing_SelectedBundleDeleted_NotUsed()
+  {
+    auto *view = ShowProcessing();
+    auto fib = Load("FiberProcessing/original.fib");
+    Select({fib});
+    CPPUNIT_ASSERT_EQUAL(QString::fromStdString(fib->GetName()), GetChild<QLabel>(view, "m_FibLabel")->text());
+    GetDataStorage()->Remove(fib);
+    Wait(20);
+    CPPUNIT_ASSERT(GetChild<QLabel>(view, "m_FibLabel")->text() != QString::fromStdString(fib->GetName()));
+    // A removal without a bundle changes nothing and does not crash.
+    Remove(view, 1);
+    CPPUNIT_ASSERT(GetNodesOfClass("FiberBundle").empty());
+  }
+
+  /** The bundles "passing" the ROI image, extracted below the bundle (removed from the storage). */
+  static mitk::FiberBundle::Pointer ExtractPassing(QWidget *view, const mitk::DataNode::Pointer &fib, const mitk::DataNode::Pointer &roi)
+  {
+    Select({fib, roi});
+    CPPUNIT_ASSERT_EQUAL(QString::fromStdString(roi->GetName()), GetChild<QLabel>(view, "m_PfLabel")->text());
+    GetChild<QPushButton>(view, "m_ExtractFibersButton")->click();
+    Wait(50);
+    auto derived = GetDataStorage()->GetDerivations(fib);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(roi->GetName(), 1u, derived->Size());
+    mitk::FiberBundle::Pointer result = Fibers(derived->front());
+    GetDataStorage()->Remove(derived->front());
+    return result;
+  }
+
+  void Processing_SegmentationRoi_AsBinaryMaskAlsoOneSlice()
+  {
+    auto *view = ShowProcessing();
+    GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(1);
+    GetChild<QComboBox>(view, "m_ExtractionBoxMask")->setCurrentIndex(2); // passing ROI
+    auto fib = Load("FiberProcessing/original.fib");
+    auto mask = LoadMask("FiberProcessing/MASK.nrrd");
+    auto *maskImage = dynamic_cast<mitk::Image *>(mask->GetData());
+    auto inMask = [maskImage](const itk::Index<3> &i) {
+      mitk::ImagePixelReadAccessor<unsigned char, 3> access(maskImage);
+      return access.GetPixelByIndex(i) != 0;
+    };
+
+    // The mask as two labels in two groups.
+    auto segmentation = AddNode(CreateSegmentation(maskImage, {{1, 0, [&](const itk::Index<3> &i) { return inMask(i) && i[0] < 15; }},
+                                                               {2, 1, [&](const itk::Index<3> &i) { return inMask(i) && i[0] >= 15; }}}),
+                                "segmentation");
+    auto fromMask = ExtractPassing(view, fib, mask);
+    CPPUNIT_ASSERT(fromMask->GetNumFibers() > 0);
+    CPPUNIT_ASSERT(ExtractPassing(view, fib, segmentation)->Equals(fromMask));
+
+    // A segmentation of one slice of the mask's grid, and the binary image of the same voxels.
+    auto oneSlice = mitk::Image::New();
+    unsigned int size[] = {maskImage->GetDimension(0), maskImage->GetDimension(1), 1};
+    oneSlice->Initialize(mitk::MakeScalarPixelType<unsigned char>(), 3, size);
+    oneSlice->SetOrigin(maskImage->GetGeometry()->GetOrigin());
+    auto oneSliceSegmentation = AddNode(CreateSegmentation(oneSlice, {{1, 0, inMask}}), "one slice segmentation");
+    auto oneSliceMask = AddNode(CreateMask(oneSlice, inMask), "one slice mask");
+    oneSliceMask->SetBoolProperty("binary", true);
+    auto fromOneSliceMask = ExtractPassing(view, fib, oneSliceMask);
+    CPPUNIT_ASSERT(fromOneSliceMask->GetNumFibers() > 0);
+    CPPUNIT_ASSERT(ExtractPassing(view, fib, oneSliceSegmentation)->Equals(fromOneSliceMask));
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  /** Distance of the point from the segment ab. */
+  static double DistanceToSegment(const mitk::Point3D &p, const mitk::Point3D &a, const mitk::Point3D &b)
+  {
+    const mitk::Vector3D ab = b - a;
+    const double lengthSquared = ab.GetSquaredNorm();
+    const double t = lengthSquared > 0 ? std::clamp(((p - a) * ab) / lengthSquared, 0.0, 1.0) : 0.0;
+    return p.EuclideanDistanceTo(a + ab * t);
+  }
+
+  /**
+   * An image with anisotropic voxels (30 x 30 x 12 voxels of 2 x 2 x 1 mm), rotated by 20 degrees
+   * about x and 10 about z, centred on the point: a grid unlike a fiber bundle's.
+   */
+  static mitk::Image::Pointer CreateObliqueImage(const mitk::Point3D &centre)
+  {
+    using ItkImage = itk::Image<unsigned char, 3>;
+    auto itkImage = ItkImage::New();
+    ItkImage::SizeType size = {{30, 30, 12}};
+    itkImage->SetRegions(ItkImage::RegionType(size));
+    ItkImage::SpacingType spacing;
+    spacing[0] = 2;
+    spacing[1] = 2;
+    spacing[2] = 1;
+    itkImage->SetSpacing(spacing);
+    auto rotation = itk::Euler3DTransform<double>::New();
+    rotation->SetRotation(20 * itk::Math::pi / 180, 0, 10 * itk::Math::pi / 180);
+    ItkImage::DirectionType direction;
+    direction = rotation->GetMatrix();
+    itkImage->SetDirection(direction);
+    itk::Vector<double, 3> halfExtent;
+    for (unsigned int i = 0; i < 3; ++i)
+      halfExtent[i] = spacing[i] * (size[i] / 2);
+    itkImage->SetOrigin(centre - direction * halfExtent);
+    itkImage->Allocate();
+    itkImage->FillBuffer(0);
+    mitk::Image::Pointer image;
+    mitk::CastToMitkImage(itkImage, image);
+    return image;
+  }
+
+  /** The axial slice plane of the image through the point, as a render window gives it to a figure drawn there. */
+  static mitk::PlaneGeometry::Pointer AxialPlaneThrough(const mitk::Image *image, const mitk::Point3D &point)
+  {
+    auto controller = mitk::SliceNavigationController::New();
+    controller->SetInputWorldTimeGeometry(image->GetTimeGeometry());
+    controller->Update(mitk::AnatomicalPlane::Axial);
+    controller->SelectSliceByPoint(point);
+    return controller->GetCurrentPlaneGeometry()->Clone();
+  }
+
+  /** The point projected onto the plane. */
+  static mitk::Point3D ProjectOntoPlane(const mitk::PlaneGeometry *plane, const mitk::Point3D &point)
+  {
+    return point - plane->GetNormal() / plane->GetNormal().GetNorm() * plane->SignedDistanceFromPlane(point);
+  }
+
+  /** A circle on the plane around the centre (a point of the plane). */
+  static mitk::PlanarCircle::Pointer CreateCircle(mitk::PlaneGeometry *plane, const mitk::Point3D &centre, double radius)
+  {
+    mitk::Vector3D u = plane->GetAxisVector(0);
+    u.Normalize();
+    auto circle = mitk::PlanarCircle::New();
+    circle->SetPlaneGeometry(plane);
+    mitk::Point2D point2D;
+    plane->Map(centre, point2D);
+    circle->PlaceFigure(point2D);
+    plane->Map(centre + u * radius, point2D);
+    circle->SetControlPoint(1, point2D);
+    return circle;
+  }
+
+  void Processing_RoiImageOfFigures_ObliqueGridUnionAndExtraction()
+  {
+    auto bundle = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("FiberProcessing/original.fib"));
+    const auto centre = bundle->GetGeometry()->GetCenter();
+    auto image = CreateObliqueImage(centre);
+    auto imageNode = AddNode(image, "oblique");
+
+    // A circle and a rectangle on the axial slice of the image through the bundle's centre.
+    auto plane = AxialPlaneThrough(image, centre);
+    mitk::Vector3D u = plane->GetAxisVector(0);
+    mitk::Vector3D v = plane->GetAxisVector(1);
+    u.Normalize();
+    v.Normalize();
+    const mitk::Point3D circleCentre = ProjectOntoPlane(plane, centre);
+    const double radius = 4;
+    auto circle = CreateCircle(plane, circleCentre, radius);
+    mitk::Point2D point2D;
+    const mitk::Point3D rectangleCentre = circleCentre + u * 9.0;
+    const double halfSide = 3;
+    auto rectangle = mitk::PlanarPolygon::New();
+    rectangle->SetPlaneGeometry(plane);
+    const double corners[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+    for (int k = 0; k < 4; ++k)
+    {
+      plane->Map(rectangleCentre + u * (corners[k][0] * halfSide) + v * (corners[k][1] * halfSide), point2D);
+      if (k == 0)
+        rectangle->PlaceFigure(point2D);
+      else
+        rectangle->AddControlPoint(point2D);
+    }
+    rectangle->SetClosed(true);
+    auto circleNode = AddNode(circle, "Circle1");
+    auto rectangleNode = AddNode(rectangle, "Polygon1");
+
+    // The ROI image of both figures: on the image's grid, both figures filled, nothing else set.
+    auto *view = ShowProcessing();
+    Select({imageNode, circleNode, rectangleNode});
+    auto *generate = GetChild<QPushButton>(view, "m_GenerateRoiImage");
+    CPPUNIT_ASSERT(generate->isEnabled());
+    generate->click();
+    Wait(50);
+    auto roi = GetDataStorage()->GetNamedNode("Circle1+Polygon1");
+    CPPUNIT_ASSERT(roi != nullptr);
+    auto *roiImage = dynamic_cast<mitk::Image *>(roi->GetData());
+    CPPUNIT_ASSERT(mitk::Equal(*image->GetGeometry(), *roiImage->GetGeometry(), 1e-6, 1e-6, true));
+    std::vector<mitk::Point3D> setVoxels;
+    {
+      mitk::ImagePixelReadAccessor<unsigned char, 3> access(roiImage);
+      itk::Index<3> index;
+      for (index[2] = 0; index[2] < 12; ++index[2])
+        for (index[1] = 0; index[1] < 30; ++index[1])
+          for (index[0] = 0; index[0] < 30; ++index[0])
+          {
+            if (access.GetPixelByIndex(index) == 0)
+              continue;
+            mitk::Point3D world;
+            roiImage->GetGeometry()->IndexToWorld(index, world);
+            setVoxels.push_back(world);
+          }
+      for (const auto &figureCentre : {circleCentre, rectangleCentre})
+      {
+        roiImage->GetGeometry()->WorldToIndex(figureCentre, index);
+        CPPUNIT_ASSERT(access.GetPixelByIndex(index) != 0);
+      }
+    }
+    // A voxel diagonal (3 mm) beyond the figures at most.
+    for (const auto &voxel : setVoxels)
+      CPPUNIT_ASSERT(voxel.EuclideanDistanceTo(circleCentre) <= radius + 3.0 || voxel.EuclideanDistanceTo(rectangleCentre) <= halfSide * std::sqrt(2.0) + 3.0);
+    const auto roiVoxels = setVoxels.size();
+
+    // An AND composite cannot be converted: a message, no image.
+    Select({circleNode, rectangleNode});
+    GetChild<QPushButton>(view, "PFCompoANDButton")->click();
+    Wait(50);
+    auto andNode = GetDataStorage()->GetNamedNode("AND");
+    CPPUNIT_ASSERT(andNode != nullptr);
+    Select({imageNode, andNode});
+    generate->click();
+    CPPUNIT_ASSERT(OneMessage().contains("AND and NOT composites cannot be converted"));
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), GetNodesOfClass("Image").size());
+
+    // Extraction with the ROI image: the fibers through the figures.
+    auto fib = AddNode(bundle, "bundle");
+    GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(1);
+    GetChild<QComboBox>(view, "m_ExtractionBoxMask")->setCurrentIndex(2); // passing ROI
+    auto passing = ExtractPassing(view, fib, roi);
+    CPPUNIT_ASSERT(passing->GetNumFibers() > 0 && passing->GetNumFibers() < bundle->GetNumFibers());
+    auto *polyData = passing->GetFiberPolyData().GetPointer();
+    for (unsigned int i = 0; i < passing->GetNumFibers(); ++i)
+    {
+      auto *points = polyData->GetCell(i)->GetPoints();
+      double closest = std::numeric_limits<double>::max();
+      for (vtkIdType j = 0; j + 1 < points->GetNumberOfPoints(); ++j)
+      {
+        mitk::Point3D a(points->GetPoint(j));
+        mitk::Point3D b(points->GetPoint(j + 1));
+        for (const auto &voxel : setVoxels)
+          closest = std::min(closest, DistanceToSegment(voxel, a, b));
+      }
+      CPPUNIT_ASSERT_MESSAGE("Fiber " + std::to_string(i) + " passes " + std::to_string(closest) + " mm from the ROI",
+                             closest <= 3.0 + 1e-6);
+    }
+    CPPUNIT_ASSERT(roiVoxels > 0);
+  }
+
+  void Processing_RoiImageWithBundleLoaded_SelectedImageGridElseBundleGrid()
+  {
+    // A tractogram in the storage, which the view selects whenever no bundle is selected, and an
+    // image on another grid.
+    auto fib = Load("FiberProcessing/original.fib");
+    const auto *bundleGeometry = Fibers(fib)->GetGeometry();
+    const auto centre = bundleGeometry->GetCenter();
+    auto image = CreateObliqueImage(centre);
+    auto imageNode = AddNode(image, "oblique");
+    auto plane = AxialPlaneThrough(image, centre);
+    const auto circleCentre = ProjectOntoPlane(plane, centre);
+    auto circleNode = AddNode(CreateCircle(plane, circleCentre, 4), "Circle1");
+
+    auto *view = ShowProcessing();
+    auto *generate = GetChild<QPushButton>(view, "m_GenerateRoiImage");
+    // The ROI image of the selection, removed from the storage; its figure's centre is set.
+    auto generateRoiImage = [&](const QList<mitk::DataNode::Pointer> &selection) {
+      Select(selection);
+      CPPUNIT_ASSERT(generate->isEnabled());
+      generate->click();
+      Wait(50);
+      mitk::DataNode::Pointer roi;
+      for (const auto &node : GetNodesOfClass("Image"))
+        if (node != imageNode)
+          roi = node;
+      CPPUNIT_ASSERT(roi.IsNotNull());
+      GetDataStorage()->Remove(roi);
+      mitk::Image::Pointer roiImage = dynamic_cast<mitk::Image *>(roi->GetData());
+      itk::Index<3> index;
+      roiImage->GetGeometry()->WorldToIndex(circleCentre, index);
+      mitk::ImagePixelReadAccessor<unsigned char, 3> access(roiImage);
+      CPPUNIT_ASSERT(access.GetPixelByIndex(index) != 0);
+      return roiImage;
+    };
+
+    // Image and figure selected: the image's grid, also with the bundle the view selected itself
+    // and with the bundle selected too.
+    Select({imageNode, circleNode});
+    CPPUNIT_ASSERT_EQUAL(QString::fromStdString(fib->GetName()), GetChild<QLabel>(view, "m_FibLabel")->text());
+    for (const auto &selection : {QList<mitk::DataNode::Pointer>{imageNode, circleNode}, QList<mitk::DataNode::Pointer>{fib, imageNode, circleNode}})
+    {
+      auto roiImage = generateRoiImage(selection);
+      CPPUNIT_ASSERT(mitk::Equal(*image->GetGeometry(), *roiImage->GetGeometry(), 1e-6, 1e-6, true));
+    }
+
+    // Only the figure selected: the grid of the bundle the view selected, 1 mm voxels from the
+    // corner of the bundle's bounding box.
+    auto roiImage = generateRoiImage({circleNode});
+    const auto *roiGeometry = roiImage->GetGeometry();
+    const auto bounds = bundleGeometry->GetBounds();
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(bounds[2 * i], roiGeometry->GetOrigin()[i], 1e-6);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, roiGeometry->GetSpacing()[i], 1e-9);
+      CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(bundleGeometry->GetExtent(i)), roiImage->GetDimension(i));
+      for (unsigned int j = 0; j < 3; ++j)
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(i == j ? 1.0 : 0.0, roiGeometry->GetMatrixColumn(i)[j], 1e-9);
+    }
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+  }
+
+  void Processing_CurvatureDecimalsScalarMapBoxUnplacedCircle()
+  {
+    auto *view = ShowProcessing();
+    auto fib = Load("FiberProcessing/original.fib");
+    const auto fibersBefore = Fibers(fib)->GetNumFibers();
+    Select({fib});
+
+    // The curvature threshold keeps its decimals; removing curved fibers changes the bundle.
+    auto *angle = GetChild<QDoubleSpinBox>(view, "m_CurvSpinBox");
+    angle->setValue(30.5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(30.5, angle->value(), 1e-9);
+    GetChild<QCheckBox>(view, "m_RemoveCurvedFibersBox")->setChecked(true);
+    Remove(view, 2);
+    CPPUNIT_ASSERT(Fibers(fib)->GetNumFibers() < fibersBefore);
+    CPPUNIT_ASSERT(DialogHandler::Instance().TakeMessages().isEmpty());
+
+    // The scalar map box lists 3D one-component images only, no DWI or peak image.
+    auto scalar = Load("tensorImage_FA.nrrd");
+    auto dwi = Load("ImageReconstruction/test.dwi");
+    mitk::PreferenceListReaderOptionsFunctor functor(mitk::PreferenceListReaderOptionsFunctor::ListType({"Peak Image"}),
+                                                     mitk::PreferenceListReaderOptionsFunctor::ListType());
+    auto peaks = mitk::IOUtil::Load(mitk::GetDiffusionTestDataFilePath("peak_image_test.nii.gz"), *GetDataStorage(), &functor)->front();
+    Wait(20);
+    CPPUNIT_ASSERT(BoxOffers(view, "m_ColorMapBox", scalar));
+    CPPUNIT_ASSERT(!BoxOffers(view, "m_ColorMapBox", dwi));
+    CPPUNIT_ASSERT(!BoxOffers(view, "m_ColorMapBox", peaks));
+
+    // Extraction with a circle created but not placed: the hint to place it.
+    Select({fib});
+    GetChild<QPushButton>(view, "m_CircleButton")->click();
+    Wait(20);
+    GetChild<QComboBox>(view, "m_ExtractionMethodBox")->setCurrentIndex(0);
+    auto *extract = GetChild<QPushButton>(view, "m_ExtractFibersButton");
+    CPPUNIT_ASSERT(extract->isEnabled());
+    extract->click();
+    CPPUNIT_ASSERT(OneMessage().contains("forgot to actually place it"));
+    CPPUNIT_ASSERT_EQUAL(std::size_t(1), GetNodesOfClass("FiberBundle").size());
+  }
+
+  void Quantification_EnvelopeEndingsAndReferenceImages()
+  {
+    auto fib = Load("fiberBundleX.fib");
+    // A scalar image 1000 mm away from the fibers (the box offers only one-component images).
+    auto reference = Load("tensorImage_FA.nrrd");
+    auto *referenceImage = dynamic_cast<mitk::Image *>(reference->GetData());
+    auto origin = referenceImage->GetGeometry()->GetOrigin();
+    origin[0] += 1000;
+    referenceImage->GetGeometry()->SetOrigin(origin);
+    auto *view = ShowView(QuantificationId, "QmitkFiberQuantificationViewControls");
+    ChooseNode(view, "m_TractBox", fib);
+    auto *method = GetChild<QComboBox>(view, "m_GenerationBox");
+    auto *start = GetChild<QPushButton>(view, "m_ProcessFiberBundleButton");
+
+    // Binary envelope on the grid of the reference image, without any fiber in it.
+    ChooseNode(view, "m_ImageBox", reference);
+    method->setCurrentIndex(2);
+    start->click();
+    auto *envelope = GetDataStorage()->GetNamedNode(fib->GetName() + "_envelope");
+    CPPUNIT_ASSERT(envelope != nullptr);
+    auto *envelopeImage = dynamic_cast<mitk::Image *>(envelope->GetData());
+    CPPUNIT_ASSERT_EQUAL(3u, envelopeImage->GetDimension());
+    for (unsigned int d = 0; d < 3; ++d)
+      CPPUNIT_ASSERT_EQUAL(referenceImage->GetDimension(d), envelopeImage->GetDimension(d));
+
+    // Endings point set: two points per fiber.
+    ChooseNode(view, "m_ImageBox", nullptr);
+    method->setCurrentIndex(5);
+    start->click();
+    auto *endings = GetDataStorage()->GetNamedNode(fib->GetName() + "_fiber_endings");
+    CPPUNIT_ASSERT(endings != nullptr);
+    auto *points = dynamic_cast<mitk::PointSet *>(endings->GetData());
+    CPPUNIT_ASSERT(points != nullptr);
+    CPPUNIT_ASSERT_EQUAL(static_cast<int>(2 * dynamic_cast<mitk::FiberBundle *>(fib->GetData())->GetNumFibers()), points->GetSize());
+  }
+
+  void Clustering_MissingInputs_MessagesAndClusters()
+  {
+    auto fib = Load("fiberBundleX.fib");
+    auto *view = ShowView(ClusteringId, "QmitkFiberClusteringViewControls");
+    ChooseNode(view, "m_TractBox", fib);
+    auto *start = GetChild<QPushButton>(view, "m_StartButton");
+
+    // The anatomical metric without a parcellation.
+    GetChild<QCheckBox>(view, "m_MetricBox4")->setChecked(true);
+    start->click();
+    CPPUNIT_ASSERT(OneMessage().contains("needs a parcellation"));
+    GetChild<QCheckBox>(view, "m_MetricBox4")->setChecked(false);
+
+    // Euclidean metric with centroids: clusters, or the message that none is large enough.
+    for (int i = 1; i <= 7; ++i)
+      GetChild<QCheckBox>(view, ("m_MetricBox" + std::to_string(i)).c_str())->setChecked(i == 1);
+    GetChild<QCheckBox>(view, "m_CentroidsBox")->setChecked(true);
+    GetChild<QCheckBox>(view, "m_MergeCentroidsBox")->setChecked(true);
+    GetChild<QSpinBox>(view, "m_MinFibersBox")->setValue(50);
+    start->click();
+    Wait(50);
+    const auto messages = DialogHandler::Instance().TakeMessages();
+    const bool clusters = GetDataStorage()->GetNamedNode("Cluster_0") != nullptr;
+    CPPUNIT_ASSERT(clusters != (messages.size() == 1 && messages.front().contains("No cluster with at least")));
+  }
+};
+
+CPPUNIT_TEST_SUITE_NAMED_REGISTRATION(QmitkFiberProcessingViewsUiTest, "FiberProcessing");

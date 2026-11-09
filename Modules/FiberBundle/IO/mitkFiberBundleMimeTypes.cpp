@@ -15,18 +15,16 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include "mitkFiberBundleMimeTypes.h"
-#include "mitkIOMimeTypes.h"
-#include <itksys/SystemTools.hxx>
-#include <itkNrrdImageIO.h>
-#include <itkMetaDataDictionary.h>
-#include <itkMetaDataObject.h>
-#include <mitkLog.h>
-#include <dcmtk/dcmtract/trctractographyresults.h>
+
+#include <dcmtk/dcmdata/dcdeftag.h>
+#include <dcmtk/dcmdata/dcfilefo.h>
 #include <dcmtk/dcmdata/dcuid.h>
-#include <mitkDICOMDCMTKTagScanner.h>
-#include <itkGDCMImageIO.h>
-#include <itkNiftiImageIO.h>
-#include <itkBruker2dseqImageIO.h>
+#include <itksys/SystemTools.hxx>
+#include <mitkIOMimeTypes.h>
+#include <mitkLog.h>
+
+#include <array>
+#include <fstream>
 
 namespace mitk
 {
@@ -35,12 +33,13 @@ std::vector<CustomMimeType*> FiberBundleMimeTypes::Get()
 {
   std::vector<CustomMimeType*> mimeTypes;
 
-  // order matters here (descending rank for mime types)
+  // The activator sets the ranks by name; the order here does not matter.
 
   mimeTypes.push_back(PLANARFIGURECOMPOSITE_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_VTK_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_TRK_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_TCK_MIMETYPE().Clone());
+  mimeTypes.push_back(FIBERBUNDLE_TRX_MIMETYPE().Clone());
   mimeTypes.push_back(FIBERBUNDLE_DICOM_MIMETYPE().Clone());
 
   return mimeTypes;
@@ -63,12 +62,6 @@ std::string FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE_NAME()
     return name;
 }
 
-std::string FiberBundleMimeTypes::PLANARFIGURECOMPOSITE_MIMETYPE_DESCRIPTION()
-{
-    static std::string description = "Planar Figure Composite";
-    return description;
-}
-
 
 
 CustomMimeType FiberBundleMimeTypes::FIBERBUNDLE_VTK_MIMETYPE()
@@ -89,6 +82,16 @@ CustomMimeType FiberBundleMimeTypes::FIBERBUNDLE_TCK_MIMETYPE()
   mimeType.SetComment("MRtrix Fibers");
   mimeType.SetCategory(category);
   mimeType.AddExtension("tck");
+  return mimeType;
+}
+
+CustomMimeType FiberBundleMimeTypes::FIBERBUNDLE_TRX_MIMETYPE()
+{
+  CustomMimeType mimeType(FIBERBUNDLE_TRX_MIMETYPE_NAME());
+  std::string category = "TRX Fibers";
+  mimeType.SetComment("TRX Fibers");
+  mimeType.SetCategory(category);
+  mimeType.AddExtension("trx");
   return mimeType;
 }
 
@@ -120,47 +123,33 @@ FiberBundleMimeTypes::FiberBundleDicomMimeType::FiberBundleDicomMimeType()
 
 bool FiberBundleMimeTypes::FiberBundleDicomMimeType::AppliesTo(const std::string &path) const
 {
+  // MITK bug 18572: the writer selection also asks with the output path, which does not exist
+  // yet; then the extension decides, so that saving to a new .dcm file finds the writer.
+  if (!itksys::SystemTools::FileExists(path.c_str(), true))
+    return CustomMimeType::AppliesTo(path);
+
   try
   {
-    std::ifstream myfile;
-    myfile.open (path, std::ios::binary);
-    //    myfile.seekg (128);
-    char *buffer = new char [128];
-    myfile.read (buffer,128);
-    myfile.read (buffer,4);
-    if (std::string(buffer).compare("DICM")!=0)
-    {
-      delete[] buffer;
-      return false;
-    }
-    delete[] buffer;
-
-    mitk::DICOMDCMTKTagScanner::Pointer scanner = mitk::DICOMDCMTKTagScanner::New();
-    mitk::DICOMTag SOPInstanceUID(0x0008, 0x0016);
-
-    mitk::StringList relevantFiles;
-    relevantFiles.push_back(path);
-
-    scanner->AddTag(SOPInstanceUID);
-    scanner->SetInputFiles(relevantFiles);
-    scanner->Scan();
-    mitk::DICOMTagCache::Pointer tagCache = scanner->GetScanCache();
-
-    mitk::DICOMImageFrameList imageFrameList = mitk::ConvertToDICOMImageFrameList(tagCache->GetFrameInfoList());
-    if (imageFrameList.empty())
+    // DICOM part 10 file: 128 bytes preamble, then "DICM"
+    std::ifstream file(path, std::ios::binary);
+    std::array<char, 132> head{};
+    if (!file.read(head.data(), static_cast<std::streamsize>(head.size())) || std::string(head.data() + 128, 4) != "DICM")
       return false;
 
-    mitk::DICOMImageFrameInfo *firstFrame = imageFrameList.begin()->GetPointer();
-
-    std::string tag_value = tagCache->GetTagValue(firstFrame, SOPInstanceUID).value;
-    if (tag_value.empty()) {
+    // The dataset is parsed only up to the SOP Class UID (0008,0016): a tractogram holds one item
+    // per track, and parsing all of them only to tell the file type cost about 0.2 s per call for
+    // a million points (and the check runs for every DICOM file the user opens).
+    file.close();
+    DcmFileFormat dicomFile;
+    const DcmTagKey afterSopClassUid(0x0008, 0x0017);
+    if (dicomFile.loadFileUntilTag(path.c_str(), EXS_Unknown, EGL_noChange, DCM_MaxReadLength, ERM_autoDetect, afterSopClassUid).bad())
       return false;
-    }
 
-    if (tag_value.compare(UID_TractographyResultsStorage)!=0)
+    OFString sopClassUid;
+    if (dicomFile.getDataset()->findAndGetOFString(DCM_SOPClassUID, sopClassUid).bad() || sopClassUid.empty())
       return false;
 
-    return true;
+    return sopClassUid == UID_TractographyResultsStorage;
   }
   catch (std::exception& e)
   {
@@ -195,6 +184,12 @@ std::string FiberBundleMimeTypes::FIBERBUNDLE_TCK_MIMETYPE_NAME()
   return name;
 }
 
+std::string FiberBundleMimeTypes::FIBERBUNDLE_TRX_MIMETYPE_NAME()
+{
+  static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.trx";
+  return name;
+}
+
 std::string FiberBundleMimeTypes::FIBERBUNDLE_TRK_MIMETYPE_NAME()
 {
   static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.trk";
@@ -205,13 +200,6 @@ std::string FiberBundleMimeTypes::FIBERBUNDLE_DICOM_MIMETYPE_NAME()
 {
   static std::string name = IOMimeTypes::DEFAULT_BASE_NAME() + ".FiberBundle.dcm";
   return name;
-}
-
-// Descriptions
-std::string FiberBundleMimeTypes::FIBERBUNDLE_MIMETYPE_DESCRIPTION()
-{
-  static std::string description = "Fiberbundles";
-  return description;
 }
 
 }

@@ -14,42 +14,37 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
+#ifndef QmitkSimpleRegistrationView_h
+#define QmitkSimpleRegistrationView_h
 
-
-#include <berryISelectionListener.h>
-#include <berryIStructuredSelection.h>
 #include <QmitkAbstractView.h>
 #include "ui_QmitkSimpleRegistrationViewControls.h"
 
 #include <mitkImage.h>
 #include <QmitkRegistrationJob.h>
 
-typedef short DiffusionPixelType;
+#include <memory>
 
-/*!
-\brief View for diffusion image registration / head motion correction
-*/
-
-// Forward Qt class declarations
-
+/**
+ * \brief View for rigid and affine registration of images and DWIs, and for applying registrations
+ * to tractograms.
+ *
+ * Of a DWI one volume is registered; the result is applied to all volumes and turns the gradients
+ * (mitk::DiffusionImageMapping).
+ */
 class QmitkSimpleRegistrationView : public QmitkAbstractView
 {
-
-  // this is needed for all Qt objects that should have a Qt meta-object
-  // (everything that derives from QObject and wants to have signal/slots)
   Q_OBJECT
 
 public:
 
-  typedef itk::Image< float, 3 > ItkFloatImageType;
-  typedef itk::Image<DiffusionPixelType, 3> ITKDiffusionVolumeType;
-  typedef itk::VectorImage< short, 3 >   ItkDwiType;
+  using ItkFloatImageType = itk::Image<float, 3>;
   static const std::string VIEW_ID;
 
   QmitkSimpleRegistrationView();
-  virtual ~QmitkSimpleRegistrationView();
+  ~QmitkSimpleRegistrationView() override;
 
-  virtual void CreateQtPartControl(QWidget *parent) override;
+  void CreateQtPartControl(QWidget *parent) override;
   void SetFocus() override;
 
 protected slots:
@@ -60,16 +55,22 @@ protected slots:
   void StartRegistration();
   void StartTractoRegistration();
   void OnRegResultIsAvailable(mitk::MAPRegistrationWrapper::Pointer spResultRegistration, const QmitkRegistrationJob* pRegJob);
+  void OnRegistrationError(QString message);
+  void OnRegistrationFinished();
 
 protected:
 
   /// \brief called by QmitkAbstractView when DataManager's selection has changed
-  virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
+  void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
 
-  Ui::QmitkSimpleRegistrationViewControls* m_Controls;
+  /** Enables "Start" if both images can be registered and no registration runs. */
+  void UpdateStartButton();
+
+  std::unique_ptr<Ui::QmitkSimpleRegistrationViewControls> m_Controls;
+  /** Moving image and type of the running registration; only one runs at a time. */
   mitk::DataNode::Pointer  m_MovingImageNode;
-  int  m_RegistrationType;
-
-private:
-
+  int  m_RegistrationType = 0;
+  bool m_RegistrationRunning = false;
 };
+
+#endif

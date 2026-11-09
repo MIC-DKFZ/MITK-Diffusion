@@ -15,6 +15,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 ===================================================================*/
 
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
+#include <mitkImageCast.h>
 #include <mitkCommandLineParser.h>
 #include <mitkLexicalCast.h>
 #include <mitkIOUtil.h>
@@ -27,17 +29,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkClusteringMetricInnerAngles.h>
 #include <mitkClusteringMetricLength.h>
 #include <itksys/SystemTools.hxx>
-
-typedef itksys::SystemTools ist;
-
-mitk::FiberBundle::Pointer LoadFib(std::string filename)
-{
-  std::vector<mitk::BaseData::Pointer> fibInfile = mitk::IOUtil::Load(filename);
-  if( fibInfile.empty() )
-    std::cout << "File " << filename << " could not be read!";
-  mitk::BaseData::Pointer baseData = fibInfile.at(0);
-  return dynamic_cast<mitk::FiberBundle*>(baseData.GetPointer());
-}
+#include <mitkDiffusionDataIOHelper.h>
+#include <mitkExceptionMacro.h>
 
 /*!
 \brief Spatially cluster fibers
@@ -51,7 +44,7 @@ int main(int argc, char* argv[])
   parser.setContributor("MIC");
 
   parser.setArgumentPrefix("--", "-");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input fiber bundle (.fib; .trk; .tck)", us::Any(), false, false, false, mitkCommandLineParser::Input);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input fiber bundle (.fib; .trk; .tck; .trx)", us::Any(), false, false, false, mitkCommandLineParser::Input);
   parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output root", us::Any(), false, false, false, mitkCommandLineParser::Output);
 
   parser.addArgument("cluster_size", "", mitkCommandLineParser::Int, "Cluster size:", "", 10);
@@ -62,7 +55,7 @@ int main(int argc, char* argv[])
   parser.addArgument("output_centroids", "", mitkCommandLineParser::Bool, "Output centroids:", "");
   parser.addArgument("only_centroids", "", mitkCommandLineParser::Bool, "Output only centroids:", "");
   parser.addArgument("merge_centroids", "", mitkCommandLineParser::Bool, "Merge centroids:", "");
-  parser.addArgument("metrics", "", mitkCommandLineParser::StringList, "Metrics:", "EU_MEAN; EU_STD; EU_MAX; ANAT; MAP; LENGTH", std::string("EU_MEAN"));
+  parser.addArgument("metrics", "", mitkCommandLineParser::StringList, "Metrics:", "EU_MEAN; EU_STD; EU_MAX; ANGLES; ANAT; MAP; LENGTH", std::string("EU_MEAN"));
   parser.addArgument("metric_weights", "", mitkCommandLineParser::StringList, "Metric weights:", "add one float weight for each used metric");
   parser.addArgument("input_centroids", "", mitkCommandLineParser::String, "Input centroids:", "", us::Any(), true, false, false, mitkCommandLineParser::Input);
   parser.addArgument("scalar_map", "", mitkCommandLineParser::String, "Scalar map:", "", us::Any(), true, false, false, mitkCommandLineParser::Input);
@@ -138,12 +131,20 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
   }
 
+  // A cluster size of 0 would never reach the largest cluster distance, and the metrics compare
+  // fibers point by point.
+  if (cluster_size<=0 || fiber_points<2)
+  {
+    MITK_INFO << "--cluster_size must be positive and --fiber_points at least 2.";
+    return EXIT_FAILURE;
+  }
+
   try
   {
     typedef itk::Image< float, 3 > FloatImageType;
     typedef itk::Image< short, 3 > ShortImageType;
 
-    mitk::FiberBundle::Pointer fib = LoadFib(inFileName);
+    mitk::FiberBundle::Pointer fib = mitk::FiberBundleIOHelper::load_fib(inFileName);
 
     float max_d = 0;
     int i=1;
@@ -162,65 +163,67 @@ int main(int argc, char* argv[])
     if (input_centroids!="")
     {
 
-      mitk::FiberBundle::Pointer in_centroids = LoadFib(input_centroids);
+      mitk::FiberBundle::Pointer in_centroids = mitk::FiberBundleIOHelper::load_fib(input_centroids);
       clusterer->SetInCentroids(in_centroids);
     }
 
-    std::vector< mitk::ClusteringMetric* > metrics;
-
+    // Each metric name must create its metric, so that its weight is not given to another one.
     int mc = 0;
     for (auto m : metric_strings)
     {
       float w = boost::lexical_cast<float>(metric_weights.at(mc));
       MITK_INFO << "Metric: " << m << " (w=" << w << ")";
+      std::unique_ptr<mitk::ClusteringMetric> metric;
       if (m=="EU_MEAN")
-        metrics.push_back({new mitk::ClusteringMetricEuclideanMean()});
+        metric = std::make_unique<mitk::ClusteringMetricEuclideanMean>();
       else if (m=="EU_STD")
-        metrics.push_back({new mitk::ClusteringMetricEuclideanStd()});
+        metric = std::make_unique<mitk::ClusteringMetricEuclideanStd>();
       else if (m=="EU_MAX")
-        metrics.push_back({new mitk::ClusteringMetricEuclideanMax()});
+        metric = std::make_unique<mitk::ClusteringMetricEuclideanMax>();
       else if (m=="ANGLES")
-        metrics.push_back({new mitk::ClusteringMetricInnerAngles()});
+        metric = std::make_unique<mitk::ClusteringMetricInnerAngles>();
       else if (m=="LENGTH")
-        metrics.push_back({new mitk::ClusteringMetricLength()});
-      else if (m=="MAP" && scalar_map!="")
+        metric = std::make_unique<mitk::ClusteringMetricLength>();
+      else if (m=="MAP" || m=="ANAT")
       {
-        mitk::Image::Pointer mitk_map = mitk::IOUtil::Load<mitk::Image>(scalar_map);
-        if (mitk_map->GetDimension()==3)
+        const std::string& image_file = m=="MAP" ? scalar_map : parcellation;
+        if (image_file.empty())
+          mitkThrow() << "Metric " << m << " needs --" << (m=="MAP" ? "scalar_map" : "parcellation") << ".";
+        mitk::Image::Pointer mitk_map = mitk::IOUtil::Load<mitk::Image>(image_file);
+        if (mitk_map->GetDimension()!=3)
+          mitkThrow() << "Metric " << m << " needs a 3D image: " << image_file;
+
+        if (m=="MAP")
         {
           FloatImageType::Pointer itk_map = FloatImageType::New();
           mitk::CastToItkImage(mitk_map, itk_map);
-
-          mitk::ClusteringMetricScalarMap* metric = new mitk::ClusteringMetricScalarMap();
-          metric->SetImages({itk_map});
-          metric->SetScale(distances.at(0));
-          metrics.push_back(metric);
+          auto map_metric = std::make_unique<mitk::ClusteringMetricScalarMap>();
+          map_metric->SetImages({itk_map});
+          metric = std::move(map_metric);
         }
-      }
-      else if (m=="ANAT" && parcellation!="")
-      {
-        mitk::Image::Pointer mitk_map = mitk::IOUtil::Load<mitk::Image>(parcellation);
-        if (mitk_map->GetDimension()==3)
+        else
         {
           ShortImageType::Pointer itk_map = ShortImageType::New();
           mitk::CastToItkImage(mitk_map, itk_map);
-
-          mitk::ClusteringMetricAnatomic* metric = new mitk::ClusteringMetricAnatomic();
-          metric->SetParcellations({itk_map});
-          metrics.push_back(metric);
+          auto anat_metric = std::make_unique<mitk::ClusteringMetricAnatomic>();
+          anat_metric->SetParcellations({itk_map});
+          metric = std::move(anat_metric);
         }
       }
-      metrics.back()->SetScale(w);
+      else
+        mitkThrow() << "Unknown metric " << m << ".";
+
+      metric->SetScale(w);
+      clusterer->AddMetric(std::move(metric));
       mc++;
     }
 
-    if (metrics.empty())
+    if (mc==0)
     {
       MITK_INFO << "No metric selected!";
       return EXIT_FAILURE;
     }
 
-    clusterer->SetMetrics(metrics);
     clusterer->SetMergeDuplicateThreshold(merge_clusters);
     clusterer->SetNumPoints(fiber_points);
     clusterer->SetMaxClusters(max_clusters);
@@ -230,13 +233,15 @@ int main(int argc, char* argv[])
     std::vector<mitk::FiberBundle::Pointer> centroids = clusterer->GetOutCentroids();
 
     MITK_INFO << "Saving clusters";
-    std::streambuf *old = std::cout.rdbuf(); // <-- save
-    std::stringstream ss;
-    std::cout.rdbuf (ss.rdbuf());       // <-- redirect
+    mitk::CoutSilencer silencer;
 
     if (!only_centroids)
+    {
       for (unsigned int i=0; i<tracts.size(); ++i)
         mitk::IOUtil::Save(tracts.at(i), out_root + "Cluster_" + boost::lexical_cast<std::string>(i) + file_ending);
+      if (clusterer->GetOutUnassigned()->GetNumFibers()>0)
+        mitk::IOUtil::Save(clusterer->GetOutUnassigned(), out_root + "Cluster_unassigned" + file_ending);
+    }
 
 
     if (output_centroids && !merge_centroids)
@@ -248,20 +253,17 @@ int main(int argc, char* argv[])
     {
       mitk::FiberBundle::Pointer centroid = mitk::FiberBundle::New();
       centroid = centroid->AddBundles(centroids);
-      mitk::IOUtil::Save(centroid, out_root + ist::GetFilenameWithoutExtension(inFileName) + "_Centroids" + file_ending);
+      mitk::IOUtil::Save(centroid, out_root + mitk::DiffusionDataIOHelper::GetNameWithoutExtension(inFileName) + "_Centroids" + file_ending);
     }
-
-    std::cout.rdbuf (old);              // <-- restore
-
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (...)

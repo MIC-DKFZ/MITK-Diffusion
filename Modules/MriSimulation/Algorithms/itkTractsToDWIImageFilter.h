@@ -20,15 +20,20 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVnlForwardFFTImageFilter.h>
 #include <itkVectorImage.h>
 #include <cmath>
+#include <cstdint>
+#include <atomic>
 #include <mitkFiberfoxParameters.h>
-#include <itkTimeProbe.h>
 #include <mitkRawShModel.h>
 #include <itkAnalyticalDiffusionQballReconstructionImageFilter.h>
 #include <mitkPointSet.h>
 #include <itkLinearInterpolateImageFunction.h>
+#include <mitkFiberfoxMotion.h>
+#include <mitkFiberfoxLog.h>
 
 namespace itk
 {
+
+class TimeSegmentMemoryBudget;
 
 /**
 * \brief Generates artificial diffusion weighted image volume from the input fiberbundle using a generic multicompartment model.
@@ -66,22 +71,43 @@ public:
     itkSetMacro( FiberBundle, FiberBundleType )             ///< Input fiber bundle
     itkSetMacro( InputImage, typename OutputImageType::Pointer )     ///< Input diffusion-weighted image. If no fiber bundle is set, then the acquisition is simulated for this image without a new diffusion simulation.
     itkSetMacro( UseConstantRandSeed, bool )                ///< Seed for random generator.
-    void SetParameters( FiberfoxParameters param )  ///< Simulation parameters.
+    /** Memory of the time segments of all k-space slice jobs together, which they wait for (TimeSegmentMemoryBudget); KspaceImageFilter::TIME_SEGMENT_MEMORY_BUDGET by default (tests set less). */
+    itkSetMacro( TimeSegmentMemoryBudget, std::uint64_t )
+    /** Volumes simulated together (a batch); 0, the default: as many as fit into BATCH_MEMORY_BUDGET, at most one per OpenMP thread. The images do not depend on it (tests set others). */
+    itkSetMacro( VolumesPerBatch, unsigned int )
+    void SetParameters( mitk::FiberfoxParameters param )  ///< Simulation parameters.
     { m_Parameters = param; }
 
     /** Output */
-    FiberfoxParameters GetParameters(){ return m_Parameters; }
+    mitk::FiberfoxParameters GetParameters(){ return m_Parameters; }
     std::vector< ItkDoubleImgType::Pointer > GetVolumeFractions() ///< one double image for each compartment containing the corresponding volume fraction per voxel
     { return m_VolumeFractions; }
-    itkGetMacro( StatusText, std::string )
-    itkGetMacro( PhaseImage, DoubleDwiType::Pointer )
+    std::string GetStatusText() const   ///< log of the running simulation; safe to call from another thread
+    { return m_Log->GetStatusText(); }
+    mitk::FiberfoxLog* GetLog() const   ///< log and progress (itk::ProgressEvent of the log) of the simulation
+    { return m_Log; }
+    itkGetMacro( PhaseImage, DoubleDwiType::Pointer )   ///< phase of the k-space simulation; only with m_OutputAdditionalImages, else null
     itkGetMacro( KspaceImage, DoubleDwiType::Pointer )
     itkGetMacro( CoilPointset, mitk::PointSet::Pointer )
     itkGetMacro( TickImage, typename Float2DImageType::Pointer )    ///< k-space readout ordering encoded in the voxels
     itkGetMacro( RfImage, typename Float2DImageType::Pointer )    ///< time passed since last RF pulse encoded per voxel
+    const std::vector< mitk::FiberfoxMotion >& GetMotion() const   ///< head motion of each simulated volume (ground truth for motion correction)
+    { return m_Motion; }
 
     void GenerateData() override;
 
+    /** Memory of the compartment images and k-space magnitudes of one batch of volumes, from which the automatic number of volumes per batch follows. */
+    static constexpr std::uint64_t BATCH_MEMORY_BUDGET = std::uint64_t(2)*1024*1024*1024;
+
+    /**
+     * Estimated peak memory of the simulation in bytes, from the parameters and inputs, to be called before
+     * Update(): the output, the images of a batch of volumes, masks, the volume fractions and two copies of
+     * the tractogram, the magnitude of all volumes with a noise model, the time segments of the k-space step
+     * and the additional outputs (real, imaginary and phase images) if requested.
+     */
+    std::uint64_t EstimateMemoryBytes() const;
+
+    /** Real and imaginary part of each coil's image; only with m_OutputAdditionalImages, else empty. */
     std::vector<DoubleDwiType::Pointer> GetOutputImagesReal() const
     {
       return m_OutputImagesReal;
@@ -97,27 +123,151 @@ protected:
     TractsToDWIImageFilter();
     ~TractsToDWIImageFilter() override;
     itk::Vector<double, 3> GetItkVector(double point[3]);
+    /** Seed of the random signal models for one fiber segment and compartment. */
+    static int SegmentSeed(int runSeed, int fiber, int segment, int compartment);
+    /** Throws if the model is a prototype (raw-SH) model and the gradients have more than one shell. */
+    void CheckPrototypeShells(mitk::DiffusionSignalModel<double>* model);
     vnl_vector_fixed<double, 3> GetVnlVector(double point[3]);
     vnl_vector_fixed<double, 3> GetVnlVector(Vector< float, 3 >& vector);
-    double RoundToNearest(double num);
-    std::string GetTime();
     bool PrepareLogFile();  /** Prepares the log file and returns true if successful or false if failed. */
-    void PrintToLog(std::string m, bool addTime=true, bool linebreak=true, bool stdOut=true);
+    void PrintToLog(const std::string& m, bool addTime=true, bool linebreak=true, bool stdOut=true)
+    { m_Log->Print(m, addTime, linebreak, stdOut); }
+    /** Progress bar of 50 stars in the log, the status text and on stdout, for total steps. */
+    void StartProgress(std::uint64_t total)
+    { m_Log->StartProgress(total); }
+    /** Steps of the progress bar, one by default; called from the parallel loops. */
+    void AdvanceProgress(std::uint64_t steps = 1)
+    { m_Log->AdvanceProgress(steps); }
 
-    /** Transform generated image compartment by compartment, channel by channel and slice by slice using DFT and add k-space artifacts/effects. */
-    DoubleDwiType::Pointer SimulateKspaceAcquisition(std::vector< DoubleDwiType::Pointer >& images);
+    /** Volume, slice and coil of one spike. */
+    struct Spike
+    {
+      unsigned int volume;
+      unsigned int slice;
+      unsigned int coil;
+    };
+
+    /** What the k-space jobs of one run share; they only read it. */
+    struct KspaceRun
+    {
+      const std::vector< DoubleDwiType::Pointer >* compartmentImages;   ///< the volumes of the batch as components
+      unsigned int firstVolume;   ///< volume of component 0 of the compartment images and the magnitude
+      unsigned int numVolumes;    ///< volumes of the whole simulation
+      unsigned int numSlices;
+      std::vector< itk::Vector<double, 3> > coilPositions;
+      std::vector< Spike > spikes;
+      int threadsPerSlice;
+      TimeSegmentMemoryBudget* timeSegmentMemory;   ///< memory budget of the time segments of all slice jobs
+      bool storeTimings;   ///< the job of volume 0, slice 0 and coil 0 stores the readout timings
+      DoubleDwiType::Pointer magnitude;
+      std::atomic<unsigned int>* cappedJobs;   ///< counts the jobs that took the exact sum instead of the time segments asked for
+    };
+
+    /**
+     * Prepares the k-space step of all batches: coil positions, spikes, the echo time, the k-space image and, with
+     * additional outputs, the phase image; logs the parallel volumes and threads per slice of a batch of volumesPerBatch.
+     */
+    void PrepareKspaceRun(KspaceRun& run, unsigned int volumesPerBatch);
+    /**
+     * Transform generated image compartment by compartment, channel by channel and slice by slice using DFT and add k-space artifacts/effects.
+     * One job per volume of the batch in parallel (SimulateKspaceVolume), one per slice and coil in it (SimulateKspaceCoil);
+     * returns the magnitude of the batch's volumes.
+     */
+    DoubleDwiType::Pointer SimulateKspaceBatch(KspaceRun& run, unsigned int firstVolume);
+    /** Image on the grid of the output image, but with the unshifted origin, with the given number of components, all 0. */
+    DoubleDwiType::Pointer NewKspaceResultImage(unsigned int components) const;
+    /** Coil positions in m, relative to the image centre, evenly spaced on a circle around the z axis; also fills m_CoilPointset. */
+    std::vector< itk::Vector<double, 3> > ComputeCoilPositions();
+    /** Draws coil, slice and volume of every spike from the run's generator. */
+    std::vector< Spike > DrawSpikes(unsigned int numVolumes, unsigned int numSlices);
+    /** Simulates the acquisition of all slices and coils of volume g; returns its spike log. */
+    std::string SimulateKspaceVolume(const KspaceRun& run, unsigned int g);
+    /** Slice z of component k (a volume of the batch) of every compartment image, with the T1 and T2 of the compartment's signal model. */
+    void ExtractCompartmentSlices(const std::vector< DoubleDwiType::Pointer >& images, unsigned int k, unsigned int z,
+                                  std::vector< Float2DImageType::Pointer >& slices, std::vector< float >& t1, std::vector< float >& t2) const;
+    /**
+     * Acquires slice z of volume g with coil c (k-space filter, then DFT back to image space) and stores
+     * the result in the magnitude and, if allocated, the coil's real and imaginary images and the phase;
+     * returns the spike log.
+     */
+    std::string SimulateKspaceCoil(const KspaceRun& run, unsigned int g, unsigned int z, unsigned int c,
+                                   const std::vector< Float2DImageType::Pointer >& slices, const std::vector< float >& t1, const std::vector< float >& t2);
+    /** Root mean square over the coils of the summed squared magnitude (component k) and phase (volume g) in slice z. */
+    void CombineCoils(DoubleDwiType* magnitude, unsigned int k, unsigned int g, unsigned int z);
+    /**
+     * Component k of the voxel at index. The volumes are simulated in parallel, and every voxel vector holds one
+     * component per volume (per coil for the k-space image). GetPixel/SetPixel of an itk::VectorImage copy the whole
+     * voxel vector, so a write-back that way overwrites the components other threads store at the same time (lost
+     * updates, seen as zeros in the output). Each thread therefore writes only its own component.
+     */
+    static double& Component(DoubleDwiType* image, const DoubleDwiType::IndexType& index, unsigned int k);
+
+    /**
+     * Adds the signal of every fiber segment in volume g to the given component of the fiber compartment
+     * images and the segment volumes (mm³) to intraAxonalVolume; returns its largest voxel value.
+     */
+    double SimulateFiberSignal(unsigned int g, unsigned int component, int signalModelSeed, int fiberThreads, ItkDoubleImgType* intraAxonalVolume);
+
+    /**
+     * In every voxel of the moved mask, scales the fiber compartments of volume g (component k) to their
+     * volume fractions and fills the rest of the voxel with the non-fiber compartments.
+     */
+    void SimulateNonFiberSignal(unsigned int g, unsigned int k, const ItkDoubleImgType* intraAxonalVolume, double maxVolume);
 
     /** Generate signal of non-fiber compartments. */
-    void SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3>& volume_fraction_point, double intraAxonalVolume, int g);
+    using DoubleInterpolatorType = itk::LinearInterpolateImageFunction< ItkDoubleImgType, float >;
+    /** The interpolator reads the volume fraction maps; one per thread. */
+    void SimulateExtraAxonalSignal(ItkUcharImgType::IndexType& index, itk::Point<float, 3>& volume_fraction_point, double intraAxonalVolume, int g, unsigned int k, DoubleInterpolatorType* interpolator);
 
-    /** Move fibers to simulate headmotion */
-    void SimulateMotion(int g=-1);
+    /**
+     * Head motion of every volume (m_Motion) and the motion log, drawn before any volume is simulated:
+     * the run's generator draws the signal model seed, the motion of the moved volumes in volume order,
+     * the spikes and the noise model's seed in this order, which the references depend on.
+     */
+    void DrawMotion();
+    /** Moves fibers and mask to the head position of volume g; called for the volumes in their order. */
+    void ApplyMotion(unsigned int g);
+    /**
+     * Writes the points of m_FiberBundle, moved by the transform (unmoved without one), into the
+     * points of m_FiberBundleTransformed, a copy with the same point ids made once per run: one moved
+     * tractogram in memory whatever the number of moved volumes.
+     */
+    void SetMovedFiberPoints(const mitk::FiberfoxMotion::TransformType* transform);
 
     void CheckVolumeFractionImages();
     ItkDoubleImgType::Pointer NormalizeInsideMask(ItkDoubleImgType::Pointer image);
     void InitializeData();
     void InitializeFiberData();
+    /**
+     * Compartment images with one component per volume of the batch: zero with fibers, else the input
+     * image's volumes (upsampled for Gibbs ringing).
+     */
+    void InitializeBatch(unsigned int firstVolume, unsigned int numVolumes);
+    /** Sum of the compartment images (simulation without k-space step). */
+    DoubleDwiType::Pointer SumCompartments() const;
+    /**
+     * Scales the magnitude, adds drift and, with a noise model, noise, rounds it and stores it as volumes
+     * firstVolume, ... of the output. With a noise model it is called once with all volumes, since the model
+     * draws the noise voxel by voxel over all volumes, and shows the progress per voxel. False if aborted.
+     */
+    bool FinalizeVolumes(const DoubleDwiType* magnitude, unsigned int firstVolume, double signalScale);
+    /** Image sizes of a run, from the parameters and inputs; the same before and during the run. */
+    struct RunSizes
+    {
+      std::uint64_t outputVoxels;    ///< output grid, cropped with aliasing
+      std::uint64_t workingVoxels;   ///< grid of the compartment images, in-plane twice as fine for Gibbs ringing
+      std::uint64_t inputVoxels;     ///< input image of a simulation for a DWI, else 0
+      unsigned int numVolumes;
+      unsigned int numCompartments;
+      bool kspace;
+    };
+    RunSizes GetRunSizes() const;
+    /** Memory of one volume of a batch: compartment images, magnitude or compartment sum, the input's volume as double. */
+    static std::uint64_t BatchBytesPerVolume(const RunSizes& sizes);
+    /** Number of volumes simulated together (SetVolumesPerBatch). */
+    unsigned int GetVolumesPerBatch(const RunSizes& sizes) const;
 
+    /** A voxel's centre moved by the motion of m_MotionVolume (forward, voxel of the upsampled mask) or back. */
     itk::Point<float, 3> GetMovedPoint(itk::Index<3>& index, bool forward);
 
     // input
@@ -132,13 +282,15 @@ protected:
     std::vector < typename DoubleDwiType::Pointer > m_OutputImagesReal;
     std::vector < typename DoubleDwiType::Pointer > m_OutputImagesImag;
     std::vector< ItkDoubleImgType::Pointer >    m_VolumeFractions;
-    std::string                                 m_StatusText;
+    mitk::FiberfoxLog::Pointer                  m_Log;
 
     // MISC
-    itk::TimeProbe                              m_TimeProbe;
     bool                                        m_UseConstantRandSeed;
+    std::uint64_t                               m_TimeSegmentMemoryBudget;
+    unsigned int                                m_VolumesPerBatch;
+    std::uint64_t                               m_ProgressPerFiber;   ///< progress steps of a fiber's signal in one volume
+    std::uint64_t                               m_ProgressPerSlice;   ///< progress steps of a slice's k-space step in one volume
     bool                                        m_MaskImageSet;
-    std::ofstream                                    m_Logfile;
     std::string                                 m_MotionLog;
     std::string                                 m_SpikeLog;
 
@@ -148,12 +300,12 @@ protected:
     itk::Point<double,3>                        m_WorkingOrigin;
     ImageRegion<3>                              m_WorkingImageRegion;
     double                                      m_VoxelVolume;
-    std::vector< DoubleDwiType::Pointer >       m_CompartmentImages;
+    std::vector< DoubleDwiType::Pointer >       m_CompartmentImages;   ///< one component per volume of the current batch
     ItkUcharImgType::Pointer                    m_TransformedMaskImage;     ///< copy of mask image (changes for each motion step)
     ItkUcharImgType::Pointer                    m_UpsampledMaskImage;       ///< helper image for motion simulation
-    std::vector< MatrixType >                   m_RotationsInv;
-    std::vector< MatrixType >                   m_Rotations;                ///<stores the individual rotation of each volume (needed for k-space simulation to obtain correct frequency map position)
-    std::vector< VectorType >                   m_Translations;             ///<stores the individual translation of each volume (needed for k-space simulation to obtain correct frequency map position)
+    std::vector< mitk::FiberfoxMotion >         m_Motion;                   ///< head motion of each volume (fibers, mask, volume fraction and frequency map lookup)
+    unsigned int                                m_MotionVolume;             ///< volume whose head position the moved fibers and mask have (ApplyMotion)
+    mitk::FiberfoxMotion::PointType             m_MotionCenter;             ///< rotation centre of all volumes: centre of the unmoved fiber bundle
     double                                      m_mmRadius;
     double                                      m_SegmentVolume;
     bool                                        m_UseRelativeNonFiberVolumeFractions;
@@ -162,7 +314,6 @@ protected:
     int                                         m_NumMotionVolumes;
 
     itk::Statistics::MersenneTwisterRandomVariateGenerator::Pointer m_RandGen;
-    itk::LinearInterpolateImageFunction< ItkDoubleImgType, float >::Pointer   m_DoubleInterpolator;
     itk::Vector<double,3>                       m_NullDir;
 
     Float2DImageType::Pointer                   m_TickImage;

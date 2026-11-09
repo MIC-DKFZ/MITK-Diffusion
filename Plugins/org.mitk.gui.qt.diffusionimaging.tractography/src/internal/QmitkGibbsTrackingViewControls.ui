@@ -25,15 +25,6 @@
   <property name="windowTitle">
    <string>QmitkTemplate</string>
   </property>
-  <property name="styleSheet">
-   <string>QCommandLinkButton:disabled {
-  border: none;
-}
-
-QGroupBox {
-  background-color: transparent;
-}</string>
-  </property>
   <layout class="QFormLayout" name="formLayout">
    <property name="fieldGrowthPolicy">
     <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
@@ -66,7 +57,7 @@ QGroupBox {
        <number>6</number>
       </property>
       <item row="1" column="0">
-       <widget class="QCommandLinkButton" name="m_TrackingStart">
+       <widget class="QPushButton" name="m_TrackingStart">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -87,7 +78,7 @@ QGroupBox {
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QCommandLinkButton" name="m_TrackingStop">
+       <widget class="QPushButton" name="m_TrackingStop">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -752,7 +743,7 @@ QGroupBox {
       <item row="9" column="2">
        <widget class="QSlider" name="m_RandomSeedSlider">
         <property name="toolTip">
-         <string>auto = 1.5 * min. spacing; l</string>
+         <string>Seed of the random generator; auto = a new seed for every run.</string>
         </property>
         <property name="minimum">
          <number>-1</number>
@@ -771,6 +762,45 @@ QGroupBox {
         </property>
         <property name="tickPosition">
          <enum>QSlider::NoTicks</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="0">
+       <widget class="QCheckBox" name="m_ParallelSamplerCheckbox">
+        <property name="toolTip">
+         <string>Run the parallel sampler: blocks of the particle grid on several threads. Much faster on large images. With a fixed seed it gives the same tractogram at any number of threads, but not the same as the serial sampler.</string>
+        </property>
+        <property name="text">
+         <string>Parallel sampler</string>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="1">
+       <widget class="QLabel" name="m_ThreadsLabel">
+        <property name="text">
+         <string>Threads</string>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="2">
+       <widget class="QSpinBox" name="m_ThreadsBox">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="toolTip">
+         <string>Threads of the parallel sampler; all cores: as many as OpenMP uses.</string>
+        </property>
+        <property name="specialValueText">
+         <string>all cores</string>
+        </property>
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>256</number>
+        </property>
+        <property name="value">
+         <number>0</number>
         </property>
        </widget>
       </item>
@@ -805,7 +835,7 @@ QGroupBox {
        <number>6</number>
       </property>
       <item row="0" column="0">
-       <widget class="QCommandLinkButton" name="m_SaveTrackingParameters">
+       <widget class="QPushButton" name="m_SaveTrackingParameters">
         <property name="enabled">
          <bool>true</bool>
         </property>
@@ -826,7 +856,7 @@ QGroupBox {
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QCommandLinkButton" name="m_LoadTrackingParameters">
+       <widget class="QPushButton" name="m_LoadTrackingParameters">
         <property name="enabled">
          <bool>true</bool>
         </property>

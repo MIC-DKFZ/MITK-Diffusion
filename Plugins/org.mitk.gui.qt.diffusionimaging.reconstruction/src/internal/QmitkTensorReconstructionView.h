@@ -14,109 +14,72 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef _QMITKTENSORRECONSTRUCTIONVIEW_H_INCLUDED
-#define _QMITKTENSORRECONSTRUCTIONVIEW_H_INCLUDED
+#ifndef QmitkTensorReconstructionView_h
+#define QmitkTensorReconstructionView_h
 
 #include <QmitkAbstractView.h>
 #include <mitkILifecycleAwarePart.h>
+#include <mitkImage.h>
+#include <mitkWeakPointer.h>
+
+#include <itkImage.h>
 
 #include <string>
 
 #include "ui_QmitkTensorReconstructionViewControls.h"
 
-#include <mitkTensorImage.h>
-#include <mitkImage.h>
-#include <mitkDiffusionPropertyHelper.h>
-#include <itkVectorImage.h>
-
-typedef short DiffusionPixelType;
-
-struct TrSelListener;
-
-/*!
- * \ingroup org_mitk_gui_qt_tensorreconstruction_internal
- *
- * \brief QmitkTensorReconstructionView
- *
- * Document your class here.
+/**
+ * \brief Tensor reconstruction from a DWI, ODFs and DWIs from tensors, and a preview of the
+ * voxels the b0 threshold excludes.
  */
 class QmitkTensorReconstructionView : public QmitkAbstractView, public mitk::ILifecycleAwarePart
 {
-
-  friend struct TrSelListener;
-
-  // this is needed for all Qt objects that should have a MOC object (everything that derives from QObject)
   Q_OBJECT
 
-  public:
-
-    typedef mitk::DiffusionPropertyHelper::GradientDirectionType            GradientDirectionType;
-    typedef mitk::DiffusionPropertyHelper::GradientDirectionsContainerType  GradientDirectionContainerType;
-    typedef mitk::DiffusionPropertyHelper::BValueMapType                    BValueMapType;
-    typedef itk::VectorImage< DiffusionPixelType, 3 >                       ITKDiffusionImageType;
-
+public:
   static const std::string VIEW_ID;
 
-  QmitkTensorReconstructionView();
-  virtual ~QmitkTensorReconstructionView();
+  QmitkTensorReconstructionView() = default;
+  ~QmitkTensorReconstructionView() override;
 
-  virtual void CreateQtPartControl(QWidget *parent) override;
+  void CreateQtPartControl(QWidget *parent) override;
+  void SetFocus() override;
 
-  /// \brief Creation of the connections of main and control widget
-  virtual void CreateConnections();
-
-  ///
-  /// Sets the focus to an internal widget.
-  ///
-  virtual void SetFocus() override;
-
-  /// \brief Called when the view gets activated
-  virtual void Activated() override;
-
-  /// \brief Called when the view gets deactivated
-  virtual void Deactivated() override;
-
-  /// \brief Called when the view becomes visible
-  virtual void Visible() override;
-
-  /// \brief Called when the view becomes hidden
-  virtual void Hidden() override;
-
-  static const int nrconvkernels;
+  void Activated() override {}
+  /** Removes the threshold previews and releases the b0 image they were computed from. */
+  void Deactivated() override;
+  void Visible() override {}
+  void Hidden() override {}
 
 protected slots:
 
   void UpdateGui();
   void TensorsToOdf();
-  void TensorsToDWI();
-  void DoTensorsToDWI();
+  void TensorsToDwi();
   void Advanced1CheckboxClicked();
   void Reconstruct();
-  /**
-   * @brief PreviewThreshold Generates a preview of the values that are cut off by the thresholds
-   * @param threshold
-   */
+  /** Shows the voxels whose mean b0 is below the threshold, which get no tensor. */
   void PreviewThreshold(int threshold);
 
 protected:
+  void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer> &nodes) override;
 
-  void ItkTensorReconstruction();
-  void TeemTensorReconstruction();
-  void TensorReconstructionWithCorr();
+  Ui::QmitkTensorReconstructionViewControls *m_Controls = nullptr;
 
-  virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer part, const QList<mitk::DataNode::Pointer>& nodes) override;
+private:
+  void CreateConnections();
+  /** QmitkReconstructionResults::RunInBackground for this view. */
+  template <typename Work, typename Done>
+  void RunInBackground(const char *title, Work work, Done done);
 
-  Ui::QmitkTensorReconstructionViewControls* m_Controls;
+  /** An action runs in the background. */
+  bool m_Busy = false;
 
-  template<int ndirs> itk::VectorContainer<unsigned int, vnl_vector_fixed<double,3> >::Pointer MakeGradientList();
-
-  template<int L>
-  void TemplatedAnalyticalTensorReconstruction(mitk::Image* vols,
-    float lambda, std::string nodename, std::vector<mitk::DataNode::Pointer>* nodes, int normalization);
+  /** Mean b0 image of the DWI the threshold preview shows, kept while that DWI is unchanged; each
+   * step of the threshold box only thresholds it again. */
+  itk::Image<short, 3>::Pointer m_PreviewB0;
+  mitk::WeakPointer<const mitk::Image> m_PreviewDwi;
+  itk::ModifiedTimeType m_PreviewDwiTime = 0;
 };
 
-
-
-
-#endif // _QMITKTENSORRECONSTRUCTIONVIEW_H_INCLUDED
-
+#endif

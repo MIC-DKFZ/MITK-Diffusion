@@ -1,7 +1,23 @@
 /**
 
-\page org_mitk_views_diffusionquantification Scalar Indices
+\page org_mitk_views_diffusionquantification Diffusion Indices
 
-The scalar indices view allows the calculation of different scalar measures for raw diffusion-weighted images (MD, ADC), tensors (Fractional Anisotropy, Relative Anisotropy, Axial Diffusivity, Radial Diffusivity) or ODFs (Generalized Fractional Anisotropy).
+The diffusion indices view calculates scalar maps of the selected image:
+\li <b>Raw diffusion-weighted image:</b> MD, the mean of the apparent diffusion coefficients -ln(S/S0)/b of the diffusion-weighted volumes, and ADC, the fit of S0 exp(-b ADC) to them; S0 is the mean of the positive b=0 values. The MD of a DWI equals the MD of its tensors only for evenly spread directions and mono-exponential decay.
+\li <b>Tensor image:</b> FA (fractional anisotropy), RA (relative anisotropy, the standard deviation of the eigenvalues divided by their mean, from 0 to sqrt(2); Basser and Pierpaoli 1996), AD (axial diffusivity), RD (radial diffusivity), MD (mean diffusivity) and 1-(λ2+λ3)/(2*λ1).
+\li <b>ODF image</b> (or spherical harmonics image): GFA (generalized fractional anisotropy, Tuch 2004).
+
+Each map is computed in the background: the application stays usable, and the buttons are disabled until the map appears as a new node below the input image. A running computation cannot be stopped: closing the view lets it run to its end and drops its result, and quitting the application waits until it has ended.
+
+"Scale Image Values" multiplies every result by the given factor, for example 1000 to show diffusivities in 10^-3 mm²/s; the level window of the result follows the factor.
+
+\section DiffusionIndicesUse FA for Masks and Cutoffs
+
+The FA (0 to 1) is high where fibers run in one direction (the corpus callosum and the internal capsule reach 0.7 and more) and low in grey matter, in cerebrospinal fluid and where fibers cross. It serves two purposes in tractography: a white matter mask is the FA above 0.2 (0.3 is stricter and leaves out crossing regions), which seeds and confines whole-brain tractography; and the cutoff of the tracking, the FA below which a streamline stops (0.1 lets fibers run into the cortex, 0.2 keeps them in the core of the white matter). The GFA plays the same role for ODF images. MD, AD and RD are diffusivities in mm^2/s (about 0.7 to 0.9 x 10^-3 in white matter, 3 x 10^-3 in cerebrospinal fluid) and serve the characterization of tissue, not the tracking.
+
+\section DiffusionIndicesRest REST Endpoints
+
+\li POST /api/v1/diffusion/reconstruction/tensor-indices with {tensors: uid, indices: ["FA", "MD", "AD", "RD", "RA", "CA"]}: the maps of a tensor image as a job, each added below the tensor image with a level window that fits the index.
+\li POST /api/v1/diffusion/masks/white-matter with {fa: uid, threshold, brain_mask, segmentation}: the white matter mask as a label of a segmentation; POST /api/v1/diffusion/masks/brain with {dwi: uid}: the brain mask of a DWI. See the "Streamline Tractography" manual page.
 
 */

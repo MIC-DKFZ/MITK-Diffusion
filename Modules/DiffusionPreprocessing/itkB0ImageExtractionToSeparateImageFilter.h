@@ -14,94 +14,84 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
-#ifndef ITKB0IMAGEEXTRACTIONTOSEPARATEIMAGEFILTER_H
-#define ITKB0IMAGEEXTRACTIONTOSEPARATEIMAGEFILTER_H
+#ifndef itkB0ImageExtractionToSeparateImageFilter_h
+#define itkB0ImageExtractionToSeparateImageFilter_h
 
-#include "itkImageToImageFilter.h"
+#include <itkImageToImageFilter.h>
+#include <itkVectorContainer.h>
+#include <itkVectorImage.h>
+
+#include <limits>
+#include <vector>
 
 namespace itk
 {
-/** \class B0ImageExtractionToSeparateImageFilter
-   \brief This class has an advanced functionality to the B0ImageExtractionImageFilter, however the b0 images are
-    stored in a 3D+t image with each b0 image beeing a separate timestep and not averaged to a single 3D volume
+  /** \class B0ImageExtractionToSeparateImageFilter
+   * \brief Copies the b0 volumes of a DWI, in their order, into the time steps of a 3D+t image.
+   *
+   * A b0 volume is one whose b-value rounds to 0 (mitk::DiffusionPropertyHelper::IsB0), as for
+   * B0ImageExtractionImageFilter, which averages them instead. Throws if the image has no b0
+   * volume.
    */
-
-template< class TInputImagePixelType,
-          class TOutputImagePixelType >
-class B0ImageExtractionToSeparateImageFilter :
-    public ImageToImageFilter< VectorImage<TInputImagePixelType, 3>,
-    Image< TOutputImagePixelType, 4 > >
-{
-public:
-
-  typedef B0ImageExtractionToSeparateImageFilter  Self;
-  typedef SmartPointer<Self>                      Pointer;
-  typedef SmartPointer<const Self>                ConstPointer;
-
-  typedef TInputImagePixelType                    InputPixelType;
-  typedef TOutputImagePixelType                   OutputPixelType;
-
-  typedef ImageToImageFilter< VectorImage<TInputImagePixelType, 3>,
-      Image< TOutputImagePixelType, 4 > >         Superclass;
-
-  /** typedefs from superclass */
-  typedef typename Superclass::InputImageType     InputImageType;
-  //typedef typename Superclass::OutputImageType    OutputImageType;
-  typedef Image< TOutputImagePixelType, 4 >       OutputImageType;
-
-  typedef typename OutputImageType::RegionType    OutputImageRegionType;
-
-  typedef vnl_vector_fixed< double, 3 >            GradientDirectionType;
-
-  typedef itk::VectorContainer< unsigned int, GradientDirectionType >
-  GradientDirectionContainerType;
-
-  typedef typename GradientDirectionContainerType::ConstIterator GradContainerIteratorType;
-
-  /** Method for creation through the object factory. */
-  itkFactorylessNewMacro(Self)
-  itkCloneMacro(Self)
-
-  /** Runtime information support. */
-  itkTypeMacro(B0ImageExtractionToSeparateImageFilter,
-               ImageToImageFilter);
-
-  GradientDirectionContainerType::ConstPointer GetDirections()
+  template <class TInputImagePixelType, class TOutputImagePixelType>
+  class B0ImageExtractionToSeparateImageFilter
+    : public ImageToImageFilter<VectorImage<TInputImagePixelType, 3>, Image<TOutputImagePixelType, 4>>
   {
-    return m_Directions;
-  }
+  public:
+    using Self = B0ImageExtractionToSeparateImageFilter;
+    using Pointer = SmartPointer<Self>;
+    using ConstPointer = SmartPointer<const Self>;
+    using Superclass = ImageToImageFilter<VectorImage<TInputImagePixelType, 3>, Image<TOutputImagePixelType, 4>>;
 
-  void SetDirections( GradientDirectionContainerType::ConstPointer directions )
-  {
-    this->m_Directions = directions;
-  }
+    using InputPixelType = TInputImagePixelType;
+    using OutputPixelType = TOutputImagePixelType;
+    using InputImageType = typename Superclass::InputImageType;
+    using OutputImageType = Image<TOutputImagePixelType, 4>;
+    using OutputImageRegionType = typename OutputImageType::RegionType;
 
-protected:
+    using GradientDirectionType = vnl_vector_fixed<double, 3>;
+    using GradientDirectionContainerType = itk::VectorContainer<unsigned int, GradientDirectionType>;
 
-  B0ImageExtractionToSeparateImageFilter();
-  virtual ~B0ImageExtractionToSeparateImageFilter(){};
+    /** Method for creation through the object factory. */
+    itkFactorylessNewMacro(Self)
+    itkCloneMacro(Self)
 
-  void GenerateData();
+    /** Runtime information support. */
+    itkTypeMacro(B0ImageExtractionToSeparateImageFilter, ImageToImageFilter);
 
-  /** The dimension of the output does not match the dimension of the input
-    hence we need to re-implement the CopyInformation method to avoid
-    executing the default implementation which tries to copy the input information to the
-    output
-  */
-  virtual void CopyInformation( const DataObject *data);
+    GradientDirectionContainerType::ConstPointer GetDirections()
+    { return m_Directions; }
+    void SetDirections(GradientDirectionContainerType::ConstPointer directions)
+    {
+      this->m_Directions = directions;
+      this->Modified();
+    }
 
-  /** Override of the ProcessObject::GenerateOutputInformation() because of different
-    dimensionality of the input and the output
-  */
-  virtual void GenerateOutputInformation();
+    /** The reference b-value of the gradients; required. */
+    itkSetMacro(ReferenceBValue, double)
+    itkGetConstMacro(ReferenceBValue, double)
 
-  GradientDirectionContainerType::ConstPointer m_Directions;
-};
+  protected:
+    B0ImageExtractionToSeparateImageFilter();
+    ~B0ImageExtractionToSeparateImageFilter() override = default;
 
-} // end namespace itk
+    /** The 3D geometry of the input with one time step of spacing 1 per b0 volume. */
+    void GenerateOutputInformation() override;
+    /** The whole input is copied, the whole output written. */
+    void GenerateInputRequestedRegion() override;
+    void EnlargeOutputRequestedRegion(DataObject* output) override;
+    void GenerateData() override;
+
+    /** Throws for missing or mismatched gradients and for an image without b0 volume. */
+    std::vector<unsigned int> B0Indices() const;
+
+    GradientDirectionContainerType::ConstPointer m_Directions;
+    double m_ReferenceBValue = std::numeric_limits<double>::quiet_NaN();
+  };
+}
 
 #ifndef ITK_MANUAL_INSTANTIATION
 #include "itkB0ImageExtractionToSeparateImageFilter.txx"
 #endif
 
-#endif // ITKB0IMAGEEXTRACTIONTOSEPARATEIMAGEFILTER_H
+#endif

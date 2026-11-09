@@ -14,150 +14,68 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 ===================================================================*/
 
+#ifndef mitkCompositeMapper_h
+#define mitkCompositeMapper_h
 
-#ifndef COMPOSITEMAPPER_H_HEADER_INCLUDED
-#define COMPOSITEMAPPER_H_HEADER_INCLUDED
-
-#include "mitkVtkMapper.h"
-#include "mitkOdfImage.h"
-#include "mitkImageVtkMapper2D.h"
-#include "mitkOdfVtkMapper2D.h"
-#include "mitkLevelWindowProperty.h"
 #include <MitkDiffusionModellingExports.h>
 
-namespace mitk {
+#include <mitkImageVtkMapper2D.h>
+#include <mitkLocalStorageHandler.h>
+#include <mitkOdfVtkMapper2D.h>
+#include <mitkVtkMapper.h>
 
-  class CopyImageMapper2D : public ImageVtkMapper2D
-  {
-  public:
-    mitkClassMacro(CopyImageMapper2D,ImageVtkMapper2D);
-    itkFactorylessNewMacro(Self)
-    itkCloneMacro(Self)
+#include <vtkPropAssembly.h>
+#include <vtkSmartPointer.h>
 
-    friend class CompositeMapper;
-  };
-
-  //##Documentation
-  //## @brief Composite pattern for combination of different mappers
-  //## @ingroup Mapper
+namespace mitk
+{
+  /**
+   * \brief 2D mapper of tensor, ODF and SH images: the colour map of ImageVtkMapper2D with the
+   *        glyphs of OdfVtkMapper2D on top.
+   *
+   * The class name and the image mapper in mapper slot 3 (set by the service activator) are a
+   * contract with MITK: PlaneGeometryDataVtkMapper3D takes the image mapper from slot 3 of nodes
+   * whose 2D mapper is named "CompositeMapper" to texture the slices in the 3D view.
+   */
   class MITKDIFFUSIONMODELLING_EXPORT CompositeMapper : public VtkMapper
   {
   public:
+    mitkClassMacro(CompositeMapper, VtkMapper);
+    itkFactorylessNewMacro(Self);
+    itkCloneMacro(Self);
 
-    mitkClassMacro(CompositeMapper,VtkMapper);
-    itkFactorylessNewMacro(Self)
-    itkCloneMacro(Self)
+    int MitkRenderOverlay(BaseRenderer *renderer) override;
+    int MitkRenderOpaqueGeometry(BaseRenderer *renderer) override;
+    int MitkRenderTranslucentGeometry(BaseRenderer *renderer) override;
+    int MitkRenderVolumetricGeometry(BaseRenderer *renderer) override;
 
-    int MitkRenderOverlay(BaseRenderer* renderer) override
+    void SetDataNode(DataNode *node) override;
+    void Update(BaseRenderer *renderer) override;
+
+    ImageVtkMapper2D::Pointer GetImageMapper();
+
+    vtkProp *GetVtkProp(BaseRenderer *renderer) override;
+    bool HasVtkProp(const vtkProp *prop, BaseRenderer *renderer) override;
+    void ReleaseGraphicsResources(BaseRenderer *renderer) override;
+    bool IsLODEnabled(BaseRenderer *renderer) const override;
+
+    static void SetDefaultProperties(DataNode *node, BaseRenderer *renderer = nullptr, bool overwrite = false);
+
+    class LocalStorage : public Mapper::BaseLocalStorage
     {
-      return m_ImgMapper->MitkRenderOverlay(renderer)
-           + m_OdfMapper->MitkRenderOverlay(renderer);
-    }
-
-    int MitkRenderOpaqueGeometry(BaseRenderer* renderer) override
-    {
-      int rendered = m_ImgMapper->MitkRenderOpaqueGeometry(renderer)
-                   + m_OdfMapper->MitkRenderOpaqueGeometry(renderer);
-      if( mitk::RenderingManager::GetInstance()->GetNextLOD( renderer ) == 0 )
-      {
-        renderer->Modified();
-      }
-      return rendered;
-    }
-
-    int MitkRenderTranslucentGeometry(BaseRenderer* renderer) override
-    {
-      return m_ImgMapper->MitkRenderTranslucentGeometry(renderer)
-           + m_OdfMapper->MitkRenderTranslucentGeometry(renderer);
-    }
-
-    int MitkRenderVolumetricGeometry(BaseRenderer* renderer) override
-    {
-      return m_ImgMapper->MitkRenderVolumetricGeometry(renderer)
-           + m_OdfMapper->MitkRenderVolumetricGeometry(renderer);
-    }
-
-    void SetDataNode(DataNode* node) override
-    {
-      m_DataNode = node;
-      m_ImgMapper->SetDataNode(node);
-      m_OdfMapper->SetDataNode(node);
-    }
-
-    mitk::ImageVtkMapper2D::Pointer GetImageMapper()
-    {
-      ImageVtkMapper2D* retval = m_ImgMapper;
-      return retval;
-    }
-
-    bool HasVtkProp( const vtkProp* prop, BaseRenderer* renderer ) override
-    {
-      return m_OdfMapper->HasVtkProp(prop, renderer);
-    }
-
-    void ReleaseGraphicsResources(mitk::BaseRenderer* renderer) override
-    {
-      m_ImgMapper->ReleaseGraphicsResources(renderer);
-      m_OdfMapper->ReleaseGraphicsResources(renderer);
-    }
-
-    static void SetDefaultProperties(DataNode* node, BaseRenderer* renderer = nullptr, bool overwrite = false )
-    {
-      mitk::OdfVtkMapper2D<float,ODF_SAMPLING_SIZE>::SetDefaultProperties(node, renderer, overwrite);
-      mitk::CopyImageMapper2D::SetDefaultProperties(node, renderer, overwrite);
-
-      mitk::LevelWindow opaclevwin;
-      opaclevwin.SetRangeMinMax(0,255);
-      opaclevwin.SetWindowBounds(0,0);
-      mitk::LevelWindowProperty::Pointer prop = mitk::LevelWindowProperty::New(opaclevwin);
-      node->AddProperty( "opaclevelwindow", prop );
-    }
-
-    bool IsLODEnabled( BaseRenderer * renderer ) const override
-    {
-      return m_ImgMapper->IsLODEnabled(renderer) || m_OdfMapper->IsLODEnabled(renderer);
-    }
-
-    vtkProp* GetVtkProp(mitk::BaseRenderer* renderer) override
-    {
-      m_PropAssembly = vtkSmartPointer<vtkPropAssembly>::New();
-      m_PropAssembly->AddPart( m_OdfMapper->GetVtkProp(renderer));
-      m_PropAssembly->AddPart( m_ImgMapper->GetVtkProp(renderer));
-      return m_PropAssembly;
-    }
+    public:
+      vtkSmartPointer<vtkPropAssembly> m_PropAssembly = vtkSmartPointer<vtkPropAssembly>::New();
+    };
 
   protected:
-
-    void Update(mitk::BaseRenderer* renderer) override
-    {
-      m_OdfMapper->Update(renderer);
-      GenerateDataForRenderer(renderer);
-    }
-
-    void GenerateDataForRenderer(mitk::BaseRenderer* renderer) override
-    {
-      m_ImgMapper->GenerateDataForRenderer(renderer);
-//      if( mitk::RenderingManager::GetInstance()->GetNextLOD( renderer ) > 0 )
-//      {
-//        m_OdfMapper->GenerateDataForRenderer(renderer);
-//      }
-    }
-
     CompositeMapper();
-
-    ~CompositeMapper() override;
+    ~CompositeMapper() override = default;
 
   private:
-
-    mitk::OdfVtkMapper2D<float,ODF_SAMPLING_SIZE>::Pointer m_OdfMapper;
-    mitk::CopyImageMapper2D::Pointer m_ImgMapper;
-    vtkSmartPointer<vtkPropAssembly> m_PropAssembly;
-
+    OdfVtkMapper2D::Pointer m_OdfMapper;
+    ImageVtkMapper2D::Pointer m_ImgMapper;
+    LocalStorageHandler<LocalStorage> m_LSH;
   };
+}
 
-} // namespace mitk
-
-
-
-#endif /* COMPOSITEMAPPER_H_HEADER_INCLUDED */
-
+#endif

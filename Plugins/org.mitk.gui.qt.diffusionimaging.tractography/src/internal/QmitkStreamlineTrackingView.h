@@ -30,6 +30,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerTensor.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerPeaks.h>
 #include <Algorithms/TrackingHandlers/mitkTrackingHandlerOdf.h>
+#include <memory>
 #include <random>
 #include <mitkPointSet.h>
 #include <mitkPointSetShapeProperty.h>
@@ -90,6 +91,7 @@ public:
   TrackerType::Pointer              m_Tracker;
   QmitkStreamlineTrackingWorker     m_TrackingWorker;
   QThread                           m_TrackingThread;
+  std::string                       m_TrackingError;  ///< set by the worker thread, shown by AfterThread
 
   virtual void Activated() override;
   virtual void Deactivated() override;
@@ -135,18 +137,17 @@ private:
   mitk::DataNode::Pointer                 m_InteractivePointSetNode;
 
   std::vector< mitk::DataNode::Pointer >  m_InputImageNodes; ///< input image nodes
-  std::vector< mitk::Image::ConstPointer >     m_AdditionalInputImages;
   bool                                    m_FirstTensorProbRun;
   bool                                    m_FirstInteractiveRun;
 
-  mitk::TrackingDataHandler*              m_TrackingHandler;
+  std::unique_ptr<mitk::TrackingDataHandler> m_TrackingHandler;  ///< m_Tracker borrows it
   bool                                    m_ThreadIsRunning;
   QTimer*                                 m_TrackingTimer;
   bool                                    m_DeleteTrackingHandler;
   QmitkSliceNavigationListener            m_SliceChangeListener;
   bool                                    m_Visible;
   mitk::DataNode::Pointer                 m_LastPrior;
-  mitk::TrackingDataHandler*              m_TrackingPriorHandler;
+  std::unique_ptr<mitk::TrackingDataHandler> m_TrackingPriorHandler;  ///< m_Tracker borrows it
   std::map< QString, std::string >        m_LastTractoParams;
   QString                                 m_ParameterFile;
 };

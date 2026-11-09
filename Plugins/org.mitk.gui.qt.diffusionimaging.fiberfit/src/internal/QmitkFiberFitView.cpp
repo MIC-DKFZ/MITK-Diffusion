@@ -20,6 +20,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 
 #include "QmitkFiberFitView.h"
 
+#include <QmitkDiffusionViewControlsGuard.h>
+
 #include <mitkNodePredicateDataType.h>
 #include <mitkImageCast.h>
 #include <mitkImageAccessByItk.h>
@@ -33,6 +35,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateDimension.h>
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateOr.h>
+#include <mitkNodePredicateIsDWI.h>
+#include <QMessageBox>
 
 const std::string QmitkFiberFitView::VIEW_ID = "org.mitk.views.fiberfit";
 using namespace mitk;
@@ -47,7 +51,7 @@ QmitkFiberFitView::QmitkFiberFitView()
 // Destructor
 QmitkFiberFitView::~QmitkFiberFitView()
 {
-
+  delete m_Controls;
 }
 
 void QmitkFiberFitView::CreateQtPartControl( QWidget *parent )
@@ -57,6 +61,7 @@ void QmitkFiberFitView::CreateQtPartControl( QWidget *parent )
   {
     // create GUI widgets from the Qt Designer's .ui file
     m_Controls = new Ui::QmitkFiberFitViewControls;
+    QmitkDiffusionViewControlsGuard::Install(parent, this);
     m_Controls->setupUi( parent );
 
     connect( m_Controls->m_StartButton, SIGNAL(clicked()), this, SLOT(StartFit()) );
@@ -72,7 +77,10 @@ void QmitkFiberFitView::CreateQtPartControl( QWidget *parent )
     m_Controls->m_TractBox->SetPredicate(isFib);
 
     m_Controls->m_ImageBox->SetDataStorage(this->GetDataStorage());
-    m_Controls->m_ImageBox->SetPredicate( mitk::NodePredicateOr::New( mitk::NodePredicateAnd::New(isImage, is3D), mitk::TNodePredicateDataType<mitk::PeakImage>::New()) );
+    // scalar images, peak images and DWIs (StartFit); the dimension predicate takes only images
+    // with one component, so DWIs need their own predicate
+    auto isScalarOrPeakImage = mitk::NodePredicateOr::New(mitk::NodePredicateAnd::New(isImage, is3D), mitk::TNodePredicateDataType<mitk::PeakImage>::New());
+    m_Controls->m_ImageBox->SetPredicate( mitk::NodePredicateOr::New(isScalarOrPeakImage, mitk::NodePredicateIsDWI::New()) );
 
     DataSelectionChanged();
   }
@@ -96,9 +104,11 @@ void QmitkFiberFitView::StartFit()
   if (m_Controls->m_TractBox->GetSelectedNode().IsNull() || m_Controls->m_ImageBox->GetSelectedNode().IsNull())
     return;
 
-  mitk::FiberBundle::Pointer input_tracts = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_TractBox->GetSelectedNode()->GetData())->GetDeepCopy();
+  mitk::FiberBundle::Pointer input_tracts = dynamic_cast<mitk::FiberBundle*>(m_Controls->m_TractBox->GetSelectedNode()->GetData())->Clone();
 
   mitk::DataNode::Pointer node = m_Controls->m_ImageBox->GetSelectedNode();
+  // the fitter keeps a raw pointer to the signal model; declared first, the model outlives it
+  mitk::TensorModel<> model;
   itk::FitFibersToImageFilter::Pointer fitter = itk::FitFibersToImageFilter::New();
 
   mitk::Image::Pointer mitk_image = dynamic_cast<mitk::Image*>(node->GetData());
@@ -117,13 +127,13 @@ void QmitkFiberFitView::StartFit()
     if (mitk::DiffusionPropertyHelper::IsDiffusionWeightedImage(mitk_image))
     {
       fitter->SetDiffImage(mitk::DiffusionPropertyHelper::GetItkVectorImage(mitk_image));
-      mitk::TensorModel<>* model = new mitk::TensorModel<>();
-      model->SetBvalue(1000);
-      model->SetDiffusivity1(0.0010);
-      model->SetDiffusivity2(0.00015);
-      model->SetDiffusivity3(0.00015);
-      model->SetGradientList(mitk::DiffusionPropertyHelper::GetGradientContainer(mitk_image));
-      fitter->SetSignalModel(model);
+      // the gradient norms encode sqrt(b/b_ref), so the model needs the image's reference b-value
+      model.SetBvalue(mitk::DiffusionPropertyHelper::GetReferenceBValue(mitk_image));
+      model.SetDiffusivity1(0.0010);
+      model.SetDiffusivity2(0.00015);
+      model.SetDiffusivity3(0.00015);
+      model.SetGradientList(mitk::DiffusionPropertyHelper::GetGradientContainer(mitk_image));
+      fitter->SetSignalModel(&model);
     }
     else
     {
@@ -151,7 +161,15 @@ void QmitkFiberFitView::StartFit()
   fitter->SetGradientTolerance(1e-5);
   fitter->SetLambda(m_Controls->m_ReguBox->value());
   fitter->SetFilterOutliers(m_Controls->m_OutliersBox->isChecked());
-  fitter->Update();
+  try
+  {
+    fitter->Update();
+  }
+  catch (const std::exception& e)
+  {
+    QMessageBox::warning(nullptr, "Fit failed", e.what());
+    return;
+  }
 
   mitk::FiberBundle::Pointer output_tracts = fitter->GetTractograms().at(0);
   output_tracts->ColorFibersByFiberWeights(false, mitk::LookupTable::JET);

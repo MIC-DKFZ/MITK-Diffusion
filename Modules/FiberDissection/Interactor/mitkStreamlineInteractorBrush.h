@@ -62,6 +62,14 @@ namespace mitk
       void SetPositiveNode(DataNode *node);
       void LabelfromPrediction(bool predlabeling);
 
+      /** Moves fiber fiberId of source to the end of target; with target null, only removes it
+       *  from source. Both bundles get new fiber polydata and weights (SetFiberPolyData,
+       *  SetFiberWeights): label bundles edited in place keep their old fiber count and weights,
+       *  and SubsetByIds or AddBundle on them throw when the classifier is trained. Weights travel
+       *  with the fibers; both bundles are coloured by orientation afterwards. Throws if fiberId
+       *  is not a fiber of source. */
+      static void MoveFiber(FiberBundle *source, FiberBundle *target, unsigned int fiberId);
+
   protected:
 
        void AddStreamlineNegBundle(StateMachineAction *, InteractionEvent *interactionEvent);
@@ -74,6 +82,9 @@ namespace mitk
        bool CheckSelection(const InteractionEvent *interactionEvent);
 
        void SelectStreamline(StateMachineAction *, InteractionEvent *);
+
+       /** The id of the fiber of the interactor's data node under the mouse, -1 if none. */
+       vtkIdType PickFiber(const InteractionEvent *interactionEvent);
 
 
        std::map<BaseRenderer *, vtkSmartPointer<vtkCellPicker>> m_Picker;
@@ -104,7 +115,7 @@ namespace mitk
     mitk::FiberBundle::Pointer            m_NegStreamline;
     mitk::FiberBundle::Pointer            m_PosStreamline;
     mitk::FiberBundle::Pointer            m_manStreamline;
-    bool                                  m_predlabeling;
+    bool                                  m_predlabeling = false;
 //    mitk::FiberBundle::Pointer            m_visualStreamline;
     mitk::DataNode::Pointer               m_NegStreamlineNode;
     mitk::DataNode::Pointer               m_PosStreamlineNode;

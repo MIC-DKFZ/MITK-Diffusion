@@ -28,7 +28,6 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkTestingComparisonImageFilter.h>
 #include <itkImageRegionConstIterator.h>
 #include <mitkRicianNoiseModel.h>
-#include <mitkChiSquareNoiseModel.h>
 #include <mitkIOUtil.h>
 #include <mitkDiffusionPropertyHelper.h>
 #include <mitkProperties.h>
@@ -37,6 +36,7 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <itkVectorImage.h>
 #include <mitkPreferenceListReaderOptionsFunctor.h>
 
+#include "mitkDiffusionTestData.h"
 #include "mitkTestFixture.h"
 
 class mitkFiberfoxSignalGenerationBrainSliceTestSuite : public mitk::TestFixture
@@ -48,6 +48,7 @@ class mitkFiberfoxSignalGenerationBrainSliceTestSuite : public mitk::TestFixture
   MITK_TEST(Test3);
   MITK_TEST(Test4);
   MITK_TEST(Test5);
+  MITK_TEST(Test4Exact);
   CPPUNIT_TEST_SUITE_END();
 
   typedef itk::VectorImage< short, 3>   ItkDwiType;
@@ -57,13 +58,13 @@ private:
 public:
 
   /** Members used inside the different (sub-)tests. All members are initialized via setUp().*/
-  FiberBundle::Pointer m_FiberBundle;
+  mitk::FiberBundle::Pointer m_FiberBundle;
   mitk::Image::Pointer m_Template;
 
   void setUp() override
   {
-    m_FiberBundle = mitk::IOUtil::Load<FiberBundle>(GetTestDataFilePath("DiffusionImaging/Fiberfox/SignalGen_BrainSlice.fib"));
-    m_Template = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/SignalGen_BrainSliceTemplate.nii.gz"));
+    m_FiberBundle = mitk::IOUtil::Load<mitk::FiberBundle>(mitk::GetDiffusionTestDataFilePath("Fiberfox/SignalGen_BrainSlice.fib"));
+    m_Template = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/SignalGen_BrainSliceTemplate.nii.gz"));
   }
 
   void adjust_to_template(mitk::FiberfoxParameters& parameters)
@@ -82,10 +83,19 @@ public:
 
   }
 
-  bool CompareDwi(itk::VectorImage< short, 3 >* dwi1, itk::VectorImage< short, 3 >* dwi2)
+  /** True if no value differs by more than maxDifference. */
+  bool CompareDwi(itk::VectorImage< short, 3 >* dwi1, itk::VectorImage< short, 3 >* dwi2, short maxDifference)
   {
     bool out = true;
     typedef itk::VectorImage< short, 3 > DwiImageType;
+    // the iterators below walk both images in step
+    if (dwi1->GetLargestPossibleRegion().GetSize() != dwi2->GetLargestPossibleRegion().GetSize()
+        || dwi1->GetVectorLength() != dwi2->GetVectorLength())
+    {
+      MITK_INFO << "Image size " << dwi1->GetLargestPossibleRegion().GetSize() << " x " << dwi1->GetVectorLength()
+                << " differs from the reference size " << dwi2->GetLargestPossibleRegion().GetSize() << " x " << dwi2->GetVectorLength();
+      return false;
+    }
     try{
       itk::ImageRegionIterator< DwiImageType > it1(dwi1, dwi1->GetLargestPossibleRegion());
       itk::ImageRegionIterator< DwiImageType > it2(dwi2, dwi2->GetLargestPossibleRegion());
@@ -96,7 +106,7 @@ public:
         {
           short d = abs(it1.Get()[i]-it2.Get()[i]);
 
-          if (d>1)
+          if (d>maxDifference)
           {
             if (count<10)
             {
@@ -120,7 +130,8 @@ public:
     return out;
   }
 
-  void StartSimulation(FiberfoxParameters parameters, mitk::Image::Pointer refImage, std::string out)
+  /** maxDifference 1 allows rounding of the int16 output to differ; 0 asks for the reference bit for bit. */
+  void StartSimulation(mitk::FiberfoxParameters parameters, mitk::Image::Pointer refImage, std::string out, short maxDifference = 1)
   {
     itk::TractsToDWIImageFilter< short >::Pointer tractsToDwiFilter = itk::TractsToDWIImageFilter< short >::New();
     tractsToDwiFilter->SetUseConstantRandSeed(true);
@@ -136,14 +147,14 @@ public:
 
     if (refImage.IsNotNull())
     {
-      if(mitk::DiffusionPropertyHelper::GetGradientContainer(refImage).IsNotNull() )
+      CPPUNIT_ASSERT_MESSAGE("Reference should be a diffusion-weighted image", mitk::DiffusionPropertyHelper::GetGradientContainer(refImage).IsNotNull());
       {
         ItkDwiType::Pointer itkTestImagePointer = ItkDwiType::New();
         mitk::CastToItkImage(testImage, itkTestImagePointer);
         ItkDwiType::Pointer itkRefImagePointer = ItkDwiType::New();
         mitk::CastToItkImage(refImage, itkRefImagePointer);
 
-        bool cond = CompareDwi(itkTestImagePointer, itkRefImagePointer);
+        bool cond = CompareDwi(itkTestImagePointer, itkRefImagePointer, maxDifference);
         if (!cond)
         {
           MITK_INFO << "Saving test image to " << mitk::IOUtil::GetTempPath() + mitk::IOUtil::GetDirectorySeparator() + out;
@@ -157,53 +168,71 @@ public:
 
   void Test1()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_1.ffp"), true);
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_1.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
 
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_1_OUT.nii.gz"), &functor);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_1_OUT_v2.nii.gz"), &functor);
     StartSimulation(parameters, refImage, "BrainSlice_1_OUT.nii.gz");
   }
 
   void Test2()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_2.ffp"), true);
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_2.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_2_OUT.nii.gz"), &functor);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_2_OUT_v3.nii.gz"), &functor);
     StartSimulation(parameters, refImage, "BrainSlice_2_OUT.nii.gz");
   }
 
   void Test3()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_3.ffp"), true);
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_3.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_3_OUT.nii.gz"), &functor);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_3_OUT_v2.nii.gz"), &functor);
     StartSimulation(parameters, refImage, "BrainSlice_3_OUT.nii.gz");
   }
 
   void Test4()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_4.ffp"), true);
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_4.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_4_OUT.nii.gz"), &functor);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_4_OUT_v4.nii.gz"), &functor);
     StartSimulation(parameters, refImage, "BrainSlice_4_OUT.nii.gz");
   }
 
   void Test5()
   {
-    FiberfoxParameters parameters;
-    parameters.LoadParameters(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_5.ffp"), true);
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5_v2.ffp"), true);
     adjust_to_template(parameters);
     mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
-    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(GetTestDataFilePath("DiffusionImaging/Fiberfox/params/BrainSlice_5_OUT.nii.gz"), &functor);
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_5_OUT_v4.nii.gz"), &functor);
     StartSimulation(parameters, refImage, "BrainSlice_5_OUT.nii.gz");
+  }
+
+  /**
+   * The reference of BrainSlice_4 (eddy currents) was simulated with the exact sum of the k-space
+   * phase, which is not the default (Test4 simulates with the time segments). The exact sum
+   * reproduces it within 1, as before #47: 145 values differ by 1 from a reference older than the
+   * current code, while the exact path itself gives the same image bit for bit as before #47.
+   * mitkFiberfoxSignalGenerationTest checks the exact sum bit for bit (param1, param6, param8).
+   */
+  void Test4Exact()
+  {
+    mitk::FiberfoxParameters parameters;
+    parameters.LoadParameters(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_4.ffp"), true);
+    parameters.m_SignalGen.m_KspaceTimeSegments = 0;
+    adjust_to_template(parameters);
+    mitk::PreferenceListReaderOptionsFunctor functor = mitk::PreferenceListReaderOptionsFunctor({"Diffusion Weighted Images"}, std::vector<std::string>());
+    mitk::Image::Pointer refImage = mitk::IOUtil::Load<mitk::Image>(mitk::GetDiffusionTestDataFilePath("Fiberfox/params/BrainSlice_4_OUT_v4.nii.gz"), &functor);
+    StartSimulation(parameters, refImage, "BrainSlice_4_OUT_exact.nii.gz");
   }
 
 };

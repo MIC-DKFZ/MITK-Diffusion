@@ -1,18 +1,30 @@
 /**
 \page org_mitk_views_tensorreconstruction Tensor Reconstruction
 
-The tensor reconstruction view allows ITK based tensor reconstruction [3]. The advanced settings for ITK reconstruction let you configure a manual threshold on the non-diffusion weighted image. All voxels below this threshold will not be reconstructed and left blank. It is also possible to check for negative eigenvalues. The according voxels are also left blank.
+The tensor view reconstructs diffusion tensors from a diffusion-weighted image (DWI). Select the DWI as "Diffusion-weighted Image", choose the method under "Advanced Settings" and press "Start Reconstruction":
+\li <b>ITK Linear Least Squares:</b> a linear least-squares fit of the log-signal. Every volume is fitted with its own b-value, so DWIs with several shells are fitted correctly. "Ignore voxels with negative eigenvalues" leaves voxels whose tensor has a negative eigenvalue empty.
+\li <b>With correction for negative eigenvalues:</b> the fit is repeated after smoothing the signal of voxels whose tensor has a negative eigenvalue; voxels that still have one are left empty.
 
-\imageMacro{tensor1.png,"ITK tensor reconstruction", 9.97}
+Volumes whose b-value rounds to 0 are the baseline volumes; their mean is the non-diffusion weighted signal of a voxel. Voxels whose mean baseline signal is below the "B0 Threshold" are not reconstructed; while the threshold is changed, the excluded voxels are shown as an overlay on the DWI.
 
-A few seconds (depending on the image size) after the reconstruction button is hit, a colored image should appear in the main window.
+The reconstruction runs in the background: the application stays usable, and the buttons of the view are disabled until the result appears as a new node below the DWI (depending on the image size and method, after a few seconds to minutes). The same holds for the images generated from tensors below. A running computation cannot be stopped: closing the view lets it run to its end and drops its result, and quitting the application waits until it has ended.
 
 \imageMacro{tensor4.png,"Tensor image after reconstruction",16.00}
 
-To assess the quality of the tensor fit it has been proposed to calculate the model residual [9]. This calculates the residual between the measured signal and the signal predicted by the model. Large residuals indicate an inadequacy of the model or the presence of artefacts in the signal intensity (noise, head motion, etc.). To use this option: Select a DWI dataset, estimate a tensor, select both the DWI node and the tensor node in the datamanager and press Residual Image Calculation. MITK Diffusion can show the residual for every voxel averaged over all volumes or (in the plot widget) summarized per volume or for every slice in every volume. Clicking in the widget where the residual is shown per slice will automatically let the cross-hair jump to that position in the DWI dataset. If Percentage of outliers is checked, the per volume plot will show the percentage of outliers per volume. Otherwise it will show the mean together with the first and third quantile of residuals. See [9] for more information.
+The view also generates images from a tensor image:
+\li <b>ODF Image from Tensors:</b> the ODFs are initialized directly from the tensor values and normalized.
+\li <b>Diffusion-weighted Image from Tensors:</b> a DWI with the chosen b-value and number of gradient directions (the directions are subdivisions of an icosahedron) and one baseline volume. The baseline signal is the l2-norm of the tensor; the diffusion-weighted volumes follow the tensor model.
 
-\imageMacro{residuals.png,"The residual widget",16.00}
+\section TensorReconstructionUse When to Use Tensors
 
-The view also allows the generation of artificial diffusion weighted or ODF images from the selected tensor image. The ODFs of the Q-Ball image are directly initialized from the tensor values and afterwards normalized. The diffusion weighted image is estimated using the l2-norm image of the tensor image as B0. The gradient images are afterwards generated using the standard tensor equation.
+The tensor is the simplest model: one ellipsoid per voxel, whose principal axis is the main fiber direction and whose shape gives the FA (\ref org_mitk_views_diffusionquantification). It needs only six or more gradient directions at one b-value (typically 1000 s/mm^2), is robust to noise and is the basis of FA maps, of the colour-coded FA map and of deterministic tractography of compact bundles. It cannot represent crossing fibers: where bundles cross, the tensor is flat (low FA, no clear direction), and tractography stops or turns into the wrong bundle. For such regions, reconstruct Q-ball ODFs and peaks (\ref org_mitk_views_qballreconstruction, \ref org_mitk_views_odfmaximaextraction); the choice is discussed in "Choosing the Model and the Method" of the "Streamline Tractography" manual page.
+
+The tensor image renders as a colour-coded FA map in the 2D views: each voxel gets the colour of its principal direction (red left-right, green anterior-posterior, blue superior-inferior) scaled by its FA. This is the map on which the ROIs of a tract are placed.
+
+\section TensorReconstructionRest REST Endpoints
+
+\li POST /api/v1/diffusion/reconstruction/tensors with {dwi: uid, fit: "lls" or "eigenvalue_correction", b0_threshold, zero_negative_eigenvalues}: the reconstruction of this view as a job; the tensor image is added below the DWI, named as the view names it.
+\li POST /api/v1/diffusion/reconstruction/color-fa with {tensors: uid}: the colour-coded FA map as an RGB image below the tensor image, for screenshots.
+\li The scalar maps (FA, MD, ...) of a tensor image: POST /api/v1/diffusion/reconstruction/tensor-indices, see \ref org_mitk_views_diffusionquantification.
 
 */

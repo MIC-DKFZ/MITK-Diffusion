@@ -43,7 +43,6 @@ public:
 
 
   void InitForTracking() override;     ///< calls InputDataValidForTracking() and creates feature images
-  vnl_vector_fixed<float,3> ProposeDirection(const itk::Point<float, 3>& pos, std::deque< vnl_vector_fixed<float,3> >& olddirs, itk::Index<3>& oldIndex) override;  ///< predicts next progression direction at the given position
   bool WorldToIndex(itk::Point<float, 3>& pos, itk::Index<3>& index) override;
 
   void AddTensorImage( ItkTensorImageType::ConstPointer img ){ m_TensorImages.push_back(img); DataModified(); }
@@ -54,12 +53,16 @@ public:
   int GetNumTensorImages() const { return m_TensorImages.size(); }
 
 
-  ItkUcharImgType::SpacingType GetSpacing() override{ return m_FaImage->GetSpacing(); }
-  itk::Point<float,3> GetOrigin() override{ return m_FaImage->GetOrigin(); }
-  ItkUcharImgType::DirectionType GetDirection() override{ return m_FaImage->GetDirection(); }
-  ItkUcharImgType::RegionType GetLargestPossibleRegion() override{ return m_FaImage->GetLargestPossibleRegion(); }
+  // The tensor grid is the tracking grid; the FA image is read through its interpolator and may have another grid.
+  ItkUcharImgType::SpacingType GetSpacing() override{ return m_TensorImages.at(0)->GetSpacing(); }
+  itk::Point<float,3> GetOrigin() override{ return m_TensorImages.at(0)->GetOrigin(); }
+  ItkUcharImgType::DirectionType GetDirection() override{ return m_TensorImages.at(0)->GetDirection(); }
+  ItkUcharImgType::RegionType GetLargestPossibleRegion() override{ return m_TensorImages.at(0)->GetLargestPossibleRegion(); }
 
 protected:
+
+  bool PassesCutoff(const itk::Point<float, 3>& pos) override;  ///< FA at pos >= cutoff
+  TrackingDirectionType ProposeDataDirection(const itk::Point<float, 3>& pos, const TrackingDirectionType& oldDir) override;
 
   vnl_vector_fixed<float,3> GetMatchingDirection(itk::Index<3> idx, vnl_vector_fixed<float,3>& oldDir, int& image_num);
   vnl_vector_fixed<float,3> GetDirection(itk::Point<float, 3> itkP, vnl_vector_fixed<float,3> oldDir, TensorType& tensor);

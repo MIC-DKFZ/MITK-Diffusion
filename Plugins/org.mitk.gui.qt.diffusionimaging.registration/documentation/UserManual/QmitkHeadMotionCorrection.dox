@@ -1,5 +1,13 @@
 /**
 \page org_mitk_views_headmotioncorrectionview Head-Motion Correction
 
-This view allows head-motion and eddy-current correction by affinely registering all volumes to the first unweighted volume of the complete diffusion-weighted image. The individual gradient directions are roated accordingly.
+This view corrects head motion and eddy-current distortions in a diffusion-weighted image (DWI).
+The reference is the first volume of the shell with the lowest b-value, usually a b0 volume. Every
+other volume is registered to it with an affine transformation (MatchPoint's multi-modal affine
+algorithm) and resampled with B-spline interpolation. The gradient direction of each volume is
+rotated with the rotation part of its transformation. The corrected DWI keeps the volume order of
+the input and appears below it, named "_Corrected".
+
+The correction runs in the background, so MITK stays usable meanwhile; it takes about as many
+registrations as the DWI has volumes. If it fails, a message shows the reason.
 */

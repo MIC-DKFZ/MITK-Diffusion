@@ -22,16 +22,14 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkPlanarFigure.h>
 #include <mitkPlanarFigureComposite.h>
 #include <mitkFiberBundle.h>
+#include <mitkFiberBundleIOHelper.h>
 #include <mitkImageCast.h>
 #include <mitkImageToItk.h>
 #include <mitkStandaloneDataStorage.h>
 #include <itksys/SystemTools.hxx>
+#include <mitkDiffusionDataIOHelper.h>
 #include <itkFiberExtractionFilter.h>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
-
-typedef itksys::SystemTools ist;
 typedef itk::Image<float, 3>    ItkFloatImgType;
 
 ItkFloatImgType::Pointer LoadItkImage(const std::string& filename)
@@ -57,8 +55,8 @@ int main(int argc, char* argv[])
   parser.setArgumentPrefix("--", "-");
 
   parser.beginGroup("1. Mandatory arguments:");
-  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.dcm)", us::Any(), false);
-  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output root", us::Any(), false);
+  parser.addArgument("", "i", mitkCommandLineParser::String, "Input:", "input tractogram (.fib/.trk/.tck/.trx/.dcm)", us::Any(), false);
+  parser.addArgument("", "o", mitkCommandLineParser::String, "Output:", "output tractogram (.trk if the name has no extension of a known file type); with labels, _LABEL is inserted before the extension", us::Any(), false);
   parser.addArgument("rois", "", mitkCommandLineParser::StringList, "ROI images:", "ROI images", us::Any(), false);
   parser.endGroup();
 
@@ -160,19 +158,18 @@ int main(int argc, char* argv[])
   try
   {
     // load fiber bundle
-    mitk::FiberBundle::Pointer inputTractogram = mitk::IOUtil::Load<mitk::FiberBundle>(inFib);
+    mitk::FiberBundle::Pointer inputTractogram = mitk::FiberBundleIOHelper::load_fib(inFib);
 
-    std::streambuf *old = std::cout.rdbuf(); // <-- save
-    std::stringstream ss;
-    std::cout.rdbuf (ss.rdbuf());       // <-- redirect
     std::vector< ItkFloatImgType::Pointer > roi_images;
     std::vector< std::string > roi_names;
-    for (std::size_t i=0; i<roi_files.size(); ++i)
     {
-      roi_images.push_back( LoadItkImage(roi_files.at(i)) );
-      roi_names.push_back(itksys::SystemTools::GetFilenameWithoutExtension(roi_files.at(i)));
+      mitk::CoutSilencer silencer;
+      for (std::size_t i=0; i<roi_files.size(); ++i)
+      {
+        roi_images.push_back( LoadItkImage(roi_files.at(i)) );
+        roi_names.push_back(mitk::DiffusionDataIOHelper::GetNameWithoutExtension(roi_files.at(i)));
+      }
     }
-    std::cout.rdbuf (old);              // <-- restore
     MITK_INFO << "Loaded " << roi_images.size() << " ROI images.";
 
     std::vector< ItkFloatImgType* > roi_images2;
@@ -213,10 +210,10 @@ int main(int argc, char* argv[])
       extractor->SetInputType(itk::FiberExtractionFilter<float>::INPUT::LABEL_MAP);
     extractor->Update();
 
-    std::string ext = itksys::SystemTools::GetFilenameExtension(outFib);
+    std::string ext = mitk::DiffusionDataIOHelper::GetExtension(outFib);
     if (ext.empty())
       ext = ".trk";
-    outFib = itksys::SystemTools::GetFilenamePath(outFib) + '/' + itksys::SystemTools::GetFilenameWithoutExtension(outFib);
+    outFib = mitk::DiffusionDataIOHelper::GetPathWithoutExtension(outFib);
     if (invert)
       mitk::IOUtil::Save(extractor->GetNegatives().at(0), outFib + ext);
     else
@@ -258,12 +255,12 @@ int main(int argc, char* argv[])
   }
   catch (const itk::ExceptionObject& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (std::exception& e)
   {
-    std::cout << e.what();
+    std::cout << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   catch (...)

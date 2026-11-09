@@ -1,4 +1,5 @@
 MITK_CREATE_MODULE_TESTS()
+include(mitkDiffusionTestData)
 
 mitkAddCustomModuleTest(mitkStreamlineTractographyTest mitkStreamlineTractographyTest)
 mitkAddCustomModuleTest(mitkGlobalTractographyTest mitkGlobalTractographyTest)
